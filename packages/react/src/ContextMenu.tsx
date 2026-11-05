@@ -37,6 +37,8 @@ import {
   placeSubmenu,
   submenuPanelKey,
   translateKeyOrText,
+  inFixedView,
+  placeInFixedFrame,
 } from '@pptx-editor.dev/core/editor';
 import { PptxEditorContext, TranslationContext } from './context.ts';
 
@@ -110,12 +112,11 @@ export function ContextMenu({
     const panel = ref.current;
     if (!panel) return;
     setPos(
-      placeInViewport(
-        at,
-        panel.offsetWidth,
-        panel.offsetHeight,
-        window.innerWidth,
-        window.innerHeight
+      placeInFixedFrame(
+        panel.parentElement,
+        { width: panel.offsetWidth, height: panel.offsetHeight },
+        (size, view) =>
+          placeInViewport(inFixedView(at, view), size.width, size.height, view.width, view.height)
       )
     );
   }, [at]);
@@ -341,10 +342,10 @@ export function MenuSubmenu(props: MenuSubmenuProps) {
     const p = panel.current;
     if (!open || !r || !p) return;
     setPos(
-      placeSubmenu(
-        r,
+      placeInFixedFrame(
+        p.parentElement,
         { width: p.offsetWidth, height: p.offsetHeight },
-        { width: window.innerWidth, height: window.innerHeight }
+        (size, view) => placeSubmenu(inFixedView(r, view), size, view)
       )
     );
   }, [open]);

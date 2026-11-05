@@ -137,6 +137,13 @@ export {
   type PopoverPlacement,
 } from './chrome-popover.ts';
 export {
+  inFixedView,
+  placeInFixedFrame,
+  type FixedPoint,
+  type FixedSize,
+  type FixedView,
+} from './fixed-frame.ts';
+export {
   NOTES_SLOTS,
   colorPickLabel,
   cssFontFamily,

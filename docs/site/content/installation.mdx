@@ -41,7 +41,7 @@ The editor runs in the browser. It needs the FontFace API and WebAssembly for te
 
 ## Add styles and a container
 
-Import the stylesheet once. It holds every chrome style and the `--doc-*` tokens. Each adapter also exports it as `styles.css`.
+Import the stylesheet once. It holds every chrome style and the `--doc-*` tokens. Each adapter also exports it as `styles.css`. Import it after your app's CSS reset.
 
 ```ts
 import '@pptx-editor.dev/core/styles/editor.css';
@@ -56,6 +56,23 @@ The default editor fills the height of its parent, so give the parent a height:
 ```
 
 To theme the chrome, see [Appearance](/docs/customization/appearance). The slides always show the deck's own colors.
+
+## Embed in a page
+
+The editor shares the page with your app:
+
+- Every rule in the stylesheet selects a `pptx-` class first. The rules do not style elements outside the editor.
+- The editor chrome sets the styles it needs. A CSS reset in your app, such as Tailwind preflight, does not change it.
+- Menus, popovers, and tooltips open at their controls in a container with a `transform`, `filter`, or scale. A drawer or a sheet is an example.
+- In a container that clips its overflow, menus stay in the visible part of the container.
+- Ctrl/Cmd+F and Ctrl/Cmd+H open the find bar when the focus or the last click is in the editor. Before the first click, and after a click elsewhere, the browser keeps these shortcuts.
+- More than one editor can be on a page. Each editor opens its own popups.
+
+Keep the menu bar and the toolbar inside the viewport (`PptxEditor.Viewport` in React, `PptxEditorViewport` in Vue). Their menus then get the editor tokens, and the link popup opens at the menu bar.
+
+Your own content inside the viewport keeps your styles. It gets only the editor's text styles, box sizing, and focus ring. Content inside an editor part, such as a custom toolbar control, also gets the chrome defaults. These defaults set margins, lists, and controls. To change the chrome text styles, set them on `.pptx-editor` after the editor stylesheet.
+
+The slide show asks the browser for full screen. In an iframe, add `allow="fullscreen"`. Without full screen, the slide show fills only a transformed container around the editor.
 
 ## Set up your bundler
 

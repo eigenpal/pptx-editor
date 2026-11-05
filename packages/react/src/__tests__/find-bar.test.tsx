@@ -62,6 +62,57 @@ describe('FindBar', () => {
     expect(document.activeElement).toBe(before);
   });
 
+  test('Ctrl/Cmd+F after work on the host page stays with the browser', async () => {
+    const { before } = await setup();
+    const outside = document.createElement('input');
+    document.body.appendChild(outside);
+    const ctrlF = (target: EventTarget): boolean => {
+      const key = new KeyboardEvent('keydown', {
+        key: 'f',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      target.dispatchEvent(key);
+      return key.defaultPrevented;
+    };
+    try {
+      // The focus on a host field, then on nothing: the browser keeps the key both times.
+      outside.focus();
+      expect(ctrlF(outside)).toBe(false);
+      outside.blur();
+      expect(ctrlF(document.body)).toBe(false);
+      expect(screen.queryByRole('textbox', { name: 'Find' }) === null).toBe(true);
+      // Work in the editor, then the focus drops to nothing (a closed menu): the bar opens.
+      before.focus();
+      before.blur();
+      let opened = false;
+      act(() => void (opened = ctrlF(document.body)));
+      expect(opened).toBe(true);
+      expect(document.activeElement).toBe(input('Find'));
+    } finally {
+      outside.remove();
+    }
+  });
+
+  test('after the bar opens and closes, Ctrl+F with the focus on nothing opens it again', async () => {
+    const { before } = await setup();
+    fireEvent.keyDown(before, { key: 'f', ctrlKey: true });
+    fireEvent.keyDown(input('Find'), { key: 'Escape' });
+    expect(document.activeElement).toBe(before);
+    // A closed menu or a removed control drops the focus to nothing, with no new press.
+    before.blur();
+    const key = new KeyboardEvent('keydown', {
+      key: 'f',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => void document.body.dispatchEvent(key));
+    expect(key.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(input('Find'));
+  });
+
   test('the bar keeps its height free above the slide while it is mounted', async () => {
     await setup();
     const scope = document.querySelector<HTMLElement>('.pptx-find')!.parentElement!;

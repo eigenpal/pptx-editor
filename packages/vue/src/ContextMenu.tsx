@@ -27,6 +27,8 @@ import {
   panelItems,
   placeInViewport,
   popoverScope,
+  inFixedView,
+  placeInFixedFrame,
 } from '@pptx-editor.dev/core/editor';
 import { keepFocus } from './chrome.tsx';
 import { usePptxEditor } from './composables.ts';
@@ -77,12 +79,17 @@ export const ContextMenu = defineComponent({
     const place = (): void => {
       const el = panel.value;
       if (!el) return;
-      pos.value = placeInViewport(
-        props.at,
-        el.offsetWidth,
-        el.offsetHeight,
-        window.innerWidth,
-        window.innerHeight
+      pos.value = placeInFixedFrame(
+        el.parentElement,
+        { width: el.offsetWidth, height: el.offsetHeight },
+        (size, view) =>
+          placeInViewport(
+            inFixedView(props.at, view),
+            size.width,
+            size.height,
+            view.width,
+            view.height
+          )
       );
     };
     // Where focus was when the menu opened: it goes back there on close.

@@ -194,6 +194,46 @@ describe('PptxEditorFindBar', () => {
     expect(scope.querySelector('input[aria-label="Replace"]') !== null).toBe(true);
   });
 
+  const ctrlF = (target: EventTarget): boolean => {
+    const key = new KeyboardEvent('keydown', {
+      key: 'f',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    target.dispatchEvent(key);
+    return key.defaultPrevented;
+  };
+
+  test('Ctrl/Cmd+F after work on the host page stays with the browser', async () => {
+    const editor = await open();
+    const scope = await mountVue(editor, () => [
+      h('button', { type: 'button', id: 'before' }, 'before'),
+      h(PptxEditorFindBar),
+    ]);
+    const before = scope.querySelector<HTMLButtonElement>('#before')!;
+    const outside = document.createElement('input');
+    document.body.appendChild(outside);
+    try {
+      // The focus on a host field, then on nothing: the browser keeps the key both times.
+      outside.focus();
+      expect(ctrlF(outside)).toBe(false);
+      outside.blur();
+      expect(ctrlF(document.body)).toBe(false);
+      await nextTick();
+      expect(scope.querySelector('.pptx-find')?.hasAttribute('hidden')).toBe(true);
+      // Work in the editor, then the focus drops to nothing (a closed menu): the bar opens.
+      before.focus();
+      before.blur();
+      expect(ctrlF(document.body)).toBe(true);
+      await nextTick();
+      await nextTick();
+      expect(document.activeElement).toBe(scope.querySelector('input[aria-label="Find"]'));
+    } finally {
+      outside.remove();
+    }
+  });
+
   test('the bar keeps its height free above the slide while it is mounted', async () => {
     const editor = await open();
     const scope = await mountVue(editor, () => h(PptxEditorFindBar));
@@ -583,6 +623,9 @@ describe('the notices', () => {
     expect(editor.session!.layout(0)!.items).toHaveLength(0);
     expect(data.size).toBeGreaterThan(0);
     expect(editor.snapshot().lastRemoval).toBeNull();
+    // A surface left in the page would take the presses of the next test file.
+    editor.detach();
+    host.remove();
   });
 
   test('Cut from the menu reports no removal', async () => {

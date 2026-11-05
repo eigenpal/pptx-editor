@@ -5,7 +5,7 @@
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
-import { closeDemo, fill, openDemo, press, screen, until } from './demo-harness.tsx';
+import { clickSlide, closeDemo, fill, openDemo, press, screen, until } from './demo-harness.tsx';
 
 afterEach(closeDemo);
 
@@ -19,7 +19,10 @@ describe('demo find and replace', () => {
     const total = count(editor, 'HarfBuzz');
     expect(total).toBeGreaterThan(1);
 
-    // Ctrl+F opens find; typing selects the first match on its slide, before Enter.
+    // Ctrl+F opens find after a press on the slide, with the focus on nothing: the person
+    // works in this editor. Typing selects the first match on its slide, before Enter.
+    await clickSlide(0, 0);
+    (document.activeElement as HTMLElement | null)?.blur();
     await press('Control+f');
     const find = screen.getByRole('textbox', { name: 'Find' });
     expect(document.activeElement).toBe(find);

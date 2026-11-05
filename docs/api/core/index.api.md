@@ -1868,6 +1868,36 @@ export function firstFontPickerFamily(groups: readonly FontPickerGroup[]): strin
 export function fitSlideToScreen(screenWidth: number, screenHeight: number, slideWidth: number, slideHeight: number, dpr?: number): SlideshowFit;
 
 // @internal
+export interface FixedPoint {
+    // (undocumented)
+    readonly left: number;
+    // (undocumented)
+    readonly maxHeight?: number;
+    // (undocumented)
+    readonly top: number;
+}
+
+// @internal
+export interface FixedSize {
+    // (undocumented)
+    readonly height: number;
+    // (undocumented)
+    readonly width: number;
+}
+
+// @internal
+export interface FixedView {
+    // (undocumented)
+    readonly height: number;
+    // (undocumented)
+    readonly left: number;
+    // (undocumented)
+    readonly top: number;
+    // (undocumented)
+    readonly width: number;
+}
+
+// @internal
 export function focusAfterFindBar(editor: PptxEditorInstance | null, bar: Element | null | undefined, scopeFrom: Element | null | undefined, opener: HTMLElement | null): void;
 
 // @internal
@@ -2514,6 +2544,9 @@ export type ImageSlotId = 'image.corrections' | 'image.color' | 'image.transpare
 
 // @public
 export type ImageStyleId = 'simpleFrameWhite' | 'simpleFrameBlack' | 'softEdgeRectangle' | 'softEdgeOval' | 'reflectedRoundedRectangle';
+
+// @internal
+export function inFixedView<R extends object>(r: R, view: FixedView): R;
 
 // @internal
 export function insertImageFile(editor: PptxEditorInstance, file: File, target?: 'replaceImage'): Promise<void>;
@@ -3311,6 +3344,9 @@ export function picturePropertiesDraftFrom(picture: (Pick<SelectedImageState, 'w
 
 // @internal
 export function picturePropertiesWithValue(fields: PicturePropertiesDraftFields, field: 'width' | 'height', value: number, initial: PicturePropertiesDraftFields): PicturePropertiesDraftFields;
+
+// @internal
+export function placeInFixedFrame<T extends FixedPoint>(host: Element | null | undefined, size: FixedSize, place: (size: FixedSize, view: FixedView) => T): T;
 
 // @internal
 export function placeInViewport(at: {
