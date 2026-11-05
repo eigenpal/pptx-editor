@@ -192,7 +192,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'partial',
     tier: 'community',
     notes:
-      'Typing re-lays out with HarfBuzz. The caret steps and deletes by grapheme cluster. Left and Right collapse a selected range to its start or end before typing. Alt or Ctrl with Left and Right steps by word, Ctrl or Cmd with Home and End goes to the start or end of the text, and a double-click or a format painter click takes a word (Unicode word boundaries) and a triple-click the paragraph; a drag after a double-click or triple-click extends by whole words or paragraphs. Home and End go to the edges of the laid-out line. Validate your target input methods.',
+      'Typing re-lays out with HarfBuzz. The caret steps and deletes by grapheme cluster. Left and Right collapse a selected range to its start or end before typing. Alt or Ctrl with Left and Right steps by word, Ctrl or Cmd with Home and End goes to the start or end of the text, and a double-click or a format painter click takes a word (Unicode word boundaries) and a triple-click the paragraph; a drag after a double-click or triple-click extends by whole words or paragraphs. Home and End go to the edges of the laid-out line. An input method composes at the caret: the text being composed shows there underlined, and the result goes in once at composition end as one undo step. Keys during a composition, and the key that ends it, run no shortcut. Validate your target input methods.',
   },
   {
     id: 'text.complex-scripts',
@@ -203,7 +203,8 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'partial',
     tier: 'community',
     notes:
-      'Right-to-left text and script fonts (ea, cs) are approximate. Bidi line layout is not built, so the caret moves in logical order in right-to-left text. Caret steps keep combining marks and clusters whole, and word steps use dictionary words in Thai, Lao, Khmer, Myanmar, and CJK text.',
+      "East Asian characters measure and draw with the run's ea font, complex-script characters with its cs font, and symbol characters with its sym font. A theme with an empty ea or cs font uses its script font (a:font) for the run's language (lang, altLang). Chinese and Japanese text breaks between characters and Korean text at spaces. eaLnBrk, latinLnBrk, hangingPunct, the presentation kinsoku lists (p:kinsoku), and justified and distributed East Asian lines follow the reference rules. A missing East Asian font falls back to a host CJK face, such as Noto Sans CJK JP from @docx-editor.dev/fonts-cjk, and a character that the run's face lacks uses another loaded face. Right-to-left text is approximate. Bidi line layout is not built, so the caret moves in logical order in right-to-left text. Caret steps keep combining marks and clusters whole, and word steps use dictionary words in Thai, Lao, Khmer, Myanmar, and CJK text.",
+    docsLink: '/docs/guides/east-asian-text',
   },
   {
     id: 'text.find-replace',
@@ -857,7 +858,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'none',
     tier: 'premium',
     notes:
-      '@pptx-editor.dev/pptx-to-pdf needs the EigenPal Pro License. The PDF export draws shapes, solid and gradient fills, cropped PNG and JPEG pictures, tables, shadows, glow, and searchable text. It exports in one call or from a reusable session, and leaves hidden slides out. Approximations, each with a diagnostic code: shadow and glow blur, opaque silhouettes, inner shadows, soft edges, gradient lines, gradients with more than 64 stops, fills past the shape box, tiled pictures, picture color effects, dashes, compound lines, and some text styles; SVG pictures draw from their PNG fallback. The border of a picture is drawn outside the picture. Not drawn yet: pattern fills, picture fills on text, reflections, arrowheads, underline and strikethrough, text outlines, other picture formats, charts, diagrams, OLE objects with no picture, and other graphic frames, and table frames with no grid. The export fidelity is not measured yet, so rendering stays planned.',
+      '@pptx-editor.dev/pptx-to-pdf needs the EigenPal Pro License. The PDF export draws shapes, solid and gradient fills, cropped PNG and JPEG pictures, tables, shadows, glow, and searchable text. It exports in one call or from a reusable session, and leaves hidden slides out. Approximations, each with a diagnostic code: shadow and glow blur, opaque silhouettes, inner shadows, soft edges, gradient lines, gradients with more than 64 stops, fills past the shape box, tiled pictures, picture color effects, dashes, compound lines, and some text styles; SVG pictures draw from their PNG fallback. The border of a picture is drawn outside the picture. With the optional @docx-editor.dev/fonts-cjk installed, East Asian text in a missing font draws with Noto Sans CJK JP. Not drawn yet: pattern fills, picture fills on text, reflections, arrowheads, underline and strikethrough, text outlines, other picture formats, charts, diagrams, OLE objects with no picture, and other graphic frames, and table frames with no grid. The export fidelity is not measured yet, so rendering stays planned.',
   },
 ];
 

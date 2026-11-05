@@ -1,6 +1,7 @@
 // The font request a deck makes of the host's font origins (PPTX only; the composition itself
 // is DOCX Editor's, `layout/font-resolver.ts`). The families are the theme fonts of every theme
-// a slide master uses, then every typeface the slides, layouts, and masters name. The default
+// a slide master uses, with the script fonts of the languages the deck names, then every
+// typeface the slides, layouts, masters, and the presentation's default text style name. The default
 // family is the minor Latin font of the first master's theme: body text measures with it.
 
 import {
@@ -12,7 +13,7 @@ import {
   type XmlPart,
   xmlPartOf,
 } from '../store/index.ts';
-import { parseTheme, type FontCollection } from '../cascade/index.ts';
+import { collectionScriptFont, parseTheme, type FontCollection } from '../cascade/index.ts';
 import {
   DEFAULT_FONT,
   MAX_RESOLVER_FAMILIES,
@@ -26,22 +27,40 @@ import { FONT_NAME } from '../automation/commands/font-format.ts';
  */
 const TYPEFACE_ELEMENTS = new Set(['latin', 'ea', 'cs', 'sym', 'buFont']);
 const FAMILY_PARTS = /^\/ppt\/(slides|slideLayouts|slideMasters)\//;
-const cache = new WeakMap<XmlPart, readonly string[]>();
+const cache = new WeakMap<XmlPart, PartFonts>();
+
+/** What a part names: its typefaces in document order, and its run languages. */
+interface PartFonts {
+  readonly faces: readonly string[];
+  /** `lang` and `altLang` of its run properties, which pick theme script fonts. */
+  readonly languages: ReadonlySet<string>;
+}
+
+/** The most run languages read from one part. */
+const MAX_PART_LANGUAGES = 32;
+const RUN_PROPERTIES = new Set(['rPr', 'defRPr', 'endParaRPr']);
 
 /** Typefaces a part names, in document order. Theme references (`+mn-lt`) are not names. */
-function partTypefaces(part: XmlPart): readonly string[] {
+function partFonts(part: XmlPart): PartFonts {
   const hit = cache.get(part);
   if (hit) return hit;
-  const out: string[] = [];
+  const faces: string[] = [];
+  const languages = new Set<string>();
   const walk = (el: Element, depth: number): void => {
     if (depth > 256) return;
     if (el.ns === NS.a && TYPEFACE_ELEMENTS.has(el.local)) {
       const face = attr(el, 'typeface');
-      if (face && !face.startsWith('+')) out.push(face);
+      if (face && !face.startsWith('+')) faces.push(face);
     }
+    if (el.ns === NS.a && RUN_PROPERTIES.has(el.local) && languages.size < MAX_PART_LANGUAGES)
+      for (const name of ['lang', 'altLang']) {
+        const lang = attr(el, name);
+        if (lang) languages.add(lang);
+      }
     for (const c of el.children) if (c.type === 'element') walk(c, depth + 1);
   };
   walk(part.root, 0);
+  const out = { faces, languages };
   cache.set(part, out);
   return out;
 }
@@ -63,16 +82,29 @@ export function deckFontFamilies(pkg: PptxPackage): string[] {
     if (!family || byKey.size >= MAX_RESOLVER_FAMILIES || !FONT_NAME.test(family)) return;
     if (!byKey.has(family.toLowerCase())) byKey.set(family.toLowerCase(), family);
   };
+  // The presentation part holds `p:defaultTextStyle`, whose `lang` applies to every run that
+  // names none.
+  const presentationPart = presentationInfo(pkg).presentationPart;
+  const parts = [...pkg.parts.values()].flatMap((part) =>
+    part.kind === 'xml' && (FAMILY_PARTS.test(part.partName) || part.partName === presentationPart)
+      ? [partFonts(part.xml)]
+      : []
+  );
+  const languages = new Set(parts.flatMap((p) => [...p.languages]));
   const themes = [...new Set(presentationInfo(pkg).slides.map((s) => s.themePart))];
   for (const name of themes)
     for (const collection of themeOf(pkg, name)) {
       add(collection.latin);
       add(collection.ea);
       add(collection.cs);
+      // The script fonts of the languages the runs name (ECMA-376 Part 1, 20.1.4.1.16 `font`),
+      // so East Asian text in a theme with an empty `a:ea` asks for its face.
+      for (const lang of languages) {
+        if (!collection.ea) add(collectionScriptFont(collection, 'ea', lang));
+        if (!collection.cs) add(collectionScriptFont(collection, 'cs', lang));
+      }
     }
-  for (const part of pkg.parts.values())
-    if (part.kind === 'xml' && FAMILY_PARTS.test(part.partName))
-      for (const face of partTypefaces(part.xml)) add(face);
+  for (const p of parts) for (const face of p.faces) add(face);
   return [...byKey.values()];
 }
 

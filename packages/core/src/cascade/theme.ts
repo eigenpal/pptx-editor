@@ -3,13 +3,23 @@
 
 import { attr, child, elements, path, type Element, type XmlPart } from '../store/index.ts';
 import { colorChild, parseHex, resolveColor, type ColorContext, type Rgba } from './color.ts';
+import { complexScriptOf, eastAsianScriptOf } from './script-fonts.ts';
 
 /** One script slot of a font scheme collection. */
 export interface FontCollection {
   readonly latin?: string;
   readonly ea?: string;
   readonly cs?: string;
+  /**
+   * The script fonts (`a:font script="Jpan" typeface="…"`, ECMA-376 Part 1, 20.1.4.1.16), by
+   * ISO 15924 script code. They name the East Asian and complex-script faces when `a:ea` or
+   * `a:cs` is empty. Absent when the collection has none.
+   */
+  readonly scripts?: ReadonlyMap<string, string>;
 }
+
+/** The most script fonts read from one collection. ECMA-376 themes list about 50. */
+const MAX_SCRIPT_FONTS = 256;
 
 /** A parsed theme. */
 export interface Theme {
@@ -65,7 +75,19 @@ function fonts(el: Element | undefined): FontCollection {
   const latin = pick('a:latin');
   const ea = pick('a:ea');
   const cs = pick('a:cs');
-  return { ...(latin ? { latin } : {}), ...(ea ? { ea } : {}), ...(cs ? { cs } : {}) };
+  const scripts = new Map<string, string>();
+  for (const f of elements(el)) {
+    if (f.local !== 'font' || scripts.size >= MAX_SCRIPT_FONTS) continue;
+    const script = attr(f, 'script');
+    const typeface = attr(f, 'typeface');
+    if (script && typeface && !scripts.has(script)) scripts.set(script, typeface);
+  }
+  return {
+    ...(latin ? { latin } : {}),
+    ...(ea ? { ea } : {}),
+    ...(cs ? { cs } : {}),
+    ...(scripts.size > 0 ? { scripts } : {}),
+  };
 }
 
 /** Parse a theme part. A missing theme yields the default theme. */
@@ -122,10 +144,31 @@ export function readColorMap(el: Element | undefined): ReadonlyMap<string, strin
 }
 
 /**
- * Resolve a theme font reference (`+mj-lt`, `+mn-ea`, …) to a typeface. Returns the input
- * unchanged when it is a plain typeface name.
+ * The East Asian (`ea`) or complex-script (`cs`) face of a collection for a language: the
+ * slot's own typeface, else the script font of the language's script (ECMA-376 Part 1,
+ * 20.1.4.1.16 `font`). Undefined when the collection names neither.
  */
-export function resolveThemeFont(typeface: string, theme: Theme): string | undefined {
+export function collectionScriptFont(
+  collection: FontCollection,
+  slot: 'ea' | 'cs',
+  lang?: string
+): string | undefined {
+  const own = slot === 'ea' ? collection.ea : collection.cs;
+  if (own) return own;
+  const script = slot === 'ea' ? eastAsianScriptOf(lang) : complexScriptOf(lang);
+  return script ? collection.scripts?.get(script) : undefined;
+}
+
+/**
+ * Resolve a theme font reference (`+mj-lt`, `+mn-ea`, …) to a typeface. Returns the input
+ * unchanged when it is a plain typeface name. `lang` picks the script font of an `ea` or `cs`
+ * reference when the theme's slot is empty.
+ */
+export function resolveThemeFont(
+  typeface: string,
+  theme: Theme,
+  lang?: string
+): string | undefined {
   if (!typeface.startsWith('+')) return typeface;
   const collection = typeface.startsWith('+mj')
     ? theme.majorFont
@@ -134,7 +177,9 @@ export function resolveThemeFont(typeface: string, theme: Theme): string | undef
       : null;
   if (!collection) return undefined;
   if (typeface.endsWith('-lt')) return collection.latin;
-  if (typeface.endsWith('-ea')) return collection.ea || collection.latin;
-  if (typeface.endsWith('-cs')) return collection.cs || collection.latin;
+  if (typeface.endsWith('-ea'))
+    return collectionScriptFont(collection, 'ea', lang) || collection.latin;
+  if (typeface.endsWith('-cs'))
+    return collectionScriptFont(collection, 'cs', lang) || collection.latin;
   return collection.latin;
 }

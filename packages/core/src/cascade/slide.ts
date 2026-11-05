@@ -34,11 +34,18 @@ import {
 } from './paint-props.ts';
 import { resolveFrameTable } from './table.ts';
 import { DEFAULT_COLOR_MAP, parseTheme, readColorMap, type Theme } from './theme.ts';
-import { fontRefEntry, levelEntries, resolveParagraph, type FontRef } from './text-style.ts';
+import {
+  fontRefEntry,
+  levelEntries,
+  readKinsoku,
+  resolveParagraph,
+  type FontRef,
+} from './text-style.ts';
 import type {
   Autofit,
   BodyProps,
   GeometrySpec,
+  KinsokuRules,
   Layer,
   ResolvedElement,
   ResolvedPicture,
@@ -65,6 +72,7 @@ interface SlideScope {
   readonly slideNumber: number;
   readonly defaultTextStyle?: Element;
   readonly txStyles?: Element;
+  readonly kinsoku?: KinsokuRules;
   readonly layoutPlaceholders: readonly PlaceholderEntry[];
   readonly masterPlaceholders: readonly PlaceholderEntry[];
 }
@@ -277,6 +285,7 @@ function resolveText(
         theme: scope.theme,
         ...(fontRef ? { fontRef } : {}),
         slideNumber: scope.slideNumber,
+        ...(scope.kinsoku ? { kinsoku: scope.kinsoku } : {}),
       })
     );
   return { nodeId: txBody.id, body: readBodyProps(bodyChain), paragraphs };
@@ -581,6 +590,7 @@ export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | u
     if (read) colorMap = read;
   }
   const presentation = xmlPartOf(pkg, info.presentationPart)?.root;
+  const kinsoku = readKinsoku(presentation);
   const scope: SlideScope = {
     pkg,
     theme,
@@ -590,6 +600,7 @@ export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | u
       ? { defaultTextStyle: child(presentation, 'p:defaultTextStyle') }
       : {}),
     ...(child(master, 'p:txStyles') ? { txStyles: child(master, 'p:txStyles') } : {}),
+    ...(kinsoku ? { kinsoku } : {}),
     layoutPlaceholders: collectPlaceholders(pkg, ref.layoutPart),
     masterPlaceholders: collectPlaceholders(pkg, ref.masterPart),
   };

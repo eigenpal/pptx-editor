@@ -8,5 +8,5 @@ export default defineConfig({
   clean: true,
   metafile: true,
   sourcemap: true,
-  external: ['pdf-lib', 'fontkit', /^@pptx-editor\.dev\//],
+  external: ['pdf-lib', 'fontkit', /^@pptx-editor\.dev\//, '@docx-editor.dev/fonts-cjk'],
 });

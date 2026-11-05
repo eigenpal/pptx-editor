@@ -33,7 +33,7 @@ export const boundedStructuralFontValidator: FontByteValidator;
 export function boxMatrix(x: Xfrm, withFlip?: boolean, extraRotation?: number): Matrix;
 
 // @public
-export function breakOpportunities(text: string, eaLineBreak?: boolean): Uint8Array;
+export function breakOpportunities(text: string, eaLineBreak?: boolean, latinLineBreak?: boolean, kinsoku?: KinsokuLists): Uint8Array;
 
 // @public
 export interface CellLayout {
@@ -98,6 +98,12 @@ export function deferFonts(origin: FontOrigin): MarkedFontResolver;
 
 // @public
 export function defineFontResolver<T extends FontResolver>(resolve: T): MarkedFontResolver<T>;
+
+// @public
+export const EAST_ASIAN_FALLBACK_FAMILIES: readonly string[];
+
+// @public
+export function eastAsianFallbackFamilies(lang?: string): readonly string[];
 
 // @public
 export interface EvaluatedGeometry {
@@ -204,6 +210,8 @@ export interface FontRequest {
     readonly family: string;
     // (undocumented)
     readonly italic: boolean;
+    readonly lang?: string;
+    readonly script?: 'eastAsian';
 }
 
 // @public
@@ -347,6 +355,12 @@ export interface ItemPlacement {
     readonly parentMatrix: Matrix;
     // (undocumented)
     readonly toSource: SourceMap | null;
+}
+
+// @public
+export interface KinsokuLists {
+    readonly notEnd: string;
+    readonly notStart: string;
 }
 
 // @public
@@ -602,6 +616,7 @@ export interface TextMeasurer {
     advances(face: ResolvedFace, text: string, options?: {
         readonly kerning?: boolean;
     }): Float64Array;
+    fallbackFace?(face: ResolvedFace, codePoint: number, lang?: string): ResolvedFace | undefined;
     // (undocumented)
     resolve(request: FontRequest): ResolvedFace;
 }

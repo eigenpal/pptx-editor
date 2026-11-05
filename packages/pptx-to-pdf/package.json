@@ -28,13 +28,20 @@
     "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/pptx-to-pdf"
   },
   "peerDependencies": {
+    "@docx-editor.dev/fonts-cjk": "^2.34.0",
     "@pptx-editor.dev/core": "0.x"
+  },
+  "peerDependenciesMeta": {
+    "@docx-editor.dev/fonts-cjk": {
+      "optional": true
+    }
   },
   "dependencies": {
     "fontkit": "2.0.4",
     "pdf-lib": "1.17.1"
   },
   "devDependencies": {
+    "@docx-editor.dev/fonts-cjk": "^2.34.0",
     "@pptx-editor.dev/core": "workspace:*",
     "pdfjs-dist": "5.4.624"
   },

@@ -10,6 +10,7 @@ import { os2LineExtents, withFaceLineMetrics } from './face-line-metrics.ts';
 import { isIdeographic } from './line-break.ts';
 import {
   DEFAULT_FALLBACK_FAMILY,
+  eastAsianFallbackFamilies,
   FONT_SUBSTITUTES,
   type FaceMetrics,
   type FontRequest,
@@ -181,12 +182,15 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     candidates[0];
 
   const resolve = (r: FontRequest): ResolvedFace => {
-    const key = `${r.family.toLowerCase()}|${r.bold}|${r.italic}`;
+    const eastAsian = r.script === 'eastAsian';
+    const fallbackOrder = eastAsian ? eastAsianFallbackFamilies(r.lang) : [];
+    const key = `${r.family.toLowerCase()}|${r.bold}|${r.italic}${eastAsian ? `|ea|${fallbackOrder[0]}` : ''}`;
     const hit = resolved.get(key);
     if (hit) return hit;
     const order = [
       r.family,
       ...(FONT_SUBSTITUTES[r.family.toLowerCase()] ?? []),
+      ...fallbackOrder,
       DEFAULT_FALLBACK_FAMILY,
     ];
     let chosen: LoadedFace | null = null;
@@ -273,5 +277,44 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     return out;
   };
 
-  return { resolve, advances, faces };
+  // Glyph coverage, by face id and code point; bounded like the advance cache.
+  const fallbacks = new Map<string, ResolvedFace | null>();
+  const has = (entry: RegisteredFace, cp: number): boolean => {
+    const lf = load(entry);
+    if (!lf) return false;
+    const glyph = lf.font.nominalGlyph(cp);
+    return glyph !== undefined && glyph !== 0;
+  };
+  /** One regular face for each family, in registration order: the fallback candidates. */
+  const families: RegisteredFace[] = [];
+  for (const f of faces)
+    if (!families.some((g) => g.family.toLowerCase() === f.family.toLowerCase()))
+      families.push(pick(byFamily(f.family), { family: f.family, bold: false, italic: false })!);
+
+  const fallbackFace = (
+    face: ResolvedFace,
+    cp: number,
+    lang?: string
+  ): ResolvedFace | undefined => {
+    const order = eastAsianFallbackFamilies(lang);
+    const key = `${face.id}|${face.bold}|${face.italic}|${cp}|${order[0]}`;
+    const hit = fallbacks.get(key);
+    if (hit !== undefined) return hit ?? undefined;
+    const own = faces.find((f) => f.id === face.id);
+    let found: ResolvedFace | null = null;
+    if (own && !has(own, cp)) {
+      const eastAsian = isIdeographic(cp) || (cp >= 0x2460 && cp <= 0x27bf);
+      const named = eastAsian ? order.flatMap((name) => byFamily(name).slice(0, 1)) : [];
+      for (const entry of [...named, ...families]) {
+        if (entry.family.toLowerCase() === own.family.toLowerCase() || !has(entry, cp)) continue;
+        found = resolve({ family: entry.family, bold: face.bold, italic: face.italic });
+        break;
+      }
+    }
+    if (fallbacks.size >= CACHE_LIMIT) fallbacks.clear();
+    fallbacks.set(key, found);
+    return found ?? undefined;
+  };
+
+  return { resolve, advances, fallbackFace, faces };
 }
