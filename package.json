@@ -95,7 +95,7 @@
     "happy-dom": "21.0.4",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.4",
-    "oxlint": "1.85.0",
+    "oxlint": "1.90.0",
     "pdfjs-dist": "5.4.624",
     "pixelmatch": "^8.0.0",
     "pngjs": "^7.0.0",
