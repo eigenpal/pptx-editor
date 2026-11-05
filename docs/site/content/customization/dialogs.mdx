@@ -151,6 +151,8 @@ Each dialog has its own hook, such as `useFontDialog` or `useParagraphDialog`. S
 
 ## Build your own link panel
 
+The packaged link popup opens under the selected text on the slide. With no text selected, it opens under the control that opened it. It has **Apply**, **Cancel**, and **Remove link** when the text has a link.
+
 Use `useHyperlinkPopup()` to build your own link UI. It gives the link popup's state with no UI, as DOCX Editor's hook of the same name. Inside a root, it is the state that the packaged popup shows, so your panel and the link controls agree.
 
 Turn off the packaged popup with `popups.hyperlink: false`, or `hyperlinkPopup={false}` on `<PptxEditor>`. Then mount your panel anywhere inside the root. While it is mounted, the toolbar's link control, **Insert > Link…**, and Ctrl+K (Cmd+K on macOS) open it.
