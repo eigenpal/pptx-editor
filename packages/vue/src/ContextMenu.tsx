@@ -74,14 +74,14 @@ export const ContextMenu = defineComponent({
   setup(props, { attrs, slots }) {
     const editor = usePptxEditor();
     const panel = ref<HTMLDivElement | null>(null);
-    const pos = shallowRef<{ left: number; top: number } | null>(null);
+    const pos = shallowRef<{ left: number; top: number; maxHeight?: number } | null>(null);
     const close = (): void => props.onClose();
     const place = (): void => {
       const el = panel.value;
       if (!el) return;
       pos.value = placeInFixedFrame(
         el.parentElement,
-        { width: el.offsetWidth, height: el.offsetHeight },
+        { width: el.offsetWidth, height: el.scrollHeight + el.offsetHeight - el.clientHeight },
         (size, view) =>
           placeInViewport(
             inFixedView(props.at, view),
@@ -151,7 +151,13 @@ export const ContextMenu = defineComponent({
           tabindex={-1}
           style={
             pos.value
-              ? { left: `${pos.value.left}px`, top: `${pos.value.top}px` }
+              ? {
+                  left: `${pos.value.left}px`,
+                  top: `${pos.value.top}px`,
+                  ...(pos.value.maxHeight === undefined
+                    ? {}
+                    : { maxHeight: `${pos.value.maxHeight}px` }),
+                }
               : { visibility: 'hidden', left: `${props.at.x}px`, top: `${props.at.y}px` }
           }
           onMousedown={keepFocus}

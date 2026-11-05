@@ -96,6 +96,14 @@ export async function vueAdapterShape(contract?: ParityContract): Promise<VueAda
       component: vue.PptxEditor,
       props: { document: new Uint8Array([1, 2, 3]) },
       settle: 50,
+      // The part props: `true` or an object adds the part, `false` removes it.
+      values: {
+        menu: { props: { menu: true }, shows: (s) => s.querySelector('.pptx-menubar') !== null },
+        toolbar: {
+          props: { toolbar: false },
+          shows: (s) => s.querySelector('.pptx-default__dock') === null,
+        },
+      },
     },
     PptxEditorRoot: { component: vue.PptxEditorRoot },
     PptxEditorToolbar: { component: vue.PptxEditorToolbar, props: { preset: false } },
@@ -170,7 +178,7 @@ export async function vueAdapterShape(contract?: ParityContract): Promise<VueAda
   };
 
   // The link popup compound renders while a popup state is open: the probe provides one.
-  const { hyperlinkPopupKey } = await import('../src/HyperLink.tsx');
+  const { hyperlinkPopupKey } = await import('../src/useHyperlinkPopup.ts');
   const { hyperlinkPopupFromRequest } = await import('@pptx-editor.dev/core/editor');
   const openLinkPopup = (node: ReturnType<typeof h>) =>
     h({
@@ -288,8 +296,40 @@ export async function vueAdapterShape(contract?: ParityContract): Promise<VueAda
     });
   const inStatusBar: Wrap = (node) =>
     inRoot(h(vue.PptxEditorStatusBar, { preset: false }, () => [node]));
+  const inRail: Wrap = (node) =>
+    inRoot(h(vue.PptxEditorSlideRail, { preset: false }, () => [node]));
   const dialog = { open: true, onClose: () => undefined };
   Object.assign(probes, {
+    SlideRailAddSlide: { component: vue.SlideRailAddSlide, props: { asChild: true }, wrap: inRail },
+    SlideRailChooseLayout: {
+      component: vue.SlideRailChooseLayout,
+      props: { asChild: true },
+      wrap: inRail,
+    },
+    SlideRailCollapse: { component: vue.SlideRailCollapse, props: { asChild: true }, wrap: inRail },
+    // Show thumbnails renders in the folded strip only.
+    SlideRailExpand: {
+      component: vue.SlideRailExpand,
+      props: { asChild: true },
+      wrap: (node: ReturnType<typeof h>) =>
+        inRoot(h(vue.PptxEditorSlideRail, { defaultOpen: false }, () => [node])),
+    },
+    SlideRailDelete: { component: vue.SlideRailDelete, props: { asChild: true }, wrap: inRail },
+    SlideRailDuplicate: {
+      component: vue.SlideRailDuplicate,
+      props: { asChild: true },
+      wrap: inRail,
+    },
+    SlideRailMoveEarlier: {
+      component: vue.SlideRailMoveEarlier,
+      props: { asChild: true },
+      wrap: inRail,
+    },
+    SlideRailMoveLater: {
+      component: vue.SlideRailMoveLater,
+      props: { asChild: true },
+      wrap: inRail,
+    },
     ImageAltTextDialog: { component: vue.ImageAltTextDialog, props: dialog },
     ImagePropertiesDialog: { component: vue.ImagePropertiesDialog, props: dialog },
     PageSetupDialog: { component: vue.PageSetupDialog, props: dialog, wrap: inRoot },

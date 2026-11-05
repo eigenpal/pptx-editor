@@ -39,7 +39,7 @@ const title = computed(() => {
 </template>
 ```
 
-`useEditorCommand(slot: MaybeRefOrGetter<ChromeSlotId>): UseEditorCommandReturn` takes a slot identifier from the [toolbar slot reference](/docs/customization/toolbar#registered-groups-and-slots), or a ref or getter that returns one. The state follows the slot.
+`useEditorCommand(slot: MaybeRefOrGetter<ChromeSlotId>): UseEditorCommandReturn` takes a slot identifier from the [toolbar slot reference](/docs/customization/reference/toolbar#registered-groups-and-slots), or a ref or getter that returns one. The state follows the slot.
 
 | Member | Type | Description |
 | --- | --- | --- |
@@ -138,7 +138,8 @@ State members are refs. Function members are plain functions.
 | `useBackgroundDialog()` | `UseBackgroundDialogReturn` | `UseDialogReturn<BackgroundDialogFields>` with `reset()`. |
 | `useContextMenuRequest()` | `UseContextMenuRequestReturn` | `ContextMenuRequest \| null`: the open canvas context menu. Each request mounts the menu anew, so the value is fixed for the menu's life. |
 | `useContextMenuTarget()` | `UseContextMenuTargetReturn` | `HTMLElement \| null`: the element the open context menu opened on. |
-| `useOpenFailure()` | `UseOpenFailureReturn` | `failure`, `message`, and `kept`: computed refs. `dismiss(failure?)`. See [Show a banner or a toast](/docs/customization/layout#show-a-banner-or-a-toast). |
+| `useOpenFailure({ t? })` | `UseOpenFailureReturn` | `failure`, `message`, and `kept`: computed refs. `dismiss(failure?)`. `t` translates `message`. See [Show a banner or a toast](/docs/customization/layout#show-a-banner-or-a-toast). |
+| `useHyperlinkPopup()`, `useHyperlinkPopupInstance(active?)` | `UseHyperlinkPopupReturn`, `UseHyperlinkPopupInstanceReturn` | `state`: a computed ref to the link popup's state. The actions of the [React hook](/docs/customization/dialogs#build-your-own-link-panel). |
 
 ### Fonts
 
@@ -146,6 +147,89 @@ State members are refs. Function members are plain functions.
 | --- | --- | --- |
 | `useFonts(source, ...fragments)` or `useFonts(...origins)` | `UseFontsReturn` | A `MarkedFontResolver` with a stable identity, for the `fonts` prop. Each argument can be a ref or a getter. See [Fonts](/docs/customization/fonts). |
 | `useFontFamily()` | `UseFontFamilyReturn` | `value`, `theme`, `options`, `groups`, `isEnabled`, and `disabledReason`: computed refs. `isCurrent(row)` and `setValue(family)`. As DOCX Editor's composable of the same name. Use it for your own font picker. See [Build the list from `useFontFamily`](/docs/customization/toolbar#build-the-list-from-usefontfamily). |
+| `usePptxSource(source, options?)` | `UsePptxSourceReturn` | `document`, `fonts`, `error`, and `isLoading`: computed refs. `source` and `options` can be refs or getters. The twin of DOCX Editor's `useDocxSource`, with the same font paths as the [React hook](/docs/react/hooks#open-a-presentation). |
+
+## Build your own chrome
+
+These composables have the names and the shapes of DOCX Editor's composables. Call them in `setup`.
+
+### Zoom
+
+`useZoom(): UseZoomReturn` reads and sets the slide zoom:
+
+```vue
+<script setup lang="ts">
+import { useZoom } from '@pptx-editor.dev/vue';
+
+const { zoom, isFit, fit, zoomIn, zoomOut, canZoomIn, canZoomOut } = useZoom();
+</script>
+
+<template>
+  <div role="group" aria-label="Zoom">
+    <button :disabled="!canZoomOut" @click="zoomOut">-</button>
+    <span>{{ Math.round(zoom * 100) }}%</span>
+    <button :disabled="!canZoomIn" @click="zoomIn">+</button>
+    <button :aria-pressed="isFit" @click="fit">Fit</button>
+  </div>
+</template>
+```
+
+`zoom`, `isFit`, `canZoomIn`, and `canZoomOut` are computed refs. `setZoom(zoom)`, `fit()`, `reset()`, `zoomIn()`, and `zoomOut()` are functions, and `levels` is an array. The members are the same as in the [React hook](/docs/react/hooks#zoom).
+
+### Events
+
+`useEditorEvent(event, handler): void` calls `handler` each time the event occurs, until the component unmounts:
+
+```ts
+import { useEditorEvent } from '@pptx-editor.dev/vue';
+
+useEditorEvent('rejection', (rejection) => console.info(rejection.reason));
+```
+
+The events are `change`, `selectionChange`, `rejection`, and `openFailure`, as in the [React hook](/docs/react/hooks#events).
+
+### Other composables
+
+| Composable | Return type | Members |
+| --- | --- | --- |
+| `useEditorSnapshot(editor)` | `Readonly<Ref<number>>` | A counter that changes on each editor change. `editor` can be a ref or a getter. Prefer `useEditorState`. |
+| `useScopeClassName()` | `UseScopeClassNameReturn` | `ComputedRef<'' \| 'pptx-editor ' \| 'pptx-editor dark '>`: the scope classes for the root element of your own part. See [Style your controls](/docs/customization/appearance#style-your-controls). |
+| `useEditorHostDocument()` | `UseEditorHostDocumentReturn` | `Readonly<ShallowRef<Document \| null>>`: the document that the slide is mounted in. |
+
+### Find, caret, and undo steps
+
+| Composable | Return type | Members |
+| --- | --- | --- |
+| `useDocumentSearch()` | `UseDocumentSearchReturn` | The find session as computed refs (`query`, `matchCase`, `wholeWord`, `matches`, `activeIndex`, `activeMatch`), and the actions of the [React hook](/docs/react/hooks#find-caret-and-undo-steps). |
+| `useEditorCaret()` | `UseEditorCaretReturn` | `Readonly<Ref<EditorCaret \| null>>`: the caret while text is edited. |
+| `useHistoryGroup({ kind })` | `UseHistoryGroupReturn` | `ref`, a function ref for the control, and `options()` for each command of the gesture. |
+
+```vue
+<script setup lang="ts">
+import { useEditorValueCommand, useHistoryGroup } from '@pptx-editor.dev/vue';
+
+const group = useHistoryGroup({ kind: 'range' });
+const size = useEditorValueCommand('font.size');
+</script>
+
+<template>
+  <input
+    type="range"
+    :ref="group.ref"
+    @input="size.execute(Number(($event.target as HTMLInputElement).value), group.options())"
+  />
+</template>
+```
+
+### Labels
+
+| Composable | Return type | Members |
+| --- | --- | --- |
+| `useChromeTranslate(overrides?)` | `UseChromeTranslateReturn` | The `t` of the nearest compound, else the root's `locale`. |
+| `useToolbarContext()` | `UseToolbarContextReturn` | `{ t }`: a ref to the host's `t` on the nearest compound. |
+| `useToolbarLabel()`, `useToolbarLabelFor(t)` | `UseToolbarLabelReturn`, `UseToolbarLabelForReturn` | `(key) => string`, as in React. |
+
+`PptxEditorToolbar`, `PptxEditorMenu`, `PptxEditorContextMenu`, `PptxEditorSlideRail`, `PptxEditorStatusBar`, `PptxEditorFindBar`, `PptxEditorOpenFailure`, `PptxEditorFontNotice`, and `PptxEditorEditNotice` take the `t` prop.
 
 ## Apply a value
 

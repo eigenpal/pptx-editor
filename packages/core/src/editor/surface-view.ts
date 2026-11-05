@@ -47,3 +47,16 @@ export function scrollBoxIntoView(scroller: HTMLElement, box: ClientBox, margin:
   if (box.top < view.top + my) scroller.scrollTop -= view.top + my - box.top;
   else if (box.bottom > view.bottom - my) scroller.scrollTop += box.bottom - (view.bottom - my);
 }
+
+/** The surface padding in CSS pixels, including the no-stylesheet default. */
+export function surfacePadding(root: HTMLElement): { x: number; y: number } {
+  const own = root.ownerDocument.defaultView?.getComputedStyle(root);
+  const side = (value: string | undefined): number => {
+    const px = parseFloat(value ?? '');
+    return Number.isFinite(px) ? px : 24;
+  };
+  return {
+    x: side(own?.paddingLeft) + side(own?.paddingRight),
+    y: side(own?.paddingTop) + side(own?.paddingBottom),
+  };
+}

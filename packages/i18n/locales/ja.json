@@ -90,6 +90,8 @@
     "deleteSlides": "{count} 枚のスライドを削除",
     "moveUp": "上へ移動",
     "moveDown": "下へ移動",
+    "moveLeft": "左へ移動",
+    "moveRight": "右へ移動",
     "layout": "レイアウト",
     "resetSlide": "スライドのリセット",
     "hideSlide": "スライドを非表示にする",
@@ -113,6 +115,8 @@
       "clearFormatting": "Ctrl+\\",
       "moveUp": "Ctrl+↑",
       "moveDown": "Ctrl+↓",
+      "moveLeft": "Ctrl+←",
+      "moveRight": "Ctrl+→",
       "undo": "Ctrl+Z",
       "redo": "Ctrl+Y",
       "selectAll": "Ctrl+A",
@@ -743,7 +747,8 @@
     "hiddenSlideLabel": "スライド {index} (非表示)",
     "chooseLayout": "レイアウトを指定してスライドを追加",
     "collapse": "サムネイルを非表示にする",
-    "expand": "サムネイルを表示する"
+    "expand": "サムネイルを表示する",
+    "moreActions": "その他のスライド操作"
   },
   "notes": {
     "title": "ノート",
@@ -873,6 +878,7 @@
     "label": "リンク",
     "placeholder": "リンクを貼り付けるか入力してください",
     "apply": "適用",
+    "cancel": "キャンセル",
     "remove": "リンクの削除",
     "open": "リンクを開く",
     "unavailable": "このエディターでは、リンクはオフになっています",
@@ -880,7 +886,6 @@
     "copied": "リンクをコピーしました",
     "edit": "リンクの編集",
     "insert": "リンクの挿入",
-    "cancel": "キャンセル",
     "unsafe": "このリンクは開けません",
     "announce": "リンク: {url}。F6 キーで操作を表示します。"
   },

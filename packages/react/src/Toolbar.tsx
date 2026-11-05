@@ -2,6 +2,7 @@
 // The floating formatting toolbar. Its arrangement derives FROM `CHROME_GROUPS`; it is never
 // hand-listed, so a slot added to the registry appears here without editing this file.
 
+import type { ChromeTranslate } from '@pptx-editor.dev/core/editor';
 import {
   Children,
   Fragment,
@@ -521,6 +522,11 @@ function hasContent(nodes: ReactNode): boolean {
 
 /** Props for `PptxEditor.Toolbar`. @public */
 export interface ToolbarProps {
+  /**
+   * Your translation function for this compound and its parts, as DOCX Editor's `t`. Without
+   * it, the root's `locale` gives the labels.
+   */
+  readonly t?: ChromeTranslate;
   /** A class name added to the bar. */
   readonly className?: string;
   /**

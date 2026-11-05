@@ -1,0 +1,213 @@
+---
+title: 'Dialog reference'
+description: 'Every PPTX editor popup registry key, dialog part option, dialog field, and popup lifetime rule.'
+category: 'Customization'
+---
+
+This page lists the popup keys, the dialog fields, and the popup rules. For the tasks, see [Dialogs](/docs/customization/dialogs).
+
+## Popup registry keys
+
+Pass the map through `popups` on `PptxEditor.Root`. A function renders that surface. `false` turns off its automatic rendering.
+
+| Key | Surface |
+| --- | --- |
+| `pageSetup` | Slide size, appearance, and fonts. |
+| `background` | The slide background: color, gradient, or picture, for this slide or all slides. |
+| `font` | The Font dialog (**Format > Font…**, **Character Spacing > More Spacing…**, and the text context menu): font, style, size, underline, effects, character spacing, and kerning. |
+| `bulletsAndNumbering` | The Bullets and Numbering dialog (**Format > Bullets and numbering…** and the last row of the Bullets and Numbering galleries): the bullet or number style, size, color, and start number. |
+| `imageAltText` | The alt text of the selected object: description, title, and **Mark as decorative**. |
+| `imageProperties` | Format Picture: the size, rotation, and crop of the selected picture. |
+| `columns` | The Columns dialog (**Format > Columns…** and **Columns > More columns…**): the column count and the spacing between columns. |
+| `paragraph` | The Paragraph dialog (**Format > Paragraph…**, **Line Spacing > Line Spacing Options…**, and the text context menu): alignment, indents, spacing, and line spacing. |
+| `hyperlink` | The link popup (Ctrl+K or Cmd+K, the toolbar's link control, **Insert > Link…**). |
+| `find` | The find and replace bar, where `PptxEditor.FindBar` stands. |
+| `contextMenu` | The slide canvas's context menu. |
+| `railContextMenu` | The slide menu of the slide rail and the slide sorter. |
+| `sectionContextMenu` | The section header menu of the slide rail and the slide sorter. |
+
+### What a `false` entry does
+
+A `false` entry turns off automatic rendering for that key. It does not turn off the operation. `setLink`, `editor.find`, `setSlideBackground`, `setFontFormat`, `setParagraphFormat`, `setBulletFormat`, `setColumns`, `setAltText`, and `setImageProperties` keep working from the API. `useEditorCommand('image.altText').execute(description)` also sets the description with the popup off.
+
+The toolbar control or menu row that opens the surface stays visible. It is disabled with a reason, such as "Links are turned off in this editor". There are two exceptions:
+
+- The link control opens your panel while a `useHyperlinkPopup()` panel of yours is mounted. See [Build your own link panel](/docs/customization/dialogs#build-your-own-link-panel).
+- A row inside a toolbar dropdown that opens a dialog is left out of the dropdown. Examples are **Line Spacing Options…**, **More Spacing…**, **Bullets and numbering…** in a gallery, and **More columns…**. A disabled row there has no use, and the other rows still work.
+
+When you replace an input popup, give your users another way to reach its operation.
+
+### Open a dialog by key
+
+`useEditorDialog(key).open()` opens a modal dialog from your own control. The keys are `pageSetup`, `background`, `font`, `paragraph`, `bulletsAndNumbering`, `columns`, `imageAltText`, and `imageProperties`. `isAvailable` is `false` when the entry is `false`.
+
+## The link popup renderer
+
+`PptxEditor.Root` hosts the link popup, so it opens with no toolbar on the page. It has two modes:
+
+- **Reading.** A click into linked text opens a small panel under the caret: the target, **Copy**, **Edit**, and **Remove link**. The caret keeps the keyboard, so typing goes on. Press F6 to move focus into the panel. A screen reader hears the link when the panel opens. The panel closes when the caret moves. In a read-only editor the panel shows the target and **Copy** only.
+- **Editing.** Ctrl+K or Cmd+K, the link control, **Insert > Link…**, and **Edit** open the URL field with **Apply** and **Cancel**. For an existing link, the panel also shows the target and **Copy**.
+
+The packaged popup is `PptxEditor.HyperLink`, with named parts on the toolbar's customization steps:
+
+| Part | Mode | What it is |
+| --- | --- | --- |
+| `HyperLink.Url` | Both | The target. A safe link opens in a new tab; any other shows as text. In editing mode it shows for an existing link. |
+| `HyperLink.Copy` | Both | Copies the safe target. Takes `icon`. In editing mode it shows for an existing link. |
+| `HyperLink.Edit`, `HyperLink.Unlink` | Reading | Icon actions. Each takes `icon`. `Unlink` also shows in editing mode for an existing link. |
+| `HyperLink.Fields` | Editing | The URL field. Enter applies. |
+| `HyperLink.Error` | Both | Why the engine refused the last change. |
+| `HyperLink.Apply`, `HyperLink.Cancel` | Editing | Text buttons. |
+
+Every part takes `className`, `asChild`, and `hidden`. A part that you pass as a child replaces the default copy of that part. `preset={false}` renders only your children. The panel carries `data-mode="reading"` or `data-mode="editing"` for your CSS. The display text is not a field: a link applies to the selected text, or to the word at the caret.
+
+`useHyperlinkPopup()` returns the state (`mode`, `url`, `href`, `draft`, `error`, `copied`, `canEdit`) and the actions (`open`, `openAtCaret`, `close`, `copy`, `openTarget`, `beginEdit`, `setUrl`, `commitEdit`, `unlink`), for a panel of your own. It has the shape of DOCX Editor's hook, with these differences: there is no `setText`, because the link applies to the text as it stands, and `error` is the reason text, not a boolean. `open(link, anchor)` takes the same arguments as DOCX Editor's, but the panel always shows the link at the caret: `open(null)` opens the URL field, and `open()` opens the link at the caret, or the URL field when there is none. Inside `PptxEditor.Root`, the hook shares the root's link state. Call it in a panel or a `popups.hyperlink` renderer. To disable the packaged panel, set `popups.hyperlink: false`. A mounted custom panel still receives link requests. See [Build your own link panel](/docs/customization/dialogs#build-your-own-link-panel).
+
+Render your panel from `popups.hyperlink`. A renderer opens for the URL field only. To show reading mode too, register it with `definePopup(YourPanel, { reading: true })`: a click into linked text then renders it with `mode: 'reading'`. The renderer also receives `HyperlinkPopupProps`:
+
+| Prop | Value |
+| --- | --- |
+| `anchor` | The element the popup opens under: the caret after a click, else the element the request came from, the visible toolbar link button, the open menu bar trigger, or the slide. |
+| `url` | The link of the selection, or an empty string. |
+| `mode` | `reading` or `editing`. `reading` only for a renderer registered with `{ reading: true }`. |
+| `onClose` | Closes the popup. Apply the link with `editor.exec({ type: 'setLink', url })`. |
+| `className` | A class name for the popup panel. Forward it when you render `HyperlinkPopup`, the packaged popup with its default parts. |
+
+```tsx
+function AcmeLink() {
+  return (
+    <PptxEditor.HyperLink className="acme-link">
+      <PptxEditor.HyperLink.Copy hidden />
+      <PptxEditor.HyperLink.Unlink icon={<TrashIcon />} />
+    </PptxEditor.HyperLink>
+  );
+}
+
+const popups: PptxEditorPopups = { hyperlink: definePopup(AcmeLink, { reading: true }) };
+```
+
+In Vue, use `PptxEditorHyperLink` with the same parts and `useHyperlinkPopup()`. An action's glyph goes in its `icon` slot.
+
+## Dialog part options
+
+Packaged dialogs expose `Header`, `Title`, `Body`, `Footer`, `Field`, `Error`, `Apply`, and `Cancel`. The Background dialog also exposes `Reset`, which picks the layout's background.
+
+| Configuration | How it works |
+| --- | --- |
+| Root `className`, `style` | Styles the dialog surface. |
+| Root `preset` | Defaults to `true`. `false` renders your arrangement. |
+| Part `className`, `style` | Adds presentation to a named part. |
+| Part `hidden` | Removes that part. |
+| Part `asChild` | Applies the part's wiring to one child, without the packaged classes. |
+| `Field name` | Names the field to replace or hide: a section, or one field in it. |
+| Field children | Replace the field's content. On one field (a single input), they replace the whole field. Read and write the draft with the dialog's hook. `asChild` does not apply to one field and prints a development warning. |
+| Part `id`, `title`, `aria-label`, `data-*` | Reach the rendered element. |
+
+The part's own wiring wins over conflicting props: a stray `onClick` cannot detach Apply from the dialog.
+
+### Draft hooks
+
+The draft hooks are `usePageSetupDialog`, `useBackgroundDialog`, `useFontDialog`, `useParagraphDialog`, `useBulletsAndNumberingDialog`, `useColumnsDialog`, `useImageAltTextDialog`, and `useImagePropertiesDialog`. They return `values`, `setValue`, `errors`, `isEnabled`, `apply`, and `cancel`. `useBackgroundDialog` also returns `reset`. `errors` holds translated messages, one for each field. Call the hooks inside the dialog, for your own fields.
+
+Apply validates and commits the draft. A refusal keeps the dialog open with the engine's reason in the `Error` part. The draft rules live in core (`createDialogDraft`), so the React and Vue dialogs commit the same way.
+
+OK applies the draft. The Background, Font, Paragraph, Bullets and Numbering, Columns, Alt Text, and Format Picture dialogs commit it as one undo step. The Page setup dialog runs no command and reports the appearance through `onThemeChange`. Cancel discards the draft.
+
+## Dialog fields
+
+### Page setup fields
+
+| Field | Value |
+| --- | --- |
+| `slideSize` | The slide size, read-only in this version. |
+| `theme` | The appearance (`light` or `dark`), shown with `onThemeChange`. Apply it yourself through `colorMode` on `PptxEditor.Root`. |
+| `fonts` | The embedded fonts, read-only. |
+| `substitutes` | The substituted fonts, read-only. |
+
+### Background fields
+
+| Field                          | Value                                  |
+| ------------------------------ | -------------------------------------- |
+| `solid`, `gradient`, `picture` | Write the draft's `background` value.  |
+| `allSlides`                    | Applies the background to every slide. |
+
+### Paragraph fields
+
+The Paragraph dialog reads the selected paragraphs. A field that the paragraphs disagree on shows "Mixed" and stays as it is unless you change it. OK writes only the fields that changed, as one `setParagraphFormat` command. A section and each field in it are `Field` parts, so you can hide one field or the whole section.
+
+| Section | Fields | Value |
+| --- | --- | --- |
+| `general` | `alignment` | Left, centered, right, justified, or distributed. |
+| `indentation` | `indentLeft`, `special`, `specialBy` | The text indent before the text, and the first-line or hanging indent, in inches. |
+| `spacing` | `spaceBefore`, `spaceAfter` | The space before and after, in points or lines. Each field holds its unit list. |
+| `spacing` | `lineRule`, `lineAt` | Line spacing: single, 1.5 lines, double, exactly (points), or multiple. |
+
+### Font fields
+
+The Font dialog has two tabs, Font and Character Spacing, and reads the selected text. A field that the text disagrees on shows "Mixed" or a cleared box. OK writes only the fields that changed, as one `setFontFormat` command. Each field is a `Field` part, and so are the two sections of the Font tab.
+
+| Section or tab | Fields | Value |
+| --- | --- | --- |
+| Font tab | `fontFamily`, `style`, `size` | The Latin font, the style (regular, italic, bold, bold italic), and the size in points. |
+| `allText` | `color`, `underline`, `underlineColor` | The font color, the underline style, and the underline color. |
+| `effects` | `strike`, `doubleStrike`, `superscript`, `subscript`, `offset`, `smallCaps`, `allCaps` | The effects. `offset` is the superscript or subscript offset in percent. |
+| Character Spacing tab | `spacing`, `by`, `kerning`, `kerningAt` | Character spacing (normal, expanded, condensed) by points, and kerning from a font size. |
+
+### Bullets and numbering fields
+
+The dialog has a Bulleted tab and a Numbered tab, and opens on the tab of the gallery it came from. OK sends one `setBulletFormat` command for the selected paragraphs. A tab and each field on it are `Field` parts.
+
+| Tab | Fields | Value |
+| --- | --- | --- |
+| `bullet` | `style`, `char`, `font`, `sizePercent`, `color` | The bullet from the gallery, or your own character in a font, its size in percent of the text (25 to 400), and its color. A symbol font's character also shows as its Unicode twin at the end of the box. The swatch button beside a color field shows the color and opens the color grid (theme tints and shades, standard colors). |
+| `number` | `numberStyle`, `numberSizePercent`, `numberColor`, `startAt` | The numbering scheme, its size and color, and the start number (1 to 32767). |
+
+### Columns fields
+
+| Field     | Value                                 |
+| --------- | ------------------------------------- |
+| `columns` | Both fields.                          |
+| `count`   | The number of columns, 1 to 16.       |
+| `spacing` | The space between columns, in inches. |
+
+### Alt Text fields
+
+| Field | Value |
+| --- | --- |
+| `description` | The text a screen reader reads (`p:cNvPr/@descr`), up to 4,000 characters. Off while the object is decorative. |
+| `title` | The title (`p:cNvPr/@title`). |
+| `decorative` | **Mark as decorative**: a screen reader skips the object, and the description is removed. |
+
+OK sends only the fields you changed, as one `setAltText` command.
+
+### Format Picture fields
+
+| Field | Value |
+| --- | --- |
+| `size` | Height and width in inches, as the picture shows on the slide, and **Lock aspect ratio**. Off with a note when the picture is locked against resizing. |
+| `rotation` | The rotation in degrees, clockwise. |
+| `crop` | The crop of each edge in percent of the image. A negative value adds space. Off with a note when the picture is locked against cropping. |
+
+OK sends only the values you changed, as one `setImageProperties` command. The draft fields are `width`, `height`, `lockAspect`, `rotation`, `cropLeft`, `cropTop`, `cropRight`, and `cropBottom`.
+
+## Dialog styling
+
+Dialogs render outside `PptxEditor.Viewport`. Each dialog element carries `.pptx-dialog` and its own `.pptx-editor` scope, and `dark` with a dark color mode. Scope your theme on an element around `PptxEditor.Root`, or pass a `className` through the renderer. See [Appearance](/docs/customization/appearance#size-typography-and-layer-reference) for the dialog tokens.
+
+## Popup lifetime
+
+Keep the renderer's session props (`open` and `onClose`) when you wrap a popup. A dialog belongs to the document it opened on. It closes when the editor opens another document, so a draft never edits the replacement. The Alt Text and Format Picture dialogs also belong to the object they opened on. They close when the selection moves to another object or the object is removed. The dialog unmounts when it closes, so the next opening starts from the document again.
+
+The packaged dialog surface keeps focus inside, closes on Escape, and returns focus to the element that opened it. A separate application modal must keep those behaviors.
+
+## React and Vue reference
+
+The Vue adapter has the same registry keys and the same packaged dialogs: Page setup, Background, Font, Paragraph, Bullets and Numbering, Columns, Alt Text, and Format Picture. It also has the link popup (`HyperlinkPopup`) and the find bar (`PptxEditorFindBar`). Each dialog has the same named parts as its React twin, and a registry entry receives `open` and `onClose`. Build a Vue entry with `h`, for example `h(PageSetupDialog, props, () => [h(PageSetupDialog.Field, { name: 'substitutes', hidden: true })])`.
+
+Vue also has `useFontFormat`, `useParagraphFormat`, and `useBulletFormat` for your own dialogs. The Vue toolbar draws the controls that open the picture dialogs, as React's does. To open a dialog from your own control, call `useEditorDialog`.
+
+## See also
+
+- [Dialogs](/docs/customization/dialogs)
+- [Appearance](/docs/customization/appearance)
+- [`@pptx-editor.dev/react` API report](https://github.com/eigenpal/pptx-editor/blob/main/docs/api/react/index.api.md), for `PptxEditorPopups`, the dialog props, and the draft hook types

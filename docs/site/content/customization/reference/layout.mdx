@@ -1,0 +1,123 @@
+---
+title: 'Layout reference'
+description: 'Every PPTX editor layout part, pane prop, state attribute, root prop, and open-failure option.'
+category: 'Customization'
+---
+
+This page lists the layout parts and their props. For the tasks, see [Layout](/docs/customization/layout).
+
+## Layout parts
+
+| Part | What you can change | Notes |
+| --- | --- | --- |
+| `PptxEditor.Toolbar` | Position, controls, groups, and overflow. | The flat form of the chrome groups. See [Toolbar](/docs/customization/toolbar). |
+| `PptxEditor.Ribbon` | Tabs, the selected tab, and each tab's groups. | The tabs over the same chrome groups, with contextual tabs. See [Ribbon](/docs/customization/ribbon). |
+| `PptxEditor.Menu` | Position, menus, and rows. | The menu bar. In Vue, `PptxEditorMenu`. See [Menus](/docs/customization/menus). |
+| `PptxEditor.Viewport` | `className` and children. | Carries `.pptx-editor`, and `dark` with a dark color mode. |
+| `PptxEditor.Content` | `className`. | The slide canvas and its context menu. |
+| `PptxEditor.SlideRail` | `open`, `defaultOpen`, `onOpenChange`, `paneWidth`, `toggle`, `orientation`, `preset`, `t`, `className`, `style`, and part children. | The slide thumbnails, as a column or as a row. The **Hide thumbnails** button hides the rail to a strip with a **Show thumbnails** button. |
+| `PptxEditor.NotesPane` | `open`, `defaultOpen`, `onOpenChange`, `showFormatButtons`, `className`, `style`. | The speaker notes of the current slide. Shares its open state with `useNotesPane()`. Use one per root. `showFormatButtons={false}` removes the **B**, **I**, and **U** buttons. The shortcut keys still format the notes. |
+| `PptxEditor.SlideSorter` | `className`. | The Slide Sorter view: every slide as a tile, grouped by section. Render it in place of the rail, the canvas, and the notes while `presentationView` is `slideSorter`. Without a mounted sorter in that view, a development warning says so. |
+| `PptxEditor.SidePanel` | `onClose`, `paneWidth`, `className`, `style`. | The **Format** tab, and a **Comments** tab that shows an empty state in this version. Render it to show it. Remove it to hide it. |
+| `PptxEditor.ZoomPill` | `className`. | A floating zoom control, placed in the nearest positioned ancestor. |
+| `PptxEditor.StatusBar` | `className`, `preset`, `t`, and children. | A row with **Slide x of y**, **Notes**, the view switch, and the zoom pill. See [Status bar](/docs/customization/ribbon#status-bar). |
+| `PptxEditor.FindBar` | `className`, `t`. | The find and replace bar, placed in the nearest positioned ancestor. Without it, Find and Replace stay disabled with a reason. |
+| `PptxEditor.Slideshow` | None. | The slide show. Mount it once inside the viewport. It shows nothing until a show starts. |
+| `PptxEditor.FontNotice`, `PptxEditor.EditNotice` | `className`, `t`. | The font substitution notice, and the edit notice. The edit notice shows the reason the last edit was refused, or what the last Delete removed, with an Undo button. Both float in the nearest positioned ancestor. |
+| `PptxEditor.Loading` | `overlay`, `when`, `indicator`, `className`, `style`, and children. | A slide-shaped sheet with a spinner. See [Loading screen](#loading-screen). |
+| `PptxEditor.OpenFailure` | `title`, `message`, `showCode`, `actions`, `closeLabel`, `showClose`, `onDismiss`, `className`, `style`, `t`. | The notice for a file that does not open, placed in the nearest positioned ancestor. `<PptxEditor>` renders it. A composed editor adds it. See [Open failure](/docs/customization/layout#open-failure). |
+
+### Status bar parts
+
+The `PptxEditor.StatusBar` parts are `StatusBar.SlideNumber`, `.Notes`, `.Views`, and `.Zoom`. `StatusBar.Action` is your own button. Each part takes `className` and `hidden`. A part child replaces its part in place. Other children go after **Notes**. `preset={false}` shows only the children. In Vue, `PptxEditorStatusBar` has the same four parts as statics, and each takes `className` (or a host `class`).
+
+### Loading screen
+
+`PptxEditor.Loading` shows while the editor has no deck and while a deck opens. The engine paints it before it parses a large deck. `overlay` pins it over the nearest positioned ancestor, so it covers the previous deck. `indicator` replaces the spinner. Children replace the sheet. `PptxEditor.Loading.Spinner` is the packaged spinner. A refused file clears it. In Vue, use `PptxEditorLoading` with the `indicator` and default slots. `PptxEditorLoading.Spinner` is the packaged spinner.
+
+## Pane configuration
+
+The pane props follow DOCX Editor's `Navigation`:
+
+| Prop | Value | Behavior |
+| --- | --- | --- |
+| `defaultOpen` | Boolean | `true` by default. The first state, uncontrolled. |
+| `open`, `onOpenChange` | Boolean and callback | Controlled open state. Accept each change in your state. |
+| `paneWidth` | Pixels | The width of the slide rail or the side panel. For a horizontal rail, the width of the row. The notes pane does not take it. |
+| `orientation` | `vertical` or `horizontal` | Slide rail only. `vertical` by default. See [Horizontal slide rail](/docs/customization/layout#horizontal-slide-rail). |
+| `toggle` | Boolean | Slide rail only. `false` removes the **Hide thumbnails** and **Show thumbnails** buttons, for a host that opens and closes the rail from its own chrome. A closed rail with `toggle={false}` renders nothing. |
+| `className` | CSS class | Styles the pane. |
+| `style` | Inline styles | Styles the pane. A `width` in `style` wins over `paneWidth`. |
+
+Unlike DOCX Editor's `Navigation`, the rail's `toggle` takes no part props. The rail has two toggle buttons in two places, so one set of props would not say which to change. Change the **Hide thumbnails** button with the `SlideRail.Collapse` part. Change the **Show thumbnails** button of the folded strip with the `SlideRail.Expand` part.
+
+A notes pane fills the height that you give it. Set a `height`, or a `flex` value in a flex column, on the pane's `className`, and the notes field grows into it. A short pane shrinks the field to 40 pixels. Without a height from you, the field keeps its own 96 pixels.
+
+Without `open`, the notes pane reads the open state that `PptxEditor.Root` keeps. A notes pane with `open` gets a change from `useNotesPane()` through its `onOpenChange`. Render one notes pane in each root: a second one keeps its own state and prints a development warning.
+
+### Horizontal rail hooks
+
+| Hook | Use |
+| --- | --- |
+| `--pptx-rail-thumb-width` | The thumbnail width, `112px` by default. Set it on your rail class or an ancestor. |
+| [Slide rail parts](/docs/customization/layout#slide-rail-parts) | The slide actions. The row keeps two rows: its column count is half the buttons that show, rounded up. To remove **Hide thumbnails**, pass `toggle={false}`. |
+
+## Pane state attributes
+
+The slide rail and the notes pane carry `data-open="true"` or `data-open="false"`, so your CSS can follow the open state. The slide rail also carries `data-orientation`. Their built-in toggles carry `aria-expanded`, and `aria-controls` names the pane content while it is open.
+
+## Root configuration and lifetime
+
+| Prop | Behavior |
+| --- | --- |
+| `document` | The `.pptx` bytes. An identity change loads the new document. |
+| `mode` | `edit` or `view`. Changes apply without a reload. |
+| `locale` | The UI catalog. |
+| `colorMode` | `light`, `dark`, or `system`. See [Appearance](/docs/customization/appearance). |
+| `popups` | Render overrides for dialogs and popups. See [Dialogs](/docs/customization/dialogs). |
+| `fonts`, `onFontError` | Font bytes for the host's faces, and font failures. In Vue, listen to the `fontError` event. See [Fonts](/docs/customization/fonts). |
+| `fontFamilies` | The extra families the font picker offers. |
+| `onReady`, `onChange` | The instance, once, and every change of editor state. In Vue, listen to the `ready` and `change` events. |
+
+## Open-failure options
+
+Pass options as the `openFailure` object on `PptxEditor`, or as props of `PptxEditor.OpenFailure`:
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `title` | `openFailure.title` | The notice title. |
+| `message` | The message for the `reason` | Content, or a function of the `DocumentOpenFailure`. In Vue, the `message` slot wins over it. |
+| `showCode` | `true` | Shows the error code. |
+| `actions` | None | Your own buttons, as a function of the context. In Vue, the `actions` slot wins over it. |
+| `closeLabel` | `openFailure.close` | The **Close** label. |
+| `showClose` | `true` | Shows **Close**. |
+| `onDismiss` | None | Runs after any close. In Vue, listen to `dismiss`. |
+| `className`, `style` | None | Styles the notice element. |
+
+The notice uses the `.pptx-open-failure` class, with `data-reason` set to the failure's `reason`.
+
+### Error codes
+
+`snapshot().openFailure` holds the shown refusal: a `DocumentOpenFailure` with a stable `code` and a `reason`, or `null`. Each refusal is a new object, so a repeated refusal of the same file shows the notice again. The `reason` groups the codes and picks the message:
+
+| `reason` | Codes | Message key |
+| --- | --- | --- |
+| `damaged` | `zip`, `xml`, `no-content-types` | `openFailure.reasons.damaged` |
+| `not-pptx` | `not-a-presentation`, `empty` | `openFailure.reasons.notPptx` |
+| `too-large` | `too-many-parts` | `openFailure.reasons.tooLarge` |
+| `unknown` | Any other code | `openFailure.reasons.unknown` |
+
+To change a message in every editor, override its key in `locale`.
+
+## React and Vue reference
+
+The Vue adapter has the root, the viewport, the content, the toolbar, the loading screen, the find bar (`PptxEditorFindBar`), the slide show (`PptxEditorSlideshow`, `useSlideshow`), and the font and edit notices (`PptxEditorFontNotice`, `PptxEditorEditNotice`). It has the panes too: `PptxEditorSlideRail`, `PptxEditorSlideSorter`, `PptxEditorNotesPane` (which shares its open state with `useNotesPane`), `PptxEditorSidePanel`, and `PptxEditorZoomPill`.
+
+A pane's `onOpenChange` is the `update:open` event, so `v-model:open` controls it. Each part takes `className`, and `style` where React has it. A host `class` and `style` also work. `PptxEditorSidePanel` takes `onClose` as a prop, as in React: with it, the panel shows its close button.
+
+In Vue, the slide rail parts are statics of `PptxEditorSlideRail` (`PptxEditorSlideRail.AddSlide`, and so on). They are also exported as `SlideRailAddSlide`, `SlideRailChooseLayout`, `SlideRailDuplicate`, `SlideRailMoveEarlier`, `SlideRailMoveLater`, `SlideRailDelete`, `SlideRailCollapse`, and `SlideRailExpand`. Put them in the default slot. `icon` takes a VNode.
+
+## See also
+
+- [Layout](/docs/customization/layout)
+- [`@pptx-editor.dev/react` API report](https://github.com/eigenpal/pptx-editor/blob/main/docs/api/react/index.api.md), for `PaneProps`, `SlideRailProps`, `SlideRailNamespace`, `SlideRailPartProps`, `SlideSorterProps`, `NotesPaneProps`, `SidePanelProps`, `ZoomPillProps`, and `UseNotesPaneReturn`

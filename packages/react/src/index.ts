@@ -9,8 +9,9 @@
  * @public
  */
 
-import { createElement, forwardRef, type ReactNode } from 'react';
+import { createElement, forwardRef, useMemo, type FunctionComponent, type ReactNode } from 'react';
 import type { ToolbarProps } from './Toolbar.tsx';
+import { withChromeTranslate } from './headless-hooks.tsx';
 import { MenuTableGrid } from './TableControls.tsx';
 import {
   warnOpenFailureActions,
@@ -31,7 +32,24 @@ import {
 import { Toolbar as ToolbarRoot, ToolbarControl, ToolbarGroup, ToolbarSlot } from './Toolbar.tsx';
 import { ToolbarAction, ToolbarSeparator } from './toolbar-action.tsx';
 import { TOOLBAR_PARTS, type ToolbarNamedParts } from './toolbar-named-parts.tsx';
-import { NotesPane, SidePanel, SlideRail, ZoomPill } from './panes.tsx';
+import {
+  NotesPane,
+  SidePanel,
+  SlideRail as SlideRailRoot,
+  ZoomPill,
+  type NotesPaneProps,
+  type SlideRailProps,
+} from './panes.tsx';
+import {
+  SlideRailAddSlide,
+  SlideRailChooseLayout,
+  SlideRailCollapse,
+  SlideRailExpand,
+  SlideRailDelete,
+  SlideRailDuplicate,
+  SlideRailMoveEarlier,
+  SlideRailMoveLater,
+} from './rail-parts.tsx';
 import { FontNotice } from './FontNotice.tsx';
 import { EditNotice } from './EditNotice.tsx';
 import {
@@ -54,17 +72,21 @@ import { DefaultWorkspace, SlideSorter } from './SlideSorter.tsx';
 import type { PptxEditorPopups } from './popups.tsx';
 import {
   MENU_PARTS,
+  MENU_ROW_PARTS,
   Menu as MenuRoot,
   MenuEntry,
   MenuGroup,
   MenuSlotItem,
   type MenuPartComponent,
   type MenuProps,
+  type MenuRowPartComponent,
 } from './menu-parts.tsx';
 import {
+  CONTEXT_MENU_ROW_PARTS,
   PptxEditorContextMenu as ContextMenuRoot,
   type PptxEditorContextMenuProps,
 } from './context-menu-parts.tsx';
+import type { ContextMenuPartName, MenuRowPartName } from '@pptx-editor.dev/core/editor';
 import { MenuRow, MenuSeparator, MenuSubmenu } from './ContextMenu.tsx';
 import { Ribbon as RibbonRoot, RibbonTab, type RibbonProps } from './Ribbon.tsx';
 import {
@@ -145,14 +167,11 @@ export { HyperlinkPopup } from './HyperlinkPopup.tsx';
 import { HyperLink } from './HyperLink.tsx';
 export {
   HyperLink,
-  useHyperlinkPopup,
   type HyperLinkActionProps,
   type HyperLinkNamespace,
   type HyperLinkPartProps,
   type HyperLinkProps,
-  type UseHyperlinkPopupResult,
 } from './HyperLink.tsx';
-export type { HyperlinkPopupMode, HyperlinkPopupState } from '@pptx-editor.dev/core/editor';
 export {
   RailContextMenu,
   type RailContextMenuProps,
@@ -172,7 +191,14 @@ export {
   type MenuSlotItemProps,
   type MenuPartComponent,
   type MenuProps,
+  type MenuRowPartComponent,
+  type MenuRowPartProps,
 } from './menu-parts.tsx';
+export type {
+  ContextMenuPartName,
+  MenuNamedRow,
+  MenuRowPartName,
+} from '@pptx-editor.dev/core/editor';
 export {
   useContextMenuRequest,
   useContextMenuTarget,
@@ -202,15 +228,32 @@ export interface PptxEditorToolbarNamespace extends ToolbarNamedParts {
  * own button, and the named parts (`Toolbar.Bold`, `Toolbar.FontFamily`, …) stand for one slot
  * each. @public
  */
-export const Toolbar: PptxEditorToolbarNamespace = Object.assign(ToolbarRoot, {
-  ...TOOLBAR_PARTS,
-  Slot: ToolbarSlot,
-  Group: ToolbarGroup,
-  Action: ToolbarAction,
-  Separator: ToolbarSeparator,
-});
+export const Toolbar: PptxEditorToolbarNamespace = Object.assign(
+  withChromeTranslate<ToolbarProps>(ToolbarRoot, 'Toolbar'),
+  {
+    ...TOOLBAR_PARTS,
+    Slot: ToolbarSlot,
+    Group: ToolbarGroup,
+    Action: ToolbarAction,
+    Separator: ToolbarSeparator,
+  }
+);
+/**
+ * The named rows of the menu bar (`Menu.Cut`, `Menu.PageSetup`, …), one per row of core's
+ * `MENU_NAMED_PARTS`. Put one in the menu that holds its row. @public
+ */
+export type MenuNamedRows = { readonly [K in MenuRowPartName]: MenuRowPartComponent };
+
+/**
+ * The named rows of the canvas context menu (`ContextMenu.Cut`, `ContextMenu.MergeCells`, …),
+ * one per row of core's `CONTEXT_MENU_NAMED_PARTS`. @public
+ */
+export type ContextMenuNamedRows = {
+  readonly [K in ContextMenuPartName]: MenuRowPartComponent;
+};
+
 /** The menu bar with its parts attached as statics. @public */
-export interface MenuNamespace {
+export interface MenuNamespace extends MenuNamedRows {
   /** The menu bar. See `MenuProps`. */
   (props: MenuProps): ReactNode;
   /** A menu of the bar: a built-in id changes it, another id adds a host menu. */
@@ -248,19 +291,23 @@ export interface MenuNamespace {
  * with DOCX Editor's parts (`Entry`, `Item`, `Row`, `Group`, `Separator`, `Submenu`) and one
  * named part per menu (`Menu.File`, …). @public
  */
-export const PptxEditorMenu: MenuNamespace = Object.assign(MenuRoot, {
-  ...MENU_PARTS,
-  Entry: MenuEntry,
-  Item: MenuSlotItem,
-  Row: MenuRow,
-  Group: MenuGroup,
-  Separator: MenuSeparator,
-  Submenu: MenuSubmenu,
-  TableGrid: MenuTableGrid,
-});
+export const PptxEditorMenu: MenuNamespace = Object.assign(
+  withChromeTranslate<MenuProps>(MenuRoot, 'Menu'),
+  {
+    ...MENU_ROW_PARTS,
+    ...MENU_PARTS,
+    Entry: MenuEntry,
+    Item: MenuSlotItem,
+    Row: MenuRow,
+    Group: MenuGroup,
+    Separator: MenuSeparator,
+    Submenu: MenuSubmenu,
+    TableGrid: MenuTableGrid,
+  }
+);
 
 /** The canvas context menu with its parts attached as statics. @public */
-export interface ContextMenuNamespace {
+export interface ContextMenuNamespace extends ContextMenuNamedRows {
   /** The canvas context menu, for the target that opened it. See `PptxEditorContextMenuProps`. */
   (props: PptxEditorContextMenuProps): ReactNode;
   /** A row for a registered slot; replaces or hides the built-in row of the same slot. */
@@ -277,15 +324,20 @@ export interface ContextMenuNamespace {
 
 /**
  * The slide canvas's context menu (`PptxEditor.ContextMenu`), with DOCX Editor's parts (`Slot`,
- * `Item`, `Group`, `Separator`, `Submenu`). Render it in `popups.contextMenu`. @public
+ * `Item`, `Group`, `Separator`, `Submenu`). Place it in the root or the viewport, or render it
+ * in `popups.contextMenu`. @public
  */
-export const PptxEditorContextMenu: ContextMenuNamespace = Object.assign(ContextMenuRoot, {
-  Slot: MenuSlotItem,
-  Item: MenuRow,
-  Group: MenuGroup,
-  Separator: MenuSeparator,
-  Submenu: MenuSubmenu,
-});
+export const PptxEditorContextMenu: ContextMenuNamespace = Object.assign(
+  withChromeTranslate<PptxEditorContextMenuProps>(ContextMenuRoot, 'ContextMenu'),
+  {
+    ...CONTEXT_MENU_ROW_PARTS,
+    Slot: MenuSlotItem,
+    Item: MenuRow,
+    Group: MenuGroup,
+    Separator: MenuSeparator,
+    Submenu: MenuSubmenu,
+  }
+);
 
 export { RibbonTab, type RibbonProps, type RibbonTabProps } from './Ribbon.tsx';
 
@@ -327,21 +379,82 @@ export interface StatusBarNamespace {
   readonly Views: typeof StatusBarViews;
   /** The zoom pill. */
   readonly Zoom: typeof StatusBarZoom;
+  /** A host-owned button with the bar's styling: the same component as `Toolbar.Action`. */
+  readonly Action: typeof ToolbarAction;
 }
 
 /**
  * The status bar (`PptxEditor.StatusBar`): slide x of y, the Notes button, the view switch,
  * and the zoom pill. @public
  */
-export const PptxEditorStatusBar: StatusBarNamespace = Object.assign(StatusBarRoot, {
-  SlideNumber: StatusBarSlideNumber,
-  Notes: StatusBarNotes,
-  Views: StatusBarViews,
-  Zoom: StatusBarZoom,
-});
+export const PptxEditorStatusBar: StatusBarNamespace = Object.assign(
+  withChromeTranslate<StatusBarProps>(StatusBarRoot, 'StatusBar'),
+  {
+    SlideNumber: StatusBarSlideNumber,
+    Notes: StatusBarNotes,
+    Views: StatusBarViews,
+    Zoom: StatusBarZoom,
+    Action: ToolbarAction,
+  }
+);
 
 export {
-  SlideRail,
+  SlideRailAddSlide,
+  SlideRailChooseLayout,
+  SlideRailCollapse,
+  SlideRailExpand,
+  SlideRailDelete,
+  SlideRailDuplicate,
+  SlideRailMoveEarlier,
+  SlideRailMoveLater,
+  type SlideRailPartProps,
+} from './rail-parts.tsx';
+
+/** The slide rail with its action parts attached as statics, as `StatusBarNamespace`. @public */
+export interface SlideRailNamespace {
+  /** The slide rail. See `SlideRailProps`. */
+  (props: SlideRailProps): ReactNode;
+  /** Add slide. */
+  readonly AddSlide: typeof SlideRailAddSlide;
+  /** The layout gallery button. */
+  readonly ChooseLayout: typeof SlideRailChooseLayout;
+  /** Duplicate the selected slides. */
+  readonly Duplicate: typeof SlideRailDuplicate;
+  /** Move the selected slides earlier. */
+  readonly MoveEarlier: typeof SlideRailMoveEarlier;
+  /** Move the selected slides later. */
+  readonly MoveLater: typeof SlideRailMoveLater;
+  /** Delete the selected slides. */
+  readonly Delete: typeof SlideRailDelete;
+  /** Hide thumbnails. */
+  readonly Collapse: typeof SlideRailCollapse;
+  /** Show thumbnails: the button of the folded strip. */
+  readonly Expand: typeof SlideRailExpand;
+  /** A host-owned button with the rail's styling: the same component as `Toolbar.Action`. */
+  readonly Action: typeof ToolbarAction;
+}
+
+/**
+ * The slide rail (`PptxEditor.SlideRail`) with its action parts: a named part child replaces
+ * its button, `hidden` removes it, other children go after Delete, and `preset={false}` renders
+ * only the children. @public
+ */
+export const SlideRail: SlideRailNamespace = Object.assign(
+  withChromeTranslate<SlideRailProps>(SlideRailRoot, 'SlideRail'),
+  {
+    AddSlide: SlideRailAddSlide,
+    ChooseLayout: SlideRailChooseLayout,
+    Duplicate: SlideRailDuplicate,
+    MoveEarlier: SlideRailMoveEarlier,
+    MoveLater: SlideRailMoveLater,
+    Delete: SlideRailDelete,
+    Collapse: SlideRailCollapse,
+    Expand: SlideRailExpand,
+    Action: ToolbarAction,
+  }
+);
+
+export {
   NotesPane,
   ZoomPill,
   SidePanel,
@@ -353,6 +466,34 @@ export {
 } from './panes.tsx';
 export { useNotesPane, type UseNotesPaneReturn } from './pane-state.ts';
 export { useEditorColorMode, type UseEditorColorModeReturn } from './color-mode.ts';
+export {
+  ToolbarContext,
+  useChromeTranslate,
+  useDocumentSearch,
+  useEditorCaret,
+  useHistoryGroup,
+  useToolbarContext,
+  useToolbarLabel,
+  useToolbarLabelFor,
+  type ToolbarContextValue,
+  type UseDocumentSearchResult,
+  type UseHistoryGroupReturn,
+} from './headless-hooks.tsx';
+export type {
+  ChromeTranslate,
+  DocumentSearchFindOptions,
+  DocumentSearchState,
+  EditorCaret,
+  HistoryGroupBindingOptions,
+} from '@pptx-editor.dev/core/editor';
+export {
+  useEditorEvent,
+  useEditorSnapshot,
+  useScopeClassName,
+  useZoom,
+  type UseZoomResult,
+} from './customization-hooks.ts';
+export type { PptxEditorEvents } from '@pptx-editor.dev/core/editor';
 export type { ColorMode, ResolvedColorMode } from '@pptx-editor.dev/core/editor';
 export { ShapeStyleGallery, type ShapeStyleGalleryProps } from './ShapeFormatControls.tsx';
 export { FontNotice, type FontNoticeProps } from './FontNotice.tsx';
@@ -363,8 +504,33 @@ export {
   useOpenFailure,
   type OpenFailureContext,
   type PptxEditorOpenFailureProps,
+  type UseOpenFailureOptions,
   type UseOpenFailureReturn,
 } from './OpenFailure.tsx';
+export {
+  useHyperlinkPopup,
+  useHyperlinkPopupInstance,
+  type UseHyperlinkPopupResult,
+} from './useHyperlinkPopup.ts';
+export type {
+  HyperlinkPopupActions,
+  HyperlinkPopupLink,
+  HyperlinkPopupMode,
+  HyperlinkPopupState,
+} from '@pptx-editor.dev/core/editor';
+export {
+  useEditorHostDocument,
+  usePptxSource,
+  type UseEditorHostDocumentReturn,
+  type UsePptxSourceResult,
+} from './usePptxSource.ts';
+export type {
+  PptxFontOrigin,
+  PptxFontsInput,
+  PptxFontsSource,
+  PptxSource,
+  UsePptxSourceOptions,
+} from '@pptx-editor.dev/core/editor';
 export {
   Loading,
   LoadingSpinner,
@@ -614,8 +780,73 @@ export interface PptxEditorProps {
    * cases print a development warning.
    */
   readonly renderOpenFailureActions?: (context: OpenFailureContext) => ReactNode;
+  /**
+   * The toolbar (`PptxEditor.Toolbar`). An object is `ToolbarProps`, passed straight through,
+   * so `toolbar={{ children: <PptxEditor.Toolbar.Bold hidden /> }}` changes one control.
+   * `false` removes it. Default `true`.
+   */
+  readonly toolbar?: boolean | ToolbarProps;
+  /**
+   * The menu bar (`PptxEditor.Menu`), above the toolbar. An object is `MenuProps`, passed
+   * straight through, as DOCX Editor's `menu`. Default `false`: the packaged editor shows the
+   * toolbar only.
+   */
+  readonly menu?: boolean | MenuProps;
+  /**
+   * The slide canvas's context menu. An object is `PptxEditorContextMenuProps`, passed straight
+   * through, so `contextMenu={{ children: <PptxEditor.ContextMenu.Cut hidden /> }}` changes one
+   * row. `false` shows no menu. It sets `popups.contextMenu`, and a `popups.contextMenu` entry
+   * wins over it. Default `true`.
+   */
+  readonly contextMenu?: boolean | PptxEditorContextMenuProps;
+  /**
+   * The packaged link popup. `false` removes it, as `popups.hyperlink: false` does: a host
+   * panel that reads `useHyperlinkPopup()` then opens for the link controls. A
+   * `popups.hyperlink` entry wins over it. Default `true`.
+   */
+  readonly hyperlinkPopup?: boolean;
+  /**
+   * The slide rail (`PptxEditor.SlideRail`), as DOCX Editor's `navigation`. An object is
+   * `SlideRailProps`, passed straight through, so `slideRail={{ open, onOpenChange }}` drives
+   * it from your own chrome. `false` removes it. Default `true`.
+   */
+  readonly slideRail?: boolean | SlideRailProps;
+  /**
+   * The speaker notes pane (`PptxEditor.NotesPane`). An object is `NotesPaneProps`, passed
+   * straight through. `false` removes it. Default `true`.
+   */
+  readonly notesPane?: boolean | NotesPaneProps;
   /** Extra content inside the viewport, after the slide show. */
   readonly children?: ReactNode;
+}
+
+/** The props an object value gives, or none for `true`. */
+const partProps = <P extends object>(value: boolean | P | undefined): P =>
+  typeof value === 'object' ? value : ({} as P);
+
+/**
+ * The `popups` the sugar passes to the root: the host's entries, with `contextMenu` and
+ * `hyperlinkPopup` mapped onto the same entries. A host entry wins.
+ */
+function sugarPopups(
+  popups: PptxEditorPopups | undefined,
+  hyperlinkPopup: boolean | undefined,
+  contextMenu: boolean | PptxEditorContextMenuProps | undefined
+): PptxEditorPopups | undefined {
+  const linkOff = hyperlinkPopup === false && popups?.hyperlink === undefined;
+  const menuEntry =
+    popups?.contextMenu !== undefined || contextMenu === undefined || contextMenu === true
+      ? undefined
+      : contextMenu === false
+        ? (false as const)
+        : (props: PptxEditorContextMenuProps) =>
+            createElement(PptxEditorContextMenu, { ...props, ...contextMenu });
+  if (!linkOff && menuEntry === undefined) return popups;
+  return {
+    ...popups,
+    ...(linkOff ? { hyperlink: false as const } : {}),
+    ...(menuEntry !== undefined ? { contextMenu: menuEntry } : {}),
+  };
 }
 
 const OPEN_FAILURE_ACTION_NAMES = {
@@ -646,6 +877,12 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
     modules,
     openFailure = true,
     renderOpenFailureActions,
+    toolbar = true,
+    menu = false,
+    contextMenu,
+    hyperlinkPopup,
+    slideRail = true,
+    notesPane = true,
     children,
   },
   ref
@@ -655,6 +892,20 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
     renderOpenFailureActions !== undefined,
     OPEN_FAILURE_ACTION_NAMES
   );
+  // Memoized, so stable props give the root the same `popups` at each render.
+  const rootPopups = useMemo(
+    () => sugarPopups(popups, hyperlinkPopup, contextMenu),
+    [popups, hyperlinkPopup, contextMenu]
+  );
+  const dock =
+    menu === false && toolbar === false
+      ? null
+      : createElement(
+          'div',
+          { className: 'pptx-default__dock' },
+          menu === false ? null : createElement(PptxEditorMenu, partProps(menu)),
+          toolbar === false ? null : createElement(Toolbar, partProps(toolbar))
+        );
   return createElement(
     PptxEditorRoot,
     {
@@ -664,7 +915,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
       ...(locale ? { locale } : {}),
       ...(onReady ? { onReady } : {}),
       ...(onChange ? { onChange } : {}),
-      ...(popups ? { popups } : {}),
+      ...(rootPopups ? { popups: rootPopups } : {}),
       ...(colorMode ? { colorMode } : {}),
       ...(fonts ? { fonts } : {}),
       ...(onFontError ? { onFontError } : {}),
@@ -674,7 +925,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
     createElement(
       PptxEditorViewport,
       { className: `pptx-default${className ? ` ${className}` : ''}` },
-      createElement('div', { className: 'pptx-default__dock' }, createElement(Toolbar)),
+      dock,
       createElement(DefaultWorkspace, {
         overlay:
           openFailure === false
@@ -686,7 +937,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
         normal: createElement(
           'div',
           { className: 'pptx-default__workspace' },
-          createElement(SlideRail),
+          slideRail === false ? null : createElement(SlideRail, partProps(slideRail)),
           createElement(
             'div',
             { className: 'pptx-default__main' },
@@ -695,7 +946,9 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
             createElement(EditNotice),
             createElement(Loading, { overlay: true }),
             createElement(FontNotice),
-            createElement(NotesPane)
+            notesPane === false
+              ? null
+              : createElement(NotesPane as FunctionComponent<NotesPaneProps>, partProps(notesPane))
           )
         ),
       }),

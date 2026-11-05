@@ -22,8 +22,20 @@ import {
   runFindBarAction,
   type FindBarAction,
 } from '@pptx-editor.dev/core/editor';
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import type { FindOptions, PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
+import type {
+  ChromeTranslate,
+  FindOptions,
+  PptxEditorInstance,
+} from '@pptx-editor.dev/core/editor';
+import { withChromeTranslate } from './headless-hooks.tsx';
 import { ToolButton } from './chrome.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
 import { usePopupEntry } from './popups.tsx';
@@ -36,12 +48,22 @@ export function requestFindBar(editor: PptxEditorInstance | null, replace = fals
 
 /** The props of `FindBar`. @public */
 export interface FindBarProps {
+  /**
+   * Your translation function for the bar, as DOCX Editor's `t` on its find pane. Without it,
+   * the root's `locale` gives the labels.
+   */
+  readonly t?: ChromeTranslate;
   /** Appended after the `pptx-find` class. */
   className?: string;
 }
 
 /** The find and replace bar. Render one inside the editor's viewport, over the canvas. @public */
-export function FindBar({ className }: FindBarProps) {
+export const FindBar: (props: FindBarProps) => ReactNode = withChromeTranslate<FindBarProps>(
+  FindBarRoot,
+  'FindBar'
+);
+
+function FindBarRoot({ className }: Omit<FindBarProps, 't'>) {
   const editor = usePptxEditor();
   const { t } = useTranslation();
   // Find rows and controls are on only while a find bar can answer them.

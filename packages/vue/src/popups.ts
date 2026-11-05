@@ -128,7 +128,8 @@ export interface PptxEditorPopups {
   find?: PptxEditorPopup<FindPopupProps>;
   /**
    * The slide canvas's context menu. A callback usually renders `PptxEditorContextMenu` with
-   * host rows; `false` shows no menu.
+   * host rows; `false` shows no menu. A `PptxEditorContextMenu` placed in the root or the
+   * viewport gives the same entry, and this entry wins over it.
    */
   contextMenu?: PptxEditorPopup<PptxEditorContextMenuProps>;
   /**
@@ -178,9 +179,37 @@ export interface UseEditorDialogReturn {
   readonly isAvailable: ComputedRef<boolean>;
 }
 
+/** The canvas menu entry that a `PptxEditorContextMenu` placed in the root gives. */
+type CanvasMenuEntry = PptxEditorPopup<PptxEditorContextMenuProps>;
+
+/**
+ * The `PptxEditorContextMenu` placed in the root or the viewport: it gives the canvas its menu
+ * entry, as a `popups.contextMenu` entry does. The last one placed counts. React's twin is
+ * `CanvasMenuRegistry`. @internal
+ */
+export interface CanvasMenuRegistry {
+  get(): CanvasMenuEntry | undefined;
+  place(token: object, entry: () => CanvasMenuEntry): void;
+  remove(token: object): void;
+}
+
+function createCanvasMenuRegistry(): CanvasMenuRegistry {
+  const current = shallowRef<{ readonly token: object; readonly entry: () => CanvasMenuEntry }>();
+  return {
+    get: () => current.value?.entry(),
+    place(token, entry) {
+      current.value = { token, entry };
+    },
+    remove(token) {
+      if (current.value?.token === token) current.value = undefined;
+    },
+  };
+}
+
 interface DialogHost {
   readonly active: ShallowRef<PptxEditorDialogKey | null>;
   readonly popups: () => PptxEditorPopups | undefined;
+  readonly canvasMenus: CanvasMenuRegistry;
   open(key: PptxEditorDialogKey, returnFocusTo?: HTMLElement | null): void;
   close(): void;
 }
@@ -215,6 +244,8 @@ function available(popups: PptxEditorPopups | undefined, key: PptxEditorDialogKe
 export interface OverlayHost {
   readonly slideshow: UseSlideshowReturn;
   readonly findBars: Readonly<Ref<number>>;
+  /** How many host panels show the link popup state (`useHyperlinkPopup`). */
+  readonly linkViews?: Readonly<Ref<number>>;
 }
 
 /** Why an overlay slot (find, the link popup) cannot run now, as React's root says, or null. */
@@ -225,7 +256,9 @@ function overlayReason(
   slot: Parameters<NonNullable<ChromeActionHost['unavailable']>>[0]
 ): string | null {
   const key = SLOT_POPUP_KEYS[slot];
-  if (key === 'hyperlink') return popups?.hyperlink === false ? 'link.unavailable' : null;
+  // With `hyperlink: false`, a host panel that reads `useHyperlinkPopup()` still opens.
+  if (key === 'hyperlink')
+    return popups?.hyperlink === false && !overlays.linkViews?.value ? 'link.unavailable' : null;
   if (key !== 'find') return null;
   if (popups?.find === false) return 'find.unavailable';
   // Find shows its matches on the slide canvas, which the slide sorter does not show.
@@ -290,6 +323,7 @@ export function provideDialogHost(
   const host: DialogHost = {
     active,
     popups,
+    canvasMenus: createCanvasMenuRegistry(),
     open(key, returnFocusTo) {
       if (!available(popups(), key)) {
         // A `false` entry turns the dialog off on purpose; no renderer is a host mistake.
@@ -386,4 +420,23 @@ export function usePopupEntry<K extends keyof PptxEditorPopups>(
 ): () => PptxEditorPopups[K] | undefined {
   const host = inject(dialogHostKey, null);
   return () => host?.popups()?.[key];
+}
+
+/**
+ * The canvas menu entry of the enclosing `PptxEditorRoot`, read at call time: its
+ * `popups.contextMenu` entry, else the entry of a `PptxEditorContextMenu` placed in the root,
+ * else undefined for the packaged menu. An explicit `popups.contextMenu` entry wins, as in
+ * React's `useCanvasMenuEntry`. @internal
+ */
+export function useCanvasMenuEntry(): () => CanvasMenuEntry | undefined {
+  const host = inject(dialogHostKey, null);
+  return () => {
+    const explicit = host?.popups()?.contextMenu;
+    return explicit !== undefined ? explicit : host?.canvasMenus.get();
+  };
+}
+
+/** Where a `PptxEditorContextMenu` placed in the root registers, or null outside a root. @internal */
+export function useCanvasMenuRegistry(): CanvasMenuRegistry | null {
+  return inject(dialogHostKey, null)?.canvasMenus ?? null;
 }

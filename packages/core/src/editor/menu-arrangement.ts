@@ -13,6 +13,7 @@ import {
   type ChromeMenu,
   type ChromeMenuEntry,
 } from './chrome-menus.ts';
+import type { ChromeSlotId } from './chrome-controls.ts';
 import { tidySeparators } from './chrome-forms.ts';
 import { warnMenuPart } from './dev-warnings.ts';
 import { translateKeyOrText } from './adapter-support.ts';
@@ -25,8 +26,12 @@ import type { PptxEditorInstance } from './pptx-editor.ts';
 const EDGE = 8;
 
 /**
- * Place a panel of size `w` × `h` at the point `at`, flipped and clamped to stay inside a
- * window of size `vw` × `vh`. @internal
+ * Place a panel of size `w` × `h` at the point `at`, inside a window of size `vw` × `vh`. The
+ * panel keeps a corner at the point: it opens below and to the right, flips above or to the
+ * left when it does not fit, and is clamped at the side edges. When it fits neither above nor
+ * below, it opens on the side with more room and `maxHeight` caps it there, so its rows scroll
+ * and it never slides away from the point (over the toolbar, for a menu opened in a rail at the
+ * bottom of a short window). @internal
  */
 export function placeInViewport(
   at: { readonly x: number; readonly y: number },
@@ -34,10 +39,15 @@ export function placeInViewport(
   h: number,
   vw: number,
   vh: number
-): { left: number; top: number } {
+): { left: number; top: number; maxHeight?: number } {
   const left = at.x + w + EDGE > vw ? Math.max(EDGE, Math.min(at.x - w, vw - w - EDGE)) : at.x;
-  const top = at.y + h + EDGE > vh ? Math.max(EDGE, Math.min(at.y - h, vh - h - EDGE)) : at.y;
-  return { left, top };
+  const below = vh - EDGE - at.y;
+  const above = at.y - EDGE;
+  if (h <= below) return { left, top: at.y };
+  if (h <= above) return { left, top: at.y - h };
+  return below >= above
+    ? { left, top: at.y, maxHeight: Math.max(0, below) }
+    : { left, top: EDGE, maxHeight: above };
 }
 
 /**
@@ -82,6 +92,115 @@ export function isContextMenuKey(e: { readonly key: string; readonly shiftKey: b
 
 // ---------------------------------------------------------------------------------------------
 // Host rows over registry rows
+
+/** The registry row a named menu row part stands for: its slot, and its value if any. @internal */
+export interface MenuNamedRow {
+  readonly slot: ChromeSlotId;
+  readonly value?: string;
+}
+
+const row = (slot: ChromeSlotId, value?: string): MenuNamedRow =>
+  value === undefined ? { slot } : { slot, value };
+
+/** The order and grouping rows both menus share. */
+const ARRANGE_ROWS = {
+  BringToFront: row('arrange.order', 'front'),
+  SendToBack: row('arrange.order', 'back'),
+  BringForward: row('arrange.order', 'forward'),
+  SendBackward: row('arrange.order', 'backward'),
+  GroupObjects: row('arrange.group'),
+  UngroupObjects: row('arrange.ungroup'),
+} as const;
+
+/**
+ * The named rows of the canvas context menu (`ContextMenu.Cut`, …) and the row each one stands
+ * for, after DOCX Editor's context menu parts. `ContextMenu.Cut` is shorthand for
+ * `ContextMenu.Slot slotId="edit.cut"`, with the same props. The names follow DOCX Editor's
+ * where the row is the same (`Cut`, `Copy`, `Paste`, `Delete`, `InsertRowAbove`, `MergeCells`,
+ * `DeleteTable`), and the toolbar's named parts elsewhere. @internal
+ */
+export const CONTEXT_MENU_NAMED_PARTS = {
+  Cut: row('edit.cut'),
+  Copy: row('edit.copy'),
+  Paste: row('edit.paste'),
+  Delete: row('more.delete'),
+  Duplicate: row('more.duplicate'),
+  Bold: row('text.bold'),
+  Italic: row('text.italic'),
+  Underline: row('text.underline'),
+  Link: row('text.link'),
+  ClearFormatting: row('format.clear'),
+  FormatPainter: row('format.painter'),
+  Font: row('text.dialog'),
+  ParagraphDialog: row('paragraph.dialog'),
+  ...ARRANGE_ROWS,
+  ImageAltText: row('image.altText'),
+  ImageChange: row('image.change'),
+  ImageProperties: row('image.properties'),
+  FormatBackground: row('slide.background'),
+  NewSlide: row('slide.add'),
+  InsertRowAbove: row('table.insertRowAbove'),
+  InsertRowBelow: row('table.insertRowBelow'),
+  InsertColumnLeft: row('table.insertColumnLeft'),
+  InsertColumnRight: row('table.insertColumnRight'),
+  MergeCells: row('table.mergeCells'),
+  DeleteTableRow: row('table.delete', 'rows'),
+  DeleteTableColumn: row('table.delete', 'columns'),
+  DeleteTable: row('table.delete', 'table'),
+} as const satisfies Record<string, MenuNamedRow>;
+
+/**
+ * The named rows of the menu bar (`Menu.PageSetup`, `Menu.Cut`, …) and the row each one stands
+ * for, after DOCX Editor's menu row parts (`PageSetup`, `ParagraphDialog`, `ImageInsert`). Put
+ * one in the menu that holds its row, such as `Menu.Edit`. @internal
+ */
+export const MENU_NAMED_PARTS = {
+  PageSetup: row('file.pageSetup'),
+  Undo: row('history.undo'),
+  Redo: row('history.redo'),
+  Cut: row('edit.cut'),
+  Copy: row('edit.copy'),
+  Paste: row('edit.paste'),
+  SelectAll: row('edit.selectAll'),
+  Duplicate: row('more.duplicate'),
+  Delete: row('more.delete'),
+  Find: row('find.find'),
+  Replace: row('find.replace'),
+  NormalView: row('view.presentationView', 'normal'),
+  SlideSorterView: row('view.presentationView', 'slideSorter'),
+  SmartGuides: row('view.smartGuides'),
+  NewSlide: row('slide.add'),
+  TextBox: row('insert.textBox'),
+  TableInsert: row('table.insert'),
+  ImageInsert: row('insert.image'),
+  Shapes: row('insert.shape'),
+  Line: row('insert.line'),
+  Link: row('text.link'),
+  Font: row('text.dialog'),
+  ParagraphDialog: row('paragraph.dialog'),
+  BulletsAndNumbering: row('list.bulletStyle', 'dialog'),
+  Columns: row('paragraph.columns', 'dialog'),
+  Bold: row('text.bold'),
+  Italic: row('text.italic'),
+  Underline: row('text.underline'),
+  Strike: row('text.strike'),
+  BulletList: row('list.bullet'),
+  NumberedList: row('list.numbered'),
+  FormatPainter: row('format.painter'),
+  ClearFormatting: row('format.clear'),
+  FormatBackground: row('slide.background'),
+  ImageCrop: row('image.crop'),
+  ImageProperties: row('image.properties'),
+  ...ARRANGE_ROWS,
+  PlayFromStart: row('view.playFromStart'),
+  PlayFromCurrent: row('view.playFromCurrent'),
+  HideSlide: row('slide.hide'),
+} as const satisfies Record<string, MenuNamedRow>;
+
+/** The name of a named context menu row. @internal */
+export type ContextMenuPartName = keyof typeof CONTEXT_MENU_NAMED_PARTS;
+/** The name of a named menu bar row. @internal */
+export type MenuRowPartName = keyof typeof MENU_NAMED_PARTS;
 
 /** A host row that names a registry slot (`Menu.Item`, `ContextMenu.Slot`). @internal */
 export interface MenuSlotRowSpec {

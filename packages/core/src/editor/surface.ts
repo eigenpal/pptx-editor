@@ -1,6 +1,4 @@
-// The editable slide surface. The painted slide IS the surface: pointer and keyboard input are
-// read here and re-expressed as editor commands; the DOM is never edited directly. The caret and
-// selection are engine-painted from layout geometry, like docx-editor's `surface-caret.ts`.
+// The editable slide surface translates input into editor commands and paints layout geometry.
 
 import { paintSlide } from '../output/index.ts';
 import { apply, type LayoutItem, type Matrix, type SlideLayout } from '../layout/index.ts';
@@ -50,7 +48,7 @@ import { cropAt, cropOverlay, onCropImage, startCropDrag } from './surface-crop.
 import type { CropDrag, CropHandle } from './surface-crop.ts';
 import { withHalos } from './surface-halo.ts';
 import { hitItem, inText, onBorder } from './surface-hit.ts';
-import { outsideVeil, scrollBoxIntoView } from './surface-view.ts';
+import { outsideVeil, scrollBoxIntoView, surfacePadding } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
 import { resizeOne, scaleMany } from './surface-resize.ts';
 
@@ -241,8 +239,10 @@ export class SlideSurface {
       (parseFloat(pad?.paddingLeft ?? '') || 0) + (parseFloat(pad?.paddingRight ?? '') || 0);
     const padY =
       (parseFloat(pad?.paddingTop ?? '') || 0) + (parseFloat(pad?.paddingBottom ?? '') || 0);
-    const availW = Math.max(100, this.host.clientWidth - padX - 48);
-    const availH = Math.max(100, this.host.clientHeight - padY - 48);
+    // The surface's own padding (`--doc-slide-padding`, 24px a side) stays around the slide.
+    const { x: ownX, y: ownY } = surfacePadding(this.root);
+    const availW = Math.max(100, this.host.clientWidth - padX - ownX);
+    const availH = Math.max(100, this.host.clientHeight - padY - ownY);
     this.editor.fitChanged(Math.max(0.1, Math.min(availW / w, availH / h)));
   }
 

@@ -13,6 +13,7 @@ import { ChromeControl } from '@pptx-editor.dev/core/editor';
 import { ChromeGroupId } from '@pptx-editor.dev/core/editor';
 import { ChromeMenuId } from '@pptx-editor.dev/core/editor';
 import { ChromeSlotId } from '@pptx-editor.dev/core/editor';
+import { ChromeTranslate } from '@pptx-editor.dev/core/editor';
 import { ColorMode } from '@pptx-editor.dev/core/editor';
 import { ColumnsDialogFields } from '@pptx-editor.dev/core/editor';
 import { CommandResult } from '@pptx-editor.dev/core/editor';
@@ -22,6 +23,7 @@ import { ComponentOptionsMixin } from 'vue';
 import { composeFontConfiguration } from '@pptx-editor.dev/core/editor';
 import { composeFontOrigins } from '@pptx-editor.dev/core/editor';
 import { ComputedRef } from 'vue';
+import { ContextMenuPartName } from '@pptx-editor.dev/core/editor';
 import { createFontSource } from '@pptx-editor.dev/core/editor';
 import { CSSProperties } from 'vue';
 import { DEFAULT_FONT } from '@pptx-editor.dev/core/editor';
@@ -29,6 +31,9 @@ import { deferFonts } from '@pptx-editor.dev/core/editor';
 import { DefineComponent } from 'vue';
 import { defineFontResolver } from '@pptx-editor.dev/core/editor';
 import { DocumentOpenFailure } from '@pptx-editor.dev/core/editor';
+import { DocumentSearchFindOptions } from '@pptx-editor.dev/core/editor';
+import { DocumentSearchState } from '@pptx-editor.dev/core/editor';
+import { EditorCaret } from '@pptx-editor.dev/core/editor';
 import { EditorCommand } from '@pptx-editor.dev/core/editor';
 import { EditorExecOptions } from '@pptx-editor.dev/core/editor';
 import { EditorFontError } from '@pptx-editor.dev/core/editor';
@@ -40,6 +45,7 @@ import { EditorRejection } from '@pptx-editor.dev/core/editor';
 import { EditorRemoval } from '@pptx-editor.dev/core/editor';
 import { EditorSnapshot } from '@pptx-editor.dev/core/editor';
 import { ExtractPublicPropTypes } from 'vue';
+import { FindMatch } from '@pptx-editor.dev/core/editor';
 import { FontConfiguration } from '@pptx-editor.dev/core/contracts';
 import { FontConfigurationBase } from '@pptx-editor.dev/core/editor';
 import { FontConfigurationFragment } from '@pptx-editor.dev/core/editor';
@@ -61,6 +67,9 @@ import { FontSourceSubstitution } from '@pptx-editor.dev/core/contracts';
 import { FontUrlSource } from '@pptx-editor.dev/core/editor';
 import { FunctionalComponent } from 'vue';
 import { GradientFill } from '@pptx-editor.dev/core/editor';
+import { HistoryGroupBindingOptions } from '@pptx-editor.dev/core/editor';
+import { HyperlinkPopupActions } from '@pptx-editor.dev/core/editor';
+import { HyperlinkPopupLink } from '@pptx-editor.dev/core/editor';
 import { HyperlinkPopupMode } from '@pptx-editor.dev/core/editor';
 import { HyperlinkPopupState } from '@pptx-editor.dev/core/editor';
 import { InjectionKey } from 'vue';
@@ -73,12 +82,20 @@ import { LocaleCatalog } from '@pptx-editor.dev/i18n';
 import { MarkedFontResolver } from '@pptx-editor.dev/core/editor';
 import { MAX_RESOLVER_FAMILIES } from '@pptx-editor.dev/core/editor';
 import { MaybeRefOrGetter } from 'vue';
+import { MenuNamedRow } from '@pptx-editor.dev/core/editor';
+import { MenuRowPartName } from '@pptx-editor.dev/core/editor';
 import { ParagraphDialogFields } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatCommand } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatRead } from '@pptx-editor.dev/core/editor';
+import { PopoverAnchorRect } from '@pptx-editor.dev/core/editor';
 import * as _pptx_editor_dev_core_contracts from '@pptx-editor.dev/core/contracts';
 import * as _pptx_editor_dev_core_editor from '@pptx-editor.dev/core/editor';
+import { PptxEditorEvents } from '@pptx-editor.dev/core/editor';
 import { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import { PptxFontOrigin } from '@pptx-editor.dev/core/editor';
+import { PptxFontsInput } from '@pptx-editor.dev/core/editor';
+import { PptxFontsSource } from '@pptx-editor.dev/core/editor';
+import { PptxSource } from '@pptx-editor.dev/core/editor';
 import { PropType } from 'vue';
 import { Ref } from 'vue';
 import { ResolvedColorMode } from '@pptx-editor.dev/core/editor';
@@ -96,6 +113,7 @@ import { TOOLBAR_NAMED_PARTS } from '@pptx-editor.dev/core/editor';
 import { ToolbarShownValue } from '@pptx-editor.dev/core/editor';
 import { ToolbarValueMap } from '@pptx-editor.dev/core/editor';
 import { Translate } from '@pptx-editor.dev/i18n';
+import { UsePptxSourceOptions } from '@pptx-editor.dev/core/editor';
 import { VNode } from 'vue';
 import { VNodeChild } from 'vue';
 import { VNodeProps } from 'vue';
@@ -351,6 +369,8 @@ export { ChromeMenuId }
 
 export { ChromeSlotId }
 
+export { ChromeTranslate }
+
 export { ColorMode }
 
 // @public
@@ -532,13 +552,20 @@ export const ContextMenu: vue.DefineComponent<vue.ExtractPropTypes<{
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 
 // @public
-export type ContextMenuNamespace = typeof ContextMenuRoot & {
+export type ContextMenuNamedRows = {
+    readonly [K in ContextMenuPartName]: MenuRowPartComponent;
+};
+
+// @public
+export type ContextMenuNamespace = typeof ContextMenuRoot & ContextMenuNamedRows & {
     readonly Slot: typeof MenuSlotItem;
     readonly Item: typeof MenuRow;
     readonly Group: typeof MenuGroup;
     readonly Separator: typeof MenuSeparator;
     readonly Submenu: typeof MenuSubmenu;
 };
+
+export { ContextMenuPartName }
 
 // @public
 export interface ContextMenuPoint {
@@ -599,8 +626,14 @@ export interface DialogPartProps {
 
 export { DocumentOpenFailure }
 
+export { DocumentSearchFindOptions }
+
+export { DocumentSearchState }
+
 // @public
 export type EditNoticeProps = ExtractPublicPropTypes<typeof pptxEditorEditNoticeProps>;
+
+export { EditorCaret }
 
 export { EditorCommand }
 
@@ -873,11 +906,13 @@ export type GradientDialogProps = ExtractPublicPropTypes<typeof gradientDialogPr
 
 export { GradientFill }
 
+export { HistoryGroupBindingOptions }
+
 // @public
 export type HyperLinkActionProps = HyperLinkPartProps;
 
 // @public
-export type HyperLinkPartProps = ExtractPublicPropTypes<typeof partProps$1>;
+export type HyperLinkPartProps = ExtractPublicPropTypes<typeof partProps$2>;
 
 // @public
 export const HyperlinkPopup: vue.DefineComponent<vue.ExtractPropTypes<{
@@ -926,6 +961,10 @@ export const HyperlinkPopup: vue.DefineComponent<vue.ExtractPropTypes<{
     readonly className: string;
     readonly mode: "reading" | "editing";
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+export { HyperlinkPopupActions }
+
+export { HyperlinkPopupLink }
 
 export { HyperlinkPopupMode }
 
@@ -1444,8 +1483,8 @@ export const MenuEntry: DefineComponent<vue.ExtractPropTypes<{
     };
 }>> & Readonly<{}>, {
     readonly className: string;
-    readonly label: string;
     readonly preset: boolean;
+    readonly label: string;
     readonly hidden: boolean;
     readonly icon: string | VNode<vue.RendererNode, vue.RendererElement, {
         [key: string]: any;
@@ -1582,8 +1621,15 @@ export const MenuItem: vue.DefineComponent<vue.ExtractPropTypes<{
 // @internal
 export type MenuItemProps = ExtractPublicPropTypes<typeof menuItemProps>;
 
+export { MenuNamedRow }
+
 // @public
-export type MenuNamespace = typeof MenuRoot & {
+export type MenuNamedRows = {
+    readonly [K in MenuRowPartName]: MenuRowPartComponent;
+};
+
+// @public
+export type MenuNamespace = typeof MenuRoot & MenuNamedRows & {
     readonly Entry: typeof MenuEntry;
     readonly Item: typeof MenuSlotItem;
     readonly Row: typeof MenuRow;
@@ -1612,6 +1658,16 @@ export type MenuProps = ExtractPublicPropTypes<typeof menuProps>;
 export const MenuRow: DefineComponent<typeof menuRowProps, () => JSX.Element, {}, {}, {}, ComponentOptionsMixin, ComponentOptionsMixin, {
     select: () => true;
 }>;
+
+// @public
+export type MenuRowPartComponent = DefineComponent<MenuRowPartProps> & {
+    readonly pptxMenuRow: MenuNamedRow;
+};
+
+export { MenuRowPartName }
+
+// @public
+export type MenuRowPartProps = ExtractPublicPropTypes<typeof menuRowPartProps>;
 
 // @public
 export type MenuRowProps = ExtractPublicPropTypes<typeof menuRowProps>;
@@ -1834,9 +1890,9 @@ export const PageSetupDialog: {
     }> | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, vue.PublicProps, {
         readonly className: string;
         readonly style: CSSProperties;
+        readonly preset: boolean;
         readonly theme: "light" | "dark";
         readonly onThemeChange: (theme: "light" | "dark") => void;
-        readonly preset: boolean;
     }, true, {}, {}, vue.GlobalComponents, vue.GlobalDirectives, string, {}, any, vue.ComponentProvideOptions, {
         P: {};
         B: {};
@@ -1878,9 +1934,9 @@ export const PageSetupDialog: {
     }> | null, {}, {}, {}, {
         readonly className: string;
         readonly style: CSSProperties;
+        readonly preset: boolean;
         readonly theme: "light" | "dark";
         readonly onThemeChange: (theme: "light" | "dark") => void;
-        readonly preset: boolean;
     }>;
     __isFragment?: never;
     __isTeleport?: never;
@@ -1919,9 +1975,9 @@ export const PageSetupDialog: {
 }> | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, {
     readonly className: string;
     readonly style: CSSProperties;
+    readonly preset: boolean;
     readonly theme: "light" | "dark";
     readonly onThemeChange: (theme: "light" | "dark") => void;
-    readonly preset: boolean;
 }, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & {
     Header: vue.DefineComponent<DialogPartProps>;
     Title: vue.DefineComponent<DialogPartProps>;
@@ -2110,6 +2166,10 @@ export const Popover: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: StringConstructor;
         readonly default: undefined;
     };
+    readonly anchorRect: {
+        readonly type: PropType<PopoverAnchorRect | null>;
+        readonly default: null;
+    };
 }>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
     readonly anchor: {
         readonly type: PropType<HTMLElement | null>;
@@ -2151,6 +2211,10 @@ export const Popover: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: StringConstructor;
         readonly default: undefined;
     };
+    readonly anchorRect: {
+        readonly type: PropType<PopoverAnchorRect | null>;
+        readonly default: null;
+    };
 }>> & Readonly<{}>, {
     readonly className: string;
     readonly label: string;
@@ -2161,6 +2225,7 @@ export const Popover: vue.DefineComponent<vue.ExtractPropTypes<{
     readonly id: string;
     readonly focusFirst: boolean;
     readonly passive: boolean;
+    readonly anchorRect: PopoverAnchorRect | null;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 
 // @internal
@@ -2205,6 +2270,30 @@ export const PptxEditor: {
             readonly type: PropType<boolean | PptxEditorOpenFailureProps>;
             readonly default: true;
         };
+        readonly toolbar: {
+            readonly type: PropType<boolean | ToolbarProps>;
+            readonly default: true;
+        };
+        readonly menu: {
+            readonly type: PropType<boolean | MenuProps>;
+            readonly default: false;
+        };
+        readonly contextMenu: {
+            readonly type: PropType<boolean | PptxEditorContextMenuProps>;
+            readonly default: true;
+        };
+        readonly hyperlinkPopup: {
+            readonly type: BooleanConstructor;
+            readonly default: true;
+        };
+        readonly slideRail: {
+            readonly type: PropType<boolean | SlideRailProps>;
+            readonly default: true;
+        };
+        readonly notesPane: {
+            readonly type: PropType<boolean | NotesPaneProps>;
+            readonly default: true;
+        };
     }>> & Readonly<{
         onReady?: ((_editor: PptxEditorInstance) => any) | undefined;
         onChange?: ((_editor: PptxEditorInstance) => any) | undefined;
@@ -2219,12 +2308,18 @@ export const PptxEditor: {
         readonly document: Uint8Array<ArrayBufferLike>;
         readonly mode: EditorMode;
         readonly locale: LocaleCatalog;
+        readonly menu: boolean | MenuProps;
+        readonly contextMenu: boolean | PptxEditorContextMenuProps;
+        readonly toolbar: boolean | ToolbarProps;
         readonly fonts: EditorFontsOption;
         readonly openFailure: boolean | PptxEditorOpenFailureProps;
         readonly fontFamilies: readonly string[];
         readonly modules: readonly EditorModule[];
         readonly popups: PptxEditorPopups;
         readonly colorMode: ColorMode;
+        readonly hyperlinkPopup: boolean;
+        readonly slideRail: boolean | SlideRailProps;
+        readonly notesPane: boolean | NotesPaneProps;
     }, true, {}, SlotsType<{
         default?: () => VNodeChild;
         openFailureActions?: (context: OpenFailureContext) => VNodeChild;
@@ -2272,6 +2367,30 @@ export const PptxEditor: {
             readonly type: PropType<boolean | PptxEditorOpenFailureProps>;
             readonly default: true;
         };
+        readonly toolbar: {
+            readonly type: PropType<boolean | ToolbarProps>;
+            readonly default: true;
+        };
+        readonly menu: {
+            readonly type: PropType<boolean | MenuProps>;
+            readonly default: false;
+        };
+        readonly contextMenu: {
+            readonly type: PropType<boolean | PptxEditorContextMenuProps>;
+            readonly default: true;
+        };
+        readonly hyperlinkPopup: {
+            readonly type: BooleanConstructor;
+            readonly default: true;
+        };
+        readonly slideRail: {
+            readonly type: PropType<boolean | SlideRailProps>;
+            readonly default: true;
+        };
+        readonly notesPane: {
+            readonly type: PropType<boolean | NotesPaneProps>;
+            readonly default: true;
+        };
     }>> & Readonly<{
         onReady?: ((_editor: PptxEditorInstance) => any) | undefined;
         onChange?: ((_editor: PptxEditorInstance) => any) | undefined;
@@ -2282,12 +2401,18 @@ export const PptxEditor: {
         readonly document: Uint8Array<ArrayBufferLike>;
         readonly mode: EditorMode;
         readonly locale: LocaleCatalog;
+        readonly menu: boolean | MenuProps;
+        readonly contextMenu: boolean | PptxEditorContextMenuProps;
+        readonly toolbar: boolean | ToolbarProps;
         readonly fonts: EditorFontsOption;
         readonly openFailure: boolean | PptxEditorOpenFailureProps;
         readonly fontFamilies: readonly string[];
         readonly modules: readonly EditorModule[];
         readonly popups: PptxEditorPopups;
         readonly colorMode: ColorMode;
+        readonly hyperlinkPopup: boolean;
+        readonly slideRail: boolean | SlideRailProps;
+        readonly notesPane: boolean | NotesPaneProps;
     }>;
     __isFragment?: never;
     __isTeleport?: never;
@@ -2329,6 +2454,30 @@ export const PptxEditor: {
         readonly type: PropType<boolean | PptxEditorOpenFailureProps>;
         readonly default: true;
     };
+    readonly toolbar: {
+        readonly type: PropType<boolean | ToolbarProps>;
+        readonly default: true;
+    };
+    readonly menu: {
+        readonly type: PropType<boolean | MenuProps>;
+        readonly default: false;
+    };
+    readonly contextMenu: {
+        readonly type: PropType<boolean | PptxEditorContextMenuProps>;
+        readonly default: true;
+    };
+    readonly hyperlinkPopup: {
+        readonly type: BooleanConstructor;
+        readonly default: true;
+    };
+    readonly slideRail: {
+        readonly type: PropType<boolean | SlideRailProps>;
+        readonly default: true;
+    };
+    readonly notesPane: {
+        readonly type: PropType<boolean | NotesPaneProps>;
+        readonly default: true;
+    };
 }>> & Readonly<{
     onReady?: ((_editor: PptxEditorInstance) => any) | undefined;
     onChange?: ((_editor: PptxEditorInstance) => any) | undefined;
@@ -2343,12 +2492,18 @@ export const PptxEditor: {
     readonly document: Uint8Array<ArrayBufferLike>;
     readonly mode: EditorMode;
     readonly locale: LocaleCatalog;
+    readonly menu: boolean | MenuProps;
+    readonly contextMenu: boolean | PptxEditorContextMenuProps;
+    readonly toolbar: boolean | ToolbarProps;
     readonly fonts: EditorFontsOption;
     readonly openFailure: boolean | PptxEditorOpenFailureProps;
     readonly fontFamilies: readonly string[];
     readonly modules: readonly EditorModule[];
     readonly popups: PptxEditorPopups;
     readonly colorMode: ColorMode;
+    readonly hyperlinkPopup: boolean;
+    readonly slideRail: boolean | SlideRailProps;
+    readonly notesPane: boolean | NotesPaneProps;
 }, {}, string, SlotsType<{
     default?: () => VNodeChild;
     openFailureActions?: (context: OpenFailureContext) => VNodeChild;
@@ -2489,7 +2644,119 @@ export const PptxEditor: {
             readonly required: true;
         };
     }>> & Readonly<{}>, {}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
-    SlideRail: vue.DefineComponent<vue.ExtractPropTypes<{
+    SlideRail: {
+        new (...args: any[]): vue.CreateComponentPublicInstanceWithMixins<Readonly<vue.ExtractPropTypes<{
+            readonly toggle: {
+                readonly type: BooleanConstructor;
+                readonly default: undefined;
+            };
+            readonly orientation: {
+                readonly type: PropType<_pptx_editor_dev_core_editor.SlideRailOrientation>;
+                readonly default: undefined;
+            };
+            readonly preset: {
+                readonly type: BooleanConstructor;
+                readonly default: true;
+            };
+            readonly t: {
+                readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+                readonly default: undefined;
+            };
+            readonly open: {
+                readonly type: BooleanConstructor;
+                readonly default: undefined;
+            };
+            readonly defaultOpen: {
+                readonly type: BooleanConstructor;
+                readonly default: undefined;
+            };
+            readonly paneWidth: {
+                readonly type: NumberConstructor;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly style: {
+                readonly type: PropType<vue.CSSProperties>;
+                readonly default: undefined;
+            };
+        }>> & Readonly<{
+            "onUpdate:open"?: ((_open: boolean) => any) | undefined;
+        }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
+            'update:open': (_open: boolean) => true;
+        }, vue.PublicProps, {
+            readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
+            readonly className: string;
+            readonly style: vue.CSSProperties;
+            readonly preset: boolean;
+            readonly toggle: boolean;
+            readonly orientation: _pptx_editor_dev_core_editor.SlideRailOrientation;
+            readonly open: boolean;
+            readonly defaultOpen: boolean;
+            readonly paneWidth: number;
+        }, true, {}, {}, vue.GlobalComponents, vue.GlobalDirectives, string, {}, any, vue.ComponentProvideOptions, {
+            P: {};
+            B: {};
+            D: {};
+            C: {};
+            M: {};
+            Defaults: {};
+        }, Readonly<vue.ExtractPropTypes<{
+            readonly toggle: {
+                readonly type: BooleanConstructor;
+                readonly default: undefined;
+            };
+            readonly orientation: {
+                readonly type: PropType<_pptx_editor_dev_core_editor.SlideRailOrientation>;
+                readonly default: undefined;
+            };
+            readonly preset: {
+                readonly type: BooleanConstructor;
+                readonly default: true;
+            };
+            readonly t: {
+                readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+                readonly default: undefined;
+            };
+            readonly open: {
+                readonly type: BooleanConstructor;
+                readonly default: undefined;
+            };
+            readonly defaultOpen: {
+                readonly type: BooleanConstructor;
+                readonly default: undefined;
+            };
+            readonly paneWidth: {
+                readonly type: NumberConstructor;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly style: {
+                readonly type: PropType<vue.CSSProperties>;
+                readonly default: undefined;
+            };
+        }>> & Readonly<{
+            "onUpdate:open"?: ((_open: boolean) => any) | undefined;
+        }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, {
+            readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
+            readonly className: string;
+            readonly style: vue.CSSProperties;
+            readonly preset: boolean;
+            readonly toggle: boolean;
+            readonly orientation: _pptx_editor_dev_core_editor.SlideRailOrientation;
+            readonly open: boolean;
+            readonly defaultOpen: boolean;
+            readonly paneWidth: number;
+        }>;
+        __isFragment?: never;
+        __isTeleport?: never;
+        __isSuspense?: never;
+    } & vue.ComponentOptionsBase<Readonly<vue.ExtractPropTypes<{
         readonly toggle: {
             readonly type: BooleanConstructor;
             readonly default: undefined;
@@ -2498,35 +2765,12 @@ export const PptxEditor: {
             readonly type: PropType<_pptx_editor_dev_core_editor.SlideRailOrientation>;
             readonly default: undefined;
         };
-        readonly open: {
+        readonly preset: {
             readonly type: BooleanConstructor;
-            readonly default: undefined;
+            readonly default: true;
         };
-        readonly defaultOpen: {
-            readonly type: BooleanConstructor;
-            readonly default: undefined;
-        };
-        readonly paneWidth: {
-            readonly type: NumberConstructor;
-            readonly default: undefined;
-        };
-        readonly className: {
-            readonly type: StringConstructor;
-            readonly default: undefined;
-        };
-        readonly style: {
-            readonly type: PropType<vue.CSSProperties>;
-            readonly default: undefined;
-        };
-    }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
-        'update:open': (_open: boolean) => true;
-    }, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
-        readonly toggle: {
-            readonly type: BooleanConstructor;
-            readonly default: undefined;
-        };
-        readonly orientation: {
-            readonly type: PropType<_pptx_editor_dev_core_editor.SlideRailOrientation>;
+        readonly t: {
+            readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
             readonly default: undefined;
         };
         readonly open: {
@@ -2551,15 +2795,430 @@ export const PptxEditor: {
         };
     }>> & Readonly<{
         "onUpdate:open"?: ((_open: boolean) => any) | undefined;
-    }>, {
+    }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
+        'update:open': (_open: boolean) => true;
+    }, string, {
+        readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
         readonly className: string;
         readonly style: vue.CSSProperties;
-        readonly open: boolean;
+        readonly preset: boolean;
         readonly toggle: boolean;
         readonly orientation: _pptx_editor_dev_core_editor.SlideRailOrientation;
+        readonly open: boolean;
         readonly defaultOpen: boolean;
         readonly paneWidth: number;
-    }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+    }, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & {
+        AddSlide: vue.DefineComponent<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>> & Readonly<{}>, {
+            readonly className: string;
+            readonly hidden: boolean;
+            readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+                [key: string]: any;
+            }>;
+            readonly asChild: boolean;
+        }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+        ChooseLayout: vue.DefineComponent<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>> & Readonly<{}>, {
+            readonly className: string;
+            readonly hidden: boolean;
+            readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+                [key: string]: any;
+            }>;
+            readonly asChild: boolean;
+        }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+        Duplicate: vue.DefineComponent<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>> & Readonly<{}>, {
+            readonly className: string;
+            readonly hidden: boolean;
+            readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+                [key: string]: any;
+            }>;
+            readonly asChild: boolean;
+        }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+        MoveEarlier: vue.DefineComponent<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>> & Readonly<{}>, {
+            readonly className: string;
+            readonly hidden: boolean;
+            readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+                [key: string]: any;
+            }>;
+            readonly asChild: boolean;
+        }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+        MoveLater: vue.DefineComponent<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>> & Readonly<{}>, {
+            readonly className: string;
+            readonly hidden: boolean;
+            readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+                [key: string]: any;
+            }>;
+            readonly asChild: boolean;
+        }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+        Delete: vue.DefineComponent<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>> & Readonly<{}>, {
+            readonly className: string;
+            readonly hidden: boolean;
+            readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+                [key: string]: any;
+            }>;
+            readonly asChild: boolean;
+        }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+        Collapse: vue.DefineComponent<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>> & Readonly<{}>, {
+            readonly className: string;
+            readonly hidden: boolean;
+            readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+                [key: string]: any;
+            }>;
+            readonly asChild: boolean;
+        }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+        Expand: vue.DefineComponent<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+            readonly hidden: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>> & Readonly<{}>, {
+            readonly className: string;
+            readonly hidden: boolean;
+            readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+                [key: string]: any;
+            }>;
+            readonly asChild: boolean;
+        }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+        Action: vue.DefineComponent<vue.ExtractPropTypes<{
+            readonly label: {
+                readonly type: StringConstructor;
+                readonly required: true;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly active: {
+                readonly type: PropType<boolean | undefined>;
+                readonly default: undefined;
+            };
+            readonly disabled: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly disabledReason: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
+            [key: string]: any;
+        }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
+            select: () => true;
+        }, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+            readonly label: {
+                readonly type: StringConstructor;
+                readonly required: true;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly active: {
+                readonly type: PropType<boolean | undefined>;
+                readonly default: undefined;
+            };
+            readonly disabled: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly disabledReason: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>> & Readonly<{
+            onSelect?: (() => any) | undefined;
+        }>, {
+            readonly className: string;
+            readonly disabled: boolean;
+            readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+                [key: string]: any;
+            }>;
+            readonly asChild: boolean;
+            readonly active: boolean | undefined;
+            readonly disabledReason: string;
+        }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+    };
     SlideSorter: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly className: {
             readonly type: StringConstructor;
@@ -2676,12 +3335,16 @@ export const PptxEditor: {
     }>> & Readonly<{}>, {
         readonly className: string;
         readonly style: vue.CSSProperties;
-        readonly onClose: () => void;
         readonly paneWidth: number;
+        readonly onClose: () => void;
     }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
     FontNotice: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly className: {
             readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly t: {
+            readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
             readonly default: undefined;
         };
     }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
@@ -2689,7 +3352,12 @@ export const PptxEditor: {
             readonly type: StringConstructor;
             readonly default: undefined;
         };
+        readonly t: {
+            readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+            readonly default: undefined;
+        };
     }>> & Readonly<{}>, {
+        readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
         readonly className: string;
     }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
     EditNotice: vue.DefineComponent<vue.ExtractPropTypes<{
@@ -2697,15 +3365,28 @@ export const PptxEditor: {
             readonly type: StringConstructor;
             readonly default: undefined;
         };
+        readonly t: {
+            readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+            readonly default: undefined;
+        };
     }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
         readonly className: {
             readonly type: StringConstructor;
             readonly default: undefined;
         };
+        readonly t: {
+            readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+            readonly default: undefined;
+        };
     }>> & Readonly<{}>, {
+        readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
         readonly className: string;
     }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
     OpenFailure: vue.DefineComponent<vue.ExtractPropTypes<{
+        readonly t: {
+            readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+            readonly default: undefined;
+        };
         readonly title: {
             readonly type: StringConstructor;
             readonly default: undefined;
@@ -2741,6 +3422,10 @@ export const PptxEditor: {
     }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
         dismiss: (_failure: _pptx_editor_dev_core_contracts.DocumentOpenFailure) => true;
     }, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+        readonly t: {
+            readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+            readonly default: undefined;
+        };
         readonly title: {
             readonly type: StringConstructor;
             readonly default: undefined;
@@ -2776,6 +3461,7 @@ export const PptxEditor: {
     }>> & Readonly<{
         onDismiss?: ((_failure: _pptx_editor_dev_core_contracts.DocumentOpenFailure) => any) | undefined;
     }>, {
+        readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
         readonly title: string;
         readonly message: VNodeChild | ((failure: _pptx_editor_dev_core_contracts.DocumentOpenFailure) => VNodeChild);
         readonly showCode: boolean;
@@ -2924,9 +3610,9 @@ export const PptxEditor: {
         }> | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, vue.PublicProps, {
             readonly className: string;
             readonly style: vue.CSSProperties;
+            readonly preset: boolean;
             readonly theme: "light" | "dark";
             readonly onThemeChange: (theme: "light" | "dark") => void;
-            readonly preset: boolean;
         }, true, {}, {}, vue.GlobalComponents, vue.GlobalDirectives, string, {}, any, vue.ComponentProvideOptions, {
             P: {};
             B: {};
@@ -2968,9 +3654,9 @@ export const PptxEditor: {
         }> | null, {}, {}, {}, {
             readonly className: string;
             readonly style: vue.CSSProperties;
+            readonly preset: boolean;
             readonly theme: "light" | "dark";
             readonly onThemeChange: (theme: "light" | "dark") => void;
-            readonly preset: boolean;
         }>;
         __isFragment?: never;
         __isTeleport?: never;
@@ -3009,9 +3695,9 @@ export const PptxEditor: {
     }> | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, {
         readonly className: string;
         readonly style: vue.CSSProperties;
+        readonly preset: boolean;
         readonly theme: "light" | "dark";
         readonly onThemeChange: (theme: "light" | "dark") => void;
-        readonly preset: boolean;
     }, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & {
         Header: vue.DefineComponent<DialogPartProps>;
         Title: vue.DefineComponent<DialogPartProps>;
@@ -3766,12 +4452,21 @@ export const PptxEditor: {
             readonly type: StringConstructor;
             readonly default: undefined;
         };
+        readonly t: {
+            readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+            readonly default: undefined;
+        };
     }>, () => vue_jsx_runtime.JSX.Element | VNodeChild[] | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
         readonly className: {
             readonly type: StringConstructor;
             readonly default: undefined;
         };
+        readonly t: {
+            readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+            readonly default: undefined;
+        };
     }>> & Readonly<{}>, {
+        readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
         readonly className: string;
     }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
     Menu: MenuNamespace;
@@ -3959,9 +4654,14 @@ export const PptxEditor: {
                 readonly type: StringConstructor;
                 readonly default: undefined;
             };
+            readonly t: {
+                readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+                readonly default: undefined;
+            };
         }>> & Readonly<{}>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
             [key: string]: any;
         }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, vue.PublicProps, {
+            readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
             readonly className: string;
             readonly preset: boolean;
         }, true, {}, {}, vue.GlobalComponents, vue.GlobalDirectives, string, {}, any, vue.ComponentProvideOptions, {
@@ -3980,9 +4680,14 @@ export const PptxEditor: {
                 readonly type: StringConstructor;
                 readonly default: undefined;
             };
+            readonly t: {
+                readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+                readonly default: undefined;
+            };
         }>> & Readonly<{}>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
             [key: string]: any;
         }>, {}, {}, {}, {
+            readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
             readonly className: string;
             readonly preset: boolean;
         }>;
@@ -3998,9 +4703,14 @@ export const PptxEditor: {
             readonly type: StringConstructor;
             readonly default: undefined;
         };
+        readonly t: {
+            readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+            readonly default: undefined;
+        };
     }>> & Readonly<{}>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
         [key: string]: any;
     }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, {
+        readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
         readonly className: string;
         readonly preset: boolean;
     }, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & {
@@ -4120,6 +4830,80 @@ export const PptxEditor: {
             readonly className: string;
             readonly hidden: boolean;
         }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+        Action: vue.DefineComponent<vue.ExtractPropTypes<{
+            readonly label: {
+                readonly type: StringConstructor;
+                readonly required: true;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly active: {
+                readonly type: PropType<boolean | undefined>;
+                readonly default: undefined;
+            };
+            readonly disabled: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly disabledReason: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
+            [key: string]: any;
+        }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
+            select: () => true;
+        }, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+            readonly label: {
+                readonly type: StringConstructor;
+                readonly required: true;
+            };
+            readonly icon: {
+                readonly type: PropType<vue.VNode>;
+                readonly default: undefined;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly active: {
+                readonly type: PropType<boolean | undefined>;
+                readonly default: undefined;
+            };
+            readonly disabled: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+            readonly disabledReason: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly asChild: {
+                readonly type: BooleanConstructor;
+                readonly default: false;
+            };
+        }>> & Readonly<{
+            onSelect?: (() => any) | undefined;
+        }>, {
+            readonly className: string;
+            readonly disabled: boolean;
+            readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+                [key: string]: any;
+            }>;
+            readonly asChild: boolean;
+            readonly active: boolean | undefined;
+            readonly disabledReason: string;
+        }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
     };
 };
 
@@ -4162,14 +4946,25 @@ export const PptxEditorEditNotice: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: StringConstructor;
         readonly default: undefined;
     };
+    readonly t: {
+        readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+        readonly default: undefined;
+    };
 }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
     readonly className: {
         readonly type: StringConstructor;
         readonly default: undefined;
     };
+    readonly t: {
+        readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+        readonly default: undefined;
+    };
 }>> & Readonly<{}>, {
+    readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
     readonly className: string;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+export { PptxEditorEvents }
 
 // @public
 export const PptxEditorFindBar: vue.DefineComponent<vue.ExtractPropTypes<{
@@ -4177,12 +4972,21 @@ export const PptxEditorFindBar: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: StringConstructor;
         readonly default: undefined;
     };
+    readonly t: {
+        readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+        readonly default: undefined;
+    };
 }>, () => vue_jsx_runtime.JSX.Element | vue.VNodeChild[] | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
     readonly className: {
         readonly type: StringConstructor;
         readonly default: undefined;
     };
+    readonly t: {
+        readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+        readonly default: undefined;
+    };
 }>> & Readonly<{}>, {
+    readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
     readonly className: string;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 
@@ -4192,12 +4996,21 @@ export const PptxEditorFontNotice: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: StringConstructor;
         readonly default: undefined;
     };
+    readonly t: {
+        readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+        readonly default: undefined;
+    };
 }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
     readonly className: {
         readonly type: StringConstructor;
         readonly default: undefined;
     };
+    readonly t: {
+        readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+        readonly default: undefined;
+    };
 }>> & Readonly<{}>, {
+    readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
     readonly className: string;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 
@@ -4734,6 +5547,10 @@ export const PptxEditorNotesPane: vue.DefineComponent<vue.ExtractPropTypes<{
 
 // @public
 export const PptxEditorOpenFailure: vue.DefineComponent<vue.ExtractPropTypes<{
+    readonly t: {
+        readonly type: () => ChromeTranslate;
+        readonly default: undefined;
+    };
     readonly title: {
         readonly type: StringConstructor;
         readonly default: undefined;
@@ -4769,6 +5586,10 @@ export const PptxEditorOpenFailure: vue.DefineComponent<vue.ExtractPropTypes<{
 }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
     dismiss: (_failure: DocumentOpenFailure) => true;
 }, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    readonly t: {
+        readonly type: () => ChromeTranslate;
+        readonly default: undefined;
+    };
     readonly title: {
         readonly type: StringConstructor;
         readonly default: undefined;
@@ -4804,6 +5625,7 @@ export const PptxEditorOpenFailure: vue.DefineComponent<vue.ExtractPropTypes<{
 }>> & Readonly<{
     onDismiss?: ((_failure: DocumentOpenFailure) => any) | undefined;
 }>, {
+    readonly t: ChromeTranslate;
     readonly title: string;
     readonly message: VNodeChild | ((failure: DocumentOpenFailure) => VNodeChild);
     readonly showCode: boolean;
@@ -5161,12 +5983,124 @@ export const PptxEditorSidePanel: vue.DefineComponent<vue.ExtractPropTypes<{
 }>> & Readonly<{}>, {
     readonly className: string;
     readonly style: CSSProperties;
-    readonly onClose: () => void;
     readonly paneWidth: number;
+    readonly onClose: () => void;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 
 // @public
-export const PptxEditorSlideRail: vue.DefineComponent<vue.ExtractPropTypes<{
+export const PptxEditorSlideRail: {
+    new (...args: any[]): vue.CreateComponentPublicInstanceWithMixins<Readonly<vue.ExtractPropTypes<{
+        readonly toggle: {
+            readonly type: BooleanConstructor;
+            readonly default: undefined;
+        };
+        readonly orientation: {
+            readonly type: PropType<SlideRailOrientation>;
+            readonly default: undefined;
+        };
+        readonly preset: {
+            readonly type: BooleanConstructor;
+            readonly default: true;
+        };
+        readonly t: {
+            readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+            readonly default: undefined;
+        };
+        readonly open: {
+            readonly type: BooleanConstructor;
+            readonly default: undefined;
+        };
+        readonly defaultOpen: {
+            readonly type: BooleanConstructor;
+            readonly default: undefined;
+        };
+        readonly paneWidth: {
+            readonly type: NumberConstructor;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly style: {
+            readonly type: PropType<CSSProperties>;
+            readonly default: undefined;
+        };
+    }>> & Readonly<{
+        "onUpdate:open"?: ((_open: boolean) => any) | undefined;
+    }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
+        'update:open': (_open: boolean) => true;
+    }, vue.PublicProps, {
+        readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
+        readonly className: string;
+        readonly style: CSSProperties;
+        readonly preset: boolean;
+        readonly toggle: boolean;
+        readonly orientation: SlideRailOrientation;
+        readonly open: boolean;
+        readonly defaultOpen: boolean;
+        readonly paneWidth: number;
+    }, true, {}, {}, vue.GlobalComponents, vue.GlobalDirectives, string, {}, any, vue.ComponentProvideOptions, {
+        P: {};
+        B: {};
+        D: {};
+        C: {};
+        M: {};
+        Defaults: {};
+    }, Readonly<vue.ExtractPropTypes<{
+        readonly toggle: {
+            readonly type: BooleanConstructor;
+            readonly default: undefined;
+        };
+        readonly orientation: {
+            readonly type: PropType<SlideRailOrientation>;
+            readonly default: undefined;
+        };
+        readonly preset: {
+            readonly type: BooleanConstructor;
+            readonly default: true;
+        };
+        readonly t: {
+            readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+            readonly default: undefined;
+        };
+        readonly open: {
+            readonly type: BooleanConstructor;
+            readonly default: undefined;
+        };
+        readonly defaultOpen: {
+            readonly type: BooleanConstructor;
+            readonly default: undefined;
+        };
+        readonly paneWidth: {
+            readonly type: NumberConstructor;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly style: {
+            readonly type: PropType<CSSProperties>;
+            readonly default: undefined;
+        };
+    }>> & Readonly<{
+        "onUpdate:open"?: ((_open: boolean) => any) | undefined;
+    }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, {
+        readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
+        readonly className: string;
+        readonly style: CSSProperties;
+        readonly preset: boolean;
+        readonly toggle: boolean;
+        readonly orientation: SlideRailOrientation;
+        readonly open: boolean;
+        readonly defaultOpen: boolean;
+        readonly paneWidth: number;
+    }>;
+    __isFragment?: never;
+    __isTeleport?: never;
+    __isSuspense?: never;
+} & vue.ComponentOptionsBase<Readonly<vue.ExtractPropTypes<{
     readonly toggle: {
         readonly type: BooleanConstructor;
         readonly default: undefined;
@@ -5175,35 +6109,12 @@ export const PptxEditorSlideRail: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: PropType<SlideRailOrientation>;
         readonly default: undefined;
     };
-    readonly open: {
+    readonly preset: {
         readonly type: BooleanConstructor;
-        readonly default: undefined;
+        readonly default: true;
     };
-    readonly defaultOpen: {
-        readonly type: BooleanConstructor;
-        readonly default: undefined;
-    };
-    readonly paneWidth: {
-        readonly type: NumberConstructor;
-        readonly default: undefined;
-    };
-    readonly className: {
-        readonly type: StringConstructor;
-        readonly default: undefined;
-    };
-    readonly style: {
-        readonly type: PropType<CSSProperties>;
-        readonly default: undefined;
-    };
-}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
-    'update:open': (_open: boolean) => true;
-}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
-    readonly toggle: {
-        readonly type: BooleanConstructor;
-        readonly default: undefined;
-    };
-    readonly orientation: {
-        readonly type: PropType<SlideRailOrientation>;
+    readonly t: {
+        readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
         readonly default: undefined;
     };
     readonly open: {
@@ -5228,15 +6139,430 @@ export const PptxEditorSlideRail: vue.DefineComponent<vue.ExtractPropTypes<{
     };
 }>> & Readonly<{
     "onUpdate:open"?: ((_open: boolean) => any) | undefined;
-}>, {
+}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
+    'update:open': (_open: boolean) => true;
+}, string, {
+    readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
     readonly className: string;
     readonly style: CSSProperties;
-    readonly open: boolean;
+    readonly preset: boolean;
     readonly toggle: boolean;
     readonly orientation: SlideRailOrientation;
+    readonly open: boolean;
     readonly defaultOpen: boolean;
     readonly paneWidth: number;
-}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+}, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & {
+    AddSlide: vue.DefineComponent<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>> & Readonly<{}>, {
+        readonly className: string;
+        readonly hidden: boolean;
+        readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+            [key: string]: any;
+        }>;
+        readonly asChild: boolean;
+    }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+    ChooseLayout: vue.DefineComponent<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>> & Readonly<{}>, {
+        readonly className: string;
+        readonly hidden: boolean;
+        readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+            [key: string]: any;
+        }>;
+        readonly asChild: boolean;
+    }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+    Duplicate: vue.DefineComponent<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>> & Readonly<{}>, {
+        readonly className: string;
+        readonly hidden: boolean;
+        readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+            [key: string]: any;
+        }>;
+        readonly asChild: boolean;
+    }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+    MoveEarlier: vue.DefineComponent<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>> & Readonly<{}>, {
+        readonly className: string;
+        readonly hidden: boolean;
+        readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+            [key: string]: any;
+        }>;
+        readonly asChild: boolean;
+    }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+    MoveLater: vue.DefineComponent<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>> & Readonly<{}>, {
+        readonly className: string;
+        readonly hidden: boolean;
+        readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+            [key: string]: any;
+        }>;
+        readonly asChild: boolean;
+    }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+    Delete: vue.DefineComponent<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>> & Readonly<{}>, {
+        readonly className: string;
+        readonly hidden: boolean;
+        readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+            [key: string]: any;
+        }>;
+        readonly asChild: boolean;
+    }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+    Collapse: vue.DefineComponent<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>> & Readonly<{}>, {
+        readonly className: string;
+        readonly hidden: boolean;
+        readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+            [key: string]: any;
+        }>;
+        readonly asChild: boolean;
+    }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+    Expand: vue.DefineComponent<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+        readonly hidden: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>> & Readonly<{}>, {
+        readonly className: string;
+        readonly hidden: boolean;
+        readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+            [key: string]: any;
+        }>;
+        readonly asChild: boolean;
+    }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+    Action: vue.DefineComponent<vue.ExtractPropTypes<{
+        readonly label: {
+            readonly type: StringConstructor;
+            readonly required: true;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly active: {
+            readonly type: PropType<boolean | undefined>;
+            readonly default: undefined;
+        };
+        readonly disabled: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly disabledReason: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
+        select: () => true;
+    }, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+        readonly label: {
+            readonly type: StringConstructor;
+            readonly required: true;
+        };
+        readonly icon: {
+            readonly type: PropType<vue.VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly active: {
+            readonly type: PropType<boolean | undefined>;
+            readonly default: undefined;
+        };
+        readonly disabled: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly disabledReason: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>> & Readonly<{
+        onSelect?: (() => any) | undefined;
+    }>, {
+        readonly className: string;
+        readonly disabled: boolean;
+        readonly icon: vue.VNode<vue.RendererNode, vue.RendererElement, {
+            [key: string]: any;
+        }>;
+        readonly asChild: boolean;
+        readonly active: boolean | undefined;
+        readonly disabledReason: string;
+    }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+};
 
 // @public
 export const PptxEditorSlideshow: vue.DefineComponent<{}, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<{}> & Readonly<{}>, {}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
@@ -5267,9 +6593,14 @@ export const PptxEditorStatusBar: {
             readonly type: StringConstructor;
             readonly default: undefined;
         };
+        readonly t: {
+            readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+            readonly default: undefined;
+        };
     }>> & Readonly<{}>, () => VNode<vue.RendererNode, vue.RendererElement, {
         [key: string]: any;
     }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, vue.PublicProps, {
+        readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
         readonly className: string;
         readonly preset: boolean;
     }, true, {}, {}, vue.GlobalComponents, vue.GlobalDirectives, string, {}, any, vue.ComponentProvideOptions, {
@@ -5288,9 +6619,14 @@ export const PptxEditorStatusBar: {
             readonly type: StringConstructor;
             readonly default: undefined;
         };
+        readonly t: {
+            readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+            readonly default: undefined;
+        };
     }>> & Readonly<{}>, () => VNode<vue.RendererNode, vue.RendererElement, {
         [key: string]: any;
     }>, {}, {}, {}, {
+        readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
         readonly className: string;
         readonly preset: boolean;
     }>;
@@ -5306,9 +6642,14 @@ export const PptxEditorStatusBar: {
         readonly type: StringConstructor;
         readonly default: undefined;
     };
+    readonly t: {
+        readonly type: () => _pptx_editor_dev_core_editor.ChromeTranslate;
+        readonly default: undefined;
+    };
 }>> & Readonly<{}>, () => VNode<vue.RendererNode, vue.RendererElement, {
     [key: string]: any;
 }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, {
+    readonly t: _pptx_editor_dev_core_editor.ChromeTranslate;
     readonly className: string;
     readonly preset: boolean;
 }, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & {
@@ -5428,6 +6769,80 @@ export const PptxEditorStatusBar: {
         readonly className: string;
         readonly hidden: boolean;
     }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+    Action: vue.DefineComponent<vue.ExtractPropTypes<{
+        readonly label: {
+            readonly type: StringConstructor;
+            readonly required: true;
+        };
+        readonly icon: {
+            readonly type: PropType<VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly active: {
+            readonly type: PropType<boolean | undefined>;
+            readonly default: undefined;
+        };
+        readonly disabled: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly disabledReason: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>, () => VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
+        select: () => true;
+    }, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+        readonly label: {
+            readonly type: StringConstructor;
+            readonly required: true;
+        };
+        readonly icon: {
+            readonly type: PropType<VNode>;
+            readonly default: undefined;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly active: {
+            readonly type: PropType<boolean | undefined>;
+            readonly default: undefined;
+        };
+        readonly disabled: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+        readonly disabledReason: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly asChild: {
+            readonly type: BooleanConstructor;
+            readonly default: false;
+        };
+    }>> & Readonly<{
+        onSelect?: (() => any) | undefined;
+    }>, {
+        readonly className: string;
+        readonly disabled: boolean;
+        readonly icon: VNode<vue.RendererNode, vue.RendererElement, {
+            [key: string]: any;
+        }>;
+        readonly asChild: boolean;
+        readonly active: boolean | undefined;
+        readonly disabledReason: string;
+    }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 };
 
 // @public
@@ -5476,8 +6891,16 @@ export const PptxEditorZoomPill: vue.DefineComponent<vue.ExtractPropTypes<{
     readonly className: string;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 
+export { PptxFontOrigin }
+
+export { PptxFontsInput }
+
+export { PptxFontsSource }
+
 // @public
 export const pptxSlideshowKey: InjectionKey<UseSlideshowReturn>;
+
+export { PptxSource }
 
 // @public
 export const pptxTranslationKey: InjectionKey<ShallowRef<Translate>>;
@@ -5778,7 +7201,362 @@ export { SlideBackground }
 
 export { SlideLayoutSummary }
 
+// @public
+export const SlideRailAddSlide: vue.DefineComponent<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>> & Readonly<{}>, {
+    readonly className: string;
+    readonly hidden: boolean;
+    readonly icon: VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }>;
+    readonly asChild: boolean;
+}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+// @public
+export const SlideRailChooseLayout: vue.DefineComponent<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>> & Readonly<{}>, {
+    readonly className: string;
+    readonly hidden: boolean;
+    readonly icon: VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }>;
+    readonly asChild: boolean;
+}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+// @public
+export const SlideRailCollapse: vue.DefineComponent<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>> & Readonly<{}>, {
+    readonly className: string;
+    readonly hidden: boolean;
+    readonly icon: VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }>;
+    readonly asChild: boolean;
+}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+// @public
+export const SlideRailDelete: vue.DefineComponent<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>> & Readonly<{}>, {
+    readonly className: string;
+    readonly hidden: boolean;
+    readonly icon: VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }>;
+    readonly asChild: boolean;
+}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+// @public
+export const SlideRailDuplicate: vue.DefineComponent<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>> & Readonly<{}>, {
+    readonly className: string;
+    readonly hidden: boolean;
+    readonly icon: VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }>;
+    readonly asChild: boolean;
+}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+// @public
+export const SlideRailExpand: vue.DefineComponent<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>> & Readonly<{}>, {
+    readonly className: string;
+    readonly hidden: boolean;
+    readonly icon: VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }>;
+    readonly asChild: boolean;
+}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+// @public
+export const SlideRailMoveEarlier: vue.DefineComponent<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>> & Readonly<{}>, {
+    readonly className: string;
+    readonly hidden: boolean;
+    readonly icon: VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }>;
+    readonly asChild: boolean;
+}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+// @public
+export const SlideRailMoveLater: vue.DefineComponent<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    readonly hidden: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+    readonly icon: {
+        readonly type: PropType<VNode>;
+        readonly default: undefined;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly asChild: {
+        readonly type: BooleanConstructor;
+        readonly default: false;
+    };
+}>> & Readonly<{}>, {
+    readonly className: string;
+    readonly hidden: boolean;
+    readonly icon: VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }>;
+    readonly asChild: boolean;
+}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
 export { SlideRailOrientation }
+
+// @public
+export type SlideRailPartProps = ExtractPublicPropTypes<typeof partProps$1>;
 
 // @public
 export type SlideRailProps = ExtractPublicPropTypes<typeof slideRailProps>;
@@ -5994,9 +7772,9 @@ export const ToolbarAction: DefineComponent<vue.ExtractPropTypes<{
     readonly icon: VNode<vue.RendererNode, vue.RendererElement, {
         [key: string]: any;
     }>;
+    readonly asChild: boolean;
     readonly active: boolean | undefined;
     readonly disabledReason: string;
-    readonly asChild: boolean;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 
 // @public
@@ -6277,6 +8055,10 @@ export const ToolButton: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: BooleanConstructor;
         readonly default: undefined;
     };
+    readonly host: {
+        readonly type: PropType<VNode | null>;
+        readonly default: null;
+    };
 }>, () => (VNode<vue.RendererNode, vue.RendererElement, {
     [key: string]: any;
 }> | null)[], {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
@@ -6332,19 +8114,26 @@ export const ToolButton: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: BooleanConstructor;
         readonly default: undefined;
     };
+    readonly host: {
+        readonly type: PropType<VNode | null>;
+        readonly default: null;
+    };
 }>> & Readonly<{}>, {
     readonly className: string;
     readonly disabled: boolean;
     readonly slot: string;
+    readonly host: VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }> | null;
     readonly onClick: () => void;
     readonly controls: string;
     readonly expanded: boolean;
     readonly icon: string;
-    readonly paths: readonly string[] | null;
+    readonly asChild: boolean;
     readonly disabledReason: string | null;
+    readonly paths: readonly string[] | null;
     readonly pressed: boolean;
     readonly hasPopup: "menu" | "dialog" | "grid";
-    readonly asChild: boolean;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 
 // @internal
@@ -6375,6 +8164,12 @@ export function useBulletsAndNumberingDialog(): UseBulletsAndNumberingDialogRetu
 export type UseBulletsAndNumberingDialogReturn = UseDialogReturn<BulletsDialogFields>;
 
 // @public
+export function useChromeTranslate(overrides?: ReadonlyMap<string, string>): UseChromeTranslateReturn;
+
+// @public
+export type UseChromeTranslateReturn = ChromeTranslate;
+
+// @public
 export function useColumnsDialog(): UseColumnsDialogReturn;
 
 // @public
@@ -6401,6 +8196,51 @@ export interface UseDialogReturn<Fields extends object> {
     setValue<K extends keyof Fields>(name: K, value: Fields[K]): void;
     readonly values: Readonly<Ref<Fields>>;
 }
+
+// @public
+export function useDocumentSearch(): UseDocumentSearchReturn;
+
+// @public
+export interface UseDocumentSearchReturn {
+    // (undocumented)
+    readonly activeIndex: ComputedRef<number>;
+    // (undocumented)
+    readonly activeMatch: ComputedRef<FindMatch | null>;
+    // (undocumented)
+    readonly clear: () => void;
+    // (undocumented)
+    readonly find: (query: string, options?: DocumentSearchFindOptions) => readonly FindMatch[];
+    // (undocumented)
+    readonly goTo: (index: number) => boolean;
+    // (undocumented)
+    readonly isPending: ComputedRef<boolean>;
+    // (undocumented)
+    readonly matchCase: ComputedRef<boolean>;
+    // (undocumented)
+    readonly matches: ComputedRef<readonly FindMatch[]>;
+    // (undocumented)
+    readonly next: () => boolean;
+    // (undocumented)
+    readonly previous: () => boolean;
+    // (undocumented)
+    readonly query: ComputedRef<string>;
+    // (undocumented)
+    readonly setMatchCase: (value: boolean) => void;
+    // (undocumented)
+    readonly setQuery: (query: string) => void;
+    // (undocumented)
+    readonly setWholeWord: (value: boolean) => void;
+    // (undocumented)
+    readonly truncated: ComputedRef<boolean>;
+    // (undocumented)
+    readonly wholeWord: ComputedRef<boolean>;
+}
+
+// @public
+export function useEditorCaret(): UseEditorCaretReturn;
+
+// @public
+export type UseEditorCaretReturn = Readonly<ShallowRef<EditorCaret | null>>;
 
 // @public
 export function useEditorColorMode(): UseEditorColorModeReturn;
@@ -6432,6 +8272,24 @@ export interface UseEditorDialogReturn {
     readonly isOpen: ComputedRef<boolean>;
     open(returnFocusTo?: HTMLElement | null): void;
 }
+
+// @public
+export function useEditorEvent<E extends keyof PptxEditorEvents>(event: E, handler: PptxEditorEvents[E]): UseEditorEventReturn;
+
+// @public
+export type UseEditorEventReturn = void;
+
+// @public
+export function useEditorHostDocument(): UseEditorHostDocumentReturn;
+
+// @public
+export type UseEditorHostDocumentReturn = Readonly<ShallowRef<Document | null>>;
+
+// @public
+export function useEditorSnapshot(editor: MaybeRefOrGetter<PptxEditorInstance | null>): UseEditorSnapshotReturn;
+
+// @public
+export type UseEditorSnapshotReturn = Readonly<Ref<number>>;
 
 // @public
 export function useEditorState<T>(selector: (snapshot: EditorSnapshot) => T, isEqual?: (a: T, b: T) => boolean): UseEditorStateReturn<T>;
@@ -6492,25 +8350,26 @@ export function useFonts(...origins: readonly MaybeRefOrGetter<FontOrigin>[]): U
 export type UseFontsReturn = MarkedFontResolver;
 
 // @public
+export function useHistoryGroup(input: HistoryGroupBindingOptions): UseHistoryGroupReturn;
+
+// @public
+export interface UseHistoryGroupReturn {
+    readonly options: () => EditorExecOptions;
+    readonly ref: (element: unknown) => void;
+}
+
+// @public
 export function useHyperlinkPopup(): UseHyperlinkPopupReturn;
 
 // @public
-export interface UseHyperlinkPopupReturn {
-    beginEdit(): void;
-    // (undocumented)
-    close(): void;
-    commitEdit(): boolean;
-    copy(): Promise<boolean>;
-    open(link?: {
-        readonly url: string;
-    } | null, anchor?: HTMLElement | null): void;
-    openAtCaret(): void;
-    openTarget(): boolean;
-    // (undocumented)
-    setUrl(url: string): void;
-    // (undocumented)
+export function useHyperlinkPopupInstance(active?: boolean): UseHyperlinkPopupInstanceReturn;
+
+// @public
+export type UseHyperlinkPopupInstanceReturn = UseHyperlinkPopupReturn;
+
+// @public
+export interface UseHyperlinkPopupReturn extends HyperlinkPopupActions {
     readonly state: ComputedRef<HyperlinkPopupState>;
-    unlink(): boolean;
 }
 
 // @public
@@ -6536,7 +8395,12 @@ export interface UseNotesPaneReturn {
 }
 
 // @public
-export function useOpenFailure(): UseOpenFailureReturn;
+export function useOpenFailure(options?: UseOpenFailureOptions): UseOpenFailureReturn;
+
+// @public
+export interface UseOpenFailureOptions {
+    readonly t?: ChromeTranslate;
+}
 
 // @public
 export interface UseOpenFailureReturn {
@@ -6575,6 +8439,25 @@ export function usePptxEditor(): UsePptxEditorReturn;
 export type UsePptxEditorReturn = Readonly<ShallowRef<PptxEditorInstance | null>>;
 
 // @public
+export function usePptxSource(source: MaybeRefOrGetter<PptxSource | null | undefined>, options?: MaybeRefOrGetter<UsePptxSourceOptions>): UsePptxSourceReturn;
+
+export { UsePptxSourceOptions }
+
+// @public
+export interface UsePptxSourceReturn {
+    readonly document: ComputedRef<Uint8Array | undefined>;
+    readonly error: ComputedRef<Error | null>;
+    readonly fonts: ComputedRef<FontConfiguration | FontResolver | undefined>;
+    readonly isLoading: ComputedRef<boolean>;
+}
+
+// @public
+export function useScopeClassName(): UseScopeClassNameReturn;
+
+// @public
+export type UseScopeClassNameReturn = ComputedRef<'' | 'pptx-editor ' | 'pptx-editor dark '>;
+
+// @public
 export function useSlideLayouts(): UseSlideLayoutsReturn;
 
 // @public
@@ -6591,11 +8474,48 @@ export interface UseSlideshowReturn {
 }
 
 // @public
+export function useToolbarContext(): UseToolbarContextReturn;
+
+// @public
+export interface UseToolbarContextReturn {
+    readonly t: Readonly<ShallowRef<ChromeTranslate | undefined>>;
+}
+
+// @public
+export function useToolbarLabel(): UseToolbarLabelReturn;
+
+// @public
+export function useToolbarLabelFor(t: ChromeTranslate | undefined): UseToolbarLabelForReturn;
+
+// @public
+export type UseToolbarLabelForReturn = (key: string) => string;
+
+// @public
+export type UseToolbarLabelReturn = UseToolbarLabelForReturn;
+
+// @public
 export function useTranslation(): UseTranslationReturn;
 
 // @public
 export interface UseTranslationReturn {
     readonly t: Translate;
+}
+
+// @public
+export function useZoom(): UseZoomReturn;
+
+// @public
+export interface UseZoomReturn {
+    readonly canZoomIn: ComputedRef<boolean>;
+    readonly canZoomOut: ComputedRef<boolean>;
+    readonly fit: () => void;
+    readonly isFit: ComputedRef<boolean>;
+    readonly levels: readonly number[];
+    readonly reset: () => void;
+    readonly setZoom: (zoom: number) => void;
+    readonly zoom: ComputedRef<number>;
+    readonly zoomIn: () => void;
+    readonly zoomOut: () => void;
 }
 
 // @public

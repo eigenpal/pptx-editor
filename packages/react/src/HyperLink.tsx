@@ -25,11 +25,13 @@ import {
   isValidElement,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   type ReactElement,
   type ReactNode,
 } from 'react';
 import {
+  linkSelectionRect,
   openHyperlinkPopup,
   requestLinkPopup,
   translateKeyOrText,
@@ -164,7 +166,14 @@ function HyperLinkRoot({ className, asChild, hidden, preset = true, children }: 
   const ctx = useContext(HyperlinkPopupContext);
   const { t } = useTranslation();
   const state = ctx?.state ?? CLOSED_STATE;
-  if (!ctx || state.mode === 'closed') return null;
+  const editor = usePptxEditor();
+  const open = state.mode !== 'closed';
+  // Capture the text box before the field takes focus. Keep it while the draft changes.
+  const anchorRect = useMemo(
+    () => (open && editor && state.anchor ? linkSelectionRect(editor) : null),
+    [editor, open, state.anchor]
+  );
+  if (!ctx || !open) return null;
   // `hidden` drops the packaged panel only: the gestures stay, so a host renders its own UI.
   if (hidden) return <>{children}</>;
   const body = preset ? <HyperLinkPreset>{children}</HyperLinkPreset> : children;
@@ -173,6 +182,7 @@ function HyperLinkRoot({ className, asChild, hidden, preset = true, children }: 
   return (
     <Popover
       anchor={state.anchor}
+      anchorRect={anchorRect}
       role="dialog"
       label={t(reading ? 'link.label' : state.url ? 'link.edit' : 'link.insert')}
       onClose={() => ctx.controller.close()}

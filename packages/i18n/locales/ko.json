@@ -90,6 +90,8 @@
     "deleteSlides": "슬라이드 {count}개 삭제",
     "moveUp": "위로 이동",
     "moveDown": "아래로 이동",
+    "moveLeft": "왼쪽으로 이동",
+    "moveRight": "오른쪽으로 이동",
     "layout": "레이아웃",
     "resetSlide": "슬라이드 원래대로",
     "hideSlide": "슬라이드 숨기기",
@@ -113,6 +115,8 @@
       "clearFormatting": "Ctrl+\\",
       "moveUp": "Ctrl+↑",
       "moveDown": "Ctrl+↓",
+      "moveLeft": "Ctrl+←",
+      "moveRight": "Ctrl+→",
       "undo": "Ctrl+Z",
       "redo": "Ctrl+Y",
       "selectAll": "Ctrl+A",
@@ -743,7 +747,8 @@
     "hiddenSlideLabel": "슬라이드 {index}(숨김)",
     "chooseLayout": "레이아웃을 지정하여 슬라이드 추가",
     "collapse": "축소판 그림 숨기기",
-    "expand": "축소판 그림 표시"
+    "expand": "축소판 그림 표시",
+    "moreActions": "슬라이드 추가 작업"
   },
   "notes": {
     "title": "슬라이드 노트",
@@ -873,6 +878,7 @@
     "label": "링크",
     "placeholder": "링크를 붙여 넣거나 입력하세요",
     "apply": "적용",
+    "cancel": "취소",
     "remove": "링크 제거",
     "open": "링크 열기",
     "unavailable": "이 편집기에서는 링크가 꺼져 있습니다",
@@ -880,7 +886,6 @@
     "copied": "링크를 복사했습니다",
     "edit": "링크 편집",
     "insert": "링크 삽입",
-    "cancel": "취소",
     "unsafe": "이 링크를 열 수 없습니다",
     "announce": "링크: {url}. 작업을 보려면 F6 키를 누르세요."
   },

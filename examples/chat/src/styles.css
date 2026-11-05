@@ -15,6 +15,8 @@
   --c-accent-soft: rgb(79 70 229 / 0.14);
   --c-on-accent: #ffffff;
   --c-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.14);
+  --c-scroll: color-mix(in srgb, var(--c-muted) 40%, transparent);
+  --c-scroll-hover: color-mix(in srgb, var(--c-muted) 65%, transparent);
   /* Strong curves: ease-out for what enters, the drawer curve for the panel. */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
@@ -152,7 +154,7 @@ button {
 .shell[data-resizing] .shell__handle::after {
   opacity: 1;
   transform: translateY(-50%);
-  background: var(--c-text);
+  background: var(--c-accent);
 }
 @media (hover: hover) and (pointer: fine) {
   .shell__handle:hover::after {
@@ -211,7 +213,7 @@ button {
   margin-inline-start: auto;
   padding: 6px 10px;
   border: 1px solid var(--c-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--c-surface);
   font-size: 13px;
   font-weight: 500;
@@ -266,6 +268,9 @@ button {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  /* The same thin thumb as the editor's rail and notes. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-scroll) transparent;
 }
 .thread__inner {
   display: flex;
@@ -404,7 +409,7 @@ button {
 .card__cta {
   flex: none;
   padding: 6px 12px;
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--c-accent);
   color: var(--c-on-accent);
   font-size: 13px;
@@ -567,7 +572,7 @@ button {
   height: 32px;
   padding: 0 10px 0 12px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--c-accent);
   color: var(--c-on-accent);
   font-size: 13px;
@@ -618,6 +623,52 @@ button {
 }
 
 /* ============================================================================
+ * EDITOR THEME: the editor chrome wears the chat's tokens, so the panel, its menus, and its
+ * dialogs read as one product with the chat. Every `.pptx-editor` scope declares its own
+ * defaults, light and dark, so the rule names both. The `--c-*` values switch with the
+ * system theme, and `colorMode="system"` on the root follows the same setting.
+ * ============================================================================ */
+
+:is(.pptx-editor, .pptx-editor.dark) {
+  --doc-font-ui: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  /* The chat's shapes: 14px cards (the composer, the deck card), 9px controls. */
+  --doc-radius-surface: 14px;
+  --doc-radius-control: 9px;
+  --doc-bg: var(--c-bg);
+  --doc-bg-subtle: var(--c-tint);
+  --doc-bg-hover: var(--c-tint);
+  --doc-bg-input: var(--c-surface);
+  --doc-surface: var(--c-surface);
+  --doc-popover-bg: var(--c-surface);
+  --doc-popover-fg: var(--c-text);
+  --doc-text: var(--c-text);
+  --doc-text-muted: var(--c-muted);
+  --doc-border: var(--c-border);
+  --doc-border-dark: var(--c-border-strong);
+  --doc-primary: var(--c-accent);
+  --doc-primary-hover: color-mix(in srgb, var(--c-accent) 88%, var(--c-text));
+  --doc-primary-light: var(--c-accent-soft);
+  --doc-on-primary: var(--c-on-accent);
+  --doc-toggle-active-bg: var(--c-accent-soft);
+  --doc-toggle-active-fg: var(--c-accent);
+  --doc-focus-ring: var(--c-accent);
+  --doc-selection: var(--c-accent-soft);
+  --doc-accent: var(--c-accent);
+  /* A hairline ring plus the chat's soft shadow: the toolbar, the rail, and the menus get the
+     same edge as the composer and the deck card. */
+  --doc-card-shadow: 0 0 0 1px var(--c-border), var(--c-shadow);
+  --doc-card-shadow-strong: 0 0 0 1px var(--c-border), var(--c-shadow);
+  --doc-shadow-lg: var(--c-shadow);
+  --doc-text-subtle: color-mix(in srgb, var(--c-muted) 60%, transparent);
+  --doc-tooltip-bg: var(--c-text);
+  --doc-tooltip-text: var(--c-bg);
+}
+/* A dialog draws its own 1px border: it takes the soft shadow without the hairline ring. */
+.pptx-dialog.pptx-editor {
+  --doc-card-shadow: var(--c-shadow);
+}
+
+/* ============================================================================
  * DECK PANEL (inside PptxEditor.Viewport: editor tokens)
  * ============================================================================ */
 
@@ -636,8 +687,10 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 52px;
+  /* The chat header's height and rule, so the two headers read as one bar. */
+  height: 56px;
   padding: 0 8px 0 14px;
+  border-bottom: 1px solid var(--doc-border);
 }
 .deck__glyph {
   flex: none;
@@ -647,7 +700,7 @@ button {
   height: 30px;
   border-radius: 8px;
   background: var(--doc-primary);
-  color: var(--doc-primary-foreground, #fff);
+  color: var(--doc-on-primary);
 }
 .deck__glyph svg {
   width: 18px;
@@ -684,52 +737,25 @@ button {
   display: flex;
   gap: 2px;
 }
-.chat-icon-btn {
-  display: grid;
-  place-items: center;
+/* The header actions: `Toolbar.Action` brings the hover, pressed, disabled, and focus states;
+   the header makes them the chat's size. */
+.deck__action {
   width: 34px;
   height: 34px;
-  padding: 0;
-  border: 0;
-  border-radius: 9px;
-  background: none;
-  color: var(--doc-text-muted, currentColor);
-  cursor: pointer;
-  transition:
-    background-color 150ms ease,
-    color 150ms ease,
-    transform 160ms var(--ease-out);
 }
-.chat-icon-btn svg {
+.deck__action svg {
   width: 20px;
   height: 20px;
   fill: currentColor;
-}
-.chat-icon-btn:active:not(:disabled) {
-  transform: scale(0.96);
-}
-.chat-icon-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-.chat-icon-btn:focus-visible {
-  outline: 2px solid var(--doc-focus-ring);
-  outline-offset: -2px;
-}
-@media (hover: hover) and (pointer: fine) {
-  .chat-icon-btn:hover:not(:disabled) {
-    background: var(--doc-bg-hover);
-    color: var(--doc-text);
-  }
 }
 .deck__dock {
   flex: none;
   display: flex;
   justify-content: center;
   min-width: 0;
-  padding: 0 10px 8px;
+  padding: 8px 10px;
 }
-.deck__dock .pptx-toolbar {
+.deck__toolbar {
   max-width: 100%;
 }
 
@@ -740,7 +766,7 @@ button {
   min-height: 0;
 }
 .deck-ws[data-mode='wide'] {
-  padding-left: 12px;
+  padding: 0 0 12px 12px;
 }
 .deck-ws__main {
   position: relative;
@@ -759,43 +785,29 @@ button {
 .deck-ws__canvas[hidden] {
   display: none;
 }
-/* A narrow panel: smaller thumbnails, and no move buttons (Ctrl+Left and Ctrl+Right still
-   move slides), so more slides fit in the row. */
+/* A narrow panel: smaller thumbnails, so more slides fit in the row. `DeckPanel` also hides
+   the move buttons there, through the rail's parts. */
 @container deck (max-width: 560px) {
   .deck-ws__rail {
     --pptx-rail-thumb-width: 88px;
   }
-  .deck-ws__rail .pptx-rail__move {
-    display: none;
-  }
-  /* Five actions left: three over two, not four over one. */
-  .deck-ws__rail[data-orientation] .pptx-rail__actions {
-    grid-template-columns: repeat(3, auto);
-  }
 }
-/* Stacked: the slide asks for the height that fits the width (an inline `flex-basis`), the
-   rail keeps its own height, and the open notes take the rest. A short panel shrinks the
-   slide, not the notes; with the notes closed, the slide takes the spare height. */
+/* Stacked: the slide asks for the height that fits the width (an inline `flex-basis`) and
+   takes the spare height, the rail keeps its own height, and the open notes keep a reading
+   height. A short panel shrinks the slide and the notes together. */
+/* Stacked: the slide takes only its fitted height (the inline flex-basis from DeckPanel), so
+   no empty bands appear above and below it. The open notes take the spare height. */
 .deck-ws[data-mode='stacked'] .deck-ws__canvas {
   flex-grow: 0;
   flex-shrink: 1;
   min-height: 160px;
 }
-.deck-ws[data-mode='stacked']:has(.deck-ws__notes[data-open='false']) .deck-ws__canvas {
-  flex-grow: 1;
-}
 .deck-ws__rail {
   margin: 0 12px 10px;
 }
 .deck-ws[data-mode='stacked'] .deck-ws__notes[data-open='true'] {
-  flex: 1 0 128px;
-  min-height: 0;
-}
-.deck-ws[data-mode='stacked'] .deck-ws__notes[data-open='true'] .pptx-notes__text {
-  flex: 1 1 auto;
-  height: auto;
-  min-height: 40px;
-  margin-bottom: 10px;
+  flex: 1 1 0;
+  min-height: 96px;
 }
 
 /* ============================================================================

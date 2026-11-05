@@ -7,40 +7,39 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useId,
   useMemo,
-  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
 } from 'react';
 import {
   SLOT_POPUP_KEYS,
-  createHyperlinkPopupController,
+  createHyperlinkPopupStore,
   focusSurfaceOf,
   hyperlinkEntryReads,
   linkPopupAnnouncement,
   listenLinkClicks,
   listenLinkPanelKey,
   linkPopupReturnsFocus,
-  listenLinkRequests,
   pickImageInto,
   requestLinkPopup,
   type ChromeActionHost,
   type ChromeSlotId,
+  type HyperlinkPopupStore,
 } from '@pptx-editor.dev/core/editor';
-import {
-  ChromeActionHostContext,
-  useEditorCommand,
-  usePptxEditor,
-  useSlideshow,
-  useTranslation,
-} from './context.ts';
+import { ChromeActionHostContext, usePptxEditor, useSlideshow, useTranslation } from './context.ts';
 import { requestFindBar } from './FindBar.tsx';
-import { HyperLink, HyperlinkPopupContext } from './HyperLink.tsx';
+import { HyperLink, HyperlinkPopupContext as ControllerContext } from './HyperLink.tsx';
 import { useDialogOpener, usePopupEntry, usePopups, type PptxEditorPopups } from './popups.tsx';
+import {
+  HyperlinkPopupContext,
+  HyperlinkPopupViewsContext,
+  useHyperlinkPopupBinding,
+} from './useHyperlinkPopup.ts';
 
 // Ask the `PptxEditor.Root` of an editor to open its link popup, as Ctrl/Cmd+K does. The
 // request and the anchor rules are core's (`overlays.ts`), shared with the Vue adapter.
@@ -60,14 +59,19 @@ const OFF_REASONS: Readonly<Record<string, string>> = {
   columns: 'dialog.unavailable',
 };
 
-/** Why `slot` cannot run with these `popups`, or null. */
+/**
+ * Why `slot` cannot run with these `popups`, or null. With `hyperlink: false`, a host panel
+ * that reads `useHyperlinkPopup()` (`linkViews`) still opens for the link controls.
+ */
 function popupReason(
   popups: PptxEditorPopups | undefined,
   slot: ChromeSlotId,
-  dialog?: string
+  dialog: string | undefined,
+  linkViews: number
 ): string | null {
   const key = dialog ?? SLOT_POPUP_KEYS[slot];
   if (!key || popups?.[key as keyof PptxEditorPopups] !== false) return null;
+  if (key === 'hyperlink' && linkViews > 0) return null;
   return OFF_REASONS[key] ?? null;
 }
 
@@ -84,7 +88,7 @@ export function useRegisterFindBar(): void {
 }
 
 /** The host this root's own contexts give, never an enclosing root's. */
-function useLocalChromeActionHost(findBars: number | null): ChromeActionHost {
+function useLocalChromeActionHost(findBars: number | null, linkViews = 0): ChromeActionHost {
   const editor = usePptxEditor();
   const openDialog = useDialogOpener();
   const show = useSlideshow();
@@ -99,7 +103,7 @@ function useLocalChromeActionHost(findBars: number | null): ChromeActionHost {
         if (editor) pickImageInto(editor, document, target);
       },
       unavailable: (slot, dialog) =>
-        popupReason(popups, slot, dialog) ??
+        popupReason(popups, slot, dialog, linkViews) ??
         // Find shows its matches on the slide canvas, which the slide sorter does not show.
         (SLOT_POPUP_KEYS[slot] === 'find' && editor?.snapshot().presentationView === 'slideSorter'
           ? 'disabled.findSorter'
@@ -107,7 +111,7 @@ function useLocalChromeActionHost(findBars: number | null): ChromeActionHost {
         // Find needs a find bar to open: nothing answers the request without one.
         (findBars === 0 && SLOT_POPUP_KEYS[slot] === 'find' ? 'find.noBar' : null),
     }),
-    [editor, openDialog, show, popups, findBars]
+    [editor, openDialog, show, popups, findBars, linkViews]
   );
 }
 
@@ -134,73 +138,70 @@ export function ChromeActionHostProvider({ children }: { children?: ReactNode })
     }),
     [findBars]
   );
-  const host = useLocalChromeActionHost(findBars);
+  // The root's one link popup state, which the packaged popup and `useHyperlinkPopup` share.
+  const [linkStore] = useState(createHyperlinkPopupStore);
+  const [linkViews, setLinkViews] = useState(0);
+  const attachLinkView = useCallback(() => {
+    setLinkViews((n) => n + 1);
+    let attached = true;
+    return () => {
+      if (!attached) return;
+      attached = false;
+      setLinkViews((n) => n - 1);
+    };
+  }, []);
+  const host = useLocalChromeActionHost(findBars, linkViews);
   return (
     <FindBarsContext.Provider value={finds}>
       <ChromeActionHostContext.Provider value={host}>
-        {children}
-        <LinkPopupHost />
+        <HyperlinkPopupContext.Provider value={linkStore}>
+          <HyperlinkPopupViewsContext.Provider value={attachLinkView}>
+            <LinkPopupBridge store={linkStore}>
+              {children}
+              <LinkPopupHost store={linkStore} views={linkViews} />
+            </LinkPopupBridge>
+          </HyperlinkPopupViewsContext.Provider>
+        </HyperlinkPopupContext.Provider>
       </ChromeActionHostContext.Provider>
     </FindBarsContext.Provider>
   );
 }
 
-/**
- * The link popup of one root: `popups.hyperlink`, or the packaged `PptxEditor.HyperLink`. It
- * owns the root's one popup state (core's controller), opened in edit mode by every link
- * request and in reading mode by a click into linked text.
- */
-function LinkPopupHost(): ReactNode {
+/** Publish the current controller to the compound parts and host-rendered children. */
+function LinkPopupBridge({ store, children }: { store: HyperlinkPopupStore; children: ReactNode }) {
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState);
+  const errorId = useId();
+  const controller = store.controller();
+  return (
+    <ControllerContext.Provider value={controller ? { controller, state, errorId } : null}>
+      {children}
+    </ControllerContext.Provider>
+  );
+}
+
+/** The root's shared popup, including reading gestures and accessible announcements. */
+function LinkPopupHost({ store, views }: { store: HyperlinkPopupStore; views: number }): ReactNode {
   const editor = usePptxEditor();
   const entry = usePopupEntry('hyperlink');
-  const cmd = useEditorCommand('text.link');
   const { t } = useTranslation();
-  const errorId = useId();
-  const controller = useMemo(
-    () => (editor ? createHyperlinkPopupController(editor) : null),
-    [editor]
-  );
-  useEffect(() => () => controller?.dispose(), [controller]);
-  const state = useSyncExternalStore(
-    (notify) => controller?.subscribe(notify) ?? (() => {}),
-    () => controller?.getState() ?? null,
-    () => controller?.getState() ?? null
-  );
+  useHyperlinkPopupBinding(store, true);
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState);
+  const controller = store.controller();
   const off = entry === false;
-  const enabled = cmd.isEnabled;
-  const enabledRef = useRef(enabled);
-  enabledRef.current = enabled;
-  useEffect(() => {
-    if (off || !editor || !controller) return;
-    // Requests for this root's editor only: another editor on the page opens its own. The
-    // anchor is core's `linkPopupAnchor`.
-    return listenLinkRequests(
-      editor,
-      () => enabledRef.current,
-      (at) => controller.openEditing(at)
-    );
-  }, [editor, controller, off]);
-  // A click into linked text opens the reading panel under the caret, also for a viewer: it
-  // reads, copies, and opens the link, and the panel shows Edit and Unlink only when the link
-  // command can run. A host renderer gets reading mode only when it asks for it.
   const reads = hyperlinkEntryReads(entry);
   useEffect(() => {
     if (off || !reads || !editor || !controller) return;
     const stopClicks = listenLinkClicks(editor, (at) => controller.openReading(at));
-    // F6 moves focus from the slide text into the open reading panel.
     const stopKey = listenLinkPanelKey(editor, () => controller.getState().mode === 'reading');
     return () => {
       stopClicks();
       stopKey();
     };
   }, [editor, controller, off, reads]);
-  // Turning links off closes an open popup.
   useEffect(() => {
-    if (off) controller?.close();
-  }, [off, controller]);
-  // On close, focus goes back to the slide (the text input while text is selected), as DOCX
-  // Editor's HyperLink does; focus that moved elsewhere on purpose stays there. Checked at the
-  // moment of closing, while focus is still in the panel.
+    if (off && views === 0) store.close();
+  }, [off, views, store]);
+  // Check focus synchronously while the closing panel is still mounted.
   useEffect(() => {
     if (!controller || !editor) return;
     let open = controller.getState().mode !== 'closed';
@@ -210,31 +211,21 @@ function LinkPopupHost(): ReactNode {
       open = now;
     });
   }, [controller, editor]);
-  if (!controller || !state || off) return null;
-  const value = { controller, state, errorId };
-  // A polite live region, always mounted so a screen reader hears the panel open and the copy.
-  const live = (
-    <span className="pptx-sr-only" role="status" aria-live="polite">
-      {linkPopupAnnouncement(state, t)}
-    </span>
-  );
+  if (!controller) return null;
   let content: ReactNode = null;
-  if (state.mode !== 'closed')
+  if (state.mode !== 'closed' && !off)
     content =
       typeof entry === 'function' ? (
-        entry({
-          anchor: state.anchor,
-          url: state.url,
-          mode: state.mode,
-          onClose: () => controller.close(),
-        })
+        entry({ anchor: state.anchor, url: state.url, mode: state.mode, onClose: store.close })
       ) : (
         <HyperLink />
       );
   return (
-    <HyperlinkPopupContext.Provider value={value}>
+    <>
       {content}
-      {live}
-    </HyperlinkPopupContext.Provider>
+      <span className="pptx-sr-only" role="status" aria-live="polite">
+        {linkPopupAnnouncement(state, t)}
+      </span>
+    </>
   );
 }

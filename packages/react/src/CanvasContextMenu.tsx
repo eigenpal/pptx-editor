@@ -2,10 +2,12 @@
 // The slide canvas's context menu request. The engine surface stops the browser's own menu and
 // selects what is under the pointer first (`surface-context-menu.ts`); this hook reads the
 // selection, opens a menu request for it (shapes, text being edited, or empty slide area), and
-// renders the `popups.contextMenu` entry: the packaged `PptxEditor.ContextMenu` by default, a
+// renders the `popups.contextMenu` entry (or the entry of a `PptxEditor.ContextMenu` placed in
+// the root): the packaged `PptxEditor.ContextMenu` by default, a
 // host renderer, or nothing for `false`. The rows live in `context-menu-parts.tsx`.
 
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -26,7 +28,7 @@ import {
   PptxEditorContextMenu,
   type ContextMenuRequest,
 } from './context-menu-parts.tsx';
-import { usePopupEntry } from './popups.tsx';
+import { useCanvasMenuEntry } from './popups.tsx';
 
 interface CanvasMenuState {
   readonly at: ContextMenuPoint;
@@ -45,8 +47,12 @@ export function useCanvasContextMenu(): {
   readonly layer: ReactNode;
 } {
   const editor = usePptxEditor();
-  const entry = usePopupEntry('contextMenu');
+  const entry = useCanvasMenuEntry();
   const [menu, setMenu] = useState<CanvasMenuState | null>(null);
+  // An entry that turns `false` (a placed menu turned `disabled`) closes the open menu.
+  useEffect(() => {
+    if (entry === false) setMenu(null);
+  }, [entry]);
   const keyboardAt = useRef(0);
   const open = (owner: HTMLElement, at: ContextMenuPoint | null): void => {
     if (entry === false || !editor || editor.snapshot().status !== 'ready') return;

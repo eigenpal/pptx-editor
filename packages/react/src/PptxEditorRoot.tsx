@@ -48,7 +48,12 @@ import { DialogProvider, type PptxEditorPopups } from './popups.tsx';
 import { ChromeActionHostProvider } from './chrome-actions.tsx';
 import { SlideSorterWatch } from './SlideSorter.tsx';
 import { ChromeTooltip } from './ChromeTooltip.tsx';
-import { ChromeDarkContext, useChromeDark, useResolvedDark } from './color-mode.ts';
+import {
+  ChromeDarkContext,
+  ScopedByAncestorContext,
+  useChromeDark,
+  useResolvedDark,
+} from './color-mode.ts';
 import { PaneStateContext, type PaneState } from './pane-state.ts';
 
 /** Props for `PptxEditor.Root`. Only `document` identity reloads the document. @public */
@@ -262,7 +267,7 @@ export function PptxEditorViewport({ className, children }: PptxEditorViewportPr
   const dark = useChromeDark();
   return (
     <div className={['pptx-editor', dark ? 'dark' : '', className].filter(Boolean).join(' ')}>
-      {children}
+      <ScopedByAncestorContext.Provider value>{children}</ScopedByAncestorContext.Provider>
     </div>
   );
 }

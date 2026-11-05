@@ -703,18 +703,20 @@ describe('menu review fixes, round 1', () => {
     const warn = spyOn(console, 'warn').mockImplementation(() => {});
     try {
       await loaded((onReady) => (
-        <PptxEditorRoot onReady={onReady}>
-          <PptxEditor.Menu>
-            <PptxEditor.Menu.Edit>
-              <PptxEditor.Menu.Item slotId="text.bold" hidden />
-              <PptxEditor.Menu.Item slotId={'nope.nope' as never} />
-              <PptxEditor.Menu.Item slotId="text.color" />
-              <PptxEditor.Menu.Item slotId="shape.styles" />
-            </PptxEditor.Menu.Edit>
-            <PptxEditor.Menu.Entry id="acme" label="Acme" after="nope" />
-          </PptxEditor.Menu>
+        <>
           <PptxEditor.ContextMenu />
-        </PptxEditorRoot>
+          <PptxEditorRoot onReady={onReady}>
+            <PptxEditor.Menu>
+              <PptxEditor.Menu.Edit>
+                <PptxEditor.Menu.Item slotId="text.bold" hidden />
+                <PptxEditor.Menu.Item slotId={'nope.nope' as never} />
+                <PptxEditor.Menu.Item slotId="text.color" />
+                <PptxEditor.Menu.Item slotId="shape.styles" />
+              </PptxEditor.Menu.Edit>
+              <PptxEditor.Menu.Entry id="acme" label="Acme" after="nope" />
+            </PptxEditor.Menu>
+          </PptxEditorRoot>
+        </>
       ));
       openMenu('Edit');
       const text = warn.mock.calls.map((c: unknown[]) => String(c[0])).join('\n');
@@ -722,7 +724,7 @@ describe('menu review fixes, round 1', () => {
       expect(text).toContain('slotId="nope.nope" is not a registered control');
       expect(text).toContain('slotId="text.color" picks a value');
       expect(text).toContain('Menu.Entry has after="nope"');
-      expect(text).toContain('PptxEditor.ContextMenu renders only while');
+      expect(text).toContain('PptxEditor.ContextMenu is outside PptxEditor.Root');
       const color = document.querySelector<HTMLElement>('[data-slot="text.color"]')!;
       expect(color.getAttribute('aria-disabled')).toBe('true');
       // Quick Styles is a gallery, but not the Insert Shape grid: its row is disabled too.
@@ -899,6 +901,59 @@ describe('menu review fixes, round 1', () => {
     act(() => requestLinkPopup(editor));
     act(() => void fireEvent.click(screen.getByRole('button', { name: 'Remove link' })));
     expect(document.activeElement).toBe(input());
+  });
+
+  test('the link popup opens at the selected text, and Cancel closes it with no change', async () => {
+    // The Vue twin is packages/vue/test/overlays.test.ts ('the link popup opens at the selected text').
+    const editor = await loaded((onReady) => (
+      <PptxEditorRoot onReady={onReady}>
+        <PptxEditorContent />
+      </PptxEditorRoot>
+    ));
+    const nodeId = editor.session!.layout(0)!.items[0]!.element.nodeId;
+    act(() =>
+      editor.setSelection({
+        kind: 'text',
+        nodeId,
+        anchor: { paragraph: 0, offset: 0 },
+        focus: { paragraph: 0, offset: 2 },
+      })
+    );
+    const marks = [...document.querySelectorAll('.pptx-surface__text-selection')];
+    expect(marks.length > 0).toBe(true);
+    for (const mark of marks)
+      mark.getBoundingClientRect = () =>
+        ({ left: 100, top: 200, right: 180, bottom: 220, width: 80, height: 20 }) as DOMRect;
+    act(() => requestLinkPopup(editor));
+    const popup = document.querySelector<HTMLElement>('.pptx-link-popup')!;
+    // Under the selected words, with the popover's 6px gap.
+    expect(popup.style.left).toBe('100px');
+    expect(popup.style.top).toBe('226px');
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Cancel' })));
+    expect(document.querySelector('.pptx-link-popup') === null).toBe(true);
+    expect(editor.snapshot().format?.link ?? '').toBe('');
+    expect(document.activeElement).toBe(document.querySelector('.pptx-surface__input'));
+  });
+
+  test('with no text selected, the link popup opens under the control that asked', async () => {
+    const editor = await loaded((onReady) => (
+      <PptxEditorRoot onReady={onReady}>
+        <PptxEditorContent />
+      </PptxEditorRoot>
+    ));
+    const button = document.createElement('button');
+    document.body.append(button);
+    button.getBoundingClientRect = () =>
+      ({ left: 40, top: 10, right: 70, bottom: 30, width: 30, height: 20 }) as DOMRect;
+    button.getClientRects = () => [button.getBoundingClientRect()] as unknown as DOMRectList;
+    act(() => editor.selectAll());
+    act(() => requestLinkPopup(editor, button));
+    const popup = document.querySelector<HTMLElement>('.pptx-link-popup')!;
+    expect(popup.style.left).toBe('40px');
+    expect(popup.style.top).toBe('36px');
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Remove link' })).toBeNull();
+    button.remove();
   });
 
   test('execute() for text.link warns when no popup can open', async () => {

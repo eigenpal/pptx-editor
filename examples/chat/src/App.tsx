@@ -125,7 +125,10 @@ function ChatApp({ loadDeck }: { loadDeck: () => void }) {
   useEffect(() => {
     if (!open || !layout.sheet) return;
     const frame = requestAnimationFrame(() =>
-      panel.current?.querySelector<HTMLElement>('.deck__head button')?.focus()
+      // A pointer opened the sheet: no ring on Back. A keyboard user still gets one on Tab.
+      panel.current
+        ?.querySelector<HTMLElement>('.deck__head button')
+        ?.focus({ focusVisible: false } as FocusOptions)
     );
     return () => cancelAnimationFrame(frame);
   }, [open, layout.sheet]);
@@ -140,18 +143,20 @@ function ChatApp({ loadDeck }: { loadDeck: () => void }) {
 
   // Escape closes the panel from the chat, the panel header, or the divider. Escape on the
   // slide, in the notes, or in a menu belongs to the editor: it leaves a text box or a group.
+  // A running slide show owns Escape too: it ends the show.
+  const presenting = show.controller !== null;
   useEffect(() => {
-    if (!open) return;
+    if (!open || presenting) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
       const target = e.target as Element | null;
       const chrome = target?.closest?.('.deck__head, .shell__handle');
-      if (!chrome && target?.closest?.('.shell__panel, .pptx-slideshow')) return;
+      if (!chrome && target?.closest?.('.shell__panel')) return;
       closePanel();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, closePanel]);
+  }, [open, presenting, closePanel]);
 
   const shellStyle = { '--panel-w': `${layout.panelWidth}px` } as CSSProperties;
   return (

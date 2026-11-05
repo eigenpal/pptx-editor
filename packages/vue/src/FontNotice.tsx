@@ -19,9 +19,11 @@ import {
   fontNoticeFamilies,
 } from '@pptx-editor.dev/core/editor';
 import { ToolButton, keepFocus } from './chrome.tsx';
-import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
+import { useEditorState, usePptxEditor } from './composables.ts';
+import { chromeTranslateProp, useChromeTranslateScope } from './headless-hooks.ts';
 
 const pptxEditorFontNoticeProps = {
+  ...chromeTranslateProp,
   /** A class name added to the notice, as React's `className`. A host `class` also works. */
   className: { type: String, default: undefined },
 } as const;
@@ -39,7 +41,7 @@ export const PptxEditorFontNotice = defineComponent({
   props: pptxEditorFontNoticeProps,
   setup(props, { attrs }) {
     const editorRef = usePptxEditor();
-    const { t } = useTranslation();
+    const { t } = useChromeTranslateScope(() => props.t);
     const substituted = useEditorState((s) => s.substitutedFonts);
     // A newly opened document starts with no outcome of an earlier local font request.
     const loadState = useEditorState((s) => s.status);

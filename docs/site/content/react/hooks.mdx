@@ -34,7 +34,7 @@ export function BoldButton() {
 }
 ```
 
-`useEditorCommand(slot: ChromeSlotId): UseEditorCommandReturn` takes a slot identifier from the [toolbar slot reference](/docs/customization/toolbar#registered-groups-and-slots).
+`useEditorCommand(slot: ChromeSlotId): UseEditorCommandReturn` takes a slot identifier from the [toolbar slot reference](/docs/customization/reference/toolbar#registered-groups-and-slots).
 
 | Member | Type | Description |
 | --- | --- | --- |
@@ -125,7 +125,8 @@ A direct `snapshot()` call does not subscribe the component. Use `useEditorState
 | `usePageSetupDialog()`, `useBackgroundDialog()`, `useParagraphDialog()`, `useFontDialog()`, `useBulletsAndNumberingDialog()`, `useColumnsDialog()`, `useImageAltTextDialog()`, `useImagePropertiesDialog()` | The draft of an open dialog: `values`, `errors`, `isEnabled`, `setValue(name, value)`, `apply()`, and `cancel()`. `useBackgroundDialog()` adds `reset()`. Call them inside the dialog. See [Dialog parts and draft state](/docs/customization/dialogs#dialog-parts-and-draft-state). |
 | `useContextMenuRequest()` | The open canvas context menu request, or `null`. |
 | `useContextMenuTarget()` | The element the open context menu opened on, or `null`. |
-| `useOpenFailure()` | `failure`, `message`, `kept`, and `dismiss()` for a file that did not open. See [Show a banner or a toast](/docs/customization/layout#show-a-banner-or-a-toast). |
+| `useOpenFailure({ t? })` | `failure`, `message`, `kept`, and `dismiss()` for a file that did not open. `t` translates `message`. See [Show a banner or a toast](/docs/customization/layout#show-a-banner-or-a-toast). |
+| `useHyperlinkPopup()`, `useHyperlinkPopupInstance(active?)` | The link popup's `state` and actions, with no UI, as DOCX Editor's hooks. See [Build your own link panel](/docs/customization/dialogs#build-your-own-link-panel). |
 
 ### Fonts
 
@@ -133,6 +134,138 @@ A direct `snapshot()` call does not subscribe the component. Use `useEditorState
 | --- | --- |
 | `useFonts(source, ...fragments)` or `useFonts(...origins)` | A font resolver with a stable identity, for the `fonts` prop. See [Fonts](/docs/customization/fonts). |
 | `useFontFamily()` | `UseFontFamilyReturn`: `value`, `theme`, `options`, `groups`, `isCurrent(row)`, `setValue(family)`, `isEnabled`, and `disabledReason`, as DOCX Editor's hook of the same name. Use it for your own font picker. See [Build the list from `useFontFamily`](/docs/customization/toolbar#build-the-list-from-usefontfamily). |
+
+### Open a presentation
+
+`usePptxSource(source, { fonts?, fetchOptions? })` is the twin of DOCX Editor's `useDocxSource`. It fetches a URL (or takes bytes), resolves the fonts, and cancels both when the component unmounts or the source changes:
+
+```tsx
+import { PptxEditor, usePptxSource } from '@pptx-editor.dev/react';
+import { packagedFonts } from '@docx-editor.dev/fonts';
+
+export function Deck({ url }: { url: string }) {
+  const { document, fonts, error } = usePptxSource(url, { fonts: packagedFonts() });
+  if (error) return <p>{error.message}</p>;
+  return <PptxEditor document={document} fonts={fonts} />;
+}
+```
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `document` | `Uint8Array \| undefined` | The bytes, for the `document` prop. |
+| `fonts` | `FontConfiguration \| FontResolver \| undefined` | The value for the `fonts` prop. |
+| `error` | `Error \| null` | Why the presentation did not open. A font failure never shows here. |
+| `isLoading` | `boolean` | True until the presentation arrives or fails, and while eager fonts load. |
+
+The fonts follow DOCX Editor's two paths. Eager fonts (a value, a promise, or a zero-argument loader) hold the deck back until they settle, so the slides lay out once. An on-demand resolver (`packagedFonts()`, `googleFonts()`) needs the parsed deck, so the bytes go through at once, and `fonts` is one resolver for the life of the hook. A string source is always a URL, fetched as you wrote it. Check a URL from user input first.
+
+## Build your own chrome
+
+These hooks have the names and the shapes of DOCX Editor's hooks.
+
+### Zoom
+
+`useZoom(): UseZoomResult` reads and sets the slide zoom. This control replaces the zoom pill:
+
+```tsx
+import { useZoom } from '@pptx-editor.dev/react';
+
+export function ZoomControl() {
+  const { zoom, isFit, fit, zoomIn, zoomOut, canZoomIn, canZoomOut } = useZoom();
+  return (
+    <div role="group" aria-label="Zoom">
+      <button onClick={zoomOut} disabled={!canZoomOut}>-</button>
+      <span>{Math.round(zoom * 100)}%</span>
+      <button onClick={zoomIn} disabled={!canZoomIn}>+</button>
+      <button onClick={fit} aria-pressed={isFit}>Fit</button>
+    </div>
+  );
+}
+```
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `zoom` | `number` | The zoom in force. `1` is 100 %. In fit mode, it is the zoom that fits the slide. |
+| `isFit` | `boolean` | Whether the slide fits the window and follows its size. |
+| `setZoom(zoom)` | `void` | Sets a fixed zoom from 10 % to 400 %, and leaves fit mode. |
+| `fit()` | `void` | Fits the slide to the window. |
+| `reset()` | `void` | Sets a fixed 100 %. |
+| `zoomIn()`, `zoomOut()` | `void` | Move one step of `levels` from the zoom in force. |
+| `canZoomIn`, `canZoomOut` | `boolean` | Whether a step is possible. |
+| `levels` | `readonly number[]` | The steps that the zoom buttons use. |
+
+PPTX Editor has one fit mode, so `useZoom` has `fit()` in place of DOCX Editor's `mode`, `setMode`, `fitToWidth`, and `auto`.
+
+### Events
+
+`useEditorEvent(event, handler): void` calls `handler` each time the event occurs, while the component is mounted:
+
+```tsx
+import { useEditorEvent } from '@pptx-editor.dev/react';
+
+export function RefusalToast({ show }: { show: (text: string) => void }) {
+  useEditorEvent('rejection', (rejection) => show(rejection.reason));
+  return null;
+}
+```
+
+| Event | Handler | Occurs when |
+| --- | --- | --- |
+| `change` | `(snapshot) => void` | An edit applies, an undo or redo runs, or a load finishes or fails. |
+| `selectionChange` | `(snapshot) => void` | The shape or text selection, the current slide, or the selected slides change. |
+| `rejection` | `(rejection, snapshot) => void` | The editor refuses an edit. |
+| `openFailure` | `(failure, snapshot) => void` | A file does not open. |
+
+The events come from the editor's one subscription. Outside the adapters, `onEditorEvent(editor, event, handler)` from `@pptx-editor.dev/core/editor` gives the same events and returns the unsubscribe function. The `PptxEditorEvents` type lists the events.
+
+### Other hooks
+
+| Hook | Returns | Notes |
+| --- | --- | --- |
+| `useEditorSnapshot(editor)` | `number` | A counter that changes on each editor change. Prefer `useEditorState`, which renders again only when its slice changes. |
+| `useScopeClassName()` | `'' \| 'pptx-editor ' \| 'pptx-editor dark '` | The scope classes for the root element of your own part, so the `--doc-*` tokens apply. See [Style your controls](/docs/customization/appearance#style-your-controls). |
+| `useEditorHostDocument()` | `Document \| null` | The document that the slide is mounted in: an iframe's when you mount the editor there, else the page's. Use it in place of the global `document` for listeners and focus. `null` during server rendering. |
+
+### Find, caret, and undo steps
+
+| Hook | Returns | Notes |
+| --- | --- | --- |
+| `useDocumentSearch()` | `UseDocumentSearchResult` | A find session with no UI, for your own find bar: `query`, `setQuery`, `matchCase`, `wholeWord`, `matches`, `activeIndex`, `activeMatch`, `goTo(index)`, `next()`, `previous()`, `find(query, { selectFirst })`, and `clear()`. Every hook on one editor shares the session. |
+| `useEditorCaret()` | `EditorCaret \| null` | The caret while text is edited: `nodeId`, `paragraph`, `offset`, and `cell` in a table. It changes only when the caret moves. |
+| `useHistoryGroup({ kind })` | `UseHistoryGroupReturn` | One undo step for one gesture on your own control. Put `ref` on the control, and pass `options()` to each command of the gesture. `kind` is `range`, `repeat`, `keyboard`, or `native-color`. |
+
+```tsx
+import { useEditorValueCommand, useHistoryGroup } from '@pptx-editor.dev/react';
+
+export function SizeSlider() {
+  const group = useHistoryGroup({ kind: 'range' });
+  const size = useEditorValueCommand('font.size');
+  return (
+    <input
+      type="range"
+      min={8}
+      max={96}
+      ref={group.ref}
+      onChange={(e) => size.execute(Number(e.target.value), group.options())}
+    />
+  );
+}
+```
+
+### Labels
+
+| Hook | Returns | Notes |
+| --- | --- | --- |
+| `useChromeTranslate(overrides?)` | `ChromeTranslate` | The `t` of the nearest compound, else the root's `locale`. `overrides` is a `Map` that wins for its keys. |
+| `useToolbarContext()` | `ToolbarContextValue` | `{ t }`: the host's `t` on the nearest compound, or `undefined`. |
+| `useToolbarLabel()` | `(key) => string` | The label for a key: the compound's `t`, else the locale catalog. |
+| `useToolbarLabelFor(t)` | `(key) => string` | The same, for a resolver that you pass. |
+
+`Toolbar`, `Menu`, `ContextMenu`, `SlideRail`, `StatusBar`, `FindBar`, `OpenFailure`, `FontNotice`, and `EditNotice` take DOCX Editor's `t` prop. With it, the compound and its parts take every label from your function. The dialogs take their labels from the root's `locale`, as DOCX Editor's dialogs do.
+
+### Not built
+
+DOCX Editor's `useHighlights` and the `highlight` option of its `useDocumentSearch` have no PPTX twin. The slide is painted, not laid out as page text, so there is no named highlight layer for slide text. Find shows its match as the selection on the slide.
 
 ## Apply a value
 

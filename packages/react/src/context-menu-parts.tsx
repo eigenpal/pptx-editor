@@ -7,18 +7,25 @@
 // pointer: shapes, text being edited, or empty slide area. The menu renders core's
 // `CANVAS_CONTEXT_MENUS` rows for that kind. `ContextMenu.Slot slotId` replaces or hides one
 // row in place, other children add rows at the end, and `preset={false}` keeps only the
-// children. The `popups.contextMenu` registry entry decides what the canvas renders.
+// children. The `popups.contextMenu` registry entry, or a menu placed in the root, decides
+// what the canvas renders.
 
+import type { ChromeTranslate } from '@pptx-editor.dev/core/editor';
 import {
   Children,
   Fragment,
   createContext,
   isValidElement,
   useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
   type ReactNode,
 } from 'react';
 import {
   CANVAS_CONTEXT_MENUS,
+  CONTEXT_MENU_NAMED_PARTS,
   arrangeMenuRows,
   canvasMenuLabelKey,
   warnMenuPart,
@@ -30,9 +37,14 @@ import {
   MenuSeparator,
   type ContextMenuPoint,
 } from './ContextMenu.tsx';
-import { useTranslation } from './context.ts';
+import { TranslationContext, useTranslation } from './context.ts';
+import { ToolbarContext } from './headless-hooks.tsx';
+import { useCanvasMenuRegistry } from './popups.tsx';
 import { MenuEntries } from './menu-rows.tsx';
-import { MenuSlotItem, type MenuSlotItemProps } from './menu-parts.tsx';
+import { defineMenuRowParts, menuSlotRowOf } from './menu-parts.tsx';
+
+/** The named rows of the canvas context menu (`ContextMenu.Cut`, …), from core's table. */
+export const CONTEXT_MENU_ROW_PARTS = defineMenuRowParts(CONTEXT_MENU_NAMED_PARTS);
 
 /** What a canvas context menu opened on, and where. @public */
 export interface ContextMenuRequest {
@@ -74,6 +86,11 @@ export function useContextMenuTarget(): HTMLElement | null {
 
 /** Props for `PptxEditor.ContextMenu`. @public */
 export interface PptxEditorContextMenuProps {
+  /**
+   * Your translation function for this compound and its parts, as DOCX Editor's `t`. Without
+   * it, the root's `locale` gives the labels.
+   */
+  readonly t?: ChromeTranslate;
   /** A class name added to the menu. */
   readonly className?: string;
   /**
@@ -82,6 +99,13 @@ export interface PptxEditorContextMenuProps {
    * children.
    */
   readonly preset?: boolean;
+  /**
+   * `true` shows no canvas menu, as DOCX Editor's `disabled`. An open menu closes. Default
+   * `false`.
+   */
+  readonly disabled?: boolean;
+  /** Called with `true` when the menu opens and `false` when it closes. */
+  readonly onOpenChange?: (open: boolean) => void;
   /** `ContextMenu.Slot` children change built-in rows; other children add rows. */
   readonly children?: ReactNode;
 }
@@ -96,34 +120,101 @@ const flatten = (nodes: ReactNode): ReactNode[] =>
   );
 
 /**
- * The slide canvas's context menu. It renders while the canvas has a menu request open: put it
- * in the `popups.contextMenu` entry to change the rows.
+ * The slide canvas's context menu. Place it in `PptxEditor.Root` or `PptxEditor.Viewport`, as
+ * DOCX Editor's `DocxEditor.ContextMenu`, or render it from the `popups.contextMenu` entry. A
+ * placed menu gives the canvas the same entry, and an explicit `popups.contextMenu` entry wins.
  *
  * @example
  * ```tsx
- * const popups: PptxEditorPopups = {
- *   contextMenu: (props) => (
- *     <PptxEditor.ContextMenu {...props}>
+ * <PptxEditor.Root>
+ *   <PptxEditor.Viewport>
+ *     <PptxEditor.Content />
+ *     <PptxEditor.ContextMenu onOpenChange={setMenuOpen}>
  *       <PptxEditor.ContextMenu.Slot slotId="format.painter" hidden />
  *       <PptxEditor.ContextMenu.Item label="Ask legal" icon="info" onSelect={askLegal} />
  *     </PptxEditor.ContextMenu>
- *   ),
- * };
+ *   </PptxEditor.Viewport>
+ * </PptxEditor.Root>
  * ```
  *
  * @public
  */
-export function PptxEditorContextMenu({
+export function PptxEditorContextMenu(props: PptxEditorContextMenuProps): ReactNode {
+  const target = useContextMenuRequest();
+  const registry = useCanvasMenuRegistry();
+  const placed = !target && registry !== null;
+  usePlacedCanvasMenu(placed ? registry : null, props);
+  useOpenChange(target && !props.disabled ? target : null, props);
+  if (target) return <OpenContextMenu target={target} {...props} />;
+  if (!placed) warnMenuPart('PptxEditor.ContextMenu', 'outsideContextMenu');
+  return null;
+}
+
+/**
+ * A menu placed in the root gives the canvas its entry: the same menu, with the `t` and the
+ * locale of where it was placed, or `false` while it is `disabled`.
+ */
+function usePlacedCanvasMenu(
+  registry: ReturnType<typeof useCanvasMenuRegistry>,
+  props: PptxEditorContextMenuProps
+): void {
+  const token = useRef({}).current;
+  const host = useContext(ToolbarContext);
+  const translate = useContext(TranslationContext);
+  const { disabled, className, preset, onOpenChange, children } = props;
+  const entry = useMemo(
+    () =>
+      disabled
+        ? (false as const)
+        : () => (
+            <ToolbarContext.Provider value={host}>
+              <TranslationContext.Provider value={translate}>
+                <PptxEditorContextMenu
+                  {...(className !== undefined ? { className } : {})}
+                  {...(preset !== undefined ? { preset } : {})}
+                  {...(onOpenChange ? { onOpenChange } : {})}
+                >
+                  {children}
+                </PptxEditorContextMenu>
+              </TranslationContext.Provider>
+            </ToolbarContext.Provider>
+          ),
+    [disabled, className, preset, onOpenChange, children, host, translate]
+  );
+  useLayoutEffect(() => {
+    if (registry) registry.place(token, entry);
+  }, [registry, token, entry]);
+  useLayoutEffect(() => (registry ? () => registry.remove(token) : undefined), [registry, token]);
+}
+
+/** `onOpenChange` hears each open and close of the menu, once. */
+function useOpenChange(
+  target: ContextMenuRequest | null,
+  { onOpenChange }: PptxEditorContextMenuProps
+): void {
+  const handler = useRef(onOpenChange);
+  handler.current = onOpenChange;
+  const open = target !== null;
+  useEffect(() => {
+    if (!open) return undefined;
+    handler.current?.(true);
+    return () => handler.current?.(false);
+  }, [open]);
+}
+
+function OpenContextMenu({
+  target,
   className,
   preset = true,
+  disabled,
   children,
-}: PptxEditorContextMenuProps): ReactNode {
+}: PptxEditorContextMenuProps & { readonly target: ContextMenuRequest }): ReactNode {
   const { t } = useTranslation();
-  const target = useContextMenuRequest();
-  if (!target) {
-    warnMenuPart('PptxEditor.ContextMenu', 'outsideContextMenu');
-    return null;
-  }
+  // `disabled` turning on closes an open menu.
+  useEffect(() => {
+    if (disabled) target.close();
+  }, [disabled, target]);
+  if (disabled) return null;
   let content: ReactNode = children;
   if (preset) {
     // A hidden row for a row this target lacks (a text row on a shape) is no extra row.
@@ -131,11 +222,7 @@ export function PptxEditorContextMenu({
       entries: shown,
       overrides,
       extras,
-    } = arrangeMenuRows(CANVAS_CONTEXT_MENUS[target.kind], flatten(children), (child) =>
-      isValidElement<NodeProps>(child) && child.type === MenuSlotItem
-        ? (child.props as unknown as MenuSlotItemProps)
-        : null
-    );
+    } = arrangeMenuRows(CANVAS_CONTEXT_MENUS[target.kind], flatten(children), menuSlotRowOf);
     content = (
       <>
         <MenuEntries entries={shown} overrides={overrides} />

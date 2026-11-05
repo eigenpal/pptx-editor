@@ -22,6 +22,19 @@ import {
 } from '@pptx-editor.dev/core/editor';
 
 const chromeDarkKey: InjectionKey<ComputedRef<boolean>> = Symbol('pptxChromeDark');
+
+/** True inside `PptxEditorViewport`: an ancestor element already carries `.pptx-editor`. */
+const scopedByAncestorKey: InjectionKey<boolean> = Symbol('pptxScopedByAncestor');
+
+/** Mark the components below as inside the viewport's scope. @internal */
+export function provideScopedByAncestor(): void {
+  provide(scopedByAncestorKey, true);
+}
+
+/** Whether an ancestor element already carries `.pptx-editor`. @internal */
+export function useScopedByAncestor(): boolean {
+  return inject(scopedByAncestorKey, false);
+}
 const lightChrome = computed(() => false);
 
 /** Resolve and provide the chrome color mode for one root. @internal */

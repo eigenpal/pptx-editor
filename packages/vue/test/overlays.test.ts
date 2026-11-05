@@ -1,7 +1,5 @@
-// The Vue overlays against their React twins: the find bar, the edit and font notices, the link
-// popup, and the slide show render the same markup for one editor, and behave the same (keys,
-// requests through the root's action host, focus). After DOCX Editor's cross-adapter
-// differential test (docx-editor/packages/vue/test/cross-adapter-differential.test.ts).
+// Vue overlay markup, keyboard, and focus parity with React. After DOCX Editor:
+// docx-editor/packages/vue/test/cross-adapter-differential.test.ts.
 
 import { afterEach, describe, expect, jest, test } from 'bun:test';
 import { createElement, type ReactNode } from 'react';
@@ -18,6 +16,7 @@ import {
 } from 'vue';
 import {
   createPptxEditor,
+  requestLinkPopup,
   runClipboardSlot,
   startSlideshowController,
   type PptxEditorInstance,
@@ -51,9 +50,7 @@ import {
 } from '../src/index.ts';
 import { providePptxEditor } from '../src/composables.ts';
 import { canonicalDom } from './canonical-dom.ts';
-
 const IN = 914_400;
-
 let app: App | null = null;
 let vueHost: HTMLElement | null = null;
 afterEach(() => {
@@ -111,7 +108,6 @@ async function mountVue(editor: PptxEditorInstance, render: () => unknown, setup
   await nextTick();
   return vueHost;
 }
-
 function mountReact(editor: PptxEditorInstance, node: ReactNode): HTMLElement {
   const { container } = render(
     createElement(
@@ -204,7 +200,6 @@ describe('PptxEditorFindBar', () => {
     target.dispatchEvent(key);
     return key.defaultPrevented;
   };
-
   test('Ctrl/Cmd+F after work on the host page stays with the browser', async () => {
     const editor = await open();
     const scope = await mountVue(editor, () => [
@@ -390,6 +385,61 @@ describe('the root hosts find, the link popup, and the slide show', () => {
     await nextTick();
     expect(document.querySelector('.pptx-link-popup') === null).toBe(true);
     expect(link!.value.value ?? '').toBe('');
+  });
+
+  test('the link popup opens at the selected text, and Cancel closes it with no change', async () => {
+    // The React twin is packages/react/src/__tests__/menu-parts.test.tsx.
+    const editor = await mountRoot(undefined, () => [h(PptxEditorContent)]);
+    const nodeId = editor.session!.layout(0)!.items[0]!.element.nodeId;
+    editor.setSelection({
+      kind: 'text',
+      nodeId,
+      anchor: { paragraph: 0, offset: 0 },
+      focus: { paragraph: 0, offset: 2 },
+    });
+    await nextTick();
+    const marks = [...document.querySelectorAll('.pptx-surface__text-selection')];
+    expect(marks.length > 0).toBe(true);
+    for (const mark of marks)
+      mark.getBoundingClientRect = () =>
+        ({ left: 100, top: 200, right: 180, bottom: 220, width: 80, height: 20 }) as DOMRect;
+    requestLinkPopup(editor);
+    await nextTick();
+    await nextTick();
+    const popup = document.querySelector<HTMLElement>('.pptx-link-popup')!;
+    // Under the selected words, with the popover's 6px gap.
+    expect(popup.style.left).toBe('100px');
+    expect(popup.style.top).toBe('226px');
+    const cancel = [...popup.querySelectorAll<HTMLButtonElement>('button')].find(
+      (b) => b.textContent === 'Cancel'
+    )!;
+    cancel.click();
+    await nextTick();
+    await nextTick();
+    expect(document.querySelector('.pptx-link-popup') === null).toBe(true);
+    expect(editor.snapshot().format?.link ?? '').toBe('');
+    expect(document.activeElement).toBe(document.querySelector('.pptx-surface__input'));
+  });
+
+  test('with no text selected, the link popup opens under the control that asked', async () => {
+    const editor = await mountRoot(undefined, () => [h(PptxEditorContent)]);
+    const button = document.createElement('button');
+    document.body.append(button);
+    button.getBoundingClientRect = () =>
+      ({ left: 40, top: 10, right: 70, bottom: 30, width: 30, height: 20 }) as DOMRect;
+    button.getClientRects = () => [button.getBoundingClientRect()] as unknown as DOMRectList;
+    editor.selectAll();
+    await nextTick();
+    requestLinkPopup(editor, button);
+    await nextTick();
+    await nextTick();
+    const popup = document.querySelector<HTMLElement>('.pptx-link-popup')!;
+    expect(popup.style.left).toBe('40px');
+    expect(popup.style.top).toBe('36px');
+    const labels = [...popup.querySelectorAll('button')].map((b) => b.textContent);
+    expect(labels).toContain('Cancel');
+    expect(labels).not.toContain('Remove link');
+    button.remove();
   });
 
   test('popups.hyperlink false turns the popup off; the API still sets links', async () => {

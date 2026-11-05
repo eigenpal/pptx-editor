@@ -21,9 +21,11 @@ import type {
   EditorCommand,
   EditorSnapshot,
   SlideSection,
+  TableCellAddress,
   TableStyleChoice,
 } from '../contracts/index.ts';
 import type { PptxEditorInstance } from './pptx-editor-types.ts';
+import { zoomStep } from './zoom.ts';
 import { isTranslationKey, type Translate, type TranslationParams } from '@pptx-editor.dev/i18n';
 import {
   warnBuiltInGroupSetting,
@@ -624,7 +626,20 @@ export function runSlideStep(
 // --- Zoom steps and color mode --------------------------------------------------------------
 
 // The zoom range and its steps are `zoom.ts`'s, shared with the canvas.
-export { zoomLimitReason, zoomStep } from './zoom.ts';
+export { ZOOM_LEVELS, zoomLimitReason, zoomStep } from './zoom.ts';
+
+/**
+ * Step `editor`'s zoom one level in (`1`) or out (`-1`) from the zoom in force now, so two
+ * calls in a row step twice. Does nothing at the end of the range. `useZoom` calls it. @internal
+ */
+export function stepEditorZoom(
+  editor: Pick<PptxEditorInstance, 'snapshot' | 'setZoom'> | null,
+  direction: 1 | -1
+): void {
+  const next = editor ? zoomStep(editor.snapshot().zoom, direction) : null;
+  if (next !== null) editor?.setZoom(next);
+}
+export { onEditorEvent, type PptxEditorEvents } from './editor-events.ts';
 
 /** "Slide x of y" for the status bar: one-based, or null with no slides. @internal */
 export function slideStatus(
@@ -658,4 +673,50 @@ export function subscribeSystemDark(listener: () => void): () => void {
   const query = matchMedia(DARK_QUERY);
   query.addEventListener('change', listener);
   return () => query.removeEventListener('change', listener);
+}
+
+/**
+ * A host's translation function for the editor chrome, as DOCX Editor's `ChromeTranslate`: a
+ * key of the locale catalog, and its parameters, to display text. @public
+ */
+export type ChromeTranslate = (key: string, params?: TranslationParams) => string;
+
+/**
+ * The caret: the text box that holds it, and a paragraph and an offset in that text box, as
+ * DOCX Editor's `EditorCaret`. `cell` names the table cell when the text box is a table. @public
+ */
+export interface EditorCaret {
+  readonly nodeId: string;
+  readonly paragraph: number;
+  readonly offset: number;
+  readonly cell?: TableCellAddress;
+}
+
+/**
+ * The caret of `snapshot`: the focus of a text selection, or null when no text is being
+ * edited. `previous` comes back when the caret did not move, so a hook can compare by
+ * identity. @internal
+ */
+export function editorCaretOf(
+  snapshot: Pick<EditorSnapshot, 'selection'>,
+  previous: EditorCaret | null
+): EditorCaret | null {
+  const selection = snapshot.selection;
+  if (selection.kind !== 'text') return null;
+  const { focus, nodeId, cell } = selection;
+  if (
+    previous &&
+    previous.nodeId === nodeId &&
+    previous.paragraph === focus.paragraph &&
+    previous.offset === focus.offset &&
+    previous.cell?.row === cell?.row &&
+    previous.cell?.column === cell?.column
+  )
+    return previous;
+  return {
+    nodeId,
+    paragraph: focus.paragraph,
+    offset: focus.offset,
+    ...(cell ? { cell: { row: cell.row, column: cell.column } } : {}),
+  };
 }

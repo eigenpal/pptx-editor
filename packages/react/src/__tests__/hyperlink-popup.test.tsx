@@ -105,6 +105,34 @@ async function clickText(editor: PptxEditorInstance, index = 2): Promise<void> {
 const panel = () => document.querySelector<HTMLElement>('.pptx-link');
 
 describe('PptxEditor.HyperLink', () => {
+  test('the link popup stays beside the selected text while its draft changes', async () => {
+    const editor = await loaded((onReady) => (
+      <PptxEditorRoot onReady={onReady}>
+        <PptxEditorContent />
+      </PptxEditorRoot>
+    ));
+    linkAndCaret(editor);
+    const surface = surfaceRootOf(editor)!;
+    const caret = surface.querySelector<HTMLElement>('.pptx-surface__caret')!;
+    expect(caret).not.toBeNull();
+    caret.getBoundingClientRect = () =>
+      ({ left: 220, right: 222, top: 160, bottom: 180, width: 2, height: 20 }) as DOMRect;
+    act(() => requestLinkPopup(editor));
+    const popup = document.querySelector<HTMLElement>('.pptx-link-popup')!;
+    expect(popup.style.left).toBe('220px');
+    expect(popup.style.top).toBe('186px');
+    caret.getBoundingClientRect = () =>
+      ({ left: 500, right: 502, top: 360, bottom: 380, width: 2, height: 20 }) as DOMRect;
+    act(
+      () =>
+        void fireEvent.change(document.querySelector('.pptx-link__field')!, {
+          target: { value: 'https://example.com/new' },
+        })
+    );
+    expect(popup.style.left).toBe('220px');
+    expect(popup.style.top).toBe('186px');
+  });
+
   test('a click into linked text opens reading mode with the target, Copy, Edit, and Unlink', async () => {
     const editor = await loaded((onReady) => (
       <PptxEditorRoot onReady={onReady}>

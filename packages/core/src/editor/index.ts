@@ -64,6 +64,18 @@ export {
 } from './collaboration-status.ts';
 export { safeParticipantColor } from './collaboration-presence.ts';
 export {
+  bindHistoryGroup,
+  type HistoryGroupBinding,
+  type HistoryGroupBindingOptions,
+} from './bind-history-group.ts';
+export {
+  IDLE_DOCUMENT_SEARCH,
+  documentSearchOf,
+  type DocumentSearch,
+  type DocumentSearchFindOptions,
+  type DocumentSearchState,
+} from './document-search.ts';
+export {
   EMPTY_EDITOR_SNAPSHOT,
   TOOLBAR_BAR_GROUPS,
   resolveDarkChrome,
@@ -71,6 +83,13 @@ export {
   systemPrefersDark,
   zoomStep,
   zoomLimitReason,
+  ZOOM_LEVELS,
+  stepEditorZoom,
+  onEditorEvent,
+  type PptxEditorEvents,
+  editorCaretOf,
+  type ChromeTranslate,
+  type EditorCaret,
   slideStatus,
   type ColorMode,
   type ResolvedColorMode,
@@ -134,6 +153,7 @@ export {
   submenuPanelKey,
   type ChromeKeyEvent,
   type PopoverFocusOptions,
+  type PopoverAnchorRect,
   type PopoverPlacement,
 } from './chrome-popover.ts';
 export {
@@ -229,6 +249,7 @@ export {
   focusCurrentSlideOrCanvas,
   focusSorterOnShow,
   followCurrentSlide,
+  keepCurrentSlideInView,
   notesCanFormat,
   notesCommittedRange,
   notesFieldFocused,
@@ -264,13 +285,18 @@ export {
   type SlideListKeyContext,
 } from './pane-support.ts';
 export {
+  RAIL_FOLD_WIDTH,
   railDragAxis,
+  railFoldsActions,
   railOrientationChrome,
   railOrientationOf,
+  railOverflowPoint,
   railParentKey,
+  railRightToLeft,
   railStepOfKey,
   resolveRailOrientation,
   scrollIntoNearestScroller,
+  watchRailFold,
   type RailOrientationChrome,
   type SlideRailOrientation,
 } from './rail-orientation.ts';
@@ -290,6 +316,11 @@ export {
   type ResolvedMenuRow,
 } from './chrome-menus.ts';
 export {
+  CONTEXT_MENU_NAMED_PARTS,
+  MENU_NAMED_PARTS,
+  type ContextMenuPartName,
+  type MenuNamedRow,
+  type MenuRowPartName,
   addSectionAt,
   addSectionCommand,
   arrangeMenuBar,
@@ -312,6 +343,8 @@ export {
   type MenuSlotRowSpec,
 } from './menu-arrangement.ts';
 export {
+  editorHostDocument,
+  onEditorHostChange,
   focusSurfaceOf,
   repaintSurfaceOf,
   surfaceInputOf,
@@ -619,6 +652,7 @@ export {
   applyLocalFonts,
   dispatchFindRequest,
   editNoticeShows,
+  linkPopupShowsRejection,
   editRejectionMessage,
   editRemovalMessage,
   REMOVAL_NOTICE_MS,
@@ -628,6 +662,7 @@ export {
   focusAfterFindBar,
   fontNoticeFamilies,
   linkPopupAnchor,
+  linkSelectionRect,
   linkPopupReturnsFocus,
   listenFindRequests,
   onNewDocument,
@@ -637,8 +672,16 @@ export {
   reserveFindBarSpace,
   runFindBarAction,
   findAsYouType,
+  CLOSED_HYPERLINK_POPUP,
+  createHyperlinkPopupStore,
+  hyperlinkPopupActions,
+  hyperlinkPopupLink,
+  listenHyperlinkPopup,
   type FindBarAction,
   type FindBarView,
+  type HyperlinkPopupActions,
+  type HyperlinkPopupLink,
+  type HyperlinkPopupStore,
   type LinkRequest,
 } from './overlays.ts';
 export {
@@ -686,6 +729,20 @@ export type * from '../contracts/index.ts';
 // Font configuration, as DOCX Editor's `@docx-editor.dev/core/editor` exports it.
 export * from './font-composition.ts';
 export * from './font-resolver.ts';
+export {
+  fetchPptxSource,
+  isAbortError,
+  pptxFontsShape,
+  pptxSourceBytes,
+  pptxSourceFontsResolver,
+  resolveEagerPptxFonts,
+  type PptxFontOrigin,
+  type PptxFontsInput,
+  type PptxFontsShape,
+  type PptxFontsSource,
+  type PptxSource,
+  type UsePptxSourceOptions,
+} from './pptx-source.ts';
 export { deferFonts } from '../layout/defer-fonts.ts';
 export {
   createFontSource,

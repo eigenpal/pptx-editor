@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test';
+import { createHyperlinkPopupStore } from '../overlays.ts';
+import type { PptxEditorInstance } from '../pptx-editor.ts';
 import type { Editor, EditorSelection } from '../../contracts/index.ts';
 import {
   createHyperlinkPopupController,
@@ -40,6 +42,7 @@ function fakeEditor(start: { selection: EditorSelection; link?: string; editable
   return {
     editor,
     calls,
+    subscriptionCount: () => listeners.size,
     move(next: EditorSelection, nextLink?: string) {
       selection = next;
       link = nextLink;
@@ -216,5 +219,40 @@ describe('popups.hyperlink and reading mode', () => {
     expect(hyperlinkEntryReads(false)).toBe(false);
     expect(hyperlinkEntryReads(() => null)).toBe(false);
     expect(hyperlinkEntryReads(markReadingPopup(() => null))).toBe(true);
+  });
+});
+
+describe('shared link popup store', () => {
+  test('the host and packaged controller share drafts and preserve reading selection lifetime', () => {
+    const fake = fakeEditor({ selection: caret(2), link: 'https://example.com/a' });
+    const store = createHyperlinkPopupStore();
+    store.setEditor(fake.editor as PptxEditorInstance);
+    store.open();
+    expect(store.getState().mode).toBe('reading');
+    expect(store.controller()?.getState()).toBe(store.getState());
+    fake.move(caret(3), 'https://example.com/a');
+    expect(store.getState().mode).toBe('closed');
+    store.openAtCaret();
+    store.setUrl('https://example.com/b');
+    expect(store.controller()?.getState().draft).toBe('https://example.com/b');
+    expect(store.commitEdit()).toBe(true);
+    expect(fake.calls).toEqual(['https://example.com/b']);
+    store.setEditor(null);
+  });
+
+  test('replacing and detaching the editor disposes the previous controller', () => {
+    const first = fakeEditor({ selection: caret(1), link: 'https://example.com/a' });
+    const second = fakeEditor({ selection: caret(1) });
+    const store = createHyperlinkPopupStore();
+    store.setEditor(first.editor as PptxEditorInstance);
+    expect(first.subscriptionCount()).toBe(1);
+    store.open();
+    store.setEditor(second.editor as PptxEditorInstance);
+    expect(first.subscriptionCount()).toBe(0);
+    expect(second.subscriptionCount()).toBe(1);
+    expect(store.getState().mode).toBe('closed');
+    store.setEditor(null);
+    expect(second.subscriptionCount()).toBe(0);
+    expect(store.controller()).toBeNull();
   });
 });

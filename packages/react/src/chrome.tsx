@@ -8,6 +8,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ReactElement,
   type ReactNode,
   type MouseEvent as ReactMouseEvent,
   useId,
@@ -27,8 +28,15 @@ import {
   restorePopoverFocus,
   warnUnknownIcon,
   warnUnsupportedOverride,
+  type PopoverAnchorRect,
 } from '@pptx-editor.dev/core/editor';
-import { buttonRoleProps, renderAsChild, slotPartNames, useSlotOverride } from './slot-override.ts';
+import {
+  buttonRoleProps,
+  renderAsChild,
+  slotPartNames,
+  useSlotOverride,
+  type HostElementProps,
+} from './slot-override.ts';
 
 /**
  * Prevent chrome mousedown from moving focus (inputs keep their behavior). Chrome building
@@ -135,6 +143,8 @@ export interface ToolButtonProps {
   hasPopup?: 'menu' | 'grid' | 'dialog';
   /** False for the main half of a color split: a host element cannot stand in for it. */
   asChild?: boolean;
+  /** A host element that renders the button, from a part's own `asChild` (no slot override). */
+  host?: ReactElement<HostElementProps> | null;
 }
 
 /** A toolbar icon button with tooltip and disabled reason. Not a stable API. @internal */
@@ -180,16 +190,18 @@ export function ToolButton(props: ToolButtonProps) {
       {reason}
     </span>
   ) : null;
-  if (override?.asChild && props.asChild !== false) {
+  const hostElement =
+    props.host ?? (override?.asChild && props.asChild !== false ? override.asChild : null);
+  if (hostElement) {
     // The host element renders the control, after DOCX Editor's toolbar `Slot`: the props merge
     // into the child's (classes join, handlers run child-first). A host element that is not a
     // button gets `role="button"`, a tab stop, and Enter and Space, so the label and the
     // pressed state stay valid ARIA and the keyboard can run it. It
     // cannot be disabled natively, so it says so with `aria-disabled` and gets no handler.
-    const isButton = override.asChild.type === 'button';
+    const isButton = hostElement.type === 'button';
     return (
       <>
-        {renderAsChild(override.asChild, {
+        {renderAsChild(hostElement, {
           ...attributes,
           ...(isButton ? { type: 'button' } : buttonRoleProps(onClick)),
           onClick,
@@ -239,6 +251,11 @@ export interface PopoverProps {
   passive?: boolean;
   /** A class name added to the panel. */
   className?: string;
+  /**
+   * A box in client pixels to open at instead of the anchor's own box (the link popup at the
+   * selected text). Focus and dismissal still use `anchor`.
+   */
+  anchorRect?: PopoverAnchorRect | null;
 }
 
 /**
@@ -267,6 +284,7 @@ export function Popover({
   field = false,
   passive = false,
   className,
+  anchorRect = null,
 }: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{
@@ -284,8 +302,8 @@ export function Popover({
   // it re-renders with `pos`, and a browser does not focus into a `visibility: hidden` panel.
   useLayoutEffect(() => {
     if (!anchor) return;
-    setPos(positionPopover(ref.current, anchor, align));
-  }, [anchor, align]);
+    setPos(positionPopover(ref.current, anchor, align, anchorRect));
+  }, [anchor, align, anchorRect]);
   // The element that had focus before the open, for the same trigger. StrictMode runs the
   // effect below twice: the second run finds focus already inside the panel and saves nothing,
   // so the first saved element is kept instead of falling back to the trigger on close.

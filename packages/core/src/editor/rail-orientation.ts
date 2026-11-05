@@ -12,12 +12,33 @@ export type SlideRailOrientation = 'vertical' | 'horizontal';
 export interface RailOrientationChrome {
   readonly moveEarlierIcon: string;
   readonly moveLaterIcon: string;
-  readonly moveEarlierLabel: 'rail.moveUp' | 'rail.moveLeft';
-  readonly moveLaterLabel: 'rail.moveDown' | 'rail.moveRight';
+  readonly moveEarlierLabel: 'rail.moveUp' | 'rail.moveDown' | 'rail.moveLeft' | 'rail.moveRight';
+  readonly moveLaterLabel: 'rail.moveUp' | 'rail.moveDown' | 'rail.moveLeft' | 'rail.moveRight';
   /** The Hide thumbnails button: it points to where the rail goes. */
   readonly collapseIcon: string;
   /** The Show thumbnails button of the closed strip: it points to where the rail comes from. */
   readonly expandIcon: string;
+  /** The slide menu's move rows: their labels and shortcuts follow the rail's direction. */
+  readonly menuMoveEarlierLabel:
+    | 'contextMenu.moveUp'
+    | 'contextMenu.moveDown'
+    | 'contextMenu.moveLeft'
+    | 'contextMenu.moveRight';
+  readonly menuMoveLaterLabel:
+    | 'contextMenu.moveUp'
+    | 'contextMenu.moveDown'
+    | 'contextMenu.moveLeft'
+    | 'contextMenu.moveRight';
+  readonly menuMoveEarlierShortcut:
+    | 'contextMenu.shortcuts.moveUp'
+    | 'contextMenu.shortcuts.moveDown'
+    | 'contextMenu.shortcuts.moveLeft'
+    | 'contextMenu.shortcuts.moveRight';
+  readonly menuMoveLaterShortcut:
+    | 'contextMenu.shortcuts.moveUp'
+    | 'contextMenu.shortcuts.moveDown'
+    | 'contextMenu.shortcuts.moveLeft'
+    | 'contextMenu.shortcuts.moveRight';
 }
 
 const VERTICAL: RailOrientationChrome = {
@@ -27,6 +48,10 @@ const VERTICAL: RailOrientationChrome = {
   moveLaterLabel: 'rail.moveDown',
   collapseIcon: 'keyboard_arrow_left',
   expandIcon: 'keyboard_arrow_right',
+  menuMoveEarlierLabel: 'contextMenu.moveUp',
+  menuMoveLaterLabel: 'contextMenu.moveDown',
+  menuMoveEarlierShortcut: 'contextMenu.shortcuts.moveUp',
+  menuMoveLaterShortcut: 'contextMenu.shortcuts.moveDown',
 };
 
 const HORIZONTAL: RailOrientationChrome = {
@@ -36,13 +61,48 @@ const HORIZONTAL: RailOrientationChrome = {
   moveLaterLabel: 'rail.moveRight',
   collapseIcon: 'keyboard_arrow_down',
   expandIcon: 'keyboard_arrow_up',
+  menuMoveEarlierLabel: 'contextMenu.moveLeft',
+  menuMoveLaterLabel: 'contextMenu.moveRight',
+  menuMoveEarlierShortcut: 'contextMenu.shortcuts.moveLeft',
+  menuMoveLaterShortcut: 'contextMenu.shortcuts.moveRight',
 };
 
-/** The rail's icons and labels for `orientation`. @internal */
+/**
+ * A right-to-left horizontal rail reads from the right: the slide before is to the right, so
+ * the earlier move says Move right with Ctrl+Right, as the arrow keys step (`railStepOfKey`).
+ */
+const HORIZONTAL_RTL: RailOrientationChrome = {
+  ...HORIZONTAL,
+  moveEarlierIcon: HORIZONTAL.moveLaterIcon,
+  moveLaterIcon: HORIZONTAL.moveEarlierIcon,
+  moveEarlierLabel: HORIZONTAL.moveLaterLabel,
+  moveLaterLabel: HORIZONTAL.moveEarlierLabel,
+  menuMoveEarlierLabel: HORIZONTAL.menuMoveLaterLabel,
+  menuMoveLaterLabel: HORIZONTAL.menuMoveEarlierLabel,
+  menuMoveEarlierShortcut: HORIZONTAL.menuMoveLaterShortcut,
+  menuMoveLaterShortcut: HORIZONTAL.menuMoveEarlierShortcut,
+};
+
+/**
+ * The rail's icons and labels for `orientation`. A horizontal rail in a right-to-left list
+ * (`rightToLeft`, from {@link railRightToLeft}) mirrors its move icons, labels, and shortcuts.
+ * @internal
+ */
 export function railOrientationChrome(
-  orientation: SlideRailOrientation | undefined
+  orientation: SlideRailOrientation | undefined,
+  rightToLeft = false
 ): RailOrientationChrome {
-  return orientation === 'horizontal' ? HORIZONTAL : VERTICAL;
+  if (orientation !== 'horizontal') return VERTICAL;
+  return rightToLeft ? HORIZONTAL_RTL : HORIZONTAL;
+}
+
+/**
+ * Whether `el` reads right to left, from its computed `direction`. The rail's arrow keys, its
+ * move buttons, and its slide menu all read this one check. @internal
+ */
+export function railRightToLeft(el: Element | null): boolean {
+  if (!el) return false;
+  return el.ownerDocument.defaultView?.getComputedStyle(el).direction === 'rtl';
 }
 
 /**
@@ -55,16 +115,54 @@ export function railOrientationOf(el: Element | null): SlideRailOrientation {
     : 'vertical';
 }
 
+/**
+ * Below this width in CSS pixels, a horizontal rail folds its secondary actions (layouts,
+ * duplicate, move, delete) into one overflow menu, so a phone shows more thumbnails. @internal
+ */
+export const RAIL_FOLD_WIDTH = 420;
+
+/** Whether a rail of `width` pixels folds its secondary actions into one menu. @internal */
+export function railFoldsActions(
+  orientation: SlideRailOrientation | undefined,
+  width: number
+): boolean {
+  return orientation === 'horizontal' && width > 0 && width < RAIL_FOLD_WIDTH;
+}
+
+/**
+ * Tell `onChange` whether `rail` folds its actions now and after each change of its size. A
+ * vertical rail never folds. Returns the function that stops. @internal
+ */
+export function watchRailFold(
+  rail: HTMLElement | null,
+  orientation: SlideRailOrientation | undefined,
+  onChange: (folded: boolean) => void
+): () => void {
+  if (!rail || orientation !== 'horizontal') {
+    onChange(false);
+    return () => undefined;
+  }
+  const measure = (): void => onChange(railFoldsActions(orientation, rail.clientWidth));
+  measure();
+  if (typeof ResizeObserver !== 'function') return () => undefined;
+  const observer = new ResizeObserver(measure);
+  observer.observe(rail);
+  return () => observer.disconnect();
+}
+
+/**
+ * Where the rail's overflow menu opens for its button: at the button's left edge, under it when
+ * there is more room below, else over it. @internal
+ */
+export function railOverflowPoint(button: Element): { x: number; y: number } {
+  const box = button.getBoundingClientRect();
+  const height = button.ownerDocument.defaultView?.innerHeight ?? 0;
+  return { x: box.left, y: height - box.bottom >= box.top ? box.bottom : box.top };
+}
+
 /** The drag axis of a rail: the direction in which its slides read. @internal */
 export function railDragAxis(orientation: SlideRailOrientation | undefined): 'x' | 'y' {
   return orientation === 'horizontal' ? 'x' : 'y';
-}
-
-/** A right-to-left list reads its row from the right. */
-function rightToLeft(list: HTMLElement | null): boolean {
-  if (!list) return false;
-  const view = list.ownerDocument.defaultView;
-  return view?.getComputedStyle(list).direction === 'rtl';
 }
 
 /**
@@ -79,7 +177,7 @@ export function railStepOfKey(
 ): -1 | 0 | 1 {
   if (orientation !== 'horizontal') return key === 'ArrowUp' ? -1 : key === 'ArrowDown' ? 1 : 0;
   const step = key === 'ArrowLeft' ? -1 : key === 'ArrowRight' ? 1 : 0;
-  return rightToLeft(list) ? ((-step || 0) as -1 | 0 | 1) : step;
+  return railRightToLeft(list) ? ((-step || 0) as -1 | 0 | 1) : step;
 }
 
 /**

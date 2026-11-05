@@ -67,7 +67,8 @@ function frameworkNeutral(type) {
     /\b(?:react\.|vue\.)?(?:ReactNode|ReactElement|JSX\.Element|VNodeChild|VNode)\b/g,
     'Node'
   );
-  const parts = mapped.split(' | ');
+  // `ReactElement<Props>` names a rendered node too: its props are React's own typing.
+  const parts = mapped.replace(/\bNode<[^<>]*>/g, 'Node').split(' | ');
   if (!parts.includes('Node')) return mapped;
   const kept = parts.filter((p) => !['string', 'number', 'boolean', 'null'].includes(p));
   return [...new Set(kept)].sort().join(' | ');

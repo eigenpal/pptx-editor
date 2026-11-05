@@ -30,6 +30,9 @@ Keep CSS under your wrapper class. These tokens and selectors work in both frame
 
 ```css
 .acme-theme .pptx-editor {
+  --doc-font-ui: 'Inter', system-ui, sans-serif;
+  --doc-radius-surface: 16px;
+  --doc-radius-control: 8px;
   --doc-dialog-radius: 16px;
   --doc-dialog-padding: 24px;
 }
@@ -40,6 +43,18 @@ Keep CSS under your wrapper class. These tokens and selectors work in both frame
   opacity: 0.5;
 }
 ```
+
+A part that you build yourself gets the tokens from the `.pptx-editor` scope. Inside `PptxEditor.Viewport`, the viewport gives that scope. Outside the viewport, put the classes from `useScopeClassName()` on the root element of your part. The hook returns `''` inside the viewport, and `'pptx-editor '` or `'pptx-editor dark '` outside it:
+
+```tsx
+import { useScopeClassName } from '@pptx-editor.dev/react';
+
+export function AcmePanel() {
+  return <aside className={`${useScopeClassName()}acme-panel`} />;
+}
+```
+
+In Vue, `useScopeClassName()` returns a computed ref. A part that you portal to `document.body` is outside the viewport in the page, so add `pptx-editor` to it yourself, with `useEditorColorMode()` for the theme.
 
 To style one dialog, pass a class through its `popups` renderer. The class goes on the dialog element, beside `.pptx-dialog`:
 
@@ -58,7 +73,8 @@ const popups: PptxEditorPopups = {
 | Interface palette | Override `--doc-*` properties on `.acme-theme .pptx-editor`. | Toolbar, menus, panes, dialogs, and notices. |
 | Utility palette | `--foreground` and `--radius`. | The light active toggle and the slide show controls. |
 | Dark mode | Set `colorMode` on `PptxEditor.Root`: `light` (default), `dark`, or `system`. | The chrome, not the slide. |
-| Typography | `--doc-font-ui` and the dialog font properties. | Dialogs. Not slide fonts. |
+| Typography | `--doc-font-ui` and the dialog font properties. | The whole chrome: toolbar, menus, panes, notes, and dialogs. Not slide fonts. |
+| Corner radius | `--doc-radius-surface`, `--doc-radius-control`, `--doc-radius-pill`, and the dialog radius properties. | Cards, controls, pills, and dialogs. |
 | Control shape | Add `className` to named parts. | The selected part and its interaction states. |
 | Custom elements | Use a supported part's `asChild`. | Your element receives the part's behavior. |
 | Slide appearance | Use the deck's theme, layouts, and formatting commands. | Slide content and saved formatting. |
@@ -71,9 +87,10 @@ Set CSS color values for these properties. Override related foreground and backg
 | --- | --- |
 | Main surfaces | `--doc-surface`, `--doc-popover-bg`, `--doc-bg` (the workspace behind the slide) |
 | Hover and input surfaces | `--doc-bg-hover` (also the hovered or open font family field), `--doc-bg-input` |
-| Primary actions | `--doc-primary`, `--doc-primary-light`, `--doc-on-primary` |
+| Primary actions | `--doc-primary`, `--doc-primary-hover` (the hovered primary dialog button), `--doc-primary-light`, `--doc-on-primary` |
 | Active toggles | `--doc-toggle-active-bg`, `--doc-toggle-active-fg` |
-| Text and icons | `--doc-text`, `--doc-popover-fg`, `--doc-text-muted` |
+| Text and icons | `--doc-text`, `--doc-popover-fg`, `--doc-text-muted`, `--doc-text-subtle` (disabled icons) |
+| Tooltips | `--doc-tooltip-bg`, `--doc-tooltip-text` |
 | Borders | `--doc-border`, `--doc-border-dark` |
 | Errors | `--doc-error`, `--doc-error-bg` |
 | Warnings | `--doc-warning`, `--doc-warning-bg`, `--doc-warning-text` |
@@ -82,10 +99,10 @@ Set CSS color values for these properties. Override related foreground and backg
 | Collaboration accents | `--doc-accent` |
 | Behind the slide | `--doc-page-bg` (rail thumbnails), `--doc-page-bg-rendered` (the canvas stage) |
 | Overlay | `--doc-overlay` |
-| Complete shadow values | `--doc-card-shadow`, `--doc-card-shadow-strong` |
+| Complete shadow values | `--doc-card-shadow` (the toolbar, rail, notes, and dialogs), `--doc-card-shadow-strong` (menus and popovers), `--doc-shadow-lg` (tooltips) |
 | Slide show | `--doc-slideshow-bg`, `--doc-slideshow-black`, `--doc-slideshow-white`, `--doc-slideshow-text`, `--doc-slideshow-bar-bg`, `--doc-slideshow-bar-hover`, `--doc-slideshow-focus` |
 
-The shadow properties accept CSS `box-shadow` values. The stylesheet also defines the other DOCX Editor `--doc-*` names, such as `--doc-primary-hover`, for parity; no PPTX Editor rule reads them yet.
+The shadow properties accept CSS `box-shadow` values. The stylesheet also defines the other DOCX Editor `--doc-*` names, such as `--doc-bg-subtle` and `--doc-border-light`, for parity; no PPTX Editor rule reads them yet.
 
 ### Utility palette reference
 
@@ -102,11 +119,16 @@ The other names, such as `--primary` and `--ring`, are present for DOCX Editor p
 
 | Property | Value type | Default or behavior |
 | --- | --- | --- |
-| `--doc-font-ui` | Font stack | The dialog font when `--doc-dialog-font-family` is not set. Falls back to the system font. |
+| `--doc-font-ui` | Font stack | The chrome font: the toolbar, menus, panes, notes, and dialogs. Falls back to the system font. Slide text keeps the deck's fonts. |
 | `--doc-dialog-font-family` | Font stack | Falls back to `--doc-font-ui`. |
 | `--doc-dialog-font-size` | CSS length | `13px`. |
-| `--doc-dialog-radius` | CSS length | Dialog panel: `12px`. |
+| `--doc-radius-surface` | CSS length | The corners of the floating cards: the toolbar, menus, the slide rail, the notes pane, the side panel, the find bar, and the notices. Each keeps its own value when unset: `10px` to `14px`. |
+| `--doc-radius-control` | CSS length | The corners of the controls inside them: buttons, fields, menu rows, tabs, the notes field, and tooltips. Each keeps its own value when unset: `6px` to `8px`. |
+| `--doc-radius-pill` | CSS length | The corners of the rounded pills: the zoom pill, its buttons and zoom level, and the chips in the side panel and dialogs. Defaults to `999px`, a full pill. |
+| `--doc-dialog-radius` | CSS length | Dialog panel. Falls back to `--doc-radius-surface`, then `12px`. |
+| `--doc-dialog-control-radius` | CSS length | Dialog buttons and fields. Falls back to `--doc-radius-control`, then `8px`. |
 | `--doc-dialog-padding` | One CSS length | Dialog inset: `24px`. |
+| `--doc-slide-padding` | One CSS length | The room around the slide in the canvas, on each side: `24px`. Zoom to fit keeps it. |
 | `--doc-z-overlay` | Integer | Menus and popovers: `50`. |
 | `--doc-z-context` | Integer | Context menus and submenus: `55`. |
 | `--doc-z-tooltip` | Integer | Chrome tooltips, above every other layer: `60`. |

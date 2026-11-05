@@ -14,6 +14,9 @@ import {
   commandRowReason,
   groupSlideSections,
   layoutRowProbe,
+  railOrientationChrome,
+  railOrientationOf,
+  railRightToLeft,
   runSlideStep,
   slideStep,
   stepCommand,
@@ -117,6 +120,12 @@ export const RailContextMenu = defineComponent({
       const grouped = groupSlideSections(sectionsRef.value, count);
       const up = stepCommand(selected, slideStep(selected, count, -1, grouped));
       const down = stepCommand(selected, slideStep(selected, count, 1, grouped));
+      // A row rail moves slides left and right: the rows say so, as the rail buttons do. A
+      // right-to-left row mirrors them, as its arrow keys do.
+      const move = railOrientationChrome(
+        railOrientationOf(props.menu.owner),
+        railRightToLeft(props.menu.owner)
+      );
       const canPresent = count > 0 && !!editor.value;
       const addSection = addSectionCommand(props.menu.index, t);
       const sectionCan = editor.value ? editor.value.can(addSection) : null;
@@ -230,15 +239,15 @@ export const RailContextMenu = defineComponent({
                 />
                 <MenuSeparator />
                 {row(up, {
-                  label: t('contextMenu.moveUp'),
-                  icon: 'keyboard_arrow_up',
-                  shortcut: t('contextMenu.shortcuts.moveUp'),
+                  label: t(move.menuMoveEarlierLabel),
+                  icon: move.moveEarlierIcon,
+                  shortcut: t(move.menuMoveEarlierShortcut),
                   slot: 'slide.moveUp',
                 })}
                 {row(down, {
-                  label: t('contextMenu.moveDown'),
-                  icon: 'keyboard_arrow_down',
-                  shortcut: t('contextMenu.shortcuts.moveDown'),
+                  label: t(move.menuMoveLaterLabel),
+                  icon: move.moveLaterIcon,
+                  shortcut: t(move.menuMoveLaterShortcut),
                   slot: 'slide.moveDown',
                 })}
                 <MenuSeparator />

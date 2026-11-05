@@ -4,6 +4,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { GlobalWindow } from 'happy-dom';
+import { positionPopover } from '../chrome-popover.ts';
 import { inFixedView, placeInFixedFrame, type FixedSize, type FixedView } from '../index.ts';
 
 // A DOM of this file's own: the core run has no global DOM (`bun run test`).
@@ -139,4 +140,25 @@ describe('placeInFixedFrame', () => {
     document.body.appendChild(plain);
     expect(placeInFixedFrame(plain, SIZE, () => at)).toBe(at);
   });
+});
+
+test('a selected-text popover uses its client rectangle inside a scaled host', () => {
+  const frame = host(10, 20, 2);
+  frame.style.transform = 'scale(2)';
+  const anchor = document.createElement('button');
+  const panel = document.createElement('div');
+  frame.appendChild(anchor);
+  frame.appendChild(panel);
+  anchor.getBoundingClientRect = () => box(10, 600, 40, 30);
+  Object.defineProperties(panel, {
+    offsetWidth: { value: 200 },
+    offsetHeight: { value: 100 },
+  });
+  const selectedText = box(110, 200, 80, 40);
+  const at = positionPopover(panel, anchor, 'start', selectedText);
+  expect(at.left).toBe(50);
+  expect(at.top).toBe(113);
+  expect(panel.style.left).toBe('50px');
+  expect(panel.style.top).toBe('113px');
+  frame.remove();
 });

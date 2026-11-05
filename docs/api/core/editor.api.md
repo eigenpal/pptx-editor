@@ -127,6 +127,9 @@ export function backgroundPresetGradient(base: string): GradientFill;
 // @internal
 export function backgroundStatusKey(chosen: SlideBackground | null | undefined, opening: SlideBackground | null | undefined, presets: readonly GradientFill[]): TranslationKey | null;
 
+// @public
+export function bindHistoryGroup(editor: HistoryGroupHost, element: HTMLElement, config: HistoryGroupBindingOptions): HistoryGroupBinding;
+
 // @internal
 export function builtInGroupPriority(groupId: string, groups: readonly Pick<ChromeGroup, 'id' | 'contextual'>[]): number;
 
@@ -504,6 +507,9 @@ export interface ChromeTooltipState {
     readonly target: HTMLElement;
 }
 
+// @public
+export type ChromeTranslate = (key: string, params?: TranslationParams) => string;
+
 // @internal
 export function clearNotesFindMatch(root: HTMLElement | null): void;
 
@@ -558,6 +564,9 @@ export interface ClipboardRelationship {
     // (undocumented)
     readonly type: string;
 }
+
+// @internal
+export const CLOSED_HYPERLINK_POPUP: HyperlinkPopupState;
 
 // @public
 export type CollaborationApplyResult = {
@@ -858,6 +867,45 @@ export interface ComposePreparedFontOriginsOptions extends ComposeFontOriginsOpt
 export function configuredDefaultFontFamily(configuration?: FontCatalogConfiguration): string;
 
 // @internal
+export const CONTEXT_MENU_NAMED_PARTS: {
+    readonly ImageAltText: MenuNamedRow;
+    readonly ImageChange: MenuNamedRow;
+    readonly ImageProperties: MenuNamedRow;
+    readonly FormatBackground: MenuNamedRow;
+    readonly NewSlide: MenuNamedRow;
+    readonly InsertRowAbove: MenuNamedRow;
+    readonly InsertRowBelow: MenuNamedRow;
+    readonly InsertColumnLeft: MenuNamedRow;
+    readonly InsertColumnRight: MenuNamedRow;
+    readonly MergeCells: MenuNamedRow;
+    readonly DeleteTableRow: MenuNamedRow;
+    readonly DeleteTableColumn: MenuNamedRow;
+    readonly DeleteTable: MenuNamedRow;
+    readonly BringToFront: MenuNamedRow;
+    readonly SendToBack: MenuNamedRow;
+    readonly BringForward: MenuNamedRow;
+    readonly SendBackward: MenuNamedRow;
+    readonly GroupObjects: MenuNamedRow;
+    readonly UngroupObjects: MenuNamedRow;
+    readonly Cut: MenuNamedRow;
+    readonly Copy: MenuNamedRow;
+    readonly Paste: MenuNamedRow;
+    readonly Delete: MenuNamedRow;
+    readonly Duplicate: MenuNamedRow;
+    readonly Bold: MenuNamedRow;
+    readonly Italic: MenuNamedRow;
+    readonly Underline: MenuNamedRow;
+    readonly Link: MenuNamedRow;
+    readonly ClearFormatting: MenuNamedRow;
+    readonly FormatPainter: MenuNamedRow;
+    readonly Font: MenuNamedRow;
+    readonly ParagraphDialog: MenuNamedRow;
+};
+
+// @internal
+export type ContextMenuPartName = keyof typeof CONTEXT_MENU_NAMED_PARTS;
+
+// @internal
 export interface CorrectionGridCell {
     readonly brightness: number;
     readonly contrast: number;
@@ -913,6 +961,9 @@ export function createFontSource(bytes: Uint8Array, request: FontFaceRequest & {
 export function createHyperlinkPopupController(editor: Editor, clipboard?: () => {
     writeText(text: string): Promise<void>;
 } | undefined): HyperlinkPopupController;
+
+// @internal
+export function createHyperlinkPopupStore(): HyperlinkPopupStore;
 
 // @internal
 export function createNotesFindPainter(): {
@@ -1063,6 +1114,52 @@ export function documentOpenFailure(code: string): DocumentOpenFailure;
 // @public
 export type DocumentOpenFailureReason = 'damaged' | 'not-pptx' | 'too-large' | 'unknown';
 
+// @internal
+export interface DocumentSearch {
+    // (undocumented)
+    clear(): void;
+    // (undocumented)
+    find(query: string, options?: DocumentSearchFindOptions): readonly FindMatch[];
+    // (undocumented)
+    getState(): DocumentSearchState;
+    // (undocumented)
+    goTo(index: number): boolean;
+    // (undocumented)
+    next(): boolean;
+    // (undocumented)
+    previous(): boolean;
+    // (undocumented)
+    setMatchCase(value: boolean): void;
+    // (undocumented)
+    setQuery(query: string): void;
+    // (undocumented)
+    setWholeWord(value: boolean): void;
+    // (undocumented)
+    subscribe(listener: () => void): () => void;
+}
+
+// @public
+export interface DocumentSearchFindOptions extends FindOptions {
+    readonly selectFirst?: boolean;
+}
+
+// @internal
+export function documentSearchOf(editor: PptxEditorInstance): DocumentSearch;
+
+// @public
+export interface DocumentSearchState {
+    readonly activeIndex: number;
+    readonly activeMatch: FindMatch | null;
+    readonly isPending: boolean;
+    // (undocumented)
+    readonly matchCase: boolean;
+    readonly matches: readonly FindMatch[];
+    readonly query: string;
+    readonly truncated: boolean;
+    // (undocumented)
+    readonly wholeWord: boolean;
+}
+
 // @public (undocumented)
 export class DocumentSession {
     constructor(store: PptxDocumentStore, fonts: FontSet);
@@ -1150,6 +1247,21 @@ export interface Editor {
     // (undocumented)
     subscribe(listener: () => void): () => void;
 }
+
+// @public
+export interface EditorCaret {
+    // (undocumented)
+    readonly cell?: TableCellAddress;
+    // (undocumented)
+    readonly nodeId: string;
+    // (undocumented)
+    readonly offset: number;
+    // (undocumented)
+    readonly paragraph: number;
+}
+
+// @internal
+export function editorCaretOf(snapshot: Pick<EditorSnapshot, 'selection'>, previous: EditorCaret | null): EditorCaret | null;
 
 // @public
 export interface EditorCollaborationSession {
@@ -1625,6 +1737,9 @@ export interface EditorFontSubstitution {
 }
 
 // @public
+export function editorHostDocument(editor: object): Document | null;
+
+// @public
 export type EditorMode = 'edit' | 'view';
 
 // @public
@@ -1790,6 +1905,9 @@ export function exportSlidesPngZip(session: DocumentSession, options?: SlideImag
 
 // @public
 export function exportSlideSvg(session: DocumentSession, index: number, options?: SlideImageOptions): string;
+
+// @internal
+export function fetchPptxSource(url: string | URL, init: RequestInit | undefined, signal: AbortSignal): Promise<Uint8Array>;
 
 // @internal
 export const fieldPart: (name: string) => {
@@ -2385,6 +2503,18 @@ export interface HistoryGroup {
 }
 
 // @public
+export interface HistoryGroupBinding {
+    dispose(): void;
+    options(): EditorExecOptions;
+}
+
+// @public
+export interface HistoryGroupBindingOptions {
+    // (undocumented)
+    readonly kind: 'native-color' | 'range' | 'repeat' | 'keyboard';
+}
+
+// @public
 export interface HistoryGroupOptions {
     readonly historyGroup?: HistoryGroup;
 }
@@ -2405,6 +2535,25 @@ export interface HostFaces {
 
 // @internal
 export function hyperlinkEntryReads(entry: unknown): boolean;
+
+// @public
+export interface HyperlinkPopupActions {
+    readonly beginEdit: () => void;
+    readonly close: () => void;
+    readonly commitEdit: () => boolean;
+    readonly copy: () => Promise<boolean>;
+    readonly open: (link?: {
+        readonly url: string;
+        readonly href?: string | null;
+    } | null, anchor?: HTMLElement | null) => void;
+    readonly openAtCaret: (anchor?: HTMLElement | null) => void;
+    readonly openTarget: () => boolean;
+    readonly setUrl: (url: string) => void;
+    readonly unlink: () => boolean;
+}
+
+// @internal
+export function hyperlinkPopupActions(store: HyperlinkPopupStore): HyperlinkPopupActions;
 
 // @internal
 export interface HyperlinkPopupController {
@@ -2427,6 +2576,15 @@ export interface HyperlinkPopupController {
 
 // @internal
 export function hyperlinkPopupFromRequest(editor: Editor | null, request: HyperlinkPopupRequest): HyperlinkPopupController;
+
+// @public
+export interface HyperlinkPopupLink {
+    readonly href: string | null;
+    readonly url: string;
+}
+
+// @internal
+export function hyperlinkPopupLink(url: string | null | undefined): HyperlinkPopupLink | null;
 
 // @public
 export type HyperlinkPopupMode =
@@ -2462,8 +2620,22 @@ export interface HyperlinkPopupState {
     readonly url: string;
 }
 
+// @internal
+export interface HyperlinkPopupStore extends HyperlinkPopupActions {
+    // (undocumented)
+    readonly controller: () => HyperlinkPopupController | null;
+    // (undocumented)
+    readonly getState: () => HyperlinkPopupState;
+    readonly setEditor: (editor: PptxEditorInstance | null) => void;
+    // (undocumented)
+    readonly subscribe: (listener: () => void) => () => void;
+}
+
 // @public
 export const ICON_PATHS: Readonly<Record<string, readonly string[]>>;
+
+// @internal
+export const IDLE_DOCUMENT_SEARCH: DocumentSearchState;
 
 // @internal
 export const IMAGE_FILE_TYPES = "image/png,image/jpeg,image/gif,image/svg+xml";
@@ -2555,6 +2727,9 @@ export function insertImageFile(editor: PptxEditorInstance, file: File, target?:
 export function insertNotesText(root: HTMLElement, text: string): void;
 
 // @internal
+export function isAbortError(cause: unknown): boolean;
+
+// @internal
 export function isAdapterSlot(slot: ChromeSlotId): boolean;
 
 // @public
@@ -2589,6 +2764,9 @@ export function isTextCaret(selection: EditorSelection): boolean;
 export function isToolbarBarSlot(slot: string, options?: {
     readonly contextual?: boolean;
 }): boolean;
+
+// @internal
+export function keepCurrentSlideInView(list: HTMLElement | null, item: string): () => void;
 
 // @internal
 export function layoutGalleryEnter(gallery: Element, target: EventTarget | null): void;
@@ -2675,12 +2853,18 @@ export function linkPopupAnnouncement(state: HyperlinkPopupState, t: (key: 'link
 export function linkPopupReturnsFocus(editor?: object): boolean;
 
 // @internal
+export function linkPopupShowsRejection(popup: HyperlinkPopupState | null | undefined, rejection: EditorRejection | null | undefined): boolean;
+
+// @internal
 export interface LinkRequest {
     // (undocumented)
     readonly anchor?: HTMLElement | null;
     // (undocumented)
     readonly editor?: unknown;
 }
+
+// @internal
+export function linkSelectionRect(editor: object): PopoverAnchorRect | null;
 
 // @internal
 export function listenAway(panel: () => HTMLElement | null, onClose: () => void, doc?: Document): () => void;
@@ -2693,6 +2877,9 @@ export function listenContextMenuDismiss(panel: () => HTMLElement | null, onClos
 
 // @internal
 export function listenFindRequests(editor: PptxEditorInstance, scope: () => Element | null | undefined, open: (replace: boolean) => void): () => void;
+
+// @internal
+export function listenHyperlinkPopup(store: HyperlinkPopupStore, editor: object, enabled: () => boolean): () => void;
 
 // @internal
 export function listenLinkClicks(editor: Editor, open: (anchor: HTMLElement | null) => void, enabled?: () => boolean, doc?: Document | undefined): () => void;
@@ -2783,6 +2970,55 @@ export const MAX_ALT_TEXT = 4000;
 export const MAX_RESOLVER_FAMILIES = 64;
 
 // @internal
+export const MENU_NAMED_PARTS: {
+    readonly PlayFromStart: MenuNamedRow;
+    readonly PlayFromCurrent: MenuNamedRow;
+    readonly HideSlide: MenuNamedRow;
+    readonly BringToFront: MenuNamedRow;
+    readonly SendToBack: MenuNamedRow;
+    readonly BringForward: MenuNamedRow;
+    readonly SendBackward: MenuNamedRow;
+    readonly GroupObjects: MenuNamedRow;
+    readonly UngroupObjects: MenuNamedRow;
+    readonly PageSetup: MenuNamedRow;
+    readonly Undo: MenuNamedRow;
+    readonly Redo: MenuNamedRow;
+    readonly Cut: MenuNamedRow;
+    readonly Copy: MenuNamedRow;
+    readonly Paste: MenuNamedRow;
+    readonly SelectAll: MenuNamedRow;
+    readonly Duplicate: MenuNamedRow;
+    readonly Delete: MenuNamedRow;
+    readonly Find: MenuNamedRow;
+    readonly Replace: MenuNamedRow;
+    readonly NormalView: MenuNamedRow;
+    readonly SlideSorterView: MenuNamedRow;
+    readonly SmartGuides: MenuNamedRow;
+    readonly NewSlide: MenuNamedRow;
+    readonly TextBox: MenuNamedRow;
+    readonly TableInsert: MenuNamedRow;
+    readonly ImageInsert: MenuNamedRow;
+    readonly Shapes: MenuNamedRow;
+    readonly Line: MenuNamedRow;
+    readonly Link: MenuNamedRow;
+    readonly Font: MenuNamedRow;
+    readonly ParagraphDialog: MenuNamedRow;
+    readonly BulletsAndNumbering: MenuNamedRow;
+    readonly Columns: MenuNamedRow;
+    readonly Bold: MenuNamedRow;
+    readonly Italic: MenuNamedRow;
+    readonly Underline: MenuNamedRow;
+    readonly Strike: MenuNamedRow;
+    readonly BulletList: MenuNamedRow;
+    readonly NumberedList: MenuNamedRow;
+    readonly FormatPainter: MenuNamedRow;
+    readonly ClearFormatting: MenuNamedRow;
+    readonly FormatBackground: MenuNamedRow;
+    readonly ImageCrop: MenuNamedRow;
+    readonly ImageProperties: MenuNamedRow;
+};
+
+// @internal
 export function menuBarArrow(key: string, rtl: boolean): -1 | 0 | 1;
 
 // @internal
@@ -2826,6 +3062,14 @@ export function menuEntryKey(entry: {
 }): string;
 
 // @internal
+export interface MenuNamedRow {
+    // (undocumented)
+    readonly slot: ChromeSlotId;
+    // (undocumented)
+    readonly value?: string;
+}
+
+// @internal
 export function menuPartName(id: string): string;
 
 // @internal
@@ -2839,6 +3083,9 @@ export function menuRowCheck(row: ResolvedMenuRow, control: ChromeControl, state
     readonly checked: boolean | undefined;
     readonly radio: boolean;
 };
+
+// @internal
+export type MenuRowPartName = keyof typeof MENU_NAMED_PARTS;
 
 // @internal
 export interface MenuSlotRowSpec {
@@ -3011,6 +3258,12 @@ export function observeSlideshowScreen(el: HTMLElement, onSize: (size: Slideshow
 
 // @internal
 export function observeToolbarFit(bar: HTMLElement, fit: () => void): () => void;
+
+// @public
+export function onEditorEvent<E extends keyof PptxEditorEvents>(editor: EventSource_2, event: E, handler: PptxEditorEvents[E]): () => void;
+
+// @public
+export function onEditorHostChange(editor: object, listener: () => void): () => void;
 
 // @internal
 export function onFindShown(find: PptxFind, listener: () => void): () => void;
@@ -3355,6 +3608,7 @@ export function placeInViewport(at: {
 }, w: number, h: number, vw: number, vh: number): {
     left: number;
     top: number;
+    maxHeight?: number;
 };
 
 // @internal
@@ -3418,6 +3672,18 @@ export function platformShortcuts(text: string, isApple?: boolean): string;
 export const POINTER_OPEN_ATTRIBUTE = "data-pointer-open";
 
 // @internal
+export interface PopoverAnchorRect {
+    // (undocumented)
+    readonly bottom: number;
+    // (undocumented)
+    readonly left: number;
+    // (undocumented)
+    readonly right: number;
+    // (undocumented)
+    readonly top: number;
+}
+
+// @internal
 export interface PopoverFocusOptions {
     readonly field?: boolean;
     readonly focusFirst: boolean;
@@ -3449,7 +3715,15 @@ export function popoverScope(el: Element | null | undefined): HTMLElement;
 export function positionChromeTooltip(bubble: HTMLElement, target: HTMLElement): void;
 
 // @internal
-export function positionPopover(panel: HTMLElement | null, anchor: HTMLElement, align: 'start' | 'end'): PopoverPlacement;
+export function positionPopover(panel: HTMLElement | null, anchor: HTMLElement, align: 'start' | 'end', rect?: PopoverAnchorRect | null): PopoverPlacement;
+
+// @public
+export interface PptxEditorEvents {
+    change: (snapshot: EditorSnapshot) => void;
+    openFailure: (failure: DocumentOpenFailure, snapshot: EditorSnapshot) => void;
+    rejection: (rejection: EditorRejection, snapshot: EditorSnapshot) => void;
+    selectionChange: (snapshot: EditorSnapshot) => void;
+}
 
 // @public
 export interface PptxEditorInstance extends Editor {
@@ -3495,6 +3769,30 @@ export interface PptxFind {
 }
 
 // @public
+export type PptxFontOrigin = FontOrigin | (() => PptxFontsInput | Promise<PptxFontsInput>);
+
+// @public
+export type PptxFontsInput = FontConfiguration | FontConfigurationFragment;
+
+// @internal
+export type PptxFontsShape = 'absent' | 'eager' | 'on-demand';
+
+// @internal
+export function pptxFontsShape(source: PptxFontsSource | undefined): PptxFontsShape;
+
+// @public
+export type PptxFontsSource = PptxFontOrigin | readonly PptxFontOrigin[];
+
+// @public
+export type PptxSource = string | URL | Uint8Array | ArrayBuffer;
+
+// @internal
+export function pptxSourceBytes(source: PptxSource): Uint8Array | null;
+
+// @internal
+export function pptxSourceFontsResolver(latest: () => PptxFontsSource | undefined): MarkedFontResolver;
+
+// @public
 export type PresentationView = 'normal' | 'slideSorter';
 
 // @internal
@@ -3507,7 +3805,13 @@ export function queryLocalFontSources(families: readonly string[]): Promise<Loca
 export function radioGroupStep<T>(choices: readonly T[], current: T, key: string): T | null;
 
 // @internal
+export const RAIL_FOLD_WIDTH = 420;
+
+// @internal
 export function railDragAxis(orientation: SlideRailOrientation | undefined): 'x' | 'y';
+
+// @internal
+export function railFoldsActions(orientation: SlideRailOrientation | undefined, width: number): boolean;
 
 // @internal
 export function railKeyDown(e: PaneKeyEvent, ctx: SlideListKeyContext): void;
@@ -3516,24 +3820,40 @@ export function railKeyDown(e: PaneKeyEvent, ctx: SlideListKeyContext): void;
 export interface RailOrientationChrome {
     readonly collapseIcon: string;
     readonly expandIcon: string;
+    readonly menuMoveEarlierLabel: 'contextMenu.moveUp' | 'contextMenu.moveDown' | 'contextMenu.moveLeft' | 'contextMenu.moveRight';
+    // (undocumented)
+    readonly menuMoveEarlierShortcut: 'contextMenu.shortcuts.moveUp' | 'contextMenu.shortcuts.moveDown' | 'contextMenu.shortcuts.moveLeft' | 'contextMenu.shortcuts.moveRight';
+    // (undocumented)
+    readonly menuMoveLaterLabel: 'contextMenu.moveUp' | 'contextMenu.moveDown' | 'contextMenu.moveLeft' | 'contextMenu.moveRight';
+    // (undocumented)
+    readonly menuMoveLaterShortcut: 'contextMenu.shortcuts.moveUp' | 'contextMenu.shortcuts.moveDown' | 'contextMenu.shortcuts.moveLeft' | 'contextMenu.shortcuts.moveRight';
     // (undocumented)
     readonly moveEarlierIcon: string;
     // (undocumented)
-    readonly moveEarlierLabel: 'rail.moveUp' | 'rail.moveLeft';
+    readonly moveEarlierLabel: 'rail.moveUp' | 'rail.moveDown' | 'rail.moveLeft' | 'rail.moveRight';
     // (undocumented)
     readonly moveLaterIcon: string;
     // (undocumented)
-    readonly moveLaterLabel: 'rail.moveDown' | 'rail.moveRight';
+    readonly moveLaterLabel: 'rail.moveUp' | 'rail.moveDown' | 'rail.moveLeft' | 'rail.moveRight';
 }
 
 // @internal
-export function railOrientationChrome(orientation: SlideRailOrientation | undefined): RailOrientationChrome;
+export function railOrientationChrome(orientation: SlideRailOrientation | undefined, rightToLeft?: boolean): RailOrientationChrome;
 
 // @internal
 export function railOrientationOf(el: Element | null): SlideRailOrientation;
 
 // @internal
+export function railOverflowPoint(button: Element): {
+    x: number;
+    y: number;
+};
+
+// @internal
 export function railParentKey(orientation: SlideRailOrientation | undefined): string;
+
+// @internal
+export function railRightToLeft(el: Element | null): boolean;
 
 // @internal
 export function railStepOfKey(key: string, orientation: SlideRailOrientation | undefined, list: HTMLElement | null): -1 | 0 | 1;
@@ -3621,6 +3941,9 @@ export interface ResolvedMenuRow {
     // (undocumented)
     readonly value?: string;
 }
+
+// @internal
+export function resolveEagerPptxFonts(source: PptxFontsSource): Promise<FontConfiguration | undefined>;
 
 // @public
 export function resolveEditorModules(modules: readonly EditorModule[] | undefined): EditorModuleRegistry;
@@ -4367,6 +4690,9 @@ export function startSlideshowController(editor: PptxEditorInstance | null, from
 
 // @internal
 export function stepCommand(selected: readonly number[], to: SlideStep | null): EditorCommand | null;
+
+// @internal
+export function stepEditorZoom(editor: Pick<PptxEditorInstance, 'snapshot' | 'setZoom'> | null, direction: 1 | -1): void;
 
 // @public
 export type StrikeStyle = 'none' | 'single' | 'double';
@@ -5159,6 +5485,12 @@ export const UNDERLINE_STYLES: readonly UnderlineStyle[];
 // @public
 export type UnderlineStyle = 'none' | 'words' | 'single' | 'double' | 'heavy' | 'dotted' | 'dottedHeavy' | 'dash' | 'dashHeavy' | 'dashLong' | 'dashLongHeavy' | 'dotDash' | 'dotDashHeavy' | 'dotDotDash' | 'dotDotDashHeavy' | 'wavy' | 'wavyHeavy' | 'wavyDouble';
 
+// @public
+export interface UsePptxSourceOptions {
+    readonly fetchOptions?: RequestInit;
+    readonly fonts?: PptxFontsSource;
+}
+
 // @internal
 export function validateAltTextDraft(fields: AltTextDraftFields): DialogErrors<AltTextDraftFields>;
 
@@ -5253,6 +5585,9 @@ export function warnUnknownSlot(slot: string, parts?: ToolbarPartNames): void;
 export function warnUnsupportedOverride(slot: string, setting: 'icon' | 'asChild', parts?: ToolbarPartNames): void;
 
 // @internal
+export function watchRailFold(rail: HTMLElement | null, orientation: SlideRailOrientation | undefined, onChange: (folded: boolean) => void): () => void;
+
+// @internal
 export function withExclusive(d: FontDialogFields, which: 'strike' | 'doubleStrike' | 'smallCaps' | 'allCaps', on: boolean): FontDialogFields;
 
 // @public
@@ -5269,6 +5604,9 @@ export function withSpacing(d: FontDialogFields, spacing: SpacingChoice): FontDi
 
 // @public @deprecated
 export const WORD_DEFAULT_FONT: FontConfiguration['defaultFont'];
+
+// @internal
+export const ZOOM_LEVELS: readonly number[];
 
 // @internal
 export const ZOOM_MENU_LEVELS: readonly number[];

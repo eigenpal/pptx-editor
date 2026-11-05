@@ -90,6 +90,8 @@
     "deleteSlides": "删除 {count} 张幻灯片",
     "moveUp": "上移",
     "moveDown": "下移",
+    "moveLeft": "左移",
+    "moveRight": "右移",
     "layout": "版式",
     "resetSlide": "重置幻灯片",
     "hideSlide": "隐藏幻灯片",
@@ -113,6 +115,8 @@
       "clearFormatting": "Ctrl+\\",
       "moveUp": "Ctrl+↑",
       "moveDown": "Ctrl+↓",
+      "moveLeft": "Ctrl+←",
+      "moveRight": "Ctrl+→",
       "undo": "Ctrl+Z",
       "redo": "Ctrl+Y",
       "selectAll": "Ctrl+A",
@@ -743,7 +747,8 @@
     "hiddenSlideLabel": "幻灯片 {index}(已隐藏)",
     "chooseLayout": "添加具有版式的幻灯片",
     "collapse": "隐藏缩略图",
-    "expand": "显示缩略图"
+    "expand": "显示缩略图",
+    "moreActions": "更多幻灯片操作"
   },
   "notes": {
     "title": "演讲者备注",
@@ -873,6 +878,7 @@
     "label": "链接",
     "placeholder": "粘贴或键入链接",
     "apply": "应用",
+    "cancel": "取消",
     "remove": "删除链接",
     "open": "打开链接",
     "unavailable": "此编辑器已关闭链接功能",
@@ -880,7 +886,6 @@
     "copied": "已复制链接",
     "edit": "编辑链接",
     "insert": "插入链接",
-    "cancel": "取消",
     "unsafe": "无法打开此链接",
     "announce": "链接：{url}。按 F6 查看其操作。"
   },
