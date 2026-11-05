@@ -1,0 +1,224 @@
+# @pptx-editor.dev/core
+
+## 0.1.0
+
+### Minor Changes
+
+- 412d750: `PptxEditor` and its root take a `modules` prop for the pro review and collaboration modules, a new `fontFamilies` list updates the font picker in place (`setFontFamilies`), and `save()` returns `Uint8Array<ArrayBuffer>`, so `new Blob([bytes])` type-checks on TypeScript 5.7 and later.
+- 412d750: A title shrinks to 90 % at most on overflow, the font size box shows the size the text is drawn at, and a new Text fitting toolbar control (`paragraph.autofit`) switches between no autofit, shrink text on overflow, and resize shape to fit text.
+- 412d750: Add `@pptx-editor.dev/editor-api`, an Office.js-shaped API that edits slides, shapes, text, and tables on a server or in an open editor, over the new DOM-free automation host in `@pptx-editor.dev/core/automation`.
+- 412d750: Bind shapes by id with `Presentation.bindings`, `BindingCollection`, and `Binding`; the runtime keeps bindings in memory and never saves them in the file.
+- 412d750: Draw `getImageAsBase64` pictures on a server with `createServer({ rasterize })`: the engine paints the SVG with the editor's own renderer and your function turns it into a PNG.
+- 412d750: A sync that splits before a read is now one undo step on a live editor: automation batches that carry the same `historyGroup` share one history entry.
+- 412d750: Read and delete the hyperlinks of a text range through `TextRange.hyperlinks`, a `HyperlinkScopedCollection` of the text links that overlap the range.
+- 412d750: Add the Bullets and Numbering galleries (`setBulletFormat`, the `list.bulletStyle` and `list.numberStyle` dropdowns), `PptxEditor.BulletsAndNumberingDialog` for size, color, and start number (with the dialog named parts, `useBulletsAndNumberingDialog`, and Format > Bullets and numbering…), and `useBulletFormat` in React and Vue.
+- 412d750: Text lines now follow the measured line spacing, paragraph spacing, and stored-autofit rules (`a:lnSpc`, `a:spcBef`, `a:spcAft`, `a:normAutofit`), and shrink on overflow reduces line spacing before font size. `baselineOffsetPt` takes no spacing argument now; the four-argument form is deprecated.
+- 412d750: Tab and Shift+Tab move the selection through the shapes on the slide, a table cell gets its own context menu (`CanvasMenuKind` `table`) with row and column commands, and the canvas keeps the caret in view, places IME input at the caret, shows shapes outside the slide dimmed, and zooms in 10 % wheel steps within one zoom range.
+- 929ca86: Build your own chrome with DOCX Editor's hooks. `useZoom` reads and sets the slide zoom, steps it, and fits the slide. `useEditorEvent` subscribes to `change`, `selectionChange`, `rejection`, and `openFailure`, and `onEditorEvent` gives the same events without an adapter. `useEditorSnapshot` follows every editor change, and `useScopeClassName` returns the classes that make the `--doc-*` tokens apply to your own parts. Vue has the same composables.
+
+  More of DOCX Editor's hooks have PPTX twins, in React and Vue: `useChromeTranslate`, `useToolbarContext`, `useToolbarLabel`, and `useToolbarLabelFor` for labels, `useHistoryGroup` to make one gesture on your own control one undo step, `useEditorCaret` for the caret while text is edited, and `useDocumentSearch` for your own find bar. `Toolbar`, `Menu`, `ContextMenu`, `SlideRail`, and `StatusBar` take DOCX Editor's `t` prop. `StatusBar.Action` adds your own button to the status bar. `SlideRail.Expand` changes the Show thumbnails button of the folded rail, `toggle={false}` now also removes a `SlideRail.Collapse` child under `preset={false}`, a Vue `v-if` child no longer counts as a rail action, and the rail keeps the current slide in view when its panel changes size.
+
+  `<PptxEditor>` takes DOCX Editor's part props: `toolbar`, `menu`, `contextMenu`, `hyperlinkPopup`, `slideRail`, and `notesPane` each take `true`, `false`, or the part's props, and `contextMenu` and `hyperlinkPopup` set the same `popups` entries. `useHyperlinkPopup` and `useHyperlinkPopupInstance` give the link popup's state with no UI, and with `popups.hyperlink: false` a mounted host panel opens for the link controls. Named menu rows (`ContextMenu.Cut`, `ContextMenu.MergeCells`, `Menu.PageSetup`, `Menu.Cut`, and more) change or hide one row with `label`, `icon`, `className`, and `hidden`. `FindBar`, `OpenFailure`, `FontNotice`, and `EditNotice` take `t`, and `useOpenFailure` takes `{ t }`. `usePptxSource` fetches a deck and resolves its fonts as DOCX Editor's `useDocxSource`, and `useEditorHostDocument` returns the document that the slide is mounted in. Vue has the same props, parts, and composables.
+
+  The `--doc-slide-padding` token sets the room around the slide in the canvas (default `24px`), and zoom to fit keeps it, so a host can compute the fitted slide height for a width. The slide menu of a horizontal rail says Move left and Move right, with their shortcuts. A link that the open link popup refuses shows its reason once, in the popup, and not again in the edit notice. `useHyperlinkPopup().open(link)` checks `link.url` with `sanitizeHref` again and ignores the given `href`. `useDocumentSearch` reads the matches again when a hook mounts after edits made while none was mounted. Vue `usePptxSource` keeps the deck when a getter returns a new `fonts` value, and keeps the old bytes while a new URL loads, as React does. Vue `useHistoryGroup` binds an element from an iframe.
+
+  `PptxEditor.ContextMenu` placed in the root or the viewport is the canvas menu, as in DOCX Editor, through the same entry as `popups.contextMenu`, which wins over it. It takes `disabled` and `onOpenChange` (Vue: `openChange`). The link popup opens at the selected text and has Cancel. A horizontal rail narrower than 420px keeps New slide and folds the other slide actions into one More menu. A right-to-left horizontal rail names its moves, shortcuts, and icons by its direction, as its arrow keys step. A change of a compound's `t` between set and unset no longer remounts it.
+
+- 929ca86: Match the editor chrome to your app with public API only. `--doc-font-ui` now sets the font of the whole chrome, `--doc-radius-surface`, `--doc-radius-control`, and `--doc-radius-pill` (the zoom pill and chips) set its corners, the dialog panel falls back to `--doc-radius-surface`, dialog controls read `--doc-dialog-control-radius`, then `--doc-radius-control`, and the primary dialog button reads `--doc-primary-hover`. The slide rail's action row has named parts (`SlideRail.AddSlide`, `ChooseLayout`, `Duplicate`, `MoveEarlier`, `MoveLater`, `Delete`, `Collapse`, and `Action`) with `hidden`, `icon`, `className`, `asChild`, and `preset={false}`. A horizontal rail sets its action columns to half the buttons that show, rounded up, so a rail with `toggle={false}` shows its six buttons as three over three. The notes field fills the height that a host gives the notes pane. A focused rail slide rings its thumbnail, and the custom color field is as tall as Apply beside it. A context menu that is too tall for the room above or below the pointer now stays at the pointer and scrolls, so a slide menu opened in a rail at the bottom of a short window no longer covers the toolbar.
+- 412d750: Collaboration sessions can own undo and redo, report a status snapshot with typed failure codes, and exchange presence and selections. The canvas shows collaboration peers' selected shapes and text carets. Custom `EditorCollaborationSession` implementations must now provide `statusSnapshot()`, and `subscribeStatus` listeners receive the reason code and detail.
+- 412d750: Right-click a slide in the rail or the slide canvas to open a context menu with icons, shortcut hints, and the reason when a command is unavailable.
+- 412d750: Add a font substitution notice with local font access, and upright East Asian characters in vertical text.
+- 412d750: After you delete slides or shapes, the edit notice says what went and offers Undo for ten seconds; `snapshot.lastRemoval` reports the removal.
+- 412d750: Dialogs expose DOCX Editor's named parts (`Header`, `Title`, `Body`, `Footer`, `Field`, `Error`, `Apply`, `Cancel`, `Reset`) over a draft, with `usePageSetupDialog` and `useBackgroundDialog`: Format Background (the menu row is now "Format Background…") applies its choice on OK as one undo step and Cancel discards it, Page setup reports the appearance through `onThemeChange` on OK instead of on each click and has OK and Cancel instead of Close, and the Vue adapter gains the `popups` registry and the Page setup dialog.
+- 412d750: Toolbar slot ids now use the DOCX Editor names (`font.family`, `font.size`, `format.clear`, `list.bullet`, `list.numbered`, `list.indent`, `list.outdent`, `list.lineSpacing`, `list.bulletStyle`, `list.numberStyle`), and `Toolbar.FontFamily` has `Trigger`, `Content`, and `Item` parts in React and Vue.
+- 457a754: East Asian text measures and draws with each run's `a:ea` font (complex-script text with `a:cs`, symbol characters with `a:sym`), and a theme with an empty `a:ea` uses its script font for the run's language. `eaLnBrk="0"` now breaks East Asian text between any two characters with no kinsoku rule, `latinLnBrk="1"` breaks inside Latin words, Korean text breaks at spaces, `hangingPunct` lets a comma or full stop hang past the line end, the presentation's `p:kinsoku` lists replace the built-in lists, and justified East Asian lines spread between characters, as the reference PDFs show. A missing East Asian font falls back to a host CJK face for the text's language, such as Noto Sans CJK JP, and a character that the run's face lacks uses another loaded face. The canvas shows the text that an input method composes at the caret, and the key that ends a composition runs no shortcut. `@pptx-editor.dev/i18n` adds Japanese (`/ja`), Korean (`/ko`), and Simplified Chinese (`/zh-CN`) catalogs, and `@pptx-editor.dev/pptx-to-pdf` draws East Asian text with Noto Sans CJK JP when the optional `@docx-editor.dev/fonts-cjk` is installed.
+- 412d750: Typing and dragging stay fast on large decks: an edit lays out and repaints only the slides it changes, thumbnails repaint when the editor is idle, and two editors on one page no longer share SVG ids or link shortcuts.
+- 412d750: Fix lost or misplaced edits: speaker notes stay on their slide, undo and redo return to the edited slide, deleted slides leave no broken links, emoji and fields edit as one character, and refused edits show a reason.
+- 412d750: `createPptxEditor` accepts `modules` for review and collaboration, and the store can publish parts that a collaboration replica rebuilt.
+- 412d750: Draw scaled, skewed, aligned, and rotating shadows, reflections, and effects on text in shapes without fill, without clipping large blurs.
+- 412d750: A click in an empty text placeholder or an empty text box now places a visible caret, so you can type into a new slide's title and body at once. Adds `hasCharacters` and `ResolvedShape.textBox`.
+- 412d750: Draw rectangular path gradients, preset patterns, gradient text, tiled pictures at their natural size, and compound lines.
+- 412d750: Gradient, tiled-picture, and picture fills render closer to the reference PDFs (gradients gain `tileRect`), fill overlays draw (`ResolvedEffects.fillOverlay`, `BlendMode`), and `DocumentSession.imageSize` uses 72 DPI for an image without a stated resolution.
+- 412d750: Find and replace in slide text, tables, and speaker notes (`editor.find`, the `replace` and `replaceAll` commands, and the `FindBar` with Ctrl/Cmd+F and Ctrl/Cmd+H), and export of slides as PNG, a ZIP of PNGs, or standalone SVG (`exportSlidePng`, `exportSlidesPngZip`, `exportSlideSvg`).
+- 412d750: Add DOCX Editor's font configuration API: the `fonts` option and prop (a `FontConfiguration`, a fragment, or a `FontResolver` such as `packagedFonts()`), `editor.setFonts()`, `onFontError`, `useFonts`, `loadFonts`, `createFontSource`, `customFonts`, and `deferFonts`, and replace `fontProvider` and `addFonts` with them.
+- 412d750: Add `focus()` on the editor, superscript and subscript (`script.super`, `script.sub`, Ctrl/Cmd+Shift+= and Ctrl/Cmd+=), the Character Spacing and Change Case menus, the Font dialog (`setFontFormat`, `PptxEditor.FontDialog` with the dialog named parts and `useFontDialog`), and `useFontFormat` in React and Vue; formatting at a caret now applies to the word around it, or to the text typed next at a word edge.
+- 412d750: Add the format painter: the `format.painter` toolbar button, Ctrl/Cmd+Shift+C and Ctrl/Cmd+Shift+V, and the `toggleFormatPainter`, `copyFormat`, and `pasteFormat` commands copy text or shape formatting and paint it as one undo step.
+- 412d750: An empty list item shows its bullet or number dimmed while the caret is in it, and the caret starts where the item's text will start.
+- 412d750: Edit inside groups, select and transform several shapes together (Shift+click, marquee, Ctrl/Cmd+A), group and ungroup, and copy, cut, and paste shapes within and between decks.
+- 412d750: The core package now bundles its text shaper, so Bun and esbuild apps build, and `setHarfBuzzWasmUrl` points the shaper at a self-hosted `@pptx-editor.dev/core/harfbuzz.wasm`.
+- 412d750: Group undo steps with `Editor.beginHistoryGroup()` and `exec(command, { historyGroup })`, restore the selection after a step on redo, and commit `projection` or `awareness` transactions that add no undo step; `runToolbarCommand` and `useEditorValueCommand().execute` take `{ historyGroup }` last; `historyGroup` replaces the store's `mergeKey` and `setTableGrid.gesture`, `closeHistoryGroup()` replaces `sealHistory()`, and `redo()` returns the selection after the step.
+- 412d750: The slide rail takes `orientation="horizontal"` to run as a row under the slide in a tall, narrow host, and it keeps the current slide in view by scrolling only the rail, so a page around the editor no longer moves.
+- 412d750: A click into linked text opens a link popup with Copy, Edit, and Remove (a read-only editor shows only the target and Copy), and `PptxEditor.HyperLink` and `useHyperlinkPopup` let you restyle, replace, or rebuild its parts; a `popups.hyperlink` renderer shows this reading mode only when registered with `definePopup(Component, { reading: true })`.
+- 412d750: Add a loading screen (`PptxEditor.Loading` in React, `PptxEditorLoading` in Vue) that shows while a deck opens, and paint it before the engine parses a large deck.
+- 412d750: `PptxEditor.Menu` and `PptxEditor.ContextMenu` render the menu bar and the canvas menus from a core registry (`CHROME_MENUS`, `CANVAS_CONTEXT_MENUS`) with `slotId` rows, `Group`, `Separator`, and `Submenu`, the `popups` registry gains `hyperlink`, `find`, `contextMenu`, and `railContextMenu`, `PptxEditor.Root` now hosts the link popup, and `useEditorCommand` runs dialog, clipboard, find, link, and slide show slots (in Vue, the clipboard and pictures; the others show as disabled with the reason).
+- 412d750: Speaker notes show their formatting and keep it through every edit, and the notes pane sets bold, italic, and underline (Ctrl/Cmd+B, I, U, its buttons, or the toolbar while the notes have the cursor) through the new `formatNotes` command.
+- 412d750: `PptxEditor` now shows a notice that says why a file did not open, with `PptxEditor.OpenFailure`, `useOpenFailure`, the `openFailure` option, and `renderOpenFailureActions` (the Vue `openFailureActions` slot) to change it.
+- 412d750: The slide rail and the notes pane take DOCX Editor's pane props (`open`, `defaultOpen`, `onOpenChange`, `className`, and `paneWidth` and `toggle` on the rail), the side panel takes `className` and `paneWidth`, `useNotesPane` and `useEditorColorMode` give the notes state and the resolved theme, and `PptxEditor.Root` takes `colorMode` (`'light'`, `'dark'`, or `'system'`) for the chrome, with `colorMode` and `useEditorColorMode` in Vue too.
+- 412d750: Add the Paragraph dialog: `setParagraphFormat` sets alignment, indents, space before and after, and line spacing as one undo step, `PptxEditor.ParagraphDialog` (with the dialog named parts and `useParagraphDialog`) opens from Format > Paragraph…, Line spacing options…, and the text context menu, `useParagraphFormat` reads and writes the same fields in React and Vue, with its `ParagraphFormatRead` and `ParagraphFormatCommand` types, and `setLineSpacing` now refuses a multiple below 0.01 or above 9.99, as the dialog does.
+- 412d750: Pictures can be cropped, changed, reset, adjusted, styled, sized, and given alt text through new commands, the toolbar's `image` group, and the `imageAltText` and `imageProperties` popups, and picture borders now draw outside the picture.
+- 412d750: Empty placeholders show their prompt text ("Click to add title", or the layout's custom prompt) in the editor in the style typed text takes; thumbnails, exports, and saved files never hold it.
+- 412d750: Add PPTX Editor v0.1: standards-based slide rendering (ECMA-376), a minimal editing slice, and the React adapter.
+- 412d750: The Vue adapter, the pro modules for review and collaboration, and PDF export are now published with the other packages.
+- 412d750: Add links, clear formatting, slide backgrounds, line end point editing, a searchable font picker with host-loaded families, zoom that scrolls to every edge, and slide rail shortcuts.
+- 412d750: Add `PptxEditor.Ribbon` and `PptxEditor.StatusBar` (Vue: `PptxEditorRibbon` and `PptxEditorStatusBar`), so your editor can show its commands on tabs, with contextual Format and Table tabs, and slide x of y, notes, views, and zoom under the slide.
+- 412d750: `moveSlides` and `moveSlide` take an optional `section`, so a drop below a section header or a Ctrl/Cmd+Arrow step across one puts the slides into that section, and the saved file keeps one slide list with a valid id for every slide after two collaborators add the first slide at the same time. Behavior change: `moveSlide` now follows the rule of `moveSlides`, so a slide moved up to the first place of a section joins the section before it instead of that section; pass the section's id as `section` to keep the earlier result.
+- 412d750: Sections show in the rail and the slide sorter and can be added, renamed, removed, moved, and collapsed (`addSection`, `renameSection`, `removeSection`, `removeAllSections`, `moveSection`, `setSectionsCollapsed`, the `section.*` slots), and the new Slide Sorter view (`setPresentationView`, `PptxEditor.SlideSorter`, the `view.presentationView` slot) shows every slide by section. The `railContextMenu` popup entry covers the slide sorter, and the new `sectionContextMenu` entry (`SectionContextMenu`) replaces or turns off the section menu. A slide entry that repeats a slide id of another slide keeps its slide with a fresh id, so the slide list that the editor shows, the commands, and the saved file agree. In the Vue adapter, the `section.*` slots draw as buttons and `view.presentationView` works through `useEditorCommand`. The default editor's zoom pill moved into the status bar, next to the view switch.
+- 412d750: The toolbar shows only the controls for the selection (set `contextual={false}` to show every group), and superscript, subscript, character spacing, and columns leave the default bar and `formattingBarChromeGroups()`.
+- 412d750: Add shadow, reflection, glow, and soft edge presets, Quick Styles, and commands to distribute, flip, rotate, lock, hide, and rename objects, with toolbar parts that a host places and a typed `useEditorValueCommand` hook.
+- 412d750: Add a visual shape gallery, gradient fills with a custom gradient dialog, a line tool with editable line ends, vertical text alignment, single-click text editing, and a toolbar overflow menu.
+- 412d750: Add shape fill, border color, border weight, border dash, and text fitting commands and controls, an editable Format panel, and a Page setup dialog that replaces the Settings tab.
+- 412d750: Add change layout, reset slide, hide slide, and New slide with a layout gallery, through the new `applyLayout`, `resetSlides`, and `setSlidesHidden` commands, the `slide.*` slots, the rail's context menu, `LayoutGallery`, and the `useSlideLayouts` hook in React and Vue.
+- 412d750: Select several slides in the rail with Shift+click (a range) and Ctrl/Cmd+click (one more or one less), then delete, duplicate, or move them together as one undo step.
+- 412d750: The `setSlideNumbers` command shows or hides slide numbers on every slide through the layout's slide-number placeholder (`p:ph type="sldNum"`).
+- 412d750: Present a deck full screen with `PptxEditor.Slideshow` and `useSlideshow()`, or F5 and Ctrl/Cmd+Enter, with the standard slide show navigation keys, hidden slides skipped, and the editor's own slide painting.
+- 412d750: Shapes snap to smart guides while you move or resize them (edges, centers, the slide, and equal spacing), Alt turns snapping off, and View > Smart guides switches it.
+- 412d750: The document store now refuses a transaction that breaks a table grid, a merge, a shape id, the slide list, a relationship target, or a content type, with a typed `tree-invariant` or `package-invariant` rejection that names the part and the rule.
+- 412d750: Tables are editable: type in cells, insert tables, rows, and columns, merge and split cells, and format cells and table styles with new commands and the toolbar's `table` group.
+- 412d750: Render tables with their styles, merged cells, borders, and rows that fit their text, and draw text in styled shapes in the style's font color.
+- 412d750: Add font and underline color to the Font dialog (`setFontFormat` `underlineColor`, drawn from `a:uFill`), `PptxEditor.ColumnsDialog` (Format > Columns… and "More columns…") for the column count and spacing, and a custom bullet character and font in the Bullets and Numbering dialog.
+- 412d750: Add Text Direction and Columns (`setTextDirection` with Office.js orientation words (`TextOrientation`), `setColumns` with `count` and `gapEmu`, and the `paragraph.textDirection` and `paragraph.columns` menus in the React toolbar), and resize-to-fit and shrink-on-overflow that follow rotated text, columns, and the text rectangle of shapes that are not rectangles; `mongolianVertical` and `wordArtVerticalRtl` are refused and listed as approximations.
+- 412d750: Apply the Font, Paragraph, and Bullets and Numbering formats, superscript, subscript, Change Case, and character spacing to table cells, type the text slots in `ToolbarValueMap` (`font.size` steps with `{ step: 1 }` or `{ step: -1 }`), and export `TextFormatCommand`, `BulletGalleryKey`, and `NumberGalleryKey`.
+- 412d750: Color menus show the deck's theme colors with their lighter and darker variants and write them as theme colors, and every toolbar menu works with the keyboard.
+- 412d750: `PptxEditor.Toolbar` takes `preset`, `Toolbar.Slot`, and `Toolbar.Group` for customization, and `PptxEditor.Root` takes a `popups` registry with `definePopup` and `useEditorDialog`.
+- 412d750: The toolbar gains DOCX Editor's named parts (`Toolbar.Bold`, `Toolbar.FontFamily`, …), `Toolbar.Action` and `Toolbar.Separator`, group `priority`, `pinned`, `after`, `className`, and `overflowContent`, and `overflow={false}` to wrap the bar instead of using a More menu; the Vue toolbar gets the named parts, `ToolbarAction`, `ToolbarSeparator`, `after`, and `className`, and its bar wraps until it has a More menu.
+- 412d750: The React adapter exports its stylesheet as `@pptx-editor.dev/react/styles.css`, and the logic it shares with the Vue adapter now lives in core.
+- 412d750: A literal tab, line feed, or carriage return in an XML attribute value now reads as a space, as XML 1.0 attribute-value normalization requires; if you kept attribute values from an earlier build, read the deck again.
+- 412d750: In a collaboration session, two collaborators who change the same fill, outline, effect list, background, or text property at once now get one valid element, and the saved file opens without a repair prompt.
+
+### Patch Changes
+
+- 412d750: The React and Vue adapters add `useFontFamily()` for a host font picker, export the core types their props and hooks use (such as `PptxEditorInstance`, `EditorCommand`, and `ChromeSlotId`), warn in development when `modules` changes after mount, and no longer export the deprecated `WORD_DEFAULT_FONT`.
+- 412d750: A slide draws the `mc:Choice` branch of `mc:AlternateContent` that requires only namespaces the engine reads, such as `p14`, and an edit of that branch leaves no out-of-date copy in `mc:Fallback`.
+- 412d750: A binding whose shape or slide is deleted no longer binds a new shape that takes the same id; an undo that restores the shape makes it work again.
+- 412d750: New shapes, slides, and copied comments get ids inside their schema range and unique on the slide, also when the file holds ids such as `4294967295` or `1e400`.
+- 412d750: The canvas context menu's **New slide** row is the `slide.add` registry row, so `ContextMenu.Slot slotId="slide.add"` hides or replaces it.
+- 412d750: The text caret takes the color of the text it sits in, so it reads as one solid line on dark and light slides alike.
+- 412d750: Controls show a styled tooltip with the reason a control is off, the font picker groups the theme, deck, and other fonts and applies a theme font as a theme reference (`SelectionFormat.fontFamilyTheme`), color menus take a custom hex color, menus close on any press outside, a menu opens on its checked row, a selected section shows its first slide, Change case and Insert link act on the word at the caret, and undo, find, notes formatting, and keyboard focus work as expected.
+- 412d750: Two peers who type at once into a table cell with no text body both keep their text, a blank second text body in a cell no longer adds an empty line, and the automation API reads and edits the text of every text body of such a cell.
+- 412d750: Include component copyright and permission notices for the bundled HarfBuzz binary and runtime. Check dependency versions, binary hashes, and notice hashes before generating release notices.
+- 412d750: Install `@pptx-editor.dev/core` from npm with a resolvable `@pptx-editor.dev/i18n` dependency.
+- 412d750: A server picture now sends the rasterizer only the faces that may leave the engine, as the SVG export does.
+- 412d750: An automation selection read now answers the selection that the selection writes before it in the same batch leave.
+- 412d750: Font face ids are now unique for each open presentation, so a rasterizer's font registry never mixes the faces of two presentations.
+- 412d750: A custom geometry path draws nothing before its first `a:moveTo`, so a path that starts with `a:lnTo` or `a:arcTo` no longer draws from the top-left corner.
+- 412d750: Deleting, cutting, or ungrouping shapes, deleting a table, and turning slide numbers off now remove the animations and connector ends that name the removed shapes, so a saved slide never names a missing shape.
+- 412d750: Every argument refusal now says what to pass, for example "Use '#RRGGBB' or a named color" or "Use a font size from 1 to 4000 points".
+- 412d750: `PptxEditor` and its root now take a ref to a `PptxEditorRef` with `load`, `save`, `exec`, `snapshot`, `focus`, and `getEditor`, the same members in React and Vue.
+- 3bf89a8: Menus, popovers, and tooltips now open at their controls in a transformed, scaled, or clipping host container. A host CSS reset no longer changes the chrome, and Ctrl/Cmd+F and the link popup now stay with their own editor.
+- 412d750: Text lines take each font's OS/2 line metrics and its own ascent share, and a missing Japanese, Chinese, Korean, or common Latin font keeps its line positions.
+- 412d750: When a deck embeds no regular face of a font, regular text now uses an upright face instead of the italic one.
+- 412d750: Find counts and highlights each match in the speaker notes, Redo shows ⇧⌘Z on macOS, the custom color field shows the current color, and the slide sorter shows no zoom percentage.
+- 412d750: The font notice drops the result of an earlier local font request when another presentation opens, and dialog buttons get a destructive style and press feedback.
+- 412d750: Text now shapes with HarfBuzz 15.0.0, and `HARFBUZZ_VERSION` reports the new runtime.
+- 412d750: Draw colors with the `a:inv` and `a:gray` transforms in the correct shade: `a:inv` inverts linear RGB components, and `a:gray` weights the sRGB components by the Rec. 709 primaries.
+- 412d750: The core package now carries the full Ecma copyright notice for its preset geometry data, and every toolbar icon is an official Material Symbol.
+- 412d750: Enter starts a new paragraph, so bullets apply to single paragraphs; Tab and Shift+Tab change the list level and move the text; Backspace or Enter on an empty item leaves a list; and bullets in placeholders keep the master's style.
+- 412d750: The embedded font decoder's LZCOMP stage is a new implementation, written from its specification, that decodes every font exactly as before.
+- 412d750: Draw shadow blur, glow, and soft edges at their measured size, put an inner shadow on the side its direction names, and keep a shape's outline inside its effects.
+- 412d750: Escape in a menu bar menu now returns focus to its menu bar item, the open find bar no longer covers the slide, and a disabled control's reason is read once.
+- 412d750: Describe every feature by its ECMA-376 behavior in docs and labels: the export menu item reads "Presentation (.pptx)", the diagram placeholder labels read "Diagram", and the diagram placeholder prompt now uses the i18n key `canvas.prompts.diagram`.
+- 412d750: An embedded OLE object now shows the PNG, JPEG, GIF, or BMP picture of its `p:oleObj/p:pic` in the frame's box, in place of a labeled placeholder.
+- 412d750: The package reader and writer now come from a shared internal OOXML module, with no change in behavior or public API.
+- 412d750: A deck that inflates past 8 MiB at more than 200 times its file size is now refused, as in DOCX Editor (the threshold was 64 MiB), and a save stays within that cap, so a deck that opened opens again.
+- 412d750: Each package now ships its Apache-2.0 `LICENSE` file and a README, and the `core` third-party notices name the Material Symbols and ECMA-376 geometry data it contains.
+- 412d750: Pattern fills (`a:pattFill`) now draw 1 pt preset pixels on 8 pt tiles aligned to the slide, with measured bitmaps for twelve presets.
+- 412d750: The PDF export draws scaled linear gradients, circle path gradients, and two-stop gradient colors with the same rules as the editor.
+- 412d750: The picture Corrections control shows its brightness and contrast presets as a grid of preview samples instead of a long list.
+- 412d750: `pptx-to-pdf` now draws cropped pictures, linear and path gradients (gradient text too), tables, outer and inner shadows, and glow, and reports each approximation with a diagnostic code; the codes `effects`, `picture.crop`, `path.fill-mode`, `fill.linear`, `fill.path`, and `fill.group` are no longer emitted, and `frame.table` only for a table frame without a grid. Many effects or gradients on one page now stay inside the paint budget and `timeoutMs`.
+- 412d750: API reference comments now state each rule in place, and the developer documentation lives in the public docs pages.
+- 412d750: Use available host faces or substitutes for embedded fonts that permit only preview and print. Keep the original font bytes and relationships when saving. Apply the same admission rule in editing and viewer sessions.
+- 412d750: Collapse selected text to its start or end with Left or Right before the next edit.
+- 412d750: Ctrl/Cmd+Z and redo now work while the slide rail has focus.
+- 412d750: Open decks whose custom geometry asks for huge arcs without hanging, and draw text in flipped groups, line ends, trailing line breaks, aligned bullets, numbering restarts, arcs in stretched shapes, and faded text decorations correctly.
+- 412d750: In a collaboration session, two peers that add or copy slides, pictures, links, shapes, tables, or comments at the same time no longer save one id twice.
+- 412d750: Moving slides refuses an invalid target, the rail selection stays valid when a host deletes the current slide, and Ctrl+click on a Mac opens the context menu without collapsing the text selection.
+- 412d750: Add the `menu.openSample` string, and list picture brightness and contrast (`a:lum`) as a known approximation.
+- f59eaa3: A click on text that overflows its text box now selects the box and places the caret. Drag selection, double-click, and the text cursor also work on those lines.
+- 412d750: Color transforms now read a percentage written with a `%` sign (`lumMod val="50%"`) and an integer with a leading `+`, so the transform draws the value the file states instead of 0.
+- 412d750: Preset and custom shape geometry comes from one shared DrawingML geometry evaluator, and every shape draws the same as before.
+- 412d750: Step the caret by word with Alt or Ctrl and the Left and Right keys, go to the text edges with Ctrl or Cmd and Home or End, select a Unicode word on double-click or with the format painter, and keep words and character clusters whole across run boundaries and in Thai, Lao, Khmer, Myanmar, and CJK text; the engine now needs `Intl.Segmenter` (see Installation).
+- 412d750: The menu bar has **Insert > New slide** (Ctrl+M, ⌃M on a Mac, now also while you edit text or notes) and **Slide Show > Hide slide**, and `Menu.Item` takes `direct` to run a value slot at once or open its choices.
+- 412d750: Text typed over a selection is one undo step, a quick drag in the slide rail or sorter reorders slides, the Format menu names its picture row Format picture, and the find bar moves the slide only when it would cover it.
+- 412d750: Keep sections and custom shows in step when you add, duplicate, move, or delete slides, give a duplicated slide its own charts, comments, and embedded objects, and remove the parts only a deleted slide used.
+- 412d750: A slide show that starts right after another one ends no longer closes at once, and leaving full screen keeps the show running in the window.
+- 412d750: Refuse zip bombs, oversized embedded font tables, deep XML, and unsafe names in edits, and open and save decks with SVG media, encoded part names, or large blank bitmaps without data loss.
+- 412d750: A table cell that holds two text bodies now shows, finds, and edits the text of both, as the saved file holds it in one body.
+- 412d750: In a collaboration session, a table whose last columns or rows two people delete at the same time now leaves the slide and the saved file, so the saved file stays valid.
+- 412d750: In a collaboration session, a table whose rows or merged cells two people changed at once, such as a merge while a peer deletes one of its rows, now shows the row below the merge on every replica and saves with valid merge markers; the room format is now 3, so a replica of an earlier build refuses the room.
+- 412d750: In a collaboration session, text in a table cell that a peer merges, or that a concurrent row or column delete, insert, split, or merge moves, now shows once on every replica and is no longer lost; the room format is now 4, so a replica of an earlier build refuses the room.
+- 412d750: A table cell with an `hMerge` or `vMerge` that no `gridSpan` or `rowSpan` reaches is drawn with its text, and you can select, edit, copy, and duplicate it.
+- 412d750: In a collaboration session, a table whose rows concurrent structure edits leave with too few or too many cells now shows on the slide the cells and columns that the saved file holds, and you can type in them.
+- 412d750: A drag after a double-click or triple-click extends the selection by whole words or paragraphs, and Home and End go to the edges of the laid-out line.
+- 412d750: The toolbar font family field and font size box now rest as bordered surface boxes, take the hover color on hover instead of the pressed-toggle color, show the focus ring, and look dimmed when disabled.
+- 412d750: The packages build with tsup 9 and esbuild 0.28, with no change to the public API.
+- 412d750: The Vue adapter now has every part of the React adapter under the same names, including the menu bar, context menus, ribbon, status bar, slide rail, slide sorter, notes pane, side panel, find bar, slide show, form dialogs, `Icon`, `MenuRow`, `MenuSubmenu`, and `useNotesPane`, and its parts take `className` and `style` as the React parts do.
+- 412d750: A plain `class` on the Vue `PptxEditorToolbar.Slot` now goes on its control, as `className` on the React `Toolbar.Slot` does, and a Vue named part with both `class` and `control-class` now adds both names instead of only `control-class`. Both adapters print a development warning when a slot's own content replaces the control, so its class or icon has nothing to apply to, and when a slot has an attribute that never reaches its control, such as `style`, `id`, or `data-*`.
+- 412d750: Text baselines round to whole points from the top of the text body, so each line sits on its measured baseline.
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [457a754]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+- Updated dependencies [412d750]
+  - @pptx-editor.dev/i18n@0.1.0
