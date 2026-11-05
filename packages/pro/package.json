@@ -1,6 +1,6 @@
 {
   "name": "@pptx-editor.dev/pro",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Commercial capabilities for PPTX Editor, as EditorModules: the review module (comments and suggestions) and realtime collaboration.",
   "type": "module",
   "sideEffects": false,

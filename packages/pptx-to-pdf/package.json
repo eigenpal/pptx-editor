@@ -1,6 +1,6 @@
 {
   "name": "@pptx-editor.dev/pptx-to-pdf",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Convert PPTX to PDF on Node.js with searchable text and embedded fonts, through the PPTX Editor layout engine.",
   "type": "module",
   "sideEffects": false,

@@ -96,7 +96,7 @@
     },
     "packages/core": {
       "name": "@pptx-editor.dev/core",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@docx-editor.dev/fonts": "^2.34.0",
         "@pptx-editor.dev/i18n": "^0.0.0",
@@ -110,7 +110,7 @@
     },
     "packages/editor-api": {
       "name": "@pptx-editor.dev/editor-api",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "devDependencies": {
         "@pptx-editor.dev/core": "workspace:*",
       },
@@ -120,7 +120,7 @@
     },
     "packages/i18n": {
       "name": "@pptx-editor.dev/i18n",
-      "version": "0.0.0",
+      "version": "0.1.0",
     },
     "packages/ooxml-core": {
       "name": "@eigenpal/ooxml-core",
@@ -132,7 +132,7 @@
     },
     "packages/pptx-to-pdf": {
       "name": "@pptx-editor.dev/pptx-to-pdf",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "fontkit": "2.0.4",
         "pdf-lib": "1.17.1",
@@ -152,7 +152,7 @@
     },
     "packages/pro": {
       "name": "@pptx-editor.dev/pro",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "y-protocols": "^1.0.7",
         "yjs": "^13.6.32",
@@ -166,7 +166,7 @@
     },
     "packages/react": {
       "name": "@pptx-editor.dev/react",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@pptx-editor.dev/i18n": "^0.0.0",
       },
@@ -181,7 +181,7 @@
     },
     "packages/vue": {
       "name": "@pptx-editor.dev/vue",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@pptx-editor.dev/i18n": "^0.0.0",
       },
