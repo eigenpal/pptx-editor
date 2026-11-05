@@ -33,6 +33,8 @@ import {
   popoverScope,
   submenuPanelKey,
   translateKeyOrText,
+  inFixedView,
+  placeInFixedFrame,
 } from '@pptx-editor.dev/core/editor';
 import { Icon, keepFocus } from './chrome.tsx';
 import { useTranslation } from './composables.ts';
@@ -216,10 +218,10 @@ const menuSubmenu = defineComponent({
         const r = row.value?.getBoundingClientRect();
         const p = panel.value;
         if (!now || !r || !p) return;
-        pos.value = placeSubmenu(
-          r,
+        pos.value = placeInFixedFrame(
+          p.parentElement,
           { width: p.offsetWidth, height: p.offsetHeight },
-          { width: window.innerWidth, height: window.innerHeight }
+          (size, view) => placeSubmenu(inFixedView(r, view), size, view)
         );
       },
       { flush: 'post' }

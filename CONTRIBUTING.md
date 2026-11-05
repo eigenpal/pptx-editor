@@ -35,6 +35,7 @@ The demo builds against workspace source, so it needs no package build.
    bun run build:packages && bun run api:check
    bun run i18n:validate
    bun run check:security
+   bun run check:css-scope
    bun run fidelity
    ```
    `bun run test` runs one `bun test` process per test file over a pool of workers, slowest file first, as DOCX Editor does (`scripts/test/run-parallel.mjs`). Only the React and Vue adapter tests preload happy-dom. The engine tests run with no global DOM. Other test commands:

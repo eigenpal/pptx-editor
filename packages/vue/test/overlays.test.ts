@@ -1,7 +1,5 @@
-// The Vue overlays against their React twins: the find bar, the edit and font notices, the link
-// popup, and the slide show render the same markup for one editor, and behave the same (keys,
-// requests through the root's action host, focus). After DOCX Editor's cross-adapter
-// differential test (docx-editor/packages/vue/test/cross-adapter-differential.test.ts).
+// Vue overlay markup, keyboard, and focus parity with React. After DOCX Editor:
+// docx-editor/packages/vue/test/cross-adapter-differential.test.ts.
 
 import { afterEach, describe, expect, jest, test } from 'bun:test';
 import { createElement, type ReactNode } from 'react';
@@ -52,9 +50,7 @@ import {
 } from '../src/index.ts';
 import { providePptxEditor } from '../src/composables.ts';
 import { canonicalDom } from './canonical-dom.ts';
-
 const IN = 914_400;
-
 let app: App | null = null;
 let vueHost: HTMLElement | null = null;
 afterEach(() => {
@@ -112,7 +108,6 @@ async function mountVue(editor: PptxEditorInstance, render: () => unknown, setup
   await nextTick();
   return vueHost;
 }
-
 function mountReact(editor: PptxEditorInstance, node: ReactNode): HTMLElement {
   const { container } = render(
     createElement(
@@ -193,6 +188,45 @@ describe('PptxEditorFindBar', () => {
     before.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', ctrlKey: true, bubbles: true }));
     await nextTick();
     expect(scope.querySelector('input[aria-label="Replace"]') !== null).toBe(true);
+  });
+
+  const ctrlF = (target: EventTarget): boolean => {
+    const key = new KeyboardEvent('keydown', {
+      key: 'f',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    target.dispatchEvent(key);
+    return key.defaultPrevented;
+  };
+  test('Ctrl/Cmd+F after work on the host page stays with the browser', async () => {
+    const editor = await open();
+    const scope = await mountVue(editor, () => [
+      h('button', { type: 'button', id: 'before' }, 'before'),
+      h(PptxEditorFindBar),
+    ]);
+    const before = scope.querySelector<HTMLButtonElement>('#before')!;
+    const outside = document.createElement('input');
+    document.body.appendChild(outside);
+    try {
+      // The focus on a host field, then on nothing: the browser keeps the key both times.
+      outside.focus();
+      expect(ctrlF(outside)).toBe(false);
+      outside.blur();
+      expect(ctrlF(document.body)).toBe(false);
+      await nextTick();
+      expect(scope.querySelector('.pptx-find')?.hasAttribute('hidden')).toBe(true);
+      // Work in the editor, then the focus drops to nothing (a closed menu): the bar opens.
+      before.focus();
+      before.blur();
+      expect(ctrlF(document.body)).toBe(true);
+      await nextTick();
+      await nextTick();
+      expect(document.activeElement).toBe(scope.querySelector('input[aria-label="Find"]'));
+    } finally {
+      outside.remove();
+    }
   });
 
   test('the bar keeps its height free above the slide while it is mounted', async () => {
@@ -639,6 +673,9 @@ describe('the notices', () => {
     expect(editor.session!.layout(0)!.items).toHaveLength(0);
     expect(data.size).toBeGreaterThan(0);
     expect(editor.snapshot().lastRemoval).toBeNull();
+    // A surface left in the page would take the presses of the next test file.
+    editor.detach();
+    host.remove();
   });
 
   test('Cut from the menu reports no removal', async () => {

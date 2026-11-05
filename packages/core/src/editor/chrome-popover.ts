@@ -3,6 +3,7 @@
 // which element takes focus, and when a panel closes. The adapters keep only their glue (a
 // portal, refs, and effects), so the two cannot drift.
 
+import { inFixedView, placeInFixedFrame } from './fixed-frame.ts';
 import { dialogFocusables } from './dialog-draft.ts';
 import { focusEdge, handleMenuKey, panelItems } from './menu-keyboard.ts';
 
@@ -73,12 +74,11 @@ export function positionPopover(
   align: 'start' | 'end',
   rect?: PopoverAnchorRect | null
 ): PopoverPlacement {
-  const view = anchor.ownerDocument.defaultView;
-  const next = placePopover(
-    rect ?? anchor.getBoundingClientRect(),
+  const anchorRect = rect ?? anchor.getBoundingClientRect();
+  const next = placeInFixedFrame(
+    panel?.parentElement,
     { width: panel?.offsetWidth ?? 200, height: panel?.offsetHeight ?? 0 },
-    align,
-    { width: view?.innerWidth ?? 0, height: view?.innerHeight ?? 0 }
+    (size, area) => placePopover(inFixedView(anchorRect, area), size, align, area)
   );
   if (panel) {
     panel.style.left = `${next.left}px`;

@@ -8,6 +8,7 @@
 // The bubble is visual only (`aria-hidden`): the control's `aria-label` is its accessible name,
 // and a disabled control keeps its reason in an `aria-describedby` note, as before.
 
+import { inFixedView, placeInFixedFrame } from './fixed-frame.ts';
 import { popoverScope } from './chrome-popover.ts';
 
 /** The hover delay before a tooltip opens, as DOCX Editor's `Tooltip` (`delayMs = 400`). @internal */
@@ -79,12 +80,11 @@ export function placeTooltip(
 
 /** Place a rendered bubble for its control: `left`, `top`, and `data-side`. @internal */
 export function positionChromeTooltip(bubble: HTMLElement, target: HTMLElement): void {
-  const win = bubble.ownerDocument.defaultView;
   const rect = target.getBoundingClientRect();
-  const at = placeTooltip(
-    rect,
+  const at = placeInFixedFrame(
+    bubble.parentElement,
     { width: bubble.offsetWidth, height: bubble.offsetHeight },
-    { width: win?.innerWidth ?? 0, height: win?.innerHeight ?? 0 }
+    (size, view) => placeTooltip(inFixedView(rect, view), size, view)
   );
   bubble.style.left = `${at.left}px`;
   bubble.style.top = `${at.top}px`;

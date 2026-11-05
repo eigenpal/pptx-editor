@@ -66,6 +66,7 @@ jobs:
         run: |
           bun run lint
           bun run check:security
+          bun run check:css-scope
           bun run i18n:validate
           node scripts/check-public-terminology.mjs
       # The multi-threaded CLI checks the tree about twice as fast from a cold start. The

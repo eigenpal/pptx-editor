@@ -4,6 +4,7 @@
 // (the room the bar may use, the cost of a separator, and which groups leave the bar). After
 // DOCX Editor's `toolbar-measure.ts` and `useToolbarOverflow`.
 
+import { inFixedView, placeInFixedFrame } from './fixed-frame.ts';
 import type { ChromeActionHost } from './chrome-actions.ts';
 import type {
   ChromeControl,
@@ -163,7 +164,10 @@ export const SIZE_ERROR_MS = 5000;
 /** Where the font size box's message goes: under the box, in viewport pixels. @internal */
 export function sizeErrorPlace(box: HTMLElement | null): { left: number; top: number } {
   const rect = box?.getBoundingClientRect();
-  return { left: Math.round(rect?.left ?? 0), top: Math.round((rect?.bottom ?? 0) + 6) };
+  const at = placeInFixedFrame(box?.parentElement, { width: 0, height: 0 }, (_, view) =>
+    inFixedView({ left: rect?.left ?? 0, top: (rect?.bottom ?? 0) + 6 }, view)
+  );
+  return { left: Math.round(at.left), top: Math.round(at.top) };
 }
 
 /** The size typed in the font size box, or null when it is not a positive number. @internal */

@@ -355,12 +355,117 @@
     sans-serif
   );
   font-size: 13px;
+  /* The other inherited text styles, so the host page's (`html { line-height: 1.5 }`) do not
+     reach the chrome. */
+  font-style: normal;
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: start;
+  text-indent: 0;
+  word-spacing: normal;
+  white-space: normal;
+  tab-size: 8;
+  font-feature-settings: normal;
+  font-variation-settings: normal;
   -webkit-font-smoothing: antialiased;
 }
 .pptx-editor *,
 .pptx-editor ::before,
 .pptx-editor ::after {
   box-sizing: border-box;
+}
+/* The browser defaults the chrome relies on, set again inside the editor's own parts, so a host
+   reset (`* { margin: 0 }`, `h2 { font-size: inherit }`, `svg { display: block }`) cannot
+   change them. A part is an element with a `pptx-` class other than the `.pptx-editor` scope
+   itself, so host content beside the chrome keeps the host's styles. The values are the
+   Chromium defaults. `:where()` keeps each rule at the specificity of one class, so the
+   component rules below win. */
+.pptx-editor :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) p) {
+  margin-block: 1em;
+}
+.pptx-editor
+  :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) :is(h2, h3)) {
+  font-weight: bold;
+}
+.pptx-editor :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) h2) {
+  margin-block: 0.83em;
+  font-size: 1.5em;
+}
+.pptx-editor :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) h3) {
+  margin-block: 1em;
+  font-size: 1.17em;
+}
+.pptx-editor
+  :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) :is(ul, ol)) {
+  margin-block: 1em;
+  padding-inline-start: 40px;
+}
+.pptx-editor :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) ul) {
+  list-style-type: disc;
+}
+.pptx-editor :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) ol) {
+  list-style-type: decimal;
+}
+.pptx-editor
+  :where(
+    :is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) :is(ul, ol) :is(ul, ol)
+  ) {
+  margin-block: 0;
+}
+.pptx-editor
+  :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) :is(ul, ol) ul) {
+  list-style-type: circle;
+}
+.pptx-editor :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) fieldset) {
+  margin-inline: 2px;
+  padding-block: 0.35em 0.625em;
+  padding-inline: 0.75em;
+  border: 2px groove ThreeDFace;
+}
+.pptx-editor :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) legend) {
+  padding-inline: 2px;
+}
+.pptx-editor
+  :where(
+    :is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor'])
+      :is(svg, canvas):not([hidden])
+  ) {
+  display: inline;
+  vertical-align: baseline;
+}
+/* Controls use the chrome font, not the browser's control font. */
+.pptx-editor
+  :where(
+    :is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor'])
+      :is(button, input, select, textarea)
+  ) {
+  font: inherit;
+}
+.pptx-editor :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) button) {
+  padding-block: 1px;
+  padding-inline: 6px;
+}
+.pptx-editor :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) button) {
+  color: ButtonText;
+}
+.pptx-editor
+  :where(
+    :is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor'])
+      :is(input, select, textarea)
+  ) {
+  color: FieldText;
+}
+.pptx-editor
+  :where(
+    :is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) input[type='checkbox']
+  ) {
+  margin: 3px 3px 3px 4px;
+}
+.pptx-editor
+  :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) input[type='radio']) {
+  margin: 3px 3px 0 5px;
 }
 .pptx-editor :focus-visible {
   outline: 2px solid var(--doc-focus-ring);
@@ -1550,6 +1655,8 @@
   height: 1px;
   padding: 0;
   border: 0;
+  color: inherit;
+  background: transparent;
   opacity: 0;
   resize: none;
   overflow: hidden;

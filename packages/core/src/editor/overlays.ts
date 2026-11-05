@@ -37,11 +37,24 @@ export function dispatchFindRequest(editor: object | null, replace = false): voi
 }
 
 /**
+ * The element an event started on. In a shadow root, `target` at the document is the shadow
+ * host, so the composed path gives the real element inside it.
+ */
+function eventOrigin(e: Event): EventTarget | null {
+  return (typeof e.composedPath === 'function' ? e.composedPath()[0] : null) ?? e.target;
+}
+
+/** For each editor: whether the last press or focus on the page was in it. */
+const lastWorkedIn = new WeakMap<object, boolean>();
+
+/**
  * Listen for the requests a find bar answers: `dispatchFindRequest` for `editor`, and
- * Ctrl/Cmd+F (find) or Ctrl/Cmd+H (replace) while focus is in the bar's editor scope or on
- * nothing. `scope` finds the bar's `.pptx-editor`. In the slide sorter, which shows no slide
- * to find on, the request shows why through the edit notice instead. Returns the function that
- * stops. @internal
+ * Ctrl/Cmd+F (find) or Ctrl/Cmd+H (replace) while focus is in the bar's editor scope. With focus
+ * on nothing (a closed menu or a removed control drops it to `<body>`), the key opens the bar
+ * only when the last press or focus on the page was in this editor. Elsewhere on the host page,
+ * the browser's own find keeps the key. `scope` finds the bar's `.pptx-editor`. In the slide
+ * sorter, which shows no slide to find on, the request shows why through the edit notice
+ * instead. Returns the function that stops. @internal
  */
 export function listenFindRequests(
   editor: PptxEditorInstance,
@@ -56,21 +69,34 @@ export function listenFindRequests(
     const d = (e as CustomEvent<{ editor?: unknown; replace?: boolean } | null>).detail;
     if (d?.editor === editor) answer(!!d.replace);
   };
+  const inside = (target: EventTarget | null): boolean => {
+    const own = scope()?.closest('.pptx-editor');
+    return !!own && target instanceof Node && own.contains(target);
+  };
+  // Whether the person last worked in this editor: a press or focus there, not on the host page.
+  // Kept for the editor, so a listener an adapter adds again (the bar opened or closed) keeps it.
+  if (!lastWorkedIn.has(editor)) lastWorkedIn.set(editor, inside(document.activeElement));
+  const onActivity = (e: Event): void => {
+    lastWorkedIn.set(editor, inside(eventOrigin(e)));
+  };
   const onKey = (e: KeyboardEvent): void => {
     const key = e.key.toLowerCase();
     if (!(e.metaKey || e.ctrlKey) || e.altKey || (key !== 'f' && key !== 'h')) return;
-    const own = scope()?.closest('.pptx-editor');
-    const target = e.target instanceof Node ? e.target : null;
-    if (!own || !(target === document.body || (target && own.contains(target)))) return;
+    const onNothing = e.target === document.body || e.target === document.documentElement;
+    if (!inside(eventOrigin(e)) && !(onNothing && lastWorkedIn.get(editor))) return;
     e.preventDefault();
     e.stopPropagation();
     answer(key === 'h');
   };
   document.addEventListener(FIND_REQUEST, onRequest);
   document.addEventListener('keydown', onKey, true);
+  document.addEventListener('pointerdown', onActivity, true);
+  document.addEventListener('focusin', onActivity, true);
   return () => {
     document.removeEventListener(FIND_REQUEST, onRequest);
     document.removeEventListener('keydown', onKey, true);
+    document.removeEventListener('pointerdown', onActivity, true);
+    document.removeEventListener('focusin', onActivity, true);
   };
 }
 
@@ -306,10 +332,8 @@ export function linkPopupAnchor(request: LinkRequest, editor: object): HTMLEleme
   const scope = surface?.closest<HTMLElement>('.pptx-editor') ?? null;
   const button = scope?.querySelector<HTMLElement>('[data-slot="text.link"]');
   if (shown(button) && !button.closest('.pptx-menu')) return button;
-  // The open menu bar trigger; its menu bar lives beside this editor, so look in the page.
-  const trigger = document.querySelector<HTMLElement>(
-    '.pptx-menubar__trigger[aria-expanded="true"]'
-  );
+  // The open menu bar trigger of this editor only: another editor on the page has its own.
+  const trigger = scope?.querySelector<HTMLElement>('.pptx-menubar__trigger[aria-expanded="true"]');
   if (shown(trigger)) return trigger;
   return surface;
 }
