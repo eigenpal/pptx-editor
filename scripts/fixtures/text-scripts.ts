@@ -4,9 +4,13 @@
 // and alignment and indents. `east-asian-line-breaking` holds CJK text with `eaLnBrk`,
 // `latinLnBrk`, and `hangingPunct` on and off, punctuation at line ends, and the `a:ea`, `a:cs`,
 // and `a:sym` run fonts (21.1.2.3.3 ea, 21.1.2.3.1 cs, 21.1.2.3.10 sym). Every run names its
-// fonts, so no theme fallback decides the face.
+// fonts, so no theme fallback decides the face. `east-asian-theme-fonts` names no run font: its
+// theme's `a:ea` is empty, and the theme script fonts (20.1.4.1.16 font) with each run's `lang`
+// and `altLang` decide the face. It also holds shared symbols in East Asian and Latin runs, and
+// Korean and Chinese text in narrow boxes. `east-asian-typography` holds custom `p:kinsoku`
+// lists and justified and distributed East Asian text.
 
-import { escapeText, shape, solid, type FixtureSlide } from './builder.ts';
+import { escapeText, shape, solid, type FixtureOptions, type FixtureSlide } from './builder.ts';
 
 const IN = 914_400;
 
@@ -291,6 +295,139 @@ const eastAsian: FixtureSlide[] = [
       ),
   },
 ];
+
+// --- east-asian-theme-fonts ---------------------------------------------------
+
+/** The theme script fonts of `east-asian-theme-fonts`, in both theme font collections. */
+const THEME_SCRIPT_FONTS: readonly (readonly [string, string])[] = [
+  ['Jpan', 'Yu Gothic'],
+  ['Hans', 'DengXian'],
+  ['Hant', 'Microsoft JhengHei'],
+  ['Hang', 'Malgun Gothic'],
+  ['Arab', 'Tahoma'],
+];
+
+/** A run that names no font: the theme decides each slot. */
+const lr = (text: string, lang: string, altLang?: string): string =>
+  r(text, lang, '', `sz="2400"${altLang ? ` altLang="${altLang}"` : ''}`);
+
+/** The `east-asian-theme-fonts` deck: the theme names the East Asian faces by script. */
+export function eastAsianThemeFontsDeck(): FixtureOptions {
+  return {
+    majorFont: 'Arial',
+    minorFont: 'Arial',
+    scriptFonts: THEME_SCRIPT_FONTS,
+    slides: [
+      {
+        shapes:
+          // Each language takes its script font; Latin text in the same run stays Arial.
+          box(
+            2,
+            0.4,
+            0.3,
+            6.2,
+            4.2,
+            p(lr('日本語のテーマ Arial', 'ja-JP')) +
+              p(lr('简体中文的主题 Arial', 'zh-CN')) +
+              p(lr('繁體中文的主題 Arial', 'zh-TW')) +
+              p(lr('한국어 테마 글꼴 Arial', 'ko-KR')) +
+              p(lr('代替言語の日本語 Arial', 'en-US', 'ja-JP')) +
+              p(lr('نص عربي Arial', 'ar-SA'), RTL_R)
+          ) +
+          // Shared symbols: curly quotes, the ellipsis, and arrows in a Japanese and a Latin run.
+          box(
+            3,
+            6.8,
+            0.3,
+            6.1,
+            2,
+            p(lr('“引用”…→ ①②③ ※', 'ja-JP')) + p(lr('“Quote”…→ ①②③ ※', 'en-US'))
+          ) +
+          // Korean and Chinese text in narrow boxes: where each line breaks.
+          box(
+            4,
+            6.8,
+            2.6,
+            2.9,
+            4.6,
+            p(lr('한국어 문장은 띄어쓰기로 단어를 나눕니다. 좁은 상자에서 줄이 바뀝니다.', 'ko-KR'))
+          ) +
+          box(
+            5,
+            10,
+            2.6,
+            2.9,
+            4.6,
+            p(lr('中文句子没有空格，每个字之间都可以换行。“引号”和（括号）不在行首。', 'zh-CN'))
+          ),
+      },
+    ],
+  };
+}
+
+// --- east-asian-typography ---------------------------------------------------
+
+/**
+ * The deck's `p:kinsoku` (ECMA-376 Part 1, 19.2.1.17): custom lists for Japanese. The first
+ * kana of each kana row may not start a line, and the last may not end one. `。` and `」` are in
+ * neither list.
+ */
+const KINSOKU_LISTS = '<p:kinsoku lang="ja-JP" invalStChars="かさたなはまやらわ" invalEndChars="おこそとのほもよろ"/>';
+const KANA = 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん';
+const STOPS = 'テストです。「次」の文。テストです。「次」の文。テストです。「次」の文。';
+const JUSTIFY =
+  '両端揃えの段落では、行の文字の間隔が広がります。英語のwordsと数字123、（括弧）と「かぎ括弧」が混ざっています。';
+
+/** The width in inches of a box that holds `n` 20 pt full-width characters per line. */
+const fits = (n: number): number => Math.round(((n * 20 + 14.4 + 4) / 72) * 100) / 100;
+
+/** A row of boxes with the same Japanese text, from `from` to `from + count - 1` characters wide. */
+function widths(id: number, y: number, from: number, count: number, text: string, height: number): string {
+  let x = 0.3;
+  let out = '';
+  for (let i = 0; i < count; i += 1) {
+    const cx = fits(from + i);
+    out += box(id + i, x, y, cx, height, p(ja(text)), i % 2 ? 'EEF4FB' : 'FBF4EE');
+    x += cx + 0.35;
+  }
+  return out;
+}
+
+export function eastAsianTypographyDeck(): FixtureOptions {
+  return {
+    presentationLists: KINSOKU_LISTS,
+    slides: [
+      {
+        // The custom kinsoku lists: the kana rows at five widths, then the stops, which the
+        // custom lists do not name, at five widths.
+        shapes: widths(2, 0.2, 5, 5, KANA, 3.4) + widths(7, 3.8, 5, 5, STOPS, 3.4),
+      },
+      {
+        // `algn="just"` and `algn="dist"` with Japanese text at two widths, and Korean text.
+        shapes:
+          [
+            ['just', 3.4],
+            ['dist', 3.4],
+            ['just', 4.6],
+            ['dist', 4.6],
+          ]
+            .map(([algn, cx], i) =>
+              box(2 + i, 0.3 + (i % 2) * (Number(cx) + 0.5), i < 2 ? 0.2 : 3.0, Number(cx), 2.6, p(ja(JUSTIFY), `<a:pPr algn="${algn}"/>`), i % 2 ? 'EEF4FB' : 'FBF4EE')
+            )
+            .join('') +
+          box(
+            6,
+            9.8,
+            0.2,
+            3.2,
+            5.4,
+            p(r('한국어 문단을 양쪽 맞춤으로 정렬하면 단어 사이와 글자 사이의 간격이 넓어집니다.', 'ko-KR', '<a:latin typeface="Arial"/><a:ea typeface="Malgun Gothic"/>'), '<a:pPr algn="just"/>') +
+              p(r('균등 분할 정렬은 마지막 줄도 채웁니다.', 'ko-KR', '<a:latin typeface="Arial"/><a:ea typeface="Malgun Gothic"/>'), '<a:pPr algn="dist"/>')
+          ),
+      },
+    ],
+  };
+}
 
 export const textScriptFixtures: Record<string, FixtureSlide[]> = {
   'rtl-text': rtlText,

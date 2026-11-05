@@ -25,8 +25,16 @@ import {
   resolveLine,
   type ResolvedFill,
 } from './paint-props.ts';
-import { resolveThemeFont, type Theme } from './theme.ts';
-import type { ResolvedBullet, ResolvedParagraph, ResolvedRun, RunProps, Spacing } from './types.ts';
+import { slotLanguage } from './script-fonts.ts';
+import { collectionScriptFont, resolveThemeFont, type Theme } from './theme.ts';
+import type {
+  KinsokuRules,
+  ResolvedBullet,
+  ResolvedParagraph,
+  ResolvedRun,
+  RunProps,
+  Spacing,
+} from './types.ts';
 
 /** The theme font and color a shape's `p:style/a:fontRef` contributes. */
 export interface FontRef {
@@ -157,9 +165,16 @@ export function resolveRunProps(
     }
     return undefined;
   };
+  const lang = pick('lang');
+  const altLang = pick('altLang');
+  // The language that picks a theme script font for the East Asian and complex-script slots.
+  const eaLang = slotLanguage('ea', lang, altLang);
+  const csLang = slotLanguage('cs', lang, altLang);
   const fontOf = (slot: 'latin' | 'ea' | 'cs' | 'sym'): string | undefined => {
     const face = faceOf(slot);
-    return face ? resolveThemeFont(face, theme) : undefined;
+    return face
+      ? resolveThemeFont(face, theme, slot === 'ea' ? eaLang : slot === 'cs' ? csLang : undefined)
+      : undefined;
   };
   const refCollection =
     fontRef?.font === 'major'
@@ -171,8 +186,18 @@ export function resolveRunProps(
   const ownLatin = latinFace ? resolveThemeFont(latinFace, theme) : undefined;
   const latin = ownLatin ?? refCollection?.latin ?? theme.minorFont.latin ?? 'Calibri';
   const latinTheme = latinThemeOf(latinFace, ownLatin, fontRef, refCollection, theme);
-  const ea = fontOf('ea') ?? refCollection?.ea ?? theme.minorFont.ea ?? latin;
-  const cs = fontOf('cs') ?? refCollection?.cs ?? theme.minorFont.cs ?? latin;
+  // A run naming no East Asian or complex-script face takes the theme's (ECMA-376 Part 1,
+  // 20.1.4.1.16 `font`): the slot's typeface, else the script font of the run's language.
+  const ea =
+    fontOf('ea') ??
+    (refCollection && collectionScriptFont(refCollection, 'ea', eaLang)) ??
+    collectionScriptFont(theme.minorFont, 'ea', eaLang) ??
+    latin;
+  const cs =
+    fontOf('cs') ??
+    (refCollection && collectionScriptFont(refCollection, 'cs', csLang)) ??
+    collectionScriptFont(theme.minorFont, 'cs', csLang) ??
+    latin;
   const sym = fontOf('sym');
   let fill: ResolvedFill | undefined;
   for (let i = chain.length - 1; i >= 0 && !fill; i -= 1) {
@@ -193,7 +218,6 @@ export function resolveRunProps(
   const size = Number(pick('sz') ?? '1800');
   const spc = Number(pick('spc') ?? '0');
   const baseline = Number(pick('baseline') ?? '0');
-  const lang = pick('lang');
   const kernRaw = pick('kern');
   const kern = kernRaw !== undefined && /^\d{1,6}$/.test(kernRaw) ? Number(kernRaw) : undefined;
   const hlink = lastChild(chain, ['hlinkClick']);
@@ -228,6 +252,7 @@ export function resolveRunProps(
     ...(highlight ? { highlight } : {}),
     ...(outline && outline.fill.type !== 'none' ? { outline } : {}),
     ...(lang ? { lang } : {}),
+    ...(altLang ? { altLang } : {}),
     ...(hyperlink ? { hyperlink } : {}),
   };
 }
@@ -285,6 +310,42 @@ export interface ParagraphInputs {
   readonly fontRef?: FontRef;
   /** Text for `a:fld type="slidenum"`. */
   readonly slideNumber: number;
+  /** The presentation's custom kinsoku lists (`readKinsoku`). */
+  readonly kinsoku?: KinsokuRules;
+}
+
+/** The most characters read from each `p:kinsoku` list: a guard against a hostile file. */
+const MAX_KINSOKU_CHARS = 1024;
+
+/** Read `p:kinsoku` (ECMA-376 Part 1, 19.2.1.17) from `p:presentation`. */
+export function readKinsoku(presentation: Element | undefined): KinsokuRules | undefined {
+  const el = child(presentation, 'p:kinsoku');
+  if (!el) return undefined;
+  const list = (name: string): string =>
+    [...(attr(el, name) ?? '')].slice(0, MAX_KINSOKU_CHARS).join('');
+  const lang = attr(el, 'lang');
+  return {
+    ...(lang ? { lang } : {}),
+    notStart: list('invalStChars'),
+    notEnd: list('invalEndChars'),
+  };
+}
+
+const primaryLanguage = (tag: string | undefined): string | undefined =>
+  tag?.split('-')[0]?.toLowerCase();
+
+/**
+ * The kinsoku lists that apply to a paragraph: lists with no language apply to every paragraph;
+ * other lists apply when the paragraph's first run (or its mark) has the same primary language.
+ */
+function paragraphKinsoku(
+  rules: KinsokuRules | undefined,
+  runs: readonly ResolvedRun[],
+  end: RunProps
+): KinsokuRules | undefined {
+  if (!rules?.lang) return rules;
+  const first = runs.find((r) => r.text.length > 0 && r.props.lang)?.props.lang ?? end.lang;
+  return primaryLanguage(first) === primaryLanguage(rules.lang) ? rules : undefined;
 }
 
 /** Resolve one `a:p`. */
@@ -325,6 +386,8 @@ export function resolveParagraph(input: ParagraphInputs): ResolvedParagraph {
     }
   }
   const end = child(paragraph, 'a:endParaRPr');
+  const endProps = resolveRunProps(end ? [...runBase, end] : runBase, ctx, theme, fontRef);
+  const kinsoku = paragraphKinsoku(input.kinsoku, runs, endProps);
   const align = lastAttr(chain, 'algn') ?? 'l';
   const tabs: { pos: number; align: string }[] = [];
   const tabList = lastChild(chain, ['tabLst']);
@@ -346,8 +409,10 @@ export function resolveParagraph(input: ParagraphInputs): ResolvedParagraph {
     rtl: lastAttr(chain, 'rtl') === '1',
     eaLineBreak: lastAttr(chain, 'eaLnBrk') !== '0',
     latinLineBreak: lastAttr(chain, 'latinLnBrk') === '1',
+    hangingPunct: lastAttr(chain, 'hangingPunct') === '1',
+    ...(kinsoku ? { kinsoku } : {}),
     runs,
-    endProps: resolveRunProps(end ? [...runBase, end] : runBase, ctx, theme, fontRef),
+    endProps,
   };
 }
 

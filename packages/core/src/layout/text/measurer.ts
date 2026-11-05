@@ -3,11 +3,24 @@
 // tests. Both answer the same two questions: which face draws this request, and how wide is
 // this text in that face.
 
+import { eastAsianScriptOf } from '../../cascade/script-fonts.ts';
+
 /** A font request from a run. */
 export interface FontRequest {
   readonly family: string;
   readonly bold: boolean;
   readonly italic: boolean;
+  /**
+   * The script of the text the face draws. `eastAsian` text (the `a:ea` slot) whose family is
+   * missing falls back to an East Asian face (`eastAsianFallbackFamilies`) before
+   * `DEFAULT_FALLBACK_FAMILY`. Absent for Latin text.
+   */
+  readonly script?: 'eastAsian';
+  /**
+   * The language of East Asian text (a BCP 47 tag, `lang` or `altLang`): it orders the East
+   * Asian fallback faces, so Chinese and Korean text draw with their own glyph forms.
+   */
+  readonly lang?: string;
 }
 
 /** Face metrics in em units (font size = 1). Ascent and descent are positive. */
@@ -47,6 +60,13 @@ export interface TextMeasurer {
     text: string,
     options?: { readonly kerning?: boolean }
   ): Float64Array;
+  /**
+   * Another face that draws a character `face` lacks: the East Asian fallback faces first for
+   * East Asian characters (in the order of `lang`), then each other face in registration order. Undefined when `face`
+   * has the character or no face has it. Optional: a measurer without it measures a missing
+   * character with an estimated width (the "Missing glyphs" approximation).
+   */
+  fallbackFace?(face: ResolvedFace, codePoint: number, lang?: string): ResolvedFace | undefined;
 }
 
 /**
@@ -96,6 +116,57 @@ export function isMetricCompatible(family: string, substitute: string): boolean 
 
 /** The face used when nothing else matches. */
 export const DEFAULT_FALLBACK_FAMILY = 'Liberation Sans';
+
+const JAPANESE_FACES = ['Noto Sans CJK JP', 'Noto Sans JP'];
+const SIMPLIFIED_FACES = ['Noto Sans CJK SC', 'Noto Sans SC'];
+const TRADITIONAL_FACES = ['Noto Sans CJK TC', 'Noto Sans TC'];
+const KOREAN_FACES = ['Noto Sans CJK KR', 'Noto Sans KR'];
+
+/**
+ * The faces that draw East Asian text whose own family is missing, in order, when the host
+ * supplies one, for Japanese text or text with no language: the pan-CJK face of
+ * `@docx-editor.dev/fonts-cjk` (Noto Sans CJK JP), the regional Noto Sans faces of
+ * `googleFonts({ cjk: true })`, and the Noto Sans CJK faces a system may have. They cover the
+ * text, not the original's metrics. `eastAsianFallbackFamilies` gives the order for a language.
+ */
+export const EAST_ASIAN_FALLBACK_FAMILIES: readonly string[] = Object.freeze([
+  ...JAPANESE_FACES,
+  ...SIMPLIFIED_FACES,
+  ...TRADITIONAL_FACES,
+  ...KOREAN_FACES,
+]);
+
+const FALLBACKS_BY_SCRIPT: Readonly<Record<string, readonly string[]>> = {
+  Hans: Object.freeze([
+    ...SIMPLIFIED_FACES,
+    ...TRADITIONAL_FACES,
+    ...JAPANESE_FACES,
+    ...KOREAN_FACES,
+  ]),
+  Hant: Object.freeze([
+    ...TRADITIONAL_FACES,
+    ...SIMPLIFIED_FACES,
+    ...JAPANESE_FACES,
+    ...KOREAN_FACES,
+  ]),
+  Hang: Object.freeze([
+    ...KOREAN_FACES,
+    ...JAPANESE_FACES,
+    ...SIMPLIFIED_FACES,
+    ...TRADITIONAL_FACES,
+  ]),
+};
+
+/**
+ * The East Asian fallback faces in the order for a language (a BCP 47 tag): the faces of its
+ * script first (Simplified Chinese for `Hans`, Traditional Chinese for `Hant`, Korean for
+ * `Hang`), so the text draws with its own glyph forms. Japanese and no language:
+ * `EAST_ASIAN_FALLBACK_FAMILIES`.
+ */
+export function eastAsianFallbackFamilies(lang?: string): readonly string[] {
+  const script = eastAsianScriptOf(lang);
+  return (script && FALLBACKS_BY_SCRIPT[script]) || EAST_ASIAN_FALLBACK_FAMILIES;
+}
 
 /**
  * A deterministic measurer for tests and for hosts without fonts: every code unit is 0.5 em,

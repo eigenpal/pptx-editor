@@ -68,7 +68,26 @@ const labels: LocaleCatalog = {
 
 A missing or `null` value falls back to English. A value can hold `{name}` placeholders, such as `Slide {index}`; keep the placeholder names when you translate it.
 
-The package ships the English catalog only. To use another language, supply its catalog.
+## Use a packaged catalog
+
+The package ships three catalogs. The Japanese and Simplified Chinese catalogs reuse DOCX Editor's translations where the strings match. A `null` value, such as the product name, shows English.
+
+| Import | Language |
+| --- | --- |
+| `import ja from '@pptx-editor.dev/i18n/ja'` | Japanese |
+| `import ko from '@pptx-editor.dev/i18n/ko'` | Korean |
+| `import zhCN from '@pptx-editor.dev/i18n/zh-CN'` | Simplified Chinese |
+
+```tsx
+import ja from '@pptx-editor.dev/i18n/ja';
+import { PptxEditor } from '@pptx-editor.dev/react';
+
+export function DeckEditor({ bytes }: { bytes: Uint8Array }) {
+  return <PptxEditor document={bytes} locale={ja} />;
+}
+```
+
+To change a value, spread the catalog into your own and replace the value. For any other language, supply its catalog.
 
 ## Add a language
 

@@ -1,0 +1,86 @@
+---
+title: 'Chinese, Japanese, and Korean text'
+description: 'Fonts, line breaking, input methods, PDF export, and interface languages for East Asian decks.'
+category: 'Guides'
+---
+
+The editor reads, edits, and draws Chinese, Japanese, and Korean text. This page tells you what to set up.
+
+## Fonts
+
+Each character uses the font of its slot in the run (ECMA-376 `a:rPr`):
+
+| Characters | Font |
+| --- | --- |
+| Han, kana, bopomofo, Hangul, full-width forms | `a:ea` |
+| Arabic, Hebrew, Indic, Thai, and other complex scripts | `a:cs` |
+| Symbol characters U+F000 to U+F0FF, when the run names `a:sym` | `a:sym` |
+| All other characters | `a:latin` |
+
+Quotes, dashes, the ellipsis, and arrows use `a:ea` when the run's `lang` or `altLang` is Chinese, Japanese, or Korean. A space uses `a:latin`, except a space between two complex-script characters, which uses `a:cs`.
+
+When the slot's font has no glyph for a character, such as `①` in Arial, the character uses another loaded face that has it. East Asian faces come first.
+
+When a run names no East Asian font and the theme's `a:ea` is empty, the theme's script font (`a:font script="Jpan"`, `Hans`, `Hant`, or `Hang`) for the run's language applies. `lang` comes first, then `altLang`.
+
+Browsers and servers rarely have the fonts that decks name, such as Yu Gothic or SimSun. Supply an East Asian face through the `fonts` option. See [Fonts](/docs/customization/fonts#render-chinese-japanese-and-korean-text):
+
+```tsx
+import { useFonts } from '@pptx-editor.dev/react';
+import { packagedFonts } from '@docx-editor.dev/fonts';
+import { googleFonts } from '@docx-editor.dev/fonts/google';
+import { cjkFonts } from '@docx-editor.dev/fonts-cjk/browser';
+
+export function useDeckFonts() {
+  return useFonts(packagedFonts(), googleFonts(), cjkFonts());
+}
+```
+
+East Asian text whose font is missing uses the first host face that the text's language puts first: Noto Sans CJK SC or Noto Sans SC for Simplified Chinese, Noto Sans CJK TC or Noto Sans TC for Traditional Chinese, Noto Sans CJK KR or Noto Sans KR for Korean, and Noto Sans CJK JP or Noto Sans JP for Japanese and other text. The other faces follow. The face gives the glyphs, not the metrics of the missing font, so line breaks can differ.
+
+## Line breaking
+
+Chinese and Japanese text breaks between any two characters. Korean text breaks at spaces, and a Korean word wider than the line breaks between characters. Three paragraph properties change the rules:
+
+| Property | Effect |
+| --- | --- |
+| `eaLnBrk="1"` (default) | No line starts with closing punctuation, small kana, or the prolonged sound mark. No line ends with opening punctuation. |
+| `eaLnBrk="0"` | Lines break between any two East Asian characters, with no such rule. |
+| `latinLnBrk="1"` | Lines can also break inside a Latin word. |
+| `hangingPunct="1"` | An ideographic comma or full stop that does not fit hangs past the line end. |
+
+The presentation's kinsoku lists (`p:kinsoku`) replace the built-in lists for their language: `invalStChars` cannot start a line, and `invalEndChars` cannot end one.
+
+## Justified text
+
+A justified (`algn="just"`) or distributed (`algn="dist"`) line with East Asian text first widens each space to half the font size. Then it spreads the rest of the room evenly between all its characters. A line with no East Asian text widens its spaces only. A justified last line that ends with hanging punctuation also fills the line. Punctuation does not compress.
+
+## Input methods
+
+The canvas takes text from input methods (IME) for Chinese, Japanese, and Korean:
+
+- The candidate window opens at the caret.
+- The text being composed shows at the caret, underlined.
+- The result goes in once, at composition end, as one undo step. It replaces the selected text.
+- Keys during a composition, and the Enter that ends one, run no editor shortcut.
+
+If you add your own key handlers, ignore events with `isComposing` set or with key code 229.
+
+## PDF export
+
+`@pptx-editor.dev/pptx-to-pdf` finds `@docx-editor.dev/fonts-cjk` when you install it next to the exporter. For a deck with East Asian text, East Asian text in a missing font then draws with Noto Sans CJK JP. Without the package, such characters are left out and reported as `text.missing-glyph`.
+
+```bash
+npm install @docx-editor.dev/fonts-cjk
+```
+
+## Interface language
+
+`@pptx-editor.dev/i18n/ja`, `@pptx-editor.dev/i18n/ko`, and `@pptx-editor.dev/i18n/zh-CN` hold the Japanese, Korean, and Simplified Chinese catalogs. The product name and any untranslated string show English. See [Language](/docs/customization/language).
+
+## Limits
+
+- Vertical East Asian text (`eaVert`) draws upright characters with no vertical metrics or vertical glyph forms.
+- Punctuation does not compress, and `strictFirstAndLastChars` is not applied.
+- There is no Traditional Chinese interface catalog yet.
+- A run with no language and a theme with an empty `a:ea` uses its Latin font for East Asian text.

@@ -493,9 +493,23 @@ export function withBaselines(
   );
 }
 
-/** Whitespace-normalized text for line matching. */
+/**
+ * CJK radicals that a PDF text layer can write for an ideograph: a font maps both code points
+ * to one glyph, and the PDF's `ToUnicode` map names the radical. The Kangxi radicals
+ * (U+2F00 to U+2FD5) decompose under NFKC. These CJK Radicals Supplement characters do not,
+ * so each maps to its equivalent unified ideograph (Unicode `EquivalentUnifiedIdeograph`).
+ */
+const RADICAL_IDEOGRAPHS: ReadonlyMap<string, string> = new Map([['\u2ED1', '\u9577']]);
+
+/**
+ * Whitespace-normalized text for line matching. Radicals that stand for an ideograph read as
+ * the ideograph, so the same glyphs match on both sides.
+ */
 export function normalize(s: string): string {
-  return s.replace(/\s+/g, ' ').trim();
+  const text = /[\u2E80-\u2FDF]/.test(s)
+    ? s.replace(/[\u2E80-\u2FDF]/g, (c) => RADICAL_IDEOGRAPHS.get(c) ?? c.normalize('NFKC'))
+    : s;
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 /**

@@ -96,6 +96,9 @@ export interface CellBorders {
 }
 
 // @public
+export function collectionScriptFont(collection: FontCollection, slot: 'ea' | 'cs', lang?: string): string | undefined;
+
+// @public
 export function colorChild(el: Element_2 | undefined): Element_2 | undefined;
 
 // @public
@@ -161,6 +164,7 @@ export interface FontCollection {
     readonly ea?: string;
     // (undocumented)
     readonly latin?: string;
+    readonly scripts?: ReadonlyMap<string, string>;
 }
 
 // @public
@@ -202,6 +206,13 @@ export const isAlternateContent: (el: Element_2) => boolean;
 export function isColorElement(el: Element_2): boolean;
 
 // @public
+export interface KinsokuRules {
+    readonly lang?: string;
+    readonly notEnd: string;
+    readonly notStart: string;
+}
+
+// @public
 export type Layer = 'master' | 'layout' | 'slide';
 
 // @internal
@@ -230,6 +241,7 @@ export interface ParagraphInputs {
     readonly ctx: ColorContext;
     // (undocumented)
     readonly fontRef?: FontRef;
+    readonly kinsoku?: KinsokuRules;
     // (undocumented)
     readonly paragraph: Element_2;
     readonly slideNumber: number;
@@ -251,6 +263,9 @@ export function q(name: string): QName;
 
 // @public
 export function readColorMap(el: Element_2 | undefined): ReadonlyMap<string, string> | undefined;
+
+// @public
+export function readKinsoku(presentation: Element_2 | undefined): KinsokuRules | undefined;
 
 // @public
 export interface RelRect {
@@ -448,8 +463,10 @@ export interface ResolvedParagraph {
     // (undocumented)
     readonly eaLineBreak: boolean;
     readonly endProps: RunProps;
+    readonly hangingPunct: boolean;
     // (undocumented)
     readonly indent: number;
+    readonly kinsoku?: KinsokuRules;
     // (undocumented)
     readonly latinLineBreak: boolean;
     // (undocumented)
@@ -609,7 +626,7 @@ export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | u
 export function resolveTable(graphicData: Element_2 | undefined, scope: TableScope): ResolvedTable | undefined;
 
 // @public
-export function resolveThemeFont(typeface: string, theme: Theme): string | undefined;
+export function resolveThemeFont(typeface: string, theme: Theme, lang?: string): string | undefined;
 
 // @public
 export interface Rgba {
@@ -625,6 +642,7 @@ export interface Rgba {
 
 // @public
 export interface RunProps {
+    readonly altLang?: string;
     readonly baseline: number;
     // (undocumented)
     readonly bold: boolean;
@@ -643,7 +661,6 @@ export interface RunProps {
     // (undocumented)
     readonly italic: boolean;
     readonly kern?: number;
-    // (undocumented)
     readonly lang?: string;
     // (undocumented)
     readonly latin: string;
@@ -687,6 +704,7 @@ export interface TableScope {
     readonly ctx: ColorContext;
     // (undocumented)
     readonly defaultTextStyle?: Element_2;
+    readonly kinsoku?: KinsokuRules;
     // (undocumented)
     readonly pkg: PptxPackage;
     // (undocumented)

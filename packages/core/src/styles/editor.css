@@ -1663,6 +1663,19 @@
   pointer-events: none;
   caret-color: transparent;
 }
+/* While an IME composes, the input shows the text being composed at the caret, underlined, as
+   the platform shows it in a text field. The slide shows the text once the composition ends. */
+.pptx-surface__input.pptx-surface__input--composing {
+  min-width: 1px;
+  opacity: 1;
+  z-index: 1;
+  white-space: pre;
+  color: var(--doc-text);
+  background: var(--doc-surface);
+  caret-color: var(--doc-caret);
+  text-decoration: underline;
+  box-shadow: 0 0 0 1px var(--doc-surface);
+}
 .pptx-surface__stage [data-layer='slide'] {
   cursor: default;
 }

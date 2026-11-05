@@ -9,6 +9,18 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./ja": {
+      "types": "./dist/ja.d.ts",
+      "import": "./dist/ja.js"
+    },
+    "./ko": {
+      "types": "./dist/ko.d.ts",
+      "import": "./dist/ko.js"
+    },
+    "./zh-CN": {
+      "types": "./dist/zh-CN.d.ts",
+      "import": "./dist/zh-CN.js"
+    },
     "./en.json": "./en.json",
     "./package.json": "./package.json"
   },

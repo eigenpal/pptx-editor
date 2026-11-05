@@ -138,12 +138,17 @@
         "pdf-lib": "1.17.1",
       },
       "devDependencies": {
+        "@docx-editor.dev/fonts-cjk": "^2.34.0",
         "@pptx-editor.dev/core": "workspace:*",
         "pdfjs-dist": "5.4.624",
       },
       "peerDependencies": {
+        "@docx-editor.dev/fonts-cjk": "^2.34.0",
         "@pptx-editor.dev/core": "0.x",
       },
+      "optionalPeers": [
+        "@docx-editor.dev/fonts-cjk",
+      ],
     },
     "packages/pro": {
       "name": "@pptx-editor.dev/pro",

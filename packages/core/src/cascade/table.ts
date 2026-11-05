@@ -32,6 +32,7 @@ import type { Theme } from './theme.ts';
 import type {
   BodyProps,
   CellBorders,
+  KinsokuRules,
   ResolvedTable,
   ResolvedTableCell,
   ResolvedTextBody,
@@ -44,6 +45,8 @@ export interface TableScope {
   readonly ctx: ColorContext;
   readonly slideNumber: number;
   readonly defaultTextStyle?: Element;
+  /** The presentation's custom kinsoku lists (`p:kinsoku`). */
+  readonly kinsoku?: KinsokuRules;
 }
 
 const MAX_LENGTH = 51_206_400;
@@ -214,6 +217,7 @@ function cellText(
         ctx: scope.ctx,
         theme: scope.theme,
         slideNumber: scope.slideNumber,
+        ...(scope.kinsoku ? { kinsoku: scope.kinsoku } : {}),
       })
     );
   return { ...(txBody ? { nodeId: txBody.id } : {}), body: cellBody(tcPr), paragraphs };

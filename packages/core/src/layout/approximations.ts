@@ -188,8 +188,7 @@ class Collector {
       // fidelity page, "Line model").
       this.add('line-model');
       if (p.rtl) this.add('rtl');
-      if (p.align === 'justLow' || p.align === 'thaiDist' || p.latinLineBreak)
-        this.add('anchoring');
+      if (p.align === 'justLow' || p.align === 'thaiDist') this.add('anchoring');
       if (p.bullet && (p.align === 'ctr' || p.align === 'r')) this.add('aligned-bullets');
       if (p.bullet?.type === 'autonum' && !isExactScheme(p.bullet.scheme))
         this.add('numbering-schemes');

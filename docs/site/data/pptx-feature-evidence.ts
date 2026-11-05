@@ -39,7 +39,12 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   'text.hyperlinks': { fixtures: [], approximations: ['hyperlink-text'] },
   'text.input-method': { fixtures: ['text-runs'] },
   'text.complex-scripts': {
-    fixtures: ['rtl-text', 'east-asian-line-breaking'],
+    fixtures: [
+      'rtl-text',
+      'east-asian-line-breaking',
+      'east-asian-theme-fonts',
+      'east-asian-typography',
+    ],
     approximations: ['script-fonts', 'rtl'],
   },
   'text.find-replace': { fixtures: [] },

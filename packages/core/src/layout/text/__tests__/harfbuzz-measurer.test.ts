@@ -1,7 +1,13 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { createHarfBuzzMeasurer, initializeHarfBuzz, type TextMeasurer } from '../../index.ts';
+import {
+  createHarfBuzzMeasurer,
+  EAST_ASIAN_FALLBACK_FAMILIES,
+  eastAsianFallbackFamilies,
+  initializeHarfBuzz,
+  type TextMeasurer,
+} from '../../index.ts';
 import { AdvanceCache } from '../advance-cache.ts';
 import { os2LineExtents } from '../face-line-metrics.ts';
 
@@ -161,5 +167,88 @@ describe('the OS/2 line extents', () => {
     expect(os2LineExtents(undefined)).toBeUndefined();
     expect(os2LineExtents(new Uint8Array(70))).toBeUndefined();
     expect(os2LineExtents(os2(0, [0, 0], [0, 0]))).toBeUndefined();
+  });
+});
+
+describe('East Asian fallback faces', () => {
+  const cjk = () => ({ ...liberation(), family: 'Noto Sans CJK JP', origin: 'host' });
+
+  test('East Asian text whose family is missing takes a host East Asian face', () => {
+    const m = createHarfBuzzMeasurer([liberation(), cjk()]);
+    const face = m.resolve({
+      family: 'Yu Gothic',
+      bold: false,
+      italic: false,
+      script: 'eastAsian',
+    });
+    expect(face.family).toBe('Noto Sans CJK JP');
+    expect(face.substituted).toBe(true);
+    // Latin text with the same missing family keeps the default fallback.
+    expect(m.resolve({ family: 'Yu Gothic', bold: false, italic: false }).family).toBe(
+      'Liberation Sans'
+    );
+  });
+
+  test("the run's language orders the East Asian faces", () => {
+    const region = (family: string) => ({ ...liberation(), family, origin: 'host' });
+    const m = createHarfBuzzMeasurer([
+      liberation(),
+      region('Noto Sans CJK JP'),
+      region('Noto Sans SC'),
+      region('Noto Sans TC'),
+      region('Noto Sans KR'),
+    ]);
+    const family = (lang?: string) =>
+      m.resolve({
+        family: 'Missing Face',
+        bold: false,
+        italic: false,
+        script: 'eastAsian',
+        ...(lang ? { lang } : {}),
+      }).family;
+    expect(family('zh-CN')).toBe('Noto Sans SC');
+    expect(family('zh-TW')).toBe('Noto Sans TC');
+    expect(family('ko-KR')).toBe('Noto Sans KR');
+    expect(family('ja-JP')).toBe('Noto Sans CJK JP');
+    expect(family()).toBe('Noto Sans CJK JP');
+    expect(eastAsianFallbackFamilies('zh-HK')[0]).toBe('Noto Sans CJK TC');
+    expect(eastAsianFallbackFamilies('en-US')).toBe(EAST_ASIAN_FALLBACK_FAMILIES);
+  });
+
+  test('without a host East Asian face, East Asian text takes the default fallback', () => {
+    const face = measurer.resolve({
+      family: 'Yu Gothic',
+      bold: false,
+      italic: false,
+      script: 'eastAsian',
+    });
+    expect(face.family).toBe('Liberation Sans');
+  });
+});
+
+describe('glyph fallback', () => {
+  const face = (file: string, family: string) => ({
+    family,
+    bold: false,
+    italic: false,
+    bytes: new Uint8Array(readFileSync(join(fontsDir, file))),
+    origin: 'substitute',
+  });
+
+  test('a character the face lacks takes the first loaded face that has it', () => {
+    const m = createHarfBuzzMeasurer([
+      face('Selawik-Regular.ttf', 'Selawik'),
+      liberation(),
+      face('Carlito-Regular.ttf', 'Carlito'),
+    ]);
+    const selawik = m.resolve({ family: 'Selawik', bold: false, italic: false });
+    // Selawik has no Cyrillic; Liberation Sans, loaded next, has it.
+    expect(m.fallbackFace!(selawik, 0x0416)?.family).toBe('Liberation Sans');
+    // Liberation Sans has no circled digits; Carlito has them.
+    const sans = m.resolve({ family: 'Liberation Sans', bold: false, italic: false });
+    expect(m.fallbackFace!(sans, 0x2460)?.family).toBe('Carlito');
+    // A character the face has, or that no face has, needs no fallback.
+    expect(m.fallbackFace!(sans, 0x0416)).toBeUndefined();
+    expect(m.fallbackFace!(sans, 0x10ffff)).toBeUndefined();
   });
 });

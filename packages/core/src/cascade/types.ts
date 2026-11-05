@@ -78,7 +78,10 @@ export interface RunProps {
   readonly underlineFill?: ResolvedFill;
   readonly highlight?: Rgba;
   readonly outline?: ResolvedLine;
+  /** The run's language (`lang`), a BCP 47 tag. */
   readonly lang?: string;
+  /** The run's alternate language (`altLang`), a BCP 47 tag. */
+  readonly altLang?: string;
   readonly hyperlink?: string;
 }
 
@@ -92,6 +95,19 @@ export interface ResolvedRun {
   readonly text: string;
   readonly props: RunProps;
   readonly fieldType?: string;
+}
+
+/**
+ * Custom East Asian line breaking lists (`p:kinsoku`, ECMA-376 Part 1, 19.2.1.17): the
+ * characters that may not start a line (`invalStChars`) and may not end one (`invalEndChars`).
+ */
+export interface KinsokuRules {
+  /** The language the lists apply to (`lang`), a BCP 47 tag. No tag: every language. */
+  readonly lang?: string;
+  /** Characters that may not start a line (`invalStChars`). */
+  readonly notStart: string;
+  /** Characters that may not end a line (`invalEndChars`). */
+  readonly notEnd: string;
 }
 
 /** A resolved paragraph. Lengths in EMU. */
@@ -111,6 +127,13 @@ export interface ResolvedParagraph {
   readonly rtl: boolean;
   readonly eaLineBreak: boolean;
   readonly latinLineBreak: boolean;
+  /** `hangingPunct`: East Asian commas and full stops may hang past the line end. */
+  readonly hangingPunct: boolean;
+  /**
+   * The presentation's custom East Asian line breaking lists (`p:kinsoku`), when they apply to
+   * the paragraph's language. They replace the built-in lists.
+   */
+  readonly kinsoku?: KinsokuRules;
   readonly runs: readonly ResolvedRun[];
   /** Properties of the paragraph mark (`a:endParaRPr`), sizing an empty paragraph. */
   readonly endProps: RunProps;

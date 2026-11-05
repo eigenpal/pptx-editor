@@ -6,7 +6,8 @@
 // measured it again with those tools). The one move to supersampled rasters
 // (`RASTER_SCALE_MOVE`) and the one move to anti-aliasing judged at the device scale
 // (`ANTIALIASING_MOVE`) each allow new values once; any other change of either is a problem. One
-// looser value has an owner exception (`OWNER_GAP_EXCEPTION`), for exactly one slide. A new list is allowed only together with its new environment in
+// looser value or smaller line count has an owner exception (`OWNER_GAP_EXCEPTION`), for exactly
+// one slide. A new list is allowed only together with its new environment in
 // `FIDELITY_ENVIRONMENTS`, and the check covers every list; a removed list is a problem.
 //
 //   bun run fidelity:check-gaps -- --base origin/main
@@ -87,22 +88,22 @@ const allowedScaleMove = (base: unknown, head: unknown): boolean =>
 export const ANTIALIASING_MOVE = { from: 'images', to: 'device' } as const;
 
 /**
- * The one looser known-gap value that the owner allowed (5 November 2026, eigenpal/pptx-editor-miro#156,
- * whole-point baselines): `rtl-text/4` on `linux` scores 3.41 % of pixels instead of 3.40 %. Its
- * geometry is better: each of its 12 lines is within 0.12 pt of its PDF glyph origin, against up
- * to 0.49 pt without the rule. The pixels rise because CI draws the slide with substitute glyph
- * outlines and no line breaks at the same words as the PDF (`line-breaks` 0). It allows exactly
- * this slide, environment, kind, and pair of values. Once the base records `to`, it allows nothing.
+ * The one known-gap change that the owner allowed (5 November 2026, East Asian text):
+ * `east-asian-line-breaking/3` on `linux` checks 27 lines instead of 28. The editor laid out one
+ * line too many before, and the reference PDF has 27 lines. On `macos-reference`, all 27 lines
+ * match the PDF, and the slide passes. On `linux`, more lines match than before (15 of 27, against
+ * 11 of 28). It allows exactly this slide, environment, kind, and pair of values. Once the base
+ * records `to`, it allows nothing.
  */
 export const OWNER_GAP_EXCEPTION = {
   environment: 'linux',
-  slide: 'rtl-text/4',
-  kind: 'pixels',
-  from: 0.034,
-  to: 0.0341,
+  slide: 'east-asian-line-breaking/3',
+  kind: 'lines',
+  from: 28,
+  to: 27,
 } as const;
 
-/** Whether a looser `kind` score of `key` in `env` is the one owner exception. */
+/** Whether a looser `kind` score (or a smaller `lines` count) of `key` in `env` is the one owner exception. */
 const ownerException = (
   env: string,
   key: string,
@@ -281,8 +282,12 @@ export function looserGaps(
         // `gapEntry` keeps `lines` on every entry whose slide checks lines, also one that drops
         // its line kinds, so a smaller or missing count means lost text.
         // A size entry records no line count, so its count is unknown, not smaller.
-        if (!gap.size && old.lines !== undefined && (gap.lines ?? 0) < old.lines)
-          fewerLines = `fewer checked lines (${old.lines} → ${gap.lines ?? 0})`;
+        if (!gap.size && old.lines !== undefined && (gap.lines ?? 0) < old.lines) {
+          const f = `fewer checked lines (${old.lines} → ${gap.lines ?? 0})`;
+          if (ownerException(env, key, 'lines', old.lines, gap.lines))
+            allowed.push(`${env} ${key}: ${f}, allowed once by the owner (OWNER_GAP_EXCEPTION)`);
+          else fewerLines = f;
+        }
         for (const kind of gapKinds(gap))
           if (old[kind] === undefined && old.size && !gap.size)
             // A size entry records no other score, so the scores that replace it are not new.

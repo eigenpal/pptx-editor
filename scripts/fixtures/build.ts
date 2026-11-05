@@ -12,7 +12,7 @@ import { slideLayoutsDeck } from './slide-layouts.ts';
 import { fillFidelityDeck } from './fill-fidelity.ts';
 import { slideStructureDeck } from './slide-structure.ts';
 import { shapeFormatFixtures } from './shape-format.ts';
-import { textScriptFixtures } from './text-scripts.ts';
+import { eastAsianThemeFontsDeck, eastAsianTypographyDeck, textScriptFixtures } from './text-scripts.ts';
 import { followUpFixtures } from './follow-ups.ts';
 
 const OUT = 'fixtures';
@@ -837,4 +837,8 @@ writeFileSync(`${OUT}/slide-structure.pptx`, buildPptx(slideStructureDeck(image,
 writeFileSync(`${OUT}/slide-layouts.pptx`, buildPptx(slideLayoutsDeck()));
 // One slide per fill rule.
 writeFileSync(`${OUT}/fill-fidelity.pptx`, buildPptx(fillFidelityDeck(image)));
-console.log(`${Object.keys(fixtures).length + 2} fixtures written to ${OUT}/`);
+// East Asian faces from the theme script fonts, by each run's language.
+writeFileSync(`${OUT}/east-asian-theme-fonts.pptx`, buildPptx(eastAsianThemeFontsDeck()));
+// Custom kinsoku lists, and justified and distributed East Asian text.
+writeFileSync(`${OUT}/east-asian-typography.pptx`, buildPptx(eastAsianTypographyDeck()));
+console.log(`${Object.keys(fixtures).length + 3} fixtures written to ${OUT}/`);
