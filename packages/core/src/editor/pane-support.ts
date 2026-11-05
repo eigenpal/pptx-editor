@@ -222,6 +222,25 @@ export function followCurrentSlide(
   if (target && (onItem || gone)) target.focus({ preventScroll: true });
 }
 
+/** Scroll the current slide of `list` into view in the rail or the sorter, never the page. */
+function revealCurrentSlide(list: HTMLElement, item: string): void {
+  const target = list.querySelector<HTMLElement>(`${item}[aria-current="true"]`);
+  if (target) scrollIntoNearestScroller(target, list.closest('.pptx-rail, .pptx-sorter') ?? list);
+}
+
+/**
+ * Keep the current slide of a slide list in view while the list changes size, as when a host
+ * narrows the panel that holds a horizontal rail. `followCurrentSlide` covers a change of the
+ * current slide; this covers a resize. Returns the function that stops it. Without
+ * `ResizeObserver`, it does nothing. @internal
+ */
+export function keepCurrentSlideInView(list: HTMLElement | null, item: string): () => void {
+  if (!list || typeof ResizeObserver !== 'function') return () => undefined;
+  const observer = new ResizeObserver(() => revealCurrentSlide(list, item));
+  observer.observe(list);
+  return () => observer.disconnect();
+}
+
 // --- Sections -----------------------------------------------------------------------------------
 
 /**

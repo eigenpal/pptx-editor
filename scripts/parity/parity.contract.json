@@ -5,12 +5,24 @@
     "comment": "Each paired component: the React props type (read from docs/api/react/index.api.md, with its extends clause and Omit<> bases folded in) against the Vue component's runtime props and emits, with mount probes for class, className, and every mapped slot (packages/vue/test/parity-shape.ts). The React component is the reactNamesAsVueNames twin of the key, or the key itself. classUnprobed and hostClassGap acknowledge a class the probe cannot see, with the reason; topLevel marks the PptxEditor sugar, whose callbacks must be emits and whose className must be the fallthrough class.",
     "PptxEditorSlideRail": {
       "reactProps": "SlideRailProps",
-      "paired": ["className", "defaultOpen", "open", "orientation", "paneWidth", "style", "toggle"],
+      "paired": [
+        "className",
+        "defaultOpen",
+        "open",
+        "orientation",
+        "paneWidth",
+        "preset",
+        "style",
+        "t",
+        "toggle"
+      ],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {
         "onOpenChange": "update:open"
       },
-      "reactRenderPropsAsVueSlots": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
       "reactClassNameAsVueClass": {},
       "vueExclusive": {}
     },
@@ -57,14 +69,20 @@
       "topLevel": true,
       "paired": [
         "colorMode",
+        "contextMenu",
         "document",
         "fontFamilies",
         "fonts",
+        "hyperlinkPopup",
         "locale",
+        "menu",
         "mode",
         "modules",
+        "notesPane",
         "openFailure",
-        "popups"
+        "popups",
+        "slideRail",
+        "toolbar"
       ],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {
@@ -107,7 +125,7 @@
     },
     "PptxEditorToolbar": {
       "reactProps": "ToolbarProps",
-      "paired": ["className", "contextual", "overflow", "preset"],
+      "paired": ["className", "contextual", "overflow", "preset", "t"],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {},
       "reactRenderPropsAsVueSlots": {
@@ -165,7 +183,7 @@
     },
     "PptxEditorStatusBar": {
       "reactProps": "StatusBarProps",
-      "paired": ["className", "preset"],
+      "paired": ["className", "preset", "t"],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {},
       "reactRenderPropsAsVueSlots": {
@@ -301,7 +319,7 @@
     },
     "PptxEditorMenu": {
       "reactProps": "MenuProps",
-      "paired": ["className", "preset"],
+      "paired": ["className", "preset", "t"],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {},
       "reactRenderPropsAsVueSlots": {
@@ -352,9 +370,11 @@
     },
     "PptxEditorContextMenu": {
       "reactProps": "PptxEditorContextMenuProps",
-      "paired": ["className", "preset"],
+      "paired": ["className", "disabled", "preset", "t"],
       "deferredInVue": {},
-      "reactCallbacksAsVueEmits": {},
+      "reactCallbacksAsVueEmits": {
+        "onOpenChange": "openChange"
+      },
       "reactRenderPropsAsVueSlots": {
         "children": "default"
       },
@@ -532,7 +552,7 @@
     },
     "PptxEditorFindBar": {
       "reactProps": "FindBarProps",
-      "paired": ["className"],
+      "paired": ["className", "t"],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {},
       "reactRenderPropsAsVueSlots": {},
@@ -541,7 +561,7 @@
     },
     "PptxEditorEditNotice": {
       "reactProps": "EditNoticeProps",
-      "paired": ["className"],
+      "paired": ["className", "t"],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {},
       "reactRenderPropsAsVueSlots": {},
@@ -559,17 +579,23 @@
         "showClose",
         "showCode",
         "style",
+        "t",
         "title"
       ],
       "deferredInVue": {},
-      "reactCallbacksAsVueEmits": { "onDismiss": "dismiss" },
-      "reactRenderPropsAsVueSlots": { "actions": "actions", "message": "message" },
+      "reactCallbacksAsVueEmits": {
+        "onDismiss": "dismiss"
+      },
+      "reactRenderPropsAsVueSlots": {
+        "actions": "actions",
+        "message": "message"
+      },
       "reactClassNameAsVueClass": {},
       "vueExclusive": {}
     },
     "PptxEditorFontNotice": {
       "reactProps": "FontNoticeProps",
-      "paired": ["className"],
+      "paired": ["className", "t"],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {},
       "reactRenderPropsAsVueSlots": {},
@@ -639,6 +665,7 @@
       "paired": [
         "align",
         "anchor",
+        "anchorRect",
         "className",
         "field",
         "focusFirst",
@@ -666,6 +693,7 @@
         "disabledReason",
         "expanded",
         "hasPopup",
+        "host",
         "icon",
         "label",
         "onClick",
@@ -790,6 +818,94 @@
       "partOf": "PptxEditorToolbar.FontFamily",
       "reactProps": "FontFamilyItemProps",
       "paired": ["className", "value"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "SlideRailAddSlide": {
+      "reactProps": "SlideRailPartProps",
+      "paired": ["asChild", "className", "hidden", "icon"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "SlideRailChooseLayout": {
+      "reactProps": "SlideRailPartProps",
+      "paired": ["asChild", "className", "hidden", "icon"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "SlideRailCollapse": {
+      "reactProps": "SlideRailPartProps",
+      "paired": ["asChild", "className", "hidden", "icon"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "SlideRailExpand": {
+      "reactProps": "SlideRailPartProps",
+      "paired": ["asChild", "className", "hidden", "icon"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "SlideRailDelete": {
+      "reactProps": "SlideRailPartProps",
+      "paired": ["asChild", "className", "hidden", "icon"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "SlideRailDuplicate": {
+      "reactProps": "SlideRailPartProps",
+      "paired": ["asChild", "className", "hidden", "icon"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "SlideRailMoveEarlier": {
+      "reactProps": "SlideRailPartProps",
+      "paired": ["asChild", "className", "hidden", "icon"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "SlideRailMoveLater": {
+      "reactProps": "SlideRailPartProps",
+      "paired": ["asChild", "className", "hidden", "icon"],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {},
       "reactRenderPropsAsVueSlots": {
@@ -1091,7 +1207,56 @@
       "FontFamilyItemProps",
       "FontFamilyNamespace",
       "FontFamilyPartProps",
-      "FontFamilyProps"
+      "FontFamilyProps",
+      "SlideRailAddSlide",
+      "SlideRailChooseLayout",
+      "SlideRailCollapse",
+      "SlideRailExpand",
+      "SlideRailDelete",
+      "SlideRailDuplicate",
+      "SlideRailMoveEarlier",
+      "SlideRailMoveLater",
+      "SlideRailPartProps",
+      "PptxEditorEvents",
+      "useEditorEvent",
+      "useEditorSnapshot",
+      "useScopeClassName",
+      "useZoom",
+      "ChromeTranslate",
+      "DocumentSearchFindOptions",
+      "DocumentSearchState",
+      "EditorCaret",
+      "HistoryGroupBindingOptions",
+      "useChromeTranslate",
+      "useDocumentSearch",
+      "useEditorCaret",
+      "useHistoryGroup",
+      "UseHistoryGroupReturn",
+      "useToolbarContext",
+      "useToolbarLabel",
+      "useToolbarLabelFor",
+      "ContextMenuNamedRows",
+      "ContextMenuPartName",
+      "MenuNamedRow",
+      "MenuNamedRows",
+      "MenuRowPartComponent",
+      "MenuRowPartName",
+      "MenuRowPartProps",
+      "HyperlinkPopupActions",
+      "HyperlinkPopupLink",
+      "HyperlinkPopupMode",
+      "HyperlinkPopupState",
+      "useHyperlinkPopup",
+      "useHyperlinkPopupInstance",
+      "UseOpenFailureOptions",
+      "PptxFontOrigin",
+      "PptxFontsInput",
+      "PptxFontsSource",
+      "PptxSource",
+      "usePptxSource",
+      "UsePptxSourceOptions",
+      "useEditorHostDocument",
+      "UseEditorHostDocumentReturn"
     ],
     "reactNamesAsVueNames": {
       "SlideRail": "PptxEditorSlideRail",
@@ -1122,7 +1287,14 @@
       "ToolbarNamedParts": "The React type of the named parts on Toolbar; Vue attaches the same names to PptxEditorToolbar.",
       "translatorFor": "React builds the translator for its context; Vue builds it inside PptxEditorRoot.",
       "LoadingComponent": "The type of React's `Loading` with its `Loading.Spinner` static; Vue attaches the same `Spinner` static to `PptxEditorLoading`.",
-      "ToolbarSlotBaseProps": "The React base of the ToolbarSlotProps union, exported so the parity check can read its members; Vue's ToolbarSlotProps holds the same members in one type."
+      "ToolbarSlotBaseProps": "The React base of the ToolbarSlotProps union, exported so the parity check can read its members; Vue's ToolbarSlotProps holds the same members in one type.",
+      "SlideRailNamespace": "The React type of PptxEditor.SlideRail with its statics; Vue attaches the same part statics and Action to PptxEditorSlideRail.",
+      "UseZoomResult": "DOCX Editor's React name for useZoom's result; Vue declares UseZoomReturn, with refs.",
+      "ToolbarContext": "A React context object; Vue parts read the same value through useToolbarContext.",
+      "ToolbarContextValue": "The value of the React ToolbarContext; Vue returns it as UseToolbarContextReturn.",
+      "UseDocumentSearchResult": "DOCX Editor's React name; Vue returns refs as UseDocumentSearchReturn.",
+      "UseHyperlinkPopupResult": "DOCX Editor's React name; Vue returns the state as a ref in UseHyperlinkPopupReturn.",
+      "UsePptxSourceResult": "DOCX Editor's React name (UseDocxSourceResult); Vue returns refs as UsePptxSourceReturn."
     },
     "vueExclusive": {
       "UseContextMenuRequestReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
@@ -1132,7 +1304,20 @@
       "UseEditorStateReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
       "UsePptxEditorReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
       "UseSlideLayoutsReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
-      "UseTranslationReturn": "Vue composables declare named return types (AGENTS.md, Public API)."
+      "UseTranslationReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UseScopeClassNameReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UseZoomReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UseEditorEventReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UseEditorSnapshotReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UseChromeTranslateReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UseDocumentSearchReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UseEditorCaretReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UseToolbarContextReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UseToolbarLabelForReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UseToolbarLabelReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UseHyperlinkPopupReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UseHyperlinkPopupInstanceReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UsePptxSourceReturn": "Vue composables declare named return types (AGENTS.md, Public API)."
     }
   }
 }

@@ -11,8 +11,16 @@ import { translateKeyOrText } from './adapter-support.ts';
 import { comparePoints } from '../automation/commands/text-model.ts';
 import type { PptxEditorInstance } from './pptx-editor.ts';
 import { surfaceRootOf } from './surface-registry.ts';
+import type { PopoverAnchorRect } from './chrome-popover.ts';
 import { queryLocalFontSources } from './local-fonts.ts';
 import { withFontOrigin } from './host-fonts.ts';
+import { sanitizeHref } from '../store/index.ts';
+import {
+  createHyperlinkPopupController,
+  openHyperlinkPopup,
+  type HyperlinkPopupController,
+  type HyperlinkPopupState,
+} from './link-popup.ts';
 
 /** The event a find request travels on. */
 const FIND_REQUEST = 'pptx-find-request';
@@ -307,6 +315,30 @@ export function linkPopupAnchor(request: LinkRequest, editor: object): HTMLEleme
 }
 
 /**
+ * The box of the selected text on the slide, in client pixels, for the link popup to open at:
+ * the drawn selection highlight, else the caret. Null when no text is selected or the surface
+ * shows none, and the popup then opens at its anchor element. @internal
+ */
+export function linkSelectionRect(editor: object): PopoverAnchorRect | null {
+  const surface = surfaceRootOf(editor);
+  if (!surface) return null;
+  const boxes = [...surface.querySelectorAll('.pptx-surface__text-selection')]
+    .map((mark) => mark.getBoundingClientRect())
+    .filter((box) => box.width > 0 || box.height > 0);
+  if (boxes.length === 0) {
+    const caret = surface.querySelector('.pptx-surface__caret')?.getBoundingClientRect();
+    if (caret && (caret.width > 0 || caret.height > 0)) boxes.push(caret);
+  }
+  if (boxes.length === 0) return null;
+  return {
+    left: Math.min(...boxes.map((box) => box.left)),
+    right: Math.max(...boxes.map((box) => box.right)),
+    top: Math.min(...boxes.map((box) => box.top)),
+    bottom: Math.max(...boxes.map((box) => box.bottom)),
+  };
+}
+
+/**
  * Listen for link requests for `editor` (the toolbar, a menu row, Ctrl/Cmd+K). `open` gets the
  * anchor; `enabled` says whether the link command can run now. Returns the function that stops.
  * @internal
@@ -355,6 +387,24 @@ export function editNoticeShows(
 ): rejection is EditorRejection {
   // A command with nothing to do (Ctrl+Z with no history) is not a refusal worth a notice.
   return !!rejection && !rejection.noop && rejection !== dismissed;
+}
+
+/**
+ * Whether the open link popup already shows `rejection`: its Apply was refused, and the popup
+ * says why under the field. The edit notice then stays hidden, so the refusal shows once.
+ * @internal
+ */
+export function linkPopupShowsRejection(
+  popup: HyperlinkPopupState | null | undefined,
+  rejection: EditorRejection | null | undefined
+): boolean {
+  return (
+    !!popup &&
+    !!rejection &&
+    popup.mode !== 'closed' &&
+    popup.error !== null &&
+    popup.error === rejection.reason
+  );
 }
 
 /**
@@ -410,4 +460,137 @@ export async function applyLocalFonts(
   // The local faces go after the host's own fonts; the host's origins stay in force.
   await editor.setFonts(withFontOrigin(editor.fonts, { sources: result.sources }));
   return 'fonts.localAdded';
+}
+
+// ---------------------------------------------------------------------------------------------
+// The link popup's state, after DOCX Editor's `useHyperlinkPopup`. One store per root holds
+// whether the popup shows, what it shows, and the draft. The packaged popup, a host's own
+// panel (`useHyperlinkPopup`), and the root's request listener read and change the same store,
+// so the React and Vue adapters only subscribe to it.
+
+/** The link a popup shows. @public */
+export interface HyperlinkPopupLink {
+  /** The target as the file holds it. */
+  readonly url: string;
+  /** The target that `sanitizeHref` allows, or null for a target that never opens. */
+  readonly href: string | null;
+}
+
+/** The actions of the link popup, as DOCX Editor's `UseHyperlinkPopupResult`. @public */
+export interface HyperlinkPopupActions {
+  /** Open the link at the caret in reading mode, or the URL field when there is none. A null link requests editing. Caller-supplied targets never replace the selected target. */
+  readonly open: (
+    link?: { readonly url: string; readonly href?: string | null } | null,
+    anchor?: HTMLElement | null
+  ) => void;
+  /**
+   * Open for the selection, as Ctrl/Cmd+K and the toolbar's link control do: in editing mode,
+   * with the link of the selection in the field when it has one.
+   */
+  readonly openAtCaret: (anchor?: HTMLElement | null) => void;
+  /** Hide the popup. */
+  readonly close: () => void;
+  /** Copy the safe target. False when there is nothing safe to copy. */
+  readonly copy: () => Promise<boolean>;
+  /** Change to editing mode. */
+  readonly beginEdit: () => void;
+  /** Change the draft target. */
+  readonly setUrl: (url: string) => void;
+  /** Apply the draft to the selection. False when the engine refused it. */
+  readonly commitEdit: () => boolean;
+  /** Remove the link from the selection. The text stays. */
+  readonly unlink: () => boolean;
+  /** Open the safe target in a new tab. False for a target that never opens. */
+  readonly openTarget: () => boolean;
+}
+
+/** One link popup: its state, a subscription, and its actions. @internal */
+export interface HyperlinkPopupStore extends HyperlinkPopupActions {
+  readonly controller: () => HyperlinkPopupController | null;
+  readonly getState: () => HyperlinkPopupState;
+  readonly subscribe: (listener: () => void) => () => void;
+  /** The editor the actions run on. A new editor closes the popup. */
+  readonly setEditor: (editor: PptxEditorInstance | null) => void;
+}
+
+/** The closed popup. @internal */
+export const CLOSED_HYPERLINK_POPUP: HyperlinkPopupState = Object.freeze({
+  mode: 'closed',
+  href: null,
+  anchor: null,
+  url: '',
+  draft: '',
+  copied: false,
+  error: null,
+  canEdit: false,
+});
+
+/** The popup link for a target, or null for no target. @internal */
+export function hyperlinkPopupLink(url: string | null | undefined): HyperlinkPopupLink | null {
+  if (!url) return null;
+  const safe = sanitizeHref(url);
+  return { url, href: safe.ok ? safe.href : null };
+}
+
+/**
+ * One store around the shared link controller. A root and its custom panels use the same
+ * reading state, draft, safety checks, and selection lifetime. @internal
+ */
+export function createHyperlinkPopupStore(): HyperlinkPopupStore {
+  let editor: PptxEditorInstance | null = null;
+  let controller: HyperlinkPopupController | null = null;
+  let stop: (() => void) | undefined;
+  const listeners = new Set<() => void>();
+  const notify = (): void => {
+    for (const listener of [...listeners]) listener();
+  };
+  return {
+    controller: () => controller,
+    getState: () => controller?.getState() ?? CLOSED_HYPERLINK_POPUP,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    setEditor: (next) => {
+      if (next === editor) return;
+      stop?.();
+      controller?.dispose();
+      editor = next;
+      controller = next ? createHyperlinkPopupController(next) : null;
+      stop = controller?.subscribe(notify);
+      notify();
+    },
+    open: (link, anchor) => {
+      if (controller && editor) openHyperlinkPopup(controller, editor, link, anchor);
+    },
+    openAtCaret: (anchor) => controller?.openEditing(anchor ?? null),
+    close: () => controller?.close(),
+    copy: () => controller?.copy() ?? Promise.resolve(false),
+    beginEdit: () => controller?.beginEdit(),
+    setUrl: (url) => controller?.setUrl(url),
+    commitEdit: () => controller?.commitEdit() ?? false,
+    unlink: () => controller?.unlink() ?? false,
+    openTarget: () => controller?.openTarget() ?? false,
+  };
+}
+
+/** The actions of a store, without its state and subscription. @internal */
+export function hyperlinkPopupActions(store: HyperlinkPopupStore): HyperlinkPopupActions {
+  const { open, openAtCaret, close, copy, beginEdit, setUrl, commitEdit, unlink, openTarget } =
+    store;
+  return { open, openAtCaret, close, copy, beginEdit, setUrl, commitEdit, unlink, openTarget };
+}
+
+/**
+ * Open `store` for each link request of `editor` (the toolbar, a menu row, Ctrl/Cmd+K), while
+ * `enabled` says that the link command can run. Returns the function that stops. @internal
+ */
+export function listenHyperlinkPopup(
+  store: HyperlinkPopupStore,
+  editor: object,
+  enabled: () => boolean
+): () => void {
+  return listenLinkRequests(editor, enabled, (anchor) => store.openAtCaret(anchor));
 }

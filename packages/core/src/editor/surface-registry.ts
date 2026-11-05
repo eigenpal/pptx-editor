@@ -10,6 +10,7 @@ interface SurfaceEntry {
 }
 
 const surfaces = new WeakMap<object, SurfaceEntry>();
+const hostListeners = new WeakMap<object, Set<() => void>>();
 
 /** Record (or, with null, forget) the element `editor` paints into. @internal */
 export function setSurfaceRoot(
@@ -18,8 +19,35 @@ export function setSurfaceRoot(
   focus: () => void = () => element?.focus({ preventScroll: true }),
   repaint: () => void = () => {}
 ): void {
+  const before = surfaces.get(editor)?.root.ownerDocument ?? null;
   if (element) surfaces.set(editor, { root: element, focus, repaint });
   else surfaces.delete(editor);
+  if ((element?.ownerDocument ?? null) === before) return;
+  for (const listener of [...(hostListeners.get(editor) ?? [])]) listener();
+}
+
+/**
+ * The document that `editor`'s slide is mounted in: an iframe's when the host mounted the
+ * editor there, else the page's own. Before the slide mounts, the page's document. Null with no
+ * DOM, as during server rendering. @public
+ */
+export function editorHostDocument(editor: object): Document | null {
+  const root = surfaces.get(editor)?.root;
+  if (root) return root.ownerDocument;
+  return typeof document === 'undefined' ? null : document;
+}
+
+/**
+ * Call `listener` each time `editor`'s slide moves to another document, as DOCX Editor's
+ * `hostChange` event. Returns the function that stops. @public
+ */
+export function onEditorHostChange(editor: object, listener: () => void): () => void {
+  let set = hostListeners.get(editor);
+  if (!set) hostListeners.set(editor, (set = new Set()));
+  set.add(listener);
+  return () => {
+    set.delete(listener);
+  };
 }
 
 /** The element `editor` paints into, or null. @internal */

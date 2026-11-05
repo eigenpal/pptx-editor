@@ -2,15 +2,18 @@
 // The slide rail, speaker notes, zoom pill, and side panel. Each is a hook consumer over the
 // editor; none holds document state of its own.
 
+import type { ChromeTranslate } from '@pptx-editor.dev/core/editor';
 import {
   memo,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
   type FocusEvent,
   type KeyboardEvent,
+  type ReactNode,
   type RefObject,
 } from 'react';
 import {
@@ -18,10 +21,13 @@ import {
   tooltipAttributes,
   followCurrentSlide,
   groupSlideSections,
+  keepCurrentSlideInView,
   radioGroupStep,
   railDragAxis,
   railKeyDown,
   railOrientationChrome,
+  railRightToLeft,
+  watchRailFold,
   resolveRailOrientation,
   runSlideStep,
   sectionOfSlide,
@@ -39,6 +45,12 @@ import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { Icon, MenuItem, Popover, ToolButton, keepFocus, useAriaDisabled } from './chrome.tsx';
 import { useEditorDialog } from './popups.tsx';
 import { RailMenuHost, useSlideStep, type RailMenuState } from './RailContextMenu.tsx';
+import {
+  RailActionsContext,
+  railActionContent,
+  railExpandContent,
+  type RailActions,
+} from './rail-parts.tsx';
 import { useSlideDrag } from './slide-drag.ts';
 import { LayoutGallery } from './SlideControls.tsx';
 import {
@@ -123,6 +135,11 @@ export interface PaneProps {
 /** Props of `SlideRail`: the pane props, DOCX Editor's `toggle`, and `orientation`. @public */
 export interface SlideRailProps extends PaneProps {
   /**
+   * Your translation function for this compound and its parts, as DOCX Editor's `t`. Without
+   * it, the root's `locale` gives the labels.
+   */
+  readonly t?: ChromeTranslate;
+  /**
    * Where the rail runs. `vertical` (the default) is a column beside the slide. `horizontal` is
    * a row under it, for a tall, narrow host: the thumbnails scroll sideways, Left and Right
    * step, a drag reorders along the row, and Hide thumbnails folds the rail down.
@@ -133,6 +150,21 @@ export interface SlideRailProps extends PaneProps {
    * that opens and closes the rail from its own chrome (`open`, `onOpenChange`).
    */
   readonly toggle?: boolean;
+  /**
+   * `true` (default): the packaged action buttons, with named part children
+   * (`SlideRail.AddSlide`, `SlideRail.Delete`, …) in their places and other children after
+   * Delete. `false`: only the children, in their order.
+   */
+  readonly preset?: boolean;
+  /** Named part children replace their buttons; other children go after **Delete**. */
+  readonly children?: ReactNode;
+}
+
+/** The grid columns of a horizontal rail's two action rows (`--pptx-rail-action-columns`). */
+function actionColumns(shown: number): CSSProperties {
+  return {
+    '--pptx-rail-action-columns': String(Math.max(1, Math.ceil(shown / 2))),
+  } as CSSProperties;
 }
 
 /** The collapsed rail strip keeps the host's styles but not a width: it stays a narrow strip. */
@@ -190,7 +222,14 @@ export function SlideRail(props: SlideRailProps = {}) {
   // Sections group the rail when they cover every slide in order; otherwise it stays flat.
   const grouped = groupSlideSections(sections, count);
   const orientation = resolveRailOrientation(props.orientation, 'PptxEditor.SlideRail');
-  const chrome = railOrientationChrome(orientation);
+  // A right-to-left row mirrors the move buttons, as its arrow keys do. The direction comes
+  // from the mounted rail, so it is read after the rail mounts or changes.
+  const [rightToLeft, setRightToLeft] = useState(false);
+  useLayoutEffect(() => setRightToLeft(railRightToLeft(rail.current)), [orientation, open]);
+  const chrome = railOrientationChrome(orientation, rightToLeft);
+  // A narrow horizontal rail (a phone) folds its secondary actions into one menu.
+  const [folded, setFolded] = useState(false);
+  useEffect(() => watchRailFold(rail.current, orientation, setFolded), [orientation, open]);
   const { itemProps: dragProps, cancel: cancelDrag } = useSlideDrag(
     railDragAxis(orientation),
     selected,
@@ -221,6 +260,8 @@ export function SlideRail(props: SlideRailProps = {}) {
     runSlideStep(editor, stepCommand(selected, stepTarget(step)));
   };
   const trackFocus = useFocusFollowsCurrent(list, '.pptx-rail__item', current, count, open);
+  // A resize (a host narrowing the panel) keeps the current slide in view too.
+  useEffect(() => keepCurrentSlideInView(list.current, '.pptx-rail__item'), [open]);
   /** Why the rail's slide buttons are off, or null when they work. */
   const why = !editor ? t('disabled.noEditor') : readOnly ? t('disabled.viewing') : null;
   useEffect(() => {
@@ -286,6 +327,37 @@ export function SlideRail(props: SlideRailProps = {}) {
       <Thumbnail slide={s} ratio={ratio} />
     </li>
   );
+  const railActions: RailActions = {
+    t,
+    editor,
+    why,
+    selected,
+    count,
+    chrome,
+    step: stepTarget,
+    moveBy,
+    galleryOpen: !!gallery,
+    // A second click closes the gallery, as the toolbar's menu buttons do.
+    // In a folded rail, the gallery opens at the overflow button that held its row.
+    toggleGallery: () =>
+      setGallery((shown) =>
+        shown
+          ? null
+          : (actions.current?.querySelector<HTMLElement>('.pptx-rail__layouts, .pptx-rail__more') ??
+            null)
+      ),
+    listId,
+    open,
+    toggle,
+    collapse: () => setOpen(false),
+    expand: () => setOpen(true),
+  };
+  const { content: actionContent, shown } = railActionContent(
+    props.children,
+    props.preset !== false,
+    toggle,
+    folded
+  );
   const className = ['pptx-rail', props.className].filter(Boolean).join(' ');
   // Closed with no toggle, the rail leaves the page: the host's chrome opens it again.
   if (!open && !toggle) return null;
@@ -300,13 +372,9 @@ export function SlideRail(props: SlideRailProps = {}) {
         style={stripStyle(props.style)}
         onMouseDown={keepFocus}
       >
-        <ToolButton
-          label={t('rail.expand')}
-          icon={chrome.expandIcon}
-          className="pptx-rail__collapse"
-          expanded={false}
-          onClick={() => setOpen(true)}
-        />
+        <RailActionsContext.Provider value={railActions}>
+          {railExpandContent(props.children)}
+        </RailActionsContext.Provider>
       </nav>
     );
   return (
@@ -351,75 +419,16 @@ export function SlideRail(props: SlideRailProps = {}) {
             })
           : slides.map(item)}
       </ol>
-      <div ref={actions} className="pptx-rail__actions" onMouseDown={keepFocus}>
-        <ToolButton
-          label={t('rail.addSlide')}
-          icon="add"
-          className="pptx-rail__add"
-          disabled={!!why}
-          disabledReason={why}
-          onClick={() => editor?.exec({ type: 'addSlide' })}
-        />
-        <ToolButton
-          label={t('rail.chooseLayout')}
-          icon="note_add"
-          className="pptx-rail__layouts"
-          hasPopup="menu"
-          expanded={!!gallery}
-          disabled={!!why}
-          disabledReason={why}
-          // A second click closes the gallery, as the toolbar's menu buttons do.
-          onClick={() =>
-            setGallery((open) =>
-              open
-                ? null
-                : (actions.current?.querySelector<HTMLElement>('.pptx-rail__layouts') ?? null)
-            )
-          }
-        />
-        <ToolButton
-          label={t('rail.duplicateSlide')}
-          icon="content_copy"
-          className="pptx-rail__duplicate"
-          disabled={!!why}
-          disabledReason={why}
-          onClick={() => editor?.exec({ type: 'duplicateSlides', indices: selected })}
-        />
-        <ToolButton
-          label={t(chrome.moveEarlierLabel)}
-          icon={chrome.moveEarlierIcon}
-          className="pptx-rail__move"
-          disabled={!!why || stepTarget(-1) === null}
-          disabledReason={why ?? t('disabled.slideEdge')}
-          onClick={() => moveBy(-1)}
-        />
-        <ToolButton
-          label={t(chrome.moveLaterLabel)}
-          icon={chrome.moveLaterIcon}
-          className="pptx-rail__move"
-          disabled={!!why || stepTarget(1) === null}
-          disabledReason={why ?? t('disabled.slideEdge')}
-          onClick={() => moveBy(1)}
-        />
-        <ToolButton
-          label={t('rail.deleteSlide')}
-          icon="delete"
-          className="pptx-rail__delete"
-          disabled={!!why || selected.length >= slides.length}
-          disabledReason={why ?? t('disabled.lastSlide')}
-          onClick={() => editor?.exec({ type: 'deleteSlides', indices: selected })}
-        />
-        {toggle ? (
-          <ToolButton
-            label={t('rail.collapse')}
-            icon={chrome.collapseIcon}
-            className="pptx-rail__collapse"
-            expanded
-            controls={listId}
-            onClick={() => setOpen(false)}
-          />
-        ) : null}
-      </div>
+      <RailActionsContext.Provider value={railActions}>
+        <div
+          ref={actions}
+          className="pptx-rail__actions"
+          style={actionColumns(shown)}
+          onMouseDown={keepFocus}
+        >
+          {actionContent}
+        </div>
+      </RailActionsContext.Provider>
       {gallery ? (
         <Popover anchor={gallery} onClose={() => setGallery(null)} label={t('rail.chooseLayout')}>
           <LayoutGallery

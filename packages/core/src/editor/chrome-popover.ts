@@ -52,18 +52,30 @@ export function placePopover(
 }
 
 /**
- * Measure `panel` against `anchor` and write its place to the node at once: a browser does not
+ * A box in client pixels that a popover opens at instead of its anchor element's own box (the
+ * link popup at the selected text). Focus and dismissal still use the anchor element. @internal
+ */
+export interface PopoverAnchorRect {
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+}
+
+/**
+ * Measure `panel` against `anchor` (or `rect`, when given) and write its place to the node at once: a browser does not
  * focus into a `visibility: hidden` panel, and the focus step runs before the adapter re-renders.
  * Returns the placement. @internal
  */
 export function positionPopover(
   panel: HTMLElement | null,
   anchor: HTMLElement,
-  align: 'start' | 'end'
+  align: 'start' | 'end',
+  rect?: PopoverAnchorRect | null
 ): PopoverPlacement {
   const view = anchor.ownerDocument.defaultView;
   const next = placePopover(
-    anchor.getBoundingClientRect(),
+    rect ?? anchor.getBoundingClientRect(),
     { width: panel?.offsetWidth ?? 200, height: panel?.offsetHeight ?? 0 },
     align,
     { width: view?.innerWidth ?? 0, height: view?.innerHeight ?? 0 }

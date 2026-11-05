@@ -42,11 +42,12 @@ import {
 import { createTranslator, type LocaleCatalog, type Translate } from '@pptx-editor.dev/i18n';
 import { providePptxEditor, pptxTranslationKey, usePptxEditor } from './composables.ts';
 import { ActiveDialog, provideDialogHost, type PptxEditorPopups } from './popups.ts';
-import { provideChromeDark, useChromeDark } from './color-mode.ts';
+import { provideChromeDark, provideScopedByAncestor, useChromeDark } from './color-mode.ts';
 import { providePaneState } from './pane-state.ts';
 import { provideSlideshow } from './Slideshow.tsx';
 import { provideFindBars } from './FindBar.tsx';
 import { LinkPopupHost } from './HyperlinkPopup.tsx';
+import { provideHyperlinkPopup } from './useHyperlinkPopup.ts';
 import { useCanvasContextMenu } from './CanvasContextMenu.tsx';
 import { SlideSorterWatch } from './SlideSorter.tsx';
 import { ChromeTooltip } from './ChromeTooltip.tsx';
@@ -235,7 +236,13 @@ export const PptxEditorRoot = defineComponent({
     // starts the show and opens find and the link popup through them.
     const slideshow = provideSlideshow(editor);
     const findBars = provideFindBars();
-    const host = provideDialogHost(editor, () => props.popups, { slideshow, findBars });
+    // The root's one link popup state, which the packaged popup and `useHyperlinkPopup` share.
+    const link = provideHyperlinkPopup();
+    const host = provideDialogHost(editor, () => props.popups, {
+      slideshow,
+      findBars,
+      linkViews: link.views,
+    });
     provideChromeDark(() => props.colorMode);
     // The notes pane's open state, which the pane and host chrome share (`useNotesPane`).
     providePaneState();
@@ -244,7 +251,7 @@ export const PptxEditorRoot = defineComponent({
       slots.default?.(),
       h(SlideSorterWatch),
       h(ActiveDialog, { host }),
-      h(LinkPopupHost),
+      h(LinkPopupHost, { store: link.store, views: link.views.value }),
       h(ChromeTooltip),
     ];
   },
@@ -267,6 +274,7 @@ export const PptxEditorViewport = defineComponent({
   props: pptxEditorViewportProps,
   setup(props, { slots }) {
     const dark = useChromeDark();
+    provideScopedByAncestor();
     // The host's `class` attribute merges onto this element through attribute fallthrough.
     return () =>
       h(

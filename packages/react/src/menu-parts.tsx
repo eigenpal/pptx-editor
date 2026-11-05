@@ -9,6 +9,7 @@
 // `preset={false}` on the bar renders only the children. Hiding a row changes the interface
 // only: its command still runs from the toolbar, the keyboard, and the API.
 
+import type { ChromeTranslate } from '@pptx-editor.dev/core/editor';
 import {
   Children,
   Fragment,
@@ -31,9 +32,11 @@ import {
   menuPartName,
   translateKeyOrText,
   warnMenuPart,
+  MENU_NAMED_PARTS,
   type ChromeMenu,
   type ChromeMenuId,
   type ChromeSlotId,
+  type MenuNamedRow,
 } from '@pptx-editor.dev/core/editor';
 import { Icon, Popover, keepFocus } from './chrome.tsx';
 import { MenuCloseContext } from './ContextMenu.tsx';
@@ -101,6 +104,74 @@ export function MenuSlotItem(props: MenuSlotItemProps): ReactNode {
     />
   );
 }
+
+/** Props for a named menu row (`Menu.Cut`, `ContextMenu.Cut`, …), as DOCX Editor's. @public */
+export interface MenuRowPartProps {
+  /** The row's text, or a translation key, in place of the registry label. */
+  readonly label?: string;
+  /** A translation key for the row's label, in place of the registry label. */
+  readonly labelKey?: string;
+  /** A translation key for the shortcut shown at the end of the row. */
+  readonly shortcutKey?: string;
+  /** In place of the registry icon: a Material Symbol name, or icon content (an element). */
+  readonly icon?: ReactNode;
+  /** A class name added to the row. */
+  readonly className?: string;
+  /** Remove the row. Its command keeps working elsewhere. */
+  readonly hidden?: boolean;
+}
+
+/** A named menu row: a `Menu.Item` with its slot pinned. @public */
+export interface MenuRowPartComponent {
+  (props: MenuRowPartProps): ReactNode;
+  /** The registry row the part stands for. */
+  readonly pptxMenuRow: MenuNamedRow;
+}
+
+/**
+ * A named row, after DOCX Editor's `defineCommandRow`: a `Menu.Item` with its slot and value
+ * pinned, and the row as a static (`pptxMenuRow`), so a menu finds it among its children.
+ * @internal
+ */
+export function defineMenuRowPart(row: MenuNamedRow): MenuRowPartComponent {
+  const Part = ({ label, labelKey, ...rest }: MenuRowPartProps): ReactNode => (
+    <MenuSlotItem
+      {...rest}
+      slotId={row.slot}
+      {...(row.value !== undefined ? { value: row.value } : {})}
+      {...((label ?? labelKey) !== undefined ? { labelKey: label ?? labelKey } : {})}
+    />
+  );
+  return Object.assign(Part, { pptxMenuRow: row });
+}
+
+/** The named rows of `table`, by name. @internal */
+export function defineMenuRowParts<K extends string>(
+  table: Readonly<Record<K, MenuNamedRow>>
+): Record<K, MenuRowPartComponent> {
+  return Object.fromEntries(
+    Object.entries<MenuNamedRow>(table).map(([name, row]) => [name, defineMenuRowPart(row)])
+  ) as Record<K, MenuRowPartComponent>;
+}
+
+/**
+ * The registry row a menu child names: a `Menu.Item`, or a named row with its row pinned. Null
+ * for any other child. @internal
+ */
+export function menuSlotRowOf(node: ReactNode): MenuSlotItemProps | null {
+  if (!isValidElement<NodeProps>(node)) return null;
+  if (node.type === MenuSlotItem) return node.props as unknown as MenuSlotItemProps;
+  const row = (node.type as { pptxMenuRow?: MenuNamedRow } | null)?.pptxMenuRow;
+  if (!row) return null;
+  return {
+    ...(node.props as unknown as MenuRowPartProps),
+    slotId: row.slot,
+    ...(row.value !== undefined ? { value: row.value } : {}),
+  };
+}
+
+/** The named rows of the menu bar, from core's table. */
+const MENU_ROW_PARTS = defineMenuRowParts(MENU_NAMED_PARTS);
 
 /** Props for `Menu.Group`. @public */
 export interface MenuGroupProps {
@@ -232,10 +303,7 @@ function builtInRows(menu: ChromeMenu, spec: MenuEntryProps | undefined): ReactN
   const { entries, overrides, extras } = arrangeMenuRows(
     menu.entries,
     flatten(spec?.children),
-    (child) =>
-      isValidElement<NodeProps>(child) && child.type === MenuSlotItem
-        ? (child.props as unknown as MenuSlotItemProps)
-        : null,
+    menuSlotRowOf,
     // A hidden row this menu does not have removes nothing, and says so.
     (slot) => warnMenuPart(`${menuPartName(menu.id)} > Menu.Item`, 'unmatchedHidden', slot)
   );
@@ -249,6 +317,11 @@ function builtInRows(menu: ChromeMenu, spec: MenuEntryProps | undefined): ReactN
 
 /** Props for `PptxEditor.Menu`. @public */
 export interface MenuProps {
+  /**
+   * Your translation function for this compound and its parts, as DOCX Editor's `t`. Without
+   * it, the root's `locale` gives the labels.
+   */
+  readonly t?: ChromeTranslate;
   /** A class name added to the bar. */
   readonly className?: string;
   /**
@@ -453,4 +526,4 @@ function MenuBar({
   );
 }
 
-export { MENU_PARTS };
+export { MENU_PARTS, MENU_ROW_PARTS };

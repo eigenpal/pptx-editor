@@ -85,7 +85,7 @@ Mount only the parts that your layout needs. An omitted part renders no interfac
 | --- | --- | --- |
 | `PptxEditor.Toolbar`, `PptxEditor.Ribbon`, `PptxEditor.Menu` | The flat toolbar, the tabbed ribbon, and the menu bar | [Toolbar](/docs/customization/toolbar), [Ribbon](/docs/customization/ribbon), [Menus](/docs/customization/menus) |
 | `PptxEditor.SlideRail`, `PptxEditor.SlideSorter` | The slide thumbnails, and the Slide Sorter view | [Layout](/docs/customization/layout) |
-| `PptxEditor.NotesPane` | The speaker notes of the current slide | [Pane configuration](/docs/customization/layout#pane-configuration) |
+| `PptxEditor.NotesPane` | The speaker notes of the current slide | [Pane configuration](/docs/customization/reference/layout#pane-configuration) |
 | `PptxEditor.SidePanel` | The **Format** panel | [Layout](/docs/customization/layout) |
 | `PptxEditor.ZoomPill`, `PptxEditor.StatusBar` | A floating zoom control, and a status row | [Status bar](/docs/customization/ribbon#status-bar) |
 | `PptxEditor.FindBar` | Find and replace. Without it, Find and Replace stay disabled with a reason. | [Layout](/docs/customization/layout) |
@@ -95,7 +95,7 @@ Mount only the parts that your layout needs. An omitted part renders no interfac
 | `PptxEditor.FontNotice`, `PptxEditor.EditNotice` | Substituted fonts, and the reason the last edit was refused | [Fonts](/docs/customization/fonts) |
 | `PptxEditor.PageSetupDialog`, `PptxEditor.ParagraphDialog`, and the other dialogs | Dialogs that the `popups` registry mounts, or that you mount | [Dialogs](/docs/customization/dialogs) |
 
-The canvas context menu (`PptxEditor.ContextMenu`) renders through `popups.contextMenu`. See [Dialogs](/docs/customization/dialogs).
+Place the canvas context menu (`PptxEditor.ContextMenu`) in the root or the viewport, or render it through `popups.contextMenu`. See [Customize the context menu](/docs/customization/menus#customize-the-context-menu).
 
 ## Override a component
 

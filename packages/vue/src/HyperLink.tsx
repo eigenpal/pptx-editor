@@ -11,41 +11,26 @@
 
 import {
   cloneVNode,
-  computed,
   defineComponent,
   Fragment,
   inject,
   isVNode,
   onMounted,
   ref,
-  type ComputedRef,
+  shallowRef,
+  watch,
   type ExtractPublicPropTypes,
-  type InjectionKey,
-  type ShallowRef,
   type VNode,
   type VNodeArrayChildren,
 } from 'vue';
 import {
-  openHyperlinkPopup,
-  requestLinkPopup,
   translateKeyOrText,
-  type HyperlinkPopupController,
+  linkSelectionRect,
   type HyperlinkPopupState,
 } from '@pptx-editor.dev/core/editor';
 import { Icon, Popover } from './chrome.tsx';
 import { usePptxEditor, useTranslation } from './composables.ts';
-
-/** The root's link popup state, provided by `PptxEditorRoot`. @internal */
-export interface HyperlinkPopupProvision {
-  readonly controller: HyperlinkPopupController;
-  readonly state: Readonly<ShallowRef<HyperlinkPopupState>>;
-  /** The id of the error message, so the URL field names it. */
-  readonly errorId: string;
-}
-
-/** @internal */
-export const hyperlinkPopupKey: InjectionKey<HyperlinkPopupProvision> =
-  Symbol('pptxHyperlinkPopup');
+import { hyperlinkPopupKey, useHyperlinkPopup } from './useHyperlinkPopup.ts';
 
 const CLOSED_STATE: HyperlinkPopupState = {
   mode: 'closed',
@@ -57,60 +42,6 @@ const CLOSED_STATE: HyperlinkPopupState = {
   canEdit: false,
   anchor: null,
 };
-
-/** What `useHyperlinkPopup` returns, the twin of React's `UseHyperlinkPopupResult`. @public */
-export interface UseHyperlinkPopupReturn {
-  readonly state: ComputedRef<HyperlinkPopupState>;
-  /**
-   * Open reading mode over the link at a text caret, or the URL field when there is none, under
-   * `anchor` (default: the caret). DOCX Editor's argument order: `link` is `null` for the URL
-   * field at once; the panel shows the link at the caret, so a given `link` only asks for
-   * reading mode.
-   */
-  open(link?: { readonly url: string } | null, anchor?: HTMLElement | null): void;
-  /** Open the URL field for the selection, as Ctrl/Cmd+K and the link control do. */
-  openAtCaret(): void;
-  close(): void;
-  /** Copy the safe target. Resolves false when there is nothing safe to copy. */
-  copy(): Promise<boolean>;
-  /** Switch from reading to editing. */
-  beginEdit(): void;
-  setUrl(url: string): void;
-  /** Apply the draft. False when the engine refused it; `state.error` says why. */
-  commitEdit(): boolean;
-  /** Remove the link, keeping its text. */
-  unlink(): boolean;
-  /** Open the safe target in a new tab, with no opener. False when there is none. */
-  openTarget(): boolean;
-}
-
-/**
- * The link popup's state and actions: the root's one state, in a part of the panel or in a
- * `popups.hyperlink` renderer, which the root renders inside it; closed and inert elsewhere.
- * @public
- */
-export function useHyperlinkPopup(): UseHyperlinkPopupReturn {
-  const provision = inject(hyperlinkPopupKey, null);
-  const editorRef = usePptxEditor();
-  const c = provision?.controller;
-  return {
-    state: computed(() => provision?.state.value ?? CLOSED_STATE),
-    open: (link, anchor) => {
-      const editor = editorRef.value;
-      if (c && editor) openHyperlinkPopup(c, editor, link, anchor);
-    },
-    openAtCaret: () => {
-      if (editorRef.value) requestLinkPopup(editorRef.value);
-    },
-    close: () => c?.close(),
-    copy: () => c?.copy() ?? Promise.resolve(false),
-    beginEdit: () => c?.beginEdit(),
-    setUrl: (url) => c?.setUrl(url),
-    commitEdit: () => c?.commitEdit() ?? false,
-    unlink: () => c?.unlink() ?? false,
-    openTarget: () => c?.openTarget() ?? false,
-  };
-}
 
 const partProps = {
   /** A class name added to the part (`class` works too). */
@@ -454,6 +385,25 @@ const HyperLinkRoot = defineComponent({
   setup(props, { slots, attrs }) {
     const provision = inject(hyperlinkPopupKey, null);
     const { t } = useTranslation();
+    const editorRef = usePptxEditor();
+    const selectionRect = shallowRef<ReturnType<typeof linkSelectionRect>>(null);
+    watch(
+      () => [editorRef.value, provision?.state.value.mode, provision?.state.value.anchor] as const,
+      ([editor, mode, anchor], previous) => {
+        if (!mode || mode === 'closed') {
+          selectionRect.value = null;
+        } else if (
+          !previous ||
+          previous[1] === 'closed' ||
+          previous[0] !== editor ||
+          previous[2] !== anchor
+        ) {
+          // Keep the selection box while the field takes focus and its draft changes.
+          selectionRect.value = editor ? linkSelectionRect(editor) : null;
+        }
+      },
+      { immediate: true, flush: 'sync' }
+    );
     return () => {
       const state = provision?.state.value ?? CLOSED_STATE;
       if (!provision || state.mode === 'closed') return null;
@@ -467,6 +417,7 @@ const HyperLinkRoot = defineComponent({
       return (
         <Popover
           anchor={state.anchor}
+          anchorRect={selectionRect.value}
           role="dialog"
           label={t(reading ? 'link.label' : state.url ? 'link.edit' : 'link.insert')}
           onClose={() => provision.controller.close()}

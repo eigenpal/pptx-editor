@@ -11,6 +11,7 @@
 // interface only: its command still runs from the toolbar, the keyboard, and the API. Which
 // rows and menus show, and how the bar's keys move, come from core (`menu-arrangement.ts`).
 
+import { chromeTranslateProp, useChromeTranslateScope } from './headless-hooks.ts';
 import {
   Comment,
   Fragment,
@@ -39,9 +40,12 @@ import {
   menuPartName,
   translateKeyOrText,
   warnMenuPart,
+  MENU_NAMED_PARTS,
   type ChromeMenu,
   type ChromeMenuId,
   type ChromeSlotId,
+  type MenuNamedRow,
+  type MenuRowPartName,
   type MenuSlotRowSpec,
 } from '@pptx-editor.dev/core/editor';
 import { Icon, Popover, keepFocus } from './chrome.tsx';
@@ -96,8 +100,14 @@ function slotChildren(vnode: VNode): VNode[] {
   return typeof slot === 'function' ? flattenMenuChildren(slot()) : [];
 }
 
-/** The registry row a `MenuSlotItem` child names, or null for any other child. @internal */
+/**
+ * The registry row a child names: a `MenuSlotItem`, or a named row (`PptxEditorMenu.Cut`) with
+ * its row pinned. Null for any other child. @internal
+ */
 export function slotRowOf(vnode: VNode): MenuSlotRowSpec | null {
+  const pinned = (vnode.type as { pptxMenuRow?: MenuNamedRow } | null)?.pptxMenuRow;
+  if (pinned)
+    return { slotId: pinned.slot, value: pinned.value, hidden: flag(vnode, 'hidden') ?? false };
   if (vnode.type !== MenuSlotItem) return null;
   return {
     slotId: String(prop(vnode, 'slotId')),
@@ -180,6 +190,82 @@ export const MenuSlotItem = defineComponent({
     };
   },
 });
+
+// ---------------------------------------------------------------------------------------------
+// Named rows
+
+const menuRowPartProps = {
+  /** The row's text, or a translation key, in place of the registry label. */
+  label: { type: String, default: undefined },
+  /** A translation key for the row's label, in place of the registry label. */
+  labelKey: { type: String, default: undefined },
+  /** A translation key for the shortcut shown at the end of the row. */
+  shortcutKey: { type: String, default: undefined },
+  /** In place of the registry icon: a Material Symbol name, or icon content (a vnode). */
+  icon: { type: [String, Object] as PropType<string | VNode>, default: undefined },
+  /** A class name added to the row, as React's `className`. A host `class` also works. */
+  className: { type: String, default: undefined },
+  /** Remove the row. Its command keeps working elsewhere. */
+  hidden: { type: Boolean, default: false },
+} as const;
+
+/** Props for a named menu row, the twin of React's `MenuRowPartProps`. @public */
+export type MenuRowPartProps = ExtractPublicPropTypes<typeof menuRowPartProps>;
+
+/** A named menu row: a `MenuSlotItem` with its slot pinned, as React's. @public */
+export type MenuRowPartComponent = DefineComponent<MenuRowPartProps> & {
+  /** The registry row the part stands for. */
+  readonly pptxMenuRow: MenuNamedRow;
+};
+
+/**
+ * A named row, after DOCX Editor's `defineCommandRow`: a `MenuSlotItem` with its slot and value
+ * pinned, and the row as a static (`pptxMenuRow`), so a menu finds it among its children.
+ * @internal
+ */
+function defineMenuRowPart(name: string, row: MenuNamedRow): MenuRowPartComponent {
+  return Object.assign(
+    defineComponent({
+      name: `MenuRow${name}`,
+      inheritAttrs: false,
+      props: menuRowPartProps,
+      setup(props, { attrs }) {
+        return () => {
+          const labelKey = props.label ?? props.labelKey;
+          return (
+            <MenuSlotItem
+              slotId={row.slot}
+              {...(row.value !== undefined ? { value: row.value } : {})}
+              {...(labelKey !== undefined ? { labelKey } : {})}
+              {...(props.shortcutKey !== undefined ? { shortcutKey: props.shortcutKey } : {})}
+              {...(props.icon !== undefined ? { icon: props.icon } : {})}
+              className={normalizeClass([attrs.class, props.className]) || undefined}
+              hidden={props.hidden}
+            />
+          );
+        };
+      },
+    }),
+    { pptxMenuRow: row }
+  ) as unknown as MenuRowPartComponent;
+}
+
+/** The named rows of `table`, by name. @internal */
+export function defineMenuRowParts<K extends string>(
+  table: Readonly<Record<K, MenuNamedRow>>
+): Record<K, MenuRowPartComponent> {
+  return Object.fromEntries(
+    Object.entries<MenuNamedRow>(table).map(([name, row]) => [name, defineMenuRowPart(name, row)])
+  ) as Record<K, MenuRowPartComponent>;
+}
+
+/**
+ * The named rows of the menu bar (`PptxEditorMenu.Cut`, `PptxEditorMenu.PageSetup`, …), the
+ * twin of React's `MenuNamedRows`. @public
+ */
+export type MenuNamedRows = { readonly [K in MenuRowPartName]: MenuRowPartComponent };
+
+const MENU_ROW_PARTS: MenuNamedRows = defineMenuRowParts(MENU_NAMED_PARTS);
 
 // ---------------------------------------------------------------------------------------------
 // MenuGroup
@@ -385,6 +471,7 @@ interface BarMenu {
 }
 
 const menuProps = {
+  ...chromeTranslateProp,
   /**
    * `true` (default): the built-in menus, changed by named menu and `MenuEntry` children;
    * other children follow the menus. `false`: only the children.
@@ -410,7 +497,7 @@ const MenuRoot = defineComponent({
   name: 'PptxEditorMenu',
   props: menuProps,
   setup(props, { slots }) {
-    const { t } = useTranslation();
+    const { t } = useChromeTranslateScope(() => props.t);
     const open = ref<string | null>(null);
     // Roving tab stop, as DOCX Editor's menu bar: the bar is one Tab stop, the arrows move.
     const active = ref<string | null>(null);
@@ -593,29 +680,30 @@ const MenuRoot = defineComponent({
 });
 
 /** The menu bar with its parts as statics, the twin of React's `MenuNamespace`. @public */
-export type MenuNamespace = typeof MenuRoot & {
-  /** A host menu, or a built-in one by id. */
-  readonly Entry: typeof MenuEntry;
-  /** A registry row: replace, change, or hide it in place. */
-  readonly Item: typeof MenuSlotItem;
-  /** A host row. */
-  readonly Row: typeof MenuRow;
-  /** A labeled set of rows. */
-  readonly Group: typeof MenuGroup;
-  /** A line between rows. */
-  readonly Separator: typeof MenuSeparator;
-  /** A row that opens a nested panel. */
-  readonly Submenu: typeof MenuSubmenu;
-  /** The Insert > Table grid, for a host's own Table submenu (DOCX Editor's `Menu.TableGrid`). */
-  readonly TableGrid: typeof MenuTableGrid;
-  readonly File: MenuPartComponent;
-  readonly Edit: MenuPartComponent;
-  readonly View: MenuPartComponent;
-  readonly Insert: MenuPartComponent;
-  readonly Format: MenuPartComponent;
-  readonly Arrange: MenuPartComponent;
-  readonly SlideShow: MenuPartComponent;
-};
+export type MenuNamespace = typeof MenuRoot &
+  MenuNamedRows & {
+    /** A host menu, or a built-in one by id. */
+    readonly Entry: typeof MenuEntry;
+    /** A registry row: replace, change, or hide it in place. */
+    readonly Item: typeof MenuSlotItem;
+    /** A host row. */
+    readonly Row: typeof MenuRow;
+    /** A labeled set of rows. */
+    readonly Group: typeof MenuGroup;
+    /** A line between rows. */
+    readonly Separator: typeof MenuSeparator;
+    /** A row that opens a nested panel. */
+    readonly Submenu: typeof MenuSubmenu;
+    /** The Insert > Table grid, for a host's own Table submenu (DOCX Editor's `Menu.TableGrid`). */
+    readonly TableGrid: typeof MenuTableGrid;
+    readonly File: MenuPartComponent;
+    readonly Edit: MenuPartComponent;
+    readonly View: MenuPartComponent;
+    readonly Insert: MenuPartComponent;
+    readonly Format: MenuPartComponent;
+    readonly Arrange: MenuPartComponent;
+    readonly SlideShow: MenuPartComponent;
+  };
 
 /**
  * The menu bar (`PptxEditorMenu`): File, Edit, View, Insert, Format, Arrange, and Slide Show,
@@ -636,6 +724,7 @@ export type MenuNamespace = typeof MenuRoot & {
  * ```
  */
 export const PptxEditorMenu: MenuNamespace = Object.assign(MenuRoot, {
+  ...MENU_ROW_PARTS,
   ...MENU_PARTS,
   Entry: MenuEntry,
   Item: MenuSlotItem,

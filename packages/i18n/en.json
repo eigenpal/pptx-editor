@@ -90,6 +90,8 @@
     "deleteSlides": "Delete {count} slides",
     "moveUp": "Move up",
     "moveDown": "Move down",
+    "moveLeft": "Move left",
+    "moveRight": "Move right",
     "layout": "Layout",
     "resetSlide": "Reset slide",
     "hideSlide": "Hide slide",
@@ -113,6 +115,8 @@
       "clearFormatting": "Ctrl+\\",
       "moveUp": "Ctrl+↑",
       "moveDown": "Ctrl+↓",
+      "moveLeft": "Ctrl+←",
+      "moveRight": "Ctrl+→",
       "undo": "Ctrl+Z",
       "redo": "Ctrl+Y",
       "selectAll": "Ctrl+A",
@@ -743,7 +747,8 @@
     "hiddenSlideLabel": "Slide {index} (hidden)",
     "chooseLayout": "Add slide with layout",
     "collapse": "Hide thumbnails",
-    "expand": "Show thumbnails"
+    "expand": "Show thumbnails",
+    "moreActions": "More slide actions"
   },
   "notes": {
     "title": "Speaker notes",
@@ -873,6 +878,7 @@
     "label": "Link",
     "placeholder": "Paste or type a link",
     "apply": "Apply",
+    "cancel": "Cancel",
     "remove": "Remove link",
     "open": "Open link",
     "unavailable": "Links are turned off in this editor",

@@ -40,3 +40,67 @@ Inside the root, the chat reads and drives the deck:
 | Present | `useSlideshow().start('current')` |
 | Download | `editor.save()` |
 | Tell the model where the user is | `editor.snapshot().currentSlide` |
+
+## Match the chat's look
+
+Map your chat's tokens to the editor tokens, so the panel reads as part of your app. Use public tokens and parts only, never internal class names. Scope the rule to your wrapper, here `.chat-app`, so it reaches only the editor in your app. Name both `.pptx-editor` and `.pptx-editor.dark`: each scope declares its own light and dark defaults.
+
+```css
+.chat-app .pptx-editor,
+.chat-app .pptx-editor.dark {
+  --doc-font-ui: var(--chat-font);
+  --doc-radius-surface: var(--chat-radius-card);
+  --doc-radius-control: var(--chat-radius-control);
+  --doc-surface: var(--chat-surface);
+  --doc-primary: var(--chat-accent);
+}
+```
+
+In a narrow panel, hide the rail's move buttons with its parts. Ctrl+Left and Ctrl+Right still move slides:
+
+```tsx
+<PptxEditor.SlideRail orientation="horizontal">
+  <PptxEditor.SlideRail.MoveEarlier hidden />
+  <PptxEditor.SlideRail.MoveLater hidden />
+</PptxEditor.SlideRail>
+```
+
+A full match maps more tokens. The [palette reference](/docs/customization/appearance#interface-palette-reference) lists each one.
+
+The example's `styles.css` (the "EDITOR THEME" block) owns the whole page, so it scopes the rule as `:is(.pptx-editor, .pptx-editor.dark)`, with no wrapper. A host page that has other content scopes the same rule to its wrapper, as above. The example maps these groups:
+
+- The chrome font, and the surface and control corner radii.
+- The main, hover, and input surfaces, and the popover colors.
+- The text and icon colors, including the disabled icons.
+- The borders.
+- The primary actions and the active toggles.
+- Focus, selection, and the collaboration accent.
+- The shadows and the tooltips.
+
+It keeps the editor's defaults for the other groups. These are the errors, the warnings, the caret and slide guides, the backgrounds behind the slide, the overlay, and the slide show. A dialog draws its own border, so the example also gives `.pptx-dialog.pptx-editor` a `--doc-card-shadow` without the hairline ring.
+
+Put your own panel buttons, such as Present or Close, in `PptxEditor.Toolbar.Action`. It works outside the toolbar too, and gives your button the editor's tooltip, disabled state, and focus behavior:
+
+```tsx
+<PptxEditor.Toolbar.Action label="Present" icon={<PresentIcon />} onSelect={() => show.start('current')} />
+```
+
+## Fit the slide to the panel width
+
+In a tall panel, give the slide only the height that fits the panel width. Then no empty bands appear above and below the slide. Set the room around the slide with `--doc-slide-padding`, and use the same value for the height:
+
+```tsx
+const SLIDE_PADDING = 12;
+// width: the panel width. ratio: slideHeight / slideWidth, from useEditorState.
+const height = (width - 2 * SLIDE_PADDING) * ratio + 2 * SLIDE_PADDING;
+
+<div style={{ '--doc-slide-padding': `${SLIDE_PADDING}px` } as CSSProperties}>
+  <div className="deck-canvas" style={{ flex: `0 1 ${height}px` }}>
+    <PptxEditor.Content />
+  </div>
+  <PptxEditor.SlideRail orientation="horizontal" />
+  <PptxEditor.NotesPane className="deck-notes" />
+</div>
+```
+
+Give the notes the rest of the panel height: give `.deck-notes` `flex: 1` in your flex column. The notes field fills the pane. See [Appearance](/docs/customization/appearance#size-typography-and-layer-reference) and [Slide rail parts](/docs/customization/layout#slide-rail-parts).

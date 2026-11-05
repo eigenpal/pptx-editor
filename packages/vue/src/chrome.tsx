@@ -37,6 +37,7 @@ import {
   restorePopoverFocus,
   warnUnknownIcon,
   warnUnsupportedOverride,
+  type PopoverAnchorRect,
   type PopoverPlacement,
 } from '@pptx-editor.dev/core/editor';
 import { buttonRoleProps, renderAsChild, slotPartNames, useSlotOverride } from './slot-override.ts';
@@ -150,6 +151,8 @@ const toolButtonProps = {
   hasPopup: { type: String as PropType<'menu' | 'grid' | 'dialog'>, default: undefined },
   /** False for the main half of a color split: a host element cannot stand in for it. */
   asChild: { type: Boolean, default: undefined },
+  /** A host element that renders the button, from a part's own `asChild` (no slot override). */
+  host: { type: Object as PropType<VNode | null>, default: null },
 } as const;
 
 /** The props of `ToolButton`, the twin of React's `ToolButtonProps`. @internal */
@@ -211,12 +214,14 @@ export const ToolButton = defineComponent({
           {reason}
         </span>
       ) : null;
-      if (override?.asChild && props.asChild !== false) {
+      const hostElement =
+        props.host ?? (override?.asChild && props.asChild !== false ? override.asChild : null);
+      if (hostElement) {
         // The host element renders the control, as React's `renderAsChild`: a host element that
         // is not a button gets `role="button"`, a tab stop, and Enter and Space.
-        const isButton = override.asChild.type === 'button';
+        const isButton = hostElement.type === 'button';
         return [
-          renderAsChild(override.asChild, {
+          renderAsChild(hostElement, {
             ...attributes,
             ...(isButton ? { type: 'button' } : buttonRoleProps(onClick)),
             onClick,
@@ -256,6 +261,11 @@ const popoverProps = {
   passive: { type: Boolean, default: false },
   /** A class name added to the panel. */
   className: { type: String, default: undefined },
+  /**
+   * A box in client pixels to open at instead of the anchor's own box (the link popup at the
+   * selected text). Focus and dismissal still use `anchor`.
+   */
+  anchorRect: { type: Object as PropType<PopoverAnchorRect | null>, default: null },
 } as const;
 
 /** The props of `Popover`, the twin of React's `PopoverProps`. @internal */
@@ -280,7 +290,8 @@ export const Popover = defineComponent({
     let focusInside = false;
     const close = (): void => props.onClose();
     const place = (): void => {
-      if (props.anchor) pos.value = positionPopover(panel.value, props.anchor, props.align);
+      if (props.anchor)
+        pos.value = positionPopover(panel.value, props.anchor, props.align, props.anchorRect);
     };
     let stopListening: (() => void) | null = null;
     const listen = (anchor: HTMLElement | null): void => {
@@ -301,7 +312,7 @@ export const Popover = defineComponent({
       listen(props.anchor);
     });
     watch(
-      () => [props.anchor, props.align] as const,
+      () => [props.anchor, props.align, props.anchorRect] as const,
       ([anchor], [old]) => {
         place();
         if (anchor === old) return;

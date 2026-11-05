@@ -57,8 +57,7 @@ const REACT_MENU_PARTS: MenuPartNames = { bar: 'PptxEditor.Menu', root: 'PptxEdi
 
 /**
  * A menu part is misused, after DOCX Editor's menu warnings: a row for an id that is not a
- * registered control, a menu outside the menu bar, or a context menu outside its
- * `popups.contextMenu` entry. Each renders nothing. `part` and `names` are the adapter's own
+ * registered control, a menu outside the menu bar, or a context menu outside the root. Each renders nothing. `part` and `names` are the adapter's own
  * part names. @internal
  */
 export function warnMenuPart(
@@ -86,8 +85,8 @@ export function warnMenuPart(
             : problem === 'outsideBar'
               ? `${part} is outside ${names.bar}, so it renders nothing. Render it as a direct ` +
                 `child of ${names.bar}.`
-              : `${part} renders only while the canvas has a context menu open. Render it from the ` +
-                `popups.contextMenu entry of ${names.root}.`
+              : `${part} is outside ${names.root}, so it renders nothing. Place it in ` +
+                `${names.root} or its viewport, or render it from the popups.contextMenu entry.`
   );
 }
 

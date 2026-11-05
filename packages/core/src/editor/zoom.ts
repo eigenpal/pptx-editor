@@ -12,8 +12,11 @@ export function clampZoom(zoom: number): number {
   return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom));
 }
 
-/** The zoom steps the zoom buttons of the status bar move through, from end to end. */
-const ZOOM_STEPS: readonly number[] = [
+/**
+ * The zoom steps the zoom buttons of the status bar move through, from end to end. `useZoom`
+ * returns them as `levels`, so a host's own zoom control shows the same steps. @internal
+ */
+export const ZOOM_LEVELS: readonly number[] = [
   ZOOM_MIN,
   0.25,
   0.33,
@@ -37,8 +40,8 @@ const ZOOM_STEPS: readonly number[] = [
 export function zoomStep(zoom: number, direction: 1 | -1): number | null {
   const next =
     direction > 0
-      ? ZOOM_STEPS.find((z) => z > zoom + 0.001)
-      : [...ZOOM_STEPS].reverse().find((z) => z < zoom - 0.001);
+      ? ZOOM_LEVELS.find((z) => z > zoom + 0.001)
+      : [...ZOOM_LEVELS].reverse().find((z) => z < zoom - 0.001);
   return next ?? null;
 }
 

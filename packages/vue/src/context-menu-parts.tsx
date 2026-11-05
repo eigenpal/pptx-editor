@@ -7,12 +7,22 @@
 // pointer: shapes, pictures, text being edited, or empty slide area. The menu renders core's
 // `CANVAS_CONTEXT_MENUS` rows for that kind. `PptxEditorContextMenu.Slot slot-id` replaces or
 // hides one row in place, other children add rows at the end, and `:preset="false"` keeps only
-// the children. The `popups.contextMenu` registry entry decides what the canvas renders.
+// the children. The `popups.contextMenu` registry entry, or a menu placed in the root, decides
+// what the canvas renders.
 
 import {
+  chromeTranslateProp,
+  useChromeTranslateScope,
+  useToolbarContext,
+} from './headless-hooks.ts';
+import {
   defineComponent,
+  h,
   inject,
+  onBeforeUnmount,
+  onMounted,
   provide,
+  watch,
   type ExtractPublicPropTypes,
   type InjectionKey,
   type PropType,
@@ -20,22 +30,36 @@ import {
 } from 'vue';
 import {
   CANVAS_CONTEXT_MENUS,
+  CONTEXT_MENU_NAMED_PARTS,
   arrangeMenuRows,
   canvasMenuLabelKey,
   warnMenuPart,
   type CanvasMenuKind,
+  type ContextMenuPartName,
 } from '@pptx-editor.dev/core/editor';
 import { ContextMenu, type ContextMenuPoint } from './ContextMenu.tsx';
-import { useTranslation } from './composables.ts';
 import { MenuRow, MenuSeparator, MenuSubmenu } from './menu-row.tsx';
 import { MenuEntries, VUE_MENU_PARTS } from './menu-rows.tsx';
 import {
   MenuCloseScope,
   MenuGroup,
   MenuSlotItem,
+  defineMenuRowParts,
   flattenMenuChildren,
   slotRowOf,
+  type MenuRowPartComponent,
 } from './menu-parts.tsx';
+import { useCanvasMenuRegistry } from './popups.ts';
+
+/**
+ * The named rows of the canvas context menu (`PptxEditorContextMenu.Cut`, …), the twin of
+ * React's `ContextMenuNamedRows`. @public
+ */
+export type ContextMenuNamedRows = {
+  readonly [K in ContextMenuPartName]: MenuRowPartComponent;
+};
+
+const CONTEXT_MENU_ROW_PARTS: ContextMenuNamedRows = defineMenuRowParts(CONTEXT_MENU_NAMED_PARTS);
 
 /** What a canvas context menu opened on, and where. @public */
 export interface ContextMenuRequest {
@@ -91,6 +115,7 @@ export function useContextMenuTarget(): UseContextMenuTargetReturn {
 }
 
 const pptxEditorContextMenuProps = {
+  ...chromeTranslateProp,
   /**
    * `true` (default): the built-in rows for the target, with `PptxEditorContextMenu.Slot`
    * children replacing their rows in place and other children added at the end. `false`: only
@@ -99,6 +124,8 @@ const pptxEditorContextMenuProps = {
   preset: { type: Boolean, default: true },
   /** A class name added to the menu, as React's `className`. A host `class` also works. */
   className: { type: String, default: undefined },
+  /** `true` shows no canvas menu, as DOCX Editor's `disabled`. An open menu closes. */
+  disabled: { type: Boolean, default: false },
 } as const;
 
 /**
@@ -108,21 +135,68 @@ const pptxEditorContextMenuProps = {
 export type PptxEditorContextMenuProps = ExtractPublicPropTypes<typeof pptxEditorContextMenuProps>;
 
 /**
- * The slide canvas's context menu. It renders while the canvas has a menu request open: put it
- * in the `popups.contextMenu` entry to change the rows.
+ * The slide canvas's context menu. Place it in `PptxEditorRoot` or `PptxEditorViewport`, as
+ * DOCX Editor's `DocxEditorContextMenu`, or render it from the `popups.contextMenu` entry. A
+ * placed menu gives the canvas the same entry, and an explicit `popups.contextMenu` entry wins.
+ * `openChange` says when the menu opens and closes.
  */
 const ContextMenuRoot = defineComponent({
   name: 'PptxEditorContextMenu',
   inheritAttrs: false,
   props: pptxEditorContextMenuProps,
-  setup(props, { attrs, slots }) {
-    const { t } = useTranslation();
+  emits: { openChange: (_open: boolean) => true },
+  setup(props, { attrs, slots, emit }) {
+    const placedHost = useToolbarContext().t;
+    const { t } = useChromeTranslateScope(() => props.t);
     const target = useContextMenuRequest();
+    const registry = target ? null : useCanvasMenuRegistry();
+    if (registry) {
+      // Placed in the root: give the canvas the same menu, with the `t` of where it stands.
+      const token = {};
+      registry.place(token, () =>
+        props.disabled
+          ? false
+          : () =>
+              h(
+                ContextMenuRoot,
+                {
+                  t: props.t ?? placedHost.value,
+                  preset: props.preset,
+                  className: props.className,
+                  class: attrs.class,
+                  onOpenChange: (open: boolean) => emit('openChange', open),
+                },
+                slots
+              )
+      );
+      onBeforeUnmount(() => registry.remove(token));
+    }
+    if (target) {
+      // Each request mounts the menu anew: it opens on mount and closes on unmount.
+      let told = false;
+      onMounted(() => {
+        if (props.disabled) return;
+        told = true;
+        emit('openChange', true);
+      });
+      onBeforeUnmount(() => {
+        if (told) emit('openChange', false);
+      });
+      // `disabled` turning on closes an open menu.
+      watch(
+        () => props.disabled,
+        (off) => {
+          if (off) target.close();
+        }
+      );
+    }
     return () => {
       if (!target) {
-        warnMenuPart('PptxEditorContextMenu', 'outsideContextMenu', undefined, VUE_MENU_PARTS);
+        if (!registry)
+          warnMenuPart('PptxEditorContextMenu', 'outsideContextMenu', undefined, VUE_MENU_PARTS);
         return null;
       }
+      if (props.disabled) return null;
       const content = (): unknown => {
         const children = flattenMenuChildren(slots.default?.());
         if (!props.preset) return children;
@@ -162,22 +236,24 @@ const ContextMenuRoot = defineComponent({
 });
 
 /** The canvas context menu with its parts as statics, the twin of React's. @public */
-export type ContextMenuNamespace = typeof ContextMenuRoot & {
-  /** A registry row: replace, change, or hide it in place. */
-  readonly Slot: typeof MenuSlotItem;
-  /** A host row. */
-  readonly Item: typeof MenuRow;
-  /** A labeled set of rows. */
-  readonly Group: typeof MenuGroup;
-  /** A line between rows. */
-  readonly Separator: typeof MenuSeparator;
-  /** A row that opens a nested panel. */
-  readonly Submenu: typeof MenuSubmenu;
-};
+export type ContextMenuNamespace = typeof ContextMenuRoot &
+  ContextMenuNamedRows & {
+    /** A registry row: replace, change, or hide it in place. */
+    readonly Slot: typeof MenuSlotItem;
+    /** A host row. */
+    readonly Item: typeof MenuRow;
+    /** A labeled set of rows. */
+    readonly Group: typeof MenuGroup;
+    /** A line between rows. */
+    readonly Separator: typeof MenuSeparator;
+    /** A row that opens a nested panel. */
+    readonly Submenu: typeof MenuSubmenu;
+  };
 
 /**
  * The slide canvas's context menu (`PptxEditorContextMenu`), with DOCX Editor's parts (`Slot`,
- * `Item`, `Group`, `Separator`, `Submenu`). Render it in `popups.contextMenu`. @public
+ * `Item`, `Group`, `Separator`, `Submenu`). Place it in the root or the viewport, or render it
+ * in `popups.contextMenu`. @public
  *
  * @example
  * ```ts
@@ -191,6 +267,7 @@ export type ContextMenuNamespace = typeof ContextMenuRoot & {
  * ```
  */
 export const PptxEditorContextMenu: ContextMenuNamespace = Object.assign(ContextMenuRoot, {
+  ...CONTEXT_MENU_ROW_PARTS,
   Slot: MenuSlotItem,
   Item: MenuRow,
   Group: MenuGroup,

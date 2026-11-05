@@ -310,10 +310,8 @@ describe('PptxEditorMenu', () => {
       await nextTick();
       const said = warn.mock.calls.map((c) => String(c[0])).join('\n');
       expect(said).toContain('PptxEditorMenu.Entry is outside PptxEditorMenu');
-      expect(said).toContain(
-        'PptxEditorContextMenu renders only while the canvas has a context menu open'
-      );
-      expect(said).toContain('popups.contextMenu entry of PptxEditorRoot');
+      expect(said).toContain('PptxEditorContextMenu is outside PptxEditorRoot');
+      expect(said).toContain('or render it from the popups.contextMenu entry');
       expect(said).toContain(
         'PptxEditorMenu.Edit > PptxEditorMenu.Item slotId="text.bold" hidden matches no row'
       );
@@ -587,6 +585,85 @@ describe('PptxEditorContextMenu and popups.contextMenu', () => {
     // The same flow with a renderer opens the menu.
     expect(await rightClick(stage, 10, 6)).toBe(true);
     expect(menuSlots()).toEqual(['edit.paste', 'slide.background']);
+  });
+});
+
+describe('a PptxEditorContextMenu placed in the root', () => {
+  // The React twin is packages/react/src/__tests__/menu-parts.test.tsx.
+  test('it is the canvas menu, with its rows, and openChange hears each open and close', async () => {
+    const opens: boolean[] = [];
+    let asked = 0;
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { stage } = await vueCanvas(undefined, () =>
+        h(
+          PptxEditorContextMenu,
+          { className: 'placed', onOpenChange: (open: boolean) => opens.push(open) },
+          () => [
+            h(PptxEditorContextMenu.Slot, { slotId: 'format.painter', hidden: true }),
+            h(PptxEditorContextMenu.Item, { label: 'Ask legal', onSelect: () => (asked += 1) }),
+          ]
+        )
+      );
+      expect(document.querySelector('.pptx-contextmenu') === null).toBe(true);
+      await rightClick(stage, 1.5, 1.5);
+      const menu = document.querySelector<HTMLElement>('.pptx-contextmenu.placed')!;
+      expect(menu !== null).toBe(true);
+      expect(menu.querySelector('[data-slot="format.painter"]') === null).toBe(true);
+      expect(menu.querySelector('[data-slot="arrange.order.front"]') !== null).toBe(true);
+      expect(opens).toEqual([true]);
+      [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+        .find((r) => r.textContent?.includes('Ask legal'))!
+        .click();
+      await nextTick();
+      expect(asked).toBe(1);
+      expect(document.querySelector('.pptx-contextmenu') === null).toBe(true);
+      expect(opens).toEqual([true, false]);
+      const said = warn.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(said).not.toContain('PptxEditorContextMenu is outside');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test('disabled shows no menu, and turning it on closes an open menu', async () => {
+    const opens: boolean[] = [];
+    const disabled = shallowRef(false);
+    const { stage } = await vueCanvas(undefined, () =>
+      h(PptxEditorContextMenu, {
+        disabled: disabled.value,
+        onOpenChange: (open: boolean) => opens.push(open),
+      })
+    );
+    const count = () => document.querySelectorAll('.pptx-contextmenu').length;
+    await rightClick(stage, 1.5, 1.5);
+    expect(count()).toBe(1);
+    disabled.value = true;
+    await nextTick();
+    await nextTick();
+    expect(count()).toBe(0);
+    expect(opens).toEqual([true, false]);
+    await rightClick(stage, 1.5, 1.5);
+    expect(count()).toBe(0);
+    disabled.value = false;
+    await nextTick();
+    expect(count()).toBe(0);
+    await rightClick(stage, 1.5, 1.5);
+    expect(count()).toBe(1);
+  });
+
+  test('an explicit popups.contextMenu entry wins over a placed menu', async () => {
+    const placedMenu = () => h(PptxEditorContextMenu, { className: 'placed' });
+    const { stage } = await vueCanvas(
+      { contextMenu: (props) => h(PptxEditorContextMenu, { ...props, className: 'explicit' }) },
+      placedMenu
+    );
+    await rightClick(stage, 1.5, 1.5);
+    expect(document.querySelector('.pptx-contextmenu.explicit') !== null).toBe(true);
+    expect(document.querySelector('.pptx-contextmenu.placed') === null).toBe(true);
+    const off = await vueCanvas({ contextMenu: false }, placedMenu);
+    await rightClick(off.stage, 1.5, 1.5);
+    expect(document.querySelector('.pptx-contextmenu') === null).toBe(true);
   });
 });
 

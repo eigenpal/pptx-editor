@@ -5,6 +5,7 @@
 // `hidden` and a host `class`; a named part child replaces its part in place, other children
 // follow the Notes button, and `preset: false` renders only the children.
 
+import { chromeTranslateProp, useChromeTranslateScope } from './headless-hooks.ts';
 import {
   defineComponent,
   h,
@@ -156,6 +157,7 @@ const PARTS: readonly unknown[] = [
 ];
 
 const statusBarProps = {
+  ...chromeTranslateProp,
   /** `false`: only the default slot, with no default parts. */
   preset: { type: Boolean, default: true },
   /** A class name added to the bar, as React's `className`. A host `class` also works. */
@@ -188,7 +190,7 @@ export const PptxEditorStatusBar = Object.assign(
     name: 'PptxEditorStatusBar',
     props: statusBarProps,
     setup(props, { slots }) {
-      const { t } = useTranslation();
+      const { t } = useChromeTranslateScope(() => props.t);
       return () => {
         const children = slots.default?.();
         const bar = (content: VNodeArrayChildren) =>
@@ -224,5 +226,6 @@ export const PptxEditorStatusBar = Object.assign(
     Notes: StatusBarNotes,
     Views: StatusBarViews,
     Zoom: StatusBarZoom,
+    Action: ToolbarAction,
   }
 );

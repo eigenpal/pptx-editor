@@ -4,11 +4,14 @@
 // both. Each reads the editor through the composables; none holds document state of its own.
 // The keys, the drag, and the focus moves come from core (`pane-support.ts`).
 
+import { chromeTranslateProp, useChromeTranslateScope } from './headless-hooks.ts';
 import {
   computed,
   defineComponent,
   nextTick,
   onMounted,
+  onUpdated,
+  provide,
   ref,
   shallowRef,
   useId,
@@ -24,9 +27,12 @@ import {
   tooltipAttributes,
   followCurrentSlide,
   groupSlideSections,
+  keepCurrentSlideInView,
   railDragAxis,
   railKeyDown,
   railOrientationChrome,
+  railRightToLeft,
+  watchRailFold,
   resolveRailOrientation,
   runSlideStep,
   sectionOfSlide,
@@ -45,6 +51,20 @@ import { Icon, MenuItem, Popover, ToolButton, keepFocus, useAriaDisabled } from 
 import { useEditorDialog } from './popups.ts';
 import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
 import { RailMenuHost, type RailMenuState } from './RailContextMenu.tsx';
+import {
+  SlideRailAddSlide,
+  SlideRailChooseLayout,
+  SlideRailCollapse,
+  SlideRailDelete,
+  SlideRailDuplicate,
+  SlideRailExpand,
+  SlideRailMoveEarlier,
+  SlideRailMoveLater,
+  railActionContent,
+  railActionsKey,
+  railExpandContent,
+} from './rail-parts.tsx';
+import { ToolbarAction } from './toolbar-parts.ts';
 import { useSlideDrag } from './slide-drag.ts';
 import { LayoutGallery } from './SlideControls.tsx';
 import {
@@ -143,6 +163,7 @@ export type PaneProps = ExtractPublicPropTypes<typeof paneProps>;
 
 const slideRailProps = {
   ...paneProps,
+  ...chromeTranslateProp,
   /**
    * The built-in Hide thumbnails and Show thumbnails buttons. `false` removes them, for a host
    * that opens and closes the rail from its own chrome (`open`, `update:open`).
@@ -154,6 +175,12 @@ const slideRailProps = {
    * step, a drag reorders along the row, and Hide thumbnails folds the rail down.
    */
   orientation: { type: String as PropType<SlideRailOrientation>, default: undefined },
+  /**
+   * `true` (default): the packaged action buttons, with named part children
+   * (`PptxEditorSlideRail.AddSlide`, `.Delete`, …) in their places and other children after
+   * Delete. `false`: only the default slot, in its order.
+   */
+  preset: { type: Boolean, default: true },
 } as const;
 
 /** Props of `PptxEditorSlideRail`, the twin of React's `SlideRailProps`. @public */
@@ -197,12 +224,12 @@ export function usePaneOpen(
  * Its last button hides it to a narrow strip with a button that shows it again. Emits
  * `update:open`; a host `class` and `style` go on the rail. @public
  */
-export const PptxEditorSlideRail = defineComponent({
+const SlideRailRoot = defineComponent({
   name: 'PptxEditorSlideRail',
   inheritAttrs: false,
   props: slideRailProps,
   emits: { 'update:open': (_open: boolean) => true },
-  setup(props, { attrs, emit }) {
+  setup(props, { attrs, emit, slots }) {
     const pane = usePaneOpen(props, emit);
     const rail = ref<HTMLElement | null>(null);
     const listId = useId();
@@ -217,7 +244,7 @@ export const PptxEditorSlideRail = defineComponent({
       });
     };
     const editor = usePptxEditor();
-    const { t } = useTranslation();
+    const { t } = useChromeTranslateScope(() => props.t);
     const slides = useEditorState((s) => s.slides, sameSlides);
     const current = useEditorState((s) => s.currentSlide);
     const selected = useEditorState((s) => s.selectedSlides, sameIndices);
@@ -234,6 +261,26 @@ export const PptxEditorSlideRail = defineComponent({
     const orientation = (): SlideRailOrientation =>
       resolveRailOrientation(props.orientation, 'PptxEditorSlideRail');
     const drag = useSlideDrag(() => railDragAxis(orientation()), selected, readOnly, grouped);
+    // A right-to-left row mirrors the move buttons, as its arrow keys do. The direction comes
+    // from the mounted rail, so it is read after each render.
+    // A narrow horizontal rail (a phone) folds its secondary actions into one menu.
+    const folded = shallowRef(false);
+    watch(
+      () => [rail.value, orientation(), pane.open.value] as const,
+      ([el, axis], _old, onCleanup) =>
+        onCleanup(
+          watchRailFold(el, axis, (next) => {
+            folded.value = next;
+          })
+        ),
+      { flush: 'post', immediate: true }
+    );
+    const rightToLeft = shallowRef(false);
+    const readDirection = (): void => {
+      rightToLeft.value = railRightToLeft(rail.value);
+    };
+    onMounted(readDirection);
+    onUpdated(readDirection);
     const collapsed = useCollapsedSections();
     const renaming = ref<string | null>(null);
     useOpenCurrentSection(grouped);
@@ -272,6 +319,12 @@ export const PptxEditorSlideRail = defineComponent({
       count(),
       pane.open.value,
     ]);
+    // A resize (a host narrowing the panel) keeps the current slide in view too.
+    watch(
+      list,
+      (el, _old, onCleanup) => onCleanup(keepCurrentSlideInView(el, '.pptx-rail__item')),
+      { flush: 'post' }
+    );
     watch(
       () => pane.open.value,
       (open) => {
@@ -290,6 +343,31 @@ export const PptxEditorSlideRail = defineComponent({
       },
       { flush: 'post' }
     );
+    provide(railActionsKey, {
+      t,
+      editor: () => editor.value,
+      why: () =>
+        !editor.value ? t('disabled.noEditor') : readOnly.value ? t('disabled.viewing') : null,
+      selected: () => selected.value,
+      count,
+      chrome: () => railOrientationChrome(orientation(), rightToLeft.value),
+      step: stepTarget,
+      moveBy,
+      galleryOpen: () => !!gallery.value,
+      // A second click closes the gallery, as the toolbar's menu buttons do.
+      toggleGallery: () => {
+        gallery.value = gallery.value
+          ? null
+          : // In a folded rail, the gallery opens at the overflow button that held its row.
+            (actions.value?.querySelector<HTMLElement>('.pptx-rail__layouts, .pptx-rail__more') ??
+            null);
+      },
+      listId,
+      open: () => pane.open.value,
+      toggle: () => props.toggle !== false,
+      collapse: () => setOpen(false),
+      expand: () => setOpen(true),
+    });
     /** Slide shortcuts while the rail has focus (core's `railKeyDown`). */
     const onKeydown = (e: KeyboardEvent): void =>
       railKeyDown(e, {
@@ -342,10 +420,6 @@ export const PptxEditorSlideRail = defineComponent({
     return () => {
       const toggle = props.toggle !== false;
       const open = pane.open.value;
-      const chrome = railOrientationChrome(orientation());
-      const ed = editor.value;
-      /** Why the rail's slide buttons are off, or null when they work. */
-      const why = !ed ? t('disabled.noEditor') : readOnly.value ? t('disabled.viewing') : null;
       const className = ['pptx-rail', attrs.class, props.className];
       const style = [attrs.style as StyleValue, props.style];
       // Closed with no toggle, the rail leaves the page: the host's chrome opens it again.
@@ -362,18 +436,17 @@ export const PptxEditorSlideRail = defineComponent({
             style={stripStyle(style)}
             onMousedown={keepFocus}
           >
-            <ToolButton
-              label={t('rail.expand')}
-              icon={chrome.expandIcon}
-              className="pptx-rail__collapse"
-              expanded={false}
-              onClick={() => setOpen(true)}
-            />
+            {railExpandContent(slots.default?.())}
           </nav>
         );
+      const { content, shown } = railActionContent(
+        slots.default?.(),
+        props.preset !== false,
+        toggle,
+        folded.value
+      );
       const groups = grouped.value;
       const currentSection = groups ? sectionOfSlide(groups, current.value)?.id : undefined;
-      const sel = selected.value;
       return (
         <nav
           {...restAttrs(attrs)}
@@ -428,72 +501,13 @@ export const PptxEditorSlideRail = defineComponent({
                 })
               : slides.value.map(item)}
           </ol>
-          <div ref={actions} class="pptx-rail__actions" onMousedown={keepFocus}>
-            <ToolButton
-              label={t('rail.addSlide')}
-              icon="add"
-              className="pptx-rail__add"
-              disabled={!!why}
-              disabledReason={why}
-              onClick={() => editor.value?.exec({ type: 'addSlide' })}
-            />
-            <ToolButton
-              label={t('rail.chooseLayout')}
-              icon="note_add"
-              className="pptx-rail__layouts"
-              hasPopup="menu"
-              expanded={!!gallery.value}
-              disabled={!!why}
-              disabledReason={why}
-              // A second click closes the gallery, as the toolbar's menu buttons do.
-              onClick={() => {
-                gallery.value = gallery.value
-                  ? null
-                  : (actions.value?.querySelector<HTMLElement>('.pptx-rail__layouts') ?? null);
-              }}
-            />
-            <ToolButton
-              label={t('rail.duplicateSlide')}
-              icon="content_copy"
-              className="pptx-rail__duplicate"
-              disabled={!!why}
-              disabledReason={why}
-              onClick={() => editor.value?.exec({ type: 'duplicateSlides', indices: sel })}
-            />
-            <ToolButton
-              label={t(chrome.moveEarlierLabel)}
-              icon={chrome.moveEarlierIcon}
-              className="pptx-rail__move"
-              disabled={!!why || stepTarget(-1) === null}
-              disabledReason={why ?? t('disabled.slideEdge')}
-              onClick={() => moveBy(-1)}
-            />
-            <ToolButton
-              label={t(chrome.moveLaterLabel)}
-              icon={chrome.moveLaterIcon}
-              className="pptx-rail__move"
-              disabled={!!why || stepTarget(1) === null}
-              disabledReason={why ?? t('disabled.slideEdge')}
-              onClick={() => moveBy(1)}
-            />
-            <ToolButton
-              label={t('rail.deleteSlide')}
-              icon="delete"
-              className="pptx-rail__delete"
-              disabled={!!why || sel.length >= slides.value.length}
-              disabledReason={why ?? t('disabled.lastSlide')}
-              onClick={() => editor.value?.exec({ type: 'deleteSlides', indices: sel })}
-            />
-            {toggle ? (
-              <ToolButton
-                label={t('rail.collapse')}
-                icon={chrome.collapseIcon}
-                className="pptx-rail__collapse"
-                expanded
-                controls={listId}
-                onClick={() => setOpen(false)}
-              />
-            ) : null}
+          <div
+            ref={actions}
+            class="pptx-rail__actions"
+            style={{ '--pptx-rail-action-columns': String(Math.max(1, Math.ceil(shown / 2))) }}
+            onMousedown={keepFocus}
+          >
+            {content}
           </div>
           {gallery.value ? (
             <Popover
@@ -535,6 +549,23 @@ export const PptxEditorSlideRail = defineComponent({
       );
     };
   },
+});
+
+/**
+ * The slide rail with its action parts, as React's `PptxEditor.SlideRail`: a named part child
+ * replaces its button, `hidden` removes it, other children go after Delete, and `preset: false`
+ * renders only the default slot. `Action` is `ToolbarAction`. @public
+ */
+export const PptxEditorSlideRail = Object.assign(SlideRailRoot, {
+  AddSlide: SlideRailAddSlide,
+  ChooseLayout: SlideRailChooseLayout,
+  Duplicate: SlideRailDuplicate,
+  MoveEarlier: SlideRailMoveEarlier,
+  MoveLater: SlideRailMoveLater,
+  Delete: SlideRailDelete,
+  Collapse: SlideRailCollapse,
+  Expand: SlideRailExpand,
+  Action: ToolbarAction,
 });
 
 const zoomPillProps = {

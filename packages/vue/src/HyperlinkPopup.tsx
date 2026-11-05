@@ -19,7 +19,6 @@ import {
   type PropType,
 } from 'vue';
 import {
-  createHyperlinkPopupController,
   focusSurfaceOf,
   hyperlinkEntryReads,
   hyperlinkPopupFromRequest,
@@ -29,10 +28,12 @@ import {
   listenLinkPanelKey,
   listenLinkRequests,
   type HyperlinkPopupController,
+  type HyperlinkPopupStore,
   type HyperlinkPopupState,
 } from '@pptx-editor.dev/core/editor';
 import { useEditorCommand, usePptxEditor, useTranslation } from './composables.ts';
-import { hyperlinkPopupKey, PptxEditorHyperLink } from './HyperLink.tsx';
+import { PptxEditorHyperLink } from './HyperLink.tsx';
+import { hyperlinkPopupKey } from './useHyperlinkPopup.ts';
 import { usePopupEntry } from './popups.ts';
 
 const hyperlinkPopupProps = {
@@ -104,104 +105,50 @@ export const HyperlinkPopup = defineComponent({
  */
 export const LinkPopupHost = defineComponent({
   name: 'PptxLinkPopupHost',
-  setup() {
+  props: {
+    store: { type: Object as PropType<HyperlinkPopupStore>, required: true as const },
+    views: { type: Number, required: true as const },
+  },
+  setup(props) {
     const editorRef = usePptxEditor();
     const entry = usePopupEntry('hyperlink');
     const cmd = useEditorCommand('text.link');
     const { t } = useTranslation();
-    const errorId = useId();
-    const state = shallowRef<HyperlinkPopupState | null>(null);
-    const controllerRef = shallowRef<HyperlinkPopupController | null>(null);
-    const closed: HyperlinkPopupState = {
-      mode: 'closed',
-      url: '',
-      href: null,
-      draft: '',
-      error: null,
-      copied: false,
-      canEdit: false,
-      anchor: null,
-    };
-    // The parts read the provision; it follows the current controller.
-    const provided = shallowRef<HyperlinkPopupState>(closed);
-    const relay: HyperlinkPopupController = {
-      getState: () => provided.value,
-      subscribe: (l) => controllerRef.value?.subscribe(l) ?? (() => {}),
-      openReading: (a) => controllerRef.value?.openReading(a),
-      openEditing: (a) => controllerRef.value?.openEditing(a),
-      beginEdit: () => controllerRef.value?.beginEdit(),
-      setUrl: (u) => controllerRef.value?.setUrl(u),
-      commitEdit: () => controllerRef.value?.commitEdit() ?? false,
-      unlink: () => controllerRef.value?.unlink() ?? false,
-      copy: () => controllerRef.value?.copy() ?? Promise.resolve(false),
-      openTarget: () => controllerRef.value?.openTarget() ?? false,
-      close: () => controllerRef.value?.close(),
-      dispose: () => {},
-    };
-    provide(hyperlinkPopupKey, { controller: relay, state: provided, errorId });
-    // One controller per editor, as React's root: turning the entry off or on keeps it, so an
-    // open popup is closed (with focus back on the slide), never dropped.
+    const state = shallowRef(props.store.getState());
+    let open = false;
+    const stopState = props.store.subscribe(() => {
+      const now = props.store.getState();
+      const editor = editorRef.value;
+      const isOpen = now.mode !== 'closed';
+      if (open && !isOpen && editor && linkPopupReturnsFocus(editor)) focusSurfaceOf(editor);
+      open = isOpen;
+      state.value = now;
+    });
+    onUnmounted(() => {
+      props.store.setEditor(null);
+      stopState();
+    });
+    watch(editorRef, (editor) => props.store.setEditor(editor), { immediate: true });
+    // A host hook keeps link controls active when the packaged popup is disabled.
     watch(
-      editorRef,
-      (editor, _old, onCleanup) => {
-        if (!editor) {
-          state.value = null;
-          provided.value = closed;
-          return;
-        }
-        const controller = createHyperlinkPopupController(editor);
-        controllerRef.value = controller;
-        let open = false;
-        const stopState = controller.subscribe(() => {
-          const now = controller.getState();
-          // On close, focus goes back to the slide (the text input while text is selected), as
-          // DOCX Editor's HyperLink does; focus that moved elsewhere on purpose stays there.
-          const isOpen = now.mode !== 'closed';
-          if (open && !isOpen && linkPopupReturnsFocus(editor)) focusSurfaceOf(editor);
-          open = isOpen;
-          state.value = now;
-          provided.value = now;
-        });
-        state.value = controller.getState();
-        provided.value = state.value;
-        onCleanup(() => {
-          controller.close();
-          provided.value = closed;
-          stopState();
-          controller.dispose();
-          if (controllerRef.value === controller) controllerRef.value = null;
-        });
-      },
-      { immediate: true }
-    );
-    // Turning links off closes an open popup; a host panel that reads `useHyperlinkPopup()` sees
-    // it closed, as React's.
-    watch(
-      () => [controllerRef.value, entry() === false] as const,
-      ([controller, off]) => {
-        if (off) controller?.close();
+      () => entry() === false && props.views === 0,
+      (off) => {
+        if (off) props.store.close();
       },
       { immediate: true }
     );
     watch(
-      () =>
-        [
-          editorRef.value,
-          controllerRef.value,
-          entry() === false,
-          hyperlinkEntryReads(entry()),
-        ] as const,
-      ([editor, controller, off, reads], _old, onCleanup) => {
-        if (!editor || !controller || off) return;
-        // Requests for this root's editor only: another editor on the page opens its own.
+      () => [editorRef.value, entry(), props.views] as const,
+      ([editor, current, views], _old, onCleanup) => {
+        const controller = props.store.controller();
+        if (!editor || !controller || (current === false && views === 0)) return;
         const stopRequests = listenLinkRequests(
           editor,
           () => cmd.isEnabled.value,
           (at) => controller.openEditing(at)
         );
-        // A click into linked text opens the reading panel under the caret, also for a viewer:
-        // Edit and Unlink show only when the link command can run. A host renderer gets reading
-        // mode only when it asks for it. F6 moves focus from the slide text into the panel.
+        // Preserve reading clicks and F6. Custom renderers still opt into reading mode.
+        const reads = current === false ? views > 0 : hyperlinkEntryReads(current);
         const stopClicks = reads
           ? listenLinkClicks(editor, (at) => controller.openReading(at))
           : () => {};
@@ -219,9 +166,8 @@ export const LinkPopupHost = defineComponent({
     return () => {
       const current = entry();
       const s = state.value;
-      const controller = controllerRef.value;
-      if (!s || !controller || current === false) return null;
-      // A polite live region, always mounted so a screen reader hears the panel open and the copy.
+      if (current === false) return null;
+      // Keep the live region mounted so reading and copy state changes are announced.
       const live = (
         <span class="pptx-sr-only" role="status" aria-live="polite">
           {linkPopupAnnouncement(s, t)}
@@ -230,12 +176,7 @@ export const LinkPopupHost = defineComponent({
       if (s.mode === 'closed') return live;
       const panel =
         typeof current === 'function' ? (
-          current({
-            anchor: s.anchor,
-            url: s.url,
-            mode: s.mode,
-            onClose: () => controller.close(),
-          })
+          current({ anchor: s.anchor, url: s.url, mode: s.mode, onClose: props.store.close })
         ) : (
           <PptxEditorHyperLink />
         );

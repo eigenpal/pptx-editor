@@ -8,8 +8,10 @@
 // (`overlays.ts`).
 
 import {
+  computed,
   defineComponent,
   onBeforeUnmount,
+  onScopeDispose,
   shallowRef,
   watch,
   watchEffect,
@@ -21,13 +23,17 @@ import {
   editRejectionMessage,
   editRemovalMessage,
   focusSurfaceOf,
+  linkPopupShowsRejection,
   REMOVAL_NOTICE_MS,
   removalNoticeShows,
   type EditorRejection,
 } from '@pptx-editor.dev/core/editor';
 import type { Translate } from '@pptx-editor.dev/i18n';
 import { ToolButton, keepFocus } from './chrome.tsx';
-import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
+import { useEditorState, usePptxEditor } from './composables.ts';
+import { chromeTranslateProp, useChromeTranslateScope } from './headless-hooks.ts';
+import { usePopupEntry } from './popups.ts';
+import { injectHyperlinkPopupStore } from './useHyperlinkPopup.ts';
 
 /** The message for a refusal: its reason, with the detail where the reason names one. @public */
 export function rejectionMessage(t: Translate, rejection: EditorRejection): string {
@@ -35,6 +41,7 @@ export function rejectionMessage(t: Translate, rejection: EditorRejection): stri
 }
 
 const pptxEditorEditNoticeProps = {
+  ...chromeTranslateProp,
   /** A class name added to the notice, as React's `className`. A host `class` also works. */
   className: { type: String, default: undefined },
 } as const;
@@ -54,10 +61,31 @@ export const PptxEditorEditNotice = defineComponent({
   props: pptxEditorEditNoticeProps,
   setup(props, { attrs }) {
     const editorRef = usePptxEditor();
-    const { t } = useTranslation();
+    const { t } = useChromeTranslateScope(() => props.t);
     const rejection = useEditorState((s) => s.lastRejection ?? null);
     const removal = useEditorState((s) => s.lastRemoval ?? null);
     const dismissed = shallowRef<EditorRejection | null>(null);
+    // A refused link shows its reason in the open link popup: the notice does not repeat it,
+    // and stays closed when the popup closes. As React's `EditNotice`.
+    const linkStore = injectHyperlinkPopupStore();
+    const linkPopup = shallowRef(linkStore?.getState() ?? null);
+    if (linkStore)
+      onScopeDispose(
+        linkStore.subscribe(() => {
+          linkPopup.value = linkStore.getState();
+        })
+      );
+    const linkEntry = usePopupEntry('hyperlink');
+    const covered = computed(
+      () => linkEntry() !== false && linkPopupShowsRejection(linkPopup.value, rejection.value)
+    );
+    watch(
+      covered,
+      (now) => {
+        if (now) dismissed.value = rejection.value;
+      },
+      { immediate: true }
+    );
     // The serial of the removal the user closed or that timed out.
     const closed = shallowRef<number | null>(null);
     const held = shallowRef(false);
@@ -83,7 +111,7 @@ export const PptxEditorEditNotice = defineComponent({
     return () => {
       const classes = ['pptx-edit-notice', attrs.class, props.className];
       const refused = rejection.value;
-      if (editNoticeShows(refused, dismissed.value))
+      if (!covered.value && editNoticeShows(refused, dismissed.value))
         return (
           <div
             {...attrs}

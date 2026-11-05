@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  RAIL_FOLD_WIDTH,
   railDragAxis,
+  railFoldsActions,
   railOrientationChrome,
   railParentKey,
   railStepOfKey,
@@ -107,6 +109,22 @@ describe('rail orientation', () => {
       collapseIcon: 'keyboard_arrow_down',
       expandIcon: 'keyboard_arrow_up',
     });
+    // A right-to-left row steps earlier with Right, so its moves say so.
+    expect(railOrientationChrome('horizontal', true)).toMatchObject({
+      moveEarlierLabel: 'rail.moveRight',
+      moveLaterLabel: 'rail.moveLeft',
+      moveEarlierIcon: 'keyboard_arrow_right',
+      menuMoveEarlierLabel: 'contextMenu.moveRight',
+      menuMoveEarlierShortcut: 'contextMenu.shortcuts.moveRight',
+      menuMoveLaterShortcut: 'contextMenu.shortcuts.moveLeft',
+      collapseIcon: 'keyboard_arrow_down',
+    });
+    expect(railOrientationChrome('vertical', true).moveEarlierLabel).toBe('rail.moveUp');
+    // A narrow row folds its secondary actions; a column, and a row not yet laid out, never do.
+    expect(railFoldsActions('horizontal', 390)).toBe(true);
+    expect(railFoldsActions('horizontal', RAIL_FOLD_WIDTH)).toBe(false);
+    expect(railFoldsActions('horizontal', 0)).toBe(false);
+    expect(railFoldsActions('vertical', 200)).toBe(false);
     expect(railDragAxis('horizontal')).toBe('x');
     expect(railDragAxis(undefined)).toBe('y');
     expect(railParentKey('horizontal')).toBe('ArrowUp');

@@ -13,9 +13,17 @@ import { useCallback, useId, useState, type CSSProperties, type ReactNode } from
 import {
   OPEN_FAILURE_MESSAGE_KEYS,
   shownOpenFailure,
+  type ChromeTranslate,
   type DocumentOpenFailure,
 } from '@pptx-editor.dev/core/editor';
 import { useEditorState, useTranslation } from './context.ts';
+import { withChromeTranslate } from './headless-hooks.tsx';
+
+/** Options for `useOpenFailure`, as DOCX Editor's `UseOpenFailureOptions`. @public */
+export interface UseOpenFailureOptions {
+  /** Your translation function for `message`. Without it, the root's `locale` gives it. */
+  readonly t?: ChromeTranslate;
+}
 
 /** The current refused open, with the packaged message and a way to dismiss it. @public */
 export interface UseOpenFailureReturn {
@@ -37,10 +45,11 @@ export interface UseOpenFailureReturn {
  * a toast. Pair it with `openFailure={false}` on `<PptxEditor>`, so the packaged notice does not
  * show as well. Call it inside a `PptxEditor.Root`. @public
  */
-export function useOpenFailure(): UseOpenFailureReturn {
+export function useOpenFailure(options: UseOpenFailureOptions = {}): UseOpenFailureReturn {
   const current = useEditorState(shownOpenFailure);
   const kept = useEditorState((s) => s.status === 'ready');
-  const { t } = useTranslation();
+  const { t: ambient } = useTranslation();
+  const t = options.t ?? ambient;
   // Each refusal is a new object, so remembering the dismissed one by reference lets the next
   // refusal of the same file show again.
   const [dismissed, setDismissed] = useState<DocumentOpenFailure | null>(null);
@@ -89,6 +98,11 @@ export interface PptxEditorOpenFailureProps {
   readonly className?: string;
   /** Inline styles for the notice. */
   readonly style?: CSSProperties;
+  /**
+   * Your translation function for the notice, as DOCX Editor's `t`. Without it, the root's
+   * `locale` gives the labels.
+   */
+  readonly t?: ChromeTranslate;
 }
 
 /**
@@ -109,7 +123,10 @@ export interface PptxEditorOpenFailureProps {
  *
  * For a toast or a banner of your own, use `useOpenFailure`. @public
  */
-export function OpenFailure({
+export const OpenFailure: (props: PptxEditorOpenFailureProps) => ReactNode =
+  withChromeTranslate<PptxEditorOpenFailureProps>(OpenFailureRoot, 'OpenFailure');
+
+function OpenFailureRoot({
   title,
   message,
   showCode = true,
@@ -119,7 +136,7 @@ export function OpenFailure({
   onDismiss,
   className,
   style,
-}: PptxEditorOpenFailureProps) {
+}: Omit<PptxEditorOpenFailureProps, 't'>) {
   const { t } = useTranslation();
   const { failure, message: packaged, kept, dismiss } = useOpenFailure();
   const titleId = useId();

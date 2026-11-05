@@ -3,10 +3,11 @@
 // `CanvasContextMenu.tsx`. The engine surface stops the browser's own menu and selects what is
 // under the pointer first (`surface-context-menu.ts`); this composable reads the selection,
 // opens a menu request for it (shapes, pictures, text being edited, or empty slide area), and
-// renders the `popups.contextMenu` entry: the packaged `PptxEditorContextMenu` by default, a
+// renders the `popups.contextMenu` entry (or the entry of a `PptxEditorContextMenu` placed in
+// the root): the packaged `PptxEditorContextMenu` by default, a
 // host renderer, or nothing for `false`. `PptxEditorContent` binds it.
 
-import { h, shallowRef, type VNodeChild } from 'vue';
+import { h, shallowRef, watch, type VNodeChild } from 'vue';
 import {
   canvasMenuKind,
   canvasMenuPoint,
@@ -20,7 +21,7 @@ import {
   PptxEditorContextMenu,
   type ContextMenuRequest,
 } from './context-menu-parts.tsx';
-import { usePopupEntry } from './popups.ts';
+import { useCanvasMenuEntry } from './popups.ts';
 
 interface CanvasMenuState {
   readonly at: ContextMenuPoint;
@@ -45,8 +46,15 @@ export interface UseCanvasContextMenuReturn {
  */
 export function useCanvasContextMenu(): UseCanvasContextMenuReturn {
   const editor = usePptxEditor();
-  const entry = usePopupEntry('contextMenu');
+  const entry = useCanvasMenuEntry();
   const menu = shallowRef<ContextMenuRequest | null>(null);
+  // An entry that turns `false` (a placed menu turned `disabled`) closes the open menu.
+  watch(
+    () => entry() === false,
+    (off) => {
+      if (off) menu.value = null;
+    }
+  );
   // Each request mounts the menu anew, so a part reads a fixed request (`useContextMenuRequest`).
   let opened = 0;
   let keyboardAt = 0;

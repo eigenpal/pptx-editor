@@ -18,6 +18,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ComponentType,
   type ReactNode,
 } from 'react';
@@ -143,7 +144,8 @@ export interface PptxEditorPopups {
   find?: PptxEditorPopup<FindPopupProps>;
   /**
    * The slide canvas's context menu. A callback usually renders `PptxEditor.ContextMenu` with
-   * host rows; `false` shows no menu.
+   * host rows; `false` shows no menu. A `PptxEditor.ContextMenu` placed in the root or the
+   * viewport gives the same entry, and this entry wins over it.
    */
   contextMenu?: PptxEditorPopup<PptxEditorContextMenuProps>;
   /**
@@ -201,9 +203,49 @@ export interface UseEditorDialogReturn {
   readonly isAvailable: boolean;
 }
 
+/** The canvas menu entry that a `PptxEditor.ContextMenu` placed in the root gives. */
+type CanvasMenuEntry = PptxEditorPopup<PptxEditorContextMenuProps>;
+
+/**
+ * The `PptxEditor.ContextMenu` placed in the root or the viewport: it gives the canvas its menu
+ * entry, as a `popups.contextMenu` entry does. The last one placed counts. @internal
+ */
+export interface CanvasMenuRegistry {
+  get(): CanvasMenuEntry | undefined;
+  place(token: object, entry: CanvasMenuEntry): void;
+  remove(token: object): void;
+  subscribe(listener: () => void): () => void;
+}
+
+function createCanvasMenuRegistry(): CanvasMenuRegistry {
+  let current: { readonly token: object; readonly entry: CanvasMenuEntry } | null = null;
+  const listeners = new Set<() => void>();
+  const notify = (): void => {
+    for (const listener of listeners) listener();
+  };
+  return {
+    get: () => current?.entry,
+    place(token, entry) {
+      if (current?.token === token && current.entry === entry) return;
+      current = { token, entry };
+      notify();
+    },
+    remove(token) {
+      if (current?.token !== token) return;
+      current = null;
+      notify();
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => void listeners.delete(listener);
+    },
+  };
+}
+
 interface DialogHost {
   readonly active: PptxEditorDialogKey | null;
   readonly popups: PptxEditorPopups | undefined;
+  readonly canvasMenus: CanvasMenuRegistry;
   open(key: PptxEditorDialogKey, returnFocusTo?: HTMLElement | null): void;
   close(): void;
 }
@@ -235,6 +277,7 @@ export function DialogProvider({
   const popupsRef = useRef(popups);
   popupsRef.current = popups;
   const opener = useRef<HTMLElement | null>(null);
+  const [canvasMenus] = useState(createCanvasMenuRegistry);
 
   const open = useCallback((key: PptxEditorDialogKey, returnFocusTo?: HTMLElement | null) => {
     if (popupsRef.current?.[key] === false) return;
@@ -271,8 +314,8 @@ export function DialogProvider({
   }, [popups, active]);
 
   const host = useMemo<DialogHost>(
-    () => ({ active, popups, open, close }),
-    [active, popups, open, close]
+    () => ({ active, popups, canvasMenus, open, close }),
+    [active, popups, canvasMenus, open, close]
   );
   return (
     <DialogHostContext.Provider value={host}>
@@ -328,6 +371,31 @@ export function useDialogOpener(): (
  */
 export function usePopupEntry<K extends keyof PptxEditorPopups>(key: K): PptxEditorPopups[K] {
   return useContext(DialogHostContext)?.popups?.[key];
+}
+
+const noCanvasMenus = (): (() => void) => () => {};
+const noCanvasMenu = (): undefined => undefined;
+
+/**
+ * The canvas menu entry of the enclosing `PptxEditor.Root`: its `popups.contextMenu` entry,
+ * else the entry of a `PptxEditor.ContextMenu` placed in the root, else undefined for the
+ * packaged menu. An explicit `popups.contextMenu` entry wins. @internal
+ */
+export function useCanvasMenuEntry(): CanvasMenuEntry | undefined {
+  const host = useContext(DialogHostContext);
+  const registry = host?.canvasMenus;
+  const placed = useSyncExternalStore(
+    registry?.subscribe ?? noCanvasMenus,
+    registry?.get ?? noCanvasMenu,
+    registry?.get ?? noCanvasMenu
+  );
+  const explicit = host?.popups?.contextMenu;
+  return explicit !== undefined ? explicit : placed;
+}
+
+/** Where a `PptxEditor.ContextMenu` placed in the root registers, or null outside a root. @internal */
+export function useCanvasMenuRegistry(): CanvasMenuRegistry | null {
+  return useContext(DialogHostContext)?.canvasMenus ?? null;
 }
 
 /** The whole `popups` map of the enclosing `PptxEditor.Root`. @internal */

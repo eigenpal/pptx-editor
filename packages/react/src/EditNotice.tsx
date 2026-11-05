@@ -12,14 +12,21 @@ import {
   editRejectionMessage,
   editRemovalMessage,
   focusSurfaceOf,
+  linkPopupShowsRejection,
   REMOVAL_NOTICE_MS,
   removalNoticeShows,
 } from '@pptx-editor.dev/core/editor';
-import { useEffect, useState } from 'react';
-import type { EditorRejection } from '@pptx-editor.dev/core/editor';
+import { useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import type { ChromeTranslate, EditorRejection } from '@pptx-editor.dev/core/editor';
+import { withChromeTranslate } from './headless-hooks.tsx';
 import type { Translate } from '@pptx-editor.dev/i18n';
 import { ToolButton, keepFocus } from './chrome.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
+import { usePopupEntry } from './popups.tsx';
+import { HyperlinkPopupContext } from './useHyperlinkPopup.ts';
+
+const NO_STORE = (): (() => void) => () => undefined;
+const NO_STATE = (): null => null;
 
 /** The message for a refusal: its reason, with the detail where the reason names one. @public */
 export function rejectionMessage(t: Translate, rejection: EditorRejection): string {
@@ -28,6 +35,11 @@ export function rejectionMessage(t: Translate, rejection: EditorRejection): stri
 
 /** The props of `EditNotice`. @public */
 export interface EditNoticeProps {
+  /**
+   * Your translation function for the notice, as DOCX Editor's `t` on its notices. Without it,
+   * the root's `locale` gives the labels.
+   */
+  readonly t?: ChromeTranslate;
   /** Appended after the `pptx-edit-notice` class. */
   className?: string;
 }
@@ -37,7 +49,10 @@ export interface EditNoticeProps {
  * nothing while edits apply, and nothing for a command that had nothing to do
  * (`EditorRejection.noop`). @public
  */
-export function EditNotice({ className }: EditNoticeProps) {
+export const EditNotice: (props: EditNoticeProps) => ReactNode =
+  withChromeTranslate<EditNoticeProps>(EditNoticeRoot, 'EditNotice');
+
+function EditNoticeRoot({ className }: Omit<EditNoticeProps, 't'>) {
   const editor = usePptxEditor();
   const { t } = useTranslation();
   const rejection = useEditorState((s) => s.lastRejection ?? null);
@@ -56,8 +71,21 @@ export function EditNotice({ className }: EditNoticeProps) {
     const timer = setTimeout(() => setClosed(serial), REMOVAL_NOTICE_MS);
     return () => clearTimeout(timer);
   }, [offered, held, removal]);
+  // A refused link shows its reason in the open link popup: the notice does not repeat it, and
+  // stays closed when the popup closes.
+  const linkStore = useContext(HyperlinkPopupContext);
+  const linkPopup = useSyncExternalStore(
+    linkStore?.subscribe ?? NO_STORE,
+    linkStore?.getState ?? NO_STATE,
+    linkStore?.getState ?? NO_STATE
+  );
+  const covered =
+    usePopupEntry('hyperlink') !== false && linkPopupShowsRejection(linkPopup, rejection);
+  useEffect(() => {
+    if (covered) setDismissed(rejection);
+  }, [covered, rejection]);
   const classes = `pptx-edit-notice${className ? ` ${className}` : ''}`;
-  if (editNoticeShows(rejection, dismissed))
+  if (!covered && editNoticeShows(rejection, dismissed))
     return (
       <div
         className={classes}

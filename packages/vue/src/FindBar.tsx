@@ -36,7 +36,8 @@ import {
   type PptxEditorInstance,
 } from '@pptx-editor.dev/core/editor';
 import { ToolButton } from './chrome.tsx';
-import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
+import { useEditorState, usePptxEditor } from './composables.ts';
+import { chromeTranslateProp, useChromeTranslateScope } from './headless-hooks.ts';
 import { usePopupEntry } from './popups.ts';
 
 /** What a replacement find bar receives, as React's `FindPopupProps`. @public */
@@ -73,6 +74,7 @@ function useRegisterFindBar(): void {
 }
 
 const pptxEditorFindBarProps = {
+  ...chromeTranslateProp,
   /** A class name added to the find bar, as React's `className`. A host `class` also works. */
   className: { type: String, default: undefined },
 } as const;
@@ -90,7 +92,7 @@ export const PptxEditorFindBar = defineComponent({
   props: pptxEditorFindBarProps,
   setup(props, { attrs }) {
     const editorRef = usePptxEditor();
-    const { t } = useTranslation();
+    const { t } = useChromeTranslateScope(() => props.t);
     // Find rows and controls are on only while a find bar can answer them.
     useRegisterFindBar();
     // `popups.find`: a renderer replaces the packaged bar here; `false` turns find off.

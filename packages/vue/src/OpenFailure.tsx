@@ -22,9 +22,17 @@ import {
 import {
   OPEN_FAILURE_MESSAGE_KEYS,
   shownOpenFailure,
+  type ChromeTranslate,
   type DocumentOpenFailure,
 } from '@pptx-editor.dev/core/editor';
 import { useEditorState, useTranslation } from './composables.ts';
+import { chromeTranslateProp, useChromeTranslateScope } from './headless-hooks.ts';
+
+/** Options for `useOpenFailure`, the twin of React's `UseOpenFailureOptions`. @public */
+export interface UseOpenFailureOptions {
+  /** Your translation function for `message`. Without it, the root's `locale` gives it. */
+  readonly t?: ChromeTranslate;
+}
 
 /** What `useOpenFailure` returns, the twin of React's `UseOpenFailureReturn`. @public */
 export interface UseOpenFailureReturn {
@@ -46,10 +54,11 @@ export interface UseOpenFailureReturn {
  * a toast. Pair it with `:open-failure="false"` on `PptxEditor`, so the packaged notice does
  * not show as well. Call it inside a `PptxEditorRoot`. @public
  */
-export function useOpenFailure(): UseOpenFailureReturn {
+export function useOpenFailure(options: UseOpenFailureOptions = {}): UseOpenFailureReturn {
   const current = useEditorState(shownOpenFailure);
   const ready = useEditorState((s) => s.status === 'ready');
-  const { t } = useTranslation();
+  const { t: ambient } = useTranslation();
+  const t = options.t ?? ambient;
   // Each refusal is a new object, so remembering the dismissed one by reference lets the next
   // refusal of the same file show again.
   const dismissed = shallowRef<DocumentOpenFailure | null>(null);
@@ -110,6 +119,7 @@ const openFailureProps = {
   className: { type: String, default: undefined },
   /** Inline styles for the notice, as React's `style`. */
   style: { type: Object as PropType<CSSProperties>, default: undefined },
+  ...chromeTranslateProp,
 } as const;
 
 /**
@@ -152,8 +162,9 @@ export const PptxEditorOpenFailure = defineComponent({
     message?: (context: OpenFailureContext) => VNodeChild;
   }>,
   setup(props, { emit, slots }) {
-    const { t } = useTranslation();
-    const { failure, message, kept, dismiss } = useOpenFailure();
+    const { t } = useChromeTranslateScope(() => props.t);
+    // A component does not inject what it provides itself, so the scoped `t` goes in directly.
+    const { failure, message, kept, dismiss } = useOpenFailure({ t: t as ChromeTranslate });
     const titleId = useId();
     return () => {
       const shown = failure.value;

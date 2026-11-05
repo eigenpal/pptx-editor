@@ -118,6 +118,52 @@ const button = (label: string) =>
   document.querySelector<HTMLButtonElement>(`.pptx-link [aria-label="${label}"]`);
 
 describe('PptxEditorHyperLink', () => {
+  test('places the popup by the selected text and keeps that box while the draft changes', async () => {
+    const editor = await mountRoot();
+    select(editor, 0, 5);
+    await nextTick();
+    const surface = surfaceRootOf(editor)!;
+    const mark = document.createElement('div');
+    mark.className = 'pptx-surface__text-selection';
+    let left = 180;
+    mark.getBoundingClientRect = () =>
+      ({ left, right: left + 90, top: 220, bottom: 240, width: 90, height: 20 }) as DOMRect;
+    surface.append(mark);
+    const anchor = document.createElement('button');
+    anchor.getBoundingClientRect = () =>
+      ({ left: 20, right: 60, top: 30, bottom: 50, width: 40, height: 20 }) as DOMRect;
+    document.body.append(anchor);
+    requestLinkPopup(editor, anchor);
+    await nextTick();
+    await nextTick();
+    const popup = document.querySelector<HTMLElement>('.pptx-link-popup')!;
+    expect(popup.style.left).toBe('180px');
+    expect(popup.style.top).toBe('246px');
+    left = 480;
+    const field = document.querySelector<HTMLInputElement>('.pptx-link__field')!;
+    field.value = 'https://example.com/new';
+    field.dispatchEvent(new Event('input'));
+    await nextTick();
+    expect(popup.style.left).toBe('180px');
+    expect(popup.style.top).toBe('246px');
+  });
+
+  test('falls back to the opener when the selection has no visible box', async () => {
+    const editor = await mountRoot();
+    select(editor, 0, 5);
+    await nextTick();
+    const anchor = document.createElement('button');
+    anchor.getBoundingClientRect = () =>
+      ({ left: 35, right: 75, top: 30, bottom: 50, width: 40, height: 20 }) as DOMRect;
+    document.body.append(anchor);
+    requestLinkPopup(editor, anchor);
+    await nextTick();
+    await nextTick();
+    const popup = document.querySelector<HTMLElement>('.pptx-link-popup')!;
+    expect(popup.style.left).toBe('35px');
+    expect(popup.style.top).toBe('56px');
+  });
+
   test('a click into linked text opens reading mode; Edit and Apply change the link', async () => {
     const editor = await mountRoot();
     await linkAndCaret(editor);

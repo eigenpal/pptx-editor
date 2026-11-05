@@ -9,6 +9,7 @@
 // `ToolbarSlot` and `ToolbarGroup` under a preset bar are descriptions: the bar reads their
 // props and renders the controls itself, as in DOCX Editor's Vue toolbar.
 
+import { chromeTranslateProp, useChromeTranslateScope } from './headless-hooks.ts';
 import {
   Comment,
   Text,
@@ -443,6 +444,7 @@ function collectOverrides(
 const hasContent = (nodes: VNodeArrayChildren | undefined): boolean => flatten(nodes).length > 0;
 
 const pptxEditorToolbarProps = {
+  ...chromeTranslateProp,
   /**
    * `true` (default): the registry's groups, changed by `ToolbarSlot` and `ToolbarGroup`
    * children. `false`: only the children, in the order given.
@@ -479,7 +481,7 @@ export const ToolbarRoot = defineComponent({
   name: 'PptxEditorToolbar',
   props: pptxEditorToolbarProps,
   setup(props, { slots }) {
-    const { t } = useTranslation();
+    const { t } = useChromeTranslateScope(() => props.t);
     // The bar shows the groups that act on the selection, as in React (`toolbarContextOf`).
     const selection = useEditorState(toolbarContextOf);
     // A focused speaker notes field takes the text formatting (`NOTES_SLOTS`), as in React.

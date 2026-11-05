@@ -31,7 +31,12 @@ describe('ContextMenu', () => {
       left: 750,
       top: 400,
     });
-    expect(placeInViewport({ x: 10, y: 10 }, 240, 900, 1000, 760)).toEqual({ left: 10, top: 8 });
+    // Too tall for either side: it stays at the point and scrolls.
+    expect(placeInViewport({ x: 10, y: 10 }, 240, 900, 1000, 760)).toEqual({
+      left: 10,
+      top: 10,
+      maxHeight: 742,
+    });
   });
 
   test('arrow keys move through the rows, a click runs one, Escape closes and returns focus', () => {

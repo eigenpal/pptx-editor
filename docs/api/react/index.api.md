@@ -12,18 +12,23 @@ import { ChromeControl } from '@pptx-editor.dev/core/editor';
 import { ChromeGroupId } from '@pptx-editor.dev/core/editor';
 import { ChromeMenuId } from '@pptx-editor.dev/core/editor';
 import { ChromeSlotId } from '@pptx-editor.dev/core/editor';
+import { ChromeTranslate } from '@pptx-editor.dev/core/editor';
 import { ColorMode } from '@pptx-editor.dev/core/editor';
 import { ColumnsDialogFields } from '@pptx-editor.dev/core/editor';
 import { CommandResult } from '@pptx-editor.dev/core/editor';
 import { ComponentType } from 'react';
 import { composeFontConfiguration } from '@pptx-editor.dev/core/editor';
 import { composeFontOrigins } from '@pptx-editor.dev/core/editor';
+import { ContextMenuPartName } from '@pptx-editor.dev/core/editor';
 import { createFontSource } from '@pptx-editor.dev/core/editor';
 import { CSSProperties } from 'react';
 import { DEFAULT_FONT } from '@pptx-editor.dev/core/editor';
 import { deferFonts } from '@pptx-editor.dev/core/editor';
 import { defineFontResolver } from '@pptx-editor.dev/core/editor';
 import { DocumentOpenFailure } from '@pptx-editor.dev/core/editor';
+import { DocumentSearchFindOptions } from '@pptx-editor.dev/core/editor';
+import { DocumentSearchState } from '@pptx-editor.dev/core/editor';
+import { EditorCaret } from '@pptx-editor.dev/core/editor';
 import { EditorCommand } from '@pptx-editor.dev/core/editor';
 import { EditorExecOptions } from '@pptx-editor.dev/core/editor';
 import { EditorFontError } from '@pptx-editor.dev/core/editor';
@@ -34,6 +39,7 @@ import { EditorModule } from '@pptx-editor.dev/core/editor';
 import { EditorRejection } from '@pptx-editor.dev/core/editor';
 import { EditorRemoval } from '@pptx-editor.dev/core/editor';
 import { EditorSnapshot } from '@pptx-editor.dev/core/editor';
+import { FindMatch } from '@pptx-editor.dev/core/editor';
 import { FontConfiguration } from '@pptx-editor.dev/core/contracts';
 import { FontConfigurationBase } from '@pptx-editor.dev/core/editor';
 import { FontConfigurationFragment } from '@pptx-editor.dev/core/editor';
@@ -55,6 +61,9 @@ import { FontSourceSubstitution } from '@pptx-editor.dev/core/contracts';
 import { FontUrlSource } from '@pptx-editor.dev/core/editor';
 import { gradientCss } from '@pptx-editor.dev/core/editor';
 import { GradientFill } from '@pptx-editor.dev/core/editor';
+import { HistoryGroupBindingOptions } from '@pptx-editor.dev/core/editor';
+import { HyperlinkPopupActions } from '@pptx-editor.dev/core/editor';
+import { HyperlinkPopupLink } from '@pptx-editor.dev/core/editor';
 import { HyperlinkPopupMode } from '@pptx-editor.dev/core/editor';
 import { HyperlinkPopupState } from '@pptx-editor.dev/core/editor';
 import { isFontResolver } from '@pptx-editor.dev/core/editor';
@@ -64,12 +73,20 @@ import { LoadFontsResult } from '@pptx-editor.dev/core/editor';
 import { LocaleCatalog } from '@pptx-editor.dev/i18n';
 import { MarkedFontResolver } from '@pptx-editor.dev/core/editor';
 import { MAX_RESOLVER_FAMILIES } from '@pptx-editor.dev/core/editor';
+import { MenuNamedRow } from '@pptx-editor.dev/core/editor';
+import { MenuRowPartName } from '@pptx-editor.dev/core/editor';
 import { MouseEvent as MouseEvent_2 } from 'react';
 import { ParagraphDialogFields } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatCommand } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatRead } from '@pptx-editor.dev/core/editor';
 import { platformShortcuts } from '@pptx-editor.dev/core/editor';
+import { PopoverAnchorRect } from '@pptx-editor.dev/core/editor';
+import { PptxEditorEvents } from '@pptx-editor.dev/core/editor';
 import { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import { PptxFontOrigin } from '@pptx-editor.dev/core/editor';
+import { PptxFontsInput } from '@pptx-editor.dev/core/editor';
+import { PptxFontsSource } from '@pptx-editor.dev/core/editor';
+import { PptxSource } from '@pptx-editor.dev/core/editor';
 import * as react from 'react';
 import { ReactElement } from 'react';
 import { ReactNode } from 'react';
@@ -85,6 +102,7 @@ import { SlideshowController } from '@pptx-editor.dev/core/editor';
 import { ToolbarShownValue } from '@pptx-editor.dev/core/editor';
 import { ToolbarValueMap } from '@pptx-editor.dev/core/editor';
 import { Translate } from '@pptx-editor.dev/i18n';
+import { UsePptxSourceOptions } from '@pptx-editor.dev/core/editor';
 
 // @public
 export const BackgroundDialog: typeof BackgroundDialogRoot & {
@@ -155,6 +173,8 @@ export { ChromeMenuId }
 
 export { ChromeSlotId }
 
+export { ChromeTranslate }
+
 export { ColorMode }
 
 // @public
@@ -192,7 +212,12 @@ export { composeFontOrigins }
 export function ContextMenu(input: ContextMenuProps): react.ReactPortal;
 
 // @public
-export interface ContextMenuNamespace {
+export type ContextMenuNamedRows = {
+    readonly [K in ContextMenuPartName]: MenuRowPartComponent;
+};
+
+// @public
+export interface ContextMenuNamespace extends ContextMenuNamedRows {
     (props: PptxEditorContextMenuProps): ReactNode;
     readonly Group: typeof MenuGroup;
     readonly Item: typeof MenuRow;
@@ -200,6 +225,8 @@ export interface ContextMenuNamespace {
     readonly Slot: typeof MenuSlotItem;
     readonly Submenu: typeof MenuSubmenu;
 }
+
+export { ContextMenuPartName }
 
 // @public
 export interface ContextMenuPoint {
@@ -266,13 +293,20 @@ export interface DialogPartProps {
 
 export { DocumentOpenFailure }
 
+export { DocumentSearchFindOptions }
+
+export { DocumentSearchState }
+
 // @public
-export function EditNotice(input: EditNoticeProps): react.JSX.Element | null;
+export const EditNotice: (props: EditNoticeProps) => ReactNode;
 
 // @public
 export interface EditNoticeProps {
     className?: string;
+    readonly t?: ChromeTranslate;
 }
+
+export { EditorCaret }
 
 export { EditorCommand }
 
@@ -304,11 +338,12 @@ export interface FillControlProps {
 }
 
 // @public
-export function FindBar(input: FindBarProps): react.JSX.Element | null;
+export const FindBar: (props: FindBarProps) => ReactNode;
 
 // @public
 export interface FindBarProps {
     className?: string;
+    readonly t?: ChromeTranslate;
 }
 
 // @public
@@ -384,11 +419,12 @@ export { FontLoadFailure }
 export { FontLoadFailureReason }
 
 // @public
-export function FontNotice(input: FontNoticeProps): react.JSX.Element | null;
+export const FontNotice: (props: FontNoticeProps) => ReactNode;
 
 // @public
 export interface FontNoticeProps {
     className?: string;
+    readonly t?: ChromeTranslate;
 }
 
 export { FontOrigin }
@@ -428,6 +464,8 @@ export interface GradientDialogProps {
 }
 
 export { GradientFill }
+
+export { HistoryGroupBindingOptions }
 
 // @public
 export const HyperLink: HyperLinkNamespace;
@@ -471,6 +509,10 @@ export interface HyperLinkPartProps {
 
 // @public
 export function HyperlinkPopup(props: HyperlinkPopupProps): ReactNode;
+
+export { HyperlinkPopupActions }
+
+export { HyperlinkPopupLink }
 
 export { HyperlinkPopupMode }
 
@@ -691,8 +733,15 @@ export interface MenuItemProps {
     title?: string;
 }
 
+export { MenuNamedRow }
+
 // @public
-export interface MenuNamespace {
+export type MenuNamedRows = {
+    readonly [K in MenuRowPartName]: MenuRowPartComponent;
+};
+
+// @public
+export interface MenuNamespace extends MenuNamedRows {
     (props: MenuProps): ReactNode;
     readonly Arrange: MenuPartComponent;
     readonly Edit: MenuPartComponent;
@@ -721,10 +770,30 @@ export interface MenuProps {
     readonly children?: ReactNode;
     readonly className?: string;
     readonly preset?: boolean;
+    readonly t?: ChromeTranslate;
 }
 
 // @public
 export function MenuRow(props: MenuRowProps): react.JSX.Element;
+
+// @public
+export interface MenuRowPartComponent {
+    // (undocumented)
+    (props: MenuRowPartProps): ReactNode;
+    readonly pptxMenuRow: MenuNamedRow;
+}
+
+export { MenuRowPartName }
+
+// @public
+export interface MenuRowPartProps {
+    readonly className?: string;
+    readonly hidden?: boolean;
+    readonly icon?: ReactNode;
+    readonly label?: string;
+    readonly labelKey?: string;
+    readonly shortcutKey?: string;
+}
 
 // @public
 export interface MenuRowProps {
@@ -810,7 +879,7 @@ export interface NotesPaneProps extends Omit<PaneProps, 'paneWidth'> {
 }
 
 // @public
-export function OpenFailure(input: PptxEditorOpenFailureProps): react.JSX.Element | null;
+export const OpenFailure: (props: PptxEditorOpenFailureProps) => ReactNode;
 
 // @public
 export interface OpenFailureContext {
@@ -897,6 +966,7 @@ export function Popover(input: PopoverProps): react.ReactPortal;
 export interface PopoverProps {
     align?: 'start' | 'end';
     anchor: HTMLElement | null;
+    anchorRect?: PopoverAnchorRect | null;
     children: ReactNode;
     className?: string;
     field?: boolean;
@@ -915,14 +985,14 @@ export const PptxEditor: react.ForwardRefExoticComponent<PptxEditorProps & react
     Content: typeof PptxEditorContent;
     Toolbar: PptxEditorToolbarNamespace;
     ToolbarControl: typeof ToolbarControl;
-    SlideRail: typeof SlideRail;
+    SlideRail: SlideRailNamespace;
     SlideSorter: typeof SlideSorter;
     NotesPane: typeof NotesPane;
     ZoomPill: typeof ZoomPill;
     SidePanel: typeof SidePanel;
-    FontNotice: typeof FontNotice;
-    EditNotice: typeof EditNotice;
-    OpenFailure: typeof OpenFailure;
+    FontNotice: (props: FontNoticeProps) => ReactNode;
+    EditNotice: (props: EditNoticeProps) => ReactNode;
+    OpenFailure: (props: PptxEditorOpenFailureProps) => ReactNode;
     Loading: LoadingComponent;
     PageSetupDialog: ((props: PageSetupDialogProps) => ReactNode) & {
         Header: (props: DialogPartProps) => ReactNode;
@@ -1022,7 +1092,7 @@ export const PptxEditor: react.ForwardRefExoticComponent<PptxEditorProps & react
         Cancel: (props: DialogPartProps) => ReactNode;
     };
     Slideshow: typeof Slideshow;
-    FindBar: typeof FindBar;
+    FindBar: (props: FindBarProps) => ReactNode;
     HyperLink: HyperLinkNamespace;
     Menu: MenuNamespace;
     ContextMenu: ContextMenuNamespace;
@@ -1048,11 +1118,16 @@ export const PptxEditorContextMenu: ContextMenuNamespace;
 export interface PptxEditorContextMenuProps {
     readonly children?: ReactNode;
     readonly className?: string;
+    readonly disabled?: boolean;
+    readonly onOpenChange?: (open: boolean) => void;
     readonly preset?: boolean;
+    readonly t?: ChromeTranslate;
 }
 
 // @public
 export type PptxEditorDialogKey = 'pageSetup' | 'background' | 'paragraph' | 'font' | 'bulletsAndNumbering' | 'columns' | 'imageAltText' | 'imageProperties';
+
+export { PptxEditorEvents }
 
 export { PptxEditorInstance }
 
@@ -1069,6 +1144,7 @@ export interface PptxEditorOpenFailureProps {
     readonly showClose?: boolean;
     readonly showCode?: boolean;
     readonly style?: CSSProperties;
+    readonly t?: ChromeTranslate;
     readonly title?: string;
 }
 
@@ -1097,18 +1173,24 @@ export interface PptxEditorProps {
     readonly children?: ReactNode;
     readonly className?: string;
     readonly colorMode?: ColorMode;
+    readonly contextMenu?: boolean | PptxEditorContextMenuProps;
     readonly document?: Uint8Array;
     readonly fontFamilies?: readonly string[];
     readonly fonts?: EditorFontsOption;
+    readonly hyperlinkPopup?: boolean;
     readonly locale?: LocaleCatalog;
+    readonly menu?: boolean | MenuProps;
     readonly mode?: EditorMode;
     readonly modules?: readonly EditorModule[];
+    readonly notesPane?: boolean | NotesPaneProps;
     readonly onChange?: (editor: PptxEditorInstance) => void;
     readonly onFontError?: (error: EditorFontError) => void;
     readonly onReady?: (editor: PptxEditorInstance) => void;
     readonly openFailure?: boolean | PptxEditorOpenFailureProps;
     readonly popups?: PptxEditorPopups;
     readonly renderOpenFailureActions?: (context: OpenFailureContext) => ReactNode;
+    readonly slideRail?: boolean | SlideRailProps;
+    readonly toolbar?: boolean | ToolbarProps;
 }
 
 // @public
@@ -1163,6 +1245,14 @@ export interface PptxEditorViewportProps {
     children?: ReactNode;
     className?: string;
 }
+
+export { PptxFontOrigin }
+
+export { PptxFontsInput }
+
+export { PptxFontsSource }
+
+export { PptxSource }
 
 // @public
 export function RailContextMenu(input: RailContextMenuProps): react.JSX.Element;
@@ -1302,13 +1392,63 @@ export { SlideBackground }
 export { SlideLayoutSummary }
 
 // @public
-export function SlideRail(props?: SlideRailProps): react.JSX.Element | null;
+export const SlideRail: SlideRailNamespace;
+
+// @public
+export function SlideRailAddSlide(props: SlideRailPartProps): ReactNode;
+
+// @public
+export function SlideRailChooseLayout(props: SlideRailPartProps): ReactNode;
+
+// @public
+export function SlideRailCollapse(props: SlideRailPartProps): ReactNode;
+
+// @public
+export function SlideRailDelete(props: SlideRailPartProps): ReactNode;
+
+// @public
+export function SlideRailDuplicate(props: SlideRailPartProps): ReactNode;
+
+// @public
+export function SlideRailExpand(props: SlideRailPartProps): ReactNode;
+
+// @public
+export function SlideRailMoveEarlier(props: SlideRailPartProps): ReactNode;
+
+// @public
+export function SlideRailMoveLater(props: SlideRailPartProps): ReactNode;
+
+// @public
+export interface SlideRailNamespace {
+    (props: SlideRailProps): ReactNode;
+    readonly Action: typeof ToolbarAction;
+    readonly AddSlide: typeof SlideRailAddSlide;
+    readonly ChooseLayout: typeof SlideRailChooseLayout;
+    readonly Collapse: typeof SlideRailCollapse;
+    readonly Delete: typeof SlideRailDelete;
+    readonly Duplicate: typeof SlideRailDuplicate;
+    readonly Expand: typeof SlideRailExpand;
+    readonly MoveEarlier: typeof SlideRailMoveEarlier;
+    readonly MoveLater: typeof SlideRailMoveLater;
+}
 
 export { SlideRailOrientation }
 
 // @public
+export interface SlideRailPartProps {
+    readonly asChild?: boolean;
+    readonly children?: ReactNode;
+    readonly className?: string;
+    readonly hidden?: boolean;
+    readonly icon?: ReactNode;
+}
+
+// @public
 export interface SlideRailProps extends PaneProps {
+    readonly children?: ReactNode;
     readonly orientation?: SlideRailOrientation;
+    readonly preset?: boolean;
+    readonly t?: ChromeTranslate;
     readonly toggle?: boolean;
 }
 
@@ -1333,6 +1473,7 @@ export interface SlideSorterProps {
 // @public
 export interface StatusBarNamespace {
     (props: StatusBarProps): ReactNode;
+    readonly Action: typeof ToolbarAction;
     readonly Notes: typeof StatusBarNotes;
     readonly SlideNumber: typeof StatusBarSlideNumber;
     readonly Views: typeof StatusBarViews;
@@ -1360,6 +1501,7 @@ export interface StatusBarProps {
     readonly children?: ReactNode;
     readonly className?: string;
     readonly preset?: boolean;
+    readonly t?: ChromeTranslate;
 }
 
 // @public
@@ -1399,6 +1541,14 @@ export interface ToolbarColorSplitComponent {
 // @public
 export interface ToolbarColorSplitProps extends ToolbarSlotPartProps {
     readonly icon?: ReactNode;
+}
+
+// @public
+export const ToolbarContext: react.Context<ToolbarContextValue>;
+
+// @public
+export interface ToolbarContextValue {
+    readonly t: ChromeTranslate | undefined;
 }
 
 // @public
@@ -1559,6 +1709,7 @@ export interface ToolbarProps {
     readonly contextual?: boolean;
     readonly overflow?: boolean;
     readonly preset?: boolean;
+    readonly t?: ChromeTranslate;
 }
 
 // @public
@@ -1618,6 +1769,7 @@ export interface ToolButtonProps {
     disabledReason?: string | null;
     expanded?: boolean;
     hasPopup?: 'menu' | 'grid' | 'dialog';
+    host?: ReactElement<HostElementProps> | null;
     icon?: string;
     label: string;
     onClick: () => void;
@@ -1654,6 +1806,9 @@ export function useBulletsAndNumberingDialog(): UseBulletsAndNumberingDialogRetu
 export type UseBulletsAndNumberingDialogReturn = UseDialogReturn<BulletsDialogFields>;
 
 // @public
+export function useChromeTranslate(overrides?: ReadonlyMap<string, string>): ChromeTranslate;
+
+// @public
 export function useColumnsDialog(): UseColumnsDialogReturn;
 
 // @public
@@ -1674,6 +1829,26 @@ export interface UseDialogReturn<Fields extends object> {
     setValue<K extends keyof Fields>(name: K, value: Fields[K]): void;
     readonly values: Fields;
 }
+
+// @public
+export function useDocumentSearch(): UseDocumentSearchResult;
+
+// @public
+export interface UseDocumentSearchResult extends DocumentSearchState {
+    readonly clear: () => void;
+    readonly find: (query: string, options?: DocumentSearchFindOptions) => readonly FindMatch[];
+    readonly goTo: (index: number) => boolean;
+    readonly next: () => boolean;
+    readonly previous: () => boolean;
+    // (undocumented)
+    readonly setMatchCase: (value: boolean) => void;
+    readonly setQuery: (query: string) => void;
+    // (undocumented)
+    readonly setWholeWord: (value: boolean) => void;
+}
+
+// @public
+export function useEditorCaret(): EditorCaret | null;
 
 // @public
 export function useEditorColorMode(): UseEditorColorModeReturn;
@@ -1705,6 +1880,18 @@ export interface UseEditorDialogReturn {
     readonly isOpen: boolean;
     open(returnFocusTo?: HTMLElement | null): void;
 }
+
+// @public
+export function useEditorEvent<E extends keyof PptxEditorEvents>(event: E, handler: PptxEditorEvents[E]): void;
+
+// @public
+export function useEditorHostDocument(): UseEditorHostDocumentReturn;
+
+// @public
+export type UseEditorHostDocumentReturn = Document | null;
+
+// @public
+export function useEditorSnapshot(editor: PptxEditorInstance | null): number;
 
 // @public
 export function useEditorState<T>(selector: (snapshot: EditorSnapshot) => T, isEqual?: (a: T, b: T) => boolean): T;
@@ -1762,25 +1949,23 @@ export function useFonts(...origins: readonly FontOrigin[]): UseFontsReturn;
 export type UseFontsReturn = MarkedFontResolver;
 
 // @public
+export function useHistoryGroup(input: HistoryGroupBindingOptions): UseHistoryGroupReturn;
+
+// @public
+export interface UseHistoryGroupReturn {
+    readonly options: () => EditorExecOptions;
+    readonly ref: (element: HTMLElement | null) => void;
+}
+
+// @public
 export function useHyperlinkPopup(): UseHyperlinkPopupResult;
 
 // @public
-export interface UseHyperlinkPopupResult {
-    beginEdit(): void;
-    // (undocumented)
-    close(): void;
-    commitEdit(): boolean;
-    copy(): Promise<boolean>;
-    open(link?: {
-        readonly url: string;
-    } | null, anchor?: HTMLElement | null): void;
-    openAtCaret(): void;
-    openTarget(): boolean;
-    // (undocumented)
-    setUrl(url: string): void;
-    // (undocumented)
+export function useHyperlinkPopupInstance(active?: boolean): UseHyperlinkPopupResult;
+
+// @public
+export interface UseHyperlinkPopupResult extends HyperlinkPopupActions {
     readonly state: HyperlinkPopupState;
-    unlink(): boolean;
 }
 
 // @public
@@ -1806,7 +1991,12 @@ export interface UseNotesPaneReturn {
 }
 
 // @public
-export function useOpenFailure(): UseOpenFailureReturn;
+export function useOpenFailure(options?: UseOpenFailureOptions): UseOpenFailureReturn;
+
+// @public
+export interface UseOpenFailureOptions {
+    readonly t?: ChromeTranslate;
+}
 
 // @public
 export interface UseOpenFailureReturn {
@@ -1842,6 +2032,22 @@ export interface UseParagraphFormatReturn {
 export function usePptxEditor(): PptxEditorInstance | null;
 
 // @public
+export function usePptxSource(source: PptxSource | null | undefined, options?: UsePptxSourceOptions): UsePptxSourceResult;
+
+export { UsePptxSourceOptions }
+
+// @public
+export interface UsePptxSourceResult {
+    readonly document: Uint8Array | undefined;
+    readonly error: Error | null;
+    readonly fonts: FontConfiguration | FontResolver | undefined;
+    readonly isLoading: boolean;
+}
+
+// @public
+export function useScopeClassName(): '' | 'pptx-editor ' | 'pptx-editor dark ';
+
+// @public
 export function useSlideLayouts(): readonly SlideLayoutSummary[];
 
 // @public
@@ -1855,9 +2061,35 @@ export interface UseSlideshowReturn {
 }
 
 // @public
+export function useToolbarContext(): ToolbarContextValue;
+
+// @public
+export function useToolbarLabel(): (key: string) => string;
+
+// @public
+export function useToolbarLabelFor(t: ChromeTranslate | undefined): (key: string) => string;
+
+// @public
 export function useTranslation(): {
     t: Translate;
 };
+
+// @public
+export function useZoom(): UseZoomResult;
+
+// @public
+export interface UseZoomResult {
+    readonly canZoomIn: boolean;
+    readonly canZoomOut: boolean;
+    readonly fit: () => void;
+    readonly isFit: boolean;
+    readonly levels: readonly number[];
+    readonly reset: () => void;
+    readonly setZoom: (zoom: number) => void;
+    readonly zoom: number;
+    readonly zoomIn: () => void;
+    readonly zoomOut: () => void;
+}
 
 // @public
 export function ZoomPill(input?: ZoomPillProps): react.JSX.Element;

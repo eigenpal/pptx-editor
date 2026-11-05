@@ -60,6 +60,37 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
+describe('--doc-slide-padding', () => {
+  test('sets the room around the fitted slide, 24px a side by default', async () => {
+    const css = await Bun.file(
+      new URL('../../../core/src/styles/editor.css', import.meta.url)
+    ).text();
+    const sheet = document.createElement('style');
+    sheet.textContent = css;
+    document.head.append(sheet);
+    const fitFor = async (padding: string | null): Promise<number> => {
+      const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+      expect((await editor.load(buildPptx({ slides: [{ shapes: '' }] }))).ok).toBe(true);
+      const host = document.createElement('div');
+      if (padding) host.style.setProperty('--doc-slide-padding', padding);
+      // A 1280 x 720 slide in a host that is 48px wider than the slide.
+      Object.defineProperty(host, 'clientWidth', { value: 1328 });
+      Object.defineProperty(host, 'clientHeight', { value: 2000 });
+      document.body.append(host);
+      editor.attach(host);
+      const zoom = editor.snapshot().zoom;
+      editor.destroy();
+      return zoom;
+    };
+    try {
+      expect(await fitFor(null)).toBeCloseTo(1, 3);
+      expect(await fitFor('4px')).toBeCloseTo(1320 / 1280, 3);
+    } finally {
+      sheet.remove();
+    }
+  });
+});
+
 describe('slide surface', () => {
   test('E19: the surface and its text input have accessible names from en.json', async () => {
     const { editor, host } = await setup();

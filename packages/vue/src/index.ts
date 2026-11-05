@@ -49,8 +49,11 @@ import { PptxEditorFontNotice } from './FontNotice.tsx';
 import { PptxEditorSlideshow } from './Slideshow.tsx';
 import { PptxEditorSlideSorter } from './SlideSorter.tsx';
 import { PptxEditorSidePanel, PptxEditorZoomPill } from './panes.tsx';
-import { PptxEditorMenu } from './menu-parts.tsx';
-import { PptxEditorContextMenu } from './context-menu-parts.tsx';
+import { PptxEditorMenu, type MenuProps } from './menu-parts.tsx';
+import { PptxEditorContextMenu, type PptxEditorContextMenuProps } from './context-menu-parts.tsx';
+import type { ToolbarProps } from './toolbar.ts';
+import type { SlideRailProps } from './panes.tsx';
+import type { NotesPaneProps } from './NotesPane.tsx';
 import { PptxEditorRibbon } from './ribbon.ts';
 import { PptxEditorStatusBar } from './status-bar.ts';
 import { ToolbarControl } from './toolbar.ts';
@@ -95,6 +98,40 @@ export type {
   ParagraphFormatRead,
 } from '@pptx-editor.dev/core/editor';
 export { useEditorColorMode, type UseEditorColorModeReturn } from './color-mode.ts';
+export {
+  useEditorEvent,
+  useEditorSnapshot,
+  useScopeClassName,
+  useZoom,
+  type UseScopeClassNameReturn,
+  type UseEditorEventReturn,
+  type UseEditorSnapshotReturn,
+  type UseZoomReturn,
+} from './customization-hooks.ts';
+export {
+  useChromeTranslate,
+  useDocumentSearch,
+  useEditorCaret,
+  useHistoryGroup,
+  useToolbarContext,
+  useToolbarLabel,
+  useToolbarLabelFor,
+  type UseChromeTranslateReturn,
+  type UseDocumentSearchReturn,
+  type UseEditorCaretReturn,
+  type UseHistoryGroupReturn,
+  type UseToolbarContextReturn,
+  type UseToolbarLabelForReturn,
+  type UseToolbarLabelReturn,
+} from './headless-hooks.ts';
+export type {
+  ChromeTranslate,
+  DocumentSearchFindOptions,
+  DocumentSearchState,
+  EditorCaret,
+  HistoryGroupBindingOptions,
+} from '@pptx-editor.dev/core/editor';
+export type { PptxEditorEvents } from '@pptx-editor.dev/core/editor';
 export type { ColorMode, ResolvedColorMode } from '@pptx-editor.dev/core/editor';
 export {
   PptxEditorContent,
@@ -128,19 +165,42 @@ export {
   useOpenFailure,
   type OpenFailureContext,
   type PptxEditorOpenFailureProps,
+  type UseOpenFailureOptions,
   type UseOpenFailureReturn,
 } from './OpenFailure.tsx';
 export { PptxEditorFontNotice, type FontNoticeProps } from './FontNotice.tsx';
+export {
+  useHyperlinkPopup,
+  useHyperlinkPopupInstance,
+  type UseHyperlinkPopupInstanceReturn,
+  type UseHyperlinkPopupReturn,
+} from './useHyperlinkPopup.ts';
+export type {
+  HyperlinkPopupActions,
+  HyperlinkPopupLink,
+  HyperlinkPopupMode,
+  HyperlinkPopupState,
+} from '@pptx-editor.dev/core/editor';
+export {
+  useEditorHostDocument,
+  usePptxSource,
+  type UseEditorHostDocumentReturn,
+  type UsePptxSourceReturn,
+} from './usePptxSource.ts';
+export type {
+  PptxFontOrigin,
+  PptxFontsInput,
+  PptxFontsSource,
+  PptxSource,
+  UsePptxSourceOptions,
+} from '@pptx-editor.dev/core/editor';
 export { HyperlinkPopup, type HyperlinkPopupProps } from './HyperlinkPopup.tsx';
 export {
   PptxEditorHyperLink,
-  useHyperlinkPopup,
   type HyperLinkActionProps,
   type HyperLinkPartProps,
   type HyperLinkProps,
-  type UseHyperlinkPopupReturn,
 } from './HyperLink.tsx';
-export type { HyperlinkPopupMode, HyperlinkPopupState } from '@pptx-editor.dev/core/editor';
 export {
   PptxEditorSlideshow,
   pptxSlideshowKey,
@@ -238,11 +298,20 @@ export {
   type MenuPartComponent,
   type MenuProps,
   type MenuSlotItemProps,
+  type MenuNamedRows,
+  type MenuRowPartComponent,
+  type MenuRowPartProps,
 } from './menu-parts.tsx';
+export type {
+  ContextMenuPartName,
+  MenuNamedRow,
+  MenuRowPartName,
+} from '@pptx-editor.dev/core/editor';
 export {
   PptxEditorContextMenu,
   useContextMenuRequest,
   useContextMenuTarget,
+  type ContextMenuNamedRows,
   type ContextMenuNamespace,
   type ContextMenuRequest,
   type PptxEditorContextMenuProps,
@@ -258,6 +327,17 @@ export {
   type SectionMenuState,
 } from './RailContextMenu.tsx';
 export { useNotesPane, type UseNotesPaneReturn } from './pane-state.ts';
+export {
+  SlideRailAddSlide,
+  SlideRailChooseLayout,
+  SlideRailCollapse,
+  SlideRailExpand,
+  SlideRailDelete,
+  SlideRailDuplicate,
+  SlideRailMoveEarlier,
+  SlideRailMoveLater,
+  type SlideRailPartProps,
+} from './rail-parts.tsx';
 export {
   PptxEditorSlideRail,
   PptxEditorSidePanel,
@@ -443,7 +523,71 @@ const pptxEditorProps = {
     type: [Boolean, Object] as PropType<boolean | PptxEditorOpenFailureProps>,
     default: true,
   },
+  /**
+   * The toolbar (`PptxEditorToolbar`). An object is `ToolbarProps`, passed straight through.
+   * `false` removes it. Default `true`.
+   */
+  toolbar: { type: [Boolean, Object] as PropType<boolean | ToolbarProps>, default: true },
+  /**
+   * The menu bar (`PptxEditorMenu`), above the toolbar. An object is `MenuProps`, passed
+   * straight through, as DOCX Editor's `menu`. Default `false`: the packaged editor shows the
+   * toolbar only.
+   */
+  menu: { type: [Boolean, Object] as PropType<boolean | MenuProps>, default: false },
+  /**
+   * The slide canvas's context menu. An object is `PptxEditorContextMenuProps`, passed straight
+   * through. `false` shows no menu. It sets `popups.contextMenu`, and a `popups.contextMenu`
+   * entry wins over it. Default `true`.
+   */
+  contextMenu: {
+    type: [Boolean, Object] as PropType<boolean | PptxEditorContextMenuProps>,
+    default: true,
+  },
+  /**
+   * The packaged link popup. `false` removes it, as `popups.hyperlink: false` does: a host
+   * panel that reads `useHyperlinkPopup()` then opens for the link controls. Default `true`.
+   */
+  hyperlinkPopup: { type: Boolean, default: true },
+  /**
+   * The slide rail (`PptxEditorSlideRail`), as DOCX Editor's `navigation`. An object is
+   * `SlideRailProps`, passed straight through. `false` removes it. Default `true`.
+   */
+  slideRail: { type: [Boolean, Object] as PropType<boolean | SlideRailProps>, default: true },
+  /**
+   * The speaker notes pane (`PptxEditorNotesPane`). An object is `NotesPaneProps`, passed
+   * straight through. `false` removes it. Default `true`.
+   */
+  notesPane: { type: [Boolean, Object] as PropType<boolean | NotesPaneProps>, default: true },
 } as const;
+
+/** The props an object value gives, or none for `true`. */
+const partProps = <P extends object>(value: boolean | P | undefined): P | null =>
+  typeof value === 'object' ? value : null;
+
+/**
+ * The `popups` the sugar passes to the root: the host's entries, with `contextMenu` and
+ * `hyperlinkPopup` mapped onto the same entries, as React's sugar. A host entry wins.
+ */
+function sugarPopups(
+  popups: PptxEditorPopups | undefined,
+  hyperlinkPopup: boolean,
+  contextMenu: boolean | PptxEditorContextMenuProps
+): PptxEditorPopups | undefined {
+  const linkOff = !hyperlinkPopup && popups?.hyperlink === undefined;
+  const menuEntry =
+    popups?.contextMenu !== undefined || contextMenu === true
+      ? undefined
+      : contextMenu === false
+        ? (false as const)
+        : (props: PptxEditorContextMenuProps) =>
+            h(PptxEditorContextMenu, { ...props, ...contextMenu });
+  if (!linkOff && menuEntry === undefined) return popups;
+  return {
+    ...popups,
+    ...(linkOff ? { hyperlink: false as const } : {}),
+    ...(menuEntry !== undefined ? { contextMenu: menuEntry } : {}),
+  };
+}
 
 /**
  * Props of the `PptxEditor` sugar component, the twin of React's `PptxEditorProps`. Derived
@@ -493,6 +637,14 @@ const PptxEditorDefault = defineComponent({
         slots.openFailureActions !== undefined,
         OPEN_FAILURE_ACTION_NAMES
       );
+      const popups = sugarPopups(props.popups, props.hyperlinkPopup, props.contextMenu);
+      const dock =
+        props.menu === false && props.toolbar === false
+          ? null
+          : h('div', { class: 'pptx-default__dock' }, [
+              props.menu === false ? null : h(PptxEditorMenu, partProps(props.menu)),
+              props.toolbar === false ? null : h(PptxEditorToolbar, partProps(props.toolbar)),
+            ]);
       return h(
         PptxEditorRoot,
         {
@@ -500,7 +652,7 @@ const PptxEditorDefault = defineComponent({
           ...(props.document ? { document: props.document } : {}),
           ...(props.locale ? { locale: props.locale } : {}),
           ...(props.fontFamilies ? { fontFamilies: props.fontFamilies } : {}),
-          ...(props.popups ? { popups: props.popups } : {}),
+          ...(popups ? { popups } : {}),
           ...(props.colorMode ? { colorMode: props.colorMode } : {}),
           ...(props.fonts ? { fonts: props.fonts } : {}),
           ...(props.modules ? { modules: props.modules } : {}),
@@ -515,7 +667,7 @@ const PptxEditorDefault = defineComponent({
         {
           default: () =>
             h(PptxEditorViewport, mergeProps(attrs, { class: 'pptx-default' }), () => [
-              h('div', { class: 'pptx-default__dock' }, [h(PptxEditorToolbar)]),
+              dock,
               h(DefaultWorkspace, null, {
                 overlay: () =>
                   props.openFailure === false
@@ -527,14 +679,18 @@ const PptxEditorDefault = defineComponent({
                       ),
                 normal: () =>
                   h('div', { class: 'pptx-default__workspace' }, [
-                    h(PptxEditorSlideRail),
+                    props.slideRail === false
+                      ? null
+                      : h(PptxEditorSlideRail, partProps(props.slideRail)),
                     h('div', { class: 'pptx-default__main' }, [
                       h(PptxEditorContent),
                       h(PptxEditorFindBar),
                       h(PptxEditorEditNotice),
                       h(PptxEditorLoading, { overlay: true }),
                       h(PptxEditorFontNotice),
-                      h(PptxEditorNotesPane),
+                      props.notesPane === false
+                        ? null
+                        : h(PptxEditorNotesPane, partProps(props.notesPane)),
                     ]),
                   ]),
               }),

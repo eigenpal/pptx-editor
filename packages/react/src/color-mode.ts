@@ -19,6 +19,9 @@ import {
  */
 export const ChromeDarkContext = createContext(false);
 
+/** True inside `PptxEditor.Viewport`: an ancestor element already carries `.pptx-editor`. */
+export const ScopedByAncestorContext = createContext(false);
+
 const light = (): boolean => false;
 const none = (): (() => void) => () => undefined;
 

@@ -70,7 +70,8 @@ export interface ContextMenuProps {
 }
 
 /**
- * Place a panel of size `w` × `h` at `at`, flipped and clamped to stay inside the window. The
+ * Place a panel of size `w` × `h` at `at`, flipped, clamped, or capped (`maxHeight`) to stay
+ * inside the window with a corner at the point. The
  * rule lives in core (`placeInViewport`), shared with the Vue adapter.
  */
 export const placeInViewport: (
@@ -79,7 +80,7 @@ export const placeInViewport: (
   h: number,
   vw: number,
   vh: number
-) => { left: number; top: number } = placeAt;
+) => { left: number; top: number; maxHeight?: number } = placeAt;
 
 /** The editor scope an element lives in, so a portaled panel inherits its tokens. */
 const scopeOf = (el: HTMLElement | null | undefined): HTMLElement =>
@@ -103,7 +104,7 @@ export function ContextMenu({
   // Read on close: the menu belongs to one editor for its whole life.
   const editorRef = useRef(editor);
   editorRef.current = editor;
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const [pos, setPos] = useState<{ left: number; top: number; maxHeight?: number } | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   useLayoutEffect(() => {
@@ -113,7 +114,8 @@ export function ContextMenu({
       placeInViewport(
         at,
         panel.offsetWidth,
-        panel.offsetHeight,
+        // The full height, past a cap from an earlier place (its rows scroll).
+        panel.scrollHeight + panel.offsetHeight - panel.clientHeight,
         window.innerWidth,
         window.innerHeight
       )

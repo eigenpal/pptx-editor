@@ -6,6 +6,7 @@
 // renders only the children. The view buttons and zoom are the editor's own `ViewSwitch` and
 // `ZoomPill`, so the bar adds no second control for the same action.
 
+import type { ChromeTranslate } from '@pptx-editor.dev/core/editor';
 import { Children, Fragment, isValidElement, type ReactNode } from 'react';
 import { slideStatus, warnAsChildChild } from '@pptx-editor.dev/core/editor';
 import { Icon, keepFocus } from './chrome.tsx';
@@ -120,6 +121,11 @@ const PARTS = [StatusBarSlideNumber, StatusBarNotes, StatusBarViews, StatusBarZo
 
 /** Props for `PptxEditor.StatusBar`. @public */
 export interface StatusBarProps {
+  /**
+   * Your translation function for this compound and its parts, as DOCX Editor's `t`. Without
+   * it, the root's `locale` gives the labels.
+   */
+  readonly t?: ChromeTranslate;
   /** A class name added to the bar. */
   readonly className?: string;
   /**
