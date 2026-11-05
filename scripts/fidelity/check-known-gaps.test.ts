@@ -125,38 +125,33 @@ describe('the known-gap ratchet against the base branch', () => {
     ]);
   });
 
-  test('the owner exception allows exactly one looser value', () => {
-    const list = (env: string, key: string, pixels: number) => ({
-      [env]: { slides: { [key]: { pixels, 'line-breaks': 0, lines: 12 } } },
+  test('the owner exception allows exactly one smaller line count', () => {
+    const list = (env: string, key: string, lines: number) => ({
+      [env]: { slides: { [key]: { pixels: 0.03, 'line-breaks': 0.5, lines } } },
     });
-    const { from, to } = OWNER_GAP_EXCEPTION;
-    expect(
-      looserGaps(list('linux', 'rtl-text/4', from), list('linux', 'rtl-text/4', to), none)
-    ).toEqual({
+    const { environment, slide, from, to } = OWNER_GAP_EXCEPTION;
+    expect(looserGaps(list(environment, slide, from), list(environment, slide, to), none)).toEqual({
       problems: [],
       allowed: [
-        `linux rtl-text/4: a looser pixels score (${from} → ${to}), allowed once by the owner (OWNER_GAP_EXCEPTION)`,
+        `${environment} ${slide}: fewer checked lines (${from} → ${to}), allowed once by the owner (OWNER_GAP_EXCEPTION)`,
       ],
       removed: [],
     });
     // Another value, slide, environment, or base value is still a problem.
     const problems = (base: object, head: object) =>
       looserGaps(base as never, head as never, none).problems;
+    expect(problems(list(environment, slide, from), list(environment, slide, to - 1))).toHaveLength(
+      1
+    );
     expect(
-      problems(list('linux', 'rtl-text/4', from), list('linux', 'rtl-text/4', 0.0342))
+      problems(list(environment, 'rtl-text/3', from), list(environment, 'rtl-text/3', to))
     ).toHaveLength(1);
     expect(
-      problems(list('linux', 'rtl-text/3', from), list('linux', 'rtl-text/3', to))
+      problems(list('macos-reference', slide, from), list('macos-reference', slide, to))
     ).toHaveLength(1);
-    expect(
-      problems(
-        list('macos-reference', 'rtl-text/4', from),
-        list('macos-reference', 'rtl-text/4', to)
-      )
-    ).toHaveLength(1);
-    expect(
-      problems(list('linux', 'rtl-text/4', 0.0339), list('linux', 'rtl-text/4', to))
-    ).toHaveLength(1);
+    expect(problems(list(environment, slide, from + 1), list(environment, slide, to))).toHaveLength(
+      1
+    );
   });
 
   test('only the one move from raster scale 1 to 4 allows new values', () => {
