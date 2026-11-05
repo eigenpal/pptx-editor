@@ -8,6 +8,7 @@ import { PNG } from 'pngjs';
 import {
   decode,
   hasPoppler,
+  normalize,
   pdfPageFonts,
   pruneRasterCache,
   rasterize,
@@ -21,6 +22,17 @@ import {
   withBaselines,
   type PdfLine,
 } from './references.ts';
+
+describe('normalize', () => {
+  test('radicals that a PDF text layer writes for ideographs read as the ideographs', () => {
+    // The reference PDF of `east-asian-line-breaking` writes Kangxi radicals and U+2ED1.
+    expect(normalize('\u2F47\u672C\u8A9E\u306E\u2F42  \u7AE0')).toBe(
+      '\u65E5\u672C\u8A9E\u306E\u6587 \u7AE0'
+    );
+    expect(normalize('\u2ED1\u2FB3\u30FC')).toBe('\u9577\u97F3\u30FC');
+    expect(normalize('Latin text')).toBe('Latin text');
+  });
+});
 
 describe('decode', () => {
   test('decodes the five XML entities', () => {

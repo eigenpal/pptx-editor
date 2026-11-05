@@ -76,6 +76,13 @@ export interface FixtureOptions {
   /** Theme major/minor Latin fonts. Default Calibri Light / Calibri. */
   readonly majorFont?: string;
   readonly minorFont?: string;
+  /**
+   * Theme script fonts (`a:font`, ECMA-376 Part 1, 20.1.4.1.16) as `[script, typeface]`, in both
+   * the major and minor collections. Default none.
+   */
+  readonly scriptFonts?: readonly (readonly [string, string])[];
+  /** The language of `p:defaultTextStyle` (`a:defPPr/a:defRPr/@lang`). Default `en-US`. */
+  readonly defaultLanguage?: string;
   /** The theme's `a:theme/@name`, which a layout picker shows. Default `Fixture`. */
   readonly themeName?: string;
   /** Extra XML parts: `[partName without leading slash, contentType, xml]`. */
@@ -131,7 +138,14 @@ const rels = (items: readonly (readonly string[])[]): string =>
     .join('') +
   '</Relationships>';
 
-function theme(major: string, minor: string, colors?: ThemeColors, name = 'Fixture'): string {
+function theme(
+  major: string,
+  minor: string,
+  colors?: ThemeColors,
+  name = 'Fixture',
+  scriptFonts: readonly (readonly [string, string])[] = []
+): string {
+  const scripts = scriptFonts.map(([script, face]) => `<a:font script="${script}" typeface="${face}"/>`).join('');
   const clr = (name: string, hex: string): string => `<a:${name}><a:srgbClr val="${colors?.[name as keyof ThemeColors] ?? hex}"/></a:${name}>`;
   const sys = (name: 'dk1' | 'lt1', val: string, last: string): string =>
     colors ? clr(name, colors[name]) : `<a:${name}><a:sysClr val="${val}" lastClr="${last}"/></a:${name}>`;
@@ -146,8 +160,8 @@ function theme(major: string, minor: string, colors?: ThemeColors, name = 'Fixtu
     clr('dk2', '44546A') + clr('lt2', 'E7E6E6') + clr('accent1', '4472C4') + clr('accent2', 'ED7D31') +
     clr('accent3', 'A5A5A5') + clr('accent4', 'FFC000') + clr('accent5', '5B9BD5') + clr('accent6', '70AD47') +
     clr('hlink', '0563C1') + clr('folHlink', '954F72') + '</a:clrScheme>' +
-    `<a:fontScheme name="${name}"><a:majorFont><a:latin typeface="${major}"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>` +
-    `<a:minorFont><a:latin typeface="${minor}"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme>` +
+    `<a:fontScheme name="${name}"><a:majorFont><a:latin typeface="${major}"/><a:ea typeface=""/><a:cs typeface=""/>${scripts}</a:majorFont>` +
+    `<a:minorFont><a:latin typeface="${minor}"/><a:ea typeface=""/><a:cs typeface=""/>${scripts}</a:minorFont></a:fontScheme>` +
     '<a:fmtScheme name="Default"><a:fillStyleLst>' + fill + fill + fill + '</a:fillStyleLst>' +
     '<a:lnStyleLst>' + line(6350) + line(12700) + line(19050) + '</a:lnStyleLst>' +
     '<a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle>' +
@@ -362,7 +376,7 @@ export function buildPptx(opts: FixtureOptions): Uint8Array {
     `${XML}<p:presentation ${NS_DECL} saveSubsetFonts="1"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst>` +
       `<p:notesMasterIdLst><p:notesMasterId r:id="rId2"/></p:notesMasterIdLst><p:sldIdLst>${sldIds.join('')}</p:sldIdLst>` +
       `<p:sldSz cx="${width}" cy="${height}"/><p:notesSz cx="6858000" cy="9144000"/>${opts.presentationLists ?? ''}` +
-      `<p:defaultTextStyle><a:defPPr><a:defRPr lang="en-US"/></a:defPPr>${level(1, 1800)}${level(2, 1800)}</p:defaultTextStyle>${opts.presentationExt ?? ''}</p:presentation>`
+      `<p:defaultTextStyle><a:defPPr><a:defRPr lang="${escapeText(opts.defaultLanguage ?? 'en-US')}"/></a:defPPr>${level(1, 1800)}${level(2, 1800)}</p:defaultTextStyle>${opts.presentationExt ?? ''}</p:presentation>`
   );
   put('ppt/_rels/presentation.xml.rels', rels(presRels));
   put('ppt/presProps.xml', `${XML}<p:presentationPr ${NS_DECL}/>`);
@@ -378,7 +392,7 @@ export function buildPptx(opts: FixtureOptions): Uint8Array {
   );
   put(
     'ppt/theme/theme1.xml',
-    theme(opts.majorFont ?? 'Calibri Light', opts.minorFont ?? 'Calibri', opts.colors, opts.themeName)
+    theme(opts.majorFont ?? 'Calibri Light', opts.minorFont ?? 'Calibri', opts.colors, opts.themeName, opts.scriptFonts)
   );
   put('ppt/theme/theme2.xml', theme('Calibri Light', 'Calibri'));
   const extra = opts.layouts ?? [];

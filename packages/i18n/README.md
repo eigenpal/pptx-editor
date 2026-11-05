@@ -35,3 +35,14 @@ const t = createTranslator();
 t('toolbar.bold'); // "Bold (Ctrl+B)"
 t('rail.slideLabel', { index: 3 }); // "Slide 3"
 ```
+
+## Packaged catalogs
+
+`@pptx-editor.dev/i18n/ja` (Japanese), `@pptx-editor.dev/i18n/ko` (Korean), and `@pptx-editor.dev/i18n/zh-CN` (Simplified Chinese) are packaged catalogs. A `null` value shows English.
+
+```ts
+import ja from '@pptx-editor.dev/i18n/ja';
+
+const t = createTranslator(ja);
+t('toolbar.bold'); // "太字 (Ctrl+B)"
+```

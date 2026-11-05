@@ -14,6 +14,8 @@ import {
   type PptxEditorOptions,
 } from '../index.ts';
 import { deckDefaultFamily, deckFontFamilies } from '../deck-font-request.ts';
+import { resolveSlide } from '../../cascade/index.ts';
+import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { face, fixture, fontBytes, settle, themedDeck } from './font-test-helpers.ts';
 
 const realFetch = globalThis.fetch;
@@ -35,6 +37,63 @@ describe('the request a deck makes', () => {
     expect(families).toContain('Segoe UI');
     expect(families).toContain('Yu Gothic');
     expect(new Set(families.map((f) => f.toLowerCase())).size).toBe(families.length);
+  });
+
+  test("the theme script fonts of the runs' languages, not every script font", () => {
+    const r = readPptx(
+      buildPptx({
+        scriptFonts: [
+          ['Jpan', 'Yu Gothic'],
+          ['Hang', 'Malgun Gothic'],
+          ['Arab', 'Tahoma'],
+        ],
+        slides: [
+          {
+            shapes: shape({
+              id: 2,
+              x: 0,
+              y: 0,
+              cx: 914_400,
+              cy: 914_400,
+              text: para(run('日本語', 'altLang="ja-JP"')),
+            }),
+          },
+        ],
+      })
+    );
+    if (!r.ok) throw new Error('deck');
+    const families = deckFontFamilies(r.pkg);
+    expect(families).toContain('Yu Gothic');
+    expect(families).not.toContain('Malgun Gothic');
+    expect(families).not.toContain('Tahoma');
+  });
+
+  test("the default text style's language picks a script font for runs with no language", () => {
+    const r = readPptx(
+      buildPptx({
+        defaultLanguage: 'ja-JP',
+        scriptFonts: [['Jpan', 'Yu Gothic']],
+        slides: [
+          {
+            shapes: shape({
+              id: 2,
+              x: 0,
+              y: 0,
+              cx: 914_400,
+              cy: 914_400,
+              text: para('<a:r><a:rPr dirty="0"/><a:t>日本語</a:t></a:r>'),
+            }),
+          },
+        ],
+      })
+    );
+    if (!r.ok) throw new Error('deck');
+    // The cascade gives the run Yu Gothic, so the deck asks for it.
+    const sp = resolveSlide(r.pkg, 0)!.elements.find((e) => e.kind === 'shape' && e.text);
+    expect(sp?.kind === 'shape' ? sp.text?.paragraphs[0].runs[0].props.ea : undefined).toBe(
+      'Yu Gothic'
+    );
+    expect(deckFontFamilies(r.pkg)).toContain('Yu Gothic');
   });
 
   test('the default family is the theme minor Latin font, not Calibri', () => {

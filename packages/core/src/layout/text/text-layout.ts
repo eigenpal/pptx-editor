@@ -6,9 +6,16 @@
 // opportunities, then paragraph spacing, alignment, columns, and vertical anchoring.
 
 import type { ResolvedParagraph, ResolvedTextBody, RunProps } from '../../cascade/index.ts';
+import { slotLanguage } from '../../cascade/script-fonts.ts';
 import { anchorOffset, ROTATED_VERT, shiftLines } from './anchor.ts';
 import { AutonumberCounters, autonumberText, symbolBulletText } from './autonumber.ts';
-import { breakOpportunities, isTrailingSpace } from './line-break.ts';
+import { fontSlotPieces, slotFamily, type FontSlot } from './font-slots.ts';
+import {
+  breakOpportunities,
+  isHangingPunctuation,
+  isIdeographic,
+  isTrailingSpace,
+} from './line-break.ts';
 import type { ResolvedFace, TextMeasurer } from './measurer.ts';
 import {
   autofitSizePt,
@@ -115,12 +122,20 @@ interface Segment {
   readonly isBreak: boolean;
 }
 
-/** The face for a run: latin font, bold/italic. */
-function faceFor(props: RunProps, measurer: TextMeasurer, family?: string): ResolvedFace {
+/** The face for a run: its Latin font, or the font of `slot`, bold and italic. */
+function faceFor(
+  props: RunProps,
+  measurer: TextMeasurer,
+  family?: string,
+  slot: FontSlot = 'latin'
+): ResolvedFace {
+  const lang = slot === 'ea' ? slotLanguage('ea', props.lang, props.altLang) : undefined;
   return measurer.resolve({
     family: family ?? props.latin,
     bold: props.bold,
     italic: props.italic,
+    ...(slot === 'ea' ? { script: 'eastAsian' as const } : {}),
+    ...(lang ? { lang } : {}),
   });
 }
 
@@ -130,6 +145,101 @@ function displayText(text: string, caps: RunProps['caps']): string {
   for (const ch of text) {
     const up = ch.toUpperCase();
     out += up.length === ch.length ? up : ch;
+  }
+  return out;
+}
+
+/** The width a space may grow to in East Asian justified text, as a share of its font size. */
+const EAST_ASIAN_SPACE_EM = 0.5;
+
+/**
+ * The room that justified and distributed alignment adds after each unit of a line, `[start,
+ * end)`. A line with no East Asian character widens its spaces only. A line with East Asian
+ * characters first widens each space to half its font size, then spreads the rest evenly over
+ * the gaps between all its characters, Latin letters included (reference PDF of the
+ * `east-asian-typography` fixture).
+ */
+function justifyExtra(
+  units: readonly Unit[],
+  segments: readonly { sizePt: number }[],
+  start: number,
+  end: number,
+  room: number
+): Float64Array | undefined {
+  const out = new Float64Array(Math.max(0, end - start));
+  const spaces: number[] = [];
+  let eastAsian = false;
+  for (let i = start; i < end; i += 1) {
+    if (units[i].code === 32) spaces.push(i);
+    else if (isIdeographic(units[i].code)) eastAsian = true;
+  }
+  if (!eastAsian) {
+    if (spaces.length === 0) return undefined;
+    for (const i of spaces) out[i - start] = room / spaces.length;
+    return out;
+  }
+  let rest = room;
+  if (spaces.length > 0) {
+    const share = room / spaces.length;
+    for (const i of spaces) {
+      const grow = Math.max(
+        0,
+        segments[units[i].seg].sizePt * EAST_ASIAN_SPACE_EM * EMU_PER_PT - units[i].advance
+      );
+      const add = Math.min(share, grow);
+      out[i - start] += add;
+      rest -= add;
+    }
+  }
+  if (rest <= 0) return out;
+  const gaps: number[] = [];
+  for (let i = start; i < end - 1; i += 1) {
+    const next = units[i + 1].code;
+    // Never inside a surrogate pair or before a combining mark.
+    if (
+      (next >= 0xdc00 && next <= 0xdfff) ||
+      (next >= 0x0300 && MARK.test(String.fromCharCode(next)))
+    )
+      continue;
+    gaps.push(i);
+  }
+  if (gaps.length === 0) return out;
+  for (const i of gaps) out[i - start] += rest / gaps.length;
+  return out;
+}
+
+const MARK = /^[\p{M}\uFE00-\uFE0F]$/u;
+
+/**
+ * Split text by the face that draws each character: `face`, or another face for a character
+ * it lacks (`TextMeasurer.fallbackFace`). ASCII stays in `face`.
+ */
+function glyphFallbackPieces(
+  text: string,
+  face: ResolvedFace,
+  measurer: TextMeasurer,
+  lang: string | undefined
+): { text: string; face: ResolvedFace }[] {
+  const fallback = measurer.fallbackFace;
+  if (!fallback || !/[^\u0000-\u007f]/.test(text)) return [{ text, face }];
+  const out: { text: string; face: ResolvedFace }[] = [];
+  for (let i = 0; i < text.length;) {
+    const cp = text.codePointAt(i) ?? 0;
+    const len = cp > 0xffff ? 2 : 1;
+    // A combining mark or joiner stays with the character before it.
+    const joins =
+      out.length > 0 &&
+      cp >= 0x0300 &&
+      (cp === 0x200d || /^\p{M}$/u.test(String.fromCodePoint(cp)));
+    const drawn = joins
+      ? out[out.length - 1].face
+      : cp < 0x80
+        ? face
+        : (fallback.call(measurer, face, cp, lang) ?? face);
+    const last = out[out.length - 1];
+    if (last && last.face === drawn) last.text += text.slice(i, i + len);
+    else out.push({ text: text.slice(i, i + len), face: drawn });
+    i += len;
   }
   return out;
 }
@@ -149,10 +259,10 @@ function buildSegments(
     const runSize = autofitSizePt(props.size / 100, fontScale);
     const baseSize = runSize * scriptScale;
     const face = faceFor(props, measurer);
-    if (face.substituted) substitutions.add(props.latin);
     const rise = (props.baseline / 100) * runSize * EMU_PER_PT;
     const spacing = (props.spacing / 100) * EMU_PER_PT;
     if (run.kind === 'break') {
+      if (face.substituted) substitutions.add(props.latin);
       out.push({
         runIndex,
         start: offset,
@@ -179,8 +289,28 @@ function buildSegments(
         else pieces.push({ text: t, small });
       }
     } else pieces.push({ text: shown, small: false });
-    let local = 0;
+    // Each piece in the font of its characters' slot (`font-slots.ts`).
+    const slotted: { text: string; small: boolean; face: ResolvedFace }[] = [];
     for (const piece of pieces) {
+      const parts = fontSlotPieces(piece.text, props);
+      // An empty run still sizes its line, in its Latin face.
+      if (parts.length === 0) {
+        if (face.substituted) substitutions.add(props.latin);
+        slotted.push({ text: piece.text, small: piece.small, face });
+      }
+      for (const part of parts) {
+        const family = slotFamily(props, part.slot);
+        const slotFace = part.slot === 'latin' ? face : faceFor(props, measurer, family, part.slot);
+        if (slotFace.substituted) substitutions.add(family);
+        const text = piece.text.slice(part.start, part.end);
+        const lang = slotLanguage('ea', props.lang, props.altLang);
+        for (const run of glyphFallbackPieces(text, slotFace, measurer, lang))
+          slotted.push({ text: run.text, small: piece.small, face: run.face });
+      }
+    }
+    let local = 0;
+    for (const piece of slotted) {
+      const face = piece.face;
       const sizePt = piece.small ? baseSize * SMALL_CAPS_SCALE : baseSize;
       const kerning = props.kern !== undefined && props.size >= props.kern;
       const em = measurer.advances(face, piece.text, { kerning });
@@ -309,7 +439,7 @@ export function layoutText(
         text += s.text[i];
       }
     });
-    const breaks = breakOpportunities(text, p.eaLineBreak);
+    const breaks = breakOpportunities(text, p.eaLineBreak, p.latinLineBreak, p.kinsoku);
 
     const bullet = sourceLength > 0 ? marker : null;
     const pending = sourceLength > 0 ? null : marker;
@@ -346,7 +476,10 @@ export function layoutText(
         if (u.code === 9) u.advance = tabStopAfter(x) - x;
         if (i > start && breaks[i]) lastBreak = i;
         const next = x + u.advance;
-        if (wrap && next - left > limit + 1 && !isTrailingSpace(u.code)) {
+        // `hangingPunct`: a comma or full stop that starts inside the line hangs past its end.
+        const hangs =
+          p.hangingPunct && i > start && isHangingPunctuation(u.code) && x - left <= limit + 1;
+        if (wrap && next - left > limit + 1 && !isTrailingSpace(u.code) && !hangs) {
           if (lastBreak > start) end = lastBreak;
           else end = Math.max(i, start + 1);
           break;
@@ -367,6 +500,7 @@ export function layoutText(
       const first = li === 0;
       let maxSize = 0;
       let maxFace: ResolvedFace | null = null;
+      let maxRun = -2;
       // A segment's units are contiguous: visit each segment on the line once, in order.
       for (let i = range.start, last = -1; i < range.end; i += 1) {
         if (units[i].seg === last) continue;
@@ -375,8 +509,25 @@ export function layoutText(
         if (s.sizePt >= maxSize) {
           maxSize = s.sizePt;
           maxFace = s.face;
+          maxRun = s.runIndex;
         }
       }
+      // One run in several fonts (its East Asian and Latin text, `font-slots.ts`): the tallest
+      // ascent and the deepest descent of its faces place the baseline (reference PDFs of
+      // `east-asian-line-breaking`, slide 4, and `east-asian-theme-fonts`).
+      let metrics = maxFace?.metrics;
+      if (metrics)
+        for (let i = range.start, last = -1; i < range.end; i += 1) {
+          if (units[i].seg === last) continue;
+          last = units[i].seg;
+          const s = segments[last];
+          if (s.runIndex !== maxRun || s.sizePt !== maxSize || s.face === maxFace) continue;
+          metrics = {
+            ...metrics,
+            ascent: Math.max(metrics.ascent, s.face.metrics.ascent),
+            descent: Math.max(metrics.descent, s.face.metrics.descent),
+          };
+        }
       if (maxSize === 0 || !maxFace) {
         // An empty line: an empty paragraph, or the line after a trailing break. The paragraph
         // mark (`a:endParaRPr`) sizes it.
@@ -389,7 +540,7 @@ export function layoutText(
       // `bullets-numbering`, "Custom character, 150%").
       const heightPt = lineHeightPt(maxSize, p.lineSpacing, reduction);
       const height = heightPt * EMU_PER_PT;
-      const baseline = baselineOffsetPt(maxSize, heightPt, maxFace.metrics) * EMU_PER_PT;
+      const baseline = baselineOffsetPt(maxSize, heightPt, metrics ?? maxFace.metrics) * EMU_PER_PT;
 
       // Positions, then alignment. Positions include the left inset, so no later pass copies
       // the position arrays to add it.
@@ -402,17 +553,23 @@ export function layoutText(
         contentEnd -= 1;
       let width = 0;
       for (let i = range.start; i < contentEnd; i += 1) width += units[i].advance;
+      // A hanging comma or full stop stays outside the line for alignment.
+      const hanging =
+        p.hangingPunct &&
+        contentEnd > range.start &&
+        isHangingPunctuation(units[contentEnd - 1].code) &&
+        width > avail(first) + 1;
+      if (hanging) width -= units[contentEnd - 1].advance;
       const room = avail(first) - width;
       const lastOfPara = li === lineRanges.length - 1 || range.forced;
       let shift = 0;
-      let extraPerSpace = 0;
+      let extra: Float64Array | undefined;
       if (p.align === 'ctr') shift = room / 2;
       else if (p.align === 'r') shift = room;
-      else if ((p.align === 'just' && !lastOfPara) || p.align === 'dist') {
-        let spaces = 0;
-        for (let i = range.start; i < contentEnd; i += 1) if (units[i].code === 32) spaces += 1;
-        if (spaces > 0 && room > 0) extraPerSpace = room / spaces;
-      }
+      // A justified line that ends with hanging punctuation fills the line, also the last line.
+      else if (((p.align === 'just' && (!lastOfPara || hanging)) || p.align === 'dist') && room > 0)
+        // The hanging character keeps its gap: the line ends where the character starts.
+        extra = justifyExtra(units, segments, range.start, contentEnd, room);
       if (!wrap && p.align === 'ctr') shift = (avail(first) - width) / 2;
       const caretX: number[] = [];
       const origin = left + shift + bp.lIns;
@@ -449,7 +606,7 @@ export function layoutText(
         caretX.push(x);
         cur.xs.push(x);
         cur.text += String.fromCharCode(u.code);
-        x += u.advance + (u.code === 32 && i < contentEnd ? extraPerSpace : 0);
+        x += u.advance + (extra ? extra[i - range.start] : 0);
       }
       flush();
       caretX.push(x);

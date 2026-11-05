@@ -59,9 +59,22 @@ const COMMANDS: Readonly<Record<string, EditorCommand>> = {
   formatStrikeThrough: { type: 'toggleStrike' },
 };
 
+/**
+ * Input types of an IME composition. The composition's result arrives once, at composition
+ * end; a browser that reports one of these outside a composition (a late commit event) is
+ * ignored, so the text never goes in twice.
+ */
+const COMPOSITION_INPUT = new Set([
+  'insertCompositionText',
+  'deleteCompositionText',
+  'insertFromComposition',
+  'deleteByComposition',
+]);
+
 /** Apply one `beforeinput` event. Exported for tests. */
 export function dispatchBeforeInput(host: SurfaceInputHost, e: InputEvent): void {
   const type = e.inputType;
+  if (COMPOSITION_INPUT.has(type)) return;
   const kind = Object.prototype.hasOwnProperty.call(TEXT_INPUT, type) ? TEXT_INPUT[type] : null;
   if (kind) return host.textInput(kind);
   if (INSERTS.has(type)) {
@@ -73,6 +86,18 @@ export function dispatchBeforeInput(host: SurfaceInputHost, e: InputEvent): void
   host.refuse('errors.inputUnsupported', type);
 }
 
+/** The class the input takes while an IME composes: it shows the text being composed. */
+export const COMPOSING_CLASS = 'pptx-surface__input--composing';
+
+/**
+ * Whether a key belongs to an IME composition: during one, and the key that ends one (some
+ * browsers send the Enter that commits a composition after `compositionend`, with key code
+ * 229). Such a key never runs an editor shortcut, so Enter does not also split the paragraph.
+ */
+export function isCompositionKey(e: KeyboardEvent): boolean {
+  return e.isComposing || e.keyCode === 229;
+}
+
 /** Listen for input on the surface. Returns the function that stops listening. */
 export function bindSurfaceInput(
   input: HTMLTextAreaElement,
@@ -80,6 +105,18 @@ export function bindSurfaceInput(
   host: SurfaceInputHost
 ): () => void {
   let composing = false;
+  // The input grows with the text being composed, so the text shows at the caret while the
+  // IME composes it (the slide shows the text only once the composition ends).
+  const fit = (): void => {
+    input.style.width = '';
+    if (composing && input.value) input.style.width = `${input.scrollWidth + 1}px`;
+  };
+  const endComposition = (): void => {
+    composing = false;
+    input.classList.remove(COMPOSING_CLASS);
+    input.value = '';
+    fit();
+  };
   const onBeforeInput = (e: InputEvent): void => {
     // The IME owns the field until it finishes; the result arrives at composition end.
     if (composing) return;
@@ -87,16 +124,19 @@ export function bindSurfaceInput(
     dispatchBeforeInput(host, e);
     input.value = '';
   };
+  const onInput = (): void => {
+    if (composing) fit();
+  };
   const onCompositionStart = (): void => {
     composing = true;
+    input.classList.add(COMPOSING_CLASS);
   };
   const onCompositionEnd = (e: CompositionEvent): void => {
-    composing = false;
+    endComposition();
     if (e.data) host.textInput('text', e.data);
-    input.value = '';
   };
   const onKeyDown = (e: KeyboardEvent): void => {
-    if (e.isComposing) return;
+    if (isCompositionKey(e)) return;
     if (host.shortcut(e.key, e)) {
       e.preventDefault();
       e.stopPropagation();
@@ -115,6 +155,7 @@ export function bindSurfaceInput(
     }
   };
   input.addEventListener('beforeinput', onBeforeInput);
+  input.addEventListener('input', onInput);
   input.addEventListener('compositionstart', onCompositionStart);
   input.addEventListener('compositionend', onCompositionEnd);
   input.addEventListener('keydown', onKeyDown);
@@ -124,6 +165,7 @@ export function bindSurfaceInput(
   root.addEventListener('paste', onPaste);
   return () => {
     input.removeEventListener('beforeinput', onBeforeInput);
+    input.removeEventListener('input', onInput);
     input.removeEventListener('compositionstart', onCompositionStart);
     input.removeEventListener('compositionend', onCompositionEnd);
     input.removeEventListener('keydown', onKeyDown);

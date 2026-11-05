@@ -172,7 +172,7 @@ Earlier sources win for the same family, weight, and style. A supplied face wins
 
 A `FontResolver` receives `families`, `defaultFamily`, and optional `signal` and `resolvedFaces`. It returns a configuration, a fragment, or `undefined`. Map family names to URLs through your own lookup, and pass `signal` to your fetch calls so cancellation stops network work.
 
-For a deck, `families` lists the theme fonts first (`a:majorFont` and `a:minorFont`), then every `a:latin`, `a:ea`, `a:cs`, `a:sym`, and `a:buFont` typeface in the slides, layouts, and masters, at most 64. `defaultFamily` is the theme's minor Latin font, the font of body text.
+For a deck, `families` lists the theme fonts first (`a:majorFont` and `a:minorFont`, with the script fonts of the languages that the runs name when the theme's `a:ea` or `a:cs` is empty), then every `a:latin`, `a:ea`, `a:cs`, `a:sym`, and `a:buFont` typeface in the slides, layouts, and masters, at most 64. `defaultFamily` is the theme's minor Latin font, the font of body text.
 
 ### Render Chinese, Japanese, and Korean text
 
@@ -197,7 +197,7 @@ export function useSelfHostedCjkFonts() {
 
 Call one of these hooks in your editor component and pass the result to `fonts`. Install `@docx-editor.dev/fonts-cjk` yourself; the editor packages do not depend on it.
 
-Neither downloads anything for decks without East Asian families.
+Neither downloads anything for decks without East Asian families. East Asian text whose own font is missing draws with the East Asian face you supply. See [Chinese, Japanese, and Korean text](/docs/guides/east-asian-text).
 
 ## Replace fonts
 

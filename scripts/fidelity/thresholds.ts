@@ -247,6 +247,18 @@ export const FIXTURE_KNOWN_GAPS: Readonly<Record<FidelityEnvironment, KnownGapLi
   // 3.41 % of pixels, the value the CI run measured. Each of its 12 lines is within 0.12 pt of its
   // PDF glyph origin, against up to 0.49 pt without the rule. CI draws it with substitute glyph
   // outlines, and no line breaks at the same words as the PDF (`line-breaks` 0).
+  // 5 November 2026, East Asian text: theme script fonts by `lang` and `altLang`, Korean breaks
+  // at spaces, `eaLnBrk` and `latinLnBrk` as measured, `hangingPunct`, custom `p:kinsoku` lists,
+  // East Asian justification, and a fallback face for a character the run's face lacks.
+  // `macos-reference` only (Poppler 26.10.0): 50 of 76 slides pass. Slides 1 to 3 of
+  // `east-asian-line-breaking` pass. Slide 3 laid out one line too many before (28 lines against
+  // the 27 of its PDF); all 27 lines match now. Slide 4, `rtl-text/1`, and
+  // `vertical-east-asian/1` score better, and no other slide changes. The new fixtures
+  // `east-asian-theme-fonts` and `east-asian-typography` (the gate allows entries for a new
+  // fixture): the Arabic line of `east-asian-theme-fonts/1` misses on line breaks ("Right-to-left
+  // text"), and lines with Malgun Gothic and Arial miss on baseline by about 1 pt ("Line
+  // model"). `east-asian-typography/1` passes. `linux` values for this change come from its CI
+  // run.
   linux: {
     poppler: '24.02.0',
     chromium: '156.0.8078.4',
@@ -293,10 +305,9 @@ export const FIXTURE_KNOWN_GAPS: Readonly<Record<FidelityEnvironment, KnownGapLi
     antialiasing: 'device',
     slides: {
       'autofit/1': { pixels: 0.0053, lines: 9 },
-      'east-asian-line-breaking/1': { pixels: 0.0082, 'line-breaks': 0.4615, lines: 52 },
-      'east-asian-line-breaking/2': { 'line-breaks': 0.6154, lines: 52 },
-      'east-asian-line-breaking/3': { pixels: 0.0158, 'line-breaks': 0.6786, lines: 28 },
-      'east-asian-line-breaking/4': { pixels: 0.0169, 'line-breaks': 0.3077, lines: 13 },
+      'east-asian-line-breaking/4': { pixels: 0.0061, 'line-breaks': 0.6154, lines: 13 },
+      'east-asian-theme-fonts/1': { pixels: 0.006, 'line-breaks': 0.9412, baseline: 1, lines: 17 },
+      'east-asian-typography/2': { baseline: 1.04, lines: 24 },
       'fill-fidelity/3': { pixels: 0.0091 },
       'fill-fidelity/4': { pixels: 0.0177 },
       'fill-fidelity/6': { pixels: 0.0513 },
@@ -309,7 +320,7 @@ export const FIXTURE_KNOWN_GAPS: Readonly<Record<FidelityEnvironment, KnownGapLi
       'picture-editing/1': { pixels: 0.008 },
       'picture-editing/2': { pixels: 0.0084 },
       'pictures/1': { pixels: 0.0063 },
-      'rtl-text/1': { pixels: 0.0346, 'line-breaks': 0.0833, lines: 12 },
+      'rtl-text/1': { pixels: 0.0342, 'line-breaks': 0.0833, lines: 12 },
       'rtl-text/2': { pixels: 0.0303, 'line-breaks': 0.1538, lines: 13 },
       'rtl-text/3': { pixels: 0.0204, 'line-breaks': 0, lines: 17 },
       'rtl-text/4': { pixels: 0.0267, 'line-breaks': 0, lines: 12 },
@@ -317,7 +328,7 @@ export const FIXTURE_KNOWN_GAPS: Readonly<Record<FidelityEnvironment, KnownGapLi
       'tables/3': { pixels: 0.0238 },
       'text-direction/1': { pixels: 0.012, 'line-breaks': 0.6154, baseline: 91.08, lines: 52 },
       'vertical-columns/1': { pixels: 0.0065, lines: 12 },
-      'vertical-east-asian/1': { pixels: 0.0127 },
+      'vertical-east-asian/1': { pixels: 0.0113 },
     },
   },
 };

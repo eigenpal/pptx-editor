@@ -73,6 +73,24 @@
         540
       ]
     },
+    "east-asian-theme-fonts": {
+      "deck": "87a9bfa021a33868f4f05c7f623c54c552f8f44e4ffca2cda42145379ba4b909",
+      "pdf": "4c58f4c36c8c8b3a68dacc64615f8c962de9f54c78968af4c28b4cee868c348b",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "east-asian-typography": {
+      "deck": "0ee2fd5bac7f41eaa29a052f64eadfd501a24df3bf2a3052a97afd4ccad6d6c7",
+      "pdf": "2e43499d271653cada303a8c529131895beeb49e2026cfb9f5a85024951ff676",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
     "effects": {
       "deck": "8c5cf1a12f640121745089bb92476e6b90670e9f998b12e8f7ce282cb28e80d3",
       "pdf": "1a22f5167292e44e6fef29396e545a238919f5a92741c411cd7bbeb15c539947",
