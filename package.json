@@ -48,6 +48,7 @@
     "check:parity-contract": "bun scripts/check-parity-contract.mjs",
     "check:composable-parity": "node scripts/check-composable-parity.mjs",
     "check:adapter-css-thin": "node scripts/check-adapter-css-thin.mjs",
+    "check:css-scope": "node scripts/check-css-scope.mjs",
     "check:adapter-mirror": "node scripts/check-adapter-mirror.mjs",
     "check:security": "node scripts/check-security-grep.mjs",
     "check:api-changeset": "node scripts/check-api-changeset.mjs",
