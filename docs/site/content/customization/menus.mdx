@@ -1,0 +1,206 @@
+---
+title: 'Menus'
+description: 'Customize the PPTX editor menu bar and context menus with registered slot rows, application rows, groups, and submenus.'
+category: 'Customization'
+---
+
+Compose `PptxEditor.Menu` and `PptxEditor.ContextMenu` independently. Rows for registered slots take their label, icon, shortcut, enabled state, and action from the chrome registry, so a menu row and its toolbar twin cannot drift.
+
+Use `Menu.Item` or `ContextMenu.Slot` with a `slotId`, such as `text.bold`, for an editor command. Use `Menu.Row` or `ContextMenu.Item` for your own action, and `Submenu` to group rows. A slot that collects a value (**Insert > Shape**, **Insert > Line**) opens a submenu of its choices.
+
+## Menu configuration reference
+
+| Surface | Options |
+| --- | --- |
+| `PptxEditor.Menu` | `className`, `preset`, named menus, `Menu.Entry`, and other children after the menus. |
+| Named menus | `Menu.File`, `Menu.Edit`, `Menu.View`, `Menu.Insert`, `Menu.Format`, `Menu.Arrange`, `Menu.SlideShow`. |
+| `PptxEditor.ContextMenu` | `className`, `preset`, and rows. Render it in `popups.contextMenu`. |
+| Registered rows | `Menu.Item` or `ContextMenu.Slot` with `slotId` (and `value` for one choice of a value slot). |
+| Application rows | `Menu.Row` or `ContextMenu.Item` with your label, icon, `onSelect`, or a web `href`. |
+| Sections | `Group`, `Separator`, and `Submenu` parts. |
+
+The built-in menu bar has these menus: **File**, **Edit**, **View**, **Insert**, **Format**, **Arrange**, and **Slide Show**, limited to the rows the engine has. Rows use common presentation editor words in sentence case, for example **Slide background…** and **Play from current slide**. A named menu child changes its menu in place. `Menu.Entry` with another `id` adds your menu, after the built-in ones or after the menu its `after` names. Set `preset={false}` on one menu to render only your rows in it. `preset={false}` on the bar drops the built-in menus that you do not name; a named built-in menu still brings its rows, unless it also has `preset={false}`.
+
+**Not built yet**, compared with DOCX Editor's menus:
+
+- The File menu props `onOpen`, `onSave`, `fileName`, and `exporters`, with their packaged rows. Add your own rows with `Menu.Row` in `Menu.File`.
+- Menu overflow into a **More** menu on narrow widths.
+- Named row parts, such as `ContextMenu.Cut` and `Menu.PageSetup`. Use `ContextMenu.Slot` or `Menu.Item` with the slot identifier.
+- The `{ t }` argument for a `popups.contextMenu` renderer. Call `useTranslation()` in a component that you register with `definePopup()`.
+- `PptxEditor.ContextMenu` placed in the root or the viewport, with the `disabled` and `onOpenChange` props. The canvas owns the right-click, so the context menu renders from `popups.contextMenu`. Set the entry to `false` to show no menu.
+
+The canvas context menu has one arrangement for each target: shapes, pictures, text being edited, a table cell, or empty slide area. A right-click on a table cell puts the caret in that cell, and the table menu adds the row and column commands: **Insert row above**, **Insert row below**, **Insert column left**, **Insert column right**, **Delete rows**, **Delete columns**, **Delete table**, **Merge cells**, and **Split cells**. The picture menu opens when every selected object is a picture; it adds **Change picture…** and **Format picture…** to the shape rows. On empty slide area, the menu shows **Paste**, **Format Background…**, and **New slide** (`slide.add`), which adds a slide after the current slide. The new slide uses the layout of the current slide. After a title slide, it uses the Title and Content layout of the same master. `ContextMenu.Slot slotId="slide.add" hidden` removes the row. A row that the selection cannot run stays in the menu, disabled with the engine's reason. In your own rows, `useContextMenuRequest()` returns the open menu: its `kind` (`CanvasMenuKind`: `shapes`, `picture`, `text`, `table`, or `slide`), `at`, `owner`, `keyboard`, and `close`. `useContextMenuTarget()` returns the element that the menu opened on, or `null` while no menu is open. The slide menu of the slide rail and of the slide sorter is `popups.railContextMenu`, and the section header menu of both is `popups.sectionContextMenu` (props: `SectionContextMenuProps`). A function replaces the menu, or renders the packaged `RailContextMenu` or `SectionContextMenu` with its props; `false` turns it off. The section and slide commands keep working from the API.
+
+### Rows for dialogs and popups
+
+A row that opens a dialog or popup reads the `popups` registry on `PptxEditor.Root`. When its entry is `false`, the row stays in the menu, disabled with a reason, for example "This dialog is turned off in this editor". The operation keeps working from the API.
+
+| Slot | Action |
+| --- | --- |
+| `file.pageSetup` | **File > Page setup…** opens the `pageSetup` dialog. |
+| `slide.background` | **Format > Slide background…** opens the `background` dialog. |
+| `image.properties` | **Format > Format picture…** and **Format picture…** in the picture context menu open the `imageProperties` dialog. |
+| `image.altText` | **Edit alt text…** in the shape and picture context menus opens the `imageAltText` dialog. |
+| `text.dialog` | **Format > Font…** and **Font…** in the text context menu open the `font` dialog. |
+| `list.bulletStyle` (value `dialog`) | **Format > Bullets and numbering…** opens the `bulletsAndNumbering` dialog on the Bulleted tab. |
+| `paragraph.columns` (value `dialog`) | **Format > Columns…** opens the `columns` dialog. |
+| `paragraph.dialog` | **Format > Paragraph…** and **Paragraph…** in the text context menu open the `paragraph` dialog. |
+| `text.link` | **Insert > Link…** opens the `hyperlink` popup. |
+| `find.find`, `find.replace` | **Edit > Find > Find…** and **Edit > Find > Replace…** open the `find` bar. Without a mounted `PptxEditor.FindBar`, the rows are disabled with a reason. |
+
+A row with the value `dialog` is a menu row that opens a dialog; `dialog` is not a value of the slot's command, so `runToolbarCommand` and `useEditorValueCommand` refuse it. To open these dialogs from your own code, call `useEditorDialog('bulletsAndNumbering')` or `useEditorDialog('columns')`.
+
+### Menu-only slots
+
+These slots belong to contextual groups that the toolbar does not show. Each one also has a named toolbar part. The built-in menu bar places **Insert > New slide** (`slide.add` as a direct row, Ctrl+M, ⌃M on a Mac) and **Slide Show > Hide slide** (`slide.hide`, a check row). It does not place `slide.layout` and `slide.reset`; add them with `Menu.Item` in the menu that you choose. The built-in menu bar places no `section.*` slot either (`section.add`, `section.rename`, `section.remove`, `section.removeAll`, `section.collapseAll`, `section.expandAll`). To offer **Insert > Section**, and **Rename Section** and **Remove Section** on a section, place them with `Menu.Item`. `slide.background` is in the built-in **Format** menu. The slide rail's context menu (`popups.railContextMenu`) places **New slide**, **Layout**, **Reset slide**, and **Hide slide**, and the canvas context menu places **New slide** on empty slide area. The other slots in this table are in the built-in menu bar.
+
+| Slot | Action |
+| --- | --- |
+| `file.pageSetup` | Opens the `pageSetup` dialog. |
+| `edit.cut`, `edit.copy`, `edit.paste`, `edit.selectAll` | The clipboard. Cut and Copy write the system clipboard through the canvas's copy event, so Ctrl+V pastes what the menu copied; where the browser refuses, shapes fall back to the editor's own clipboard. Paste of shapes from a menu row pastes the editor's last copy, because a browser lets a page read the system clipboard only from Ctrl+V. Paste into text reads the system clipboard where the browser allows it. |
+| `slide.background` | Opens the `background` dialog. |
+| `slide.add`, `slide.layout` | In `Menu.Item`, open the deck's layout gallery in a submenu. `slide.add` adds a slide with the picked layout; `slide.layout` changes the layout of the selected slides and marks the current one. The built-in **Insert > New slide** row and the **New slide** rows of the context menus add a slide at once. A `Menu.Item slotId="slide.add"` placed directly in `Menu.Insert` replaces that row and runs as it does; set `direct={false}` for the gallery, or put the row in a `Menu.Group` to keep both rows. |
+| `slide.reset`, `slide.hide` | Reset the selected slides to their layout, and hide or show them (a check row). |
+| `view.presentationView` | **View > Normal** and **View > Slide sorter**, two rows of one value slot (`normal`, `slideSorter`). The checked row is the current view. Mount `PptxEditor.SlideSorter` for the Slide Sorter view. |
+| `view.smartGuides` | **View > Smart guides**, a check box row that turns the slide guides on and off. |
+| `view.playFromStart`, `view.playFromCurrent` | Starts the slide show. Mount `PptxEditor.Slideshow` for the show to play. |
+
+### Menu part options
+
+| Part | Options and use |
+| --- | --- |
+| `Menu.Entry` | `id`, `label` or `labelKey`, `icon`, `className`, `hidden`, `preset`, `after`, and children. |
+| Named menu | `label` or `labelKey`, `icon`, `className`, `hidden`, `preset`, and children. |
+| `Menu.Item`, `ContextMenu.Slot` | `slotId`, `value`, `labelKey`, `shortcutKey`, `direct`, `icon`, `className`, and `hidden`. Replaces the built-in row with the same slot in place. `direct` runs a value slot at once instead of opening its choices; unset, the row runs as the row it replaces. |
+| `Menu.Row`, `ContextMenu.Item` | `label`, `icon` or `paths` or `glyph`, `shortcut`, `disabled`, `disabledReason` (or `reason`), `active`, `checked`, `href`, `onSelect`, and `className`. |
+| `Menu.Group`, `ContextMenu.Group` | `label` or `labelKey`, `className`, `hidden`, and children. |
+| `Menu.Submenu`, `ContextMenu.Submenu` | `label` or `labelKey`, `icon` or `paths` or `glyph`, `disabled`, `reason`, `className`, and children. |
+| `Menu.Separator`, `ContextMenu.Separator` | A line between rows. |
+
+A menu `icon` is icon content (an element) or the name of a packaged Material Symbol from `ICON_PATHS`, such as `info`. On `Menu.Item` and `ContextMenu.Slot`, it replaces the registry icon on every row kind, also on a row that opens a submenu or a gallery. `icon={null}` removes the icon. A name that is not in `ICON_PATHS` draws nothing and prints a development warning.
+
+`Menu.Row` takes `label`, `disabledReason` (or `reason`), and `checked`, where DOCX Editor's row takes children, `title`, and `selected`. The row is shared with the context menu, whose application rows already used these names. Aligning the names with DOCX Editor is a follow-up.
+
+A row's `href` opens in a new tab. Only relative links and `http`, `https`, `mailto`, `tel`, and `ftp` links pass `sanitizeHref`; any other link disables the row. Use `disabledReason` to explain why a row is disabled.
+
+### Keyboard and selection behavior
+
+The menus manage keyboard navigation, Escape, dismissal, and selection protection. ArrowLeft and ArrowRight move between the menus of the bar. A disabled row stays focusable with `aria-disabled`, so a keyboard user can read why it is disabled. A custom row inside a menu keeps that behavior and closes the menu after it runs.
+
+## React reference
+
+```tsx
+import { PptxEditor, type PptxEditorPopups } from '@pptx-editor.dev/react';
+
+interface DeckEditorProps {
+  readonly bytes: Uint8Array;
+  readonly askLegal: () => void;
+  readonly openFile: () => void;
+}
+
+export function DeckEditor({ bytes, askLegal, openFile }: DeckEditorProps) {
+  const popups: PptxEditorPopups = {
+    contextMenu: (props) => (
+      <PptxEditor.ContextMenu {...props}>
+        <PptxEditor.ContextMenu.Slot slotId="format.painter" hidden />
+        <PptxEditor.ContextMenu.Item label="Ask legal" icon="info" onSelect={askLegal} />
+      </PptxEditor.ContextMenu>
+    ),
+  };
+  return (
+    <PptxEditor.Root document={bytes} popups={popups}>
+      <PptxEditor.Viewport>
+        <PptxEditor.Menu>
+          <PptxEditor.Menu.File preset={false}>
+            <PptxEditor.Menu.Row label="Open…" icon="folder_open" onSelect={openFile} />
+            <PptxEditor.Menu.Item slotId="file.pageSetup" />
+          </PptxEditor.Menu.File>
+          <PptxEditor.Menu.Edit>
+            <PptxEditor.Menu.Item slotId="more.delete" hidden />
+          </PptxEditor.Menu.Edit>
+          <PptxEditor.Menu.Entry id="help" label="Help">
+            <PptxEditor.Menu.Row
+              label="Documentation"
+              icon="info"
+              href="https://example.com/docs"
+            />
+          </PptxEditor.Menu.Entry>
+        </PptxEditor.Menu>
+        <PptxEditor.Content />
+      </PptxEditor.Viewport>
+    </PptxEditor.Root>
+  );
+}
+```
+
+In Vue, `PptxEditorMenu` has the same parts as statics (`PptxEditorMenu.File`, `PptxEditorMenu.Item`, `PptxEditorMenu.Row`, `PptxEditorMenu.Group`, `PptxEditorMenu.Entry`, and the others). A row's `onSelect` is the `select` event, and each part takes `className` as in React (a host `class` also works). `PptxEditorContextMenu` (with `Slot`, `Item`, `Group`, `Separator`, and `Submenu`), `RailContextMenu`, `SectionContextMenu`, and the `contextMenu`, `railContextMenu`, and `sectionContextMenu` entries of `popups` work as in React. The two adapters read which rows and menus show from core (`menu-arrangement.ts`), so they cannot drift.
+
+```vue
+<script setup lang="ts">
+import { PptxEditorMenu } from '@pptx-editor.dev/vue';
+</script>
+
+<template>
+  <PptxEditorMenu>
+    <PptxEditorMenu.Edit>
+      <PptxEditorMenu.Item slot-id="more.delete" hidden />
+    </PptxEditorMenu.Edit>
+    <PptxEditorMenu.Arrange hidden />
+  </PptxEditorMenu>
+</template>
+```
+
+## Remove a packaged row
+
+Render the row's slot with `hidden`. The row leaves the menu in place; its command keeps working from the toolbar, keyboard shortcuts, and the API. The `text.link` slot is the **Insert link…** row of the text context menu.
+
+Render `PptxEditor.ContextMenu` inside `popups.contextMenu`, and forward the renderer's props. DOCX Editor places its context menu in the root; here, a context menu outside the `popups` entry renders nothing and prints a development warning.
+
+```tsx
+import { PptxEditor, type PptxEditorPopups } from '@pptx-editor.dev/react';
+
+const popups: PptxEditorPopups = {
+  contextMenu: (props) => (
+    <PptxEditor.ContextMenu {...props}>
+      <PptxEditor.ContextMenu.Slot slotId="text.link" hidden />
+    </PptxEditor.ContextMenu>
+  ),
+};
+```
+
+## Add an application row
+
+`ContextMenu.Item` supplies all of its behavior. Pass a `label` and an `onSelect` handler. To disable the row, pass `disabled` and a `disabledReason`.
+
+To show a row for some targets only, read `useContextMenuRequest()` in a component that you register with `definePopup()`. Pass `false` instead of the row when it does not apply: a child component that renders nothing still counts as a row, and leaves a separator at the end of the menu. Do not call a hook inside an inline renderer.
+
+```tsx
+import {
+  definePopup,
+  PptxEditor,
+  useContextMenuRequest,
+  type PptxEditorContextMenuProps,
+  type PptxEditorPopups,
+} from '@pptx-editor.dev/react';
+
+function askLegal() {
+  // Your application's action.
+}
+
+function AcmeContextMenu(props: PptxEditorContextMenuProps) {
+  const request = useContextMenuRequest();
+  return (
+    <PptxEditor.ContextMenu {...props}>
+      {(request?.kind === 'shapes' || request?.kind === 'picture') && (
+        <PptxEditor.ContextMenu.Item label="Ask legal" icon="info" onSelect={askLegal} />
+      )}
+    </PptxEditor.ContextMenu>
+  );
+}
+
+const popups: PptxEditorPopups = { contextMenu: definePopup(AcmeContextMenu) };
+```
+
+## More control
+
+See `CHROME_MENUS` and `CANVAS_CONTEXT_MENUS` in [`chrome-menus.ts`](https://github.com/eigenpal/pptx-editor/blob/main/packages/core/src/editor/chrome-menus.ts) for every built-in row, and the [`@pptx-editor.dev/react` API report](https://github.com/eigenpal/pptx-editor/blob/main/docs/api/react/index.api.md) for the part types.

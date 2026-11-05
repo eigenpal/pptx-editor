@@ -1,0 +1,11 @@
+# API Extractor snapshots: written by `bun run api:extract`, never hand-edit.
+docs/api/**/*.api.md
+# Generated preset geometry table: written by scripts/geometry/build-presets.ts.
+packages/ooxml-core/src/drawingml-preset-geometry.generated.ts
+# Generated Office.js conformance assertions: written by `bun run compat:generate`.
+packages/editor-api/compat/generated/
+# Legal texts are reproduced verbatim.
+LICENSE
+CLA.md
+reference/
+fixtures/

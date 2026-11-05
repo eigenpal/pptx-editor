@@ -1,0 +1,168 @@
+/*
+Copyright (c) 2026 EigenPal, Inc. All rights reserved.
+Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pptx-to-pdf/LICENSE.md.
+Production use requires a commercial agreement: licensing@eigenpal.com
+*/
+// The PDF writer mirrors the editor's gradient geometry and picture placement
+// (`packages/core/src/output/paint-fill.ts`). These tests paint the same slide with the editor's
+// SVG paint, in a happy-dom window of their own, and with the PDF writer, and fail when the two
+// disagree: a change to the editor's rule must reach the PDF writer too.
+
+import { describe, expect, test } from 'bun:test';
+import { Window } from 'happy-dom';
+import { PNG } from 'pngjs';
+import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { openPresentation } from '@pptx-editor.dev/core/editor';
+import { paintSlide } from '@pptx-editor.dev/core/output';
+import { buildPptx, shape } from '../../../../scripts/fixtures/builder.ts';
+import { exportPdf } from '../index.ts';
+
+const IN = 914_400;
+const BEST = { fidelityPolicy: 'best-effort' } as const;
+const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+
+/** The editor's SVG of slide 1, painted into a document of this test's own window. */
+async function svgOf(bytes: Uint8Array): Promise<Element> {
+  const opened = await openPresentation(bytes);
+  if (!opened.ok) throw new Error('deck');
+  const layout = opened.session.layout(0)!;
+  const { document } = new Window();
+  const root = paintSlide(document as unknown as Document, layout, {
+    images: () => 'blob:picture',
+    idPrefix: 't',
+    hitTargets: false,
+  });
+  opened.session.dispose();
+  return root as unknown as Element;
+}
+
+/** The numbers of each `/Coords` array of the PDF's shadings, in object order. */
+function coordsOf(pdf: Uint8Array): { type: number; coords: number[] }[] {
+  const text = new TextDecoder('latin1').decode(pdf);
+  return [
+    ...text.matchAll(/\/ShadingType (\d)\s*\/ColorSpace \/DeviceRGB\s*\/Coords \[ ([^\]]+) \]/g),
+  ].map((m) => ({ type: Number(m[1]), coords: m[2]!.trim().split(/\s+/).map(Number) }));
+}
+
+const attrs = (el: Element | null, names: string[]): number[] => {
+  if (!el) throw new Error('missing SVG element');
+  return names.map((n) => Number(el.getAttribute(n)));
+};
+
+const gradientDeck = (fill: string, cx = 3 * IN, cy = IN) =>
+  buildPptx({
+    slides: [{ layout: 'blank', shapes: shape({ id: 2, x: IN, y: IN, cx, cy, fill }) }],
+  });
+
+const stops =
+  '<a:gsLst><a:gs pos="0"><a:srgbClr val="FF0000"/></a:gs>' +
+  '<a:gs pos="100000"><a:srgbClr val="0000FF"/></a:gs></a:gsLst>';
+
+describe('the PDF writer and the SVG paint agree', () => {
+  test('on the linear gradient axis, scaled and not', async () => {
+    for (const lin of ['<a:lin ang="0" scaled="0"/>', '<a:lin ang="2700000" scaled="1"/>']) {
+      const bytes = gradientDeck(`<a:gradFill>${stops}${lin}</a:gradFill>`, 2 * IN, IN);
+      const svg = await svgOf(bytes);
+      const want = attrs(svg.querySelector('linearGradient'), ['x1', 'y1', 'x2', 'y2']);
+      const [shading] = coordsOf((await exportPdf(bytes, BEST)).bytes);
+      expect(shading!.type).toBe(2);
+      shading!.coords.forEach((v, i) => expect(v).toBeCloseTo(want[i]!, 0));
+    }
+  });
+
+  test('on the radial gradient focal point, center, and radius', async () => {
+    const path =
+      '<a:path path="circle"><a:fillToRect l="25000" t="50000" r="75000" b="50000"/></a:path>';
+    const bytes = gradientDeck(`<a:gradFill>${stops}${path}</a:gradFill>`);
+    const svg = await svgOf(bytes);
+    const [cx, cy, r, fx, fy] = attrs(svg.querySelector('radialGradient'), [
+      'cx',
+      'cy',
+      'r',
+      'fx',
+      'fy',
+    ]);
+    const [shading] = coordsOf((await exportPdf(bytes, BEST)).bytes);
+    expect(shading!.type).toBe(3);
+    // The first stop is at the focal point, the last on the circle (the reference PDFs' rule).
+    const [x0, y0, r0, x1, y1, r1] = shading!.coords;
+    for (const [got, wanted] of [
+      [x0, fx],
+      [y0, fy],
+      [x1, cx],
+      [y1, cy],
+      [r1, r],
+    ] as const)
+      expect(got).toBeCloseTo(wanted!, 0);
+    expect(r0).toBe(0);
+  });
+
+  test('on the trapezoids of a rectangular path gradient', async () => {
+    const path =
+      '<a:path path="rect"><a:fillToRect l="25000" t="40000" r="50000" b="20000"/></a:path>';
+    const bytes = gradientDeck(`<a:gradFill>${stops}${path}</a:gradFill>`);
+    const svg = await svgOf(bytes);
+    // Each trapezoid's gradient line, to 10 EMU, in sorted order: both painters draw four.
+    const line = (values: number[]) => values.map((v) => Math.round(v / 10)).join();
+    const want = [...svg.querySelectorAll('linearGradient')]
+      .map((g) => line(attrs(g, ['x1', 'y1', 'x2', 'y2'])))
+      .sort();
+    const got = coordsOf((await exportPdf(bytes, BEST)).bytes)
+      .filter((s) => s.type === 2)
+      .map((s) => line(s.coords))
+      .sort();
+    expect(want).toHaveLength(4);
+    expect(got).toEqual(want);
+  });
+
+  for (const [name, blip] of [
+    [
+      'a cropped picture',
+      '<a:srcRect l="10000" t="20000" r="5000"/><a:stretch><a:fillRect/></a:stretch>',
+    ],
+    [
+      'a cropped picture in a fill rectangle',
+      '<a:srcRect l="10000" t="20000" r="5000"/>' +
+        '<a:stretch><a:fillRect l="10000" t="5000" r="20000" b="15000"/></a:stretch>',
+    ],
+  ] as const)
+    test(`on the place of ${name}`, async () => {
+      await pictureAgrees(blip);
+    });
+});
+
+async function pictureAgrees(blip: string): Promise<void> {
+  {
+    const png = new PNG({ width: 2, height: 2 });
+    png.data.fill(200);
+    const picture =
+      `<p:pic><p:nvPicPr><p:cNvPr id="4" name="Picture"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>` +
+      `<p:blipFill><a:blip r:embed="rIdImg"/>${blip}</p:blipFill>` +
+      `<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${IN}" cy="${IN}"/></a:xfrm>` +
+      `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+    const bytes = buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          shapes: picture,
+          rels: [['rIdImg', `${R}/image`, '../media/img.png']],
+        },
+      ],
+      media: [{ name: 'img.png', bytes: PNG.sync.write(png), contentType: 'image/png' }],
+    });
+    const svg = await svgOf(bytes);
+    const [x, y, width, height] = attrs(svg.querySelector('image'), ['x', 'y', 'width', 'height']);
+    const pdf = await getDocument({
+      data: (await exportPdf(bytes, BEST)).bytes.slice(),
+      useSystemFonts: false,
+    }).promise;
+    const { fnArray, argsArray } = await (await pdf.getPage(1)).getOperatorList();
+    const at = fnArray.indexOf(OPS.paintImageXObject);
+    // The image space is the unit square: `cm iw 0 0 -ih x y+ih`.
+    const [iw, , , negIh, e, f] = argsArray[fnArray.lastIndexOf(OPS.transform, at)] as number[];
+    expect(iw!).toBeCloseTo(width!, 0);
+    expect(-negIh!).toBeCloseTo(height!, 0);
+    expect(e!).toBeCloseTo(x!, 0);
+    expect(f! + negIh!).toBeCloseTo(y!, 0);
+  }
+}

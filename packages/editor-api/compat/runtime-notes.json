@@ -1,0 +1,274 @@
+{
+  "PowerPoint.Presentation#insertSlidesFromBase64": {
+    "status": "partial",
+    "notes": "Reads the file through the bounded reader (at most 100 MiB) and copies each slide with its notes, pictures, media, charts, diagrams, embedded objects, tags, and custom XML parts (with new item ids). KeepSourceFormatting copies the layouts, masters, and themes the slides use, once per call; UseDestinationTheme puts each slide on the first layout with the same type (a custom layout by name), else the first layout, and re-maps its placeholders. A link to a slide that is not imported loses its action. Comments come along, with their authors merged by name and initials into the comment author list. A slide with threaded comments or an embedded control (p:control) refuses with NotSupported, and the diagnostic names the slide ids. Embedded fonts of the source are not copied, and the slide size of the source is not applied."
+  },
+  "PowerPoint.ShapeFill#setImage": {
+    "status": "partial",
+    "notes": "Accepts PNG, JPEG, and GIF bytes and writes a stretched a:blipFill over a new media part. A table cell refuses a picture fill with InvalidArgument."
+  },
+  "PowerPoint.ShapeLineFormat#dashStyle": {
+    "status": "partial",
+    "notes": "ST_PresetLineDashVal has eleven presets and the enum twelve: SquareDot writes sysDot, which reads back as SystemDot."
+  },
+  "PowerPoint.TextFrame#autoSizeSetting": {
+    "status": "partial",
+    "notes": "AutoSizeMixed is a read state only; writing it refuses with InvalidArgument. Text writes re-fit the body by its autofit rule (ECMA-376 Part 1, 21.1.2.1)."
+  },
+  "PowerPoint.TableCell#textRuns": {
+    "status": "partial",
+    "notes": "A write replaces the cell text with the runs, each with its own character format, in one sync. A read merges neighbouring text with the same format into one run and puts a paragraph break (\\r) at the end of the run before it, so the run texts join to text. Each run gives every font property; color is absent when the text has no solid fill."
+  },
+  "PowerPoint.TableCell#resize": {
+    "status": "partial",
+    "notes": "The old merged block comes apart, then the new span merges from the cell's first grid position. A span that cuts another merged block refuses with NotSupported and changes nothing."
+  },
+  "PowerPoint.Table#clear": {
+    "status": "partial",
+    "notes": "Text clears every cell to one empty paragraph. Format removes each cell's a:tcPr and its paragraph and run properties; hyperlinks and the table style stay. No options, or all, clears both."
+  },
+  "PowerPoint.ShapeCollection#addTable": {
+    "status": "partial",
+    "notes": "Applies every option in one batch, in this order: values, style, column widths and row heights, mergedAreas, uniformCellProperties, then specificCellProperties. A bad option refuses the sync with InvalidArgument and adds no table. A cell takes text or textRuns, not both. A style follows TableStyleSettings#style."
+  },
+  "PowerPoint.TableCell#verticalAlignment": {
+    "status": "equivalent",
+    "notes": "Writes a:tcPr/@anchor of the cell's merged block; the Centered values also set @anchorCtr. Covered by a save and reopen test."
+  },
+  "PowerPoint.TableCell#split": {
+    "status": "equivalent",
+    "notes": "A merged cell splits along its grid lines when its size divides evenly; a single cell gets new, equal grid lines and its neighbours widen over them. An uneven split of a merged cell refuses."
+  },
+  "PowerPoint.Shape#delete": {
+    "status": "equivalent",
+    "notes": "Removes the shape and its relationships that nothing else uses. Covered by a save and reopen test."
+  },
+  "PowerPoint.Slide#delete": {
+    "status": "equivalent",
+    "notes": "Removes the slide, its section entry, and the parts that only it owns. Covered by a save and reopen test."
+  },
+  "PowerPoint.TextRange#text": {
+    "status": "equivalent",
+    "notes": "\\r or \\n starts a paragraph and \\v writes a line break (a:br). The write re-fits the text body by its autofit rule."
+  },
+  "PowerPoint.SlideBackground#isMasterBackgroundFollowed": {
+    "status": "partial",
+    "notes": "True removes the own p:bg. False copies the background that the slide shows into an own p:bg, and a copied picture gets a new relationship to the same media part. A copied theme color resolves through the color map of the slide, which can differ from that of the layout."
+  },
+  "PowerPoint.SlideLayoutBackground#isMasterBackgroundFollowed": {
+    "status": "partial",
+    "notes": "True removes the own p:bg. False copies the master background into an own p:bg, and a copied picture gets a new relationship to the same media part."
+  },
+  "PowerPoint.SlideBackground#reset": {
+    "status": "partial",
+    "notes": "Removes the own p:bg, so the slide shows the background of its layout or master. It does not change areBackgroundGraphicsHidden."
+  },
+  "PowerPoint.SlideLayoutBackground#reset": {
+    "status": "partial",
+    "notes": "Removes the own p:bg, so the layout shows the master background. It does not change areBackgroundGraphicsHidden."
+  },
+  "PowerPoint.SlideBackground#areBackgroundGraphicsHidden": {
+    "status": "equivalent",
+    "notes": "Writes p:sld/@showMasterSp (0 hides, absent shows). Covered by a save and reopen test."
+  },
+  "PowerPoint.SlideLayoutBackground#areBackgroundGraphicsHidden": {
+    "status": "equivalent",
+    "notes": "Writes p:sldLayout/@showMasterSp (0 hides, absent shows). Covered by a save and reopen test."
+  },
+  "PowerPoint.SlideBackgroundFill#setSolidFill": {
+    "status": "partial",
+    "notes": "Writes an own p:bgPr with a:solidFill. An absent color keeps the current solid color, and an own theme color keeps its theme link; with no solid fill, the color is white. An absent transparency keeps the current one."
+  },
+  "PowerPoint.SlideBackgroundFill#setGradientFill": {
+    "status": "partial",
+    "notes": "Writes a:lin (Linear) or a:path with path circle (Radial), rect (Rectangular), or shape (Path). An own gradient keeps its stops; a shown gradient from the layout or master gives its stops as sRGB; with no gradient, the stops are bg1 and bg2. ShadeFromTitle refuses with NotImplemented."
+  },
+  "PowerPoint.SlideBackgroundFill#setPatternFill": {
+    "status": "partial",
+    "notes": "Writes a:pattFill. An absent pattern or color keeps the current one; with no pattern fill, the defaults are Percent5, black, and white."
+  },
+  "PowerPoint.SlideBackgroundFill#setPictureOrTextureFill": {
+    "status": "partial",
+    "notes": "Writes a stretched a:blipFill from PNG, JPEG, or GIF bytes; a tiled texture is not written. Without imageBase64, only a:alphaModFix of the current picture changes, so its crop, tile, and effects stay; with no picture, the call refuses with InvalidArgument."
+  },
+  "PowerPoint.SlideBackgroundGradientFill#type": {
+    "status": "partial",
+    "notes": "ShadeFromTitle (p:bgPr/@shadeToTitle) is a read state only; writing it refuses with NotImplemented. Unsupported refuses with InvalidArgument."
+  },
+  "PowerPoint.SlideBackgroundPatternFill#pattern": {
+    "status": "partial",
+    "notes": "The 54 values map one to one to ST_PresetPatternVal. Unsupported is a read state only; writing it refuses with InvalidArgument."
+  },
+  "PowerPoint.SlideBackgroundPictureOrTextureFill#setImage": {
+    "status": "partial",
+    "notes": "Accepts PNG, JPEG, and GIF bytes, adds a media part, and keeps the current transparency."
+  },
+  "PowerPoint.ThemeColorScheme#setThemeColor": {
+    "status": "partial",
+    "notes": "Writes a:srgbClr (or a:prstClr for a preset name) into the a:clrScheme of the theme of the master. Every slide, layout, and master that uses that theme changes. Mixed and None refuse with InvalidArgument."
+  },
+  "PowerPoint.ThemeColorScheme#getThemeColor": {
+    "status": "partial",
+    "notes": "Reads the theme of the master as #RRGGBB; a:sysClr reads its lastClr. A slide theme override part is not read. Mixed and None refuse with InvalidArgument."
+  },
+  "PowerPoint.SlideBackgroundFill#type": {
+    "status": "partial",
+    "notes": "Reads the background that the part shows, also when it comes from the layout or master. A slide reads it from the cascade. a:noFill and a:grpFill read as Unsupported."
+  },
+  "PowerPoint.Border#color": {
+    "status": "partial",
+    "notes": "Writes the a:tcPr line of the cell's merged block (a:lnL, a:lnR, a:lnT, a:lnB, a:lnTlToBr, or a:lnBlToTr); the properties a write leaves out keep the line the cell shows, its own or the table style's, and a cell with no line starts from a black solid line of 1 point. An outside edge also writes the opposite edge of each cell across it, so the two cells agree. Writing undefined refuses with InvalidArgument. A cell with no line reads undefined. Takes #RRGGBB or a preset color name."
+  },
+  "PowerPoint.Border#dashStyle": {
+    "status": "partial",
+    "notes": "Writes a:prstDash of the cell line. ECMA-376 has eleven dash presets: SquareDot writes sysDot, which reads back as SystemDot. An outside edge also writes the opposite edge of each cell across it, so the two cells agree. Writing undefined refuses with InvalidArgument."
+  },
+  "PowerPoint.Border#transparency": {
+    "status": "partial",
+    "notes": "Writes a:alpha on the line color, 0 (opaque) to 1 (clear). An outside edge also writes the opposite edge of each cell across it, so the two cells agree. Writing undefined refuses with InvalidArgument."
+  },
+  "PowerPoint.Border#weight": {
+    "status": "partial",
+    "notes": "Writes the line width @w in points, 0 to 1584. An outside edge also writes the opposite edge of each cell across it, so the two cells agree. Writing undefined or a negative weight refuses with InvalidArgument."
+  },
+  "PowerPoint.Margins#left": {
+    "status": "equivalent",
+    "notes": "Writes a:tcPr/@marL of the cell's merged block, in points. Writing undefined removes it, back to the 7.2 point default. Covered by a save and reopen test."
+  },
+  "PowerPoint.Margins#right": {
+    "status": "equivalent",
+    "notes": "Writes a:tcPr/@marR, in points. Writing undefined removes it, back to the 7.2 point default."
+  },
+  "PowerPoint.Margins#top": {
+    "status": "equivalent",
+    "notes": "Writes a:tcPr/@marT, in points. Writing undefined removes it, back to the 3.6 point default."
+  },
+  "PowerPoint.Margins#bottom": {
+    "status": "equivalent",
+    "notes": "Writes a:tcPr/@marB, in points. Writing undefined removes it, back to the 3.6 point default."
+  },
+  "PowerPoint.TableStyleSettings#style": {
+    "status": "partial",
+    "notes": "Finds the style by its styleName in ppt/tableStyles.xml (LightStyle1 is \"Light Style 1\") and writes a:tblPr/a:tableStyleId. The file format holds no definition of the built-in styles, so a style must be defined in the presentation, except MediumStyle2Accent1, which is built in; another refuses with NotSupported (edit.table-style-undefined). NoStyleNoGrid removes the style choice. A style whose name has no TableStyle value refuses a read with NotImplemented."
+  },
+  "PowerPoint.TableStyleSettings#isFirstRowHighlighted": {
+    "status": "equivalent",
+    "notes": "Writes a:tblPr/@firstRow; false removes it (the default is off)."
+  },
+  "PowerPoint.TableStyleSettings#isLastRowHighlighted": {
+    "status": "equivalent",
+    "notes": "Writes a:tblPr/@lastRow; false removes it (the default is off)."
+  },
+  "PowerPoint.TableStyleSettings#isFirstColumnHighlighted": {
+    "status": "equivalent",
+    "notes": "Writes a:tblPr/@firstCol; false removes it (the default is off)."
+  },
+  "PowerPoint.TableStyleSettings#isLastColumnHighlighted": {
+    "status": "equivalent",
+    "notes": "Writes a:tblPr/@lastCol; false removes it (the default is off)."
+  },
+  "PowerPoint.TableStyleSettings#areRowsBanded": {
+    "status": "equivalent",
+    "notes": "Writes a:tblPr/@bandRow; false removes it (the default is off)."
+  },
+  "PowerPoint.TableStyleSettings#areColumnsBanded": {
+    "status": "equivalent",
+    "notes": "Writes a:tblPr/@bandCol; false removes it (the default is off)."
+  },
+  "PowerPoint.Adjustments#set": {
+    "status": "partial",
+    "notes": "Writes a:prstGeom/a:avLst/a:gd of the preset guide at that index, in the order of the preset's own avLst (presetShapeDefinitions.xml). A length is a fraction of the shape size (guide value / 100000); an angle (an a:ahPolar angle handle) is in degrees (guide value / 60000). The value is bounded to the range of the preset's adjust handle at the shape's size; a value outside the 32-bit guide range refuses with InvalidArgument. A placeholder that takes its geometry from its layout gets its own a:prstGeom. A shape with no preset geometry refuses with NotSupported (edit.no-preset-geometry)."
+  },
+  "PowerPoint.Adjustments#get": {
+    "status": "partial",
+    "notes": "Reads the stored value, or the preset default when a:avLst omits the guide, in the units of Adjustments#set. An index past the last value refuses with ItemNotFound."
+  },
+  "PowerPoint.TableCellCollection#getItemAtOrNullObject": {
+    "status": "partial",
+    "notes": "Answers the merged area that holds the cell at that table row and column, as its first cell, or a null object when no merged area holds it."
+  },
+  "PowerPoint.CustomPropertyCollection#add": {
+    "status": "partial",
+    "notes": "Creates docProps/custom.xml, its relationship, and its content type when missing (ECMA-376 Part 1, 22.3). Keys compare without case and keep the spelling of the first write. A whole Number in the 32-bit range is stored as vt:i4, another Number as vt:r8, and a Date as vt:filetime in UTC to whole seconds. A key names one property: add with the key of a property of another variant type (a vector, a blob) replaces it."
+  },
+  "PowerPoint.CustomPropertyCollection#deleteAll": {
+    "status": "partial",
+    "notes": "Deletes every listed String, Number, Boolean, and Date property. A property of another variant type (a vector, a blob) is not listed and stays."
+  },
+  "PowerPoint.CustomProperty#value": {
+    "status": "partial",
+    "notes": "A write of another JavaScript type changes the type too. A Date is stored in UTC to whole seconds; a vt:lpstr, vt:bstr, integer, or vt:date property reads as String, Number, or Date."
+  },
+  "PowerPoint.CustomProperty#delete": {
+    "status": "equivalent",
+    "notes": "Removes the property element. A write on a null object refuses at the call with InvalidObjectPath."
+  },
+  "PowerPoint.CustomXmlPartCollection#add": {
+    "status": "partial",
+    "notes": "Writes /customXml/itemN.xml and itemPropsN.xml with a random ds:itemID, their relationships, and the content type (ECMA-376 Part 1, 22.5). A slide, layout, master, or shape also gets a p:custDataLst/p:custData entry. The text goes through the bounded XML reader: one root element, no DTD, no entities, at most 8 MiB, and UTF-8 only; other text refuses with InvalidArgument and the diagnostic edit.invalid-custom-xml."
+  },
+  "PowerPoint.CustomXmlPart#setXml": {
+    "status": "partial",
+    "notes": "Replaces the text of the data part under the same checks as add. The item id stays. When the root namespace changes, the schema references (ds:schemaRefs) point at the new namespace in place of the old one, and the other references stay. A part that two owners name changes for both."
+  },
+  "PowerPoint.CustomXmlPart#delete": {
+    "status": "equivalent",
+    "notes": "Removes the owner's relationship and customer data entry. The data and properties parts go when nothing else names them, so a part a duplicated slide shares stays for the other slide."
+  },
+  "PowerPoint.Slide#getImageAsBase64": {
+    "status": "partial",
+    "notes": "Draws a PNG with the editor's own renderer, fit into the asked width and height with the slide's aspect ratio; with no size, the slide's own size at 96 pixels per inch, at most 8192 pixels on a side. A runtime over a live editor in a browser draws pictures (capabilities.images). A server runtime draws them only with a rasterize option of createServer: the engine paints the same SVG into a DOM-free document and the host's function turns it into a PNG, which must have exactly the asked size (else GeneralException, image.failed); without one it refuses with NotSupported. Charts and diagrams appear as the editor draws them on its canvas."
+  },
+  "PowerPoint.Shape#getImageAsBase64": {
+    "status": "partial",
+    "notes": "Draws a PNG of the shape alone, without the slide background, with the same renderer and size rules as Slide.getImageAsBase64. The picture is the box of the shape (rotated and flipped), so an outline, a shadow, or a glow outside that box is cut off. A shape of a layout or a master refuses with NotSupported. Only format Png."
+  },
+  "PowerPoint.Hyperlink#delete": {
+    "status": "equivalent",
+    "notes": "Removes the a:hlinkClick of the linked runs or of the shape, and the hyperlink relationship once nothing else in the slide names it. Covered by a test of the slide relationships."
+  },
+  "PowerPoint.Hyperlink#address": {
+    "status": "equivalent",
+    "notes": "Writes a new external hyperlink relationship through sanitizeHref and removes the old one once nothing else in the slide names it. Covered by a test of the slide relationships."
+  },
+  "PowerPoint.DocumentProperties#creationDate": {
+    "status": "partial",
+    "notes": "Reads dcterms:created. A file without one, or with a value that is not a date, reads an invalid Date (getTime() is NaN), never null."
+  },
+  "OfficeExtension.ClientRequestContext#sync": {
+    "status": "partial",
+    "notes": "Answers the pass-through value after the batch applies. One sync is one atomic batch; reads that later calls wait for go in earlier rounds pinned to one revision, and a write after a read is conditional on that read (StaleDocument)."
+  },
+  "OfficeExtension.ClientRequestContext#loadRecursive": {
+    "status": "partial",
+    "notes": "Each object whose type name is a key of the options loads that option, and the objects its load fills in (navigation properties and collection items) go on, down to maxDepth levels (at most 32, the default). An object whose type is not a key loads nothing and stops the walk. A key that is not a type name of this API, or a bad option, refuses with InvalidArgument at the call. Each level costs one more host batch in the same sync."
+  },
+  "OfficeExtension.ClientRequestContext#trace": {
+    "status": "partial",
+    "notes": "A failed sync gives the messages queued before the failed call in PptxEditorError.traceMessages; when the failed call is not known (a read queued while the sync settled, or a picture that failed to draw), it gives every message of the sync. The messages go nowhere else."
+  },
+  "OfficeExtension.ClientRequestContext#debugInfo": {
+    "status": "partial",
+    "notes": "pendingStatements lists what the next sync sends, in order: the consumer-facing path of each queued call and the message of each trace call. It never holds a handle or presentation content."
+  },
+  "PowerPoint.Presentation#bindings": {
+    "status": "different",
+    "notes": "Bindings are not file content: ECMA-376 has no element for them. The runtime keeps them in memory for its lifetime and never writes them to the package, so a save, a reopened file, or another runtime over the same bytes has none. A runtime holds at most 10000 bindings; a new id past that refuses with InvalidArgument (binding.limit)."
+  },
+  "PowerPoint.BindingCollection#add": {
+    "status": "partial",
+    "notes": "Binds the shape by its owner and p:cNvPr id, as a shape object names it. An id that is in use moves that binding to the new shape and keeps its place in the collection. Only BindingType Shape. The binding applies only when its sync commits."
+  },
+  "PowerPoint.BindingCollection#addFromSelection": {
+    "status": "partial",
+    "notes": "Needs a runtime over a live editor (capabilities.selection); a server refuses with NotSupported (host.no-selection). The selection must be exactly one shape on a slide; any other selection refuses with InvalidArgument (binding.selection)."
+  },
+  "PowerPoint.Binding#getShape": {
+    "status": "partial",
+    "notes": "A binding whose shape an edit deleted stays listed, and getShape refuses with ItemNotFound (binding.shape-deleted). An undo that restores the shape makes the binding work again, because the shape keeps its id."
+  },
+  "PowerPoint.TextRange#hyperlinks": {
+    "status": "partial",
+    "notes": "Lists each text link (a:rPr/a:hlinkClick) that overlaps the range, in text order. Each link keeps its whole span, so a link that starts before the range reads from its own start, and delete removes the whole link. An empty range lists the link around its point. A link on the whole shape (p:cNvPr/a:hlinkClick) is not text and is not listed."
+  }
+}

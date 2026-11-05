@@ -1,0 +1,167 @@
+---
+title: 'Tables and cells'
+description: 'Insert tables, type in cells, add or delete rows and columns, merge and split cells, and format tables.'
+category: 'Guides'
+---
+
+A PPTX table is a graphic frame that holds an `a:tbl`. You edit it with editor commands: run `editor.exec(command)`, or check first with `editor.can(command)`. Each command acts on the table of the current selection: a caret in a cell, a range of cells, or the selected table frame. Every edit is one undo step, and every edit keeps the table valid under ECMA-376: one cell for each grid column in every row, and merge markers (`gridSpan`, `rowSpan`, `hMerge`, `vMerge`) on the covered cells.
+
+The toolbar shows the `table` group while the selection is in a table. Its slots carry the DOCX Editor names (`table.mergeCells`, `table.splitCell`, `table.cellFill`, `table.borderTarget`) and `table.*` names for the PPTX controls that DOCX Editor does not have.
+
+## Insert a table
+
+`insertTable` adds a table to the current slide with the deck's default table style, Header Row, and Banded Rows. The table is two thirds of the slide wide and centered. The caret goes into the first cell.
+
+```tsx
+import { MenuTableGrid, useEditorCommand } from '@pptx-editor.dev/react';
+
+// The 10 × 8 size grid inside a host's Insert > Table submenu.
+function InsertTableMenu({ close }: { close: () => void }) {
+  return <MenuTableGrid onInserted={close} />;
+}
+
+// The same insert from your own button.
+function InsertThreeByTwo() {
+  const insert = useEditorCommand('table.insert');
+  return (
+    <button disabled={!insert.isEnabled} onClick={() => insert.execute({ rows: 2, cols: 3 })}>
+      Insert a 3 × 2 table
+    </button>
+  );
+}
+```
+
+Counts must be integers from 1 to 75. `MenuTableGrid` is a `grid` with one tab stop: the arrow keys, Home, and End move in it, and Enter inserts the table.
+
+## Read the table of the selection
+
+`editor.snapshot().table` is a `TableContext` while the selection is in or on a table, and `null` otherwise. `tableChromeVisible(snapshot.table)` gives the same answer as DOCX Editor's helper.
+
+```ts
+const table = editor.snapshot().table;
+if (table) {
+  console.log(table.rows, table.columns); // the grid size
+  console.log(table.rowIndex, table.columnIndex); // the caret's cell, or the range's focus cell
+  console.log(table.selectedRows, table.selectedColumns); // { from, to } each
+  console.log(table.styleId, table.options); // the style and its style options
+}
+```
+
+A caret in a cell is a text selection with a `cell` address. A range of cells is a `cells` selection:
+
+```ts
+editor.setSelection({
+  kind: 'cells',
+  nodeId: table.nodeId,
+  anchor: { row: 0, column: 0 },
+  focus: { row: 1, column: 1 },
+});
+```
+
+An address inside a merged cell moves to the merged cell's top-left grid position.
+
+## Edit cell text
+
+Every text command works in a cell, in each cell of a range, and in each cell of a selected table: font, size, bold, alignment, bullets, and the others. Type with `editor.input('text', value)` while the caret is in a cell. Tab selects the text of the next cell, and Shift+Tab the text of the cell before. Tab in the last cell adds a row. An arrow key at the edge of a cell's text moves to the next cell, and Escape selects the table. Typing with a range of cells selected is refused with `disabled.typeInOneCell`.
+
+## Edit structure
+
+| Command | Effect |
+| --- | --- |
+| `{ type: 'insertRow', where: 'above' \| 'below' }` | One row for a caret or a selected table, one row for each selected row of a range |
+| `{ type: 'insertColumn', where: 'left' \| 'right' }` | The same for columns |
+| `{ type: 'deleteRow' }`, `{ type: 'deleteColumn' }` | Deletes the selected rows or columns; the table goes when none would stay |
+| `{ type: 'deleteTable' }` | Deletes the table |
+| `{ type: 'selectTableRegion', region: 'table' \| 'row' \| 'column' }` | Selects the table, or the rows or columns of the selection |
+| `{ type: 'setRowHeight', height }`, `{ type: 'setColumnWidth', width }` | Sizes in EMU; a row height is a minimum, so rows still grow to fit their text |
+| `{ type: 'distributeRows' }`, `{ type: 'distributeColumns' }` | Gives the selected rows or columns the same size |
+| `{ type: 'setTableGrid', columns?, rows? }` | Sets every grid column width or row height at once, in EMU, as a grid line drag does. Run the steps of one drag with one `historyGroup` to undo them as one step (see [Undo and history groups](/docs/guides/undo-history)) |
+
+A merged cell that a new row or column crosses grows over it. A merged cell that loses some of its rows or columns keeps its text.
+
+## Merge and split cells
+
+`mergeCells` merges a range of cells into one cell. The text of every merged cell moves into it, in reading order. A range of one cell is refused with `disabled.mergeOneCell`.
+
+`splitCell` splits one cell into `rows` × `cols` cells. A merged cell splits along its grid lines when its width or height divides evenly. A one-column cell gets new grid columns that share its width, and the cells above and below it widen over them.
+
+```ts
+editor.exec({ type: 'mergeCells' });
+editor.exec({ type: 'splitCell', rows: 2, cols: 1 });
+```
+
+## Format tables and cells
+
+| Command | Effect |
+| --- | --- |
+| `{ type: 'setTableStyle', styleId }` | A style from `editor.tableStyles()`; the id is an upper-case GUID |
+| `{ type: 'toggleTableStyleOption', option }` | `firstRow`, `lastRow`, `bandRow`, `firstCol`, `lastCol`, or `bandCol` |
+| `{ type: 'setCellFill', color }` | A color, or `null` for No Fill |
+| `{ type: 'setTableBorders', scope, spec }` | `all`, `outside`, `inside`, `top`, `bottom`, `left`, or `right`, with `{ color, width, dash? }` in points; `{ scope: 'none' }` removes every border of the selected cells |
+| `{ type: 'setCellMargins', margins }` | `left`, `right`, `top`, `bottom` in EMU |
+| `{ type: 'setVerticalAlign', anchor }` | `t`, `ctr`, or `b` for the selected cells |
+
+## Customize the table chrome
+
+The table controls follow the customization ladder of the toolbar. Hide or restyle them by slot id, or hide the whole group:
+
+```tsx
+<PptxEditor.Toolbar>
+  <PptxEditor.Toolbar.Group id="table" hidden />
+</PptxEditor.Toolbar>
+
+<PptxEditor.Toolbar>
+  <PptxEditor.Toolbar.Slot slotId="table.mergeCells" hidden />
+  <PptxEditor.Toolbar.Slot slotId="table.insertRowBelow" className="acme-insert-below" />
+</PptxEditor.Toolbar>
+```
+
+Give a button your own icon, or render your own element with `asChild`. The named parts are the same controls:
+
+```tsx
+<PptxEditor.Toolbar>
+  <PptxEditor.Toolbar.TableInsert icon={<AcmeTableIcon />} />
+  <PptxEditor.Toolbar.TableInsertRowBelow icon={<AcmeRowIcon />} />
+  <PptxEditor.Toolbar.TableMergeCells asChild>
+    <AcmeButton />
+  </PptxEditor.Toolbar.TableMergeCells>
+</PptxEditor.Toolbar>
+```
+
+`table.insert` (the Insert Table grid button) takes `icon` and `asChild` too, and `table.cellFill` takes `icon` for its color split. The dropdown pickers (`table.style`, `table.borderTarget`, `table.select`, `table.delete`, `table.splitCell`, and `table.cellMargins`) take `className` and `hidden`, and warn in development on `icon` or `asChild`. `PptxEditor.Menu`'s Insert menu already holds the Table grid; `PptxEditor.Menu.TableGrid` places it in your own menu, and it closes that menu after an insert.
+
+In Vue, the same parts are `PptxEditorToolbar`, `ToolbarGroup`, and `ToolbarSlot`:
+
+```vue
+<PptxEditorToolbar>
+  <ToolbarGroup id="table" hidden />
+</PptxEditorToolbar>
+
+<PptxEditorToolbar>
+  <ToolbarSlot slot-id="table.mergeCells" hidden />
+  <ToolbarSlot slot-id="table.insertRowBelow" className="acme-insert-below" />
+</PptxEditorToolbar>
+```
+
+`TABLE_CHROME_SLOT_IDS` lists the slots that a table selection shows, and `isTableChromeSlot(slot)` tests one. Hiding a control changes the interface only: the command still runs. The Vue toolbar draws the same table controls as the React toolbar, pickers included.
+
+## Handle unsupported structures
+
+A command that cannot run returns `{ ok: false, reason }` and changes nothing. The reasons:
+
+| Reason | When |
+| --- | --- |
+| `disabled.noSelection` | Nothing is selected |
+| `disabled.noTable` | The selection is not in a table |
+| `disabled.mergeOneCell` | Merge with one cell selected |
+| `disabled.splitOneCell` | Split with more than one cell selected |
+| `disabled.splitUneven` | A split that does not divide a merged cell evenly |
+| `disabled.tableTooLarge` | The table would grow past 75 columns or 1,000 rows |
+| `disabled.typeInOneCell` | Typing with a range of cells selected |
+| `errors.unsupported` | A value no table can take, with a detail: a size, color, or style id a host passes; distribute on a table without sizes; or a table from a file that the editor cannot read (rows that do not match its grid in a table larger than the editor makes) |
+
+A table whose rows do not hold one cell for each grid column is repaired by the next table command when it is no larger than 75 columns and 1,000 rows, and a save writes whole rows. In a collaboration session, two people can change the rows, columns, or merged cells of one table at the same time and leave merge markers that do not match. The editor then shows and edits that table with the markers that the next table command would write, and a save writes those markers. Every other table shows and saves with the merge markup that it has in the editor.
+
+## Next steps
+
+See [Toolbar customization](/docs/customization/toolbar) for the slot ladder, and [PPTX fidelity](/docs/pptx-fidelity#tables) for what the editor supports.

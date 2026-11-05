@@ -1,0 +1,3 @@
+/* The adapter stylesheet only imports the shared core stylesheet: all chrome styling lives in
+   @pptx-editor.dev/core (bun run check:adapter-css-thin). */
+@import '@pptx-editor.dev/core/styles/editor.css';

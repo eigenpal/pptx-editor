@@ -1,0 +1,10 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+/* The empty page shown until the client-only editor chunk loads. */
+.demo-loading {
+  min-height: 100vh;
+}

@@ -1,0 +1,142 @@
+---
+title: 'Language'
+description: 'Translate the PPTX editor interface with a locale catalog, add a language, and translate your own controls.'
+category: 'Customization'
+---
+
+Pass a locale catalog to the `locale` prop to translate the interface. Interface language never translates the text of the deck.
+
+## Translate the interface
+
+This example renames the Bold and Italic labels and the File menu. Every other string stays English:
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import type { LocaleCatalog } from '@pptx-editor.dev/i18n';
+import { PptxEditor } from '@pptx-editor.dev/react';
+
+const labels: LocaleCatalog = {
+  toolbar: { bold: 'Fett (Ctrl+B)', italic: 'Kursiv (Ctrl+I)' },
+  menu: { file: 'Datei' },
+};
+
+export function DeckEditor({ bytes }: { bytes: Uint8Array }) {
+  return <PptxEditor document={bytes} locale={labels} />;
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import type { LocaleCatalog } from '@pptx-editor.dev/i18n';
+import { PptxEditor } from '@pptx-editor.dev/vue';
+
+defineProps<{ bytes: Uint8Array }>();
+
+const labels: LocaleCatalog = {
+  toolbar: { bold: 'Fett (Ctrl+B)', italic: 'Kursiv (Ctrl+I)' },
+  menu: { file: 'Datei' },
+};
+</script>
+
+<template>
+  <PptxEditor :document="bytes" :locale="labels" />
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+`PptxEditor.Root` (`PptxEditorRoot` in Vue) takes the same `locale` prop. One catalog applies to all the chrome inside the root: the toolbar, the menus, the dialogs, the panes, the notices, and the labels the engine paints on the canvas, such as empty placeholder prompts.
+
+## Understand the catalog
+
+`@pptx-editor.dev/i18n` holds the interface strings. The adapters install it for you. To import a catalog or a type from it, as the examples on this page do, add it to your own dependencies with `npm install @pptx-editor.dev/i18n`.
+
+| Export | Use |
+| --- | --- |
+| `@pptx-editor.dev/i18n/en.json` | The English catalog, the source of truth. Every other catalog has its shape. |
+| `englishCatalog` | The English catalog as a typed object (`Catalog`). |
+| `LocaleCatalog` | The type of a catalog for the `locale` prop: the English shape, where each value is optional and can be `null`. |
+| `TranslationKey` | Every key, as a dotted path such as `toolbar.bold`. |
+| `createTranslator(locale?)` | A `Translate` function over a catalog, for use outside the editor. |
+| `isTranslationKey(key)` | Whether a string is a key. To show a `disabledReason` from `useEditorCommand`, use `translateKeyOrText(t, reason)` from `@pptx-editor.dev/core/editor`. |
+
+A missing or `null` value falls back to English. A value can hold `{name}` placeholders, such as `Slide {index}`; keep the placeholder names when you translate it.
+
+The package ships the English catalog only. To use another language, supply its catalog.
+
+## Add a language
+
+1. Copy `@pptx-editor.dev/i18n/en.json` into your application, for example as `locales/de.json`.
+2. Translate each value. Keep every key and every `{name}` placeholder. Write shortcuts in the `Ctrl+B` form; the editor shows them as `⌘B` on macOS.
+3. Leave a value out, or set it to `null`, to show the English text for it.
+4. Import the file, type it as `LocaleCatalog`, and pass it to `locale`.
+
+```ts
+import type { LocaleCatalog } from '@pptx-editor.dev/i18n';
+import de from './locales/de.json';
+
+export const german: LocaleCatalog = de;
+```
+
+When `@pptx-editor.dev/i18n` adds keys in a later version, a catalog without them shows English for those keys. In an object literal typed as `LocaleCatalog`, TypeScript reports a key that the English catalog does not have.
+
+To switch the language at run time, pass another catalog. The editor keeps the deck, the selection, and the undo history, and repaints the canvas once for its painted labels.
+
+## Translate custom controls
+
+`useTranslation()` returns `{ t }`, the translator of the nearest root. Pass `t` a typed `TranslationKey` and the placeholder values:
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { useEditorState, useTranslation } from '@pptx-editor.dev/react';
+
+export function CurrentSlideLabel() {
+  const { t } = useTranslation();
+  const current = useEditorState((s) => s.currentSlide);
+  return <span>{t('rail.slideLabel', { index: current + 1 })}</span>;
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { useEditorState, useTranslation } from '@pptx-editor.dev/vue';
+
+const { t } = useTranslation();
+const current = useEditorState((s) => s.currentSlide);
+</script>
+
+<template>
+  <span>{{ t('rail.slideLabel', { index: current + 1 }) }}</span>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+In Vue, `t` reads the current catalog at each call, so a template that calls it updates when `locale` changes.
+
+Application labels belong in your own catalog. `Toolbar.Action` `label` takes resolved text, not a key.
+
+## Limits
+
+- The editor has no provider for one region of the interface. One `locale` applies to the whole root.
+- The editor follows the content of the catalog, not its identity. A new object with the same strings does not repaint.
+- An unknown key shows the key itself, so a gap is visible instead of blank.
+- `locale` sets interface strings only. It does not change the language that text shaping uses or the text direction of the deck.
+
+## See also
+
+- [Toolbar](/docs/customization/toolbar)
+- [React hooks](/docs/react/hooks)
+- [Vue composables](/docs/vue/composables)

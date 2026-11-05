@@ -1,0 +1,807 @@
+---
+title: 'Toolbar'
+description: 'Customize the PPTX editor toolbar with named controls, command slots, application actions, groups, and responsive overflow.'
+category: 'Customization'
+---
+
+Use `className` for styling. Use `icon` for an icon element, `asChild` for your element, and `hidden` to remove a default part. `hidden` on a named part, such as `Toolbar.Bold`, is shorthand for `<Toolbar.Slot slotId="text.bold" hidden />`. A control shows its state as `data-active` and `data-disabled` attributes for your CSS. A slot passes only `className` to its control; any other attribute on it, such as `style`, `id`, or `data-*`, prints a development warning.
+
+Set `preset={false}` to choose the complete arrangement. Use `useEditorCommand(slotId)` for application controls. It supplies the enabled state and the engine's refusal reason.
+
+Keep the caret when a toolbar button receives a mouse press. Call `preventDefault()` for buttons, but skip inputs, selects, and text areas. Hiding a button does not remove its operation.
+
+## Toolbar configuration reference
+
+| Configuration | How to use it |
+| --- | --- |
+| One control | Pass `className`, `icon`, or `hidden` to its named part. |
+| A different element | Use `asChild` on a button control. Forward its attributes and events. |
+| One registered slot | Use `Toolbar.Slot` with `slotId`. |
+| A built-in group | Use `Toolbar.Group` with its registered `id`. Add children or set `hidden`. |
+| An application group | Choose another `id`, then set its label, position, and overflow behavior. |
+| An application button | Use `Toolbar.Action`. |
+| A complete arrangement | Set `preset={false}` and compose all visible controls. |
+| Narrow widths | Keep `overflow` on, or set `overflow={false}` to let the bar wrap. A `preset={false}` bar always wraps. |
+| Every group at all times | Set `contextual={false}`. By default, the bar shows only the groups for the selection. |
+
+Pickers take `className` and `hidden`: `Toolbar.FontFamily`, `Toolbar.FontSize`, `Toolbar.CharacterSpacing`, `Toolbar.ChangeCase`, `Toolbar.Alignment`, `Toolbar.TextDirection`, `Toolbar.VerticalAlignment`, `Toolbar.Autofit`, `Toolbar.BulletStyle`, `Toolbar.NumberStyle`, `Toolbar.LineSpacing`, `Toolbar.Columns`, `Toolbar.Line`, `Toolbar.Shapes`, `Toolbar.LineWidth`, `Toolbar.LineStart`, `Toolbar.LineEnd`, `Toolbar.LineDash`, `Toolbar.ShapeStyles`, `Toolbar.ShapeEffects`, `Toolbar.Order`, `Toolbar.AlignObjects`, and `Toolbar.Rotate`. The color split controls (`Toolbar.FontColor`, `Toolbar.Highlight`, `Toolbar.ShapeFill`, `Toolbar.LineColor`) also take `icon`, the glyph over the color bar. A picker has no single element, so `asChild` on a picker slot prints a development warning and does nothing.
+
+`Toolbar.FontFamily` is also a compound, as in DOCX Editor: compose its `Trigger`, `Content`, and `Item` parts to change the picker's markup. See [Compose the font picker](#compose-the-font-picker).
+
+To apply a theme font, pass its reference: `execute('+mj-lt')` for the headings font, and `execute('+mn-lt')` for the body font. The text then keeps the theme reference and follows a theme change (ECMA-376 Part 1, 20.1.4.1.17 `latin`). To mark the theme row as current, read `snapshot().format?.fontFamilyTheme` (a `SelectionFormat` field): `major` for the headings font, `minor` for the body font, and absent for a literal family. `value` is the theme's family name in both cases.
+
+### Registered groups and slots
+
+These identifiers come from the shared chrome registry (`CHROME_GROUPS`). A registered operation can stay disabled with the engine's refusal reason. The preset toolbar never shows the slots marked with an asterisk (\*); see [Place the shape format controls](#place-the-shape-format-controls). The contextual groups (`view`, `file`, `edit`, `slide`, and `section`) belong to the menus, the slide rail, and the slide sorter; a named part or `Toolbar.Slot` can still place one of their slots. The toolbar shows the `slide.background` and `slide.layout` controls while nothing is selected.
+
+The toolbar shows only the groups that act on the selection:
+
+| Selection | Groups on the toolbar |
+| --- | --- |
+| Nothing, or slides in the slide rail | `history`, `insert`, `slide` (`slide.background` and `slide.layout` only), `find` |
+| Text with the caret or a text range in it | `history`, `font`, `text`, `paragraph`, `list`, `insert`, `format` |
+| One or more shapes | `history`, `font`, `text`, `paragraph`, `insert`, `shape`, `format`, `arrange`, `more` |
+| Pictures only | `history`, `insert`, `image`, `arrange`, `more` |
+| Text in a table cell, or a range of cells | `history`, `font`, `text`, `paragraph`, `list`, `insert`, `format`, `table` |
+| A table, selected as an object | `history`, `font`, `text`, `paragraph`, `insert`, `format`, `arrange`, `more`, `table` |
+| The speaker notes field, while it has focus | `history`, `text.bold`, `text.italic`, `text.underline`, and `text.strike` (they format the notes), and `find` |
+
+Hiding a group never turns off its commands: menus, shortcuts, and the ribbon still run them. Insert > Table in the menu bar places `table.insert`.
+
+- A `Toolbar.Slot` or named part for a slot of these groups changes that control. It shows while its group shows.
+- A `Toolbar.Slot` for a slot that no context shows, such as a slot marked with an asterisk, goes after the groups and shows for every selection.
+- An application group with `after` follows its anchor. When the selection does not show the anchor, the group follows the nearest shown group before the anchor, in this order: `history`, `font`, `text`, `script`, `paragraph`, `list`, `insert`, `image`, `shape`, `format`, `arrange`, `more`, `slide`, `find`, `table`. With `contextual={false}`, it follows the order of that bar: its groups, then `image` and `table`.
+- Set `contextual={false}` to show every group for every selection. The controls that cannot run are disabled with the engine's reason, and the `image` or `table` group joins after the other groups. The bar then has no `slide` group, so a placed `slide.background` or `slide.layout` goes after the groups. The slots marked with an asterisk stay off the bar in both modes.
+- A `preset={false}` bar shows the slots you place for every selection.
+
+| Group identifier | Slot identifiers |
+| --- | --- |
+| `history` | `history.undo`, `history.redo` |
+| `font` | `font.family`, `font.size` |
+| `text` | `text.bold`, `text.italic`, `text.underline`, `text.strike`, `text.characterSpacing`\*, `text.changeCase`, `text.color`, `text.highlight`, `text.link`, `text.dialog` (contextual) |
+| `script` | `script.super`\*, `script.sub`\* |
+| `paragraph` | `paragraph.align`, `paragraph.textDirection`, `paragraph.valign`, `paragraph.columns`\*, `paragraph.dialog` (contextual) |
+| `list` | `list.bullet`, `list.bulletStyle`, `list.numbered`, `list.numberStyle`, `list.outdent`, `list.indent`, `list.lineSpacing` |
+| `insert` | `insert.textBox`, `insert.line`, `insert.shape`, `insert.image` |
+| `shape` | `shape.styles`\*, `shape.fill`, `shape.lineColor`, `shape.lineWidth`, `shape.lineStart`, `shape.lineEnd`, `shape.lineDash`, `shape.effects`\*, `shape.properties`\* |
+| `format` | `format.painter`, `format.clear` |
+| `arrange` | `arrange.order`, `arrange.align`, `arrange.rotate`\*, `arrange.group`, `arrange.ungroup`, `arrange.selectionPane`\* |
+| `more` | `more.duplicate`, `more.delete` |
+| `find` | `find.find`, `find.replace` |
+| `view` (contextual) | `view.presentationView`, `view.smartGuides`, `view.playFromStart`, `view.playFromCurrent` |
+| `file` (contextual) | `file.pageSetup` |
+| `edit` (contextual) | `edit.cut`, `edit.copy`, `edit.paste`, `edit.selectAll` |
+| `slide` (contextual) | `slide.background`, `slide.add`, `slide.layout`, `slide.reset`, `slide.hide` |
+| `section` (contextual) | `section.add`, `section.rename`, `section.remove`, `section.removeAll`, `section.collapseAll`, `section.expandAll` |
+| `table` (contextual, shown in a table) | `table.insert`, `table.headerRow`, `table.totalRow`, `table.bandedRows`, `table.firstColumn`, `table.lastColumn`, `table.bandedColumns`, `table.style`, `table.cellFill`, `table.borderTarget`, `table.select`, `table.delete`, `table.insertRowAbove`, `table.insertRowBelow`, `table.insertColumnLeft`, `table.insertColumnRight`, `table.mergeCells`, `table.splitCell`, `table.distributeRows`, `table.distributeColumns`, `table.cellMargins` |
+| `image` (contextual) | `image.corrections`, `image.color`, `image.transparency`, `image.change`, `image.reset`, `image.styles`, `image.altText`, `image.crop`, `image.cropToShape`, `image.cropFit`, `image.properties` |
+
+### Named parts
+
+| Part                             | Slot                      |
+| -------------------------------- | ------------------------- |
+| `Toolbar.Undo`                   | `history.undo`            |
+| `Toolbar.Redo`                   | `history.redo`            |
+| `Toolbar.FontFamily`             | `font.family`             |
+| `Toolbar.FontSize`               | `font.size`               |
+| `Toolbar.Bold`                   | `text.bold`               |
+| `Toolbar.Italic`                 | `text.italic`             |
+| `Toolbar.Underline`              | `text.underline`          |
+| `Toolbar.Strike`                 | `text.strike`             |
+| `Toolbar.CharacterSpacing`       | `text.characterSpacing`   |
+| `Toolbar.ChangeCase`             | `text.changeCase`         |
+| `Toolbar.FontColor`              | `text.color`              |
+| `Toolbar.Highlight`              | `text.highlight`          |
+| `Toolbar.Link`                   | `text.link`               |
+| `Toolbar.ClearFormatting`        | `format.clear`            |
+| `Toolbar.Font`                   | `text.dialog`             |
+| `Toolbar.Superscript`            | `script.super`            |
+| `Toolbar.Subscript`              | `script.sub`              |
+| `Toolbar.Alignment`              | `paragraph.align`         |
+| `Toolbar.TextDirection`          | `paragraph.textDirection` |
+| `Toolbar.VerticalAlignment`      | `paragraph.valign`        |
+| `Toolbar.Autofit`                | `paragraph.autofit`       |
+| `Toolbar.BulletList`             | `list.bullet`             |
+| `Toolbar.BulletStyle`            | `list.bulletStyle`        |
+| `Toolbar.NumberedList`           | `list.numbered`           |
+| `Toolbar.NumberStyle`            | `list.numberStyle`        |
+| `Toolbar.Outdent`                | `list.outdent`            |
+| `Toolbar.Indent`                 | `list.indent`             |
+| `Toolbar.LineSpacing`            | `list.lineSpacing`        |
+| `Toolbar.Columns`                | `paragraph.columns`       |
+| `Toolbar.Paragraph`              | `paragraph.dialog`        |
+| `Toolbar.TextBox`                | `insert.textBox`          |
+| `Toolbar.Line`                   | `insert.line`             |
+| `Toolbar.Shapes`                 | `insert.shape`            |
+| `Toolbar.ImageInsert`            | `insert.image`            |
+| `Toolbar.ShapeFill`              | `shape.fill`              |
+| `Toolbar.LineColor`              | `shape.lineColor`         |
+| `Toolbar.LineWidth`              | `shape.lineWidth`         |
+| `Toolbar.LineStart`              | `shape.lineStart`         |
+| `Toolbar.LineEnd`                | `shape.lineEnd`           |
+| `Toolbar.LineDash`               | `shape.lineDash`          |
+| `Toolbar.ShapeStyles`            | `shape.styles`            |
+| `Toolbar.ShapeEffects`           | `shape.effects`           |
+| `Toolbar.FormatShape`            | `shape.properties`        |
+| `Toolbar.FormatPainter`          | `format.painter`          |
+| `Toolbar.Order`                  | `arrange.order`           |
+| `Toolbar.AlignObjects`           | `arrange.align`           |
+| `Toolbar.GroupObjects`           | `arrange.group`           |
+| `Toolbar.UngroupObjects`         | `arrange.ungroup`         |
+| `Toolbar.Rotate`                 | `arrange.rotate`          |
+| `Toolbar.SelectionPane`          | `arrange.selectionPane`   |
+| `Toolbar.Duplicate`              | `more.duplicate`          |
+| `Toolbar.Delete`                 | `more.delete`             |
+| `Toolbar.Find`                   | `find.find`               |
+| `Toolbar.Replace`                | `find.replace`            |
+| `Toolbar.SmartGuides`            | `view.smartGuides`        |
+| `Toolbar.PlayFromStart`          | `view.playFromStart`      |
+| `Toolbar.PlayFromCurrent`        | `view.playFromCurrent`    |
+| `Toolbar.PageSetup`              | `file.pageSetup`          |
+| `Toolbar.Cut`                    | `edit.cut`                |
+| `Toolbar.Copy`                   | `edit.copy`               |
+| `Toolbar.Paste`                  | `edit.paste`              |
+| `Toolbar.SelectAll`              | `edit.selectAll`          |
+| `Toolbar.FormatBackground`       | `slide.background`        |
+| `Toolbar.NewSlide`               | `slide.add`               |
+| `Toolbar.SlideLayout`            | `slide.layout`            |
+| `Toolbar.ResetSlide`             | `slide.reset`             |
+| `Toolbar.HideSlide`              | `slide.hide`              |
+| `Toolbar.PresentationView`       | `view.presentationView`   |
+| `Toolbar.AddSection`             | `section.add`             |
+| `Toolbar.RenameSection`          | `section.rename`          |
+| `Toolbar.RemoveSection`          | `section.remove`          |
+| `Toolbar.RemoveAllSections`      | `section.removeAll`       |
+| `Toolbar.CollapseAllSections`    | `section.collapseAll`     |
+| `Toolbar.ExpandAllSections`      | `section.expandAll`       |
+| `Toolbar.TableInsert`            | `table.insert`            |
+| `Toolbar.TableStyle`             | `table.style`             |
+| `Toolbar.TableHeaderRow`         | `table.headerRow`         |
+| `Toolbar.TableTotalRow`          | `table.totalRow`          |
+| `Toolbar.TableBandedRows`        | `table.bandedRows`        |
+| `Toolbar.TableFirstColumn`       | `table.firstColumn`       |
+| `Toolbar.TableLastColumn`        | `table.lastColumn`        |
+| `Toolbar.TableBandedColumns`     | `table.bandedColumns`     |
+| `Toolbar.TableCellFill`          | `table.cellFill`          |
+| `Toolbar.TableBorderTarget`      | `table.borderTarget`      |
+| `Toolbar.TableSelect`            | `table.select`            |
+| `Toolbar.TableDelete`            | `table.delete`            |
+| `Toolbar.TableInsertRowAbove`    | `table.insertRowAbove`    |
+| `Toolbar.TableInsertRowBelow`    | `table.insertRowBelow`    |
+| `Toolbar.TableInsertColumnLeft`  | `table.insertColumnLeft`  |
+| `Toolbar.TableInsertColumnRight` | `table.insertColumnRight` |
+| `Toolbar.TableMergeCells`        | `table.mergeCells`        |
+| `Toolbar.TableSplitCell`         | `table.splitCell`         |
+| `Toolbar.TableDistributeRows`    | `table.distributeRows`    |
+| `Toolbar.TableDistributeColumns` | `table.distributeColumns` |
+| `Toolbar.TableCellMargins`       | `table.cellMargins`       |
+| `Toolbar.ImageCorrections`       | `image.corrections`       |
+| `Toolbar.ImageColor`             | `image.color`             |
+| `Toolbar.ImageTransparency`      | `image.transparency`      |
+| `Toolbar.ImageChange`            | `image.change`            |
+| `Toolbar.ImageReset`             | `image.reset`             |
+| `Toolbar.ImageStyles`            | `image.styles`            |
+| `Toolbar.ImageAltText`           | `image.altText`           |
+| `Toolbar.ImageCrop`              | `image.crop`              |
+| `Toolbar.ImageCropToShape`       | `image.cropToShape`       |
+| `Toolbar.ImageCropFit`           | `image.cropFit`           |
+| `Toolbar.ImageProperties`        | `image.properties`        |
+
+`Toolbar.AddSection` and `Toolbar.RenameSection` open the section name field in a mounted slide rail (`PptxEditor.SlideRail`) or slide sorter (`PptxEditor.SlideSorter`). Without one, `Toolbar.RenameSection` is off with the reason `disabled.noSectionPane`, and `Toolbar.AddSection` adds the section without the name field. To start a rename from your own chrome, call `requestSectionRename(editor, sectionId)` from `@pptx-editor.dev/react` or `@pptx-editor.dev/vue`; it also needs a mounted rail or sorter.
+
+A named part for a slot that the toolbar does not show, such as `Toolbar.SmartGuides`, `Toolbar.Cut`, `Toolbar.Font`, or `Toolbar.Paragraph`, goes after the groups. `text.dialog` and `paragraph.dialog` are contextual: the bar has no dialog launcher, so it does not show them. **Format > Font…** and **Character Spacing > More Spacing…** open the Font dialog; **Format > Paragraph…** and **Line Spacing Options…** open the Paragraph dialog. In a preset bar, an `image` part replaces that control in the picture group, which shows only while every selected element is a picture. In a `preset={false}` bar, it stays in place, disabled with the reason, such as "Select a picture", until a picture is selected. The React and Vue toolbars have the same named parts and draw the same controls; see [React and Vue reference](#react-and-vue-reference).
+
+`Toolbar.Separator` draws a rule between controls in a `preset={false}` bar.
+
+### Application group options
+
+| Prop | Use |
+| --- | --- |
+| `id` | A built-in group identifier or your application group identifier. |
+| `label` | Accessible name. Takes priority over `labelKey`. |
+| `labelKey` | Catalog key for your group's accessible name. |
+| `after` | Places your group after another group. Applies to application groups. When the selection does not show that group, your group follows the nearest shown group before it. |
+| `priority` | Lower numbers move to the **More** menu first. A built-in group's priority is its place in `TOOLBAR_COLLAPSE_ORDER`, in steps of 10: `view` is 10 and `history` is 180. The view, file, Find, clipboard, and slide groups move first, then the arrange, table, format, shape, and script groups. The insert group (text box, line, shape, picture) moves after them, and the list, paragraph, font, text, and history groups stay longest, on the toolbar and on every ribbon tab. The contextual `image` group's priority is 190, so it stays longest, because the selection asked for it. DOCX Editor's `image` group moves first instead. A group without a priority moves first. |
+| `pinned` | Keeps your group on the bar at every width. |
+| `hidden` | Removes the group from the bar and the **More** menu. |
+| `overflowContent` | A function that returns the group's content in the **More** menu (`() => ReactNode`). |
+| `className` | Styles the group wrapper. |
+
+### Application action options
+
+`Toolbar.Action` gives your operation the toolbar's button styling, state attributes, keyboard behavior, and selection protection.
+
+| Prop                         | Use                                                               |
+| ---------------------------- | ----------------------------------------------------------------- |
+| `label`                      | Required accessible name and tooltip, from your own catalog.      |
+| `icon`, `children`           | Visible content.                                                  |
+| `onSelect`                   | Runs your action. In Vue, listen to `select`.                     |
+| `active`                     | Sets `aria-pressed` and `data-active`.                            |
+| `disabled`, `disabledReason` | Disables the action and explains why. The button stays focusable. |
+| `asChild`                    | Applies the behavior to one child element.                        |
+| `className`                  | Styles the action.                                                |
+
+### Keyboard and focus behavior
+
+The toolbar is an ARIA `toolbar` with one Tab stop. The control that last had focus keeps the Tab stop. ArrowLeft, ArrowRight, Home, and End move between the controls; a right-to-left interface swaps the arrows. The Font size field keeps Home and End, and keeps each arrow until the caret reaches that end of its text.
+
+A disabled control carries `aria-disabled="true"` instead of the native `disabled` attribute. It stays in the arrow order, runs nothing, and gives its reason to assistive technology. Your own buttons, inputs, and links inside the toolbar join the arrow order. Use `aria-disabled` on them too: a native `disabled` control leaves the order.
+
+### Command state from `useEditorCommand`
+
+`useEditorCommand(slotId)` returns `isEnabled`, `isActive`, `disabledReason`, `value`, and `execute`. A slot that opens a surface (a dialog, find, or the slide show) runs through `PptxEditor.Root`, as a menu row does. Outside a root, that slot is disabled with the `disabled.noRoot` reason. When the `popups` entry of its surface is `false`, the slot is disabled with the reason that the surface is turned off. `find.find` and `find.replace` are also disabled with `find.noBar` while no `PptxEditor.FindBar` is mounted.
+
+`disabledReason` is a catalog key, such as `disabled.noSelection`, or the engine's own text. Translate it before you show it with `translateKeyOrText(t, reason)` from `@pptx-editor.dev/core/editor`, with `t` from `useTranslation()`, as the example in [Build a control from a command](#build-a-control-from-a-command) does. The packaged controls translate it for you. Issue [#15](https://github.com/eigenpal/pptx-editor/issues/15) tracks a hook that returns the translated text, as DOCX Editor's does.
+
+`text.link` is the exception: it stays enabled in both cases, because hiding the popup never turns off links. `useEditorCommand('text.link').execute(url)` always sets a link, and `execute(null)` removes it. The engine can still refuse the link: with only a caret outside a link (`disabled.selectText`), or for an unsafe address (`errors.unsafeLink`). `execute()` with no value opens the link popup, and prints a development warning when no popup can open.
+
+In Vue, `useEditorCommand` follows the same rules through `PptxEditorRoot`: it starts the slide show, opens the find bar (disabled with `find.noBar` while no `PptxEditorFindBar` is mounted), and opens the link popup that the root hosts.
+
+## React and Vue reference
+
+<FrameworkTabs variant="block">
+<Framework value="react">
+
+```tsx
+import { PptxEditor } from '@pptx-editor.dev/react';
+import '@pptx-editor.dev/core/styles/editor.css';
+
+export function DeckEditor({ bytes, send }: { bytes: Uint8Array; send: () => void }) {
+  return (
+    <PptxEditor.Root document={bytes}>
+      <PptxEditor.Viewport className="deck-workspace">
+        <PptxEditor.Toolbar>
+          <PptxEditor.Toolbar.Group id="review" label="Review" priority={15} after="text">
+            <PptxEditor.Toolbar.Action label="Send for review" onSelect={send} />
+          </PptxEditor.Toolbar.Group>
+          <PptxEditor.Toolbar.Strike hidden />
+          <PptxEditor.Toolbar.Group id="find" hidden />
+        </PptxEditor.Toolbar>
+        <PptxEditor.Content />
+      </PptxEditor.Viewport>
+    </PptxEditor.Root>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import {
+  PptxEditorContent,
+  PptxEditorRoot,
+  PptxEditorToolbar,
+  PptxEditorViewport,
+} from '@pptx-editor.dev/vue';
+import '@pptx-editor.dev/core/styles/editor.css';
+
+defineProps<{ bytes: Uint8Array; send: () => void }>();
+</script>
+
+<template>
+  <PptxEditorRoot :document="bytes">
+    <PptxEditorViewport class="deck-workspace">
+      <PptxEditorToolbar>
+        <PptxEditorToolbar.Group id="review" label="Review" after="text">
+          <PptxEditorToolbar.Action label="Send for review" @select="send" />
+        </PptxEditorToolbar.Group>
+        <PptxEditorToolbar.Strike hidden />
+        <PptxEditorToolbar.Group id="find" hidden />
+      </PptxEditorToolbar>
+      <PptxEditorContent />
+    </PptxEditorViewport>
+  </PptxEditorRoot>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+The Vue toolbar draws the same controls as the React toolbar, with the same markup, classes, and ARIA: the pickers, the font size stepper, the value menus, the color splits, the galleries, the table grid, the link control, Find and Replace, the slide show buttons, and the dialog and file picker buttons. Groups that do not fit the width move into the **More** menu, and `overflow`, `priority`, `pinned`, and `overflowContent` work as in React.
+
+Vue takes each rung of the ladder as DOCX Editor's Vue adapter does:
+
+- `className` (or a host `class`) on `PptxEditorToolbar.Slot` or on a named part goes on the control, as on every Vue part whose React twin takes `className`.
+- The `icon` prop (or the `icon` slot) replaces the registry icon of a button or of the main half of a color split.
+- `as-child` renders the control as the one element in the default slot. It gets the label, the state attributes, and the click handler. An element that is not a button also gets `role="button"`, a tab stop, and Enter and Space.
+- Without `as-child`, default slot content of `PptxEditorToolbar.Slot` replaces the control. The default slot of a named button part (`PptxEditorToolbar.Bold`) is its icon.
+- A picker refuses `icon` and `as-child` with a development warning, as in React.
+- Any other attribute on a slot part, such as `style`, `id`, or `data-*`, never reaches the control and prints a development warning. A `class` or `icon` on a slot with its own content also warns, because no control renders to take it.
+
+## Group your own controls
+
+Put your controls in a `Toolbar.Group`. When the toolbar runs out of width, a whole group moves into the **More** menu, and the group's label becomes the heading of its section there. Give your group a `label`, or a `labelKey` from your translation catalog. The `id` of a built-in group, such as `find`, changes that group instead. TypeScript suggests the built-in identifiers through the `ChromeGroupId` type, which `@pptx-editor.dev/react` and `@pptx-editor.dev/vue` export.
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { PptxEditor } from '@pptx-editor.dev/react';
+import { BoldIcon } from './icons';
+
+export function ReviewToolbar({ send }: { send: () => void }) {
+  return (
+    <PptxEditor.Toolbar>
+      <PptxEditor.Toolbar.Group id="review" label="Review" priority={15} after="text">
+        <PptxEditor.Toolbar.Action label="Send for review" onSelect={send} />
+      </PptxEditor.Toolbar.Group>
+      <PptxEditor.Toolbar.Bold icon={<BoldIcon />} className="acme-bold" />
+      <PptxEditor.Toolbar.Strike hidden />
+      <PptxEditor.Toolbar.Group id="find" hidden />
+    </PptxEditor.Toolbar>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { PptxEditorToolbar } from '@pptx-editor.dev/vue';
+
+defineProps<{ send: () => void }>();
+</script>
+
+<template>
+  <PptxEditorToolbar>
+    <PptxEditorToolbar.Group id="review" label="Review" after="text">
+      <PptxEditorToolbar.Action label="Send for review" @select="send" />
+    </PptxEditorToolbar.Group>
+    <PptxEditorToolbar.Bold className="acme-bold" />
+    <PptxEditorToolbar.Strike hidden />
+    <PptxEditorToolbar.Group id="find" hidden />
+  </PptxEditorToolbar>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+A lower `priority` leaves the bar first. `hidden` on a group removes the whole group.
+
+## Compose the font picker
+
+`Toolbar.FontFamily` holds the picker state in a part-level context. With no children, it renders the default trigger and the grouped list with a search field. With children, compose its parts:
+
+- `Toolbar.FontFamily.Trigger` is the button that opens the list. Its children replace the current family name.
+- `Toolbar.FontFamily.Content` is the list while it is open. Its children replace the search field and the default groups.
+- `Toolbar.FontFamily.Item` is one option. Its `value` is a family name, or a theme font reference: `+mj-lt` for the headings font, `+mn-lt` for the body font. A theme item shows the theme's family and its role, and the text keeps the reference. The item carries the check mark while the text uses that font. Its children replace the name.
+
+Each part takes `className`. An item whose `value` names no font renders nothing. A part outside `Toolbar.FontFamily` renders nothing and prints a development warning.
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { PptxEditor } from '@pptx-editor.dev/react';
+
+const { FontFamily } = PptxEditor.Toolbar;
+
+export function BrandToolbar() {
+  return (
+    <PptxEditor.Toolbar>
+      <FontFamily>
+        <FontFamily.Trigger className="acme-font-trigger" />
+        <FontFamily.Content>
+          <FontFamily.Item value="+mj-lt" />
+          <FontFamily.Item value="+mn-lt" />
+          <FontFamily.Item value="Arial">Arial (brand)</FontFamily.Item>
+        </FontFamily.Content>
+      </FontFamily>
+    </PptxEditor.Toolbar>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { PptxEditorToolbar } from '@pptx-editor.dev/vue';
+
+const FontFamily = PptxEditorToolbar.FontFamily;
+</script>
+
+<template>
+  <PptxEditorToolbar>
+    <FontFamily>
+      <FontFamily.Trigger className="acme-font-trigger" />
+      <FontFamily.Content>
+        <FontFamily.Item value="+mj-lt" />
+        <FontFamily.Item value="+mn-lt" />
+        <FontFamily.Item value="Arial">Arial (brand)</FontFamily.Item>
+      </FontFamily.Content>
+    </FontFamily>
+  </PptxEditorToolbar>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+### Build the list from `useFontFamily`
+
+`useFontFamily()` gives the picker's behavior with no UI, as DOCX Editor's hook of the same name. It returns:
+
+- `value`, the family of the selected text, or `null` for a mixed selection or no selection.
+- `theme`, the theme font that the text uses (`major` or `minor`), or `null`.
+- `options`, every family the editor offers.
+- `groups`, the default picker's groups for the current slide: the theme fonts (`theme`), the other families the deck uses (`document`), and all families (`all`). Each group has an `id`, a `labelKey` to translate, and `rows`. Each row has `family`, `value` (a theme font reference on a theme row), `roleKey`, and `disabled`.
+- `isCurrent(row)`, which is true for the row of the font that the text uses.
+- `setValue(family)`, which applies a family or a theme font reference. A refusal does nothing.
+- `isEnabled` and `disabledReason`, as `useEditorCommand` gives them.
+
+This list shows the theme fonts and the deck's fonts from the hook, inside the default trigger and popover:
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { PptxEditor, useFontFamily, useTranslation } from '@pptx-editor.dev/react';
+
+const { FontFamily } = PptxEditor.Toolbar;
+
+function DeckFonts() {
+  const { groups } = useFontFamily();
+  const { t } = useTranslation();
+  return groups
+    .filter((group) => group.id !== 'all')
+    .map((group) => (
+      <div key={group.id} role="group" aria-label={t(group.labelKey)}>
+        {group.rows.map((row) => (
+          <FontFamily.Item key={row.value} value={row.value} />
+        ))}
+      </div>
+    ));
+}
+
+export function DeckFontToolbar() {
+  return (
+    <PptxEditor.Toolbar>
+      <FontFamily>
+        <FontFamily.Trigger />
+        <FontFamily.Content>
+          <DeckFonts />
+        </FontFamily.Content>
+      </FontFamily>
+    </PptxEditor.Toolbar>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { computed } from 'vue';
+import { PptxEditorToolbar, useFontFamily, useTranslation } from '@pptx-editor.dev/vue';
+
+const FontFamily = PptxEditorToolbar.FontFamily;
+const { groups } = useFontFamily();
+const { t } = useTranslation();
+const deckGroups = computed(() => groups.value.filter((group) => group.id !== 'all'));
+</script>
+
+<template>
+  <PptxEditorToolbar>
+    <FontFamily>
+      <FontFamily.Trigger />
+      <FontFamily.Content>
+        <div
+          v-for="group in deckGroups"
+          :key="group.id"
+          role="group"
+          :aria-label="t(group.labelKey)"
+        >
+          <FontFamily.Item v-for="row in group.rows" :key="row.value" :value="row.value" />
+        </div>
+      </FontFamily.Content>
+    </FontFamily>
+  </PptxEditorToolbar>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+To build a picker from nothing, replace the whole control with `Toolbar.Slot`, and render your own list from `groups` or `options`, `isCurrent`, and `setValue`. See [Replace one control](#replace-one-control).
+
+## Place the shape format controls
+
+The default bar has no room for Quick Styles, Shape Effects, Rotate, Format Shape, and Selection Pane at 1440 px, so it leaves them out. Place them yourself with their named parts or with `Toolbar.Slot`.
+
+- `Toolbar.ShapeStyles` (`shape.styles`) applies a theme style (`p:style`) to the selected shapes.
+- `Toolbar.ShapeEffects` (`shape.effects`) sets and removes a shadow, reflection, glow, or soft edge.
+- `Toolbar.Rotate` (`arrange.rotate`) turns the selection 90° or flips it.
+- `Toolbar.FormatShape` (`shape.properties`) and `Toolbar.SelectionPane` (`arrange.selectionPane`) are placeholders for task panes that are not built yet. They stay disabled with the `disabled.paneNotBuilt` reason.
+
+The Vue toolbar draws these controls too. To build your own, use `useEditorValueCommand`, as the next section shows.
+
+```tsx
+import { PptxEditor } from '@pptx-editor.dev/react';
+
+export function ShapeToolbar() {
+  return (
+    <PptxEditor.Toolbar>
+      <PptxEditor.Toolbar.Group id="shape">
+        <PptxEditor.Toolbar.ShapeStyles />
+        <PptxEditor.Toolbar.ShapeEffects />
+      </PptxEditor.Toolbar.Group>
+      <PptxEditor.Toolbar.Group id="arrange">
+        <PptxEditor.Toolbar.Rotate />
+      </PptxEditor.Toolbar.Group>
+    </PptxEditor.Toolbar>
+  );
+}
+```
+
+## Typed values from `useEditorValueCommand`
+
+`useEditorValueCommand(slotId)` binds a value slot with its type from `ToolbarValueMap`, as in DOCX Editor. A typo in a value does not compile. It returns:
+
+- `execute(value)`, which runs the command and returns the engine's `CommandResult`. A refused value gives `ok: false` and the reason, such as `disabled.invalidValue` or `disabled.noEffectChange`.
+- `value`, the value that the slot shows, or `null` when the selection is mixed or the slot shows no value (the highlight, shape fill, line color, line spacing, and Arrange slots). `shape.effects` shows one choice for each effect kind, separated by spaces (`shadow.outerTop reflection.none glow.none softEdge.none`). Test one choice with `chromeOptionChecked(value, choice)` from `@pptx-editor.dev/core/editor`.
+- `options`, the slot's fixed choices from the registry, such as the Rotate, Align, line width, and Shape Effects rows. A slot with a free value, such as `font.size`, `shape.fill`, or `shape.styles`, has none.
+- Numeric slots give numbers: `font.size` and `shape.lineWidth` in `value` and `options`, and `list.lineSpacing` in `options`.
+- `isEnabled` and `disabledReason`, as `useEditorCommand` gives them.
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { useEditorValueCommand } from '@pptx-editor.dev/react';
+
+export function RotateRightButton() {
+  const rotate = useEditorValueCommand('arrange.rotate');
+  return (
+    <button
+      type="button"
+      aria-disabled={!rotate.isEnabled || undefined}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => {
+        const result = rotate.execute('right90');
+        if (!result.ok) console.info(result.reason);
+      }}
+    >
+      Rotate right
+    </button>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { useEditorValueCommand } from '@pptx-editor.dev/vue';
+
+const effects = useEditorValueCommand('shape.effects');
+function shadow() {
+  const result = effects.execute('shadow.outerBottomRight');
+  if (!result.ok) console.info(result.reason);
+}
+</script>
+
+<template>
+  <button
+    type="button"
+    :aria-disabled="!effects.isEnabled.value || undefined"
+    @mousedown.prevent
+    @click="shadow"
+  >
+    Shadow
+  </button>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+## Build a control from a command
+
+Build a control from `useEditorCommand` when `Toolbar.Action` does not fit. Keep the selection, keep the control focusable when it is disabled, and give the reason.
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { translateKeyOrText } from '@pptx-editor.dev/core/editor';
+import { useEditorCommand, useTranslation } from '@pptx-editor.dev/react';
+
+export function PresentButton() {
+  const { t } = useTranslation();
+  const present = useEditorCommand('view.playFromStart');
+  const reason = present.disabledReason;
+  return (
+    <button
+      type="button"
+      aria-disabled={!present.isEnabled || undefined}
+      title={reason ? translateKeyOrText(t, reason) : undefined}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => {
+        if (present.isEnabled) present.execute();
+      }}
+    >
+      Present
+    </button>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { computed } from 'vue';
+import { translateKeyOrText } from '@pptx-editor.dev/core/editor';
+import { useEditorCommand, useTranslation } from '@pptx-editor.dev/vue';
+
+const { t } = useTranslation();
+const present = useEditorCommand('view.playFromStart');
+const reason = computed(() => {
+  const value = present.disabledReason.value;
+  return value ? translateKeyOrText(t, value) : undefined;
+});
+function run() {
+  if (present.isEnabled.value) present.execute();
+}
+</script>
+
+<template>
+  <button
+    type="button"
+    :aria-disabled="!present.isEnabled.value || undefined"
+    :title="reason"
+    @mousedown.prevent
+    @click="run"
+  >
+    Present
+  </button>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+Render `PresentButton` inside `PptxEditor.Root`, and mount `PptxEditor.Slideshow` in the viewport so the show has a place to play. In Vue, render it inside `PptxEditorRoot` and mount `PptxEditorSlideshow`.
+
+## Build a layout picker
+
+`LayoutGallery` shows the deck's slide layouts in the way of a **Layout** or **New slide** gallery: one group for each slide master, and each tile the engine's own render of a new slide on that layout. Its tiles are menu rows, so you can put the gallery in any menu or popup of your own. It takes these props:
+
+| Prop | Description |
+| --- | --- |
+| `onChange` | Called with the picked layout's `id`. |
+| `value` | The layout to mark as the current one. Without it, the tiles are plain menu rows. |
+| `layouts` | The layouts to show. The default is every layout of the deck. |
+| `disabled`, `disabledReason` | Show the tiles but take no pick, and the reason for their tooltips. The default is disabled while the deck is open for viewing. |
+| `className` | A class name added to the gallery's root element. |
+
+`useSlideLayouts()` returns the deck's layouts, in gallery order. Each one has `id`, `name`, `type` (the `p:sldLayout/@type` value, such as `title` or `secHead`), `masterId`, and `masterName`. The array keeps its identity while the layouts do not change. Run the pick through `useEditorCommand`: `slide.layout` changes the layout of the selected slides, and its `value` is the layout of the current slide. `slide.add` adds a slide with the layout.
+
+The following React example shows a **Layout** menu that marks the current layout, and a **New section** menu that lists only the section header layouts:
+
+```tsx
+import { LayoutGallery, useEditorCommand, useSlideLayouts } from '@pptx-editor.dev/react';
+
+export function MyLayoutMenu() {
+  const layout = useEditorCommand('slide.layout');
+  return (
+    <div role="menu" aria-label="Layout">
+      <LayoutGallery
+        value={String(layout.value ?? '')}
+        disabled={!layout.isEnabled}
+        disabledReason={layout.disabledReason}
+        onChange={(id) => layout.execute(id)}
+      />
+    </div>
+  );
+}
+
+export function MyNewSectionMenu() {
+  const add = useEditorCommand('slide.add');
+  const sections = useSlideLayouts().filter((l) => l.type === 'secHead');
+  return (
+    <div role="menu" aria-label="New section">
+      <LayoutGallery layouts={sections} onChange={(id) => add.execute(id)} />
+    </div>
+  );
+}
+```
+
+Render both inside `PptxEditor.Root`. In Vue, `LayoutGallery` takes the same props and emits `change` with the picked layout's `id`. `className` (or a host `class`) goes on the gallery. `ShapeStyleGallery` and `ShapeGrid` take `onPick` as a prop, as in React. `MenuTableGrid` takes `onPick` and `onInserted` as props, as in React, because they change what a pick does.
+
+## Replace one control
+
+`Toolbar.Slot` replaces one built-in control with your own content. Your content keeps the control's place and collapses with its group. No control renders, so `className` and `icon` on the slot (`class` in Vue) print a development warning; put them on your content.
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { PptxEditor } from '@pptx-editor.dev/react';
+import { MyFontPicker } from './MyFontPicker';
+
+export function FontToolbar() {
+  return (
+    <PptxEditor.Toolbar>
+      <PptxEditor.Toolbar.Slot slotId="font.family">
+        <MyFontPicker />
+      </PptxEditor.Toolbar.Slot>
+    </PptxEditor.Toolbar>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { PptxEditorToolbar } from '@pptx-editor.dev/vue';
+import MyFontPicker from './MyFontPicker.vue';
+</script>
+
+<template>
+  <PptxEditorToolbar>
+    <PptxEditorToolbar.Slot slot-id="font.family">
+      <MyFontPicker />
+    </PptxEditorToolbar.Slot>
+  </PptxEditorToolbar>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+Use `asChild` to keep the control's behavior on your own element. In Vue, `PptxEditorToolbar.Action`, `PptxEditorToolbar.Slot`, and the named button parts take `as-child`.
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { PptxEditor } from '@pptx-editor.dev/react';
+
+export function BoldAsChild() {
+  return (
+    <PptxEditor.Toolbar>
+      <PptxEditor.Toolbar.Bold asChild>
+        <button type="button" className="acme-button">
+          B
+        </button>
+      </PptxEditor.Toolbar.Bold>
+    </PptxEditor.Toolbar>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { PptxEditorToolbar } from '@pptx-editor.dev/vue';
+</script>
+
+<template>
+  <PptxEditorToolbar>
+    <PptxEditorToolbar.Bold as-child>
+      <button type="button" class="acme-button">B</button>
+    </PptxEditorToolbar.Bold>
+  </PptxEditorToolbar>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+## More control
+
+See `CHROME_GROUPS` in [`chrome-controls.ts`](https://github.com/eigenpal/pptx-editor/blob/main/packages/core/src/editor/chrome-controls.ts) for every control's label, icon, and state, and the [`@pptx-editor.dev/react` API report](https://github.com/eigenpal/pptx-editor/blob/main/docs/api/react/index.api.md) for the part types.

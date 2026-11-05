@@ -1,0 +1,1138 @@
+{
+  "version": 2,
+  "comment": "Which React adapter members the Vue adapter pairs, under which name, and which it defers. After DOCX Editor's scripts/parity/parity.contract.json. bun run check:parity enforces it against docs/api/{react,vue}/index.api.md.",
+  "components": {
+    "comment": "Each paired component: the React props type (read from docs/api/react/index.api.md, with its extends clause and Omit<> bases folded in) against the Vue component's runtime props and emits, with mount probes for class, className, and every mapped slot (packages/vue/test/parity-shape.ts). The React component is the reactNamesAsVueNames twin of the key, or the key itself. classUnprobed and hostClassGap acknowledge a class the probe cannot see, with the reason; topLevel marks the PptxEditor sugar, whose callbacks must be emits and whose className must be the fallthrough class.",
+    "PptxEditorSlideRail": {
+      "reactProps": "SlideRailProps",
+      "paired": ["className", "defaultOpen", "open", "orientation", "paneWidth", "style", "toggle"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {
+        "onOpenChange": "update:open"
+      },
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorNotesPane": {
+      "reactProps": "NotesPaneProps",
+      "paired": ["className", "defaultOpen", "open", "showFormatButtons", "style"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {
+        "onOpenChange": "update:open"
+      },
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorSidePanel": {
+      "reactProps": "SidePanelProps",
+      "paired": ["className", "onClose", "paneWidth", "style"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorZoomPill": {
+      "reactProps": "ZoomPillProps",
+      "paired": ["className"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorSlideSorter": {
+      "reactProps": "SlideSorterProps",
+      "paired": ["className"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditor": {
+      "reactProps": "PptxEditorProps",
+      "topLevel": true,
+      "paired": [
+        "colorMode",
+        "document",
+        "fontFamilies",
+        "fonts",
+        "locale",
+        "mode",
+        "modules",
+        "openFailure",
+        "popups"
+      ],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {
+        "onChange": "change",
+        "onReady": "ready",
+        "onFontError": "fontError"
+      },
+      "reactRenderPropsAsVueSlots": {
+        "children": "default",
+        "renderOpenFailureActions": "openFailureActions"
+      },
+      "reactClassNameAsVueClass": {
+        "className": "class"
+      },
+      "vueExclusive": {}
+    },
+    "PptxEditorRoot": {
+      "reactProps": "PptxEditorRootProps",
+      "paired": [
+        "colorMode",
+        "document",
+        "fontFamilies",
+        "fonts",
+        "locale",
+        "mode",
+        "modules",
+        "popups"
+      ],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {
+        "onChange": "change",
+        "onReady": "ready",
+        "onFontError": "fontError"
+      },
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorToolbar": {
+      "reactProps": "ToolbarProps",
+      "paired": ["className", "contextual", "overflow", "preset"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "ToolbarGroup": {
+      "reactProps": "ToolbarGroupProps",
+      "paired": [
+        "after",
+        "className",
+        "hidden",
+        "id",
+        "label",
+        "labelKey",
+        "overflowContent",
+        "pinned",
+        "priority"
+      ],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "ToolbarAction": {
+      "reactProps": "ToolbarActionProps",
+      "paired": ["active", "asChild", "className", "disabled", "disabledReason", "icon", "label"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {
+        "onSelect": "select"
+      },
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorRibbon": {
+      "reactProps": "RibbonProps",
+      "paired": ["className", "defaultTab", "overflow", "preset", "tab"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {
+        "onTabChange": ["tabChange", "update:tab"]
+      },
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorStatusBar": {
+      "reactProps": "StatusBarProps",
+      "paired": ["className", "preset"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorLoading": {
+      "reactProps": "LoadingProps",
+      "paired": ["className", "overlay", "style", "when"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default",
+        "indicator": "indicator"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "GradientDialog": {
+      "reactProps": "GradientDialogProps",
+      "paired": ["initial", "onApply", "onClose", "open"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "BackgroundDialog": {
+      "reactProps": "BackgroundDialogProps",
+      "paired": ["className", "onClose", "open", "preset", "style"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "BulletsAndNumberingDialog": {
+      "reactProps": "BulletsAndNumberingDialogProps",
+      "paired": ["className", "onClose", "open", "preset", "style"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "ColumnsDialog": {
+      "reactProps": "ColumnsDialogProps",
+      "paired": ["className", "onClose", "open", "preset", "style"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "FontDialog": {
+      "reactProps": "FontDialogProps",
+      "paired": ["className", "onClose", "open", "preset", "style"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "ParagraphDialog": {
+      "reactProps": "ParagraphDialogProps",
+      "paired": ["className", "onClose", "open", "preset", "style"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "ShapeStyleGallery": {
+      "reactProps": "ShapeStyleGalleryProps",
+      "paired": ["className", "onPick", "value"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "MenuTableGrid": {
+      "reactProps": "MenuTableGridProps",
+      "paired": ["autoFocus", "className", "label", "onInserted", "onPick", "slot"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "LayoutGallery": {
+      "reactProps": "LayoutGalleryProps",
+      "paired": ["className", "disabled", "disabledReason", "layouts", "value"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {
+        "onChange": "change"
+      },
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorHyperLink": {
+      "reactProps": "HyperLinkProps",
+      "paired": ["asChild", "className", "hidden", "preset"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "HyperlinkPopup": {
+      "reactProps": "HyperlinkPopupProps",
+      "paired": ["anchor", "className", "mode", "onClose", "url"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorMenu": {
+      "reactProps": "MenuProps",
+      "paired": ["className", "preset"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "MenuEntry": {
+      "reactProps": "MenuEntryProps",
+      "paired": ["after", "className", "hidden", "icon", "id", "label", "labelKey", "preset"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "MenuGroup": {
+      "reactProps": "MenuGroupProps",
+      "paired": ["className", "hidden", "label", "labelKey"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "MenuSlotItem": {
+      "reactProps": "MenuSlotItemProps",
+      "paired": [
+        "className",
+        "direct",
+        "hidden",
+        "icon",
+        "labelKey",
+        "shortcutKey",
+        "slotId",
+        "value"
+      ],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorContextMenu": {
+      "reactProps": "PptxEditorContextMenuProps",
+      "paired": ["className", "preset"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "ContextMenu": {
+      "reactProps": "ContextMenuProps",
+      "paired": ["at", "className", "keyboard", "label", "onClose", "owner"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "RailContextMenu": {
+      "reactProps": "RailContextMenuProps",
+      "paired": ["menu", "onBackground", "onClose", "onSectionAdded"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "SectionContextMenu": {
+      "reactProps": "SectionContextMenuProps",
+      "paired": ["menu", "onClose", "onRemoved", "onRename", "section"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "ImageAltTextDialog": {
+      "reactProps": "ImageAltTextDialogProps",
+      "paired": ["className", "onClose", "open", "preset", "style"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "ImagePropertiesDialog": {
+      "reactProps": "ImagePropertiesDialogProps",
+      "paired": ["className", "onClose", "open", "preset", "style"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PageSetupDialog": {
+      "reactProps": "PageSetupDialogProps",
+      "paired": ["className", "onClose", "onThemeChange", "open", "preset", "style", "theme"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "RibbonTab": {
+      "reactProps": "RibbonTabProps",
+      "paired": ["after", "className", "hidden", "id", "label", "labelKey"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "StatusBarNotes": {
+      "reactProps": "StatusBarNotesProps",
+      "paired": ["asChild", "className", "hidden", "icon"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "StatusBarSlideNumber": {
+      "reactProps": "StatusBarPartProps",
+      "paired": ["className", "hidden"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "StatusBarViews": {
+      "reactProps": "StatusBarPartProps",
+      "paired": ["className", "hidden"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "StatusBarZoom": {
+      "reactProps": "StatusBarPartProps",
+      "paired": ["className", "hidden"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "ToolbarSeparator": {
+      "reactProps": "ToolbarSeparatorProps",
+      "paired": ["className"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "ToolbarSlot": {
+      "reactProps": "ToolbarSlotProps",
+      "paired": ["asChild", "className", "hidden", "icon", "slotId"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "ToolbarControl": {
+      "reactProps": "ToolbarControlProps",
+      "paired": ["control", "group"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorLoadingSpinner": {
+      "reactProps": "LoadingSpinnerProps",
+      "paired": ["className"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorViewport": {
+      "reactProps": "PptxEditorViewportProps",
+      "paired": ["className"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorContent": {
+      "reactProps": "PptxEditorContentProps",
+      "paired": ["className"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorFindBar": {
+      "reactProps": "FindBarProps",
+      "paired": ["className"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorEditNotice": {
+      "reactProps": "EditNoticeProps",
+      "paired": ["className"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {},
+      "classUnprobed": "Renders nothing until an edit is refused, and the probe has no deck; packages/vue/test/class-name.test.ts and overlays.test.ts check its class with a refused edit."
+    },
+    "PptxEditorOpenFailure": {
+      "reactProps": "PptxEditorOpenFailureProps",
+      "paired": [
+        "actions",
+        "className",
+        "closeLabel",
+        "message",
+        "showClose",
+        "showCode",
+        "style",
+        "title"
+      ],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": { "onDismiss": "dismiss" },
+      "reactRenderPropsAsVueSlots": { "actions": "actions", "message": "message" },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorFontNotice": {
+      "reactProps": "FontNoticeProps",
+      "paired": ["className"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {},
+      "classUnprobed": "Renders nothing until a font is substituted, and the probe has no deck; packages/vue/test/class-name.test.ts checks its class with a substituted font."
+    },
+    "MenuRow": {
+      "reactProps": "MenuRowProps",
+      "paired": [
+        "active",
+        "checked",
+        "className",
+        "disabled",
+        "disabledReason",
+        "glyph",
+        "href",
+        "icon",
+        "label",
+        "paths",
+        "radio",
+        "reason",
+        "shortcut",
+        "slot"
+      ],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {
+        "onSelect": "select"
+      },
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "MenuSubmenu": {
+      "reactProps": "MenuSubmenuProps",
+      "paired": ["className", "disabled", "glyph", "icon", "label", "labelKey", "paths", "reason"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "MenuItem": {
+      "reactProps": "MenuItemProps",
+      "paired": [
+        "checkbox",
+        "checked",
+        "description",
+        "disabled",
+        "onSelect",
+        "option",
+        "reason",
+        "title"
+      ],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "Popover": {
+      "reactProps": "PopoverProps",
+      "paired": [
+        "align",
+        "anchor",
+        "className",
+        "field",
+        "focusFirst",
+        "id",
+        "label",
+        "onClose",
+        "passive",
+        "role"
+      ],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "ToolButton": {
+      "reactProps": "ToolButtonProps",
+      "paired": [
+        "asChild",
+        "className",
+        "controls",
+        "disabled",
+        "disabledReason",
+        "expanded",
+        "hasPopup",
+        "icon",
+        "label",
+        "onClick",
+        "paths",
+        "pressed",
+        "slot"
+      ],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "Icon": {
+      "reactProps": "IconProps",
+      "paired": ["className", "name", "paths"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "ShapeIcon": {
+      "reactProps": "ShapeIconProps",
+      "paired": ["preset"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "ShapeGrid": {
+      "reactProps": "ShapeGridProps",
+      "paired": ["onPick", "presets"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "LineGlyph": {
+      "reactProps": "LineGlyphProps",
+      "paired": ["start", "value"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "FillControl": {
+      "reactProps": "FillControlProps",
+      "paired": ["control", "slot"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "LineMenuControl": {
+      "reactProps": "LineMenuControlProps",
+      "paired": ["control", "slot"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "ShapeGalleryControl": {
+      "reactProps": "ShapeGalleryControlProps",
+      "paired": ["control", "slot"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "NewSlideControl": {
+      "reactProps": "NewSlideControlProps",
+      "paired": ["control", "slot"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "LayoutControl": {
+      "reactProps": "LayoutControlProps",
+      "paired": ["control", "slot"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "FontFamilyTrigger": {
+      "partOf": "PptxEditorToolbar.FontFamily",
+      "reactProps": "FontFamilyPartProps",
+      "paired": ["className"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "FontFamilyContent": {
+      "partOf": "PptxEditorToolbar.FontFamily",
+      "reactProps": "FontFamilyPartProps",
+      "paired": ["className"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "FontFamilyItem": {
+      "partOf": "PptxEditorToolbar.FontFamily",
+      "reactProps": "FontFamilyItemProps",
+      "paired": ["className", "value"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    }
+  },
+  "propsUnchecked": {
+    "comment": "React component exports with a props type and no components entry, each with the reason. None today: every such component is checked."
+  },
+  "ref": {
+    "comment": "The members of each adapter's own PptxEditorRef interface (React forwardRef on PptxEditor and PptxEditor.Root, Vue expose on PptxEditor and PptxEditorRoot), after DOCX Editor's DocxEditorRef. Both build the handle with core's createEditorRefApi. A paired member has the same name and type in both snapshots.",
+    "paired": ["exec", "focus", "getEditor", "load", "save", "snapshot"],
+    "deferredInVue": {},
+    "vueExclusive": {}
+  },
+  "exports": {
+    "comment": "Top-level exports of @pptx-editor.dev/react and @pptx-editor.dev/vue.",
+    "paired": [
+      "NotesPaneProps",
+      "PaneProps",
+      "SidePanelProps",
+      "SlideRailProps",
+      "SlideSorterProps",
+      "StatusBarNotes",
+      "StatusBarNotesProps",
+      "StatusBarViews",
+      "ZoomPillProps",
+      "requestSectionRename",
+      "BulletFormat",
+      "BulletFormatRead",
+      "FontFormatCommand",
+      "FontFormatRead",
+      "ParagraphFormatCommand",
+      "ParagraphFormatRead",
+      "definePopup",
+      "DefinePopupOptions",
+      "DialogCustomizationProps",
+      "DialogPartProps",
+      "ImageAltTextDialog",
+      "ImageAltTextDialogFieldName",
+      "ImageAltTextDialogFields",
+      "ImageAltTextDialogProps",
+      "ImagePropertiesDialog",
+      "ImagePropertiesDialogFieldName",
+      "ImagePropertiesDialogFields",
+      "ImagePropertiesDialogProps",
+      "PageSetupDialog",
+      "PageSetupDialogFieldName",
+      "PageSetupDialogFields",
+      "PageSetupDialogProps",
+      "BackgroundDialog",
+      "BackgroundDialogFieldName",
+      "BackgroundDialogFields",
+      "BackgroundDialogProps",
+      "BulletsAndNumberingDialog",
+      "BulletsAndNumberingDialogFieldName",
+      "BulletsAndNumberingDialogProps",
+      "ColumnsDialog",
+      "ColumnsDialogFieldName",
+      "ColumnsDialogProps",
+      "FontDialog",
+      "FontDialogFieldName",
+      "FontDialogProps",
+      "ParagraphDialog",
+      "ParagraphDialogFieldName",
+      "ParagraphDialogProps",
+      "UseBackgroundDialogReturn",
+      "UseBulletsAndNumberingDialogReturn",
+      "UseColumnsDialogReturn",
+      "UseFontDialogReturn",
+      "UseParagraphDialogReturn",
+      "useBackgroundDialog",
+      "useBulletsAndNumberingDialog",
+      "useColumnsDialog",
+      "useFontDialog",
+      "useParagraphDialog",
+      "PptxEditor",
+      "PptxEditorContent",
+      "PptxEditorDialogKey",
+      "PptxEditorPopup",
+      "PptxEditorPopups",
+      "PptxEditorProps",
+      "PptxEditorRef",
+      "PptxEditorRibbon",
+      "PptxEditorRoot",
+      "PptxEditorRootProps",
+      "PptxEditorStatusBar",
+      "PptxEditorToolbarNamespace",
+      "PptxEditorViewport",
+      "RibbonProps",
+      "RibbonTab",
+      "RibbonTabProps",
+      "StatusBarPartProps",
+      "StatusBarProps",
+      "StatusBarSlideNumber",
+      "StatusBarZoom",
+      "ToolbarAction",
+      "ToolbarActionProps",
+      "ToolbarControl",
+      "ToolbarGroup",
+      "ToolbarGroupProps",
+      "ToolbarPartComponent",
+      "ToolbarPartProps",
+      "ToolbarProps",
+      "ToolbarSeparator",
+      "ToolbarSeparatorProps",
+      "ToolbarSlot",
+      "ToolbarSlotProps",
+      "ToolbarSlotPartComponent",
+      "ToolbarSlotPartProps",
+      "ToolbarColorSplitComponent",
+      "ToolbarColorSplitProps",
+      "UseBulletFormatReturn",
+      "UseFontFormatReturn",
+      "UseParagraphFormatReturn",
+      "useBulletFormat",
+      "UseDialogReturn",
+      "useEditorCommand",
+      "useEditorValueCommand",
+      "ColorMode",
+      "ResolvedColorMode",
+      "useEditorColorMode",
+      "UseEditorColorModeReturn",
+      "useEditorDialog",
+      "useEditorState",
+      "useFontFormat",
+      "useParagraphFormat",
+      "useImageAltTextDialog",
+      "UseImageAltTextDialogReturn",
+      "useImagePropertiesDialog",
+      "UseImagePropertiesDialogReturn",
+      "usePageSetupDialog",
+      "UsePageSetupDialogReturn",
+      "usePptxEditor",
+      "useSlideLayouts",
+      "useTranslation",
+      "useFonts",
+      "FontsInput",
+      "UseFontsReturn",
+      "EditorFontError",
+      "EditorFontErrorCode",
+      "FontConfiguration",
+      "FontFaceRequest",
+      "FontSource",
+      "FontSourceSubstitution",
+      "MAX_RESOLVER_FAMILIES",
+      "DEFAULT_FONT",
+      "composeFontConfiguration",
+      "composeFontOrigins",
+      "createFontSource",
+      "deferFonts",
+      "defineFontResolver",
+      "isFontResolver",
+      "loadFonts",
+      "FontConfigurationBase",
+      "FontConfigurationFragment",
+      "FontLoadFailure",
+      "FontLoadFailureReason",
+      "FontOrigin",
+      "FontResolutionRequest",
+      "FontResolver",
+      "FontResolverMark",
+      "MarkedFontResolver",
+      "FontUrlSource",
+      "LoadFontsRequest",
+      "LoadFontsResult",
+      "useFontFamily",
+      "UseFontFamilyReturn",
+      "BulletsDialogFields",
+      "CanvasMenuKind",
+      "ChromeControl",
+      "ChromeGroupId",
+      "ChromeMenuId",
+      "ChromeSlotId",
+      "ColumnsDialogFields",
+      "CommandResult",
+      "DocumentOpenFailure",
+      "EditorCommand",
+      "EditorExecOptions",
+      "EditorFontsOption",
+      "EditorMode",
+      "EditorModule",
+      "EditorRejection",
+      "EditorRemoval",
+      "EditorSnapshot",
+      "FontDialogFields",
+      "FontPickerGroup",
+      "FontPickerGroupId",
+      "FontPickerRow",
+      "GradientFill",
+      "ParagraphDialogFields",
+      "PptxEditorInstance",
+      "RibbonTabId",
+      "ShapeStyleChoice",
+      "ShapeStyleValue",
+      "SlideBackground",
+      "SlideLayoutSummary",
+      "SlideRailOrientation",
+      "SlideSection",
+      "SlideshowController",
+      "ToolbarShownValue",
+      "ToolbarValueMap",
+      "Icon",
+      "ToolButton",
+      "Popover",
+      "MenuItem",
+      "MenuRow",
+      "MenuRowProps",
+      "MenuSeparator",
+      "MenuSubmenu",
+      "MenuSubmenuProps",
+      "ContextMenu",
+      "ContextMenuNamespace",
+      "ContextMenuPoint",
+      "ContextMenuProps",
+      "ContextMenuRequest",
+      "MenuEntry",
+      "MenuEntryProps",
+      "MenuGroup",
+      "MenuGroupProps",
+      "MenuNamespace",
+      "MenuPartComponent",
+      "MenuProps",
+      "MenuSlotItem",
+      "MenuSlotItemProps",
+      "PptxEditorContextMenu",
+      "PptxEditorContextMenuProps",
+      "PptxEditorMenu",
+      "RailContextMenu",
+      "RailContextMenuProps",
+      "RailMenuState",
+      "SectionContextMenu",
+      "SectionContextMenuProps",
+      "SectionMenuState",
+      "useContextMenuRequest",
+      "useContextMenuTarget",
+      "useNotesPane",
+      "UseNotesPaneReturn",
+      "useOpenFailure",
+      "UseOpenFailureReturn",
+      "OpenFailureContext",
+      "PptxEditorOpenFailureProps",
+      "UseEditorCommandReturn",
+      "UseEditorValueCommandReturn",
+      "UseEditorDialogReturn",
+      "UseSlideshowReturn",
+      "FindBarProps",
+      "EditNoticeProps",
+      "FontNoticeProps",
+      "LoadingProps",
+      "LoadingSpinnerProps",
+      "keepFocus",
+      "FillControl",
+      "GradientDialog",
+      "GradientDialogProps",
+      "LayoutControl",
+      "LayoutGallery",
+      "LayoutGalleryProps",
+      "LineGlyph",
+      "LineMenuControl",
+      "NewSlideControl",
+      "ShapeGalleryControl",
+      "ShapeGrid",
+      "ShapeIcon",
+      "ShapeStyleGallery",
+      "ShapeStyleGalleryProps",
+      "MenuTableGrid",
+      "MenuTableGridProps",
+      "FindPopupProps",
+      "HyperlinkPopup",
+      "HyperlinkPopupProps",
+      "useHyperlinkPopup",
+      "HyperLinkActionProps",
+      "HyperLinkPartProps",
+      "HyperLinkProps",
+      "HyperlinkPopupMode",
+      "HyperlinkPopupState",
+      "rejectionMessage",
+      "requestFindBar",
+      "useSlideshow",
+      "PptxEditorContentProps",
+      "PptxEditorViewportProps",
+      "ToolbarControlProps",
+      "FillControlProps",
+      "LineGlyphProps",
+      "LineMenuControlProps",
+      "ShapeGalleryControlProps",
+      "ShapeGridProps",
+      "ShapeIconProps",
+      "LayoutControlProps",
+      "NewSlideControlProps",
+      "IconProps",
+      "MenuItemProps",
+      "PopoverProps",
+      "ToolButtonProps",
+      "FontFamilyItemProps",
+      "FontFamilyNamespace",
+      "FontFamilyPartProps",
+      "FontFamilyProps"
+    ],
+    "reactNamesAsVueNames": {
+      "SlideRail": "PptxEditorSlideRail",
+      "SidePanel": "PptxEditorSidePanel",
+      "ZoomPill": "PptxEditorZoomPill",
+      "SlideSorter": "PptxEditorSlideSorter",
+      "NotesPane": "PptxEditorNotesPane",
+      "Toolbar": "PptxEditorToolbar",
+      "PptxEditorContext": "pptxEditorKey",
+      "Loading": "PptxEditorLoading",
+      "LoadingSpinner": "PptxEditorLoadingSpinner",
+      "FindBar": "PptxEditorFindBar",
+      "HyperLink": "PptxEditorHyperLink",
+      "UseHyperlinkPopupResult": "UseHyperlinkPopupReturn",
+      "EditNotice": "PptxEditorEditNotice",
+      "OpenFailure": "PptxEditorOpenFailure",
+      "FontNotice": "PptxEditorFontNotice",
+      "Slideshow": "PptxEditorSlideshow",
+      "SlideshowContext": "pptxSlideshowKey"
+    },
+    "deferredInVue": {},
+    "reactExclusive": {
+      "gradientCss": "A React re-export kept for compatibility; adapters read it from @pptx-editor.dev/core/editor.",
+      "platformShortcuts": "A React re-export kept for compatibility; Vue applies it inside useTranslation.",
+      "RibbonNamespace": "The React type of PptxEditorRibbon with its statics; Vue attaches the same Tab static.",
+      "StatusBarNamespace": "The React type of PptxEditorStatusBar with its statics; Vue attaches the same SlideNumber and Zoom statics.",
+      "HyperLinkNamespace": "The React type of HyperLink with its part statics; Vue attaches the same Url, Copy, Edit, Unlink, Fields, Error, Apply, and Cancel statics to PptxEditorHyperLink.",
+      "ToolbarNamedParts": "The React type of the named parts on Toolbar; Vue attaches the same names to PptxEditorToolbar.",
+      "translatorFor": "React builds the translator for its context; Vue builds it inside PptxEditorRoot.",
+      "LoadingComponent": "The type of React's `Loading` with its `Loading.Spinner` static; Vue attaches the same `Spinner` static to `PptxEditorLoading`.",
+      "ToolbarSlotBaseProps": "The React base of the ToolbarSlotProps union, exported so the parity check can read its members; Vue's ToolbarSlotProps holds the same members in one type."
+    },
+    "vueExclusive": {
+      "UseContextMenuRequestReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UseContextMenuTargetReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "PptxEditorDialogSessionProps": "The props the Vue popups registry hands every dialog it renders (open, onClose), named for a host renderer; React types each entry with its dialog's own props only.",
+      "pptxTranslationKey": "Vue provides the translator through an injection key; React's TranslationContext is internal.",
+      "UseEditorStateReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UsePptxEditorReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UseSlideLayoutsReturn": "Vue composables declare named return types (AGENTS.md, Public API).",
+      "UseTranslationReturn": "Vue composables declare named return types (AGENTS.md, Public API)."
+    }
+  }
+}

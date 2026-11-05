@@ -1,0 +1,176 @@
+---
+title: 'Props'
+description: 'Configure the React PPTX editor document, mode, fonts, chrome, callbacks, and ref.'
+category: 'React'
+order: 31
+---
+
+## Configure the editor
+
+This example loads `.pptx` bytes, keeps the instance, and saves the edited deck:
+
+```tsx
+import { useState } from 'react';
+import { PptxEditor, type PptxEditorInstance } from '@pptx-editor.dev/react';
+
+export function DeckEditor({
+  bytes,
+  upload,
+}: {
+  bytes: Uint8Array;
+  upload: (bytes: Uint8Array) => Promise<void>;
+}) {
+  const [editor, setEditor] = useState<PptxEditorInstance | null>(null);
+
+  async function save() {
+    const saved = editor?.save();
+    if (saved) await upload(saved);
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <button onClick={save} disabled={!editor}>
+        Save
+      </button>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <PptxEditor document={bytes} mode="edit" onReady={setEditor} />
+      </div>
+    </div>
+  );
+}
+```
+
+For generated signatures, see `docs/api/react/index.api.md` in the repository.
+
+## Set props
+
+### Document
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `document` | `Uint8Array` | The `.pptx` bytes. A new array loads a new deck. Without it, the editor shows its loading sheet. |
+| `mode` | `'edit' \| 'view'` | Edit the deck, or only show it. Defaults to `'edit'`. Changes apply without a reload. |
+
+### Fonts
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `fonts` | `FontConfiguration \| FontConfigurationFragment \| FontResolver` | Font bytes for layout. A change replaces the fonts in place; the deck, the selection, and the undo history stay. Wrap a resolver in `useFonts()` to keep one identity. |
+| `fontFamilies` | `readonly string[]` | Families the font picker offers besides the standard ones and the deck's own. A change updates the picker in place; the deck and the undo history stay. |
+
+Without `fonts`, the editor measures with the deck's embedded fonts and then the packaged substitutes, and it fetches nothing. See [Fonts](/docs/customization/fonts).
+
+### Capability modules
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `modules` | `readonly EditorModule[]` | Capability modules, such as the review and collaboration modules of `@pptx-editor.dev/pro`. Read once, when the editor is created. A later change has no effect and prints a development warning. |
+
+Create the list once, outside the component, so each render passes the same modules:
+
+```tsx
+import { PptxEditor } from '@pptx-editor.dev/react';
+import { reviewModule } from '@pptx-editor.dev/pro';
+
+const modules = [reviewModule()];
+
+export function ReviewedDeck({ bytes }: { bytes: Uint8Array }) {
+  return <PptxEditor document={bytes} modules={modules} />;
+}
+```
+
+`@pptx-editor.dev/pro` is under the EigenPal Pro License. To use other modules after mount, change the `key` of `PptxEditor` to create a new editor.
+
+### Appearance and language
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `colorMode` | `'light' \| 'dark' \| 'system'` | The chrome color mode. Defaults to `'light'`. The slides keep the deck's own colors. See [Appearance](/docs/customization/appearance). |
+| `locale` | `LocaleCatalog` | The interface strings. English when you omit it. See [Language](/docs/customization/language). |
+| `className` | `string` | Added after the `pptx-default` class of the viewport. |
+
+### Chrome
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `popups` | `PptxEditorPopups` | Replaces or turns off the dialogs and popups the editor mounts. See [Dialogs](/docs/customization/dialogs). |
+| `openFailure` | `boolean \| PptxEditorOpenFailureProps` | The notice for a file that does not open. `false` removes it. Defaults to `true`. See [Open failure](/docs/customization/layout#open-failure). |
+| `renderOpenFailureActions` | `(context: OpenFailureContext) => ReactNode` | Your own buttons in the open-failure notice, before **Close**. `context` has `failure`, `message`, and `dismiss()`. |
+| `children` | `ReactNode` | Extra content inside the viewport, after the slide show. |
+
+## Handle callbacks
+
+| Callback | Payload | Description |
+| --- | --- | --- |
+| `onReady` | `editor: PptxEditorInstance` | Called once for each instance, after the editor mounts. |
+| `onChange` | `editor: PptxEditorInstance` | Called after every change of editor state, also for selection changes. |
+| `onFontError` | `error: EditorFontError` | Called for each font failure: a failed origin, a refused face, or a failed resolution. Without it, each failure prints one warning. |
+
+Use the instance from `onReady` for actions and one-time reads:
+
+| Member | Returns | Description |
+| --- | --- | --- |
+| `save()` | `Uint8Array<ArrayBuffer> \| null` | Serializes the deck to `.pptx`. Returns `null` when no deck is open. `new Blob([bytes])` takes the bytes as they are. |
+| `load(bytes)` | `Promise<CommandResult>` | Opens other `.pptx` bytes in the same instance. |
+| `exec(command, options?)` | `CommandResult` | Runs a typed `EditorCommand`. A refusal returns `ok: false` with a reason. |
+| `can(command, options?)` | `CanResult` | Says whether a command can run now, without running it. |
+| `snapshot()` | `EditorSnapshot` | Reads the current state. A direct call does not subscribe; use `useEditorState` in components. |
+| `focus()` | `void` | Gives the keyboard back to the slide: the text caret, else the slide surface. |
+
+## Use the ref
+
+`<PptxEditor>` and `PptxEditor.Root` take a `ref` to a `PptxEditorRef`. Use it to reach the editor from a parent component:
+
+```tsx
+import { useRef } from 'react';
+import { PptxEditor, type PptxEditorRef } from '@pptx-editor.dev/react';
+
+export function DeckEditor({
+  bytes,
+  upload,
+}: {
+  bytes: Uint8Array;
+  upload: (bytes: Uint8Array) => Promise<void>;
+}) {
+  const editorRef = useRef<PptxEditorRef>(null);
+
+  async function save() {
+    const saved = editorRef.current?.save();
+    if (saved) await upload(saved);
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <button onClick={save}>Save</button>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <PptxEditor ref={editorRef} document={bytes} />
+      </div>
+    </div>
+  );
+}
+```
+
+| Method | Returns | Description |
+| --- | --- | --- |
+| `load(bytes)` | `Promise<CommandResult>` | Opens `.pptx` bytes. Resolves when the deck is open, or with the refusal. |
+| `save()` | `Uint8Array<ArrayBuffer> \| null` | Serializes the deck to `.pptx`. Returns `null` when no deck is open. `new Blob([bytes])` takes the bytes as they are. |
+| `getEditor()` | `PptxEditorInstance \| null` | Returns the editor instance, or `null` before it mounts. |
+| `focus()` | `void` | Gives the keyboard back to the slide: the text caret, else the slide surface. |
+| `exec(command, options?)` | `CommandResult` | Runs a typed `EditorCommand`, as `editor.exec`. |
+| `snapshot()` | `EditorSnapshot` | Reads the current state, as `editor.snapshot()`. |
+
+Every method is safe before the editor mounts: `load` and `exec` refuse with `disabled.noEditor`, `save` and `getEditor` return `null`, `focus` does nothing, and `snapshot` returns an empty snapshot. Everything else is on the instance that `getEditor()` returns.
+
+## Limits
+
+- `onReady` runs once for each instance. A new `document` reuses the instance, so `onReady` does not run again.
+- `save()` returns the bytes only. Your application owns any download or upload.
+- `modules` applies when the instance is created. To change it, remount with a different `key`.
+- `locale` follows the content of the catalog, not its identity, so an inline object does not reload the strings on each render.
+- `popups` entries set to `false` turn off that dialog's interface. The operation stays available to the API.
+
+## Next steps
+
+- [React hooks](/docs/react/hooks): read state and run commands from your controls.
+- [React composition](/docs/react/composition): build your own layout.
+- [React examples](/docs/react/examples): run the example applications.

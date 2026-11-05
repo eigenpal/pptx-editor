@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "bun run build:preview",
+  "outputDirectory": "examples/parity/dist",
+  "installCommand": "HUSKY=0 bun install --frozen-lockfile",
+  "rewrites": [
+    { "source": "/react/(.*)", "destination": "/react/index.html" },
+    { "source": "/vue/(.*)", "destination": "/vue/index.html" },
+    { "source": "/", "destination": "/react/index.html" }
+  ]
+}

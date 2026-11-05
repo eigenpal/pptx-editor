@@ -1,0 +1,714 @@
+{
+  "schemaVersion": 1,
+  "$comment": "Allowlisted subset of the Office.js presentation API (the PowerPoint.* namespace) that the public PptxEditor surface of @pptx-editor.dev/editor-api is measured against for source and shape compatibility. This file selects the upstream UIDs used as reference-only conformance input. It is not a dependency declaration; PPTX Editor does not vendor, copy, or generate its declarations from the upstream package. Every selected class leaves out the ClientObject plumbing that each upstream class redeclares (context, isNullObject, load, toJSON, track, untrack); ClientObject itself selects context and isNullObject. See README.md in this directory for the policy.",
+  "categories": {
+    "core": [
+      "RequestContext",
+      "ClientRequestContext",
+      "RequestContextDebugInfo",
+      "Application",
+      "ClientObject",
+      "Presentation",
+      "DocumentProperties",
+      "PageSetup",
+      "InsertSlideOptions",
+      "CustomPropertyCollection",
+      "CustomProperty"
+    ],
+    "slides": [
+      "SlideCollection",
+      "SlideScopedCollection",
+      "Slide",
+      "SlideLayout",
+      "SlideLayoutCollection",
+      "SlideMaster",
+      "SlideMasterCollection",
+      "AddSlideOptions",
+      "SlideGetImageOptions"
+    ],
+    "shapes": [
+      "Shape",
+      "ShapeCollection",
+      "ShapeScopedCollection",
+      "ShapeGroup",
+      "ShapeFill",
+      "ShapeLineFormat",
+      "PlaceholderFormat",
+      "Adjustments",
+      "ShapeAddOptions",
+      "ShapeGetImageOptions"
+    ],
+    "text": ["TextFrame", "TextRange", "ShapeFont", "ParagraphFormat", "BulletFormat"],
+    "tables": [
+      "Table",
+      "TableCell",
+      "TableRow",
+      "TableRowCollection",
+      "TableColumn",
+      "TableColumnCollection",
+      "TableCellCollection",
+      "TableStyleSettings",
+      "Borders",
+      "Border",
+      "Margins",
+      "TableAddOptions",
+      "TableClearOptions",
+      "TableCellProperties",
+      "TableCellBorders",
+      "BorderProperties",
+      "TableCellMargins",
+      "FillProperties",
+      "TableColumnProperties",
+      "TableRowProperties",
+      "TableMergedAreaProperties",
+      "TextRun",
+      "FontProperties"
+    ],
+    "hyperlinks": [
+      "Hyperlink",
+      "HyperlinkCollection",
+      "HyperlinkScopedCollection",
+      "HyperlinkAddOptions"
+    ],
+    "tags": ["Tag", "TagCollection"],
+    "bindings": ["Binding", "BindingCollection"],
+    "backgrounds": [
+      "SlideBackground",
+      "SlideLayoutBackground",
+      "SlideMasterBackground",
+      "SlideBackgroundFill",
+      "SlideBackgroundGradientFill",
+      "SlideBackgroundPatternFill",
+      "SlideBackgroundPictureOrTextureFill",
+      "SlideBackgroundSolidFill",
+      "SlideBackgroundSolidFillOptions",
+      "SlideBackgroundGradientFillOptions",
+      "SlideBackgroundPatternFillOptions",
+      "SlideBackgroundPictureOrTextureFillOptions"
+    ],
+    "themes": ["ThemeColorScheme"],
+    "customXml": ["CustomXmlPartCollection", "CustomXmlPartScopedCollection", "CustomXmlPart"]
+  },
+  "enums": {
+    "$comment": "String enums that the selected members name in their types. The public surface declares each as a string literal union type with the same name. The reference extractor reads classes, interfaces, and functions only, as in DOCX Editor, so enum values are recorded as enum-member rows in reference/presentation.full-inventory.json, not in reference/presentation.reference.json.",
+    "names": [
+      "BindingType",
+      "BulletStyle",
+      "BulletType",
+      "ConnectorType",
+      "DocumentPropertyType",
+      "GeometricShapeType",
+      "HyperlinkType",
+      "InsertSlideFormatting",
+      "ParagraphHorizontalAlignment",
+      "PlaceholderType",
+      "ShapeAutoSize",
+      "ShapeFillType",
+      "ShapeFontUnderlineStyle",
+      "ShapeGetImageFormatType",
+      "ShapeLineDashStyle",
+      "ShapeLineStyle",
+      "ShapeType",
+      "ShapeZOrder",
+      "SlideBackgroundFillType",
+      "SlideBackgroundGradientFillType",
+      "SlideBackgroundPatternFillType",
+      "SlideLayoutType",
+      "TableStyle",
+      "TextVerticalAlignment",
+      "ThemeColor"
+    ]
+  },
+  "symbols": {
+    "run": {
+      "isFunction": true,
+      "members": []
+    },
+    "RequestContext": {
+      "members": ["presentation", "application"]
+    },
+    "ClientRequestContext": {
+      "namespace": "OfficeExtension",
+      "members": ["debugInfo", "load", "loadRecursive", "sync", "trace", "trackedObjects"]
+    },
+    "RequestContextDebugInfo": {
+      "namespace": "OfficeExtension",
+      "members": ["pendingStatements"]
+    },
+    "Application": {
+      "members": []
+    },
+    "ClientObject": {
+      "namespace": "OfficeExtension",
+      "members": ["context", "isNullObject"]
+    },
+    "Presentation": {
+      "members": [
+        "slides",
+        "slideMasters",
+        "tags",
+        "properties",
+        "title",
+        "id",
+        "pageSetup",
+        "getSelectedSlides",
+        "getSelectedShapes",
+        "getSelectedTextRange",
+        "getSelectedTextRangeOrNullObject",
+        "setSelectedSlides",
+        "insertSlidesFromBase64",
+        "customXmlParts",
+        "bindings"
+      ]
+    },
+    "SlideCollection": {
+      "members": [
+        "add",
+        "exportAsBase64Presentation",
+        "getCount",
+        "getItem",
+        "getItemAt",
+        "getItemOrNullObject",
+        "items"
+      ]
+    },
+    "SlideScopedCollection": {
+      "members": [
+        "exportAsBase64Presentation",
+        "getCount",
+        "getItem",
+        "getItemAt",
+        "getItemOrNullObject",
+        "items"
+      ]
+    },
+    "Slide": {
+      "members": [
+        "id",
+        "index",
+        "layout",
+        "slideMaster",
+        "shapes",
+        "tags",
+        "hyperlinks",
+        "delete",
+        "moveTo",
+        "exportAsBase64",
+        "applyLayout",
+        "setSelectedShapes",
+        "background",
+        "themeColorScheme",
+        "customXmlParts",
+        "getImageAsBase64"
+      ]
+    },
+    "SlideLayout": {
+      "members": [
+        "id",
+        "name",
+        "shapes",
+        "type",
+        "background",
+        "themeColorScheme",
+        "customXmlParts"
+      ]
+    },
+    "SlideLayoutCollection": {
+      "members": ["getCount", "getItem", "getItemAt", "getItemOrNullObject", "items"]
+    },
+    "SlideMaster": {
+      "members": [
+        "id",
+        "layouts",
+        "name",
+        "shapes",
+        "background",
+        "themeColorScheme",
+        "customXmlParts"
+      ]
+    },
+    "SlideMasterCollection": {
+      "members": ["getCount", "getItem", "getItemAt", "getItemOrNullObject", "items"]
+    },
+    "SlideBackground": {
+      "members": ["areBackgroundGraphicsHidden", "fill", "isMasterBackgroundFollowed", "reset"]
+    },
+    "SlideLayoutBackground": {
+      "members": ["areBackgroundGraphicsHidden", "fill", "isMasterBackgroundFollowed", "reset"]
+    },
+    "SlideMasterBackground": {
+      "members": ["fill"]
+    },
+    "SlideBackgroundFill": {
+      "members": [
+        "getGradientFillOrNullObject",
+        "getPatternFillOrNullObject",
+        "getPictureOrTextureFillOrNullObject",
+        "getSolidFillOrNullObject",
+        "setGradientFill",
+        "setPatternFill",
+        "setPictureOrTextureFill",
+        "setSolidFill",
+        "type"
+      ]
+    },
+    "SlideBackgroundGradientFill": {
+      "members": ["type"]
+    },
+    "SlideBackgroundPatternFill": {
+      "members": ["backgroundColor", "foregroundColor", "pattern"]
+    },
+    "SlideBackgroundPictureOrTextureFill": {
+      "members": ["setImage", "transparency"]
+    },
+    "SlideBackgroundSolidFill": {
+      "members": ["color", "transparency"]
+    },
+    "ThemeColorScheme": {
+      "members": ["getThemeColor", "setThemeColor"]
+    },
+    "Shape": {
+      "members": [
+        "adjustments",
+        "altTextDescription",
+        "altTextTitle",
+        "creationId",
+        "delete",
+        "fill",
+        "getParentSlide",
+        "getParentSlideLayout",
+        "getParentSlideLayoutOrNullObject",
+        "getParentSlideMaster",
+        "getParentSlideMasterOrNullObject",
+        "getParentSlideOrNullObject",
+        "getTable",
+        "getTextFrameOrNullObject",
+        "group",
+        "height",
+        "id",
+        "isDecorative",
+        "left",
+        "level",
+        "lineFormat",
+        "name",
+        "parentGroup",
+        "placeholderFormat",
+        "rotation",
+        "setHyperlink",
+        "setZOrder",
+        "tags",
+        "textFrame",
+        "top",
+        "type",
+        "visible",
+        "width",
+        "zOrderPosition",
+        "customXmlParts",
+        "getImageAsBase64"
+      ]
+    },
+    "ShapeCollection": {
+      "members": [
+        "addGeometricShape",
+        "addLine",
+        "addTextBox",
+        "addTable",
+        "addGroup",
+        "getItem",
+        "getItemAt",
+        "getItemOrNullObject",
+        "getCount",
+        "items"
+      ]
+    },
+    "ShapeScopedCollection": {
+      "members": ["getCount", "getItem", "getItemAt", "getItemOrNullObject", "group", "items"]
+    },
+    "ShapeGroup": {
+      "members": ["creationId", "id", "shape", "shapes", "ungroup"]
+    },
+    "ShapeFill": {
+      "members": ["clear", "foregroundColor", "setImage", "setSolidColor", "transparency", "type"]
+    },
+    "ShapeLineFormat": {
+      "members": ["color", "dashStyle", "style", "transparency", "visible", "weight"]
+    },
+    "ShapeFont": {
+      "members": [
+        "allCaps",
+        "bold",
+        "color",
+        "doubleStrikethrough",
+        "italic",
+        "name",
+        "size",
+        "smallCaps",
+        "strikethrough",
+        "subscript",
+        "superscript",
+        "underline"
+      ]
+    },
+    "PlaceholderFormat": {
+      "members": ["containedType", "type"]
+    },
+    "TextFrame": {
+      "members": [
+        "autoSizeSetting",
+        "bottomMargin",
+        "deleteText",
+        "getParentShape",
+        "hasText",
+        "leftMargin",
+        "rightMargin",
+        "textRange",
+        "topMargin",
+        "verticalAlignment",
+        "wordWrap"
+      ]
+    },
+    "TextRange": {
+      "members": [
+        "font",
+        "getParentTextFrame",
+        "getSubstring",
+        "hyperlinks",
+        "length",
+        "paragraphFormat",
+        "setHyperlink",
+        "setSelected",
+        "start",
+        "text"
+      ]
+    },
+    "ParagraphFormat": {
+      "members": ["bulletFormat", "horizontalAlignment", "indentLevel"]
+    },
+    "BulletFormat": {
+      "members": ["style", "type", "visible"]
+    },
+    "Table": {
+      "members": [
+        "clear",
+        "columnCount",
+        "columns",
+        "getCellOrNullObject",
+        "getMergedAreas",
+        "getShape",
+        "mergeCells",
+        "rowCount",
+        "rows",
+        "styleSettings",
+        "values"
+      ]
+    },
+    "TableCell": {
+      "members": [
+        "borders",
+        "columnCount",
+        "columnIndex",
+        "fill",
+        "font",
+        "horizontalAlignment",
+        "indentLevel",
+        "margins",
+        "resize",
+        "rowCount",
+        "rowIndex",
+        "split",
+        "text",
+        "textRuns",
+        "verticalAlignment"
+      ]
+    },
+    "TableRow": {
+      "members": ["currentHeight", "delete", "height", "rowIndex"]
+    },
+    "TableRowCollection": {
+      "members": ["add", "deleteRows", "getCount", "getItemAt", "items"]
+    },
+    "TableColumn": {
+      "members": ["columnIndex", "delete", "width"]
+    },
+    "TableColumnCollection": {
+      "members": ["add", "deleteColumns", "getCount", "getItemAt", "items"]
+    },
+    "Hyperlink": {
+      "members": [
+        "address",
+        "delete",
+        "getLinkedShapeOrNullObject",
+        "getLinkedTextRangeOrNullObject",
+        "screenTip",
+        "type"
+      ]
+    },
+    "HyperlinkCollection": {
+      "members": ["add", "getCount", "getItemAt", "items"]
+    },
+    "HyperlinkScopedCollection": {
+      "members": ["getCount", "getItemAt", "items"]
+    },
+    "Tag": {
+      "members": ["key", "value"]
+    },
+    "Binding": {
+      "members": ["delete", "getShape", "id", "type"]
+    },
+    "BindingCollection": {
+      "members": [
+        "add",
+        "addFromSelection",
+        "getCount",
+        "getItem",
+        "getItemAt",
+        "getItemOrNullObject",
+        "items"
+      ]
+    },
+    "TagCollection": {
+      "members": [
+        "add",
+        "delete",
+        "getCount",
+        "getItem",
+        "getItemAt",
+        "getItemOrNullObject",
+        "items"
+      ]
+    },
+    "DocumentProperties": {
+      "members": [
+        "author",
+        "category",
+        "comments",
+        "company",
+        "creationDate",
+        "keywords",
+        "lastAuthor",
+        "manager",
+        "revisionNumber",
+        "subject",
+        "title",
+        "customProperties"
+      ]
+    },
+    "PageSetup": {
+      "members": ["slideHeight", "slideWidth"]
+    },
+    "Adjustments": {
+      "members": ["count", "get", "set"]
+    },
+    "ShapeAddOptions": {
+      "members": ["height", "left", "top", "width"]
+    },
+    "TableCellCollection": {
+      "members": ["getCount", "getItemAtOrNullObject", "items"]
+    },
+    "TableStyleSettings": {
+      "members": [
+        "areColumnsBanded",
+        "areRowsBanded",
+        "isFirstColumnHighlighted",
+        "isFirstRowHighlighted",
+        "isLastColumnHighlighted",
+        "isLastRowHighlighted",
+        "style"
+      ]
+    },
+    "Borders": {
+      "members": ["bottom", "diagonalDown", "diagonalUp", "left", "right", "top"]
+    },
+    "Border": {
+      "members": ["color", "dashStyle", "transparency", "weight"]
+    },
+    "Margins": {
+      "members": ["bottom", "left", "right", "top"]
+    },
+    "TableAddOptions": {
+      "members": [
+        "columns",
+        "height",
+        "left",
+        "mergedAreas",
+        "rows",
+        "specificCellProperties",
+        "style",
+        "top",
+        "uniformCellProperties",
+        "values",
+        "width"
+      ]
+    },
+    "TableClearOptions": {
+      "members": ["all", "format", "text"]
+    },
+    "TableCellProperties": {
+      "members": [
+        "borders",
+        "fill",
+        "font",
+        "horizontalAlignment",
+        "indentLevel",
+        "margins",
+        "text",
+        "textRuns",
+        "verticalAlignment"
+      ]
+    },
+    "TableCellBorders": {
+      "members": ["bottom", "diagonalDown", "diagonalUp", "left", "right", "top"]
+    },
+    "BorderProperties": {
+      "members": ["color", "dashStyle", "transparency", "weight"]
+    },
+    "TableCellMargins": {
+      "members": ["bottom", "left", "right", "top"]
+    },
+    "FillProperties": {
+      "members": ["color", "transparency"]
+    },
+    "TableColumnProperties": {
+      "members": ["columnWidth"]
+    },
+    "TableRowProperties": {
+      "members": ["rowHeight"]
+    },
+    "TableMergedAreaProperties": {
+      "members": ["columnCount", "columnIndex", "rowCount", "rowIndex"]
+    },
+    "TextRun": {
+      "members": ["font", "text"]
+    },
+    "FontProperties": {
+      "members": [
+        "allCaps",
+        "bold",
+        "color",
+        "doubleStrikethrough",
+        "italic",
+        "name",
+        "size",
+        "smallCaps",
+        "strikethrough",
+        "subscript",
+        "superscript",
+        "underline"
+      ]
+    },
+    "HyperlinkAddOptions": {
+      "members": ["address", "screenTip"]
+    },
+    "AddSlideOptions": {
+      "members": ["layoutId", "slideMasterId"]
+    },
+    "InsertSlideOptions": {
+      "members": ["formatting", "sourceSlideIds", "targetSlideId"]
+    },
+    "SlideBackgroundSolidFillOptions": {
+      "members": ["color", "transparency"]
+    },
+    "SlideBackgroundGradientFillOptions": {
+      "members": ["type"]
+    },
+    "SlideBackgroundPatternFillOptions": {
+      "members": ["backgroundColor", "foregroundColor", "pattern"]
+    },
+    "SlideBackgroundPictureOrTextureFillOptions": {
+      "members": ["imageBase64", "transparency"]
+    },
+    "CustomPropertyCollection": {
+      "members": [
+        "add",
+        "deleteAll",
+        "getCount",
+        "getItem",
+        "getItemAt",
+        "getItemOrNullObject",
+        "items"
+      ]
+    },
+    "CustomProperty": {
+      "members": ["delete", "key", "type", "value"]
+    },
+    "CustomXmlPartCollection": {
+      "members": [
+        "add",
+        "getByNamespace",
+        "getCount",
+        "getItem",
+        "getItemAt",
+        "getItemOrNullObject",
+        "items"
+      ]
+    },
+    "CustomXmlPartScopedCollection": {
+      "members": [
+        "getCount",
+        "getItem",
+        "getItemAt",
+        "getItemOrNullObject",
+        "getOnlyItem",
+        "getOnlyItemOrNullObject",
+        "items"
+      ]
+    },
+    "CustomXmlPart": {
+      "members": ["delete", "getXml", "id", "namespaceUri", "setXml"]
+    },
+    "SlideGetImageOptions": {
+      "members": ["height", "width"]
+    },
+    "ShapeGetImageOptions": {
+      "members": ["format", "height", "width"]
+    }
+  },
+  "omissions": [
+    {
+      "uid": "OfficeExtension.ClientRequestContext#requestHeaders",
+      "reason": "The HTTP headers of the requests from an add-in to its host. A runtime calls its presentation host in the same process and sends no HTTP request, so a header would have no effect, and a property that accepts headers and ignores them would hide that."
+    },
+    {
+      "uid": "PowerPoint.RequestContext#sensitivityLabelsCatalog",
+      "reason": "The catalog of labels comes from the compliance service of the signed-in user's organization, through the host. It is not in the file, and a runtime has no user, no organization, and no service to ask."
+    },
+    {
+      "uid": "PowerPoint.createPresentation",
+      "reason": "Opens a new presentation in a new host window. Host window management is outside the presentation object model; a host opens a deck through its own runtime factory."
+    }
+  ],
+  "conformanceExceptions": [
+    {
+      "uid": "PowerPoint.run",
+      "reason": "The package has no global host to run against, so it exports no top-level run function. PptxEditorRuntime#run takes the same batch callback and the same object or object-array first argument. The source-compatibility fixtures call it in place of PowerPoint.run."
+    },
+    {
+      "uid": "OfficeExtension.ClientRequestContext#load",
+      "reason": "The package returns the object it loads, typed as that object (load<T extends ClientObject>(object: T, option?: LoadOption): T), so a call can chain; Office.js returns void. Every Office.js call compiles, because LoadOption already takes a string and a string array, and a void result is not used."
+    },
+    {
+      "uid": "OfficeExtension.ClientRequestContext#trackedObjects",
+      "reason": "The package declares trackedObjects read-only. Each context has one TrackedObjects that the runtime makes; a write from a consumer would detach the tracked objects from the context that owns them."
+    },
+    {
+      "uid": "OfficeExtension.ClientObject#context",
+      "reason": "The package declares context read-only and types it as RequestContext. The runtime sets the context of a proxy, and a write from a consumer would detach the proxy from its batch. The package has one context class, RequestContext; ClientRequestContext is a type alias of it."
+    },
+    {
+      "uid": "OfficeExtension.ClientObject#isNullObject",
+      "reason": "The package declares isNullObject read-only. The runtime sets it after a sync, and a write from a consumer would make a null object look real."
+    },
+    {
+      "uid": "PowerPoint.Shape#type",
+      "reason": "The enum leaves out the one value that names a trademarked feature. The file stores that content as a diagram (dgm:), and the package reports it as Diagram. Every other value matches, and compat:report does not count this read-only member."
+    },
+    {
+      "uid": "PowerPoint.PlaceholderFormat#containedType",
+      "reason": "The enum leaves out the one value that names a trademarked feature. The file stores that content as a diagram (dgm:), and the package reports it as Diagram. Every other value matches, and compat:report does not count this read-only member."
+    },
+    {
+      "uid": "PowerPoint.PlaceholderFormat#type",
+      "reason": "The enum leaves out the one value that names a trademarked feature. The file stores that content as a diagram (dgm:), and the package reports it as Diagram. Every other value matches, and compat:report does not count this read-only member."
+    }
+  ]
+}

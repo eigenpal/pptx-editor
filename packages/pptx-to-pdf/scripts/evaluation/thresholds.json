@@ -1,0 +1,31 @@
+{
+  "protocol": 1,
+  "source": "scripts/fidelity/thresholds.ts",
+  "comparisonA": {
+    "renderWidthPx": 1920,
+    "rasterScale": 4,
+    "antialiasing": "device",
+    "maxSizeDeltaPx": 0,
+    "maxPixelMismatch": 0.005,
+    "pixelThreshold": 0.1,
+    "maxBaselineDeltaPt": 0.5,
+    "minLineBreakMatch": 1,
+    "maxSelfConsistencyMismatch": 0
+  },
+  "comparisonB": {
+    "renderWidthPx": 1920,
+    "pixelThreshold": 0.1,
+    "maxPixelMismatch": 0.005,
+    "minWordMatchPercent": 100,
+    "maxWordDisplacementPt": 0.5,
+    "maxPageSizeDeltaPt": 0.5,
+    "screening": {
+      "colorChannelDelta": 24,
+      "grayDelta": 12,
+      "tileSamples": 8,
+      "minChangedSamplesInTile": 3,
+      "maxChangedFraction": 0.01,
+      "textShiftPt": 2
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "@pptx-editor.dev/i18n",
+  "version": "0.0.0",
+  "description": "Shared user-facing strings for the PPTX Editor chrome. English is the source of truth.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./en.json": "./en.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "en.json",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "bun check",
+    "api:extract": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/i18n --local",
+    "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/i18n"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eigenpal/pptx-editor.git",
+    "directory": "packages/i18n"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

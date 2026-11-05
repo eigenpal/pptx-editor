@@ -1,0 +1,6327 @@
+{
+  "schemaVersion": 1,
+  "generatedFrom": {
+    "package": "@types/office-js",
+    "version": "1.0.605"
+  },
+  "symbols": {
+    "AddSlideOptions": {
+      "uid": "PowerPoint.AddSlideOptions",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.3",
+      "members": {
+        "layoutId": {
+          "uid": "PowerPoint.AddSlideOptions#layoutId",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "slideMasterId": {
+          "uid": "PowerPoint.AddSlideOptions#slideMasterId",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        }
+      }
+    },
+    "Adjustments": {
+      "uid": "PowerPoint.Adjustments",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "count": {
+          "uid": "PowerPoint.Adjustments#count",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "get": {
+          "uid": "PowerPoint.Adjustments#get",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "set": {
+          "uid": "PowerPoint.Adjustments#set",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                },
+                {
+                  "name": "value",
+                  "type": "number"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        }
+      }
+    },
+    "Application": {
+      "uid": "PowerPoint.Application",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.0",
+      "members": {}
+    },
+    "Binding": {
+      "uid": "PowerPoint.Binding",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "delete": {
+          "uid": "PowerPoint.Binding#delete",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "void"
+            }
+          ]
+        },
+        "getShape": {
+          "uid": "PowerPoint.Binding#getShape",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "id": {
+          "uid": "PowerPoint.Binding#id",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "type": {
+          "uid": "PowerPoint.Binding#type",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Shape\""
+            }
+          ]
+        }
+      }
+    },
+    "BindingCollection": {
+      "uid": "PowerPoint.BindingCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "add": {
+          "uid": "PowerPoint.BindingCollection#add",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "shape",
+                  "type": "Shape"
+                },
+                {
+                  "name": "bindingType",
+                  "type": "BindingType"
+                },
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ],
+              "returns": "Binding"
+            },
+            {
+              "params": [
+                {
+                  "name": "shape",
+                  "type": "Shape"
+                },
+                {
+                  "name": "bindingType",
+                  "type": "\"Shape\""
+                },
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ],
+              "returns": "Binding"
+            }
+          ]
+        },
+        "addFromSelection": {
+          "uid": "PowerPoint.BindingCollection#addFromSelection",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "bindingType",
+                  "type": "BindingType"
+                },
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ],
+              "returns": "Binding"
+            },
+            {
+              "params": [
+                {
+                  "name": "bindingType",
+                  "type": "\"Shape\""
+                },
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ],
+              "returns": "Binding"
+            }
+          ]
+        },
+        "getCount": {
+          "uid": "PowerPoint.BindingCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItem": {
+          "uid": "PowerPoint.BindingCollection#getItem",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "key",
+                  "type": "string"
+                }
+              ],
+              "returns": "Binding"
+            }
+          ]
+        },
+        "getItemAt": {
+          "uid": "PowerPoint.BindingCollection#getItemAt",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "Binding"
+            }
+          ]
+        },
+        "getItemOrNullObject": {
+          "uid": "PowerPoint.BindingCollection#getItemOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ],
+              "returns": "Binding"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.BindingCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Binding[]"
+            }
+          ]
+        }
+      }
+    },
+    "Border": {
+      "uid": "PowerPoint.Border",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.9",
+      "members": {
+        "color": {
+          "uid": "PowerPoint.Border#color",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string | undefined"
+            }
+          ]
+        },
+        "dashStyle": {
+          "uid": "PowerPoint.Border#dashStyle",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Dash\" | \"DashDot\" | \"DashDotDot\" | \"LongDash\" | \"LongDashDot\" | \"RoundDot\" | \"Solid\" | \"SquareDot\" | \"LongDashDotDot\" | \"SystemDash\" | \"SystemDot\" | \"SystemDashDot\" | undefined"
+            }
+          ]
+        },
+        "transparency": {
+          "uid": "PowerPoint.Border#transparency",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        },
+        "weight": {
+          "uid": "PowerPoint.Border#weight",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        }
+      }
+    },
+    "BorderProperties": {
+      "uid": "PowerPoint.BorderProperties",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "color": {
+          "uid": "PowerPoint.BorderProperties#color",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string | undefined"
+            }
+          ]
+        },
+        "dashStyle": {
+          "uid": "PowerPoint.BorderProperties#dashStyle",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Dash\" | \"DashDot\" | \"DashDotDot\" | \"LongDash\" | \"LongDashDot\" | \"RoundDot\" | \"Solid\" | \"SquareDot\" | \"LongDashDotDot\" | \"SystemDash\" | \"SystemDot\" | \"SystemDashDot\" | undefined"
+            }
+          ]
+        },
+        "transparency": {
+          "uid": "PowerPoint.BorderProperties#transparency",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        },
+        "weight": {
+          "uid": "PowerPoint.BorderProperties#weight",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        }
+      }
+    },
+    "Borders": {
+      "uid": "PowerPoint.Borders",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.9",
+      "members": {
+        "bottom": {
+          "uid": "PowerPoint.Borders#bottom",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Border"
+            }
+          ]
+        },
+        "diagonalDown": {
+          "uid": "PowerPoint.Borders#diagonalDown",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Border"
+            }
+          ]
+        },
+        "diagonalUp": {
+          "uid": "PowerPoint.Borders#diagonalUp",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Border"
+            }
+          ]
+        },
+        "left": {
+          "uid": "PowerPoint.Borders#left",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Border"
+            }
+          ]
+        },
+        "right": {
+          "uid": "PowerPoint.Borders#right",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Border"
+            }
+          ]
+        },
+        "top": {
+          "uid": "PowerPoint.Borders#top",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Border"
+            }
+          ]
+        }
+      }
+    },
+    "BulletFormat": {
+      "uid": "PowerPoint.BulletFormat",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.4",
+      "members": {
+        "style": {
+          "uid": "PowerPoint.BulletFormat#style",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Unsupported\" | \"AlphabetLowercasePeriod\" | \"AlphabetUppercasePeriod\" | \"ArabicNumeralParenthesisRight\" | \"ArabicNumeralPeriod\" | \"RomanLowercaseParenthesesBoth\" | \"RomanLowercaseParenthesisRight\" | \"RomanLowercasePeriod\" | \"RomanUppercasePeriod\" | \"AlphabetLowercaseParenthesesBoth\" | \"AlphabetLowercaseParenthesisRight\" | \"AlphabetUppercaseParenthesesBoth\" | \"AlphabetUppercaseParenthesisRight\" | \"ArabicNumeralParenthesesBoth\" | \"ArabicNumeralPlain\" | \"RomanUppercaseParenthesesBoth\" | \"RomanUppercaseParenthesisRight\" | \"SimplifiedChinesePlain\" | \"SimplifiedChinesePeriod\" | \"CircleNumberDoubleBytePlain\" | \"CircleNumberWideDoubleByteWhitePlain\" | \"CircleNumberWideDoubleByteBlackPlain\" | \"TraditionalChinesePlain\" | \"TraditionalChinesePeriod\" | \"ArabicAlphabetDash\" | \"ArabicAbjadDash\" | \"HebrewAlphabetDash\" | \"KanjiKoreanPlain\" | \"KanjiKoreanPeriod\" | \"ArabicDoubleBytePlain\" | \"ArabicDoubleBytePeriod\" | \"ThaiAlphabetPeriod\" | \"ThaiAlphabetParenthesisRight\" | \"ThaiAlphabetParenthesesBoth\" | \"ThaiNumeralPeriod\" | \"ThaiNumeralParenthesisRight\" | \"ThaiNumeralParenthesesBoth\" | \"HindiAlphabetPeriod\" | \"HindiNumeralPeriod\" | \"KanjiSimplifiedChineseDoubleBytePeriod\" | \"HindiNumeralParenthesisRight\" | \"HindiAlphabet1Period\" | null"
+            }
+          ]
+        },
+        "type": {
+          "uid": "PowerPoint.BulletFormat#type",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Unsupported\" | \"None\" | \"Numbered\" | \"Unnumbered\" | null"
+            }
+          ]
+        },
+        "visible": {
+          "uid": "PowerPoint.BulletFormat#visible",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | null"
+            }
+          ]
+        }
+      }
+    },
+    "ClientObject": {
+      "uid": "OfficeExtension.ClientObject",
+      "kind": "class",
+      "requirementSet": null,
+      "members": {
+        "context": {
+          "uid": "OfficeExtension.ClientObject#context",
+          "kind": "property",
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientRequestContext"
+            }
+          ]
+        },
+        "isNullObject": {
+          "uid": "OfficeExtension.ClientObject#isNullObject",
+          "kind": "property",
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    "ClientRequestContext": {
+      "uid": "OfficeExtension.ClientRequestContext",
+      "kind": "class",
+      "requirementSet": null,
+      "members": {
+        "debugInfo": {
+          "uid": "OfficeExtension.ClientRequestContext#debugInfo",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "RequestContextDebugInfo"
+            }
+          ]
+        },
+        "load": {
+          "uid": "OfficeExtension.ClientRequestContext#load",
+          "kind": "method",
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "object",
+                  "type": "ClientObject"
+                },
+                {
+                  "name": "option",
+                  "type": "string | string[] | LoadOption",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "loadRecursive": {
+          "uid": "OfficeExtension.ClientRequestContext#loadRecursive",
+          "kind": "method",
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "object",
+                  "type": "ClientObject"
+                },
+                {
+                  "name": "options",
+                  "type": "{ [typeName: string]: string | string[] | LoadOption }"
+                },
+                {
+                  "name": "maxDepth",
+                  "type": "number",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "sync": {
+          "uid": "OfficeExtension.ClientRequestContext#sync",
+          "kind": "method",
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "passThroughValue",
+                  "type": "T",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<T>"
+            }
+          ]
+        },
+        "trace": {
+          "uid": "OfficeExtension.ClientRequestContext#trace",
+          "kind": "method",
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "message",
+                  "type": "string"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "trackedObjects": {
+          "uid": "OfficeExtension.ClientRequestContext#trackedObjects",
+          "kind": "property",
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TrackedObjects"
+            }
+          ]
+        }
+      }
+    },
+    "CustomProperty": {
+      "uid": "PowerPoint.CustomProperty",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.7",
+      "members": {
+        "delete": {
+          "uid": "PowerPoint.CustomProperty#delete",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "void"
+            }
+          ]
+        },
+        "key": {
+          "uid": "PowerPoint.CustomProperty#key",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "type": {
+          "uid": "PowerPoint.CustomProperty#type",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Boolean\" | \"Date\" | \"Number\" | \"String\""
+            }
+          ]
+        },
+        "value": {
+          "uid": "PowerPoint.CustomProperty#value",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | Date | number | string"
+            }
+          ]
+        }
+      }
+    },
+    "CustomPropertyCollection": {
+      "uid": "PowerPoint.CustomPropertyCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.7",
+      "members": {
+        "add": {
+          "uid": "PowerPoint.CustomPropertyCollection#add",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "key",
+                  "type": "string"
+                },
+                {
+                  "name": "value",
+                  "type": "boolean | Date | number | string"
+                }
+              ],
+              "returns": "CustomProperty"
+            }
+          ]
+        },
+        "deleteAll": {
+          "uid": "PowerPoint.CustomPropertyCollection#deleteAll",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "void"
+            }
+          ]
+        },
+        "getCount": {
+          "uid": "PowerPoint.CustomPropertyCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItem": {
+          "uid": "PowerPoint.CustomPropertyCollection#getItem",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "key",
+                  "type": "string"
+                }
+              ],
+              "returns": "CustomProperty"
+            }
+          ]
+        },
+        "getItemAt": {
+          "uid": "PowerPoint.CustomPropertyCollection#getItemAt",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "CustomProperty"
+            }
+          ]
+        },
+        "getItemOrNullObject": {
+          "uid": "PowerPoint.CustomPropertyCollection#getItemOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "key",
+                  "type": "string"
+                }
+              ],
+              "returns": "CustomProperty"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.CustomPropertyCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "CustomProperty[]"
+            }
+          ]
+        }
+      }
+    },
+    "CustomXmlPart": {
+      "uid": "PowerPoint.CustomXmlPart",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.7",
+      "members": {
+        "delete": {
+          "uid": "PowerPoint.CustomXmlPart#delete",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "void"
+            }
+          ]
+        },
+        "getXml": {
+          "uid": "PowerPoint.CustomXmlPart#getXml",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<string>"
+            }
+          ]
+        },
+        "id": {
+          "uid": "PowerPoint.CustomXmlPart#id",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "namespaceUri": {
+          "uid": "PowerPoint.CustomXmlPart#namespaceUri",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "setXml": {
+          "uid": "PowerPoint.CustomXmlPart#setXml",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "xml",
+                  "type": "string"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        }
+      }
+    },
+    "CustomXmlPartCollection": {
+      "uid": "PowerPoint.CustomXmlPartCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.7",
+      "members": {
+        "add": {
+          "uid": "PowerPoint.CustomXmlPartCollection#add",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "xml",
+                  "type": "string"
+                }
+              ],
+              "returns": "CustomXmlPart"
+            }
+          ]
+        },
+        "getByNamespace": {
+          "uid": "PowerPoint.CustomXmlPartCollection#getByNamespace",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "namespaceUri",
+                  "type": "string"
+                }
+              ],
+              "returns": "CustomXmlPartScopedCollection"
+            }
+          ]
+        },
+        "getCount": {
+          "uid": "PowerPoint.CustomXmlPartCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItem": {
+          "uid": "PowerPoint.CustomXmlPartCollection#getItem",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ],
+              "returns": "CustomXmlPart"
+            }
+          ]
+        },
+        "getItemAt": {
+          "uid": "PowerPoint.CustomXmlPartCollection#getItemAt",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "CustomXmlPart"
+            }
+          ]
+        },
+        "getItemOrNullObject": {
+          "uid": "PowerPoint.CustomXmlPartCollection#getItemOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ],
+              "returns": "CustomXmlPart"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.CustomXmlPartCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "CustomXmlPart[]"
+            }
+          ]
+        }
+      }
+    },
+    "CustomXmlPartScopedCollection": {
+      "uid": "PowerPoint.CustomXmlPartScopedCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.7",
+      "members": {
+        "getCount": {
+          "uid": "PowerPoint.CustomXmlPartScopedCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItem": {
+          "uid": "PowerPoint.CustomXmlPartScopedCollection#getItem",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ],
+              "returns": "CustomXmlPart"
+            }
+          ]
+        },
+        "getItemAt": {
+          "uid": "PowerPoint.CustomXmlPartScopedCollection#getItemAt",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "CustomXmlPart"
+            }
+          ]
+        },
+        "getItemOrNullObject": {
+          "uid": "PowerPoint.CustomXmlPartScopedCollection#getItemOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ],
+              "returns": "CustomXmlPart"
+            }
+          ]
+        },
+        "getOnlyItem": {
+          "uid": "PowerPoint.CustomXmlPartScopedCollection#getOnlyItem",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "CustomXmlPart"
+            }
+          ]
+        },
+        "getOnlyItemOrNullObject": {
+          "uid": "PowerPoint.CustomXmlPartScopedCollection#getOnlyItemOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "CustomXmlPart"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.CustomXmlPartScopedCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "CustomXmlPart[]"
+            }
+          ]
+        }
+      }
+    },
+    "DocumentProperties": {
+      "uid": "PowerPoint.DocumentProperties",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.7",
+      "members": {
+        "author": {
+          "uid": "PowerPoint.DocumentProperties#author",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "category": {
+          "uid": "PowerPoint.DocumentProperties#category",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "comments": {
+          "uid": "PowerPoint.DocumentProperties#comments",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "company": {
+          "uid": "PowerPoint.DocumentProperties#company",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "creationDate": {
+          "uid": "PowerPoint.DocumentProperties#creationDate",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Date"
+            }
+          ]
+        },
+        "customProperties": {
+          "uid": "PowerPoint.DocumentProperties#customProperties",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "CustomPropertyCollection"
+            }
+          ]
+        },
+        "keywords": {
+          "uid": "PowerPoint.DocumentProperties#keywords",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "lastAuthor": {
+          "uid": "PowerPoint.DocumentProperties#lastAuthor",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "manager": {
+          "uid": "PowerPoint.DocumentProperties#manager",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "revisionNumber": {
+          "uid": "PowerPoint.DocumentProperties#revisionNumber",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "subject": {
+          "uid": "PowerPoint.DocumentProperties#subject",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "title": {
+          "uid": "PowerPoint.DocumentProperties#title",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        }
+      }
+    },
+    "FillProperties": {
+      "uid": "PowerPoint.FillProperties",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "color": {
+          "uid": "PowerPoint.FillProperties#color",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string | undefined"
+            }
+          ]
+        },
+        "transparency": {
+          "uid": "PowerPoint.FillProperties#transparency",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        }
+      }
+    },
+    "FontProperties": {
+      "uid": "PowerPoint.FontProperties",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "allCaps": {
+          "uid": "PowerPoint.FontProperties#allCaps",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | undefined"
+            }
+          ]
+        },
+        "bold": {
+          "uid": "PowerPoint.FontProperties#bold",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | undefined"
+            }
+          ]
+        },
+        "color": {
+          "uid": "PowerPoint.FontProperties#color",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string | undefined"
+            }
+          ]
+        },
+        "doubleStrikethrough": {
+          "uid": "PowerPoint.FontProperties#doubleStrikethrough",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | undefined"
+            }
+          ]
+        },
+        "italic": {
+          "uid": "PowerPoint.FontProperties#italic",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | undefined"
+            }
+          ]
+        },
+        "name": {
+          "uid": "PowerPoint.FontProperties#name",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string | undefined"
+            }
+          ]
+        },
+        "size": {
+          "uid": "PowerPoint.FontProperties#size",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        },
+        "smallCaps": {
+          "uid": "PowerPoint.FontProperties#smallCaps",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | undefined"
+            }
+          ]
+        },
+        "strikethrough": {
+          "uid": "PowerPoint.FontProperties#strikethrough",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | undefined"
+            }
+          ]
+        },
+        "subscript": {
+          "uid": "PowerPoint.FontProperties#subscript",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | undefined"
+            }
+          ]
+        },
+        "superscript": {
+          "uid": "PowerPoint.FontProperties#superscript",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | undefined"
+            }
+          ]
+        },
+        "underline": {
+          "uid": "PowerPoint.FontProperties#underline",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"None\" | \"Single\" | \"Double\" | \"Heavy\" | \"Dotted\" | \"DottedHeavy\" | \"Dash\" | \"DashHeavy\" | \"DashLong\" | \"DashLongHeavy\" | \"DotDash\" | \"DotDashHeavy\" | \"DotDotDash\" | \"DotDotDashHeavy\" | \"Wavy\" | \"WavyHeavy\" | \"WavyDouble\" | undefined"
+            }
+          ]
+        }
+      }
+    },
+    "Hyperlink": {
+      "uid": "PowerPoint.Hyperlink",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.6",
+      "members": {
+        "address": {
+          "uid": "PowerPoint.Hyperlink#address",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.6",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "delete": {
+          "uid": "PowerPoint.Hyperlink#delete",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "void"
+            }
+          ]
+        },
+        "getLinkedShapeOrNullObject": {
+          "uid": "PowerPoint.Hyperlink#getLinkedShapeOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "getLinkedTextRangeOrNullObject": {
+          "uid": "PowerPoint.Hyperlink#getLinkedTextRangeOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TextRange"
+            }
+          ]
+        },
+        "screenTip": {
+          "uid": "PowerPoint.Hyperlink#screenTip",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.6",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "type": {
+          "uid": "PowerPoint.Hyperlink#type",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"TextRange\" | \"Shape\""
+            }
+          ]
+        }
+      }
+    },
+    "HyperlinkAddOptions": {
+      "uid": "PowerPoint.HyperlinkAddOptions",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "address": {
+          "uid": "PowerPoint.HyperlinkAddOptions#address",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "screenTip": {
+          "uid": "PowerPoint.HyperlinkAddOptions#screenTip",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        }
+      }
+    },
+    "HyperlinkCollection": {
+      "uid": "PowerPoint.HyperlinkCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.6",
+      "members": {
+        "add": {
+          "uid": "PowerPoint.HyperlinkCollection#add",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "target",
+                  "type": "TextRange | Shape"
+                },
+                {
+                  "name": "options",
+                  "type": "HyperlinkAddOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Hyperlink"
+            }
+          ]
+        },
+        "getCount": {
+          "uid": "PowerPoint.HyperlinkCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.6",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItemAt": {
+          "uid": "PowerPoint.HyperlinkCollection#getItemAt",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.6",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "Hyperlink"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.HyperlinkCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Hyperlink[]"
+            }
+          ]
+        }
+      }
+    },
+    "HyperlinkScopedCollection": {
+      "uid": "PowerPoint.HyperlinkScopedCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "getCount": {
+          "uid": "PowerPoint.HyperlinkScopedCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItemAt": {
+          "uid": "PowerPoint.HyperlinkScopedCollection#getItemAt",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "Hyperlink"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.HyperlinkScopedCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Hyperlink[]"
+            }
+          ]
+        }
+      }
+    },
+    "InsertSlideOptions": {
+      "uid": "PowerPoint.InsertSlideOptions",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.2",
+      "members": {
+        "formatting": {
+          "uid": "PowerPoint.InsertSlideOptions#formatting",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.2",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"KeepSourceFormatting\" | \"UseDestinationTheme\""
+            }
+          ]
+        },
+        "sourceSlideIds": {
+          "uid": "PowerPoint.InsertSlideOptions#sourceSlideIds",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.2",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string[]"
+            }
+          ]
+        },
+        "targetSlideId": {
+          "uid": "PowerPoint.InsertSlideOptions#targetSlideId",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.2",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        }
+      }
+    },
+    "Margins": {
+      "uid": "PowerPoint.Margins",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.9",
+      "members": {
+        "bottom": {
+          "uid": "PowerPoint.Margins#bottom",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        },
+        "left": {
+          "uid": "PowerPoint.Margins#left",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        },
+        "right": {
+          "uid": "PowerPoint.Margins#right",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        },
+        "top": {
+          "uid": "PowerPoint.Margins#top",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        }
+      }
+    },
+    "PageSetup": {
+      "uid": "PowerPoint.PageSetup",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "slideHeight": {
+          "uid": "PowerPoint.PageSetup#slideHeight",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "slideWidth": {
+          "uid": "PowerPoint.PageSetup#slideWidth",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        }
+      }
+    },
+    "ParagraphFormat": {
+      "uid": "PowerPoint.ParagraphFormat",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.4",
+      "members": {
+        "bulletFormat": {
+          "uid": "PowerPoint.ParagraphFormat#bulletFormat",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "BulletFormat"
+            }
+          ]
+        },
+        "horizontalAlignment": {
+          "uid": "PowerPoint.ParagraphFormat#horizontalAlignment",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Left\" | \"Center\" | \"Right\" | \"Justify\" | \"JustifyLow\" | \"Distributed\" | \"ThaiDistributed\" | null"
+            }
+          ]
+        },
+        "indentLevel": {
+          "uid": "PowerPoint.ParagraphFormat#indentLevel",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        }
+      }
+    },
+    "PlaceholderFormat": {
+      "uid": "PowerPoint.PlaceholderFormat",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "containedType": {
+          "uid": "PowerPoint.PlaceholderFormat#containedType",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Unsupported\" | \"Image\" | \"GeometricShape\" | \"Group\" | \"Line\" | \"Table\" | \"Callout\" | \"Chart\" | \"ContentApp\" | \"Diagram\" | \"Freeform\" | \"Graphic\" | \"Ink\" | \"Media\" | \"Model3D\" | \"Ole\" | \"Placeholder\" | \"SmartArt\" | \"TextBox\" | null"
+            }
+          ]
+        },
+        "type": {
+          "uid": "PowerPoint.PlaceholderFormat#type",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Unsupported\" | \"Date\" | \"SlideNumber\" | \"Footer\" | \"Header\" | \"Title\" | \"Body\" | \"CenterTitle\" | \"Subtitle\" | \"VerticalTitle\" | \"VerticalBody\" | \"Content\" | \"Chart\" | \"Table\" | \"OnlinePicture\" | \"SmartArt\" | \"Media\" | \"VerticalContent\" | \"Picture\" | \"Cameo\""
+            }
+          ]
+        }
+      }
+    },
+    "Presentation": {
+      "uid": "PowerPoint.Presentation",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.0",
+      "members": {
+        "bindings": {
+          "uid": "PowerPoint.Presentation#bindings",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "BindingCollection"
+            }
+          ]
+        },
+        "customXmlParts": {
+          "uid": "PowerPoint.Presentation#customXmlParts",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "CustomXmlPartCollection"
+            }
+          ]
+        },
+        "getSelectedShapes": {
+          "uid": "PowerPoint.Presentation#getSelectedShapes",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ShapeScopedCollection"
+            }
+          ]
+        },
+        "getSelectedSlides": {
+          "uid": "PowerPoint.Presentation#getSelectedSlides",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideScopedCollection"
+            }
+          ]
+        },
+        "getSelectedTextRange": {
+          "uid": "PowerPoint.Presentation#getSelectedTextRange",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TextRange"
+            }
+          ]
+        },
+        "getSelectedTextRangeOrNullObject": {
+          "uid": "PowerPoint.Presentation#getSelectedTextRangeOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TextRange"
+            }
+          ]
+        },
+        "id": {
+          "uid": "PowerPoint.Presentation#id",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "insertSlidesFromBase64": {
+          "uid": "PowerPoint.Presentation#insertSlidesFromBase64",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.2",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "base64File",
+                  "type": "string"
+                },
+                {
+                  "name": "options",
+                  "type": "InsertSlideOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "pageSetup": {
+          "uid": "PowerPoint.Presentation#pageSetup",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "PageSetup"
+            }
+          ]
+        },
+        "properties": {
+          "uid": "PowerPoint.Presentation#properties",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "DocumentProperties"
+            }
+          ]
+        },
+        "setSelectedSlides": {
+          "uid": "PowerPoint.Presentation#setSelectedSlides",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "slideIds",
+                  "type": "string[]"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "slideMasters": {
+          "uid": "PowerPoint.Presentation#slideMasters",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideMasterCollection"
+            }
+          ]
+        },
+        "slides": {
+          "uid": "PowerPoint.Presentation#slides",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.2",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideCollection"
+            }
+          ]
+        },
+        "tags": {
+          "uid": "PowerPoint.Presentation#tags",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TagCollection"
+            }
+          ]
+        },
+        "title": {
+          "uid": "PowerPoint.Presentation#title",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.0",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        }
+      }
+    },
+    "RequestContext": {
+      "uid": "PowerPoint.RequestContext",
+      "kind": "class",
+      "requirementSet": null,
+      "members": {
+        "application": {
+          "uid": "PowerPoint.RequestContext#application",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Application"
+            }
+          ]
+        },
+        "presentation": {
+          "uid": "PowerPoint.RequestContext#presentation",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Presentation"
+            }
+          ]
+        }
+      }
+    },
+    "RequestContextDebugInfo": {
+      "uid": "OfficeExtension.RequestContextDebugInfo",
+      "kind": "interface",
+      "requirementSet": null,
+      "members": {
+        "pendingStatements": {
+          "uid": "OfficeExtension.RequestContextDebugInfo#pendingStatements",
+          "kind": "property",
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string[]"
+            }
+          ]
+        }
+      }
+    },
+    "Shape": {
+      "uid": "PowerPoint.Shape",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.3",
+      "members": {
+        "adjustments": {
+          "uid": "PowerPoint.Shape#adjustments",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Adjustments"
+            }
+          ]
+        },
+        "altTextDescription": {
+          "uid": "PowerPoint.Shape#altTextDescription",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "altTextTitle": {
+          "uid": "PowerPoint.Shape#altTextTitle",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "creationId": {
+          "uid": "PowerPoint.Shape#creationId",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string | null"
+            }
+          ]
+        },
+        "customXmlParts": {
+          "uid": "PowerPoint.Shape#customXmlParts",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "CustomXmlPartCollection"
+            }
+          ]
+        },
+        "delete": {
+          "uid": "PowerPoint.Shape#delete",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "void"
+            }
+          ]
+        },
+        "fill": {
+          "uid": "PowerPoint.Shape#fill",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ShapeFill"
+            }
+          ]
+        },
+        "getImageAsBase64": {
+          "uid": "PowerPoint.Shape#getImageAsBase64",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "options",
+                  "type": "ShapeGetImageOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "ClientResult<string>"
+            }
+          ]
+        },
+        "getParentSlide": {
+          "uid": "PowerPoint.Shape#getParentSlide",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Slide"
+            }
+          ]
+        },
+        "getParentSlideLayout": {
+          "uid": "PowerPoint.Shape#getParentSlideLayout",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideLayout"
+            }
+          ]
+        },
+        "getParentSlideLayoutOrNullObject": {
+          "uid": "PowerPoint.Shape#getParentSlideLayoutOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideLayout"
+            }
+          ]
+        },
+        "getParentSlideMaster": {
+          "uid": "PowerPoint.Shape#getParentSlideMaster",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideMaster"
+            }
+          ]
+        },
+        "getParentSlideMasterOrNullObject": {
+          "uid": "PowerPoint.Shape#getParentSlideMasterOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideMaster"
+            }
+          ]
+        },
+        "getParentSlideOrNullObject": {
+          "uid": "PowerPoint.Shape#getParentSlideOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Slide"
+            }
+          ]
+        },
+        "getTable": {
+          "uid": "PowerPoint.Shape#getTable",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Table"
+            }
+          ]
+        },
+        "getTextFrameOrNullObject": {
+          "uid": "PowerPoint.Shape#getTextFrameOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TextFrame"
+            }
+          ]
+        },
+        "group": {
+          "uid": "PowerPoint.Shape#group",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ShapeGroup"
+            }
+          ]
+        },
+        "height": {
+          "uid": "PowerPoint.Shape#height",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "id": {
+          "uid": "PowerPoint.Shape#id",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "isDecorative": {
+          "uid": "PowerPoint.Shape#isDecorative",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "left": {
+          "uid": "PowerPoint.Shape#left",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "level": {
+          "uid": "PowerPoint.Shape#level",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "lineFormat": {
+          "uid": "PowerPoint.Shape#lineFormat",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ShapeLineFormat"
+            }
+          ]
+        },
+        "name": {
+          "uid": "PowerPoint.Shape#name",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "parentGroup": {
+          "uid": "PowerPoint.Shape#parentGroup",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "placeholderFormat": {
+          "uid": "PowerPoint.Shape#placeholderFormat",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "PlaceholderFormat"
+            }
+          ]
+        },
+        "rotation": {
+          "uid": "PowerPoint.Shape#rotation",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "setHyperlink": {
+          "uid": "PowerPoint.Shape#setHyperlink",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "options",
+                  "type": "HyperlinkAddOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Hyperlink"
+            }
+          ]
+        },
+        "setZOrder": {
+          "uid": "PowerPoint.Shape#setZOrder",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "position",
+                  "type": "ShapeZOrder"
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "params": [
+                {
+                  "name": "position",
+                  "type": "\"BringForward\" | \"BringToFront\" | \"SendBackward\" | \"SendToBack\""
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "tags": {
+          "uid": "PowerPoint.Shape#tags",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TagCollection"
+            }
+          ]
+        },
+        "textFrame": {
+          "uid": "PowerPoint.Shape#textFrame",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TextFrame"
+            }
+          ]
+        },
+        "top": {
+          "uid": "PowerPoint.Shape#top",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "type": {
+          "uid": "PowerPoint.Shape#type",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Unsupported\" | \"Image\" | \"GeometricShape\" | \"Group\" | \"Line\" | \"Table\" | \"Callout\" | \"Chart\" | \"ContentApp\" | \"Diagram\" | \"Freeform\" | \"Graphic\" | \"Ink\" | \"Media\" | \"Model3D\" | \"Ole\" | \"Placeholder\" | \"SmartArt\" | \"TextBox\""
+            }
+          ]
+        },
+        "visible": {
+          "uid": "PowerPoint.Shape#visible",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "width": {
+          "uid": "PowerPoint.Shape#width",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "zOrderPosition": {
+          "uid": "PowerPoint.Shape#zOrderPosition",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        }
+      }
+    },
+    "ShapeAddOptions": {
+      "uid": "PowerPoint.ShapeAddOptions",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.4",
+      "members": {
+        "height": {
+          "uid": "PowerPoint.ShapeAddOptions#height",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "left": {
+          "uid": "PowerPoint.ShapeAddOptions#left",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "top": {
+          "uid": "PowerPoint.ShapeAddOptions#top",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "width": {
+          "uid": "PowerPoint.ShapeAddOptions#width",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        }
+      }
+    },
+    "ShapeCollection": {
+      "uid": "PowerPoint.ShapeCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.3",
+      "members": {
+        "addGeometricShape": {
+          "uid": "PowerPoint.ShapeCollection#addGeometricShape",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "geometricShapeType",
+                  "type": "GeometricShapeType"
+                },
+                {
+                  "name": "options",
+                  "type": "ShapeAddOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Shape"
+            },
+            {
+              "params": [
+                {
+                  "name": "geometricShapeType",
+                  "type": "\"LineInverse\" | \"Triangle\" | \"RightTriangle\" | \"Rectangle\" | \"Diamond\" | \"Parallelogram\" | \"Trapezoid\" | \"NonIsoscelesTrapezoid\" | \"Pentagon\" | \"Hexagon\" | \"Heptagon\" | \"Octagon\" | \"Decagon\" | \"Dodecagon\" | \"Star4\" | \"Star5\" | \"Star6\" | \"Star7\" | \"Star8\" | \"Star10\" | \"Star12\" | \"Star16\" | \"Star24\" | \"Star32\" | \"RoundRectangle\" | \"Round1Rectangle\" | \"Round2SameRectangle\" | \"Round2DiagonalRectangle\" | \"SnipRoundRectangle\" | \"Snip1Rectangle\" | \"Snip2SameRectangle\" | \"Snip2DiagonalRectangle\" | \"Plaque\" | \"Ellipse\" | \"Teardrop\" | \"HomePlate\" | \"Chevron\" | \"PieWedge\" | \"Pie\" | \"BlockArc\" | \"Donut\" | \"NoSmoking\" | \"RightArrow\" | \"LeftArrow\" | \"UpArrow\" | \"DownArrow\" | \"StripedRightArrow\" | \"NotchedRightArrow\" | \"BentUpArrow\" | \"LeftRightArrow\" | \"UpDownArrow\" | \"LeftUpArrow\" | \"LeftRightUpArrow\" | \"QuadArrow\" | \"LeftArrowCallout\" | \"RightArrowCallout\" | \"UpArrowCallout\" | \"DownArrowCallout\" | \"LeftRightArrowCallout\" | \"UpDownArrowCallout\" | \"QuadArrowCallout\" | \"BentArrow\" | \"UturnArrow\" | \"CircularArrow\" | \"LeftCircularArrow\" | \"LeftRightCircularArrow\" | \"CurvedRightArrow\" | \"CurvedLeftArrow\" | \"CurvedUpArrow\" | \"CurvedDownArrow\" | \"SwooshArrow\" | \"Cube\" | \"Can\" | \"LightningBolt\" | \"Heart\" | \"Sun\" | \"Moon\" | \"SmileyFace\" | \"IrregularSeal1\" | \"IrregularSeal2\" | \"FoldedCorner\" | \"Bevel\" | \"Frame\" | \"HalfFrame\" | \"Corner\" | \"DiagonalStripe\" | \"Chord\" | \"Arc\" | \"LeftBracket\" | \"RightBracket\" | \"LeftBrace\" | \"RightBrace\" | \"BracketPair\" | \"BracePair\" | \"Callout1\" | \"Callout2\" | \"Callout3\" | \"AccentCallout1\" | \"AccentCallout2\" | \"AccentCallout3\" | \"BorderCallout1\" | \"BorderCallout2\" | \"BorderCallout3\" | \"AccentBorderCallout1\" | \"AccentBorderCallout2\" | \"AccentBorderCallout3\" | \"WedgeRectCallout\" | \"WedgeRRectCallout\" | \"WedgeEllipseCallout\" | \"CloudCallout\" | \"Cloud\" | \"Ribbon\" | \"Ribbon2\" | \"EllipseRibbon\" | \"EllipseRibbon2\" | \"LeftRightRibbon\" | \"VerticalScroll\" | \"HorizontalScroll\" | \"Wave\" | \"DoubleWave\" | \"Plus\" | \"FlowChartProcess\" | \"FlowChartDecision\" | \"FlowChartInputOutput\" | \"FlowChartPredefinedProcess\" | \"FlowChartInternalStorage\" | \"FlowChartDocument\" | \"FlowChartMultidocument\" | \"FlowChartTerminator\" | \"FlowChartPreparation\" | \"FlowChartManualInput\" | \"FlowChartManualOperation\" | \"FlowChartConnector\" | \"FlowChartPunchedCard\" | \"FlowChartPunchedTape\" | \"FlowChartSummingJunction\" | \"FlowChartOr\" | \"FlowChartCollate\" | \"FlowChartSort\" | \"FlowChartExtract\" | \"FlowChartMerge\" | \"FlowChartOfflineStorage\" | \"FlowChartOnlineStorage\" | \"FlowChartMagneticTape\" | \"FlowChartMagneticDisk\" | \"FlowChartMagneticDrum\" | \"FlowChartDisplay\" | \"FlowChartDelay\" | \"FlowChartAlternateProcess\" | \"FlowChartOffpageConnector\" | \"ActionButtonBlank\" | \"ActionButtonHome\" | \"ActionButtonHelp\" | \"ActionButtonInformation\" | \"ActionButtonForwardNext\" | \"ActionButtonBackPrevious\" | \"ActionButtonEnd\" | \"ActionButtonBeginning\" | \"ActionButtonReturn\" | \"ActionButtonDocument\" | \"ActionButtonSound\" | \"ActionButtonMovie\" | \"Gear6\" | \"Gear9\" | \"Funnel\" | \"MathPlus\" | \"MathMinus\" | \"MathMultiply\" | \"MathDivide\" | \"MathEqual\" | \"MathNotEqual\" | \"CornerTabs\" | \"SquareTabs\" | \"PlaqueTabs\" | \"ChartX\" | \"ChartStar\" | \"ChartPlus\""
+                },
+                {
+                  "name": "options",
+                  "type": "ShapeAddOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "addGroup": {
+          "uid": "PowerPoint.ShapeCollection#addGroup",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "values",
+                  "type": "Array<string | Shape>"
+                }
+              ],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "addLine": {
+          "uid": "PowerPoint.ShapeCollection#addLine",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "connectorType",
+                  "type": "ConnectorType",
+                  "optional": true
+                },
+                {
+                  "name": "options",
+                  "type": "ShapeAddOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Shape"
+            },
+            {
+              "params": [
+                {
+                  "name": "connectorType",
+                  "type": "\"Straight\" | \"Elbow\" | \"Curve\"",
+                  "optional": true
+                },
+                {
+                  "name": "options",
+                  "type": "ShapeAddOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "addTable": {
+          "uid": "PowerPoint.ShapeCollection#addTable",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "rowCount",
+                  "type": "number"
+                },
+                {
+                  "name": "columnCount",
+                  "type": "number"
+                },
+                {
+                  "name": "options",
+                  "type": "TableAddOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "addTextBox": {
+          "uid": "PowerPoint.ShapeCollection#addTextBox",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "text",
+                  "type": "string"
+                },
+                {
+                  "name": "options",
+                  "type": "ShapeAddOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "getCount": {
+          "uid": "PowerPoint.ShapeCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItem": {
+          "uid": "PowerPoint.ShapeCollection#getItem",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "key",
+                  "type": "string"
+                }
+              ],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "getItemAt": {
+          "uid": "PowerPoint.ShapeCollection#getItemAt",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "getItemOrNullObject": {
+          "uid": "PowerPoint.ShapeCollection#getItemOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.ShapeCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Shape[]"
+            }
+          ]
+        }
+      }
+    },
+    "ShapeFill": {
+      "uid": "PowerPoint.ShapeFill",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.4",
+      "members": {
+        "clear": {
+          "uid": "PowerPoint.ShapeFill#clear",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "void"
+            }
+          ]
+        },
+        "foregroundColor": {
+          "uid": "PowerPoint.ShapeFill#foregroundColor",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "setImage": {
+          "uid": "PowerPoint.ShapeFill#setImage",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "base64EncodedImage",
+                  "type": "string"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "setSolidColor": {
+          "uid": "PowerPoint.ShapeFill#setSolidColor",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "color",
+                  "type": "string"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "transparency": {
+          "uid": "PowerPoint.ShapeFill#transparency",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "type": {
+          "uid": "PowerPoint.ShapeFill#type",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"NoFill\" | \"Solid\" | \"Gradient\" | \"Pattern\" | \"PictureAndTexture\" | \"SlideBackground\""
+            }
+          ]
+        }
+      }
+    },
+    "ShapeFont": {
+      "uid": "PowerPoint.ShapeFont",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.4",
+      "members": {
+        "allCaps": {
+          "uid": "PowerPoint.ShapeFont#allCaps",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | null"
+            }
+          ]
+        },
+        "bold": {
+          "uid": "PowerPoint.ShapeFont#bold",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | null"
+            }
+          ]
+        },
+        "color": {
+          "uid": "PowerPoint.ShapeFont#color",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string | null"
+            }
+          ]
+        },
+        "doubleStrikethrough": {
+          "uid": "PowerPoint.ShapeFont#doubleStrikethrough",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | null"
+            }
+          ]
+        },
+        "italic": {
+          "uid": "PowerPoint.ShapeFont#italic",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | null"
+            }
+          ]
+        },
+        "name": {
+          "uid": "PowerPoint.ShapeFont#name",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string | null"
+            }
+          ]
+        },
+        "size": {
+          "uid": "PowerPoint.ShapeFont#size",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | null"
+            }
+          ]
+        },
+        "smallCaps": {
+          "uid": "PowerPoint.ShapeFont#smallCaps",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | null"
+            }
+          ]
+        },
+        "strikethrough": {
+          "uid": "PowerPoint.ShapeFont#strikethrough",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | null"
+            }
+          ]
+        },
+        "subscript": {
+          "uid": "PowerPoint.ShapeFont#subscript",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | null"
+            }
+          ]
+        },
+        "superscript": {
+          "uid": "PowerPoint.ShapeFont#superscript",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean | null"
+            }
+          ]
+        },
+        "underline": {
+          "uid": "PowerPoint.ShapeFont#underline",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"None\" | \"Single\" | \"Double\" | \"Heavy\" | \"Dotted\" | \"DottedHeavy\" | \"Dash\" | \"DashHeavy\" | \"DashLong\" | \"DashLongHeavy\" | \"DotDash\" | \"DotDashHeavy\" | \"DotDotDash\" | \"DotDotDashHeavy\" | \"Wavy\" | \"WavyHeavy\" | \"WavyDouble\" | null"
+            }
+          ]
+        }
+      }
+    },
+    "ShapeGetImageOptions": {
+      "uid": "PowerPoint.ShapeGetImageOptions",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "format": {
+          "uid": "PowerPoint.ShapeGetImageOptions#format",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Png\""
+            }
+          ]
+        },
+        "height": {
+          "uid": "PowerPoint.ShapeGetImageOptions#height",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "width": {
+          "uid": "PowerPoint.ShapeGetImageOptions#width",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        }
+      }
+    },
+    "ShapeGroup": {
+      "uid": "PowerPoint.ShapeGroup",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "creationId": {
+          "uid": "PowerPoint.ShapeGroup#creationId",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string | null"
+            }
+          ]
+        },
+        "id": {
+          "uid": "PowerPoint.ShapeGroup#id",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "shape": {
+          "uid": "PowerPoint.ShapeGroup#shape",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "shapes": {
+          "uid": "PowerPoint.ShapeGroup#shapes",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ShapeScopedCollection"
+            }
+          ]
+        },
+        "ungroup": {
+          "uid": "PowerPoint.ShapeGroup#ungroup",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "void"
+            }
+          ]
+        }
+      }
+    },
+    "ShapeLineFormat": {
+      "uid": "PowerPoint.ShapeLineFormat",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.4",
+      "members": {
+        "color": {
+          "uid": "PowerPoint.ShapeLineFormat#color",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "dashStyle": {
+          "uid": "PowerPoint.ShapeLineFormat#dashStyle",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Dash\" | \"DashDot\" | \"DashDotDot\" | \"LongDash\" | \"LongDashDot\" | \"RoundDot\" | \"Solid\" | \"SquareDot\" | \"LongDashDotDot\" | \"SystemDash\" | \"SystemDot\" | \"SystemDashDot\""
+            }
+          ]
+        },
+        "style": {
+          "uid": "PowerPoint.ShapeLineFormat#style",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Single\" | \"ThickBetweenThin\" | \"ThickThin\" | \"ThinThick\" | \"ThinThin\""
+            }
+          ]
+        },
+        "transparency": {
+          "uid": "PowerPoint.ShapeLineFormat#transparency",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "visible": {
+          "uid": "PowerPoint.ShapeLineFormat#visible",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "weight": {
+          "uid": "PowerPoint.ShapeLineFormat#weight",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        }
+      }
+    },
+    "ShapeScopedCollection": {
+      "uid": "PowerPoint.ShapeScopedCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.5",
+      "members": {
+        "getCount": {
+          "uid": "PowerPoint.ShapeScopedCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItem": {
+          "uid": "PowerPoint.ShapeScopedCollection#getItem",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "key",
+                  "type": "string"
+                }
+              ],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "getItemAt": {
+          "uid": "PowerPoint.ShapeScopedCollection#getItemAt",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "getItemOrNullObject": {
+          "uid": "PowerPoint.ShapeScopedCollection#getItemOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "group": {
+          "uid": "PowerPoint.ShapeScopedCollection#group",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.ShapeScopedCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Shape[]"
+            }
+          ]
+        }
+      }
+    },
+    "Slide": {
+      "uid": "PowerPoint.Slide",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.2",
+      "members": {
+        "applyLayout": {
+          "uid": "PowerPoint.Slide#applyLayout",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "slideLayout",
+                  "type": "SlideLayout"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "background": {
+          "uid": "PowerPoint.Slide#background",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideBackground"
+            }
+          ]
+        },
+        "customXmlParts": {
+          "uid": "PowerPoint.Slide#customXmlParts",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "CustomXmlPartCollection"
+            }
+          ]
+        },
+        "delete": {
+          "uid": "PowerPoint.Slide#delete",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.2",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "void"
+            }
+          ]
+        },
+        "exportAsBase64": {
+          "uid": "PowerPoint.Slide#exportAsBase64",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<string>"
+            }
+          ]
+        },
+        "getImageAsBase64": {
+          "uid": "PowerPoint.Slide#getImageAsBase64",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "options",
+                  "type": "SlideGetImageOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "ClientResult<string>"
+            }
+          ]
+        },
+        "hyperlinks": {
+          "uid": "PowerPoint.Slide#hyperlinks",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.6",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "HyperlinkCollection"
+            }
+          ]
+        },
+        "id": {
+          "uid": "PowerPoint.Slide#id",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.2",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "index": {
+          "uid": "PowerPoint.Slide#index",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "layout": {
+          "uid": "PowerPoint.Slide#layout",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideLayout"
+            }
+          ]
+        },
+        "moveTo": {
+          "uid": "PowerPoint.Slide#moveTo",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "slideIndex",
+                  "type": "number"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "setSelectedShapes": {
+          "uid": "PowerPoint.Slide#setSelectedShapes",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "shapeIds",
+                  "type": "string[]"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "shapes": {
+          "uid": "PowerPoint.Slide#shapes",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ShapeCollection"
+            }
+          ]
+        },
+        "slideMaster": {
+          "uid": "PowerPoint.Slide#slideMaster",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideMaster"
+            }
+          ]
+        },
+        "tags": {
+          "uid": "PowerPoint.Slide#tags",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TagCollection"
+            }
+          ]
+        },
+        "themeColorScheme": {
+          "uid": "PowerPoint.Slide#themeColorScheme",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ThemeColorScheme"
+            }
+          ]
+        }
+      }
+    },
+    "SlideBackground": {
+      "uid": "PowerPoint.SlideBackground",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "areBackgroundGraphicsHidden": {
+          "uid": "PowerPoint.SlideBackground#areBackgroundGraphicsHidden",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "fill": {
+          "uid": "PowerPoint.SlideBackground#fill",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideBackgroundFill"
+            }
+          ]
+        },
+        "isMasterBackgroundFollowed": {
+          "uid": "PowerPoint.SlideBackground#isMasterBackgroundFollowed",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "reset": {
+          "uid": "PowerPoint.SlideBackground#reset",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "void"
+            }
+          ]
+        }
+      }
+    },
+    "SlideBackgroundFill": {
+      "uid": "PowerPoint.SlideBackgroundFill",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "getGradientFillOrNullObject": {
+          "uid": "PowerPoint.SlideBackgroundFill#getGradientFillOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideBackgroundGradientFill"
+            }
+          ]
+        },
+        "getPatternFillOrNullObject": {
+          "uid": "PowerPoint.SlideBackgroundFill#getPatternFillOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideBackgroundPatternFill"
+            }
+          ]
+        },
+        "getPictureOrTextureFillOrNullObject": {
+          "uid": "PowerPoint.SlideBackgroundFill#getPictureOrTextureFillOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideBackgroundPictureOrTextureFill"
+            }
+          ]
+        },
+        "getSolidFillOrNullObject": {
+          "uid": "PowerPoint.SlideBackgroundFill#getSolidFillOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideBackgroundSolidFill"
+            }
+          ]
+        },
+        "setGradientFill": {
+          "uid": "PowerPoint.SlideBackgroundFill#setGradientFill",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "options",
+                  "type": "SlideBackgroundGradientFillOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "setPatternFill": {
+          "uid": "PowerPoint.SlideBackgroundFill#setPatternFill",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "options",
+                  "type": "SlideBackgroundPatternFillOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "setPictureOrTextureFill": {
+          "uid": "PowerPoint.SlideBackgroundFill#setPictureOrTextureFill",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "options",
+                  "type": "SlideBackgroundPictureOrTextureFillOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "setSolidFill": {
+          "uid": "PowerPoint.SlideBackgroundFill#setSolidFill",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "options",
+                  "type": "SlideBackgroundSolidFillOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "type": {
+          "uid": "PowerPoint.SlideBackgroundFill#type",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Unsupported\" | \"Solid\" | \"Gradient\" | \"PictureOrTexture\" | \"Pattern\""
+            }
+          ]
+        }
+      }
+    },
+    "SlideBackgroundGradientFill": {
+      "uid": "PowerPoint.SlideBackgroundGradientFill",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "type": {
+          "uid": "PowerPoint.SlideBackgroundGradientFill#type",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Unsupported\" | \"Linear\" | \"Radial\" | \"Rectangular\" | \"Path\" | \"ShadeFromTitle\""
+            }
+          ]
+        }
+      }
+    },
+    "SlideBackgroundGradientFillOptions": {
+      "uid": "PowerPoint.SlideBackgroundGradientFillOptions",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "type": {
+          "uid": "PowerPoint.SlideBackgroundGradientFillOptions#type",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Unsupported\" | \"Linear\" | \"Radial\" | \"Rectangular\" | \"Path\" | \"ShadeFromTitle\""
+            }
+          ]
+        }
+      }
+    },
+    "SlideBackgroundPatternFill": {
+      "uid": "PowerPoint.SlideBackgroundPatternFill",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "backgroundColor": {
+          "uid": "PowerPoint.SlideBackgroundPatternFill#backgroundColor",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "foregroundColor": {
+          "uid": "PowerPoint.SlideBackgroundPatternFill#foregroundColor",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "pattern": {
+          "uid": "PowerPoint.SlideBackgroundPatternFill#pattern",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Unsupported\" | \"Percent5\" | \"Percent10\" | \"Percent20\" | \"Percent25\" | \"Percent30\" | \"Percent40\" | \"Percent50\" | \"Percent60\" | \"Percent70\" | \"Percent75\" | \"Percent80\" | \"Percent90\" | \"Horizontal\" | \"Vertical\" | \"LightHorizontal\" | \"LightVertical\" | \"DarkHorizontal\" | \"DarkVertical\" | \"NarrowHorizontal\" | \"NarrowVertical\" | \"DashedHorizontal\" | \"DashedVertical\" | \"Cross\" | \"DownwardDiagonal\" | \"UpwardDiagonal\" | \"LightDownwardDiagonal\" | \"LightUpwardDiagonal\" | \"DarkDownwardDiagonal\" | \"DarkUpwardDiagonal\" | \"WideDownwardDiagonal\" | \"WideUpwardDiagonal\" | \"DashedDownwardDiagonal\" | \"DashedUpwardDiagonal\" | \"DiagonalCross\" | \"SmallCheckerBoard\" | \"LargeCheckerBoard\" | \"SmallGrid\" | \"LargeGrid\" | \"DottedGrid\" | \"SmallConfetti\" | \"LargeConfetti\" | \"HorizontalBrick\" | \"DiagonalBrick\" | \"SolidDiamond\" | \"OutlinedDiamond\" | \"DottedDiamond\" | \"Plaid\" | \"Sphere\" | \"Weave\" | \"Divot\" | \"Shingle\" | \"Wave\" | \"Trellis\" | \"ZigZag\""
+            }
+          ]
+        }
+      }
+    },
+    "SlideBackgroundPatternFillOptions": {
+      "uid": "PowerPoint.SlideBackgroundPatternFillOptions",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "backgroundColor": {
+          "uid": "PowerPoint.SlideBackgroundPatternFillOptions#backgroundColor",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "foregroundColor": {
+          "uid": "PowerPoint.SlideBackgroundPatternFillOptions#foregroundColor",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "pattern": {
+          "uid": "PowerPoint.SlideBackgroundPatternFillOptions#pattern",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Unsupported\" | \"Percent5\" | \"Percent10\" | \"Percent20\" | \"Percent25\" | \"Percent30\" | \"Percent40\" | \"Percent50\" | \"Percent60\" | \"Percent70\" | \"Percent75\" | \"Percent80\" | \"Percent90\" | \"Horizontal\" | \"Vertical\" | \"LightHorizontal\" | \"LightVertical\" | \"DarkHorizontal\" | \"DarkVertical\" | \"NarrowHorizontal\" | \"NarrowVertical\" | \"DashedHorizontal\" | \"DashedVertical\" | \"Cross\" | \"DownwardDiagonal\" | \"UpwardDiagonal\" | \"LightDownwardDiagonal\" | \"LightUpwardDiagonal\" | \"DarkDownwardDiagonal\" | \"DarkUpwardDiagonal\" | \"WideDownwardDiagonal\" | \"WideUpwardDiagonal\" | \"DashedDownwardDiagonal\" | \"DashedUpwardDiagonal\" | \"DiagonalCross\" | \"SmallCheckerBoard\" | \"LargeCheckerBoard\" | \"SmallGrid\" | \"LargeGrid\" | \"DottedGrid\" | \"SmallConfetti\" | \"LargeConfetti\" | \"HorizontalBrick\" | \"DiagonalBrick\" | \"SolidDiamond\" | \"OutlinedDiamond\" | \"DottedDiamond\" | \"Plaid\" | \"Sphere\" | \"Weave\" | \"Divot\" | \"Shingle\" | \"Wave\" | \"Trellis\" | \"ZigZag\""
+            }
+          ]
+        }
+      }
+    },
+    "SlideBackgroundPictureOrTextureFill": {
+      "uid": "PowerPoint.SlideBackgroundPictureOrTextureFill",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "setImage": {
+          "uid": "PowerPoint.SlideBackgroundPictureOrTextureFill#setImage",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "base64EncodedImage",
+                  "type": "string"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "transparency": {
+          "uid": "PowerPoint.SlideBackgroundPictureOrTextureFill#transparency",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        }
+      }
+    },
+    "SlideBackgroundPictureOrTextureFillOptions": {
+      "uid": "PowerPoint.SlideBackgroundPictureOrTextureFillOptions",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "imageBase64": {
+          "uid": "PowerPoint.SlideBackgroundPictureOrTextureFillOptions#imageBase64",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "transparency": {
+          "uid": "PowerPoint.SlideBackgroundPictureOrTextureFillOptions#transparency",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        }
+      }
+    },
+    "SlideBackgroundSolidFill": {
+      "uid": "PowerPoint.SlideBackgroundSolidFill",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "color": {
+          "uid": "PowerPoint.SlideBackgroundSolidFill#color",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "transparency": {
+          "uid": "PowerPoint.SlideBackgroundSolidFill#transparency",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        }
+      }
+    },
+    "SlideBackgroundSolidFillOptions": {
+      "uid": "PowerPoint.SlideBackgroundSolidFillOptions",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "color": {
+          "uid": "PowerPoint.SlideBackgroundSolidFillOptions#color",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "transparency": {
+          "uid": "PowerPoint.SlideBackgroundSolidFillOptions#transparency",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        }
+      }
+    },
+    "SlideCollection": {
+      "uid": "PowerPoint.SlideCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.2",
+      "members": {
+        "add": {
+          "uid": "PowerPoint.SlideCollection#add",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "options",
+                  "type": "AddSlideOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "exportAsBase64Presentation": {
+          "uid": "PowerPoint.SlideCollection#exportAsBase64Presentation",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "values",
+                  "type": "Array<string | Slide>"
+                }
+              ],
+              "returns": "ClientResult<string>"
+            }
+          ]
+        },
+        "getCount": {
+          "uid": "PowerPoint.SlideCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.2",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItem": {
+          "uid": "PowerPoint.SlideCollection#getItem",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.2",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "key",
+                  "type": "string"
+                }
+              ],
+              "returns": "Slide"
+            }
+          ]
+        },
+        "getItemAt": {
+          "uid": "PowerPoint.SlideCollection#getItemAt",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.2",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "Slide"
+            }
+          ]
+        },
+        "getItemOrNullObject": {
+          "uid": "PowerPoint.SlideCollection#getItemOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.2",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ],
+              "returns": "Slide"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.SlideCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Slide[]"
+            }
+          ]
+        }
+      }
+    },
+    "SlideGetImageOptions": {
+      "uid": "PowerPoint.SlideGetImageOptions",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "height": {
+          "uid": "PowerPoint.SlideGetImageOptions#height",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "width": {
+          "uid": "PowerPoint.SlideGetImageOptions#width",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        }
+      }
+    },
+    "SlideLayout": {
+      "uid": "PowerPoint.SlideLayout",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.3",
+      "members": {
+        "background": {
+          "uid": "PowerPoint.SlideLayout#background",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideLayoutBackground"
+            }
+          ]
+        },
+        "customXmlParts": {
+          "uid": "PowerPoint.SlideLayout#customXmlParts",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "CustomXmlPartCollection"
+            }
+          ]
+        },
+        "id": {
+          "uid": "PowerPoint.SlideLayout#id",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "name": {
+          "uid": "PowerPoint.SlideLayout#name",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "shapes": {
+          "uid": "PowerPoint.SlideLayout#shapes",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ShapeCollection"
+            }
+          ]
+        },
+        "themeColorScheme": {
+          "uid": "PowerPoint.SlideLayout#themeColorScheme",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ThemeColorScheme"
+            }
+          ]
+        },
+        "type": {
+          "uid": "PowerPoint.SlideLayout#type",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Blank\" | \"Chart\" | \"ChartAndText\" | \"ClipArtAndText\" | \"ClipArtAndVerticalText\" | \"Comparison\" | \"ContentWithCaption\" | \"Custom\" | \"FourObjects\" | \"LargeObject\" | \"MediaClipAndText\" | \"Mixed\" | \"Object\" | \"ObjectAndText\" | \"ObjectAndTwoObjects\" | \"ObjectOverText\" | \"OrganizationChart\" | \"PictureWithCaption\" | \"SectionHeader\" | \"Table\" | \"Text\" | \"TextAndChart\" | \"TextAndClipArt\" | \"TextAndMediaClip\" | \"TextAndObject\" | \"TextAndTwoObjects\" | \"TextOverObject\" | \"Title\" | \"TitleOnly\" | \"TwoColumnText\" | \"TwoObjects\" | \"TwoObjectsAndObject\" | \"TwoObjectsAndText\" | \"TwoObjectsOverText\" | \"VerticalText\" | \"VerticalTitleAndText\" | \"VerticalTitleAndTextOverChart\""
+            }
+          ]
+        }
+      }
+    },
+    "SlideLayoutBackground": {
+      "uid": "PowerPoint.SlideLayoutBackground",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "areBackgroundGraphicsHidden": {
+          "uid": "PowerPoint.SlideLayoutBackground#areBackgroundGraphicsHidden",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "fill": {
+          "uid": "PowerPoint.SlideLayoutBackground#fill",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideBackgroundFill"
+            }
+          ]
+        },
+        "isMasterBackgroundFollowed": {
+          "uid": "PowerPoint.SlideLayoutBackground#isMasterBackgroundFollowed",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "reset": {
+          "uid": "PowerPoint.SlideLayoutBackground#reset",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "void"
+            }
+          ]
+        }
+      }
+    },
+    "SlideLayoutCollection": {
+      "uid": "PowerPoint.SlideLayoutCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.3",
+      "members": {
+        "getCount": {
+          "uid": "PowerPoint.SlideLayoutCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItem": {
+          "uid": "PowerPoint.SlideLayoutCollection#getItem",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "key",
+                  "type": "string"
+                }
+              ],
+              "returns": "SlideLayout"
+            }
+          ]
+        },
+        "getItemAt": {
+          "uid": "PowerPoint.SlideLayoutCollection#getItemAt",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "SlideLayout"
+            }
+          ]
+        },
+        "getItemOrNullObject": {
+          "uid": "PowerPoint.SlideLayoutCollection#getItemOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ],
+              "returns": "SlideLayout"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.SlideLayoutCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideLayout[]"
+            }
+          ]
+        }
+      }
+    },
+    "SlideMaster": {
+      "uid": "PowerPoint.SlideMaster",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.3",
+      "members": {
+        "background": {
+          "uid": "PowerPoint.SlideMaster#background",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideMasterBackground"
+            }
+          ]
+        },
+        "customXmlParts": {
+          "uid": "PowerPoint.SlideMaster#customXmlParts",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.7",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "CustomXmlPartCollection"
+            }
+          ]
+        },
+        "id": {
+          "uid": "PowerPoint.SlideMaster#id",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "layouts": {
+          "uid": "PowerPoint.SlideMaster#layouts",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideLayoutCollection"
+            }
+          ]
+        },
+        "name": {
+          "uid": "PowerPoint.SlideMaster#name",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "shapes": {
+          "uid": "PowerPoint.SlideMaster#shapes",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ShapeCollection"
+            }
+          ]
+        },
+        "themeColorScheme": {
+          "uid": "PowerPoint.SlideMaster#themeColorScheme",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ThemeColorScheme"
+            }
+          ]
+        }
+      }
+    },
+    "SlideMasterBackground": {
+      "uid": "PowerPoint.SlideMasterBackground",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "fill": {
+          "uid": "PowerPoint.SlideMasterBackground#fill",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideBackgroundFill"
+            }
+          ]
+        }
+      }
+    },
+    "SlideMasterCollection": {
+      "uid": "PowerPoint.SlideMasterCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.3",
+      "members": {
+        "getCount": {
+          "uid": "PowerPoint.SlideMasterCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItem": {
+          "uid": "PowerPoint.SlideMasterCollection#getItem",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "key",
+                  "type": "string"
+                }
+              ],
+              "returns": "SlideMaster"
+            }
+          ]
+        },
+        "getItemAt": {
+          "uid": "PowerPoint.SlideMasterCollection#getItemAt",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "SlideMaster"
+            }
+          ]
+        },
+        "getItemOrNullObject": {
+          "uid": "PowerPoint.SlideMasterCollection#getItemOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ],
+              "returns": "SlideMaster"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.SlideMasterCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "SlideMaster[]"
+            }
+          ]
+        }
+      }
+    },
+    "SlideScopedCollection": {
+      "uid": "PowerPoint.SlideScopedCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.5",
+      "members": {
+        "exportAsBase64Presentation": {
+          "uid": "PowerPoint.SlideScopedCollection#exportAsBase64Presentation",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<string>"
+            }
+          ]
+        },
+        "getCount": {
+          "uid": "PowerPoint.SlideScopedCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItem": {
+          "uid": "PowerPoint.SlideScopedCollection#getItem",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "key",
+                  "type": "string"
+                }
+              ],
+              "returns": "Slide"
+            }
+          ]
+        },
+        "getItemAt": {
+          "uid": "PowerPoint.SlideScopedCollection#getItemAt",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "Slide"
+            }
+          ]
+        },
+        "getItemOrNullObject": {
+          "uid": "PowerPoint.SlideScopedCollection#getItemOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ],
+              "returns": "Slide"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.SlideScopedCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Slide[]"
+            }
+          ]
+        }
+      }
+    },
+    "Table": {
+      "uid": "PowerPoint.Table",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "clear": {
+          "uid": "PowerPoint.Table#clear",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "options",
+                  "type": "TableClearOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "columnCount": {
+          "uid": "PowerPoint.Table#columnCount",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "columns": {
+          "uid": "PowerPoint.Table#columns",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TableColumnCollection"
+            }
+          ]
+        },
+        "getCellOrNullObject": {
+          "uid": "PowerPoint.Table#getCellOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "rowIndex",
+                  "type": "number"
+                },
+                {
+                  "name": "columnIndex",
+                  "type": "number"
+                }
+              ],
+              "returns": "TableCell"
+            }
+          ]
+        },
+        "getMergedAreas": {
+          "uid": "PowerPoint.Table#getMergedAreas",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TableCellCollection"
+            }
+          ]
+        },
+        "getShape": {
+          "uid": "PowerPoint.Table#getShape",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "mergeCells": {
+          "uid": "PowerPoint.Table#mergeCells",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "rowIndex",
+                  "type": "number"
+                },
+                {
+                  "name": "columnIndex",
+                  "type": "number"
+                },
+                {
+                  "name": "rowCount",
+                  "type": "number"
+                },
+                {
+                  "name": "columnCount",
+                  "type": "number"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "rowCount": {
+          "uid": "PowerPoint.Table#rowCount",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "rows": {
+          "uid": "PowerPoint.Table#rows",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TableRowCollection"
+            }
+          ]
+        },
+        "styleSettings": {
+          "uid": "PowerPoint.Table#styleSettings",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TableStyleSettings"
+            }
+          ]
+        },
+        "values": {
+          "uid": "PowerPoint.Table#values",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string[][]"
+            }
+          ]
+        }
+      }
+    },
+    "TableAddOptions": {
+      "uid": "PowerPoint.TableAddOptions",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "columns": {
+          "uid": "PowerPoint.TableAddOptions#columns",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TableColumnProperties[]"
+            }
+          ]
+        },
+        "height": {
+          "uid": "PowerPoint.TableAddOptions#height",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        },
+        "left": {
+          "uid": "PowerPoint.TableAddOptions#left",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        },
+        "mergedAreas": {
+          "uid": "PowerPoint.TableAddOptions#mergedAreas",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TableMergedAreaProperties[]"
+            }
+          ]
+        },
+        "rows": {
+          "uid": "PowerPoint.TableAddOptions#rows",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TableRowProperties[]"
+            }
+          ]
+        },
+        "specificCellProperties": {
+          "uid": "PowerPoint.TableAddOptions#specificCellProperties",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TableCellProperties[][]"
+            }
+          ]
+        },
+        "style": {
+          "uid": "PowerPoint.TableAddOptions#style",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"NoStyleNoGrid\" | \"ThemedStyle1Accent1\" | \"ThemedStyle1Accent2\" | \"ThemedStyle1Accent3\" | \"ThemedStyle1Accent4\" | \"ThemedStyle1Accent5\" | \"ThemedStyle1Accent6\" | \"NoStyleTableGrid\" | \"ThemedStyle2Accent1\" | \"ThemedStyle2Accent2\" | \"ThemedStyle2Accent3\" | \"ThemedStyle2Accent4\" | \"ThemedStyle2Accent5\" | \"ThemedStyle2Accent6\" | \"LightStyle1\" | \"LightStyle1Accent1\" | \"LightStyle1Accent2\" | \"LightStyle1Accent3\" | \"LightStyle1Accent4\" | \"LightStyle1Accent5\" | \"LightStyle1Accent6\" | \"LightStyle2\" | \"LightStyle2Accent1\" | \"LightStyle2Accent2\" | \"LightStyle2Accent3\" | \"LightStyle2Accent4\" | \"LightStyle2Accent5\" | \"LightStyle2Accent6\" | \"LightStyle3\" | \"LightStyle3Accent1\" | \"LightStyle3Accent2\" | \"LightStyle3Accent3\" | \"LightStyle3Accent4\" | \"LightStyle3Accent5\" | \"LightStyle3Accent6\" | \"MediumStyle1\" | \"MediumStyle1Accent1\" | \"MediumStyle1Accent2\" | \"MediumStyle1Accent3\" | \"MediumStyle1Accent4\" | \"MediumStyle1Accent5\" | \"MediumStyle1Accent6\" | \"MediumStyle2\" | \"MediumStyle2Accent1\" | \"MediumStyle2Accent2\" | \"MediumStyle2Accent3\" | \"MediumStyle2Accent4\" | \"MediumStyle2Accent5\" | \"MediumStyle2Accent6\" | \"MediumStyle3\" | \"MediumStyle3Accent1\" | \"MediumStyle3Accent2\" | \"MediumStyle3Accent3\" | \"MediumStyle3Accent4\" | \"MediumStyle3Accent5\" | \"MediumStyle3Accent6\" | \"MediumStyle4\" | \"MediumStyle4Accent1\" | \"MediumStyle4Accent2\" | \"MediumStyle4Accent3\" | \"MediumStyle4Accent4\" | \"MediumStyle4Accent5\" | \"MediumStyle4Accent6\" | \"DarkStyle1\" | \"DarkStyle1Accent1\" | \"DarkStyle1Accent2\" | \"DarkStyle1Accent3\" | \"DarkStyle1Accent4\" | \"DarkStyle1Accent5\" | \"DarkStyle1Accent6\" | \"DarkStyle2\" | \"DarkStyle2Accent1\" | \"DarkStyle2Accent2\" | \"DarkStyle2Accent3\""
+            }
+          ]
+        },
+        "top": {
+          "uid": "PowerPoint.TableAddOptions#top",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        },
+        "uniformCellProperties": {
+          "uid": "PowerPoint.TableAddOptions#uniformCellProperties",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TableCellProperties"
+            }
+          ]
+        },
+        "values": {
+          "uid": "PowerPoint.TableAddOptions#values",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string[][]"
+            }
+          ]
+        },
+        "width": {
+          "uid": "PowerPoint.TableAddOptions#width",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        }
+      }
+    },
+    "TableCell": {
+      "uid": "PowerPoint.TableCell",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "borders": {
+          "uid": "PowerPoint.TableCell#borders",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Borders"
+            }
+          ]
+        },
+        "columnCount": {
+          "uid": "PowerPoint.TableCell#columnCount",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "columnIndex": {
+          "uid": "PowerPoint.TableCell#columnIndex",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "fill": {
+          "uid": "PowerPoint.TableCell#fill",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ShapeFill"
+            }
+          ]
+        },
+        "font": {
+          "uid": "PowerPoint.TableCell#font",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ShapeFont"
+            }
+          ]
+        },
+        "horizontalAlignment": {
+          "uid": "PowerPoint.TableCell#horizontalAlignment",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Left\" | \"Center\" | \"Right\" | \"Justify\" | \"JustifyLow\" | \"Distributed\" | \"ThaiDistributed\" | null"
+            }
+          ]
+        },
+        "indentLevel": {
+          "uid": "PowerPoint.TableCell#indentLevel",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | null"
+            }
+          ]
+        },
+        "margins": {
+          "uid": "PowerPoint.TableCell#margins",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Margins"
+            }
+          ]
+        },
+        "resize": {
+          "uid": "PowerPoint.TableCell#resize",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "rowCount",
+                  "type": "number"
+                },
+                {
+                  "name": "columnCount",
+                  "type": "number"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "rowCount": {
+          "uid": "PowerPoint.TableCell#rowCount",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "rowIndex": {
+          "uid": "PowerPoint.TableCell#rowIndex",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "split": {
+          "uid": "PowerPoint.TableCell#split",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "rowCount",
+                  "type": "number"
+                },
+                {
+                  "name": "columnCount",
+                  "type": "number"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "text": {
+          "uid": "PowerPoint.TableCell#text",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "textRuns": {
+          "uid": "PowerPoint.TableCell#textRuns",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TextRun[]"
+            }
+          ]
+        },
+        "verticalAlignment": {
+          "uid": "PowerPoint.TableCell#verticalAlignment",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Top\" | \"Middle\" | \"Bottom\" | \"TopCentered\" | \"MiddleCentered\" | \"BottomCentered\""
+            }
+          ]
+        }
+      }
+    },
+    "TableCellBorders": {
+      "uid": "PowerPoint.TableCellBorders",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "bottom": {
+          "uid": "PowerPoint.TableCellBorders#bottom",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "BorderProperties"
+            }
+          ]
+        },
+        "diagonalDown": {
+          "uid": "PowerPoint.TableCellBorders#diagonalDown",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "BorderProperties"
+            }
+          ]
+        },
+        "diagonalUp": {
+          "uid": "PowerPoint.TableCellBorders#diagonalUp",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "BorderProperties"
+            }
+          ]
+        },
+        "left": {
+          "uid": "PowerPoint.TableCellBorders#left",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "BorderProperties"
+            }
+          ]
+        },
+        "right": {
+          "uid": "PowerPoint.TableCellBorders#right",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "BorderProperties"
+            }
+          ]
+        },
+        "top": {
+          "uid": "PowerPoint.TableCellBorders#top",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "BorderProperties"
+            }
+          ]
+        }
+      }
+    },
+    "TableCellCollection": {
+      "uid": "PowerPoint.TableCellCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "getCount": {
+          "uid": "PowerPoint.TableCellCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItemAtOrNullObject": {
+          "uid": "PowerPoint.TableCellCollection#getItemAtOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "row",
+                  "type": "number"
+                },
+                {
+                  "name": "column",
+                  "type": "number"
+                }
+              ],
+              "returns": "TableCell"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.TableCellCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TableCell[]"
+            }
+          ]
+        }
+      }
+    },
+    "TableCellMargins": {
+      "uid": "PowerPoint.TableCellMargins",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "bottom": {
+          "uid": "PowerPoint.TableCellMargins#bottom",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        },
+        "left": {
+          "uid": "PowerPoint.TableCellMargins#left",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        },
+        "right": {
+          "uid": "PowerPoint.TableCellMargins#right",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        },
+        "top": {
+          "uid": "PowerPoint.TableCellMargins#top",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        }
+      }
+    },
+    "TableCellProperties": {
+      "uid": "PowerPoint.TableCellProperties",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "borders": {
+          "uid": "PowerPoint.TableCellProperties#borders",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TableCellBorders"
+            }
+          ]
+        },
+        "fill": {
+          "uid": "PowerPoint.TableCellProperties#fill",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "FillProperties"
+            }
+          ]
+        },
+        "font": {
+          "uid": "PowerPoint.TableCellProperties#font",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "FontProperties"
+            }
+          ]
+        },
+        "horizontalAlignment": {
+          "uid": "PowerPoint.TableCellProperties#horizontalAlignment",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Left\" | \"Center\" | \"Right\" | \"Justify\" | \"JustifyLow\" | \"Distributed\" | \"ThaiDistributed\" | undefined"
+            }
+          ]
+        },
+        "indentLevel": {
+          "uid": "PowerPoint.TableCellProperties#indentLevel",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        },
+        "margins": {
+          "uid": "PowerPoint.TableCellProperties#margins",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TableCellMargins"
+            }
+          ]
+        },
+        "text": {
+          "uid": "PowerPoint.TableCellProperties#text",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "textRuns": {
+          "uid": "PowerPoint.TableCellProperties#textRuns",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TextRun[]"
+            }
+          ]
+        },
+        "verticalAlignment": {
+          "uid": "PowerPoint.TableCellProperties#verticalAlignment",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Top\" | \"Middle\" | \"Bottom\" | \"TopCentered\" | \"MiddleCentered\" | \"BottomCentered\" | undefined"
+            }
+          ]
+        }
+      }
+    },
+    "TableClearOptions": {
+      "uid": "PowerPoint.TableClearOptions",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.9",
+      "members": {
+        "all": {
+          "uid": "PowerPoint.TableClearOptions#all",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "format": {
+          "uid": "PowerPoint.TableClearOptions#format",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "text": {
+          "uid": "PowerPoint.TableClearOptions#text",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    "TableColumn": {
+      "uid": "PowerPoint.TableColumn",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.9",
+      "members": {
+        "columnIndex": {
+          "uid": "PowerPoint.TableColumn#columnIndex",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "delete": {
+          "uid": "PowerPoint.TableColumn#delete",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "void"
+            }
+          ]
+        },
+        "width": {
+          "uid": "PowerPoint.TableColumn#width",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        }
+      }
+    },
+    "TableColumnCollection": {
+      "uid": "PowerPoint.TableColumnCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.9",
+      "members": {
+        "add": {
+          "uid": "PowerPoint.TableColumnCollection#add",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number | null | undefined",
+                  "optional": true
+                },
+                {
+                  "name": "count",
+                  "type": "number | undefined",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "deleteColumns": {
+          "uid": "PowerPoint.TableColumnCollection#deleteColumns",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "columns",
+                  "type": "TableColumn[]"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "getCount": {
+          "uid": "PowerPoint.TableColumnCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItemAt": {
+          "uid": "PowerPoint.TableColumnCollection#getItemAt",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "TableColumn"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.TableColumnCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TableColumn[]"
+            }
+          ]
+        }
+      }
+    },
+    "TableColumnProperties": {
+      "uid": "PowerPoint.TableColumnProperties",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "columnWidth": {
+          "uid": "PowerPoint.TableColumnProperties#columnWidth",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        }
+      }
+    },
+    "TableMergedAreaProperties": {
+      "uid": "PowerPoint.TableMergedAreaProperties",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "columnCount": {
+          "uid": "PowerPoint.TableMergedAreaProperties#columnCount",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "columnIndex": {
+          "uid": "PowerPoint.TableMergedAreaProperties#columnIndex",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "rowCount": {
+          "uid": "PowerPoint.TableMergedAreaProperties#rowCount",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "rowIndex": {
+          "uid": "PowerPoint.TableMergedAreaProperties#rowIndex",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        }
+      }
+    },
+    "TableRow": {
+      "uid": "PowerPoint.TableRow",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.9",
+      "members": {
+        "currentHeight": {
+          "uid": "PowerPoint.TableRow#currentHeight",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "delete": {
+          "uid": "PowerPoint.TableRow#delete",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "void"
+            }
+          ]
+        },
+        "height": {
+          "uid": "PowerPoint.TableRow#height",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "rowIndex": {
+          "uid": "PowerPoint.TableRow#rowIndex",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        }
+      }
+    },
+    "TableRowCollection": {
+      "uid": "PowerPoint.TableRowCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.9",
+      "members": {
+        "add": {
+          "uid": "PowerPoint.TableRowCollection#add",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number | null | undefined",
+                  "optional": true
+                },
+                {
+                  "name": "count",
+                  "type": "number | undefined",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "deleteRows": {
+          "uid": "PowerPoint.TableRowCollection#deleteRows",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "rows",
+                  "type": "TableRow[]"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "getCount": {
+          "uid": "PowerPoint.TableRowCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItemAt": {
+          "uid": "PowerPoint.TableRowCollection#getItemAt",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "TableRow"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.TableRowCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TableRow[]"
+            }
+          ]
+        }
+      }
+    },
+    "TableRowProperties": {
+      "uid": "PowerPoint.TableRowProperties",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "rowHeight": {
+          "uid": "PowerPoint.TableRowProperties#rowHeight",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number | undefined"
+            }
+          ]
+        }
+      }
+    },
+    "TableStyleSettings": {
+      "uid": "PowerPoint.TableStyleSettings",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.9",
+      "members": {
+        "areColumnsBanded": {
+          "uid": "PowerPoint.TableStyleSettings#areColumnsBanded",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "areRowsBanded": {
+          "uid": "PowerPoint.TableStyleSettings#areRowsBanded",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "isFirstColumnHighlighted": {
+          "uid": "PowerPoint.TableStyleSettings#isFirstColumnHighlighted",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "isFirstRowHighlighted": {
+          "uid": "PowerPoint.TableStyleSettings#isFirstRowHighlighted",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "isLastColumnHighlighted": {
+          "uid": "PowerPoint.TableStyleSettings#isLastColumnHighlighted",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "isLastRowHighlighted": {
+          "uid": "PowerPoint.TableStyleSettings#isLastRowHighlighted",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "style": {
+          "uid": "PowerPoint.TableStyleSettings#style",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.9",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"NoStyleNoGrid\" | \"ThemedStyle1Accent1\" | \"ThemedStyle1Accent2\" | \"ThemedStyle1Accent3\" | \"ThemedStyle1Accent4\" | \"ThemedStyle1Accent5\" | \"ThemedStyle1Accent6\" | \"NoStyleTableGrid\" | \"ThemedStyle2Accent1\" | \"ThemedStyle2Accent2\" | \"ThemedStyle2Accent3\" | \"ThemedStyle2Accent4\" | \"ThemedStyle2Accent5\" | \"ThemedStyle2Accent6\" | \"LightStyle1\" | \"LightStyle1Accent1\" | \"LightStyle1Accent2\" | \"LightStyle1Accent3\" | \"LightStyle1Accent4\" | \"LightStyle1Accent5\" | \"LightStyle1Accent6\" | \"LightStyle2\" | \"LightStyle2Accent1\" | \"LightStyle2Accent2\" | \"LightStyle2Accent3\" | \"LightStyle2Accent4\" | \"LightStyle2Accent5\" | \"LightStyle2Accent6\" | \"LightStyle3\" | \"LightStyle3Accent1\" | \"LightStyle3Accent2\" | \"LightStyle3Accent3\" | \"LightStyle3Accent4\" | \"LightStyle3Accent5\" | \"LightStyle3Accent6\" | \"MediumStyle1\" | \"MediumStyle1Accent1\" | \"MediumStyle1Accent2\" | \"MediumStyle1Accent3\" | \"MediumStyle1Accent4\" | \"MediumStyle1Accent5\" | \"MediumStyle1Accent6\" | \"MediumStyle2\" | \"MediumStyle2Accent1\" | \"MediumStyle2Accent2\" | \"MediumStyle2Accent3\" | \"MediumStyle2Accent4\" | \"MediumStyle2Accent5\" | \"MediumStyle2Accent6\" | \"MediumStyle3\" | \"MediumStyle3Accent1\" | \"MediumStyle3Accent2\" | \"MediumStyle3Accent3\" | \"MediumStyle3Accent4\" | \"MediumStyle3Accent5\" | \"MediumStyle3Accent6\" | \"MediumStyle4\" | \"MediumStyle4Accent1\" | \"MediumStyle4Accent2\" | \"MediumStyle4Accent3\" | \"MediumStyle4Accent4\" | \"MediumStyle4Accent5\" | \"MediumStyle4Accent6\" | \"DarkStyle1\" | \"DarkStyle1Accent1\" | \"DarkStyle1Accent2\" | \"DarkStyle1Accent3\" | \"DarkStyle1Accent4\" | \"DarkStyle1Accent5\" | \"DarkStyle1Accent6\" | \"DarkStyle2\" | \"DarkStyle2Accent1\" | \"DarkStyle2Accent2\" | \"DarkStyle2Accent3\""
+            }
+          ]
+        }
+      }
+    },
+    "Tag": {
+      "uid": "PowerPoint.Tag",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.3",
+      "members": {
+        "key": {
+          "uid": "PowerPoint.Tag#key",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        },
+        "value": {
+          "uid": "PowerPoint.Tag#value",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        }
+      }
+    },
+    "TagCollection": {
+      "uid": "PowerPoint.TagCollection",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.3",
+      "members": {
+        "add": {
+          "uid": "PowerPoint.TagCollection#add",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "key",
+                  "type": "string"
+                },
+                {
+                  "name": "value",
+                  "type": "string"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "delete": {
+          "uid": "PowerPoint.TagCollection#delete",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "key",
+                  "type": "string"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        },
+        "getCount": {
+          "uid": "PowerPoint.TagCollection#getCount",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ClientResult<number>"
+            }
+          ]
+        },
+        "getItem": {
+          "uid": "PowerPoint.TagCollection#getItem",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "key",
+                  "type": "string"
+                }
+              ],
+              "returns": "Tag"
+            }
+          ]
+        },
+        "getItemAt": {
+          "uid": "PowerPoint.TagCollection#getItemAt",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "index",
+                  "type": "number"
+                }
+              ],
+              "returns": "Tag"
+            }
+          ]
+        },
+        "getItemOrNullObject": {
+          "uid": "PowerPoint.TagCollection#getItemOrNullObject",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.3",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "key",
+                  "type": "string"
+                }
+              ],
+              "returns": "Tag"
+            }
+          ]
+        },
+        "items": {
+          "uid": "PowerPoint.TagCollection#items",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": null,
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Tag[]"
+            }
+          ]
+        }
+      }
+    },
+    "TextFrame": {
+      "uid": "PowerPoint.TextFrame",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.4",
+      "members": {
+        "autoSizeSetting": {
+          "uid": "PowerPoint.TextFrame#autoSizeSetting",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"AutoSizeNone\" | \"AutoSizeTextToFitShape\" | \"AutoSizeShapeToFitText\" | \"AutoSizeMixed\""
+            }
+          ]
+        },
+        "bottomMargin": {
+          "uid": "PowerPoint.TextFrame#bottomMargin",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "deleteText": {
+          "uid": "PowerPoint.TextFrame#deleteText",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "void"
+            }
+          ]
+        },
+        "getParentShape": {
+          "uid": "PowerPoint.TextFrame#getParentShape",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "Shape"
+            }
+          ]
+        },
+        "hasText": {
+          "uid": "PowerPoint.TextFrame#hasText",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        },
+        "leftMargin": {
+          "uid": "PowerPoint.TextFrame#leftMargin",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "rightMargin": {
+          "uid": "PowerPoint.TextFrame#rightMargin",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "textRange": {
+          "uid": "PowerPoint.TextFrame#textRange",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TextRange"
+            }
+          ]
+        },
+        "topMargin": {
+          "uid": "PowerPoint.TextFrame#topMargin",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "verticalAlignment": {
+          "uid": "PowerPoint.TextFrame#verticalAlignment",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "\"Top\" | \"Middle\" | \"Bottom\" | \"TopCentered\" | \"MiddleCentered\" | \"BottomCentered\""
+            }
+          ]
+        },
+        "wordWrap": {
+          "uid": "PowerPoint.TextFrame#wordWrap",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    "TextRange": {
+      "uid": "PowerPoint.TextRange",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.4",
+      "members": {
+        "font": {
+          "uid": "PowerPoint.TextRange#font",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ShapeFont"
+            }
+          ]
+        },
+        "getParentTextFrame": {
+          "uid": "PowerPoint.TextRange#getParentTextFrame",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "TextFrame"
+            }
+          ]
+        },
+        "getSubstring": {
+          "uid": "PowerPoint.TextRange#getSubstring",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "start",
+                  "type": "number"
+                },
+                {
+                  "name": "length",
+                  "type": "number",
+                  "optional": true
+                }
+              ],
+              "returns": "TextRange"
+            }
+          ]
+        },
+        "hyperlinks": {
+          "uid": "PowerPoint.TextRange#hyperlinks",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "HyperlinkScopedCollection"
+            }
+          ]
+        },
+        "length": {
+          "uid": "PowerPoint.TextRange#length",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "paragraphFormat": {
+          "uid": "PowerPoint.TextRange#paragraphFormat",
+          "kind": "property",
+          "readonly": true,
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "ParagraphFormat"
+            }
+          ]
+        },
+        "setHyperlink": {
+          "uid": "PowerPoint.TextRange#setHyperlink",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "options",
+                  "type": "HyperlinkAddOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Hyperlink"
+            }
+          ]
+        },
+        "setSelected": {
+          "uid": "PowerPoint.TextRange#setSelected",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "void"
+            }
+          ]
+        },
+        "start": {
+          "uid": "PowerPoint.TextRange#start",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.5",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "number"
+            }
+          ]
+        },
+        "text": {
+          "uid": "PowerPoint.TextRange#text",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.4",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        }
+      }
+    },
+    "TextRun": {
+      "uid": "PowerPoint.TextRun",
+      "kind": "interface",
+      "requirementSet": "PowerPointApi 1.8",
+      "members": {
+        "font": {
+          "uid": "PowerPoint.TextRun#font",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "FontProperties"
+            }
+          ]
+        },
+        "text": {
+          "uid": "PowerPoint.TextRun#text",
+          "kind": "property",
+          "requirementSet": "PowerPointApi 1.8",
+          "overloads": [
+            {
+              "params": [],
+              "returns": "string"
+            }
+          ]
+        }
+      }
+    },
+    "ThemeColorScheme": {
+      "uid": "PowerPoint.ThemeColorScheme",
+      "kind": "class",
+      "requirementSet": "PowerPointApi 1.10",
+      "members": {
+        "getThemeColor": {
+          "uid": "PowerPoint.ThemeColorScheme#getThemeColor",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "color",
+                  "type": "ThemeColor"
+                }
+              ],
+              "returns": "ClientResult<string>"
+            },
+            {
+              "params": [
+                {
+                  "name": "color",
+                  "type": "\"Mixed\" | \"None\" | \"Accent1\" | \"Accent2\" | \"Accent3\" | \"Accent4\" | \"Accent5\" | \"Accent6\" | \"Dark1\" | \"Dark2\" | \"FollowedHyperlink\" | \"Hyperlink\" | \"Light1\" | \"Light2\""
+                }
+              ],
+              "returns": "ClientResult<string>"
+            }
+          ]
+        },
+        "setThemeColor": {
+          "uid": "PowerPoint.ThemeColorScheme#setThemeColor",
+          "kind": "method",
+          "requirementSet": "PowerPointApi 1.10",
+          "overloads": [
+            {
+              "params": [
+                {
+                  "name": "color",
+                  "type": "ThemeColor"
+                },
+                {
+                  "name": "rgbColor",
+                  "type": "string"
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "params": [
+                {
+                  "name": "color",
+                  "type": "\"Mixed\" | \"None\" | \"Accent1\" | \"Accent2\" | \"Accent3\" | \"Accent4\" | \"Accent5\" | \"Accent6\" | \"Dark1\" | \"Dark2\" | \"FollowedHyperlink\" | \"Hyperlink\" | \"Light1\" | \"Light2\""
+                },
+                {
+                  "name": "rgbColor",
+                  "type": "string"
+                }
+              ],
+              "returns": "void"
+            }
+          ]
+        }
+      }
+    },
+    "run": {
+      "uid": "PowerPoint.run",
+      "kind": "function",
+      "requirementSet": null,
+      "overloads": [
+        {
+          "params": [
+            {
+              "name": "batch",
+              "type": "(context: RequestContext) => IPromise<T>"
+            }
+          ],
+          "returns": "IPromise<T>"
+        },
+        {
+          "params": [
+            {
+              "name": "object",
+              "type": "ClientObject"
+            },
+            {
+              "name": "batch",
+              "type": "(context: RequestContext) => IPromise<T>"
+            }
+          ],
+          "returns": "IPromise<T>"
+        },
+        {
+          "params": [
+            {
+              "name": "objects",
+              "type": "ClientObject[]"
+            },
+            {
+              "name": "batch",
+              "type": "(context: RequestContext) => IPromise<T>"
+            }
+          ],
+          "returns": "IPromise<T>"
+        }
+      ]
+    }
+  }
+}

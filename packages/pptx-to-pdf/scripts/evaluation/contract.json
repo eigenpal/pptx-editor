@@ -1,0 +1,545 @@
+{
+  "protocol": 1,
+  "repository": "eigenpal/pptx-editor",
+  "description": "The PDF candidate and measurement commands that eigenpal/pptx-eval calls. The counterpart of the editor-contract.json file in eigenpal/docx-eval. Paths are relative to the root of a pptx-editor checkout, which is also the working directory of every command.",
+  "runtime": {
+    "bun": ">=1.3",
+    "python": ">=3.11",
+    "pythonPackages": ["pymupdf>=1.26,<2", "Pillow>=11,<13"],
+    "setup": "Run `bun install` in the checkout. Use the evaluator's locked Python environment for the Python commands."
+  },
+  "requiredFiles": [
+    "packages/pptx-to-pdf/scripts/evaluation/export.ts",
+    "packages/pptx-to-pdf/scripts/evaluation/layout-summary.ts",
+    "packages/pptx-to-pdf/scripts/evaluation/layout-text.ts",
+    "packages/pptx-to-pdf/scripts/evaluation/settings.ts",
+    "packages/pptx-to-pdf/scripts/evaluation/worker.py",
+    "packages/pptx-to-pdf/scripts/evaluation/word_movement.py",
+    "packages/pptx-to-pdf/scripts/evaluation/thresholds.json"
+  ],
+  "identity": {
+    "candidate": {
+      "description": "Hash these files for the identity of candidate exports and layout summaries. Also record `bun --version` and the font plan identity of each export.",
+      "paths": [
+        "bun.lock",
+        "package.json",
+        "tsconfig.base.json",
+        "packages/core/package.json",
+        "packages/core/tsconfig.json",
+        "packages/core/src",
+        "packages/i18n/package.json",
+        "packages/i18n/src",
+        "packages/ooxml-core/package.json",
+        "packages/ooxml-core/src",
+        "packages/pptx-to-pdf/package.json",
+        "packages/pptx-to-pdf/tsconfig.json",
+        "packages/pptx-to-pdf/src",
+        "packages/pptx-to-pdf/scripts/evaluation/export.ts",
+        "packages/pptx-to-pdf/scripts/evaluation/layout-summary.ts",
+        "packages/pptx-to-pdf/scripts/evaluation/layout-text.ts",
+        "packages/pptx-to-pdf/scripts/evaluation/settings.ts"
+      ],
+      "exclude": ["__tests__", ".test."]
+    },
+    "measurement": {
+      "description": "Hash these files for the identity of measurements, comparisons, and evidence. A change here invalidates comparison evidence, not candidate exports. Also record the Python, PyMuPDF, and Pillow versions.",
+      "paths": [
+        "packages/pptx-to-pdf/scripts/evaluation/worker.py",
+        "packages/pptx-to-pdf/scripts/evaluation/word_movement.py",
+        "packages/pptx-to-pdf/scripts/evaluation/thresholds.json"
+      ],
+      "exclude": []
+    }
+  },
+  "commands": {
+    "export": {
+      "description": "Export one deck to a candidate PDF with the protocol settings: best-effort fidelity, hidden slides left out, packaged substitute fonts, and the font plan when given.",
+      "argv": ["bun", "packages/pptx-to-pdf/scripts/evaluation/export.ts", "{input}", "{output}"],
+      "optionalArgv": [["--fonts", "{fontPlan}"]],
+      "inputs": { "input": "pptx", "output": "pdf (written)", "fontPlan": "#/schemas/font-plan" },
+      "stdout": { "exported": "#/schemas/export-report", "error": "#/schemas/error-report" },
+      "exitCodes": { "0": "exported", "1": "error" },
+      "timeoutSeconds": 90
+    },
+    "layoutSummary": {
+      "description": "Lay out one deck without painting a PDF: pages, the page-to-slide map, layout notes, and logical text with line boxes.",
+      "argv": [
+        "bun",
+        "packages/pptx-to-pdf/scripts/evaluation/layout-summary.ts",
+        "{input}",
+        "{output}"
+      ],
+      "optionalArgv": [["--fonts", "{fontPlan}"]],
+      "inputs": { "input": "pptx", "output": "json (written)", "fontPlan": "#/schemas/font-plan" },
+      "output": "#/schemas/layout-summary",
+      "stdout": { "laid-out": "#/schemas/layout-status", "error": "#/schemas/error-report" },
+      "exitCodes": { "0": "laid-out", "1": "error" },
+      "timeoutSeconds": 90
+    },
+    "measure": {
+      "description": "Measure one PDF, reference or candidate: page sizes, words with boxes, visual sketches, and drawing metadata. A `.gz` output is written compressed.",
+      "argv": [
+        "python",
+        "packages/pptx-to-pdf/scripts/evaluation/worker.py",
+        "measure",
+        "{input}",
+        "{output}"
+      ],
+      "inputs": { "input": "pdf", "output": "json or json.gz (written)" },
+      "output": "#/schemas/measurement",
+      "exitCodes": { "0": "measured", "nonzero": "error on stderr" }
+    },
+    "compare": {
+      "description": "Compare two measurements: page count and size, word coverage and movement, and visual screening. Pages pair by number. Give the export's stdout report as --candidate-report to renumber candidate pages to reference pages through slideNumbers. Screening only; scoring belongs to the evaluator.",
+      "argv": [
+        "python",
+        "packages/pptx-to-pdf/scripts/evaluation/worker.py",
+        "compare",
+        "{reference}",
+        "{output}",
+        "--candidate",
+        "{candidate}"
+      ],
+      "optionalArgv": [["--candidate-report", "{candidateReport}"]],
+      "inputs": {
+        "reference": "#/schemas/measurement",
+        "candidate": "#/schemas/measurement",
+        "candidateReport": "#/schemas/export-report",
+        "output": "json or json.gz (written)"
+      },
+      "output": "#/schemas/comparison",
+      "exitCodes": { "0": "compared", "nonzero": "error on stderr" }
+    },
+    "evidence": {
+      "description": "Render at most three reference pages of two PDFs at up to 144 DPI (lower for a page past the pixel budget): `{page}-reference.png`, `{page}-candidate.png`, `{page}-overlay.png`, and `{page}-crop.png` when they differ, plus `report.json`. With --candidate-report, each reference page is paired with its candidate page through slideNumbers.",
+      "argv": [
+        "python",
+        "packages/pptx-to-pdf/scripts/evaluation/worker.py",
+        "evidence",
+        "{reference}",
+        "{outputDir}",
+        "--candidate",
+        "{candidate}",
+        "--pages",
+        "{pages}"
+      ],
+      "optionalArgv": [["--candidate-report", "{candidateReport}"]],
+      "inputs": {
+        "reference": "pdf",
+        "candidate": "pdf",
+        "outputDir": "folder (written)",
+        "pages": "one-based reference page numbers, comma-separated",
+        "candidateReport": "#/schemas/export-report"
+      },
+      "output": "#/schemas/evidence-report",
+      "exitCodes": { "0": "rendered", "nonzero": "error on stderr" }
+    },
+    "page": {
+      "description": "Render one page at up to 144 DPI to `page.png`, with `report.json`.",
+      "argv": [
+        "python",
+        "packages/pptx-to-pdf/scripts/evaluation/worker.py",
+        "page",
+        "{input}",
+        "{outputDir}",
+        "--pages",
+        "{page}"
+      ],
+      "inputs": {
+        "input": "pdf",
+        "outputDir": "folder (written)",
+        "page": "one-based page number"
+      },
+      "output": "#/schemas/page-report",
+      "exitCodes": { "0": "rendered", "nonzero": "error on stderr" }
+    }
+  },
+  "schemas": {
+    "font-plan": {
+      "type": "object",
+      "required": ["protocol", "faces"],
+      "properties": {
+        "protocol": { "const": 1 },
+        "faces": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2000,
+          "items": {
+            "type": "object",
+            "required": ["path", "family", "bold", "italic"],
+            "properties": {
+              "path": { "type": "string" },
+              "family": { "type": "string", "minLength": 1, "maxLength": 64 },
+              "bold": { "type": "boolean" },
+              "italic": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "font-resolution": {
+      "type": "object",
+      "required": ["faces", "substitutions", "refusedEmbedded"],
+      "properties": {
+        "faces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["family", "origin"],
+            "properties": { "family": { "type": "string" }, "origin": { "type": "string" } }
+          }
+        },
+        "substitutions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["family", "substitute", "metricCompatible"],
+            "properties": {
+              "family": { "type": "string" },
+              "substitute": { "type": "string" },
+              "metricCompatible": { "type": "boolean" }
+            }
+          }
+        },
+        "refusedEmbedded": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "font-plan-identity": {
+      "type": ["object", "null"],
+      "required": ["faces", "sha256"],
+      "properties": { "faces": { "type": "integer" }, "sha256": { "type": "string" } }
+    },
+    "diagnostic": {
+      "type": "object",
+      "required": ["code", "message", "severity"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "severity": { "enum": ["unsupported", "approximation", "information"] },
+        "slideIndex": { "type": "integer" },
+        "slideNumber": { "type": "integer" },
+        "pageIndex": { "type": "integer" },
+        "pageNumber": { "type": "integer" }
+      }
+    },
+    "export-report": {
+      "type": "object",
+      "required": [
+        "protocol",
+        "status",
+        "pages",
+        "slideNumbers",
+        "slideCount",
+        "hiddenSlides",
+        "diagnostics",
+        "fontResolution",
+        "fontPlan",
+        "timings"
+      ],
+      "properties": {
+        "protocol": { "const": 1 },
+        "status": { "const": "exported" },
+        "pages": { "type": "integer" },
+        "slideNumbers": { "type": "array", "items": { "type": "integer" } },
+        "slideCount": { "type": "integer" },
+        "hiddenSlides": { "type": "array", "items": { "type": "integer" } },
+        "diagnostics": { "type": "array", "items": { "$ref": "#/schemas/diagnostic" } },
+        "fontResolution": { "$ref": "#/schemas/font-resolution" },
+        "fontPlan": { "$ref": "#/schemas/font-plan-identity" },
+        "timings": {
+          "type": "object",
+          "required": ["openMs", "layoutMs", "paintMs", "saveMs"],
+          "properties": {
+            "openMs": { "type": "number" },
+            "layoutMs": { "type": "number" },
+            "paintMs": { "type": "number" },
+            "saveMs": { "type": "number" }
+          }
+        }
+      }
+    },
+    "error-report": {
+      "type": "object",
+      "required": ["protocol", "status", "error", "code"],
+      "properties": {
+        "protocol": { "const": 1 },
+        "status": { "const": "error" },
+        "error": { "type": "string" },
+        "code": { "type": "string", "minLength": 1 }
+      }
+    },
+    "layout-status": {
+      "type": "object",
+      "required": ["protocol", "status", "pages"],
+      "properties": {
+        "protocol": { "const": 1 },
+        "status": { "const": "laid-out" },
+        "pages": { "type": "integer" }
+      }
+    },
+    "layout-summary": {
+      "type": "object",
+      "required": [
+        "protocol",
+        "scope",
+        "pageCount",
+        "slideNumbers",
+        "slideCount",
+        "hiddenSlides",
+        "notLaidOut",
+        "fontResolution",
+        "fontPlan",
+        "timings",
+        "text",
+        "pages",
+        "textStatus",
+        "visualStatus"
+      ],
+      "properties": {
+        "protocol": { "const": 1 },
+        "scope": { "const": "layout-slides" },
+        "pageCount": { "type": "integer" },
+        "slideNumbers": { "type": "array", "items": { "type": "integer" } },
+        "slideCount": { "type": "integer" },
+        "hiddenSlides": { "type": "array", "items": { "type": "integer" } },
+        "notLaidOut": { "type": "array", "items": { "type": "integer" } },
+        "fontResolution": { "$ref": "#/schemas/font-resolution" },
+        "fontPlan": { "$ref": "#/schemas/font-plan-identity" },
+        "timings": {
+          "type": "object",
+          "required": ["openMs", "layoutMs"],
+          "properties": { "openMs": { "type": "number" }, "layoutMs": { "type": "number" } }
+        },
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["page", "slideNumber", "width", "height", "layoutNotes"],
+            "properties": {
+              "page": { "type": "integer" },
+              "slideNumber": { "type": "integer" },
+              "width": { "type": "number" },
+              "height": { "type": "number" },
+              "layoutNotes": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "text": {
+          "type": "object",
+          "required": ["version", "coordinateSpace", "geometryStatus", "untrusted", "pages"],
+          "properties": {
+            "version": { "const": "layout-text-v1" },
+            "coordinateSpace": { "const": "slide-points-top-left" },
+            "geometryStatus": { "const": "before-paint" },
+            "untrusted": { "const": true },
+            "pages": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["page", "slideNumber", "lines"],
+                "properties": {
+                  "page": { "type": "integer" },
+                  "slideNumber": { "type": "integer" },
+                  "lines": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["text", "partName", "nodeId", "layer", "paragraph", "bbox"],
+                      "properties": {
+                        "text": { "type": "string" },
+                        "partName": { "type": "string" },
+                        "nodeId": { "type": "string" },
+                        "layer": { "enum": ["master", "layout", "slide"] },
+                        "paragraph": { "type": "integer" },
+                        "bbox": {
+                          "type": "array",
+                          "minItems": 4,
+                          "maxItems": 4,
+                          "items": { "type": "number" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "textStatus": { "const": "recorded-logical-layout" },
+        "visualStatus": { "const": "not-measured" }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "required": ["protocol", "pages", "words", "pdfSha256"],
+      "properties": {
+        "protocol": { "const": 1 },
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "number",
+              "size",
+              "sketch",
+              "rgbSketch",
+              "rgbSketchSize",
+              "images",
+              "drawingCount",
+              "fonts"
+            ],
+            "properties": {
+              "number": { "type": "integer" },
+              "size": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": { "type": "number" }
+              },
+              "sketch": { "type": "string" },
+              "rgbSketch": { "type": "string" },
+              "rgbSketchSize": { "const": [192, 144] },
+              "images": { "type": "array" },
+              "drawingCount": { "type": "integer" },
+              "fonts": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "words": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["page", "x0", "y0", "x1", "y1", "text"],
+            "properties": {
+              "page": { "type": "integer" },
+              "x0": { "type": "number" },
+              "y0": { "type": "number" },
+              "x1": { "type": "number" },
+              "y1": { "type": "number" },
+              "text": { "type": "string" }
+            }
+          }
+        },
+        "pdfSha256": { "type": "string" }
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "required": [
+        "protocol",
+        "findings",
+        "movement",
+        "pages",
+        "referencePages",
+        "candidatePages",
+        "screeningOnly",
+        "firstDivergence"
+      ],
+      "properties": {
+        "protocol": { "const": 1 },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "severity", "page", "confidence"],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "pagination",
+                  "text-coverage",
+                  "text-added",
+                  "page-geometry",
+                  "visual-region",
+                  "text-position"
+                ]
+              },
+              "severity": { "type": "integer" },
+              "page": { "type": "integer" },
+              "confidence": { "enum": ["high", "medium", "low"] }
+            }
+          }
+        },
+        "movement": {
+          "type": "object",
+          "required": ["severity", "matchedWords", "distanceBuckets", "movementScore"],
+          "properties": {
+            "severity": { "enum": ["equal", "minor", "moderate", "major", "critical"] },
+            "matchedWords": { "type": "integer" },
+            "distanceBuckets": { "type": "object" },
+            "movementScore": { "type": "number" }
+          }
+        },
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["page", "changedFraction", "mode", "detected", "bbox", "region"],
+            "properties": {
+              "page": { "type": "integer" },
+              "changedFraction": { "type": "number" },
+              "mode": { "enum": ["local-rgb", "legacy-grayscale"] },
+              "detected": { "type": "boolean" },
+              "bbox": { "type": ["array", "null"] },
+              "region": { "enum": ["top", "body", "bottom", null] }
+            }
+          }
+        },
+        "referencePages": { "type": "integer" },
+        "candidatePages": { "type": "integer" },
+        "screeningOnly": { "const": true },
+        "firstDivergence": {
+          "type": ["object", "null"],
+          "required": ["type", "page", "confidence", "coordinateSpace", "untrusted"],
+          "properties": {
+            "type": { "type": "string" },
+            "page": { "type": "integer" },
+            "confidence": { "enum": ["high", "medium", "low"] },
+            "coordinateSpace": { "enum": ["reference", "candidate"] },
+            "untrusted": { "const": true }
+          }
+        }
+      }
+    },
+    "evidence-report": {
+      "type": "object",
+      "required": ["protocol", "pages"],
+      "properties": {
+        "protocol": { "const": 1 },
+        "pages": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["page", "candidatePage", "dpi", "changedPixels", "pixels", "bbox"],
+            "properties": {
+              "page": { "type": "integer" },
+              "candidatePage": { "type": ["integer", "null"] },
+              "dpi": { "type": "array", "minItems": 2, "maxItems": 2 },
+              "changedPixels": { "type": "integer" },
+              "pixels": { "type": "integer" },
+              "bbox": { "type": ["array", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "page-report": {
+      "type": "object",
+      "required": ["protocol", "page", "pages", "dpi", "widthPt", "heightPt", "rotationMatrix"],
+      "properties": {
+        "protocol": { "const": 1 },
+        "page": { "type": "integer" },
+        "pages": { "type": "integer" },
+        "dpi": { "type": "integer" },
+        "widthPt": { "type": "number" },
+        "heightPt": { "type": "number" },
+        "rotationMatrix": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": { "type": "number" }
+        }
+      }
+    }
+  }
+}

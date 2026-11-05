@@ -1,0 +1,412 @@
+---
+title: 'Layout'
+description: 'Place the PPTX editor toolbar, menu bar, slide canvas, slide rail, speaker notes, zoom control, and side panel.'
+category: 'Customization'
+---
+
+Compose the editor from parts inside `PptxEditor.Root`. `Root` owns the editor and renders no element. `PptxEditor.Viewport` is the styling scope: a plain block element with no layout of its own. `PptxEditor.Content` attaches the slide canvas.
+
+Give the viewport a height, or a flexible parent with `min-height: 0`. Arrange the parts with your own CSS, as in [Workspace layout](#workspace-layout).
+
+`Root` hosts the link popup, so Ctrl+K (Cmd+K on macOS), the toolbar's link control, and **Insert > Link…** work with no toolbar on the page. Keep every part, menu, and application control that uses the editor under the same root. Keep the toolbar and the menu bar inside `PptxEditor.Viewport`: their menus render inside the viewport and take its tokens.
+
+## Layout options
+
+| Part | What you can change | Notes |
+| --- | --- | --- |
+| `PptxEditor.Toolbar` | Position, controls, groups, and overflow. | The flat form of the chrome groups. See [Toolbar](/docs/customization/toolbar). |
+| `PptxEditor.Ribbon` | Tabs, the selected tab, and each tab's groups. | The tabs over the same chrome groups, with contextual tabs. See [Ribbon](/docs/customization/ribbon). |
+| `PptxEditor.Menu` | Position, menus, and rows. | The menu bar. In Vue, `PptxEditorMenu`. See [Menus](/docs/customization/menus). |
+| `PptxEditor.Viewport` | `className` and children. | Carries `.pptx-editor`, and `dark` with a dark color mode. |
+| `PptxEditor.Content` | `className`. | The slide canvas and its context menu. |
+| `PptxEditor.SlideRail` | `open`, `defaultOpen`, `onOpenChange`, `paneWidth`, `toggle`, `orientation`, `className`, `style`. | The slide thumbnails, as a column or as a row. The **Hide thumbnails** button hides the rail to a strip with a **Show thumbnails** button. |
+| `PptxEditor.NotesPane` | `open`, `defaultOpen`, `onOpenChange`, `showFormatButtons`, `className`, `style`. | The speaker notes of the current slide. Shares its open state with `useNotesPane()`. Use one per root. `showFormatButtons={false}` removes the **B**, **I**, and **U** buttons; the shortcut keys still format the notes. |
+| `PptxEditor.SlideSorter` | `className`. | The Slide Sorter view: every slide as a tile, grouped by section. Render it in place of the rail, the canvas, and the notes while `presentationView` is `slideSorter`. Without a mounted sorter in that view, a development warning says so. |
+| `PptxEditor.SidePanel` | `onClose`, `paneWidth`, `className`, `style`. | The **Format** tab, and a **Comments** tab that shows an empty state in this version. Render it to show it; remove it to hide it. |
+| `PptxEditor.ZoomPill` | `className`. | A floating zoom control, placed in the nearest positioned ancestor. |
+| `PptxEditor.StatusBar` | `className`, `preset`, and children. | A row with **Slide x of y**, **Notes**, the view switch, and the zoom pill. The parts are `StatusBar.SlideNumber`, `.Notes`, `.Views`, and `.Zoom`: each takes `className` and `hidden`, a part child replaces its part in place, other children go after **Notes**, and `preset={false}` shows only the children. In Vue, `PptxEditorStatusBar` has the same four parts as statics, and each takes `className` (or a host `class`). |
+| `PptxEditor.FindBar` | `className`. | The find and replace bar, placed in the nearest positioned ancestor. Without it, Find and Replace stay disabled with a reason. |
+| `PptxEditor.Slideshow` | None. | The slide show. Mount it once inside the viewport. It shows nothing until a show starts. |
+| `PptxEditor.FontNotice`, `PptxEditor.EditNotice` | `className`. | The font substitution notice, and the edit notice: the reason the last edit was refused, or what the last Delete removed with an Undo button. Both float in the nearest positioned ancestor. |
+| `PptxEditor.Loading` | `overlay`, `when`, `indicator`, `className`, `style`, and children. | A slide-shaped sheet with a spinner, shown while the editor has no deck and while a deck opens. The engine paints it before it parses a large deck. `overlay` pins it over the nearest positioned ancestor, so it covers the previous deck. `indicator` replaces the spinner; children replace the sheet; `PptxEditor.Loading.Spinner` is the packaged spinner. A refused file clears it. In Vue, use `PptxEditorLoading` with the `indicator` and default slots; `PptxEditorLoading.Spinner` is the packaged spinner. |
+| `PptxEditor.OpenFailure` | `title`, `message`, `showCode`, `actions`, `closeLabel`, `showClose`, `onDismiss`, `className`, `style`. | The notice for a file that does not open, placed in the nearest positioned ancestor. `<PptxEditor>` renders it; a composed editor adds it. In Vue, use `PptxEditorOpenFailure` with the `actions` and `message` slots, and listen to `dismiss`. See [Open failure](#open-failure). |
+
+### Workspace layout
+
+The packaged `PptxEditor` uses this arrangement, and a composed editor works best with the same one: the toolbar on top, then a row with the slide rail, a main column, and an optional side panel. The main column holds the canvas, the floating parts, and the notes pane. The zoom pill, the find bar, and the notices use absolute positions, so the main column must be `position: relative`.
+
+```css
+.acme-theme {
+  height: 100vh;
+}
+.deck-workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--doc-bg);
+}
+.deck-workspace__dock {
+  display: flex;
+  justify-content: center;
+  padding: 8px 14px 10px;
+}
+.deck-workspace__body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-left: 12px;
+}
+.deck-workspace__main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+```
+
+Keep `min-height: 0` on each flex level, so the canvas and the rail scroll inside the window instead of growing the page.
+
+### Switch between Normal and Slide Sorter
+
+The packaged `PptxEditor` swaps its workspace when the view changes. In a composed editor, read the view with `useEditorState` and make the same switch. The `view.presentationView` slot, in the View menu or a toolbar, changes the view.
+
+```tsx
+import { PptxEditor, useEditorState } from '@pptx-editor.dev/react';
+
+export function Workspace() {
+  const sorter = useEditorState((s) => s.presentationView === 'slideSorter');
+  return sorter ? (
+    <PptxEditor.SlideSorter />
+  ) : (
+    <>
+      <PptxEditor.SlideRail />
+      <PptxEditor.Content />
+      <PptxEditor.NotesPane />
+    </>
+  );
+}
+```
+
+### Pane configuration
+
+The pane props follow DOCX Editor's `Navigation`:
+
+| Prop | Value | Behavior |
+| --- | --- | --- |
+| `defaultOpen` | Boolean | `true` by default. The first state, uncontrolled. |
+| `open`, `onOpenChange` | Boolean and callback | Controlled open state. Accept each change in your state. |
+| `paneWidth` | Pixels | The width of the slide rail or the side panel. For a horizontal rail, the width of the row. The notes pane does not take it. |
+| `orientation` | `vertical` or `horizontal` | Slide rail only. `vertical` by default. See [Horizontal slide rail](#horizontal-slide-rail). |
+| `toggle` | Boolean | Slide rail only. `false` removes the **Hide thumbnails** and **Show thumbnails** buttons, for a host that opens and closes the rail from its own chrome. A closed rail with `toggle={false}` renders nothing. |
+| `className` | CSS class | Styles the pane. |
+| `style` | Inline styles | Styles the pane. A `width` in `style` wins over `paneWidth`. |
+
+Unlike DOCX Editor's `Navigation`, the rail's `toggle` takes no part props: the rail has two toggle buttons in two places, so one set of props would not say which to change. Restyle them through `.pptx-rail__collapse`.
+
+Without `open`, the notes pane reads the open state that `PptxEditor.Root` keeps. Use `useNotesPane()` to build a notes toggle of your own: it returns `open`, and `setOpen` and `toggle` functions that keep their identity across renders. A notes pane with `open` gets a change from the hook through its `onOpenChange`. Render one notes pane in each root: a second one keeps its own state and prints a development warning.
+
+### Horizontal slide rail
+
+In a tall, narrow host, such as a panel beside a chat, put the rail under the slide as a row. In Vue, pass the same prop to `PptxEditorSlideRail`.
+
+```tsx
+<PptxEditor.Content />
+<PptxEditor.SlideRail orientation="horizontal" />
+<PptxEditor.NotesPane />
+```
+
+The row works as the column does. Left and Right step through the slides, and Ctrl+Left and Ctrl+Right (Cmd on macOS) move them. A drag reorders along the row. On a section header, Down expands and Up collapses. **Hide thumbnails** folds the row down.
+
+| Hook | Use |
+| --- | --- |
+| `--pptx-rail-thumb-width` | The thumbnail width, `112px` by default. Set it on your rail class or an ancestor. |
+| `.pptx-rail__add`, `__layouts`, `__duplicate`, `__move`, `__delete` | The slide actions. Hide one with `display: none`; its command stays on the keyboard and in the slide menu. To remove **Hide thumbnails**, pass `toggle={false}`. |
+
+### Pane state attributes
+
+The slide rail and the notes pane carry `data-open="true"` or `data-open="false"`, so your CSS can follow the open state. The slide rail also carries `data-orientation`. Their built-in toggles carry `aria-expanded`, and `aria-controls` names the pane content while it is open.
+
+### Root configuration and lifetime
+
+| Prop | Behavior |
+| --- | --- |
+| `document` | The `.pptx` bytes. An identity change loads the new document. |
+| `mode` | `edit` or `view`. Changes apply without a reload. |
+| `locale` | The UI catalog. |
+| `colorMode` | `light`, `dark`, or `system`. See [Appearance](/docs/customization/appearance). |
+| `popups` | Render overrides for dialogs and popups. See [Dialogs](/docs/customization/dialogs). |
+| `fonts`, `onFontError` | Font bytes for the host's faces, and font failures. In Vue, listen to the `fontError` event. See [Fonts](/docs/customization/fonts). |
+| `fontFamilies` | The extra families the font picker offers. |
+| `onReady`, `onChange` | The instance, once; and every change of editor state. In Vue, listen to the `ready` and `change` events. |
+
+## Open failure
+
+The editor refuses a file that it cannot open safely, such as a damaged archive or a file that holds no presentation. When a deck was open before, it stays open. The open-failure notice shows a generic message, says whether the open deck stays, and shows a stable error code. It names no contact of its own.
+
+`<PptxEditor>` renders the notice. A composed editor does not: add `PptxEditor.OpenFailure` (Vue: `PptxEditorOpenFailure`) inside `PptxEditor.Root`, in a positioned box.
+
+### Add your own actions
+
+Pass `renderOpenFailureActions` in React, or fill the `#openFailureActions` slot in Vue, to add buttons before **Close**. Each receives the context: `failure`, `message`, and `dismiss()`.
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { PptxEditor } from '@pptx-editor.dev/react';
+
+export function Editor({ bytes }: { bytes: Uint8Array }) {
+  return (
+    <PptxEditor
+      document={bytes}
+      renderOpenFailureActions={({ failure }) => (
+        <a className="pptx-open-failure__action" href={`/support?code=${failure.code}`}>
+          Get help
+        </a>
+      )}
+    />
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { PptxEditor } from '@pptx-editor.dev/vue';
+
+defineProps<{ bytes: Uint8Array }>();
+</script>
+
+<template>
+  <PptxEditor :document="bytes">
+    <template #openFailureActions="{ failure }">
+      <a class="pptx-open-failure__action" :href="`/support?code=${failure.code}`">Get help</a>
+    </template>
+  </PptxEditor>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+Send the `code` to your support page, not the file. `renderOpenFailureActions` replaces `openFailure.actions`, so pass only one. With `openFailure={false}` (Vue: `:open-failure="false"`), it renders nothing. Both cases print a development warning.
+
+### Configure the notice
+
+Pass options as the `openFailure` object on `PptxEditor`, or as props of `PptxEditor.OpenFailure`:
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `title` | `openFailure.title` | The notice title. |
+| `message` | The message for the `reason` | Content, or a function of the `DocumentOpenFailure`. In Vue, the `message` slot wins over it. |
+| `showCode` | `true` | Shows the error code. |
+| `actions` | None | Your own buttons, as a function of the context. In Vue, the `actions` slot wins over it. |
+| `closeLabel` | `openFailure.close` | The **Close** label. |
+| `showClose` | `true` | Shows **Close**. |
+| `onDismiss` | None | Runs after any close. In Vue, listen to `dismiss`. |
+| `className`, `style` | None | Styles the notice element. |
+
+The notice uses the `.pptx-open-failure` class, with `data-reason` set to the failure's `reason`.
+
+### Error codes
+
+`snapshot().openFailure` holds the shown refusal: a `DocumentOpenFailure` with a stable `code` and a `reason`, or `null`. Each refusal is a new object, so a repeated refusal of the same file shows the notice again. The `reason` groups the codes and picks the message:
+
+| `reason` | Codes | Message key |
+| --- | --- | --- |
+| `damaged` | `zip`, `xml`, `no-content-types` | `openFailure.reasons.damaged` |
+| `not-pptx` | `not-a-presentation`, `empty` | `openFailure.reasons.notPptx` |
+| `too-large` | `too-many-parts` | `openFailure.reasons.tooLarge` |
+| `unknown` | Any other code | `openFailure.reasons.unknown` |
+
+To change a message in every editor, override its key in `locale`.
+
+### Show a banner or a toast
+
+Turn off the notice with `openFailure={false}` (Vue: `:open-failure="false"`), then read the failure with `useOpenFailure` inside the root:
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { PptxEditor, useOpenFailure } from '@pptx-editor.dev/react';
+
+function OpenFailureBanner() {
+  const { failure, message, dismiss } = useOpenFailure();
+  if (!failure) return null;
+  return (
+    <div role="alert" className="banner">
+      {message} ({failure.code})
+      <button type="button" onClick={() => dismiss(failure)}>
+        Dismiss
+      </button>
+    </div>
+  );
+}
+
+<PptxEditor document={bytes} openFailure={false}>
+  <OpenFailureBanner />
+</PptxEditor>;
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<!-- OpenFailureBanner.vue -->
+<script setup lang="ts">
+import { useOpenFailure } from '@pptx-editor.dev/vue';
+
+const { failure, message, dismiss } = useOpenFailure();
+</script>
+
+<template>
+  <div v-if="failure" role="alert" class="banner">
+    {{ message }} ({{ failure.code }})
+    <button type="button" @click="dismiss(failure)">Dismiss</button>
+  </div>
+</template>
+```
+
+Mount the banner in the default slot of `<PptxEditor :document="bytes" :open-failure="false">`.
+
+</Framework>
+</FrameworkTabs>
+
+`dismiss` hides only the current refusal. Pass the failure that your UI showed, so a late close cannot hide a newer refusal. `kept` says whether the deck that was open stays open.
+
+## React and Vue reference
+
+<FrameworkTabs variant="block">
+<Framework value="react">
+
+```tsx
+import { useState } from 'react';
+import { PptxEditor, useNotesPane } from '@pptx-editor.dev/react';
+
+function NotesToggle() {
+  const notes = useNotesPane();
+  return (
+    <button type="button" aria-pressed={notes.open} onClick={notes.toggle}>
+      Notes
+    </button>
+  );
+}
+
+export function Workspace({ bytes }: { bytes: Uint8Array }) {
+  const [rail, setRail] = useState(true);
+  const [panel, setPanel] = useState(false);
+  return (
+    <div className="acme-theme">
+      <PptxEditor.Root document={bytes}>
+        <PptxEditor.Viewport className="deck-workspace">
+          <div className="deck-workspace__dock">
+            <PptxEditor.Toolbar />
+            <NotesToggle />
+            <button type="button" aria-pressed={panel} onClick={() => setPanel(!panel)}>
+              Format
+            </button>
+          </div>
+          <div className="deck-workspace__body">
+            <PptxEditor.SlideRail open={rail} onOpenChange={setRail} paneWidth={220} />
+            <div className="deck-workspace__main">
+              <PptxEditor.Content />
+              <PptxEditor.FindBar />
+              <PptxEditor.EditNotice />
+              <PptxEditor.FontNotice />
+              <PptxEditor.Loading overlay />
+              <PptxEditor.NotesPane defaultOpen={false} style={{ maxHeight: 240 }} />
+              <PptxEditor.ZoomPill />
+            </div>
+            {panel && <PptxEditor.SidePanel paneWidth={320} onClose={() => setPanel(false)} />}
+          </div>
+          <PptxEditor.Slideshow />
+        </PptxEditor.Viewport>
+      </PptxEditor.Root>
+    </div>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import {
+  PptxEditorContent,
+  PptxEditorLoading,
+  PptxEditorRoot,
+  PptxEditorToolbar,
+  PptxEditorViewport,
+} from '@pptx-editor.dev/vue';
+import '@pptx-editor.dev/core/styles/editor.css';
+
+defineProps<{ bytes: Uint8Array }>();
+</script>
+
+<template>
+  <div class="acme-theme">
+    <PptxEditorRoot :document="bytes">
+      <PptxEditorViewport class="deck-workspace">
+        <div class="deck-workspace__dock">
+          <PptxEditorToolbar />
+        </div>
+        <div class="deck-workspace__body">
+          <div class="deck-workspace__main">
+            <PptxEditorContent />
+            <PptxEditorLoading overlay />
+          </div>
+        </div>
+      </PptxEditorViewport>
+    </PptxEditorRoot>
+  </div>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+The Vue adapter has the root, the viewport, the content, the toolbar, the loading screen, the find bar (`PptxEditorFindBar`), the slide show (`PptxEditorSlideshow`, `useSlideshow`), and the font and edit notices (`PptxEditorFontNotice`, `PptxEditorEditNotice`). It has the panes too: `PptxEditorSlideRail`, `PptxEditorSlideSorter`, `PptxEditorNotesPane` (which shares its open state with `useNotesPane`), `PptxEditorSidePanel`, and `PptxEditorZoomPill`. A pane's `onOpenChange` is the `update:open` event, so `v-model:open` controls it. Each part takes `className`, and `style` where React has it, and a host `class` and `style` also work. `PptxEditorSidePanel` takes `onClose` as a prop, as in React: with it, the panel shows its close button.
+
+## Open the slide rail from your chrome
+
+Set `toggle={false}` to remove the rail's own buttons, and control `open` from your application. The example uses the CSS from [Workspace layout](#workspace-layout).
+
+```tsx
+import { useState } from 'react';
+import { PptxEditor } from '@pptx-editor.dev/react';
+
+export function RailFromHostChrome({ bytes }: { bytes: Uint8Array }) {
+  const [rail, setRail] = useState(true);
+  return (
+    <div className="acme-theme">
+      <PptxEditor.Root document={bytes}>
+        <PptxEditor.Viewport className="deck-workspace">
+          <div className="deck-workspace__dock">
+            <button type="button" aria-pressed={rail} onClick={() => setRail(!rail)}>
+              Slides
+            </button>
+            <PptxEditor.Toolbar />
+          </div>
+          <div className="deck-workspace__body">
+            <PptxEditor.SlideRail open={rail} onOpenChange={setRail} toggle={false} />
+            <div className="deck-workspace__main">
+              <PptxEditor.Content />
+            </div>
+          </div>
+        </PptxEditor.Viewport>
+      </PptxEditor.Root>
+    </div>
+  );
+}
+```
+
+## More control
+
+See the [`@pptx-editor.dev/react` API report](https://github.com/eigenpal/pptx-editor/blob/main/docs/api/react/index.api.md) for `PaneProps`, `SlideRailProps`, `SlideSorterProps`, `NotesPaneProps`, `SidePanelProps`, `ZoomPillProps`, and `UseNotesPaneReturn`.

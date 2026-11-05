@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# Keep every whole-repository gate. Same shape as the DOCX Editor hook
+# (docx-editor/.husky/pre-commit): format and lint staged files, then run the
+# repository gates that nothing else covers.
+run_check() {
+  check_label="$1"
+  shift
+  check_started=$(date +%s)
+  printf '\nRunning %s...\n' "$check_label"
+  if "$@"; then
+    printf 'Passed %s (%ss)\n' "$check_label" "$(($(date +%s) - check_started))"
+  else
+    check_status=$?
+    printf 'Failed %s (%ss, exit %s)\n' "$check_label" "$(($(date +%s) - check_started))" "$check_status" >&2
+    exit "$check_status"
+  fi
+}
+
+run_check 'staged formatting and lint' npx lint-staged
+run_check 'TypeScript type check' bun run typecheck
+run_check 'lint' bun run lint
+run_check 'i18n validation' bun run i18n:validate
+run_check 'security grep' bun run check:security
+run_check 'formatting check' bun run format:check
+# API Extractor reads the built declarations, so build first (about 5 s).
+run_check 'API snapshot check' sh -c 'bun run build:packages >/dev/null && bun run api:check'
+run_check 'adapter parity' bun run check:parity

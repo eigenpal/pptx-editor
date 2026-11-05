@@ -1,0 +1,199 @@
+---
+title: 'Appearance'
+description: 'Customize PPTX editor appearance with CSS color tokens, dark mode, borders, spacing, and control states.'
+category: 'Customization'
+---
+
+Put a theme class on a wrapper around `PptxEditor.Root`, and set `--doc-*` properties on `.acme-theme .pptx-editor`. Each `.pptx-editor` scope declares its own defaults, so a property set on the wrapper alone does not reach the chrome. Load your CSS after the editor stylesheet.
+
+Set `colorMode` on `PptxEditor.Root` for dark controls. Only the chrome changes: the slide keeps the colors that the file defines, in both modes.
+
+## Apply an application color theme
+
+PPTX Editor uses the same `--doc-*` token names as DOCX Editor, so one override themes both products. Put your theme class on an element around `PptxEditor.Root`, and scope the tokens to every `.pptx-editor` inside it. Dialogs render outside `PptxEditor.Viewport` with their own `.pptx-editor` scope, so a rule on the viewport alone does not reach them.
+
+```css
+.acme-theme .pptx-editor,
+.acme-theme .pptx-editor.dark {
+  --doc-primary: var(--app-brand);
+  --doc-primary-light: var(--app-brand-surface);
+  --doc-on-primary: var(--app-on-brand);
+  --doc-focus-ring: var(--app-focus-ring);
+}
+```
+
+Define light and dark application values for the mapped tokens. The shared rule keeps both editor themes connected to your application's active palette.
+
+## Style your controls
+
+Keep CSS under your wrapper class. These tokens and selectors work in both frameworks.
+
+```css
+.acme-theme .pptx-editor {
+  --doc-dialog-radius: 16px;
+  --doc-dialog-padding: 24px;
+}
+.acme-theme .pptx-toolbar__button[data-active] {
+  background: var(--doc-primary-light);
+}
+.acme-theme .pptx-toolbar__button[data-disabled] {
+  opacity: 0.5;
+}
+```
+
+To style one dialog, pass a class through its `popups` renderer. The class goes on the dialog element, beside `.pptx-dialog`:
+
+```tsx
+import { PptxEditor, type PptxEditorPopups } from '@pptx-editor.dev/react';
+
+const popups: PptxEditorPopups = {
+  pageSetup: (props) => <PptxEditor.PageSetupDialog {...props} className="acme-dialog" />,
+};
+```
+
+## Appearance options
+
+| Area | Configuration | Scope |
+| --- | --- | --- |
+| Interface palette | Override `--doc-*` properties on `.acme-theme .pptx-editor`. | Toolbar, menus, panes, dialogs, and notices. |
+| Utility palette | `--foreground` and `--radius`. | The light active toggle and the slide show controls. |
+| Dark mode | Set `colorMode` on `PptxEditor.Root`: `light` (default), `dark`, or `system`. | The chrome, not the slide. |
+| Typography | `--doc-font-ui` and the dialog font properties. | Dialogs. Not slide fonts. |
+| Control shape | Add `className` to named parts. | The selected part and its interaction states. |
+| Custom elements | Use a supported part's `asChild`. | Your element receives the part's behavior. |
+| Slide appearance | Use the deck's theme, layouts, and formatting commands. | Slide content and saved formatting. |
+
+### Interface palette reference
+
+Set CSS color values for these properties. Override related foreground and background properties together. The default stylesheet defines separate light and dark palettes. This table lists only the properties that a PPTX Editor rule reads.
+
+| Purpose | Properties |
+| --- | --- |
+| Main surfaces | `--doc-surface`, `--doc-popover-bg`, `--doc-bg` (the workspace behind the slide) |
+| Hover and input surfaces | `--doc-bg-hover` (also the hovered or open font family field), `--doc-bg-input` |
+| Primary actions | `--doc-primary`, `--doc-primary-light`, `--doc-on-primary` |
+| Active toggles | `--doc-toggle-active-bg`, `--doc-toggle-active-fg` |
+| Text and icons | `--doc-text`, `--doc-popover-fg`, `--doc-text-muted` |
+| Borders | `--doc-border`, `--doc-border-dark` |
+| Errors | `--doc-error`, `--doc-error-bg` |
+| Warnings | `--doc-warning`, `--doc-warning-bg`, `--doc-warning-text` |
+| Focus and selection | `--doc-focus-ring`, `--doc-selection` |
+| Caret and slide guides | `--doc-caret`, `--doc-smart-guide`, `--doc-cursor-format-paint` |
+| Collaboration accents | `--doc-accent` |
+| Behind the slide | `--doc-page-bg` (rail thumbnails), `--doc-page-bg-rendered` (the canvas stage) |
+| Overlay | `--doc-overlay` |
+| Complete shadow values | `--doc-card-shadow`, `--doc-card-shadow-strong` |
+| Slide show | `--doc-slideshow-bg`, `--doc-slideshow-black`, `--doc-slideshow-white`, `--doc-slideshow-text`, `--doc-slideshow-bar-bg`, `--doc-slideshow-bar-hover`, `--doc-slideshow-focus` |
+
+The shadow properties accept CSS `box-shadow` values. The stylesheet also defines the other DOCX Editor `--doc-*` names, such as `--doc-primary-hover`, for parity; no PPTX Editor rule reads them yet.
+
+### Utility palette reference
+
+The stylesheet defines the shadcn HSL properties with DOCX Editor's names and values, for parity. PPTX Editor has no utility classes, so only two of them change the chrome:
+
+| Property | Value type | Use |
+| --- | --- | --- |
+| `--foreground` | HSL components, such as `222.2 84% 4.9%` | The active toggle background in light mode (through `--doc-toggle-active-bg`). |
+| `--radius` | CSS length | The corner radius of the slide show controls. |
+
+The other names, such as `--primary` and `--ring`, are present for DOCX Editor parity only.
+
+### Size, typography, and layer reference
+
+| Property | Value type | Default or behavior |
+| --- | --- | --- |
+| `--doc-font-ui` | Font stack | The dialog font when `--doc-dialog-font-family` is not set. Falls back to the system font. |
+| `--doc-dialog-font-family` | Font stack | Falls back to `--doc-font-ui`. |
+| `--doc-dialog-font-size` | CSS length | `13px`. |
+| `--doc-dialog-radius` | CSS length | Dialog panel: `12px`. |
+| `--doc-dialog-padding` | One CSS length | Dialog inset: `24px`. |
+| `--doc-z-overlay` | Integer | Menus and popovers: `50`. |
+| `--doc-z-context` | Integer | Context menus and submenus: `55`. |
+| `--doc-z-tooltip` | Integer | Chrome tooltips, above every other layer: `60`. |
+| `--doc-z-slideshow` | Integer | The slide show, when full screen is refused: `2147483000`. |
+
+Keep the layer order when you change these values. Some floating chrome uses fixed values: the zoom pill and the font notice use `25`, the edit notice `26`, and the find bar `30`. Keep `--doc-z-overlay` above `30`, so menus open above them. An ancestor's stacking context can still limit an editor overlay.
+
+### Theme scope and interaction states
+
+`PptxEditor.Viewport` carries `.pptx-editor`. Menus, popovers, and context menus render inside the `.pptx-editor` element of the control that opens them, so keep the toolbar and the menu bar inside the viewport. Dialogs render outside the viewport and carry `.pptx-editor` on their own element. Scope your theme on an element around `PptxEditor.Root`, as in the example above, so both receive it.
+
+Add classes through component props instead of removing the library's classes. Toolbar buttons and menu rows carry `data-active` when a toggle is on, and `data-disabled` when the engine refuses the command. The slide rail and the notes pane carry `data-open="true"` or `data-open="false"`.
+
+A disabled control carries `aria-disabled="true"`, not the native `disabled` attribute. It stays focusable, runs nothing, and gives its reason to assistive technology, so do not hide it with `pointer-events: none` or `display: none`. Keep visible focus indicators and readable text in each theme.
+
+### Dark mode behavior
+
+`colorMode="system"` follows the operating system and updates when it changes. With a dark mode, `PptxEditor.Viewport` and every dialog carry `dark` beside `.pptx-editor`. Declare dark overrides with `.acme-theme .pptx-editor.dark` after the editor stylesheet.
+
+Use `useEditorColorMode()` to style your own panels with the mode that `PptxEditor.Root` resolved. It returns `colorMode`, which is `light` or `dark`. Both adapters export the `ColorMode` type (`light`, `dark`, or `system`) and the `ResolvedColorMode` type (`light` or `dark`).
+
+In dark mode, the rail's slide numbers, the side panel tabs, and the notes placeholder meet a 4.5:1 contrast ratio. Keep that ratio when you override the dark tokens.
+
+Dark mode never changes the slide, and it never writes a color into the `.pptx` file.
+
+## React and Vue reference
+
+<FrameworkTabs variant="block">
+<Framework value="react">
+
+```tsx
+import { PptxEditor, useEditorColorMode } from '@pptx-editor.dev/react';
+import '@pptx-editor.dev/core/styles/editor.css';
+
+function ReviewPanel() {
+  const { colorMode } = useEditorColorMode();
+  return <aside className={colorMode === 'dark' ? 'panel panel--dark' : 'panel'} />;
+}
+
+export function Workspace({ bytes }: { bytes: Uint8Array }) {
+  return (
+    <div className="acme-theme">
+      <PptxEditor.Root document={bytes} colorMode="dark">
+        <PptxEditor.Viewport>
+          <PptxEditor.Toolbar />
+          <PptxEditor.Content />
+        </PptxEditor.Viewport>
+        <ReviewPanel />
+      </PptxEditor.Root>
+    </div>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import {
+  PptxEditorContent,
+  PptxEditorRoot,
+  PptxEditorToolbar,
+  PptxEditorViewport,
+} from '@pptx-editor.dev/vue';
+import '@pptx-editor.dev/core/styles/editor.css';
+
+defineProps<{ bytes: Uint8Array }>();
+</script>
+
+<template>
+  <div class="acme-theme">
+    <PptxEditorRoot :document="bytes" color-mode="dark">
+      <PptxEditorViewport>
+        <PptxEditorToolbar />
+        <PptxEditorContent />
+      </PptxEditorViewport>
+    </PptxEditorRoot>
+  </div>
+</template>
+```
+
+In a component inside `PptxEditorRoot`, `useEditorColorMode()` returns `colorMode` as a computed ref.
+
+</Framework>
+</FrameworkTabs>
+
+## More control
+
+See the [`--doc-*` token definitions](https://github.com/eigenpal/pptx-editor/blob/main/packages/core/src/styles/editor.css) for every token and its light and dark values.

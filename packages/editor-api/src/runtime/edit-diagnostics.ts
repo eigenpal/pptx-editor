@@ -1,0 +1,388 @@
+/*
+Copyright (c) 2026 EigenPal, Inc. All rights reserved.
+Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/editor-api/LICENSE.md.
+Production use requires a commercial agreement: licensing@eigenpal.com
+*/
+// The public diagnostics of the engine's edit refusals, beside `errors.ts` (which keeps the
+// shape of DOCX Editor's module). Each row maps a host detail to a stable code and a fixed hint:
+// the cause, then the action. `scripts/refusal-reasons.mjs` lists every reason the core can
+// give through an automation host, and `scripts/__tests__/refusal-reasons.test.ts` fails when
+// one has no diagnostic.
+
+/** Rows of `[host detail, public code, hint]`. */
+export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = [
+  // Edit refusals of the engine (`disabled.*`): NotSupported.
+  [
+    'disabled.cropFillMode',
+    'edit.picture-not-stretched',
+    'The picture is tiled or inset in its frame, so it cannot be cropped. Use a stretched picture.',
+  ],
+  [
+    'disabled.cropLocked',
+    'edit.picture-locked',
+    'The picture is locked against this change in the file. Remove the lock in the file first.',
+  ],
+  [
+    'disabled.rotationLocked',
+    'edit.picture-locked',
+    'The picture is locked against rotation in the file. Remove the lock in the file first.',
+  ],
+  [
+    'disabled.sizeLocked',
+    'edit.picture-locked',
+    'The picture is locked against resizing in the file. Remove the lock in the file first.',
+  ],
+  [
+    'disabled.shapeLocked',
+    'edit.picture-locked',
+    'The picture is locked against a change of shape in the file. Remove the lock in the file first.',
+  ],
+  [
+    'disabled.decorative',
+    'edit.decorative',
+    'The shape is decorative, so it has no alternative text. Set isDecorative to false first.',
+  ],
+  [
+    'disabled.distributeNeedsThree',
+    'edit.needs-three-shapes',
+    'Distributing needs three or more shapes. Pass more shapes.',
+  ],
+  [
+    'disabled.groupNeedsTwo',
+    'edit.group-count',
+    'A group needs two or more different shapes. Remove repeated shapes or add more.',
+  ],
+  [
+    'disabled.groupScope',
+    'edit.group-parent',
+    'The shapes are not in the same parent. Use shapes of one slide, or of one group.',
+  ],
+  [
+    'disabled.imageSizeUnknown',
+    'edit.picture-size-unknown',
+    'The size of the picture cannot be read from its bytes. Use a PNG, JPEG, or GIF picture.',
+  ],
+  [
+    'disabled.mergeOneCell',
+    'edit.merge-one-cell',
+    'A merge needs two or more cells. Pass a row count or a column count above 1.',
+  ],
+  [
+    'disabled.mixedSize',
+    'edit.mixed-size',
+    'The text has more than one size, so it cannot be stepped as one. Set font.size instead.',
+  ],
+  [
+    'disabled.noArrangeChange',
+    'edit.no-change',
+    'The shapes are already in that position. Read zOrderPosition before you move a shape.',
+  ],
+  [
+    'disabled.noEffectChange',
+    'edit.no-change',
+    'The shapes do not have that effect, so nothing changes.',
+  ],
+  [
+    'disabled.noLockChange',
+    'edit.no-change',
+    'The setting already has that value, so nothing changes.',
+  ],
+  [
+    'disabled.noNameChange',
+    'edit.no-change',
+    'The shape already has that name, so nothing changes.',
+  ],
+  [
+    'disabled.noVisibilityChange',
+    'edit.no-change',
+    'The shapes already have that visibility, so nothing changes.',
+  ],
+  [
+    'disabled.noEditor',
+    'host.no-document',
+    'The editor has no presentation open yet. Wait until it has loaded one.',
+  ],
+  [
+    'disabled.noList',
+    'edit.no-list',
+    'The paragraphs have no bullets or numbers. Set bulletFormat.visible to true first.',
+  ],
+  ['disabled.noMatch', 'edit.no-match', 'The text was not found. Read the text again.'],
+  ['disabled.noNotes', 'edit.no-notes', 'The slide has no speaker notes. Add notes first.'],
+  ['disabled.noPicture', 'edit.not-a-picture', 'The shape is not a picture. Use a picture shape.'],
+  [
+    'disabled.onePicture',
+    'edit.not-a-picture',
+    'This change takes exactly one picture. Pass one picture shape.',
+  ],
+  [
+    'disabled.pictureEffects',
+    'edit.picture-effects',
+    'The picture has effects this API cannot change. Change another property, or remove the effects in the file.',
+  ],
+  [
+    'disabled.noSections',
+    'edit.no-sections',
+    'The presentation has no sections. Add a section first.',
+  ],
+  [
+    'disabled.sectionEdge',
+    'edit.section-edge',
+    'The section is already at that edge of the presentation, so it cannot move further.',
+  ],
+  [
+    'disabled.noSelection',
+    'edit.no-target',
+    'The call has no shape to act on. Pass a shape, or select one in the editor first.',
+  ],
+  ['disabled.selectOne', 'edit.no-target', 'This change takes exactly one shape. Pass one shape.'],
+  [
+    'disabled.selectText',
+    'edit.no-target',
+    'The call needs a text range. Pass a text range with text in it.',
+  ],
+  [
+    'disabled.selectWord',
+    'edit.no-target',
+    'The call needs text. Pass a text range that is not empty.',
+  ],
+  [
+    'disabled.selectNotesText',
+    'edit.no-target',
+    'The call needs the text of the notes. Address the text of the notes placeholder.',
+  ],
+  [
+    'disabled.noShapeEffects',
+    'edit.no-effects',
+    'The shape cannot take effects. Use a shape, a line, or a picture.',
+  ],
+  [
+    'disabled.noShapeFill',
+    'edit.no-fill',
+    'The shape cannot have a fill, for example a line or a connector. Use a shape with an area.',
+  ],
+  [
+    'disabled.noShapeStyle',
+    'edit.no-style',
+    'The shape cannot take a shape style. Use a geometric shape.',
+  ],
+  [
+    'disabled.noSlideNumberPlaceholder',
+    'edit.no-slide-number-placeholder',
+    'The layouts have no slide number placeholder. Add one to the layout first.',
+  ],
+  ['disabled.noTable', 'edit.not-a-table', 'The shape is not a table. Use a table shape.'],
+  [
+    'disabled.notAGroup',
+    'edit.not-a-group',
+    'The shape is not a group. Check shape.type first, and use a group shape.',
+  ],
+  ['disabled.notALine', 'edit.not-a-line', 'The shape is not a line or a connector. Use a line.'],
+  [
+    'disabled.noText',
+    'edit.no-text-frame',
+    'The shape has no text frame. Check shape.type first, and read text only of a shape that holds text.',
+  ],
+  [
+    'disabled.slideNotCopyable',
+    'import.slide-not-copyable',
+    'A slide to import has threaded comments or an embedded control. Leave it out with sourceSlideIds.',
+  ],
+  [
+    'disabled.slideSorter',
+    'host.slide-sorter',
+    'The editor shows the slide sorter, which takes no shape edits. Switch the editor to the normal view.',
+  ],
+  [
+    'disabled.splitOneCell',
+    'edit.split-one-cell',
+    'A split takes one cell. Use getCellOrNullObject for one cell, then split it.',
+  ],
+  [
+    'disabled.splitUneven',
+    'edit.split-uneven',
+    'A merged cell splits only into parts that divide it evenly. Use a row and column count that divides its span.',
+  ],
+  [
+    'disabled.tableText',
+    'edit.table-text',
+    'A table cell does not take this text body setting. Set it on a text box or a shape.',
+  ],
+  [
+    'disabled.tableTooLarge',
+    'edit.table-too-large',
+    'A table has at most 75 columns and 1,000 rows. Use fewer rows or columns.',
+  ],
+  [
+    'disabled.unsupportedElement',
+    'edit.unsupported-element',
+    'The object is of a kind this API cannot edit, for example a chart or an embedded object. Read it, or edit another object.',
+  ],
+  // Edit errors of the engine (`errors.*`): GeneralException, or InvalidArgument for a name.
+  [
+    'errors.altTextLength',
+    'edit.alt-text-length',
+    'Alternative text can have up to 4000 characters. Shorten it.',
+  ],
+  [
+    'errors.clipboard',
+    'edit.clipboard',
+    'The content is not shapes this API can insert. Insert shapes from a presentation instead.',
+  ],
+  [
+    'errors.coordinateRange',
+    'edit.coordinate-range',
+    'The position or size is outside the range a slide can hold. Use values within the slide size limits.',
+  ],
+  [
+    'errors.exportFailed',
+    'image.failed',
+    'The picture could not be made. Read the shape, then try again.',
+  ],
+  [
+    'errors.exportSize',
+    'image.invalid-size',
+    'A picture is from 16 to 8192 pixels on a side. Pass a size in that range.',
+  ],
+  [
+    'errors.findStale',
+    'edit.stale-target',
+    'An edit removed the object. Read the presentation again.',
+  ],
+  [
+    'errors.findTooLong',
+    'edit.text-too-long',
+    'The text is too long for this call. Use shorter text.',
+  ],
+  [
+    'errors.invalidName',
+    'edit.invalid-name',
+    'A name has 1 to 255 characters. Use a shorter name that is not empty.',
+  ],
+  [
+    'errors.invalidText',
+    'edit.invalid-text',
+    'The text has no characters that a slide can hold, such as control characters only. Remove them.',
+  ],
+  [
+    'errors.layoutNotFound',
+    'edit.layout-not-found',
+    'The presentation has no such slide layout. Read the layouts of the master again.',
+  ],
+  [
+    'errors.malformed',
+    'edit.malformed-part',
+    'A part of the presentation is damaged, so the change cannot apply. Repair the file, then try again.',
+  ],
+  [
+    'errors.sectionName',
+    'edit.section-name',
+    'A section name has 1 to 255 characters. Use a shorter name that is not empty.',
+  ],
+  [
+    'errors.sectionNotFound',
+    'edit.section-not-found',
+    'The presentation has no such section. Read the sections again.',
+  ],
+  [
+    'errors.slideNotFound',
+    'edit.slide-not-found',
+    'The presentation has no such slide. Read the slides again.',
+  ],
+  [
+    'errors.tooLarge',
+    'edit.too-large',
+    'The content is larger than the presentation accepts. Use smaller content.',
+  ],
+  [
+    'errors.unsafeLink',
+    'argument.not-accepted',
+    'Use an http, https, mailto, tel, or ftp address of up to 2048 characters.',
+  ],
+  [
+    'errors.unsupported',
+    'edit.unsupported',
+    'The presentation cannot take this change. Change another property.',
+  ],
+  [
+    'partly-applied',
+    'edit.partly-applied',
+    'A read in this sync needed the result of the writes before it, so those writes applied first. The call in errorLocation and the calls after it did not apply.',
+  ],
+  // Host refusals with a detail of their own.
+  ['document', 'host.no-document', 'The host holds no presentation. Open one before you run.'],
+  [
+    'internal',
+    'host.internal',
+    'The engine could not complete the request, and nothing changed. Report the call that failed.',
+  ],
+  [
+    'no-theme',
+    'edit.no-theme-color',
+    'The master has no theme, or the theme has no such color. Use a theme color of the master.',
+  ],
+  ['part', 'edit.not-xml-part', 'That part of the presentation is not XML. Use an XML part.'],
+  [
+    'picture',
+    'edit.picture-not-in-package',
+    'The background picture is a theme fill or a link outside the file. Pass imageBase64 to set a picture.',
+  ],
+  [
+    'rotation',
+    'edit.no-rotation',
+    'A table or another graphic frame does not rotate. Rotate another shape.',
+  ],
+  [
+    'transparency',
+    'edit.fill-not-solid',
+    'Only a solid fill has a transparency. Call setSolidColor first.',
+  ],
+  [
+    'result',
+    'edit.stale-target',
+    'The object is not available in this batch. Read the presentation again.',
+  ],
+  [
+    'parentGroup',
+    'edit.not-in-group',
+    'The shape is not in a group. Check shape.level first: 0 is the top level of the slide.',
+  ],
+  [
+    'group',
+    'edit.not-a-group',
+    'The shape is not a group. Check shape.type first, and use a group shape.',
+  ],
+];
+
+/**
+ * The diagnostic of a host refusal that has no detail of its own, by host code: an argument
+ * that is out of range or of the wrong form, a missing item, a stale read, a change the store
+ * refused as a whole, and an operation the host does not know.
+ */
+export const CODE_DIAGNOSTICS: Readonly<Record<string, readonly [string, string]>> = Object.freeze({
+  'invalid-argument': [
+    'argument.not-accepted',
+    'An argument is out of range or of the wrong form. errorLocation names the call; its reference lists the values it takes.',
+  ],
+  'item-not-found': [
+    'edit.item-not-found',
+    'The collection has no item with that id, key, or index. Read the items again.',
+  ],
+  'stale-revision': [
+    'edit.stale-document',
+    'Another writer changed the presentation after this context read it. Read again before you write.',
+  ],
+  'transaction-refused': [
+    'edit.refused',
+    'The presentation refused the change as a whole, and nothing applied. Change one property at a time to find the cause.',
+  ],
+  disposed: ['host.disposed', 'The host was disposed. Create a new runtime.'],
+  'document-unavailable': [
+    'host.no-document',
+    'The editor holds no presentation right now. Wait until it has loaded one.',
+  ],
+  'unknown-operation': [
+    'host.unknown-operation',
+    'The host does not know this call. Use a host of the same package version.',
+  ],
+});

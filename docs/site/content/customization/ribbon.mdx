@@ -1,0 +1,158 @@
+---
+title: 'Ribbon'
+description: 'Use tabs and contextual tabs in the PPTX editor, and change each tab with toolbar parts.'
+category: 'Customization'
+---
+
+`PptxEditor.Ribbon` arranges the chrome groups on tabs: the Quick Access Toolbar, Home, Insert, Design, Slide Show, and View, and the contextual tabs Shape Format, Picture Format, Table Design, and Table Layout. Use it in place of `PptxEditor.Toolbar`, which stays as the flat form of the same groups.
+
+The ribbon is a layer over the toolbar. Each tab panel is the toolbar with that tab's groups, and every button is a toolbar slot (`ChromeSlotId`) that runs the same command as the toolbar and the menus. Every toolbar customization works inside a tab: `Toolbar.Slot`, named parts, `Toolbar.Group` with `priority`, `Toolbar.Action`, `hidden`, and the More menu. DOCX Editor has no ribbon; the equivalent of a tab there is a `Toolbar` with `preset={false}` and its groups.
+
+## Ribbon configuration reference
+
+| Prop or part | Use |
+| --- | --- |
+| `className` | Styles the ribbon. |
+| `preset` | `true` (default): the built-in tabs. `false`: only your `Ribbon.Tab` children. A built-in id among them keeps its title and groups, so `preset={false}` with `<Ribbon.Tab id="home" />` shows Home alone. |
+| `tab`, `onTabChange` | The selected tab, controlled. In Vue, use `v-model:tab`, or listen to `tabChange`. |
+| `defaultTab` | The first selected tab, uncontrolled. Default `home`. |
+| `overflow` | `false` lets a tab's groups wrap instead of using the More menu. |
+| `Ribbon.Tab id` | A built-in tab id changes that tab; another id adds your tab. |
+| `Ribbon.Tab` `label`, `labelKey` | The tab's title. Built-in tabs keep their own title without it. |
+| `Ribbon.Tab` `hidden` | Removes the tab. Its commands keep working from menus, keys, and the API. |
+| `Ribbon.Tab` `after` | Places your tab after another tab. |
+| `Ribbon.Tab` `className` | Styles the tab's panel. |
+| `Ribbon.Tab` children | Toolbar children for that tab's panel. |
+
+### Tabs and their groups
+
+| Tab id | Groups | Shows |
+| --- | --- | --- |
+| `quickAccess` | `history` | Always, beside the tab names |
+| `home` | `edit` (`paste`, `cut`, `copy`, `selectAll`), `format`, `slide` (`add`, `layout`, `reset`), `text`, `script`, `paragraph` (lists and indents first), `insert` (`image`, `shape`, `line`, `textBox`), `shape`, `arrange`, `more`, `find` | Always |
+| `insert` | `slide` (`add`), `table` (`insert`), `insert` (`image`, `shape`, `line`, `textBox`) | Always |
+| `design` | `file` (slide size), `slide` (`background`) | Always |
+| `slideShow` | `view` (`playFromStart`, `playFromCurrent`), `slide` (`hide`) | Always |
+| `view` | `view` (`presentationView`, `smartGuides`) | Always |
+| `shapeFormat` | `insert` (`shape`, `line`, `textBox`), `shape`, `arrange` | While shapes are selected, or the text of a shape is edited, and no picture or table is selected |
+| `pictureFormat` | `image`, `arrange` | While every selected element is a picture (`snapshot.image`) |
+| `tableDesign` | `table` (table style options, styles, shading, borders) | While the selection is in or on a table (`snapshot.table`) |
+| `tableLayout` | `table` (select, delete, insert, merge, split, distribute, margins) | While the selection is in or on a table |
+
+A group in parentheses shows only the controls named there. `arrange` follows the reference order on every tab: order, Selection Pane, align, group, ungroup, and rotate. A tab shows every control of its groups, also the ones the flat toolbar leaves out (`defaultToolbar: false`, such as **Shape Styles** and **Shape Effects**). The section commands stay on the slide rail's menu. A tab with no groups does not show. The arrangement lives in core (`RIBBON_TABS`, `ribbonTabs(snapshot)`, `ribbonTabGroups(tab)`), so the React and Vue ribbons agree.
+
+When the selected tab goes away (a contextual tab after the selection changes), the ribbon selects Home, calls `onTabChange('home')`, and moves the keyboard focus to the Home tab name when the focus was in the ribbon. Selecting an object shows its contextual tab, and the user opens it. Inserting an object (a shape, line, text box, picture, or table) opens its tab: the ribbon reads `snapshot.insertions` and selects the first contextual tab that shows, and a controlled host hears it through `onTabChange`.
+
+A change inside `Ribbon.Tab` applies to that tab only. The `shape` and `arrange` groups are on Home and on Shape Format, and `arrange` is on Picture Format too: to hide a group or a control everywhere, hide it in each tab.
+
+### Development warnings
+
+In a development build the ribbon warns, once each, when a `Ribbon.Tab` cannot do what it says: an id that is not a built-in tab and has no `label` (often a misspelled id, such as `Home`), `hidden` on an id no tab has, `after` on a built-in tab, `after` that names no tab, and a ribbon child that is not a `Ribbon.Tab`.
+
+### Keyboard and accessibility
+
+The tab names are a `tablist`. The arrow keys, Home, and End move between tabs, and the panel is a `tabpanel` that holds the tab's toolbar.
+
+## React and Vue reference
+
+<FrameworkTabs variant="block">
+<Framework value="react">
+
+```tsx
+<PptxEditor.Ribbon defaultTab="home">
+  <PptxEditor.Ribbon.Tab id="home">
+    <PptxEditor.Toolbar.Strike hidden />
+    <PptxEditor.Toolbar.Group id="more" hidden />
+  </PptxEditor.Ribbon.Tab>
+  <PptxEditor.Ribbon.Tab id="view" hidden />
+  <PptxEditor.Ribbon.Tab id="legal" label="Legal" after="home">
+    <PptxEditor.Toolbar.Group id="legal" label="Legal">
+      <PptxEditor.Toolbar.Action label="Ask legal" onSelect={askLegal} />
+    </PptxEditor.Toolbar.Group>
+  </PptxEditor.Ribbon.Tab>
+</PptxEditor.Ribbon>
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<PptxEditorRibbon default-tab="home">
+  <PptxEditorRibbon.Tab id="home">
+    <PptxEditorToolbar.Strike hidden />
+  </PptxEditorRibbon.Tab>
+  <PptxEditorRibbon.Tab id="view" hidden />
+  <PptxEditorRibbon.Tab id="legal" label="Legal" after="home">
+    <PptxEditorToolbar.Group id="legal" label="Legal">
+      <PptxEditorToolbar.Action label="Ask legal" @select="askLegal" />
+    </PptxEditorToolbar.Group>
+  </PptxEditorRibbon.Tab>
+</PptxEditorRibbon>
+```
+
+</Framework>
+</FrameworkTabs>
+
+The Vue ribbon's tab panels are Vue toolbars, so they draw the same controls as React's and move the groups that do not fit into **More**. `overflow` works as in React; the Quick Access Toolbar always wraps. See [Toolbar](/docs/customization/toolbar#react-and-vue-reference).
+
+## Add your own tab
+
+A `Ribbon.Tab` with a new id adds a tab. Give it a `label`, place it with `after`, and fill it with toolbar groups and actions.
+
+```tsx
+<PptxEditor.Ribbon>
+  <PptxEditor.Ribbon.Tab id="review" label="Review" after="view">
+    <PptxEditor.Toolbar.Group id="approval" label="Approval">
+      <PptxEditor.Toolbar.Action label="Approve" icon={<CheckIcon />} onSelect={approve} />
+    </PptxEditor.Toolbar.Group>
+  </PptxEditor.Ribbon.Tab>
+</PptxEditor.Ribbon>
+```
+
+## Replace one control in one tab
+
+Use a named part or `Toolbar.Slot` inside the tab. The control keeps its command and state.
+
+```tsx
+<PptxEditor.Ribbon>
+  <PptxEditor.Ribbon.Tab id="home">
+    <PptxEditor.Toolbar.Bold icon={<MyBoldIcon />} className="acme-bold" />
+  </PptxEditor.Ribbon.Tab>
+</PptxEditor.Ribbon>
+```
+
+## Build your own ribbon
+
+`ribbonTabs(snapshot)` from `@pptx-editor.dev/core/editor` gives the tabs that show now, with their groups. Read the snapshot with `useEditorState`, draw the tab names yourself, and render each tab's controls with `PptxEditor.ToolbarControl` or `useEditorCommand(slotId)`.
+
+```tsx
+const tabs = useEditorState((s) => ribbonTabs(s));
+const [current, setCurrent] = useState('home');
+const tab = tabs.find((t) => t.tab.id === current) ?? tabs[1];
+return (
+  <PptxEditor.Toolbar preset={false}>
+    {tab?.groups.flatMap((g) =>
+      g.controls.map((c) => (
+        <PptxEditor.ToolbarControl key={`${g.id}.${c.id}`} group={g.id} control={c} />
+      ))
+    )}
+  </PptxEditor.Toolbar>
+);
+```
+
+## Status bar
+
+`PptxEditor.StatusBar` is a row for under the slide: **Slide x of y**, **Notes**, the view switch, and the zoom pill. Each part takes `className` and `hidden`; `StatusBar.Notes` also takes `icon`, and `asChild` with one element child that becomes the button. A part child replaces its part in place, and other children go after **Notes**.
+
+```tsx
+<PptxEditor.StatusBar>
+  <PptxEditor.StatusBar.Views hidden />
+  <span className="acme-saved">Saved</span>
+</PptxEditor.StatusBar>
+```
+
+In Vue, `PptxEditorStatusBar` has the same parts as in React: the slide number, **Notes**, the view switch, and the zoom pill with its zoom menu.
+
+## More control
+
+See the [`@pptx-editor.dev/react` API report](https://github.com/eigenpal/pptx-editor/blob/main/docs/api/react/index.api.md) for `RibbonProps`, `RibbonTabProps`, `StatusBarProps`, and `StatusBarPartProps`, and the core report for `RIBBON_TABS`, `RibbonTab`, `RibbonGroupPick`, and `ribbonTabs`.

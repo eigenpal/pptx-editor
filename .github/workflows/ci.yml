@@ -1,0 +1,416 @@
+name: CI
+
+# Source checks, browser checks, package verification, and unit test shards run
+# concurrently. Same shape as docx-editor/.github/workflows/ci.yml, sized for v0.
+#
+# The test-durations cache is written only by pushes to main and pruned to the
+# newest entry by `cache-maintenance`; pull requests only read it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    strategy:
+      fail-fast: true
+      matrix:
+        # Short checks share a job, as in DOCX Editor: `lint` also runs the adapter parity
+        # and shipped advisory checks, and `build` also installs the packed packages into a
+        # fresh app, so the packages build once.
+        check: [lint, typecheck, build, fidelity, e2e, changeset]
+    name: ${{ matrix.check }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The changeset check diffs against the base branch, so it needs full history (0).
+          # `0` is falsy in expressions, so `x && 0 || 1` is always 1: test the other case.
+          fetch-depth: ${{ matrix.check != 'changeset' && 1 || 0 }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.3'
+      # The consumer check installs the packed packages from npm. A restored cache answers
+      # without the network. Saved only by pushes to main.
+      - name: Restore npm cache
+        if: matrix.check == 'build'
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.npm
+          key: npm-build-${{ hashFiles('bun.lock') }}
+          restore-keys: npm-build-
+      # Playwright's browser download, keyed by the lockfile that pins its version.
+      - name: Restore Playwright browsers
+        if: matrix.check == 'build' || matrix.check == 'e2e' || matrix.check == 'fidelity'
+        id: playwright-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('bun.lock') }}
+      - run: bun install --frozen-lockfile
+      - name: Lint and format
+        if: matrix.check == 'lint'
+        run: |
+          bun run lint
+          bun run check:security
+          bun run i18n:validate
+          node scripts/check-public-terminology.mjs
+      # The multi-threaded CLI checks the tree about twice as fast from a cold start. The
+      # pre-commit gate keeps the classic CLI, whose content cache this CLI does not support.
+      - name: Format check
+        if: matrix.check == 'lint'
+        run: bun run format:check
+        env:
+          PRETTIER_EXPERIMENTAL_CLI: '1'
+      # React and Vue adapters against scripts/parity/parity.contract.json (DOCX Editor's
+      # parity lane). It reads the committed API snapshots; the build job keeps them current.
+      - name: Adapter parity
+        if: matrix.check == 'lint'
+        run: bun run check:parity
+      # Advisories against the dependency closure a consumer installs (docx-editor's shipped-advisories lane).
+      - name: Shipped dependency advisories
+        if: matrix.check == 'lint'
+        run: bun run check:shipped-advisories
+      - name: Typecheck and lane boundaries
+        if: matrix.check == 'typecheck'
+        run: bun run typecheck
+      - name: CLA logic tests
+        if: matrix.check == 'typecheck'
+        run: bash .github/cla/cla.test.sh
+      - name: Build packages and check API snapshots
+        if: matrix.check == 'build'
+        run: |
+          bun run build:packages
+          bun run api:check
+          bun run check:consumer-types
+          bun run notices:generate
+          bun run check:package-artifacts
+          bun run check:package-size --out package-sizes.json
+          bun run --filter './examples/vite' build
+          bun run build:preview
+          bun run --filter './examples/nextjs' build
+      - name: Upload package size report
+        if: matrix.check == 'build'
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-sizes
+          path: package-sizes.json
+          overwrite: true
+      # Skips the slow apt step unless Chromium cannot start; see the script header.
+      - name: Install Chromium
+        if: matrix.check == 'build' || matrix.check == 'e2e'
+        run: bash scripts/install-ci-chromium.sh
+      # Install the packed tarballs into a fresh app; build with Vite and Bun; render in
+      # Chromium. Uses the packages that the build step above made.
+      - name: Consumer install
+        if: matrix.check == 'build'
+        run: bun run check:consumer-install
+      # The device rasters of the reference PDFs (`rasterizePages` in
+      # scripts/fidelity/references.ts). Each entry inside is keyed by its PDF, the Poppler
+      # version, and the `pdftoppm` options, so an older entry still serves the PDFs that did not
+      # change. A run over every fixture prunes the folder to the current PDFs.
+      - name: Restore reference rasters
+        if: matrix.check == 'fidelity'
+        id: rasters-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .cache/fidelity-rasters
+          key: fidelity-rasters-${{ hashFiles('fixtures/*.pdf', 'scripts/fidelity/references.ts') }}
+          restore-keys: fidelity-rasters-
+      # The package files that apt downloads for the fidelity job: Chromium's system
+      # dependencies and fonts (`playwright install --with-deps`), Poppler, and xmllint. apt
+      # still resolves and installs the same packages; a cached file only skips its download,
+      # and apt checks it against the package lists first. Keyed by the OS release, the package
+      # list, and the lockfile that pins Playwright.
+      - name: Apt cache key
+        if: matrix.check == 'fidelity'
+        id: apt-key
+        env:
+          APT_PACKAGES: 'playwright-chromium-deps poppler-utils libxml2-utils'
+        run: |
+          . /etc/os-release
+          list=$(printf '%s' "$APT_PACKAGES" | sha256sum | cut -c1-16)
+          echo "prefix=apt-fidelity-${ID}${VERSION_ID}-$(uname -m)-" >> "$GITHUB_OUTPUT"
+          echo "packages=$list" >> "$GITHUB_OUTPUT"
+      - name: Restore apt package files
+        if: matrix.check == 'fidelity'
+        id: apt-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/apt-archives
+          key: ${{ steps.apt-key.outputs.prefix }}${{ steps.apt-key.outputs.packages }}-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ steps.apt-key.outputs.prefix }}${{ steps.apt-key.outputs.packages }}-
+      - name: Fidelity harness and schema validation on synthetic fixtures
+        if: matrix.check == 'fidelity'
+        run: |
+          # apt keeps its package files in ~/apt-archives, which the cache restores and saves.
+          mkdir -p ~/apt-archives/partial
+          printf '%s\n' "Dir::Cache::Archives \"$HOME/apt-archives/\";" \
+            'APT::Keep-Downloaded-Packages "true";' \
+            'Binary::apt::APT::Keep-Downloaded-Packages "true";' \
+            'APT::Sandbox::User "root";' | sudo tee /etc/apt/apt.conf.d/99-fidelity-cache >/dev/null
+          # `--with-deps` keeps the system packages that the known-gap lists were measured with:
+          # it installs the fallback fonts that Chromium paints with. Its `apt-get update` also
+          # serves Poppler (the reference rasters) and xmllint (validate:xsd), with the same
+          # packages as before. A restored browser cache skips only the browser download.
+          bunx playwright install --with-deps chromium
+          sudo apt-get install -y poppler-utils libxml2-utils
+          sudo chown -R "$(id -u):$(id -g)" ~/apt-archives
+          # The installed package set, to compare runs with and without the cache.
+          echo "dpkg: $(dpkg-query -W -f '${Package}=${Version}\n' | sort | sha256sum | cut -c1-16)" \
+            "$(dpkg-query -W | wc -l) packages"
+          # Only the harness tests that the unit shards skip, because they have no Poppler and no
+          # Chromium (a browser that crashes or hangs in the middle of a deck). The shards run
+          # the rest of scripts/fidelity/. These run first and do not stop the gate, so a red
+          # gate still has its report and these results.
+          bun test scripts/fidelity/harness-page.test.ts scripts/fidelity/references.test.ts \
+            scripts/fidelity/score-deck.test.ts || tests=$?
+          bun run fidelity -- --print-gaps
+          bun run validate:xsd
+          exit "${tests:-0}"
+      # Only what needs a real browser: canvas pixels and CSS layout (e2e/browser.spec.ts). The
+      # demo flows and the open-every-deck check run in happy-dom in the unit shards (`bun run test`).
+      - name: Browser checks of the demo
+        if: matrix.check == 'e2e'
+        run: |
+          bun run test:e2e
+      # A public API change must carry a changeset (docx-editor's api-changeset lane).
+      - name: API change has a changeset
+        if: matrix.check == 'changeset' && github.event_name == 'pull_request' && !startsWith(github.head_ref, 'changeset-release/')
+        run: node scripts/check-api-changeset.mjs --base origin/${{ github.base_ref }}
+      # FIXTURE_KNOWN_GAPS only shrinks: no new entry, new kind, or looser score
+      # unless the fixture's reference PDF changes too. Needs the base branch (full history).
+      - name: Known gaps only shrink
+        if: matrix.check == 'changeset' && github.event_name == 'pull_request'
+        run: bun run fidelity:check-gaps -- --base origin/${{ github.base_ref }}
+      - name: Upload fidelity report
+        if: matrix.check == 'fidelity' && always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fidelity-report
+          path: fidelity-report/
+      # Caches are saved only by pushes to main; `cache-maintenance` keeps the newest.
+      - name: Save apt package files
+        if: github.event_name == 'push' && matrix.check == 'fidelity' && !cancelled() && steps.apt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/apt-archives
+          key: ${{ steps.apt-key.outputs.prefix }}${{ steps.apt-key.outputs.packages }}-${{ hashFiles('bun.lock') }}
+      - name: Save reference rasters
+        if: github.event_name == 'push' && matrix.check == 'fidelity' && !cancelled() && steps.rasters-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .cache/fidelity-rasters
+          key: fidelity-rasters-${{ hashFiles('fixtures/*.pdf', 'scripts/fidelity/references.ts') }}
+      - name: Save npm cache
+        if: github.event_name == 'push' && matrix.check == 'build'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.npm
+          key: npm-build-${{ hashFiles('bun.lock') }}
+      - name: Save Playwright browsers
+        if: github.event_name == 'push' && matrix.check == 'build' && steps.playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('bun.lock') }}
+
+  # Every unit shard must split the suite with the same durations, or shards overlap
+  # and skip files. This job reads the newest durations cache once and hands that
+  # one copy to all shards. On a miss every shard splits without durations, which
+  # is the same split everywhere.
+  unit-plan:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 5
+    outputs:
+      planned: ${{ steps.restore.outputs.cache-matched-key != '' }}
+    steps:
+      - name: Restore test durations
+        id: restore
+        uses: actions/cache/restore@v6
+        with:
+          path: test-durations.json
+          key: test-durations-${{ github.run_id }}
+          restore-keys: test-durations-
+      - name: Hand the durations to the shards
+        if: steps.restore.outputs.cache-matched-key != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-durations-plan
+          path: test-durations.json
+          if-no-files-found: error
+          retention-days: 3
+
+  # `scripts/test/run-parallel.mjs` runs one `bun test` per file over a worker pool,
+  # slowest first. Only the adapter tests (react, vue) preload happy-dom; the engine
+  # tests run with no global DOM.
+  unit:
+    needs: unit-plan
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: ['1/3', '2/3', '3/3']
+    name: unit (${{ matrix.shard }})
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.3'
+      - run: bun install --frozen-lockfile
+      # Required when planned: a shard that lost the file would split differently.
+      - name: Download test durations
+        if: needs.unit-plan.outputs.planned == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: test-durations-plan
+          path: node_modules/.cache/pptx-editor
+      # --balance splits by measured time. Without a durations file every shard
+      # falls back to the same split by file count, so the shards still partition
+      # the suite. --retry-failed runs a failed file once more: a pass on the retry is
+      # reported as a FLAKY warning annotation instead of cancelling every shard.
+      # Pull requests skip the seeded collaboration fuzzers, the longest files in the suite.
+      # Every push to main runs them, as DOCX Editor does with its seeded scenarios.
+      - name: Run unit test shard
+        env:
+          TEST_SHARD: '${{ matrix.shard }}'
+          EVENT_NAME: '${{ github.event_name }}'
+        run: |
+          set -- --shard "$TEST_SHARD" --fail-fast --retry-failed --balance \
+            --durations-out shard-durations.json
+          if [ "$EVENT_NAME" = pull_request ]; then
+            set -- "$@" \
+              --exclude packages/pro/src/__tests__/yjs-text-fuzz.test.ts \
+              --exclude packages/pro/src/__tests__/yjs-table-fuzz.test.ts
+          fi
+          bun run test "$@"
+      - name: Upload shard durations
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-durations-shard-${{ strategy.job-index }}
+          path: shard-durations.json
+          retention-days: 3
+
+  # Pushes to main only. Merges the shards' fresh durations into one cache entry,
+  # drops entries for deleted test files, and deletes every cache entry the new ones
+  # replace, so the cache holds one entry per prefix.
+  cache-maintenance:
+    if: "!cancelled() && github.event_name == 'push'"
+    needs: [checks, unit]
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write # delete replaced cache entries
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Download the plan and shard durations
+        if: needs.unit.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: test-durations-*
+          path: durations
+      - name: Merge durations
+        if: needs.unit.result == 'success'
+        run: |
+          set --
+          [ -f durations/test-durations-plan/test-durations.json ] &&
+            set -- durations/test-durations-plan/test-durations.json
+          for shard in durations/test-durations-shard-*/shard-durations.json; do
+            [ -f "$shard" ] && set -- "$@" "$shard"
+          done
+          node scripts/test/merge-durations.mjs --out test-durations.json "$@"
+      - name: Save test durations
+        if: needs.unit.result == 'success'
+        uses: actions/cache/save@v6
+        with:
+          path: test-durations.json
+          key: test-durations-${{ github.run_id }}
+      - name: Prune replaced cache entries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # Keep the newest entry for each prefix; delete the rest.
+          for prefix in test-durations- npm-build- playwright- fidelity-rasters- apt-fidelity-; do
+            gh cache list --ref refs/heads/main --key "$prefix" --sort created_at \
+              --order desc --limit 100 --json id --jq '.[1:][].id' |
+              while read -r id; do
+                gh cache delete "$id"
+              done
+          done
+
+  # The tarball size against the PR base commit (docx-editor's package-size job). Growth over
+  # +20% and +25 KB fails unless the PR has the `size-increase-expected` label.
+  package-size:
+    if: github.event_name == 'pull_request'
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    needs: checks
+    permissions:
+      contents: read
+      actions: read # download the baseline artifact from a main run
+      pull-requests: write # sticky size comment
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Download current size report
+        uses: actions/download-artifact@v8
+        with:
+          name: package-sizes
+      - name: Download size report for the PR base commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/package-size-baseline.mjs
+      # The label is read from the API, not the frozen event payload, so "label + re-run" works.
+      - name: Compare against baseline (gate)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          allow=""
+          if gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/labels" --jq '.[].name' \
+            | grep -qx 'size-increase-expected'; then
+            allow=1
+          fi
+          PACKAGE_SIZE_ALLOW_GROWTH="$allow" node scripts/check-package-size.mjs \
+            --compare package-sizes.json \
+            --baseline baseline/package-sizes.json --comment size-comment.md
+      - name: Post sticky PR comment
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          comment_id=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq '[.[] | select(.user.login == "github-actions[bot]") | select(.body | startswith("<!-- package-size-report -->"))][0].id // empty')
+          if [ -n "$comment_id" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" -F body=@size-comment.md
+          else
+            gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -F body=@size-comment.md
+          fi

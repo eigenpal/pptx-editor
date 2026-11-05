@@ -1,0 +1,10 @@
+name: Feature request
+description: Describe a presentation editing need.
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What task do you need to complete?
+      description: Describe the workflow and any workaround. Check existing issues before submitting.
+    validations:
+      required: true

@@ -1,0 +1,73 @@
+---
+title: 'React examples'
+description: 'Find React examples for loading, saving, custom chrome, and the example applications.'
+category: 'React'
+order: 34
+---
+
+## Choose an example
+
+| Task | Source |
+| --- | --- |
+| Open a local file and download the edited deck | [Quickstart](/docs/quickstart) |
+| Save through the ref | [Use the ref](/docs/react/props#use-the-ref) |
+| Build custom toolbar buttons | [React hooks](/docs/react/hooks) |
+| Arrange editor parts | [React composition](/docs/react/composition) |
+| Replace a dialog | [Dialogs](/docs/customization/dialogs) |
+| Translate the interface | [Language](/docs/customization/language) |
+| Run a command from your code | [Run a command](#run-a-command) |
+
+## Run a command
+
+Render this component inside `PptxEditor.Root`. It adds a slide with the typed `addSlide` command and shows the engine's refusal reason:
+
+```tsx
+import { useState } from 'react';
+import { useEditorState, usePptxEditor } from '@pptx-editor.dev/react';
+
+export function AddSlideButton() {
+  const editor = usePptxEditor();
+  const editable = useEditorState((s) => s.status === 'ready' && s.mode === 'edit');
+  const [error, setError] = useState<string | null>(null);
+
+  function add() {
+    if (!editor) return;
+    const result = editor.exec({ type: 'addSlide' });
+    setError(result.ok ? null : result.reason);
+  }
+
+  return (
+    <>
+      <button type="button" disabled={!editable} onClick={add}>
+        New slide
+      </button>
+      <output aria-live="polite">{error}</output>
+    </>
+  );
+}
+```
+
+`exec` returns a `CommandResult`: `ok` is `false` with a `reason` when the engine refuses the command. Each `exec` call is one undo step. For a control that a toolbar slot already describes, prefer `useEditorCommand(slot)`; see [React hooks](/docs/react/hooks).
+
+## Run the React examples
+
+The repository has two React applications:
+
+| Example | Shows | Command |
+| --- | --- | --- |
+| [`examples/vite`](https://github.com/eigenpal/pptx-editor/tree/main/examples/vite) | Composed chrome: a menu bar, the toolbar or the ribbon, the slide rail and the Slide Sorter, the notes, the side panel, and export | `bun run dev` (`http://localhost:5274`) |
+| [`examples/nextjs`](https://github.com/eigenpal/pptx-editor/tree/main/examples/nextjs) | The packaged `<PptxEditor>` in the App Router | `bun run dev:nextjs` (`http://localhost:3000`) |
+
+Run `bun install` at the repository root first. The Vite example builds against the package source and needs no build step. The Next.js example uses the built packages, so run `bun run build:packages` first.
+
+## Limits
+
+- Render command components inside `PptxEditor.Root`. Wait for `usePptxEditor()` to return the instance before you call it.
+- `save()` returns `null` when no deck is open. Your application owns any download or upload of the saved bytes.
+- The editor makes no network request of its own. Your application fetches the deck and passes its bytes.
+
+## Next steps
+
+- [React props](/docs/react/props): configure `<PptxEditor>` and its ref.
+- [Toolbar](/docs/customization/toolbar): find command slot identifiers.
+- [Next.js](/docs/frameworks/nextjs): set up the editor in the App Router.

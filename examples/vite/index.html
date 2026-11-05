@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PPTX Editor</title>
+    <!-- The same icon set as DOCX Editor's demo, built by scripts/brand/build-icons.ts. -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/web-app-manifest-192x192.png" />
+    <style>
+      html, body, #app { margin: 0; height: 100%; }
+      /* The splash until the app mounts and replaces it, as in the DOCX Editor demos. The
+         editor's own loading screen (PptxEditor.Loading) takes over from there. */
+      .splash { display: grid; place-items: center; height: 100%; background: #f4f3f0; }
+      .splash__spinner {
+        width: 32px; height: 32px; border-radius: 50%;
+        border: 3px solid #e7e4df; border-top-color: #1b1a19;
+        animation: splash-spin 0.8s linear infinite;
+      }
+      @keyframes splash-spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .splash__spinner { animation: none; } }
+    </style>
+  </head>
+  <body>
+    <div id="app"><div class="splash" role="status" aria-label="Loading"><span class="splash__spinner"></span></div></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

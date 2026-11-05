@@ -1,0 +1,62 @@
+{
+  "name": "@pptx-editor.dev/editor-api",
+  "version": "0.0.0",
+  "description": "Presentation automation for PPTX: an Office.js-shaped batching object model that drives a deck on a server or in an editor already open in a page.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE.md",
+    "THIRD_PARTY_NOTICES.md",
+    "!dist/metafile-*.json"
+  ],
+  "engines": {
+    "node": "^20.16.0 || >=22.3.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "bun check",
+    "api:extract": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/editor-api --local",
+    "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/editor-api",
+    "compat:generate": "node scripts/generate-conformance.mjs",
+    "compat:report": "node scripts/compat-report.mjs",
+    "compat:fetch-inventory": "node scripts/fetch-signature-inventory.mjs",
+    "compat:fetch-reference": "node scripts/fetch-office-reference.mjs",
+    "compat:check-drift": "node scripts/fetch-office-reference.mjs --check"
+  },
+  "keywords": [
+    "pptx",
+    "presentation",
+    "ooxml",
+    "automation",
+    "headless",
+    "office-js"
+  ],
+  "peerDependencies": {
+    "@pptx-editor.dev/core": "0.x"
+  },
+  "devDependencies": {
+    "@pptx-editor.dev/core": "workspace:*"
+  },
+  "license": "LicenseRef-EigenPal-Pro-Evaluation-1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eigenpal/pptx-editor.git",
+    "directory": "packages/editor-api"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

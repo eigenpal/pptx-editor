@@ -1,0 +1,50 @@
+{
+  "name": "@pptx-editor.dev/vue",
+  "version": "0.0.0",
+  "description": "Vue 3 adapter for PPTX Editor: a provider, composables, and chrome components over the @pptx-editor.dev/core editor contract.",
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./styles.css": "./src/styles/editor.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src/styles",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md",
+    "!dist/metafile-*.json"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "bun check",
+    "api:extract": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/vue --local",
+    "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/vue"
+  },
+  "dependencies": {
+    "@pptx-editor.dev/i18n": "^0.0.0"
+  },
+  "peerDependencies": {
+    "@pptx-editor.dev/core": "0.x",
+    "vue": "^3.3.0"
+  },
+  "devDependencies": {
+    "@pptx-editor.dev/core": "workspace:*",
+    "vue": "3.5.44"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eigenpal/pptx-editor.git",
+    "directory": "packages/vue"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

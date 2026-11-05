@@ -1,0 +1,80 @@
+---
+title: 'Installation'
+description: 'Install the PPTX editor packages, check runtime requirements, add the stylesheet, and set up your bundler.'
+category: 'Getting started'
+---
+
+## Install packages
+
+Install one adapter and the engine. Each adapter declares `@pptx-editor.dev/core` as a peer dependency, and it installs the shared strings (`@pptx-editor.dev/i18n`) for you.
+
+<FrameworkTabs>
+<Framework value="react">
+
+```bash
+npm install @pptx-editor.dev/react @pptx-editor.dev/core
+```
+
+</Framework>
+<Framework value="vue">
+
+```bash
+npm install @pptx-editor.dev/vue @pptx-editor.dev/core
+```
+
+</Framework>
+</FrameworkTabs>
+
+Install one copy of `@pptx-editor.dev/core`. The text shaper and its measurement caches belong to that copy, so two copies in one bundle measure text separately.
+
+## Check runtime requirements
+
+| Requirement                                            | Version                  |
+| ------------------------------------------------------ | ------------------------ |
+| React and React DOM                                    | 18 or 19                 |
+| Vue                                                    | 3.3 or later             |
+| Node.js, for tooling and server-side use of the engine | `^20.16.0` or `>=22.3.0` |
+| Module format                                          | ESM only                 |
+| TypeScript, for the bundled types                      | 5.7 or later             |
+
+The editor runs in the browser. It needs the FontFace API and WebAssembly for text shaping, and `Intl.Segmenter` for caret steps and word boundaries (Chrome 87, Safari 14.1, Firefox 125, or later). On a runtime without `Intl.Segmenter`, the import of `@pptx-editor.dev/core` throws an error that names it.
+
+## Add styles and a container
+
+Import the stylesheet once. It holds every chrome style and the `--doc-*` tokens. Each adapter also exports it as `styles.css`.
+
+```ts
+import '@pptx-editor.dev/core/styles/editor.css';
+```
+
+The default editor fills the height of its parent, so give the parent a height:
+
+```tsx
+<div style={{ height: '100vh' }}>
+  <PptxEditor document={bytes} />
+</div>
+```
+
+To theme the chrome, see [Appearance](/docs/customization/appearance). The slides always show the deck's own colors.
+
+## Set up your bundler
+
+The engine shapes text with HarfBuzz and loads `harfbuzz.wasm` from `new URL(..., import.meta.url)`.
+
+- Vite, webpack, and Turbopack emit the file. They need no configuration.
+- Bun and esbuild do not emit it. Serve `@pptx-editor.dev/core/harfbuzz.wasm` as a static file, and point the shaper at it before you create the first editor:
+
+```ts
+import { setHarfBuzzWasmUrl } from '@pptx-editor.dev/core/layout';
+
+setHarfBuzzWasmUrl('/static/harfbuzz.wasm');
+```
+
+## Choose fonts
+
+Without other setup, the editor measures with the deck's embedded fonts, then with the metric-compatible substitutes of `@docx-editor.dev/fonts`, and it makes no network request. To supply your own faces, see [Fonts](/docs/customization/fonts).
+
+## Next steps
+
+- [Quickstart](/docs/quickstart): open and save a deck.
+- [Customization](/docs/customization): change the toolbar, menus, dialogs, and appearance.

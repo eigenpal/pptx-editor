@@ -1,0 +1,5 @@
+/* The React demo's styles, in the structure of the DOCX Editor repository demos: the editor
+   stylesheet first, then the demo shell that the React and Vue demos share.
+   In standalone usage: @import '@pptx-editor.dev/core/styles/editor.css'; */
+@import '@pptx-editor.dev/core/styles/editor.css';
+@import '../../shared/shell.css';

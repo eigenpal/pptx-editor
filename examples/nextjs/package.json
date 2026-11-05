@@ -1,0 +1,26 @@
+{
+  "name": "@pptx-editor.dev/example-nextjs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "assets": "mkdir -p public && cp ../vite/public/* public/",
+    "dev": "bun run assets && next dev --port 3000",
+    "build": "bun run assets && next build",
+    "start": "next start --port 3000"
+  },
+  "dependencies": {
+    "@pptx-editor.dev/core": "workspace:*",
+    "@pptx-editor.dev/i18n": "workspace:*",
+    "@pptx-editor.dev/react": "workspace:*",
+    "next": "^16.2.7",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "^5.9.3"
+  }
+}

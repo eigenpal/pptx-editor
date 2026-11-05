@@ -1,0 +1,420 @@
+name: Release
+
+# DOCX Editor's release flow (docx-editor/.github/workflows/release.yml), sized for v0.
+#
+# 1. Every push to main with pending changesets in `.changeset/` opens or updates a
+#    "chore: release" PR with the version bumps and CHANGELOG entries applied.
+# 2. When that PR is merged, the same flow sees no pending changesets and publishes.
+#
+# `mode` picks the path. On the publish path, `checks` and `build` must pass first, and
+# `release` publishes exactly the dist that `build` validated. On the PR-update path they
+# are skipped: `changeset version` only rewrites versions, and every contributing PR
+# already ran CI.
+#
+# `release` runs on a GitHub-hosted runner and publishes with npm trusted publishing
+# (OIDC), so no long-lived npm token exists. npm signs provenance only for public
+# repositories, so provenance follows the repository's visibility. Every stable job requires
+# main, so a manual run on another branch never updates the release PR or publishes.
+#
+# Canary channel, as in DOCX Editor. The nightly schedule, or a manual run with
+# channel=canary, publishes the newest main commit that passed CI as a prerelease on the
+# `canary` dist-tag, for example 0.1.0-canary.20261106032300.sha-b20ba9f. The base version
+# is the one the pending changesets will release. `changeset version --snapshot` changes
+# versions on the runner only: no commit, no git tag, no changelog, no GitHub Release, and
+# `latest` never moves. The canary lives in this file because npm allows one trusted
+# publisher per package, bound to the workflow file name. It runs in its own concurrency
+# group, so a nightly run never cancels a queued release-PR update.
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Off the hour: GitHub delays or drops scheduled runs at :00 under load.
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'release: update the release PR or publish to latest. canary: publish the newest green main commit to the canary tag.'
+        type: choice
+        options: [release, canary]
+        default: release
+
+concurrency:
+  group: ${{ (github.event_name == 'schedule' || inputs.channel == 'canary') && 'release-canary' || 'release' }}
+  cancel-in-progress: false
+
+jobs:
+  # Pending changesets: the PR-update path (checks and build skip). None: the publish path.
+  # A canary run answers canary or idle (scripts/release-mode.mjs).
+  mode:
+    name: Detect release mode
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read # canary: find the newest main commit that passed CI
+    env:
+      RELEASE_CHANNEL: ${{ (github.event_name == 'schedule' || inputs.channel == 'canary') && 'canary' || 'release' }}
+    outputs:
+      # A canary run can only answer canary or idle.
+      mode: ${{ ((github.event_name == 'schedule' || inputs.channel == 'canary') && steps.mode.outputs.mode != 'canary') && 'idle' || steps.mode.outputs.mode }}
+      commit: ${{ steps.commit.outputs.sha }}
+    steps:
+      # A canary ships only a commit that main's own CI run passed, and only from the
+      # canonical repository's main branch: never from a fork or a dispatch on a branch.
+      - name: Find the newest main commit that passed CI
+        id: commit
+        if: ${{ env.RELEASE_CHANNEL == 'canary' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$REPOSITORY" != "eigenpal/pptx-editor" ] || [ "$REF" != "refs/heads/main" ]; then
+            echo "Canaries publish only from eigenpal/pptx-editor main, not $REPOSITORY $REF" >&2
+            exit 1
+          fi
+          sha=$(gh run list --repo "$REPOSITORY" --workflow ci.yml --branch main --event push \
+            --status success --limit 1 --json headSha --jq '.[0].headSha // empty')
+          if [ -z "$sha" ]; then
+            echo "No main commit has a successful CI run" >&2
+            exit 1
+          fi
+          echo "Newest main commit that passed CI: $sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.commit.outputs.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Detect pending changesets
+        id: mode
+        env:
+          CANARY_COMMIT: ${{ steps.commit.outputs.sha }}
+          # Canary only: reads main's changesets and the active Release runs.
+          GH_TOKEN: ${{ env.RELEASE_CHANNEL == 'canary' && github.token || '' }}
+        run: node scripts/release-mode.mjs
+      - name: Refuse stable releases outside main
+        if: ${{ env.RELEASE_CHANNEL == 'release' && github.ref != 'refs/heads/main' }}
+        env:
+          REF: ${{ github.ref }}
+        run: echo "::warning::Stable releases run only from main. This run on $REF stops after mode detection."
+
+  checks:
+    name: Prepublish ${{ matrix.label }}
+    needs: mode
+    if: ${{ github.ref == 'refs/heads/main' && needs.mode.outputs.mode == 'publish' }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - label: lint
+            command: bun run lint && bun run format:check && bun run check:security
+          - label: typecheck
+            command: bun run typecheck
+          - label: tests
+            command: bun run test
+          - label: i18n
+            command: bun run i18n:validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.3'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: bun install --frozen-lockfile
+      - run: ${{ matrix.command }}
+
+  build:
+    name: Prepublish build
+    needs: mode
+    if: ${{ github.ref == 'refs/heads/main' && needs.mode.outputs.mode == 'publish' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.3'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: bun install --frozen-lockfile
+      - name: Build packages (publish reuses this dist)
+        run: bun run build:packages
+      - name: API snapshots
+        run: bun run api:check
+      - name: Build the demo
+        run: bun run --filter './examples/vite' build
+      - name: Generate third-party notices
+        run: bun run notices:generate
+      - name: Check published package artifacts
+        run: bun run check:package-artifacts
+      - name: Upload publish artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: publish-dist
+          path: |
+            packages/*/dist
+            packages/*/THIRD_PARTY_NOTICES.md
+          if-no-files-found: error
+          retention-days: 3
+
+  release:
+    name: Release
+    needs: [mode, checks, build]
+    # checks and build are skipped on the PR-update path by design. The publish path needs
+    # both to succeed: a skipped gate on the publish path never publishes.
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && needs.mode.result == 'success' && ((needs.mode.outputs.mode == 'pending' && needs.checks.result == 'skipped' && needs.build.result == 'skipped') || (needs.mode.outputs.mode == 'publish' && needs.checks.result == 'success' && needs.build.result == 'success')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      # Read by notify-failure to tell "the changesets step failed" from "an earlier step
+      # failed", and "already published" from "nothing published".
+      changesets_outcome: ${{ steps.changesets.outcome }}
+      published: ${{ steps.changesets.outputs.published }}
+    permissions:
+      contents: write # push tags, create GitHub Releases
+      pull-requests: write # open or update the release PR
+      id-token: write # OIDC for npm trusted publishing
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.3'
+      # npm trusted publishing needs npm 11.5.1 or later, which ships with Node 24.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - run: bun install --frozen-lockfile
+      # `bun install` runs `prepare` (husky). The local pre-commit hook must not gate the
+      # bot's "chore: release" commit: the checks above already ran on the publish path.
+      - name: Disable git hooks for automated commits
+        run: git config core.hooksPath /dev/null
+      - name: Download publish artifacts
+        if: ${{ needs.mode.outputs.mode == 'publish' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: publish-dist
+          path: packages
+      - name: Release PR or publish
+        id: changesets
+        uses: changesets/action@v2
+        # v2 renamed the inputs and reads the token from `github-token`, as in DOCX Editor.
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          version-script: bun run version-packages
+          publish-script: bunx changeset publish
+          pr-title: 'chore: release'
+          commit-message: 'chore: release'
+        env:
+          NPM_CONFIG_PROVENANCE: ${{ github.event.repository.private && 'false' || 'true' }}
+
+      # changesets/action tags each package (`@pptx-editor.dev/core@0.1.0`). The fixed group
+      # keeps every package on one version, so add one `vX.Y.Z` tag for the release as a
+      # whole. Post-release reads it to find what shipped. As in DOCX Editor.
+      - name: Create umbrella version tag (vX.Y.Z)
+        if: ${{ steps.changesets.outputs.published == 'true' && github.ref == 'refs/heads/main' }}
+        env:
+          PUBLISHED_PACKAGES: ${{ steps.changesets.outputs.published-packages }}
+        run: |
+          version=$(jq -r '.[0].version' <<<"$PUBLISHED_PACKAGES")
+          git tag -a "v$version" -m "Release v$version"
+          git push origin "v$version"
+
+      - name: Notify Slack — release succeeded
+        continue-on-error: true
+        if: ${{ steps.changesets.outputs.published == 'true' && env.SLACK_WEBHOOK_URL != '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          PUBLISHED_PACKAGES: ${{ steps.changesets.outputs.published-packages }}
+          ACTOR: ${{ github.actor }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SERVER_URL: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+        run: |
+          # published-packages is JSON like [{"name":"@pptx-editor.dev/core","version":"0.1.0"}].
+          version=$(jq -r '.[0].version' <<<"$PUBLISHED_PACKAGES")
+          packages_md=$(jq -r '.[] | "• <https://www.npmjs.com/package/\(.name)/v/\(.version)|\(.name)@\(.version)>"' <<<"$PUBLISHED_PACKAGES")
+          # GitHub Releases exist for the per-package tags (`@pptx-editor.dev/core@0.1.0`),
+          # not for the umbrella tag. URL-encode `@` and `/` so the link resolves.
+          release_tag=$(jq -rn --argjson pkgs "$PUBLISHED_PACKAGES" '$pkgs[0].name + "@" + $pkgs[0].version | @uri')
+          release_url="$SERVER_URL/$REPO/releases/tag/$release_tag"
+          payload=$(jq -n \
+            --arg version "$version" \
+            --arg actor "$ACTOR" \
+            --arg run_n "$RUN_NUMBER" \
+            --arg run_url "$RUN_URL" \
+            --arg release "$release_url" \
+            --arg packages "$packages_md" \
+            '{
+              text: ":large_green_circle: pptx-editor \($version) released",
+              blocks: [
+                { type: "section", text: { type: "mrkdwn", text: ":large_green_circle: *pptx-editor \($version) released*" } },
+                { type: "section", fields: [
+                  { type: "mrkdwn", text: "*Version*\n<\($release)|\($version)>" },
+                  { type: "mrkdwn", text: "*Triggered by*\n\($actor)" }
+                ] },
+                { type: "section", text: { type: "mrkdwn", text: "*Packages*\n\($packages)" } },
+                { type: "context", elements: [ { type: "mrkdwn", text: "<\($run_url)|Run #\($run_n)>" } ] }
+              ]
+            }')
+          curl -sSf --connect-timeout 10 --max-time 30 -X POST -H 'Content-Type: application/json' -d "$payload" "$SLACK_WEBHOOK_URL" >/dev/null
+
+  # Nightly prerelease on the `canary` dist-tag; see the header comment. Main's CI already
+  # passed this commit, so the job repeats only the gates that depend on the canary version:
+  # the build, the package artifacts, and a consumer install of the exact tarballs with their
+  # pinned internal ranges. Publishing needs a GitHub-hosted runner for provenance.
+  canary:
+    name: Canary
+    needs: mode
+    if: ${{ (github.event_name == 'schedule' || inputs.channel == 'canary') && needs.mode.result == 'success' && needs.mode.outputs.mode == 'canary' && needs.mode.outputs.commit != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      actions: read # the stable-release gate lists active Release runs
+      id-token: write # OIDC for npm trusted publishing
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.mode.outputs.commit }}
+          # `changeset version` reads the commit that added each changeset.
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.3'
+      # npm trusted publishing needs npm 11.5.1 or later, which ships with Node 24.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - run: bun install --frozen-lockfile
+      # Versions every public package <pending version>-canary.<UTC time>.sha-<commit> and
+      # pins the internal peer and runtime ranges to that exact version.
+      - name: Version the canary
+        run: bun run changeset version --snapshot canary
+      - name: Check the canary version
+        run: |
+          version=$(node -p "require('./packages/core/package.json').version")
+          echo "Canary version: $version"
+          case "$version" in
+            *-canary.*.sha-*) ;;
+            *) echo "Unexpected canary version: $version" >&2; exit 1 ;;
+          esac
+      - name: Build packages
+        run: bun run build:packages
+      - name: Generate third-party notices
+        run: bun run notices:generate
+      - name: Check published package artifacts
+        run: bun run check:package-artifacts
+      - name: Install Chromium for the consumer check
+        run: bunx playwright install --with-deps chromium
+      - name: Consumer install check
+        run: bun run check:consumer-install
+      # npm refuses provenance from a private repository. A scheduled event has no
+      # `repository` object, so read the visibility from the API.
+      - name: Read the repository visibility
+        id: visibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: echo "private=$(gh api "repos/$REPOSITORY" --jq .private)" >> "$GITHUB_OUTPUT"
+      # Checked again right before publishing: a release PR merged or a stable publish
+      # started during this job skips the publish. See stableReleaseClear.
+      - name: Confirm no stable release is active
+        id: gate
+        env:
+          RELEASE_CHANNEL: canary-gate
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release-mode.mjs
+      # --tag canary keeps `latest` where it is. Canaries create no git tags and post nothing
+      # to Slack; a failed canary shows only as a failed run in Actions.
+      - name: Publish canary
+        if: ${{ steps.gate.outputs.clear == 'true' }}
+        run: bun run changeset publish --tag canary --no-git-tag
+        env:
+          NPM_CONFIG_PROVENANCE: ${{ steps.visibility.outputs.private == 'false' && 'true' || 'false' }}
+
+  # As in DOCX Editor: one Slack notice for any failure, with the most likely cause.
+  # A separate job, so a failed prepublish check still alerts when `release` never starts.
+  # Canary runs never post to Slack.
+  notify-failure:
+    name: Notify Slack — workflow failed
+    needs: [mode, checks, build, release]
+    if: ${{ failure() && github.event_name != 'schedule' && inputs.channel != 'canary' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Notify Slack
+        if: ${{ env.SLACK_WEBHOOK_URL != '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          ACTOR: ${{ github.actor }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          MODE_RESULT: ${{ needs.mode.result }}
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          MODE: ${{ needs.mode.outputs.mode }}
+          CHANGESETS_OUTCOME: ${{ needs.release.outputs.changesets_outcome }}
+          PUBLISHED: ${{ needs.release.outputs.published }}
+        run: |
+          if [ "$PUBLISHED" = "true" ]; then
+            mode="post-publish"
+            title=":warning: pptx-editor — release tagging failed after publication"
+            detail="Packages were published, but a later step failed (the version tag or the Slack message). Do not republish. Check the run and create the missing tag by hand."
+          elif [ "$MODE_RESULT" != "success" ]; then
+            mode="release-mode"
+            title=":x: pptx-editor — release mode detection failed"
+            detail="The Detect release mode job failed, so no release PR was updated and no publish was attempted."
+          elif [ "$CHANGESETS_OUTCOME" != "failure" ]; then
+            mode="pre-release"
+            title=":x: pptx-editor — pre-release step failed"
+            detail="A prepublish check or build failed (checks: $CHECKS_RESULT; build: $BUILD_RESULT), or release-job setup failed. No release PR was updated and no publish was attempted."
+          elif [ "$MODE" != "publish" ]; then
+            mode="release-pr"
+            title=":warning: pptx-editor — failed to update release PR"
+            detail="The Release workflow could not assemble the \`chore: release\` PR. No publish was attempted. Likely cause: a malformed changeset file (wrong package name, bad frontmatter)."
+          else
+            mode="publish"
+            title=":x: pptx-editor — release publish failed"
+            detail="No pending changesets, so the workflow tried to publish to npm and failed. Packages may be partly published; check the run logs."
+          fi
+          payload=$(jq -n \
+            --arg title "$title" \
+            --arg detail "$detail" \
+            --arg mode "$mode" \
+            --arg actor "$ACTOR" \
+            --arg run_n "$RUN_NUMBER" \
+            --arg run_url "$RUN_URL" \
+            '{
+              text: $title,
+              blocks: [
+                { type: "section", text: { type: "mrkdwn", text: "*\($title)*" } },
+                { type: "section", text: { type: "mrkdwn", text: $detail } },
+                { type: "section", fields: [
+                  { type: "mrkdwn", text: "*Mode*\n\($mode)" },
+                  { type: "mrkdwn", text: "*Triggered by*\n\($actor)" },
+                  { type: "mrkdwn", text: "*Run*\n<\($run_url)|#\($run_n)>" }
+                ] }
+              ]
+            }')
+          curl -sSf --connect-timeout 10 --max-time 30 -X POST -H 'Content-Type: application/json' -d "$payload" "$SLACK_WEBHOOK_URL" >/dev/null

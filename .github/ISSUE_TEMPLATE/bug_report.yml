@@ -1,0 +1,20 @@
+name: Bug report
+description: Report a reproducible presentation editing issue.
+body:
+  - type: markdown
+    attributes:
+      value: Use Security Advisories for vulnerabilities. Attach only synthetic or sanitized decks. Never upload confidential content.
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include the command, package version or commit, browser, and operating system.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Explain the edit and what changed after saving and reopening, if relevant.
+    validations:
+      required: true

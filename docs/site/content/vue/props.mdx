@@ -1,0 +1,147 @@
+---
+title: 'Props'
+description: 'Reference for the Vue PPTX editor props, events, slots, and the six ref methods.'
+category: 'Vue'
+order: 36
+---
+
+## Configure the editor
+
+This example loads `.pptx` bytes and saves the edited deck through the ref:
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { PptxEditor, type PptxEditorRef } from '@pptx-editor.dev/vue';
+
+const props = defineProps<{
+  bytes: Uint8Array;
+  upload: (bytes: Uint8Array) => Promise<void>;
+}>();
+const editorRef = ref<PptxEditorRef | null>(null);
+
+async function save() {
+  const saved = editorRef.value?.save();
+  if (saved) await props.upload(saved);
+}
+</script>
+
+<template>
+  <div style="display: flex; flex-direction: column; height: 100vh">
+    <button @click="save">Save</button>
+    <div style="flex: 1; min-height: 0">
+      <PptxEditor ref="editorRef" :document="bytes" mode="edit" />
+    </div>
+  </div>
+</template>
+```
+
+For generated signatures, see `docs/api/vue/index.api.md` in the repository. The props type, `PptxEditorProps`, derives from the component's runtime props.
+
+## Set props
+
+### Document
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `document` | `Uint8Array` | The `.pptx` bytes. A new array loads a new deck. Without it, the editor shows its loading sheet. |
+| `mode` | `'edit' \| 'view'` | Edit the deck, or only show it. Defaults to `'edit'`. Changes apply without a reload. |
+
+### Fonts
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `fonts` | `FontConfiguration \| FontConfigurationFragment \| FontResolver` | Font bytes for layout. A change replaces the fonts in place; the deck, the selection, and the undo history stay. Wrap a resolver in `useFonts()` to keep one identity. |
+| `fontFamilies` | `readonly string[]` | Families the font picker offers besides the standard ones and the deck's own. A change updates the picker in place; the deck and the undo history stay. |
+
+Without `fonts`, the editor measures with the deck's embedded fonts and then the packaged substitutes, and it fetches nothing. See [Fonts](/docs/customization/fonts).
+
+### Capability modules
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `modules` | `readonly EditorModule[]` | Capability modules, such as the review and collaboration modules of `@pptx-editor.dev/pro`. Read once, when the editor is created. A later change has no effect and prints a development warning. |
+
+Create the list once in `setup`, so each render passes the same modules:
+
+```vue
+<script setup lang="ts">
+import { PptxEditor } from '@pptx-editor.dev/vue';
+import { reviewModule } from '@pptx-editor.dev/pro';
+
+defineProps<{ bytes: Uint8Array }>();
+const modules = [reviewModule()];
+</script>
+
+<template>
+  <PptxEditor :document="bytes" :modules="modules" />
+</template>
+```
+
+`@pptx-editor.dev/pro` is under the EigenPal Pro License. To use other modules after mount, change the `key` of `PptxEditor` to create a new editor.
+
+### Appearance and language
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `colorMode` | `'light' \| 'dark' \| 'system'` | The chrome color mode. Defaults to `'light'`. The slides keep the deck's own colors. See [Appearance](/docs/customization/appearance). |
+| `locale` | `LocaleCatalog` | The interface strings. English when you omit it. See [Language](/docs/customization/language). |
+
+A host `class`, `style`, `id`, or `data-*` attribute goes on the viewport, after its `pptx-default` class.
+
+### Chrome
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `popups` | `PptxEditorPopups` | Replaces or turns off the dialogs and popups the editor mounts. See [Dialogs](/docs/customization/dialogs). |
+| `openFailure` | `boolean \| PptxEditorOpenFailureProps` | The notice for a file that does not open. `false` removes it. Defaults to `true`. See [Open failure](/docs/customization/layout#open-failure). |
+
+## Handle events and slots
+
+`<PptxEditor>` emits three events:
+
+| Event | Payload | Description |
+| --- | --- | --- |
+| `@ready` | `editor: PptxEditorInstance` | Emitted once for each instance, after the editor mounts. |
+| `@change` | `editor: PptxEditorInstance` | Emitted after every change of editor state, also for selection changes. |
+| `@font-error` | `error: EditorFontError` | A font failure: a failed origin, a refused face, or a failed resolution. Without a listener, each failure prints one warning. |
+
+| Slot | Props | Description |
+| --- | --- | --- |
+| `#default` | none | Extra content inside the viewport, after the slide show. |
+| `#openFailureActions` | `{ failure, message, dismiss }` | Your own buttons in the open-failure notice, before **Close**. With `:open-failure="false"`, it renders nothing and prints a development warning. |
+
+## Use the ref
+
+`<PptxEditor>` and `PptxEditorRoot` expose a `PptxEditorRef`. Read it with a template ref:
+
+```ts
+const saved = editorRef.value?.save();
+const editor = editorRef.value?.getEditor();
+editorRef.value?.focus();
+```
+
+| Method | Returns | Description |
+| --- | --- | --- |
+| `load(bytes)` | `Promise<CommandResult>` | Opens `.pptx` bytes. Resolves when the deck is open, or with the refusal. |
+| `save()` | `Uint8Array<ArrayBuffer> \| null` | Serializes the deck to `.pptx`. Returns `null` when no deck is open. `new Blob([bytes])` takes the bytes as they are. |
+| `getEditor()` | `PptxEditorInstance \| null` | Returns the editor instance, or `null` before it mounts. |
+| `focus()` | `void` | Gives the keyboard back to the slide: the text caret, else the slide surface. |
+| `exec(command, options?)` | `CommandResult` | Runs a typed `EditorCommand`, as `editor.exec`. |
+| `snapshot()` | `EditorSnapshot` | Reads the current state, as `editor.snapshot()`. |
+
+Every method is safe before the editor mounts: `load` and `exec` refuse with `disabled.noEditor`, `save` and `getEditor` return `null`, `focus` does nothing, and `snapshot` returns an empty snapshot. Everything else is on the instance that `getEditor()` returns.
+
+## Limits
+
+- `@ready` fires once for each instance. A new `document` reuses the instance, so `@ready` does not fire again.
+- `save()` returns the bytes only. Your application owns any download or upload.
+- `locale` follows the content of the catalog, not its identity, so a new object with the same strings does not repaint.
+- `modules` applies when the instance is created. To change it, remount with a different `:key`.
+- `PptxEditorRoot` emits the same three events. The `#openFailureActions` slot belongs to `<PptxEditor>`; a composed editor passes actions to `PptxEditorOpenFailure`.
+
+## Next steps
+
+- [Vue composables](/docs/vue/composables): read state and run commands from your controls.
+- [Vue composition](/docs/vue/composition): build your own layout.
+- [Vue examples](/docs/vue/examples): run the example applications.

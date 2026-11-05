@@ -1,0 +1,106 @@
+---
+title: 'Undo and history groups'
+description: 'What one undo step holds, what undo and redo restore, and how to make several of your own commands one undo step.'
+category: 'Guides'
+---
+
+Every edit the user makes is one undo step. Undo restores the slide and the selection from before the step, and redo restores the slide and the selection from after it. Run `editor.exec({ type: 'undo' })` and `editor.exec({ type: 'redo' })`, or check first with `editor.can(command)`.
+
+## What one undo step holds
+
+| User action | Undo steps |
+| --- | --- |
+| Typing at a caret | One step for the whole burst. A caret move, a click, a selection change, any command, undo, and redo end the burst. |
+| Backspace, Delete, Enter, or typing over a selected range | One step each |
+| Moving, resizing, rotating, or cropping with the pointer | One step for the whole drag, from press to release |
+| Dragging a table grid line | One step for the whole drag |
+| Arrow keys that nudge the selected shapes | One step for consecutive nudges of the same selection, also with key repeat. Another selection or another command starts a new step. |
+| Any other command | One step |
+
+A command that has nothing to do adds no step. When the browser cancels a pointer drag (`pointercancel`), the drag ends where it is and keeps one step.
+
+## Group your own commands
+
+Use a history group to make several commands one undo step. Open one with `editor.beginHistoryGroup()`, pass it to each command as `{ historyGroup }`, and call `end()` when the gesture ends:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core';
+
+function moveAndTurn(editor: Editor) {
+  const group = editor.beginHistoryGroup();
+  try {
+    const moved = editor.exec({ type: 'nudge', dx: 914400, dy: 0 }, { historyGroup: group });
+    if (!moved.ok) return moved;
+    return editor.exec({ type: 'rotateObjects', degrees: 90 }, { historyGroup: group });
+  } finally {
+    group.end();
+  }
+}
+// One `editor.exec({ type: 'undo' })` reverts the move and the turn.
+```
+
+Call `end()` in a `finally` block, so a refused command or an exception does not leave the group open. `end()` keeps the edits already applied, and you can call it more than once.
+
+These rules apply to a group:
+
+- Undo, redo, and a command with another group or with no group split the step. A later command with the same open group starts a new step.
+- A selection change, and a command that the editor refuses before it writes, do not split the step.
+- Redo restores the selection after the last command of the group.
+- `group.state` is `'open'` until `end()`. `load()` and `destroy()` close every group.
+- `exec` and `can` refuse a closed group, a group from another editor, and any other value with `errors.unsupported`. The document does not change.
+
+## Group a slider or a stepper
+
+Toolbar value slots take a group as the last argument. A host slider sends each value while the pointer moves, and one undo step reverts the whole drag. In React:
+
+```tsx
+import { useRef } from 'react';
+import type { HistoryGroup } from '@pptx-editor.dev/core';
+import { useEditorValueCommand, usePptxEditor } from '@pptx-editor.dev/react';
+
+export function FontSizeSlider() {
+  const editor = usePptxEditor();
+  const size = useEditorValueCommand('font.size');
+  const gesture = useRef<HistoryGroup | null>(null);
+  const end = () => {
+    gesture.current?.end();
+    gesture.current = null;
+  };
+  return (
+    <input
+      type="range"
+      min={8}
+      max={96}
+      value={size.value ?? 18}
+      disabled={!size.isEnabled}
+      onPointerDown={() => {
+        end();
+        gesture.current = editor?.beginHistoryGroup() ?? null;
+      }}
+      onPointerUp={end}
+      onPointerCancel={end}
+      onBlur={end}
+      onChange={(event) => {
+        const historyGroup = gesture.current ?? undefined;
+        size.execute(
+          Number(event.currentTarget.value),
+          historyGroup ? { historyGroup } : undefined
+        );
+      }}
+    />
+  );
+}
+```
+
+`font.size` takes points. Without a group, for example when the user moves the slider with the keyboard, each value is its own step.
+
+In Vue, `useEditorValueCommand(slot).execute(value, { historyGroup })` takes the same options, and `usePptxEditor().value?.beginHistoryGroup()` opens the group. Without a framework, call `runToolbarCommand(editor, 'font.size', 24, { historyGroup })`.
+
+## Collaboration
+
+With the collaboration module from `@pptx-editor.dev/pro`, undo reverts only your own steps, in the room. A group is one step in the room too, also when a collaborator edits the deck in the middle of your gesture. Without the module, a store transaction with the `remote` origin clears the local undo and redo history, because undo restores whole slides and would revert that edit.
+
+## Next steps
+
+- See [Tables and cells](/docs/guides/tables) for the table commands, which follow the same undo rules.
+- See [Toolbar customization](/docs/customization/toolbar) for the value slots and `useEditorValueCommand`.

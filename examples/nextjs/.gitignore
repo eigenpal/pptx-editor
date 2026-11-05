@@ -1,0 +1,4 @@
+.next/
+next-env.d.ts
+# Copied from examples/vite/public by `bun run assets`.
+public/

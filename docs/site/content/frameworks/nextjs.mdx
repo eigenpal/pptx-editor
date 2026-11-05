@@ -1,0 +1,101 @@
+---
+title: 'Next.js'
+description: 'Set up a Next.js PPTX editor in the App Router with dynamic() and ssr: false.'
+category: 'Frameworks'
+seoTitle: 'Next.js PPTX editor setup'
+---
+
+## Install
+
+```bash
+npm install @pptx-editor.dev/react @pptx-editor.dev/core
+```
+
+## Import the stylesheet
+
+Import the stylesheet once in the root layout:
+
+```tsx
+// app/layout.tsx
+import '@pptx-editor.dev/core/styles/editor.css';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+## Load the editor on the client
+
+The editor measures text with HarfBuzz and paints into the DOM, so it renders in the browser only. Load the editor component with `dynamic()` and `ssr: false` from a client component:
+
+```tsx
+// app/page.tsx
+'use client';
+
+import dynamic from 'next/dynamic';
+
+const Editor = dynamic(() => import('./components/Editor').then((m) => m.Editor), {
+  ssr: false,
+  loading: () => <div>Loading editor...</div>,
+});
+
+export default function Page() {
+  return <Editor />;
+}
+```
+
+The `"use client"` directive alone does not turn off server rendering. `ssr: false` skips the server render, and the editor starts after the component mounts in the browser.
+
+## Mount the editor
+
+The editor component fetches a deck and fills a container with a height:
+
+```tsx
+// app/components/Editor.tsx
+'use client';
+
+import { useEffect, useState } from 'react';
+import { PptxEditor } from '@pptx-editor.dev/react';
+
+export function Editor() {
+  const [bytes, setBytes] = useState<Uint8Array>();
+  useEffect(() => {
+    void fetch('/deck.pptx')
+      .then((response) => response.arrayBuffer())
+      .then((buffer) => setBytes(new Uint8Array(buffer)));
+  }, []);
+  return (
+    <div style={{ height: '100vh' }}>
+      <PptxEditor document={bytes} />
+    </div>
+  );
+}
+```
+
+Put `deck.pptx` in the `public` folder. To open and download local files, use the component from the [quickstart](/docs/quickstart).
+
+## Limits
+
+- `dynamic(..., { ssr: false })` keeps the editor module off the server and out of the route's first bundle.
+- Keep the rest of the page as server components. Only the editor needs the client boundary.
+- Turbopack and webpack emit the engine's `harfbuzz.wasm` with no configuration.
+- Without `document`, the editor shows its loading sheet until bytes arrive.
+
+## Run the example
+
+The [`examples/nextjs`](https://github.com/eigenpal/pptx-editor/tree/main/examples/nextjs) app uses the built packages, as an application that installs them from npm does. After you clone the repository and run `bun install`, run:
+
+```bash
+bun run build:packages
+bun run dev:nextjs   # http://localhost:3000
+```
+
+## Next steps
+
+- [Quickstart](/docs/quickstart): open, edit, and save a deck.
+- [React props](/docs/react/props): configure `<PptxEditor>` and its ref.
+- [Installation](/docs/installation): requirements and bundler setup.

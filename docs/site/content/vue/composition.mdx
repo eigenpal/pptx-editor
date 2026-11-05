@@ -1,0 +1,217 @@
+---
+title: 'Composition'
+description: 'Build a custom Vue PPTX editor from the root, the viewport, the content, and compound parts.'
+category: 'Vue'
+order: 37
+---
+
+`<PptxEditor>` is a packaged arrangement of public components. Compose those components yourself when you need a different layout or your own controls.
+
+## Compose an editor
+
+This example mounts a toolbar, the slide rail, the canvas, and the notes in a bounded column:
+
+```vue
+<script setup lang="ts">
+import {
+  PptxEditorContent,
+  PptxEditorEditNotice,
+  PptxEditorFindBar,
+  PptxEditorFontNotice,
+  PptxEditorLoading,
+  PptxEditorNotesPane,
+  PptxEditorOpenFailure,
+  PptxEditorRoot,
+  PptxEditorSlideRail,
+  PptxEditorSlideshow,
+  PptxEditorToolbar,
+  PptxEditorViewport,
+} from '@pptx-editor.dev/vue';
+import '@pptx-editor.dev/vue/styles.css';
+
+defineProps<{ bytes: Uint8Array }>();
+</script>
+
+<template>
+  <div style="height: 100vh">
+    <PptxEditorRoot :document="bytes">
+      <PptxEditorViewport class="deck-workspace">
+        <PptxEditorToolbar />
+        <div class="deck-workspace__body">
+          <PptxEditorSlideRail />
+          <div class="deck-workspace__main">
+            <PptxEditorContent />
+            <PptxEditorFindBar />
+            <PptxEditorEditNotice />
+            <PptxEditorFontNotice />
+            <PptxEditorLoading overlay />
+            <PptxEditorOpenFailure />
+            <PptxEditorNotesPane />
+          </div>
+        </div>
+        <PptxEditorSlideshow />
+      </PptxEditorViewport>
+    </PptxEditorRoot>
+  </div>
+</template>
+```
+
+| Requirement | Why |
+| --- | --- |
+| `PptxEditorRoot` | Owns the editor instance. It renders no element, so its children sit in your layout. |
+| `PptxEditorViewport` | The styling scope. It carries `.pptx-editor`, and `dark` with a dark color mode. Put every part inside it. |
+| `PptxEditorContent` | The slide canvas and its context menu. |
+| Editor stylesheet | Styles the viewport and the packaged parts. Import it once. |
+| Bounded height | Gives the canvas room. Use `min-height: 0` on each flex level between the container and the canvas. |
+| Positioned main column | The find bar, the notices, the loading sheet, and the zoom pill use absolute positions. Give their parent `position: relative`. |
+
+For the CSS of this arrangement, see [Workspace layout](/docs/customization/layout#workspace-layout).
+
+Each part is also a static of `PptxEditor`. In a template, `<PptxEditor.Root>` and `<PptxEditorRoot>` are the same component.
+
+## Reach the editor from a parent
+
+Components inside the root call [`usePptxEditor()`](/docs/vue/composables#read-state). A parent component that renders the root reads the editor through a template ref:
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import {
+  PptxEditorContent,
+  PptxEditorRoot,
+  PptxEditorViewport,
+  type PptxEditorRef,
+} from '@pptx-editor.dev/vue';
+
+defineProps<{ bytes: Uint8Array }>();
+const editorRef = ref<PptxEditorRef | null>(null);
+</script>
+
+<template>
+  <button @click="editorRef?.focus()">Back to slide</button>
+  <PptxEditorRoot ref="editorRef" :document="bytes">
+    <PptxEditorViewport>
+      <PptxEditorContent />
+    </PptxEditorViewport>
+  </PptxEditorRoot>
+</template>
+```
+
+For each member, see [Use the ref](/docs/vue/props#use-the-ref). You can also keep the instance from `@ready`.
+
+## Choose optional components
+
+Mount only the parts that your layout needs. An omitted part renders no interface.
+
+| Part | Purpose | Owner guide |
+| --- | --- | --- |
+| `PptxEditorToolbar`, `PptxEditorRibbon`, `PptxEditorMenu` | The flat toolbar, the tabbed ribbon, and the menu bar | [Toolbar](/docs/customization/toolbar), [Ribbon](/docs/customization/ribbon), [Menus](/docs/customization/menus) |
+| `PptxEditorSlideRail`, `PptxEditorSlideSorter` | The slide thumbnails, and the Slide Sorter view | [Layout](/docs/customization/layout) |
+| `PptxEditorNotesPane` | The speaker notes of the current slide | [Pane configuration](/docs/customization/layout#pane-configuration) |
+| `PptxEditorSidePanel` | The **Format** panel | [Layout](/docs/customization/layout) |
+| `PptxEditorZoomPill`, `PptxEditorStatusBar` | A floating zoom control, and a status row | [Status bar](/docs/customization/ribbon#status-bar) |
+| `PptxEditorFindBar` | Find and replace. Without it, Find and Replace stay disabled with a reason. | [Layout](/docs/customization/layout) |
+| `PptxEditorSlideshow` | The slide show. Mount it once inside the viewport. | [Layout](/docs/customization/layout) |
+| `PptxEditorLoading` | The loading sheet, with the `indicator` and default slots | [Layout](/docs/customization/layout) |
+| `PptxEditorOpenFailure` | The notice for a file that does not open, with the `actions` and `message` slots and the `dismiss` event | [Open failure](/docs/customization/layout#open-failure) |
+| `PptxEditorFontNotice`, `PptxEditorEditNotice` | Substituted fonts, and the reason the last edit was refused | [Fonts](/docs/customization/fonts) |
+| `PageSetupDialog`, `ParagraphDialog`, and the other dialogs | Dialogs that the `popups` registry mounts, or that you mount | [Dialogs](/docs/customization/dialogs) |
+
+A pane's `onOpenChange` is the `update:open` event, so `v-model:open` controls `PptxEditorSlideRail` and `PptxEditorNotesPane`. Each part takes `className`, and `style` where React has it. A host `class` and `style` also work.
+
+## Override a component
+
+A named child replaces the matching control in the preset. `hidden` removes it, and `as-child` renders the control as your element:
+
+```vue
+<PptxEditorToolbar>
+  <PptxEditorToolbar.Bold as-child>
+    <MyButton variant="ghost">Bold</MyButton>
+  </PptxEditorToolbar.Bold>
+  <PptxEditorToolbar.Highlight hidden />
+</PptxEditorToolbar>
+```
+
+`as-child` passes the label, the state attributes, and the click handler to the one element in the default slot. An element that is not a button also gets `role="button"`, a tab stop, and Enter and Space. Without `as-child`, the default slot of a named button part is its icon.
+
+### Custom toolbar
+
+Set `:preset="false"` to render only the parts that you list, in template order:
+
+```vue
+<PptxEditorToolbar :preset="false" class-name="my-toolbar">
+  <PptxEditorToolbar.Undo />
+  <PptxEditorToolbar.Redo />
+  <PptxEditorToolbar.Separator />
+  <PptxEditorToolbar.FontFamily />
+  <PptxEditorToolbar.Bold />
+  <PptxEditorToolbar.BulletList />
+</PptxEditorToolbar>
+```
+
+Each part reads its enabled state, its active state, and its command from the engine. For `PptxEditorToolbar.Group`, `PptxEditorToolbar.Slot`, and `PptxEditorToolbar.Action`, and for every slot identifier, see [Toolbar](/docs/customization/toolbar).
+
+### Compose the font picker
+
+`PptxEditorToolbar.FontFamily` is a compound part, as in DOCX Editor. `FontFamily.Trigger` is the button, `FontFamily.Content` is the list, and `FontFamily.Item` is one family:
+
+```vue
+<PptxEditorToolbar>
+  <PptxEditorToolbar.FontFamily>
+    <PptxEditorToolbar.FontFamily.Trigger class-name="my-font-trigger" />
+    <PptxEditorToolbar.FontFamily.Content>
+      <PptxEditorToolbar.FontFamily.Item value="Calibri" />
+      <PptxEditorToolbar.FontFamily.Item value="Georgia" />
+    </PptxEditorToolbar.FontFamily.Content>
+  </PptxEditorToolbar.FontFamily>
+</PptxEditorToolbar>
+```
+
+To fill the list or build a picker from nothing, use `useFontFamily()`: `value` is the current family, `groups` and `options` are the families to offer, `isCurrent(row)` marks the current one, and `setValue(family)` applies one. See [Build the list from `useFontFamily`](/docs/customization/toolbar#build-the-list-from-usefontfamily).
+
+## Control lifetime and focus
+
+`PptxEditorRoot` creates one instance for its life. This table shows how each prop behaves after a change:
+
+| Prop or event | Type | Behavior |
+| --- | --- | --- |
+| `document` | `Uint8Array` | A new array opens the new deck in the same instance. |
+| `mode` | `'edit' \| 'view'` | Updates in place. |
+| `fonts` | `EditorFontsOption` | Replaces the fonts in place. The deck, the selection, and the undo history stay. |
+| `fontFamilies` | `readonly string[]` | Read when the instance is created. Change the `:key` to remount. |
+| `locale` | `LocaleCatalog` | Updates the strings and repaints the canvas once. Follows the catalog's content, not its identity. |
+| `colorMode` | `'light' \| 'dark' \| 'system'` | Updates the chrome theme. |
+| `popups` | `PptxEditorPopups` | Updates the dialogs that the root mounts. |
+| `@ready`, `@change`, `@font-error` | Events | Report the instance, every change of editor state, and font failures. |
+
+A `mousedown` that reaches the slide moves the selection. Prevent it on your own chrome, but not on form fields:
+
+```vue
+<script setup lang="ts">
+function keepSelection(event: MouseEvent) {
+  const tag = (event.target as HTMLElement | null)?.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+  event.preventDefault();
+}
+</script>
+
+<template>
+  <div @mousedown="keepSelection"><!-- Your toolbar --></div>
+</template>
+```
+
+Packaged chrome already applies this rule.
+
+## Limits
+
+- Every part must render inside `PptxEditorRoot`. Outside it, `usePptxEditor().value` is `null`.
+- Render one `PptxEditorNotesPane` in each root. A second one keeps its own state and prints a development warning.
+- In the Slide Sorter view, render `PptxEditorSlideSorter` in place of the rail, the canvas, and the notes. See [Switch between Normal and Slide Sorter](/docs/customization/layout#switch-between-normal-and-slide-sorter).
+- `as-child` requires exactly one child element. A picker refuses `icon` and `as-child` with a development warning.
+- Theme the chrome with `--doc-*` tokens. The slide canvas always shows the deck's own colors. See [Appearance](/docs/customization/appearance).
+
+## See also
+
+- [Vue composables](/docs/vue/composables)
+- [Vue props](/docs/vue/props)
+- [Vite with Vue](/docs/frameworks/vite-vue)

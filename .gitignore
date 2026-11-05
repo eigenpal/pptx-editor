@@ -1,0 +1,60 @@
+# Private corpus: client decks and their reference PDFs. Never commit.
+demo-presentations/
+
+# Dependencies and build output
+node_modules/
+dist/
+dist-check/
+*.tsbuildinfo
+.cache/
+
+# Fidelity harness output (renders, diffs, HTML report)
+fidelity-report/
+.fidelity/
+
+# Playwright
+test-results/
+playwright-report/
+
+# Generated API JSON
+docs/json/
+
+# Third-party notices are generated at release time
+packages/*/THIRD_PARTY_NOTICES.md
+
+# Private workspace files and agent state.
+local/
+.claude/settings.local.json
+.claude/worktrees/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS / editor
+.DS_Store
+*.log
+.idea/
+.vscode/
+
+# CI reports
+package-sizes.json
+baseline/
+size-comment.md
+
+# Python bytecode from the evaluation worker
+__pycache__/
+
+# Local outputs: family-parity screenshots and the private corpus census
+screenshots/
+local/census/
+
+# Assembled preview deploy (bun run build:preview)
+examples/parity/
+
+# Generated informational Office.js reports (the reference inventory is committed).
+packages/editor-api/compat/reports/
+
+# Keep proposals and investigation records in local/planning/.
+openspec/changes/

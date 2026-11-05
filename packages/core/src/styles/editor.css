@@ -1,0 +1,3268 @@
+/**
+ * PPTX Editor styles — the single source of truth for chrome CSS and tokens.
+ *
+ * The token block (shadcn HSL set and `--doc-*` chrome palette, light and dark) is copied from
+ * docx-editor/packages/core/src/styles/editor.css with the same NAMES, so one theme override
+ * styles both products. Component rules below use tokens only — no raw hex or rgba. The slide
+ * canvas is never themed: it keeps the deck's own colors in dark mode too.
+ */
+
+/* ============================================================================
+ * TOKENS (copied from DOCX Editor, scoped to .pptx-editor)
+ * ============================================================================ */
+.pptx-editor {
+  /* ----------------------------------------------------------------------
+    * shadcn tokens (HSL triples), with the same names and values as DOCX
+    * Editor so one theme override styles both products. PPTX Editor has no
+    * Tailwind: the chrome rules below are plain CSS
+    * that read these through `hsl(var(--name))`. Do not change the values.
+    * -------------------------------------------------------------------- */
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 221.2 83.2% 53.3%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 221.2 83.2% 53.3%;
+  --radius: 0.5rem;
+
+  /* ======================================================================
+    * Document-editor chrome palette — the single source of truth for UI
+    * colors. Components reference these via var(--doc-*); component styles
+    * carry no raw hex/rgba. Override the whole set under .pptx-editor.dark to
+    * theme the UI. The slide canvas is painted from the .pptx and is
+    * intentionally NOT themed here: it keeps the deck's own colors in both
+    * themes.
+    * ==================================================================== */
+
+  /* Surfaces */
+  --doc-surface: #ffffff; /* panels, menus, dropdowns, cards */
+  --doc-popover-bg: var(--doc-surface); /* floating previews and contextual menus */
+  --doc-card: #f8fbff; /* collapsed comment / suggestion cards (near-white) */
+  --doc-bg: #f8f9fa; /* app background behind the page */
+  --doc-bg-subtle: #f5f5f5; /* subtle section backgrounds */
+  --doc-bg-hover: #f1f3f4; /* hover states */
+  --doc-bg-input: #f8f9fa; /* input backgrounds */
+
+  /* Primary action color (Google blue) */
+  --doc-primary: #1a73e8;
+  --doc-primary-hover: #1557b0;
+  --doc-primary-light: #e8f0fe; /* selected/active backgrounds */
+
+  /* Accent (indigo — agent / assistant UI) */
+  --doc-accent: #6366f1;
+  --doc-accent-bg: #eef2ff;
+
+  /* Foreground for text/icons sitting on a colored fill (primary/accent/
+    * dark buttons, badges, tooltips). Inverts in dark mode so contrast holds. */
+  --doc-on-primary: #ffffff;
+
+  /* Active toolbar toggle (bold, italic, bullets, ...): dark slab in light mode,
+    * accent tint in dark mode (where a dark slab would flip light). */
+  --doc-toggle-active-bg: hsl(var(--foreground));
+  --doc-toggle-active-fg: #ffffff;
+
+  /* Tooltips and the size box error: a dark label in light mode, a muted one in dark mode. */
+  --doc-tooltip-bg: hsl(var(--foreground));
+  --doc-tooltip-text: var(--doc-on-primary);
+
+  /* Review tokens (comment bands, the open review card). Kept with DOCX Editor's names and
+     values so one theme override styles both products; PPTX Editor does not paint review
+     marks yet. */
+  --doc-review-card-active-bg: color-mix(in srgb, #e8f0fe 45%, #fff);
+  --doc-comment-bg: rgba(255, 212, 0, 0.12);
+  --doc-comment-border: rgba(245, 174, 0, 0.45);
+  --doc-comment-active-bg: rgba(255, 212, 0, 0.35);
+  --doc-comment-active-border: rgba(245, 174, 0, 0.9);
+  --doc-comment-resolved-active-bg: rgba(255, 212, 0, 0.18);
+  --doc-comment-resolved-active-border: rgba(245, 174, 0, 0.6);
+
+  /* Text */
+  --doc-text: #202124; /* primary text */
+  --doc-popover-fg: var(--doc-text); /* text inside floating previews and menus */
+  --doc-text-muted: #5f6368; /* secondary text */
+  --doc-text-subtle: #9aa0a6; /* tertiary/disabled text */
+  --doc-text-placeholder: #999; /* placeholder text */
+
+  /* Borders */
+  --doc-border: #e0e0e0; /* standard borders */
+  --doc-border-light: #dadce0; /* lighter borders */
+  --doc-border-dark: #d0d0d0; /* darker borders (tables) */
+  --doc-border-input: #ccc; /* input borders */
+
+  /* Status */
+  --doc-error: #c5221f; /* error states */
+  --doc-error-bg: #fce8e6; /* error backgrounds */
+  --doc-danger: var(--doc-error); /* invalid and refused controls */
+  --doc-destructive: var(--doc-error); /* destructive menu/context rows */
+  --doc-destructive-hover-bg: var(--doc-error-bg);
+  --doc-success: #34a853; /* success states */
+  --doc-success-bg: #e8f5e9; /* success backgrounds */
+  --doc-warning: #f9a825; /* warning states (icon/accent/border) */
+  --doc-warning-bg: #fff8e1; /* warning backgrounds */
+  --doc-warning-text: #856404; /* readable warning text on warning-bg */
+
+  /* Link */
+  --doc-link: #0563c1; /* hyperlinks */
+
+  /* Revision, field, and review-author tokens. Kept with DOCX Editor's names and values for
+     token parity; PPTX Editor does not track changes yet, so nothing here reads them. */
+  --doc-revision-insertion: #2e7d32;
+  --doc-revision-deletion: #c62828;
+  --doc-revision-insertion-decoration-style: solid;
+  --doc-revision-insertion-decoration-thickness: 0.06em;
+  --doc-revision-insertion-underline-offset: 0.15em;
+  --doc-revision-insertion-active-bg: rgba(46, 125, 50, 0.24);
+  --doc-revision-insertion-active-border: var(--doc-revision-insertion);
+  --doc-revision-deletion-active-bg: rgba(198, 40, 40, 0.24);
+  --doc-revision-deletion-active-border: var(--doc-revision-deletion);
+  --doc-revision-other-active-bg: color-mix(
+    in srgb,
+    var(--doc-text-muted, #8a8f98) 14%,
+    transparent
+  );
+  --doc-revision-insertion-wash: rgba(46, 125, 50, 0.05);
+  --doc-revision-deletion-wash: rgba(198, 40, 40, 0.05);
+  --doc-field-shading: rgba(0, 0, 0, 0.09);
+  --doc-revision-format: #6b7f8c;
+  --doc-revision-format-wash: rgba(107, 127, 140, 0.1);
+  --doc-review-author-0: #c0392b;
+  --doc-review-author-1: #1f6fb2;
+  --doc-review-author-2: #7d3c98;
+  --doc-review-author-3: #117a65;
+  --doc-review-author-4: #9a6206;
+  --doc-review-author-5: #c2185b;
+  --doc-review-author-6: #2e4053;
+  --doc-review-author-7: #2e7d32;
+  --doc-review-change-bar: #a4a4a4;
+  --doc-review-change-bar-width: 1px;
+  --doc-review-change-bar-simple: #ea3425;
+  --doc-review-change-bar-simple-width: 2px;
+
+  /* Selected table cells: drawn, because a native selection cannot express a rectangle
+    * of cells. Kept close to the browser's own selection tint. */
+  --doc-cell-selection: rgba(26, 115, 232, 0.22);
+
+  /* Shadows & overlays */
+  --doc-shadow: rgba(0, 0, 0, 0.15);
+  --doc-shadow-strong: rgba(0, 0, 0, 0.3);
+  --doc-shadow-subtle: rgba(0, 0, 0, 0.06);
+  --doc-overlay: rgba(0, 0, 0, 0.5); /* modal backdrops */
+  /* Dimmed furniture opacity. Kept for token parity with DOCX Editor. */
+  --doc-hf-dim-opacity: 0.45;
+
+  /* Card elevation (Google-grey, compound): the rail, the toolbar, the panel, and menus. */
+  --doc-card-shadow: 0 1px 3px rgba(60, 64, 67, 0.2), 0 2px 6px rgba(60, 64, 67, 0.08);
+  --doc-card-shadow-strong: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+  /* A larger popover elevation. Kept with DOCX Editor's value for token parity. */
+  --doc-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+
+  /* Focus ring & text selection (derived from primary) */
+  --doc-focus-ring: rgba(26, 115, 232, 0.4);
+  --doc-selection: rgba(26, 115, 232, 0.3);
+
+  /* ----------------------------------------------------------------------
+    * Chrome layering.
+    *
+    * Two bands, and the order between them is the whole point: something the
+    * user just OPENED must paint over furniture that was already there. Before
+    * these tokens the popups sat at 30 and the gutter at 40, so the File menu
+    * opened underneath the navigation toggle.
+    *
+    *   --doc-z-chrome    ambient furniture that is always on screen: the
+    *                     navigation gutter, table chrome, the outline toggle.
+    *   --doc-z-overlay   anything transient the user summoned: menus, popovers,
+    *                     colour pickers, the toolbar overflow panel.
+    *   --doc-z-context   the context menu, which is raised over a selection
+    *                     that may already have an overlay open, so it outranks
+    *                     every other overlay.
+    *   --doc-z-tooltip   the chrome tooltip, over every other layer, so the
+    *                     reason of a disabled row in an open menu is readable.
+    *
+    * Add a new floating surface by picking the band, never a fresh number.
+    * -------------------------------------------------------------------- */
+  --doc-z-chrome: 40;
+  --doc-z-overlay: 50;
+  --doc-z-context: 55;
+  --doc-z-tooltip: 60;
+  /* The slide show covers the whole window (its fallback when full screen is refused). */
+  --doc-z-slideshow: 2147483000;
+
+  /* The format painter's pointer: the Material Symbols `format_paint` brush (icon-paths.ts),
+     dark with a light outline so it shows on any slide. The hot spot is the bristles' edge. */
+  --doc-cursor-format-paint:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 -960 960 960'%3E%3Cpath fill='black' stroke='white' stroke-width='48' paint-order='stroke' d='M440-80q-33 0-56.5-23.5T360-160v-160H240q-33 0-56.5-23.5T160-400v-280q0-66 47-113t113-47h480v440q0 33-23.5 56.5T720-320H600v160q0 33-23.5 56.5T520-80h-80ZM240-560h480v-200h-40v160h-80v-160h-40v80h-80v-80H320q-33 0-56.5 23.5T240-680v120Zm0 160h480v-80H240v80Zm0 0v-80 80Z'/%3E%3C/svg%3E")
+      12 4,
+    copy;
+
+  /* Slide show tokens. The show screen and its blank screens are fixed
+     literals (black letterbox, B and W screens); they do not change in dark mode. */
+  --doc-slideshow-bg: #000000;
+  --doc-slideshow-black: #000000;
+  --doc-slideshow-white: #ffffff;
+  --doc-slideshow-text: #ffffff;
+  --doc-slideshow-bar-bg: rgba(32, 33, 36, 0.72);
+  --doc-slideshow-bar-hover: rgba(255, 255, 255, 0.16);
+  --doc-slideshow-focus: #8ab4f8;
+
+  /* Page and caret tokens. Kept with DOCX Editor's names for token parity. The slide canvas
+     is not themed, so these are literals, and the dark block below changes them only for
+     chrome that reads them. */
+  --doc-page-bg: #ffffff;
+  --doc-page-bg-rendered: #ffffff;
+  --doc-page-text: #000000;
+  --doc-caret: #202124;
+  --doc-caret-contrast: #ffffff;
+  /* Marks drawn over the slide contrast with the slide, not with the chrome, so the dark block
+     keeps these: the caret, and the halo under selection outlines and the fill of handles. */
+  --doc-slide-caret: #202124;
+  --doc-selection-halo: #ffffff;
+  /* The slide's edge against the workspace: a dark slide on dark chrome still shows its box. */
+  --doc-slide-edge: rgba(60, 64, 67, 0.12);
+  /* Smart guides drawn over the slide while a shape moves or resizes. */
+  --doc-smart-guide: #e8590c;
+
+  /* Document scroll container scrollbar */
+  --doc-scrollbar-size: 14px;
+  --doc-scrollbar-thumb: color-mix(in srgb, var(--doc-text-muted) 45%, transparent);
+  --doc-scrollbar-thumb-hover: color-mix(in srgb, var(--doc-text-muted) 65%, transparent);
+  --doc-scrollbar-track: transparent;
+}
+
+.pptx-editor.dark,
+.pptx-editor.dark .pptx-editor {
+  /* Native parts (scrollbars, the notes field's resize grip) follow the dark chrome. */
+  color-scheme: dark;
+  /* The dark chrome palette, the same values as DOCX Editor's dark theme. The shadcn
+    * tokens (HSL triples) mirror the --doc-* chrome values below. */
+  --background: 0 0% 12%; /* #1f1f1f ribbon/surface */
+  --foreground: 0 0% 91%; /* #e8e8e8 */
+  --card: 0 0% 18%; /* #2d2d2d */
+  --card-foreground: 0 0% 91%;
+  --popover: 0 0% 18%; /* #2d2d2d */
+  --popover-foreground: 0 0% 91%;
+  --primary: 212 100% 65%; /* #4e9dff accent */
+  --primary-foreground: 0 0% 12%;
+  --secondary: 0 0% 20%; /* #333333 */
+  --secondary-foreground: 0 0% 91%;
+  --muted: 0 0% 20%; /* #333333 */
+  --muted-foreground: 0 0% 63%; /* #a0a0a0 */
+  --accent: 0 0% 23%; /* #3a3a3a */
+  --accent-foreground: 212 100% 65%;
+  --destructive: 0 72% 60%; /* #e05656 */
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 24%; /* #3c3c3c */
+  --input: 0 0% 24%;
+  --ring: 212 100% 60%;
+
+  /* chrome palette (dark) */
+  --doc-surface: #1f1f1f; /* ribbon / toolbar / title bar */
+  --doc-card: #2d2d2d; /* collapsed comment / suggestion cards */
+  --doc-bg: #262626; /* workspace behind the page */
+  --doc-bg-subtle: #2d2d2d; /* dropdowns, dialogs, panels */
+  --doc-bg-hover: #3a3a3a; /* hover states */
+  --doc-bg-input: #333333; /* input fields */
+  --doc-primary: #4e9dff; /* accent blue */
+  --doc-primary-hover: #6cb0ff;
+  --doc-primary-light: rgba(78, 157, 255, 0.18); /* selected/active bg */
+  --doc-accent: #4e9dff;
+  --doc-accent-bg: #1f3047;
+  --doc-on-primary: #1f1f1f; /* text/icon on a filled primary surface */
+  --doc-toggle-active-bg: var(--doc-primary-light);
+  --doc-toggle-active-fg: var(--doc-primary);
+  --doc-tooltip-bg: hsl(var(--muted));
+  --doc-tooltip-text: hsl(var(--foreground));
+  /* Mixed from the OPAQUE accent, not from the translucent `--doc-primary-light` above. */
+  --doc-review-card-active-bg: color-mix(in srgb, #4e9dff 12%, var(--doc-surface, #1b1d22));
+  --doc-comment-bg: rgba(253, 214, 99, 0.16);
+  --doc-comment-border: rgba(253, 214, 99, 0.5);
+  --doc-comment-active-bg: rgba(253, 214, 99, 0.32);
+  --doc-comment-active-border: rgba(253, 214, 99, 0.95);
+  /* Review tokens for dark mode, kept for token parity with DOCX Editor. */
+  --doc-revision-format: #9fb3bf;
+  --doc-review-change-bar: #9e9e9e;
+  --doc-review-change-bar-simple: #f0524a;
+  --doc-text: #e8e8e8; /* primary text */
+  --doc-text-muted: #a0a0a0; /* secondary text */
+  --doc-text-subtle: #6e6e6e; /* tertiary/disabled text */
+  --doc-text-placeholder: #6e6e6e;
+  --doc-border: #3c3c3c; /* standard borders */
+  --doc-border-light: #353535; /* lighter borders */
+  --doc-border-dark: #555555; /* darker borders (tables) */
+  --doc-border-input: #4a4a4a; /* input borders */
+  --doc-error: #f28b82;
+  --doc-error-bg: #3c1f1d;
+  --doc-success: #81c995;
+  --doc-success-bg: #1f2e22;
+  --doc-warning: #fdd663;
+  --doc-warning-bg: #332a1a;
+  --doc-warning-text: #fdd663;
+  --doc-link: #6eb9ff;
+  --doc-shadow: rgba(0, 0, 0, 0.4);
+  --doc-shadow-strong: rgba(0, 0, 0, 0.6);
+  --doc-shadow-subtle: rgba(0, 0, 0, 0.2);
+  --doc-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.2);
+  --doc-card-shadow-strong: 0 1px 3px rgba(0, 0, 0, 0.5), 0 4px 8px 3px rgba(0, 0, 0, 0.3);
+  --doc-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
+  --doc-overlay: rgba(0, 0, 0, 0.7);
+  --doc-hf-dim-opacity: 0.4;
+  --doc-focus-ring: rgba(78, 157, 255, 0.45);
+  --doc-selection: rgba(78, 157, 255, 0.32);
+
+  /* Page and caret tokens for dark mode, kept for token parity with DOCX Editor. The
+     slide canvas itself is not themed: it keeps the deck's own colors. */
+  --doc-page-bg: #cccccc;
+  --doc-page-bg-rendered: #333333;
+  --doc-caret: #e8e8e8;
+  --doc-caret-contrast: #202124;
+  --doc-slide-edge: rgba(255, 255, 255, 0.22);
+}
+
+/* ============================================================================
+ * EDITOR ROOT
+ * ============================================================================ */
+
+.pptx-editor {
+  color: var(--doc-text);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+.pptx-editor *,
+.pptx-editor ::before,
+.pptx-editor ::after {
+  box-sizing: border-box;
+}
+.pptx-editor :focus-visible {
+  outline: 2px solid var(--doc-focus-ring);
+  outline-offset: 1px;
+}
+.pptx-editor svg.pptx-icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  flex: 0 0 auto;
+}
+
+/* ============================================================================
+ * FLOATING TOOLBAR CARD (DOCX formatting bar: radius, shadow, dividers, pills)
+ * ============================================================================ */
+
+.pptx-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 44px;
+  padding: 0 6px;
+  max-width: 100%;
+  width: max-content;
+  background: var(--doc-surface);
+  border-radius: 12px;
+  box-shadow: var(--doc-card-shadow);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+/* `overflow={false}`: the bar wraps to more rows instead of using a More menu. */
+.pptx-toolbar.pptx-toolbar--wrap {
+  flex-wrap: wrap;
+  height: auto;
+  min-height: 44px;
+  /* Rows keep clear of the card's rounded edge, as DOCX Editor's wrapped bar. */
+  padding: 4px 8px;
+  overflow-x: visible;
+}
+/* In the More-menu bar, groups, separators, and More keep their natural width: the fit measures
+ * them, so flex must never shrink one into a clipped state that the next fit accepts. */
+.pptx-toolbar:not(.pptx-toolbar--wrap) > * {
+  flex-shrink: 0;
+}
+/* Host content after the groups (a loose Toolbar.Action): it never collapses. */
+.pptx-toolbar__fixed {
+  flex-shrink: 0;
+}
+/* A Toolbar.Action with no icon shows its label. */
+.pptx-toolbar__button.pptx-toolbar__button--text {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+/* In wrap mode a wide group wraps its own controls instead of running past the card. */
+.pptx-toolbar--wrap .pptx-toolbar__group {
+  flex-wrap: wrap;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.pptx-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: 0 0 auto;
+}
+.pptx-toolbar__sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 5px;
+  background: var(--doc-border);
+  flex: 0 0 auto;
+}
+.pptx-toolbar__button {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--doc-text-muted);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.16s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.pptx-toolbar__button:hover:not(:disabled) {
+  background: var(--doc-bg-hover);
+  color: var(--doc-text);
+}
+.pptx-toolbar__button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.pptx-toolbar__button[aria-pressed='true'],
+.pptx-toolbar__button[data-active] {
+  background: var(--doc-toggle-active-bg);
+  color: var(--doc-toggle-active-fg);
+}
+.pptx-toolbar__button:disabled,
+.pptx-toolbar__button[aria-disabled='true'] {
+  /* An aria-disabled control looks the same as a disabled one and stays focusable. */
+  opacity: 0.35;
+  cursor: default;
+}
+/* No press feedback on a control that does nothing. */
+.pptx-toolbar__button[aria-disabled='true']:active {
+  transform: none;
+}
+.pptx-toolbar__button--wide {
+  width: auto;
+  padding: 0 4px 0 6px;
+  display: inline-flex;
+  gap: 0;
+}
+/* The arrow half of a split button (the Bullets and Numbering galleries): next to the toggle it
+ * belongs to, and 24px wide, the WCAG 2.2 minimum target size. */
+.pptx-toolbar__button--caret {
+  width: 24px;
+  padding: 0;
+  margin-inline-start: -1px;
+  display: inline-flex;
+  justify-content: center;
+}
+/* A dialog color field: the list, and the swatch button that shows the color and opens the grid. */
+.pptx-color-field {
+  position: relative;
+  display: flex;
+  align-items: end;
+  gap: 6px;
+}
+.pptx-color-field > .pptx-field {
+  flex: 1;
+}
+.pptx-color-field__button {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 2px;
+  background: var(--doc-surface);
+}
+.pptx-color-field__button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.pptx-color-field__panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: var(--doc-z-overlay);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--doc-popover-bg);
+  color: var(--doc-popover-fg);
+  box-shadow: var(--doc-card-shadow-strong);
+}
+/* A dimmed field (style None in the Bullets and Numbering dialog) dims its label and unit too. */
+.pptx-field:has(:disabled) {
+  opacity: 0.5;
+}
+.pptx-field:has(:disabled) :disabled {
+  /* The field already takes the dimming; the control is not dimmed twice. */
+  opacity: 1;
+}
+/* The Bullets and Numbering dialog's style names are long: the style takes the whole row. */
+.pptx-dialog[data-pptx-dialog='bulletsAndNumbering'] .pptx-dialog__grid > :first-child {
+  grid-column: 1 / -1;
+}
+/* A text preview in a menu row's icon column (a gallery bullet). */
+.pptx-menu__glyph {
+  flex: none;
+  width: 18px;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1;
+}
+.pptx-toolbar__caret {
+  width: 14px !important;
+  height: 14px !important;
+  opacity: 0.6;
+}
+.pptx-toolbar__swatch {
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: 4px;
+  height: 3px;
+  border-radius: 1px;
+}
+/* A picker trigger (the font family field), after DOCX Editor's `.docx-toolbar__font-family-trigger`:
+   a bordered surface box that takes the hover token on hover and while its list is open. The
+   toggle tokens (`--doc-toggle-active-*`) are for pressed toggles only; the field keeps its text
+   color, so a toggle slab under it makes the label unreadable. A disabled field carries
+   `aria-disabled` and stays focusable, so it is matched by attribute too. */
+.pptx-toolbar__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--doc-border);
+  border-radius: 7px;
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  min-width: 0;
+  transition: background-color 0.15s ease;
+}
+.pptx-toolbar__field:hover:not(:disabled):not([aria-disabled='true']),
+.pptx-toolbar__field[aria-expanded='true'] {
+  background: var(--doc-bg-hover);
+}
+.pptx-toolbar__field:disabled,
+.pptx-toolbar__field[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+.pptx-toolbar__field--family {
+  width: 140px;
+  justify-content: space-between;
+}
+.pptx-toolbar__family-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pptx-toolbar__stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+/* The font size box, after DOCX Editor's boxed `.docx-toolbar__font-size-input`. */
+.pptx-toolbar__size {
+  width: 40px;
+  height: 30px;
+  text-align: center;
+  border: 1px solid var(--doc-border);
+  border-radius: 7px;
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.pptx-toolbar__size:focus {
+  outline: 2px solid var(--doc-focus-ring);
+  outline-offset: -2px;
+}
+.pptx-toolbar__size[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+.pptx-toolbar__step {
+  width: 24px;
+}
+/* Why the size box refused a size (out of range): under the box, in the tooltip's colors. */
+.pptx-toolbar__size[aria-invalid='true'] {
+  border-color: var(--doc-danger);
+}
+.pptx-toolbar__size-error {
+  position: fixed;
+  z-index: var(--doc-z-tooltip);
+  max-width: 280px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--doc-tooltip-bg);
+  color: var(--doc-tooltip-text);
+  box-shadow: var(--doc-shadow-lg);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: normal;
+  pointer-events: none;
+}
+
+/* The slide rail hidden to a strip (`SlideRail` `open={false}`). */
+.pptx-rail.pptx-rail--collapsed {
+  width: auto;
+  align-items: center;
+  padding: 6px 4px;
+}
+.pptx-rail__collapse {
+  margin-inline-start: auto;
+}
+/* A horizontal rail hides to a small tab at the end of its row: the Show thumbnails button. */
+.pptx-rail[data-orientation='horizontal'].pptx-rail--collapsed {
+  align-self: flex-end;
+  padding: 4px;
+}
+.pptx-rail[data-orientation='horizontal'] .pptx-rail__collapse {
+  margin-inline-start: 0;
+}
+
+/* The ribbon (`PptxEditor.Ribbon`): the Quick Access Toolbar and the tab names on one row,
+   the selected tab's toolbar below. Contextual tabs carry `data-contextual`. */
+.pptx-ribbon {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+.pptx-ribbon__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.pptx-ribbon__qat .pptx-toolbar {
+  height: 32px;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.pptx-ribbon__tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.pptx-ribbon__tab {
+  position: relative;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--doc-text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pptx-ribbon__tab:hover,
+.pptx-ribbon__tab:focus-visible {
+  background: var(--doc-bg-hover);
+  color: var(--doc-text);
+}
+.pptx-ribbon__tab[aria-selected='true'] {
+  color: var(--doc-text);
+}
+.pptx-ribbon__tab[aria-selected='true']::after {
+  position: absolute;
+  inset-inline: 12px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--doc-primary);
+  content: '';
+}
+.pptx-ribbon__tab[data-contextual] {
+  color: var(--doc-primary);
+}
+.pptx-ribbon__panel {
+  display: flex;
+  min-width: 0;
+}
+
+/* The status bar (`PptxEditor.StatusBar`): a full row under the slide, with slide x of y,
+   notes, the view switch, and the zoom pill. The default editor's status area stays a corner. */
+.pptx-statusbar.pptx-statusbar--bar {
+  position: static;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 8px;
+  background: var(--doc-surface);
+  border-radius: 10px;
+  box-shadow: var(--doc-card-shadow);
+  color: var(--doc-text-muted);
+  font-size: 12px;
+}
+.pptx-statusbar__spacer {
+  flex: 1 1 auto;
+}
+.pptx-statusbar__views,
+.pptx-statusbar__zoom {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* The menu bar (`PptxEditor.Menu`): the same structure as DOCX Editor's `.docx-menubar`. */
+.pptx-menubar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+}
+.pptx-menubar__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--doc-text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.pptx-menubar__trigger:hover,
+.pptx-menubar__trigger:focus-visible,
+.pptx-menubar__trigger[aria-expanded='true'] {
+  background: var(--doc-bg-hover);
+  color: var(--doc-text);
+}
+/* `Menu.Group`: a labeled set of rows. */
+.pptx-menu__heading {
+  padding: 6px 10px 2px;
+  color: var(--doc-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Popover menus (dropdowns, color pickers, Export). */
+.pptx-menu {
+  position: fixed;
+  z-index: var(--doc-z-overlay);
+  min-width: 180px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--doc-popover-bg);
+  color: var(--doc-popover-fg);
+  box-shadow: var(--doc-card-shadow-strong);
+  animation: pptx-pop 0.15s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.pptx-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+.pptx-menu__item:hover,
+.pptx-menu__item:focus-visible {
+  background: var(--doc-bg-hover);
+}
+/* A panel takes focus when it opens, so the keys reach it; the panel shows no ring. While a
+ * pointer opened it (`data-pointer-open`, until a key is pressed), its rows show no ring
+ * either: the focused row is the hovered row. */
+.pptx-menu:focus {
+  outline: none;
+}
+.pptx-menu[data-pointer-open] :focus-visible:not(input, textarea) {
+  outline: none;
+}
+/* A toolbar menu row's check mark goes to the end of the row (DOCX Editor's
+ * `.docx-toolbar__menu-check`), so the checked row differs from the hovered row. The mark is
+ * the context menu's `check` icon (`svg.pptx-menu__check` below). */
+.pptx-menu__item:not(.pptx-menu__row) > .pptx-menu__check {
+  margin-inline-start: auto;
+}
+.pptx-menu__item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* A refused toolbar-menu row with a reason stays focusable: muted text, never
+   clickable-looking, and its focus ring and focus background at full strength. Menu-bar and
+   context-menu rows (`.pptx-menu__row`) keep their own disabled style below. */
+.pptx-menu__item[aria-disabled='true']:not(.pptx-menu__row) {
+  color: var(--doc-text-subtle);
+  cursor: default;
+}
+.pptx-menu__item[aria-disabled='true']:not(.pptx-menu__row):hover:not(:focus-visible) {
+  background: transparent;
+}
+.pptx-menu__sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--doc-border);
+}
+/* Menu rows with an icon column, a label, and a shortcut hint, as DOCX Editor lays out its
+ * menu bar and context menu rows (`.docx-menubar__item`, `.docx-contextmenu`). The icon column
+ * is kept on a row with no glyph, so labels line up. */
+.pptx-menu__row {
+  gap: 12px;
+}
+.pptx-menu__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--doc-text-muted);
+}
+.pptx-menu__label {
+  flex: 1;
+  text-align: start;
+  white-space: nowrap;
+}
+.pptx-menu__shortcut {
+  flex: none;
+  margin-inline-start: 24px;
+  color: var(--doc-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.pptx-editor svg.pptx-menu__caret {
+  flex: none;
+  margin-inline-start: 16px;
+  color: var(--doc-text-muted);
+}
+.pptx-menu__row[data-active] {
+  background: var(--doc-primary-light);
+}
+.pptx-menu__row[data-open] {
+  background: var(--doc-bg-hover);
+}
+.pptx-menu__row[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+.pptx-menu__row[aria-disabled='true']:hover {
+  background: transparent;
+}
+/* The context menu: the same card, placed at the pointer, above dialogs and dropdowns. */
+.pptx-contextmenu {
+  z-index: var(--doc-z-context);
+  min-width: 240px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+}
+.pptx-contextmenu:focus {
+  outline: none;
+}
+.pptx-menu--submenu {
+  z-index: var(--doc-z-context);
+  min-width: 220px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+}
+/* A shape submenu of the Insert menu: the toolbar gallery's grid in a cascading panel. */
+.pptx-menu--shapes {
+  width: 296px;
+  min-width: 0;
+  padding: 8px;
+}
+.pptx-editor svg.pptx-menu__check {
+  flex: none;
+  margin-inline-start: 16px;
+  color: var(--doc-text-muted);
+}
+/* A drawn line kind in the icon column of the Insert > Line rows. The Insert > Line row itself
+ * opens that submenu: its line fits the 18px icon column, so its label lines up with the
+ * other rows. */
+.pptx-menu__item > .pptx-menu__icon .pptx-line-glyph {
+  width: 18px;
+  height: 18px;
+}
+.pptx-menu__item:not([aria-haspopup]) > .pptx-menu__icon:has(.pptx-line-glyph) {
+  width: 36px;
+}
+.pptx-menu__item:not([aria-haspopup]) > .pptx-menu__icon .pptx-line-glyph {
+  width: 36px;
+  height: 18px;
+}
+/* Color menus: titled sections of ten columns. */
+.pptx-swatches__section + .pptx-swatches__section {
+  border-top: 1px solid var(--doc-border);
+}
+.pptx-swatches__title {
+  margin: 0;
+  padding: 8px 8px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--doc-text-muted);
+}
+.pptx-swatches {
+  display: grid;
+  grid-template-columns: repeat(10, 20px);
+  gap: 4px;
+  padding: 6px 8px 8px;
+}
+/* The theme colors on top, then their lighter and darker variants as one block. */
+.pptx-swatches--theme {
+  row-gap: 0;
+}
+.pptx-swatches--theme > .pptx-swatch:nth-child(-n + 10) {
+  margin-bottom: 6px;
+}
+.pptx-swatches--theme > .pptx-swatch:nth-child(n + 11) {
+  border-radius: 0;
+}
+.pptx-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--doc-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.pptx-swatch:hover {
+  transform: scale(1.1);
+}
+.pptx-swatch[aria-pressed='true'],
+.pptx-swatch[aria-current='true'] {
+  outline: 2px solid var(--doc-primary);
+  outline-offset: 1px;
+}
+/* The Custom Color row, after DOCX Editor's color picker: the browser's color selector, `#`,
+ * the hex field, and Apply. */
+.pptx-custom-color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 8px;
+}
+.pptx-custom-color__picker {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid var(--doc-border);
+  border-radius: 6px;
+  background: var(--doc-bg-input);
+  cursor: pointer;
+}
+.pptx-custom-color__hash {
+  color: var(--doc-text-muted);
+  font-size: 12px;
+}
+.pptx-custom-color__hex {
+  flex: 1;
+  min-width: 0;
+  width: 84px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--doc-border);
+  border-radius: 6px;
+  background: var(--doc-bg-input);
+  color: var(--doc-text);
+  font: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-transform: uppercase;
+}
+.pptx-custom-color__apply {
+  height: 28px;
+  padding: 0 10px;
+}
+.pptx-custom-color__apply:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@keyframes pptx-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-2px);
+  }
+}
+
+/* ============================================================================
+ * SLIDE RAIL (left, card style)
+ * ============================================================================ */
+
+.pptx-rail {
+  display: flex;
+  flex-direction: column;
+  width: 196px;
+  min-height: 0;
+  background: var(--doc-surface);
+  border-radius: 14px;
+  box-shadow: var(--doc-card-shadow);
+  overflow: hidden;
+}
+.pptx-rail__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 10px 4px 6px;
+  margin: 0;
+  list-style: none;
+}
+.pptx-rail__item {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+.pptx-rail__number {
+  width: 18px;
+  padding-top: 2px;
+  text-align: end;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  /* Muted, not subtle: 4.5:1 or more in both color modes (WCAG 1.4.3). */
+  color: var(--doc-text-muted);
+}
+.pptx-rail__thumb {
+  flex: 1 1 auto;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--doc-border);
+  background: var(--doc-page-bg);
+  transition: box-shadow 0.15s ease;
+}
+.pptx-rail__item[aria-current='true'] .pptx-rail__thumb,
+.pptx-rail__item[aria-selected='true'] .pptx-rail__thumb {
+  box-shadow: 0 0 0 2px var(--doc-primary);
+}
+.pptx-rail__item[aria-current='true'] .pptx-rail__number {
+  color: var(--doc-text);
+  font-weight: 600;
+}
+.pptx-rail__item[data-hidden] .pptx-rail__thumb {
+  opacity: 0.5;
+}
+/* A hidden slide's number is struck through in the slide pane. */
+.pptx-rail__item[data-hidden] .pptx-rail__number {
+  text-decoration: line-through;
+}
+.pptx-rail__item[data-drop='before'] .pptx-rail__thumb {
+  box-shadow:
+    0 -3px 0 0 var(--doc-primary),
+    0 0 0 1px var(--doc-border);
+}
+.pptx-rail__item[data-drop='after'] .pptx-rail__thumb {
+  box-shadow:
+    0 3px 0 0 var(--doc-primary),
+    0 0 0 1px var(--doc-border);
+}
+.pptx-rail__thumb svg {
+  display: block;
+}
+/* Sections: a header per section that collapses its slides. */
+.pptx-rail__section,
+.pptx-rail__section-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pptx-rail__section-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 2px 0 6px;
+  padding: 2px 4px 2px 0;
+  border-radius: 6px;
+  color: var(--doc-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+.pptx-rail__section-head:hover {
+  background: var(--doc-bg-hover);
+}
+.pptx-rail__section-head:hover .pptx-rail__section-count {
+  color: var(--doc-text);
+}
+/* A section header in the sorter keeps the shared focus ring on its row. */
+.pptx-sorter__section:focus-visible {
+  outline: none;
+}
+.pptx-sorter__section:focus-visible > .pptx-rail__section-head {
+  outline: 2px solid var(--doc-focus-ring);
+  outline-offset: 1px;
+}
+/* The section's tree item shows the shared focus ring on its header row. */
+.pptx-rail__section:focus-visible {
+  outline: none;
+}
+.pptx-rail__section:focus-visible > .pptx-rail__section-head {
+  outline: 2px solid var(--doc-focus-ring);
+  outline-offset: 1px;
+}
+.pptx-rail__section-toggle {
+  display: flex;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+.pptx-rail__section-toggle .pptx-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--doc-text-muted);
+}
+.pptx-rail__section-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pptx-rail__section-count {
+  flex: 0 0 auto;
+  color: var(--doc-text-muted);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.pptx-rail__section-name-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Room between the field's border and the slide count after it. */
+  margin-right: 6px;
+  padding: 2px 6px;
+  border: 1px solid var(--doc-border-dark);
+  border-radius: 6px;
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 12px;
+}
+.pptx-rail__actions {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--doc-border);
+}
+
+/* A horizontal rail (`SlideRail` `orientation="horizontal"`): a row under the slide, for a
+   tall, narrow host. The thumbnails scroll sideways with the number under each one, and the
+   slide actions sit at the row's end in two rows. `--pptx-rail-thumb-width` sizes a thumbnail
+   (112px when unset); set it on the rail's class or any ancestor. */
+.pptx-rail[data-orientation='horizontal'] {
+  flex: none;
+  flex-direction: row;
+  width: auto;
+  min-width: 0;
+}
+.pptx-rail[data-orientation='horizontal'] .pptx-rail__list {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 10px 12px 6px;
+  scroll-padding-inline: 12px;
+  scrollbar-width: thin;
+}
+.pptx-rail[data-orientation='horizontal'] .pptx-rail__item {
+  flex: none;
+  flex-direction: column-reverse;
+  align-items: stretch;
+  gap: 4px;
+  width: var(--pptx-rail-thumb-width, 112px);
+  margin-bottom: 0;
+}
+.pptx-rail[data-orientation='horizontal'] .pptx-rail__number {
+  width: auto;
+  padding-top: 0;
+  line-height: 14px;
+  text-align: center;
+}
+.pptx-rail[data-orientation='horizontal'] .pptx-rail__thumb {
+  flex: none;
+}
+.pptx-rail[data-orientation='horizontal'] .pptx-rail__item[data-drop='before'] .pptx-rail__thumb {
+  box-shadow:
+    -3px 0 0 0 var(--doc-primary),
+    0 0 0 1px var(--doc-border);
+}
+.pptx-rail[data-orientation='horizontal'] .pptx-rail__item[data-drop='after'] .pptx-rail__thumb {
+  box-shadow:
+    3px 0 0 0 var(--doc-primary),
+    0 0 0 1px var(--doc-border);
+}
+/* A section is a column: its header over the row of its slides. */
+.pptx-rail[data-orientation='horizontal'] .pptx-rail__section {
+  flex: none;
+  max-width: none;
+}
+.pptx-rail[data-orientation='horizontal'] .pptx-rail__section-head {
+  margin: 0 0 4px;
+  max-width: calc(var(--pptx-rail-thumb-width, 112px) * 2);
+}
+.pptx-rail[data-orientation='horizontal'] .pptx-rail__section-list {
+  display: flex;
+  gap: 10px;
+}
+/* The actions in two rows: add, layout, duplicate, and delete; then the two moves and the
+   hide button. */
+.pptx-rail[data-orientation='horizontal'] .pptx-rail__actions {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  align-content: center;
+  border-top: 0;
+  border-inline-start: 1px solid var(--doc-border);
+}
+.pptx-rail[data-orientation='horizontal'] .pptx-rail__delete {
+  order: 1;
+}
+.pptx-rail[data-orientation='horizontal'] .pptx-rail__move {
+  order: 2;
+}
+.pptx-rail[data-orientation='horizontal'] .pptx-rail__actions .pptx-rail__collapse {
+  order: 3;
+}
+
+/* ============================================================================
+ * SLIDE SORTER (View > Slide Sorter): every slide in a grid, by section
+ * ============================================================================ */
+
+.pptx-sorter {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+  background: var(--doc-surface);
+  border-radius: 14px;
+  box-shadow: var(--doc-card-shadow);
+}
+.pptx-sorter__list,
+.pptx-sorter__section {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pptx-sorter__section + .pptx-sorter__section {
+  margin-top: 12px;
+}
+.pptx-sorter__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 18px 16px;
+  margin: 0 0 4px;
+  padding: 0;
+  list-style: none;
+}
+.pptx-sorter__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+}
+.pptx-sorter__item:focus-visible {
+  outline: none;
+}
+.pptx-sorter__number {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--doc-text-muted);
+}
+.pptx-sorter__item[aria-selected='true'] .pptx-rail__thumb,
+.pptx-sorter__item[aria-current='true'] .pptx-rail__thumb {
+  box-shadow: 0 0 0 2px var(--doc-primary);
+}
+.pptx-sorter__item[data-hidden] .pptx-rail__thumb {
+  opacity: 0.5;
+}
+/* Focus shows on top of the selection ring, in the shared focus color. */
+.pptx-sorter__item:focus-visible .pptx-rail__thumb {
+  outline: 2px solid var(--doc-focus-ring);
+  outline-offset: 3px;
+}
+.pptx-sorter__item[data-hidden] .pptx-sorter__number {
+  text-decoration: line-through;
+}
+.pptx-sorter__item[data-drop='before'] .pptx-rail__thumb {
+  box-shadow:
+    -4px 0 0 0 var(--doc-primary),
+    0 0 0 1px var(--doc-border);
+}
+.pptx-sorter__item[data-drop='after'] .pptx-rail__thumb {
+  box-shadow:
+    4px 0 0 0 var(--doc-primary),
+    0 0 0 1px var(--doc-border);
+}
+
+/* ============================================================================
+ * CANVAS AND SURFACE (the slide itself is never themed)
+ * ============================================================================ */
+
+.pptx-canvas {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--doc-bg);
+}
+/* An open find bar beside the canvas keeps the slide clear: when the bar would cover the
+   slide, the canvas pads its top by the bar's height (`reserveFindBarSpace`), and the fitted
+   zoom leaves that room. A bar in the canvas margin reserves 0, so the slide stays put. */
+.pptx-canvas:has(~ .pptx-find:not([hidden])) {
+  padding-top: var(--pptx-find-reserve, 0px);
+}
+/* The surface grows with a zoomed slide, so every edge scrolls into view; a smaller slide
+   centers through the stage's auto margins (grid centering would cut off its top and left). */
+.pptx-surface {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  display: flex;
+  box-sizing: border-box;
+  width: max-content;
+  height: max-content;
+  min-width: 100%;
+  min-height: 100%;
+  padding: 24px;
+  outline: none;
+}
+.pptx-surface__stage {
+  flex: none;
+  margin: auto;
+  position: relative;
+  background: var(--doc-page-bg-rendered);
+  box-shadow:
+    0 0 0 1px var(--doc-slide-edge),
+    var(--doc-card-shadow);
+}
+.pptx-surface__slide,
+.pptx-surface__overlay {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+/* A shape dragged partly off the slide stays visible: the editing surface does not clip the
+   slide, and the overlay dims what lies outside it (surface-view.ts). Thumbnails, the slide
+   show, and export clip to the slide. */
+.pptx-surface__slide {
+  overflow: visible;
+}
+.pptx-surface__outside {
+  fill: var(--doc-bg);
+  fill-opacity: 0.6;
+  pointer-events: none;
+}
+.pptx-surface__overlay {
+  overflow: visible;
+  pointer-events: none;
+}
+.pptx-surface__outline {
+  fill: none;
+  stroke: var(--doc-primary);
+}
+/* The halo under a selection mark (surface-halo.ts): a light edge in every chrome theme, so
+   the mark shows on a dark slide and on a light one. */
+.pptx-surface__halo {
+  fill: none;
+  stroke: var(--doc-selection-halo);
+  stroke-opacity: 0.9;
+  pointer-events: none;
+}
+.pptx-surface__halo--caret {
+  animation: pptx-caret-blink 1.06s steps(1) infinite;
+}
+/* An entered group's box, and the common box of several selected shapes. */
+.pptx-surface__group-outline {
+  fill: none;
+  stroke: var(--doc-text-muted, #5f6368);
+}
+/* Drag selection. */
+.pptx-surface__marquee {
+  fill: color-mix(in srgb, var(--doc-primary) 8%, transparent);
+  stroke: var(--doc-primary);
+}
+.pptx-surface__handle {
+  fill: var(--doc-selection-halo);
+  stroke: var(--doc-primary);
+  pointer-events: all;
+  cursor: pointer;
+}
+.pptx-surface__handle--nw,
+.pptx-surface__handle--se {
+  cursor: nwse-resize;
+}
+.pptx-surface__handle--ne,
+.pptx-surface__handle--sw {
+  cursor: nesw-resize;
+}
+.pptx-surface__handle--n,
+.pptx-surface__handle--s {
+  cursor: ns-resize;
+}
+.pptx-surface__handle--e,
+.pptx-surface__handle--w {
+  cursor: ew-resize;
+}
+.pptx-surface__handle--rot {
+  cursor: grab;
+}
+/* Crop mode (surface-crop.ts): the image outside the frame, dimmed, and the crop handles. */
+.pptx-surface__crop-image {
+  opacity: 0.4;
+}
+.pptx-surface__crop-extent {
+  fill: none;
+  stroke: var(--doc-text-muted);
+}
+.pptx-surface__crop-halo {
+  fill: none;
+  stroke: var(--doc-surface);
+  stroke-linecap: square;
+  pointer-events: stroke;
+}
+.pptx-surface__crop-handle {
+  fill: none;
+  stroke: var(--doc-text);
+  stroke-linecap: square;
+  pointer-events: stroke;
+}
+/* Smart guides (surface-guides.ts): alignment lines and equal-spacing bars while dragging. */
+.pptx-surface__guide {
+  stroke: var(--doc-smart-guide);
+  shape-rendering: crispEdges;
+  pointer-events: none;
+}
+.pptx-surface__caret {
+  stroke: var(--doc-slide-caret);
+  animation: pptx-caret-blink 1.06s steps(1) infinite;
+}
+
+/* The bullet an empty list item will get, shown while the caret is there (surface-ghost.ts). */
+.pptx-surface__ghost-bullet {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.pptx-surface__text-selection {
+  fill: var(--doc-selection);
+}
+
+/* A selected range of table cells (surface-table.ts). */
+.pptx-surface__cell-selection {
+  fill: var(--doc-selection);
+}
+
+/* Collaboration peers (surface-presence.ts), after DOCX Editor's remote carets: the
+   participant color comes from `--pptx-remote-color`, the accent when there is none. */
+.pptx-surface__presence {
+  pointer-events: none;
+}
+.pptx-surface__remote-outline {
+  fill: none;
+  stroke: var(--pptx-remote-color, var(--doc-accent));
+}
+.pptx-surface__remote-selection {
+  fill: color-mix(in srgb, var(--pptx-remote-color, var(--doc-accent)) 28%, transparent);
+}
+.pptx-surface__remote-caret {
+  stroke: var(--pptx-remote-color, var(--doc-accent));
+}
+.pptx-surface__remote-label rect {
+  fill: var(--pptx-remote-color, var(--doc-accent));
+}
+.pptx-surface__remote-label text {
+  fill: var(--doc-on-primary);
+  font-family: system-ui, sans-serif;
+  font-weight: 600;
+}
+.pptx-surface__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  resize: none;
+  overflow: hidden;
+  pointer-events: none;
+  caret-color: transparent;
+}
+.pptx-surface__stage [data-layer='slide'] {
+  cursor: default;
+}
+/* While the format painter is on, the whole slide shows its brush (surface.ts). */
+.pptx-surface--painting .pptx-surface__stage,
+.pptx-surface--painting .pptx-surface__stage [data-layer='slide'] {
+  cursor: var(--doc-cursor-format-paint);
+}
+
+@keyframes pptx-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ============================================================================
+ * SPEAKER NOTES (collapsible card under the canvas)
+ * ============================================================================ */
+
+.pptx-notes {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  margin: 0 12px 12px;
+  background: var(--doc-surface);
+  border-radius: 14px;
+  box-shadow: var(--doc-card-shadow);
+}
+.pptx-notes__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 6px 0 14px;
+  color: var(--doc-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.pptx-notes__head span {
+  flex: 1 1 auto;
+}
+.pptx-notes__text {
+  height: 96px;
+  margin: 0 8px 8px;
+  padding: 8px 10px;
+  overflow-y: auto;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+  background: var(--doc-bg-input);
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  cursor: text;
+  resize: vertical;
+}
+/* The field keeps the shared focus ring (`.pptx-editor :focus-visible`). The field is
+   contenteditable, so its prompt is `:empty::before` in the muted token (4.5:1 on the dark field). */
+.pptx-notes__text:focus {
+  border-color: var(--doc-border-dark);
+  background: var(--doc-surface);
+}
+/* The find bar's match in the notes (`notes-find-highlight.ts`): a CSS custom highlight, so the
+   focus stays in the find field. The selection tint, as a selected match on the slide shows. */
+.pptx-notes__text ::highlight(pptx-find),
+.pptx-notes__text::highlight(pptx-find) {
+  background-color: var(--doc-selection);
+}
+.pptx-notes__text:empty::before {
+  content: attr(data-placeholder);
+  color: var(--doc-text-muted);
+  pointer-events: none;
+}
+.pptx-notes__run--bold {
+  font-weight: 700;
+}
+.pptx-notes__run--italic {
+  font-style: italic;
+}
+.pptx-notes__run--underline {
+  text-decoration: underline;
+}
+.pptx-notes__run--strike {
+  text-decoration: line-through;
+}
+.pptx-notes__run--underline.pptx-notes__run--strike {
+  text-decoration: underline line-through;
+}
+.pptx-notes__format {
+  display: flex;
+  gap: 2px;
+}
+.pptx-notes__refusal {
+  margin: 0 12px 8px;
+  color: var(--doc-error);
+  font-size: 12px;
+}
+
+/* ============================================================================
+ * EDIT NOTICE: why the last edit was refused
+ * ============================================================================ */
+
+.pptx-edit-notice {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 26;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100% - 48px);
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--doc-error);
+  border-radius: 10px;
+  background: var(--doc-error-bg);
+  color: var(--doc-text);
+  font-size: 12.5px;
+  line-height: 1.4;
+  box-shadow: var(--doc-card-shadow);
+  /* It drops in a few pixels as it appears, so the eye finds it; `translate` leaves the
+     centering `transform` alone. */
+  transition:
+    opacity 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    translate 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+@starting-style {
+  .pptx-edit-notice {
+    opacity: 0;
+    translate: 0 -6px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pptx-edit-notice {
+    transition: opacity 150ms ease;
+  }
+  @starting-style {
+    .pptx-edit-notice {
+      translate: none;
+    }
+  }
+}
+/* Undo after a Delete: a text action beside the message. */
+.pptx-edit-notice__action {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--doc-border);
+  border-radius: 7px;
+  background: var(--doc-surface);
+  color: var(--doc-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.pptx-edit-notice__action:active {
+  transform: scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pptx-edit-notice__action:active {
+    transform: none;
+  }
+}
+/* A state the edit cannot run in (a deck open for viewing) is information, not an error. */
+.pptx-edit-notice[data-tone='info'] {
+  border-color: var(--doc-border);
+  background: var(--doc-surface);
+}
+.pptx-edit-notice__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pptx-edit-notice .pptx-toolbar__button {
+  width: 26px;
+  height: 26px;
+}
+
+/* ============================================================================
+ * OPEN FAILURE: why a file did not open
+ * ============================================================================ */
+
+.pptx-open-failure {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 27;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(440px, calc(100% - 32px));
+  padding: 14px 16px 12px;
+  border: 1px solid var(--doc-error);
+  border-radius: 12px;
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font-size: 13px;
+  line-height: 1.45;
+  box-shadow: var(--doc-card-shadow);
+}
+.pptx-open-failure__text p {
+  margin: 0;
+}
+.pptx-open-failure__title {
+  font-weight: 600;
+  color: var(--doc-error);
+}
+.pptx-open-failure__message {
+  margin-top: 4px;
+}
+.pptx-open-failure__kept {
+  margin-top: 4px;
+  color: var(--doc-text-muted);
+}
+.pptx-open-failure__code {
+  margin-top: 6px;
+  color: var(--doc-text-muted);
+  font-size: 12px;
+}
+.pptx-open-failure__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.pptx-open-failure__action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.pptx-open-failure__action:hover {
+  background: var(--doc-bg-hover);
+}
+.pptx-open-failure__action:focus-visible {
+  outline: 2px solid var(--doc-primary);
+  outline-offset: 1px;
+}
+
+/* ============================================================================
+ * SIDE PANEL (Format · Comments · Settings), DOCX review-panel styling
+ * ============================================================================ */
+
+.pptx-panel {
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  min-height: 0;
+  background: var(--doc-surface);
+  border-radius: 14px;
+  box-shadow: var(--doc-card-shadow);
+  overflow: hidden;
+}
+.pptx-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 10px 8px 12px;
+}
+.pptx-tabs {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--doc-bg-hover);
+}
+.pptx-tabs__tab {
+  flex: 1 1 auto;
+  height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  /* Between muted and full text: 4.5:1 or more in both color modes (WCAG 1.4.3). */
+  color: color-mix(in srgb, var(--doc-text) 78%, transparent);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition:
+    background-color 0.16s,
+    color 0.16s,
+    box-shadow 0.16s;
+}
+.pptx-tabs__tab:hover {
+  color: var(--doc-text);
+}
+.pptx-tabs__tab[aria-selected='true'] {
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  box-shadow: var(--doc-card-shadow);
+}
+.pptx-panel__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 6px 16px 24px;
+  overflow-y: auto;
+}
+.pptx-panel__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.pptx-panel__title {
+  margin: 0;
+  color: var(--doc-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.pptx-panel__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+.pptx-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--doc-text-muted);
+}
+.pptx-field input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.pptx-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--doc-border);
+  border-radius: 999px;
+  background: var(--doc-surface);
+  color: var(--doc-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.pptx-empty {
+  padding: 32px 8px;
+  text-align: center;
+}
+.pptx-empty__title {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+.pptx-empty__body {
+  margin: 0;
+  color: var(--doc-text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.pptx-segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--doc-bg-hover);
+}
+.pptx-segmented button {
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--doc-text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.pptx-segmented button[aria-checked='true'],
+.pptx-segmented button[aria-selected='true'] {
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  box-shadow: var(--doc-card-shadow);
+}
+
+/* ============================================================================
+ * ZOOM PILL (bottom right)
+ * ============================================================================ */
+
+.pptx-zoom {
+  position: absolute;
+  right: 18px;
+  bottom: 16px;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--doc-surface);
+  box-shadow: var(--doc-card-shadow-strong);
+}
+/* The views box holds the Normal or Slide Sorter workspace and, at its bottom right, the status
+   area, which stays mounted when the view changes. */
+.pptx-default__views {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* The view switch shows the chosen view as a pressed toggle, also inside the zoom pill. */
+.pptx-view-switch .pptx-view-switch__option[aria-checked='true'] {
+  background: var(--doc-toggle-active-bg);
+  color: var(--doc-toggle-active-fg);
+}
+/* The default editor's status area: the view switch and the zoom pill, bottom right. */
+.pptx-statusbar {
+  position: absolute;
+  right: 18px;
+  bottom: 16px;
+  z-index: 25;
+  display: flex;
+  gap: 8px;
+}
+.pptx-statusbar .pptx-zoom {
+  position: static;
+}
+.pptx-zoom .pptx-toolbar__button {
+  height: 28px;
+  border-radius: 999px;
+  color: var(--doc-text-muted);
+}
+.pptx-zoom__level {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 6px 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.pptx-zoom__level:hover {
+  background: var(--doc-bg-hover);
+}
+.pptx-zoom__level[aria-disabled='true'] {
+  opacity: 0.35;
+  cursor: default;
+  background: transparent;
+}
+
+/* ============================================================================
+ * DEFAULT LAYOUT (<PptxEditor>): dock, rail, canvas, notes
+ * ============================================================================ */
+
+.pptx-default {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--doc-bg);
+}
+.pptx-default__dock {
+  display: flex;
+  justify-content: center;
+  padding: 8px 14px 10px;
+}
+.pptx-default__workspace {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 0;
+  padding: 0 0 0 12px;
+}
+.pptx-default__main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ============================================================================
+ * FONT SUBSTITUTION NOTICE (DOCX Editor's font notice)
+ * ============================================================================ */
+
+.pptx-font-notice {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100% - 200px);
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--doc-warning);
+  border-radius: 10px;
+  background: var(--doc-warning-bg);
+  color: var(--doc-warning-text);
+  font-size: 12.5px;
+  line-height: 1.4;
+  box-shadow: var(--doc-card-shadow);
+}
+.pptx-font-notice__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pptx-font-notice__action {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--doc-warning);
+  border-radius: 7px;
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.pptx-font-notice__action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.pptx-font-notice .pptx-toolbar__button {
+  width: 26px;
+  height: 26px;
+  color: var(--doc-warning-text);
+}
+.pptx-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pptx-panel__list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pptx-chip--quiet {
+  height: 20px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Dialogs (`PptxEditor.PageSetupDialog`). The same structure and tokens as DOCX Editor's
+   `.docx-dialog`, so one theme override styles both products.
+   --------------------------------------------------------------------------------------------- */
+.pptx-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  box-sizing: border-box;
+  width: calc(100vw - 40px);
+  max-width: 480px;
+  max-height: 90dvh;
+  padding: 0;
+  overflow: hidden;
+  color: var(--doc-text);
+  background: var(--doc-surface);
+  border: 1px solid var(--doc-border);
+  border-radius: var(--doc-dialog-radius, 12px);
+  box-shadow: var(--doc-card-shadow);
+  font: var(--doc-dialog-font-size, 13px) / 1.5
+    var(--doc-dialog-font-family, var(--doc-font-ui, system-ui, sans-serif));
+}
+.pptx-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.pptx-dialog::backdrop {
+  background: var(--doc-overlay);
+}
+.pptx-dialog__header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 12px 4px var(--doc-dialog-padding, 24px);
+}
+.pptx-dialog__title {
+  margin: 0;
+  font-size: 1.385em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.pptx-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  padding: 12px var(--doc-dialog-padding, 24px) 8px;
+  overflow-y: auto;
+}
+.pptx-dialog__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pptx-dialog__label {
+  margin: 0;
+  font-size: 0.923em;
+  font-weight: 600;
+  color: var(--doc-text-muted);
+}
+.pptx-dialog__value {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+.pptx-dialog__muted {
+  color: var(--doc-text-muted);
+}
+/* The Background dialog's status line: what the draft holds, announced on change. It stays in
+   the page while empty, so a screen reader hears the first message. */
+.pptx-dialog__status {
+  margin: 0;
+}
+.pptx-dialog__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pptx-dialog__list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pptx-dialog__footer {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px var(--doc-dialog-padding, 24px) 20px;
+}
+/* The `error` part: the engine's refusal or a field error, before the actions. */
+.pptx-dialog__error {
+  flex: 1 1 100%;
+  order: -1;
+  color: var(--doc-error);
+  font-size: 0.923em;
+}
+.pptx-dialog__error:empty {
+  display: none;
+}
+/* A multi-line field (the Alt Text description). */
+.pptx-dialog__textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 88px;
+  padding: 8px 10px;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+  resize: vertical;
+}
+.pptx-dialog__textarea:disabled {
+  color: var(--doc-text-subtle);
+  background: var(--doc-bg-subtle);
+}
+/* The `reset` part sits apart from Cancel and OK, at the start of the footer. */
+.pptx-dialog__reset {
+  margin-inline-end: auto;
+}
+.pptx-button {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.pptx-button--primary {
+  border-color: var(--doc-primary);
+  background: var(--doc-primary);
+  color: var(--doc-on-primary);
+}
+/* An action that throws work away (Discard changes), as DOCX Editor's `destructive` button
+   variant. The destructive color keeps 4.5:1 with the on-primary text in both themes. */
+.pptx-button--destructive {
+  border-color: var(--doc-destructive);
+  background: var(--doc-destructive);
+  color: var(--doc-on-primary);
+}
+/* A press answers at once: the button shrinks a little while it is held. */
+.pptx-button:not(:disabled):active {
+  transform: scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pptx-button {
+    transition: none;
+  }
+  .pptx-button:not(:disabled):active {
+    transform: none;
+  }
+}
+/* Text for assistive technology only: a disabled control's reason (aria-describedby). */
+.pptx-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* A disabled action looks disabled: the author colors above override the browser's own. */
+.pptx-button:where(:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Form dialogs (Paragraph): fieldsets, a field grid, rows of paired fields (Before and its
+   unit; Line spacing and At), and the error line. */
+.pptx-dialog__form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+}
+/* Text for screen readers only: a unit in a field's name, a label the layout shows by position. */
+.pptx-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+fieldset.pptx-dialog__section {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+legend.pptx-dialog__label {
+  padding: 0;
+  margin-bottom: 6px;
+}
+.pptx-dialog__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 8px 12px;
+}
+.pptx-dialog__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* Fixed columns that keep the same order at every width (the Font dialog's Effects). */
+.pptx-dialog__columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  align-items: start;
+}
+/* Controls that belong together, kept in order on one row when the dialog is wide enough:
+ * Superscript and its Offset, Spacing and By. */
+.pptx-dialog__inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px 12px;
+}
+/* The tabs of a dialog in one cell: the dialog takes the size of its largest tab. A tab that
+ * is not shown keeps its space and is hidden, so it takes no focus. */
+.pptx-dialog__panels {
+  display: grid;
+}
+/* A tab panel spaces its rows and sections as the dialog body does: a section heading (the Font
+   dialog's All text, Effects) never sits right under the fields before it. */
+.pptx-dialog__panels > [role='tabpanel'] {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.pptx-dialog__panels > [data-inactive] {
+  visibility: hidden;
+}
+.pptx-field__pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: end;
+}
+/* A field the dialog marked with an error (`aria-invalid`), as DOCX Editor marks it. */
+.pptx-field input[aria-invalid='true'],
+.pptx-field select[aria-invalid='true'] {
+  border-color: var(--doc-danger);
+}
+.pptx-field input::placeholder {
+  color: var(--doc-text-muted);
+  opacity: 1;
+}
+.pptx-field input:disabled,
+.pptx-field select:disabled {
+  opacity: 0.5;
+}
+.pptx-dialog__error {
+  margin: 0;
+  color: var(--doc-danger);
+}
+
+/* Format panel: radios and number fields with a unit. */
+.pptx-radios {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pptx-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--doc-text);
+  cursor: pointer;
+}
+.pptx-radio input {
+  margin: 0;
+  accent-color: var(--doc-primary);
+}
+.pptx-field__control {
+  position: relative;
+  display: flex;
+}
+.pptx-field__control input {
+  padding-right: 28px;
+}
+/* A field with an error (Format Picture, Alt Text): the danger border beside the message that names it. */
+.pptx-field__control input[aria-invalid='true'],
+.pptx-field > input[aria-invalid='true'],
+.pptx-dialog__textarea[aria-invalid='true'] {
+  border-color: var(--doc-danger);
+}
+.pptx-field__unit {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: var(--doc-text-muted);
+  pointer-events: none;
+}
+
+/* Insert > Table: the size grid (TableControls.tsx). */
+.pptx-table-grid {
+  padding: 6px 8px 4px;
+}
+.pptx-table-grid__cells {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pptx-table-grid__row {
+  /* Real boxes, not `display: contents`: WebKit drops the role of a box-less row. */
+  display: flex;
+  gap: 3px;
+}
+.pptx-table-grid__cell {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  /* A 3:1 edge on the surface (WCAG 1.4.11). */
+  border: 1px solid var(--doc-text-muted);
+  border-radius: 2px;
+  background: var(--doc-surface);
+  cursor: pointer;
+}
+.pptx-table-grid__cell[data-active] {
+  border-color: var(--doc-primary);
+  background: var(--doc-primary-light);
+}
+.pptx-table-grid__cell:focus-visible {
+  outline: 2px solid var(--doc-primary);
+  outline-offset: 1px;
+}
+.pptx-table-grid__label {
+  margin: 6px 0 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--doc-text-muted);
+}
+
+/* Insert-shape gallery: previews drawn from the spec geometry. */
+.pptx-shape-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 296px;
+  max-height: min(60vh, 520px);
+  padding: 4px 6px 6px;
+  overflow-y: auto;
+}
+.pptx-shape-gallery__title {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--doc-text-muted);
+}
+.pptx-shape-gallery__grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+}
+.pptx-shape-gallery__item {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--doc-text);
+  cursor: pointer;
+}
+.pptx-shape-gallery__item:hover,
+.pptx-shape-gallery__item:focus-visible {
+  background: var(--doc-bg-hover);
+}
+/* The layout gallery (Home > Layout, New Slide): engine-drawn tiles, three to a row. */
+.pptx-layout-gallery {
+  max-height: min(60vh, 520px);
+  padding: 0 6px 6px;
+  overflow-y: auto;
+}
+/* One group per slide master, headed by its name. */
+.pptx-layout-gallery__header {
+  padding: 8px 4px 4px;
+  color: var(--doc-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.pptx-layout-gallery__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 112px);
+  gap: 6px;
+}
+.pptx-layout-gallery__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 11px;
+  text-align: center;
+  cursor: pointer;
+}
+.pptx-layout-gallery__item:hover,
+.pptx-layout-gallery__item:focus-visible {
+  background: var(--doc-bg-hover);
+}
+/* A gallery that takes no pick (viewing mode, or `disabled`) shows its tiles dimmed. */
+.pptx-layout-gallery__item[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+.pptx-layout-gallery__thumb {
+  display: block;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--doc-border);
+  background: var(--doc-page-bg);
+}
+.pptx-layout-gallery__item[data-current] .pptx-layout-gallery__thumb {
+  box-shadow: 0 0 0 2px var(--doc-primary);
+}
+.pptx-layout-gallery__thumb svg {
+  display: block;
+}
+.pptx-layout-gallery__name {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.pptx-layout-gallery__empty {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--doc-text-muted);
+}
+.pptx-shape-icon {
+  width: 24px;
+  height: 24px;
+  stroke-width: 1.25px;
+  stroke-linejoin: round;
+}
+.pptx-shape-icon__fill {
+  fill: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+/* Fill control tabs and the custom gradient dialog. */
+.pptx-fill__tabs {
+  margin: 2px 4px 8px;
+}
+.pptx-gradient {
+  max-width: 560px;
+}
+.pptx-gradient__top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: 20px;
+}
+.pptx-gradient__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.pptx-gradient__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+.pptx-gradient__row .pptx-field {
+  flex: 1 1 110px;
+}
+.pptx-field select {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 13px;
+}
+.pptx-gradient__color {
+  width: 44px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+  background: var(--doc-surface);
+  cursor: pointer;
+}
+.pptx-gradient__preview {
+  height: 132px;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+}
+.pptx-gradient__bar {
+  position: relative;
+  height: 14px;
+  margin: 10px 8px 6px;
+  border: 1px solid var(--doc-border);
+  border-radius: 4px;
+}
+.pptx-gradient__handle {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 2px solid var(--doc-surface);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--doc-text-muted);
+  transform: translate(-50%, -50%);
+  cursor: ew-resize;
+  touch-action: none;
+}
+.pptx-gradient__handle[aria-pressed='true'] {
+  box-shadow: 0 0 0 2px var(--doc-primary);
+}
+.pptx-line-glyph {
+  width: 32px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+.pptx-menu__item .pptx-line-glyph {
+  width: 40px;
+  height: 20px;
+}
+/* The angle field's own unit replaces the number spinner. */
+.pptx-gradient input[type='number'] {
+  appearance: textfield;
+}
+.pptx-gradient input[type='number']::-webkit-inner-spin-button,
+.pptx-gradient input[type='number']::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+/* Toolbar groups that do not fit, in the More menu. */
+.pptx-toolbar__overflow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: min(320px, calc(100vw - 32px));
+  /* A short window scrolls the panel instead of cutting controls off, as DOCX Editor's. */
+  max-height: min(72vh, 560px);
+  overflow-y: auto;
+  padding: 2px;
+}
+/* Each collapsed group is a section: its name over its controls. A long group (the table
+   group) wraps its controls inside the panel. */
+.pptx-toolbar__overflow > .pptx-toolbar__group {
+  flex-wrap: wrap;
+  max-width: 100%;
+  padding-top: 6px;
+  border-top: 1px solid var(--doc-border);
+}
+.pptx-toolbar__overflow > .pptx-toolbar__group:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.pptx-toolbar__overflow-heading {
+  flex-basis: 100%;
+  padding: 0 2px 2px;
+  color: var(--doc-text-muted);
+  font-size: 0.846em;
+  font-weight: 600;
+}
+/* Font picker: a search field over a scrolling list. */
+.pptx-font-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 240px;
+}
+.pptx-font-picker__search {
+  height: 32px;
+  margin: 2px 2px 0;
+  padding: 0 10px;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 13px;
+}
+.pptx-font-picker__list {
+  max-height: min(50vh, 360px);
+  overflow-y: auto;
+}
+.pptx-font-picker__empty {
+  margin: 8px 10px;
+  color: var(--doc-text-muted);
+  font-size: 13px;
+}
+/* A group (theme fonts, fonts in this presentation, all fonts), with a rule between groups. */
+.pptx-font-picker__group + .pptx-font-picker__group {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--doc-border);
+}
+.pptx-font-picker__heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--doc-popover-bg);
+}
+/* Each name in its own face (`--pptx-font-face`, set per row); a face that is not loaded falls
+ * back to the chrome font, as DOCX Editor's picker leaves it to the browser. */
+.pptx-font-picker__face {
+  margin-inline-end: auto;
+  overflow: hidden;
+  font-family:
+    var(--pptx-font-face),
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  font-size: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pptx-font-picker__role {
+  flex: none;
+  color: var(--doc-text-muted);
+  font-size: 12px;
+}
+.pptx-menu__item.pptx-font-picker__option > .pptx-menu__check {
+  flex: none;
+  margin-inline-start: 0;
+}
+.pptx-font-picker__option[aria-selected='true'] {
+  background: var(--doc-primary-light);
+}
+.pptx-font-picker__option[aria-selected='true']:hover,
+.pptx-font-picker__option[aria-selected='true']:focus-visible {
+  background: var(--doc-bg-hover);
+}
+
+/* Chrome tooltips, after DOCX Editor's `Tooltip`: a dark bubble under the control (light
+ * bubble in dark mode), the label, and a disabled control's reason on its own line. Visual
+ * only: the control's `aria-label` and `aria-describedby` carry the same text. */
+.pptx-tooltip {
+  position: fixed;
+  z-index: var(--doc-z-tooltip);
+  max-width: 280px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--doc-tooltip-bg);
+  color: var(--doc-tooltip-text);
+  box-shadow: var(--doc-shadow-lg);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  pointer-events: none;
+  animation: pptx-tooltip-in 0.12s ease-out both;
+}
+.pptx-tooltip:not([data-side]) {
+  visibility: hidden;
+}
+.pptx-tooltip__label,
+.pptx-tooltip__reason {
+  display: block;
+}
+.pptx-tooltip__reason {
+  font-weight: 400;
+  opacity: 0.8;
+}
+@keyframes pptx-tooltip-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pptx-tooltip {
+    animation: none;
+  }
+}
+/* Link popover. */
+.pptx-link {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 300px;
+  padding: 2px;
+}
+.pptx-link__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.pptx-link__open {
+  margin-right: auto;
+  color: var(--doc-primary);
+  font-size: 13px;
+}
+.pptx-link__error {
+  margin: 0;
+  color: var(--doc-error);
+  font-size: 12px;
+}
+/* Reading mode: the target and its actions on one row, under the caret. */
+.pptx-link[data-mode='reading'] {
+  width: auto;
+  max-width: 360px;
+}
+.pptx-link__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pptx-link__url {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 4px;
+  color: var(--doc-primary);
+  font-size: 13px;
+  text-decoration: none;
+}
+.pptx-link__url bdi {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pptx-link__url .pptx-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+.pptx-link__url[data-inert] {
+  color: var(--doc-text-muted);
+}
+.pptx-link__url:not([data-inert]):hover,
+.pptx-link__url:focus-visible {
+  background: var(--doc-bg-hover);
+  text-decoration: underline;
+}
+.pptx-link__tools {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  margin-left: auto;
+  padding-left: 4px;
+  border-left: 1px solid var(--doc-border);
+}
+.pptx-link__action {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--doc-text-muted);
+  cursor: pointer;
+}
+.pptx-link__action .pptx-icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.pptx-link__action:hover,
+.pptx-link__action:focus-visible {
+  background: var(--doc-bg-hover);
+  color: var(--doc-text);
+}
+.pptx-link__action[data-copied] {
+  color: var(--doc-primary);
+}
+.pptx-link__actions .pptx-link__unlink {
+  margin-right: auto;
+}
+
+/* Slide show: the slide fitted to the screen on black, a blank or end screen, and an
+   auto-hiding control bar. */
+.pptx-show {
+  position: fixed;
+  inset: 0;
+  z-index: var(--doc-z-slideshow);
+  overflow: hidden;
+  background: var(--doc-slideshow-bg);
+  color: var(--doc-slideshow-text);
+  outline: none;
+  cursor: default;
+  user-select: none;
+}
+.pptx-show[data-idle='true'] {
+  cursor: none;
+}
+.pptx-show[data-link='true'] {
+  cursor: pointer;
+}
+.pptx-show__slide {
+  position: absolute;
+}
+.pptx-show__slide > svg {
+  display: block;
+}
+.pptx-show__blank {
+  position: absolute;
+  inset: 0;
+}
+.pptx-show__blank[data-color='black'] {
+  background: var(--doc-slideshow-black);
+}
+.pptx-show__blank[data-color='white'] {
+  background: var(--doc-slideshow-white);
+}
+.pptx-show__end {
+  position: absolute;
+  top: 24px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 15px;
+}
+.pptx-show__goto {
+  position: absolute;
+  left: 50%;
+  bottom: 72px;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  background: var(--doc-slideshow-bar-bg);
+  font-size: 14px;
+}
+.pptx-show__bar {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--radius);
+  background: var(--doc-slideshow-bar-bg);
+  color: var(--doc-slideshow-text);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.pptx-show__bar[data-visible='true'],
+.pptx-show__bar:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+.pptx-show__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.pptx-show__button:hover {
+  background: var(--doc-slideshow-bar-hover);
+}
+.pptx-show__button:focus-visible {
+  outline: 2px solid var(--doc-slideshow-focus);
+  outline-offset: -2px;
+}
+.pptx-show__button svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+.pptx-show__position {
+  min-width: 96px;
+  padding: 0 6px;
+  font-size: 13px;
+  text-align: center;
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pptx-show__bar {
+    transition: none;
+  }
+}
+/* Find bar: find and replace, over the top right of the canvas. */
+.pptx-find {
+  position: absolute;
+  top: 12px;
+  right: 18px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(380px, calc(100% - 36px));
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  box-shadow: var(--doc-card-shadow-strong);
+  font-size: 13px;
+}
+.pptx-find[hidden] {
+  display: none;
+}
+.pptx-find__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pptx-find__row--replace {
+  padding-left: 34px;
+}
+.pptx-find__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+  background: var(--doc-bg-input);
+  color: var(--doc-text);
+  font: inherit;
+}
+.pptx-find__input:focus-visible {
+  outline: 2px solid var(--doc-focus-ring);
+  outline-offset: 0;
+}
+.pptx-find__row .pptx-button {
+  height: 30px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+.pptx-find__count {
+  min-width: 56px;
+  color: var(--doc-text-muted);
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+.pptx-find__options {
+  display: flex;
+  gap: 14px;
+  padding-left: 38px;
+  color: var(--doc-text-muted);
+  font-size: 12px;
+}
+.pptx-find__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+.pptx-find__hint,
+.pptx-find__status {
+  margin: 0;
+  padding-left: 38px;
+  color: var(--doc-text-muted);
+  font-size: 12px;
+}
+
+/* Shape Format: labeled menu triggers and the Shape Styles gallery. */
+.pptx-style-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+}
+.pptx-style-gallery__row {
+  display: flex;
+  gap: 2px;
+}
+.pptx-menu__item.pptx-style-gallery__cell {
+  width: auto;
+  padding: 3px;
+  border-radius: 6px;
+}
+.pptx-style-gallery__cell[aria-checked='true'] {
+  box-shadow: inset 0 0 0 2px var(--doc-primary);
+}
+.pptx-style-gallery__swatch {
+  display: block;
+  width: 40px;
+  height: 28px;
+}
+.pptx-style-gallery__shadow {
+  fill: var(--doc-text);
+}
+.pptx-corrections-grid__title,
+.pptx-corrections-grid__label,
+.pptx-corrections-grid__side {
+  color: var(--doc-text-muted);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+/* The row labels and the Contrast title take 52px at the left: the columns line up under the
+   Brightness title and its labels. */
+.pptx-corrections-grid__title {
+  padding-inline-start: 52px;
+  font-weight: 600;
+}
+.pptx-corrections-grid__head {
+  display: flex;
+  gap: 2px;
+  padding-inline-start: 52px;
+}
+.pptx-corrections-grid__label {
+  flex: none;
+  width: 58px;
+}
+.pptx-corrections-grid__label--row {
+  width: 32px;
+  align-self: center;
+  text-align: end;
+}
+.pptx-corrections-grid__body {
+  display: flex;
+  gap: 2px;
+}
+.pptx-corrections-grid__side {
+  flex: none;
+  width: 16px;
+  font-weight: 600;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+.pptx-corrections-grid__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pptx-corrections-grid__swatch {
+  display: block;
+  width: 52px;
+  height: 36px;
+  border-radius: 3px;
+}
+.pptx-glow-grid__box {
+  fill: var(--doc-surface);
+  stroke: var(--doc-text-muted);
+  stroke-width: 1;
+}
+.pptx-style-gallery__trigger {
+  display: block;
+  width: 26px;
+  height: 18px;
+}
+.pptx-effects-glyph__shadow {
+  fill: currentColor;
+  opacity: 0.35;
+}
+.pptx-effects-glyph__box {
+  fill: var(--doc-surface);
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+
+/* The loading screen (`PptxEditor.Loading` in React, `PptxEditorLoading` in Vue), after DOCX
+   Editor's `DocxEditor.Loading`: a slide-shaped sheet with a spinner, at the slide size and
+   zoom that the deck will paint at, so the swap to the first slide does not jump. In flow it
+   fills the box the host gives it. `--overlay` pins it over the nearest positioned ancestor
+   and covers the previous deck while the next one opens; its short appearance delay keeps a
+   fast open from flashing it. The spinner turns by a transform, which the compositor runs
+   while a large deck's parse blocks the main thread. */
+.pptx-loading {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 32px;
+  overflow: hidden;
+  background: var(--doc-bg);
+  color: var(--doc-text-muted);
+}
+
+.pptx-loading--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: var(--doc-z-overlay, 50);
+  animation: pptx-loading-appear 0.2s linear 0.15s backwards;
+}
+
+@keyframes pptx-loading-appear {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.pptx-loading__sheet {
+  display: grid;
+  flex: none;
+  place-items: center;
+  /* The adapters set the width and the aspect ratio inline; a narrow box shrinks the sheet. */
+  max-width: 100%;
+  height: auto;
+  background: var(--doc-page-bg);
+  box-shadow: 0 1px 3px var(--doc-shadow);
+}
+
+.pptx-loading__spinner {
+  display: block;
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--doc-border);
+  border-top-color: var(--doc-primary);
+  border-radius: 50%;
+  animation: pptx-loading-spin 0.8s linear infinite;
+}
+
+@keyframes pptx-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Respect a reduced-motion preference: keep the indicator still. */
+@media (prefers-reduced-motion: reduce) {
+  .pptx-loading__spinner {
+    animation: none;
+  }
+}

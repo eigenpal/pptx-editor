@@ -1,0 +1,68 @@
+---
+title: 'Vue examples'
+description: 'Find Vue examples for loading, saving, custom chrome, and the example application.'
+category: 'Vue'
+order: 39
+---
+
+## Choose an example
+
+| Task | Source |
+| --- | --- |
+| Open a local file and download the edited deck | [Quickstart](/docs/quickstart) |
+| Save through the ref | [Use the ref](/docs/vue/props#use-the-ref) |
+| Build custom toolbar buttons | [Vue composables](/docs/vue/composables) |
+| Arrange editor parts | [Vue composition](/docs/vue/composition) |
+| Replace a dialog | [Dialogs](/docs/customization/dialogs) |
+| Translate the interface | [Language](/docs/customization/language) |
+| Run a command from your code | [Run a command](#run-a-command) |
+
+## Run a command
+
+Render this component inside `PptxEditorRoot`. It adds a slide with the typed `addSlide` command and shows the engine's refusal reason:
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { useEditorState, usePptxEditor } from '@pptx-editor.dev/vue';
+
+const editor = usePptxEditor();
+const editable = useEditorState((s) => s.status === 'ready' && s.mode === 'edit');
+const error = ref<string | null>(null);
+
+function add() {
+  if (!editor.value) return;
+  const result = editor.value.exec({ type: 'addSlide' });
+  error.value = result.ok ? null : result.reason;
+}
+</script>
+
+<template>
+  <button type="button" :disabled="!editable" @click="add">New slide</button>
+  <output aria-live="polite">{{ error }}</output>
+</template>
+```
+
+`exec` returns a `CommandResult`: `ok` is `false` with a `reason` when the engine refuses the command. Each `exec` call is one undo step. For a control that a toolbar slot already describes, prefer `useEditorCommand(slot)`; see [Vue composables](/docs/vue/composables).
+
+## Run the Vue example
+
+The [`examples/vue`](https://github.com/eigenpal/pptx-editor/tree/main/examples/vue) app is the twin of the React example. It shows composed chrome: a menu bar, the toolbar or the ribbon, the slide rail and the Slide Sorter, the notes, the side panel, and export. It builds against the package source, so it needs no build step. From the repository root, run `bun install`, then:
+
+```bash
+bun run dev:vue   # http://localhost:5275
+```
+
+To run the React and Vue examples side by side, run `bun run dev:all`.
+
+## Limits
+
+- Render command components inside `PptxEditorRoot`. Read the editor through `editor.value`, and wait for it before you call it.
+- `save()` returns `null` when no deck is open. Your application owns any download or upload of the saved bytes.
+- The editor makes no network request of its own. Your application fetches the deck and passes its bytes.
+
+## Next steps
+
+- [Vue props](/docs/vue/props): configure `<PptxEditor>` and its ref.
+- [Toolbar](/docs/customization/toolbar): find command slot identifiers.
+- [Vite with Vue](/docs/frameworks/vite-vue): set up a Vue application.

@@ -1,0 +1,23 @@
+{
+  "name": "@pptx-editor.dev/example-vue",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5275 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5275"
+  },
+  "dependencies": {
+    "@docx-editor.dev/fonts": "^2.33.0",
+    "@fontsource-variable/geist": "^5.3.0",
+    "@pptx-editor.dev/core": "workspace:*",
+    "@pptx-editor.dev/i18n": "workspace:*",
+    "@pptx-editor.dev/vue": "workspace:*",
+    "vue": "3.5.44"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.6",
+    "vite": "^8.0.10"
+  }
+}

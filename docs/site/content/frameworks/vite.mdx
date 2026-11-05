@@ -1,0 +1,74 @@
+---
+title: 'Vite'
+description: 'Build a client-rendered Vite PPTX editor with React.'
+category: 'Frameworks'
+seoTitle: 'Vite PPTX editor setup'
+---
+
+## Install
+
+```bash
+npm install @pptx-editor.dev/react @pptx-editor.dev/core
+```
+
+## Mount the editor
+
+Vite renders on the client, so you do not need a server-rendering boundary. Import the stylesheet in the entry and mount the app:
+
+```tsx
+// src/main.tsx
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import '@pptx-editor.dev/core/styles/editor.css';
+import { App } from './App';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);
+```
+
+Render the editor in a container with a height:
+
+```tsx
+// src/App.tsx
+import { useEffect, useState } from 'react';
+import { PptxEditor } from '@pptx-editor.dev/react';
+
+export function App() {
+  const [bytes, setBytes] = useState<Uint8Array>();
+  useEffect(() => {
+    void fetch('/deck.pptx')
+      .then((response) => response.arrayBuffer())
+      .then((buffer) => setBytes(new Uint8Array(buffer)));
+  }, []);
+  return (
+    <div style={{ height: '100vh' }}>
+      <PptxEditor document={bytes} />
+    </div>
+  );
+}
+```
+
+Put `deck.pptx` in the `public` folder. To open and download local files, use the component from the [quickstart](/docs/quickstart).
+
+## Limits
+
+- Vite emits the engine's `harfbuzz.wasm` with no configuration. See [Set up your bundler](/docs/installation#set-up-your-bundler).
+- The editor fills its parent, so the parent needs a measured height.
+- Without `document`, the editor shows its loading sheet until bytes arrive.
+
+## Run the example
+
+The [`examples/vite`](https://github.com/eigenpal/pptx-editor/tree/main/examples/vite) app builds against the package source, so it needs no package build. After you clone the repository and run `bun install`, run:
+
+```bash
+bun run dev   # http://localhost:5274
+```
+
+## Next steps
+
+- [Quickstart](/docs/quickstart): open, edit, and save a deck.
+- [React composition](/docs/react/composition): arrange the editor parts.
+- [Installation](/docs/installation): requirements and bundler setup.

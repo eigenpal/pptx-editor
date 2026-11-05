@@ -1,0 +1,3483 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`scenarios on the server runtime presentation.read-basics 1`] = `
+{
+  "status": "ok",
+  "value": {
+    "idIsText": true,
+    "masters": 1,
+    "slideHeight": 540,
+    "slideWidth": 960,
+    "slides": 6,
+    "title": "Fixture",
+  },
+}
+`;
+
+exports[`scenarios on the server runtime presentation.document-properties 1`] = `
+{
+  "readBack": {
+    "author": "Automation",
+    "category": "Finance",
+    "comments": "Written by an add-in",
+    "company": "Example Ltd",
+    "creationDate": "2026-01-01T00:00:00.000Z",
+    "keywords": "q3; review",
+    "manager": "A. Manager",
+    "revisionNumber": 7,
+    "subject": "Results",
+    "title": "Quarterly review",
+  },
+  "status": "ok",
+  "value": {
+    "author": "Automation",
+    "category": "Finance",
+    "comments": "Written by an add-in",
+    "company": "Example Ltd",
+    "creationDate": "2026-01-01T00:00:00.000Z",
+    "keywords": "q3; review",
+    "manager": "A. Manager",
+    "revisionNumber": 7,
+    "subject": "Results",
+    "title": "Quarterly review",
+  },
+}
+`;
+
+exports[`scenarios on the server runtime presentation.custom-properties 1`] = `
+{
+  "readBack": [
+    {
+      "key": "Client",
+      "type": "String",
+      "value": "Fabrikam",
+    },
+    {
+      "key": "Budget",
+      "type": "Number",
+      "value": 1250000,
+    },
+    {
+      "key": "Ratio",
+      "type": "Number",
+      "value": 0.75,
+    },
+    {
+      "key": "Approved",
+      "type": "Boolean",
+      "value": true,
+    },
+    {
+      "key": "Due",
+      "type": "Date",
+      "value": "2026-11-30T12:00:00.000Z",
+    },
+  ],
+  "status": "ok",
+  "value": [
+    {
+      "key": "Client",
+      "type": "String",
+      "value": "Fabrikam",
+    },
+    {
+      "key": "Budget",
+      "type": "Number",
+      "value": 1250000,
+    },
+    {
+      "key": "Ratio",
+      "type": "Number",
+      "value": 0.75,
+    },
+    {
+      "key": "Approved",
+      "type": "Boolean",
+      "value": true,
+    },
+    {
+      "key": "Due",
+      "type": "Date",
+      "value": "2026-11-30T12:00:00.000Z",
+    },
+  ],
+}
+`;
+
+exports[`scenarios on the server runtime presentation.bindings 1`] = `
+{
+  "readBack": [
+    "Title 1",
+    "Content Placeholder 2",
+    "Note box",
+  ],
+  "status": "ok",
+  "value": {
+    "ids": [
+      "title",
+    ],
+    "names": [
+      "Title 1",
+      "TextBox 4",
+      "TextBox 4",
+    ],
+    "orphan": "ItemNotFound",
+    "shapes": [
+      "Title 1",
+      "Content Placeholder 2",
+      "Note box",
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime presentation.page-setup 1`] = `
+{
+  "readBack": {
+    "slideHeight": 405,
+    "slideWidth": 720,
+  },
+  "status": "ok",
+  "value": {
+    "slideHeight": 405,
+    "slideWidth": 720,
+  },
+}
+`;
+
+exports[`scenarios on the server runtime presentation.tags 1`] = `
+{
+  "readBack": {
+    "presentation": [
+      [
+        "WORKFLOW",
+        "final",
+      ],
+      [
+        "OWNER",
+        "finance",
+      ],
+    ],
+    "shape": [
+      [
+        "ROLE",
+        "title",
+      ],
+    ],
+    "slide": [
+      [
+        "SECTION",
+        "intro",
+      ],
+    ],
+  },
+  "status": "ok",
+  "value": {
+    "all": {
+      "presentation": [
+        [
+          "WORKFLOW",
+          "final",
+        ],
+        [
+          "OWNER",
+          "finance",
+        ],
+      ],
+      "shape": [
+        [
+          "ROLE",
+          "title",
+        ],
+      ],
+      "slide": [
+        [
+          "SECTION",
+          "intro",
+        ],
+      ],
+    },
+    "firstKey": "WORKFLOW",
+  },
+}
+`;
+
+exports[`scenarios on the server runtime slides.layouts-and-masters 1`] = `
+{
+  "status": "ok",
+  "value": {
+    "layouts": [
+      {
+        "name": "Title and Content",
+        "placeholders": [
+          "Title",
+          "Content",
+        ],
+        "type": "Object",
+      },
+      {
+        "name": "Blank",
+        "placeholders": [],
+        "type": "Blank",
+      },
+      {
+        "name": "Title Slide",
+        "placeholders": [
+          "CenterTitle",
+          "Subtitle",
+        ],
+        "type": "Title",
+      },
+      {
+        "name": "Two Content",
+        "placeholders": [
+          "Title",
+          "Content",
+          "Content",
+        ],
+        "type": "TwoObjects",
+      },
+      {
+        "name": "Title Only",
+        "placeholders": [
+          "Title",
+        ],
+        "type": "TitleOnly",
+      },
+      {
+        "name": "Quote",
+        "placeholders": [
+          "Title",
+          "Body",
+        ],
+        "type": "Custom",
+      },
+    ],
+    "masterShapes": [
+      "Title Placeholder 1:Placeholder",
+      "Text Placeholder 2:Placeholder",
+    ],
+    "masters": [
+      "",
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime slides.add-with-layout 1`] = `
+{
+  "readBack": [
+    {
+      "id": "256",
+      "layout": "Title Slide",
+      "shapes": [
+        "Title 1",
+        "Subtitle 2",
+      ],
+    },
+    {
+      "id": "257",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Note box",
+      ],
+    },
+    {
+      "id": "258",
+      "layout": "Two Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Content Placeholder 3",
+      ],
+    },
+    {
+      "id": "259",
+      "layout": "Title Only",
+      "shapes": [
+        "Title 1",
+        "Text box",
+      ],
+    },
+    {
+      "id": "260",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+      ],
+    },
+    {
+      "id": "261",
+      "layout": "Quote",
+      "shapes": [
+        "Title 1",
+        "Quote Placeholder 2",
+      ],
+    },
+    {
+      "id": "262",
+      "layout": "Title Only",
+      "shapes": [
+        "Title 1",
+      ],
+    },
+    {
+      "id": "263",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+      ],
+    },
+  ],
+  "status": "ok",
+  "value": {
+    "index": 6,
+    "layout": "Title Only",
+    "outline": [
+      {
+        "id": "256",
+        "layout": "Title Slide",
+        "shapes": [
+          "Title 1",
+          "Subtitle 2",
+        ],
+      },
+      {
+        "id": "257",
+        "layout": "Title and Content",
+        "shapes": [
+          "Title 1",
+          "Content Placeholder 2",
+          "Note box",
+        ],
+      },
+      {
+        "id": "258",
+        "layout": "Two Content",
+        "shapes": [
+          "Title 1",
+          "Content Placeholder 2",
+          "Content Placeholder 3",
+        ],
+      },
+      {
+        "id": "259",
+        "layout": "Title Only",
+        "shapes": [
+          "Title 1",
+          "Text box",
+        ],
+      },
+      {
+        "id": "260",
+        "layout": "Title and Content",
+        "shapes": [
+          "Title 1",
+          "Content Placeholder 2",
+        ],
+      },
+      {
+        "id": "261",
+        "layout": "Quote",
+        "shapes": [
+          "Title 1",
+          "Quote Placeholder 2",
+        ],
+      },
+      {
+        "id": "262",
+        "layout": "Title Only",
+        "shapes": [
+          "Title 1",
+        ],
+      },
+      {
+        "id": "263",
+        "layout": "Title and Content",
+        "shapes": [
+          "Title 1",
+          "Content Placeholder 2",
+        ],
+      },
+    ],
+    "placeholders": [
+      "Title 1:Title",
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime slides.delete 1`] = `
+{
+  "readBack": [
+    {
+      "id": "256",
+      "layout": "Title Slide",
+      "shapes": [
+        "Title 1",
+        "Subtitle 2",
+      ],
+    },
+    {
+      "id": "257",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Note box",
+      ],
+    },
+    {
+      "id": "259",
+      "layout": "Title Only",
+      "shapes": [
+        "Title 1",
+        "Text box",
+      ],
+    },
+    {
+      "id": "261",
+      "layout": "Quote",
+      "shapes": [
+        "Title 1",
+        "Quote Placeholder 2",
+      ],
+    },
+  ],
+  "status": "ok",
+  "value": [
+    {
+      "id": "256",
+      "layout": "Title Slide",
+      "shapes": [
+        "Title 1",
+        "Subtitle 2",
+      ],
+    },
+    {
+      "id": "257",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Note box",
+      ],
+    },
+    {
+      "id": "259",
+      "layout": "Title Only",
+      "shapes": [
+        "Title 1",
+        "Text box",
+      ],
+    },
+    {
+      "id": "261",
+      "layout": "Quote",
+      "shapes": [
+        "Title 1",
+        "Quote Placeholder 2",
+      ],
+    },
+  ],
+}
+`;
+
+exports[`scenarios on the server runtime slides.move 1`] = `
+{
+  "readBack": [
+    {
+      "id": "261",
+      "layout": "Quote",
+      "shapes": [
+        "Title 1",
+        "Quote Placeholder 2",
+      ],
+    },
+    {
+      "id": "257",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Note box",
+      ],
+    },
+    {
+      "id": "258",
+      "layout": "Two Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Content Placeholder 3",
+      ],
+    },
+    {
+      "id": "259",
+      "layout": "Title Only",
+      "shapes": [
+        "Title 1",
+        "Text box",
+      ],
+    },
+    {
+      "id": "260",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+      ],
+    },
+    {
+      "id": "256",
+      "layout": "Title Slide",
+      "shapes": [
+        "Title 1",
+        "Subtitle 2",
+      ],
+    },
+  ],
+  "status": "ok",
+  "value": [
+    {
+      "id": "261",
+      "layout": "Quote",
+      "shapes": [
+        "Title 1",
+        "Quote Placeholder 2",
+      ],
+    },
+    {
+      "id": "257",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Note box",
+      ],
+    },
+    {
+      "id": "258",
+      "layout": "Two Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Content Placeholder 3",
+      ],
+    },
+    {
+      "id": "259",
+      "layout": "Title Only",
+      "shapes": [
+        "Title 1",
+        "Text box",
+      ],
+    },
+    {
+      "id": "260",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+      ],
+    },
+    {
+      "id": "256",
+      "layout": "Title Slide",
+      "shapes": [
+        "Title 1",
+        "Subtitle 2",
+      ],
+    },
+  ],
+}
+`;
+
+exports[`scenarios on the server runtime slides.apply-layout 1`] = `
+{
+  "readBack": [
+    {
+      "id": "256",
+      "layout": "Title Slide",
+      "shapes": [
+        "Title 1",
+        "Subtitle 2",
+      ],
+    },
+    {
+      "id": "257",
+      "layout": "Two Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Content Placeholder 3",
+        "Note box",
+      ],
+    },
+    {
+      "id": "258",
+      "layout": "Two Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Content Placeholder 3",
+      ],
+    },
+    {
+      "id": "259",
+      "layout": "Title Only",
+      "shapes": [
+        "Title 1",
+        "Text box",
+      ],
+    },
+    {
+      "id": "260",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+      ],
+    },
+    {
+      "id": "261",
+      "layout": "Quote",
+      "shapes": [
+        "Title 1",
+        "Quote Placeholder 2",
+      ],
+    },
+  ],
+  "status": "ok",
+  "value": [
+    {
+      "id": "256",
+      "layout": "Title Slide",
+      "shapes": [
+        "Title 1",
+        "Subtitle 2",
+      ],
+    },
+    {
+      "id": "257",
+      "layout": "Two Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Content Placeholder 3",
+        "Note box",
+      ],
+    },
+    {
+      "id": "258",
+      "layout": "Two Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Content Placeholder 3",
+      ],
+    },
+    {
+      "id": "259",
+      "layout": "Title Only",
+      "shapes": [
+        "Title 1",
+        "Text box",
+      ],
+    },
+    {
+      "id": "260",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+      ],
+    },
+    {
+      "id": "261",
+      "layout": "Quote",
+      "shapes": [
+        "Title 1",
+        "Quote Placeholder 2",
+      ],
+    },
+  ],
+}
+`;
+
+exports[`scenarios on the server runtime slides.background-and-theme 1`] = `
+{
+  "readBack": {
+    "accent2": "#7030A0",
+    "color": "#FFF2CC",
+    "hidden": true,
+    "sharedAccent2": "#7030A0",
+    "transparency": 0.25,
+    "type": "Solid",
+  },
+  "status": "ok",
+  "value": {
+    "accent1": "#4472C4",
+    "read": {
+      "accent2": "#7030A0",
+      "color": "#FFF2CC",
+      "hidden": true,
+      "sharedAccent2": "#7030A0",
+      "transparency": 0.25,
+      "type": "Solid",
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime shapes.add-geometric 1`] = `
+{
+  "readBack": {
+    "fill": {
+      "color": "#FFC000",
+      "transparency": 0,
+      "type": "Solid",
+    },
+    "line": {
+      "color": "#C00000",
+      "dashStyle": "Dash",
+      "style": "Single",
+      "transparency": 0,
+      "visible": true,
+      "weight": 2.5,
+    },
+  },
+  "status": "ok",
+  "value": {
+    "format": {
+      "fill": {
+        "color": "#FFC000",
+        "transparency": 0,
+        "type": "Solid",
+      },
+      "line": {
+        "color": "#C00000",
+        "dashStyle": "Dash",
+        "style": "Single",
+        "transparency": 0,
+        "visible": true,
+        "weight": 2.5,
+      },
+    },
+    "star": {
+      "height": 120,
+      "id": "5",
+      "left": 500,
+      "name": "Highlight star",
+      "rotation": 0,
+      "top": 300,
+      "type": "GeometricShape",
+      "visible": true,
+      "width": 120,
+      "z": 3,
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime shapes.add-line 1`] = `
+{
+  "readBack": [
+    {
+      "height": 104.38,
+      "id": "2",
+      "left": 66,
+      "name": "Title 1",
+      "rotation": 0,
+      "top": 28.75,
+      "type": "Placeholder",
+      "visible": true,
+      "width": 828,
+      "z": 0,
+    },
+    {
+      "height": 216,
+      "id": "3",
+      "left": 144,
+      "name": "Content Placeholder 2",
+      "rotation": 0,
+      "top": 180,
+      "type": "Placeholder",
+      "visible": true,
+      "width": 432,
+      "z": 1,
+    },
+    {
+      "height": 43.2,
+      "id": "4",
+      "left": 648,
+      "name": "Note box",
+      "rotation": 0,
+      "top": 432,
+      "type": "GeometricShape",
+      "visible": true,
+      "width": 180,
+      "z": 2,
+    },
+    {
+      "height": 0,
+      "id": "5",
+      "left": 100,
+      "name": "Divider",
+      "rotation": 0,
+      "top": 400,
+      "type": "Line",
+      "visible": true,
+      "width": 300,
+      "z": 3,
+    },
+    {
+      "height": 60,
+      "id": "6",
+      "left": 100,
+      "name": "Connector",
+      "rotation": 0,
+      "top": 420,
+      "type": "Line",
+      "visible": true,
+      "width": 200,
+      "z": 4,
+    },
+  ],
+  "status": "ok",
+  "value": [
+    {
+      "height": 104.38,
+      "id": "2",
+      "left": 66,
+      "name": "Title 1",
+      "rotation": 0,
+      "top": 28.75,
+      "type": "Placeholder",
+      "visible": true,
+      "width": 828,
+      "z": 0,
+    },
+    {
+      "height": 216,
+      "id": "3",
+      "left": 144,
+      "name": "Content Placeholder 2",
+      "rotation": 0,
+      "top": 180,
+      "type": "Placeholder",
+      "visible": true,
+      "width": 432,
+      "z": 1,
+    },
+    {
+      "height": 43.2,
+      "id": "4",
+      "left": 648,
+      "name": "Note box",
+      "rotation": 0,
+      "top": 432,
+      "type": "GeometricShape",
+      "visible": true,
+      "width": 180,
+      "z": 2,
+    },
+    {
+      "height": 0,
+      "id": "5",
+      "left": 100,
+      "name": "Divider",
+      "rotation": 0,
+      "top": 400,
+      "type": "Line",
+      "visible": true,
+      "width": 300,
+      "z": 3,
+    },
+    {
+      "height": 60,
+      "id": "6",
+      "left": 100,
+      "name": "Connector",
+      "rotation": 0,
+      "top": 420,
+      "type": "Line",
+      "visible": true,
+      "width": 200,
+      "z": 4,
+    },
+  ],
+}
+`;
+
+exports[`scenarios on the server runtime shapes.add-text-box 1`] = `
+{
+  "readBack": [
+    {
+      "height": 172.08,
+      "id": "2",
+      "left": 120.24,
+      "name": "Title 1",
+      "rotation": 0,
+      "top": 80.64,
+      "type": "Placeholder",
+      "visible": true,
+      "width": 720,
+      "z": 0,
+    },
+    {
+      "height": 119.52,
+      "id": "3",
+      "left": 120.24,
+      "name": "Subtitle 2",
+      "rotation": 0,
+      "top": 259.2,
+      "type": "Placeholder",
+      "visible": true,
+      "width": 720,
+      "z": 1,
+    },
+    {
+      "height": 26.64,
+      "id": "4",
+      "left": 60,
+      "name": "Automation note",
+      "rotation": 0,
+      "top": 420,
+      "type": "TextBox",
+      "visible": true,
+      "width": 360,
+      "z": 2,
+    },
+  ],
+  "status": "ok",
+  "value": {
+    "name": "Automation note",
+    "shapes": [
+      {
+        "height": 172.08,
+        "id": "2",
+        "left": 120.24,
+        "name": "Title 1",
+        "rotation": 0,
+        "top": 80.64,
+        "type": "Placeholder",
+        "visible": true,
+        "width": 720,
+        "z": 0,
+      },
+      {
+        "height": 119.52,
+        "id": "3",
+        "left": 120.24,
+        "name": "Subtitle 2",
+        "rotation": 0,
+        "top": 259.2,
+        "type": "Placeholder",
+        "visible": true,
+        "width": 720,
+        "z": 1,
+      },
+      {
+        "height": 26.64,
+        "id": "4",
+        "left": 60,
+        "name": "Automation note",
+        "rotation": 0,
+        "top": 420,
+        "type": "TextBox",
+        "visible": true,
+        "width": 360,
+        "z": 2,
+      },
+    ],
+    "type": "TextBox",
+  },
+}
+`;
+
+exports[`scenarios on the server runtime shapes.move-resize-rotate 1`] = `
+{
+  "readBack": {
+    "slide1": [
+      {
+        "height": 172.08,
+        "id": "2",
+        "left": 120.24,
+        "name": "Title 1",
+        "rotation": 0,
+        "top": 80.64,
+        "type": "Placeholder",
+        "visible": true,
+        "width": 720,
+        "z": 0,
+      },
+      {
+        "height": 119.52,
+        "id": "3",
+        "left": 120.24,
+        "name": "Subtitle 2",
+        "rotation": 0,
+        "top": 259.2,
+        "type": "Placeholder",
+        "visible": false,
+        "width": 720,
+        "z": 1,
+      },
+    ],
+    "slide2": [
+      {
+        "height": 104.38,
+        "id": "2",
+        "left": 66,
+        "name": "Title 1",
+        "rotation": 0,
+        "top": 28.75,
+        "type": "Placeholder",
+        "visible": true,
+        "width": 828,
+        "z": 0,
+      },
+      {
+        "height": 216,
+        "id": "3",
+        "left": 144,
+        "name": "Content Placeholder 2",
+        "rotation": 0,
+        "top": 180,
+        "type": "Placeholder",
+        "visible": true,
+        "width": 432,
+        "z": 1,
+      },
+      {
+        "height": 80,
+        "id": "4",
+        "left": 40,
+        "name": "Moved note",
+        "rotation": 15,
+        "top": 50,
+        "type": "GeometricShape",
+        "visible": true,
+        "width": 250.5,
+        "z": 2,
+      },
+    ],
+  },
+  "status": "ok",
+  "value": {
+    "alt": [
+      "Note",
+      "A note about the chart",
+    ],
+    "slide1": [
+      {
+        "height": 172.08,
+        "id": "2",
+        "left": 120.24,
+        "name": "Title 1",
+        "rotation": 0,
+        "top": 80.64,
+        "type": "Placeholder",
+        "visible": true,
+        "width": 720,
+        "z": 0,
+      },
+      {
+        "height": 119.52,
+        "id": "3",
+        "left": 120.24,
+        "name": "Subtitle 2",
+        "rotation": 0,
+        "top": 259.2,
+        "type": "Placeholder",
+        "visible": false,
+        "width": 720,
+        "z": 1,
+      },
+    ],
+    "slide2": [
+      {
+        "height": 104.38,
+        "id": "2",
+        "left": 66,
+        "name": "Title 1",
+        "rotation": 0,
+        "top": 28.75,
+        "type": "Placeholder",
+        "visible": true,
+        "width": 828,
+        "z": 0,
+      },
+      {
+        "height": 216,
+        "id": "3",
+        "left": 144,
+        "name": "Content Placeholder 2",
+        "rotation": 0,
+        "top": 180,
+        "type": "Placeholder",
+        "visible": true,
+        "width": 432,
+        "z": 1,
+      },
+      {
+        "height": 80,
+        "id": "4",
+        "left": 40,
+        "name": "Moved note",
+        "rotation": 15,
+        "top": 50,
+        "type": "GeometricShape",
+        "visible": true,
+        "width": 250.5,
+        "z": 2,
+      },
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime shapes.z-order 1`] = `
+{
+  "readBack": [
+    "Front",
+    "Content Placeholder 2",
+    "Title 1",
+    "Back",
+  ],
+  "status": "ok",
+  "value": [
+    "0:Front",
+    "1:Content Placeholder 2",
+    "2:Title 1",
+    "3:Back",
+  ],
+}
+`;
+
+exports[`scenarios on the server runtime shapes.group-ungroup 1`] = `
+{
+  "readBack": {
+    "members": [
+      "Text box",
+      "Part A",
+      "Part B",
+    ],
+    "shapes": [
+      "Title 1:Placeholder",
+      "Legend:Group",
+      "Part C:GeometricShape",
+    ],
+  },
+  "status": "ok",
+  "value": {
+    "after": [
+      "Title 1:Placeholder",
+      "Legend:Group",
+      "Part C:GeometricShape",
+    ],
+    "grouped": {
+      "box": [
+        50,
+        144,
+        454,
+        196,
+      ],
+      "members": [
+        "Text box@1",
+        "Part A@1",
+        "Part B@1",
+      ],
+      "type": "Group",
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime shapes.fill-and-line 1`] = `
+{
+  "readBack": {
+    "note": {
+      "fill": {
+        "color": "#70AD47",
+        "transparency": 0.4,
+        "type": "Solid",
+      },
+      "line": {
+        "color": "#385723",
+        "dashStyle": "SystemDot",
+        "style": "ThickThin",
+        "transparency": 0,
+        "visible": true,
+        "weight": 4,
+      },
+    },
+    "title": {
+      "fill": {
+        "color": null,
+        "transparency": 0,
+        "type": "NoFill",
+      },
+      "line": {
+        "visible": false,
+      },
+    },
+  },
+  "status": "ok",
+  "value": {
+    "after": {
+      "fill": {
+        "color": "#70AD47",
+        "transparency": 0.4,
+        "type": "Solid",
+      },
+      "line": {
+        "color": "#385723",
+        "dashStyle": "SystemDot",
+        "style": "ThickThin",
+        "transparency": 0,
+        "visible": true,
+        "weight": 4,
+      },
+    },
+    "before": {
+      "fill": {
+        "color": null,
+        "transparency": 0,
+        "type": "NoFill",
+      },
+      "line": {
+        "visible": false,
+      },
+    },
+    "cleared": {
+      "fill": {
+        "color": null,
+        "transparency": 0,
+        "type": "NoFill",
+      },
+      "line": {
+        "visible": false,
+      },
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime shapes.adjustments 1`] = `
+{
+  "readBack": {
+    "head": 0.25,
+    "radius": 0.3,
+  },
+  "status": "ok",
+  "value": {
+    "defaultRadius": 0.167,
+    "initial": {
+      "arrow": 2,
+      "card": 1,
+    },
+    "read": {
+      "head": 0.25,
+      "radius": 0.3,
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime shapes.delete-and-placeholders 1`] = `
+{
+  "readBack": [
+    "Title 1",
+    "Content Placeholder 2",
+  ],
+  "status": "ok",
+  "value": {
+    "count": 2,
+    "placeholders": [
+      {
+        "contains": null,
+        "name": "Title 1",
+        "type": "Title",
+      },
+      {
+        "contains": null,
+        "name": "Content Placeholder 2",
+        "type": "Content",
+      },
+      {
+        "contains": null,
+        "name": "Content Placeholder 3",
+        "type": "Content",
+      },
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime text.frame-properties 1`] = `
+{
+  "readBack": {
+    "autoSize": "AutoSizeNone",
+    "hasText": true,
+    "margins": [
+      12,
+      12,
+      6,
+      6,
+    ],
+    "vertical": "Middle",
+    "wordWrap": false,
+  },
+  "status": "ok",
+  "value": {
+    "after": {
+      "autoSize": "AutoSizeNone",
+      "hasText": true,
+      "margins": [
+        12,
+        12,
+        6,
+        6,
+      ],
+      "vertical": "Middle",
+      "wordWrap": false,
+    },
+    "before": {
+      "autoSize": "AutoSizeShapeToFitText",
+      "hasText": true,
+      "margins": [
+        7.2,
+        7.2,
+        3.6,
+        3.6,
+      ],
+      "vertical": "Top",
+      "wordWrap": true,
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime text.range-and-font 1`] = `
+{
+  "readBack": [
+    {
+      "font": {
+        "allCaps": true,
+        "bold": false,
+        "color": "#000000",
+        "italic": false,
+        "name": "Calibri",
+        "size": 18,
+        "smallCaps": false,
+        "strikethrough": false,
+        "superscript": false,
+        "underline": "None",
+      },
+      "text": "Revenue",
+    },
+    {
+      "font": {
+        "allCaps": false,
+        "bold": true,
+        "color": "#00B050",
+        "italic": false,
+        "name": "Calibri",
+        "size": 28,
+        "smallCaps": false,
+        "strikethrough": false,
+        "superscript": false,
+        "underline": "None",
+      },
+      "text": "12%",
+    },
+    {
+      "font": {
+        "allCaps": false,
+        "bold": false,
+        "color": "#000000",
+        "italic": true,
+        "name": "Georgia",
+        "size": 18,
+        "smallCaps": false,
+        "strikethrough": false,
+        "superscript": false,
+        "underline": "Single",
+      },
+      "text": "Q3",
+    },
+  ],
+  "status": "ok",
+  "value": {
+    "length": 22,
+    "mixed": {
+      "bold": null,
+      "size": null,
+    },
+    "pieces": [
+      {
+        "font": {
+          "allCaps": true,
+          "bold": false,
+          "color": "#000000",
+          "italic": false,
+          "name": "Calibri",
+          "size": 18,
+          "smallCaps": false,
+          "strikethrough": false,
+          "superscript": false,
+          "underline": "None",
+        },
+        "text": "Revenue",
+      },
+      {
+        "font": {
+          "allCaps": false,
+          "bold": true,
+          "color": "#00B050",
+          "italic": false,
+          "name": "Calibri",
+          "size": 28,
+          "smallCaps": false,
+          "strikethrough": false,
+          "superscript": false,
+          "underline": "None",
+        },
+        "text": "12%",
+      },
+      {
+        "font": {
+          "allCaps": false,
+          "bold": false,
+          "color": "#000000",
+          "italic": true,
+          "name": "Georgia",
+          "size": 18,
+          "smallCaps": false,
+          "strikethrough": false,
+          "superscript": false,
+          "underline": "Single",
+        },
+        "text": "Q3",
+      },
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime text.font-effects 1`] = `
+{
+  "readBack": [
+    {
+      "font": {
+        "allCaps": false,
+        "bold": false,
+        "color": "#000000",
+        "italic": false,
+        "name": "Calibri",
+        "size": 24,
+        "smallCaps": false,
+        "strikethrough": false,
+        "superscript": false,
+        "underline": "None",
+      },
+      "text": "2",
+    },
+    {
+      "font": {
+        "allCaps": false,
+        "bold": false,
+        "color": "#000000",
+        "italic": false,
+        "name": "Calibri",
+        "size": 24,
+        "smallCaps": false,
+        "strikethrough": false,
+        "superscript": true,
+        "underline": "None",
+      },
+      "text": "2",
+    },
+    {
+      "font": {
+        "allCaps": false,
+        "bold": false,
+        "color": "#000000",
+        "italic": false,
+        "name": "Calibri",
+        "size": 24,
+        "smallCaps": false,
+        "strikethrough": false,
+        "superscript": false,
+        "underline": "None",
+      },
+      "text": "struck",
+    },
+    {
+      "font": {
+        "allCaps": false,
+        "bold": false,
+        "color": "#000000",
+        "italic": false,
+        "name": "Calibri",
+        "size": 24,
+        "smallCaps": true,
+        "strikethrough": false,
+        "superscript": false,
+        "underline": "None",
+      },
+      "text": "small",
+    },
+  ],
+  "status": "ok",
+  "value": {
+    "read": [
+      {
+        "font": {
+          "allCaps": false,
+          "bold": false,
+          "color": "#000000",
+          "italic": false,
+          "name": "Calibri",
+          "size": 24,
+          "smallCaps": false,
+          "strikethrough": false,
+          "superscript": false,
+          "underline": "None",
+        },
+        "text": "2",
+      },
+      {
+        "font": {
+          "allCaps": false,
+          "bold": false,
+          "color": "#000000",
+          "italic": false,
+          "name": "Calibri",
+          "size": 24,
+          "smallCaps": false,
+          "strikethrough": false,
+          "superscript": true,
+          "underline": "None",
+        },
+        "text": "2",
+      },
+      {
+        "font": {
+          "allCaps": false,
+          "bold": false,
+          "color": "#000000",
+          "italic": false,
+          "name": "Calibri",
+          "size": 24,
+          "smallCaps": false,
+          "strikethrough": false,
+          "superscript": false,
+          "underline": "None",
+        },
+        "text": "struck",
+      },
+      {
+        "font": {
+          "allCaps": false,
+          "bold": false,
+          "color": "#000000",
+          "italic": false,
+          "name": "Calibri",
+          "size": 24,
+          "smallCaps": true,
+          "strikethrough": false,
+          "superscript": false,
+          "underline": "None",
+        },
+        "text": "small",
+      },
+    ],
+    "strike": [
+      false,
+      true,
+    ],
+    "subscript": [
+      true,
+      false,
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime text.paragraphs-and-bullets 1`] = `
+{
+  "readBack": [
+    {
+      "align": "Center",
+      "bullet": {
+        "style": null,
+        "type": "None",
+        "visible": false,
+      },
+      "level": 1,
+      "line": "Goals",
+    },
+    {
+      "align": "Left",
+      "bullet": {
+        "style": "ArabicNumeralPeriod",
+        "type": "Numbered",
+        "visible": true,
+      },
+      "level": 2,
+      "line": "Grow revenue",
+    },
+    {
+      "align": "Left",
+      "bullet": {
+        "style": null,
+        "type": "Unnumbered",
+        "visible": true,
+      },
+      "level": 2,
+      "line": "Cut costs",
+    },
+    {
+      "align": "Right",
+      "bullet": {
+        "style": null,
+        "type": "Unnumbered",
+        "visible": true,
+      },
+      "level": 1,
+      "line": "Hire",
+    },
+  ],
+  "status": "ok",
+  "value": {
+    "after": [
+      {
+        "align": "Center",
+        "bullet": {
+          "style": null,
+          "type": "None",
+          "visible": false,
+        },
+        "level": 1,
+        "line": "Goals",
+      },
+      {
+        "align": "Left",
+        "bullet": {
+          "style": "ArabicNumeralPeriod",
+          "type": "Numbered",
+          "visible": true,
+        },
+        "level": 2,
+        "line": "Grow revenue",
+      },
+      {
+        "align": "Left",
+        "bullet": {
+          "style": null,
+          "type": "Unnumbered",
+          "visible": true,
+        },
+        "level": 2,
+        "line": "Cut costs",
+      },
+      {
+        "align": "Right",
+        "bullet": {
+          "style": null,
+          "type": "Unnumbered",
+          "visible": true,
+        },
+        "level": 1,
+        "line": "Hire",
+      },
+    ],
+    "before": [
+      {
+        "align": "Left",
+        "bullet": {
+          "style": null,
+          "type": "Unnumbered",
+          "visible": true,
+        },
+        "level": 1,
+        "line": "Results by region",
+      },
+      {
+        "align": "Left",
+        "bullet": {
+          "style": null,
+          "type": "Unnumbered",
+          "visible": true,
+        },
+        "level": 1,
+        "line": "Next steps",
+      },
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime text.autofit 1`] = `
+{
+  "readBack": [
+    "Title 1:AutoSizeTextToFitShape",
+    "Content Placeholder 2:AutoSizeTextToFitShape",
+    "Grows:AutoSizeShapeToFitText",
+    "Shrinks:AutoSizeTextToFitShape",
+  ],
+  "status": "ok",
+  "value": {
+    "grewTaller": true,
+    "settings": [
+      "AutoSizeShapeToFitText",
+      "AutoSizeTextToFitShape",
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime text.hyperlinks 1`] = `
+{
+  "readBack": [
+    {
+      "address": "mailto:team@example.com",
+      "screenTip": "",
+      "shape": "Title 1",
+      "text": null,
+      "type": "Shape",
+    },
+    {
+      "address": "https://example.com/report",
+      "screenTip": "Opens the report",
+      "shape": null,
+      "text": "full report",
+      "type": "TextRange",
+    },
+  ],
+  "status": "ok",
+  "value": {
+    "first": [
+      "https://example.com/report",
+      "Opens the report",
+    ],
+    "links": [
+      {
+        "address": "mailto:team@example.com",
+        "screenTip": "",
+        "shape": "Title 1",
+        "text": null,
+        "type": "Shape",
+      },
+      {
+        "address": "https://example.com/report",
+        "screenTip": "Opens the report",
+        "shape": null,
+        "text": "full report",
+        "type": "TextRange",
+      },
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime text.range-hyperlinks 1`] = `
+{
+  "readBack": [
+    "https://example.com/report",
+    "https://example.com/press",
+  ],
+  "status": "ok",
+  "value": {
+    "all": [
+      "https://example.com/report",
+      "https://example.com/press",
+    ],
+    "inner": [
+      "https://example.com/report",
+    ],
+    "links": [
+      "https://example.com/report",
+      "https://example.com/press",
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime text.delete-text 1`] = `
+{
+  "readBack": false,
+  "status": "ok",
+  "value": {
+    "hasText": false,
+    "length": 0,
+    "text": "",
+  },
+}
+`;
+
+exports[`scenarios on the server runtime tables.add-with-options 1`] = `
+{
+  "readBack": {
+    "grid": {
+      "columns": 3,
+      "rows": 3,
+      "values": [
+        [
+          "Region",
+          "Q2",
+          "Q3",
+        ],
+        [
+          "North",
+          "120",
+          "135",
+        ],
+        [
+          "South",
+          "98",
+          "110",
+        ],
+      ],
+    },
+    "header": {
+      "align": [
+        "Left",
+        "Top",
+      ],
+      "fill": "#4472C4",
+      "font": {
+        "bold": true,
+        "color": "#FFFFFF",
+        "size": 14,
+      },
+      "text": "Q2",
+    },
+    "highlighted": {
+      "align": [
+        "Left",
+        "Top",
+      ],
+      "fill": "#E2EFDA",
+      "font": {
+        "bold": false,
+        "color": "#000000",
+        "size": 14,
+      },
+      "text": "110",
+    },
+  },
+  "status": "ok",
+  "value": {
+    "firstColumn": 200,
+    "grid": {
+      "columns": 3,
+      "rows": 3,
+      "values": [
+        [
+          "Region",
+          "Q2",
+          "Q3",
+        ],
+        [
+          "North",
+          "120",
+          "135",
+        ],
+        [
+          "South",
+          "98",
+          "110",
+        ],
+      ],
+    },
+    "header": {
+      "align": [
+        "Left",
+        "Top",
+      ],
+      "fill": "#4472C4",
+      "font": {
+        "bold": true,
+        "color": "#FFFFFF",
+        "size": 14,
+      },
+      "text": "Q2",
+    },
+    "highlighted": {
+      "align": [
+        "Left",
+        "Top",
+      ],
+      "fill": "#E2EFDA",
+      "font": {
+        "bold": false,
+        "color": "#000000",
+        "size": 14,
+      },
+      "text": "110",
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime tables.cell-format 1`] = `
+{
+  "readBack": {
+    "align": [
+      "Center",
+      "Bottom",
+    ],
+    "fill": "#FFF2CC",
+    "font": {
+      "bold": true,
+      "color": "#C00000",
+      "size": 16,
+    },
+    "text": "Updated",
+  },
+  "status": "ok",
+  "value": {
+    "after": {
+      "align": [
+        "Center",
+        "Bottom",
+      ],
+      "fill": "#FFF2CC",
+      "font": {
+        "bold": true,
+        "color": "#C00000",
+        "size": 16,
+      },
+      "text": "Updated",
+    },
+    "before": {
+      "align": [
+        "Left",
+        "Top",
+      ],
+      "fill": "#CFD5EA",
+      "font": {
+        "bold": false,
+        "color": "#000000",
+        "size": 18,
+      },
+      "text": "1,240",
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime tables.merge-and-split 1`] = `
+{
+  "readBack": [
+    "0,0 1x3",
+    "1,0 1x2",
+    "2,0 1x2",
+  ],
+  "status": "ok",
+  "value": {
+    "afterSplit": [
+      "0,0 1x4",
+      "1,0 1x2",
+      "2,0 1x2",
+    ],
+    "merged": [
+      "0,0 1x4",
+      "1,0 2x2",
+    ],
+    "resized": [
+      "0,0 1x3",
+      "1,0 1x2",
+      "2,0 1x2",
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime tables.borders-and-margins 1`] = `
+{
+  "readBack": {
+    "belowTop": [
+      "#1F4E79",
+      3,
+    ],
+    "bottom": [
+      "#1F4E79",
+      3,
+      "Dash",
+    ],
+    "margins": [
+      10,
+      7.2,
+      4,
+      3.6,
+    ],
+  },
+  "status": "ok",
+  "value": {
+    "belowTop": [
+      "#1F4E79",
+      3,
+    ],
+    "bottom": [
+      "#1F4E79",
+      3,
+      "Dash",
+    ],
+    "margins": [
+      10,
+      7.2,
+      4,
+      3.6,
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime tables.style-options 1`] = `
+{
+  "readBack": {
+    "columnsBanded": true,
+    "firstColumn": true,
+    "firstRow": false,
+    "lastColumn": true,
+    "lastRow": true,
+    "rowsBanded": true,
+  },
+  "status": "ok",
+  "value": {
+    "after": {
+      "columnsBanded": true,
+      "firstColumn": true,
+      "firstRow": false,
+      "lastColumn": true,
+      "lastRow": true,
+      "rowsBanded": true,
+    },
+    "before": {
+      "columnsBanded": false,
+      "firstColumn": false,
+      "firstRow": true,
+      "lastColumn": false,
+      "lastRow": false,
+      "rowsBanded": true,
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime tables.rows-and-columns 1`] = `
+{
+  "readBack": {
+    "columns": 4,
+    "rows": 6,
+    "values": [
+      [
+        "",
+        "Region",
+        "Q1",
+        "Q2",
+      ],
+      [
+        "",
+        "North",
+        "1,240",
+        "1,310",
+      ],
+      [
+        "",
+        "South",
+        "980",
+        "1,045",
+      ],
+      [
+        "",
+        "East",
+        "1,105",
+        "1,190",
+      ],
+      [
+        "",
+        "West",
+        "870",
+        "925",
+      ],
+      [
+        "",
+        "",
+        "",
+        "",
+      ],
+    ],
+  },
+  "status": "ok",
+  "value": {
+    "after": {
+      "columns": 4,
+      "rows": 6,
+      "values": [
+        [
+          "",
+          "Region",
+          "Q1",
+          "Q2",
+        ],
+        [
+          "",
+          "North",
+          "1,240",
+          "1,310",
+        ],
+        [
+          "",
+          "South",
+          "980",
+          "1,045",
+        ],
+        [
+          "",
+          "East",
+          "1,105",
+          "1,190",
+        ],
+        [
+          "",
+          "West",
+          "870",
+          "925",
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+        ],
+      ],
+    },
+    "before": {
+      "columns": 3,
+      "rows": 5,
+      "values": [
+        [
+          "Region",
+          "Q1",
+          "Q2",
+        ],
+        [
+          "North",
+          "1,240",
+          "1,310",
+        ],
+        [
+          "South",
+          "980",
+          "1,045",
+        ],
+        [
+          "East",
+          "1,105",
+          "1,190",
+        ],
+        [
+          "West",
+          "870",
+          "925",
+        ],
+      ],
+    },
+    "grown": {
+      "columns": 4,
+      "rows": 7,
+      "values": [
+        [
+          "",
+          "Region",
+          "Q1",
+          "Q2",
+        ],
+        [
+          "",
+          "North",
+          "1,240",
+          "1,310",
+        ],
+        [
+          "",
+          "South",
+          "980",
+          "1,045",
+        ],
+        [
+          "",
+          "East",
+          "1,105",
+          "1,190",
+        ],
+        [
+          "",
+          "West",
+          "870",
+          "925",
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+        ],
+      ],
+    },
+    "size": [
+      40,
+      90,
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime tables.text-runs 1`] = `
+{
+  "readBack": {
+    "runs": [
+      {
+        "bold": true,
+        "color": "#FFFFFF",
+        "italic": false,
+        "text": "Total ",
+      },
+      {
+        "bold": true,
+        "color": "#2F5597",
+        "italic": true,
+        "text": "revenue",
+      },
+    ],
+    "text": "Total revenue",
+  },
+  "status": "ok",
+  "value": {
+    "runs": [
+      {
+        "bold": true,
+        "color": "#FFFFFF",
+        "italic": false,
+        "text": "Total ",
+      },
+      {
+        "bold": true,
+        "color": "#2F5597",
+        "italic": true,
+        "text": "revenue",
+      },
+    ],
+    "text": "Total revenue",
+  },
+}
+`;
+
+exports[`scenarios on the server runtime tables.clear 1`] = `
+{
+  "readBack": {
+    "first": {
+      "columns": 3,
+      "rows": 5,
+      "values": [
+        [
+          "",
+          "",
+          "",
+        ],
+        [
+          "",
+          "",
+          "",
+        ],
+        [
+          "",
+          "",
+          "",
+        ],
+        [
+          "",
+          "",
+          "",
+        ],
+        [
+          "",
+          "",
+          "",
+        ],
+      ],
+    },
+    "second": {
+      "columns": 4,
+      "rows": 4,
+      "values": [
+        [
+          "Item",
+          "Cost",
+          "Units",
+          "Total",
+        ],
+        [
+          "Paper",
+          "4.00",
+          "12",
+          "48.00",
+        ],
+        [
+          "Ink",
+          "18.50",
+          "3",
+          "55.50",
+        ],
+        [
+          "Sum",
+          "",
+          "15",
+          "103.50",
+        ],
+      ],
+    },
+  },
+  "status": "ok",
+  "value": {
+    "first": {
+      "columns": 3,
+      "rows": 5,
+      "values": [
+        [
+          "",
+          "",
+          "",
+        ],
+        [
+          "",
+          "",
+          "",
+        ],
+        [
+          "",
+          "",
+          "",
+        ],
+        [
+          "",
+          "",
+          "",
+        ],
+        [
+          "",
+          "",
+          "",
+        ],
+      ],
+    },
+    "second": {
+      "columns": 4,
+      "rows": 4,
+      "values": [
+        [
+          "Item",
+          "Cost",
+          "Units",
+          "Total",
+        ],
+        [
+          "Paper",
+          "4.00",
+          "12",
+          "48.00",
+        ],
+        [
+          "Ink",
+          "18.50",
+          "3",
+          "55.50",
+        ],
+        [
+          "Sum",
+          "",
+          "15",
+          "103.50",
+        ],
+      ],
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime custom-xml.lifecycle 1`] = `
+{
+  "readBack": {
+    "namespaces": [
+      "urn:example:review",
+    ],
+    "slide": [
+      "urn:example:slide",
+    ],
+    "xml": [
+      "<review xmlns="urn:example:review"><status>approved</status></review>",
+    ],
+  },
+  "status": "ok",
+  "value": {
+    "only": false,
+    "read": {
+      "namespaces": [
+        "urn:example:review",
+      ],
+      "slide": [
+        "urn:example:slide",
+      ],
+      "xml": [
+        "<review xmlns="urn:example:review"><status>approved</status></review>",
+      ],
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime insert.keep-source-formatting 1`] = `
+{
+  "readBack": [
+    {
+      "layout": "Title Slide",
+      "text": [
+        "Quarterly review",
+        "Second quarter",
+      ],
+    },
+    {
+      "layout": "Title and Content",
+      "text": [
+        "Agenda",
+        
+"Results by region
+Next steps"
+,
+        "Draft",
+      ],
+    },
+    {
+      "layout": "Title and Content",
+      "text": [
+        
+"Regular 18 Bold Italic Underline Strike
+Size 32 bold red
+All caps text and small caps
+Spaced out tight
+H2O and x2
+Highlighted text"
+,
+        
+"The quick brown fox jumps over the lazy dog while seven wizards quietly judge boxing matches in the park.
+The quick brown fox jumps over the lazy dog while seven wizards quietly judge boxing matches in the park."
+,
+      ],
+    },
+    {
+      "layout": "Two Content",
+      "text": [
+        "Before and after",
+        "Manual steps",
+        "One click",
+      ],
+    },
+    {
+      "layout": "Title Only",
+      "text": [
+        "Backup slide",
+        "Only if asked",
+      ],
+    },
+    {
+      "layout": "Title and Content",
+      "text": [
+        "",
+        "",
+      ],
+    },
+    {
+      "layout": "Quote",
+      "text": [
+        "In their words",
+        "",
+      ],
+    },
+  ],
+  "status": "ok",
+  "value": [
+    {
+      "layout": "Title Slide",
+      "text": [
+        "Quarterly review",
+        "Second quarter",
+      ],
+    },
+    {
+      "layout": "Title and Content",
+      "text": [
+        "Agenda",
+        
+"Results by region
+Next steps"
+,
+        "Draft",
+      ],
+    },
+    {
+      "layout": "Title and Content",
+      "text": [
+        
+"Regular 18 Bold Italic Underline Strike
+Size 32 bold red
+All caps text and small caps
+Spaced out tight
+H2O and x2
+Highlighted text"
+,
+        
+"The quick brown fox jumps over the lazy dog while seven wizards quietly judge boxing matches in the park.
+The quick brown fox jumps over the lazy dog while seven wizards quietly judge boxing matches in the park."
+,
+      ],
+    },
+    {
+      "layout": "Two Content",
+      "text": [
+        "Before and after",
+        "Manual steps",
+        "One click",
+      ],
+    },
+    {
+      "layout": "Title Only",
+      "text": [
+        "Backup slide",
+        "Only if asked",
+      ],
+    },
+    {
+      "layout": "Title and Content",
+      "text": [
+        "",
+        "",
+      ],
+    },
+    {
+      "layout": "Quote",
+      "text": [
+        "In their words",
+        "",
+      ],
+    },
+  ],
+}
+`;
+
+exports[`scenarios on the server runtime insert.use-destination-theme 1`] = `
+{
+  "readBack": [
+    {
+      "layout": "Title and Content",
+      "text": [
+        "",
+        "",
+        "<Table 1>",
+      ],
+    },
+    {
+      "layout": "Title and Content",
+      "text": [
+        "",
+        "",
+        "<Table 1>",
+      ],
+    },
+    {
+      "layout": "Title Slide",
+      "text": [
+        "Quarterly review",
+        "Second quarter",
+      ],
+    },
+    {
+      "layout": "Title and Content",
+      "text": [
+        "Agenda",
+        
+"Results by region
+Next steps"
+,
+        "Draft",
+      ],
+    },
+    {
+      "layout": "Two Content",
+      "text": [
+        "Before and after",
+        "Manual steps",
+        "One click",
+      ],
+    },
+    {
+      "layout": "Title Only",
+      "text": [
+        "Backup slide",
+        "Only if asked",
+      ],
+    },
+    {
+      "layout": "Title and Content",
+      "text": [
+        "",
+        "",
+      ],
+    },
+    {
+      "layout": "Quote",
+      "text": [
+        "In their words",
+        "",
+      ],
+    },
+  ],
+  "status": "ok",
+  "value": [
+    {
+      "layout": "Title and Content",
+      "text": [
+        "",
+        "",
+        "<Table 1>",
+      ],
+    },
+    {
+      "layout": "Title and Content",
+      "text": [
+        "",
+        "",
+        "<Table 1>",
+      ],
+    },
+    {
+      "layout": "Title Slide",
+      "text": [
+        "Quarterly review",
+        "Second quarter",
+      ],
+    },
+    {
+      "layout": "Title and Content",
+      "text": [
+        "Agenda",
+        
+"Results by region
+Next steps"
+,
+        "Draft",
+      ],
+    },
+    {
+      "layout": "Two Content",
+      "text": [
+        "Before and after",
+        "Manual steps",
+        "One click",
+      ],
+    },
+    {
+      "layout": "Title Only",
+      "text": [
+        "Backup slide",
+        "Only if asked",
+      ],
+    },
+    {
+      "layout": "Title and Content",
+      "text": [
+        "",
+        "",
+      ],
+    },
+    {
+      "layout": "Quote",
+      "text": [
+        "In their words",
+        "",
+      ],
+    },
+  ],
+}
+`;
+
+exports[`scenarios on the server runtime images.slide-and-shape 1`] = `
+{
+  "status": "ok",
+  "value": {
+    "fitted": {
+      "height": 113,
+      "signature": true,
+      "width": 200,
+    },
+    "shape": {
+      "height": 259,
+      "signature": true,
+      "width": 346,
+    },
+    "slide": {
+      "height": 270,
+      "signature": true,
+      "width": 480,
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime selection.slides 1`] = `
+{
+  "code": "NotSupported",
+  "inner": "host.no-selection",
+  "location": "presentation.setSelectedSlides",
+  "status": "refused",
+}
+`;
+
+exports[`scenarios on the server runtime selection.shapes 1`] = `
+{
+  "code": "NotSupported",
+  "inner": "host.no-selection",
+  "location": "presentation.slides.getItemAt(1).setSelectedShapes",
+  "status": "refused",
+}
+`;
+
+exports[`scenarios on the server runtime selection.text-range 1`] = `
+{
+  "code": "NotSupported",
+  "inner": "host.no-selection",
+  "location": "presentation.slides.getItemAt(3).shapes.getItem().textFrame.textRange.getSubstring().setSelected",
+  "status": "refused",
+}
+`;
+
+exports[`scenarios on the server runtime load.paths-and-all 1`] = `
+{
+  "status": "ok",
+  "value": {
+    "all": {
+      "hasId": true,
+      "name": "Note box",
+      "type": "GeometricShape",
+    },
+    "deep": [
+      "Backup slide",
+      "Only if asked",
+    ],
+    "fill": "NoFill",
+    "names": [
+      [
+        "Title 1",
+        "Subtitle 2",
+      ],
+      [
+        "Title 1",
+        "Content Placeholder 2",
+        "Note box",
+      ],
+      [
+        "Title 1",
+        "Content Placeholder 2",
+        "Content Placeholder 3",
+      ],
+      [
+        "Title 1",
+        "Text box",
+      ],
+      [
+        "Title 1",
+        "Content Placeholder 2",
+      ],
+      [
+        "Title 1",
+        "Quote Placeholder 2",
+      ],
+    ],
+    "tree": [
+      6,
+      28,
+      5,
+    ],
+    "window": [
+      "Content Placeholder 2",
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime load.not-loaded 1`] = `
+{
+  "status": "ok",
+  "value": {
+    "count": 6,
+    "early": {
+      "code": "PropertyNotLoaded",
+      "inner": null,
+    },
+    "late": {
+      "code": "PropertyNotLoaded",
+      "inner": null,
+    },
+    "name": "Title 1",
+    "pending": {
+      "code": "PropertyNotLoaded",
+      "inner": null,
+    },
+    "value": {
+      "code": "ValueNotLoaded",
+      "inner": null,
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime sync.queued 1`] = `
+{
+  "readBack": [
+    "Title 1",
+    "Content Placeholder 2",
+    "Q1",
+    "Q2",
+    "Q3",
+  ],
+  "status": "ok",
+  "value": {
+    "names": [
+      "Title 1",
+      "Content Placeholder 2",
+      "Q1",
+      "Q2",
+      "Q3",
+    ],
+    "settled": [
+      "ok",
+      "ok",
+      "InvalidArgument",
+      "ok",
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime sync.tracked-objects 1`] = `
+{
+  "readBack": [
+    {
+      "id": "256",
+      "layout": "Title Slide",
+      "shapes": [
+        "Title 1 (tracked)",
+        "Subtitle 2",
+      ],
+    },
+    {
+      "id": "257",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Note box",
+      ],
+    },
+    {
+      "id": "258",
+      "layout": "Two Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Content Placeholder 3",
+      ],
+    },
+    {
+      "id": "259",
+      "layout": "Title Only",
+      "shapes": [
+        "Title 1",
+        "Text box",
+      ],
+    },
+    {
+      "id": "260",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+      ],
+    },
+    {
+      "id": "261",
+      "layout": "Quote",
+      "shapes": [
+        "Title 1",
+        "Quote Placeholder 2",
+      ],
+    },
+  ],
+  "status": "ok",
+  "value": [
+    {
+      "id": "256",
+      "layout": "Title Slide",
+      "shapes": [
+        "Title 1 (tracked)",
+        "Subtitle 2",
+      ],
+    },
+    {
+      "id": "257",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Note box",
+      ],
+    },
+    {
+      "id": "258",
+      "layout": "Two Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+        "Content Placeholder 3",
+      ],
+    },
+    {
+      "id": "259",
+      "layout": "Title Only",
+      "shapes": [
+        "Title 1",
+        "Text box",
+      ],
+    },
+    {
+      "id": "260",
+      "layout": "Title and Content",
+      "shapes": [
+        "Title 1",
+        "Content Placeholder 2",
+      ],
+    },
+    {
+      "id": "261",
+      "layout": "Quote",
+      "shapes": [
+        "Title 1",
+        "Quote Placeholder 2",
+      ],
+    },
+  ],
+}
+`;
+
+exports[`scenarios on the server runtime sync.retry-after-refusal 1`] = `
+{
+  "readBack": [
+    [
+      "Title 1",
+      828,
+      "Retried title",
+    ],
+    [
+      "Content Placeholder 2",
+      432,
+      
+"Results by region
+Next steps"
+,
+    ],
+    [
+      "Retried note",
+      200,
+      "Draft",
+    ],
+  ],
+  "status": "ok",
+  "value": {
+    "afterRefusal": "Note box",
+    "first": "InvalidArgument",
+    "name": "Retried note",
+    "title": "Retried title",
+    "width": 200,
+  },
+}
+`;
+
+exports[`scenarios on the server runtime sync.reads-see-earlier-writes 1`] = `
+{
+  "readBack": {
+    "slides": [
+      "256",
+      "257",
+      "259",
+      "260",
+      "261",
+      "262",
+    ],
+    "tag": "final",
+    "xml": "<order xmlns="urn:example:order">2</order>",
+  },
+  "status": "ok",
+  "value": {
+    "added": "262",
+    "deleted": true,
+    "listed": [
+      "Title 1",
+      "Subtitle 2",
+      "Fresh box",
+    ],
+    "read": {
+      "slides": [
+        "256",
+        "257",
+        "259",
+        "260",
+        "261",
+        "262",
+      ],
+      "tag": "final",
+      "xml": "<order xmlns="urn:example:order">2</order>",
+    },
+    "values": [
+      [
+        "",
+        "",
+      ],
+      [
+        "",
+        "cell",
+      ],
+    ],
+  },
+}
+`;
+
+exports[`scenarios on the server runtime selection.reads-see-earlier-writes 1`] = `
+{
+  "code": "NotSupported",
+  "inner": "host.no-selection",
+  "location": "presentation.slides.getItemAt(1).setSelectedShapes",
+  "status": "refused",
+}
+`;
+
+exports[`scenarios on the server runtime errors.item-not-found 1`] = `
+{
+  "status": "ok",
+  "value": {
+    "index": {
+      "code": "ItemNotFound",
+      "inner": "edit.item-not-found",
+    },
+    "shape": {
+      "code": "ItemNotFound",
+      "inner": "edit.item-not-found",
+    },
+    "slide": {
+      "code": "ItemNotFound",
+      "inner": "edit.item-not-found",
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime errors.invalid-argument 1`] = `
+{
+  "status": "ok",
+  "value": {
+    "autosize": {
+      "code": "InvalidArgument",
+      "inner": "argument.not-accepted",
+    },
+    "color": {
+      "code": "InvalidArgument",
+      "inner": "argument.not-accepted",
+    },
+    "link": {
+      "code": "InvalidArgument",
+      "inner": "argument.not-accepted",
+    },
+    "width": {
+      "code": "InvalidArgument",
+      "inner": "argument.not-accepted",
+    },
+    "xml": {
+      "code": "InvalidArgument",
+      "inner": "edit.invalid-custom-xml",
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime errors.not-supported 1`] = `
+{
+  "status": "ok",
+  "value": {
+    "pictureText": {
+      "code": "NotSupported",
+      "inner": "edit.no-text-frame",
+    },
+    "tableStyle": {
+      "code": "NotSupported",
+      "inner": "edit.table-style-undefined",
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime errors.not-implemented 1`] = `
+{
+  "readBack": [
+    "Gradient",
+    "Linear",
+  ],
+  "status": "ok",
+  "value": {
+    "code": "NotImplemented",
+    "inner": null,
+  },
+}
+`;
+
+exports[`scenarios on the server runtime errors.argument-at-sync 1`] = `
+{
+  "readBack": {
+    "boxes": [
+      [
+        "Title 1",
+        66,
+        828,
+        "Agenda",
+      ],
+      [
+        "Content Placeholder 2",
+        144,
+        432,
+        
+"Results by region
+Next steps"
+,
+      ],
+      [
+        "Note box",
+        648,
+        180,
+        "Draft",
+      ],
+      [
+        "TextBox 4",
+        10,
+        100,
+        "Retried",
+      ],
+    ],
+    "outline": [
+      {
+        "id": "256",
+        "layout": "Title Slide",
+        "shapes": [
+          "Title 1",
+          "Subtitle 2",
+        ],
+      },
+      {
+        "id": "257",
+        "layout": "Title and Content",
+        "shapes": [
+          "Title 1",
+          "Content Placeholder 2",
+          "Note box",
+          "TextBox 4",
+        ],
+      },
+      {
+        "id": "258",
+        "layout": "Two Content",
+        "shapes": [
+          "Title 1",
+          "Content Placeholder 2",
+          "Content Placeholder 3",
+        ],
+      },
+      {
+        "id": "259",
+        "layout": "Title Only",
+        "shapes": [
+          "Title 1",
+          "Text box",
+        ],
+      },
+      {
+        "id": "260",
+        "layout": "Title and Content",
+        "shapes": [
+          "Title 1",
+          "Content Placeholder 2",
+        ],
+      },
+      {
+        "id": "261",
+        "layout": "Quote",
+        "shapes": [
+          "Title 1",
+          "Quote Placeholder 2",
+        ],
+      },
+    ],
+  },
+  "status": "ok",
+  "value": {
+    "after": {
+      "boxes": [
+        [
+          "Title 1",
+          66,
+          828,
+          "Agenda",
+        ],
+        [
+          "Content Placeholder 2",
+          144,
+          432,
+          
+"Results by region
+Next steps"
+,
+        ],
+        [
+          "Note box",
+          648,
+          180,
+          "Draft",
+        ],
+        [
+          "TextBox 4",
+          10,
+          100,
+          "Retried",
+        ],
+      ],
+      "outline": [
+        {
+          "id": "256",
+          "layout": "Title Slide",
+          "shapes": [
+            "Title 1",
+            "Subtitle 2",
+          ],
+        },
+        {
+          "id": "257",
+          "layout": "Title and Content",
+          "shapes": [
+            "Title 1",
+            "Content Placeholder 2",
+            "Note box",
+            "TextBox 4",
+          ],
+        },
+        {
+          "id": "258",
+          "layout": "Two Content",
+          "shapes": [
+            "Title 1",
+            "Content Placeholder 2",
+            "Content Placeholder 3",
+          ],
+        },
+        {
+          "id": "259",
+          "layout": "Title Only",
+          "shapes": [
+            "Title 1",
+            "Text box",
+          ],
+        },
+        {
+          "id": "260",
+          "layout": "Title and Content",
+          "shapes": [
+            "Title 1",
+            "Content Placeholder 2",
+          ],
+        },
+        {
+          "id": "261",
+          "layout": "Quote",
+          "shapes": [
+            "Title 1",
+            "Quote Placeholder 2",
+          ],
+        },
+      ],
+    },
+    "refused": {
+      "code": "InvalidArgument",
+      "inner": "argument.not-accepted",
+    },
+    "threw": false,
+  },
+}
+`;
+
+exports[`scenarios on the server runtime errors.group-placeholder 1`] = `
+{
+  "status": "ok",
+  "value": {
+    "code": "NotSupported",
+    "inner": "edit.group-placeholder",
+  },
+}
+`;
+
+exports[`scenarios on the server runtime errors.enum-suggestion 1`] = `
+{
+  "status": "ok",
+  "value": {
+    "align": [
+      "InvalidArgument",
+      "Center",
+    ],
+    "bullet": [
+      "InvalidArgument",
+      "ArabicNumeralPeriod",
+    ],
+    "far": [
+      "InvalidArgument",
+      null,
+    ],
+    "shape": [
+      "InvalidArgument",
+      "Rectangle",
+    ],
+    "unchanged": {
+      "boxes": [
+        [
+          "Title 1",
+          66,
+          828,
+          "Agenda",
+        ],
+        [
+          "Content Placeholder 2",
+          144,
+          432,
+          
+"Results by region
+Next steps"
+,
+        ],
+        [
+          "Note box",
+          648,
+          180,
+          "Draft",
+        ],
+      ],
+      "outline": [
+        {
+          "id": "256",
+          "layout": "Title Slide",
+          "shapes": [
+            "Title 1",
+            "Subtitle 2",
+          ],
+        },
+        {
+          "id": "257",
+          "layout": "Title and Content",
+          "shapes": [
+            "Title 1",
+            "Content Placeholder 2",
+            "Note box",
+          ],
+        },
+        {
+          "id": "258",
+          "layout": "Two Content",
+          "shapes": [
+            "Title 1",
+            "Content Placeholder 2",
+            "Content Placeholder 3",
+          ],
+        },
+        {
+          "id": "259",
+          "layout": "Title Only",
+          "shapes": [
+            "Title 1",
+            "Text box",
+          ],
+        },
+        {
+          "id": "260",
+          "layout": "Title and Content",
+          "shapes": [
+            "Title 1",
+            "Content Placeholder 2",
+          ],
+        },
+        {
+          "id": "261",
+          "layout": "Quote",
+          "shapes": [
+            "Title 1",
+            "Quote Placeholder 2",
+          ],
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`scenarios on the server runtime errors.bindings 1`] = `
+{
+  "status": "ok",
+  "value": {
+    "badId": {
+      "code": "InvalidArgument",
+      "inner": "argument.not-accepted",
+    },
+    "badType": {
+      "code": "InvalidArgument",
+      "inner": "argument.not-accepted",
+    },
+    "ids": [
+      "kept",
+    ],
+    "missing": {
+      "code": "ItemNotFound",
+      "inner": null,
+    },
+    "position": {
+      "code": "ItemNotFound",
+      "inner": null,
+    },
+  },
+}
+`;

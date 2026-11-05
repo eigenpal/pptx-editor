@@ -1,0 +1,269 @@
+---
+title: 'Fonts'
+description: 'Load font bytes for PPTX editor layout, choose font sources, replace fonts in place, and see which face measures each family.'
+category: 'Customization'
+---
+
+Pass a font configuration through `fonts`. The editor measures text with font bytes, so CSS `@font-face` rules do not affect layout. The API is the same as DOCX Editor's, so one font setup works for both editors.
+
+Without `fonts`, the editor measures with the deck's embedded fonts, then with the metric-compatible substitutes of `@docx-editor.dev/fonts`, from the package's own bytes. It makes no network request.
+
+Embedded faces must permit installable or editable embedding.
+The editor does not load restricted, preview-and-print-only, or bitmap-only embedded faces for measurement or display.
+It uses an available host face or substitute instead.
+This rule also applies in viewer mode, because the same session can later allow editing.
+Save preserves the original embedded font bytes and relationships.
+Substitution can change text layout. Supply font bytes with appropriate rights when you need the original appearance.
+
+## Load application fonts
+
+Host your font files and load them with `loadFonts()`. Include each weight and style the deck uses.
+
+```ts
+// brand-fonts.ts (in a Vue app, import loadFonts from '@pptx-editor.dev/vue')
+import { loadFonts } from '@pptx-editor.dev/react';
+
+export function loadBrandFonts() {
+  return loadFonts({
+    sources: [
+      {
+        url: '/fonts/BrandSans-Regular.ttf',
+        family: 'Brand Sans',
+        weight: 400,
+        style: 'normal',
+      },
+      {
+        url: '/fonts/BrandSans-Bold.ttf',
+        family: 'Brand Sans',
+        weight: 700,
+        style: 'normal',
+      },
+    ],
+  });
+}
+```
+
+`loadFonts()` returns admitted `sources` and typed `failures`. One failure does not discard other faces.
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { useEffect, useState } from 'react';
+import { PptxEditor } from '@pptx-editor.dev/react';
+import { loadBrandFonts } from './brand-fonts';
+
+type Fonts = Awaited<ReturnType<typeof loadBrandFonts>>;
+
+export function FontEditor({ bytes }: { bytes: Uint8Array }) {
+  const [fonts, setFonts] = useState<Fonts>();
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let disposed = false;
+    loadBrandFonts().then(
+      (value) => {
+        if (disposed) return;
+        if (value.failures.length > 0) setFailed(true);
+        else setFonts(value);
+      },
+      () => !disposed && setFailed(true)
+    );
+    return () => {
+      disposed = true;
+    };
+  }, []);
+  if (failed) return <p role="alert">Fonts failed to load.</p>;
+  if (!fonts) return <p role="status">Loading fonts…</p>;
+  return <PptxEditor document={bytes} fonts={fonts} />;
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { onMounted, onUnmounted, ref, shallowRef } from 'vue';
+import { PptxEditor } from '@pptx-editor.dev/vue';
+import { loadBrandFonts } from './brand-fonts';
+
+defineProps<{ bytes: Uint8Array }>();
+const fonts = shallowRef<Awaited<ReturnType<typeof loadBrandFonts>>>();
+const failed = ref(false);
+let disposed = false;
+onMounted(() => {
+  loadBrandFonts().then(
+    (value) => {
+      if (disposed) return;
+      if (value.failures.length > 0) failed.value = true;
+      else fonts.value = value;
+    },
+    () => {
+      if (!disposed) failed.value = true;
+    }
+  );
+});
+onUnmounted(() => {
+  disposed = true;
+});
+</script>
+
+<template>
+  <p v-if="failed" role="alert">Fonts failed to load.</p>
+  <PptxEditor v-else-if="fonts" :document="bytes" :fonts="fonts" />
+  <p v-else role="status">Loading fonts…</p>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+| `loadFonts()` option | Use |
+| --- | --- |
+| `sources[].url` | Application-selected font URL. |
+| `sources[].family` | Family the bytes supply. |
+| `sources[].weight` | Integer from `1` through `1000`. |
+| `sources[].style` | `normal` or `italic`. |
+| `sources[].hash` | Optional `sha256:` hash. Mismatched bytes are refused. |
+| `sources[].faceIndex` | Collection face index. Default `0`. The editor measures face `0` only and refuses others with `unsupportedFaceIndex`. |
+| `cacheName` | Cache API bucket. Default `docx-editor-fonts`, shared with DOCX Editor on the same origin. |
+| `fetcher` | Fetch implementation. Default global `fetch`. |
+| `maxFontBytes` | Per-source byte limit. Default is the engine hard limit (64 MiB). |
+| `signal` | Cancels the request. The operation rejects with `signal.reason`. |
+
+Failure reasons are `networkError`, `httpError`, `hashMismatch`, `overLimit`, `emptyResponse`, `invalidRequest`, and `malformed`. Cached entries are validated before use. For bytes you hold, `createFontSource` returns a source or a typed failure.
+
+## Choose a font source
+
+`fonts` accepts a `FontConfigurationFragment`, a complete `FontConfiguration`, or a `FontResolver`. Combine origins with `useFonts()` or `composeFontConfiguration`.
+
+```tsx
+import { useFonts } from '@pptx-editor.dev/react';
+import { packagedFonts } from '@docx-editor.dev/fonts';
+import { googleFonts } from '@docx-editor.dev/fonts/google';
+
+const local = packagedFonts();
+const remote = googleFonts({ allow: ['Lato', 'Arvo', 'PT Serif'] });
+
+export function useDeckFonts() {
+  return useFonts(local, remote);
+}
+```
+
+In Vue, call `useFonts()` the same way in `<script setup>` and bind the result to `:fonts`.
+
+| Source | Use |
+| --- | --- |
+| `packagedFonts()` | Metric-compatible substitutes for common defaults, from the package's own bytes. |
+| `customFonts()` | Your own hosted families. |
+| `googleFonts({ allow })` | Pinned Google Fonts catalog. `allow` limits downloads. `onFailure` reports failed downloads. |
+| `FontResolver` | Loads approved faces after the deck requests families. Mark it with `defineFontResolver` when it sits in a list. |
+| Embedded deck fonts | Load automatically when usable (`p:embeddedFontLst`; the font's embedding permissions are honored). |
+
+Earlier sources win for the same family, weight, and style. A supplied face wins over a substitution.
+
+| Configuration field | Use |
+| --- | --- |
+| `sources` | Validated bytes with family, weight, and style. |
+| `supportedFamilies` | Selectable families. The font picker lists them, and `useFontFamily().options` gives them to your own picker. Listing performs no fetch. |
+| `substitutions` | Maps a requested face to a supplied face. `snapshot().substitutedFonts` reports the target family. |
+| `maxFontBytes` | Per-face admission limit. |
+| `defaultFont`, `language`, `epoch` | Accepted for DOCX Editor compatibility. A slide's text size comes from the deck's text styles, so these do not change layout. |
+
+A `FontResolver` receives `families`, `defaultFamily`, and optional `signal` and `resolvedFaces`. It returns a configuration, a fragment, or `undefined`. Map family names to URLs through your own lookup, and pass `signal` to your fetch calls so cancellation stops network work.
+
+For a deck, `families` lists the theme fonts first (`a:majorFont` and `a:minorFont`), then every `a:latin`, `a:ea`, `a:cs`, `a:sym`, and `a:buFont` typeface in the slides, layouts, and masters, at most 64. `defaultFamily` is the theme's minor Latin font, the font of body text.
+
+### Render Chinese, Japanese, and Korean text
+
+Choose one East Asian source. If you list both, both download and the first one paints.
+
+```tsx
+import { useFonts } from '@pptx-editor.dev/react';
+import { packagedFonts } from '@docx-editor.dev/fonts';
+import { googleFonts } from '@docx-editor.dev/fonts/google';
+import { cjkFonts } from '@docx-editor.dev/fonts-cjk/browser';
+
+// Option 1: regional Noto Sans faces from Google Fonts, 4.6 to 8.5 MB each.
+export function useGoogleCjkFonts() {
+  return useFonts(packagedFonts(), googleFonts({ cjk: true }));
+}
+
+// Option 2: one pan-CJK face, about 16 MB, from your origin.
+export function useSelfHostedCjkFonts() {
+  return useFonts(packagedFonts(), googleFonts(), cjkFonts());
+}
+```
+
+Call one of these hooks in your editor component and pass the result to `fonts`. Install `@docx-editor.dev/fonts-cjk` yourself; the editor packages do not depend on it.
+
+Neither downloads anything for decks without East Asian families.
+
+## Replace fonts
+
+A new `fonts` prop value calls `setFonts()`. The instance, deck, selection, undo history, and collaboration session stay. On a `createPptxEditor` instance, call it directly.
+
+```ts
+await editor.setFonts(nextFonts);
+// Remove host-supplied faces when their permission expires.
+await editor.setFonts(undefined);
+```
+
+| Change | Result |
+| --- | --- |
+| New fonts | Cancels the previous resolver. Current faces paint until the new ones are ready. |
+| New fonts that fail or supply nothing usable | Removes the previous host faces anyway. Text uses the packaged substitutes unless the deck embeds faces. `onFontError` reports the failure. |
+| `undefined` | Removes host faces at once. |
+
+Keep `fonts` stable across renders, because each new value resolves fonts again. `useFonts()` returns one value for the component's life.
+
+## Which face measures each family
+
+| Rank | Source |
+| --- | --- |
+| 1 | Embedded deck faces |
+| 2 | Host faces, in origin order (`fonts`) |
+| 3 | Host substitutions whose target face a host origin supplied |
+| 4 | Packaged substitutes from `@docx-editor.dev/fonts` |
+| 5 | Fallback measurement |
+
+A lower rank still serves a style that a higher rank lacks. `snapshot().substitutedFonts` lists the families that measure with another face, and `PptxEditor.FontNotice` shows them.
+
+## Configure loading
+
+To load an origin's faces after the first paint, wrap it in `deferFonts()`. The deck opens with the other faces and lays out again when these arrive.
+
+```tsx
+import { deferFonts, useFonts, type FontOrigin } from '@pptx-editor.dev/react';
+import { packagedFonts } from '@docx-editor.dev/fonts';
+
+export function useDeckFonts(brandFonts: FontOrigin) {
+  return useFonts(packagedFonts(), deferFonts(brandFonts));
+}
+```
+
+`deferFonts()` is also exported from `@pptx-editor.dev/vue` and `@pptx-editor.dev/core/editor`. A resolver can also return late faces on its `deferred` field.
+
+## Report failures
+
+`onFontError` (React) and the `fontError` event (Vue) receive an `EditorFontError` with a `code`, the face `request` when there is one, and a `diagnostic`. Without a handler, the editor prints one warning for each failure.
+
+## Add faces to the current fonts
+
+`editor.fonts` holds the value in force: the `fonts` option, or the value you last passed to `setFonts()`. To add faces without dropping the host's origins, compose them with `withFontOrigin()`. The added origin comes after the current fonts, so it serves only the faces they leave open.
+
+```ts
+import { withFontOrigin } from '@pptx-editor.dev/core/editor';
+
+await editor.setFonts(withFontOrigin(editor.fonts, { sources: localFaces }));
+```
+
+`PptxEditor.FontNotice` uses this path for the fonts on the user's computer.
+
+## Limits
+
+- Deck font names never authorize remote requests. The editor never fetches by itself.
+- Host bytes pass the content hash, the sfnt check, `maxFontBytes`, the 64 MiB face limit, 256 faces, and 128 MiB in total.
+- Replacing the deck or destroying the editor cancels outstanding resolution and discards late answers.
+- Missing coverage can change line breaks. A font command can succeed before its bytes arrive.
+- The fidelity harness measures with the reference fonts, not with host origins.

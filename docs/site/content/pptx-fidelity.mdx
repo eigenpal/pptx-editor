@@ -1,0 +1,207 @@
+---
+title: 'PPTX fidelity'
+description: 'Check which PPTX features you can edit, display, and preserve on save, and the known approximations of the renderer.'
+category: 'Getting started'
+seoTitle: 'PPTX feature support and fidelity'
+---
+
+Use this page to check which presentation features you can edit, display, and preserve when you save. The feature matrix gives the status of each feature. The lists after it name each place where the renderer, an edit, or the PDF export approximates the ECMA-376 behavior.
+
+## Feature matrix
+
+The matrix reports editing, rendering, and round-trip support separately. A feature can display without editing controls, or survive save without displaying.
+
+| Axis | Question |
+| --- | --- |
+| Editing | Can a user, or code that drives the editor, change the feature? |
+| Rendering | Does the slide display as the ECMA-376 specification and the deck's settings define? |
+| Round trip | Does the feature survive open, edit, save, and reopen? |
+
+| Status      | Meaning                                                      |
+| ----------- | ------------------------------------------------------------ |
+| Full        | Supports the feature.                                        |
+| Partial     | Works, with limits.                                          |
+| Render only | Displays, but is not editable.                               |
+| Preserved   | Stays in the file as inert content through editing and save. |
+| Planned     | Not supported yet. Work on it is planned.                    |
+| No          | Is not supported.                                            |
+
+When a feature needs [`@pptx-editor.dev/pro`](https://github.com/eigenpal/pptx-editor/tree/main/packages/pro) or [`@pptx-editor.dev/pptx-to-pdf`](https://github.com/eigenpal/pptx-editor/tree/main/packages/pptx-to-pdf), its note says so. These packages are under the EigenPal Pro License.
+
+<FeatureSummary />
+
+### Text and formatting
+
+<FeatureMatrix category="text" />
+
+### Paragraphs and text boxes
+
+<FeatureMatrix category="paragraphs" />
+
+### Bullets and numbering
+
+<FeatureMatrix category="lists" />
+
+### Shapes, groups, and connectors
+
+<FeatureMatrix category="shapes" />
+
+### Fills and lines
+
+<FeatureMatrix category="fills-lines" />
+
+### Effects
+
+<FeatureMatrix category="effects" />
+
+### Pictures
+
+<FeatureMatrix category="pictures" />
+
+### Tables
+
+<FeatureMatrix category="tables" />
+
+### Charts, diagrams, media, and OLE
+
+<FeatureMatrix category="objects" />
+
+### Slides, layouts, and notes
+
+<FeatureMatrix category="slides" />
+
+### Themes, masters, and inheritance
+
+<FeatureMatrix category="themes" />
+
+### Presenting
+
+<FeatureMatrix category="presenting" />
+
+### Comments and review
+
+<FeatureMatrix category="review" />
+
+### Collaboration and automation
+
+<FeatureMatrix category="collaboration" />
+
+### Export and print
+
+<FeatureMatrix category="export" />
+
+## Round-trip contract
+
+- The editor keeps every part of the package that it does not edit. Unknown elements stay in place as generic nodes, so content the editor does not understand never blocks editing and survives save.
+- XML parts are written again in a normalized form. Binary parts, such as pictures, media, and embedded fonts, keep their exact bytes.
+- Every edit goes through one document store. An edit that the editor cannot make is refused with a reason. It is never dropped without notice.
+- Macros, OLE objects, audio, and video never run or play. The editor shows a poster or a labeled placeholder and keeps the object on save.
+
+## Fonts
+
+The editor measures and paints text with font bytes, so a line breaks at the same place on every machine that has the same fonts.
+
+- Embedded fonts (`p:embeddedFontLst`) are decoded in memory for one document. The editor honors their embedding permissions, and never writes them to disk or caches them across documents.
+- Without other fonts, the editor uses metric-compatible substitutes from `@docx-editor.dev/fonts`. A substitute has the same advance widths as the font it replaces, so lines break at the same places.
+- You can supply your own font bytes. See [Fonts](/docs/customization/fonts).
+
+The editor lists the families it substituted in `snapshot().substitutedFonts`, and `PptxEditor.FontNotice` shows them to the user.
+
+## Known approximations
+
+Each item below is a place where the renderer does not yet follow the specification exactly, or where the specification does not state the behavior.
+
+- **Line model.** Line heights and baselines follow measured rules for Latin and Japanese text, from each font's own ascent and descent, and each baseline rounds to a whole point from the top of the text. The rules are not measured for other scripts or for vertical text. A missing font keeps its line metrics for common Latin and East Asian families. For other families, a baseline can be off by up to a few points. Text that is taller than a centered or bottom-anchored body can be 1 to 3 pt off.
+- **Glyph advances.** The text shaper's advances can differ from other renderers by a small amount per glyph. A centered or right-aligned line can start up to 0.5 pt away, and a line near the edge of its box can break at another word.
+- **Color transform spaces.** `a:tint`, `a:shade`, and `a:inv` use linear RGB, and the `a:lum*` transforms use HSL. The other transforms are not measured against a reference.
+- **Gray transform.** `a:gray` uses Rec. 709 weights on sRGB components. One measured color confirms it, so other weights are not ruled out.
+- **Blur.** The specification does not define the blur kernel. Shadows use a Gaussian blur with a standard deviation of a third of `blurRad`, as measured on reference PDFs. Reflections use half of `blurRad`, which is not measured yet.
+- **Shadow skew.** `kx` and `ky` skew after the `sx` and `sy` scale, about the `algn` point.
+- **Glow and soft edge.** A glow grows the outline by half of `rad` and blurs it by the other half. A soft edge shrinks the outline by 0.84 of `rad` and blurs it by `rad`. Reference PDFs give both rules, measured for glows of 5 to 18 pt and soft edges of 2.5 and 10 pt. How fill transparency changes them is not measured: a glow takes the fill's alpha as its strength. A soft edge removes a part of the shape that is thinner than 1.7 times `rad`. The outline grows and shrinks by a set of rectangles, not a circle: a curved edge can be up to 8 % off, and a sharp corner up to 29 %.
+- **Effects not drawn.** `a:prstShdw`, `a:blur`, `a:effectDag`, group effects, text effects, and some fill overlays are not drawn. They stay in the file.
+- **Fill overlay.** `a:fillOverlay` blends with the shape's own fill only. Over a semi-transparent fill, the result is opaque where the overlay is.
+- **Gradient colors.** A gradient with exactly two stops, at 0 and 100 %, bends each color channel toward the larger of its two end values. A gradient with three or more stops interpolates linearly in sRGB.
+- **Path gradient focus.** A circle path gradient draws as a focal radial gradient. A focus that is outside the circle or on it moves the circle out slightly.
+- **Gradient tiles.** A tile rectangle (`a:tileRect`) sets the circle of a circle path gradient and the outer edge of a rectangle path gradient. A tile rectangle that is smaller than the shape draws as one tile, not tiled.
+- **Rectangle path gradients.** `path="rect"` draws as four trapezoids. The joins along the diagonals can show seam pixels.
+- **Shape path gradients.** `path="shape"` draws as bands of the outline, scaled about the focus. Steps between bands can show.
+- **Pattern bitmaps.** The preset patterns are 8 × 8 tiles of 1 pt pixels, on a grid from the top-left corner of the slide. The specification gives no bitmaps. Twelve presets use measured bitmaps (`pct25`, `pct75`, `dnDiag`, `upDiag`, `cross`, `diagCross`, `smCheck`, `lgCheck`, `horzBrick`, `wave`, `dkHorz`, `dotGrid`), and the others are drawn to their names. The tiles of a rotated, flipped, or scaled shape start at the corner of the shape.
+- **Path fill modes.** Preset paths with `fill="darken"`, `"darkenLess"`, `"lighten"`, and `"lightenLess"` scale the fill color toward black or white by fixed factors. The specification gives no factors.
+- **Fill rotation.** Gradient and picture fills always turn with a rotated shape. `rotWithShape="0"` is ignored.
+- **Gradient text.** A gradient on text spans the bounds of the whole text body.
+- **Tiled pictures.** The tile size comes from the image's pixels and resolution, at 72 DPI when the image states none.
+- **Picture shape fill.** A picture's own fill, behind the transparent areas of the image, is not drawn.
+- **Picture brightness and contrast.** `a:lum` adds brightness to each component, then scales around mid-gray by contrast. The specification gives no formula, so washed-out pictures can draw lighter than expected.
+- **Picture recolor.** Grayscale, duotone, and black and white take the luminance with Rec. 709 weights. The specification gives no weights.
+- **Dashes on picture borders.** A picture's border draws outside the picture. Dashes get butt caps, and round dots draw as squares.
+- **EMF and WMF pictures.** Not decoded. They draw as an empty placeholder box and stay in the file.
+- **Arrowhead joins.** Under a triangle or stealth arrowhead, the line stops inside the head and the tip lands on the end point.
+- **Inset lines.** `a:ln/@algn="in"` draws as a centered line. A picture's border always draws outside the picture.
+- **Hyperlink text.** Link text draws in the theme `hlink` color with a single underline, unless the run states otherwise.
+- **Compound lines.** The widths of the bands of `dbl`, `thickThin`, `thinThick`, and `tri` lines follow fixed fractions. The specification gives no fractions.
+- **Paths without a move.** A custom geometry path draws nothing before its first `a:moveTo`, so a path with no `a:moveTo` draws nothing. When a later `a:moveTo` follows, the drawing starts there.
+- **Text in flipped shapes.** Glyphs are never mirrored. Under a net horizontal flip, text stays upright. Under a net vertical flip, it turns 180°.
+- **Content placeholders.** `pic`, `tbl`, and `chart` placeholders inherit the master's body placeholder and its text style. `clipArt`, `dgm`, and `media` placeholders inherit no master placeholder.
+- **Small caps.** Lowercase letters draw at 80 % of the size.
+- **Underline styles.** Underline styles other than `sng` and `dbl` draw as a single line. `a:uLn` is ignored.
+- **Missing glyphs.** When a font does not have a character, paint uses the system `sans-serif` font. Measurement uses an estimated width.
+- **East Asian, complex-script, and symbol fonts.** `a:ea`, `a:cs`, and `a:sym` are read but not used. All text is measured and painted with the Latin font.
+- **Right-to-left text.** There is no bidirectional layout. `a:pPr/@rtl` is ignored.
+- **Tab stops.** Right, center, and decimal tab stops behave as left tab stops.
+- **Anchoring and alignment variants.** `anchorCtr` is ignored. `anchor="just"` and `anchor="dist"` behave as top. `justLow` and `thaiDist` alignments behave as left.
+- **Upright East Asian text (`eaVert`).** East Asian characters draw upright. Vertical metrics and vertical glyph alternates are not used.
+- **Stacked text (`wordArtVert`).** Each letter advances by the font's line height. A second line goes to the left of the first.
+- **Other vertical text types.** `mongolianVert` lays out as `vert`, and `wordArtVertRtl` lays out as horizontal text. The editor does not set either type.
+- **Superscript and subscript.** Raised and lowered text is two thirds of the run size.
+- **Bullets on aligned lines.** On a centered or right-aligned line, the bullet moves with the text.
+- **Numbering schemes.** East Asian, Thai, Hindi, Arabic-Abjad, Hebrew, and circled numbering schemes fall back to `1.`.
+- **Symbol font bullets.** A Wingdings, Webdings, or Symbol bullet draws with that font. When the font is not available, the editor draws a Unicode character that looks the same.
+- **Trailing line break.** A line break at the end of a paragraph adds an empty line, sized by the paragraph mark.
+- **Default table style.** A table that names Medium Style 2 - Accent 1 without its definition in the file uses a built-in definition.
+- **Rotated cell text.** Vertical text in a table cell wraps at the row height and does not grow the row.
+- **Table cell effects.** `a:cell3D` and table effects are not drawn.
+- **Coincident cell borders.** Where two cells state different borders for one edge, the later cell in row order draws on top.
+- **Inconsistent cell merges.** ECMA-376 does not define a table whose merge markup disagrees with itself. A cell with `hMerge` or `vMerge` that no `gridSpan` or `rowSpan` reaches draws as a normal cell, with its own text and spans. A span past the grid ends at the grid, and a span into an earlier merged cell ends before that cell. These rules are not measured yet.
+- **Text warp.** `a:prstTxWarp` is not drawn. Warped text lays out at its nominal size.
+
+## Approximations after editing
+
+An edit lays out the slide again through the same pipeline, and applies the autofit rules of the text body (`a:normAutofit`, `a:spAutoFit`; ECMA-376 Part 1, 21.1.2.1). These recomputations are approximations:
+
+- **Shape autofit.** Rotated text, text in more than one column, and text in a shape that is not a rectangle get an estimated size.
+- **Shrink on overflow.** Each edit fits the text again from 100 %. A title takes one step at most, a 90 % font scale, and longer text then overflows. Other text first reduces line spacing by 10 %, then lowers the font scale in steps with 10 % and then 20 % less line spacing, and the editor writes the first step at which the text fits. Steps below a 55 % font scale are estimated.
+- **Resize several shapes.** Rotated shapes scale in the slide's axes.
+- **Ungroup a group with a non-uniform scale.** Each child keeps its center, size, and rotation.
+- **Change case.** A letter whose other case has a different length, such as `ß`, stays as it is. The language of the run is not used.
+- **Crop, Fill, Fit, Change Picture, Format Picture, and Reset Picture.** In a group with a non-uniform scale, a crop is estimated. Fill and Fit center the crop on the image. Change Picture fits the new image in the old frame and removes the crop.
+- **Picture and shape presets.** The Recolor, Corrections, Transparency, picture style, Shape Effects, and Shape Styles galleries write fixed preset definitions.
+- **Distribute.** A turned object counts with its unrotated box.
+- **Flip and rotate in a group with a non-uniform scale.** The result is estimated.
+- **Objects in `mc:AlternateContent`.** The editor edits the copy it draws: the first `mc:Choice` it can draw, else the `mc:Fallback`. Hide, rename, and the aspect lock also change the other copies. A delete removes every copy. When the editor draws a `mc:Choice`, another edit removes the copies in the other branches, and a duplicate goes into the same `mc:Choice`. A reader that selects another branch then shows nothing for the object, not its old state. In a collaboration room, an undo brings back the copies that its step removed, also when a peer edited the object after that step. When the editor draws the `mc:Fallback`, other edits do not change the `mc:Choice` copies.
+- **Table frame size.** After a table edit, the frame takes the laid-out table size. Row heights stay minimums.
+- **Insert table.** A new table goes in the center of the slide, not into an empty content placeholder.
+- **Split cells.** New columns and rows share the width or height of the cell they split.
+
+## Approximations of the PDF export
+
+[`@pptx-editor.dev/pptx-to-pdf`](https://github.com/eigenpal/pptx-editor/tree/main/packages/pptx-to-pdf) paints the same layout as the editor, so the approximations above apply to it too. It adds these. Each one reports a diagnostic code on the export result, and the package README lists every code.
+
+- **Shadow and glow blur.** Drawn as layers of growing outlines, not as a Gaussian blur.
+- **Opaque silhouettes.** Fill transparency does not lighten a shadow, and a picture's shadow takes the shape of its frame.
+- **Inner shadows.** The outer half of an outline is not shaded, and an unfilled shape gets no inner shadow.
+- **Soft edges.** Drawn hard.
+- **Gradient lines.** Drawn in one color.
+- **Gradient stops.** At most 64 stops are drawn.
+- **Fills outside the box.** A rectangle path gradient or a picture fill paints the shape's box only.
+- **Tiled pictures.** Drawn stretched over the box.
+- **Picture color effects.** Grayscale, duotone, brightness and contrast, and black and white are not applied.
+- **Dashes and compound lines.** Drawn as one solid line.
+- **SVG pictures.** The PNG fallback of the picture is drawn.
+- **Text.** Synthetic bold and italic are not drawn, upright vertical characters draw rotated, and a character that the font does not have is not drawn.
+- **Not drawn.** Pattern fills, picture fills on text, reflections, arrowheads, underline and strikethrough, text outlines, other picture formats, charts, diagrams, OLE objects with no picture, other graphic frames, and table frames with no grid.
+
+## See also
+
+- [Fonts](/docs/customization/fonts): load font bytes and choose font sources.
+- [Tables](/docs/guides/tables): edit tables with editor commands.
+- [Customization](/docs/customization): change the toolbar, menus, dialogs, and appearance.

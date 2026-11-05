@@ -1,0 +1,105 @@
+---
+title: 'Office.js compatibility'
+description: 'Compare the supported Office.js presentation API subset, known differences, and unavailable APIs.'
+category: 'Editing API'
+---
+
+`@pptx-editor.dev/editor-api` implements a subset of the Office.js presentation object model. Code built on `Presentation`, `Slide`, `Shape`, `TextRange`, and `Table` carries over after you replace the host setup and adapt the differences on this page. Compatibility covers the listed subset, not complete Office.js behavior.
+
+## Replace the Office.js host
+
+Replace the Office.js `run` function with a runtime, and keep the `load()` and `sync()` pattern:
+
+```ts
+import { PptxEditor } from '@pptx-editor.dev/editor-api';
+
+const runtime = await PptxEditor.createServer(bytes);
+try {
+  await runtime.run(async (context) => {
+    const shapes = context.presentation.slides.getItemAt(0).shapes;
+    shapes.load('items/name');
+    await context.sync();
+    for (const shape of shapes.items) shape.name = shape.name.toUpperCase();
+    await context.sync();
+  });
+} finally {
+  runtime.dispose();
+}
+```
+
+The package has no `Office.onReady` and no add-in host. In a browser, use `PptxEditor.createBrowser(editor)` from `@pptx-editor.dev/editor-api/browser`.
+
+Enums are TypeScript string enums with the Office.js member names, so `ShapeZOrder.bringToFront` and `'BringToFront'` both work.
+
+## Adapt behavior that differs
+
+| Office.js behavior | PptxEditor behavior | Required change |
+| --- | --- | --- |
+| A lookup can follow a write in the same batch. | A lookup sees the writes queued before it. When a later call needs its answer to go on, such as a write to the result of `getCellOrNullObject` or `getItemOrNullObject`, the sync splits before the lookup: the calls before it apply first. The whole sync stays one undo step. | None. |
+| `Shape.textFrame` throws `InvalidArgument` for a shape that has no text frame. | A shape that can hold text but has none reads as an empty text frame with the body properties and fonts it inherits, for example from its layout placeholder. A write adds exactly that body. A picture, a connector, a table, or a group refuses a text read with `NotSupported` and the diagnostic `edit.no-text-frame`. Through a collection's items, such as `shapes.load('items/textFrame/textRange/text')`, those shapes are skipped: their text stays not loaded, and the sync does not fail. A read of that text throws `PropertyNotLoaded` with the diagnostic `edit.no-text-frame`. In the same way, `items/group/...` skips a shape that is not a group (diagnostic `edit.not-a-group`), and `items/parentGroup` gives a shape at the top level a null object (`isNullObject`). | Check `shape.type` before you read the text of one shape. |
+| Font and paragraph reads return concrete values. | A property that differs across the range reads `null`. An empty range reads the font of the run before the point, or at the start of a paragraph the run after it. | Narrow the value before you reuse it in a write. |
+| `DocumentProperties.creationDate` is a `Date`. | A file without `dcterms:created` reads an invalid `Date`, whose `getTime()` is `NaN`. | Check `Number.isNaN(creationDate.getTime())`. |
+| `TableCell.textRuns` reads the runs of a cell. | Neighbouring text with the same format reads as one run. A paragraph break reads as `\r` at the end of the run before it, so the run texts join to `text`. Each run gives every font property; `color` is absent when the text has no solid fill. A cell with no text reads an empty array. | None. |
+| `TextFrame.autoSizeSetting` takes every `ShapeAutoSize` value. | `AutoSizeMixed` is a read state. Writing it refuses with `InvalidArgument`. | Write `AutoSizeNone`, `AutoSizeTextToFitShape`, or `AutoSizeShapeToFitText`. |
+| `ShapeLineFormat.dashStyle` keeps each of twelve styles. | ECMA-376 has eleven dash presets. `SquareDot` writes `sysDot`, which reads back as `SystemDot`. | Expect `SystemDot` after a `SquareDot` write. |
+| `ShapeFill.setImage` takes any image. | PNG, JPEG, and GIF only, stretched to the shape. A table cell refuses a picture fill. | Convert other formats first. |
+| `SlideBackgroundFill.setPictureOrTextureFill` writes a picture or a texture. | PNG, JPEG, and GIF only, stretched to the slide. Without `imageBase64`, the current picture stays; with no picture, the call refuses with `InvalidArgument`. | Pass `imageBase64` the first time. |
+| `SlideBackgroundGradientFill.type` takes every shading. | `ShadeFromTitle` is a read state. Writing it refuses with `NotImplemented`. | Write `Linear`, `Radial`, `Rectangular`, or `Path`. |
+| A fill write without options keeps or chooses values. | An absent option keeps the current value of the same fill kind. Otherwise a solid fill is white, a pattern is `Percent5` in black on white, and a new gradient runs from Background 1 to Background 2. | Pass every option you need. |
+| `SlideBackground.reset` resets the background. | Removes the own background of the slide, so it shows the layout or master background. `areBackgroundGraphicsHidden` does not change. | Set `areBackgroundGraphicsHidden` on its own. |
+| `ThemeColorScheme.setThemeColor` changes a theme color. | Changes the theme of the master, so every slide, layout, and master that uses that theme changes. | Expect the change on every slide of that master. |
+| `TableCell.resize` changes the span. | A span that cuts another merged cell refuses with `NotSupported` and the diagnostic `edit.merge-overlap`. | Resize or split the other cell first. |
+| Each shape on a slide has its own id. | A file can give two shapes on one slide the same `p:cNvPr` id. A write to either shape refuses with `NotSupported` and the diagnostic `edit.duplicate-shape-id`. A read answers the first of the two. | Give the shapes unique ids in the file before you edit them. |
+| `Table.clear` clears the table. | Text clears every cell to one empty paragraph. Format removes the direct cell, paragraph, and run format. Hyperlinks and the table style stay. | None. |
+| `ShapeCollection.addTable` takes many options. | Every option applies in one batch, in this order: `values`, `style`, column widths and row heights, `mergedAreas`, `uniformCellProperties`, then `specificCellProperties`. A bad option refuses the sync with `InvalidArgument`, and no table is added. A cell can take `text` or `textRuns`, not both. | None. |
+| `TableStyleSettings.style` takes every built-in style. | The file format holds no definition of the built-in styles. A style must be defined in the presentation (`ppt/tableStyles.xml`), found by its name: `LightStyle1` is "Light Style 1". `MediumStyle2Accent1` is built in, and `NoStyleNoGrid` removes the style. Another style refuses with `NotSupported` and the diagnostic `edit.table-style-undefined`. A table whose style has no `TableStyle` value refuses a read of `style` with `NotImplemented`. | Use a style that the presentation defines. |
+| A `Border` write changes one cell. | An outside edge also changes the cell across it, so the two cells show the same line. A cell with no line reads `undefined` for each property; a write starts from a black solid line of 1 point. Writing `undefined` refuses with `InvalidArgument`. | None. |
+| `Margins` reads and writes each side. | Writing `undefined` removes the margin, back to its default: 7.2 points left and right, 3.6 points top and bottom. | None. |
+| `Adjustments` reads and writes the adjust values. | The index order is the order of the preset's `a:avLst`. A length is a fraction of the shape size (0.5 is half); an angle is in degrees. A write is bounded to the range of the preset's adjust handle at the shape's size. A shape with no preset geometry refuses with `NotSupported` and the diagnostic `edit.no-preset-geometry`. | None. |
+| `TableCellCollection.getItemAtOrNullObject` finds a merged area. | Answers the merged area that holds the cell at that row and column of the table, as its first cell, or a null object. | None. |
+| `CustomPropertyCollection` keeps each property type. | Keys compare without case. A whole number in the 32-bit range is stored as an integer, another number as a double, and a `Date` in UTC to whole seconds. `deleteAll` removes the String, Number, Boolean, and Date properties; a property of another type stays and is not listed. `add` with the key of such a property replaces it. | None. |
+| `CustomXmlPartCollection.add` takes any XML. | The text must be one well-formed element of at most 8 MiB in UTF-8, with no DTD and no entity declaration. Other text refuses with `InvalidArgument` and the diagnostic `edit.invalid-custom-xml`. A `setXml` that changes the root namespace points the schema references of the part's properties at the new namespace and keeps the other references. `getOnlyItem` refuses with `ItemNotFound` unless the scope holds exactly one part. | Send plain XML with one root. |
+| `insertSlidesFromBase64` inserts slides of another file. | The file must be a presentation of at most 100 MiB that the bounded reader accepts. Each slide comes with its notes, pictures, media, charts, and other parts. `KeepSourceFormatting` copies the layouts, masters, and themes the slides use, again on each call. `UseDestinationTheme` puts each slide on the first layout of the same type, or of the same name for a custom layout, else on the first layout, and re-maps its placeholders as a layout change does. A link to a slide that is not imported loses its action. Comments come along: an author with the same name and initials as an author of this presentation becomes that author, and any other author is added. A slide with threaded comments or an embedded control (`p:control`) refuses with `NotSupported`, and the diagnostic names the slide ids. Embedded fonts and the slide size of the source do not come along. | Leave out the slides that the diagnostic names with `sourceSlideIds`. |
+| `getImageAsBase64` draws a picture of a slide or a shape. | A browser runtime draws pictures with the editor's own renderer. A server runtime draws them only when you pass a `rasterize` function to `createServer`: the engine paints the picture with the same renderer into an SVG document, and your function turns that SVG into a PNG of exactly the asked size. Another answer refuses with `GeneralException` and the diagnostic `image.failed`. A server without `rasterize` refuses with `NotSupported` and the diagnostic `host.no-images`. The PNG keeps the aspect ratio and fits into the width and height you give; with no size, it has the size of the slide or shape at 96 pixels per inch, at most 8192 pixels on a side. A shape picture shows the shape without the slide background, cut to the box of the shape, so an outline, a shadow, or a glow outside the box does not show. A shape of a layout or a master refuses with `NotSupported`. | Check `runtime.capabilities.images`. On a server, pass `rasterize` (see the [overview](/docs/editor-api)). |
+| `TextRange.hyperlinks` lists the links of a range. | Lists each text link that overlaps the range. A link keeps its whole span, so `delete` removes all of it, and a link that starts before the range reads from its own start. An empty range lists the link around its point. A link on the whole shape is not listed. | Read `Slide.hyperlinks` for shape links. |
+| Bindings are kept by the add-in host. | A binding lives in the memory of the runtime for its lifetime and is never saved: a saved file, a reopened file, and another runtime have no bindings. `add` with an id that is in use moves that binding to the new shape. A binding whose shape was deleted stays listed, and `getShape` refuses with `ItemNotFound` and the diagnostic `binding.shape-deleted`; an undo that restores the shape makes it work again. `addFromSelection` needs a browser runtime and exactly one selected shape; other selections refuse with `InvalidArgument` and the diagnostic `binding.selection`. A runtime holds at most 10000 bindings. | Add the bindings again after you open a presentation. |
+| Selection members run in the add-in host. | Selection needs a browser runtime. A server refuses with `NotSupported`. | Check `runtime.capabilities.selection`. |
+| `context.loadRecursive` loads an object and the objects it reaches, by type. | Each object whose type name is a key of the options loads that option, and the objects that load fills in (navigation properties and collection items) go on, down to `maxDepth` levels (at most 32, the default). An object whose type is not a key stops the walk. A type name that is not a class of this API refuses with `InvalidArgument`. Each level costs one more host batch in the same `sync()`. | None. |
+| `context.trace` adds a message to the batch. | A failed `sync()` gives the messages queued before the failed call in `error.traceMessages`. `context.debugInfo.pendingStatements` lists the queued calls by their paths, such as `presentation.slides.getCount`, and the trace messages, in order. | None. |
+
+## Check supported APIs
+
+| Area | Classes | Status |
+| --- | --- | --- |
+| Request context | `RequestContext` (also as `ClientRequestContext`), `RequestContextDebugInfo`, `Application` | Supported subset |
+| Presentation | `Presentation`, `DocumentProperties`, `PageSetup` | Supported subset |
+| Custom properties | `CustomPropertyCollection`, `CustomProperty` | Supported subset |
+| Custom XML | `CustomXmlPartCollection`, `CustomXmlPartScopedCollection`, `CustomXmlPart` | Supported subset |
+| Slides | `Slide`, `SlideCollection`, `SlideScopedCollection`, `SlideLayout`, `SlideMaster`, and their collections | Supported subset |
+| Shapes | `Shape`, `ShapeCollection`, `ShapeScopedCollection`, `ShapeGroup`, `PlaceholderFormat`, `Adjustments` | Supported subset |
+| Fill and line | `ShapeFill`, `ShapeLineFormat` | Supported subset |
+| Backgrounds | `SlideBackground`, `SlideLayoutBackground`, `SlideMasterBackground`, `SlideBackgroundFill`, and its solid, gradient, pattern, and picture fills | Supported subset |
+| Theme colors | `ThemeColorScheme` | Supported subset |
+| Text | `TextFrame`, `TextRange`, `ShapeFont`, `ParagraphFormat`, `BulletFormat` | Supported subset |
+| Tables | `Table`, `TableCell`, `TableRow`, `TableColumn`, and their collections, `TableCellCollection`, `TableStyleSettings`, `Borders`, `Border`, `Margins` | Supported subset |
+| Options and data | `TableAddOptions`, `TableCellProperties`, `TableCellBorders`, `BorderProperties`, `TableCellMargins`, `FillProperties`, `TableColumnProperties`, `TableRowProperties`, `TableMergedAreaProperties`, `TableClearOptions`, `TextRun`, `FontProperties`, `ShapeAddOptions`, `HyperlinkAddOptions`, `AddSlideOptions`, `InsertSlideOptions`, `SlideGetImageOptions`, `ShapeGetImageOptions`, and the background fill options | Exact Office.js types |
+| Links and tags | `Hyperlink`, `HyperlinkCollection`, `HyperlinkScopedCollection`, `Tag`, `TagCollection` | Supported subset |
+| Bindings | `Binding`, `BindingCollection` | Supported subset, in memory |
+
+Every editing method and property write of these classes has the exact Office.js signature. A signature match does not prove the same runtime behavior: the differences above apply.
+
+## Unavailable APIs
+
+These members are not in the subset:
+
+- `createPresentation`, which opens a host window.
+- `RequestContext.requestHeaders`, the HTTP headers of the requests from an add-in to its host. A runtime calls its host in the same process, with no HTTP request.
+- `RequestContext.sensitivityLabelsCatalog`, which the host reads from the compliance service of the user's organization. It is not in the file.
+
+## Identify extensions
+
+These members extend the Office.js shape:
+
+- `PptxEditor.createServer` and `PptxEditor.createBrowser` create a runtime.
+- `runtime.run`, `runtime.save`, `runtime.dispose`, and `runtime.capabilities` manage the runtime.
+- `PptxEditorError` and `isPptxEditorError` describe refusals, with `StaleDocument`, `RuntimeDisposed`, and the other codes on the [overview](/docs/editor-api).

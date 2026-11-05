@@ -1,0 +1,497 @@
+/** @jsxImportSource vue */
+// `PptxEditorHyperLink`: the Vue twin of the React adapter's `HyperLink.tsx`, the link popup
+// with named parts after DOCX Editor's `DocxEditor.HyperLink`. A click into linked text opens
+// it in reading mode (the target, Copy, Edit, Unlink); Ctrl/Cmd+K, the link control, Insert >
+// Link, and Edit open it in edit mode (the URL field, Apply, Cancel). The state is the root's
+// (core's `createHyperlinkPopupController`). The same ladder as React: `class` / `className`
+// and `data-mode`, an `icon` slot on the actions, `asChild`, in-place part override with
+// `hidden` and `preset: false`, and `useHyperlinkPopup()`. A renderer shows reading mode only
+// when registered with `definePopup(Component, { reading: true })`. F6 moves focus from the
+// slide text into an open reading panel.
+
+import {
+  cloneVNode,
+  computed,
+  defineComponent,
+  Fragment,
+  inject,
+  isVNode,
+  onMounted,
+  ref,
+  type ComputedRef,
+  type ExtractPublicPropTypes,
+  type InjectionKey,
+  type ShallowRef,
+  type VNode,
+  type VNodeArrayChildren,
+} from 'vue';
+import {
+  openHyperlinkPopup,
+  requestLinkPopup,
+  translateKeyOrText,
+  type HyperlinkPopupController,
+  type HyperlinkPopupState,
+} from '@pptx-editor.dev/core/editor';
+import { Icon, Popover } from './chrome.tsx';
+import { usePptxEditor, useTranslation } from './composables.ts';
+
+/** The root's link popup state, provided by `PptxEditorRoot`. @internal */
+export interface HyperlinkPopupProvision {
+  readonly controller: HyperlinkPopupController;
+  readonly state: Readonly<ShallowRef<HyperlinkPopupState>>;
+  /** The id of the error message, so the URL field names it. */
+  readonly errorId: string;
+}
+
+/** @internal */
+export const hyperlinkPopupKey: InjectionKey<HyperlinkPopupProvision> =
+  Symbol('pptxHyperlinkPopup');
+
+const CLOSED_STATE: HyperlinkPopupState = {
+  mode: 'closed',
+  url: '',
+  href: null,
+  draft: '',
+  error: null,
+  copied: false,
+  canEdit: false,
+  anchor: null,
+};
+
+/** What `useHyperlinkPopup` returns, the twin of React's `UseHyperlinkPopupResult`. @public */
+export interface UseHyperlinkPopupReturn {
+  readonly state: ComputedRef<HyperlinkPopupState>;
+  /**
+   * Open reading mode over the link at a text caret, or the URL field when there is none, under
+   * `anchor` (default: the caret). DOCX Editor's argument order: `link` is `null` for the URL
+   * field at once; the panel shows the link at the caret, so a given `link` only asks for
+   * reading mode.
+   */
+  open(link?: { readonly url: string } | null, anchor?: HTMLElement | null): void;
+  /** Open the URL field for the selection, as Ctrl/Cmd+K and the link control do. */
+  openAtCaret(): void;
+  close(): void;
+  /** Copy the safe target. Resolves false when there is nothing safe to copy. */
+  copy(): Promise<boolean>;
+  /** Switch from reading to editing. */
+  beginEdit(): void;
+  setUrl(url: string): void;
+  /** Apply the draft. False when the engine refused it; `state.error` says why. */
+  commitEdit(): boolean;
+  /** Remove the link, keeping its text. */
+  unlink(): boolean;
+  /** Open the safe target in a new tab, with no opener. False when there is none. */
+  openTarget(): boolean;
+}
+
+/**
+ * The link popup's state and actions: the root's one state, in a part of the panel or in a
+ * `popups.hyperlink` renderer, which the root renders inside it; closed and inert elsewhere.
+ * @public
+ */
+export function useHyperlinkPopup(): UseHyperlinkPopupReturn {
+  const provision = inject(hyperlinkPopupKey, null);
+  const editorRef = usePptxEditor();
+  const c = provision?.controller;
+  return {
+    state: computed(() => provision?.state.value ?? CLOSED_STATE),
+    open: (link, anchor) => {
+      const editor = editorRef.value;
+      if (c && editor) openHyperlinkPopup(c, editor, link, anchor);
+    },
+    openAtCaret: () => {
+      if (editorRef.value) requestLinkPopup(editorRef.value);
+    },
+    close: () => c?.close(),
+    copy: () => c?.copy() ?? Promise.resolve(false),
+    beginEdit: () => c?.beginEdit(),
+    setUrl: (url) => c?.setUrl(url),
+    commitEdit: () => c?.commitEdit() ?? false,
+    unlink: () => c?.unlink() ?? false,
+    openTarget: () => c?.openTarget() ?? false,
+  };
+}
+
+const partProps = {
+  /** A class name added to the part (`class` works too). */
+  className: { type: String, default: undefined },
+  /** Put this part's wiring on the one child element of the default slot. */
+  asChild: { type: Boolean, default: false },
+  /** Render nothing: inside the default arrangement this removes the part. */
+  hidden: { type: Boolean, default: false },
+} as const;
+
+/** Shared props of every part, the twin of React's `HyperLinkPartProps`. @public */
+export type HyperLinkPartProps = ExtractPublicPropTypes<typeof partProps>;
+/** Props of the action parts; the glyph is the `icon` slot. @public */
+export type HyperLinkActionProps = HyperLinkPartProps;
+
+const rootProps = {
+  ...partProps,
+  /** Render the packaged parts. `false` renders only the panel and the default slot. */
+  preset: { type: Boolean, default: true },
+} as const;
+
+/** Props of `PptxEditorHyperLink`. @public */
+export type HyperLinkProps = ExtractPublicPropTypes<typeof rootProps>;
+
+/** Keeps the caret: a press in the panel must not move it. Fields are exempt. */
+function guardMousedown(event: MouseEvent): void {
+  const tag = (event.target as HTMLElement | null)?.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+  event.preventDefault();
+}
+
+/** The top-level vnodes of `children`, with fragments opened. */
+function flatten(children: VNodeArrayChildren | undefined, out: VNode[] = []): VNode[] {
+  for (const child of children ?? []) {
+    if (Array.isArray(child)) flatten(child, out);
+    else if (isVNode(child)) {
+      if (child.type === Fragment && Array.isArray(child.children))
+        flatten(child.children as VNodeArrayChildren, out);
+      else out.push(child);
+    }
+  }
+  return out;
+}
+
+/** The part's own element, or its wiring on the host's one child (`asChild`). */
+function wire(
+  asChild: boolean,
+  children: VNode[] | undefined,
+  props: Record<string, unknown>,
+  fallback: () => VNode
+): VNode {
+  const only = asChild ? flatten(children) : [];
+  const child = only.length === 1 && typeof only[0]!.type !== 'symbol' ? only[0] : undefined;
+  return child ? cloneVNode(child, props, true) : fallback();
+}
+
+type PartName = 'Url' | 'Copy' | 'Edit' | 'Unlink' | 'Fields' | 'Error' | 'Apply' | 'Cancel';
+
+/** A part component, marked with its name so the preset swaps a host copy in place. */
+function part<P>(name: PartName, component: P): P {
+  return Object.assign(component as object, { pptxHyperLinkPart: name }) as P;
+}
+
+const HyperLinkUrl = part(
+  'Url',
+  defineComponent({
+    name: 'PptxEditorHyperLinkUrl',
+    props: partProps,
+    setup(props, { slots }) {
+      const { state } = useHyperlinkPopup();
+      const { t } = useTranslation();
+      return () => {
+        const s = state.value;
+        if (props.hidden || !s.url) return null;
+        const children = slots.default?.();
+        const text = () => <bdi dir="ltr">{s.url}</bdi>;
+        if (!s.href) {
+          const attrs = {
+            class: ['pptx-link__url', props.className],
+            'data-inert': '',
+            title: t('link.unsafe'),
+          };
+          return wire(props.asChild, children, attrs, () => (
+            <span {...attrs}>{children ?? text()}</span>
+          ));
+        }
+        const attrs = {
+          class: ['pptx-link__url', props.className],
+          href: s.href,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          title: t('link.open'),
+          onMousedown: guardMousedown,
+        };
+        return wire(props.asChild, children, attrs, () => (
+          <a {...attrs}>
+            {children ?? text()}
+            <Icon name="open_in_new" />
+          </a>
+        ));
+      };
+    },
+  })
+);
+
+/** An icon button of the reading row. */
+function actionPart(
+  name: 'Copy' | 'Edit' | 'Unlink',
+  cls: string,
+  glyph: string,
+  use: () => { label: () => string; run: () => void; shown?: () => boolean; extra?: () => object }
+) {
+  return part(
+    name,
+    defineComponent({
+      name: `PptxEditorHyperLink${name}`,
+      props: partProps,
+      setup(props, { slots }) {
+        const action = use();
+        return () => {
+          if (props.hidden || action.shown?.() === false) return null;
+          const label = action.label();
+          const attrs = {
+            type: 'button' as const,
+            class: [`pptx-link__action pptx-link__${cls}`, props.className],
+            'aria-label': label,
+            title: label,
+            onMousedown: guardMousedown,
+            onClick: action.run,
+            ...action.extra?.(),
+          };
+          const children = slots.default?.();
+          return wire(props.asChild, children, attrs, () => (
+            <button {...attrs}>{slots.icon?.() ?? children ?? <Icon name={glyph} />}</button>
+          ));
+        };
+      },
+    })
+  );
+}
+
+const HyperLinkCopy = actionPart('Copy', 'copy', 'content_copy', () => {
+  const { state, copy } = useHyperlinkPopup();
+  const { t } = useTranslation();
+  return {
+    label: () => t(state.value.copied ? 'link.copied' : 'link.copy'),
+    run: () => void copy(),
+    shown: () => !!state.value.href,
+    extra: () => (state.value.copied ? { 'data-copied': '' } : {}),
+  };
+});
+
+const HyperLinkEdit = actionPart('Edit', 'edit', 'edit', () => {
+  const { beginEdit } = useHyperlinkPopup();
+  const { t } = useTranslation();
+  return { label: () => t('link.edit'), run: beginEdit };
+});
+
+const HyperLinkUnlink = actionPart('Unlink', 'unlink', 'link_off', () => {
+  const { unlink } = useHyperlinkPopup();
+  const { t } = useTranslation();
+  return { label: () => t('link.remove'), run: () => void unlink() };
+});
+
+const HyperLinkFields = part(
+  'Fields',
+  defineComponent({
+    name: 'PptxEditorHyperLinkFields',
+    props: partProps,
+    setup(props) {
+      const provision = inject(hyperlinkPopupKey, null);
+      const { state, setUrl, commitEdit } = useHyperlinkPopup();
+      const { t } = useTranslation();
+      const field = ref<HTMLInputElement | null>(null);
+      // After the popover is placed: a browser does not focus into a hidden panel.
+      onMounted(() => {
+        field.value?.focus({ preventScroll: true });
+        field.value?.select();
+      });
+      return () => {
+        if (props.hidden) return null;
+        const s = state.value;
+        return (
+          <input
+            ref={field}
+            class={['pptx-font-picker__search pptx-link__field', props.className]}
+            type="url"
+            dir="ltr"
+            aria-label={t('link.label')}
+            placeholder={t('link.placeholder')}
+            value={s.draft}
+            aria-invalid={s.error ? true : undefined}
+            aria-describedby={s.error && provision ? provision.errorId : undefined}
+            onInput={(e: Event) => setUrl((e.target as HTMLInputElement).value)}
+            onKeydown={(e: KeyboardEvent) => {
+              if (e.key !== 'Enter') return;
+              // The Enter that applies must not reach the element focus moves to next.
+              e.preventDefault();
+              commitEdit();
+            }}
+          />
+        );
+      };
+    },
+  })
+);
+
+const HyperLinkError = part(
+  'Error',
+  defineComponent({
+    name: 'PptxEditorHyperLinkError',
+    props: partProps,
+    setup(props) {
+      const provision = inject(hyperlinkPopupKey, null);
+      const { t } = useTranslation();
+      return () => {
+        const error = provision?.state.value.error;
+        if (props.hidden || !error) return null;
+        return (
+          <p id={provision.errorId} role="alert" class={['pptx-link__error', props.className]}>
+            {translateKeyOrText(t, error)}
+          </p>
+        );
+      };
+    },
+  })
+);
+
+/** A text button of the edit row. */
+function textPart(
+  name: 'Apply' | 'Cancel',
+  cls: string,
+  labelKey: 'link.apply' | 'link.cancel',
+  primary: boolean
+) {
+  return part(
+    name,
+    defineComponent({
+      name: `PptxEditorHyperLink${name}`,
+      props: partProps,
+      setup(props, { slots }) {
+        const { state, commitEdit, close } = useHyperlinkPopup();
+        const { t } = useTranslation();
+        return () => {
+          if (props.hidden) return null;
+          const attrs = {
+            type: 'button' as const,
+            class: [
+              primary ? 'pptx-button pptx-button--primary' : 'pptx-button',
+              cls,
+              props.className,
+            ],
+            disabled: primary ? state.value.draft.trim().length === 0 : undefined,
+            onMousedown: guardMousedown,
+            onClick: primary ? () => void commitEdit() : close,
+          };
+          const children = slots.default?.();
+          return wire(props.asChild, children, attrs, () => (
+            <button {...attrs}>{children ?? t(labelKey)}</button>
+          ));
+        };
+      },
+    })
+  );
+}
+
+const HyperLinkApply = textPart('Apply', 'pptx-link__apply', 'link.apply', true);
+const HyperLinkCancel = textPart('Cancel', 'pptx-link__cancel', 'link.cancel', false);
+
+/** Each part child by its name, so the preset swaps it in place; other children follow. */
+function partOverrides(children: VNode[] | undefined): {
+  parts: Partial<Record<PartName, VNode>>;
+  extra: VNode[];
+} {
+  const parts: Partial<Record<PartName, VNode>> = {};
+  const extra: VNode[] = [];
+  for (const node of flatten(children)) {
+    const name = (node.type as { pptxHyperLinkPart?: PartName } | null)?.pptxHyperLinkPart;
+    if (name) parts[name] = node;
+    else extra.push(node);
+  }
+  return { parts, extra };
+}
+
+/** The default arrangement of the mode, with host parts in place. */
+function preset(state: HyperlinkPopupState, children: VNode[] | undefined): VNodeArrayChildren {
+  const { parts, extra } = partOverrides(children);
+  const take = (name: PartName, fallback: () => VNode): VNode | null =>
+    name in parts ? (parts[name] ?? null) : fallback();
+  if (state.mode === 'editing')
+    return [
+      // An existing link keeps its target, Copy, and Open while it is edited.
+      state.url ? (
+        <div class="pptx-link__row">
+          {take('Url', () => (
+            <HyperLinkUrl />
+          ))}
+          <div class="pptx-link__tools">
+            {take('Copy', () => (
+              <HyperLinkCopy />
+            ))}
+          </div>
+        </div>
+      ) : null,
+      take('Fields', () => <HyperLinkFields />),
+      take('Error', () => <HyperLinkError />),
+      <div class="pptx-link__actions">
+        {state.url && state.canEdit ? take('Unlink', () => <HyperLinkUnlink />) : null}
+        {take('Cancel', () => (
+          <HyperLinkCancel />
+        ))}
+        {take('Apply', () => (
+          <HyperLinkApply />
+        ))}
+      </div>,
+      ...extra,
+    ];
+  return [
+    <div class="pptx-link__row">
+      {take('Url', () => (
+        <HyperLinkUrl />
+      ))}
+      <div class="pptx-link__tools">
+        {take('Copy', () => (
+          <HyperLinkCopy />
+        ))}
+        {/* An action that can never run is absent, not disabled: a read-only editor. */}
+        {state.canEdit ? take('Edit', () => <HyperLinkEdit />) : null}
+        {state.canEdit ? take('Unlink', () => <HyperLinkUnlink />) : null}
+      </div>
+    </div>,
+    take('Error', () => <HyperLinkError />),
+    ...extra,
+  ];
+}
+
+const HyperLinkRoot = defineComponent({
+  name: 'PptxEditorHyperLink',
+  inheritAttrs: false,
+  props: rootProps,
+  setup(props, { slots, attrs }) {
+    const provision = inject(hyperlinkPopupKey, null);
+    const { t } = useTranslation();
+    return () => {
+      const state = provision?.state.value ?? CLOSED_STATE;
+      if (!provision || state.mode === 'closed') return null;
+      const children = slots.default?.();
+      // `hidden` drops the packaged panel only: the gestures stay, so a host renders its own UI.
+      if (props.hidden) return children ?? null;
+      const reading = state.mode === 'reading';
+      const inner = { class: 'pptx-link', 'data-mode': state.mode };
+      const body = props.preset ? preset(state, children) : children;
+      const extra = [props.className, attrs.class as string | undefined].filter(Boolean).join(' ');
+      return (
+        <Popover
+          anchor={state.anchor}
+          role="dialog"
+          label={t(reading ? 'link.label' : state.url ? 'link.edit' : 'link.insert')}
+          onClose={() => provision.controller.close()}
+          // Reading leaves the keys in the slide text; editing takes them in its field.
+          passive={reading}
+          field={!reading}
+          className={extra ? `pptx-link-popup ${extra}` : 'pptx-link-popup'}
+        >
+          {{
+            default: () => wire(props.asChild, children, inner, () => <div {...inner}>{body}</div>),
+          }}
+        </Popover>
+      );
+    };
+  },
+});
+
+/** `PptxEditorHyperLink`: the link popup with named parts, the twin of React's. @public */
+export const PptxEditorHyperLink = Object.assign(HyperLinkRoot, {
+  Url: HyperLinkUrl,
+  Copy: HyperLinkCopy,
+  Edit: HyperLinkEdit,
+  Unlink: HyperLinkUnlink,
+  Fields: HyperLinkFields,
+  Error: HyperLinkError,
+  Apply: HyperLinkApply,
+  Cancel: HyperLinkCancel,
+});

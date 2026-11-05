@@ -1,0 +1,130 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // oxlint configuration, in the shape of DOCX Editor's `.oxlintrc.json`. The same rules as the
+  // ESLint configuration it replaces: the `max-lines` caps, the HTML-sink bans, the varargs
+  // spread ban in the DOM-free lanes, the keyframe-namespace guard, and the React/Vue import
+  // isolation. Repository-specific rules live in scripts/oxlint/pptx-rules.mjs (`pptx/*`).
+  //
+  // `bun run lint` errors are, first of all, the line caps. Nothing else catches them, so a large
+  // file passes typecheck and tests and then fails CI. Extract; do not raise the cap.
+  // scripts/check-max-lines-caps.mjs keeps the caps honest.
+  "jsPlugins": ["./scripts/oxlint/pptx-rules.mjs"],
+  "plugins": ["eslint", "typescript", "react"],
+  // Only the rules below run. oxlint's default categories would add rules this repository has
+  // never enforced.
+  "categories": { "correctness": "off" },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/*.generated.ts",
+    "examples/*/dist/**",
+    "fidelity-report/**"
+  ],
+  "overrides": [
+    {
+      "files": ["**/*.{ts,tsx,vue}"],
+      "rules": {
+        "max-lines": ["error", { "max": 1000, "skipBlankLines": false, "skipComments": false }],
+        "no-restricted-globals": [
+          "error",
+          { "name": "require", "message": "ESM only. Use import." }
+        ],
+        "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+        "typescript/no-explicit-any": "error",
+        "no-eval": "error",
+        "no-new-func": "error",
+        "prefer-const": "error",
+        "no-labels": "error",
+        "pptx/no-html-sinks": "error",
+        "pptx/no-global-keyframes": "error"
+      }
+    },
+    {
+      "files": ["**/*.{ts,tsx}"],
+      "rules": {
+        "react/rules-of-hooks": "error",
+        "react/exhaustive-deps": "warn"
+      }
+    },
+    // Vue composables are named `use*` and run in `setup()`, not in React components. The React
+    // hook rules do not apply to the Vue adapter (DOCX Editor scopes them the same way).
+    {
+      "files": ["packages/vue/**/*.{ts,tsx}"],
+      "rules": { "react/rules-of-hooks": "off", "react/exhaustive-deps": "off" }
+    },
+    // The Vue adapter never imports React, and the React adapter never imports Vue.
+    {
+      "files": ["packages/vue/src/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["react", "react-dom", "react/*", "react-dom/*", "@pptx-editor.dev/react"],
+                "message": "The Vue adapter must not import React."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/react/src/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["vue", "vue/*", "@vue/*", "@pptx-editor.dev/vue"],
+                "message": "The React adapter must not import Vue."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    // Shipped code reports through typed results and the host, not the console.
+    {
+      "files": ["packages/*/src/**/*.{ts,tsx}"],
+      "rules": { "no-console": ["error", { "allow": ["warn", "error"] }] }
+    },
+    // The DOM-free lanes handle file-derived sizes, so they never spread an array into a call.
+    {
+      "files": [
+        "packages/core/src/store/**/*.ts",
+        "packages/core/src/cascade/**/*.ts",
+        "packages/core/src/layout/**/*.ts",
+        "packages/core/src/automation/**/*.ts",
+        "packages/ooxml-core/src/**/*.ts"
+      ],
+      "rules": { "pptx/no-varargs-spread": "error" }
+    },
+    // Tests and scripts may build fixtures from strings and log; they never ship.
+    {
+      "files": ["**/__tests__/**"],
+      "rules": {
+        "no-console": "off",
+        "pptx/no-html-sinks": "off",
+        "pptx/no-global-keyframes": "off",
+        "pptx/no-varargs-spread": "off",
+        "typescript/no-explicit-any": "off"
+      }
+    },
+    {
+      "files": ["scripts/**", "e2e/**"],
+      "rules": {
+        "pptx/no-html-sinks": "off",
+        "pptx/no-global-keyframes": "off",
+        "typescript/no-explicit-any": "off"
+      }
+    },
+    {
+      "files": ["scripts/**/*.mjs"],
+      "rules": {
+        "max-lines": ["error", { "max": 1000, "skipBlankLines": false, "skipComments": false }]
+      }
+    }
+  ]
+}

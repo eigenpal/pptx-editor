@@ -1,0 +1,50 @@
+{
+  "name": "@pptx-editor.dev/pptx-to-pdf",
+  "version": "0.0.0",
+  "description": "Convert PPTX to PDF on Node.js with searchable text and embedded fonts, through the PPTX Editor layout engine.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE.md",
+    "THIRD_PARTY_NOTICES.md",
+    "!dist/metafile-*.json"
+  ],
+  "engines": {
+    "node": "^20.16.0 || >=22.3.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "bun check",
+    "api:extract": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/pptx-to-pdf --local",
+    "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/pptx-to-pdf"
+  },
+  "peerDependencies": {
+    "@pptx-editor.dev/core": "0.x"
+  },
+  "dependencies": {
+    "fontkit": "2.0.4",
+    "pdf-lib": "1.17.1"
+  },
+  "devDependencies": {
+    "@pptx-editor.dev/core": "workspace:*",
+    "pdfjs-dist": "5.4.624"
+  },
+  "license": "LicenseRef-EigenPal-Pro-Evaluation-1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eigenpal/pptx-editor.git",
+    "directory": "packages/pptx-to-pdf"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

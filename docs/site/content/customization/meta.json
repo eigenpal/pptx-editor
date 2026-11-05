@@ -1,0 +1,14 @@
+{
+  "title": "Customization",
+  "pages": [
+    "index",
+    "appearance",
+    "layout",
+    "toolbar",
+    "ribbon",
+    "menus",
+    "dialogs",
+    "fonts",
+    "language"
+  ]
+}

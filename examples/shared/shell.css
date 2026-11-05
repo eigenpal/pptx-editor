@@ -1,0 +1,643 @@
+/*
+ * The demo shell: top bar, brand lockup, menus, mode pill, dock, workspace, and panel.
+ * Adapted from the live DOCX Editor demo shell, whose source is
+ * `src/components/editor/studio/studio.css` in EigenPal's site repository
+ * `eigenpal/docx-editor.dev`, so both products look like one family.
+ *
+ * Both PPTX Editor demos (React and Vue) import this file from their own `src/styles.css`,
+ * after the adapter stylesheet, as the DOCX Editor repository demos share CSS from
+ * `examples/shared/`. Every class uses the `demo-` prefix of those demos. `.demo-root` maps the
+ * family `--doc-*` tokens onto the shell palette, and `.demo-root.dark` switches the palette
+ * when the root's `colorMode` is `'dark'`. The slide canvas is never themed.
+ */
+
+.demo-root {
+  --demo-bg: #f4f3f0;
+  --demo-surface: #fff;
+  --demo-surface-2: #faf9f7;
+  --demo-raised: #fff;
+  --demo-ink: #1b1a19;
+  --demo-ink-2: #44413d;
+  --demo-ink-3: #75716b;
+  --demo-ink-4: #a29e97;
+  --demo-line: #e7e4df;
+  --demo-line-2: #d9d5ce;
+  --demo-hover: #1b1a190d;
+  --demo-press: #1b1a1917;
+  --demo-primary: #1b1a19;
+  --demo-primary-ink: #fff;
+  --demo-focus: #2f5d8a73;
+  --demo-shadow-1: 0 1px 2px #1b1a190d, 0 0 0 1px var(--demo-line);
+  --demo-shadow-2: 0 0 0 1px #1b1a190f, 0 2px 4px #1b1a190a, 0 16px 36px -12px #1b1a1938;
+  --demo-page-shadow: 0 0 0 1px #1b1a190a, 0 1px 2px #1b1a190d, 0 10px 28px -6px #1b1a191a;
+  --demo-sans: 'Geist Variable', 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --demo-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --demo-r-sm: 6px;
+  --demo-r: 8px;
+  --demo-r-lg: 12px;
+  --demo-panel-w: 340px;
+  --doc-surface: var(--demo-surface);
+  --doc-popover-bg: var(--demo-raised);
+  --doc-bg: var(--demo-bg);
+  --doc-bg-subtle: var(--demo-surface-2);
+  --doc-bg-hover: var(--demo-hover);
+  --doc-bg-input: var(--demo-surface);
+  --doc-primary: var(--demo-ink);
+  --doc-primary-hover: #000;
+  --doc-primary-light: var(--demo-hover);
+  --doc-accent: var(--demo-ink);
+  --doc-accent-bg: var(--demo-press);
+  --doc-toggle-active-bg: var(--demo-press);
+  --doc-toggle-active-fg: var(--demo-ink);
+  --doc-text: var(--demo-ink);
+  --doc-text-muted: var(--demo-ink-3);
+  --doc-text-subtle: var(--demo-ink-4);
+  --doc-border: var(--demo-line);
+  --doc-border-light: var(--demo-line);
+  --doc-border-dark: var(--demo-line-2);
+  --doc-focus-ring: var(--demo-focus);
+  --doc-card-shadow: var(--demo-shadow-1);
+  --doc-card-shadow-strong: var(--demo-shadow-2);
+  --doc-shadow-lg: var(--demo-shadow-2);
+  /* The chrome layers go above the dock (60), in the editor's order: menus and popovers, then
+     the context menu, then the tooltip over all of them. */
+  --doc-z-overlay: 90;
+  --doc-z-context: 95;
+  --doc-z-tooltip: 100;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--demo-bg);
+  color: var(--demo-ink);
+  font: 13.5px/1.5 var(--demo-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.demo-root.dark {
+  --demo-bg: #141413;
+  --demo-surface: #1c1c1b;
+  --demo-surface-2: #222220;
+  --demo-raised: #262624;
+  --demo-ink: #f1efec;
+  --demo-ink-2: #d2cfca;
+  --demo-ink-3: #9c9891;
+  --demo-ink-4: #6d6a64;
+  --demo-line: #2d2c2a;
+  --demo-line-2: #3b3a37;
+  --demo-hover: #ffffff0f;
+  --demo-press: #ffffff1c;
+  --demo-primary: #f1efec;
+  --demo-primary-ink: #141413;
+  --demo-focus: #7fa7cf80;
+  --demo-shadow-1: 0 1px 2px #0000004d, 0 0 0 1px var(--demo-line);
+  --demo-shadow-2: 0 0 0 1px #ffffff0f, 0 2px 4px #0000004d, 0 18px 40px -12px #0009;
+  --demo-page-shadow: 0 0 0 1px #ffffff0a, 0 12px 32px -6px #0000008c;
+  --doc-primary-hover: #fff;
+}
+/* The editor's dark theme (`.pptx-editor.dark`) sets its own workspace color, which would win
+   over the mapping above: the canvas would show as a lighter box whose lower edge ends behind
+   the zoom pill. The canvas keeps the demo's workspace color, as in the light theme. */
+.demo-root.pptx-editor.dark {
+  --doc-bg: var(--demo-bg);
+}
+.demo-root *,
+.demo-root ::before,
+.demo-root ::after {
+  box-sizing: border-box;
+}
+:where(.demo-root) :where(button) {
+  font: inherit;
+  color: inherit;
+}
+
+/* Buttons */
+.demo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--demo-r);
+  background: none;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.16s var(--demo-ease-out);
+}
+.demo-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+.demo-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.demo-btn--sm {
+  height: 30px;
+  padding: 0 10px;
+}
+.demo-btn--quiet {
+  color: var(--demo-ink-2);
+}
+.demo-btn--primary {
+  background: var(--demo-primary);
+  color: var(--demo-primary-ink);
+}
+.demo-btn__chev {
+  width: 13px !important;
+  height: 13px !important;
+  margin-inline-start: -2px;
+  opacity: 0.55;
+}
+@media (hover: hover) and (pointer: fine) {
+  .demo-btn--quiet:hover:not(:disabled) {
+    background: var(--demo-hover);
+    color: var(--demo-ink);
+  }
+  .demo-btn--primary:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+  .demo-icon-btn:hover:not(:disabled) {
+    background: var(--demo-hover);
+    color: var(--demo-ink);
+  }
+}
+.demo-icon-btn {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: var(--demo-r-sm);
+  background: none;
+  color: var(--demo-ink-3);
+  cursor: pointer;
+}
+.demo-icon-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+/* Top bar */
+.demo-topbar {
+  position: relative;
+  z-index: 40;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  height: 54px;
+  padding: 0 12px 0 16px;
+  background: var(--demo-bg);
+}
+.demo-brand {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 9px;
+  color: var(--demo-ink);
+  text-decoration: none;
+}
+.demo-brand__name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.demo-topbar__divider {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 18px;
+  background: var(--demo-line-2);
+}
+.demo-file {
+  display: flex;
+  /* The file name gives up its room before the menu bar does, so every menu stays readable. */
+  flex: 0 1000 auto;
+  align-items: baseline;
+  /* Never narrower than a readable name: below this, the menu bar gives up room instead. */
+  min-width: 60px;
+}
+.demo-file__name {
+  /* Shrinks inside the file box, so the name never runs under the menu bar. */
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 280px;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--demo-r-sm);
+  background: none;
+  color: var(--demo-ink);
+  font: 550 14px/1.3 var(--demo-sans);
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  field-sizing: content;
+}
+.demo-file__name:hover {
+  background: var(--demo-hover);
+}
+.demo-file__name:focus {
+  outline: none;
+  border-color: var(--demo-line-2);
+  background: var(--demo-surface);
+}
+.demo-file__ext {
+  margin-inline-start: -3px;
+  color: var(--demo-ink-4);
+  font-size: 13px;
+}
+.demo-menubar {
+  display: flex;
+  /* Nine menus do not fit beside the file name on a narrow window: the bar gives up room and
+   * scrolls (its panels open in a portal, so nothing clips them), and the actions stay. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  align-items: center;
+  margin-inline-start: 2px;
+}
+.demo-menubar .pptx-menubar__trigger {
+  flex: 0 0 auto;
+}
+.demo-menubar .pptx-menubar__trigger {
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--demo-r-sm);
+  background: none;
+  /* --demo-ink-2: 4.5:1 or more on the top bar (WCAG 1.4.3). */
+  color: var(--demo-ink-2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.demo-menubar .pptx-menubar__trigger:hover,
+.demo-menubar .pptx-menubar__trigger[aria-expanded='true'] {
+  background: var(--demo-hover);
+  color: var(--demo-ink);
+}
+.demo-topbar__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
+}
+.demo-topbar__actions .demo-topbar__divider {
+  margin: 0 4px;
+}
+.demo-topbar__actions .demo-btn--primary {
+  margin-inline-start: 4px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.12),
+    inset 0 1px rgba(255, 255, 255, 0.08);
+}
+.demo-modebar__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--demo-line);
+  border-radius: 999px;
+  background: var(--demo-surface);
+  color: var(--demo-ink-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.demo-modebar__pill:hover {
+  border-color: var(--demo-line-2);
+  color: var(--demo-ink);
+}
+.demo-modebar__pill svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+/* Workspace */
+.demo-dock {
+  position: relative;
+  z-index: 60;
+  display: flex;
+  flex: 0 0 auto;
+  padding: 2px 12px 10px;
+}
+/* The toolbar spans the window, like the menu bar above it. */
+.demo-root .pptx-toolbar {
+  width: 100%;
+  height: 44px;
+  box-shadow:
+    0 0 0 1px var(--demo-line),
+    0 1px 2px #1b1a190a,
+    0 8px 20px -14px #1b1a1947;
+}
+/* The ribbon fills the dock; its Quick Access Toolbar stays a compact strip. */
+.demo-root .pptx-ribbon {
+  flex: 1 1 auto;
+}
+.demo-root .pptx-ribbon__qat .pptx-toolbar {
+  width: auto;
+  height: 32px;
+  box-shadow: none;
+}
+.demo-workspace {
+  position: relative;
+  display: flex;
+  flex: 1 1 0%;
+  gap: 12px;
+  min-height: 0;
+  padding: 0 12px 12px;
+}
+.demo-docpane {
+  position: relative;
+  display: flex;
+  flex: 1 1 0%;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  gap: 12px;
+}
+/* The Slide Sorter view takes the slide's place and hides the notes; the slide surface stays
+   mounted, and the status bar and the notices stay in view. */
+.demo-canvas[hidden] {
+  display: none;
+}
+.demo-canvas {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: 14px;
+  overflow: hidden;
+}
+/* The editor's slide edge stays, so a dark slide shows its box on the dark workspace. */
+.demo-root .pptx-surface__stage {
+  box-shadow:
+    0 0 0 1px var(--doc-slide-edge),
+    var(--demo-page-shadow);
+}
+.demo-root .pptx-notes {
+  margin: 0;
+}
+.demo-root .pptx-panel {
+  width: var(--demo-panel-w);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px var(--demo-line),
+    0 1px 2px #1b1a190a,
+    0 12px 32px -20px #1b1a194d;
+}
+.demo-root .pptx-zoom {
+  box-shadow: var(--demo-shadow-2);
+}
+/* The zoom pill sits in a strip under the slide, so it never covers the slide's corner. */
+.demo-canvas:has(> .pptx-zoom) {
+  padding-bottom: 46px;
+}
+/* The slide thumbnails toggle shows only on a narrow window, where the rail leaves the row. */
+.demo-rail-toggle {
+  display: none;
+}
+
+/* Menus */
+.demo-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+.demo-menu__hint {
+  color: var(--demo-ink-3);
+  font-size: 11.5px;
+}
+.demo-menu__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+.demo-menu__text > span:first-child {
+  font-weight: 500;
+}
+.demo-filetype {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 32px;
+  border-radius: 5px;
+  background: #c43e1c;
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.demo-drop {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--demo-bg) 80%, transparent);
+  color: var(--demo-ink);
+  font-size: 15px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* Every menu stays visible down to 800 px, where the menu bar gives way: the brand name, the
+ * file extension, and then the button labels leave first. */
+/* Open and New keep their icons (and their names and tooltips), so the deck title has room. */
+@media (max-width: 1536px) {
+  .demo-topbar__actions .demo-btn--quiet .demo-btn__label {
+    display: none;
+  }
+}
+@media (max-width: 1366px) {
+  .demo-brand__name,
+  .demo-topbar__divider,
+  .demo-file__ext {
+    display: none;
+  }
+  .demo-file__name {
+    max-width: 140px;
+  }
+}
+/* 1280px, not 1180px: the adapter switcher and the theme toggle take about 200px of the bar. */
+@media (max-width: 1280px) {
+  .demo-topbar__actions .demo-btn__label {
+    display: none;
+  }
+  .demo-file__name {
+    max-width: 96px;
+  }
+}
+/* The adapter switcher (about 110px) leaves next, so every menu stays readable. */
+@media (max-width: 1100px) {
+  /* Scoped to the top bar, so it wins over the switcher's own rule further down. */
+  .demo-topbar .demo-adapter-switcher {
+    display: none;
+  }
+  .demo-menubar .pptx-menubar__trigger {
+    padding: 0 6px;
+  }
+}
+@media (max-width: 940px) {
+  /* The deck name leaves the bar; File > Rename presentation opens it over the menu bar. The
+     mode pill shows only its icon (its name stays). */
+  .demo-file {
+    display: none;
+  }
+  .demo-file.demo-file--open {
+    display: flex;
+    position: absolute;
+    top: 50%;
+    left: 60px;
+    z-index: 1;
+    transform: translateY(-50%);
+  }
+  .demo-file--open .demo-file__name {
+    max-width: 240px;
+    border-color: var(--demo-line-2);
+    background: var(--demo-surface);
+  }
+  .demo-modebar__label {
+    display: none;
+  }
+  .demo-menubar .pptx-menubar__trigger {
+    padding: 0 5px;
+  }
+}
+@media (max-width: 900px) {
+  .demo-topbar__actions .demo-btn--quiet .demo-btn__label {
+    display: none;
+  }
+  /* The rail and the side panel open over the slide, from their top-bar toggles. */
+  .demo-root .pptx-rail {
+    display: none;
+  }
+  .demo-rail-toggle {
+    display: grid;
+  }
+  /* The rail toggle joins the bar: the mode pill and the bar's gaps give it the room. */
+  .demo-topbar {
+    gap: 6px;
+    padding-inline: 10px 8px;
+  }
+  .demo-modebar__pill {
+    padding: 0 7px;
+  }
+  .demo-modebar__pill .demo-btn__chev {
+    display: none;
+  }
+  .demo-workspace--rail .pptx-rail {
+    display: flex;
+    position: absolute;
+    top: 0;
+    bottom: 12px;
+    left: 12px;
+    z-index: 30;
+    box-shadow: var(--demo-shadow-2);
+  }
+  .demo-root .pptx-panel {
+    position: absolute;
+    top: 0;
+    right: 12px;
+    bottom: 12px;
+    z-index: 30;
+    max-width: calc(100% - 24px);
+    box-shadow: var(--demo-shadow-2);
+  }
+  .demo-menubar .pptx-menubar__trigger {
+    padding: 0 3px;
+    font-size: 14px;
+  }
+}
+@media (max-width: 800px) {
+  .demo-menubar {
+    display: none;
+  }
+  /* Without the menu bar, the deck name has room on the bar again. */
+  .demo-file {
+    display: flex;
+  }
+}
+
+/* The light/dark toggle (examples/vite/src/ThemeToggle.tsx, examples/vue/src/ThemeToggle.vue):
+   a segmented sun/moon control with the shape of the DOCX Editor demos' toggle. */
+.demo-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--demo-line);
+  border-radius: 9999px;
+  background: var(--demo-surface-2);
+}
+.demo-theme-toggle__option {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 9999px;
+  background: none;
+  color: var(--demo-ink-3);
+  cursor: pointer;
+  transition:
+    background-color 0.15s var(--demo-ease-out),
+    color 0.15s var(--demo-ease-out);
+}
+.demo-theme-toggle__option[aria-checked='true'] {
+  background: var(--demo-surface);
+  color: var(--demo-ink);
+  box-shadow: var(--demo-shadow-1);
+}
+.demo-theme-toggle__option svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The React | Vue adapter switcher (examples/vite/src/AdapterSwitcher.tsx,
+   examples/vue/src/AdapterSwitcher.vue), shown in preview builds and in development, as in the
+   DOCX Editor demos. */
+.demo-adapter-switcher {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--demo-line);
+  border-radius: var(--demo-r);
+  background: var(--demo-surface-2);
+}
+.demo-adapter-switcher__option {
+  padding: 3px 10px;
+  border-radius: var(--demo-r-sm);
+  color: var(--demo-ink-3);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-decoration: none;
+  transition:
+    background-color 0.15s var(--demo-ease-out),
+    color 0.15s var(--demo-ease-out);
+}
+.demo-adapter-switcher__option[aria-current='page'] {
+  background: var(--demo-surface);
+  color: var(--demo-ink);
+  box-shadow: var(--demo-shadow-1);
+}

@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "package": {
+    "name": "harfbuzzjs",
+    "version": "1.6.4",
+    "wasmSha256": "6eeed8e1bc9ad7773038e48ff8f9e07e0ad228572c594b45e5357e9c2f7a0b2e"
+  },
+  "harfbuzz": {
+    "version": "15.0.0",
+    "revision": "35f656a1a2bab548ea7f54a6dd3fba2b09680d14",
+    "source": "https://github.com/harfbuzz/harfbuzzjs/tree/v1.6.4/harfbuzz"
+  },
+  "toolchain": {
+    "name": "Emscripten",
+    "version": "4.0.13",
+    "source": "https://github.com/harfbuzz/harfbuzzjs/blob/v1.6.4/.github/workflows/build.yml",
+    "provenance": "Version declared by the upstream release workflow. The npm binary was not independently rebuilt. Runtime notices cover the toolchain distribution, including optional components."
+  },
+  "unicode": {
+    "license": "Unicode-3.0",
+    "retrieved": "2026-11-05",
+    "source": "https://www.unicode.org/license.txt"
+  },
+  "notices": [
+    {
+      "file": "HarfBuzz-source-notices.txt",
+      "sha256": "1e190fa2eb9d4934debc8f921945505641ce91baff2978f0353617e3ca2d47ae",
+      "sources": [
+        "https://raw.githubusercontent.com/harfbuzz/harfbuzz/35f656a1a2bab548ea7f54a6dd3fba2b09680d14/src/harfbuzz.cc"
+      ],
+      "component": "HarfBuzz source copyright and permission notices",
+      "sourceComments": 145
+    },
+    {
+      "file": "HarfBuzz-COPYING.txt",
+      "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+      "sources": [
+        "https://raw.githubusercontent.com/harfbuzz/harfbuzz/35f656a1a2bab548ea7f54a6dd3fba2b09680d14/COPYING"
+      ],
+      "component": "HarfBuzz primary license"
+    },
+    {
+      "file": "HarfBuzz-Microsoft-MIT.txt",
+      "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+      "sources": [
+        "https://raw.githubusercontent.com/harfbuzz/harfbuzz/35f656a1a2bab548ea7f54a6dd3fba2b09680d14/src/ms-use/COPYING",
+        "https://raw.githubusercontent.com/harfbuzz/harfbuzz/35f656a1a2bab548ea7f54a6dd3fba2b09680d14/src/hb-ot-shaper-use-table.hh"
+      ],
+      "component": "Microsoft USE shaping data"
+    },
+    {
+      "file": "Emscripten-LICENSE.txt",
+      "sha256": "620a78084fc7ca97c0b5dea9abf891f3ffcadfdbf305276f099c9c4e12fc1d86",
+      "sources": ["https://raw.githubusercontent.com/emscripten-core/emscripten/4.0.13/LICENSE"],
+      "component": "Emscripten JavaScript runtime"
+    },
+    {
+      "file": "musl-COPYRIGHT.txt",
+      "sha256": "f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af",
+      "sources": [
+        "https://raw.githubusercontent.com/emscripten-core/emscripten/4.0.13/system/lib/libc/musl/COPYRIGHT"
+      ],
+      "component": "Emscripten bundled C library"
+    },
+    {
+      "file": "compiler-rt-LICENSE.txt",
+      "sha256": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d",
+      "sources": [
+        "https://raw.githubusercontent.com/emscripten-core/emscripten/4.0.13/system/lib/compiler-rt/LICENSE.TXT"
+      ],
+      "component": "Emscripten bundled compiler runtime"
+    },
+    {
+      "file": "Unicode-LICENSE.txt",
+      "sha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
+      "sources": [
+        "https://www.unicode.org/license.txt",
+        "https://raw.githubusercontent.com/harfbuzz/harfbuzz/35f656a1a2bab548ea7f54a6dd3fba2b09680d14/src/hb-ucd-table.hh",
+        "https://raw.githubusercontent.com/harfbuzz/harfbuzz/35f656a1a2bab548ea7f54a6dd3fba2b09680d14/src/hb-ot-shaper-use-table.hh"
+      ],
+      "component": "Unicode data tables"
+    }
+  ]
+}

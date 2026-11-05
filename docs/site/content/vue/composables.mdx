@@ -1,0 +1,208 @@
+---
+title: 'Composables'
+description: 'Connect Vue controls to PPTX editor state and commands with composables.'
+category: 'Vue'
+order: 38
+---
+
+Call these composables during `setup()` in components inside `PptxEditorRoot`. The packaged `<PptxEditor>` provides that root for its default slot. Each composable has a named return type, `Use<Name>Return`, exported from the package root.
+
+## Connect a command button
+
+This button runs a toolbar command and shows why the command cannot run:
+
+```vue
+<script setup lang="ts">
+import { computed } from 'vue';
+import { useEditorCommand, useTranslation } from '@pptx-editor.dev/vue';
+import { translateKeyOrText } from '@pptx-editor.dev/core/editor';
+
+const bold = useEditorCommand('text.bold');
+const { t } = useTranslation();
+const title = computed(() => {
+  const reason = bold.disabledReason.value;
+  return reason ? translateKeyOrText(t, reason) : t('toolbar.bold');
+});
+</script>
+
+<template>
+  <button
+    type="button"
+    :aria-disabled="!bold.isEnabled.value || undefined"
+    :aria-pressed="bold.isActive.value"
+    :title="title"
+    @mousedown.prevent
+    @click="bold.execute()"
+  >
+    B
+  </button>
+</template>
+```
+
+`useEditorCommand(slot: MaybeRefOrGetter<ChromeSlotId>): UseEditorCommandReturn` takes a slot identifier from the [toolbar slot reference](/docs/customization/toolbar#registered-groups-and-slots), or a ref or getter that returns one. The state follows the slot.
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `execute(value?)` | `boolean` | Runs the slot's command, with a value for value slots. Returns `true` when the engine ran it, and `false` on a refusal. |
+| `isEnabled` | `ComputedRef<boolean>` | Whether the command can run now. |
+| `isActive` | `ComputedRef<boolean>` | Whether a toggle control shows as pressed. |
+| `disabledReason` | `ComputedRef<string \| null>` | A translation key, or the engine's own text, when the command cannot run. |
+| `value` | `ComputedRef<string \| number \| undefined>` | The value a value slot shows, such as a font size or a family. |
+
+The types in these signatures, such as `ChromeSlotId`, `CommandResult`, `EditorSnapshot`, and `PptxEditorInstance`, are exported from `@pptx-editor.dev/vue`. You do not need an import from `@pptx-editor.dev/core` to type your handlers.
+
+## Read state
+
+`useEditorState` returns a read-only shallow ref for one slice of the snapshot. The ref changes only when that slice changes:
+
+```vue
+<script setup lang="ts">
+import { useEditorState } from '@pptx-editor.dev/vue';
+
+const current = useEditorState((s) => s.currentSlide);
+const total = useEditorState((s) => s.slides.length);
+</script>
+
+<template>
+  <span>{{ current + 1 }} / {{ total }}</span>
+</template>
+```
+
+Pass a comparator for an object slice. Common fields include `status`, `slides`, `currentSlide`, `selection`, `format`, `mode`, `canUndo`, `canRedo`, `presentationView`, `lastRejection`, and `lastRemoval`.
+
+Templates unwrap only top-level refs:
+
+| Value | In a template | In script |
+| --- | --- | --- |
+| Top-level or destructured ref, such as `current` | `current` | `current.value` |
+| Ref inside a returned object | `bold.isEnabled.value` | `bold.isEnabled.value` |
+
+| Composable | Return type | Shape |
+| --- | --- | --- |
+| `useEditorState(selector, isEqual?)` | `UseEditorStateReturn<T>` | `Readonly<ShallowRef<T>>`. `isEqual` defaults to `Object.is`. |
+| `usePptxEditor()` | `UsePptxEditorReturn` | `Readonly<ShallowRef<PptxEditorInstance \| null>>`. `null` before the editor mounts and outside a root. |
+| `useEditorColorMode()` | `UseEditorColorModeReturn` | `{ colorMode: ComputedRef<ResolvedColorMode> }`: `'light'` or `'dark'`, after `'system'` resolves. |
+| `useTranslation()` | `UseTranslationReturn` | `{ t: Translate }`. `t` follows the root's `locale`. See [Language](/docs/customization/language). |
+
+### `usePptxEditor`
+
+Use the instance for actions and one-time reads:
+
+```vue
+<script setup lang="ts">
+import { usePptxEditor } from '@pptx-editor.dev/vue';
+
+const props = defineProps<{ upload: (bytes: Uint8Array) => Promise<void> }>();
+const editor = usePptxEditor();
+
+function save() {
+  const saved = editor.value?.save();
+  if (saved) void props.upload(saved);
+}
+</script>
+
+<template>
+  <button :disabled="!editor" @click="save">Save</button>
+</template>
+```
+
+A direct `snapshot()` call does not create a Vue subscription. Use `useEditorState` for values that you render.
+
+## Choose a composable
+
+State members are refs. Function members are plain functions.
+
+### Formatting
+
+| Composable | Return type | Members |
+| --- | --- | --- |
+| `useFontFormat()` | `UseFontFormatReturn` | `format`: `UseEditorStateReturn<FontFormatRead \| null>`. `isEnabled`: `ComputedRef<boolean>`. `apply(update: FontFormatCommand)`: writes the fields as one undo step and returns whether the engine accepted them. |
+| `useParagraphFormat()` | `UseParagraphFormatReturn` | `format`: `UseEditorStateReturn<ParagraphFormatRead \| null>`. `isEnabled`. `apply(update: ParagraphFormatCommand)`: one undo step. |
+| `useBulletFormat()` | `UseBulletFormatReturn` | `format`: `UseEditorStateReturn<BulletFormatRead \| null \| undefined>`; `null` is no list, and `undefined` means the paragraphs differ. `isEnabled`. `apply(format: BulletFormat \| null)`: `null` turns the list off. |
+| `useEditorValueCommand(slot)` | `UseEditorValueCommandReturn<V, S>` | A typed value slot. See [Apply a value](#apply-a-value). |
+
+### Slides and panes
+
+| Composable | Return type | Members |
+| --- | --- | --- |
+| `useSlideLayouts()` | `UseSlideLayoutsReturn` | `UseEditorStateReturn<readonly SlideLayoutSummary[]>`: the deck's slide layouts, in gallery order. |
+| `useNotesPane()` | `UseNotesPaneReturn` | `open`: `ComputedRef<boolean>`. `setOpen(open)` and `toggle()`. |
+| `useSlideshow()` | `UseSlideshowReturn` | `controller`: `Readonly<ShallowRef<SlideshowController \| null>>`. `start('start' \| 'current')` and `stop()`. |
+
+### Dialogs, menus, and notices
+
+| Composable | Return type | Members |
+| --- | --- | --- |
+| `useEditorDialog(key)` | `UseEditorDialogReturn` | `isOpen` and `isAvailable`: `ComputedRef<boolean>`. `open(returnFocusTo?)` and `close()`. `key` is a `PptxEditorDialogKey`. See [Open a dialog from your control](/docs/customization/dialogs#open-a-dialog-from-your-control). |
+| `usePageSetupDialog()`, `useParagraphDialog()`, `useFontDialog()`, `useBulletsAndNumberingDialog()`, `useColumnsDialog()`, `useImageAltTextDialog()`, `useImagePropertiesDialog()` | `UsePageSetupDialogReturn`, `UseParagraphDialogReturn`, and so on: each is `UseDialogReturn<Fields>` | The draft of an open dialog. `values`, `errors`, and `isEnabled` are refs. `setValue(name, value)`, `apply()`, and `cancel()`. Call them inside the dialog. See [Dialog parts and draft state](/docs/customization/dialogs#dialog-parts-and-draft-state). |
+| `useBackgroundDialog()` | `UseBackgroundDialogReturn` | `UseDialogReturn<BackgroundDialogFields>` with `reset()`. |
+| `useContextMenuRequest()` | `UseContextMenuRequestReturn` | `ContextMenuRequest \| null`: the open canvas context menu. Each request mounts the menu anew, so the value is fixed for the menu's life. |
+| `useContextMenuTarget()` | `UseContextMenuTargetReturn` | `HTMLElement \| null`: the element the open context menu opened on. |
+| `useOpenFailure()` | `UseOpenFailureReturn` | `failure`, `message`, and `kept`: computed refs. `dismiss(failure?)`. See [Show a banner or a toast](/docs/customization/layout#show-a-banner-or-a-toast). |
+
+### Fonts
+
+| Composable | Return type | Members |
+| --- | --- | --- |
+| `useFonts(source, ...fragments)` or `useFonts(...origins)` | `UseFontsReturn` | A `MarkedFontResolver` with a stable identity, for the `fonts` prop. Each argument can be a ref or a getter. See [Fonts](/docs/customization/fonts). |
+| `useFontFamily()` | `UseFontFamilyReturn` | `value`, `theme`, `options`, `groups`, `isEnabled`, and `disabledReason`: computed refs. `isCurrent(row)` and `setValue(family)`. As DOCX Editor's composable of the same name. Use it for your own font picker. See [Build the list from `useFontFamily`](/docs/customization/toolbar#build-the-list-from-usefontfamily). |
+
+## Apply a value
+
+`useEditorValueCommand` reads the value of a value slot and applies a new one, with the slot's type from `ToolbarValueMap`. This slider sets the font size:
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { useEditorValueCommand } from '@pptx-editor.dev/vue';
+
+const size = useEditorValueCommand('font.size');
+const error = ref<string | null>(null);
+
+function apply(event: Event) {
+  const result = size.execute(Number((event.target as HTMLInputElement).value));
+  error.value = result.ok ? null : result.reason;
+}
+</script>
+
+<template>
+  <label :title="size.disabledReason.value ?? undefined">
+    {{ size.value.value === null ? 'Mixed' : `${size.value.value} pt` }}
+    <input
+      type="range"
+      min="8"
+      max="96"
+      :value="size.value.value ?? 18"
+      :disabled="!size.isEnabled.value"
+      @input="apply"
+    />
+    <output aria-live="polite">{{ error }}</output>
+  </label>
+</template>
+```
+
+`font.size` takes points, or `{ step: 1 }` and `{ step: -1 }` for one step of the size list. `null` means mixed or unavailable.
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `execute(value, options?)` | `CommandResult` | Runs the command. A refusal gives `ok: false` and the reason, such as `disabled.invalidValue`. |
+| `value` | `ComputedRef<S \| null>` | The value the slot shows, or `null` when mixed or unavailable. |
+| `options` | `ComputedRef<readonly V[]>` | The slot's fixed choices. A slot with a free value has none. |
+| `isEnabled`, `disabledReason` | `ComputedRef<boolean>`, `ComputedRef<string \| null>` | As `useEditorCommand` gives them. |
+
+The two composables return different results from `execute`, as in DOCX Editor: `useEditorCommand` returns a `boolean`, because a toolbar button only needs to know if the command ran, and `useEditorValueCommand` returns the `CommandResult`, because a value control shows why the engine refused a value.
+
+To make the values of one slider drag one undo step, pass `{ historyGroup }` from `editor.value.beginHistoryGroup()`. See [Group a slider or a stepper](/docs/guides/undo-history#group-a-slider-or-a-stepper).
+
+## Limits
+
+- Call composables during `setup()` inside `PptxEditorRoot`. Outside it, `usePptxEditor().value` is `null`.
+- `canUndo` reports undo availability, not unsaved changes. Track saves yourself.
+- Dialog draft composables read a draft. They do not open the dialog; use `useEditorDialog(key)` for that.
+- `disabledReason` can be a translation key. Show it with `translateKeyOrText(t, reason)` from `@pptx-editor.dev/core/editor`.
+
+## See also
+
+- [Vue composition](/docs/vue/composition)
+- [Toolbar](/docs/customization/toolbar)
+- [Undo history](/docs/guides/undo-history)

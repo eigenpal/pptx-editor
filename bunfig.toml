@@ -1,0 +1,11 @@
+[test]
+# Unit tests never read the private corpus. Corpus checks run only through
+# `bun run fidelity:corpus`.
+root = "."
+
+[install]
+# Supply-chain defense, as in DOCX Editor: install only package versions that are at least
+# 7 days old. Compromised releases are almost always yanked within hours.
+minimumReleaseAge = 604800
+# EigenPal's own packages are released and consumed in lockstep.
+minimumReleaseAgeExcludes = ["@docx-editor.dev/fonts", "@docx-editor.dev/fonts-cjk"]

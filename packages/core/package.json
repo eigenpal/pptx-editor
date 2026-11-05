@@ -1,0 +1,82 @@
+{
+  "name": "@pptx-editor.dev/core",
+  "version": "0.0.0",
+  "description": "Framework-agnostic core for PPTX Editor: PresentationML parse and serialize, the canonical document tree, the property cascade, layout, paint, and the Editor contract the adapters render.",
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "engines": {
+    "node": "^20.16.0 || >=22.3.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts.d.ts",
+      "import": "./dist/contracts.js"
+    },
+    "./store": {
+      "types": "./dist/store.d.ts",
+      "import": "./dist/store.js"
+    },
+    "./cascade": {
+      "types": "./dist/cascade.d.ts",
+      "import": "./dist/cascade.js"
+    },
+    "./layout": {
+      "types": "./dist/layout.d.ts",
+      "import": "./dist/layout.js"
+    },
+    "./automation": {
+      "types": "./dist/automation.d.ts",
+      "import": "./dist/automation.js"
+    },
+    "./output": {
+      "types": "./dist/output.d.ts",
+      "import": "./dist/output.js"
+    },
+    "./editor": {
+      "types": "./dist/editor.d.ts",
+      "import": "./dist/editor.js"
+    },
+    "./harfbuzz.wasm": "./dist/harfbuzz.wasm",
+    "./styles/editor.css": "./src/styles/editor.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "licenses",
+    "src/styles",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md",
+    "!dist/metafile-*.json"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "bun check && bun check -p tsconfig.consumer.json",
+    "api:extract": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/core --local",
+    "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/core"
+  },
+  "dependencies": {
+    "@docx-editor.dev/fonts": "^2.34.0",
+    "@pptx-editor.dev/i18n": "^0.0.0",
+    "fast-xml-parser": "^5.10.1",
+    "fflate": "^0.8.2"
+  },
+  "devDependencies": {
+    "@eigenpal/ooxml-core": "workspace:*",
+    "harfbuzzjs": "1.6.4"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eigenpal/pptx-editor.git",
+    "directory": "packages/core"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

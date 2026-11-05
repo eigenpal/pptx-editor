@@ -1,0 +1,20 @@
+{
+  "name": "@eigenpal/ooxml-core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Format-neutral OOXML package layer shared by the EigenPal editors: bounded ZIP and OPC names, the bounded XML reader, string sinks, resource limits, SHA-256, image headers, UAX #29 text units, the DrawingML color transforms, and the DrawingML geometry evaluator. Internal: `@pptx-editor.dev/core` inlines it at build time.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "bun check"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.10.1",
+    "fflate": "^0.8.2"
+  },
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,56 @@
+---
+title: '@pptx-editor.dev/react'
+description: 'Use the React PPTX editor, arrange packaged components, or build custom controls with hooks.'
+category: 'React'
+order: 30
+seoTitle: 'PPTX editor for React'
+---
+
+## Install and mount
+
+Install the adapter, its engine peer, and React:
+
+```bash
+npm install @pptx-editor.dev/react @pptx-editor.dev/core react react-dom
+```
+
+Import the stylesheet once and render `<PptxEditor>` in a container with a height:
+
+```tsx
+import { PptxEditor } from '@pptx-editor.dev/react';
+import '@pptx-editor.dev/react/styles.css';
+
+export default function App({ bytes }: { bytes: Uint8Array }) {
+  return (
+    <div style={{ height: '100vh' }}>
+      <PptxEditor document={bytes} />
+    </div>
+  );
+}
+```
+
+`<PptxEditor>` renders the toolbar, the slide rail, the slide canvas, the speaker notes, the find bar, the notices, the loading sheet, the open-failure notice, and the slide show (F5).
+
+## Choose an API
+
+| Task | API | Guide |
+| --- | --- | --- |
+| Configure the packaged editor | `<PptxEditor>` props and callbacks | [React props](/docs/react/props) |
+| Arrange or replace chrome | `PptxEditor.Root`, `PptxEditor.Viewport`, `PptxEditor.Content`, `PptxEditor.Toolbar`, and the other parts | [React composition](/docs/react/composition) |
+| Build custom controls | `usePptxEditor`, `useEditorState`, `useEditorCommand`, `useEditorValueCommand` | [React hooks](/docs/react/hooks) |
+| Translate the interface | `locale` and `useTranslation` | [Language](/docs/customization/language) |
+| Replace dialogs and popups | `popups` and `definePopup` | [Dialogs](/docs/customization/dialogs) |
+
+## Limits
+
+- The adapter requires React 18 or 19 and one shared copy of `@pptx-editor.dev/core`.
+- Load the stylesheet before you mount an editor, and give the editor's parent a measured height.
+- The editor runs in the browser. On Next.js, load it with `dynamic()` and `ssr: false`. See [Next.js](/docs/frameworks/nextjs).
+- Import components, hooks, and font helpers from the package root. The stylesheet is the only other export.
+- Review and collaboration come from `@pptx-editor.dev/pro` under the EigenPal Pro License.
+
+## Next steps
+
+- [React props](/docs/react/props): configure `<PptxEditor>`.
+- [React composition](/docs/react/composition): arrange the parts yourself.
+- [React hooks](/docs/react/hooks): connect your own controls.

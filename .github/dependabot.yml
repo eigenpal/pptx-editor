@@ -1,0 +1,39 @@
+# Supply-chain defense, as in DOCX Editor (docx-editor/.github/dependabot.yml): a 7-day
+# cooldown before Dependabot opens an update PR. Compromised packages are almost always
+# yanked within hours, well before this window elapses.
+#
+# One grouped PR per week for minor and patch updates of the workspace (the demo is a
+# workspace member, so it is covered). Majors stay ungrouped: they are real upgrade work.
+# Dependabot v2 rejects YAML aliases, so the cooldown is spelled out per entry.
+#
+# The workspace is managed by Bun (`bun.lock`). The `npm` ecosystem cannot update `bun.lock`
+# and fails every security update, so this file uses the `bun` ecosystem. DOCX Editor still
+# uses `npm` with a lockfile-refresh workflow; this is a deliberate difference.
+version: 2
+updates:
+  - package-ecosystem: 'bun'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      library:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+    # As in DOCX Editor: TypeScript majors need a deliberate migration (tsup and
+    # api-extractor load it as a library), not a Dependabot bump.
+    ignore:
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    cooldown:
+      default-days: 7

@@ -1,0 +1,103 @@
+---
+title: 'Introduction'
+description: 'Browser-based WYSIWYG PPTX editor for React and Vue 3, built on the ECMA-376 standard.'
+category: 'Getting started'
+order: 1
+seoTitle: 'Documentation and API reference'
+---
+
+PPTX Editor is a WYSIWYG editor for `.pptx` presentations in React and Vue 3. It reads the package, lays out each slide by the ECMA-376 rules, paints it as SVG, and saves the edited deck in the browser. Editing needs no upload or conversion service.
+
+## Install an editor
+
+Install an adapter and the engine:
+
+<FrameworkTabs>
+<Framework value="react">
+
+```bash
+npm install @pptx-editor.dev/react @pptx-editor.dev/core
+```
+
+</Framework>
+<Framework value="vue">
+
+```bash
+npm install @pptx-editor.dev/vue @pptx-editor.dev/core
+```
+
+</Framework>
+</FrameworkTabs>
+
+Render the editor in a container with a height:
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { PptxEditor } from '@pptx-editor.dev/react';
+import '@pptx-editor.dev/core/styles/editor.css';
+
+export default function App({ bytes }: { bytes: Uint8Array }) {
+  return (
+    <div style={{ height: '100vh' }}>
+      <PptxEditor document={bytes} mode="edit" />
+    </div>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { PptxEditor } from '@pptx-editor.dev/vue';
+import '@pptx-editor.dev/core/styles/editor.css';
+
+defineProps<{ bytes: Uint8Array }>();
+</script>
+
+<template>
+  <div style="height: 100vh">
+    <PptxEditor :document="bytes" mode="edit" />
+  </div>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+To open and save files, continue with the [quickstart](/docs/quickstart).
+
+## Check packages and licenses
+
+| Package | Purpose | License |
+| --- | --- | --- |
+| `@pptx-editor.dev/react` | React adapter: `PptxEditor`, its parts, and hooks | Apache 2.0 |
+| `@pptx-editor.dev/vue` | Vue 3 adapter: `PptxEditor`, its parts, and composables | Apache 2.0 |
+| `@pptx-editor.dev/core` | Framework-independent engine: open, cascade, layout, paint, save, and the editor facade | Apache 2.0 |
+| `@pptx-editor.dev/i18n` | Shared interface strings | Apache 2.0 |
+| [`@pptx-editor.dev/editor-api`](https://github.com/eigenpal/pptx-editor/tree/main/packages/editor-api) | Presentation automation with an Office.js-shaped API | EigenPal Pro License |
+| [`@pptx-editor.dev/pro`](https://github.com/eigenpal/pptx-editor/tree/main/packages/pro) | Review and real-time collaboration as editor modules | EigenPal Pro License |
+| [`@pptx-editor.dev/pptx-to-pdf`](https://github.com/eigenpal/pptx-editor/tree/main/packages/pptx-to-pdf) | PPTX to PDF on Node.js with the editor's own layout | EigenPal Pro License |
+
+All packages release together with one version. You can evaluate the packages under the EigenPal Pro License freely. Production use needs a commercial agreement; see each package's `LICENSE.md`.
+
+## Find a task guide
+
+| Task | Guide |
+| --- | --- |
+| Check feature support and round-trip behavior | [PPTX fidelity](/docs/pptx-fidelity) |
+| Change controls, colors, menus, and dialogs | [Customization](/docs/customization) |
+| Supply your own fonts | [Fonts](/docs/customization/fonts) |
+| Translate the interface | [Language](/docs/customization/language) |
+| Set up Vite or Next.js | [Vite](/docs/frameworks/vite), [Vite with Vue](/docs/frameworks/vite-vue), [Next.js](/docs/frameworks/nextjs) |
+| Use the React adapter | [@pptx-editor.dev/react](/docs/react) |
+| Use the Vue adapter | [@pptx-editor.dev/vue](/docs/vue) |
+| Insert and edit tables | [Tables](/docs/guides/tables) |
+
+## Next steps
+
+- [Quickstart](/docs/quickstart): open, edit, and save a `.pptx`.
+- [Installation](/docs/installation): check requirements, styles, and bundler setup.

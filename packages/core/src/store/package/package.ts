@@ -1,0 +1,406 @@
+// The OPC package: bounded read, part classification, relationships, and save.
+//
+// Pipeline: bytes → readZip (bounded, OPC names normalized) → [Content_Types].xml → each XML
+// part the engine interprets through parseXmlPart (bounded, entity-free) → PptxPackage. Every
+// other part (media, SVG, fonts, embeddings, XML the engine does not read) is carried as bytes
+// and re-emitted byte-identical. Nothing here fetches anything: external relationship targets
+// are recorded, never resolved.
+
+import { readZip, writeZip, DEFAULT_ZIP_LIMITS, type ZipLimits } from '@eigenpal/ooxml-core';
+import {
+  resolveInternalTarget,
+  validateExternalTarget,
+  asciiFold,
+  normalizePartName,
+  partNameKey,
+} from '@eigenpal/ooxml-core';
+import { parseXmlPart, type Element, type XmlPart, type TreeRejection } from './tree.ts';
+import { serializeXmlPart, canonicalFingerprint, bytesFingerprint } from './serialize.ts';
+import { attr, children, elements } from './query.ts';
+import { CONTENT_TYPE, NS, REL } from './namespaces.ts';
+import { repairPresentationRoot } from './presentation-repair.ts';
+import { markFileTimings, repairTimingRoot } from './timing.ts';
+import { sha256FontBytes } from '@eigenpal/ooxml-core';
+
+/** One part of the package. */
+export type PackagePart =
+  | { readonly kind: 'xml'; readonly partName: string; readonly xml: XmlPart }
+  | { readonly kind: 'binary'; readonly partName: string; readonly bytes: Uint8Array };
+
+/** The whole package. Immutable: an edit produces a new package that shares untouched parts. */
+export interface PptxPackage {
+  readonly parts: ReadonlyMap<string, PackagePart>;
+}
+
+/** Why a file was refused. */
+export type PackageRejection =
+  | { readonly reason: 'zip'; readonly detail: string }
+  | { readonly reason: 'no-content-types' }
+  | { readonly reason: 'not-a-presentation' }
+  | { readonly reason: 'xml'; readonly partName: string; readonly detail: TreeRejection }
+  | { readonly reason: 'too-many-parts' };
+
+export type PackageResult =
+  | { readonly ok: true; readonly pkg: PptxPackage }
+  | { readonly ok: false; readonly error: PackageRejection };
+
+export const CONTENT_TYPES_PART = '/[Content_Types].xml';
+const decoder = new TextDecoder('utf-8', { fatal: false });
+
+const PML = 'application/vnd.openxmlformats-officedocument.presentationml.';
+const PPT_MACRO = 'application/vnd.ms-powerpoint.';
+
+/** Content types of the parts the engine cannot work without. They must parse, or the deck is refused. */
+const REQUIRED_TYPES = new Set(
+  [
+    `${PML}presentation.main+xml`,
+    `${PML}slideshow.main+xml`,
+    `${PML}template.main+xml`,
+    `${PPT_MACRO}presentation.macroEnabled.main+xml`,
+    `${PPT_MACRO}slideshow.macroEnabled.main+xml`,
+    `${PPT_MACRO}template.macroEnabled.main+xml`,
+    `${PML}slide+xml`,
+    `${PML}slideLayout+xml`,
+    `${PML}slideMaster+xml`,
+    `${PML}notesSlide+xml`,
+    `${PML}notesMaster+xml`,
+    'application/vnd.openxmlformats-officedocument.theme+xml',
+  ].map(asciiFold)
+);
+
+/** Content types the engine reads but can do without. A part that does not parse is kept as bytes. */
+const OPTIONAL_TYPES = new Set([`${PML}tableStyles+xml`, `${PML}handoutMaster+xml`].map(asciiFold));
+
+/**
+ * How the reader treats a part.
+ *
+ * - `required`: parsed; a part that does not parse refuses the deck.
+ * - `optional`: parsed; a part that does not parse is kept as opaque bytes.
+ * - `binary`: never parsed. This covers media (an SVG is `image/svg+xml`, but the engine draws it
+ *   as a picture and never reads its tree), and every XML part the engine does not interpret, so
+ *   those are re-emitted byte-identical instead of normalized.
+ */
+type PartRole = 'required' | 'optional' | 'binary';
+
+/** The source part of a `.rels` part (`/` for the package), or undefined if the name is not one. */
+function relsSource(partName: string): string | undefined {
+  if (partName === '/_rels/.rels') return '/';
+  const m = /^(.*)\/_rels\/([^/]+)\.rels$/.exec(partName);
+  return m ? `${m[1]}/${m[2]}` : undefined;
+}
+
+function roleByType(partName: string, contentType: string | undefined): PartRole {
+  if (contentType === undefined)
+    // No content type is a broken package; keep the old reading of `.xml` names, but never
+    // let one refuse the deck.
+    return asciiFold(partName).endsWith('.xml') ? 'optional' : 'binary';
+  const type = asciiFold(contentType.trim());
+  if (REQUIRED_TYPES.has(type)) return 'required';
+  if (OPTIONAL_TYPES.has(type)) return 'optional';
+  return 'binary';
+}
+
+function partRole(partName: string, types: ContentTypeIndex): PartRole {
+  if (partName === CONTENT_TYPES_PART) return 'required';
+  if (asciiFold(partName).endsWith('.rels')) {
+    // Relationships are always parsed. Those of the package and of required parts must parse.
+    const source = relsSource(partName);
+    if (source === '/') return 'required';
+    if (source === undefined) return 'optional';
+    return roleByType(source, lookupContentType(types, source)) === 'required'
+      ? 'required'
+      : 'optional';
+  }
+  return roleByType(partName, lookupContentType(types, partName));
+}
+
+function decodeXml(bytes: Uint8Array): string {
+  // UTF-16 parts exist in the wild; honor a BOM. Default UTF-8.
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes);
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(bytes);
+  let text = decoder.decode(bytes);
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+  return text;
+}
+
+/** Read a `.pptx` at the trust boundary. Never throws. */
+export function readPptx(bytes: Uint8Array, limits: ZipLimits = DEFAULT_ZIP_LIMITS): PackageResult {
+  const zip = readZip(bytes, limits);
+  if (!zip.ok) return { ok: false, error: { reason: 'zip', detail: zip.reason } };
+  const ctBytes = zip.entries.get(CONTENT_TYPES_PART);
+  if (!ctBytes) return { ok: false, error: { reason: 'no-content-types' } };
+  const ct = parseXmlPart(CONTENT_TYPES_PART, decodeXml(ctBytes));
+  if (!ct.ok)
+    return { ok: false, error: { reason: 'xml', partName: CONTENT_TYPES_PART, detail: ct.reason } };
+  const types = contentTypeIndex(ct.part);
+  const parts = new Map<string, PackagePart>();
+  for (const [partName, data] of zip.entries) {
+    const role = partRole(partName, types);
+    if (role === 'binary') {
+      parts.set(partName, { kind: 'binary', partName, bytes: data });
+      continue;
+    }
+    const tree = partName === CONTENT_TYPES_PART ? ct : parseXmlPart(partName, decodeXml(data));
+    if (tree.ok) {
+      parts.set(partName, { kind: 'xml', partName, xml: tree.part });
+      if (isSlideRoot(tree.part.root)) markFileTimings(tree.part.root);
+    } else if (role === 'optional') parts.set(partName, { kind: 'binary', partName, bytes: data });
+    else return { ok: false, error: { reason: 'xml', partName, detail: tree.reason } };
+  }
+  const pkg: PptxPackage = { parts };
+  const main = mainPresentationPart(pkg);
+  if (!main || contentTypeOf(pkg, main) !== CONTENT_TYPE.presentation)
+    return { ok: false, error: { reason: 'not-a-presentation' } };
+  return { ok: true, pkg };
+}
+
+/**
+ * Write the package back to `.pptx` bytes. XML parts re-emit normalized; binaries verbatim. The
+ * bytes own an `ArrayBuffer`, so they are a valid `BlobPart` as they are.
+ */
+export function writePptx(pkg: PptxPackage): Uint8Array<ArrayBuffer> {
+  const encoder = new TextEncoder();
+  const entries = new Map<string, Uint8Array>();
+  // [Content_Types].xml first: some readers sniff the first entry.
+  const ordered = [...pkg.parts.values()].sort((a, b) =>
+    a.partName === CONTENT_TYPES_PART ? -1 : b.partName === CONTENT_TYPES_PART ? 1 : 0
+  );
+  // The presentation part leaves with one extension list, one section list, and one slide id
+  // for each slide that has a relationship and a part. A slide whose `p:timing` the session
+  // changed leaves with no empty time node list or build list in it (`repairTimingRoot`).
+  const main = mainPresentationPart(pkg);
+  for (const part of ordered)
+    entries.set(
+      part.partName,
+      part.kind === 'xml'
+        ? encoder.encode(
+            serializeXmlPart(
+              part.partName === main
+                ? { ...part.xml, root: repairedPresentationRoot(pkg) ?? part.xml.root }
+                : isSlideRoot(part.xml.root)
+                  ? { ...part.xml, root: repairTimingRoot(part.xml.root) }
+                  : part.xml
+            )
+          )
+        : part.bytes
+    );
+  const zip = writeZip(entries);
+  // The archive is a fresh allocation, so its buffer is an `ArrayBuffer`; copy if it ever is not.
+  return zip.buffer instanceof ArrayBuffer ? (zip as Uint8Array<ArrayBuffer>) : new Uint8Array(zip);
+}
+
+/**
+ * The relationship ids of the presentation part that are internal and name a part of the
+ * package, each to the part it names: a `p:sldId` whose `r:id` is not one of them names no
+ * slide. A slide that one
+ * collaborator deleted while another moved it can come back in `p:sldIdLst` without its
+ * relationship. The part lookup folds case, as OPC part names do, so a target
+ * that differs only in case stays.
+ */
+function liveRelationshipIds(pkg: PptxPackage, main: string): Map<string, string> {
+  const live = new Map<string, string>();
+  for (const r of relationshipsOf(pkg, main)) {
+    const part = !r.external && r.target ? equivalentPartName(pkg, r.target) : undefined;
+    if (part) live.set(r.id, part);
+  }
+  return live;
+}
+
+const isSlideRoot = (root: Element): boolean => root.ns === NS.p && root.local === 'sld';
+
+const repaired = new WeakMap<PptxPackage, Element | undefined>();
+
+/**
+ * The presentation root as the writer saves it (`repairPresentationRoot`), or undefined
+ * without a presentation part. The root itself when it needs no repair. Memoized per package.
+ * @internal
+ */
+export function repairedPresentationRoot(pkg: PptxPackage): Element | undefined {
+  if (repaired.has(pkg)) return repaired.get(pkg);
+  const main = mainPresentationPart(pkg);
+  const root = main ? xmlPartOf(pkg, main)?.root : undefined;
+  const out =
+    main && root ? repairPresentationRoot(root, liveRelationshipIds(pkg, main)) : undefined;
+  repaired.set(pkg, out);
+  return out;
+}
+
+// The slide id form that the writer's repair compares; `normalizePresentation` uses it too.
+export { canonicalSlideId } from './presentation-repair.ts';
+
+// ---------------------------------------------------------------- content types
+
+interface ContentTypeIndex {
+  readonly defaults: ReadonlyMap<string, string>;
+  readonly overrides: ReadonlyMap<string, string>;
+}
+
+const ctCache = new WeakMap<XmlPart, ContentTypeIndex>();
+
+function contentTypeIndex(part: XmlPart): ContentTypeIndex {
+  const hit = ctCache.get(part);
+  if (hit) return hit;
+  const defaults = new Map<string, string>();
+  const overrides = new Map<string, string>();
+  for (const el of elements(part.root)) {
+    if (el.ns !== NS.ct) continue;
+    const type = attr(el, 'ContentType');
+    if (!type) continue;
+    if (el.local === 'Default') {
+      const ext = attr(el, 'Extension');
+      if (ext) defaults.set(asciiFold(ext), type);
+    } else if (el.local === 'Override') {
+      // `PartName` is a URI, percent-encoded as the ZIP item name is. Decode it the same way,
+      // once, so it matches the canonical part name the reader keys parts by.
+      const name = attr(el, 'PartName');
+      const norm = name ? normalizePartName(name) : undefined;
+      if (norm?.ok) overrides.set(asciiFold(norm.partName), type);
+    }
+  }
+  const index = { defaults, overrides };
+  ctCache.set(part, index);
+  return index;
+}
+
+function lookupContentType(index: ContentTypeIndex, partName: string): string | undefined {
+  const over = index.overrides.get(asciiFold(partName));
+  if (over) return over;
+  const dot = partName.lastIndexOf('.');
+  return dot < 0 ? undefined : index.defaults.get(asciiFold(partName.slice(dot + 1)));
+}
+
+/** The content type of a part, from `[Content_Types].xml`. */
+export function contentTypeOf(pkg: PptxPackage, partName: string): string | undefined {
+  const ct = pkg.parts.get(CONTENT_TYPES_PART);
+  if (!ct || ct.kind !== 'xml') return undefined;
+  return lookupContentType(contentTypeIndex(ct.xml), partName);
+}
+
+// ---------------------------------------------------------------- relationships
+
+/** One relationship, resolved against its source part. */
+export interface Relationship {
+  readonly id: string;
+  readonly type: string;
+  /** Internal: the resolved part name. External: undefined. */
+  readonly target?: string;
+  /** External: the raw URI, retained verbatim and NEVER fetched. */
+  readonly externalTarget?: string;
+  readonly external: boolean;
+}
+
+/** The `.rels` part name for a source part (`/` for the package). */
+export function relsPartName(source: string): string {
+  if (source === '/') return '/_rels/.rels';
+  const slash = source.lastIndexOf('/');
+  return `${source.slice(0, slash)}/_rels/${source.slice(slash + 1)}.rels`;
+}
+
+const relCache = new WeakMap<XmlPart, readonly Relationship[]>();
+
+/** All relationships of a source part. Unsafe or unresolvable targets are dropped. */
+export function relationshipsOf(pkg: PptxPackage, source: string): readonly Relationship[] {
+  const part = pkg.parts.get(relsPartName(source));
+  if (!part || part.kind !== 'xml') return [];
+  const hit = relCache.get(part.xml);
+  if (hit) return hit;
+  const out: Relationship[] = [];
+  const owner = source === '/' ? '/x' : source;
+  for (const el of children(part.xml.root, { ns: NS.rel, local: 'Relationship' })) {
+    const id = attr(el, 'Id');
+    const type = attr(el, 'Type');
+    const target = attr(el, 'Target');
+    if (!id || !type || target === undefined) continue;
+    if (attr(el, 'TargetMode') === 'External') {
+      const ok = validateExternalTarget(target);
+      out.push({ id, type, external: true, ...(ok.ok ? { externalTarget: target } : {}) });
+      continue;
+    }
+    const resolved = resolveInternalTarget(owner, target);
+    if (resolved.ok) out.push({ id, type, target: resolved.partName, external: false });
+  }
+  relCache.set(part.xml, out);
+  return out;
+}
+
+/** The internal target of a relationship id, or undefined. */
+export function relTarget(pkg: PptxPackage, source: string, id: string): string | undefined {
+  const rel = relationshipsOf(pkg, source).find((r) => r.id === id);
+  return rel && !rel.external ? rel.target : undefined;
+}
+
+/** The first internal target of a relationship type. */
+export function relTargetByType(
+  pkg: PptxPackage,
+  source: string,
+  type: string
+): string | undefined {
+  return relationshipsOf(pkg, source).find((r) => r.type === type && !r.external)?.target;
+}
+
+/** `/ppt/presentation.xml` (or wherever the package root points). */
+export function mainPresentationPart(pkg: PptxPackage): string | undefined {
+  return relTargetByType(pkg, '/', REL.officeDocument);
+}
+
+/**
+ * The existing part whose name is OPC-equivalent to `partName` (ASCII case-insensitive), or
+ * undefined. A new part name must not match one: the writer folds case, so `Image1.png` and
+ * `image1.png` are one ZIP entry and a package holding both cannot be saved.
+ */
+export function equivalentPartName(pkg: PptxPackage, partName: string): string | undefined {
+  if (pkg.parts.has(partName)) return partName;
+  const key = partNameKey(partName);
+  for (const name of pkg.parts.keys()) if (partNameKey(name) === key) return name;
+  return undefined;
+}
+
+/** The XML tree of a part, or undefined. */
+export function xmlPartOf(pkg: PptxPackage, partName: string | undefined): XmlPart | undefined {
+  if (!partName) return undefined;
+  const part = pkg.parts.get(partName);
+  return part && part.kind === 'xml' ? part.xml : undefined;
+}
+
+/** The bytes of a binary part, or undefined. */
+export function binaryPartOf(
+  pkg: PptxPackage,
+  partName: string | undefined
+): Uint8Array | undefined {
+  if (!partName) return undefined;
+  const part = pkg.parts.get(partName);
+  return part && part.kind === 'binary' ? part.bytes : undefined;
+}
+
+// ---------------------------------------------------------------- round-trip fingerprints
+
+/**
+ * Per-part canonical fingerprints. XML parts hash their canonical form; binaries hash bytes.
+ * Two packages with the same map are the same document content, however each was written.
+ */
+export function packageFingerprints(pkg: PptxPackage): ReadonlyMap<string, string> {
+  const out = new Map<string, string>();
+  for (const part of [...pkg.parts.values()].sort((a, b) => (a.partName < b.partName ? -1 : 1)))
+    out.set(
+      part.partName,
+      part.kind === 'xml' ? canonicalFingerprint(part.xml) : bytesFingerprint(part.bytes)
+    );
+  return out;
+}
+
+/** One hash over all part fingerprints: the package's canonical fingerprint. */
+export function canonicalPackageFingerprint(pkg: PptxPackage): string {
+  const lines = [...packageFingerprints(pkg)].map(([k, v]) => `${k}\t${v}`).join('\n');
+  return sha256FontBytes(new TextEncoder().encode(lines));
+}
+
+/**
+ * Save, reopen, and fingerprint: the semantic digest. Equal digests before and after a
+ * round trip prove save loses nothing the model carries.
+ */
+export function semanticDigest(pkg: PptxPackage): string {
+  const reopened = readPptx(writePptx(pkg));
+  if (!reopened.ok)
+    throw new Error(`save produced an unreadable package: ${reopened.error.reason}`);
+  return canonicalPackageFingerprint(reopened.pkg);
+}

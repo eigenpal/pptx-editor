@@ -1,0 +1,147 @@
+---
+title: 'Overview'
+description: 'Customize your PPTX editor with CSS themes, React and Vue parts, the toolbar, menus, and dialogs.'
+category: 'Customization'
+---
+
+Customize your PPTX editor to fit your application. Each guide lists the supported options and shows React and Vue reference code. The API has the same shape as DOCX Editor's, so one host can customize both products the same way.
+
+## Live examples
+
+The demo app in [`examples/vite/`](https://github.com/eigenpal/pptx-editor/tree/main/examples/vite) composes these parts into a complete editor. In a checkout of the repository, run `bun install` and `bun run dev`, then open `http://localhost:5274/`.
+
+## Design principles
+
+The PPTX editor separates presentation editing from interface controls. Every part reads the same editor state and runs the same commands as the packaged editor.
+
+Start with the smallest change that fits your application:
+
+- **Appearance:** Set `--doc-*` CSS properties on `.acme-theme .pptx-editor`, where `.acme-theme` is a wrapper around `PptxEditor.Root`. Use `className` and `data-active` or `data-disabled` to style controls. Set `colorMode` for dark controls.
+- **Composition:** Use `PptxEditor.Root`, `.Viewport`, `.Content`, and the panes to arrange the interface. Keep every part inside `Root`.
+- **Individual controls:** Use named parts such as `PptxEditor.Toolbar.Bold`. Replace an icon with `icon`, or supply your own element with `asChild`.
+- **Control sets:** Override a slot in place, use `hidden` to remove it, or set `preset={false}` to compose the toolbar, a menu, or a dialog yourself.
+- **Custom behavior:** Use `useEditorCommand(slotId)` for command state and execution. Use `useEditorState(selector)` for the state your control shows.
+
+Keep the slide selection when you build custom controls: a chrome `mousedown` calls `preventDefault()`, except on inputs, selects, and text areas. Keep labels, keyboard support, and disabled reasons accessible. A disabled control stays focusable with `aria-disabled` and tells the user why it is disabled.
+
+Hiding a control changes the interface only. The operation keeps working from menus, keyboard shortcuts, and the API.
+
+## Customization guides
+
+<Cards>
+  <Card title="Appearance" href="/docs/customization/appearance">
+    Set interface colors, spacing, and dark mode.
+  </Card>
+  <Card title="Layout" href="/docs/customization/layout">
+    Place the toolbar, the menu bar, the slide rail, the notes, and panels.
+  </Card>
+  <Card title="Toolbar" href="/docs/customization/toolbar">
+    Choose controls, replace icons, and add your own buttons.
+  </Card>
+  <Card title="Ribbon" href="/docs/customization/ribbon">
+    Use tabs and contextual tabs, and change each tab with toolbar parts.
+  </Card>
+  <Card title="Menus" href="/docs/customization/menus">
+    Choose menu bar and context menu rows.
+  </Card>
+  <Card title="Dialogs" href="/docs/customization/dialogs">
+    Replace dialog parts, and keep draft state, validation, and focus.
+  </Card>
+  <Card title="Fonts" href="/docs/customization/fonts">
+    Load font bytes, choose font sources, and replace fonts in place.
+  </Card>
+  <Card title="Language" href="/docs/customization/language">
+    Translate the interface with a locale catalog, and translate your own controls.
+  </Card>
+</Cards>
+
+## Choose the API level
+
+| Level | Use |
+| --- | --- |
+| Props and CSS tokens | Change labels, colors, and color mode. |
+| Named parts | Arrange controls and replace selected elements. |
+| Hooks and composables | Connect application controls to editor state and commands. |
+| Modules | Add review or collaboration with [`@pptx-editor.dev/pro`](https://github.com/eigenpal/pptx-editor/tree/main/packages/pro) (EigenPal Pro License). Pass them in the `modules` prop of `PptxEditor` or its root, as in DOCX Editor; the editor reads it once, when it is created. See [Capability modules](/docs/react/props#capability-modules) for an example. |
+
+## React and Vue reference
+
+<FrameworkTabs variant="block">
+<Framework value="react">
+
+```tsx
+import { PptxEditor } from '@pptx-editor.dev/react';
+import '@pptx-editor.dev/core/styles/editor.css';
+
+export function DeckEditor({ bytes }: { bytes: Uint8Array }) {
+  return (
+    <div className="acme-theme">
+      <PptxEditor.Root document={bytes} colorMode="system">
+        <PptxEditor.Viewport className="deck-workspace">
+          <PptxEditor.Menu />
+          <div className="deck-workspace__dock">
+            <PptxEditor.Toolbar />
+          </div>
+          <div className="deck-workspace__body">
+            <PptxEditor.SlideRail />
+            <div className="deck-workspace__main">
+              <PptxEditor.Content />
+              <PptxEditor.FindBar />
+              <PptxEditor.EditNotice />
+              <PptxEditor.FontNotice />
+              <PptxEditor.NotesPane />
+              <PptxEditor.ZoomPill />
+            </div>
+          </div>
+          <PptxEditor.Slideshow />
+        </PptxEditor.Viewport>
+      </PptxEditor.Root>
+    </div>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import {
+  PptxEditorContent,
+  PptxEditorRoot,
+  PptxEditorToolbar,
+  PptxEditorViewport,
+} from '@pptx-editor.dev/vue';
+import '@pptx-editor.dev/core/styles/editor.css';
+
+defineProps<{ bytes: Uint8Array }>();
+</script>
+
+<template>
+  <div class="acme-theme">
+    <PptxEditorRoot :document="bytes" color-mode="system">
+      <PptxEditorViewport class="deck-workspace">
+        <div class="deck-workspace__dock">
+          <PptxEditorToolbar />
+        </div>
+        <div class="deck-workspace__body">
+          <div class="deck-workspace__main">
+            <PptxEditorContent />
+          </div>
+        </div>
+      </PptxEditorViewport>
+    </PptxEditorRoot>
+  </div>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+The `deck-workspace` classes are your own layout CSS. [Workspace layout](/docs/customization/layout#workspace-layout) lists it.
+
+The Vue adapter has the menu bar (`PptxEditorMenu`) and the context menus (`PptxEditorContextMenu`, `RailContextMenu`, `SectionContextMenu`). It has the panes: the slide rail (`PptxEditorSlideRail`), the slide sorter (`PptxEditorSlideSorter`), the notes pane (`PptxEditorNotesPane`), the side panel (`PptxEditorSidePanel`), and the zoom pill (`PptxEditorZoomPill`). It has the find bar (`PptxEditorFindBar`), the slide show (`PptxEditorSlideshow`), the font and edit notices (`PptxEditorFontNotice`, `PptxEditorEditNotice`), and the link popup, which `PptxEditorRoot` hosts. Its toolbar and ribbon draw the same controls as React's; see [Toolbar](/docs/customization/toolbar#react-and-vue-reference). The parity contract (`scripts/parity/parity.contract.json`) maps each React prop and export to its Vue twin.
+
+## More control
+
+See the API reports for [`@pptx-editor.dev/react`](https://github.com/eigenpal/pptx-editor/blob/main/docs/api/react/index.api.md) and [`@pptx-editor.dev/vue`](https://github.com/eigenpal/pptx-editor/blob/main/docs/api/vue/index.api.md) for every part and type.

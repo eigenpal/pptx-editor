@@ -1,0 +1,12 @@
+{
+  // A dedicated project for the generated conformance assertions and the source-compatibility
+  // fixtures. It extends the package project, so the package sources resolve as they do in
+  // `bun run typecheck`. `scripts/__tests__/conformance.test.ts` compiles it offline in
+  // `bun test`.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["type-assert.ts", "generated", "fixtures"],
+  "exclude": ["node_modules"]
+}

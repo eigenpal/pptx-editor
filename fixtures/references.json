@@ -1,0 +1,347 @@
+{
+  "version": 1,
+  "references": {
+    "alignment-anchor": {
+      "deck": "5c43b2f752de22eb4a1c01fa396360e47941531a90c16ebbffc57292d5b45a7d",
+      "pdf": "c00443c1fae7bfa6278ec94be37e1d41a9d8b371bb6befcdf7bd4bc606b97bcf",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "arrange-flip-hidden": {
+      "deck": "6175fd9470ed3176e3429941a29523c84cff2a7a2454b7babe3fab8f645d266a",
+      "pdf": "61d8c49a396825bb6d44663ee654fc137cbbdc3ba7cf89e84c065b39244431ac",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "autofit": {
+      "deck": "6b889cc9dae2f52ae191edfe4ffd6a609aa6fc13d40d9b8fee45c4643e7e69bb",
+      "pdf": "f2fe7305843b608199f3892f5bff1a14f6a2fe54829a21cfa18267b80b755982",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "bullets-gallery": {
+      "deck": "632790424caf23aee1b15fef6cd62387af9c25a0e969938ef8aefe5e07ee5d59",
+      "pdf": "de3e0544eb987cbbc8e4423837d8d62922aafd8159acf440d2cf4657e207c82c",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "bullets-numbering": {
+      "deck": "36f3f6c3f5435e6871e0d33bdf4ac8aafced5f1a9a9b77bd2dd382b037047b62",
+      "pdf": "fdbd87e0efe314b70e215cdb9f544622f5278aab85370a1b25c7f2660d68d720",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "colors": {
+      "deck": "a5d3363222c88b611510fad60ee4a43d31b41c6ef9a4813e1cbdc85f4addb5a9",
+      "pdf": "cc6bd0db67437cdf0be063af3f142d44f88ae242414a3bbfc0186ca476f83d37",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "custom-geometry": {
+      "deck": "6bcb62516a8bfe70829436fb95d2621ed55419ef7e194e29ce12103aad7b2cc4",
+      "pdf": "7038f37efbbe3cdeadc5a95fae6f864002526e87ce6e429e5348c6cdf0938c13",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "east-asian-line-breaking": {
+      "deck": "10df52313129ebf35547f91e63dceba65b260a041377a9468e8c3b0a274cbe80",
+      "pdf": "78dc2f466a2d8f5cfe29abdbefe119a0d443c7dfd182a8e4f3df888af51f0941",
+      "pages": 4,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "effects": {
+      "deck": "8c5cf1a12f640121745089bb92476e6b90670e9f998b12e8f7ce282cb28e80d3",
+      "pdf": "1a22f5167292e44e6fef29396e545a238919f5a92741c411cd7bbeb15c539947",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "fill-fidelity": {
+      "deck": "aee5207d588035b52a75918a4da96e73dd5248172b1a60e358a961a4126a501e",
+      "pdf": "d19fc4836e3cb514e95949c97279f03148686ee06c6dc0b04ac900791b7fe177",
+      "pages": 6,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "fills-lines": {
+      "deck": "6dc9b91945c44d1fa006edf6f582a07bbda76b3131700b30581e3ef757257377",
+      "pdf": "c0d8e411a45d79864a940ba1d42ed852d55690f792cb5945885967668be2214e",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "follow-ups": {
+      "deck": "d1d5031f5f7e4ec8c394f550677f072670a1a47db81c957b7e44da048910524d",
+      "pdf": "c28cc4df0151989b9b4c2779615f48e0ab08425d04f3a59c504d5dcc249cff8c",
+      "pages": 3,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "font-effects": {
+      "deck": "84cc6d7333b3eeda5161dc6dae5bf932fd9a0151412028bae500b1784331cf56",
+      "pdf": "63f827e036cff1eddadb24a72c4973309237089fd346c205d2f128b10f801f97",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "font-substitution": {
+      "deck": "67c8d3da88270891dbcdc4b33b24efcb897d1b8bc6a15d1e1abefac7cbb4cad4",
+      "pdf": "7f8371bf877bb83c56cce1443c69c7f29712d9066ad5f2d2eed6093116527861",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "gradients": {
+      "deck": "79c1d98c56b54b95316a817fa675695fb11c9c513cda15bde2c3387bf0258f69",
+      "pdf": "fcb2132848ede8fa9e1ba5bcdea77d84fc666dbece2e0716617408d976da6a91",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "groups-transforms": {
+      "deck": "ac59f28d52504a20819cda83ea95e19a71be0683d268ef13ea9abe8bee832eb7",
+      "pdf": "6f23179a35d8416fc002b563d00fd8c5ec6133aebd636843e0b6525d15c3942c",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "line-model": {
+      "deck": "c79a0fac587b096f6679405c85ee2dc4dd533a9feed3f24f213ae745f64db0b2",
+      "pdf": "b0660a2a993bc61061ffd0f5d824078f9d39fdcd548668240cecf7f876ed7079",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "lines-arrows": {
+      "deck": "c24a82ba9f9e73b4a069ca564ff51e10209db0fc123b256d67bbfe89830f8130",
+      "pdf": "f9cf07dd7123d292748c2431cc2836e08d36fb88c4882ec295fc04fa5cdc5c69",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "paragraph-format": {
+      "deck": "a3c3fca34a712b24d2296bd402faeb99a0d953368396d1a2e6bcb932b662198b",
+      "pdf": "e69bcf7cf64540281a942d873e1320045b640e6920db23fa8f49dd0e17e64075",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "picture-editing": {
+      "deck": "df5fc5d3e4ff4c1ba5c5747b32b9fae4a4f6be3b28dba33e69d30310463ead29",
+      "pdf": "8957ae4353d6ca0e17f0f9b663ca90ab23a0edf4917559be375ddf18e3cede18",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "pictures": {
+      "deck": "e82b711b0fcab65779f6452cebf5c264dbcd149efcff2006b41296fbddbe0b09",
+      "pdf": "83745ec2790e2310fd3ee1e47e85e993c87e868267c7aa7f8e25034fe963482b",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "placeholders-background": {
+      "deck": "672bfffd27769f97e93009298a387ff18fbce31f23487b1422f8dd3df9fe25a9",
+      "pdf": "2d7af1b4531b197ae6d3de894378c62f72d202ee8752fd2ce703bceb014ec49d",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "preserve-unsupported": {
+      "deck": "1a24c229e288cd4f88318ddd219b1f9a1bb96950ac4337cf1de5c38af378f08a",
+      "pdf": "a31937a22ff39c6e7b822db3c996b2e0f18aadecf7856aa0ea196c1f43e68e88",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "preset-shapes": {
+      "deck": "3f5fa26915d391fd668004c71a7a694de91fdf2f6f68436af4a73952cca1fcc8",
+      "pdf": "62d5cf6d9b94110f3cc3da57f1ac7d7ff77d7541f8edd68a7fa09fc81478b072",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "rtl-text": {
+      "deck": "dba8a3ce3b8fd049a2f65618af33ae1e45b9774262a62f3b7402976996200e26",
+      "pdf": "1a89bd21be5e487ffbadbfebcf66550f0ab59191804afc8783ad7daf7bf5086b",
+      "pages": 4,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "shape-effects-presets": {
+      "deck": "53af0347f46dba3e36d3d210b45d41d148ab4c4789347cf638a1eaec301dc361",
+      "pdf": "7ce13c7c0acf7ddf907c011d9d437d26bf969b28b357905c1ad208b3c2b0d286",
+      "pages": 3,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "shape-styles": {
+      "deck": "ab58c78061aa7f5bff17811a8f58a55832c17f890600ca28c10c315b66a695bb",
+      "pdf": "5ef2fccc89a3ed58fffdbfe9fc5c2ab6658dbecbbde996a3ea21998c0b9f1e0d",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "slide-layouts": {
+      "deck": "19751629ec857744230283eeab8a5293e3668d3bd6b015451e41eb91d9f91ea4",
+      "pdf": "89a51144f3a32f8ae83235ede918373813501765306f4b09c9fcb09e33961ede",
+      "pages": 5,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "slide-size": {
+      "deck": "0c0a9b4ad1f03a179b28ab6a1e2fa762a8e684e3b2f3618a0a7209c4d60b5a7d",
+      "pdf": "f1c602b82274b3157971c9e9d33d2690268df5dab6fb86d62ab3a1b9062b3e55",
+      "pages": 1,
+      "pageSizePt": [
+        842,
+        596
+      ]
+    },
+    "slide-size-rounding": {
+      "deck": "ea16b6445cbd8f449da0cfda0a005a2d7c8f791c605687ba96a8bcc831193792",
+      "pdf": "d96c051cb8f668f114c02692f6be6fbd45c11e0e5a940638a6025d51341dbda6",
+      "pages": 1,
+      "pageSizePt": [
+        400,
+        301
+      ]
+    },
+    "slide-structure": {
+      "deck": "af8d391c04c7eec03ab8236c83eb3396352fdb2ffa05be618038a6bb77f9e7ff",
+      "pdf": "721bf23cfc8a68db19da7ce8caf30830f1c792187db1c0b2c75b60dbd2fc7bdf",
+      "pages": 4,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "spacing": {
+      "deck": "8bca6e8b7eb18c9b82fc0c3f497f2940b0cd19b74a4958adf1ce44e23a4e0113",
+      "pdf": "d070fa532f716fc002f6b929c29202d54815505107fdb4cb407caf8b47a975e5",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "table-editing": {
+      "deck": "000f9804a6b7051e5fb33ef10bdf0647ee1fced7c497ea792d211f324c5eb4a9",
+      "pdf": "38c09cfeca560056e783e7662e1a19cb2bc0fe679e0c857b6671f8b806e74b87",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "tables": {
+      "deck": "03c978f029c33de0a562b4229919b765c20329717d3fe0f2a9dbc3fd6745d83c",
+      "pdf": "35382d1973d9d9b029f7b52ba0f99c8da159d2dca8d37a42c7c269f25cc64209",
+      "pages": 3,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "text-direction": {
+      "deck": "2f1a8d27f33d89bab12391a8183b8a0883c3ad636b1961d138d16a9f51ac1ed0",
+      "pdf": "ca15434cee66c7e38ef9f6e3b58ff9359580cac7ddc10614da9982237040fc78",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "text-runs": {
+      "deck": "ba940c0105f91599cbb9f0959c2123e0906261d15380a52623f2d8822c811af1",
+      "pdf": "69228ad3c2e9344995409bf1b6ecf3b6aba31302b93b96d2e3532f467577efaf",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "vertical-columns": {
+      "deck": "20d2556e3f78200674a3e8d70931cf25b0501664544a72ae9e80b2e71bd0f3ed",
+      "pdf": "ccf1450275d33392f7a81cf6bbed1e8065a8ca9e7514b7af8a518e774c85c63b",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "vertical-east-asian": {
+      "deck": "5a199740f6660ae110aaa61489f13681888fd13b88d2ae69dc4db706ed1f77fa",
+      "pdf": "5d7d2f4bddf019c4ce25c7c62cbefb20cb76b47ffc809cc9c974f393d45f48a8",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    }
+  }
+}

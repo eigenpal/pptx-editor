@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["vite/client"],
+    "jsx": "preserve",
+    "jsxImportSource": "vue",
+    "paths": {
+      "@pptx-editor.dev/core": ["../../packages/core/src/index.ts"],
+      "@pptx-editor.dev/core/*": ["../../packages/core/src/*/index.ts"],
+      "@pptx-editor.dev/vue": ["../../packages/vue/src/index.ts"],
+      "@pptx-editor.dev/i18n": ["../../packages/i18n/src/index.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}

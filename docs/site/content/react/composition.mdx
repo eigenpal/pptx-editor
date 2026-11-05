@@ -1,0 +1,191 @@
+---
+title: 'Composition'
+description: 'Build a custom React PPTX editor from the root, the viewport, the content, and compound parts.'
+category: 'React'
+order: 32
+---
+
+`<PptxEditor>` is a packaged arrangement of public components. Compose those components yourself when you need a different layout or your own controls.
+
+## Compose an editor
+
+This example mounts a toolbar, the slide rail, the canvas, and the notes in a bounded column:
+
+```tsx
+import { PptxEditor } from '@pptx-editor.dev/react';
+import '@pptx-editor.dev/react/styles.css';
+
+export function DeckEditor({ bytes }: { bytes: Uint8Array }) {
+  return (
+    <div style={{ height: '100vh' }}>
+      <PptxEditor.Root document={bytes}>
+        <PptxEditor.Viewport className="deck-workspace">
+          <PptxEditor.Toolbar />
+          <div className="deck-workspace__body">
+            <PptxEditor.SlideRail />
+            <div className="deck-workspace__main">
+              <PptxEditor.Content />
+              <PptxEditor.FindBar />
+              <PptxEditor.EditNotice />
+              <PptxEditor.FontNotice />
+              <PptxEditor.Loading overlay />
+              <PptxEditor.OpenFailure />
+              <PptxEditor.NotesPane />
+            </div>
+          </div>
+          <PptxEditor.Slideshow />
+        </PptxEditor.Viewport>
+      </PptxEditor.Root>
+    </div>
+  );
+}
+```
+
+| Requirement | Why |
+| --- | --- |
+| `PptxEditor.Root` | Owns the editor instance. It renders no element, so its children sit in your layout. |
+| `PptxEditor.Viewport` | The styling scope. It carries `.pptx-editor`, and `dark` with a dark color mode. Put every part inside it. |
+| `PptxEditor.Content` | The slide canvas and its context menu. |
+| Editor stylesheet | Styles the viewport and the packaged parts. Import it once. |
+| Bounded height | Gives the canvas room. Use `min-height: 0` on each flex level between the container and the canvas. |
+| Positioned main column | The find bar, the notices, the loading sheet, and the zoom pill use absolute positions. Give their parent `position: relative`. |
+
+For the CSS of this arrangement, see [Workspace layout](/docs/customization/layout#workspace-layout).
+
+## Reach the editor from a parent
+
+Components inside the root call [`usePptxEditor()`](/docs/react/hooks#read-state). A parent component that renders the root reads the editor through a `ref`:
+
+```tsx
+import { useRef } from 'react';
+import { PptxEditor, type PptxEditorRef } from '@pptx-editor.dev/react';
+
+export function DeckEditor({ bytes }: { bytes: Uint8Array }) {
+  const editorRef = useRef<PptxEditorRef>(null);
+  return (
+    <>
+      <button onClick={() => editorRef.current?.focus()}>Back to slide</button>
+      <PptxEditor.Root ref={editorRef} document={bytes}>
+        <PptxEditor.Viewport>
+          <PptxEditor.Content />
+        </PptxEditor.Viewport>
+      </PptxEditor.Root>
+    </>
+  );
+}
+```
+
+For each member, see [Use the ref](/docs/react/props#use-the-ref). You can also keep the instance from `onReady`.
+
+## Choose optional components
+
+Mount only the parts that your layout needs. An omitted part renders no interface.
+
+| Part | Purpose | Owner guide |
+| --- | --- | --- |
+| `PptxEditor.Toolbar`, `PptxEditor.Ribbon`, `PptxEditor.Menu` | The flat toolbar, the tabbed ribbon, and the menu bar | [Toolbar](/docs/customization/toolbar), [Ribbon](/docs/customization/ribbon), [Menus](/docs/customization/menus) |
+| `PptxEditor.SlideRail`, `PptxEditor.SlideSorter` | The slide thumbnails, and the Slide Sorter view | [Layout](/docs/customization/layout) |
+| `PptxEditor.NotesPane` | The speaker notes of the current slide | [Pane configuration](/docs/customization/layout#pane-configuration) |
+| `PptxEditor.SidePanel` | The **Format** panel | [Layout](/docs/customization/layout) |
+| `PptxEditor.ZoomPill`, `PptxEditor.StatusBar` | A floating zoom control, and a status row | [Status bar](/docs/customization/ribbon#status-bar) |
+| `PptxEditor.FindBar` | Find and replace. Without it, Find and Replace stay disabled with a reason. | [Layout](/docs/customization/layout) |
+| `PptxEditor.Slideshow` | The slide show. Mount it once inside the viewport. | [Layout](/docs/customization/layout) |
+| `PptxEditor.Loading` | The loading sheet, shown while a deck opens | [Layout](/docs/customization/layout) |
+| `PptxEditor.OpenFailure` | The notice for a file that does not open | [Open failure](/docs/customization/layout#open-failure) |
+| `PptxEditor.FontNotice`, `PptxEditor.EditNotice` | Substituted fonts, and the reason the last edit was refused | [Fonts](/docs/customization/fonts) |
+| `PptxEditor.PageSetupDialog`, `PptxEditor.ParagraphDialog`, and the other dialogs | Dialogs that the `popups` registry mounts, or that you mount | [Dialogs](/docs/customization/dialogs) |
+
+The canvas context menu (`PptxEditor.ContextMenu`) renders through `popups.contextMenu`. See [Dialogs](/docs/customization/dialogs).
+
+## Override a component
+
+A named child replaces the matching control in the preset. `hidden` removes it, and `asChild` renders the control as your element:
+
+```tsx
+<PptxEditor.Toolbar>
+  <PptxEditor.Toolbar.Bold asChild>
+    <MyButton variant="ghost">Bold</MyButton>
+  </PptxEditor.Toolbar.Bold>
+  <PptxEditor.Toolbar.Highlight hidden />
+</PptxEditor.Toolbar>
+```
+
+`asChild` passes the label, the state attributes, and the click handler to one child element. A group whose controls are all hidden disappears with its separator.
+
+### Custom toolbar
+
+Set `preset={false}` to render only the parts that you list, in order:
+
+```tsx
+<PptxEditor.Toolbar preset={false} className="my-toolbar">
+  <PptxEditor.Toolbar.Undo />
+  <PptxEditor.Toolbar.Redo />
+  <PptxEditor.Toolbar.Separator />
+  <PptxEditor.Toolbar.FontFamily />
+  <PptxEditor.Toolbar.Bold />
+  <PptxEditor.Toolbar.BulletList />
+</PptxEditor.Toolbar>
+```
+
+Each part reads its enabled state, its active state, and its command from the engine. For `Toolbar.Group`, `Toolbar.Slot`, and `Toolbar.Action`, and for every slot identifier, see [Toolbar](/docs/customization/toolbar).
+
+### Compose the font picker
+
+`PptxEditor.Toolbar.FontFamily` is a compound part, as in DOCX Editor. `FontFamily.Trigger` is the button, `FontFamily.Content` is the list, and `FontFamily.Item` is one family:
+
+```tsx
+<PptxEditor.Toolbar>
+  <PptxEditor.Toolbar.FontFamily>
+    <PptxEditor.Toolbar.FontFamily.Trigger className="my-font-trigger" />
+    <PptxEditor.Toolbar.FontFamily.Content>
+      <PptxEditor.Toolbar.FontFamily.Item value="Calibri" />
+      <PptxEditor.Toolbar.FontFamily.Item value="Georgia" />
+    </PptxEditor.Toolbar.FontFamily.Content>
+  </PptxEditor.Toolbar.FontFamily>
+</PptxEditor.Toolbar>
+```
+
+To fill the list or build a picker from nothing, use `useFontFamily()`: `value` is the current family, `groups` and `options` are the families to offer, `isCurrent(row)` marks the current one, and `setValue(family)` applies one. See [Build the list from `useFontFamily`](/docs/customization/toolbar#build-the-list-from-usefontfamily).
+
+## Control lifetime and focus
+
+`PptxEditor.Root` creates one instance for its life. This table shows how each prop behaves after a change:
+
+| Prop | Type | Behavior |
+| --- | --- | --- |
+| `document` | `Uint8Array` | A new array opens the new deck in the same instance. |
+| `mode` | `'edit' \| 'view'` | Updates in place. |
+| `fonts` | `EditorFontsOption` | Replaces the fonts in place. The deck, the selection, and the undo history stay. |
+| `fontFamilies` | `readonly string[]` | Read when the instance is created. |
+| `locale` | `LocaleCatalog` | Updates the strings and repaints the canvas once. Follows the catalog's content, not its identity. |
+| `colorMode` | `'light' \| 'dark' \| 'system'` | Updates the chrome theme. |
+| `popups` | `PptxEditorPopups` | Updates the dialogs that the root mounts. |
+| `onReady`, `onChange`, `onFontError` | Callbacks | Read at each call, so a new function takes effect without a remount. |
+
+A `mousedown` that reaches the slide moves the selection. Prevent it on your own chrome, but not on form fields:
+
+```tsx
+function keepSelection(event: React.MouseEvent) {
+  const tag = (event.target as HTMLElement).tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+  event.preventDefault();
+}
+
+<div onMouseDown={keepSelection}>{/* Your toolbar */}</div>;
+```
+
+Packaged chrome already applies this rule.
+
+## Limits
+
+- Every part must render inside `PptxEditor.Root`. Outside it, `usePptxEditor()` returns `null`.
+- Render one `PptxEditor.NotesPane` in each root. A second one keeps its own state and prints a development warning.
+- In the Slide Sorter view, render `PptxEditor.SlideSorter` in place of the rail, the canvas, and the notes. See [Switch between Normal and Slide Sorter](/docs/customization/layout#switch-between-normal-and-slide-sorter).
+- `asChild` requires exactly one child element. A picker refuses `asChild` and `icon` with a development warning.
+- Theme the chrome with `--doc-*` tokens. The slide canvas always shows the deck's own colors. See [Appearance](/docs/customization/appearance).
+
+## See also
+
+- [React hooks](/docs/react/hooks)
+- [React props](/docs/react/props)
+- [Vite](/docs/frameworks/vite)

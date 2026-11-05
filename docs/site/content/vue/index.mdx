@@ -1,0 +1,59 @@
+---
+title: '@pptx-editor.dev/vue'
+description: 'Use the Vue 3 PPTX editor, arrange packaged components, or build custom controls with composables.'
+category: 'Vue'
+order: 35
+seoTitle: 'PPTX editor for Vue 3'
+---
+
+## Install and mount
+
+Install the adapter, its engine peer, and Vue 3:
+
+```bash
+npm install @pptx-editor.dev/vue @pptx-editor.dev/core vue
+```
+
+Import the stylesheet once and render `<PptxEditor>` in a container with a height:
+
+```vue
+<script setup lang="ts">
+import { PptxEditor } from '@pptx-editor.dev/vue';
+import '@pptx-editor.dev/vue/styles.css';
+
+defineProps<{ bytes: Uint8Array }>();
+</script>
+
+<template>
+  <div style="height: 100vh">
+    <PptxEditor :document="bytes" />
+  </div>
+</template>
+```
+
+`<PptxEditor>` renders the toolbar, the slide rail, the slide canvas, the speaker notes, the find bar, the notices, the loading sheet, the open-failure notice, and the slide show (F5). It draws the same markup, classes, and ARIA as the React adapter.
+
+## Choose an API
+
+| Task | API | Guide |
+| --- | --- | --- |
+| Configure the packaged editor | `<PptxEditor>` props, events, slots, and `PptxEditorRef` | [Vue props](/docs/vue/props) |
+| Arrange or replace chrome | `PptxEditorRoot`, `PptxEditorViewport`, `PptxEditorContent`, `PptxEditorToolbar`, and the other parts | [Vue composition](/docs/vue/composition) |
+| Build custom controls | `usePptxEditor`, `useEditorState`, `useEditorCommand`, `useEditorValueCommand` | [Vue composables](/docs/vue/composables) |
+| Translate the interface | `locale` and `useTranslation` | [Language](/docs/customization/language) |
+| Replace dialogs and popups | `popups` and `definePopup` | [Dialogs](/docs/customization/dialogs) |
+
+## Limits
+
+- The adapter requires Vue 3.3 or later and one shared copy of `@pptx-editor.dev/core`.
+- Load the stylesheet before you mount an editor, and give the editor's parent a measured height.
+- The editor runs in the browser. A server-rendered application must render it on the client only.
+- Import components, composables, and font helpers from the package root. The stylesheet is the only other export.
+- Each part is exported as `PptxEditor<Part>`, such as `PptxEditorToolbar`, and is also a static of `PptxEditor`, such as `PptxEditor.Toolbar`. Both names are the same component.
+- Review and collaboration come from `@pptx-editor.dev/pro` under the EigenPal Pro License.
+
+## Next steps
+
+- [Vue props](/docs/vue/props): configure `<PptxEditor>` and its ref.
+- [Vue composition](/docs/vue/composition): arrange the parts yourself.
+- [Vue composables](/docs/vue/composables): connect your own controls.

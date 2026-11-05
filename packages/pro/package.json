@@ -1,0 +1,46 @@
+{
+  "name": "@pptx-editor.dev/pro",
+  "version": "0.0.0",
+  "description": "Commercial capabilities for PPTX Editor, as EditorModules: the review module (comments and suggestions) and realtime collaboration.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE.md",
+    "THIRD_PARTY_NOTICES.md",
+    "!dist/metafile-*.json"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "bun check",
+    "api:extract": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/pro --local",
+    "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/pro"
+  },
+  "peerDependencies": {
+    "@pptx-editor.dev/core": "0.x"
+  },
+  "devDependencies": {
+    "@pptx-editor.dev/core": "workspace:*"
+  },
+  "license": "LicenseRef-EigenPal-Pro-Evaluation-1.0",
+  "dependencies": {
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.32"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eigenpal/pptx-editor.git",
+    "directory": "packages/pro"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

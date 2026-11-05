@@ -1,0 +1,865 @@
+/* The chat example: the editor stylesheet, then the chat. The chat has its own tokens; the
+   deck panel sits inside `PptxEditor.Viewport` and uses the editor's `--doc-*` tokens. */
+@import '@pptx-editor.dev/core/styles/editor.css';
+
+:root {
+  /* Warm paper with an indigo accent. */
+  --c-bg: #f7f6f3;
+  --c-surface: #ffffff;
+  --c-tint: #efede8;
+  --c-text: #1c1b1a;
+  --c-muted: #6b6862;
+  --c-border: #e4e1da;
+  --c-border-strong: #cdc9c0;
+  --c-accent: #4f46e5;
+  --c-accent-soft: rgb(79 70 229 / 0.14);
+  --c-on-accent: #ffffff;
+  --c-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.14);
+  /* Strong curves: ease-out for what enters, the drawer curve for the panel. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --panel-in: 340ms;
+  --panel-out: 240ms;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-bg: #141416;
+    --c-surface: #1d1d20;
+    --c-tint: #232327;
+    --c-text: #ecebe8;
+    --c-muted: #a3a1a8;
+    --c-border: #2e2e33;
+    --c-border-strong: #45454c;
+    --c-accent: #8b85ff;
+    --c-accent-soft: rgb(139 133 255 / 0.18);
+    --c-on-accent: #14122b;
+    --c-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  }
+}
+
+body {
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* ============================================================================
+ * SHELL: chat | spacer, and the panel over the spacer
+ * The panel keeps its width while it slides, so the editor does not re-fit on every frame;
+ * only the spacer's width moves, and the chat reflows beside it.
+ * ============================================================================ */
+
+.shell {
+  position: relative;
+  display: flex;
+  height: 100%;
+  /* `clip`, not `hidden`: nothing inside (a focus, a scroll into view) can scroll the shell
+     sideways and show the closed panel's edge. */
+  overflow: clip;
+}
+.shell[data-resizing] {
+  cursor: col-resize;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.shell__chat {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  transition: opacity 180ms ease;
+}
+.shell[data-open][data-expanded] .shell__chat {
+  opacity: 0;
+}
+
+.shell__spacer {
+  flex: none;
+  width: 0;
+  transition: width var(--panel-out) var(--ease-drawer);
+}
+.shell[data-open] .shell__spacer {
+  width: var(--panel-w);
+  transition-duration: var(--panel-in);
+}
+
+.shell__panel {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 2;
+  display: flex;
+  width: var(--panel-w);
+  box-shadow:
+    -1px 0 0 var(--c-border),
+    -24px 0 48px -32px rgb(0 0 0 / 0.25);
+  transform: translateX(100%);
+  visibility: hidden;
+  /* Closing is quicker than opening: the user already decided. */
+  transition:
+    transform var(--panel-out) var(--ease-drawer),
+    width var(--panel-out) var(--ease-drawer),
+    visibility 0s linear var(--panel-out);
+}
+.shell[data-open] .shell__panel {
+  transform: none;
+  visibility: visible;
+  transition:
+    transform var(--panel-in) var(--ease-drawer),
+    width var(--panel-in) var(--ease-drawer),
+    visibility 0s;
+}
+/* A drag follows the pointer with no lag. */
+.shell[data-resizing] .shell__spacer,
+.shell[data-resizing] .shell__panel {
+  transition: none;
+}
+
+/* The divider: a wide, invisible grip on the panel's edge, and a pill that shows on hover. */
+.shell__handle {
+  position: absolute;
+  inset: 0 auto 0 -6px;
+  z-index: 10;
+  width: 12px;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+.shell__handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: 4px;
+  height: 44px;
+  border-radius: 2px;
+  background: var(--c-border-strong);
+  opacity: 0;
+  transform: translateY(-50%) scaleY(0.8);
+  transition:
+    opacity 150ms ease,
+    transform 200ms var(--ease-out),
+    background-color 150ms ease;
+}
+.shell__handle:focus-visible::after,
+.shell[data-resizing] .shell__handle::after {
+  opacity: 1;
+  transform: translateY(-50%);
+  background: var(--c-text);
+}
+@media (hover: hover) and (pointer: fine) {
+  .shell__handle:hover::after {
+    opacity: 1;
+    transform: translateY(-50%);
+  }
+}
+
+/* A phone: the panel is a sheet over the whole window, from the bottom. */
+.shell[data-sheet] .shell__handle {
+  display: none;
+}
+.shell[data-sheet] .shell__spacer {
+  width: 0;
+}
+.shell[data-sheet] .shell__panel {
+  transform: translateY(100%);
+  box-shadow: none;
+}
+.shell[data-sheet][data-open] .shell__panel {
+  transform: none;
+}
+
+/* ============================================================================
+ * CHAT
+ * ============================================================================ */
+
+.chat-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+  padding: 0 16px 0 20px;
+  border-bottom: 1px solid var(--c-border);
+  font-size: 14px;
+}
+.chat-head__brand {
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.chat-head__sep {
+  color: var(--c-border-strong);
+}
+.chat-head__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-muted);
+}
+.chat-head__new {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+  padding: 6px 10px;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  background: var(--c-surface);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    transform 160ms var(--ease-out);
+}
+.chat-head__new svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+.chat-head__new:active {
+  transform: scale(0.97);
+}
+.chat-head__new:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The assistant's mark, used in the thread and on the first screen. */
+.brand-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+}
+.brand-mark svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+.brand-mark[data-busy] svg {
+  animation: breathe 1.2s ease-in-out infinite;
+}
+
+.thread {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.thread__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 20px 20px 24px;
+}
+
+/* Every message reads from the left with its sender's name; the user's sit on a tint. */
+.msg {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 15px;
+  line-height: 1.6;
+  animation: rise 240ms var(--ease-out) backwards;
+}
+.msg--user {
+  background: var(--c-tint);
+}
+.msg__avatar--user {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--c-surface);
+  box-shadow: inset 0 0 0 1px var(--c-border);
+  font-size: 12px;
+  font-weight: 600;
+}
+.msg__content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.msg__name {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+.msg__text {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* "Building your deck": a light runs across the words while the assistant works. */
+.msg__thinking {
+  background: linear-gradient(
+      90deg,
+      var(--c-muted) 0%,
+      var(--c-muted) 40%,
+      var(--c-text) 50%,
+      var(--c-muted) 60%,
+      var(--c-muted) 100%
+    )
+    0 0 / 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shine 1.6s linear infinite;
+}
+
+/* The deck card: the live first slide on top, the name and Open under it. */
+.card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 380px;
+  margin-top: 12px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  border-radius: 14px;
+  background: var(--c-surface);
+  text-align: start;
+  cursor: pointer;
+  animation: rise 320ms var(--ease-out) backwards;
+  transition:
+    border-color 150ms ease,
+    box-shadow 200ms ease,
+    transform 160ms var(--ease-out);
+}
+.card:active {
+  transform: scale(0.985);
+}
+.card:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+.card[data-open] {
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+.card__thumb {
+  width: 100%;
+  background: var(--c-tint);
+  border-bottom: 1px solid var(--c-border);
+}
+.card__thumb svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.card__thumb:not([data-ready]) {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.card__foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 14px;
+}
+.card__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.card__title {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card__meta {
+  font-size: 12.5px;
+  color: var(--c-muted);
+  font-variant-numeric: tabular-nums;
+}
+.card__cta {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+  font-size: 13px;
+  font-weight: 500;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+.card[data-open] .card__cta {
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    border-color: var(--c-border-strong);
+    box-shadow: var(--c-shadow);
+  }
+  .card[data-open]:hover {
+    border-color: var(--c-accent);
+  }
+}
+
+/* The first screen of a new chat: the mark, a question, and three ideas to start from. */
+.empty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 560px;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 24px;
+}
+.empty__title {
+  margin: 12px 0 0;
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  animation: rise 360ms var(--ease-out) backwards;
+}
+.empty__lead {
+  margin: 0 0 16px;
+  color: var(--c-muted);
+  font-size: 15px;
+}
+.empty__ideas {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--c-border);
+  border-radius: 14px;
+  background: var(--c-surface);
+  overflow: hidden;
+}
+.idea {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0;
+  background: none;
+  font-size: 14px;
+  text-align: start;
+  cursor: pointer;
+  animation: rise 360ms var(--ease-out) backwards;
+  transition: background-color 150ms ease;
+}
+.idea + .idea {
+  border-top: 1px solid var(--c-border);
+}
+.idea__text {
+  flex: 1 1 auto;
+}
+.idea svg {
+  width: 18px;
+  height: 18px;
+  fill: var(--c-muted);
+  transition: transform 160ms var(--ease-out);
+}
+.idea:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: -2px;
+}
+.idea:active {
+  background: var(--c-tint);
+}
+@media (hover: hover) and (pointer: fine) {
+  .idea:hover {
+    background: var(--c-tint);
+  }
+  .idea:hover svg {
+    transform: translateX(2px);
+  }
+}
+
+.composer {
+  flex: none;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 20px 12px;
+}
+.composer__box {
+  border: 1px solid var(--c-border);
+  border-radius: 14px;
+  background: var(--c-surface);
+  box-shadow: var(--c-shadow);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+.composer__box:focus-within {
+  border-color: var(--c-accent);
+  box-shadow:
+    0 0 0 3px var(--c-accent-soft),
+    var(--c-shadow);
+}
+.composer__input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 48px;
+  max-height: 200px;
+  padding: 12px 14px 4px;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  line-height: 24px;
+  field-sizing: content;
+}
+.composer__input::placeholder {
+  color: var(--c-muted);
+}
+.composer__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px 8px 14px;
+}
+.composer__hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--c-muted);
+}
+.composer__send {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    opacity 150ms ease,
+    transform 160ms var(--ease-out);
+}
+.composer__send svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+.composer__send:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.composer__send:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.composer__send:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+.composer__note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--c-muted);
+  text-align: center;
+}
+
+/* A narrow chat beside the panel keeps its text, with less margin. */
+@container (max-width: 560px) {
+  .thread__inner {
+    padding: 12px 10px 16px;
+  }
+  .composer {
+    padding: 0 10px 10px;
+  }
+  .composer__hint,
+  .chat-head__new-label {
+    display: none;
+  }
+  .composer__bar {
+    justify-content: flex-end;
+  }
+}
+
+/* ============================================================================
+ * DECK PANEL (inside PptxEditor.Viewport: editor tokens)
+ * ============================================================================ */
+
+.deck {
+  container: deck / inline-size;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  background: var(--doc-bg);
+  color: var(--doc-text);
+}
+.deck__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 8px 0 14px;
+}
+.deck__glyph {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--doc-primary);
+  color: var(--doc-primary-foreground, #fff);
+}
+.deck__glyph svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.deck__title {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.25;
+}
+.deck__name {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.deck__meta {
+  font-size: 12px;
+  color: var(--doc-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.deck__edited {
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.deck__edited[data-shown] {
+  opacity: 1;
+}
+.deck__actions {
+  display: flex;
+  gap: 2px;
+}
+.chat-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--doc-text-muted, currentColor);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    transform 160ms var(--ease-out);
+}
+.chat-icon-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+.chat-icon-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.chat-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.chat-icon-btn:focus-visible {
+  outline: 2px solid var(--doc-focus-ring);
+  outline-offset: -2px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .chat-icon-btn:hover:not(:disabled) {
+    background: var(--doc-bg-hover);
+    color: var(--doc-text);
+  }
+}
+.deck__dock {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 10px 8px;
+}
+.deck__dock .pptx-toolbar {
+  max-width: 100%;
+}
+
+/* The workspace: the rail layout when wide, the stacked layout beside a chat. */
+.deck-ws {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.deck-ws[data-mode='wide'] {
+  padding-left: 12px;
+}
+.deck-ws__main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+.deck-ws__canvas {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.deck-ws__canvas[hidden] {
+  display: none;
+}
+/* A narrow panel: smaller thumbnails, and no move buttons (Ctrl+Left and Ctrl+Right still
+   move slides), so more slides fit in the row. */
+@container deck (max-width: 560px) {
+  .deck-ws__rail {
+    --pptx-rail-thumb-width: 88px;
+  }
+  .deck-ws__rail .pptx-rail__move {
+    display: none;
+  }
+  /* Five actions left: three over two, not four over one. */
+  .deck-ws__rail[data-orientation] .pptx-rail__actions {
+    grid-template-columns: repeat(3, auto);
+  }
+}
+/* Stacked: the slide asks for the height that fits the width (an inline `flex-basis`), the
+   rail keeps its own height, and the open notes take the rest. A short panel shrinks the
+   slide, not the notes; with the notes closed, the slide takes the spare height. */
+.deck-ws[data-mode='stacked'] .deck-ws__canvas {
+  flex-grow: 0;
+  flex-shrink: 1;
+  min-height: 160px;
+}
+.deck-ws[data-mode='stacked']:has(.deck-ws__notes[data-open='false']) .deck-ws__canvas {
+  flex-grow: 1;
+}
+.deck-ws__rail {
+  margin: 0 12px 10px;
+}
+.deck-ws[data-mode='stacked'] .deck-ws__notes[data-open='true'] {
+  flex: 1 0 128px;
+  min-height: 0;
+}
+.deck-ws[data-mode='stacked'] .deck-ws__notes[data-open='true'] .pptx-notes__text {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 40px;
+  margin-bottom: 10px;
+}
+
+/* ============================================================================
+ * MOTION
+ * ============================================================================ */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes shine {
+  to {
+    background-position: -150% 0;
+  }
+}
+@keyframes breathe {
+  50% {
+    transform: scale(0.82);
+    opacity: 0.6;
+  }
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Reduced motion: the panel fades in place, and nothing moves. Fades stay. */
+@media (prefers-reduced-motion: reduce) {
+  .shell__panel,
+  .shell[data-sheet] .shell__panel {
+    transform: none;
+    opacity: 0;
+    transition:
+      opacity 200ms ease,
+      visibility 0s linear 200ms;
+  }
+  .shell[data-open] .shell__panel {
+    opacity: 1;
+    transition:
+      opacity 200ms ease,
+      visibility 0s;
+  }
+  .shell__spacer {
+    transition: none;
+  }
+  .msg,
+  .card,
+  .idea,
+  .empty__title {
+    animation-name: fade;
+  }
+  .brand-mark[data-busy] svg,
+  .msg__thinking {
+    animation: none;
+  }
+  .msg__thinking {
+    color: var(--c-muted);
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}

@@ -1,0 +1,42 @@
+---
+title: 'Show the editor beside a chat'
+description: 'Put the PPTX editor in a panel next to a chat, with a layout for a tall panel.'
+category: 'Guides'
+---
+
+A panel beside a chat is taller than it is wide, and a slide is wider than it is tall. Stack the parts so the slide gets the full width, and connect the chat to the deck through one root. The [chat example](https://github.com/eigenpal/pptx-editor/tree/main/examples/chat) shows the result.
+
+## Use one root
+
+Wrap the chat and the panel in one `PptxEditor.Root`. Put `PptxEditor.Viewport` around the panel only, so the editor styles stay in it:
+
+```tsx
+<PptxEditor.Root document={bytes}>
+  <Chat />
+  <aside className="deck-panel">
+    <PptxEditor.Viewport>
+      <PptxEditor.Toolbar />
+      <div className="deck-workspace">
+        <PptxEditor.Content />
+        <PptxEditor.SlideRail orientation="horizontal" />
+        <PptxEditor.NotesPane />
+      </div>
+      <PptxEditor.Slideshow />
+    </PptxEditor.Viewport>
+  </aside>
+</PptxEditor.Root>
+```
+
+The horizontal rail sits under the slide and leaves the width to it. See [Horizontal slide rail](/docs/customization/layout#horizontal-slide-rail).
+
+## Connect the chat
+
+Inside the root, the chat reads and drives the deck:
+
+| Task | Call |
+| --- | --- |
+| Show a slide in a message | `editor.renderThumbnail(index, element)` |
+| Go to a slide | `editor.goToSlide(index)` |
+| Present | `useSlideshow().start('current')` |
+| Download | `editor.save()` |
+| Tell the model where the user is | `editor.snapshot().currentSlide` |

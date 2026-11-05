@@ -1,0 +1,189 @@
+---
+title: 'Hooks'
+description: 'Connect React controls to PPTX editor state and commands with hooks.'
+category: 'React'
+order: 33
+---
+
+Call these hooks from components inside `PptxEditor.Root`. The packaged `<PptxEditor>` provides that root for its `children`.
+
+## Connect a command button
+
+This button runs a toolbar command and shows why the command cannot run:
+
+```tsx
+import { useEditorCommand, useTranslation } from '@pptx-editor.dev/react';
+import { translateKeyOrText } from '@pptx-editor.dev/core/editor';
+
+export function BoldButton() {
+  const bold = useEditorCommand('text.bold');
+  const { t } = useTranslation();
+  const reason = bold.disabledReason;
+  return (
+    <button
+      type="button"
+      aria-disabled={!bold.isEnabled || undefined}
+      aria-pressed={bold.isActive}
+      title={reason ? translateKeyOrText(t, reason) : t('toolbar.bold')}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => bold.execute()}
+    >
+      B
+    </button>
+  );
+}
+```
+
+`useEditorCommand(slot: ChromeSlotId): UseEditorCommandReturn` takes a slot identifier from the [toolbar slot reference](/docs/customization/toolbar#registered-groups-and-slots).
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `execute(value?)` | `boolean` | Runs the slot's command, with a value for value slots. Returns `true` when the engine ran it, and `false` on a refusal. |
+| `isEnabled` | `boolean` | Whether the command can run now. |
+| `isActive` | `boolean` | Whether a toggle control shows as pressed. |
+| `disabledReason` | `string \| null` | A translation key, or the engine's own text, when the command cannot run. |
+| `value` | `string \| number \| undefined` | The value a value slot shows, such as a font size or a family. |
+
+The types in these signatures, such as `ChromeSlotId`, `CommandResult`, `EditorSnapshot`, and `PptxEditorInstance`, are exported from `@pptx-editor.dev/react`. You do not need an import from `@pptx-editor.dev/core` to type your handlers.
+
+## Read state
+
+`useEditorState(selector, isEqual?)` returns one slice of the editor snapshot. The component renders again only when the slice changes:
+
+```tsx
+import { useEditorState } from '@pptx-editor.dev/react';
+
+export function SlideCounter() {
+  const current = useEditorState((s) => s.currentSlide);
+  const total = useEditorState((s) => s.slides.length);
+  return (
+    <span>
+      {current + 1} / {total}
+    </span>
+  );
+}
+```
+
+Pass a comparator for an object slice. Common fields include `status`, `slides`, `currentSlide`, `selection`, `format`, `mode`, `canUndo`, `canRedo`, `presentationView`, and `lastRejection`.
+
+| Hook | Returns | Notes |
+| --- | --- | --- |
+| `useEditorState(selector, isEqual?)` | `T` | The selected snapshot value. `isEqual` defaults to `Object.is`. |
+| `usePptxEditor()` | `PptxEditorInstance \| null` | `null` before the editor mounts and outside a root. |
+| `useEditorColorMode()` | `{ colorMode: ResolvedColorMode }` | `'light'` or `'dark'`, after `'system'` resolves. |
+| `useTranslation()` | `{ t: Translate }` | The translator for the root's `locale`. See [Language](/docs/customization/language). |
+
+### `usePptxEditor`
+
+Use the instance for actions and one-time reads:
+
+```tsx
+import { usePptxEditor } from '@pptx-editor.dev/react';
+
+export function SaveButton({ upload }: { upload: (bytes: Uint8Array) => Promise<void> }) {
+  const editor = usePptxEditor();
+  return (
+    <button
+      disabled={!editor}
+      onClick={() => {
+        const saved = editor?.save();
+        if (saved) void upload(saved);
+      }}
+    >
+      Save
+    </button>
+  );
+}
+```
+
+A direct `snapshot()` call does not subscribe the component. Use `useEditorState` for values that you render.
+
+## Choose a hook
+
+### Formatting
+
+| Hook | Returns |
+| --- | --- |
+| `useFontFormat()` | `format`: the font of the selection, or `null`. `isEnabled`. `apply(update)` writes the fields as one undo step. |
+| `useParagraphFormat()` | `format`: the paragraph formatting of the selection, or `null`. `isEnabled`. `apply(update)` writes the fields as one undo step. |
+| `useBulletFormat()` | `format`: the bullet format, `null` for no list, or `undefined` when the paragraphs differ. `isEnabled`. `apply(format)` writes it, and `apply(null)` turns the list off. |
+| `useEditorValueCommand(slot)` | A typed value slot. See [Apply a value](#apply-a-value). |
+
+### Slides and panes
+
+| Hook | Returns |
+| --- | --- |
+| `useSlideLayouts()` | The deck's slide layouts (`SlideLayoutSummary[]`), in gallery order. See [Build a layout picker](/docs/customization/toolbar#build-a-layout-picker). |
+| `useNotesPane()` | `open`, `setOpen(open)`, and `toggle()` for the notes pane of the root. |
+| `useSlideshow()` | `controller` (or `null` while no show runs), `start('start' \| 'current')`, and `stop()`. |
+
+### Dialogs, menus, and notices
+
+| Hook | Returns |
+| --- | --- |
+| `useEditorDialog(key)` | `isOpen`, `isAvailable`, `open(returnFocusTo?)`, and `close()` for a dialog of the `popups` registry. See [Open a dialog from your control](/docs/customization/dialogs#open-a-dialog-from-your-control). |
+| `usePageSetupDialog()`, `useBackgroundDialog()`, `useParagraphDialog()`, `useFontDialog()`, `useBulletsAndNumberingDialog()`, `useColumnsDialog()`, `useImageAltTextDialog()`, `useImagePropertiesDialog()` | The draft of an open dialog: `values`, `errors`, `isEnabled`, `setValue(name, value)`, `apply()`, and `cancel()`. `useBackgroundDialog()` adds `reset()`. Call them inside the dialog. See [Dialog parts and draft state](/docs/customization/dialogs#dialog-parts-and-draft-state). |
+| `useContextMenuRequest()` | The open canvas context menu request, or `null`. |
+| `useContextMenuTarget()` | The element the open context menu opened on, or `null`. |
+| `useOpenFailure()` | `failure`, `message`, `kept`, and `dismiss()` for a file that did not open. See [Show a banner or a toast](/docs/customization/layout#show-a-banner-or-a-toast). |
+
+### Fonts
+
+| Hook | Returns |
+| --- | --- |
+| `useFonts(source, ...fragments)` or `useFonts(...origins)` | A font resolver with a stable identity, for the `fonts` prop. See [Fonts](/docs/customization/fonts). |
+| `useFontFamily()` | `UseFontFamilyReturn`: `value`, `theme`, `options`, `groups`, `isCurrent(row)`, `setValue(family)`, `isEnabled`, and `disabledReason`, as DOCX Editor's hook of the same name. Use it for your own font picker. See [Build the list from `useFontFamily`](/docs/customization/toolbar#build-the-list-from-usefontfamily). |
+
+## Apply a value
+
+`useEditorValueCommand(slot)` reads the value of a value slot and applies a new one, with the slot's type from `ToolbarValueMap`. This slider sets the font size:
+
+```tsx
+import { useEditorValueCommand } from '@pptx-editor.dev/react';
+
+export function FontSizeSlider() {
+  const size = useEditorValueCommand('font.size');
+  return (
+    <label>
+      {size.value === null ? 'Mixed' : `${size.value} pt`}
+      <input
+        type="range"
+        min={8}
+        max={96}
+        value={size.value ?? 18}
+        disabled={!size.isEnabled}
+        onChange={(event) => {
+          const result = size.execute(Number(event.target.value));
+          if (!result.ok) console.info(result.reason);
+        }}
+      />
+    </label>
+  );
+}
+```
+
+`font.size` takes points, or `{ step: 1 }` and `{ step: -1 }` for one step of the size list. `null` means mixed or unavailable.
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `execute(value, options?)` | `CommandResult` | Runs the command. A refusal gives `ok: false` and the reason, such as `disabled.invalidValue`. |
+| `value` | `S \| null` | The value the slot shows, or `null` when mixed or unavailable. |
+| `options` | `readonly V[]` | The slot's fixed choices. A slot with a free value has none. |
+| `isEnabled`, `disabledReason` | `boolean`, `string \| null` | As `useEditorCommand` gives them. |
+
+The two hooks return different results from `execute`, as in DOCX Editor: `useEditorCommand` returns a `boolean`, because a toolbar button only needs to know if the command ran, and `useEditorValueCommand` returns the `CommandResult`, because a value control shows why the engine refused a value.
+
+To make the values of one slider drag one undo step, pass `{ historyGroup }` from `editor.beginHistoryGroup()`. See [Group a slider or a stepper](/docs/guides/undo-history#group-a-slider-or-a-stepper).
+
+## Limits
+
+- Call hooks inside `PptxEditor.Root`. Outside it, `usePptxEditor()` returns `null`.
+- `canUndo` reports undo availability, not unsaved changes. Track saves yourself.
+- Dialog draft hooks read a draft. They do not open the dialog; use `useEditorDialog(key)` for that.
+- `disabledReason` can be a translation key. Show it with `translateKeyOrText(t, reason)` from `@pptx-editor.dev/core/editor`.
+
+## See also
+
+- [React composition](/docs/react/composition)
+- [Toolbar](/docs/customization/toolbar)
+- [Undo history](/docs/guides/undo-history)

@@ -1,0 +1,577 @@
+---
+title: 'Dialogs'
+description: 'Customize PPTX editor dialogs and popups with named parts, application renderers, draft state, validation, and CSS tokens.'
+category: 'Customization'
+---
+
+Register a component with `definePopup()`. Pass the map through `popups` on `PptxEditor.Root`.
+
+Forward session props to the packaged dialog. Replace named parts with `className`, `hidden`, or `asChild`. Use `preset={false}` only for a complete arrangement.
+
+Keep a title, error region, OK (`Apply`) action, and Cancel action. Draft hooks provide values, validation, and actions. OK applies the draft: the Background, Font, Paragraph, Bullets and Numbering, Columns, Alt Text, and Format Picture dialogs commit it as one undo step, and the Page setup dialog runs no command and reports the appearance through `onThemeChange`. Cancel discards the draft.
+
+Popup entries cover page setup, the slide background, the Font, Paragraph, Bullets and Numbering, and Columns dialogs, picture alt text, Format Picture, links, find and replace, and the context menus.
+
+## Dialog and popup configuration reference
+
+Use the popup registry to choose automatic renderers. Use named dialog parts to change presentation while you keep the existing draft controller.
+
+### Popup registry keys
+
+| Key | Surface |
+| --- | --- |
+| `pageSetup` | Slide size, appearance, and fonts. |
+| `background` | The slide background: color, gradient, or picture, for this slide or all slides. |
+| `font` | The Font dialog (**Format > Font…**, **Character Spacing > More Spacing…**, and the text context menu): font, style, size, underline, effects, character spacing, and kerning. |
+| `bulletsAndNumbering` | The Bullets and Numbering dialog (**Format > Bullets and numbering…** and the last row of the Bullets and Numbering galleries): the bullet or number style, size, color, and start number. |
+| `imageAltText` | The alt text of the selected object: description, title, and **Mark as decorative**. |
+| `imageProperties` | Format Picture: the size, rotation, and crop of the selected picture. |
+| `columns` | The Columns dialog (**Format > Columns…** and **Columns > More columns…**): the column count and the spacing between columns. |
+| `paragraph` | The Paragraph dialog (**Format > Paragraph…**, **Line Spacing > Line Spacing Options…**, and the text context menu): alignment, indents, spacing, and line spacing. |
+| `hyperlink` | The link popup (Ctrl+K or Cmd+K, the toolbar's link control, **Insert > Link…**). |
+| `find` | The find and replace bar, where `PptxEditor.FindBar` stands. |
+| `contextMenu` | The slide canvas's context menu. |
+| `railContextMenu` | The slide menu of the slide rail and the slide sorter. |
+| `sectionContextMenu` | The section header menu of the slide rail and the slide sorter. |
+
+A `false` entry turns off automatic rendering for that key. It does not turn off the operation: `setLink`, `editor.find`, `setSlideBackground`, `setFontFormat`, `setParagraphFormat`, `setBulletFormat`, `setColumns`, `setAltText`, and `setImageProperties` keep working from the API. `useEditorCommand('image.altText').execute(description)` also sets the description with the popup off. The toolbar control or menu row that opens the surface stays visible, disabled with a reason, such as "Links are turned off in this editor". One exception: a row inside a toolbar dropdown that opens a dialog, such as **Line Spacing Options…**, **More Spacing…**, **Bullets and numbering…** in a gallery, or **More columns…**, is left out of the dropdown, because a disabled row there has no use and the other rows still work. When you replace an input popup, give your users another way to reach its operation.
+
+Open a modal dialog from your own control with `useEditorDialog('pageSetup').open()`, `useEditorDialog('background').open()`, `useEditorDialog('font').open()`, `useEditorDialog('paragraph').open()`, `useEditorDialog('bulletsAndNumbering').open()`, `useEditorDialog('columns').open()`, `useEditorDialog('imageAltText').open()`, or `useEditorDialog('imageProperties').open()`. `isAvailable` is `false` when the entry is `false`.
+
+### The link popup
+
+`PptxEditor.Root` hosts the link popup, so it opens with no toolbar on the page. It has two modes:
+
+- **Reading.** A click into linked text opens a small panel under the caret: the target, **Copy**, **Edit**, and **Remove link**. The caret keeps the keyboard, so typing goes on. Press F6 to move focus into the panel. A screen reader hears the link when the panel opens. The panel closes when the caret moves. In a read-only editor the panel shows the target and **Copy** only.
+- **Editing.** Ctrl+K or Cmd+K, the link control, **Insert > Link…**, and **Edit** open the URL field with **Apply** and **Cancel**. For an existing link, the panel also shows the target and **Copy**.
+
+The packaged popup is `PptxEditor.HyperLink`, with named parts on the toolbar's customization steps:
+
+| Part | Mode | What it is |
+| --- | --- | --- |
+| `HyperLink.Url` | Both | The target. A safe link opens in a new tab; any other shows as text. In editing mode it shows for an existing link. |
+| `HyperLink.Copy` | Both | Copies the safe target. Takes `icon`. In editing mode it shows for an existing link. |
+| `HyperLink.Edit`, `HyperLink.Unlink` | Reading | Icon actions. Each takes `icon`. `Unlink` also shows in editing mode for an existing link. |
+| `HyperLink.Fields` | Editing | The URL field. Enter applies. |
+| `HyperLink.Error` | Both | Why the engine refused the last change. |
+| `HyperLink.Apply`, `HyperLink.Cancel` | Editing | Text buttons. |
+
+Every part takes `className`, `asChild`, and `hidden`. A part that you pass as a child replaces the default copy of that part. `preset={false}` renders only your children. The panel carries `data-mode="reading"` or `data-mode="editing"` for your CSS. The display text is not a field: a link applies to the selected text, or to the word at the caret.
+
+`useHyperlinkPopup()` returns the state (`mode`, `url`, `href`, `draft`, `error`, `copied`, `canEdit`) and the actions (`open`, `openAtCaret`, `close`, `copy`, `openTarget`, `beginEdit`, `setUrl`, `commitEdit`, `unlink`), for a panel of your own. It has the shape of DOCX Editor's hook, with these differences: there is no `setText`, because the link applies to the text as it stands, and `error` is the reason text, not a boolean. `open(link, anchor)` takes the same arguments as DOCX Editor's, but the panel always shows the link at the caret: `open(null)` opens the URL field, and `open()` opens the link at the caret, or the URL field when there is none. Call the hook in a part of the panel or in a `popups.hyperlink` renderer.
+
+Render your panel from `popups.hyperlink`. A renderer opens for the URL field only. To show reading mode too, register it with `definePopup(YourPanel, { reading: true })`: a click into linked text then renders it with `mode: 'reading'`. The renderer also receives `HyperlinkPopupProps`:
+
+| Prop | Value |
+| --- | --- |
+| `anchor` | The element the popup opens under: the caret after a click, else the element the request came from, the visible toolbar link button, the open menu bar trigger, or the slide. |
+| `url` | The link of the selection, or an empty string. |
+| `mode` | `reading` or `editing`. `reading` only for a renderer registered with `{ reading: true }`. |
+| `onClose` | Closes the popup. Apply the link with `editor.exec({ type: 'setLink', url })`. |
+| `className` | A class name for the popup panel. Forward it when you render `HyperlinkPopup`, the packaged popup with its default parts. |
+
+```tsx
+function AcmeLink() {
+  return (
+    <PptxEditor.HyperLink className="acme-link">
+      <PptxEditor.HyperLink.Copy hidden />
+      <PptxEditor.HyperLink.Unlink icon={<TrashIcon />} />
+    </PptxEditor.HyperLink>
+  );
+}
+
+const popups: PptxEditorPopups = { hyperlink: definePopup(AcmeLink, { reading: true }) };
+```
+
+In Vue, use `PptxEditorHyperLink` with the same parts and `useHyperlinkPopup()`. An action's glyph goes in its `icon` slot.
+
+### Dialog parts and draft state
+
+Packaged dialogs expose `Header`, `Title`, `Body`, `Footer`, `Field`, `Error`, `Apply`, and `Cancel`. The Background dialog also exposes `Reset`, which picks the layout's background.
+
+| Configuration | How it works |
+| --- | --- |
+| Root `className`, `style` | Styles the dialog surface. |
+| Root `preset` | Defaults to `true`; `false` renders your arrangement. |
+| Part `className`, `style` | Adds presentation to a named part. |
+| Part `hidden` | Removes that part. |
+| Part `asChild` | Applies the part's wiring to one child, without the packaged classes. |
+| `Field name` | Names the field to replace or hide: a section, or one field in it. |
+| Field children | Replace the field's content. On one field (a single input), they replace the whole field; read and write the draft with the dialog's hook. `asChild` does not apply to one field and prints a development warning. |
+| Part `id`, `title`, `aria-label`, `data-*` | Reach the rendered element. |
+
+The part's own wiring wins over conflicting props: a stray `onClick` cannot detach Apply from the dialog.
+
+The draft hooks (`usePageSetupDialog`, `useBackgroundDialog`, `useFontDialog`, `useParagraphDialog`, `useBulletsAndNumberingDialog`, `useColumnsDialog`, `useImageAltTextDialog`, `useImagePropertiesDialog`) return `values`, `setValue`, `errors`, `isEnabled`, `apply`, and `cancel` (and `reset` for Background). `errors` holds translated messages, one for each field. Call them inside the dialog, for your own fields. Apply validates and commits the draft; a refusal keeps the dialog open with the engine's reason in the `Error` part. The draft rules live in core (`createDialogDraft`), so the React and Vue dialogs commit the same way.
+
+### Page setup fields
+
+| Field | Value |
+| --- | --- |
+| `slideSize` | The slide size, read-only in this version. |
+| `theme` | The appearance (`light` or `dark`), shown with `onThemeChange`. Apply it yourself through `colorMode` on `PptxEditor.Root`. |
+| `fonts` | The embedded fonts, read-only. |
+| `substitutes` | The substituted fonts, read-only. |
+
+### Background fields
+
+| Field                          | Value                                  |
+| ------------------------------ | -------------------------------------- |
+| `solid`, `gradient`, `picture` | Write the draft's `background` value.  |
+| `allSlides`                    | Applies the background to every slide. |
+
+### Paragraph fields
+
+The Paragraph dialog reads the selected paragraphs. A field that the paragraphs disagree on shows "Mixed" and stays as it is unless you change it. OK writes only the fields that changed, as one `setParagraphFormat` command. A section and each field in it are `Field` parts, so you can hide one field or the whole section.
+
+| Section | Fields | Value |
+| --- | --- | --- |
+| `general` | `alignment` | Left, centered, right, justified, or distributed. |
+| `indentation` | `indentLeft`, `special`, `specialBy` | The text indent before the text, and the first-line or hanging indent, in inches. |
+| `spacing` | `spaceBefore`, `spaceAfter` | The space before and after, in points or lines. Each field holds its unit list. |
+| `spacing` | `lineRule`, `lineAt` | Line spacing: single, 1.5 lines, double, exactly (points), or multiple. |
+
+### Font fields
+
+The Font dialog has two tabs, Font and Character Spacing, and reads the selected text. A field that the text disagrees on shows "Mixed" or a cleared box. OK writes only the fields that changed, as one `setFontFormat` command. Each field is a `Field` part, and so are the two sections of the Font tab.
+
+| Section or tab | Fields | Value |
+| --- | --- | --- |
+| Font tab | `fontFamily`, `style`, `size` | The Latin font, the style (regular, italic, bold, bold italic), and the size in points. |
+| `allText` | `color`, `underline`, `underlineColor` | The font color, the underline style, and the underline color. |
+| `effects` | `strike`, `doubleStrike`, `superscript`, `subscript`, `offset`, `smallCaps`, `allCaps` | The effects. `offset` is the superscript or subscript offset in percent. |
+| Character Spacing tab | `spacing`, `by`, `kerning`, `kerningAt` | Character spacing (normal, expanded, condensed) by points, and kerning from a font size. |
+
+### Bullets and numbering fields
+
+The dialog has a Bulleted tab and a Numbered tab, and opens on the tab of the gallery it came from. OK sends one `setBulletFormat` command for the selected paragraphs. A tab and each field on it are `Field` parts.
+
+| Tab | Fields | Value |
+| --- | --- | --- |
+| `bullet` | `style`, `char`, `font`, `sizePercent`, `color` | The bullet from the gallery, or your own character in a font, its size in percent of the text (25 to 400), and its color. A symbol font's character also shows as its Unicode twin at the end of the box. The swatch button beside a color field shows the color and opens the color grid (theme tints and shades, standard colors). |
+| `number` | `numberStyle`, `numberSizePercent`, `numberColor`, `startAt` | The numbering scheme, its size and color, and the start number (1 to 32767). |
+
+### Columns fields
+
+| Field     | Value                                 |
+| --------- | ------------------------------------- |
+| `columns` | Both fields.                          |
+| `count`   | The number of columns, 1 to 16.       |
+| `spacing` | The space between columns, in inches. |
+
+### Alt Text fields
+
+| Field | Value |
+| --- | --- |
+| `description` | The text a screen reader reads (`p:cNvPr/@descr`), up to 4,000 characters. Off while the object is decorative. |
+| `title` | The title (`p:cNvPr/@title`). |
+| `decorative` | **Mark as decorative**: a screen reader skips the object, and the description is removed. |
+
+OK sends only the fields you changed, as one `setAltText` command.
+
+### Format Picture fields
+
+| Field | Value |
+| --- | --- |
+| `size` | Height and width in inches, as the picture shows on the slide, and **Lock aspect ratio**. Off with a note when the picture is locked against resizing. |
+| `rotation` | The rotation in degrees, clockwise. |
+| `crop` | The crop of each edge in percent of the image; a negative value adds space. Off with a note when the picture is locked against cropping. |
+
+OK sends only the values you changed, as one `setImageProperties` command. The draft fields are `width`, `height`, `lockAspect`, `rotation`, `cropLeft`, `cropTop`, `cropRight`, and `cropBottom`.
+
+### Dialog styling
+
+Dialogs render outside `PptxEditor.Viewport`. Each dialog element carries `.pptx-dialog` and its own `.pptx-editor` scope, and `dark` with a dark color mode. Scope your theme on an element around `PptxEditor.Root`, or pass a `className` through the renderer. See [Appearance](/docs/customization/appearance#size-typography-and-layer-reference) for the dialog tokens.
+
+### Popup lifetime
+
+Keep the renderer's session props (`open` and `onClose`) when you wrap a popup. A dialog belongs to the document it opened on: it closes when the editor opens another document, so a draft never edits the replacement. The Alt Text and Format Picture dialogs also belong to the object they opened on: they close when the selection moves to another object or the object is removed. The dialog unmounts when it closes, so the next opening starts from the document again. The packaged dialog surface keeps focus inside, closes on Escape, and returns focus to the element that opened it. A separate application modal must keep those behaviors.
+
+## React and Vue reference
+
+<FrameworkTabs variant="block">
+<Framework value="react">
+
+```tsx
+import { useState } from 'react';
+import { HyperlinkPopup, PptxEditor, type PptxEditorPopups } from '@pptx-editor.dev/react';
+
+export function DeckEditor({ bytes }: { bytes: Uint8Array }) {
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const popups: PptxEditorPopups = {
+    pageSetup: (props) => (
+      <PptxEditor.PageSetupDialog {...props} theme={theme} onThemeChange={setTheme}>
+        <PptxEditor.PageSetupDialog.Field name="substitutes" hidden />
+        <PptxEditor.PageSetupDialog.Apply className="acme-primary" />
+      </PptxEditor.PageSetupDialog>
+    ),
+    background: (props) => (
+      <PptxEditor.BackgroundDialog {...props}>
+        <PptxEditor.BackgroundDialog.Field name="picture" hidden />
+      </PptxEditor.BackgroundDialog>
+    ),
+    font: (props) => (
+      <PptxEditor.FontDialog {...props}>
+        <PptxEditor.FontDialog.Field name="kerningAt" hidden />
+      </PptxEditor.FontDialog>
+    ),
+    columns: (props) => (
+      <PptxEditor.ColumnsDialog {...props}>
+        <PptxEditor.ColumnsDialog.Field name="spacing" className="acme-spacing" />
+      </PptxEditor.ColumnsDialog>
+    ),
+    bulletsAndNumbering: (props) => (
+      <PptxEditor.BulletsAndNumberingDialog {...props}>
+        <PptxEditor.BulletsAndNumberingDialog.Field name="startAt" hidden />
+      </PptxEditor.BulletsAndNumberingDialog>
+    ),
+    paragraph: (props) => (
+      <PptxEditor.ParagraphDialog {...props}>
+        <PptxEditor.ParagraphDialog.Field name="indentation" hidden />
+        <PptxEditor.ParagraphDialog.Field name="lineAt" className="acme-line-at" />
+      </PptxEditor.ParagraphDialog>
+    ),
+    imageAltText: (props) => (
+      <PptxEditor.ImageAltTextDialog {...props}>
+        <PptxEditor.ImageAltTextDialog.Field name="title" hidden />
+      </PptxEditor.ImageAltTextDialog>
+    ),
+    imageProperties: (props) => (
+      <PptxEditor.ImagePropertiesDialog {...props}>
+        <PptxEditor.ImagePropertiesDialog.Field name="rotation" hidden />
+      </PptxEditor.ImagePropertiesDialog>
+    ),
+    hyperlink: (props) => <HyperlinkPopup {...props} className="acme-link" />,
+    find: false,
+  };
+  return (
+    <PptxEditor.Root document={bytes} popups={popups} colorMode={theme}>
+      <PptxEditor.Viewport>
+        <PptxEditor.Content />
+      </PptxEditor.Viewport>
+    </PptxEditor.Root>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { h } from 'vue';
+import {
+  ImageAltTextDialog,
+  ImagePropertiesDialog,
+  PageSetupDialog,
+  PptxEditorContent,
+  PptxEditorRoot,
+  PptxEditorToolbar,
+  PptxEditorViewport,
+  type PptxEditorPopups,
+} from '@pptx-editor.dev/vue';
+import '@pptx-editor.dev/core/styles/editor.css';
+
+defineProps<{ bytes: Uint8Array }>();
+
+const popups: PptxEditorPopups = {
+  pageSetup: (props) =>
+    h(PageSetupDialog, props, () => [
+      h(PageSetupDialog.Field, { name: 'substitutes', hidden: true }),
+    ]),
+  imageAltText: (props) =>
+    h(ImageAltTextDialog, props, () => [
+      h(ImageAltTextDialog.Field, { name: 'title', hidden: true }),
+    ]),
+  imageProperties: (props) =>
+    h(ImagePropertiesDialog, props, () => [
+      h(ImagePropertiesDialog.Field, { name: 'rotation', hidden: true }),
+    ]),
+};
+</script>
+
+<template>
+  <PptxEditorRoot :document="bytes" :popups="popups">
+    <PptxEditorViewport>
+      <PptxEditorToolbar />
+      <PptxEditorContent />
+    </PptxEditorViewport>
+  </PptxEditorRoot>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+The Vue adapter has the registry with `pageSetup`, `background`, `font`, `paragraph`, `bulletsAndNumbering`, `columns`, `imageAltText`, `imageProperties`, `hyperlink`, `find`, `contextMenu`, `railContextMenu`, and `sectionContextMenu`, and the packaged Page setup, Background, Font, Paragraph, Bullets and Numbering, Columns, Alt Text, and Format Picture dialogs, link popup (`HyperlinkPopup`), and find bar (`PptxEditorFindBar`). Each dialog has the same named parts as its React twin, and a registry entry receives `open` and `onClose`. Vue also has `useFontFormat`, `useParagraphFormat`, and `useBulletFormat` for your own dialogs. The Vue toolbar draws the controls that open the picture dialogs, as React's does. To open a dialog from your own control, call `useEditorDialog`.
+
+## Replace a field and the OK button
+
+Put a named part directly inside the dialog to replace that part. Content inside a `Field` replaces the field's content; a draft hook called inside the dialog reads and writes the draft. `asChild` on `Apply` keeps OK's wiring (validation, committing the draft, and closing) on your own button, without the packaged classes.
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { useState } from 'react';
+import { PptxEditor, usePageSetupDialog, type PptxEditorPopups } from '@pptx-editor.dev/react';
+
+function AppearanceSelect() {
+  const { values, setValue } = usePageSetupDialog();
+  return (
+    <label>
+      Appearance
+      <select
+        value={values.theme}
+        onChange={(event) => setValue('theme', event.target.value === 'dark' ? 'dark' : 'light')}
+      >
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </label>
+  );
+}
+
+export function DeckEditor({ bytes }: { bytes: Uint8Array }) {
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const popups: PptxEditorPopups = {
+    pageSetup: (props) => (
+      <PptxEditor.PageSetupDialog {...props} theme={theme} onThemeChange={setTheme}>
+        <PptxEditor.PageSetupDialog.Field name="theme">
+          <AppearanceSelect />
+        </PptxEditor.PageSetupDialog.Field>
+        <PptxEditor.PageSetupDialog.Apply asChild>
+          <button type="button" className="acme-primary">
+            Save
+          </button>
+        </PptxEditor.PageSetupDialog.Apply>
+      </PptxEditor.PageSetupDialog>
+    ),
+  };
+  return (
+    <PptxEditor.Root document={bytes} popups={popups} colorMode={theme}>
+      <PptxEditor.Viewport>
+        <PptxEditor.Content />
+      </PptxEditor.Viewport>
+    </PptxEditor.Root>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { defineComponent, h, ref } from 'vue';
+import {
+  PageSetupDialog,
+  PptxEditorContent,
+  PptxEditorRoot,
+  PptxEditorViewport,
+  usePageSetupDialog,
+  type PptxEditorPopups,
+} from '@pptx-editor.dev/vue';
+
+defineProps<{ bytes: Uint8Array }>();
+
+const AppearanceSelect = defineComponent({
+  setup() {
+    const { values, setValue } = usePageSetupDialog();
+    return () =>
+      h('label', [
+        'Appearance',
+        h(
+          'select',
+          {
+            value: values.value.theme,
+            onChange: (event: Event) =>
+              setValue(
+                'theme',
+                (event.target as HTMLSelectElement).value === 'dark' ? 'dark' : 'light'
+              ),
+          },
+          [h('option', { value: 'light' }, 'Light'), h('option', { value: 'dark' }, 'Dark')]
+        ),
+      ]);
+  },
+});
+
+const theme = ref<'light' | 'dark'>('light');
+const popups: PptxEditorPopups = {
+  pageSetup: (props) =>
+    h(
+      PageSetupDialog,
+      { ...props, theme: theme.value, onThemeChange: (next) => (theme.value = next) },
+      () => [
+        h(PageSetupDialog.Field, { name: 'theme' }, () => [h(AppearanceSelect)]),
+        h(PageSetupDialog.Apply, { asChild: true }, () => [
+          h('button', { type: 'button', class: 'acme-primary' }, 'Save'),
+        ]),
+      ]
+    ),
+};
+</script>
+
+<template>
+  <PptxEditorRoot :document="bytes" :popups="popups" :color-mode="theme">
+    <PptxEditorViewport>
+      <PptxEditorContent />
+    </PptxEditorViewport>
+  </PptxEditorRoot>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+Set `preset={false}` on the dialog only when you compose every part yourself: then the dialog renders only your children. Keep a `Title`, the `Error` part, `Apply`, and `Cancel` in that arrangement.
+
+## Register your link popup
+
+Define the component outside the parent render function, so it keeps its state across renders. `definePopup()` keeps its props and hooks. In Vue, set the same `popups.hyperlink` entry on `PptxEditorRoot`: your renderer receives `anchor`, `url`, `mode`, and `onClose`, and can forward them to the packaged `HyperlinkPopup`.
+
+```tsx
+import { useState } from 'react';
+import {
+  definePopup,
+  PptxEditor,
+  rejectionMessage,
+  usePptxEditor,
+  useTranslation,
+  type HyperlinkPopupProps,
+  type PptxEditorPopups,
+} from '@pptx-editor.dev/react';
+
+function AcmeLinkPopup({ anchor, url, onClose }: HyperlinkPopupProps) {
+  const editor = usePptxEditor();
+  const { t } = useTranslation();
+  const [value, setValue] = useState(url);
+  const [error, setError] = useState<string | null>(null);
+  const rect = anchor?.getBoundingClientRect();
+  return (
+    <form
+      className="acme-link-popup"
+      style={rect ? { position: 'fixed', left: rect.left, top: rect.bottom + 4 } : undefined}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onClose();
+      }}
+      onSubmit={(event) => {
+        event.preventDefault();
+        // An empty address removes the link.
+        const result = editor?.exec({ type: 'setLink', url: value.trim() || null });
+        if (result && !result.ok) setError(rejectionMessage(t, result));
+        else onClose();
+      }}
+    >
+      <input
+        autoFocus
+        aria-label="Link address"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+      />
+      {error && <p role="alert">{error}</p>}
+    </form>
+  );
+}
+
+const popups: PptxEditorPopups = { hyperlink: definePopup(AcmeLinkPopup) };
+
+export function DeckEditor({ bytes }: { bytes: Uint8Array }) {
+  return (
+    <PptxEditor.Root document={bytes} popups={popups}>
+      <PptxEditor.Viewport>
+        <PptxEditor.Content />
+      </PptxEditor.Viewport>
+    </PptxEditor.Root>
+  );
+}
+```
+
+Your popup gets `anchor` but no positioning, focus handling, or Escape handling: the example places itself under `anchor`, moves focus to its field, and closes on Escape. The engine can refuse the link, for example for an unsafe address; the popup then stays open and shows the reason. When it closes, `PptxEditor.Root` returns focus to the slide, unless focus moved elsewhere.
+
+## Register your section menu
+
+A `popups.sectionContextMenu` renderer receives `SectionContextMenuProps`: the `section`, the `menu` state (`at`, `keyboard`, and `owner`), `onClose`, `onRename`, and `onRemoved`. This example keeps the packaged menu and adds nothing in front of it, so it shows the shape of the entry. Replace the body with your own rows.
+
+```tsx
+import {
+  definePopup,
+  PptxEditor,
+  SectionContextMenu,
+  type PptxEditorPopups,
+  type SectionContextMenuProps,
+} from '@pptx-editor.dev/react';
+
+function AcmeSectionMenu(props: SectionContextMenuProps) {
+  return <SectionContextMenu {...props} />;
+}
+
+const popups: PptxEditorPopups = { sectionContextMenu: definePopup(AcmeSectionMenu) };
+
+export function DeckEditor({ bytes }: { bytes: Uint8Array }) {
+  return (
+    <PptxEditor.Root document={bytes} popups={popups}>
+      <PptxEditor.Viewport>
+        <PptxEditor.SlideRail />
+        <PptxEditor.Content />
+      </PptxEditor.Viewport>
+    </PptxEditor.Root>
+  );
+}
+```
+
+Rename in your own menu calls `onRename`, which opens the name field in the rail or the sorter that opened the menu. Renaming a section is not one engine command until the name is typed: the name field runs `renameSection`. Call `onClose` when a row runs, and `onRemoved` after a row removes sections, so focus goes to the current slide. Set the entry to `false` to show no section menu; the section commands keep working from the API.
+
+## Open a dialog from your control
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { useEditorDialog } from '@pptx-editor.dev/react';
+
+export function PageSetupButton() {
+  const dialog = useEditorDialog('pageSetup');
+  return (
+    <button
+      type="button"
+      aria-disabled={!dialog.isAvailable || undefined}
+      onClick={() => {
+        if (dialog.isAvailable) dialog.open();
+      }}
+    >
+      Page setup
+    </button>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { useEditorDialog } from '@pptx-editor.dev/vue';
+
+const dialog = useEditorDialog('pageSetup');
+function open() {
+  if (dialog.isAvailable.value) dialog.open();
+}
+</script>
+
+<template>
+  <button type="button" :aria-disabled="!dialog.isAvailable.value || undefined" @click="open">
+    Page setup
+  </button>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+Focus returns to the button when the dialog closes. The button stays focusable when the `pageSetup` entry is `false`.
+
+## More control
+
+See the [`@pptx-editor.dev/react` API report](https://github.com/eigenpal/pptx-editor/blob/main/docs/api/react/index.api.md) for `PptxEditorPopups`, the dialog props, and the draft hook types.
