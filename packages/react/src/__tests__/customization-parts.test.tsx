@@ -216,7 +216,11 @@ describe('useHyperlinkPopup', () => {
 });
 
 describe('useHyperlinkPopup open()', () => {
-  test('a javascript: target never reaches an anchor or window.open', async () => {
+  test.each([
+    'javascript:alert(1)',
+    'data:text/html,<script>alert(1)</script>',
+    'vbscript:msgbox(1)',
+  ])('%s never reaches an anchor or window.open', async (target) => {
     let popup: ReturnType<typeof useHyperlinkPopup> | null = null;
     function Opener() {
       popup = useHyperlinkPopup();
@@ -238,10 +242,10 @@ describe('useHyperlinkPopup open()', () => {
       return null;
     }) as typeof window.open;
     try {
-      act(() => popup!.open({ url: 'javascript:alert(1)', href: 'javascript:alert(1)' }));
+      act(() => popup!.open({ url: target, href: target }));
       expect(document.querySelector('.pptx-link-popup') !== null).toBe(true);
       const hrefs = [...document.querySelectorAll('a[href]')].map((a) => a.getAttribute('href'));
-      expect(hrefs.some((h) => h!.startsWith('javascript:'))).toBe(false);
+      expect(hrefs).toEqual([]);
       expect(popup!.state.href).toBeNull();
       act(() => void popup!.openTarget());
       expect(opened).toEqual([]);

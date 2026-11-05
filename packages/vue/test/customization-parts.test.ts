@@ -245,7 +245,11 @@ describe('useHyperlinkPopup (Vue)', () => {
 });
 
 describe('useHyperlinkPopup open() (Vue)', () => {
-  test('a javascript: target never reaches an anchor or window.open', async () => {
+  test.each([
+    'javascript:alert(1)',
+    'data:text/html,<script>alert(1)</script>',
+    'vbscript:msgbox(1)',
+  ])('%s never reaches an anchor or window.open', async (target) => {
     let popup!: ReturnType<typeof useHyperlinkPopup>;
     const Opener = defineComponent({
       setup() {
@@ -273,11 +277,11 @@ describe('useHyperlinkPopup open() (Vue)', () => {
       // The controller opens for the editor selection, never for a caller-supplied target.
       selectText(editor!);
       await settle();
-      popup.open({ url: 'javascript:alert(1)', href: 'javascript:alert(1)' });
+      popup.open({ url: target, href: target });
       await settle();
       expect(document.querySelector('.pptx-link-popup') !== null).toBe(true);
       const hrefs = [...document.querySelectorAll('a[href]')].map((a) => a.getAttribute('href'));
-      expect(hrefs.some((h) => h!.startsWith('javascript:'))).toBe(false);
+      expect(hrefs).toEqual([]);
       expect(popup.state.value.href).toBeNull();
       popup.openTarget();
       expect(opened).toEqual([]);
