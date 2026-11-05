@@ -46,7 +46,8 @@ function nearPath(item: LayoutItem, p: Point, tolerance: number): boolean {
 /**
  * The editable element under a slide point among a scope's items (the slide's top level, or
  * an entered group's children). Geometric: a click anywhere inside a shape's bounds selects
- * it, not only on painted ink. Topmost wins. @internal
+ * it, not only on painted ink. Text that overflows the bounds takes a click on its laid-out
+ * lines too, so a group takes one on the overflowing text of a child. Topmost wins. @internal
  */
 export function hitItem(
   layout: SlideLayout | undefined,
@@ -71,8 +72,15 @@ export function hitItem(
     const ty = cy < tolerance ? tolerance : 0;
     if (local.x >= -tx && local.x <= cx + tx && local.y >= -ty && local.y <= cy + ty)
       return item.element.nodeId;
+    if (onText(item, p)) return item.element.nodeId;
   }
   return undefined;
+}
+
+/** Whether a slide point is on laid-out text of an item or of a descendant of a group. */
+function onText(item: LayoutItem, p: Point): boolean {
+  if (item.kind === 'group') return item.children.some((child) => onText(child, p));
+  return onGlyph(item, p);
 }
 
 /**
