@@ -385,6 +385,11 @@ describe('merge, split, and formatting (editor-ui-parity 4.3)', () => {
       'D',
       'E',
     ]);
+    // The caret sits after the merged text: a key adds to it, it does not prefix it.
+    expect(e.snapshot().selection).toMatchObject({
+      cell: { row: 0, column: 0 },
+      focus: { paragraph: 3, offset: 1 },
+    });
     expectValid(e);
     roundTrip(e);
     caretIn(e, 0, 0);

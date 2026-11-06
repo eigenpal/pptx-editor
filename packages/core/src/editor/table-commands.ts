@@ -18,6 +18,7 @@ import { refitTable } from '../automation/commands/table-fit.ts';
 import { insertTableFrame } from '../automation/commands/table-insert.ts';
 import { markStructureEdit } from '../automation/commands/table-edit-marks.ts';
 import { repairTable } from '../automation/commands/table-repair.ts';
+import { paragraphLength, paragraphsOf } from '../automation/commands/text-model.ts';
 import {
   setCellAnchor,
   setCellFill,
@@ -365,11 +366,18 @@ export function compileTable(ctx: CommandContext, batch: OpBatch, command: Table
       mergeRange(batch, m, range);
       structureEdited(ctx, batch, m);
       refit(ctx, batch, m);
+      // The caret goes after the merged text, so the next key adds to it.
+      const at = { row: range.r0, column: range.c0 };
+      const paragraphs = paragraphsOf(cellBody(readTable(batch, m.part, m.frame.id), at));
+      const end = {
+        paragraph: Math.max(0, paragraphs.length - 1),
+        offset: paragraphs.length ? paragraphLength(paragraphs[paragraphs.length - 1]) : 0,
+      };
       return {
         batch,
         effect: {
           label: 'mergeCells',
-          selection: caretIn(m.frame.id, { row: range.r0, column: range.c0 }),
+          selection: { kind: 'text', nodeId: m.frame.id, cell: at, anchor: end, focus: end },
         },
       };
     }

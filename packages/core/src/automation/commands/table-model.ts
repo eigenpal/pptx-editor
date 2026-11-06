@@ -367,8 +367,9 @@ export function insertRows(
     } else {
       const b = blockOf(m, m.anchors[source][c]);
       const line = plain ? { r0: 0, r1: 0, c0: c, c1: c } : { r0: 0, r1: 0, c0: b.c0, c1: b.c1 };
+      // A covered cell holds no fill of its own: the new cell takes its block's anchor's look.
       for (let i = 0; i < count; i += 1)
-        rows[i].push(newCellSpec(m.tcs[source][c], blockAttrs(line, 0, c)));
+        rows[i].push(newCellSpec(m.tcs[b.r0][b.c0], blockAttrs(line, 0, c)));
     }
   }
   const before = m.rows[at];
@@ -434,8 +435,9 @@ export function insertColumns(
     } else {
       const b = blockOf(m, m.anchors[r][source]);
       const line = plain ? { r0: r, r1: r, c0: 0, c1: 0 } : { r0: b.r0, r1: b.r1, c0: 0, c1: 0 };
+      // A covered cell holds no fill of its own: the new cell takes its block's anchor's look.
       for (let i = 0; i < count; i += 1)
-        specs.push(newCellSpec(m.tcs[r][source], blockAttrs(line, r, 0)));
+        specs.push(newCellSpec(m.tcs[b.r0][b.c0], blockAttrs(line, r, 0)));
     }
     const next = m.tcs[r][at];
     const index = next ? tr.children.findIndex((n) => n.id === next.id) : afterLast(tr, ['tc']);
