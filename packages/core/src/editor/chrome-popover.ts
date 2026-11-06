@@ -75,6 +75,9 @@ export function positionPopover(
   rect?: PopoverAnchorRect | null
 ): PopoverPlacement {
   const anchorRect = rect ?? anchor.getBoundingClientRect();
+  // Measure the panel's full height: a cap from an earlier placement (a second render, a
+  // resize) would make it look short enough to need no scrolling.
+  if (panel) panel.style.maxHeight = '';
   const next = placeInFixedFrame(
     panel?.parentElement,
     { width: panel?.offsetWidth ?? 200, height: panel?.offsetHeight ?? 0 },
