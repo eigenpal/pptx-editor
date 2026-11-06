@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { unzipSync } from 'fflate';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { textDeck } from '../scripts/bench/text-deck.ts';
 
 /** Open the demo on the basic deck and wait until the slide is painted. */
 async function ready(page: Page): Promise<void> {
@@ -423,4 +424,154 @@ test('embedding: Ctrl/Cmd+F with the focus outside the editor stays with the bro
   });
   expect(prevented).toBe(false);
   await expect(page.getByRole('search', { name: 'Find and replace' })).toBeHidden();
+});
+
+test('long deck: the rail paints the thumbnails in view first, then the rest', async ({ page }) => {
+  // Visibility from CSS layout and the browser's IntersectionObserver: happy-dom has neither.
+  await ready(page);
+  await page.locator('input[type=file][accept*=".pptx"]').setInputFiles({
+    name: 'long.pptx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    buffer: Buffer.from(textDeck(300)),
+  });
+  await expect(page.locator('.pptx-rail__item')).toHaveCount(300, { timeout: 60_000 });
+  const painted = () => page.locator('.pptx-rail__thumb > svg').count();
+  expect(await painted()).toBeLessThan(300);
+  // Scrolled to the end, the last thumbnails paint before the idle time reaches them.
+  await page.locator('.pptx-rail__list').evaluate((el) => (el.scrollTop = el.scrollHeight));
+  const last = page.locator('.pptx-rail__item').last().locator('.pptx-rail__thumb > svg');
+  await expect(last).toHaveCount(1);
+  // In idle time, every thumbnail paints.
+  await expect.poll(painted, { timeout: 30_000 }).toBe(300);
+});
+
+test('shape drag: the preview puts the shape where the release does', async ({ page }) => {
+  // Boxes of the painted SVG: happy-dom lays nothing out.
+  await ready(page);
+  await page.locator('.pptx-rail__item').nth(1).click();
+  const shape = page.locator('.pptx-surface__slide [data-kind="shape"]').first();
+  const box = (await shape.boundingBox())!;
+  const id = await shape.getAttribute('data-node-id');
+  // During a drag, the shape is hidden and its preview painted after it.
+  const at = () =>
+    page.locator(
+      `.pptx-surface__slide :is([data-preview-of="${id}"], [data-node-id="${id}"]:not([display="none"]))`
+    );
+  // Press on the shape's border band (its top edge) and drag it.
+  const x = box.x + box.width / 2;
+  const y = box.y + 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 20, y + 10);
+  await page.mouse.move(x + 60, y + 30, { steps: 4 });
+  const during = (await at().boundingBox())!;
+  expect(during.x).toBeGreaterThan(box.x + 30);
+  await page.mouse.up();
+  const after = (await at().boundingBox())!;
+  for (const k of ['x', 'y', 'width', 'height'] as const)
+    expect(Math.abs(after[k] - during[k])).toBeLessThan(1.5);
+  // Escape during a drag puts the shape back.
+  await page.mouse.move(after.x + after.width / 2, after.y + 2);
+  await page.mouse.down();
+  await page.mouse.move(after.x + after.width / 2 + 80, after.y + 40, { steps: 4 });
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  const back = (await at().boundingBox())!;
+  expect(Math.abs(back.x - after.x)).toBeLessThan(1.5);
+});
+
+test('shape resize: the preview matches the release, and Escape on a handle cancels', async ({
+  page,
+}) => {
+  // Boxes of the painted SVG: happy-dom lays nothing out.
+  await ready(page);
+  await page.locator('.pptx-rail__item').nth(1).click();
+  const shape = page.locator('.pptx-surface__slide [data-kind="shape"]').first();
+  const id = await shape.getAttribute('data-node-id');
+  const at = () =>
+    page.locator(
+      `.pptx-surface__slide :is([data-preview-of="${id}"], [data-node-id="${id}"]:not([display="none"]))`
+    );
+  const box = (await shape.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + 2);
+  const handle = (await page.locator('[data-handle="se"]').boundingBox())!;
+  const hx = handle.x + handle.width / 2;
+  const hy = handle.y + handle.height / 2;
+  await page.mouse.move(hx, hy);
+  await page.mouse.down();
+  await page.mouse.move(hx - 60, hy + 40, { steps: 5 });
+  const during = (await at().boundingBox())!;
+  const text = await at().textContent();
+  await page.mouse.up();
+  const after = (await at().boundingBox())!;
+  for (const k of ['x', 'y', 'width', 'height'] as const)
+    expect(Math.abs(after[k] - during[k])).toBeLessThan(1.5);
+  expect(await at().textContent()).toBe(text);
+  // Escape during a resize puts the shape back, and the release writes nothing.
+  const corner = (await page.locator('[data-handle="se"]').boundingBox())!;
+  await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(corner.x + 120, corner.y + 90, { steps: 5 });
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  const back = (await at().boundingBox())!;
+  for (const k of ['x', 'y', 'width', 'height'] as const)
+    expect(Math.abs(back[k] - after[k])).toBeLessThan(1.5);
+});
+
+test('long deck: slide edits leave no thumbnail in view empty', async ({ page }) => {
+  // Layout boxes and the browser's IntersectionObserver: happy-dom has neither.
+  await ready(page);
+  await page.locator('input[type=file][accept*=".pptx"]').setInputFiles({
+    name: 'long.pptx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    buffer: Buffer.from(textDeck(200)),
+  });
+  await expect(page.locator('.pptx-rail__item')).toHaveCount(200, { timeout: 60_000 });
+  const run = (command: unknown) =>
+    page.evaluate((c) => {
+      const ed = (window as unknown as Record<string, unknown>).__pptxEditor as {
+        exec(c: unknown): { ok: boolean };
+      };
+      return ed.exec(c).ok;
+    }, command);
+  const goTo = (index: number) =>
+    page.evaluate((i) => {
+      const ed = (window as unknown as Record<string, unknown>).__pptxEditor as {
+        goToSlide(i: number): void;
+      };
+      ed.goToSlide(i);
+    }, index);
+  const painted = () => page.locator('.pptx-rail__thumb > svg').count();
+  const scrolled = () => page.locator('.pptx-rail__list').evaluate((el) => el.scrollTop);
+  // On slide 101, delete slide 3, then go back to slide 101: the rail follows it down.
+  await goTo(100);
+  expect(await run({ type: 'deleteSlides', indices: [2] })).toBe(true);
+  await goTo(100);
+  await expect.poll(painted, { timeout: 30_000 }).toBe(199);
+  await page.waitForTimeout(300);
+  // Watch for a thumbnail in the rail's box that is empty at a frame.
+  await page.evaluate(() => {
+    const w = window as unknown as { __emptyInView: number };
+    w.__emptyInView = 0;
+    const list = document.querySelector('.pptx-rail__list')!;
+    const check = (): void => {
+      const r = list.getBoundingClientRect();
+      for (const t of document.querySelectorAll('.pptx-rail__thumb')) {
+        const b = t.getBoundingClientRect();
+        if (b.bottom > r.top && b.top < r.bottom && !t.firstElementChild) w.__emptyInView += 1;
+      }
+      requestAnimationFrame(check);
+    };
+    requestAnimationFrame(check);
+  });
+  // Undo puts slide 3 back above the view, with slide 101 still current.
+  const top = await scrolled();
+  expect(top).toBeGreaterThan(5000);
+  expect(await run({ type: 'undo' })).toBe(true);
+  await expect.poll(painted, { timeout: 30_000 }).toBe(200);
+  expect(Math.abs((await scrolled()) - top)).toBeLessThan(400);
+  expect(
+    await page.evaluate(() => (window as unknown as { __emptyInView: number }).__emptyInView)
+  ).toBe(0);
 });

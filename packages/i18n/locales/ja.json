@@ -906,6 +906,7 @@
     "tableCell": "{row} 行、{column} 列",
     "shapeSelected": "{kind} {name} を選択しました",
     "shapeSelectedWithAltText": "{kind} {name}、{description} を選択しました",
+    "dragCanceled": "ドラッグを取り消しました",
     "placeholderObject": "{kind} (このバージョンでは表示されません)",
     "kinds": {
       "chart": "グラフ",
