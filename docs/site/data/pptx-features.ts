@@ -27,8 +27,8 @@
  *   (`fixtures/<name>.pdf` with its identity in `fixtures/references.json`, see CONTRIBUTING.md
  *   "Fidelity harness"), and no slide of those fixtures in `FIXTURE_KNOWN_GAPS`: the fixture
  *   passes the harness in every gated environment. The row also owns no approximation but the
- *   three that every text row shares (`PAGE_WIDE_APPROXIMATIONS` in pptx-features.test.ts), and
- *   its notes name no rendering gap. Until then, `partial` is the most a row can claim, however
+ *   three page-wide text ones (`PAGE_WIDE_APPROXIMATIONS` in pptx-features.test.ts), and its
+ *   notes name no rendering gap, such as a substitute font or a part that does not draw. Until then, `partial` is the most a row can claim, however
  *   good the render looks.
  * - `roundTrip: 'full'` needs at least one fixture, and its saved copies opened with no repair
  *   prompt (`SAVE_VERIFIED_FIXTURES` in `save-verified-fixtures.ts`). That is necessary, not
@@ -123,7 +123,7 @@ export const pptxFeatures: PptxFeature[] = [
     name: 'Font family and size',
     category: 'text',
     editing: 'full',
-    rendering: 'full',
+    rendering: 'partial',
     roundTrip: 'full',
     tier: 'community',
     notes:
@@ -590,7 +590,7 @@ export const pptxFeatures: PptxFeature[] = [
     name: 'Merge and split cells',
     category: 'tables',
     editing: 'partial',
-    rendering: 'partial',
+    rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
     notes: `Merge keeps the text of every cell. Split works on one cell. A merged cell splits only along even grid lines. When peers in a collaboration session change the rows, columns, or merged cells of one table at once, the canvas draws the table as a save writes it, with valid merge markers. ${TABLE_SAVE}`,
@@ -623,7 +623,7 @@ export const pptxFeatures: PptxFeature[] = [
     name: 'Row height and column width',
     category: 'tables',
     editing: 'partial',
-    rendering: 'partial',
+    rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
     notes: `Drag a grid line (the line under the pointer is marked), distribute rows and columns, type a row height or column width in the Format panel, or resize the frame by its handles (the columns and rows scale; how the change is shared among them is approximate). Row heights stay minimums, so rows grow to fit text. ${TABLE_SAVE}`,

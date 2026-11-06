@@ -632,12 +632,7 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
         shapes(0) === shapes(1) ? undefined : `the duplicate has ${shapes(1)}`
       );
     },
-    parts: [
-      ...NEW_SLIDES,
-      removed(/^\/ppt\/(slides|notesSlides|comments|embeddings)\//),
-      removed(/^\/ppt\/slides\/_rels\//),
-      /^\/ppt\/commentAuthors\.xml$/,
-    ],
+    parts: [...NEW_SLIDES, removed(/^\/ppt\/(slides|notesSlides|comments|embeddings)\//)],
   },
   'slides.hidden': {
     fixture: 'slide-layouts',

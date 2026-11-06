@@ -43,9 +43,14 @@ interface RasterRequest {
   width: number;
   height: number;
   scale: number;
-  /** pdf.js options from the harness server: the image limit and the CMap folder. */
+  /**
+   * pdf.js options from the harness server: the image limit, and the CMap, WebAssembly, and ICC
+   * profile folders.
+   */
   maxImageSize: number;
   cMapUrl: string;
+  wasmUrl: string;
+  iccUrl: string;
   pages: { rgba: string; png: string }[];
 }
 
@@ -346,6 +351,13 @@ const api: HarnessApi = {
       maxImageSize: r.maxImageSize,
       cMapUrl: r.cMapUrl,
       cMapPacked: true,
+      // pdf.js converts ICC-based colors with its WebAssembly color engine; without it, an
+      // ICC-based color draws as the device color with the same numbers.
+      wasmUrl: r.wasmUrl,
+      iccUrl: r.iccUrl,
+      // pdf.js turns worker fetches, and with them the color engine, off unless every data URL
+      // is set; this page sets no standard font URL.
+      useWorkerFetch: true,
       verbosity: 0,
     }).promise;
     const send = async (url: string, body: BodyInit): Promise<void> => {

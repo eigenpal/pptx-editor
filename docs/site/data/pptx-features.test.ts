@@ -35,9 +35,10 @@ const DOCX_ROW_FIELDS = new Set([
 ]);
 
 /**
- * The approximations that every text row shares: the line model, the shaper's glyph advances,
- * and missing glyphs. They do not keep a row from full rendering when its fixtures pass the
- * harness. Any other approximation is a rendering limit of its row.
+ * The page-wide text approximations: the line model, the shaper's glyph advances, and missing
+ * glyphs. They apply to all text, so they do not keep a row from full rendering when its fixtures
+ * pass the harness. Any other approximation is a rendering limit of its row. A reviewer also
+ * checks that the notes of a full row name no rendering gap; no test can read that.
  */
 const PAGE_WIDE_APPROXIMATIONS = new Set(['line-model', 'glyph-advances', 'missing-glyphs']);
 

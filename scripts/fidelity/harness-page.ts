@@ -577,8 +577,12 @@ export async function rasterPdf(
       ...size,
       scale,
       maxImageSize: MAX_IMAGE_PIXELS,
-      // The page fetches the CMaps from the harness server (Vite serves the package files).
+      // The page fetches the CMaps, the WebAssembly modules, and the ICC profiles from the
+      // harness server (Vite serves the package files). With them, pdf.js converts an ICC-based
+      // color through its profile in both PDFs, as a color-managed viewer does.
       cMapUrl: `/@fs${join(PDFJS_DIR, 'cmaps')}/`,
+      wasmUrl: `/@fs${join(PDFJS_DIR, 'wasm')}/`,
+      iccUrl: `/@fs${join(PDFJS_DIR, 'iccs')}/`,
       pages: targets.map((t) => ({ rgba: t.rgba.url, png: t.png.url })),
     });
     return await Promise.all(

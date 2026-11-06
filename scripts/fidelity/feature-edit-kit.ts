@@ -285,14 +285,19 @@ function partContent(pkg: PptxPackage, name: string): string | undefined {
 }
 
 /**
- * A fingerprint of the content of every part. A GUID that an edit makes (a new section's id)
+ * A fingerprint of every part as a save writes it: the XML text with its prefixes and namespace
+ * declarations, and the bytes of the other parts. A GUID that an edit makes (a new section's id)
  * differs on each run, so GUIDs count as equal.
  */
 export function editFingerprint(pkg: PptxPackage): string {
   const hash = createHash('sha256');
   for (const name of [...pkg.parts.keys()].sort()) {
-    const content = partContent(pkg, name) ?? '';
-    hash.update(`${name}\n${content.replace(/\{[0-9A-Fa-f-]{36}\}/g, '{GUID}')}\n`);
+    const part = pkg.parts.get(name)!;
+    const content =
+      part.kind === 'xml'
+        ? serializeXmlPart(part.xml).replace(/\{[0-9A-Fa-f-]{36}\}/g, '{GUID}')
+        : Buffer.from(part.bytes).toString('base64');
+    hash.update(`${name}\n${content}\n`);
   }
   return `sha256:${hash.digest('hex')}`;
 }
