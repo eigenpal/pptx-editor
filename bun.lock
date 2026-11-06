@@ -53,6 +53,7 @@
       "dependencies": {
         "@pptx-editor.dev/core": "workspace:*",
         "@pptx-editor.dev/i18n": "workspace:*",
+        "@pptx-editor.dev/pro": "workspace:*",
         "@pptx-editor.dev/react": "workspace:*",
         "next": "^16.2.7",
         "react": "^19.2.0",
@@ -73,6 +74,7 @@
         "@fontsource-variable/geist": "^5.3.0",
         "@pptx-editor.dev/core": "workspace:*",
         "@pptx-editor.dev/i18n": "workspace:*",
+        "@pptx-editor.dev/pro": "workspace:*",
         "@pptx-editor.dev/react": "workspace:*",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
@@ -86,6 +88,7 @@
         "@fontsource-variable/geist": "^5.3.0",
         "@pptx-editor.dev/core": "workspace:*",
         "@pptx-editor.dev/i18n": "workspace:*",
+        "@pptx-editor.dev/pro": "workspace:*",
         "@pptx-editor.dev/vue": "workspace:*",
         "vue": "3.5.44",
       },
@@ -134,12 +137,14 @@
       "name": "@pptx-editor.dev/pptx-to-pdf",
       "version": "0.1.0",
       "dependencies": {
+        "@pptx-editor.dev/pro": "~0.1.0",
         "fontkit": "2.0.4",
         "pdf-lib": "1.17.1",
       },
       "devDependencies": {
         "@docx-editor.dev/fonts-cjk": "^2.34.0",
         "@pptx-editor.dev/core": "workspace:*",
+        "@pptx-editor.dev/pro": "workspace:*",
         "pdfjs-dist": "5.4.624",
       },
       "peerDependencies": {

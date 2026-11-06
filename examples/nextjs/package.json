@@ -12,6 +12,7 @@
   "dependencies": {
     "@pptx-editor.dev/core": "workspace:*",
     "@pptx-editor.dev/i18n": "workspace:*",
+    "@pptx-editor.dev/pro": "workspace:*",
     "@pptx-editor.dev/react": "workspace:*",
     "next": "^16.2.7",
     "react": "^19.2.0",

@@ -1,21 +1,18 @@
-// Pure math that a second painter of the same layout (`@pptx-editor.dev/pptx-to-pdf`) shares with
-// this SVG paint: these rules have one copy, the gradient geometry and stop colors included.
-// Internal glue between packages, not a public API.
+// Pure math that a second painter of the same layout (`@pptx-editor.dev/pptx-to-pdf`) and the
+// effects renderer (`@pptx-editor.dev/pro/drawing`) share with this SVG paint: these rules have
+// one copy, the gradient geometry and stop colors included. Internal glue between packages, not
+// a public API.
 
 import type { EffectPlacement, GradientStop, ResolvedFill, Rgba } from '../cascade/index.ts';
 import type { GeometryPath, Matrix } from '../layout/index.ts';
 import {
   blurSigma as sigmaFor,
   effectMatrix as placementOf,
-  glowSpread as glowFor,
-  innerShadowShift as innerShiftFor,
   lumTransfer,
-  type SpreadBlur,
 } from './effect-transforms.ts';
 import { adjustForPathMode as adjusted } from './paint-fill.ts';
 import { circleGeometry, linearEnds, paintStops } from './paint-gradient.ts';
 
-export type { SpreadBlur };
 export { lumTransfer };
 
 /**
@@ -27,28 +24,11 @@ export function adjustForPathMode(color: Rgba, mode: GeometryPath['fill']): Rgba
 }
 
 /**
- * The Gaussian σ that the SVG paint uses for an effect's blur radius, in EMU.
+ * The Gaussian σ that the paint uses for an effect's blur radius, in EMU.
  * @internal
  */
 export function blurSigma(blurRad: number): number {
   return sigmaFor(blurRad);
-}
-
-/**
- * How far the SVG paint grows a glow's outline and how much it blurs it, in EMU.
- * @internal
- */
-export function glowSpread(rad: number): SpreadBlur {
-  return glowFor(rad);
-}
-
-/**
- * How far the SVG paint moves an inner shadow's inverse, in slide space: opposite `dir`, so the
- * shadow shows on the side that `dir` points to.
- * @internal
- */
-export function innerShadowShift(dist: number, dir: number): { dx: number; dy: number } {
-  return innerShiftFor(dist, dir);
 }
 
 /**

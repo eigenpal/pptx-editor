@@ -471,6 +471,9 @@ export interface ChromeMenuSubmenuEntry {
 }
 
 // @public
+export function chromeOfferedControl(slot: ChromeSlotId, control: ChromeControl): ChromeControl;
+
+// @public
 export function chromeOptionChecked(value: unknown, option: string): boolean;
 
 // @internal

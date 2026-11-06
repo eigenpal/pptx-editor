@@ -6,6 +6,11 @@ import { openPresentation, type DocumentSession } from '@pptx-editor.dev/core/ed
 import { paintSlide, registerFontFaces, type FontFaceHandle } from '@pptx-editor.dev/core/output';
 import { writePptx } from '@pptx-editor.dev/core/store';
 import type { FontSource, LayoutItem } from '@pptx-editor.dev/core/layout';
+import { installDrawing } from '@pptx-editor.dev/pro/drawing';
+
+// The harness renders as the demos do: with the Pro drawing renderers (glow, inner shadow,
+// reflection, and soft edge), installed before any deck opens.
+installDrawing();
 
 /** A deck and its local fonts, as paths on the harness server (`openDeck`). */
 interface DeckSource {

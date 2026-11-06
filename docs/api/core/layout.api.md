@@ -100,10 +100,96 @@ export function deferFonts(origin: FontOrigin): MarkedFontResolver;
 export function defineFontResolver<T extends FontResolver>(resolve: T): MarkedFontResolver<T>;
 
 // @public
+export interface DrawingCapabilities {
+    readonly effects: boolean;
+}
+
+// @public
+export function drawingCapabilities(): DrawingCapabilities;
+
+// @internal
+export interface DrawingEffectsRenderer {
+    readonly body: (effects: ResolvedEffects, bounds: EffectBounds, ids: EffectIds) => EffectFilterPaint | null;
+    readonly glow: (effects: ResolvedEffects, bounds: EffectBounds, ids: EffectIds) => EffectFilterPaint | null;
+    readonly reflection: (effects: ResolvedEffects, source: EffectCopySource, ids: EffectIds) => EffectCopyPaint | null;
+}
+
+// @internal
+export interface DrawingRenderers {
+    readonly effects?: DrawingEffectsRenderer;
+}
+
+// @internal
+export function drawingRenderers(): DrawingRenderers;
+
+// @internal
+export function drawingRenderersListenerCount(): number;
+
+// @public
+export function drawingRenderersVersion(): number;
+
+// @public
 export const EAST_ASIAN_FALLBACK_FAMILIES: readonly string[];
 
 // @public
 export function eastAsianFallbackFamilies(lang?: string): readonly string[];
+
+// @internal
+export interface EffectBounds {
+    // (undocumented)
+    readonly b: number;
+    // (undocumented)
+    readonly r: number;
+    // (undocumented)
+    readonly x: number;
+    // (undocumented)
+    readonly y: number;
+}
+
+// @internal
+export interface EffectCopyPaint {
+    // (undocumented)
+    readonly defs: readonly EffectNode[];
+    // (undocumented)
+    readonly node: EffectNode;
+}
+
+// @internal
+export interface EffectCopySource {
+    readonly contentId: string;
+    readonly corners: readonly {
+        x: number;
+        y: number;
+    }[];
+    // (undocumented)
+    readonly height: number;
+    readonly matrix: Matrix;
+    // (undocumented)
+    readonly width: number;
+}
+
+// @internal
+export interface EffectFilterPaint {
+    readonly defs: readonly EffectNode[];
+    // (undocumented)
+    readonly filter: string;
+}
+
+// @internal
+export interface EffectIds {
+    // (undocumented)
+    id(kind: string): string;
+}
+
+// @internal
+export interface EffectNode {
+    // (undocumented)
+    readonly attrs: Readonly<Record<string, string>>;
+    // (undocumented)
+    readonly children?: readonly EffectNode[];
+    // (undocumented)
+    readonly tag: string;
+}
 
 // @public
 export interface EvaluatedGeometry {
@@ -327,6 +413,9 @@ export const IDENTITY: Matrix;
 
 // @public
 export function initializeHarfBuzz(): Promise<void>;
+
+// @internal
+export function installDrawingRenderers(renderers: Partial<DrawingRenderers>): void;
 
 // @public
 export function invert(m: Matrix): Matrix;
@@ -578,6 +667,9 @@ export interface SourceMap {
     // (undocumented)
     readonly sy: number;
 }
+
+// @public
+export function subscribeDrawingRenderers(listener: () => void): () => void;
 
 // @internal
 export function symbolBulletText(char: string, font: string | null | undefined, isFamilyAvailable?: (family: string) => boolean): string;

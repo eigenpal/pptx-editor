@@ -22,6 +22,7 @@ export default defineConfig({
       { find: /^@pptx-editor\.dev\/core$/, replacement: pkg('core/src/index.ts') },
       { find: /^@pptx-editor\.dev\/vue$/, replacement: pkg('vue/src/index.ts') },
       { find: /^@pptx-editor\.dev\/i18n$/, replacement: pkg('i18n/src/index.ts') },
+      { find: /^@pptx-editor\.dev\/pro\/drawing$/, replacement: pkg('pro/src/drawing/index.ts') },
     ],
   },
   // Both packages resolve assets relative to their own module URL; pre-bundling would move them.

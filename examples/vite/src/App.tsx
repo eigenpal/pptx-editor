@@ -12,7 +12,8 @@ import {
   type DragEvent,
   type ReactNode,
 } from 'react';
-import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import type { EditorModule, PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import { drawingModule } from '@pptx-editor.dev/pro/drawing';
 import {
   PptxEditor,
   Icon,
@@ -57,6 +58,11 @@ import {
   type PictureExport,
   type UnsavedEdits,
 } from '../../shared/demo-files.ts';
+
+// Glow, inner shadow, reflection, and soft edge (EigenPal Pro License).
+const MODULES: readonly EditorModule[] = [
+  drawingModule({ licenseKey: import.meta.env.VITE_PPTX_LICENSE }),
+];
 
 const base = import.meta.env.BASE_URL;
 /** A phone opens with the notes closed, so the slide gets the room; one tap opens them. */
@@ -389,6 +395,7 @@ export function App() {
       mode={mode}
       colorMode={theme}
       popups={popups}
+      modules={MODULES}
       fonts={fonts}
       fontFamilies={CATALOG_FAMILIES}
       onReady={(instance) => {
