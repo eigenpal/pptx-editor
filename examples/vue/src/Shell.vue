@@ -209,7 +209,7 @@ function onDrop(e: DragEvent): void {
         <span class="demo-topbar__divider" />
         <button
           type="button"
-          class="demo-btn demo-btn--quiet demo-btn--sm"
+          class="demo-btn demo-btn--quiet demo-btn--sm demo-open"
           :aria-label="t('menu.open').replace('…', '')"
           :data-pptx-tooltip="t('menu.open').replace('…', '')"
           @mousedown="keepFocus"

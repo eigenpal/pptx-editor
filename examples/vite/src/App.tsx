@@ -221,7 +221,7 @@ function Shell({
           <span className="demo-topbar__divider" />
           <button
             type="button"
-            className="demo-btn demo-btn--quiet demo-btn--sm"
+            className="demo-btn demo-btn--quiet demo-btn--sm demo-open"
             // The label can hide on a narrow bar: the name and the tooltip stay.
             aria-label={t('menu.open').replace('…', '')}
             data-pptx-tooltip={t('menu.open').replace('…', '')}

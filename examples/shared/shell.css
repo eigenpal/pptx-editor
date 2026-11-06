@@ -592,10 +592,14 @@
   }
 }
 @media (max-width: 800px) {
-  .demo-menubar {
+  /* Only File stays: it holds Open, New, the sample deck, Rename, and Export. */
+  .demo-menubar .pptx-menubar__trigger:not([data-menu='file']) {
     display: none;
   }
-  /* Without the menu bar, the deck name has room on the bar again. */
+  .demo-menubar {
+    flex: none;
+  }
+  /* With only File in the menu bar, the deck name has room on the bar again. */
   .demo-file {
     display: flex;
   }
@@ -605,12 +609,14 @@
    take the height left under it. */
 @media (max-width: 600px) {
   .demo-topbar .demo-theme-toggle,
+  .demo-topbar .demo-open,
   .demo-topbar .demo-new {
     display: none;
   }
+  /* The deck name takes the room the controls leave, and never less than a few letters. */
   .demo-file {
-    flex: 0 1 auto;
-    min-width: 0;
+    flex: 1 1 auto;
+    min-width: 48px;
   }
   .demo-file__name {
     max-width: none;
@@ -620,22 +626,78 @@
     --doc-slide-padding: 12px;
   }
   /* The slide's width (the pane less the workspace and surface padding) times its ratio, plus
-     the surface padding and the strip under the slide. */
+     the surface padding. A tall slide gives up height, so the notes keep their head and two
+     lines (84px). */
   .demo-canvas {
-    flex: 0 0 auto;
-    height: calc((100vw - 48px) * var(--demo-slide-ratio, 0.5625) + 24px + 46px);
+    flex: 0 1 auto;
+    height: calc((100vw - 48px) * var(--demo-slide-ratio, 0.5625) + 24px);
+  }
+  /* The strip under the slide, when the view switch and the zoom show (not in ribbon mode). */
+  .demo-docpane:has(> .demo-status) > .demo-canvas {
+    height: calc(
+      (100vw - 48px) * var(--demo-slide-ratio, 0.5625) + 24px + var(--demo-status-strip)
+    );
   }
   .demo-root .pptx-notes[data-open='true'] {
     flex: 1 1 auto;
-    min-height: 0;
+    min-height: 84px;
   }
 }
 
-/* A short window (a phone held sideways): the notes field keeps two lines, so the slide gets
-   the height and is never cut off. */
+/* A short window (a phone held sideways): the notes field keeps two lines and the slide padding
+   shrinks, so the slide gets the height and is not cut off. */
 @media (max-height: 500px) {
+  .demo-root {
+    --doc-slide-padding: 12px;
+  }
   .demo-root .pptx-notes__text {
     height: 40px;
+  }
+}
+/* A short, wide window: the view switch and the zoom move from the strip under the slide to a
+   column on its right (the group is about 200px wide, plus its inset), so they never cover it. */
+@media (max-height: 500px) and (min-width: 601px) {
+  .demo-docpane {
+    --demo-status-strip: 0px;
+  }
+  .demo-docpane:has(> .demo-status) > .demo-canvas {
+    padding-inline-end: 224px;
+  }
+}
+
+/* The narrowest phones: the logo leaves, so every control still fits. */
+@media (max-width: 360px) {
+  .demo-topbar .demo-brand {
+    display: none;
+  }
+  .demo-topbar,
+  .demo-topbar__actions {
+    gap: 0;
+  }
+}
+
+/* A touch screen: the top bar's controls grow to 40px, a size a finger can hit. */
+@media (pointer: coarse) {
+  .demo-topbar .demo-icon-btn,
+  .demo-topbar .demo-btn--sm,
+  .demo-topbar .demo-menubar .pptx-menubar__trigger {
+    min-width: 40px;
+    height: 40px;
+  }
+}
+@media (pointer: coarse) and (max-width: 600px) {
+  .demo-topbar {
+    gap: 2px;
+    padding-inline: 6px 4px;
+  }
+}
+/* A short window: the top bar and the toolbar dock get shorter, so the slide gets the height. */
+@media (max-height: 500px) {
+  .demo-topbar {
+    height: 46px;
+  }
+  .demo-dock {
+    padding-bottom: 4px;
   }
 }
 
