@@ -18,7 +18,7 @@ import type { PptxEditorInstance } from './pptx-editor-types.ts';
 import { focusSurfaceOf, surfaceInputOf, surfaceRootOf } from './surface-registry.ts';
 import { warnNoAltTextPopup, warnNoLinkPopup } from './dev-warnings.ts';
 import { asCut } from './removal-notice.ts';
-import { pastedCells } from './table-clipboard.ts';
+import { tablePaste } from './table-clipboard.ts';
 import type { ToolbarShownValue, ToolbarValueMap } from './toolbar-values.ts';
 import { canRenameSectionInPlace, runSectionSlot } from './section-renamers.ts';
 
@@ -312,10 +312,11 @@ export function runClipboardSlot(
         ?.readText()
         .then((data) => {
           if (!data) return;
-          // Tab-separated text, or any text on a cell range, fills cells (`table-clipboard.ts`).
-          const texts = pastedCells(editor.snapshot().selection, { text: data });
-          if (texts) editor.exec({ type: 'pasteCells', texts });
-          else editor.input('text', data);
+          // Tab-separated text, or any text on a cell range, fills cells; one copied cell
+          // goes in at the caret as text (`table-clipboard.ts`).
+          const paste = tablePaste(editor.snapshot().selection, { text: data });
+          if (paste && 'cells' in paste) editor.exec({ type: 'pasteCells', texts: paste.cells });
+          else editor.input('text', paste ? paste.text : data);
         })
         .catch(() => undefined);
       return;

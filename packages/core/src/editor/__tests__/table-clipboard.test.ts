@@ -21,7 +21,7 @@ import {
   copyCellsTo,
   parseCellsJson,
   parseTabSeparated,
-  pastedCells,
+  tablePaste,
   toTabSeparated,
 } from '../table-clipboard.ts';
 
@@ -242,7 +242,7 @@ describe('paste into cells', () => {
     expect(grid(e)[0][0]).toBe('a');
   });
 
-  test('one copied cell is its own text, unquoted; more cells are tab-separated', async () => {
+  test('one copied cell pastes at a caret as its text, from either clipboard format', async () => {
     const e = await open();
     const written = new Map<string, string>();
     const data = { setData: (format: string, value: string) => void written.set(format, value) };
@@ -255,10 +255,15 @@ describe('paste into cells', () => {
     // A control character in a pasted cell is dropped, not a refused paste.
     expect(parseTabSeparated('a\u0001b\tc')).toEqual([['ab', 'c']]);
     expect(parseCellsJson('[["a\\u0001b"]]')).toEqual([['ab']]);
-    // One copied cell at a caret pastes as text, even when that text holds a tab.
+    // One copied cell at a caret pastes as text, even when it holds a tab or a line break:
+    // from the cells format (Ctrl+V), and from its quoted plain text (the menu's Paste).
     caretIn(e, 1, 1);
     const sel = e.snapshot().selection;
-    expect(pastedCells(sel, { cells: '[["a\\tb"]]', text: 'a\tb' })).toBeNull();
+    expect(tablePaste(sel, { cells: '[["a\\tb"]]', text: '"a\tb"' })).toEqual({ text: 'a\tb' });
+    expect(tablePaste(sel, { text: '"x\ny"' })).toEqual({ text: 'x\ny' });
+    expect(tablePaste(sel, { text: '"5"" disk"' })).toEqual({ text: '5" disk' });
+    // Text that only starts with a quote is not a quoted cell.
+    expect(tablePaste(sel, { text: '"hi" she said' })).toBeNull();
   });
 
   test('pasteCells refuses texts that are not rows of strings', async () => {
@@ -273,16 +278,18 @@ describe('paste into cells', () => {
     caretIn(e, 0, 0);
     const sel = e.snapshot().selection;
     // One copied cell pastes as text at the caret, as the toolbar's Paste does; more fill cells.
-    expect(pastedCells(sel, { cells: '[["a"]]', text: 'a' })).toBeNull();
-    expect(pastedCells(sel, { cells: '[["a"],["b"]]', text: 'a\nb' })).toEqual([['a'], ['b']]);
-    expect(pastedCells(sel, { text: 'a\tb' })).toEqual([['a', 'b']]);
+    expect(tablePaste(sel, { cells: '[["a"]]', text: 'a' })).toEqual({ text: 'a' });
+    expect(tablePaste(sel, { cells: '[["a"],["b"]]', text: 'a\nb' })).toEqual({
+      cells: [['a'], ['b']],
+    });
+    expect(tablePaste(sel, { text: 'a\tb' })).toEqual({ cells: [['a', 'b']] });
     // Plain text into a caret is the cell's own text paste.
-    expect(pastedCells(sel, { text: 'plain\ntext' })).toBeNull();
+    expect(tablePaste(sel, { text: 'plain\ntext' })).toBeNull();
     range(e, 0, 0, 1, 1);
-    expect(pastedCells(e.snapshot().selection, { text: 'plain' })).toEqual([['plain']]);
+    expect(tablePaste(e.snapshot().selection, { text: 'plain' })).toEqual({ cells: [['plain']] });
     // Outside a table, never.
     e.setSelection({ kind: 'none' });
-    expect(pastedCells(e.snapshot().selection, { text: 'a\tb' })).toBeNull();
+    expect(tablePaste(e.snapshot().selection, { text: 'a\tb' })).toBeNull();
     expect(CELLS_MIME).toContain('cells');
   });
 });

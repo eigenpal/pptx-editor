@@ -789,11 +789,11 @@ export class SlideSurface {
       this.editor.transform([toFile(item, { ...x, rot })], d.gesture);
       return;
     }
-    ({ dx, dy } = clampTableResize(item, [hx, hy], dx, dy, layout.slide));
-    const s0 = toParent(item, d.start.x, d.start.y);
-    const s1 = toParent(item, d.start.x + dx, d.start.y + dy);
     const locked = !!this.editor.aspectLocked?.(item.element.nodeId);
     const keep = { shift: e.shiftKey, locked };
+    ({ dx, dy } = clampTableResize(item, [hx, hy], dx, dy, layout.slide, e.shiftKey || locked));
+    const s0 = toParent(item, d.start.x, d.start.y);
+    const s1 = toParent(item, d.start.x + dx, d.start.y + dy);
     const one = resizeOne(item, x, [hx, hy], s1.x - s0.x, s1.y - s0.y, keep);
     this.editor.transform([one], d.gesture);
   };

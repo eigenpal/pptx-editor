@@ -124,31 +124,39 @@ export function parseCellsJson(raw: string): string[][] | null {
   return rows;
 }
 
+/** What a paste does in a table: fill cells, insert one cell's text at the caret, or neither. */
+export type TablePaste = { readonly cells: string[][] } | { readonly text: string } | null;
+
+/** One quoted cell, as a copy of one cell with a tab, a line break, or a quote writes it. */
+const ONE_QUOTED = /^"(?:[^"]|"")*"$/;
+
 /**
- * The cell texts a paste puts into a table, or null to paste as text. A cell range takes any
- * text; a caret in a cell takes a copied range of more than one cell or tab-separated text, and
- * leaves other text (one copied cell too) to the cell's own text paste at the caret.
+ * What a paste does in a table. A cell range takes any text as cells. A caret in a cell takes a
+ * copied range of more than one cell, or tab-separated text, as cells; one copied cell (from the
+ * cells format, or as one quoted cell of plain text) goes in as text at the caret, unquoted.
+ * Other text is null: the cell's own text paste. Outside a table, null.
  */
-export function pastedCells(
+export function tablePaste(
   sel: EditorSelection,
   data: { readonly cells?: string | null; readonly text?: string | null }
-): string[][] | null {
+): TablePaste {
   const inTable = sel.kind === 'cells' || (sel.kind === 'text' && !!sel.cell);
   if (!inTable) return null;
   const copied = data.cells ? parseCellsJson(data.cells) : null;
-  const many = !!copied && (copied.length > 1 || copied[0].length > 1);
-  if (copied && (sel.kind === 'cells' || many)) return copied;
-  // One copied cell at a caret: its plain text (unquoted, see copyCellsTo) goes in as text.
-  if (copied) return null;
   const text = data.text ?? '';
-  if (!text) return null;
-  if (sel.kind === 'cells' || text.includes('\t')) return parseTabSeparated(text);
-  return null;
+  const rows =
+    copied ??
+    (text && (sel.kind === 'cells' || text.includes('\t') || ONE_QUOTED.test(text))
+      ? parseTabSeparated(text)
+      : null);
+  if (!rows) return null;
+  const one = rows.length === 1 && rows[0].length === 1;
+  return sel.kind === 'text' && one ? { text: rows[0][0] } : { cells: rows };
 }
 
 /**
- * Write a cell range to a clipboard event's data: tab-separated text (one cell: its own text),
- * and the cells format that a paste in this editor reads. Returns false when the selection is not a cell range.
+ * Write a cell range to a clipboard event's data: tab-separated text, and the cells format that
+ * a paste in this editor reads. Returns false when the selection is not a cell range.
  */
 export function copyCellsTo(
   data: { setData(format: string, value: string): void },
@@ -158,16 +166,14 @@ export function copyCellsTo(
   const rows = cellRangeTexts(layout, sel);
   if (!rows) return false;
   data.setData(CELLS_MIME, JSON.stringify(rows));
-  // One cell is its own text, unquoted, so a paste at a caret inserts it as typed.
-  const one = rows.length === 1 && rows[0].length === 1;
-  data.setData('text/plain', one ? rows[0][0] : toTabSeparated(rows));
+  data.setData('text/plain', toTabSeparated(rows));
   return true;
 }
 
-/** The cell texts that a clipboard event pastes into the table of `sel`, or null. */
-export function cellsFrom(
+/** What a clipboard event's paste does in the table of `sel` (`tablePaste`). */
+export function tablePasteFrom(
   data: { getData(format: string): string },
   sel: EditorSelection
-): string[][] | null {
-  return pastedCells(sel, { cells: data.getData(CELLS_MIME), text: data.getData('text/plain') });
+): TablePaste {
+  return tablePaste(sel, { cells: data.getData(CELLS_MIME), text: data.getData('text/plain') });
 }

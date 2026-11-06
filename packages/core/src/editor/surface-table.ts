@@ -272,22 +272,33 @@ export class TableGestures {
 /**
  * A table frame's resize: its right and bottom edges stop at the slide's edge, as its grid
  * edges do, so a handle never leaves the place where the pointer can grab it again. `handle` is
- * the dragged handle's place on the box; `dx` and `dy` are in slide units.
+ * the dragged handle's place on the box; `dx` and `dy` are in slide units. With `aspect` (Shift
+ * or a locked aspect ratio on a corner), the scale stops where the first edge meets the slide's.
  */
 export function clampTableResize(
   item: LayoutItem,
   handle: readonly [number, number],
   dx: number,
   dy: number,
-  slide: { readonly width: number; readonly height: number }
+  slide: { readonly width: number; readonly height: number },
+  aspect = false
 ): { dx: number; dy: number } {
   if (item.kind !== 'frame' || !item.table) return { dx, dy };
-  const end = apply(item.matrix, item.element.xfrm.cx, item.element.xfrm.cy);
-  return {
-    dx: handle[0] === 1 ? Math.min(dx, Math.max(0, slide.width - end.x)) : dx,
-    dy: handle[1] === 1 ? Math.min(dy, Math.max(0, slide.height - end.y)) : dy,
-  };
+  const { cx, cy } = item.element.xfrm;
+  const end = apply(item.matrix, cx, cy);
+  const roomX = handle[0] === 1 ? Math.max(0, slide.width - end.x) : Infinity;
+  const roomY = handle[1] === 1 ? Math.max(0, slide.height - end.y) : Infinity;
+  const corner = handle[0] !== 0.5 && handle[1] !== 0.5;
+  if (aspect && corner && cx > 0 && cy > 0) {
+    // The largest scale that keeps both dragged edges on the slide.
+    const grow = Math.min(roomX / cx, roomY / cy);
+    const limit = (d: number, size: number, toward: number): number =>
+      toward === 1 ? Math.min(d, grow * size) : toward === 0 ? Math.max(d, -grow * size) : d;
+    return { dx: limit(dx, cx, handle[0]), dy: limit(dy, cy, handle[1]) };
+  }
+  return { dx: Math.min(dx, roomX), dy: Math.min(dy, roomY) };
 }
+
 /** The highlight of a selected cell range, editing chrome over the slide. */
 export function cellsOverlay(
   doc: Document,

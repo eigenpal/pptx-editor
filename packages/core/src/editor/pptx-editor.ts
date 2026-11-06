@@ -81,7 +81,7 @@ import { selectionBody, snapCellAddress, textItemOf } from './table-cells.ts';
 import { repairTablesForSave } from '../automation/commands/table-repair.ts';
 import { withoutStaleCopies } from '../automation/commands/alternate-copies.ts';
 import { applyTableKey, firstCellCaret, tableKeyAction } from './table-keys.ts';
-import { cellsFrom, copyCellsTo } from './table-clipboard.ts';
+import { copyCellsTo, tablePasteFrom } from './table-clipboard.ts';
 import { createTableStateSource } from './table-state.ts';
 import { createThemeColorSource } from './theme-palette.ts';
 import { createSlideSummaries, SlideSelection } from './slide-selection.ts';
@@ -729,9 +729,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
    */
   const pasteFrom = (data: DataTransfer): boolean => {
     if (mode === 'view') return false;
-    // Copied cells, or tab-separated text, fill the cells of a table selection.
-    const texts = cellsFrom(data, selection);
-    if (texts) return (exec({ type: 'pasteCells', texts }), true);
+    // Copied cells or tab-separated text fill cells; one copied cell goes in at the caret.
+    const paste = tablePasteFrom(data, selection);
+    if (paste && 'cells' in paste) return (exec({ type: 'pasteCells', texts: paste.cells }), true);
+    if (paste) return (textInput('text', paste.text), true);
     if (selection.kind === 'text') return false;
     // A payload parsed once is cached by its text, so a paste series keeps one identity.
     const read = readClipboard(data, lastCopied, (raw) => {
