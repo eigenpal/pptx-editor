@@ -367,7 +367,8 @@ export function compile(
     command.type === 'redo' ||
     command.type === 'toggleSmartGuides' ||
     command.type === 'setPresentationView' ||
-    command.type === 'setSectionsCollapsed'
+    command.type === 'setSectionsCollapsed' ||
+    command.type === 'setTableBorderPen'
   )
     throw new Error('history and view commands do not compile');
   if (ctx.readOnly) throw new CommandRefusal('disabled.viewing');

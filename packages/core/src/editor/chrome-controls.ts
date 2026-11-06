@@ -37,8 +37,12 @@ import {
   slideSlotValue,
 } from './chrome-slide-groups.ts';
 import {
+  type TableSlotId,
   TABLE_GROUPS,
   TABLE_PROBES,
+  armTableBorderPen,
+  rememberTableBorderPen,
+  tableBorderPen,
   tableSlotState,
   tableSlotActive,
   tableSlotValue,
@@ -769,27 +773,7 @@ export type ChromeSlotId =
   | 'section.removeAll'
   | 'section.collapseAll'
   | 'section.expandAll'
-  | 'table.insert'
-  | 'table.style'
-  | 'table.headerRow'
-  | 'table.totalRow'
-  | 'table.bandedRows'
-  | 'table.firstColumn'
-  | 'table.lastColumn'
-  | 'table.bandedColumns'
-  | 'table.cellFill'
-  | 'table.borderTarget'
-  | 'table.select'
-  | 'table.delete'
-  | 'table.insertRowAbove'
-  | 'table.insertRowBelow'
-  | 'table.insertColumnLeft'
-  | 'table.insertColumnRight'
-  | 'table.mergeCells'
-  | 'table.splitCell'
-  | 'table.distributeRows'
-  | 'table.distributeColumns'
-  | 'table.cellMargins'
+  | TableSlotId
   | ImageSlotId;
 
 /** Every slot id, derived from the registry. @public */
@@ -918,7 +902,7 @@ export function toolbarCommandState(editor: Editor | null, id: ChromeSlotId): To
                                 ? snap.geometry?.lineTail
                                 : (slideSlotValue(id, snap) ??
                                   shapeFormatSlotValue(id, snap) ??
-                                  tableSlotValue(id, snap))));
+                                  tableSlotValue(id, snap, tableBorderPen(editor)))));
   return {
     id,
     enabled: can.ok,
@@ -972,7 +956,7 @@ export function runToolbarCommand<K extends ChromeSlotId>(
     warnDialogSlotRun(id, dialog, row?.value);
     return { ok: false as const, reason: 'disabled.dialogSlot' };
   }
-  const command = value === undefined ? commandForSlot(id) : commandForSlotValue(id, value);
+  const command = value === undefined ? commandForSlot(id) : commandForSlotValue(id, value, editor);
   if (!command) {
     const state = chromeControlForSlot(id)?.state;
     if (state?.kind === 'pane') return { ok: false as const, reason: 'disabled.paneNotBuilt' };
@@ -986,5 +970,11 @@ export function runToolbarCommand<K extends ChromeSlotId>(
     warnInvalidSlotValue(id, value);
     return { ok: false as const, reason: 'disabled.invalidValue' };
   }
-  return editor.exec(command, options);
+  // A pen pick before any border target pick arms the pen and writes nothing.
+  const armed = armTableBorderPen(editor, id, value, command);
+  if (armed) return armed;
+  const result = editor.exec(command, options);
+  // A refused draw (no table) leaves the pen as it was.
+  if (result.ok) rememberTableBorderPen(editor, id, value);
+  return result;
 }

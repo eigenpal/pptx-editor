@@ -568,7 +568,7 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'partial',
     tier: 'community',
-    notes: `Click in a cell and type. Text commands work in a cell, a cell range, or the whole table. Tab and Shift+Tab move between cells. Tab in the last cell adds a row. ${TABLE_SAVE}`,
+    notes: `Click in a cell and type. Text commands work in a cell, a cell range, or the whole table. Tab and Shift+Tab move between cells. Tab in the last cell adds a row. Shift+Arrow at a cell's edge selects a cell range. Copy, cut, and paste a cell range as tab-separated text; a paste larger than the table adds rows and columns. ${TABLE_SAVE}`,
     docsLink: '/docs/guides/tables',
   },
   {
@@ -612,7 +612,7 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'partial',
     tier: 'community',
-    notes: `Shading takes a color or No Fill. Borders use one pen: 1 pt, Text 1. Diagonal borders and cell effects are not editable. ${TABLE_SAVE}`,
+    notes: `Shading takes a color or No Fill. Borders draw with a pen of a color, a preset dash, and a weight. Diagonal borders and cell effects are not editable. ${TABLE_SAVE}`,
     docsLink: '/docs/guides/tables',
   },
   {
@@ -623,7 +623,7 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'partial',
     tier: 'community',
-    notes: `Drag an inner grid line, distribute rows and columns, or resize the frame by its handles (the columns and rows scale; how the change is shared among them is approximate). Row heights stay minimums, so rows grow to fit text. ${TABLE_SAVE}`,
+    notes: `Drag a grid line (the line under the pointer is marked), distribute rows and columns, type a row height or column width in the Format panel, or resize the frame by its handles (the columns and rows scale; how the change is shared among them is approximate). Row heights stay minimums, so rows grow to fit text. ${TABLE_SAVE}`,
     docsLink: '/docs/guides/tables',
   },
 

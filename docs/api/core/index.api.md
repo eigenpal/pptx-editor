@@ -243,10 +243,10 @@ export type CanResult = {
 export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly ChromeMenuEntry[]>>;
 
 // @public
-export type CanvasMenuKind = 'shapes' | 'picture' | 'text' | 'table' | 'slide';
+export type CanvasMenuKind = 'shapes' | 'picture' | 'text' | 'table' | 'tableFrame' | 'slide';
 
 // @internal
-export function canvasMenuKind(snapshot: Pick<EditorSnapshot, 'selection' | 'image'>): CanvasMenuKind;
+export function canvasMenuKind(snapshot: Pick<EditorSnapshot, 'selection' | 'image'> & Partial<Pick<EditorSnapshot, 'table'>>): CanvasMenuKind;
 
 // @internal
 export function canvasMenuLabelKey(kind: CanvasMenuKind): 'contextMenu.textLabel' | 'contextMenu.tableLabel' | 'contextMenu.shapeLabel' | 'contextMenu.pictureLabel' | 'contextMenu.canvasLabel';
@@ -480,7 +480,7 @@ export function chromeOptionChecked(value: unknown, option: string): boolean;
 export function chromeRowState(editor: PptxEditorInstance | null, slot: ChromeSlotId, value?: string, host?: Pick<ChromeActionHost, 'unavailable'>): ChromeCommandState;
 
 // @public
-export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | 'table.insert' | 'table.style' | 'table.headerRow' | 'table.totalRow' | 'table.bandedRows' | 'table.firstColumn' | 'table.lastColumn' | 'table.bandedColumns' | 'table.cellFill' | 'table.borderTarget' | 'table.select' | 'table.delete' | 'table.insertRowAbove' | 'table.insertRowBelow' | 'table.insertColumnLeft' | 'table.insertColumnRight' | 'table.mergeCells' | 'table.splitCell' | 'table.distributeRows' | 'table.distributeColumns' | 'table.cellMargins' | ImageSlotId;
+export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | TableSlotId | ImageSlotId;
 
 // @public
 export function chromeSlotIds(): ChromeSlotId[];
@@ -811,7 +811,7 @@ export interface CommandEffect {
 export function commandForSlot(slot: ChromeSlotId): EditorCommand | null;
 
 // @public
-export function commandForSlotValue(slot: ChromeSlotId, value: unknown): EditorCommand | null;
+export function commandForSlotValue(slot: ChromeSlotId, value: unknown, editor?: Editor | null): EditorCommand | null;
 
 // @public
 export class CommandRefusal extends Error {
@@ -887,6 +887,9 @@ export const CONTEXT_MENU_NAMED_PARTS: {
     readonly DeleteTableRow: MenuNamedRow;
     readonly DeleteTableColumn: MenuNamedRow;
     readonly DeleteTable: MenuNamedRow;
+    readonly SelectTable: MenuNamedRow;
+    readonly SelectTableRow: MenuNamedRow;
+    readonly SelectTableColumn: MenuNamedRow;
     readonly BringToFront: MenuNamedRow;
     readonly SendToBack: MenuNamedRow;
     readonly BringForward: MenuNamedRow;
@@ -1032,6 +1035,9 @@ export const DEFAULT_FONT: FontConfiguration['defaultFont'];
 
 // @internal
 export const DEFAULT_GRADIENT: GradientFill;
+
+// @public
+export const DEFAULT_TABLE_BORDER_PEN: TableBorderPen;
 
 // @internal
 export function defaultFillChoice(accent1: string | undefined): {
@@ -1541,6 +1547,14 @@ export type EditorCommand = {
 | {
     readonly type: 'toggleSmartGuides';
 }
+/**
+* Set the table border pen (`snapshot.tableBorderPen`) that the Borders menu draws with. A
+* setting of this editor, not an edit: no undo step, never saved.
+*/
+| {
+    readonly type: 'setTableBorderPen';
+    readonly pen: TableBorderPen;
+}
 /** View > Normal or Slide Sorter. A view setting, not an edit: no undo step, never saved. */
 | {
     readonly type: 'setPresentationView';
@@ -1894,6 +1908,7 @@ export interface EditorSnapshot {
     readonly status: 'empty' | 'loading' | 'ready' | 'error';
     readonly substitutedFonts: readonly EditorFontSubstitution[];
     readonly table?: TableContext | null;
+    readonly tableBorderPen?: TableBorderPen;
     readonly themeColors: readonly (readonly ThemeSwatch[])[];
     // (undocumented)
     readonly zoom: number;
@@ -1913,6 +1928,9 @@ export type ElementKindLabelKey = 'panel.format.elementKind.shape' | 'panel.form
 
 // @internal
 export function elementKindLabelKey(geometry: Pick<SelectionGeometry, 'kind' | 'nodeId'>, table: EditorSnapshot['table']): ElementKindLabelKey;
+
+// @internal
+export function elementRotates(geometry: Pick<SelectionGeometry, 'nodeId'>, table: EditorSnapshot['table']): boolean;
 
 // @public
 export function embeddedFontSources(pkg: PptxPackage): {
@@ -3474,6 +3492,12 @@ export interface PaneKeyEvent {
 }
 
 // @internal
+export function panelHistoryKey(e: ModifierKeys & {
+    readonly target: unknown;
+    preventDefault(): void;
+}, editor: Pick<PptxEditorInstance, 'exec'> | null | undefined): boolean;
+
+// @internal
 export function panelItems(panel: HTMLElement): HTMLElement[];
 
 // @internal
@@ -4893,8 +4917,21 @@ export const TABLE_GRID_COLUMNS = 10;
 // @internal (undocumented)
 export const TABLE_GRID_ROWS = 8;
 
+// @internal
+export const TABLE_OPTION_ROWS: readonly TableOptionRow[];
+
 // @public
 export type TableBorderEdgeTarget = Exclude<TableBorderTarget, 'none'>;
+
+// @public
+export interface TableBorderPen {
+    readonly drawn: boolean;
+    readonly spec: TableBorderSpec;
+    readonly target: TableBorderEdgeTarget;
+}
+
+// @public
+export function tableBorderPen(editor: Editor | null | undefined): TableBorderPen;
 
 // @public
 export interface TableBorderSpec {
@@ -5001,6 +5038,17 @@ export type TableCommand =
     readonly type: 'setColumnWidth';
     readonly width: number;
 }
+/**
+* Fill cells with plain text from the top-left cell of the selection (a paste of copied
+* cells): one array for each row, one string for each cell. Each written cell keeps the format
+* of its first run. Text past the table's edge adds rows at the bottom and columns at the end of the grid (the right, or the left in a right-to-left table)
+* (new columns share the table's width), up to the table limits; a position inside a merged
+* cell is skipped.
+*/
+| {
+    readonly type: 'pasteCells';
+    readonly texts: readonly (readonly string[])[];
+}
 /** Give the selected rows (or every row) the same height. */
 | {
     readonly type: 'distributeRows';
@@ -5068,6 +5116,17 @@ export interface TableGridSize {
     // (undocumented)
     readonly rows: number;
 }
+
+// @internal
+export interface TableOptionRow {
+    // (undocumented)
+    readonly labelKey: 'table.headerRow' | 'table.totalRow' | 'table.bandedRows' | 'table.firstColumn' | 'table.lastColumn' | 'table.bandedColumns';
+    // (undocumented)
+    readonly option: TableStyleOption;
+}
+
+// @public
+export type TableSlotId = 'table.insert' | 'table.style' | 'table.headerRow' | 'table.totalRow' | 'table.bandedRows' | 'table.firstColumn' | 'table.lastColumn' | 'table.bandedColumns' | 'table.cellFill' | 'table.borderTarget' | 'table.borderColor' | 'table.borderStyle' | 'table.borderWidth' | 'table.select' | 'table.delete' | 'table.insertRowAbove' | 'table.insertRowBelow' | 'table.insertColumnLeft' | 'table.insertColumnRight' | 'table.mergeCells' | 'table.splitCell' | 'table.distributeRows' | 'table.distributeColumns' | 'table.cellMargins';
 
 // @public
 export interface TableStyleChoice {
@@ -5317,6 +5376,9 @@ export const TOOLBAR_NAMED_PARTS: {
     readonly TableBandedColumns: "table.bandedColumns";
     readonly TableCellFill: "table.cellFill";
     readonly TableBorderTarget: "table.borderTarget";
+    readonly TableBorderColor: "table.borderColor";
+    readonly TableBorderStyle: "table.borderStyle";
+    readonly TableBorderWidth: "table.borderWidth";
     readonly TableSelect: "table.select";
     readonly TableDelete: "table.delete";
     readonly TableInsertRowAbove: "table.insertRowAbove";

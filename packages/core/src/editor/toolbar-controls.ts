@@ -49,8 +49,9 @@ export function toolbarSplitDefaultColor(
   text1: string | undefined
 ): ToolbarPickedColor {
   if (slot === 'text.highlight') return { choice: '#FFFF00', color: '#FFFF00' };
-  if (slot === 'shape.lineColor' && text1) return { choice: { theme: 'tx1' }, color: text1 };
-  if (slot === 'shape.lineColor') return { choice: '#000000', color: '#000000' };
+  const outline = slot === 'shape.lineColor' || slot === 'table.borderColor';
+  if (outline && text1) return { choice: { theme: 'tx1' }, color: text1 };
+  if (outline) return { choice: '#000000', color: '#000000' };
   return { choice: '#C00000', color: '#C00000' };
 }
 

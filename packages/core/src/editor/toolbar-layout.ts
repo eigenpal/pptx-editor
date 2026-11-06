@@ -111,6 +111,9 @@ export const TOOLBAR_NAMED_PARTS = {
   TableBandedColumns: 'table.bandedColumns',
   TableCellFill: 'table.cellFill',
   TableBorderTarget: 'table.borderTarget',
+  TableBorderColor: 'table.borderColor',
+  TableBorderStyle: 'table.borderStyle',
+  TableBorderWidth: 'table.borderWidth',
   TableSelect: 'table.select',
   TableDelete: 'table.delete',
   TableInsertRowAbove: 'table.insertRowAbove',
@@ -162,7 +165,6 @@ export const TOOLBAR_COLLAPSE_ORDER: readonly ChromeGroup['id'][] = [
   'more',
   'slide',
   'arrange',
-  'table',
   'format',
   'shape',
   'script',
@@ -171,6 +173,9 @@ export const TOOLBAR_COLLAPSE_ORDER: readonly ChromeGroup['id'][] = [
   'insert',
   'list',
   'paragraph',
+  // The contextual table group shows only while the selection is in a table: the table is the
+  // task then, so its controls stay on the bar after the list and paragraph controls.
+  'table',
   // The font pair leaves before the text formatting, as in DOCX Editor's order.
   'font',
   'text',

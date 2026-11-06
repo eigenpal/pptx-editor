@@ -115,6 +115,21 @@ export function blockOf(m: TableModel, at: TableCellAddress): CellRange {
   return { r0: a.row, r1, c0: a.column, c1 };
 }
 
+/**
+ * The cells a cell range selects: a whole row or column band (every row, or every column) is
+ * its own grid lines, as Select Row and Select Column name them; any other range grows over the
+ * merged cells that cross its edge (`expandRange`). The canvas highlight reads the same rule
+ * (`selectedLayoutRange`), so what shows selected is what a command changes.
+ */
+export function selectedRange(m: TableModel, range: CellRange): CellRange {
+  return isBand(range, m.nR, m.nC) ? range : expandRange(m, range);
+}
+
+/** Whether a range covers every row or every column of a grid of `rows` × `columns`. */
+export function isBand(range: CellRange, rows: number, columns: number): boolean {
+  return (range.r0 === 0 && range.r1 === rows - 1) || (range.c0 === 0 && range.c1 === columns - 1);
+}
+
 /** A range grown until no merged block crosses its edge. */
 export function expandRange(m: TableModel, range: CellRange): CellRange {
   let r0 = Math.max(0, Math.min(range.r0, m.nR - 1));
@@ -320,14 +335,16 @@ function afterLast(parent: Element, locals: readonly string[]): number {
 /**
  * Insert `count` rows at row index `at` (0 to the row count), formatted like row `source`. A
  * merged block that crosses the insertion line grows over the new rows; elsewhere the new rows
- * repeat the source row's horizontal merges.
+ * repeat the source row's horizontal merges, or hold one cell per column when `plain` (a paste
+ * fills every new cell).
  */
 export function insertRows(
   batch: OpBatch,
   m: TableModel,
   at: number,
   count: number,
-  source: number
+  source: number,
+  plain = false
 ): void {
   if (m.nR + count > MAX_ROWS) throw new CommandRefusal('disabled.tableTooLarge');
   const grown = new Set<string>();
@@ -349,9 +366,10 @@ export function insertRows(
         rows[i].push(newCellSpec(m.tcs[at][c], blockAttrs(grownBlock, at + i, c)));
     } else {
       const b = blockOf(m, m.anchors[source][c]);
-      const line = { r0: 0, r1: 0, c0: b.c0, c1: b.c1 };
+      const line = plain ? { r0: 0, r1: 0, c0: c, c1: c } : { r0: 0, r1: 0, c0: b.c0, c1: b.c1 };
+      // A covered cell holds no fill of its own: the new cell takes its block's anchor's look.
       for (let i = 0; i < count; i += 1)
-        rows[i].push(newCellSpec(m.tcs[source][c], blockAttrs(line, 0, c)));
+        rows[i].push(newCellSpec(m.tcs[b.r0][b.c0], blockAttrs(line, 0, c)));
     }
   }
   const before = m.rows[at];
@@ -373,14 +391,16 @@ export function insertRows(
 /**
  * Insert `count` columns at grid index `at`, as wide as column `source` and formatted like it.
  * A merged block that crosses the insertion line grows over the new columns; elsewhere the new
- * columns repeat the source column's vertical merges.
+ * columns repeat the source column's vertical merges, or hold one cell per row when `plain` (a
+ * paste fills every new cell).
  */
 export function insertColumns(
   batch: OpBatch,
   m: TableModel,
   at: number,
   count: number,
-  source: number
+  source: number,
+  plain = false
 ): void {
   if (m.nC + count > MAX_TABLE_SIZE) throw new CommandRefusal('disabled.tableTooLarge');
   const w = String(intAttr(m.gridCols[source], 'w') ?? 0);
@@ -414,9 +434,10 @@ export function insertColumns(
         specs.push(newCellSpec(m.tcs[r][at], blockAttrs(grownBlock, r, at + i)));
     } else {
       const b = blockOf(m, m.anchors[r][source]);
-      const line = { r0: b.r0, r1: b.r1, c0: 0, c1: 0 };
+      const line = plain ? { r0: r, r1: r, c0: 0, c1: 0 } : { r0: b.r0, r1: b.r1, c0: 0, c1: 0 };
+      // A covered cell holds no fill of its own: the new cell takes its block's anchor's look.
       for (let i = 0; i < count; i += 1)
-        specs.push(newCellSpec(m.tcs[r][source], blockAttrs(line, r, 0)));
+        specs.push(newCellSpec(m.tcs[b.r0][b.c0], blockAttrs(line, r, 0)));
     }
     const next = m.tcs[r][at];
     const index = next ? tr.children.findIndex((n) => n.id === next.id) : afterLast(tr, ['tc']);
@@ -685,4 +706,70 @@ function clearCell(batch: OpBatch, part: string, tc: Element): void {
 /** Remove the text of the cells in a range, keeping one paragraph with its format. */
 export function clearRange(batch: OpBatch, m: TableModel, range: CellRange): void {
   for (const a of anchorsIn(m, range)) clearCell(batch, m.part, m.tcs[a.row][a.column]);
+}
+
+const textRun = (line: string, rPr: Element | undefined): NodeSpec => ({
+  ns: NS.a,
+  local: 'r',
+  prefix: 'a',
+  children: [
+    ...(rPr ? [specOf(rPr)] : []),
+    { ns: NS.a, local: 't', prefix: 'a', children: [{ text: line }] },
+  ],
+});
+
+/**
+ * Replace the text of the cell at grid position `at` (a drawn cell's top-left position) with
+ * plain `text`: one paragraph for each line, each with the first paragraph's properties, and
+ * every run in the character format of the cell's first run.
+ */
+export function setCellText(
+  batch: OpBatch,
+  m: TableModel,
+  at: TableCellAddress,
+  text: string
+): void {
+  const tc = m.tcs[at.row][at.column];
+  if (!child(tc, 'a:txBody'))
+    batch.insert({
+      op: 'insertNode',
+      part: m.part,
+      parent: tc.id,
+      index: 0,
+      spec: emptyBodySpec(tc),
+    });
+  const body = child(batch.element(m.part, tc.id), 'a:txBody')!;
+  const [first] = paragraphsOf(body);
+  const run = first ? elements(first).find((e) => e.kind === 'run') : undefined;
+  const rPr = run ? child(run, 'a:rPr') : undefined;
+  const pPr = first ? child(first, 'a:pPr') : undefined;
+  const endPr = first ? child(first, 'a:endParaRPr') : undefined;
+  clearCell(batch, m.part, batch.element(m.part, tc.id));
+  // An empty cell can still hold empty paragraphs (`clearCell` leaves them): one stays.
+  for (const p of paragraphsOf(child(batch.element(m.part, tc.id), 'a:txBody')!).slice(1))
+    batch.push({ op: 'removeNode', part: m.part, node: p.id });
+  const lines = text.split(/\r\n|\r|\n/);
+  if (!first) return;
+  if (lines[0])
+    batch.insert({
+      op: 'insertNode',
+      part: m.part,
+      parent: first.id,
+      index: pPr ? 1 : 0,
+      spec: textRun(lines[0], rPr),
+    });
+  const at0 = body.children.indexOf(first);
+  lines.slice(1).forEach((line, i) => {
+    const spec: NodeSpec = {
+      ns: NS.a,
+      local: 'p',
+      prefix: 'a',
+      children: [
+        ...(pPr ? [specOf(pPr)] : []),
+        ...(line ? [textRun(line, rPr)] : []),
+        ...(endPr ? [specOf(endPr)] : []),
+      ],
+    };
+    batch.insert({ op: 'insertNode', part: m.part, parent: body.id, index: at0 + 1 + i, spec });
+  });
 }

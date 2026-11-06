@@ -1,7 +1,8 @@
 // Keys in a table cell: Tab moves to the next cell and selects its text,
 // Shift+Tab to the previous cell, and Tab in the last cell adds a row and moves into it. An
-// arrow key at the edge of a cell's text moves into the next cell that way. Cells are visited in
-// reading order: the table layout lists drawn cells row by row.
+// arrow key at the edge of a cell's text moves into the next cell that way, and Shift+arrow there
+// starts a cell range with that cell. Cells are visited in reading order: the table layout lists
+// drawn cells row by row.
 
 import type { EditorCommand, EditorSelection, TableCellAddress } from '../contracts/index.ts';
 import { apply, invert, type SlideLayout } from '../layout/index.ts';
@@ -59,6 +60,22 @@ const ARROWS: Readonly<Record<string, readonly [number, number]>> = {
   ArrowDown: [1, 0],
 };
 
+/** The grid position one arrow step from a drawn cell, past its merge. */
+function stepFrom(
+  c: {
+    readonly row: number;
+    readonly col: number;
+    readonly rowSpan: number;
+    readonly gridSpan: number;
+  },
+  step: readonly [number, number]
+): TableCellAddress {
+  return {
+    row: step[0] > 0 ? c.row + c.rowSpan : step[0] < 0 ? c.row - 1 : c.row,
+    column: step[1] > 0 ? c.col + c.gridSpan : step[1] < 0 ? c.col - 1 : c.col,
+  };
+}
+
 /**
  * Keys with a cell range selected. Delete and Backspace clear the cells, Escape selects the
  * table, Tab and Shift+Tab select the text of the cell after (or before) the focus cell, an
@@ -91,10 +108,7 @@ function cellsKeyAction(
   }
   const step = ARROWS[key];
   if (!step) return null;
-  const c = here.cell;
-  const row = step[0] > 0 ? c.row + c.rowSpan : step[0] < 0 ? c.row - 1 : c.row;
-  const column = step[1] > 0 ? c.col + c.gridSpan : step[1] < 0 ? c.col - 1 : c.col;
-  const target = cellLayoutAt(frame.table, { row, column });
+  const target = cellLayoutAt(frame.table, stepFrom(here.cell, step));
   if (!target) return { select: () => sel };
   if (shift) {
     const to = addressOf(target);
@@ -134,6 +148,16 @@ export function tableKeyAction(
       command: { type: 'insertRow', where: 'below' },
       select: (l) => cellSelection(l, id, { row, column: 0 }, 'start'),
     };
+  }
+  const step = ARROWS[key];
+  if (shift && step) {
+    // Shift+arrow at the edge of the cell's text starts a cell range with the next cell.
+    const item = textItemOf(layout, sel);
+    if (!item || comparePoints(moveCaret(item, sel.focus, key), sel.focus) !== 0) return null;
+    const target = cellLayoutAt(frame.table, stepFrom(here.cell, step));
+    if (!target) return null;
+    const range = { anchor: addressOf(here), focus: addressOf(target) };
+    return { select: () => ({ kind: 'cells', nodeId: id, ...range }) };
   }
   if (shift || comparePoints(sel.anchor, sel.focus) !== 0) return null;
   const item = textItemOf(layout, sel);
