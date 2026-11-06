@@ -180,7 +180,7 @@ export class SlideSurface {
     this.#input.setAttribute('aria-multiline', 'true');
     this.#input.setAttribute('autocomplete', 'off');
     this.#input.setAttribute('autocorrect', 'off');
-    this.#input.spellcheck = false;
+    Object.assign(this.#input, { name: 'pptx-slide-text', spellcheck: false }); // Named, never submitted.
     this.#input.tabIndex = -1; // Not a Tab stop: the slide is; text selection focuses the input.
     // A screen reader hears which cell the caret is in after Tab or an arrow moves it.
     this.#live = doc.createElement('div');
