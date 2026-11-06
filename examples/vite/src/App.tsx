@@ -272,52 +272,55 @@ function Shell({
           }}
         />
       </header>
-      <div className="demo-dock">
-        {ribbon ? (
-          <PptxEditor.Ribbon />
-        ) : (
-          <PptxEditor.Toolbar>
-            <PptxEditor.Toolbar.ChangeCase hidden />
-            <PptxEditor.Toolbar.Link hidden />
-          </PptxEditor.Toolbar>
-        )}
-      </div>
-      <div
-        className={rail ? 'demo-workspace demo-workspace--rail' : 'demo-workspace'}
-        {...fileDrop}
-      >
-        {sorter ? null : <PptxEditor.SlideRail />}
-        {/* The slide sorter takes the canvas's place, so the status bar and the notices stay. */}
-        <div className="demo-docpane">
-          {sorter ? <PptxEditor.SlideSorter /> : null}
-          <div
-            className="demo-canvas"
-            hidden={sorter}
-            style={{ '--demo-slide-ratio': slideRatio } as CSSProperties}
-          >
-            <PptxEditor.Content />
-            <PptxEditor.FindBar />
-            <PptxEditor.Loading overlay />
-            <PptxEditor.FontNotice />
-          </div>
-          {/* The view switch and the zoom stay in view in both views, under the slide. */}
-          {ribbon ? null : (
-            <div className="demo-status">
-              <PptxEditor.StatusBar.Views />
-              <PptxEditor.ZoomPill />
-            </div>
+      <main className="demo-main">
+        <h1 className="demo-sr-only">{t('app.productName')}</h1>
+        <div className="demo-dock">
+          {ribbon ? (
+            <PptxEditor.Ribbon />
+          ) : (
+            <PptxEditor.Toolbar>
+              <PptxEditor.Toolbar.ChangeCase hidden />
+              <PptxEditor.Toolbar.Link hidden />
+            </PptxEditor.Toolbar>
           )}
-          <PptxEditor.NotesPane
-            defaultOpen={!PHONE_SCREEN}
-            {...(sorter ? { style: HIDDEN } : {})}
-          />
-          <PptxEditor.EditNotice />
-          <PptxEditor.OpenFailure />
-          {ribbon ? <PptxEditor.StatusBar /> : null}
         </div>
-        {panel ? <PptxEditor.SidePanel onClose={() => setPanel(false)} /> : null}
-        {dragging ? <div className="demo-drop">{t('app.dropHint')}</div> : null}
-      </div>
+        <div
+          className={rail ? 'demo-workspace demo-workspace--rail' : 'demo-workspace'}
+          {...fileDrop}
+        >
+          {sorter ? null : <PptxEditor.SlideRail />}
+          {/* The slide sorter takes the canvas's place, so the status bar and the notices stay. */}
+          <div className="demo-docpane">
+            {sorter ? <PptxEditor.SlideSorter /> : null}
+            <div
+              className="demo-canvas"
+              hidden={sorter}
+              style={{ '--demo-slide-ratio': slideRatio } as CSSProperties}
+            >
+              <PptxEditor.Content />
+              <PptxEditor.FindBar />
+              <PptxEditor.Loading overlay />
+              <PptxEditor.FontNotice />
+            </div>
+            {/* The view switch and the zoom stay in view in both views, under the slide. */}
+            {ribbon ? null : (
+              <div className="demo-status">
+                <PptxEditor.StatusBar.Views />
+                <PptxEditor.ZoomPill />
+              </div>
+            )}
+            <PptxEditor.NotesPane
+              defaultOpen={!PHONE_SCREEN}
+              {...(sorter ? { style: HIDDEN } : {})}
+            />
+            <PptxEditor.EditNotice />
+            <PptxEditor.OpenFailure />
+            {ribbon ? <PptxEditor.StatusBar /> : null}
+          </div>
+          {panel ? <PptxEditor.SidePanel onClose={() => setPanel(false)} /> : null}
+          {dragging ? <div className="demo-drop">{t('app.dropHint')}</div> : null}
+        </div>
+      </main>
       <PptxEditor.Slideshow />
       {children}
     </PptxEditor.Viewport>

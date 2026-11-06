@@ -251,43 +251,46 @@ function onDrop(e: DragEvent): void {
       </div>
       <input ref="fileInput" type="file" :accept="`.pptx,${PPTX_MIME}`" hidden @change="onFile" />
     </header>
-    <div class="demo-dock">
-      <PptxEditorRibbon v-if="ribbon" />
-      <PptxEditorToolbar v-else />
-    </div>
-    <div
-      :class="rail ? 'demo-workspace demo-workspace--rail' : 'demo-workspace'"
-      @dragover="onDragOver"
-      @dragleave="onDragLeave"
-      @drop="onDrop"
-    >
-      <PptxEditorSlideRail v-if="!sorter" />
-      <!-- The slide sorter takes the canvas's place, so the status bar and the notices stay. -->
-      <div class="demo-docpane">
-        <PptxEditorSlideSorter v-if="sorter" />
-        <div class="demo-canvas" :hidden="sorter" :style="{ '--demo-slide-ratio': slideRatio }">
-          <PptxEditorContent />
-          <PptxEditorFindBar />
-          <PptxEditorLoading overlay />
-          <PptxEditorFontNotice />
-        </div>
-        <!-- The view switch and the zoom stay in view in both views, under the slide. -->
-        <div v-if="!ribbon" class="demo-status">
-          <StatusBarViews />
-          <PptxEditorZoomPill />
-        </div>
-        <!-- The notes pane stays mounted in the slide sorter, so its open state and draft stay. -->
-        <PptxEditorNotesPane
-          :default-open="!phoneScreen"
-          :style="sorter ? { display: 'none' } : undefined"
-        />
-        <PptxEditorEditNotice />
-        <PptxEditorOpenFailure />
-        <PptxEditorStatusBar v-if="ribbon" />
+    <main class="demo-main">
+      <h1 class="demo-sr-only">{{ t('app.productName') }}</h1>
+      <div class="demo-dock">
+        <PptxEditorRibbon v-if="ribbon" />
+        <PptxEditorToolbar v-else />
       </div>
-      <PptxEditorSidePanel v-if="panel" :on-close="() => (panel = false)" />
-      <div v-if="dragging" class="demo-drop">{{ t('app.dropHint') }}</div>
-    </div>
+      <div
+        :class="rail ? 'demo-workspace demo-workspace--rail' : 'demo-workspace'"
+        @dragover="onDragOver"
+        @dragleave="onDragLeave"
+        @drop="onDrop"
+      >
+        <PptxEditorSlideRail v-if="!sorter" />
+        <!-- The slide sorter takes the canvas's place, so the status bar and the notices stay. -->
+        <div class="demo-docpane">
+          <PptxEditorSlideSorter v-if="sorter" />
+          <div class="demo-canvas" :hidden="sorter" :style="{ '--demo-slide-ratio': slideRatio }">
+            <PptxEditorContent />
+            <PptxEditorFindBar />
+            <PptxEditorLoading overlay />
+            <PptxEditorFontNotice />
+          </div>
+          <!-- The view switch and the zoom stay in view in both views, under the slide. -->
+          <div v-if="!ribbon" class="demo-status">
+            <StatusBarViews />
+            <PptxEditorZoomPill />
+          </div>
+          <!-- The notes pane stays mounted in the slide sorter, so its open state and draft stay. -->
+          <PptxEditorNotesPane
+            :default-open="!phoneScreen"
+            :style="sorter ? { display: 'none' } : undefined"
+          />
+          <PptxEditorEditNotice />
+          <PptxEditorOpenFailure />
+          <PptxEditorStatusBar v-if="ribbon" />
+        </div>
+        <PptxEditorSidePanel v-if="panel" :on-close="() => (panel = false)" />
+        <div v-if="dragging" class="demo-drop">{{ t('app.dropHint') }}</div>
+      </div>
+    </main>
     <PptxEditorSlideshow />
     <!-- Dialogs of the demo, inside the editor scope so the editor's tokens apply. -->
     <slot />

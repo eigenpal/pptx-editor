@@ -69,6 +69,7 @@ export function FontSizeSlider() {
   return (
     <input
       type="range"
+      aria-label="Font size"
       min={8}
       max={96}
       value={size.value ?? 18}
