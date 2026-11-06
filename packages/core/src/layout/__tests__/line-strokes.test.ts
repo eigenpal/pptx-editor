@@ -214,10 +214,27 @@ describe('line ends', () => {
     expect(points(both.ends[1].commands)[0]).toEqual([2, 0]);
   });
 
-  test('the reach of the widest head bounds every line end', () => {
+  test('the reach bounds every point of every line end, also on a line shorter than its head', () => {
     expect(lineEndReach(line())).toBe(0);
-    expect(lineEndReach(line({ width: PT, tail: end('oval', 'lg', 'lg') }))).toBe(
-      2.5 * 25_400 + PT / 2
-    );
+    const short: PathCommand[] = [STRAIGHT[0], { op: 'L', x: 2 * PT, y: 0 }];
+    const tip = short[1] as { x: number; y: number };
+    const sizes = ['sm', 'med', 'lg'] as const;
+    for (const type of ['triangle', 'stealth', 'diamond', 'oval', 'arrow'])
+      for (const w of sizes)
+        for (const len of sizes)
+          for (const width of [PT / 4, PT, 6 * PT]) {
+            const l = line({ width, tail: end(type, w, len) });
+            const reach = lineEndReach(l);
+            const [shape] = planStroke(short, l).ends;
+            const pad = shape.kind === 'stroke' ? shape.width / 2 : 0;
+            for (const c of shape.commands)
+              if (c.op !== 'Z')
+                expect(Math.hypot(c.x - tip.x, c.y - tip.y) + pad).toBeLessThanOrEqual(
+                  reach + 1e-6
+                );
+          }
+    // A lg triangle reaches its base corners, more than half its length from the tip.
+    const lg = lineEndReach(line({ tail: end('triangle', 'lg', 'lg') }));
+    expect(lg).toBeCloseTo(Math.hypot(5, 2.5) * 25_400, 3);
   });
 });

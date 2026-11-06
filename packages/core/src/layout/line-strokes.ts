@@ -130,13 +130,29 @@ function lineEndUnit(line: ResolvedLine, scale = 1): number {
 }
 
 /**
- * How far past the end point, in any direction, a line end of this outline can paint, in the
- * shape's local units: half of the widest head, or an open arrow's arm with its cap.
+ * How far from its end point, in any direction, a line end of this outline can paint, in the
+ * shape's local units: the farthest point of the head or the tail, with an arrow's stroke. A
+ * head on a line shorter than itself reaches past the other end of the line, so this bounds the
+ * ends of every line, short or long.
  * @internal
  */
 export function lineEndReach(line: ResolvedLine, scale = 1): number {
-  if (!drawsEnd(line.head) && !drawsEnd(line.tail)) return 0;
-  return (END_SIZE.lg / 2) * lineEndUnit(line, scale) + strokeWidth(line, scale) / 2;
+  const unit = lineEndUnit(line, scale);
+  const width = strokeWidth(line, scale);
+  let reach = 0;
+  for (const end of [line.head, line.tail]) {
+    if (!drawsEnd(end)) continue;
+    const shape = endShape(end, { x: 0, y: 0 }, { x: 1, y: 0 }, unit, width);
+    const pad = shape.kind === 'stroke' ? shape.width / 2 : 0;
+    // A curve lies inside its control points, so they bound it too.
+    for (const c of shape.commands) {
+      if (c.op === 'Z') continue;
+      const points = c.op === 'C' ? [c.x1, c.y1, c.x2, c.y2, c.x, c.y] : [c.x, c.y];
+      for (let i = 0; i < points.length; i += 2)
+        reach = Math.max(reach, Math.hypot(points[i], points[i + 1]) + pad);
+    }
+  }
+  return reach;
 }
 
 function drawsEnd(end: LineEnd | undefined): end is LineEnd {
