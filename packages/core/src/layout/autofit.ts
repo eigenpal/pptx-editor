@@ -19,11 +19,16 @@
 //   - A title (`title`, `ctrTitle`) takes one step at most: `fontScale="90000"` with no line
 //     spacing reduction. Text that still overflows at 90 % wraps and overflows the box.
 //   - Other text (a body placeholder, a text box): 10 % line-spacing reduction, then a 92.5 %
-//     font scale with it, then the 20 % reduction, then font scale in 7.5 % steps with the
-//     20 % reduction, down to 25 %. There is no 20 % step at full size. Measured on a text box
-//     of three 72 pt lines at 21 heights from 80 pt to 280 pt: every step from 100 % to 55 %
-//     appeared in this order. The steps below 55 % follow the same 7.5 % rule and are not
-//     measured. This is an APPROXIMATION, listed on the public fidelity page.
+//     font scale with it, then the 20 % reduction, then 85 % with the 10 % and then the 20 %
+//     reduction, then font scale in 7.5 % steps with the 20 % reduction, down to 25 %. There is
+//     no 20 % step at full size. Measured on a text box of three 72 pt lines at 21 heights from
+//     80 pt to 280 pt: every step from 100 % to 55 % appeared in this order, except 85 % with
+//     10 %, which lines alone never pick (it is taller than 92.5 % with 20 %). A body with
+//     spacing in points picks it (measured), and does not pick 62.5 % with 10 % with 7 pt to
+//     spare, so the 10 % steps stop at 85 %. The steps below 55 % follow the same 7.5 % rule
+//     and are not measured. This is an APPROXIMATION, listed on the public fidelity page.
+//   - Empty paragraphs at the end of the text do not count: the text fits when the paragraphs
+//     before them fit (measured with none, one, and two at the end of a body placeholder).
 
 import { XFRM_BOUND, type ResolvedShape } from '../cascade/index.ts';
 import { evaluateGeometry } from './geometry/geometry.ts';
@@ -43,7 +48,9 @@ const AUTOFIT_STEPS: readonly AutofitStep[] = [
   { scale: 1, reduction: 0 },
   { scale: 1, reduction: 0.1 },
   { scale: 0.925, reduction: 0.1 },
-  ...[0.925, 0.85, 0.775, 0.7, 0.625, 0.55, 0.475, 0.4, 0.325, 0.25].map((scale) => ({
+  { scale: 0.925, reduction: 0.2 },
+  { scale: 0.85, reduction: 0.1 },
+  ...[0.85, 0.775, 0.7, 0.625, 0.55, 0.475, 0.4, 0.325, 0.25].map((scale) => ({
     scale,
     reduction: 0.2,
   })),
@@ -237,13 +244,34 @@ export function columnFlowHeight(
   return hi;
 }
 
-/** The first step at which the text fits; the last step when none does (the text overflows). */
+/** A paragraph with no text, no line break, and no field: only its paragraph mark. */
+const isEmptyParagraph = (p: Text['paragraphs'][number]): boolean =>
+  p.runs.every((r) => r.kind === 'text' && r.text === '');
+
+/**
+ * The text that must fit for `normAutofit`: empty paragraphs at the end do not count, so a new
+ * empty line at the end does not shrink the text (measured: one, two, or no trailing empty
+ * paragraphs give the same scale). The first paragraph always stays.
+ */
+function fittedText(text: Text): Text {
+  let end = text.paragraphs.length;
+  while (end > 1 && isEmptyParagraph(text.paragraphs[end - 1]!)) end -= 1;
+  return end === text.paragraphs.length
+    ? text
+    : { ...text, paragraphs: text.paragraphs.slice(0, end) };
+}
+
+/**
+ * The first step at which the text fits; the last step when none does (the text overflows).
+ * Empty paragraphs at the end are not measured (`fittedText`).
+ */
 export function chooseNormAutofit(
-  text: Text,
+  full: Text,
   rect: Rect,
   measurer: TextMeasurer,
   steps: readonly AutofitStep[]
 ): AutofitStep {
+  const text = fittedText(full);
   for (const { scale, reduction } of steps) {
     const body = {
       ...text.body,

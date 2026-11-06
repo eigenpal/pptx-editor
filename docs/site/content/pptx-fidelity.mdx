@@ -170,7 +170,7 @@ Each item below is a place where the renderer does not yet follow the specificat
 An edit lays out the slide again through the same pipeline, and applies the autofit rules of the text body (`a:normAutofit`, `a:spAutoFit`; ECMA-376 Part 1, 21.1.2.1). These recomputations are approximations:
 
 - **Shape autofit.** Rotated text, text in more than one column, and text in a shape that is not a rectangle get an estimated size.
-- **Shrink on overflow.** Each edit fits the text again from 100 %. A title takes one step at most, a 90 % font scale, and longer text then overflows. Other text first reduces line spacing by 10 %, then lowers the font scale in steps with 10 % and then 20 % less line spacing, and the editor writes the first step at which the text fits. Steps below a 55 % font scale are estimated.
+- **Shrink on overflow.** Each edit fits the text again from 100 %. A title takes one step at most, a 90 % font scale, and longer text then overflows. Other text first reduces line spacing by 10 %, then lowers the font scale in steps with 10 % and then 20 % less line spacing, and the editor writes the first step at which the text fits. Below an 85 % font scale, each step has 20 % less line spacing only. Empty paragraphs at the end of the text do not count. Steps below a 55 % font scale are estimated.
 - **Resize several shapes.** Rotated shapes scale in the slide's axes.
 - **Ungroup a group with a non-uniform scale.** Each child keeps its center, size, and rotation.
 - **Change case.** A letter whose other case has a different length, such as `ß`, stays as it is. The language of the run is not used.

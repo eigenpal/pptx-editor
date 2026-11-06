@@ -5,6 +5,7 @@
 import { describe, expect, test } from 'bun:test';
 import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { find, xmlPartOf } from '../../store/index.ts';
+import { autofitStepsFor } from '../../layout/autofit.ts';
 import {
   createPptxEditor,
   runToolbarCommand,
@@ -15,14 +16,18 @@ import {
 const IN = 914_400;
 const PT = 12_700;
 
+const SINGLE = '<a:pPr><a:lnSpc><a:spcPct val="100000"/></a:lnSpc></a:pPr>';
+/** A one-line paragraph of 18 pt: 21.6 pt at 100 %. */
+const LINE = para(run('x', 'sz="1800"'), SINGLE);
+/** An empty paragraph whose mark is 18 pt: also 21.6 pt at 100 %. */
+const EMPTY = `<a:p>${SINGLE}<a:endParaRPr lang="en-US" sz="1800"/></a:p>`;
+
 /**
  * Five one-line paragraphs of 18 pt at 100 % (21.6 pt each) in a box `heightPt` tall, set to
- * shrink on overflow. `ph` makes the box a placeholder.
+ * shrink on overflow. `ph` makes the box a placeholder; `after` is XML after the fifth line.
  */
-async function shrinkEditor(heightPt: number, ph = ''): Promise<PptxEditorInstance> {
-  const lines = Array.from({ length: 5 }, () =>
-    para(run('x', 'sz="1800"'), '<a:pPr><a:lnSpc><a:spcPct val="100000"/></a:lnSpc></a:pPr>')
-  ).join('');
+async function shrinkEditor(heightPt: number, ph = '', after = ''): Promise<PptxEditorInstance> {
+  const lines = LINE.repeat(5) + after;
   const bytes = buildPptx({
     slides: [
       {
@@ -54,8 +59,8 @@ function normAutofit(e: PptxEditorInstance): Record<string, string> {
   return Object.fromEntries(norm!.attrs.map((a) => [a.local, a.value]));
 }
 
-const shrink = async (heightPt: number, ph = ''): Promise<Record<string, string>> =>
-  normAutofit(await shrinkEditor(heightPt, ph));
+const shrink = async (heightPt: number, ph = '', after = ''): Promise<Record<string, string>> =>
+  normAutofit(await shrinkEditor(heightPt, ph, after));
 
 describe('shrink on overflow', () => {
   test('a small overflow reduces line spacing and keeps the font size', async () => {
@@ -86,6 +91,46 @@ describe('shrink on overflow', () => {
 
   test('a title that fits keeps 100 %', async () => {
     expect(await shrink(130, '<p:ph type="title"/>')).toEqual({});
+  });
+
+  test('empty paragraphs at the end do not count', async () => {
+    // The five lines fit 130 pt at 100 % (115.2 pt). Two empty lines more would need 158.4 pt.
+    expect(await shrink(130, '', EMPTY + EMPTY)).toEqual({});
+    // An empty paragraph before text counts: seven lines need 158.4 pt, 143.3 pt with the 10 %
+    // reduction, and 135.7 pt at 92.5 % (17 pt runs) with it; with the 20 % reduction they
+    // need 7 × 1.2 × 17 × 0.8 + 7.2 = 121.4 pt, which fits.
+    expect(await shrink(130, '', EMPTY + LINE)).toEqual({
+      fontScale: '92500',
+      lnSpcReduction: '20000',
+    });
+  });
+
+  test('typing a new empty line at the end keeps the scale', async () => {
+    const e = await shrinkEditor(130);
+    const nodeId = e.session!.layout(0)!.items[0].element.nodeId;
+    const end = { paragraph: 4, offset: 1 };
+    e.setSelection({ kind: 'text', nodeId, anchor: end, focus: end });
+    expect(e.input('paragraph').ok).toBe(true);
+    expect(e.input('paragraph').ok).toBe(true);
+    const el = e.session!.layout(0)!.items[0].element;
+    expect(el.kind === 'shape' && el.text?.paragraphs.length).toBe(7);
+    expect(normAutofit(e)).toEqual({});
+  });
+});
+
+describe('the shrink steps', () => {
+  test('85 % takes the 10 % reduction before the 20 %; smaller scales take 20 % only', () => {
+    const steps = autofitStepsFor(undefined).map((s) => `${s.scale}/${s.reduction}`);
+    expect(steps.slice(0, 7)).toEqual([
+      '1/0',
+      '1/0.1',
+      '0.925/0.1',
+      '0.925/0.2',
+      '0.85/0.1',
+      '0.85/0.2',
+      '0.775/0.2',
+    ]);
+    expect(steps.filter((s) => s.endsWith('/0.1'))).toEqual(['1/0.1', '0.925/0.1', '0.85/0.1']);
   });
 });
 
