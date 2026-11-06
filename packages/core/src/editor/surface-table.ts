@@ -51,6 +51,11 @@ type GridDrag = {
   readonly index: number;
   readonly start: { x: number; y: number };
   readonly sizes: readonly number[];
+  /**
+   * How far the right or bottom edge may grow: to the slide's edge, so the edge stays where the
+   * pointer can reach it again. Infinite for an inner line.
+   */
+  readonly room: number;
   /** Every step of the drag runs with it: the drag is one undo step. */
   readonly historyGroup: HistoryGroup;
   /** The table is not the selection: the first move selects it, a plain click does not. */
@@ -99,12 +104,19 @@ export class TableGestures {
         sel.kind === 'shapes'
           ? sel.nodeIds.length === 1 && sel.nodeIds[0] === id
           : sel.kind !== 'none' && sel.nodeId === id;
+      const outer = line.index === lines.length - 1;
+      const end =
+        line.axis === 'column'
+          ? apply(frame.matrix, t.width, 0).x
+          : apply(frame.matrix, 0, t.height).y;
+      const slideEnd = line.axis === 'column' ? layout.slide.width : layout.slide.height;
       this.#grid = {
         pending: !on,
         id,
         ...line,
         start: apply(invert(frame.matrix), p.x, p.y),
         sizes,
+        room: outer ? Math.max(0, slideEnd - end) : Infinity,
         historyGroup: this.host.beginHistoryGroup(),
       };
       return 'grid';
@@ -156,7 +168,7 @@ export class TableGestures {
         const d = Math.max(lo, Math.min(hi, delta));
         sizes[i] += d;
         sizes[i + 1] -= d;
-      } else sizes[i] = Math.max(Math.min(MIN_LINE, sizes[i]), sizes[i] + delta);
+      } else sizes[i] = Math.max(Math.min(MIN_LINE, sizes[i]), sizes[i] + Math.min(delta, g.room));
       // The sizes are in visual order; the grid of a right-to-left table runs the other way.
       const columns = frame.table.rtl ? [...sizes].reverse() : sizes;
       const command: EditorCommand =

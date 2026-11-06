@@ -280,6 +280,22 @@ describe('table gestures: grid lines', () => {
     g.up();
   });
 
+  test('the right edge stops at the slide edge, where the pointer can reach it again', async () => {
+    const e = await open();
+    const { g } = gestures(e);
+    const id = frameId(e);
+    e.setSelection({ kind: 'shapes', nodeIds: [id] });
+    const t = frameOf(e).table;
+    const x = t.columnX[t.columnX.length - 1];
+    const y = rowMid(e, 0);
+    expect(g.down(layout(e), id, at(e, x, y), false)).toBe('grid');
+    // Far past the slide: the table at 1 in, 3 in wide, grows to the slide's right edge only.
+    expect(g.move(layout(e), at(e, x + 20 * IN, y))).toBe(true);
+    const slide = layout(e).slide.width;
+    expect(IN + widths(e).reduce((a, b) => a + b, 0)).toBe(slide);
+    g.up();
+  });
+
   test('the outer edges are grid lines, so the border band of the selected table yields', async () => {
     const e = await open();
     const { g } = gestures(e);
