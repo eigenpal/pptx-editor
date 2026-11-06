@@ -1,0 +1,53 @@
+---
+title: 'Pictures'
+description: 'Export slide previews and set picture fills through the editing API.'
+category: 'Editing API'
+---
+
+Use `getImageAsBase64()` to render a slide or shape as PNG. Check `runtime.capabilities.images` before requesting a picture. Browser runtimes use a canvas. Server runtimes require a `rasterize` callback.
+
+## Render a slide preview
+
+This function returns PNG data as a base64 string:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function renderPreview(runtime: PptxEditorRuntime) {
+  if (!runtime.capabilities.images) {
+    throw new Error('This runtime needs an image rasterizer');
+  }
+  return runtime.run(async (context) => {
+    const slide = context.presentation.slides.getItemAt(0);
+    const result = slide.getImageAsBase64({ width: 960 });
+    await context.sync();
+    return result.value;
+  });
+}
+```
+
+Read `ClientResult.value` only after synchronization. To render one shape, call `shape.getImageAsBase64({ width: 320 })`. A shape preview is clipped to its box.
+
+The output preserves the aspect ratio and fits the requested pixel dimensions. Without dimensions, the output uses the source size at 96 pixels per inch. Shape previews accept only the `Png` format.
+
+## Set a picture fill
+
+Inside a run, pass base64 image bytes to the shape fill:
+
+```ts
+// shape belongs to this run. imageBase64 contains PNG, JPEG, or GIF bytes.
+shape.fill.setImage(imageBase64);
+await context.sync();
+```
+
+The image stretches to the shape. Table cells refuse picture fills. This operation changes a fill; it does not add a picture shape. The API does not fetch an image URL for you.
+
+## Configure server rendering
+
+Follow [Draw pictures on a server](/docs/editor-api/runtime#draw-pictures-on-a-server) to supply a rasterizer. Its PNG output must have exactly the requested width and height. Use supplied font bytes only for that request and release temporary font registrations afterward.
+
+## See also
+
+- [Runtime and lifecycle](/docs/editor-api/runtime)
+- [PDF export](/docs/export/pdf)
+- [Office.js compatibility](/docs/editor-api/office-js-api)

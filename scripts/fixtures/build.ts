@@ -14,7 +14,8 @@ import { slideStructureDeck } from './slide-structure.ts';
 import { shapeFormatFixtures } from './shape-format.ts';
 import { eastAsianThemeFontsDeck, eastAsianTypographyDeck, textScriptFixtures } from './text-scripts.ts';
 import { followUpFixtures } from './follow-ups.ts';
-import { chartsDeck, diagramsDeck } from './drawingml.ts';
+import { lineEndsDashesFixtures } from './line-ends-dashes.ts';
+import { chartSizesDeck, chartsDeck, diagramsDeck } from './drawingml.ts';
 
 const OUT = 'fixtures';
 const IN = 914_400;
@@ -96,6 +97,7 @@ const fixtures: Record<string, FixtureSlide[]> = {
   ...shapeFormatFixtures,
   ...textScriptFixtures,
   ...followUpFixtures,
+  ...lineEndsDashesFixtures,
   'tables': [
     {
       // The default style, referenced but not written in tableStyles.xml.
@@ -844,6 +846,8 @@ writeFileSync(`${OUT}/east-asian-theme-fonts.pptx`, buildPptx(eastAsianThemeFont
 writeFileSync(`${OUT}/east-asian-typography.pptx`, buildPptx(eastAsianTypographyDeck()));
 // One chart type per slide, drawn from the cached values (ECMA-376 Part 1, 21.2).
 writeFileSync(`${OUT}/charts.pptx`, buildPptx(chartsDeck()));
+// Legend-bearing charts at several text and frame sizes.
+writeFileSync(`${OUT}/chart-sizes.pptx`, buildPptx(chartSizesDeck()));
 // Diagrams with their saved drawings (ECMA-376 Part 1, 21.4).
 writeFileSync(`${OUT}/diagrams.pptx`, buildPptx(diagramsDeck()));
-console.log(`${Object.keys(fixtures).length + 5} fixtures written to ${OUT}/`);
+console.log(`${Object.keys(fixtures).length + 6} fixtures written to ${OUT}/`);

@@ -95,6 +95,21 @@ test('layout: the find bar keeps the slide clear, and a zoomed slide scrolls to 
   await page.keyboard.press('Escape');
   await expect(bar).toBeHidden();
 
+  // At the fit zoom, a wider surface padding (a host style that comes late) fits the slide again.
+  const fitWidth = (await stage.boundingBox())!.width;
+  await page.evaluate(() =>
+    document
+      .querySelector<HTMLElement>('.pptx-surface')!
+      .style.setProperty('--doc-slide-padding', '120px')
+  );
+  await expect.poll(async () => (await stage.boundingBox())!.width).toBeLessThan(fitWidth - 100);
+  await page.evaluate(() =>
+    document
+      .querySelector<HTMLElement>('.pptx-surface')!
+      .style.removeProperty('--doc-slide-padding')
+  );
+  await expect.poll(async () => (await stage.boundingBox())!.width).toBeCloseTo(fitWidth, 0);
+
   // Zoomed in, every edge of the slide scrolls into view.
   await page.evaluate(() =>
     (window as unknown as { __pptxEditor: { setZoom(z: number): void } }).__pptxEditor.setZoom(2)
@@ -492,19 +507,33 @@ test('long deck: the rail paints the thumbnails in view first, then the rest', a
   // Visibility from CSS layout and the browser's IntersectionObserver: happy-dom has neither.
   // With idle time held, only the first-paint burst, the items in view (or near it), and the
   // ones that scroll into view can paint: the observer path, alone.
+  // A slow CPU (Chromium's CPU throttling) spreads the rail's renders over many tasks: a
+  // container the rail releases and asks for again must not paint out of view.
   const SLIDES = 1000;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
   await page.addInitScript(HOLD_IDLE);
   await ready(page);
   const base64 = Buffer.from(textDeck(SLIDES)).toString('base64');
-  await page.evaluate(async (data) => {
+  const opened = await page.evaluate(async (data) => {
     const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
     const editor = (
       window as unknown as {
-        __pptxEditor: { load(b: Uint8Array, o: { startSlide: number }): Promise<unknown> };
+        __pptxEditor: {
+          load(b: Uint8Array, o: { startSlide: number }): Promise<unknown>;
+          save(): Uint8Array | null;
+          snapshot(): { pendingSlides?: number };
+        };
       }
     ).__pptxEditor;
     await editor.load(bytes, { startSlide: 600 });
+    // Finish parsing before testing paint priority. Background progress updates each allow
+    // a first-paint burst, so their timing must not decide which offscreen items paint here.
+    // The next test separately checks input while a long presentation opens progressively.
+    const saved = editor.save();
+    return { saved: saved !== null, pending: editor.snapshot().pendingSlides ?? 0 };
   }, base64);
+  expect(opened).toEqual({ saved: true, pending: 0 });
   // The current slide's item is mounted and scrolled into view, and the items in view paint.
   await expect
     .poll(async () => {

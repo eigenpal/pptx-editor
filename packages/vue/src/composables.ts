@@ -29,6 +29,8 @@ import { drawingRenderersVersion, subscribeDrawingRenderers } from '@pptx-editor
 import {
   EMPTY_EDITOR_SNAPSHOT,
   chromeCommandState,
+  chromeControlForSlot,
+  chromeOfferedControl,
   editorCommandFor,
   platformShortcuts,
   runToolbarCommand,
@@ -42,6 +44,7 @@ import {
   type BulletFormatRead,
   type ChromeActionHost,
   type ChromeCommandState,
+  type ChromeControl,
   type ChromeSlotId,
   type CommandResult,
   type EditorExecOptions,
@@ -406,6 +409,7 @@ export interface UseEditorValueCommandReturn<V, S = V> {
    * rows); none for a slot with a free value (`font.size`, `shape.fill`, `shape.styles`).
    * Without the `@pptx-editor.dev/pro/drawing` module, they leave out the effects it paints
    * (`chromeOfferedControl`), so `value` can be an effect from the file that is not in the list.
+   * They keep the rows that remove an effect the selection has (`reflection.none`).
    */
   readonly options: ComputedRef<readonly V[]>;
   /** Whether the command can run now. */
@@ -440,6 +444,29 @@ function useDrawingRenderersVersion(): Readonly<ShallowRef<number>> {
 }
 
 /**
+ * The control a slot shows in this build (`chromeOfferedControl`), read again on each editor
+ * change and after each drawing renderer install, as React's `useOfferedControl`. Without the
+ * drawing module, a selection change adds or drops the rows that remove an effect the
+ * selection has. @internal
+ */
+export function useOfferedControl(
+  slot: MaybeRefOrGetter<ChromeSlotId>,
+  control: MaybeRefOrGetter<ChromeControl | null | undefined>
+): ComputedRef<ChromeControl | undefined> {
+  const editorRef = usePptxEditor();
+  const renderers = useDrawingRenderersVersion();
+  const read = (): ChromeControl | undefined => {
+    const c = toValue(control);
+    return c ? chromeOfferedControl(toValue(slot), c, editorRef.value) : undefined;
+  };
+  // The slice changes when an editor change changes the choices: the same choices give the
+  // same object, so `Object.is` keeps it. The computed reads the choices again then, after an
+  // install, and for a new slot or control, at once, as React's hook does.
+  const slice = useSlice(read, Object.is);
+  return computed(() => (void slice.value, void renderers.value, read()));
+}
+
+/**
  * State and execution for one typed value slot, as React's `useEditorValueCommand`: `execute`
  * takes the slot's `ToolbarValueMap` type and returns the engine's result. @public
  */
@@ -448,14 +475,14 @@ export function useEditorValueCommand<K extends keyof ToolbarValueMap>(
 ): UseEditorValueCommandReturn<ToolbarValueMap[K], ToolbarShownValue<K>> {
   const editorRef = usePptxEditor();
   const cmd = useEditorCommand(slot);
-  // The options follow the installed drawing renderers, as in React: an install offers the Pro
-  // choices.
-  const renderers = useDrawingRenderersVersion();
+  // The options follow the installed drawing renderers and, without them, the effects of the
+  // selection, as in React: `offered` changes with either.
+  const offered = useOfferedControl(slot, () => chromeControlForSlot(toValue(slot)));
   return {
     execute: (value: ToolbarValueMap[K], options?: EditorExecOptions): CommandResult =>
       runToolbarCommand(editorRef.value, toValue(slot), value as ToolbarSlotValue<K>, options),
     value: computed(() => valueSlotShown(toValue(slot), cmd.value.value)),
-    options: computed(() => (void renderers.value, valueSlotOptions(toValue(slot)))),
+    options: computed(() => (void offered.value, valueSlotOptions(toValue(slot), editorRef.value))),
     isEnabled: cmd.isEnabled,
     disabledReason: cmd.disabledReason,
   };

@@ -1,0 +1,79 @@
+---
+title: 'PDF API'
+description: 'Reference PDF export functions, options, results, diagnostic severity, and errors.'
+category: 'Export formats'
+---
+
+Import these functions and types from `@pptx-editor.dev/pptx-to-pdf`.
+
+## Functions
+
+| Function | Result |
+| --- | --- |
+| `exportPdf(source, options?)` | Promise of `PdfExportResult` from PPTX bytes |
+| `openDocumentForExport(source, options?)` | Promise of a success session or an open refusal |
+| `exportPdfFrom(session, options?)` | Promise of `PdfExportResult` from an existing session |
+| `session.dispose()` | Releases the session |
+
+Sources are `Uint8Array` values. Node.js `Buffer` values also work. An open result has either `{ ok: true, session }` or `{ ok: false, reason, detail? }`.
+
+## Options
+
+| Option                | Default             | Applies to                           |
+| --------------------- | ------------------- | ------------------------------------ |
+| `fonts`               | No additional faces | `exportPdf`, `openDocumentForExport` |
+| `substitutes`         | `true`              | `exportPdf`, `openDocumentForExport` |
+| `fidelityPolicy`      | `strict`            | `exportPdf`, `exportPdfFrom`         |
+| `includeHiddenSlides` | `false`             | `exportPdf`, `exportPdfFrom`         |
+| `timeoutMs`           | `60000`             | `exportPdf`, `exportPdfFrom`         |
+| `maxPages`            | `10000`             | `exportPdf`, `exportPdfFrom`         |
+| `maxOutputBytes`      | `67108864`          | `exportPdf`, `exportPdfFrom`         |
+| `signal`              | None                | All three functions                  |
+
+`maxPages` accepts integers from 1 to 10000. `maxOutputBytes` accepts integers from 1 to 67108864. `timeoutMs` accepts integers from 1 to 2147483647 and provides a cooperative deadline. Internal paint and image limits also apply; increasing output limits does not disable them.
+
+A session signal ends the whole session. An export signal cancels only that export. `exportPdfFrom()` rejects unknown option names. Keep font options on the open call and output options on the export call.
+
+## Results
+
+| Field            | Meaning                                       |
+| ---------------- | --------------------------------------------- |
+| `bytes`          | Owned PDF bytes; serve as `application/pdf`   |
+| `pageCount`      | Number of output pages                        |
+| `slideNumbers`   | One-based source slide numbers in page order  |
+| `diagnostics`    | Output limitations and information notices    |
+| `fontResolution` | Used faces, substitutions, and font refusals  |
+| `timings`        | `openMs`, `layoutMs`, `paintMs`, and `saveMs` |
+
+`exportPdfFrom()` reports `openMs: 0` because it reuses an open session. A diagnostic can have `slideIndex`, `slideNumber`, `pageIndex`, and `pageNumber`. Document-wide diagnostics omit location fields.
+
+## Diagnostic severity
+
+| Severity        | Strict policy    | Best-effort policy               |
+| --------------- | ---------------- | -------------------------------- |
+| `information`   | Export continues | Export continues                 |
+| `approximation` | Export fails     | PDF includes approximate content |
+| `unsupported`   | Export fails     | PDF can omit content             |
+
+Branch on `code`, not `message`. Handle an unknown diagnostic code by its severity. For example, `frame.chart` identifies an unsupported chart, while `effect.glow` identifies an approximate effect. Hyperlinks, speaker notes, and a PDF outline are not written.
+
+## Errors
+
+| Class | Stable code | Recovery |
+| --- | --- | --- |
+| `PdfDocumentOpenError` | `documentOpenFailed` | Inspect `reason`; obtain valid presentation bytes |
+| `PdfFidelityError` | `fidelityUnsupported` | Inspect `diagnostics`; choose best-effort only if acceptable |
+| `PdfPageLimitError` | `pageLimitExceeded` | Reduce pages or increase the configured limit within its cap |
+| `PdfOutputLimitError` | `outputTooLarge` | Reduce output size or increase the configured limit within its cap |
+| `PdfEncodingError` | `encodingFailed` | Inspect the cause and report the failure |
+| `PdfWorkLimitError` | `timeout`, `aborted`, `operations` | Distinguish cancellation from work limits |
+| `ExportResourceError` | `disposed`, `aborted` | Open another session |
+| `TypeError`, `RangeError` | None | Correct invalid arguments |
+
+`PdfOutputLimitError` extends `PdfEncodingError`; catch it first when handling them separately. `PdfPageLimitError` extends `RangeError`. Both `PdfWorkLimitError` and `ExportResourceError` can use `aborted`, so check the class before the code.
+
+## See also
+
+- [PDF export](/docs/export/pdf)
+- [PDF integrations](/docs/export/pdf/integrations)
+- [PDF fonts](/docs/export/pdf/fonts)

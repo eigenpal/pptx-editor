@@ -291,6 +291,8 @@ export {
   slideClickMode,
   slideDropMarker,
   slideItemName,
+  slideItemLabels,
+  createItemMemo,
   slideMenuPoint,
   slideSorterMounted,
   sorterKeyDown,

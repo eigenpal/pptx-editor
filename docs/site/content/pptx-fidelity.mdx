@@ -117,7 +117,7 @@ Each item below is a place where the renderer does not yet follow the specificat
 - **Gray transform.** `a:gray` uses Rec. 709 weights on sRGB components. One measured color confirms it, so other weights are not ruled out.
 - **Blur.** The specification does not define the blur kernel. Shadows use a Gaussian blur with a standard deviation of a third of `blurRad`, as measured on reference PDFs. Reflections use half of `blurRad`, which is not measured yet.
 - **Shadow skew.** `kx` and `ky` skew after the `sx` and `sy` scale, about the `algn` point.
-- **Glow and soft edge.** These effects, the inner shadow, and the reflection need the drawing module of `@pptx-editor.dev/pro` (EigenPal Pro License). Without it, a shape paints without them. A glow grows the outline by half of `rad` and blurs it by the other half. A soft edge shrinks the outline by 0.84 of `rad` and blurs it by `rad`. Reference PDFs give both rules, measured for glows of 5 to 18 pt and soft edges of 2.5 and 10 pt. How fill transparency changes them is not measured: a glow takes the fill's alpha as its strength. A soft edge removes a part of the shape that is thinner than 1.7 times `rad`. The outline grows and shrinks by a set of rectangles, not a circle: a curved edge can be up to 8 % off, and a sharp corner up to 29 %.
+- **Glow and soft edge.** These effects, the inner shadow, and the reflection need the drawing module of `@pptx-editor.dev/pro` (EigenPal Pro License). Without it, a shape paints without them, and save keeps them. The Shape Effects menu can still remove them. A glow grows the outline by half of `rad` and blurs it by the other half. A soft edge shrinks the outline by 0.84 of `rad` and blurs it by `rad`. Reference PDFs give both rules, measured for glows of 5 to 18 pt and soft edges of 2.5 and 10 pt. How fill transparency changes them is not measured: a glow takes the fill's alpha as its strength. A soft edge removes a part of the shape that is thinner than 1.7 times `rad`. The outline grows and shrinks by a set of rectangles, not a circle: a curved edge can be up to 8 % off, and a sharp corner up to 29 %.
 - **Effects not drawn.** `a:prstShdw`, `a:blur`, `a:effectDag`, group effects, text effects, and some fill overlays are not drawn. They stay in the file.
 - **Fill overlay.** `a:fillOverlay` blends with the shape's own fill only. Over a semi-transparent fill, the result is opaque where the overlay is.
 - **Gradient colors.** A gradient with exactly two stops, at 0 and 100 %, bends each color channel toward the larger of its two end values. A gradient with three or more stops interpolates linearly in sRGB.
@@ -135,7 +135,6 @@ Each item below is a place where the renderer does not yet follow the specificat
 - **Picture recolor.** Grayscale, duotone, and black and white take the luminance with Rec. 709 weights. The specification gives no weights.
 - **Dashes on picture borders.** A picture's border draws outside the picture. Dashes get butt caps, and round dots draw as squares.
 - **EMF and WMF pictures.** Not decoded. They draw as an empty placeholder box and stay in the file.
-- **Arrowhead joins.** Under a triangle or stealth arrowhead, the line stops inside the head and the tip lands on the end point.
 - **Inset lines.** `a:ln/@algn="in"` draws as a centered line. A picture's border always draws outside the picture.
 - **Hyperlink text.** Link text draws in the theme `hlink` color with a single underline, unless the run states otherwise.
 - **Compound lines.** The widths of the bands of `dbl`, `thickThin`, `thinThick`, and `tri` lines follow fixed fractions. The specification gives no fractions.
@@ -197,10 +196,10 @@ An edit lays out the slide again through the same pipeline, and applies the auto
 - **Fills outside the box.** A rectangle path gradient or a picture fill paints the shape's box only.
 - **Tiled pictures.** Drawn stretched over the box.
 - **Picture color effects.** Grayscale, duotone, brightness and contrast, and black and white are not applied.
-- **Dashes and compound lines.** Drawn as one solid line.
+- **Compound lines.** Drawn as one line.
 - **SVG pictures.** The PNG fallback of the picture is drawn.
 - **Text.** Synthetic bold and italic are not drawn, upright vertical characters draw rotated, and a character that the font does not have is not drawn. Dotted, dashed, wavy, heavy, and word-only underlines draw as one single line, as in the editor.
-- **Not drawn.** Pattern fills, picture fills on text, arrowheads, text outlines, other picture formats, diagrams with no saved drawing, OLE objects with no picture, other graphic frames, and table frames with no grid. Charts draw through the Pro drawing module, which the export always installs. Chart types outside that module show a placeholder (see [Charts](/docs/guides/charts)).
+- **Not drawn.** Pattern fills, picture fills on text, text outlines, other picture formats, diagrams with no saved drawing, OLE objects with no picture, other graphic frames, and table frames with no grid. Charts draw through the Pro drawing module, which the export always installs. Chart types outside that module show a placeholder (see [Charts](/docs/guides/charts)).
 
 ## See also
 

@@ -102,7 +102,7 @@ To keep the control's behavior on your own element, use `asChild` (`as-child` in
 | A complete arrangement | Set `preset={false}` and compose all visible controls. |
 | Narrow widths | Keep `overflow` on, or set `overflow={false}` to let the bar wrap. A `preset={false}` bar always wraps. |
 | Every group at all times | Set `contextual={false}`. By default, the bar shows only the groups for the selection. |
-| Your own labels | Pass DOCX Editor's `t` prop. Your parts read it with `useChromeTranslate()` or `useToolbarLabel()`. See [Labels](/docs/react/hooks#labels). |
+| Your own labels | Pass the `t` prop. Your parts read it with `useChromeTranslate()` or `useToolbarLabel()`. See [Labels](/docs/react/hooks#labels). |
 
 For the groups that each selection shows, see [Registered groups and slots](/docs/customization/reference/toolbar#registered-groups-and-slots).
 
@@ -155,7 +155,7 @@ Give your group a `label`, or a `labelKey` from your translation catalog. The `i
 
 ## Compose the font picker
 
-`Toolbar.FontFamily` is a compound, as in DOCX Editor. It holds the picker state in a part-level context. With no children, it renders the default trigger and the grouped list with a search field. With children, compose its parts:
+`Toolbar.FontFamily` is a compound. It holds the picker state in a part-level context. With no children, it renders the default trigger and the grouped list with a search field. With children, compose its parts:
 
 - `Toolbar.FontFamily.Trigger` is the button that opens the list. Its children replace the current family name.
 - `Toolbar.FontFamily.Content` is the list while it is open. Its children replace the search field and the default groups.
@@ -180,7 +180,7 @@ In Vue, use `const FontFamily = PptxEditorToolbar.FontFamily` and the same parts
 
 ### Build the list from `useFontFamily`
 
-`useFontFamily()` gives the picker's behavior with no UI, as DOCX Editor's hook of the same name. It returns:
+`useFontFamily()` gives the picker's behavior with no UI. It returns:
 
 - `value`, the family of the selected text, or `null` for a mixed selection or no selection.
 - `theme`, the theme font that the text uses (`major` or `minor`), or `null`.
@@ -283,13 +283,13 @@ At 1440 px, the default bar has no room for Quick Styles, Shape Effects, Rotate,
 ```
 
 - `Toolbar.ShapeStyles` (`shape.styles`) applies a theme style (`p:style`) to the selected shapes.
-- `Toolbar.ShapeEffects` (`shape.effects`) sets and removes a shadow, reflection, glow, or soft edge. The inner shadow, reflection, glow, and soft edge paint only with the drawing module of `@pptx-editor.dev/pro` (EigenPal Pro License). Without the module, the menu offers only the outer shadows, and `Toolbar.ImageStyles` (`image.styles`) offers only the frame styles. The commands still write every effect, and save keeps it. The controls and the `useEditorValueCommand` options refresh after the module installs. A custom control reads the choices of this build with `chromeOfferedControl(slot, control)`, and `subscribeDrawingRenderers` from `@pptx-editor.dev/core/layout` tells it when to read them again.
+- `Toolbar.ShapeEffects` (`shape.effects`) sets and removes a shadow, reflection, glow, or soft edge. The inner shadow, reflection, glow, and soft edge paint only with the drawing module of `@pptx-editor.dev/pro` (EigenPal Pro License). Without the module, the menu offers the outer shadows and No shadow, and `Toolbar.ImageStyles` (`image.styles`) offers only the frame styles. Removing an effect needs no module. When the selected shapes or pictures have a reflection, glow, or soft edge, the menu also offers No reflection, No glow, or No soft edges. No shadow also removes an inner shadow. The commands still write every effect, and save keeps it. The controls and the `useEditorValueCommand` options refresh after the module installs and when the selection or its effects change. A custom control reads the choices with `chromeOfferedControl(slot, control, editor)`. Read them again on each editor change, and after `subscribeDrawingRenderers` from `@pptx-editor.dev/core/layout` calls back.
 - `Toolbar.Rotate` (`arrange.rotate`) turns the selection 90° or flips it.
-- `Toolbar.FormatShape` (`shape.properties`) and `Toolbar.SelectionPane` (`arrange.selectionPane`) are placeholders for task panes that are not built yet. They stay disabled with the `disabled.paneNotBuilt` reason.
+- `Toolbar.FormatShape` (`shape.properties`) and `Toolbar.SelectionPane` (`arrange.selectionPane`) do not open task panes. They stay disabled with the `disabled.paneNotBuilt` reason.
 
 ## Apply a typed value
 
-`useEditorValueCommand(slotId)` binds a value slot with its type from `ToolbarValueMap`, as in DOCX Editor. A typo in a value does not compile.
+`useEditorValueCommand(slotId)` binds a value slot with its type from `ToolbarValueMap`. A typo in a value does not compile.
 
 ```tsx
 import { useEditorValueCommand } from '@pptx-editor.dev/react';

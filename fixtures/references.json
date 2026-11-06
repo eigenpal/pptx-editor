@@ -46,6 +46,15 @@
         540
       ]
     },
+    "chart-sizes": {
+      "deck": "8d047dafad73968a13da37c88413db21221458e4a0e0c25ccb0a80fa87c6f357",
+      "pdf": "ab02b33e0ae734489e5127ec833e9faf625a70a21e7ccf872b97a1d7592dbf55",
+      "pages": 12,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
     "charts": {
       "deck": "9069c345ccb969ab50a00b4c251ab9e77342d925ca3b8490c0f2f635eefeb471",
       "pdf": "41a95904b6833f96c9e08ac42dcf41afbf407c5152786ddac1e2b4ec82b9b6a0",
@@ -176,6 +185,15 @@
       "deck": "45e0611f06e78553a1fdc0901af3339a1e62d95d9a83e73a955f29c6c6e7bf2b",
       "pdf": "9832ee9762045b248bef7809417900a468774c4ecb2c8a3e67ddd3d8f3914838",
       "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "line-ends-dashes": {
+      "deck": "00bc1d248ff0c943aac2d7f0733918ac15f85b18866fa104bc9425e6190f2f90",
+      "pdf": "37c53a21dc703a10785958400a788ddc02b55e4b4a17b681dce126d52dab8954",
+      "pages": 7,
       "pageSizePt": [
         960,
         540

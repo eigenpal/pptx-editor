@@ -1,5 +1,5 @@
 // Fill and outline paint: solid, linear and path gradients (`paint-gradient.ts`), pictures
-// (stretch with srcRect and fillRect, tile), patterns, dashes, and arrowheads. Paint servers are
+// (stretch with srcRect and fillRect, tile), patterns, and outline strokes. Paint servers are
 // defined in the shape's local coordinate space (userSpaceOnUse over the shape box), so rotation
 // and flips carry them.
 
@@ -11,6 +11,7 @@ import {
   type ResolvedLine,
   type BlipEffect,
 } from '../cascade/index.ts';
+import { dashArray, strokeCap, strokeWidth } from '../layout/index.ts';
 import { ALIGN_POINTS, lumTransfer } from './effect-transforms.ts';
 import { circleGradient, linearGradient, rectGradient, shapeGradient } from './paint-gradient.ts';
 import { PATTERN_PIXEL, patternBitmap } from './preset-patterns.ts';
@@ -385,20 +386,6 @@ function tilePaint(
   return { paint: defs.add(pattern), opacity: alpha };
 }
 
-/** Preset dash patterns, in multiples of the line width (ECMA-376 ST_PresetLineDashVal). */
-const DASHES: Record<string, readonly number[]> = {
-  dot: [1, 3],
-  dash: [4, 3],
-  lgDash: [8, 3],
-  dashDot: [4, 3, 1, 3],
-  lgDashDot: [8, 3, 1, 3],
-  lgDashDotDot: [8, 3, 1, 3, 1, 3],
-  sysDash: [3, 1],
-  sysDot: [1, 1],
-  sysDashDot: [3, 1, 1, 1],
-  sysDashDotDot: [3, 1, 1, 1, 1, 1],
-};
-
 /** Stroke attributes for a resolved outline. `scale` corrects for group scaling. */
 export function strokeAttrs(
   line: ResolvedLine,
@@ -409,124 +396,16 @@ export function strokeAttrs(
 ): Record<string, string | undefined> {
   const paint = fillPaint(line.fill, w, h, ctx);
   if (paint.paint === 'none') return { stroke: 'none' };
-  // A zero-width line is a hairline: one device pixel at 96 dpi.
-  const width = (line.width > 0 ? line.width : 9525) / (scale || 1);
-  // `prstDash/@val` comes from the file: an own-key check keeps prototype names out.
-  const pattern =
-    line.dash === 'custom'
-      ? line.dashes
-      : Object.hasOwn(DASHES, line.dash)
-        ? DASHES[line.dash]
-        : undefined;
-  const roundCap = line.cap === 'rnd';
-  const dasharray = pattern
-    ? pattern
-        .map((v, i) => {
-          // Round caps extend each dash by the width; this keeps the visible rhythm.
-          const len = v * width + (roundCap ? (i % 2 === 0 ? -width : width) : 0);
-          return num(Math.max(i % 2 === 0 ? 0.001 : 0, len));
-        })
-        .join(' ')
-    : undefined;
+  // The width, dash pattern, and caps are the PDF export's too (`layout/line-strokes.ts`).
+  const width = strokeWidth(line, scale);
+  const dashes = dashArray(line, width);
   return {
     stroke: paint.paint,
     'stroke-opacity': paint.opacity < 1 ? num(paint.opacity) : undefined,
     'stroke-width': num(width),
-    'stroke-linecap': line.cap === 'rnd' ? 'round' : line.cap === 'sq' ? 'square' : 'butt',
+    'stroke-linecap': strokeCap(line),
     'stroke-linejoin': line.join === 'miter' ? 'miter' : line.join === 'bevel' ? 'bevel' : 'round',
     'stroke-miterlimit': line.join === 'miter' ? num(Math.max(1, line.miterLimit)) : undefined,
-    'stroke-dasharray': dasharray,
+    'stroke-dasharray': dashes?.map(num).join(' '),
   };
-}
-
-const END_SIZE = { sm: 2, med: 3, lg: 5 } as const;
-
-/**
- * How far the line stops short of its end point, in line widths, so it ends inside the head
- * rather than under its narrowing tip: a triangle at its base, a stealth arrow at its notch.
- * Open arrows, circles, and diamonds keep the line to the end point (the head covers it).
- */
-export function lineEndInset(
-  end: { type: string; w: 'sm' | 'med' | 'lg'; len: 'sm' | 'med' | 'lg' } | undefined
-): number {
-  if (!end) return 0;
-  const len = END_SIZE[end.len];
-  if (end.type === 'triangle') return len * 0.9;
-  if (end.type === 'stealth') return len * 0.65;
-  // An open arrow's mitered tip reaches 0.5 / sin(half angle) past its vertex; the line stops
-  // half a width inside that point, so the tip lands on the end point and covers the line.
-  if (end.type === 'arrow') return 0.5 / Math.sin(Math.atan2(END_SIZE[end.w] / 2, len)) + 0.5;
-  return 0;
-}
-
-/** An SVG marker for a line end, or undefined for `none`. */
-export function lineEndMarker(
-  defs: Defs,
-  end: { type: string; w: 'sm' | 'med' | 'lg'; len: 'sm' | 'med' | 'lg' } | undefined,
-  color: string,
-  opacity: number
-): string | undefined {
-  if (!end) return undefined;
-  const doc = defs.doc;
-  const mw = END_SIZE[end.w];
-  const ml = END_SIZE[end.len];
-  let shape: SVGElement;
-  switch (end.type) {
-    case 'triangle':
-      shape = svg(doc, 'path', { d: `M0 0 L${ml} ${mw / 2} L0 ${mw} Z`, fill: color });
-      break;
-    case 'stealth':
-      shape = svg(doc, 'path', {
-        d: `M0 0 L${ml} ${mw / 2} L0 ${mw} L${ml * 0.3} ${mw / 2} Z`,
-        fill: color,
-      });
-      break;
-    case 'diamond':
-      shape = svg(doc, 'path', {
-        d: `M0 ${mw / 2} L${ml / 2} 0 L${ml} ${mw / 2} L${ml / 2} ${mw} Z`,
-        fill: color,
-      });
-      break;
-    case 'oval':
-      shape = svg(doc, 'ellipse', { cx: ml / 2, cy: mw / 2, rx: ml / 2, ry: mw / 2, fill: color });
-      break;
-    case 'arrow':
-      shape = svg(doc, 'path', {
-        d: `M0 0 L${ml} ${mw / 2} L0 ${mw}`,
-        fill: 'none',
-        stroke: color,
-        // The head's strokes are as wide as the line (marker units are line widths).
-        'stroke-width': 1,
-        'stroke-linejoin': 'miter',
-      });
-      break;
-    default:
-      return undefined;
-  }
-  const centered = end.type === 'oval' || end.type === 'diamond';
-  const id = defs.id('end');
-  return defs.add(
-    svg(
-      doc,
-      'marker',
-      {
-        id,
-        markerUnits: 'strokeWidth',
-        markerWidth: ml,
-        markerHeight: mw,
-        // The tip sits on the end point; circles and diamonds center on it.
-        // The path is shortened by `lineEndInset`, so the anchor moves back by the same amount.
-        refX: centered
-          ? ml / 2
-          : end.type === 'arrow'
-            ? ml + 0.5 / Math.sin(Math.atan2(mw / 2, ml)) - lineEndInset(end)
-            : ml - lineEndInset(end),
-        refY: mw / 2,
-        orient: 'auto-start-reverse',
-        overflow: 'visible',
-        opacity: opacity < 1 ? num(opacity) : undefined,
-      },
-      [shape]
-    )
-  );
 }

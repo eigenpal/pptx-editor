@@ -2,7 +2,9 @@
 //
 // The rail and the slide sorter mount one container per slide. Of the first paints asked for
 // in one task, the first `BURST` paint at once: the top of a list that just mounted, where
-// nothing is laid out yet. The others are checked at the end of the task, all layout reads
+// nothing is laid out yet. Only a container asked for the first time takes a burst place: a
+// container asked for again (a slide that finished opening, a rail that renders again and
+// releases its items first) is checked like the others, so it paints only in view. The others are checked at the end of the task, all layout reads
 // first: a container in its scroll box (or within `OVERSCAN` of it) paints before the frame;
 // the others wait, and paint when they come into view or when the browser is idle. A waiting
 // container that showed another slide is emptied, so no container shows a wrong slide. A
@@ -91,6 +93,8 @@ export class ThumbnailQueue {
   /** The containers an observer watches, with the scroll box it watches them in. */
   readonly #watched = new Map<Element, Element | null>();
   #burst = 0;
+  /** Every container asked for since the last `clear`: only a new one takes a burst place. */
+  #asked = new WeakSet<HTMLElement>();
   #idle: { cancel(): void } | null = null;
   #soonTimer: ReturnType<typeof setTimeout> | null = null;
   #recheck: ReturnType<typeof setTimeout> | null = null;
@@ -113,8 +117,9 @@ export class ThumbnailQueue {
       this.#waiting.delete(container);
       return true;
     }
-    if (!this.#waiting.has(container) && !this.#checking.has(container) && this.#takeBurst())
-      return true;
+    const first = !this.#asked.has(container);
+    this.#asked.add(container);
+    if (first && this.#takeBurst()) return true;
     if (this.#checking.size === 0) queueMicrotask(() => this.#settle());
     const was = this.#checking.get(container);
     this.#checking.set(container, { ...ask, stale: stale || !!was?.stale });
@@ -183,6 +188,7 @@ export class ThumbnailQueue {
     this.#observers.clear();
     this.#watched.clear();
     this.#rootOf = new WeakMap();
+    this.#asked = new WeakSet();
   }
 
   #cancel(): void {

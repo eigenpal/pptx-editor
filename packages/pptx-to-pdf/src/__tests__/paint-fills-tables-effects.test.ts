@@ -187,21 +187,109 @@ describe('gradient text', () => {
   });
 });
 
-describe('line ends', () => {
-  test('are reported only on open paths, the only paths that show them', async () => {
-    const line =
-      '<a:ln w="12700"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:tailEnd type="triangle"/></a:ln>';
-    const deckWith = (prst: string) =>
-      buildPptx({
-        slides: [
-          {
-            layout: 'blank',
-            shapes: shape({ id: 2, x: IN, y: IN, cx: 2 * IN, cy: IN, prst, line }),
-          },
-        ],
-      });
-    expect(codes(await exportPdf(deckWith('rect'), BEST))).not.toContain('line.ends');
-    expect(codes(await exportPdf(deckWith('line'), BEST))).toContain('line.ends');
+describe('line ends and dashes', () => {
+  const deckWith = (prst: string, line: string) =>
+    buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          shapes: shape({ id: 2, x: IN, y: IN, cx: 2 * IN, cy: IN, prst, line }),
+        },
+      ],
+    });
+  const black = '<a:solidFill><a:srgbClr val="000000"/></a:solidFill>';
+
+  test('a triangle draws on an open path only, and nothing is reported', async () => {
+    const line = `<a:ln w="12700">${black}<a:tailEnd type="triangle"/></a:ln>`;
+    const open = await exportPdf(deckWith('line', line), BEST);
+    const closed = await exportPdf(deckWith('rect', line), BEST);
+    expect(codes(open)).toEqual([]);
+    expect(codes(closed)).toEqual([]);
+    // The same page and stroke, and on the line one more fill: the head.
+    const fills = async (r: PdfExportResult) => count((await pages(r))[0]!.ops, OPS.fill);
+    expect((await fills(open)) - (await fills(closed))).toBe(1);
+  });
+
+  /** The operators and their arguments of the first page, with each path's paint unfolded. */
+  const operators = async (r: PdfExportResult) => {
+    const pdf = await getDocument({ data: r.bytes.slice(), useSystemFonts: false }).promise;
+    const { fnArray, argsArray } = await (await pdf.getPage(1)).getOperatorList();
+    return {
+      fnArray: fnArray.map((op, i) =>
+        op === OPS.constructPath ? ((argsArray[i] as [number])[0] ?? op) : op
+      ),
+      argsArray,
+    };
+  };
+  /** The argument of the last `op` before index `before`. */
+  const lastBefore = (
+    list: { fnArray: number[]; argsArray: unknown[] },
+    op: number,
+    before: number
+  ) => list.argsArray[list.fnArray.lastIndexOf(op, before)];
+
+  test('an open arrow draws as a stroke with round caps and a mitered tip', async () => {
+    const result = await exportPdf(
+      deckWith('line', `<a:ln w="12700">${black}<a:headEnd type="arrow"/></a:ln>`),
+      BEST
+    );
+    const list = await operators(result);
+    const strokes = list.fnArray.flatMap((f, i) => (f === OPS.stroke ? [i] : []));
+    expect(strokes.length).toBe(2);
+    // The arrow is the second stroke: round cap (1), miter join (0), miter limit 10.
+    expect(lastBefore(list, OPS.setLineCap, strokes[1])).toEqual([1]);
+    expect(lastBefore(list, OPS.setLineJoin, strokes[1])).toEqual([0]);
+    expect(lastBefore(list, OPS.setMiterLimit, strokes[1])).toEqual([10]);
+  });
+
+  test('a shadow under a dashed line has the dashes and the line ends', async () => {
+    const shadow =
+      '<a:effectLst><a:outerShdw blurRad="0" dist="38100" dir="2700000">' +
+      '<a:srgbClr val="000000"/></a:outerShdw></a:effectLst>';
+    const exported = (ends: string) =>
+      exportPdf(
+        buildPptx({
+          slides: [
+            {
+              layout: 'blank',
+              shapes: shape({
+                id: 2,
+                x: IN,
+                y: IN,
+                cx: 2 * IN,
+                cy: IN,
+                prst: 'line',
+                line: `<a:ln w="12700">${black}<a:prstDash val="dash"/>${ends}</a:ln>`,
+                effects: shadow,
+              }),
+            },
+          ],
+        }),
+        BEST
+      );
+    const plain = await operators(await exported(''));
+    const ended = await operators(await exported('<a:tailEnd type="triangle"/>'));
+    const fills = (l: { fnArray: number[] }) =>
+      l.fnArray.filter((f) => f === OPS.fill || f === OPS.eoFill).length;
+    // The line's own head and the head of its shadow.
+    expect(fills(ended) - fills(plain)).toBe(2);
+    // The shadow and the line both dash, with the line's pattern.
+    const dashes = plain.fnArray.flatMap((f, i) =>
+      f === OPS.setDash && (plain.argsArray[i] as [number[]])[0].length ? [plain.argsArray[i]] : []
+    );
+    expect(dashes.length).toBe(2);
+  });
+
+  test('a dashed line sets its dash pattern in line widths, and is not reported', async () => {
+    const result = await exportPdf(
+      deckWith('line', `<a:ln w="12700" cap="rnd">${black}<a:prstDash val="dash"/></a:ln>`),
+      BEST
+    );
+    expect(codes(result)).toEqual([]);
+    const { fnArray, argsArray } = await operators(result);
+    const dash = argsArray[fnArray.indexOf(OPS.setDash)] as [number[], number];
+    // `dash` is 4 widths on and 3 off; a round cap takes one width from each dash.
+    expect(dash).toEqual([[3 * 12_700, 4 * 12_700], 0]);
   });
 });
 

@@ -199,7 +199,7 @@ In a preset bar, an `image` part replaces that control in the picture group. Tha
 
 When the toolbar runs out of width, a whole group moves into the **More** menu. A built-in group's priority is its place in `TOOLBAR_COLLAPSE_ORDER`, in steps of 10: `view` is 10 and `history` is 180. The view, file, Find, clipboard, and slide groups move first. The arrange, format, shape, and script groups move next. The insert group (text box, line, shape, picture) moves after them, then the list and paragraph groups. The table group, which shows only while the selection is in a table, moves after those. The font, text, and history groups stay longest, on the toolbar and on every ribbon tab.
 
-The contextual `image` group's priority is 190, so it stays longest, because the selection asked for it. DOCX Editor's `image` group moves first instead. A group without a priority moves first.
+The contextual `image` group's priority is 190, so it stays longest, because the selection asked for it. A group without a priority moves first.
 
 ## Action options
 
@@ -225,7 +225,7 @@ A disabled control carries `aria-disabled="true"` instead of the native `disable
 
 `useEditorCommand(slotId)` returns `isEnabled`, `isActive`, `disabledReason`, `value`, and `execute`. A slot that opens a surface (a dialog, find, or the slide show) runs through `PptxEditor.Root`, as a menu row does. Outside a root, that slot is disabled with the `disabled.noRoot` reason. When the `popups` entry of its surface is `false`, the slot is disabled with the reason that the surface is turned off. `find.find` and `find.replace` are also disabled with `find.noBar` while no `PptxEditor.FindBar` is mounted. In the slide sorter, they are disabled with `disabled.findSorter`, because the slide sorter shows no slide canvas.
 
-`disabledReason` is a catalog key, such as `disabled.noSelection`, or the engine's own text. Translate it before you show it with `translateKeyOrText(t, reason)` from `@pptx-editor.dev/core/editor`, with `t` from `useTranslation()`. See [Build a control from a command](/docs/customization/toolbar#build-a-control-from-a-command). The packaged controls translate it for you. Issue [#71](https://github.com/eigenpal/pptx-editor/issues/71) tracks a hook that returns the translated text, as DOCX Editor's does.
+`disabledReason` is a catalog key, such as `disabled.noSelection`, or the engine's own text. Translate it before you show it with `translateKeyOrText(t, reason)` from `@pptx-editor.dev/core/editor`, with `t` from `useTranslation()`. See [Build a control from a command](/docs/customization/toolbar#build-a-control-from-a-command). The packaged controls translate it for you.
 
 `text.link` is the exception: it stays enabled in both cases, because hiding the popup never turns off links. `useEditorCommand('text.link').execute(url)` always sets a link, and `execute(null)` removes it. The engine can still refuse the link: with only a caret outside a link (`disabled.selectText`), or for an unsafe address (`errors.unsafeLink`). `execute()` with no value opens the link popup, and prints a development warning when no popup can open.
 
@@ -239,7 +239,7 @@ To apply a theme font, pass its reference: `execute('+mj-lt')` for the headings 
 
 The Vue toolbar draws the same controls as the React toolbar, with the same markup, classes, and ARIA. This includes the pickers, the font size stepper, the value menus, the color splits, the galleries, and the table grid. It also includes the link control, Find and Replace, the slide show buttons, and the dialog and file picker buttons. Groups that do not fit the width move into the **More** menu. `overflow`, `priority`, `pinned`, and `overflowContent` work as in React.
 
-Vue takes each rung of the ladder as DOCX Editor's Vue adapter does:
+Vue provides the same customization levels:
 
 - `className` (or a host `class`) on `PptxEditorToolbar.Slot` or on a named part goes on the control. This applies to every Vue part whose React twin takes `className`.
 - The `icon` prop (or the `icon` slot) replaces the registry icon of a button or of the main half of a color split.

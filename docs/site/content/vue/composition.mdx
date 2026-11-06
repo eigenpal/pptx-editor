@@ -153,7 +153,7 @@ Each part reads its enabled state, its active state, and its command from the en
 
 ### Compose the font picker
 
-`PptxEditorToolbar.FontFamily` is a compound part, as in DOCX Editor. `FontFamily.Trigger` is the button, `FontFamily.Content` is the list, and `FontFamily.Item` is one family:
+`PptxEditorToolbar.FontFamily` is a compound part. `FontFamily.Trigger` is the button, `FontFamily.Content` is the list, and `FontFamily.Item` is one family:
 
 ```vue
 <PptxEditorToolbar>
@@ -178,7 +178,7 @@ To fill the list or build a picker from nothing, use `useFontFamily()`: `value` 
 | `document` | `Uint8Array` | A new array opens the new deck in the same instance. |
 | `mode` | `'edit' \| 'view'` | Updates in place. |
 | `fonts` | `EditorFontsOption` | Replaces the fonts in place. The deck, the selection, and the undo history stay. |
-| `fontFamilies` | `readonly string[]` | Read when the instance is created. Change the `:key` to remount. |
+| `fontFamilies` | `readonly string[]` | Updates the font picker in place. |
 | `locale` | `LocaleCatalog` | Updates the strings and repaints the canvas once. Follows the catalog's content, not its identity. |
 | `colorMode` | `'light' \| 'dark' \| 'system'` | Updates the chrome theme. |
 | `popups` | `PptxEditorPopups` | Updates the dialogs that the root mounts. |

@@ -1,0 +1,76 @@
+---
+title: 'Handle open failures'
+description: 'Handle refused files, failed commands, and damaged slides without losing the visible presentation.'
+category: 'Guides'
+---
+
+Check the return value from `load()` and subscribe to `openFailure` for failures discovered after loading starts.
+
+## Show an open failure
+
+This helper translates each failure group into application text. It returns an unsubscribe function:
+
+```ts
+import { onEditorEvent } from '@pptx-editor.dev/core/editor';
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function watchOpenFailures(editor: Editor, showMessage: (message: string) => void) {
+  return onEditorEvent(editor, 'openFailure', (failure) => {
+    const messages = {
+      damaged: 'This presentation is damaged.',
+      'not-pptx': 'Choose a PPTX presentation.',
+      'too-large': 'This presentation exceeds the input limits.',
+      unknown: 'The presentation could not be opened.',
+    };
+    showMessage(messages[failure.reason]);
+  });
+}
+```
+
+Call the returned function when you remove your integration. `failure.code` provides a diagnostic code. The failure object contains no filename or presentation content.
+
+A failed replacement can leave the previous presentation open. Check `openFailure`, rather than treating `status === 'ready'` as proof that the replacement succeeded.
+
+## Handle damage found after editing
+
+A long presentation can reveal a damaged slide after the user starts editing. The editor keeps the visible presentation and sets `readOnlyReason` to `'damaged-slide'`.
+
+In this state, `openFailure` stays `null`. Commands, undo, save, and automation writes are refused. `save()` returns `null`.
+
+Check this condition when your save action fails:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function saveOrExplain(editor: Editor) {
+  const bytes = editor.save();
+  if (bytes) return bytes;
+  if (editor.snapshot().readOnlyReason === 'damaged-slide') {
+    throw new Error('A damaged slide prevents saving this presentation.');
+  }
+  throw new Error('No presentation is available to save.');
+}
+```
+
+## Handle a refused command
+
+Commands return a result instead of guaranteeing that an edit occurred. A `noop` means there was nothing to change:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function undo(editor: Editor) {
+  const result = editor.exec({ type: 'undo' });
+  if (!result.ok && !result.noop) {
+    throw new Error(result.reason);
+  }
+}
+```
+
+Use `can(command)` to disable unavailable controls. Still check `exec(command)`, because the selection or document can change before execution.
+
+## See also
+
+- [Load and save presentations](/docs/guides/loading-and-saving)
+- [Long decks](/docs/guides/long-decks)
+- [React hooks](/docs/react/hooks)

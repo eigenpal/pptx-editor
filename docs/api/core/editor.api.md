@@ -471,7 +471,7 @@ export interface ChromeMenuSubmenuEntry {
 }
 
 // @public
-export function chromeOfferedControl(slot: ChromeSlotId, control: ChromeControl): ChromeControl;
+export function chromeOfferedControl(slot: ChromeSlotId, control: ChromeControl, editor?: Pick<Editor, 'can'> | null): ChromeControl;
 
 // @public
 export function chromeOptionChecked(value: unknown, option: string): boolean;
@@ -973,6 +973,9 @@ export function createHyperlinkPopupController(editor: Editor, clipboard?: () =>
 
 // @internal
 export function createHyperlinkPopupStore(): HyperlinkPopupStore;
+
+// @internal
+export function createItemMemo<V>(): (key: object, inputs: readonly unknown[], make: () => V) => V;
 
 // @internal
 export function createNotesFindPainter(): {
@@ -4573,6 +4576,9 @@ export interface SlideImageOptions {
 }
 
 // @internal
+export function slideItemLabels(t: Translate): string;
+
+// @internal
 export function slideItemName(t: Translate, slide: {
     readonly index: number;
     readonly hidden: boolean;
@@ -5695,7 +5701,7 @@ export function validateBackgroundDraft(fields: BackgroundDraftFields, initial: 
 export function validatePicturePropertiesDraft(f: PicturePropertiesDraftFields, initial?: PicturePropertiesDraftFields): DialogErrors<PicturePropertiesDraftFields>;
 
 // @internal
-export function valueSlotOptions<K extends keyof ToolbarValueMap>(slot: K): readonly ToolbarValueMap[K][];
+export function valueSlotOptions<K extends keyof ToolbarValueMap>(slot: K, editor?: Pick<Editor, 'can'> | null): readonly ToolbarValueMap[K][];
 
 // @internal
 export function valueSlotShown<K extends keyof ToolbarValueMap>(slot: K, raw: unknown): ToolbarShownValue<K> | null;

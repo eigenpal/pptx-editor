@@ -33,13 +33,13 @@ The horizontal rail sits under the slide and leaves the width to it. See [Horizo
 
 Inside the root, the chat reads and drives the deck:
 
-| Task | Call |
-| --- | --- |
-| Show a slide in a message | `editor.renderThumbnail(index, element)` paints at once |
-| Go to a slide | `editor.goToSlide(index)` |
-| Present | `useSlideshow().start('current')` |
-| Download | `editor.save()` |
-| Tell the model where the user is | `editor.snapshot().currentSlide` |
+| Task                             | Call                                                    |
+| -------------------------------- | ------------------------------------------------------- |
+| Show a slide in a message        | `editor.renderThumbnail(index, element)` paints at once |
+| Go to a slide                    | `editor.goToSlide(index)`                               |
+| Present                          | `useSlideshow().start('current')`                       |
+| Download                         | `editor.save()`                                         |
+| Tell the model where the user is | `editor.snapshot().currentSlide`                        |
 
 ## Match the chat's look
 
@@ -82,7 +82,11 @@ It keeps the editor's defaults for the other groups. These are the errors, the w
 Put your own panel buttons, such as Present or Close, in `PptxEditor.Toolbar.Action`. It works outside the toolbar too, and gives your button the editor's tooltip, disabled state, and focus behavior:
 
 ```tsx
-<PptxEditor.Toolbar.Action label="Present" icon={<PresentIcon />} onSelect={() => show.start('current')} />
+<PptxEditor.Toolbar.Action
+  label="Present"
+  icon={<PresentIcon />}
+  onSelect={() => show.start('current')}
+/>
 ```
 
 ## Fit the slide to the panel width
@@ -100,7 +104,12 @@ const height = (width - 2 * SLIDE_PADDING) * ratio + 2 * SLIDE_PADDING;
   </div>
   <PptxEditor.SlideRail orientation="horizontal" />
   <PptxEditor.NotesPane className="deck-notes" />
-</div>
+</div>;
 ```
 
 Give the notes the rest of the panel height: give `.deck-notes` `flex: 1` in your flex column. The notes field fills the pane. See [Appearance](/docs/customization/appearance#size-typography-and-layer-reference) and [Slide rail parts](/docs/customization/layout#slide-rail-parts).
+
+## See also
+
+- [Customization](/docs/customization)
+- [PPTX fidelity](/docs/pptx-fidelity)

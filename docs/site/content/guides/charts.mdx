@@ -23,6 +23,8 @@ In the React or Vue adapter, pass the same module in the `modules` prop of `Pptx
 - Line, area, scatter, pie, doughnut, and radar charts.
 - Titles, legends, axes, gridlines, data labels, and number formats.
 
+Right legends, top and bottom legends of one row, and radar labels keep their spacing at text sizes from 9 to 20 pt.
+
 3-D, of-pie, stock, bubble, and surface charts, and charts with trendlines or error bars, show the placeholder. The PDF export reports them with the `frame.chart` diagnostic code.
 
 ## How it works
@@ -30,3 +32,8 @@ In the React or Vue adapter, pass the same module in the `modules` prop of `Pptx
 The module turns a chart into shapes and labels in the chart's frame. The engine lays them out with the same geometry and text measurement as every other shape. The editor and the PDF export draw that one layout, so the two agree.
 
 A chart is not editable. It selects, moves, and deletes as one object, and its chart part saves unchanged. The engine never reads an embedded workbook or an external data source.
+
+## See also
+
+- [Customization](/docs/customization)
+- [PPTX fidelity](/docs/pptx-fidelity)

@@ -56,48 +56,33 @@ These rules apply to a group:
 Toolbar value slots take a group as the last argument. A host slider sends each value while the pointer moves, and one undo step reverts the whole drag. In React:
 
 ```tsx
-import { useRef } from 'react';
-import type { HistoryGroup } from '@pptx-editor.dev/core';
-import { useEditorValueCommand, usePptxEditor } from '@pptx-editor.dev/react';
+import { useEditorValueCommand, useHistoryGroup } from '@pptx-editor.dev/react';
 
 export function FontSizeSlider() {
-  const editor = usePptxEditor();
   const size = useEditorValueCommand('font.size');
-  const gesture = useRef<HistoryGroup | null>(null);
-  const end = () => {
-    gesture.current?.end();
-    gesture.current = null;
-  };
+  const group = useHistoryGroup({ kind: 'range' });
   return (
     <input
+      ref={group.ref}
       type="range"
       aria-label="Font size"
       min={8}
       max={96}
       value={size.value ?? 18}
       disabled={!size.isEnabled}
-      onPointerDown={() => {
-        end();
-        gesture.current = editor?.beginHistoryGroup() ?? null;
-      }}
-      onPointerUp={end}
-      onPointerCancel={end}
-      onBlur={end}
       onChange={(event) => {
-        const historyGroup = gesture.current ?? undefined;
-        size.execute(
-          Number(event.currentTarget.value),
-          historyGroup ? { historyGroup } : undefined
-        );
+        size.execute(Number(event.currentTarget.value), group.options());
       }}
     />
   );
 }
 ```
 
-`font.size` takes points. Without a group, for example when the user moves the slider with the keyboard, each value is its own step.
+`font.size` takes points. The hook groups pointer and keyboard gestures and releases its binding when the control unmounts.
 
-In Vue, `useEditorValueCommand(slot).execute(value, { historyGroup })` takes the same options, and `usePptxEditor().value?.beginHistoryGroup()` opens the group. Without a framework, call `runToolbarCommand(editor, 'font.size', 24, { historyGroup })`.
+Vue provides the same `useHistoryGroup({ kind: 'range' })` pattern. Bind `group.ref` to the control and pass `group.options()` with each write.
+
+For adapter examples, see [React hooks](/docs/react/hooks) and [Vue composables](/docs/vue/composables).
 
 ## Collaboration
 

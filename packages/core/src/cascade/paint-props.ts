@@ -211,6 +211,29 @@ function relRect(el: Element | undefined): RelRect {
 /** The most gradient stops kept (a common gradient editor allows 10): a resource limit. */
 const MAX_GRADIENT_STOPS = 64;
 
+/** The most `a:ds` dash and space pairs kept from an `a:custDash`: a resource limit. */
+const MAX_CUSTOM_DASHES = 64;
+
+/**
+ * The shortest custom dash period kept, in line widths. A shorter pattern draws as a solid line:
+ * it looks solid, and it would cost a renderer a dash for every hundredth of a width.
+ */
+const MIN_CUSTOM_DASH_PERIOD = 0.01;
+
+/**
+ * The dash and space lengths of an `a:custDash`, in line widths, or undefined for a solid line.
+ * Only the first `MAX_CUSTOM_DASHES` pairs count, a negative length is 0, and a pattern with no
+ * length, or one shorter than `MIN_CUSTOM_DASH_PERIOD`, draws solid.
+ */
+function customDashes(custDash: Element): number[] | undefined {
+  const len = (v: number | undefined): number => Math.max(0, pct(v, 1));
+  const out = children(custDash, 'a:ds')
+    .slice(0, MAX_CUSTOM_DASHES)
+    .flatMap((ds) => [len(intAttr(ds, 'd')), len(intAttr(ds, 'sp'))]);
+  const period = out.reduce((sum, v) => sum + v, 0);
+  return Number.isFinite(period) && period >= MIN_CUSTOM_DASH_PERIOD ? out : undefined;
+}
+
 function stopsOf(grad: Element, ctx: ColorContext): GradientStop[] {
   const out: GradientStop[] = [];
   for (const gs of children(child(grad, 'a:gsLst'), 'a:gs')) {
@@ -425,12 +448,7 @@ export function resolveLine(
   const [custDash] = childOf('a:custDash');
   const width = intAttr(direct, 'w') ?? intAttr(style, 'w') ?? DEFAULT_LINE_WIDTH;
   const cap = pick('cap');
-  const dashes = custDash
-    ? children(custDash, 'a:ds').flatMap((ds) => [
-        pct(intAttr(ds, 'd'), 1),
-        pct(intAttr(ds, 'sp'), 1),
-      ])
-    : undefined;
+  const dashes = custDash ? customDashes(custDash) : undefined;
   const head = lineEnd(childOf('a:headEnd')[0]);
   const tail = lineEnd(childOf('a:tailEnd')[0]);
   return {
@@ -439,7 +457,7 @@ export function resolveLine(
     cap: cap === 'rnd' || cap === 'sq' ? cap : 'flat',
     join: (joinEl?.local as ResolvedLine['join']) ?? 'round',
     miterLimit: pct(intAttr(joinEl, 'lim'), 8),
-    dash: custDash ? 'custom' : (attr(prstDash, 'val') ?? 'solid'),
+    dash: custDash ? (dashes ? 'custom' : 'solid') : (attr(prstDash, 'val') ?? 'solid'),
     ...(dashes ? { dashes } : {}),
     compound: pick('cmpd') ?? 'sng',
     ...(head ? { head } : {}),

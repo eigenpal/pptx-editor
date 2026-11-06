@@ -1,0 +1,58 @@
+---
+title: 'Comments'
+description: 'Read legacy presentation comments and build a host-owned comment list.'
+category: 'Pro'
+---
+
+Use `legacyComments()` to read legacy PresentationML comments and their replies. The function returns plain `ReviewItem` values from a parsed package. For the feature status, see <FeatureBadge id="review.comments" />.
+
+## Read comments from a file
+
+This Node.js example reads `deck.pptx` without mounting an editor:
+
+```ts
+import { readFile } from 'node:fs/promises';
+import { readPptx } from '@pptx-editor.dev/core/store';
+import { legacyComments } from '@pptx-editor.dev/pro';
+
+const opened = readPptx(await readFile('deck.pptx'));
+if (!opened.ok) throw new Error('Cannot open the presentation');
+const comments = legacyComments(opened.pkg);
+for (const comment of comments) {
+  console.log(comment.slidePart, comment.author, comment.text);
+}
+```
+
+Use application access controls before showing these values. Comment text and author names come from an untrusted file. Render them as text, such as React expressions or Vue interpolation.
+
+## Understand the returned values
+
+| Field       | Meaning                                 |
+| ----------- | --------------------------------------- |
+| `id`        | Identifier within one package revision  |
+| `kind`      | `comment` for a legacy comment          |
+| `slidePart` | Slide part that owns the comment        |
+| `author`    | Optional author display name            |
+| `date`      | Optional date string stored in the file |
+| `text`      | Comment text                            |
+| `parentId`  | Parent identifier for a reply           |
+
+Group replies by `parentId`. Preserve file order when presenting comments on the same slide. Do not treat these identifiers as permanent identifiers across unrelated files.
+
+## Register the review module
+
+Pass `reviewModule()` in the editor’s module array to register its legacy comment collector:
+
+```ts
+import { reviewModule } from '@pptx-editor.dev/pro';
+
+const modules = [reviewModule()];
+```
+
+The package reads `p:cmLst` comments and `p15` reply references. It does not read modern `p188` threaded comments. It provides no comment creation, editing, resolution, or review UI. Unknown comment content remains in the package during save.
+
+## See also
+
+- [Pro modules](/docs/pro)
+- [PPTX fidelity](/docs/pptx-fidelity)
+- [Collaboration](/docs/pro/collaboration)

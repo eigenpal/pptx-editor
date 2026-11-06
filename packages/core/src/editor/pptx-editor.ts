@@ -46,7 +46,12 @@ import { pictureStateAt, withAltText } from './picture-state.ts';
 import { isViewCommand, ViewSettings, type ViewCommand } from './view-settings.ts';
 import { PlaceholderPrompts } from './placeholder-prompts.ts';
 import { RemovalNotice } from './removal-notice.ts';
-import { CanCache, createStructureKey, STRUCTURE_COMMANDS } from './can-cache.ts';
+import {
+  CanCache,
+  createStructureKey,
+  STRUCTURE_COMMANDS,
+  structureSlideKey,
+} from './can-cache.ts';
 import { itemById, SlideSurface } from './surface.ts';
 import { createShortcut, createSurfaceHost, type SurfaceHostBase } from './surface-host.ts';
 import { setSurfaceRoot } from './surface-registry.ts';
@@ -150,7 +155,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       arm.version,
       views.presentationView,
     ],
-    () => [...structureOf(session), slide, mode, views.presentationView]
+    // The slide is part of each answer's key instead (`structureSlideKey`).
+    () => [...structureOf(session), mode, views.presentationView]
   );
   const emit = (): void => {
     arm.sync();
@@ -284,7 +290,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         ? // Commands carrying bytes are cached by object identity, not serialized.
           `${command.type}:${partVersion(command)}`
         : commandCacheKey(command);
-    return canCache.answer(key, () => canUncached(command), STRUCTURE_COMMANDS.has(command.type));
+    if (!STRUCTURE_COMMANDS.has(command.type))
+      return canCache.answer(key, () => canUncached(command));
+    const at = structureSlideKey(command, session.store.package, slide);
+    return canCache.answer(`${key}@${at}`, () => canUncached(command), true);
   };
 
   const sectionIds = () => sectionSummaries(session?.store.package).map((x) => x.id);

@@ -237,7 +237,9 @@ export interface HarnessControl {
   /**
    * Close the page and its browser context, and open the harness page in a new context. A page
    * keeps font and glyph caches across decks, so a deck can paint differently after another
-   * deck. A new context for each deck paints it as a run of that deck alone does (`lane.ts`).
+   * deck that loaded other fonts. A new context for each corpus deck paints it as a run of that
+   * deck alone does. The fixture decks all get the same fonts, so a lane gives them one page
+   * (`lane.ts`).
    */
   restart(): Promise<Page>;
   /**
@@ -470,6 +472,31 @@ export function fileDigest(file: string): ReceivedFile {
   return { bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') };
 }
 
+/** The SHA-256 of each font file, by path, size, and modification time: read once a process. */
+const fontDigests = new Map<string, string>();
+
+/**
+ * The SHA-256 of a font source: a file on disk (cached while its size and time stay), or the
+ * bytes of one face of a collection. The page keeps the bytes it fetched by this digest, so a
+ * later deck with the same font does not fetch, hash, or decode it again (`harness.ts`).
+ */
+function fontDigest(source: string | Uint8Array): string | undefined {
+  if (typeof source !== 'string') return createHash('sha256').update(source).digest('hex');
+  try {
+    const stat = statSync(source);
+    const key = `${source}\u0000${stat.size}\u0000${stat.mtimeMs}`;
+    let digest = fontDigests.get(key);
+    if (!digest) {
+      digest = createHash('sha256').update(readFileSync(source)).digest('hex');
+      fontDigests.set(key, digest);
+    }
+    return digest;
+  } catch {
+    // A file that cannot be read has no digest: the page fetches it, and reports the failure.
+    return undefined;
+  }
+}
+
 /**
  * Open a deck in the harness page with the local reference fonts that the deck names (or `fonts`).
  * The page fetches the deck and the fonts from the harness server as raw bytes. They never go
@@ -503,8 +530,9 @@ export async function openDeck(
         bold: f.bold,
         italic: f.italic,
         url: served[i + 1].url,
+        sha256: fontDigest(sources[i]),
       })),
-      fallback: fallback.map((f) => f.url),
+      fallback: fallback.map((f, i) => ({ url: f.url, sha256: fontDigest(FALLBACK_FONTS[i]) })),
     };
     return await page.evaluate((s) => (window as any).__pptxHarness.open(s), source);
   } finally {

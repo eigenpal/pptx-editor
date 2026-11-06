@@ -17,6 +17,7 @@ import {
   popGraphicsState,
   pushGraphicsState,
   setFillingRgbColor,
+  setDashPattern,
   setLineCap,
   setLineJoin,
   setLineWidth,
@@ -31,7 +32,13 @@ import {
   type PDFRef,
 } from 'pdf-lib';
 import type { GradientStop, ResolvedFill, ResolvedLine, Rgba } from '@pptx-editor.dev/core/cascade';
-import type { GeometryPath } from '@pptx-editor.dev/core/layout';
+import {
+  dashArray,
+  outsideDashArray,
+  strokeCap,
+  strokeWidth,
+  type GeometryPath,
+} from '@pptx-editor.dev/core/layout';
 import {
   adjustForPathMode,
   circleGradientGeometry,
@@ -505,33 +512,39 @@ export async function drawPicture(
   p.push(drawObject(name), popGraphicsState());
 }
 
+/** The PDF line cap of an SVG `stroke-linecap` value. */
+export function lineCapStyle(cap: 'butt' | 'round' | 'square'): LineCapStyle {
+  return cap === 'round'
+    ? LineCapStyle.Round
+    : cap === 'square'
+      ? LineCapStyle.Projecting
+      : LineCapStyle.Butt;
+}
+
 /**
  * Set the stroke for an outline, as the SVG `strokeAttrs`: a zero width is a hairline of one
- * pixel at 96 dpi, and `scale` undoes the enclosing group's scale. Returns the stroke color, or
- * null when the outline draws nothing.
+ * pixel at 96 dpi, and `scale` undoes the enclosing group's scale. The width, the dash pattern,
+ * and the caps come from the engine's shared rules (`core/layout`, `line-strokes.ts`). A
+ * picture's border (`outside`) takes the dashes of a border outside the picture. Returns the
+ * stroke color, or null when the outline draws nothing.
  */
 export function strokeStyle(
   line: ResolvedLine,
   p: PageOps,
   scope: FillScope,
-  scale = 1
+  scale = 1,
+  outside = false
 ): Rgba | null {
   const color = flatColor(line.fill, scope, p, 'lines');
   if (!color) return null;
-  if (line.dash !== 'solid')
-    p.diag.add('line.dash', 'approximation', 'Dashed lines are drawn solid.');
   if (line.compound !== 'sng')
     p.diag.add('line.compound', 'approximation', 'Compound lines are drawn as one line.');
+  const width = strokeWidth(line, scale);
+  const dashes = outside ? outsideDashArray(line, width) : dashArray(line, width);
   p.push(
     setStrokingRgbColor(...rgb(color)),
-    setLineWidth((line.width > 0 ? line.width : 9525) / (scale || 1)),
-    setLineCap(
-      line.cap === 'rnd'
-        ? LineCapStyle.Round
-        : line.cap === 'sq'
-          ? LineCapStyle.Projecting
-          : LineCapStyle.Butt
-    ),
+    setLineWidth(width),
+    setLineCap(lineCapStyle(dashes && outside ? 'butt' : strokeCap(line))),
     setLineJoin(
       line.join === 'miter'
         ? LineJoinStyle.Miter
@@ -540,6 +553,7 @@ export function strokeStyle(
           : LineJoinStyle.Round
     )
   );
+  if (dashes) p.push(setDashPattern(dashes, 0));
   // The SVG paint's `stroke-miterlimit`; PDF's default of 10 would differ.
   if (line.join === 'miter')
     p.push(

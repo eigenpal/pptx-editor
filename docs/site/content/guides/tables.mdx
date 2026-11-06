@@ -6,7 +6,7 @@ category: 'Guides'
 
 A PPTX table is a graphic frame that holds an `a:tbl`. You edit it with editor commands: run `editor.exec(command)`, or check first with `editor.can(command)`. Each command acts on the table of the current selection: a caret in a cell, a range of cells, or the selected table frame. Every edit is one undo step, and every edit keeps the table valid under ECMA-376: one cell for each grid column in every row, and merge markers (`gridSpan`, `rowSpan`, `hMerge`, `vMerge`) on the covered cells.
 
-The toolbar shows the `table` group while the selection is in a table. Its slots carry the DOCX Editor names (`table.mergeCells`, `table.splitCell`, `table.cellFill`, `table.borderTarget`) and `table.*` names for the PPTX controls that DOCX Editor does not have.
+The toolbar shows the `table` group while the selection is in a table. Customize controls through slots such as `table.mergeCells`, `table.splitCell`, `table.cellFill`, and `table.borderTarget`.
 
 ## Insert a table
 
@@ -35,7 +35,7 @@ Counts must be integers from 1 to 75. `MenuTableGrid` is a `grid` with one tab s
 
 ## Read the table of the selection
 
-`editor.snapshot().table` is a `TableContext` while the selection is in or on a table, and `null` otherwise. `tableChromeVisible(snapshot.table)` gives the same answer as DOCX Editor's helper.
+`editor.snapshot().table` is a `TableContext` while the selection is in or on a table, and `null` otherwise. `tableChromeVisible(snapshot.table)` tells you whether to show the table controls.
 
 ```ts
 const table = editor.snapshot().table;
@@ -86,7 +86,7 @@ A paste larger than the table adds rows at the bottom and columns at the end of 
 
 ## Edit on the canvas
 
-The canvas shows table chrome while the pointer is over a table or the selection is in it, as DOCX Editor does:
+The canvas shows table chrome while the pointer is over a table or the selection is in it:
 
 - **Select handle.** A small box with a move symbol sits out from the table's top-left corner. Click it to select the table. Drag it to move the table.
 - **Grid lines.** The grid line under the pointer is marked across the table. Drag it to resize the columns or rows beside it; the right and bottom edges resize the last column or row, and stop at the slide's edge so you can grab them again. A selected table has no side handles on these two edges, so each edge does one thing. The frame's other resize handles stop at the slide's edge too, also with Shift held on a corner. Just outside the top and left edges, as on any shape's border, a drag moves the table. A press inside a cell places the caret, except on a grid line, where the resize cursor shows. The drag selects the table and is one undo step. A click on a line places no caret. A table in a group shows its chrome after you enter the group.

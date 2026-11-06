@@ -1,4 +1,19 @@
 {
   "title": "Guides",
-  "pages": ["charts", "chat-panel", "east-asian-text", "long-decks", "pdf-export", "tables", "undo-history"]
+  "pages": [
+    "loading-and-saving",
+    "open-failures",
+    "navigation",
+    "zoom",
+    "images",
+    "export",
+    "pdf-export",
+    "print",
+    "charts",
+    "chat-panel",
+    "east-asian-text",
+    "long-decks",
+    "tables",
+    "undo-history"
+  ]
 }

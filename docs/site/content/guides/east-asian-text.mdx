@@ -10,12 +10,12 @@ The editor reads, edits, and draws Chinese, Japanese, and Korean text. This page
 
 Each character uses the font of its slot in the run (ECMA-376 `a:rPr`):
 
-| Characters | Font |
-| --- | --- |
-| Han, kana, bopomofo, Hangul, full-width forms | `a:ea` |
-| Arabic, Hebrew, Indic, Thai, and other complex scripts | `a:cs` |
-| Symbol characters U+F000 to U+F0FF, when the run names `a:sym` | `a:sym` |
-| All other characters | `a:latin` |
+| Characters                                                     | Font      |
+| -------------------------------------------------------------- | --------- |
+| Han, kana, bopomofo, Hangul, full-width forms                  | `a:ea`    |
+| Arabic, Hebrew, Indic, Thai, and other complex scripts         | `a:cs`    |
+| Symbol characters U+F000 to U+F0FF, when the run names `a:sym` | `a:sym`   |
+| All other characters                                           | `a:latin` |
 
 Quotes, dashes, the ellipsis, and arrows use `a:ea` when the run's `lang` or `altLang` is Chinese, Japanese, or Korean. A space uses `a:latin`, except a space between two complex-script characters, which uses `a:cs`.
 
@@ -84,3 +84,8 @@ npm install @docx-editor.dev/fonts-cjk
 - Punctuation does not compress, and `strictFirstAndLastChars` is not applied.
 - There is no Traditional Chinese interface catalog yet.
 - A run with no language and a theme with an empty `a:ea` uses its Latin font for East Asian text.
+
+## See also
+
+- [Customization](/docs/customization)
+- [PPTX fidelity](/docs/pptx-fidelity)

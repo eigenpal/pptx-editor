@@ -105,13 +105,13 @@ A menu `icon` is icon content (an element) or the name of a packaged Material Sy
 
 ### Application row names and links
 
-`Menu.Row` takes `label`, `disabledReason` (or `reason`), and `checked`, where DOCX Editor's row takes children, `title`, and `selected`. The row is shared with the context menu, whose application rows already used these names. Aligning the names with DOCX Editor is a follow-up.
+Use `label` for row text, `disabledReason` for its refusal message, and `checked` for its check mark.
 
 A row's `href` opens in a new tab. Only relative links and `http`, `https`, `mailto`, `tel`, and `ftp` links pass `sanitizeHref`. Any other link disables the row. Use `disabledReason` to explain why a row is disabled.
 
 ## Named rows
 
-A named row is shorthand for one registry row, as DOCX Editor's `ContextMenu.Cut` and `Menu.PageSetup`. `<PptxEditor.ContextMenu.Cut hidden />` is `<PptxEditor.ContextMenu.Slot slotId="edit.cut" hidden />`. A named row replaces its row in place, or removes it with `hidden`. In Vue, the same names are statics of `PptxEditorContextMenu` and `PptxEditorMenu`.
+A named row is shorthand for one registry row. `<PptxEditor.ContextMenu.Cut hidden />` is `<PptxEditor.ContextMenu.Slot slotId="edit.cut" hidden />`. A named row replaces its row in place, or removes it with `hidden`. In Vue, the same names are statics of `PptxEditorContextMenu` and `PptxEditorMenu`.
 
 | Menu | Named rows |
 | --- | --- |

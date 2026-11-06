@@ -9,6 +9,13 @@ import { buildPptx } from '../../../scripts/fixtures/builder.ts';
 import { PptxEditor } from '../src/index.ts';
 
 const saved = HTMLElement.prototype.getBoundingClientRect;
+// happy-dom defines the method on Element.prototype. Restore by removing the own property, so an
+// assignment here never shadows a later test's patch of Element.prototype in the same process.
+const ownBefore = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'getBoundingClientRect');
+function restoreRect(): void {
+  if (ownBefore) Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', ownBefore);
+  else delete (HTMLElement.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+}
 let app: App | null = null;
 let host: HTMLElement | null = null;
 afterEach(() => {
@@ -16,7 +23,7 @@ afterEach(() => {
   host?.remove();
   app = null;
   host = null;
-  HTMLElement.prototype.getBoundingClientRect = saved;
+  restoreRect();
 });
 
 /** happy-dom lays out nothing: give the views box and the notes card their boxes. */

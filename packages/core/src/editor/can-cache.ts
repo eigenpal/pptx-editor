@@ -5,9 +5,11 @@
 // A few commands edit the deck's structure and never read a slide's content: New Slide and
 // Add Section. Their probe runs the whole command on a copy, which costs more as the deck grows.
 // Their answers have a key of their own (`structure`), without the package or the selection,
-// so typing on a slide keeps them.
+// so typing on a slide keeps them. New Slide reads only the layout of the current slide, not
+// its index (`structureSlideKey`), so moving between slides on one layout keeps its answer.
 
 import type { CanResult, EditorCommand } from '../contracts/index.ts';
+import { newSlideLayout } from '../automation/commands/slide-layouts.ts';
 import { changedPartNames, presentationInfo, type PptxPackage } from '../store/index.ts';
 import type { DocumentSession } from './document-session.ts';
 import { replicaBindingOf } from './replica-ids.ts';
@@ -73,6 +75,23 @@ export class CanCache<Active> {
     this.sync();
     return (this.#active ??= compute());
   }
+}
+
+/**
+ * What the answer of a {@link STRUCTURE_COMMANDS} command reads of the current slide. New
+ * Slide reads the layout of the slide (the one it copies, and the one `newSlideLayout` picks
+ * from it); its index only places the new slide, which no refusal reads. Add Section reads the
+ * index. @internal
+ */
+export function structureSlideKey(
+  command: EditorCommand,
+  pkg: PptxPackage | undefined,
+  slide: number
+): string {
+  if (command.type !== 'addSlide' || !pkg) return `slide:${slide}`;
+  const slides = presentationInfo(pkg).slides;
+  const source = slides[Math.max(0, Math.min(slide, slides.length - 1))]?.layoutPart;
+  return `layout:${source ?? ''}\u0000${newSlideLayout(pkg, slide) ?? ''}`;
 }
 
 const same = (a: readonly unknown[], b: readonly unknown[]): boolean =>

@@ -1,0 +1,77 @@
+---
+title: 'Export presentations'
+description: 'Save PPTX files, export slide images in the browser, or create PDFs on a server.'
+category: 'Guides'
+---
+
+Choose an export format for your workflow:
+
+| Output           | API                            | Environment    |
+| ---------------- | ------------------------------ | -------------- |
+| Editable PPTX    | `editor.save()`                | Browser editor |
+| One PNG          | `exportSlidePng()`             | Browser        |
+| One SVG          | `exportSlideSvg()`             | Browser        |
+| PNG files in ZIP | `exportSlidesPngZip()`         | Browser        |
+| PDF              | `@pptx-editor.dev/pptx-to-pdf` | Node.js        |
+
+For PPTX downloads and storage, see [Load and save presentations](/docs/guides/loading-and-saving). PDF conversion requires the EigenPal Pro License.
+
+## Export the current slide as PNG
+
+Image export takes the session from a `PptxEditorInstance`. This function returns a `Blob` for your download or upload code:
+
+```ts
+import { exportSlidePng, type PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+export async function currentSlidePng(editor: PptxEditorInstance) {
+  if (!editor.save()) {
+    throw new Error('The presentation cannot be exported.');
+  }
+  const session = editor.session;
+  if (!session) throw new Error('No presentation is open.');
+  return exportSlidePng(session, editor.snapshot().currentSlide, {
+    width: 1920,
+  });
+}
+```
+
+The save check completes pending parsing and detects damaged slides before export. It serializes the presentation but does not download it.
+
+The width defaults to 1920 pixels. It must be from 16 to 8192 pixels. The height follows the slide ratio and cannot exceed 8192 pixels.
+
+## Export SVG or a ZIP archive
+
+Use the same session for either format:
+
+```ts
+import {
+  exportSlideSvg,
+  exportSlidesPngZip,
+  type PptxEditorInstance,
+} from '@pptx-editor.dev/core/editor';
+
+export async function slideAssets(editor: PptxEditorInstance) {
+  if (!editor.save()) throw new Error('Export is unavailable.');
+  const session = editor.session;
+  if (!session) throw new Error('No presentation is open.');
+  const svg = exportSlideSvg(session, editor.snapshot().currentSlide);
+  const zip = await exportSlidesPngZip(session, { width: 1280 });
+  return { svg, zip };
+}
+```
+
+SVG export returns a string. ZIP export returns bytes with numbered files such as `slide-01.png`.
+
+Catch export errors in your UI. Use PNG when you need a fixed raster image. SVG font embedding follows font permissions; another viewer can substitute unavailable fonts.
+
+## Export PDF
+
+Save the edited PPTX bytes and pass them to your server. Follow [PDF export](/docs/export/pdf) for conversion, font configuration, and error handling.
+
+Keep the PDF package in server code. The browser editor and server converter use the same engine layout.
+
+## See also
+
+- [Print a presentation](/docs/guides/print)
+- [PDF export](/docs/export/pdf)
+- [Fonts](/docs/customization/fonts)

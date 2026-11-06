@@ -7,13 +7,22 @@ import {
   type BlendMode,
   type ResolvedEffects,
   type ResolvedFill,
+  type ResolvedLine,
 } from '../cascade/index.ts';
 import {
   apply as applyMatrix,
+  ARROW_MITER_LIMIT,
   drawingRenderers,
   hasCharacters,
+  isOpenPath,
+  lineEndReach,
   multiply as multiplyMatrix,
+  outsideDashArray,
+  planStroke,
+  strokeWidth,
   type GeometryPath,
+  type PathCommand,
+  type StrokePlan,
   type LayoutItem,
   type Matrix,
   type SlideLayout,
@@ -22,11 +31,9 @@ import { effectDefs, effectElement, shadowCopy, type EffectSource } from './pain
 import { boundsOf, cornersUnder, grow, PX } from './effect-transforms.ts';
 import {
   fillPaint,
-  lineEndMarker,
   pictureImage,
   pictureRect,
   strokeAttrs,
-  lineEndInset,
   type ImageSizePort,
   type FillContext,
   type ImageUrlPort,
@@ -76,57 +83,6 @@ function pictureAria(
   const alt = altText(el.partName, el.nodeId);
   const name = alt && !alt.decorative ? alt.description.trim() : '';
   return name ? { role: 'img', 'aria-label': name } : { 'aria-hidden': 'true' };
-}
-
-/**
- * Whether a path is open: it has no `close`. Line ends (`a:headEnd`,
- * `a:tailEnd`) show only on open paths, so a rectangle or a callout box never gets an arrowhead.
- */
-export function isOpenPath(path: GeometryPath): boolean {
-  return path.commands.length >= 2 && !path.commands.some((c) => c.op === 'Z');
-}
-
-/**
- * An open path shortened by `start` at its first point and `end` at its last, along the
- * tangent there, so an arrowhead covers the line's end. Closed paths are unchanged.
- */
-export function shortenPath(path: GeometryPath, start: number, end: number): GeometryPath {
-  const cmds = path.commands;
-  if (!isOpenPath(path)) return path;
-  const out = cmds.slice();
-  const move = (
-    x: number,
-    y: number,
-    tx: number,
-    ty: number,
-    by: number
-  ): { x: number; y: number } => {
-    const len = Math.hypot(x - tx, y - ty);
-    if (!len || by <= 0) return { x, y };
-    const k = Math.min(by, len * 0.9) / len;
-    return { x: x + (tx - x) * k, y: y + (ty - y) * k };
-  };
-  // The tangent at an end runs to the nearest control point, or the neighboring point.
-  const toward = (c: (typeof cmds)[number], fallback: { x: number; y: number }) =>
-    c.op === 'C' ? { x: c.x2, y: c.y2 } : c.op === 'Q' ? { x: c.x1, y: c.y1 } : fallback;
-  const first = out[0];
-  const second = out[1];
-  if (start > 0 && first.op === 'M' && second.op !== 'Z') {
-    const t =
-      second.op === 'C'
-        ? { x: second.x1, y: second.y1 }
-        : second.op === 'Q'
-          ? { x: second.x1, y: second.y1 }
-          : second;
-    out[0] = { ...first, ...move(first.x, first.y, t.x, t.y, start) };
-  }
-  const last = out[out.length - 1];
-  const prev = out[out.length - 2];
-  if (end > 0 && last.op !== 'Z' && last.op !== 'M' && prev.op !== 'Z') {
-    const t = toward(last, prev);
-    out[out.length - 1] = { ...last, ...move(last.x, last.y, t.x, t.y, end) };
-  }
-  return { ...path, commands: out };
 }
 
 /** Path data for an evaluated path in local EMU. */
@@ -310,16 +266,17 @@ function geometryMask(
 /**
  * A picture's outline. It lies outside the picture, not centered on its edge,
  * as reference PDFs show. So the stroke is twice as wide, and a mask hides the half inside the
- * geometry. A round or square cap of the wider stroke reaches twice as far along the path, so
- * dashes get butt caps and grow by one line width instead: the dash period of a centered line
- * stays, and round dots draw as squares. Dashes outside a picture are not checked against a
- * reference PDF (approximation `picture-border-dots`).
+ * geometry. Its dashes come from `outsideDashArray`, as in the PDF export: the dash period of a
+ * centered line stays, and round dots draw as squares. Dashes outside a picture are not checked
+ * against a reference PDF (approximation `picture-border-dots`).
  */
 function outsideOutline(
   doc: Document,
   ctx: PaintContext,
   d: string,
   stroke: Record<string, string | number | undefined>,
+  line: ResolvedLine,
+  groupScale: number,
   w: number,
   h: number
 ): SVGElement {
@@ -350,22 +307,13 @@ function outsideOutline(
       ]
     )
   );
-  const dashes = stroke['stroke-dasharray'];
-  const capped = dashes !== undefined && stroke['stroke-linecap'] !== 'butt';
+  const dashes = outsideDashArray(line, strokeWidth(line, groupScale));
   return svg(doc, 'path', {
     d,
     fill: 'none',
     ...stroke,
     'stroke-width': num(width * 2),
-    ...(capped
-      ? {
-          'stroke-linecap': 'butt',
-          'stroke-dasharray': String(dashes)
-            .split(' ')
-            .map((v, i) => num(Math.max(0, Number(v) + (i % 2 === 0 ? width : -width))))
-            .join(' '),
-        }
-      : {}),
+    ...(dashes ? { 'stroke-linecap': 'butt', 'stroke-dasharray': dashes.map(num).join(' ') } : {}),
     mask: `url(#${id})`,
   });
 }
@@ -395,13 +343,6 @@ function paintGeometry(
   const out: SVGElement[] = [];
   const line = el.line;
   const stroke = line ? strokeAttrs(line, w, h, ctx, groupScale) : { stroke: 'none' };
-  const hasEnds =
-    item.kind === 'shape' &&
-    line !== undefined &&
-    stroke.stroke !== 'none' &&
-    item.geometry.paths.some((p) => p.stroke && isOpenPath(p));
-  const head = hasEnds ? lineEndMarker(ctx.defs, line.head, stroke.stroke ?? '#000', 1) : undefined;
-  const tail = hasEnds ? lineEndMarker(ctx.defs, line.tail, stroke.stroke ?? '#000', 1) : undefined;
   const paintFor = shapePaints(item, ctx);
   const effects = item.geometry.paths.length <= MAX_OVERLAY_PATHS ? el.effects : undefined;
   if (item.kind === 'picture') {
@@ -440,19 +381,22 @@ function paintGeometry(
           'stroke-width': 9525,
         })
       );
-    if (stroke.stroke !== 'none') out.push(outsideOutline(doc, ctx, d, stroke, w, h));
+    if (line && stroke.stroke !== 'none')
+      out.push(outsideOutline(doc, ctx, d, stroke, line, groupScale, w, h));
     return out;
   }
-  const width = Number(stroke['stroke-width']) || 0;
   for (const path of item.geometry.paths) {
-    // Line ends belong to open, stroked paths only.
-    const ends = path.stroke && isOpenPath(path);
-    const insets =
-      ends && line && stroke.stroke !== 'none'
-        ? [lineEndInset(line.head) * width, lineEndInset(line.tail) * width]
-        : [0, 0];
-    const d = pathData(insets[0] || insets[1] ? shortenPath(path, insets[0], insets[1]) : path);
+    // Line ends and square dash caps belong to open, stroked paths only.
+    const plan =
+      path.stroke && line && stroke.stroke !== 'none'
+        ? planStroke(path.commands, line, groupScale)
+        : undefined;
+    // The fill takes the whole path; only the stroke stops short under a line end.
+    const d = pathData(path);
     if (!d) continue;
+    const strokeD =
+      plan && plan.commands !== path.commands ? pathData({ ...path, commands: plan.commands }) : d;
+    const extras = plan ? strokeExtras(doc, plan, stroke) : [];
     const fill =
       path.fill === 'none' ? { paint: 'none', opacity: 1 } : paintFor(el.fill, d, path.fill);
     const overlay = fill.paint === 'none' ? null : overlayPath(doc, d, effects, paintFor);
@@ -472,46 +416,90 @@ function paintGeometry(
     }
     const compound =
       path.stroke && line && stroke.stroke !== 'none'
-        ? compoundStroke(ctx.defs, d, line.compound, stroke, w, h)
+        ? compoundStroke(ctx.defs, strokeD, line.compound, stroke, w, h)
         : null;
     const own = overlay ? { paint: 'none', opacity: 1 } : fill;
-    if (compound) {
-      // The bands draw in their own element; arrowheads stay on the center line.
-      out.push(
-        svg(doc, 'path', {
-          d,
-          fill: own.paint,
-          'fill-opacity': own.opacity < 1 ? num(own.opacity) : undefined,
-          'fill-rule': 'evenodd',
-          stroke: 'none',
-        }),
-        compound
-      );
-      if (ends && (head || tail))
+    const filled = own.paint !== 'none';
+    if (compound || (strokeD !== d && filled)) {
+      // The fill and the stroke draw apart: the bands of a compound line, or a stroke that
+      // stops short under a line end. Line ends stay on the center line.
+      if (filled)
         out.push(
           svg(doc, 'path', {
             d,
-            fill: 'none',
+            fill: own.paint,
+            'fill-opacity': own.opacity < 1 ? num(own.opacity) : undefined,
+            'fill-rule': 'evenodd',
             stroke: 'none',
-            'stroke-width': stroke['stroke-width'],
-            'marker-start': head,
-            'marker-end': tail,
           })
         );
+      out.push(compound ?? svg(doc, 'path', { d: strokeD, fill: 'none', ...stroke }), ...extras);
       continue;
     }
     out.push(
       svg(doc, 'path', {
-        d,
+        d: strokeD,
         fill: own.paint,
         'fill-opacity': own.opacity < 1 ? num(own.opacity) : undefined,
         'fill-rule': 'evenodd',
         ...(path.stroke ? stroke : { stroke: 'none' }),
-        'marker-start': ends ? head : undefined,
-        'marker-end': ends ? tail : undefined,
-      })
+      }),
+      ...extras
     );
   }
+  return out;
+}
+
+/** SVG path data for path commands. */
+function commandData(commands: readonly PathCommand[]): string {
+  return pathData({ commands, fill: 'none', stroke: true });
+}
+
+/**
+ * The line ends and square dash caps of a stroke, in the stroke's paint: filled heads, open
+ * arrows stroked as wide as the line, and solid caps with butt ends.
+ */
+function strokeExtras(
+  doc: Document,
+  plan: StrokePlan,
+  stroke: Record<string, string | undefined>
+): SVGElement[] {
+  const paint = stroke.stroke;
+  const opacity = stroke['stroke-opacity'];
+  const out: SVGElement[] = [];
+  for (const end of plan.ends)
+    out.push(
+      end.kind === 'fill'
+        ? svg(doc, 'path', {
+            d: commandData(end.commands),
+            fill: paint,
+            'fill-opacity': opacity,
+            stroke: 'none',
+            'data-line-end': '',
+          })
+        : svg(doc, 'path', {
+            d: commandData(end.commands),
+            fill: 'none',
+            stroke: paint,
+            'stroke-opacity': opacity,
+            'stroke-width': num(end.width),
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'miter',
+            'stroke-miterlimit': ARROW_MITER_LIMIT,
+            'data-line-end': '',
+          })
+    );
+  for (const cap of plan.caps)
+    out.push(
+      svg(doc, 'path', {
+        d: commandData(cap),
+        fill: 'none',
+        stroke: paint,
+        'stroke-opacity': opacity,
+        'stroke-width': stroke['stroke-width'],
+        'stroke-linecap': 'butt',
+      })
+    );
   return out;
 }
 
@@ -688,8 +676,9 @@ function outlineReach(item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'pic
   if (!line || line.fill.type === 'none') return 0;
   const width = Math.max(line.width, PX);
   const join = line.join === 'miter' ? Math.max(2, line.miterLimit / 2) : 2;
-  const ends = item.kind === 'shape' && item.geometry.paths.some((p) => p.stroke && isOpenPath(p));
-  return width * Math.max(join, ends ? 3 : 0);
+  const ends =
+    item.kind === 'shape' && item.geometry.paths.some((p) => p.stroke && isOpenPath(p.commands));
+  return Math.max(width * join, ends ? lineEndReach(line) : 0);
 }
 
 /**

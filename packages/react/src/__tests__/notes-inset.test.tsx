@@ -8,9 +8,16 @@ import { PptxEditor } from '../index.ts';
 // carries the card's height in `--pptx-notes-inset`, in the Normal view only.
 
 const saved = HTMLElement.prototype.getBoundingClientRect;
+// happy-dom defines the method on Element.prototype. Restore by removing the own property, so an
+// assignment here never shadows a later test's patch of Element.prototype in the same process.
+const ownBefore = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'getBoundingClientRect');
+function restoreRect(): void {
+  if (ownBefore) Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', ownBefore);
+  else delete (HTMLElement.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+}
 afterEach(() => {
   cleanup();
-  HTMLElement.prototype.getBoundingClientRect = saved;
+  restoreRect();
 });
 
 /** happy-dom lays out nothing: give the views box and the notes card their boxes. */

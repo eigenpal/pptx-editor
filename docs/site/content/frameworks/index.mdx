@@ -1,0 +1,27 @@
+---
+title: 'Frameworks'
+description: 'Choose a React or Vue framework setup for your PPTX editor.'
+category: 'Frameworks'
+---
+
+Choose the guide for your application. Each guide installs the adapter, imports its styles, and opens a presentation.
+
+| Application | Guide | Setup |
+| --- | --- | --- |
+| React with Vite | [Vite](/docs/frameworks/vite) | Mount the editor in your client entry. |
+| Vue 3 with Vite | [Vite with Vue](/docs/frameworks/vite-vue) | Mount the editor with `createApp`. |
+| React with Next.js | [Next.js](/docs/frameworks/nextjs) | Load the editor through a client component with `ssr: false`. |
+
+## Prepare your application
+
+Import the editor stylesheet once and give the editor's parent a nonzero height. Install one shared copy of `@pptx-editor.dev/core`.
+
+The interactive editor needs browser APIs. In a server-rendered application, load the editor only on the client. For server-side presentation edits, use the [Editing API](/docs/editor-api).
+
+The examples fetch `public/deck.pptx`. You supply this file. To open a local file instead, use the [Quickstart](/docs/quickstart).
+
+## See also
+
+- [Installation](/docs/installation)
+- [React composition](/docs/react/composition)
+- [Vue composition](/docs/vue/composition)

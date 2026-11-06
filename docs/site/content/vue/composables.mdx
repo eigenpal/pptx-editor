@@ -5,7 +5,9 @@ category: 'Vue'
 order: 38
 ---
 
-Call these composables during `setup()` in components inside `PptxEditorRoot`. The packaged `<PptxEditor>` provides that root for its default slot. Each composable has a named return type, `Use<Name>Return`, exported from the package root.
+Call editor-state composables during `setup()` inside `PptxEditorRoot`. The packaged `<PptxEditor>` provides that root for its default slot. Each composable exports a named return type, `Use<Name>Return`.
+
+`usePptxSource` and `useFonts` prepare input for the root. Call them in the parent component's `setup()` when needed.
 
 ## Connect a command button
 
@@ -147,12 +149,12 @@ State members are refs. Function members are plain functions.
 | Composable | Return type | Members |
 | --- | --- | --- |
 | `useFonts(source, ...fragments)` or `useFonts(...origins)` | `UseFontsReturn` | A `MarkedFontResolver` with a stable identity, for the `fonts` prop. Each argument can be a ref or a getter. See [Fonts](/docs/customization/fonts). |
-| `useFontFamily()` | `UseFontFamilyReturn` | `value`, `theme`, `options`, `groups`, `isEnabled`, and `disabledReason`: computed refs. `isCurrent(row)` and `setValue(family)`. As DOCX Editor's composable of the same name. Use it for your own font picker. See [Build the list from `useFontFamily`](/docs/customization/toolbar#build-the-list-from-usefontfamily). |
-| `usePptxSource(source, options?)` | `UsePptxSourceReturn` | `document`, `fonts`, `error`, and `isLoading`: computed refs. `source` and `options` can be refs or getters. The twin of DOCX Editor's `useDocxSource`, with the same font paths as the [React hook](/docs/react/hooks#open-a-presentation). |
+| `useFontFamily()` | `UseFontFamilyReturn` | `value`, `theme`, `options`, `groups`, `isEnabled`, and `disabledReason`: computed refs. `isCurrent(row)` and `setValue(family)`. Use it for your own font picker. See [Build the list from `useFontFamily`](/docs/customization/toolbar#build-the-list-from-usefontfamily). |
+| `usePptxSource(source, options?)` | `UsePptxSourceReturn` | `document`, `fonts`, `error`, and `isLoading`: computed refs. `source` and `options` can be refs or getters. See the font loading rules in [Open a presentation](/docs/react/hooks#open-a-presentation). |
 
 ## Build your own chrome
 
-These composables have the names and the shapes of DOCX Editor's composables. Call them in `setup`.
+Call these composables in `setup` to connect your controls to the editor.
 
 ### Zoom
 
@@ -276,7 +278,7 @@ function apply(event: Event) {
 | `options` | `ComputedRef<readonly V[]>` | The slot's fixed choices. A slot with a free value has none. |
 | `isEnabled`, `disabledReason` | `ComputedRef<boolean>`, `ComputedRef<string \| null>` | As `useEditorCommand` gives them. |
 
-The two composables return different results from `execute`, as in DOCX Editor: `useEditorCommand` returns a `boolean`, because a toolbar button only needs to know if the command ran, and `useEditorValueCommand` returns the `CommandResult`, because a value control shows why the engine refused a value.
+The two composables return different results from `execute`: `useEditorCommand` returns a `boolean`, because a toolbar button only needs to know if the command ran, and `useEditorValueCommand` returns the `CommandResult`, because a value control shows why the engine refused a value.
 
 To make the values of one slider drag one undo step, pass `{ historyGroup }` from `editor.value.beginHistoryGroup()`. See [Group a slider or a stepper](/docs/guides/undo-history#group-a-slider-or-a-stepper).
 

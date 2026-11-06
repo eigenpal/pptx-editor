@@ -100,7 +100,7 @@ describe('exportPdf', () => {
   });
 
   test('pictures draw, and content it cannot draw is reported per slide', async () => {
-    // Pattern fills and arrowheads are not drawn yet.
+    // Pattern fills are not drawn yet.
     const result = await exportPdf(deck('fills-lines'), { fidelityPolicy: 'best-effort' });
     const codes = result.diagnostics.map((d) => d.code);
     expect(codes).toContain('fill.pattern');

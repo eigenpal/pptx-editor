@@ -4,6 +4,8 @@ description: 'Install the PPTX editor packages, check runtime requirements, add 
 category: 'Getting started'
 ---
 
+Install an adapter for your framework and one shared engine. Use the same package versions throughout your application.
+
 ## Install packages
 
 Install one adapter and the engine. Each adapter declares `@pptx-editor.dev/core` as a peer dependency, and it installs the shared strings (`@pptx-editor.dev/i18n`) for you.
@@ -28,6 +30,12 @@ npm install @pptx-editor.dev/vue @pptx-editor.dev/core
 Install one copy of `@pptx-editor.dev/core`. The text shaper and its measurement caches belong to that copy, so two copies in one bundle measure text separately.
 
 Install all `@pptx-editor.dev` packages at the same minor version. Each package accepts only the minor of `@pptx-editor.dev/core` that it releases with, for example `~0.1.0`.
+
+## Choose a framework setup
+
+Use [Vite](/docs/frameworks/vite) for React, [Vite with Vue](/docs/frameworks/vite-vue) for Vue, or [Next.js](/docs/frameworks/nextjs) for the App Router.
+
+These guides show where to import styles and how to load the editor on the client.
 
 ## Check runtime requirements
 

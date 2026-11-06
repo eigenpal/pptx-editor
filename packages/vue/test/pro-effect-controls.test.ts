@@ -1,7 +1,8 @@
 // The Vue twin of `Pro effect controls` in packages/react/src/__tests__/shape-format.test.tsx:
 // without the drawing module's effects renderer, Shape Effects offers only the outer shadows and
 // Picture Styles leaves out the reflection and soft edge styles. A module installed later shows
-// them the next time the menu opens.
+// them the next time the menu opens. Removing an effect needs no module: the No row of an effect
+// stays while the selection has that effect.
 
 import { afterAll, afterEach, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import {
@@ -282,5 +283,105 @@ describe('Pro effect controls (Vue)', () => {
     await click(button('Picture styles'));
     for (const name of ['Reflected rounded rectangle', 'Soft edge rectangle', 'Soft edge oval'])
       expect(rows()).toContain(name);
+  });
+});
+
+// Removing an effect needs no drawing module, as in React: without it, the No row of an effect
+// stays while the selection has that effect.
+
+const GLOW = '<a:glow rad="63500"><a:srgbClr val="FF0000"/></a:glow>';
+const REFLECTION =
+  '<a:reflection blurRad="6350" stA="50000" endPos="55000" dist="5000" dir="5400000" sy="-100000" algn="bl" rotWithShape="0"/>';
+
+/** A shape with a glow (selected), a plain shape, and a shape with a reflection. */
+async function openEffects(): Promise<{ editor: PptxEditorInstance; ids: string[] }> {
+  const box = (id: number, x: number, effects = ''): string =>
+    shape({
+      id,
+      x,
+      y: IN,
+      cx: IN,
+      cy: IN,
+      fill: solid('4472C4'),
+      ...(effects ? { effects: `<a:effectLst>${effects}</a:effectLst>` } : {}),
+    });
+  const editor = await load(box(2, IN, GLOW) + box(3, 3 * IN) + box(4, 5 * IN, REFLECTION));
+  return { editor, ids: editor.session!.layout(0)!.items.map((i) => i.element.nodeId) };
+}
+
+const kinds = (): string[] =>
+  ['Shadow', 'Reflection', 'Glow', 'Soft edges'].filter((name) => row(name) !== undefined);
+
+describe('Removing an effect without the drawing module (Vue)', () => {
+  test('Shape effects offers No glow for a shape with a glow, and it removes the glow', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const { editor, ids } = await openEffects();
+    const [glow, plain] = ids;
+    editor.setSelection({ kind: 'shapes', nodeIds: [plain!] });
+    await mount(editor, () =>
+      h(PptxEditorToolbar, { preset: false }, () => [h(ToolbarSlot, { slotId: 'shape.effects' })])
+    );
+    await click(button('Shape effects'));
+    expect(kinds()).toEqual(['Shadow']);
+    // The open menu follows the selection.
+    editor.setSelection({ kind: 'shapes', nodeIds: [glow!] });
+    await nextTick();
+    await nextTick();
+    expect(kinds()).toEqual(['Shadow', 'Glow']);
+    await click(row('Glow'));
+    // Only the row that removes: no glow preset and no Glow Variations grid.
+    expect(row('No glow')).toBeTruthy();
+    expect(document.querySelector('.pptx-glow-grid')).toBeNull();
+    await click(row('No glow'));
+    expect(editor.snapshot().geometry?.effects?.glow).toBe(0);
+    await click(button('Shape effects'));
+    expect(kinds()).toEqual(['Shadow']);
+    await click(button('Shape effects'));
+    // Undo brings the glow and its row back.
+    expect(editor.exec({ type: 'undo' }).ok).toBe(true);
+    await click(button('Shape effects'));
+    expect(kinds()).toEqual(['Shadow', 'Glow']);
+  });
+
+  test('a menu row offers the No row of each effect that a selected shape has', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const { editor, ids } = await openEffects();
+    editor.setSelection({ kind: 'shapes', nodeIds: [ids[0]!, ids[2]!] });
+    await mount(editor, () =>
+      h(PptxEditorMenu, null, () => [
+        h(PptxEditorMenu.Entry, { id: 'acme', label: 'Acme' }, () => [
+          h(PptxEditorMenu.Item, { slotId: 'shape.effects' }),
+        ]),
+      ])
+    );
+    await click(
+      [...document.querySelectorAll('.pptx-menubar__trigger')].find((b) => b.textContent === 'Acme')
+    );
+    await click(row('Shape effects'));
+    expect(kinds()).toEqual(['Shadow', 'Reflection', 'Glow']);
+    await click(row('Reflection'));
+    expect(rows()).toContain('No reflection');
+    expect(rows().some((r) => r.startsWith('Tight reflection'))).toBe(false);
+  });
+
+  test('useEditorValueCommand options follow the selection', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const { editor, ids } = await openEffects();
+    editor.setSelection({ kind: 'shapes', nodeIds: [ids[1]!] });
+    let options: { value: readonly string[] } | null = null;
+    const Probe = defineComponent({
+      setup() {
+        const cmd = useEditorValueCommand('shape.effects');
+        options = cmd.options;
+        return () => h('output', String(cmd.options.value.length));
+      },
+    });
+    await mount(editor, () => h(Probe));
+    expect(options!.value).not.toContain('glow.none');
+    editor.setSelection({ kind: 'shapes', nodeIds: [ids[0]!, ids[1]!] });
+    await nextTick();
+    expect(options!.value).toContain('glow.none');
+    expect(options!.value).not.toContain('reflection.none');
+    expect(options!.value.some((v) => /^glow\.\d/.test(v))).toBe(false);
   });
 });

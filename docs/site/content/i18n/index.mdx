@@ -1,0 +1,69 @@
+---
+title: '@pptx-editor.dev/i18n'
+description: 'Use typed interface translations and packaged language catalogs.'
+category: 'Reference'
+---
+
+Use `@pptx-editor.dev/i18n` for interface strings outside the built-in editor controls. To change the editor language, see [Language](/docs/customization/language).
+
+## Install
+
+Add a direct dependency when you import this package:
+
+```bash
+npm install @pptx-editor.dev/i18n
+```
+
+## Translate a label
+
+Create a translator with English defaults or a packaged catalog:
+
+```ts
+import { createTranslator } from '@pptx-editor.dev/i18n';
+import ja from '@pptx-editor.dev/i18n/ja';
+
+const english = createTranslator();
+const japanese = createTranslator(ja);
+
+console.log(english('rail.slideLabel', { index: 3 }));
+console.log(japanese('toolbar.bold'));
+```
+
+The package also exports Korean at `/ko` and Simplified Chinese at `/zh-CN`.
+
+## Override selected strings
+
+A `LocaleCatalog` can contain only the values you want to change:
+
+```ts
+import { createTranslator, type LocaleCatalog } from '@pptx-editor.dev/i18n';
+
+const catalog: LocaleCatalog = {
+  toolbar: { bold: 'Bold text' },
+  rail: { slideLabel: 'Slide {index}' },
+};
+
+export const translate = createTranslator(catalog);
+```
+
+Missing values and `null` values fall back to English. Keep placeholder names such as `{index}` unchanged.
+
+## Public exports
+
+| Export                      | Purpose                                          |
+| --------------------------- | ------------------------------------------------ |
+| `englishCatalog`            | Typed English strings.                           |
+| `Catalog`                   | Complete English catalog shape.                  |
+| `LocaleCatalog`             | Optional translated values with `null` fallback. |
+| `TranslationKey`            | Valid dotted keys.                               |
+| `TranslationParams`         | String or number placeholder values.             |
+| `Translate`                 | Translator function type.                        |
+| `createTranslator(locale?)` | Create a translator.                             |
+| `isTranslationKey(value)`   | Check an untyped key before translation.         |
+
+Use your own catalog for application-specific labels. Interface translation does not translate presentation text or change its writing direction.
+
+## See also
+
+- [Language](/docs/customization/language)
+- [Contribute translations](/docs/i18n/contributing)

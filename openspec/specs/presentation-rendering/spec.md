@@ -135,3 +135,17 @@ The renderer SHALL draw `dbl`, `thickThin`, `thinThick`, and `tri` lines as sepa
 
 - **WHEN** a rectangle has `<a:ln w="38100" cmpd="dbl">`
 - **THEN** two lines of 1/3 of the width draw with a gap of 1/3 of the width between them
+
+### Requirement: Line ends and dashes
+
+The editor and the PDF export SHALL draw dashes and line ends from the same geometry (`layout/line-strokes.ts`), as the `line-ends-dashes` reference PDF shows them. A line end SHALL scale with the line width, but never with less than 2 pt.
+
+#### Scenario: Triangle on a thin line
+
+- **WHEN** an open path has `<a:ln w="9525"><a:tailEnd type="triangle" w="sm" len="lg"/></a:ln>`
+- **THEN** the triangle is 10 pt long and 4 pt wide with its tip on the end point, and the line stops 9 pt before the end point
+
+#### Scenario: Square caps on a preset dash
+
+- **WHEN** a line has `cap="sq"` and `<a:prstDash val="dot"/>`
+- **THEN** each dot is one line width long, and only the ends of the line get a square cap

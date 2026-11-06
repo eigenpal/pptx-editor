@@ -67,4 +67,26 @@ describe('registerFontFaces', () => {
     expect([...fonts][0]).toBeInstanceOf(FrameFontFace);
     handle.dispose();
   });
+
+  test('names each face as the `family` option says', async () => {
+    const created: string[] = [];
+    class FrameFontFace {
+      constructor(readonly family: string) {
+        created.push(family);
+      }
+      load(): Promise<this> {
+        return Promise.resolve(this);
+      }
+    }
+    const doc = {
+      defaultView: { FontFace: FrameFontFace },
+      fonts: { add: () => undefined, delete: () => undefined },
+    };
+    const other = { ...face, id: 'pptx-face-2' } as RegisteredFace;
+    const handle = registerFontFaces(doc as unknown as Document, [face, other], {
+      family: (f) => `host-${f.id}`,
+    });
+    await handle.ready;
+    expect(created).toEqual(['host-pptx-face-1', 'host-pptx-face-2']);
+  });
 });
