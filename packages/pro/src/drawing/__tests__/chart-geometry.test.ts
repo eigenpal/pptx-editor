@@ -12,7 +12,9 @@ import type { ChartComponent, Point } from '../chart-scene.ts';
 import { outsideLabelRoom } from '../chart-pie.ts';
 import { readChartModel } from '../chart-model.ts';
 import { renderChart } from '../chart-render.ts';
-import { chartSpace, numericSeries, renderFixture } from './chart-support.ts';
+import { withChartText } from '../chart-text.ts';
+import { createFixedMeasurer, type TextMeasurer } from '@pptx-editor.dev/core/layout';
+import { chartSpace, fixtureCharts, numericSeries, renderFixture } from './chart-support.ts';
 
 interface Box {
   l: number;
@@ -211,7 +213,63 @@ describe('axis marks and chart area', () => {
     expect(marks('')).toBeGreaterThan(marks('<c:minorTickMark val="none"/>') + 10);
   });
 
+  test('c:minorUnit sets the minor marks and gridlines, within the mark bound', () => {
+    const none = marks('<c:minorTickMark val="none"/>');
+    // The value axis runs from 0 to 2.5: a minor unit of 0.5 gives six marks.
+    expect(marks('<c:minorUnit val="0.5"/>')).toBe(none + 6);
+    // A unit past the bound falls back to five marks to a major step.
+    expect(marks('<c:minorUnit val="1e-12"/>')).toBe(marks(''));
+    const grid = '<c:minorGridlines/><c:minorTickMark val="none"/>';
+    expect(marks(`${grid}<c:minorUnit val="0.5"/>`)).toBe(none + 6);
+  });
+
   test('a chart area without c:spPr draws no border', () => {
     expect(render('').scene.components[0]!.stroke ?? null).toBeNull();
+  });
+});
+
+describe('chart text follows its face', () => {
+  // A face shorter than Calibri: ascent 0.7 and descent 0.2 of the size.
+  const short = (): TextMeasurer => {
+    const fixed = createFixedMeasurer();
+    return {
+      ...fixed,
+      resolve: (request) => {
+        const face = fixed.resolve(request);
+        return { ...face, metrics: { ...face.metrics, ascent: 0.7, descent: 0.2 } };
+      },
+    };
+  };
+  const renderWith = (measurer: TextMeasurer) => {
+    const { frame, chart } = fixtureCharts()[0]!;
+    const model = readChartModel(chart.chartSpace)!;
+    return withChartText({ measurer, theme: chart.theme }, () =>
+      renderChart(model, frame.xfrm.cx / 12_700, frame.xfrm.cy / 12_700, chart.colors)
+    )!;
+  };
+
+  test("each label frame is one line of its face's ascent plus descent", () => {
+    const single = renderWith(short()).labels.filter((l) => l.paragraphs.length === 1);
+    expect(single.length).toBeGreaterThan(5);
+    for (const label of single) {
+      const size = Math.max(...label.paragraphs[0]!.map((run) => run.style.sizePt));
+      expect(label.height).toBeCloseTo(0.9 * size, 6);
+    }
+  });
+
+  test("a legend key centres on its entry's text, set on the face's ascent", () => {
+    for (const [measurer, ascent] of [
+      [createFixedMeasurer(), 0.9],
+      [short(), 0.7],
+    ] as const) {
+      const rendered = renderWith(measurer);
+      const label = rendered.labels.find((l) => l.paragraphs[0]?.[0]?.text === 'Plan')!;
+      const size = label.paragraphs[0]![0]!.style.sizePt;
+      // The square key of the first series: 0.55 sizes wide, in its colour.
+      const key = filled(rendered.scene.components, '4472C4')
+        .map((c) => boxOf(c.subpaths[0]!))
+        .find((b) => Math.abs(b.r - b.l - 0.55 * size) < 0.01)!;
+      expect((key.t + key.b) / 2).toBeCloseTo(label.y + ascent * size - 0.27 * size, 6);
+    }
   });
 });
