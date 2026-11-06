@@ -343,7 +343,6 @@ const api: HarnessApi = {
       // Glyphs as paths: no system font rasterizer takes part. A PDF with a font that is not
       // embedded never comes here (`score-deck.ts`), so no standard font data is needed.
       disableFontFace: true,
-      isEvalSupported: false,
       maxImageSize: r.maxImageSize,
       cMapUrl: r.cMapUrl,
       cMapPacked: true,
@@ -382,7 +381,7 @@ const api: HarnessApi = {
         page.cleanup();
       }
     } finally {
-      await doc.destroy();
+      await doc.loadingTask.destroy();
     }
   },
   async reopenSaved() {

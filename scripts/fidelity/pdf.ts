@@ -33,7 +33,8 @@ function load(bytes: Uint8Array): Promise<PDFDocumentProxy> {
     // pdf.js takes the buffer over: give it a copy.
     data: new Uint8Array(bytes),
     useSystemFonts: false,
-    isEvalSupported: false,
+    // pdf.js sends a font's `name` only with its extra properties (`fonts`).
+    fontExtraProperties: true,
     maxImageSize: MAX_IMAGE_PIXELS,
     cMapUrl: `${join(PDFJS_DIR, 'cmaps')}/`,
     cMapPacked: true,
@@ -109,7 +110,7 @@ export interface Pdf {
 export async function openPdf(bytes: Uint8Array, maxPages = Infinity): Promise<Pdf> {
   const doc = await load(bytes);
   if (doc.numPages > maxPages) {
-    await doc.destroy();
+    await doc.loadingTask.destroy();
     throw new PdfPageLimit(doc.numPages);
   }
   const pages: (readonly [number, number])[] = [];
@@ -162,7 +163,7 @@ export async function openPdf(bytes: Uint8Array, maxPages = Infinity): Promise<P
       return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
     },
     async close() {
-      await doc.destroy();
+      await doc.loadingTask.destroy();
     },
   };
 }
@@ -309,6 +310,6 @@ export async function glyphOrigins(pdf: string): Promise<GlyphOrigin[][]> {
     }
     return pages;
   } finally {
-    await doc.destroy();
+    await doc.loadingTask.destroy();
   }
 }
