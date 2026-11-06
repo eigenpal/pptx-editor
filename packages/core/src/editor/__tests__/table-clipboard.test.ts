@@ -255,6 +255,8 @@ describe('paste into cells', () => {
     // A control character in a pasted cell is dropped, not a refused paste.
     expect(parseTabSeparated('a\u0001b\tc')).toEqual([['ab', 'c']]);
     expect(parseCellsJson('[["a\\u0001b"]]')).toEqual([['ab']]);
+    // A row of many cells keeps the first 75, and builds no larger row on the way.
+    expect(parseTabSeparated('x\t'.repeat(100_000))[0]).toHaveLength(75);
     // One copied cell at a caret pastes as text, even when it holds a tab or a line break:
     // from the cells format (Ctrl+V), and from its quoted plain text (the menu's Paste).
     caretIn(e, 1, 1);

@@ -6,12 +6,20 @@ import type { EditorCommand, PresentationView, TableBorderPen } from '../contrac
 import { isColorChoice } from '../automation/commands/style-commands.ts';
 import { LINE_DASHES } from './line-presets.ts';
 
-/** The pen before any pick: all borders, 1 pt solid in the theme's Text 1. @public */
-export const DEFAULT_TABLE_BORDER_PEN: TableBorderPen = {
+/** A deep copy of a pen that no one can change: the pen, its line, and the line's color. */
+function frozenPen(pen: TableBorderPen): TableBorderPen {
+  const copy = JSON.parse(JSON.stringify(pen)) as TableBorderPen;
+  if (typeof copy.spec.color === 'object' && copy.spec.color) Object.freeze(copy.spec.color);
+  Object.freeze(copy.spec);
+  return Object.freeze(copy);
+}
+
+/** The pen before any pick: all borders, 1 pt solid in the theme's Text 1. Frozen. @public */
+export const DEFAULT_TABLE_BORDER_PEN: TableBorderPen = frozenPen({
   target: 'all',
   drawn: false,
   spec: { color: { theme: 'tx1' }, width: 1 },
-};
+});
 
 const PEN_TARGETS: ReadonlySet<unknown> = new Set([
   'all',
@@ -22,14 +30,6 @@ const PEN_TARGETS: ReadonlySet<unknown> = new Set([
   'left',
   'right',
 ]);
-
-/** A deep copy of a pen that no one can change: the pen, its line, and the line's color. */
-function frozenPen(pen: TableBorderPen): TableBorderPen {
-  const copy = JSON.parse(JSON.stringify(pen)) as TableBorderPen;
-  if (typeof copy.spec.color === 'object' && copy.spec.color) Object.freeze(copy.spec.color);
-  Object.freeze(copy.spec);
-  return Object.freeze(copy);
-}
 
 /** Whether a host's pen is one the Borders menu can draw: an edge target and a valid line. */
 function validPen(pen: unknown): pen is TableBorderPen {

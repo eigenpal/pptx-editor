@@ -31,6 +31,7 @@ import { DEFAULT_TABLE_STYLE_ID, resolveSlide } from '../../cascade/index.ts';
 import type { EditorSelection } from '../../contracts/index.ts';
 import {
   createPptxEditor,
+  DEFAULT_TABLE_BORDER_PEN,
   runToolbarCommand,
   toolbarCommandState,
   type PptxEditorInstance,
@@ -466,6 +467,7 @@ describe('merge, split, and formatting (editor-ui-parity 4.3)', () => {
     expect(attr(find(child(tcPr(), 'a:lnB')!, 'a:prstDash'), 'val')).toBe('dash');
     expect(toolbarCommandState(e, 'table.borderStyle').value).toBe('dash');
     expect(Object.isFrozen(e.snapshot().tableBorderPen!.spec)).toBe(true);
+    expect(Object.isFrozen(DEFAULT_TABLE_BORDER_PEN.spec)).toBe(true);
     // The pen keeps its color: the outside borders stay green.
     expect(attr(find(child(tcPr(), 'a:lnB')!, 'a:srgbClr'), 'val')).toBe('00FF00');
     // An invalid pen value changes nothing.

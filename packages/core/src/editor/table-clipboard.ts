@@ -34,12 +34,13 @@ export function cellRangeTexts(
   const frame = tableItem(layout, sel.nodeId);
   if (!frame) return null;
   const r = selectedLayoutRange(frame.table, cellRangeOf(sel)).range;
+  // The drawn cells by grid position, read once: a 75 by 75 range looks each up at once.
+  const drawn = new Set(frame.table.cells.map((c) => `${c.cell.row}:${c.cell.col}`));
   const rows: string[][] = [];
   for (let row = r.r0; row <= r.r1; row += 1) {
     const line: string[] = [];
     for (let column = r.c0; column <= r.c1; column += 1) {
-      const drawn = frame.table.cells.find((c) => c.cell.row === row && c.cell.col === column);
-      const item = drawn ? cellItem(frame, { row, column }) : undefined;
+      const item = drawn.has(`${row}:${column}`) ? cellItem(frame, { row, column }) : undefined;
       const paragraphs = item?.element.text?.paragraphs ?? [];
       line.push(
         paragraphs
@@ -71,7 +72,9 @@ export function parseTabSeparated(raw: string): string[][] {
   let quoted = false;
   let i = 0;
   const push = (): void => {
-    rows[rows.length - 1].push(cellText(cell));
+    // Cells past the limit in a row are never kept.
+    const row = rows[rows.length - 1];
+    if (row.length < MAX_LINES) row.push(cellText(cell));
     cell = '';
   };
   while (i < text.length) {
