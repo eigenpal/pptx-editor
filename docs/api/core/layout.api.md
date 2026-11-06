@@ -16,6 +16,9 @@ export function autofitSizePt(sizePt: number, fontScale: number): number;
 // @public
 export function autonumberText(scheme: string, n: number): string;
 
+// @internal
+export function baselineInLinePt(single: number, lineHeight: number, metrics: FaceMetrics): number;
+
 // @public
 export function baselineOffsetPt(sizePt: number, lineHeight: number, metrics: FaceMetrics): number;
 
@@ -495,6 +498,14 @@ export function layoutText(body: ResolvedTextBody, rect: {
     height: number;
 }, measurer: TextMeasurer): TextLayout;
 
+// @internal
+export function layoutTextOn(body: ResolvedTextBody, rect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}, measurer: TextMeasurer, basis: LineBasis): TextLayout;
+
 // @public
 export interface Line {
     // (undocumented)
@@ -514,6 +525,16 @@ export interface Line {
     readonly start: number;
     readonly top: number;
 }
+
+// @internal
+export type LineBasis = 'size' | 'face';
+
+// @internal
+export function lineHeightInPt(singlePt: number, spacing: {
+    pct: number;
+} | {
+    pts: number;
+}, reduction: number): number;
 
 // @public
 export function lineHeightPt(sizePt: number, spacing: {
@@ -643,6 +664,9 @@ export const sha256FontBytes: (bytes: Uint8Array) => string;
 
 // @public
 export const SINGLE_LINE_FACTOR = 1.2;
+
+// @internal
+export function singleLinePt(sizePt: number, metrics: FaceMetrics, basis: LineBasis): number;
 
 // @public
 export interface SlideLayout {

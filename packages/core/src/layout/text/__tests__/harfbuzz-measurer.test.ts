@@ -252,3 +252,41 @@ describe('glyph fallback', () => {
     expect(m.fallbackFace!(sans, 0x10ffff)).toBeUndefined();
   });
 });
+
+describe('kerning', () => {
+  const carlito = () => ({
+    family: 'Carlito',
+    bold: false,
+    italic: false,
+    bytes: new Uint8Array(readFileSync(join(fontsDir, 'Carlito-Regular.ttf'))),
+    origin: 'substitute',
+  });
+  const sum = (a: Float64Array): number => a.reduce((s, v) => s + v, 0);
+
+  test('a named face with no kern table draws without kerning', () => {
+    // font-effects: "AVATAR WAVE kerned" (kern="1200", 28 pt Carlito) has the advances of the
+    // same text with kern="0" in the reference PDF. Carlito keeps its pairs in GPOS only.
+    const m = createHarfBuzzMeasurer([carlito()]);
+    const face = m.resolve({ family: 'Carlito', bold: false, italic: false });
+    expect(face.substituted).toBe(false);
+    const kerned = m.advances(face, 'AVATAR WAVE', { kerning: true });
+    expect(Array.from(kerned)).toEqual(Array.from(m.advances(face, 'AVATAR WAVE')));
+  });
+
+  test('a named face with a kern table kerns', () => {
+    const face = measurer.resolve({ family: 'Liberation Sans', bold: false, italic: false });
+    expect(sum(measurer.advances(face, 'AVATAR WAVE', { kerning: true }))).toBeLessThan(
+      sum(measurer.advances(face, 'AVATAR WAVE'))
+    );
+  });
+
+  test('a stand-in for a missing face keeps its own kerning pairs', () => {
+    const m = createHarfBuzzMeasurer([carlito()]);
+    const face = m.resolve({ family: 'Calibri', bold: false, italic: false });
+    expect(face.family).toBe('Carlito');
+    expect(face.substituted).toBe(true);
+    expect(sum(m.advances(face, 'AVATAR WAVE', { kerning: true }))).toBeLessThan(
+      sum(m.advances(face, 'AVATAR WAVE'))
+    );
+  });
+});

@@ -64,7 +64,8 @@ export function isHarfBuzzReady(): boolean {
 const featureSets = new Map<boolean, InstanceType<HarfBuzzModule['Feature']>[]>();
 /**
  * Slide text takes no standard or contextual ligatures, and kerning only when the run asks
- * for it (`a:rPr/@kern` at or below the run size).
+ * for it (`a:rPr/@kern` at or below the run size) and the face can kern
+ * (`LoadedFace.kernTable`).
  */
 function shapingFeatures(
   module: HarfBuzzModule,
@@ -99,6 +100,14 @@ interface LoadedFace {
   readonly font: InstanceType<HarfBuzzModule['Font']>;
   readonly upem: number;
   readonly metrics: FaceMetrics;
+  /**
+   * Whether the face has a `kern` table. A face that the deck names kerns only from that table:
+   * the reference PDFs draw a face whose pairs are only in `GPOS` (Carlito) without kerning,
+   * also where the run asks for it (`font-effects`, `diagrams`, and every fixture through the
+   * default text style). A stand-in for a missing face keeps its `GPOS` pairs, as the face it
+   * replaces may have a `kern` table.
+   */
+  readonly kernTable: boolean;
 }
 
 const MAX_TEXT = 100_000;
@@ -154,6 +163,7 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
         entry,
         font,
         upem,
+        kernTable: (face.referenceTable('kern')?.length ?? 0) > 0,
         metrics: {
           ascent: (line ? line[0] : Math.abs(ext.ascender)) / upem,
           descent: (line ? line[1] : Math.abs(ext.descender)) / upem,
@@ -243,12 +253,12 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     text: string,
     options?: { readonly kerning?: boolean }
   ): Float64Array => {
-    const kerning = options?.kerning === true;
+    const lf = loaded.get(face.id);
+    const kerning = options?.kerning === true && (lf?.kernTable === true || face.substituted);
     const key = `${face.id}${kerning ? 'k' : ''}\u0000${text}`;
     const hit = cache.get(key);
     if (hit) return hit;
     const out = new Float64Array(text.length);
-    const lf = loaded.get(face.id);
     if (!lf || text.length === 0 || text.length > MAX_TEXT) {
       for (let i = 0; i < text.length; i += 1) out[i] = 0.5;
       return out;

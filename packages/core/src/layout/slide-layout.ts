@@ -14,7 +14,7 @@ import type {
 import { slideApproximations } from './approximations.ts';
 import { evaluateGeometry, type EvaluatedGeometry } from './geometry/geometry.ts';
 import { layoutTable, type TableLayout } from './table-layout.ts';
-import { layoutText, type TextLayout } from './text/text-layout.ts';
+import { layoutText, layoutTextOn, type TextLayout } from './text/text-layout.ts';
 import type { TextMeasurer } from './text/measurer.ts';
 
 /** An affine matrix `[a, b, c, d, e, f]` (SVG convention). EMU units. */
@@ -242,8 +242,10 @@ function layoutElement(
       if (el.text && tx) {
         // A diagram shape's own text rectangle, in the parent's space. Its turn adds to the
         // shape's turn, and it never flips. A flipped frame or group keeps the glyphs upright,
-        // as for any other shape.
-        text = layoutText(el.text, { x: 0, y: 0, width: tx.cx, height: tx.cy }, measurer);
+        // as for any other shape. Diagram text spaces its lines on the face's line
+        // (`LineBasis` in `line-metrics.ts`).
+        const box = { x: 0, y: 0, width: tx.cx, height: tx.cy };
+        text = layoutTextOn(el.text, box, measurer, 'face');
         for (const s of text.substitutions) diagnostics.add(`font substituted: ${s}`);
         textMatrix = uprightTextMatrix(
           multiply(parent, boxMatrix({ ...tx, rot: tx.rot + el.xfrm.rot }, false)),

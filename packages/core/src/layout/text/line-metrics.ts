@@ -28,6 +28,12 @@
 //   are the first column of `tables/2` (the table style's major face, bold italic), which the
 //   PDF puts one grid step above the other cells of its row; the rounding moves them from
 //   0.04 pt to 0.36 pt off.
+// - Diagram text (`dsp:txBody`, ECMA-376 Part 1, 21.4) has another single line: the face's
+//   ascent plus descent (the values above), not 1.2 × the size. Percent spacing and the baseline
+//   rules above then take that line (`LineBasis`). Measured on 6 November 2026 on the reference
+//   PDF of `diagrams` and on the same target diagram laid out at three other frame sizes, at
+//   15 to 34 pt with 90 % spacing: all 45 lines are within 0.12 pt, against up to 0.91 pt with
+//   1.2 × the size. Plain shapes with the same text body keep 1.2 × the size.
 
 import type { FaceMetrics } from './measurer.ts';
 
@@ -66,8 +72,37 @@ export function lineHeightPt(
   spacing: { pct: number } | { pts: number },
   reduction: number
 ): number {
+  return lineHeightInPt(SINGLE_LINE_FACTOR * sizePt, spacing, reduction);
+}
+
+/**
+ * What a text body's single line is: 1.2 × the size (`size`), or the face's ascent plus
+ * descent (`face`, diagram text).
+ * @internal
+ */
+export type LineBasis = 'size' | 'face';
+
+/**
+ * The single line (points) of a line whose largest font is `sizePt` in a face with `metrics`.
+ * @internal
+ */
+export function singleLinePt(sizePt: number, metrics: FaceMetrics, basis: LineBasis): number {
+  return basis === 'face'
+    ? sizePt * Math.max(0.01, metrics.ascent + metrics.descent)
+    : SINGLE_LINE_FACTOR * sizePt;
+}
+
+/**
+ * `lineHeightPt` for a single line of `singlePt` points (`singleLinePt`).
+ * @internal
+ */
+export function lineHeightInPt(
+  singlePt: number,
+  spacing: { pct: number } | { pts: number },
+  reduction: number
+): number {
   if ('pts' in spacing) return Math.round(spacing.pts / 100);
-  return SINGLE_LINE_FACTOR * sizePt * effectivePct(spacing.pct, reduction);
+  return singlePt * effectivePct(spacing.pct, reduction);
 }
 
 /** Distance from the line box top to the baseline (points), before rounding. */
@@ -88,7 +123,14 @@ export function baselineOffsetPt(
   metrics: FaceMetrics,
   _spacing?: { pct: number } | { pts: number }
 ): number {
-  const single = SINGLE_LINE_FACTOR * sizePt;
+  return baselineInLinePt(SINGLE_LINE_FACTOR * sizePt, lineHeight, metrics);
+}
+
+/**
+ * `baselineOffsetPt` for a single line of `single` points (`singleLinePt`).
+ * @internal
+ */
+export function baselineInLinePt(single: number, lineHeight: number, metrics: FaceMetrics): number {
   const loose = lineHeight * LOOSE_BASELINE_SHARE;
   const share = metrics.ascent / Math.max(0.01, metrics.ascent + metrics.descent);
   // Taller than the single line: the extra space goes 75 % above the baseline, but the
