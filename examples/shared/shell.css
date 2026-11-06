@@ -599,14 +599,18 @@
   .demo-menubar {
     flex: none;
   }
-  /* With only File in the menu bar, the deck name has room on the bar again. */
+  /* With only File in the menu bar, the deck name has room on the bar again, and Rename edits
+     it in place. */
   .demo-file {
     display: flex;
   }
+  .demo-file.demo-file--open {
+    position: static;
+    transform: none;
+  }
 }
 
-/* A phone: the bar keeps one row, the slide area takes the slide's own shape, and the notes
-   take the height left under it. */
+/* A phone: the bar keeps one row, and the slide gets more of the width. */
 @media (max-width: 600px) {
   .demo-topbar .demo-theme-toggle,
   .demo-topbar .demo-open,
@@ -625,17 +629,28 @@
   .demo-root {
     --doc-slide-padding: 12px;
   }
-  /* The slide's width (the pane less the workspace and surface padding) times its ratio, plus
-     the surface padding. A tall slide gives up height, so the notes keep their head and two
-     lines (84px). */
+}
+
+/* A portrait window up to a tablet (the rail is an overlay here): the slide area takes the
+   slide's own shape, and an open notes pane takes the height left under it. The height is the
+   slide's width (the pane less the workspace and surface padding) times its ratio, plus the
+   surface padding. A tall slide gives up height, so the notes keep their head and two lines. */
+@media (max-width: 900px) and (orientation: portrait) {
+  .demo-root {
+    --demo-slide-pad: var(--doc-slide-padding, 24px);
+  }
   .demo-canvas {
     flex: 0 1 auto;
-    height: calc((100vw - 48px) * var(--demo-slide-ratio, 0.5625) + 24px);
+    height: calc(
+      (100vw - 24px - 2 * var(--demo-slide-pad)) * var(--demo-slide-ratio, 0.5625) + 2 *
+        var(--demo-slide-pad)
+    );
   }
   /* The strip under the slide, when the view switch and the zoom show (not in ribbon mode). */
   .demo-docpane:has(> .demo-status) > .demo-canvas {
     height: calc(
-      (100vw - 48px) * var(--demo-slide-ratio, 0.5625) + 24px + var(--demo-status-strip)
+      (100vw - 24px - 2 * var(--demo-slide-pad)) * var(--demo-slide-ratio, 0.5625) + 2 *
+        var(--demo-slide-pad) + var(--demo-status-strip)
     );
   }
   .demo-root .pptx-notes[data-open='true'] {
@@ -644,7 +659,7 @@
   }
 }
 
-/* A short window (a phone held sideways): the notes field keeps two lines and the slide padding
+/* A short window (a phone held sideways): the notes field keeps one line and the slide padding
    shrinks, so the slide gets the height and is not cut off. */
 @media (max-height: 500px) {
   .demo-root {
@@ -654,9 +669,10 @@
     height: 40px;
   }
 }
-/* A short, wide window: the view switch and the zoom move from the strip under the slide to a
-   column on its right (the group is about 200px wide, plus its inset), so they never cover it. */
-@media (max-height: 500px) and (min-width: 601px) {
+/* A short window: the view switch and the zoom move from the strip under the slide to a column
+   on its right (the group is about 200px wide, plus its inset), so they never cover it. A small
+   phone held sideways is narrower than 600px, so this rule has no minimum width. */
+@media (max-height: 500px) {
   .demo-docpane {
     --demo-status-strip: 0px;
   }
@@ -680,9 +696,21 @@
 @media (pointer: coarse) {
   .demo-topbar .demo-icon-btn,
   .demo-topbar .demo-btn--sm,
-  .demo-topbar .demo-menubar .pptx-menubar__trigger {
+  .demo-topbar .demo-menubar .pptx-menubar__trigger,
+  .demo-topbar .demo-modebar__pill {
     min-width: 40px;
     height: 40px;
+  }
+  .demo-topbar .demo-file__name {
+    min-height: 40px;
+  }
+  .demo-topbar .demo-theme-toggle__option {
+    width: 36px;
+    height: 36px;
+  }
+  /* The File menu rows, and the other menu rows, get the same finger size. */
+  .demo-root .pptx-menu__row {
+    min-height: 40px;
   }
 }
 @media (pointer: coarse) and (max-width: 600px) {
