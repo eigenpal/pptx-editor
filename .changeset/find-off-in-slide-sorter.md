@@ -4,4 +4,4 @@
 '@pptx-editor.dev/vue': patch
 ---
 
-Find and Replace are off in the slide sorter in React and Vue, and they turn on again when you return to the Normal view.
+The Find and Replace buttons are off in the slide sorter. They turn on again in the Normal view.
