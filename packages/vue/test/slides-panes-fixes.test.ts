@@ -1,8 +1,8 @@
 // The Vue twin of packages/react/src/__tests__/slides-panes-fixes.test.tsx: the open-failure
 // notice, the section menu's keys and the focus after Move section up, the rail keys in the
 // viewing mode and Home and End without sections, notes that store the formats they show, the
-// find bar on a new document and with matches but no current one, and Cmd/Ctrl+F in the slide
-// sorter.
+// find bar on a new document and with matches but no current one, Cmd/Ctrl+F in the slide
+// sorter, and the focus after the sorter goes away.
 
 import { afterEach, describe, expect, spyOn, test } from 'bun:test';
 import { createApp, defineComponent, h, nextTick, shallowRef, type App, type Component } from 'vue';
@@ -26,7 +26,7 @@ import {
   PptxEditorViewport,
   requestFindBar,
 } from '../src/index.ts';
-import { providePptxEditor } from '../src/composables.ts';
+import { providePptxEditor, useEditorState } from '../src/composables.ts';
 
 let app: App | null = null;
 let host: HTMLElement | null = null;
@@ -402,5 +402,29 @@ describe('notes formats', () => {
       ['Hi', false],
       ['!', true],
     ]);
+  });
+});
+
+describe('view switch focus', () => {
+  test('a sorter hidden while its slide has focus gives focus to the current slide of the rail', async () => {
+    const editor = await open(flatDeck());
+    editor.exec({ type: 'setPresentationView', view: 'slideSorter' });
+    // A host layout that swaps the rail and the sorter, as the examples do.
+    const Views = defineComponent({
+      setup() {
+        const sorter = useEditorState((s) => s.presentationView === 'slideSorter');
+        return () => (sorter.value ? h(PptxEditorSlideSorter) : h(PptxEditorSlideRail));
+      },
+    });
+    const el = await mount(() => h(Views), editor);
+    editor.goToSlide(1);
+    await tick();
+    el.querySelectorAll<HTMLElement>('.pptx-sorter__item')[1]!.focus();
+    editor.exec({ type: 'setPresentationView', view: 'normal' });
+    await tick();
+    await new Promise<void>((r) => requestAnimationFrame(() => r()));
+    const current = el.querySelector('.pptx-rail__list [aria-current="true"]');
+    expect(current).not.toBeNull();
+    expect(document.activeElement).toBe(current);
   });
 });

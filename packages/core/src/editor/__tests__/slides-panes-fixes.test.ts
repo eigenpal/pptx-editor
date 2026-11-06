@@ -6,7 +6,11 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { createPptxEditor } from '../pptx-editor.ts';
 import { documentOpenFailure, shownOpenFailure } from '../loading.ts';
-import { focusCurrentSlideOrCanvas, openSlideInNormalView } from '../pane-support.ts';
+import {
+  focusCurrentSlideOrCanvas,
+  openSlideInNormalView,
+  refocusAfterSorterHides,
+} from '../pane-support.ts';
 import { enterSlideshowScreen } from '../slideshow-screen.ts';
 
 const IN = 914_400;
@@ -158,6 +162,63 @@ describe('focus', () => {
     focusCurrentSlideOrCanvas(scope, editor);
     expect(document.activeElement === surface).toBe(true);
     scope.remove();
+  });
+
+  test('a sorter hidden while its slide has focus gives focus to the current slide of the rail', async () => {
+    const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    await editor.load(deck());
+    const scope = document.createElement('div');
+    scope.className = 'pptx-editor';
+    const list = document.createElement('ol');
+    const tile = document.createElement('li');
+    tile.tabIndex = 0;
+    list.append(tile);
+    scope.append(list);
+    document.body.append(scope);
+    editor.goToSlide(1);
+    tile.focus();
+    // The Normal view button: the adapter calls the helper, then renders the rail in place.
+    editor.exec({ type: 'setPresentationView', view: 'normal' });
+    refocusAfterSorterHides(list, editor);
+    list.remove();
+    const rail = document.createElement('ol');
+    rail.className = 'pptx-rail__list';
+    for (const i of [0, 1, 2]) {
+      const li = document.createElement('li');
+      li.tabIndex = -1;
+      li.setAttribute('aria-current', String(i === 1));
+      rail.append(li);
+    }
+    scope.append(rail);
+    await frame();
+    expect(document.activeElement).toBe(rail.children[1]!);
+    scope.remove();
+  });
+
+  test('a sorter hidden while focus is elsewhere leaves focus where it is', async () => {
+    const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    await editor.load(deck());
+    const scope = document.createElement('div');
+    scope.className = 'pptx-editor';
+    const list = document.createElement('ol');
+    const field = document.createElement('input');
+    const rail = document.createElement('ol');
+    rail.className = 'pptx-rail__list';
+    const item = document.createElement('li');
+    item.tabIndex = -1;
+    item.setAttribute('aria-current', 'true');
+    rail.append(item);
+    scope.append(list, rail);
+    document.body.append(scope, field);
+    field.focus();
+    refocusAfterSorterHides(list, editor);
+    list.remove();
+    // Focus left on nothing, but it was never in the sorter: the helper does not take it.
+    field.blur();
+    await frame();
+    expect(document.activeElement === item).toBe(false);
+    scope.remove();
+    field.remove();
   });
 
   test('after a show, focus goes to the current slide item, not the one the show began on', async () => {

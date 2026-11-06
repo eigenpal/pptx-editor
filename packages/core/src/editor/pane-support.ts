@@ -634,14 +634,35 @@ export function openSlideInNormalView(
   const scope = from?.closest<HTMLElement>('.pptx-editor') ?? null;
   editor?.goToSlide(index);
   editor?.exec({ type: 'setPresentationView', view: 'normal' });
+  focusNormalViewAfterRender(scope, editor);
+}
+
+/**
+ * The slide sorter `list` is about to leave the page (View > Normal, the Normal view button).
+ * When one of its slides has focus, focus goes to the current slide in the rail, or to the
+ * slide, once the Normal view rendered, so it never stays on the page body. Focus that a host
+ * put elsewhere stays. Call it before the sorter leaves the page. @internal
+ */
+export function refocusAfterSorterHides(
+  list: HTMLElement,
+  editor: PptxEditorInstance | null
+): void {
+  if (!list.contains(list.ownerDocument.activeElement)) return;
+  focusNormalViewAfterRender(list.closest<HTMLElement>('.pptx-editor'), editor);
+}
+
+/** After the adapter rendered the Normal view (the rail mounts with it), focus its current slide when focus is lost. */
+function focusNormalViewAfterRender(
+  scope: HTMLElement | null,
+  editor: PptxEditorInstance | null
+): void {
   const view = scope?.ownerDocument.defaultView;
   if (!editor || !scope || !view) return;
   const go = (): void => {
     const active = scope.ownerDocument.activeElement;
     if (active && active !== scope.ownerDocument.body && active.isConnected) return;
-    focusCurrentSlideOrCanvas(scope, editor);
+    if (scope.isConnected) focusCurrentSlideOrCanvas(scope, editor);
   };
-  // After the adapter rendered the Normal view: the rail mounts with it.
   if (typeof view.requestAnimationFrame === 'function') view.requestAnimationFrame(go);
   else setTimeout(go, 0);
 }
