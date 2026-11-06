@@ -94,3 +94,88 @@ describe('picture paint', () => {
     expect(image.getAttribute('style')).toBe('image-orientation: none');
   });
 });
+
+describe('picture accessibility', () => {
+  /** Three pictures: P with a description, D decorative, N with a blank one; and a shape S. */
+  function layout() {
+    const pic = (id: number, name: string, y: number) =>
+      `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="${name}"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>` +
+      '<p:blipFill><a:blip r:embed="rIdImg"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>' +
+      `<p:spPr><a:xfrm><a:off x="914400" y="${y}"/><a:ext cx="914400" cy="914400"/></a:xfrm>` +
+      '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>';
+    const r = readPptx(
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            rels: [['rIdImg', R_IMAGE, '../media/image1.png']],
+            shapes:
+              pic(2, 'P', 0) +
+              pic(3, 'D', 1_000_000) +
+              pic(4, 'N', 2_000_000) +
+              '<p:sp><p:nvSpPr><p:cNvPr id="5" name="S"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>' +
+              '<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm>' +
+              '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:sp>',
+          },
+        ],
+        media: [
+          {
+            name: 'image1.png',
+            bytes: new Uint8Array([137, 80, 78, 71]),
+            contentType: 'image/png',
+          },
+        ],
+      })
+    );
+    if (!r.ok) throw new Error('open failed');
+    return layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer());
+  }
+  const alt: Record<string, { description: string; decorative: boolean }> = {
+    P: { description: 'A dusk sky over a lake', decorative: false },
+    D: { description: 'Ignored', decorative: true },
+    N: { description: '  ', decorative: false },
+    S: { description: 'A box', decorative: false },
+  };
+
+  test('a described picture is an img named by its description; the others are hidden', () => {
+    const lay = layout();
+    const ids = new Map(lay.items.map((i) => [i.element.name, i.element.nodeId]));
+    const names = new Map(lay.items.map((i) => [i.element.nodeId, i.element.name]));
+    const svg = paintSlide(doc, lay, {
+      images: () => 'blob:test',
+      idPrefix: 't',
+      altText: (_part, id) => alt[names.get(id)!],
+    });
+    const g = (name: string) => svg.querySelector(`[data-node-id="${ids.get(name)}"]`)!;
+    expect(g('P').getAttribute('role')).toBe('img');
+    expect(g('P').getAttribute('aria-label')).toBe('A dusk sky over a lake');
+    expect(g('P').getAttribute('aria-hidden')).toBeNull();
+    for (const name of ['D', 'N']) {
+      expect(g(name).getAttribute('aria-hidden')).toBe('true');
+      expect(g(name).getAttribute('role')).toBeNull();
+      expect(g(name).getAttribute('aria-label')).toBeNull();
+    }
+    // A shape keeps its content (its text) in the tree: no image role, not hidden.
+    expect(g('S').getAttribute('role')).toBeNull();
+    expect(g('S').getAttribute('aria-hidden')).toBeNull();
+    // The group names the whole picture; the image element carries no ARIA.
+    expect(svg.querySelector('image[role], image[aria-label]')).toBeNull();
+  });
+
+  test('without the alt text port the paint has no ARIA, and the drawing is the same', () => {
+    const lay = layout();
+    const plain = paintSlide(doc, lay, { images: () => 'blob:test', idPrefix: 't' });
+    expect(plain.querySelector('[role], [aria-label], [aria-hidden]')).toBeNull();
+    const named = paintSlide(doc, lay, {
+      images: () => 'blob:test',
+      idPrefix: 't',
+      altText: () => ({ description: 'x', decorative: false }),
+    });
+    expect(named.querySelectorAll('[role="img"]').length).toBe(3);
+    for (const el of named.querySelectorAll('[role]')) {
+      el.removeAttribute('role');
+      el.removeAttribute('aria-label');
+    }
+    expect(named.outerHTML).toBe(plain.outerHTML);
+  });
+});

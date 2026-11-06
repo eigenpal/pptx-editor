@@ -20,7 +20,8 @@ export function Editor() {
       .then((b) => setBytes(new Uint8Array(b)));
   }, []);
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <main style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <h1 className="demo-sr-only">PPTX Editor</h1>
       <PptxEditor
         {...(bytes ? { document: bytes } : {})}
         modules={modules}
@@ -29,6 +30,6 @@ export function Editor() {
           (window as unknown as { __pptxEditor?: unknown }).__pptxEditor = editor;
         }}
       />
-    </div>
+    </main>
   );
 }

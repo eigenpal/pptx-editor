@@ -328,7 +328,25 @@
   fill: currentColor;
 }
 
-/* Workspace */
+/* Workspace: the one main landmark holds the toolbar and the editor. */
+.demo-main {
+  display: flex;
+  flex: 1 1 0%;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Text for assistive technology only, such as the page heading. */
+.demo-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 .demo-dock {
   position: relative;
   z-index: 60;
@@ -404,9 +422,37 @@
 .demo-root .pptx-zoom {
   box-shadow: var(--demo-shadow-2);
 }
-/* The zoom pill sits in a strip under the slide, so it never covers the slide's corner. */
-.demo-canvas:has(> .pptx-zoom) {
-  padding-bottom: 46px;
+/* The view switch and the zoom pill sit in a strip under the slide, so they never cover the
+   slide's corner. The group stays outside the canvas, so it also shows in the Slide Sorter.
+   Its negative top margin pulls it up into the strip, and its bottom margin gives the next pane
+   back its usual gap. */
+.demo-docpane {
+  --demo-status-h: 34px;
+  --demo-status-inset: 16px;
+  --demo-status-strip: 46px;
+}
+.demo-docpane:has(> .demo-status) > .demo-canvas {
+  padding-bottom: var(--demo-status-strip);
+}
+/* In the Slide Sorter, the group floats over the sorter's bottom edge. The extra room lets the
+   last row scroll clear of it, also when a keyboard move scrolls a slide into view. */
+.demo-docpane:has(> .demo-status) > .pptx-sorter {
+  padding-bottom: calc(var(--demo-status-h) + var(--demo-status-inset) * 2);
+  scroll-padding-bottom: calc(var(--demo-status-h) + var(--demo-status-inset));
+}
+.demo-status {
+  position: relative;
+  z-index: 25;
+  display: flex;
+  align-self: flex-end;
+  gap: 8px;
+  height: var(--demo-status-h);
+  /* 12px is the docpane's gap between panes. */
+  margin: calc(-12px - var(--demo-status-inset) - var(--demo-status-h)) 18px
+    var(--demo-status-inset) 0;
+}
+.demo-status .pptx-zoom {
+  position: static;
 }
 /* The slide thumbnails toggle shows only on a narrow window, where the rail leaves the row. */
 .demo-rail-toggle {
@@ -563,13 +609,187 @@
     font-size: 14px;
   }
 }
-@media (max-width: 800px) {
-  .demo-menubar {
+/* On a touch screen the bar's controls are larger (below), so the full menu bar needs 900px:
+   a narrower one would cut off Slide Show and Help. */
+@media (max-width: 800px), (pointer: coarse) and (max-width: 900px) {
+  /* Only File stays: it holds Open, New, the sample deck, Rename, and Export. */
+  .demo-menubar .pptx-menubar__trigger:not([data-menu='file']) {
     display: none;
   }
-  /* Without the menu bar, the deck name has room on the bar again. */
+  .demo-menubar {
+    flex: none;
+  }
+  /* With only File in the menu bar, the deck name has room on the bar again, and Rename edits
+     it in place. */
   .demo-file {
     display: flex;
+  }
+  .demo-file.demo-file--open {
+    position: static;
+    transform: none;
+  }
+}
+
+/* A tablet in portrait or a phone held sideways: the bar has room for more of the deck name. */
+@media (pointer: coarse) and (min-width: 601px) and (max-width: 900px) {
+  .demo-file__name {
+    max-width: 240px;
+  }
+}
+
+/* A phone: the bar keeps one row, and the slide gets more of the width. */
+@media (max-width: 600px) {
+  .demo-topbar .demo-theme-toggle,
+  .demo-topbar .demo-open,
+  .demo-topbar .demo-new {
+    display: none;
+  }
+  /* The deck name takes the room the controls leave, and never less than a few letters. */
+  .demo-file {
+    flex: 1 1 auto;
+    min-width: 48px;
+  }
+  .demo-file__name {
+    max-width: none;
+    min-width: 48px;
+  }
+  /* While Rename is on, the name takes the whole bar, so the full name shows as you type. */
+  .demo-topbar:has(.demo-file--open) .demo-menubar,
+  .demo-topbar:has(.demo-file--open) .demo-topbar__actions {
+    display: none;
+  }
+  .demo-root {
+    --doc-slide-padding: 12px;
+  }
+  /* The Slide Sorter has no zoom: on a phone only the view switch stays, so less of the last
+     thumbnail sits under the controls. */
+  .demo-docpane:has(> .pptx-sorter) .demo-status .pptx-zoom:not(.pptx-view-switch) {
+    display: none;
+  }
+}
+
+/* A portrait window up to a tablet (the rail is an overlay here): the open notes take the
+   height their text needs, up to half the pane, and then scroll. The slide area takes the
+   rest, as it does with the notes closed, so the slide sits in the middle of it. */
+@media (max-width: 900px) and (orientation: portrait) {
+  .demo-root .pptx-notes[data-open='true'] {
+    flex: 0 1 auto;
+    min-height: 84px;
+    max-height: 50%;
+  }
+  .demo-root .pptx-notes[data-open='true'] .pptx-notes__text {
+    height: auto;
+  }
+}
+
+/* A short window (a phone held sideways): the notes field keeps one line and the slide padding
+   shrinks, so the slide gets the height and is not cut off. */
+@media (max-height: 500px) {
+  .demo-root {
+    --doc-slide-padding: 12px;
+  }
+  .demo-root .pptx-notes__text {
+    height: 40px;
+  }
+}
+/* A short window: the view switch and the zoom move from the strip under the slide to a column
+   on its right (the group is about 200px wide, plus its inset), so they never cover it. A small
+   phone held sideways is narrower than 600px, so this rule has no minimum width. */
+@media (max-height: 500px) {
+  .demo-docpane {
+    --demo-status-strip: 0px;
+  }
+  .demo-docpane:has(> .demo-status) > .demo-canvas {
+    padding-inline-end: var(--demo-status-column, 224px);
+  }
+}
+
+/* The narrowest phones: the logo leaves, so every control still fits. */
+@media (max-width: 360px) {
+  .demo-topbar .demo-brand {
+    display: none;
+  }
+  .demo-topbar,
+  .demo-topbar__actions {
+    gap: 0;
+  }
+}
+
+/* A touch screen: the top bar's controls grow to 40px, a size a finger can hit. */
+@media (pointer: coarse) {
+  .demo-topbar .demo-icon-btn,
+  .demo-topbar .demo-btn--sm,
+  .demo-topbar .demo-menubar .pptx-menubar__trigger,
+  .demo-topbar .demo-modebar__pill {
+    min-width: 40px;
+    height: 40px;
+  }
+  .demo-topbar .demo-file__name {
+    min-height: 40px;
+  }
+  .demo-topbar .demo-theme-toggle__option {
+    width: 36px;
+    height: 36px;
+  }
+  /* The File menu rows, and the other menu rows, get the same finger size. */
+  .demo-root .pptx-menu__row {
+    min-height: 40px;
+  }
+  /* The view switch and the zoom under the slide too: the group grows, and so does the column
+     it takes on a short window. */
+  .demo-docpane {
+    --demo-status-h: 44px;
+    --demo-status-column: 264px;
+  }
+  .demo-status .pptx-zoom {
+    height: var(--demo-status-h);
+  }
+  .demo-status .pptx-toolbar__button,
+  .demo-status .pptx-zoom__level {
+    min-width: 40px;
+    height: 40px;
+  }
+}
+/* The strip under the slide is the group's height plus the 12px gap. A short window keeps no
+   strip (the group sits on the right). */
+@media (pointer: coarse) and (min-height: 501px) {
+  .demo-docpane {
+    --demo-status-strip: 56px;
+  }
+}
+@media (pointer: coarse) and (max-width: 600px) {
+  .demo-topbar {
+    gap: 2px;
+    padding-inline: 6px 4px;
+  }
+}
+/* A short window: the top bar and the toolbar dock get shorter, so the slide gets the height. */
+@media (max-height: 500px) {
+  .demo-topbar {
+    height: 46px;
+  }
+  .demo-dock {
+    padding-bottom: 4px;
+  }
+}
+
+/* A touch screen: the editor's toolbar and notes buttons get a finger size too. */
+@media (pointer: coarse) {
+  .demo-root .pptx-toolbar {
+    height: 48px;
+  }
+  .demo-root .pptx-toolbar .pptx-toolbar__button {
+    min-width: 40px;
+    height: 40px;
+  }
+  .demo-root .pptx-notes__head .pptx-toolbar__button {
+    min-width: 36px;
+    height: 36px;
+  }
+  /* The side panel's close button: it covers the slide on a phone, so it must be easy to hit. */
+  .demo-root .pptx-panel__head .pptx-toolbar__button {
+    min-width: 40px;
+    height: 40px;
   }
 }
 

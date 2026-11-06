@@ -174,7 +174,12 @@ function ChatApp({ loadDeck }: { loadDeck: () => void }) {
         inert={(open && (layout.expanded || layout.sheet)) || undefined}
       >
         <header className="chat-head">
-          <span className="chat-head__brand">{TEXT.appName}</span>
+          {/* The empty state has its own heading; a thread makes the app name the page heading. */}
+          {messages.length ? (
+            <h1 className="chat-head__brand">{TEXT.appName}</h1>
+          ) : (
+            <span className="chat-head__brand">{TEXT.appName}</span>
+          )}
           {messages.length ? (
             <>
               <span className="chat-head__sep" aria-hidden="true">

@@ -897,11 +897,15 @@
     "level": "{percent}%",
     "levelAriaLabel": "확대/축소: {percent}%"
   },
+  "viewport": {
+    "ariaLabel": "프레젠테이션 편집기"
+  },
   "canvas": {
     "ariaLabel": "슬라이드 {index}/{total}",
     "inputAriaLabel": "선택한 도형의 텍스트",
     "tableCell": "{row}행, {column}열",
-    "shapeSelected": "{name} 선택됨",
+    "shapeSelected": "{kind} {name} 선택됨",
+    "shapeSelectedWithAltText": "{kind} {name}, {description} 선택됨",
     "placeholderObject": "{kind}(이 버전에서는 표시되지 않음)",
     "kinds": {
       "chart": "차트",

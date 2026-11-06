@@ -5,7 +5,14 @@
 // Enter opens the slide in the Normal view. Every edit goes through the same commands as the
 // rail, so it is one undo step.
 
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import {
   chromeControlForSlot,
   focusSorterOnShow,
@@ -13,12 +20,16 @@ import {
   groupSlideSections,
   focusCurrentSlideOrCanvas,
   openSlideInNormalView,
+  refocusAfterSorterHides,
   sectionOfSlide,
+  slideItemName,
   slideMenuPoint,
   slideSorterMounted,
   sorterKeyDown,
+  trackNotesInset,
   translateKeyOrText,
   warnSlideSorterUnmounted,
+  type NotesInsetTracker,
   type SlideSummary,
 } from '@pptx-editor.dev/core/editor';
 import { useEditorDialog } from './popups.tsx';
@@ -79,6 +90,16 @@ export function SlideSorter({ className }: SlideSorterProps = {}) {
   // Shown from a menu, the sorter takes focus on the current slide (core's `focusSorterOnShow`),
   // after the hooks above listen for focus.
   useEffect(() => (list.current ? focusSorterOnShow(list.current) : undefined), []);
+  // Hidden while one of its slides has focus, the sorter hands focus to the Normal view (core's
+  // `refocusAfterSorterHides`). A layout effect's cleanup runs while the list is still on the page.
+  const editorNow = useRef(editor);
+  editorNow.current = editor;
+  useLayoutEffect(() => {
+    const el = list.current;
+    return () => {
+      if (el) refocusAfterSorterHides(el, editorNow.current);
+    };
+  }, []);
   // Tab goes to the current slide, or to its section's header when that section is shut.
   const own = sectionOfSlide(grouped, current);
   const shut = !!own && collapsed.includes(own.id);
@@ -119,9 +140,6 @@ export function SlideSorter({ className }: SlideSorterProps = {}) {
       role={grouped ? 'treeitem' : 'option'}
       aria-selected={selected.includes(s.index)}
       aria-current={s.index === current}
-      aria-label={t(s.hidden ? 'rail.hiddenSlideLabel' : 'rail.slideLabel', {
-        index: s.index + 1,
-      })}
       data-hidden={s.hidden ? '' : undefined}
       data-index={s.index}
       {...dragProps(s.index)}
@@ -138,7 +156,10 @@ export function SlideSorter({ className }: SlideSorterProps = {}) {
       }}
     >
       <Thumbnail slide={s} ratio={ratio} />
-      <span className="pptx-sorter__number">{s.index + 1}</span>
+      <span className="pptx-sorter__number" aria-hidden="true">
+        {s.index + 1}
+      </span>
+      <span className="pptx-sr-only">{slideItemName(t, s)}</span>
     </li>
   );
 
@@ -287,6 +308,21 @@ export function DefaultWorkspace({
     if (active && active !== active.ownerDocument.body && active.isConnected) return;
     focusCurrentSlideOrCanvas(box.current, editor);
   }, [view, editor]);
+  // The status area and the font notice float above the notes card, at every notes height.
+  const inset = useRef<NotesInsetTracker | null>(null);
+  useEffect(() => {
+    if (!box.current) return;
+    const tracker = trackNotesInset(box.current);
+    inset.current = tracker;
+    return () => {
+      tracker.dispose();
+      inset.current = null;
+    };
+  }, []);
+  // A view change or another `normal` part can add or remove the notes card.
+  useEffect(() => {
+    inset.current?.refresh();
+  });
   return (
     <div ref={box} className="pptx-default__views">
       {view === 'slideSorter' ? (

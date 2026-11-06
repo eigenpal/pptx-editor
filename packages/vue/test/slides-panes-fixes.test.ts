@@ -1,8 +1,8 @@
 // The Vue twin of packages/react/src/__tests__/slides-panes-fixes.test.tsx: the open-failure
 // notice, the section menu's keys and the focus after Move section up, the rail keys in the
 // viewing mode and Home and End without sections, notes that store the formats they show, the
-// find bar on a new document and with matches but no current one, and Cmd/Ctrl+F in the slide
-// sorter.
+// find bar on a new document and with matches but no current one, Cmd/Ctrl+F in the slide
+// sorter, and the focus after the sorter goes away.
 
 import { afterEach, describe, expect, spyOn, test } from 'bun:test';
 import { createApp, defineComponent, h, nextTick, shallowRef, type App, type Component } from 'vue';
@@ -19,11 +19,14 @@ import {
   PptxEditorFindBar,
   PptxEditorNotesPane,
   PptxEditorOpenFailure,
+  PptxEditorRoot,
   PptxEditorSlideRail,
   PptxEditorSlideSorter,
+  PptxEditorToolbar,
+  PptxEditorViewport,
   requestFindBar,
 } from '../src/index.ts';
-import { providePptxEditor } from '../src/composables.ts';
+import { providePptxEditor, useEditorState } from '../src/composables.ts';
 
 let app: App | null = null;
 let host: HTMLElement | null = null;
@@ -77,10 +80,13 @@ async function mount(render: () => unknown, editor?: PptxEditorInstance): Promis
 
 const byLabel = (role: string, name: RegExp | string): HTMLElement => {
   const all = [...document.querySelectorAll<HTMLElement>(`[role="${role}"]`)];
+  // A slide item takes its name from hidden text (`.pptx-sr-only`), not `aria-label`.
+  const label = (el: HTMLElement): string | null =>
+    el.getAttribute('aria-label') ??
+    el.querySelector(':scope > .pptx-sr-only')?.textContent ??
+    null;
   const found = all.find((el) =>
-    typeof name === 'string'
-      ? el.getAttribute('aria-label') === name
-      : name.test(el.getAttribute('aria-label') ?? el.textContent ?? '')
+    typeof name === 'string' ? label(el) === name : name.test(label(el) ?? el.textContent ?? '')
   );
   if (!found) throw new Error(`no ${role} ${String(name)}`);
   return found;
@@ -262,6 +268,33 @@ describe('slide sorter', () => {
     expect(notice()).toBe('Open the Normal view to find text in the slides');
     expect(document.querySelector<HTMLElement>('.pptx-find')!.hidden).toBe(true);
   });
+
+  test('the Find button turns off in the slide sorter and on again in the Normal view', async () => {
+    let editor: PptxEditorInstance | null = null;
+    host = document.createElement('div');
+    document.body.append(host);
+    app = createApp(
+      defineComponent({
+        setup: () => () =>
+          h(PptxEditorRoot, { onReady: (e: PptxEditorInstance) => (editor = e) }, () =>
+            h(PptxEditorViewport, null, () => [h(PptxEditorToolbar), h(PptxEditorFindBar)])
+          ),
+      }) as Component
+    );
+    app.mount(host);
+    await tick();
+    expect((await editor!.load(flatDeck())).ok).toBe(true);
+    await tick();
+    const off = (): string | null =>
+      document.querySelector('button[data-slot="find.find"]')!.getAttribute('aria-disabled');
+    expect(off()).toBe(null);
+    editor!.exec({ type: 'setPresentationView', view: 'slideSorter' });
+    await tick();
+    expect(off()).toBe('true');
+    editor!.exec({ type: 'setPresentationView', view: 'normal' });
+    await tick();
+    expect(off()).toBe(null);
+  });
 });
 
 describe('find bar', () => {
@@ -372,5 +405,29 @@ describe('notes formats', () => {
       ['Hi', false],
       ['!', true],
     ]);
+  });
+});
+
+describe('view switch focus', () => {
+  test('a sorter hidden while its slide has focus gives focus to the current slide of the rail', async () => {
+    const editor = await open(flatDeck());
+    editor.exec({ type: 'setPresentationView', view: 'slideSorter' });
+    // A host layout that swaps the rail and the sorter, as the examples do.
+    const Views = defineComponent({
+      setup() {
+        const sorter = useEditorState((s) => s.presentationView === 'slideSorter');
+        return () => (sorter.value ? h(PptxEditorSlideSorter) : h(PptxEditorSlideRail));
+      },
+    });
+    const el = await mount(() => h(Views), editor);
+    editor.goToSlide(1);
+    await tick();
+    el.querySelectorAll<HTMLElement>('.pptx-sorter__item')[1]!.focus();
+    editor.exec({ type: 'setPresentationView', view: 'normal' });
+    await tick();
+    await new Promise<void>((r) => requestAnimationFrame(() => r()));
+    const current = el.querySelector('.pptx-rail__list [aria-current="true"]');
+    expect(current).not.toBeNull();
+    expect(document.activeElement).toBe(current);
   });
 });

@@ -7,6 +7,12 @@
 // @internal
 export function adjustForPathMode(color: Rgba, mode: GeometryPath['fill']): Rgba;
 
+// @public
+export type AltTextPort = (part: string, nodeId: string) => {
+    readonly description: string;
+    readonly decorative: boolean;
+} | undefined;
+
 // @internal
 export function blurSigma(blurRad: number): number;
 
@@ -80,6 +86,7 @@ export interface PaintContext {
 
 // @public
 export interface PaintOptions {
+    readonly altText?: AltTextPort;
     readonly frameLabel?: (kind: string) => string;
     readonly hitTargets?: boolean;
     readonly idPrefix: string;

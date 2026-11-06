@@ -13,7 +13,7 @@ This page lists the layout parts and their props. For the tasks, see [Layout](/d
 | `PptxEditor.Toolbar` | Position, controls, groups, and overflow. | The flat form of the chrome groups. See [Toolbar](/docs/customization/toolbar). |
 | `PptxEditor.Ribbon` | Tabs, the selected tab, and each tab's groups. | The tabs over the same chrome groups, with contextual tabs. See [Ribbon](/docs/customization/ribbon). |
 | `PptxEditor.Menu` | Position, menus, and rows. | The menu bar. In Vue, `PptxEditorMenu`. See [Menus](/docs/customization/menus). |
-| `PptxEditor.Viewport` | `className` and children. | Carries `.pptx-editor`, and `dark` with a dark color mode. |
+| `PptxEditor.Viewport` | `className`, `label`, and children. | Carries `.pptx-editor`, and `dark` with a dark color mode. It is a landmark region named **Presentation editor**. `label` gives another name, as text or a translation key. `label={false}` removes the region. |
 | `PptxEditor.Content` | `className`. | The slide canvas and its context menu. |
 | `PptxEditor.SlideRail` | `open`, `defaultOpen`, `onOpenChange`, `paneWidth`, `toggle`, `orientation`, `preset`, `t`, `className`, `style`, and part children. | The slide thumbnails, as a column or as a row. The **Hide thumbnails** button hides the rail to a strip with a **Show thumbnails** button. |
 | `PptxEditor.NotesPane` | `open`, `defaultOpen`, `onOpenChange`, `showFormatButtons`, `className`, `style`. | The speaker notes of the current slide. Shares its open state with `useNotesPane()`. Use one per root. `showFormatButtons={false}` removes the **B**, **I**, and **U** buttons. The shortcut keys still format the notes. |

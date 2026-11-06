@@ -37,6 +37,10 @@ export const LinkControl = defineComponent({
     return () => {
       // The button opens the popup, so a `popups.hyperlink` of `false` turns it off; the
       // command (`setLink`) keeps working.
+      // Read the command state before `off`: a render that stops at `off` would not track it,
+      // and the control would stay off after the reason goes away.
+      const enabled = cmd.isEnabled.value;
+      const why = reason.value;
       const off = host?.unavailable?.(props.slot) ?? null;
       return (
         <span ref={anchor} class="pptx-toolbar__group">
@@ -44,8 +48,8 @@ export const LinkControl = defineComponent({
             slot={props.slot}
             label={label.value}
             paths={props.control.paths}
-            disabled={!!off || !cmd.isEnabled.value}
-            disabledReason={off ? translateKeyOrText(t, off) : reason.value}
+            disabled={!!off || !enabled}
+            disabledReason={off ? translateKeyOrText(t, off) : why}
             pressed={typeof cmd.value.value === 'string' && cmd.value.value !== ''}
             onClick={() => requestLinkPopup(editor.value, anchor.value)}
           />

@@ -162,3 +162,22 @@ test('a selected-text popover uses its client rectangle inside a scaled host', (
   expect(panel.style.top).toBe('113px');
   frame.remove();
 });
+
+test('a tall popover placed twice still scrolls: the first cap does not hide its height', () => {
+  const anchor = document.createElement('button');
+  const panel = document.createElement('div');
+  document.body.append(anchor, panel);
+  anchor.getBoundingClientRect = () => box(10, 10, 40, 30);
+  // The panel is as tall as its rows, less any height cap, as a browser measures it.
+  Object.defineProperties(panel, {
+    offsetWidth: { value: 200 },
+    offsetHeight: { get: () => Math.min(5000, parseFloat(panel.style.maxHeight) || Infinity) },
+  });
+  const first = positionPopover(panel, anchor, 'start');
+  const second = positionPopover(panel, anchor, 'start');
+  expect(first.scroll).toBe(true);
+  expect(second.scroll).toBe(true);
+  expect(panel.style.overflowY).toBe('auto');
+  anchor.remove();
+  panel.remove();
+});

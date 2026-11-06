@@ -11,6 +11,7 @@ import {
   defineComponent,
   onBeforeUnmount,
   onMounted,
+  onUpdated,
   ref,
   shallowRef,
   watch,
@@ -24,12 +25,16 @@ import {
   groupSlideSections,
   focusCurrentSlideOrCanvas,
   openSlideInNormalView,
+  refocusAfterSorterHides,
   sectionOfSlide,
+  slideItemName,
   slideMenuPoint,
   slideSorterMounted,
   sorterKeyDown,
+  trackNotesInset,
   translateKeyOrText,
   warnSlideSorterUnmounted,
+  type NotesInsetTracker,
   type SlideSummary,
 } from '@pptx-editor.dev/core/editor';
 import { Icon, keepFocus, useAriaDisabled } from './chrome.tsx';
@@ -107,7 +112,12 @@ export const PptxEditorSlideSorter = defineComponent({
     onMounted(() => {
       if (list.value) stopFocus = focusSorterOnShow(list.value);
     });
-    onBeforeUnmount(() => stopFocus());
+    // Hidden while one of its slides has focus, the sorter hands focus to the Normal view
+    // (core's `refocusAfterSorterHides`). `onBeforeUnmount` runs while the list is on the page.
+    onBeforeUnmount(() => {
+      stopFocus();
+      if (list.value) refocusAfterSorterHides(list.value, editor.value);
+    });
     const background = useEditorDialog('background');
     const stepTo = useSlideStepTarget(
       () => selected.value,
@@ -154,9 +164,6 @@ export const PptxEditorSlideSorter = defineComponent({
           role={groups ? 'treeitem' : 'option'}
           aria-selected={selected.value.includes(s.index)}
           aria-current={s.index === current.value}
-          aria-label={t(s.hidden ? 'rail.hiddenSlideLabel' : 'rail.slideLabel', {
-            index: s.index + 1,
-          })}
           data-hidden={s.hidden ? '' : undefined}
           data-index={s.index}
           {...drag.itemProps(s.index)}
@@ -177,7 +184,10 @@ export const PptxEditorSlideSorter = defineComponent({
           }}
         >
           <Thumbnail slide={s} ratio={ratio.value} />
-          <span class="pptx-sorter__number">{s.index + 1}</span>
+          <span class="pptx-sorter__number" aria-hidden="true">
+            {s.index + 1}
+          </span>
+          <span class="pptx-sr-only">{slideItemName(t, s)}</span>
         </li>
       );
       return (
@@ -347,6 +357,17 @@ export const DefaultWorkspace = defineComponent({
       },
       { flush: 'post' }
     );
+    // The status area and the font notice float above the notes card, at every notes height.
+    let inset: NotesInsetTracker | null = null;
+    onMounted(() => {
+      if (box.value) inset = trackNotesInset(box.value);
+    });
+    // A view change or another `normal` slot can add or remove the notes card.
+    onUpdated(() => inset?.refresh());
+    onBeforeUnmount(() => {
+      inset?.dispose();
+      inset = null;
+    });
     return () => (
       <div ref={box} class="pptx-default__views">
         {view.value === 'slideSorter' ? (

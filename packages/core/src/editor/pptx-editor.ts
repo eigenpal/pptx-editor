@@ -54,7 +54,7 @@ import {
 } from './selection-state.ts';
 import { FormatPainter } from './format-painter.ts';
 import { CropMode } from './crop-mode.ts';
-import { pictureStateAt, withAltText } from './picture-state.ts';
+import { altTextAt, pictureStateAt, withAltText } from './picture-state.ts';
 import { isViewCommand, ViewSettings, type ViewCommand } from './view-settings.ts';
 import { PlaceholderPrompts } from './placeholder-prompts.ts';
 import { RemovalNotice } from './removal-notice.ts';
@@ -894,6 +894,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         readOnly: () => mode === 'view',
         imageUrl: (p, id) => session?.imageUrl(p, id),
         imageSize: (p, id) => session?.imageSize(p, id),
+        altText: (p, id) => altTextAt(session?.store.package, p, id),
         label: (key, params) => (options.translate ? options.translate(key, params) : key),
         select,
         presence: () => presence.painted(session?.store.package, partAt(slide)),

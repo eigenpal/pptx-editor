@@ -10,7 +10,12 @@ import {
   type Element,
   type PptxPackage,
 } from '../store/index.ts';
-import type { EditorSelection, SelectedImageState, SelectionGeometry } from '../contracts/index.ts';
+import type {
+  AltText,
+  EditorSelection,
+  SelectedImageState,
+  SelectionGeometry,
+} from '../contracts/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
 import { findItem } from '../automation/commands/placement.ts';
 import {
@@ -85,6 +90,22 @@ export function pictureStateAt(
   };
 }
 
+/** The alt text of an element (`p:cNvPr/@descr`, `@title`, and `adec:decorative`), if it has a `p:cNvPr`. */
+export function altTextAt(
+  pkg: PptxPackage | undefined,
+  part: string | undefined,
+  id: string
+): AltText | undefined {
+  const el = elementAt(pkg, part, id);
+  const cNvPr = el ? nonVisualOf(el) : undefined;
+  if (!cNvPr) return undefined;
+  return {
+    description: attr(cNvPr, 'descr') ?? '',
+    title: attr(cNvPr, 'title') ?? '',
+    decorative: isDecorative(cNvPr),
+  };
+}
+
 /** The selection geometry with the element's alt text (`p:cNvPr/@descr`, `@title`). */
 export function withAltText(
   geometry: SelectionGeometry | null,
@@ -92,15 +113,6 @@ export function withAltText(
   part: string | undefined
 ): SelectionGeometry | null {
   if (!geometry) return null;
-  const el = elementAt(pkg, part, geometry.nodeId);
-  const cNvPr = el ? nonVisualOf(el) : undefined;
-  if (!cNvPr) return geometry;
-  return {
-    ...geometry,
-    altText: {
-      description: attr(cNvPr, 'descr') ?? '',
-      title: attr(cNvPr, 'title') ?? '',
-      decorative: isDecorative(cNvPr),
-    },
-  };
+  const altText = altTextAt(pkg, part, geometry.nodeId);
+  return altText ? { ...geometry, altText } : geometry;
 }

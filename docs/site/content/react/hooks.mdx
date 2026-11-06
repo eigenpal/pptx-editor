@@ -24,6 +24,7 @@ export function BoldButton() {
       type="button"
       aria-disabled={!bold.isEnabled || undefined}
       aria-pressed={bold.isActive}
+      aria-label={t('toolbar.bold')}
       title={reason ? translateKeyOrText(t, reason) : t('toolbar.bold')}
       onMouseDown={(event) => event.preventDefault()}
       onClick={() => bold.execute()}
@@ -174,10 +175,16 @@ export function ZoomControl() {
   const { zoom, isFit, fit, zoomIn, zoomOut, canZoomIn, canZoomOut } = useZoom();
   return (
     <div role="group" aria-label="Zoom">
-      <button onClick={zoomOut} disabled={!canZoomOut}>-</button>
+      <button onClick={zoomOut} disabled={!canZoomOut} aria-label="Zoom out">
+        -
+      </button>
       <span>{Math.round(zoom * 100)}%</span>
-      <button onClick={zoomIn} disabled={!canZoomIn}>+</button>
-      <button onClick={fit} aria-pressed={isFit}>Fit</button>
+      <button onClick={zoomIn} disabled={!canZoomIn} aria-label="Zoom in">
+        +
+      </button>
+      <button onClick={fit} aria-pressed={isFit}>
+        Fit
+      </button>
     </div>
   );
 }
@@ -243,6 +250,7 @@ export function SizeSlider() {
   return (
     <input
       type="range"
+      aria-label="Font size"
       min={8}
       max={96}
       ref={group.ref}

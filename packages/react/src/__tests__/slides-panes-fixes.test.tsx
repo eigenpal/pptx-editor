@@ -1,7 +1,8 @@
 // The slide panes after the browser review: the open-failure notice, the section menu's keys
 // (a React portal's key events bubble through the rail), the rail keys in the viewing mode and
 // Home and End without sections, notes that store the formats they show, the find bar on a new
-// document and with matches but no current one, and Cmd/Ctrl+F in the slide sorter.
+// document and with matches but no current one, Cmd/Ctrl+F in the slide sorter, and the focus
+// after the sorter goes away.
 
 import { afterEach, describe, expect, spyOn, test } from 'bun:test';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -12,12 +13,13 @@ import {
 } from '@pptx-editor.dev/core/editor';
 import { buildPptx, para, run, shape } from '../../../../scripts/fixtures/builder.ts';
 import { buildSlideLayoutsDeck } from '../../../../scripts/fixtures/slide-layouts.ts';
-import { PptxEditorContext } from '../context.ts';
+import { PptxEditorContext, useEditorState } from '../context.ts';
 import { EditNotice } from '../EditNotice.tsx';
 import { FindBar, requestFindBar } from '../FindBar.tsx';
-import { PptxEditor } from '../index.ts';
+import { PptxEditor, Toolbar } from '../index.ts';
 import { NotesPane } from '../NotesPane.tsx';
 import { OpenFailure } from '../OpenFailure.tsx';
+import { PptxEditorRoot } from '../PptxEditorRoot.tsx';
 import { SlideRail } from '../panes.tsx';
 import { DialogProvider } from '../popups.tsx';
 import { SlideSorter } from '../SlideSorter.tsx';
@@ -216,6 +218,26 @@ describe('slide sorter', () => {
     expect(notice()).toBe('Open the Normal view to find text in the slides');
     expect(document.querySelector<HTMLElement>('.pptx-find')!.hidden).toBe(true);
   });
+
+  test('the Find button turns off in the slide sorter and on again in the Normal view', async () => {
+    let editor: PptxEditorInstance | null = null;
+    const { container } = render(
+      <PptxEditorRoot onReady={(e) => (editor = e)}>
+        <Toolbar preset={false}>
+          <Toolbar.Find />
+        </Toolbar>
+        <PptxEditor.FindBar />
+      </PptxEditorRoot>
+    );
+    await act(async () => void (await editor!.load(flatDeck())));
+    const off = () =>
+      container.querySelector('[data-slot="find.find"]')!.getAttribute('aria-disabled');
+    expect(off()).toBe(null);
+    act(() => void editor!.exec({ type: 'setPresentationView', view: 'slideSorter' }));
+    expect(off()).toBe('true');
+    act(() => void editor!.exec({ type: 'setPresentationView', view: 'normal' }));
+    expect(off()).toBe(null);
+  });
 });
 
 describe('find bar', () => {
@@ -311,5 +333,26 @@ describe('notes formats', () => {
       ['Hi', false],
       ['!', true],
     ]);
+  });
+});
+
+describe('view switch focus', () => {
+  /** A host layout that swaps the rail and the sorter, as the examples do. */
+  function Views() {
+    const sorter = useEditorState((s) => s.presentationView === 'slideSorter');
+    return sorter ? <SlideSorter /> : <SlideRail />;
+  }
+
+  test('a sorter hidden while its slide has focus gives focus to the current slide of the rail', async () => {
+    const editor = await open(flatDeck());
+    editor.exec({ type: 'setPresentationView', view: 'slideSorter' });
+    render(<div className="pptx-editor">{tree(editor, <Views />)}</div>);
+    act(() => editor.goToSlide(1));
+    act(() => screen.getByRole('option', { name: 'Slide 2' }).focus());
+    act(() => void editor.exec({ type: 'setPresentationView', view: 'normal' }));
+    await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+    const current = document.querySelector('.pptx-rail__list [aria-current="true"]');
+    expect(current).not.toBeNull();
+    expect(document.activeElement).toBe(current);
   });
 });

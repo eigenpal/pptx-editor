@@ -240,6 +240,7 @@ export {
   renderNotes,
   selectNotes,
 } from './notes-dom.ts';
+export { NOTES_INSET_PROPERTY, trackNotesInset, type NotesInsetTracker } from './notes-inset.ts';
 export {
   NOTES_FORMAT_BUTTONS,
   NO_NOTES_FORMATS,
@@ -262,6 +263,7 @@ export {
   notesWordAt,
   openSectionOfCurrent,
   openSlideInNormalView,
+  refocusAfterSorterHides,
   sectionMenuPoint,
   railKeyDown,
   refocusAfterCollapse,
@@ -272,6 +274,7 @@ export {
   selectSlideSection,
   slideClickMode,
   slideDropMarker,
+  slideItemName,
   slideMenuPoint,
   slideSorterMounted,
   sorterKeyDown,

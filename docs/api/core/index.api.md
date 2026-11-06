@@ -3127,6 +3127,9 @@ string,
 ])[];
 
 // @internal
+export const NOTES_INSET_PROPERTY = "--pptx-notes-inset";
+
+// @internal
 export const NOTES_SLOTS: Partial<Record<ChromeSlotId, NotesFormat>>;
 
 // @internal
@@ -3170,6 +3173,12 @@ export function notesFormatShortcut(e: ModifierKeys): NotesFormat | null;
 
 // @internal
 export function notesHistoryShortcut(e: ModifierKeys): 'undo' | 'redo' | null;
+
+// @internal
+export interface NotesInsetTracker {
+    dispose(): void;
+    refresh(): void;
+}
 
 // @internal
 export interface NotesKeyContext {
@@ -3872,6 +3881,9 @@ export type ReflectionPreset = 'tightTouching' | 'halfTouching' | 'fullTouching'
 export function refocusAfterCollapse(list: HTMLElement | null, was: HTMLElement | null): void;
 
 // @internal
+export function refocusAfterSorterHides(list: HTMLElement, editor: PptxEditorInstance | null): void;
+
+// @internal
 export function registerSectionRenamer(editor: object, take: (sectionId: string) => void): () => void;
 
 // @internal
@@ -4445,6 +4457,12 @@ export interface SlideImageOptions {
     readonly frameLabel?: (kind: string) => string;
     readonly width?: number;
 }
+
+// @internal
+export function slideItemName(t: Translate, slide: {
+    readonly index: number;
+    readonly hidden: boolean;
+}): string;
 
 // @public
 export type SlideLayoutKind = 'title' | 'tx' | 'twoColTx' | 'tbl' | 'txAndChart' | 'chartAndTx' | 'dgm' | 'chart' | 'txAndClipArt' | 'clipArtAndTx' | 'titleOnly' | 'blank' | 'txAndObj' | 'objAndTx' | 'objOnly' | 'obj' | 'txAndMedia' | 'mediaAndTx' | 'objOverTx' | 'txOverObj' | 'txAndTwoObj' | 'twoObjAndTx' | 'twoObjOverTx' | 'fourObj' | 'vertTx' | 'clipArtAndVertTx' | 'vertTitleAndTx' | 'vertTitleAndTxOverChart' | 'twoObj' | 'objAndTwoObj' | 'twoObjAndObj' | 'cust' | 'secHead' | 'twoTxTwoObj' | 'objTx' | 'picTx';
@@ -5467,6 +5485,9 @@ export const TOOLTIP_SKIP_DELAY_MS = 300;
 
 // @internal
 export function tooltipAttributes(label: string, disabled?: boolean, reason?: string | null): ChromeTooltipAttributes;
+
+// @internal
+export function trackNotesInset(box: HTMLElement): NotesInsetTracker;
 
 // @public
 export interface TransformItem {
