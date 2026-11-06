@@ -111,7 +111,7 @@ export type DecodeEmbeddedFontResult = {
     info: EmbeddedFontInfo;
 } | FontRejection;
 
-// @public
+// @internal
 export function decodeXml(bytes: Uint8Array): string;
 
 // @public

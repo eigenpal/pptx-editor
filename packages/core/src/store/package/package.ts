@@ -114,7 +114,11 @@ function partRole(partName: string, types: ContentTypeIndex): PartRole {
   return roleByType(partName, lookupContentType(types, partName));
 }
 
-/** Decode the bytes of an XML part: a UTF-16 byte order mark is honored, UTF-8 otherwise. */
+/**
+ * Decode the bytes of an XML part: a UTF-16 byte order mark is honored, UTF-8 otherwise.
+ *
+ * @internal
+ */
 export function decodeXml(bytes: Uint8Array): string {
   // UTF-16 parts exist in the wild; honor a BOM. Default UTF-8.
   if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes);
