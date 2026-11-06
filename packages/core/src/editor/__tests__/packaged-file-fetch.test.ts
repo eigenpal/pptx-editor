@@ -162,7 +162,9 @@ describe('substitute failures', () => {
     ]);
     for (const f of load.failures) {
       expect(f.family).toBe('Arial');
-      expect(f.diagnostic.length).toBeGreaterThan(0);
+      // A missing file tells the developer what to ship, not only the status.
+      expect(f.diagnostic).toStartWith('HTTP 404: the file is not in the assets folder');
+      expect(f.diagnostic).toContain('DOCX_EDITOR_FONT_ASSET_ROOT');
     }
   });
 });

@@ -199,6 +199,10 @@ function substituteFetch(): typeof fetch | undefined {
   return substituteFetcher;
 }
 
+/** What a missing file on disk means: a Node bundle that left the fonts out. */
+const MISSING_ASSET =
+  'the file is not in the assets folder of @docx-editor.dev/fonts. A bundled Node app must ship that folder and set DOCX_EDITOR_FONT_ASSET_ROOT to it';
+
 /** Load one family's packaged substitutes. `fetcher` is injectable for tests. @internal */
 export function loadSubstitute(
   family: DefaultFamily,
@@ -216,7 +220,10 @@ export function loadSubstitute(
       failures: fragment.failures.map((f) => ({
         family: f.family,
         file: f.file,
-        diagnostic: f.diagnostic,
+        diagnostic:
+          fetcher && f.diagnostic === 'HTTP 404'
+            ? `${f.diagnostic}: ${MISSING_ASSET}`
+            : f.diagnostic,
       })),
     }),
     (error: unknown) => ({

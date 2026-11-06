@@ -152,6 +152,8 @@ export class PdfWorkLimitError extends Error {
     readonly code: 'timeout' | 'aborted' | 'operations';
 }
 
+export { SubstituteFontFailure }
+
 // (No @packageDocumentation comment for this package)
 
 ```
