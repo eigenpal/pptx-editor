@@ -743,6 +743,9 @@ export function setCellText(
   const pPr = first ? child(first, 'a:pPr') : undefined;
   const endPr = first ? child(first, 'a:endParaRPr') : undefined;
   clearCell(batch, m.part, batch.element(m.part, tc.id));
+  // An empty cell can still hold empty paragraphs (`clearCell` leaves them): one stays.
+  for (const p of paragraphsOf(child(batch.element(m.part, tc.id), 'a:txBody')!).slice(1))
+    batch.push({ op: 'removeNode', part: m.part, node: p.id });
   const lines = text.split(/\r\n|\r|\n/);
   if (!first) return;
   if (lines[0])

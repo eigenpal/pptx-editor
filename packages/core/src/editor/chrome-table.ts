@@ -149,8 +149,8 @@ export function armTableBorderPen(
 }
 
 /**
- * Remember the pen that a run of a border slot picks, as `runToolbarCommand` runs it. A pick that
- * the engine refuses (no table selected) still sets the pen, because a pen is a setting. @internal
+ * Remember the pen that a border slot drew with, after `runToolbarCommand` ran the draw. A draw
+ * the engine refused (no table selected) leaves the pen as it was. @internal
  */
 export function rememberTableBorderPen(editor: Editor, slot: string, value: unknown): void {
   const pen = nextPen(tableBorderPen(editor), slot, value);

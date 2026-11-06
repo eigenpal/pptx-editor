@@ -557,7 +557,7 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'partial',
     tier: 'community',
-    notes: `Click in a cell and type. Text commands work in a cell, a cell range, or the whole table. Tab and Shift+Tab move between cells. Tab in the last cell adds a row. Shift+Arrow at a cell's edge selects a cell range. Copy, cut, and paste a cell range as tab-separated text; a paste fills cells and adds no rows or columns. ${TABLE_SAVE}`,
+    notes: `Click in a cell and type. Text commands work in a cell, a cell range, or the whole table. Tab and Shift+Tab move between cells. Tab in the last cell adds a row. Shift+Arrow at a cell's edge selects a cell range. Copy, cut, and paste a cell range as tab-separated text; a paste larger than the table adds rows and columns. ${TABLE_SAVE}`,
     docsLink: '/docs/guides/tables',
   },
   {

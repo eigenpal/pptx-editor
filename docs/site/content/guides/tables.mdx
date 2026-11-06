@@ -68,7 +68,7 @@ Shift+Arrow extends the text selection in the cell. At the edge of the cell's te
 
 ## Copy and paste cells
 
-With a range of cells selected, Copy and Cut put the cells on the clipboard as tab-separated text, one line for each row. Cut also clears the cells. Paste into a range of cells, or paste text that holds tabs at a caret in a cell, to fill cells from the top-left cell of the range or the caret's cell. Text pasted at a caret without tabs goes into the cell's text, as usual.
+With a range of cells selected, Copy and Cut put the cells on the clipboard as tab-separated text, one line for each row. Cut also clears the cells. Paste into a range of cells, or paste text that holds tabs at a caret in a cell, to fill cells from the top-left cell of the range or the caret's cell. Text pasted at a caret without tabs, and one copied cell, go into the cell's text at the caret, as usual.
 
 The paste runs `pasteCells`, so a host can run it too:
 
@@ -82,7 +82,7 @@ editor.exec({
 });
 ```
 
-A paste larger than the table adds rows at the bottom and columns at the right, in the same undo step. New columns share the table's width. A covered position of a merged cell takes no text. A line break in a value makes a new paragraph in its cell. A paste reads at most 75 rows, 75 columns, and 32,768 characters in each cell. After the paste, the filled cells are selected.
+A paste larger than the table adds rows at the bottom and columns at the end of the grid (the right, or the left in a right-to-left table), in the same undo step. New columns share the table's width. A covered position of a merged cell takes no text. A line break in a value makes a new paragraph in its cell. A paste reads at most 75 rows, 75 columns, and 32,768 characters in each cell. After the paste, the filled cells are selected.
 
 ## Edit on the canvas
 

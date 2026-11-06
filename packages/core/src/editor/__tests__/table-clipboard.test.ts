@@ -222,6 +222,25 @@ describe('paste into cells', () => {
     expect(model(e).tcs[3].every((tc) => !tc.attrs.some((a) => a.local === 'hMerge'))).toBe(true);
   });
 
+  test('a pasted value replaces every empty paragraph of its cell', async () => {
+    const e = await open();
+    // Cell A: its text deleted, then two empty paragraphs.
+    e.setSelection({
+      kind: 'text',
+      nodeId: frameId(e),
+      cell: { row: 0, column: 0 },
+      anchor: { paragraph: 0, offset: 1 },
+      focus: { paragraph: 0, offset: 1 },
+    });
+    expect(e.input('deleteBackward').ok).toBe(true);
+    expect(e.input('paragraph').ok).toBe(true);
+    const body = () => child(model(e).tcs[0][0], 'a:txBody')!;
+    expect(elements(body()).filter((n) => n.local === 'p')).toHaveLength(2);
+    expect(e.exec({ type: 'pasteCells', texts: [['a']] }).ok).toBe(true);
+    expect(elements(body()).filter((n) => n.local === 'p')).toHaveLength(1);
+    expect(grid(e)[0][0]).toBe('a');
+  });
+
   test('pasteCells refuses texts that are not rows of strings', async () => {
     const e = await open();
     caretIn(e, 0, 0);
@@ -229,11 +248,13 @@ describe('paste into cells', () => {
     expect(e.exec({ type: 'pasteCells', texts: [[1 as unknown as string]] }).ok).toBe(false);
   });
 
-  test('what a paste fills: a copied range, tab-separated text, or any text on a range', async () => {
+  test('what a paste fills: copied cells, tab-separated text, or any text on a range', async () => {
     const e = await open();
     caretIn(e, 0, 0);
     const sel = e.snapshot().selection;
-    expect(pastedCells(sel, { cells: '[["a"]]', text: 'a' })).toEqual([['a']]);
+    // One copied cell pastes as text at the caret, as the toolbar's Paste does; more fill cells.
+    expect(pastedCells(sel, { cells: '[["a"]]', text: 'a' })).toBeNull();
+    expect(pastedCells(sel, { cells: '[["a"],["b"]]', text: 'a\nb' })).toEqual([['a'], ['b']]);
     expect(pastedCells(sel, { text: 'a\tb' })).toEqual([['a', 'b']]);
     // Plain text into a caret is the cell's own text paste.
     expect(pastedCells(sel, { text: 'plain\ntext' })).toBeNull();

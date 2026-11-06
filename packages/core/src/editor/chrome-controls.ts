@@ -982,6 +982,8 @@ export function runToolbarCommand<K extends ChromeSlotId>(
   // A pen pick before any border target pick arms the pen and writes nothing.
   const armed = armTableBorderPen(editor, id, value, command);
   if (armed) return armed;
-  rememberTableBorderPen(editor, id, value);
-  return editor.exec(command, options);
+  const result = editor.exec(command, options);
+  // A refused draw (no table) leaves the pen as it was.
+  if (result.ok) rememberTableBorderPen(editor, id, value);
+  return result;
 }

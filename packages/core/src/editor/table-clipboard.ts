@@ -120,8 +120,8 @@ export function parseCellsJson(raw: string): string[][] | null {
 
 /**
  * The cell texts a paste puts into a table, or null to paste as text. A cell range takes any
- * text; a caret in a cell takes a copied range or tab-separated text, and leaves other text to
- * the cell's own text paste.
+ * text; a caret in a cell takes a copied range of more than one cell or tab-separated text, and
+ * leaves other text (one copied cell too) to the cell's own text paste at the caret.
  */
 export function pastedCells(
   sel: EditorSelection,
@@ -130,7 +130,8 @@ export function pastedCells(
   const inTable = sel.kind === 'cells' || (sel.kind === 'text' && !!sel.cell);
   if (!inTable) return null;
   const copied = data.cells ? parseCellsJson(data.cells) : null;
-  if (copied) return copied;
+  const many = !!copied && (copied.length > 1 || copied[0].length > 1);
+  if (copied && (sel.kind === 'cells' || many)) return copied;
   const text = data.text ?? '';
   if (!text) return null;
   if (sel.kind === 'cells' || text.includes('\t')) return parseTabSeparated(text);
