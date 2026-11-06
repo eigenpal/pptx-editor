@@ -113,9 +113,18 @@ export function startSlideDrag(
   selected: readonly number[],
   index: number
 ): SlideDrag {
-  const moving = selected.includes(index) ? selected : [index];
+  const moving = movingSlides(selected, index);
   if (moving.length === 1) editor?.goToSlide(index);
   return { moving, over: index, side: 'before' };
+}
+
+/** The number of slides that a drag on slide `index` moves, as `startSlideDrag`. @internal */
+export function slideDragCount(selected: readonly number[], index: number): number {
+  return movingSlides(selected, index).length;
+}
+
+function movingSlides(selected: readonly number[], index: number): readonly number[] {
+  return selected.includes(index) ? selected : [index];
 }
 
 /**

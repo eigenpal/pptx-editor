@@ -9,6 +9,8 @@ import { useCallback, useRef, useState, type DragEvent } from 'react';
 import {
   dragOverSlide,
   dropSlideDrag,
+  setSlideDragImage,
+  slideDragCount,
   slideDropMarker,
   startSlideDrag,
   type SlideDrag,
@@ -43,6 +45,8 @@ export function useSlideDrag(
     draggable: !readOnly,
     onDragStart: (e: DragEvent<HTMLElement>) => {
       e.dataTransfer.effectAllowed = 'move';
+      // The image first: making the slide current can move the list.
+      setSlideDragImage(e, e.currentTarget, slideDragCount(selected, index));
       setDrag(startSlideDrag(editor, selected, index));
     },
     onDragOver: (e: DragEvent<HTMLElement>) => {

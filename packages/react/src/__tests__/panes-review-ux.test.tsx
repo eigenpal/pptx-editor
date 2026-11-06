@@ -1,10 +1,15 @@
 // The slide panes after the UX review: a quick drag in the rail or the sorter reorders before
 // React renders again, the zoom trigger says whether its menu is open, the side panel landmark
-// has a name, and focus goes to the slide when the sorter closes with the rail hidden.
+// has a name, a drag shows only the dragged thumbnail, and focus goes to the slide when the sorter closes with the rail hidden.
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { createPptxEditor, type PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import {
+  createPptxEditor,
+  SLIDE_DRAG_IMAGE_CLASS,
+  SLIDE_DRAG_TYPE,
+  type PptxEditorInstance,
+} from '@pptx-editor.dev/core/editor';
 import { buildPptx, para, run, shape } from '../../../../scripts/fixtures/builder.ts';
 import { PptxEditorContext } from '../context.ts';
 import { SidePanel, SlideRail, ZoomPill } from '../panes.tsx';
@@ -69,6 +74,34 @@ describe('a quick drag', () => {
     const items = () => [...document.querySelectorAll<HTMLElement>('.pptx-sorter__item')];
     expect(quickDrag(items)).toBe(true);
     expect(ids(editor).indexOf(first)).toBe(2);
+  });
+});
+
+describe('the drag image', () => {
+  test('a rail or sorter drag shows the dragged thumbnail alone, and sets slide data', async () => {
+    for (const [ui, item] of [
+      [<SlideRail />, '.pptx-rail__item'],
+      [<SlideSorter />, '.pptx-sorter__item'],
+    ] as const) {
+      const editor = await open();
+      render(tree(editor, ui));
+      const dragged = document.querySelector<HTMLElement>(item)!;
+      const thumb = dragged.querySelector<HTMLElement>('.pptx-rail__thumb')!;
+      thumb.getBoundingClientRect = () => ({ left: 0, top: 0, width: 160, height: 90 }) as DOMRect;
+      const images: Element[] = [];
+      const types: string[] = [];
+      fireEvent.dragStart(dragged, {
+        dataTransfer: {
+          effectAllowed: '',
+          setData: (type: string) => types.push(type),
+          setDragImage: (image: Element) => images.push(image),
+        },
+      });
+      expect(images.map((i) => i.className)).toEqual([SLIDE_DRAG_IMAGE_CLASS]);
+      expect(images[0]!.contains(dragged)).toBe(false);
+      expect(types).toEqual([SLIDE_DRAG_TYPE]);
+      cleanup();
+    }
   });
 });
 
