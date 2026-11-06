@@ -10,6 +10,7 @@
  * `table-editing`: 2 copies written at commit 0073112, no prompt on
  * 31 October 2026. `fill-fidelity` and `line-model`: 4 copies written at commit 1558bb1, no
  * prompt on 1 November 2026. That gives 26 fixtures.
+ * The rebuilt `open-font-families` fixture awaits verification of its saved copies.
  */
 export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'alignment-anchor',
@@ -20,7 +21,6 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'effects',
   'fill-fidelity',
   'fills-lines',
-  'font-substitution',
   'gradients',
   'groups-transforms',
   'line-model',

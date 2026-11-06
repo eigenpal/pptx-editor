@@ -139,7 +139,6 @@ export async function scoreDeck(
         if (issues.length) gap = { status: 'stale', reasons: issues };
         if (fixtures)
           result.foreignReferenceFonts = foreignReferenceFonts(
-            input.name,
             refFonts,
             deckFontFamilies(deckBytes, false),
             postScriptFamilies(harnessFontFiles(fonts.map((f) => f.file)))

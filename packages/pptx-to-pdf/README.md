@@ -117,7 +117,7 @@ Each diagnostic has a fixed `code`. Handle an unknown code by its `severity`. Th
 | `frame.table` | `unsupported` | A table frame with no grid (no `a:tbl`, or no rows or columns) is not drawn. |  |
 | `geometry.unknown-preset` | `approximation` | An unknown preset geometry is drawn as a rectangle. |  |
 | `slide.not-laid-out` | `unsupported` | The slide could not be laid out and has no page. |  |
-| `layout.approximation`, `font.substituted` | `information` | An engine approximation (see Known approximations on the fidelity page of the docs site) or a substituted font. | `font-substitution` (for `font.substituted`) |
+| `layout.approximation`, `font.substituted` | `information` | An engine approximation (see Known approximations on the fidelity page of the docs site) or a substituted font. | Synthetic missing-font deck in export tests (for `font.substituted`) |
 
 ## API
 

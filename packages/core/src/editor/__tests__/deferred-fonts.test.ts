@@ -10,7 +10,7 @@ import {
   type EditorFontError,
   type FontConfigurationFragment,
 } from '../index.ts';
-import { deferred, face, fixture, settle } from './font-test-helpers.ts';
+import { deferred, face, settle, missingFontsDeck } from './font-test-helpers.ts';
 
 const substituted = (editor: ReturnType<typeof createPptxEditor>): string[] =>
   editor.snapshot().substitutedFonts.map((f) => f.family);
@@ -21,7 +21,7 @@ describe('deferred font faces in the editor', () => {
     const editor = createPptxEditor({
       fonts: { sources: [face('Segoe UI')], deferred: late.promise },
     });
-    await editor.load(fixture('font-substitution.pptx'));
+    await editor.load(missingFontsDeck());
     expect(substituted(editor)).not.toContain('Segoe UI');
     expect(substituted(editor)).toContain('Aptos');
     const generation = editor.session!.fontGeneration;
@@ -41,8 +41,8 @@ describe('deferred font faces in the editor', () => {
         ++calls === 1 ? { sources: [], deferred: late.promise } : undefined
       ),
     });
-    await editor.load(fixture('font-substitution.pptx'));
-    await editor.load(fixture('font-substitution.pptx'));
+    await editor.load(missingFontsDeck());
+    await editor.load(missingFontsDeck());
     late.resolve({ sources: [face('Aptos')] });
     await settle();
     expect(substituted(editor)).toContain('Aptos');
@@ -54,7 +54,7 @@ describe('deferred font faces in the editor', () => {
       fonts: { sources: [face('Segoe UI')], deferred: Promise.reject(new Error('late failure')) },
       onFontError: () => undefined,
     });
-    expect((await editor.load(fixture('font-substitution.pptx'))).ok).toBe(true);
+    expect((await editor.load(missingFontsDeck())).ok).toBe(true);
     await settle();
     expect(substituted(editor)).not.toContain('Segoe UI');
     editor.destroy();
@@ -71,7 +71,7 @@ describe('deferred font faces in the editor', () => {
       ),
       onFontError: (e) => errors.push(e),
     });
-    await editor.load(fixture('font-substitution.pptx'));
+    await editor.load(missingFontsDeck());
     await settle(10);
     expect(substituted(editor)).not.toContain('Aptos');
     expect(errors.map((e) => e.diagnostic)).toContain('one face missing');
@@ -81,7 +81,7 @@ describe('deferred font faces in the editor', () => {
   test('setFonts with only background faces keeps waiting for them', async () => {
     const late = deferred<FontConfigurationFragment | undefined>();
     const editor = createPptxEditor();
-    await editor.load(fixture('font-substitution.pptx'));
+    await editor.load(missingFontsDeck());
     await editor.setFonts({ sources: [], deferred: late.promise });
     expect(substituted(editor)).toContain('Segoe UI');
     late.resolve({ sources: [face('Segoe UI')] });

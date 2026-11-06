@@ -54,7 +54,7 @@ export async function referenceIdentity(
     const open = postScriptFamilies(
       harnessFontFiles(localFonts(undefined, 'fixtures').map((f) => f.file))
     );
-    const foreign = foreignReferenceFonts(name, fonts, deckFontFamilies(deckBytes, false), open);
+    const foreign = foreignReferenceFonts(fonts, deckFontFamilies(deckBytes, false), open);
     if (foreign.length)
       problems.push(
         `the PDF embeds fonts that are not open fonts of the deck: ${foreign.join(', ')}`

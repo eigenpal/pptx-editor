@@ -153,16 +153,20 @@ describe('scoreDeck', () => {
   });
 
   test('fonts of our PDF that the harness did not load are listed', async () => {
-    // The fonts that are not open, on purpose: the reference of `font-substitution`.
-    const pdf = join(import.meta.dir, '../../fixtures/font-substitution.pdf'); // one page
+    // Open Arabic fixture fonts are absent from this empty deck and its loaded fonts.
+    const pdf = join(import.meta.dir, '../../fixtures/rtl-text.pdf'); // four pages
     const one = join(dir, 'one.pptx');
     writeFileSync(
       one,
-      buildPptx({ width: 12_192_000, height: 6_858_000, slides: [{ shapes: '' }] })
+      buildPptx({
+        width: 12_192_000,
+        height: 6_858_000,
+        slides: Array.from({ length: 4 }, () => ({ shapes: '' })),
+      })
     );
-    const page = fakePage(1, undefined, undefined, new Uint8Array(readFileSync(pdf)));
+    const page = fakePage(4, undefined, undefined, new Uint8Array(readFileSync(pdf)));
     const r = await scoreDeck(page, { file: one, name: 'd', pdf });
-    expect(r.foreignFonts).toEqual(['Aptos', 'ArialMT', 'Calibri', 'SegoeUI']);
+    expect(r.foreignFonts).toEqual(['NotoSansArabic-Bold', 'NotoSansArabic-Regular']);
   });
 
   test('a reference PDF with a font that it does not embed is stale', async () => {

@@ -163,12 +163,12 @@
         540
       ]
     },
-    "font-substitution": {
-      "deck": "479ea80a3c08edf2670fa5aa47806bf3e257c60e129ba8b141f283b0e7269962",
-      "pdf": "6c6a3af3756ed1de74d1d2d9103c27b199221aa5533cce46e951ffe4a68f68a4",
+    "open-font-families": {
+      "deck": "e92f2624a44f2f6e4d3cfe3d0b6a98bf575c133f5f7d4b63145a13fea8f94265",
+      "pdf": "47c6de86c8b0907fddc1e22e6be87f66a6add54d60a3cd889c7b4e936fe74caa",
       "pages": 1,
       "pageSizePt": [
-        960,
+        960.009448818898,
         540
       ]
     },

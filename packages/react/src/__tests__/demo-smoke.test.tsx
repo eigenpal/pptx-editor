@@ -1,6 +1,7 @@
 // Smoke, on the React demo in happy-dom: the v0.1 test script, view mode, and the font notice
 // on the sample deck. Ported from the Playwright `e2e/smoke.spec.ts`.
 
+import { missingFontsDeck } from '../../../core/src/editor/__tests__/font-test-helpers.ts';
 import { afterEach, describe, expect, test } from 'bun:test';
 import { within } from '@testing-library/react';
 import { presentationInfo, readPptx } from '@pptx-editor.dev/core/store';
@@ -17,7 +18,6 @@ import {
   openDemo,
   openFile,
   press,
-  repoFile,
   screen,
   slidePoint,
   type,
@@ -102,7 +102,7 @@ describe('demo smoke', () => {
   test('the font notice lists substitutes that change line breaks', async () => {
     await openDemo();
     expect(document.querySelectorAll('.pptx-font-notice')).toHaveLength(0);
-    await openFile(repoFile('fixtures/font-substitution.pptx'));
+    await openFile(new File([missingFontsDeck() as Uint8Array<ArrayBuffer>], 'missing-fonts.pptx'));
     await until(() => expect(document.querySelector('.pptx-font-notice')).not.toBeNull());
     const notice = document.querySelector<HTMLElement>('.pptx-font-notice')!;
     expect(notice.textContent).toContain('Aptos');

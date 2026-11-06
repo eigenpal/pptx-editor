@@ -23,7 +23,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['underline-styles'],
   },
   'text.font-family-size': {
-    fixtures: ['text-runs', 'font-substitution'],
+    fixtures: ['text-runs', 'open-font-families'],
     approximations: ['line-model', 'glyph-advances', 'missing-glyphs'],
   },
   'text.color-highlight': {

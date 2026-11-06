@@ -6,6 +6,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // `openDocumentForExport` and `exportPdfFrom`: one layout, many exports (DOCX Editor's
 // reusable session).
 
+import { missingFontsDeck } from '../../../core/src/editor/__tests__/font-test-helpers.ts';
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -322,7 +323,7 @@ describe('openDocumentForExport and exportPdfFrom', () => {
 
 describe('substitute font failures', () => {
   test('give one document-wide diagnostic per face, which strict refuses', async () => {
-    const opened = await openDocumentForExport(deck('font-substitution'), {});
+    const opened = await openDocumentForExport(missingFontsDeck(), {});
     if (!opened.ok) throw new Error('deck');
     // Stand in for a fonts package with a missing file: the session resolves its fonts once.
     const state = sessionState(opened.session)!;

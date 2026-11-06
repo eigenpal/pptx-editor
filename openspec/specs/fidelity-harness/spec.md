@@ -32,5 +32,5 @@ The harness SHALL print every slide to PDF with the editor's own pipeline and co
 
 #### Scenario: A reference font that the deck does not name
 
-- **WHEN** a fixture's reference PDF embeds a font that is not an open font that its deck names, and the fixture is not in `NON_OPEN_FONT_DECKS`
+- **WHEN** a fixture's reference PDF embeds a font that is not an open font that its deck names
 - **THEN** the fixture gate fails and names the font
