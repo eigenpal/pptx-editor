@@ -16,6 +16,16 @@ import { Slideshow, useSlideshowHandle } from '../Slideshow.tsx';
 // control bar, click to advance, the end screen, and exit back to the editor.
 
 const IN = 914_400;
+const R_IMAGE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
+/** A picture with alt text: the show reads it out. */
+const PICTURE =
+  '<p:pic><p:nvPicPr><p:cNvPr id="3" name="Lake" descr="A lake at dusk"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>' +
+  '<p:blipFill><a:blip r:embed="rIdImg"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>' +
+  '<p:spPr><a:xfrm><a:off x="5486400" y="914400"/><a:ext cx="914400" cy="914400"/></a:xfrm>' +
+  '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>';
+const MEDIA = [
+  { name: 'image1.png', bytes: new Uint8Array([137, 80, 78, 71]), contentType: 'image/png' },
+];
 
 async function open(): Promise<PptxEditorInstance> {
   const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
@@ -24,10 +34,15 @@ async function open(): Promise<PptxEditorInstance> {
   const r = await editor.load(
     buildPptx({
       slides: [
-        { layout: 'blank', shapes: box(2, 'One') },
+        {
+          layout: 'blank',
+          shapes: box(2, 'One') + PICTURE,
+          rels: [['rIdImg', R_IMAGE, '../media/image1.png']],
+        },
         { layout: 'blank', shapes: box(2, 'Two'), hidden: true },
         { layout: 'blank', shapes: box(2, 'Three') },
       ],
+      media: MEDIA,
     })
   );
   expect(r.ok).toBe(true);
@@ -90,6 +105,10 @@ describe('Slideshow', () => {
     expect(svg.getAttribute('data-slide-part')).toBe(editor.session!.info.slides[0].partName);
     // No editing hooks in the show.
     expect(svg.querySelector('[data-node-id]') === null).toBe(true);
+    // A screen reader reads the slide: its text, and the picture by its alt text.
+    expect(svg.getAttribute('role')).toBe('group');
+    expect(svg.textContent).toContain('One');
+    expect(svg.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('A lake at dusk');
   });
 
   test('keys step through the shown slides, skip the hidden one, and stay in the show', async () => {

@@ -6,6 +6,7 @@ import { apply, invert, type LayoutItem } from '../layout/index.ts';
 import { paintSlide } from '../output/index.ts';
 import { relationshipsOf, sanitizeHref } from '../store/index.ts';
 import type { DocumentSession } from './document-session.ts';
+import { altTextAt } from './picture-state.ts';
 import { textFrameMatrix } from './surface.ts';
 
 /** A slide box on the screen, in CSS pixels on whole device pixels. @public */
@@ -53,8 +54,9 @@ export interface SlideshowPaintOptions {
 let painted = 0;
 
 /**
- * Paint slide `index` of a session for the show: an `<svg>` without editing hooks. The caller
- * sizes it (see `fitSlideToScreen`). Returns null for a slide that does not exist. @public
+ * Paint slide `index` of a session for the show: an `<svg>` without editing hooks, with its text
+ * and the alt text of its pictures for assistive technology. The caller sizes it (see
+ * `fitSlideToScreen`). Returns null for a slide that does not exist. @public
  */
 export function paintSlideshowSlide(
   doc: Document,
@@ -70,11 +72,14 @@ export function paintSlideshowSlide(
     imageSize: session.imageSize,
     idPrefix: `pptx-show${painted}-`,
     hitTargets: false,
+    altText: (part, id) => altTextAt(session.store.package, part, id),
     ...(options.frameLabel ? { frameLabel: options.frameLabel } : {}),
   });
   svg.setAttribute('width', '100%');
   svg.setAttribute('height', '100%');
-  svg.setAttribute('role', 'img');
+  // A group, not an image: a screen reader reads the slide's text in paint order (the order of
+  // `p:spTree`) and each picture's alt text, as on the editable slide.
+  svg.setAttribute('role', 'group');
   return svg;
 }
 

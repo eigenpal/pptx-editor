@@ -1,6 +1,6 @@
 // The editable slide surface translates input into editor commands and paints layout geometry.
 
-import { paintSlide } from '../output/index.ts';
+import { paintSlide, type AltTextPort } from '../output/index.ts';
 import { apply, type LayoutItem, type Matrix, type SlideLayout } from '../layout/index.ts';
 import type { EditorSelection, ImageCrop, TransformItem } from '../contracts/index.ts';
 import { SVG_NS } from '../output/index.ts';
@@ -51,6 +51,7 @@ import { hitItem, inText, onBorder } from './surface-hit.ts';
 import { outsideVeil, scrollBoxIntoView, surfacePadding } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
 import { resizeOne, scaleMany } from './surface-resize.ts';
+import { selectionAnnouncement } from './surface-announce.ts';
 
 const EMU_PER_PX = 9_525;
 
@@ -66,6 +67,8 @@ export interface SurfaceHost extends SurfaceInputHost {
   readonly imageUrl: (part: string, rId: string) => string | undefined;
   readonly imageSize?: (part: string, rId: string) => { cx: number; cy: number } | undefined;
   readonly label: (key: string, params?: Record<string, string | number>) => string;
+  /** The alt text of an element: pictures are named by it, and the live region says it. */
+  readonly altText?: AltTextPort;
   select(selection: EditorSelection): void;
   /** Collaboration peers on this slide, painted as editing chrome. */
   presence?(): readonly PaintedPresence[];
@@ -171,6 +174,7 @@ export class SlideSurface {
     this.#stage.className = 'pptx-surface__stage';
     this.#overlay = doc.createElementNS(SVG_NS, 'svg') as SVGSVGElement;
     this.#overlay.setAttribute('class', 'pptx-surface__overlay');
+    this.#overlay.setAttribute('aria-hidden', 'true'); // Selection chrome: the live region says it.
     this.#table = new TableGestures(editor);
     this.#input = doc.createElement('textarea');
     this.#input.className = 'pptx-surface__input';
@@ -285,16 +289,7 @@ export class SlideSurface {
       total: this.editor.slideCount(),
     });
     if (this.root.getAttribute('aria-label') !== name) this.root.setAttribute('aria-label', name);
-    const sel = this.editor.selection();
-    const cell = sel.kind === 'text' ? sel.cell : sel.kind === 'cells' ? sel.focus : undefined;
-    // A shape that Tab (or a click) selects is named, so a screen reader hears where Tab went.
-    const one = sel.kind === 'shapes' && sel.nodeIds.length === 1 ? sel.nodeIds[0] : undefined;
-    const shapeName = one ? itemById(layout, one)?.element.name : undefined;
-    const said = cell
-      ? this.editor.label('canvas.tableCell', { row: cell.row + 1, column: cell.column + 1 })
-      : shapeName
-        ? this.editor.label('canvas.shapeSelected', { name: shapeName })
-        : '';
+    const said = selectionAnnouncement(layout, this.editor);
     if (this.#live.textContent !== said) this.#live.textContent = said;
     const w = (layout.slide.width / EMU_PER_PX) * zoom;
     const h = (layout.slide.height / EMU_PER_PX) * zoom;
@@ -312,6 +307,7 @@ export class SlideSurface {
         images: this.editor.imageUrl,
         ...(this.editor.imageSize ? { imageSize: this.editor.imageSize } : {}),
         idPrefix: `${this.editor.idPrefix}s${layout.slide.index}`,
+        ...(this.editor.altText ? { altText: this.editor.altText } : {}),
       });
       svg.setAttribute('class', 'pptx-surface__slide');
       const old = this.#stage.querySelector('.pptx-surface__slide');

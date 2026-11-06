@@ -56,6 +56,31 @@ export interface PaintOptions {
   readonly frameLabel?: (kind: string) => string;
   /** Include `data-node-id` hooks for hit testing. Default true. */
   readonly hitTargets?: boolean;
+  /**
+   * The alt text of an element. With it, each picture is exposed to assistive technology: a
+   * picture with a description is an image named by it, and a decorative picture or one with
+   * no description is hidden. Without it, the paint has no ARIA (thumbnails and exports).
+   */
+  readonly altText?: AltTextPort;
+}
+
+/** Resolves an element (`p:cNvPr/@descr` and the `adec:decorative` extension) to its alt text. */
+export type AltTextPort = (
+  part: string,
+  nodeId: string
+) => { readonly description: string; readonly decorative: boolean } | undefined;
+
+/**
+ * The ARIA of a picture (WAI-ARIA `img` role, after the WAI images tutorial): its description as
+ * the name, or hidden when decorative or without a description. Pixels do not change.
+ */
+function pictureAria(
+  el: { readonly partName: string; readonly nodeId: string },
+  altText: AltTextPort
+): Record<string, string> {
+  const alt = altText(el.partName, el.nodeId);
+  const name = alt && !alt.decorative ? alt.description.trim() : '';
+  return name ? { role: 'img', 'aria-label': name } : { 'aria-hidden': 'true' };
 }
 
 /**
@@ -579,7 +604,8 @@ function paintItem(
     }
     case 'shape':
     case 'picture': {
-      const outer = svg(doc, 'g', { ...common, 'data-kind': item.kind });
+      const aria = item.kind === 'picture' && opts.altText ? pictureAria(el, opts.altText) : {};
+      const outer = svg(doc, 'g', { ...common, 'data-kind': item.kind, ...aria });
       const effects = item.element.effects;
       const body = svg(doc, 'g', { transform: matrixAttr(item.matrix) });
       for (const node of paintGeometry(doc, item, local, parentScale)) body.appendChild(node);
