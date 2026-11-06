@@ -314,6 +314,26 @@ describe('focus after a grid drag', () => {
   });
 });
 
+describe('the border band of a selected table', () => {
+  test('a press just inside the bottom edge places a caret; it never moves the table', async () => {
+    const editor = await open();
+    const host = surface(editor);
+    const stage = stageOf(host);
+    const frame = frames(editor)[0];
+    act(() => editor.setSelection({ kind: 'shapes', nodeIds: [frame.id] }));
+    // The bottom edge is at y = 3 in; the press is 6 px above it, in the second row's cell.
+    const y = 3 * IN - 6 * PX;
+    stage.dispatchEvent(new PointerEvent('pointerdown', { ...at(1.5 * IN, y), button: 0 }));
+    document.dispatchEvent(new PointerEvent('pointermove', at(1.5 * IN, y + 25 * PX)));
+    document.dispatchEvent(new PointerEvent('pointerup', at(1.5 * IN, y + 25 * PX)));
+    const sel = editor.snapshot().selection;
+    expect(sel.kind === 'text' || sel.kind === 'cells').toBe(true);
+    const off = find(frames(editor)[0], 'p:xfrm')!;
+    expect(attr(find(off, 'a:off')!, 'y')).toBe(String(IN));
+    editor.destroy();
+  });
+});
+
 describe('table edge over a shape', () => {
   test('a press just outside the edge resizes the selected table, not the shape behind', async () => {
     const editor = await open('behind');

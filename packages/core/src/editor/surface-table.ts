@@ -3,7 +3,7 @@
 // extends to a range, and a drag on an inner grid line resizes the columns or rows beside it.
 // Moved out of `surface.ts` (the 1000-line cap); the surface calls these before its own hits.
 
-import type { LayoutItem, SlideLayout } from '../layout/index.ts';
+import type { LayoutItem, Matrix, SlideLayout } from '../layout/index.ts';
 import type {
   EditorCommand,
   EditorExecOptions,
@@ -256,11 +256,17 @@ export class TableGestures {
     const frame = id ? tableItem(layout, id) : undefined;
     if (!frame || !this.onLine(frame, p)) return undefined;
     if (!outside) return id;
-    const local = apply(invert(frame.matrix), p.x, p.y);
-    // The drawn grid, which rows that grow to fit their text can make taller than the frame.
-    const { width, height } = frame.table;
-    const inside = local.x >= 0 && local.x <= width && local.y >= 0 && local.y <= height;
-    return inside ? undefined : id;
+    return inGrid(frame, p) ? undefined : id;
+  }
+
+  /**
+   * Whether `p` is inside the drawn grid of table item `item`: its cells, where a press places a
+   * caret and the border band of the selected table does not reach. False for other items.
+   */
+  inGrid(item: LayoutItem, p: { x: number; y: number }): boolean {
+    return (
+      item.kind === 'frame' && !!item.table && inGrid({ matrix: item.matrix, table: item.table }, p)
+    );
   }
 
   /**
@@ -310,6 +316,16 @@ export function clampTableResize(
     return { dx: limit(dx, cx, handle[0]), dy: limit(dy, cy, handle[1]) };
   }
   return { dx: Math.min(dx, roomX), dy: Math.min(dy, roomY) };
+}
+
+/** Whether `p` is inside a table frame's drawn grid, which rows that grow can make taller. */
+function inGrid(
+  frame: { readonly matrix: Matrix; readonly table: { width: number; height: number } },
+  p: { x: number; y: number }
+): boolean {
+  const local = apply(invert(frame.matrix), p.x, p.y);
+  const { width, height } = frame.table;
+  return local.x >= 0 && local.x <= width && local.y >= 0 && local.y <= height;
 }
 
 /** The highlight of a selected cell range, editing chrome over the slide. */

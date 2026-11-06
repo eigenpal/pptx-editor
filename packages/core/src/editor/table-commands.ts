@@ -138,6 +138,19 @@ const caretIn = (nodeId: string, cell: TableCellAddress): EditorSelection => ({
   focus: { paragraph: 0, offset: 0 },
 });
 
+/** The inserted rows or columns, across the other lines of a cell range `sel`. */
+function newLines(
+  sel: Extract<EditorSelection, { kind: 'cells' }>,
+  axis: 'row' | 'column',
+  at: number,
+  count: number
+): EditorSelection {
+  const r = cellRangeOf(sel);
+  return axis === 'row'
+    ? { ...sel, anchor: { row: at, column: r.c0 }, focus: { row: at + count - 1, column: r.c1 } }
+    : { ...sel, anchor: { row: r.r0, column: at }, focus: { row: r.r1, column: at + count - 1 } };
+}
+
 /** The selection moved by whole rows or columns, as cells shift after an insert. */
 function shifted(sel: EditorSelection, dr: number, dc: number): EditorSelection {
   if (sel.kind === 'text' && sel.cell)
@@ -311,33 +324,39 @@ export function compileTable(ctx: CommandContext, batch: OpBatch, command: Table
       const { m, range } = tableTarget(ctx, batch);
       const count = lineCount(ctx.selection, range.r0, range.r1);
       const above = command.where === 'above';
-      insertRows(batch, m, above ? range.r0 : range.r1 + 1, count, above ? range.r0 : range.r1);
+      const at = above ? range.r0 : range.r1 + 1;
+      insertRows(batch, m, at, count, above ? range.r0 : range.r1);
       structureEdited(ctx, batch, m);
       refit(ctx, batch, m);
-      return {
-        batch,
-        effect: {
-          label: 'insertRow',
-          selection: above ? shifted(ctx.selection, count, 0) : ctx.selection,
-        },
-      };
+      // A cell range selects the new rows, ready to fill; a caret stays in its cell.
+      const sel = ctx.selection;
+      const selection =
+        sel.kind === 'cells'
+          ? newLines(sel, 'row', at, count)
+          : above
+            ? shifted(sel, count, 0)
+            : sel;
+      return { batch, effect: { label: 'insertRow', selection } };
     }
     case 'insertColumn': {
       const { m, range } = tableTarget(ctx, batch);
       const count = lineCount(ctx.selection, range.c0, range.c1);
       const left = command.where === 'left';
       const width = gridWidth(m);
-      insertColumns(batch, m, left ? range.c0 : range.c1 + 1, count, left ? range.c0 : range.c1);
+      const at = left ? range.c0 : range.c1 + 1;
+      insertColumns(batch, m, at, count, left ? range.c0 : range.c1);
       keepGridWidth(batch, m, width);
       structureEdited(ctx, batch, m);
       refit(ctx, batch, m);
-      return {
-        batch,
-        effect: {
-          label: 'insertColumn',
-          selection: left ? shifted(ctx.selection, 0, count) : ctx.selection,
-        },
-      };
+      // A cell range selects the new columns, ready to fill; a caret stays in its cell.
+      const sel = ctx.selection;
+      const selection =
+        sel.kind === 'cells'
+          ? newLines(sel, 'column', at, count)
+          : left
+            ? shifted(sel, 0, count)
+            : sel;
+      return { batch, effect: { label: 'insertColumn', selection } };
     }
     case 'deleteRow':
       return deleteLines(ctx, batch, 'row');

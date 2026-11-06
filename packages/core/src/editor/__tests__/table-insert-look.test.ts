@@ -1,5 +1,6 @@
-// The look of inserted rows and columns beside merged cells: a covered cell holds no fill of
-// its own, so a new cell takes the look of its block's anchor (table-model.ts).
+// Inserted rows and columns: beside merged cells a new cell takes the look of its block's
+// anchor, as a covered cell holds no fill of its own (table-model.ts); after an insert from a
+// cell range, the new lines are selected.
 
 import { describe, expect, test } from 'bun:test';
 import { buildPptx, cell, table } from '../../../../../scripts/fixtures/builder.ts';
@@ -70,5 +71,38 @@ describe('inserted cells beside merged cells', () => {
     const added = tcs(e)[3][0];
     expect(fill(added)).toBe('FF8800');
     expect(textOf(added)).toBe('');
+  });
+
+  test('an insert from a cell range selects the new lines; a caret stays in its cell', async () => {
+    const e = await open();
+    const nodeId = frame(e);
+    const column = {
+      kind: 'cells',
+      nodeId,
+      anchor: { row: 0, column: 2 },
+      focus: { row: 2, column: 2 },
+    } as const;
+    e.setSelection(column);
+    expect(e.exec({ type: 'insertColumn', where: 'right' }).ok).toBe(true);
+    expect(e.snapshot().selection).toEqual({
+      ...column,
+      anchor: { row: 0, column: 3 },
+      focus: { row: 2, column: 3 },
+    });
+    e.setSelection({
+      kind: 'cells',
+      nodeId,
+      anchor: { row: 1, column: 1 },
+      focus: { row: 1, column: 2 },
+    });
+    expect(e.exec({ type: 'insertRow', where: 'above' }).ok).toBe(true);
+    const sel = e.snapshot().selection;
+    expect(sel.kind === 'cells' && [sel.anchor, sel.focus]).toEqual([
+      { row: 1, column: 1 },
+      { row: 1, column: 2 },
+    ]);
+    caretIn(e, 0, 0);
+    expect(e.exec({ type: 'insertColumn', where: 'right' }).ok).toBe(true);
+    expect(e.snapshot().selection).toMatchObject({ kind: 'text', cell: { row: 0, column: 0 } });
   });
 });

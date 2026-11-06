@@ -667,8 +667,10 @@ export class SlideSurface {
     return inText(item, p, this.editor.zoom());
   }
 
+  /** The border band moves a shape; a table's band is outside its grid, so a cell takes a press. */
   #onBorder(item: LayoutItem, p: { x: number; y: number }): boolean {
-    return onBorder(item, p, this.editor.zoom()) && !this.#table.onLine(item, p);
+    if (this.#table.onLine(item, p) || this.#table.inGrid(item, p)) return false;
+    return onBorder(item, p, this.editor.zoom());
   }
 
   /** The pointer shows what a click does: a text cursor over text, a move cursor on shapes. */
