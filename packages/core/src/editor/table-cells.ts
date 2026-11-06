@@ -220,11 +220,37 @@ export function gridLineAt(
   const t = frame.table;
   if (local.x < -tolerance || local.x > t.width + tolerance) return undefined;
   if (local.y < -tolerance || local.y > t.height + tolerance) return undefined;
+  // A line hits only where it is drawn: not inside a merged cell that spans across it.
+  const row = lineIndexAt(t.rowY, local.y);
+  const column = lineIndexAt(t.columnX, local.x);
   for (let i = 1; i < t.columnX.length; i += 1)
-    if (Math.abs(local.x - t.columnX[i]) <= tolerance) return { axis: 'column', index: i };
+    if (Math.abs(local.x - t.columnX[i]) <= tolerance && !mergedAcross(t, 'column', i, row))
+      return { axis: 'column', index: i };
   for (let i = 1; i < t.rowY.length; i += 1)
-    if (Math.abs(local.y - t.rowY[i]) <= tolerance) return { axis: 'row', index: i };
+    if (Math.abs(local.y - t.rowY[i]) <= tolerance && !mergedAcross(t, 'row', i, column))
+      return { axis: 'row', index: i };
   return undefined;
+}
+
+/** The grid row (or column) that a local coordinate falls in, clamped to the grid. */
+function lineIndexAt(lines: readonly number[], v: number): number {
+  let i = 0;
+  while (i < lines.length - 2 && v >= lines[i + 1]) i += 1;
+  return i;
+}
+
+/**
+ * Whether a merged cell spans across grid line `index` of `axis` at row (or column) `at`: a
+ * column line inside a cell that spans two columns there, or a row line inside a cell that spans
+ * two rows.
+ */
+function mergedAcross(t: TableLayout, axis: 'column' | 'row', index: number, at: number): boolean {
+  return t.cells.some((c) => {
+    const { row, col, rowSpan, gridSpan } = c.cell;
+    return axis === 'column'
+      ? col < index && col + gridSpan > index && row <= at && row + rowSpan > at
+      : row < index && row + rowSpan > index && col <= at && col + gridSpan > at;
+  });
 }
 
 /** The highlight of a cell range: one rectangle per drawn cell, in slide space. */

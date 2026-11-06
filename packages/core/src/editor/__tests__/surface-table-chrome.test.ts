@@ -18,7 +18,7 @@ import type { EditorCommand, EditorSelection } from '../../contracts/index.ts';
 import { apply, type SlideLayout } from '../../layout/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 import { TableChrome, type TableChromeHost } from '../surface-table-chrome.ts';
-import { tableItem } from '../table-cells.ts';
+import { gridLineAt, tableItem } from '../table-cells.ts';
 import { cellsOverlay } from '../surface-table.ts';
 
 const IN = 914_400;
@@ -286,6 +286,19 @@ describe('the table chrome', () => {
       [false, false, false],
       [false, true, false],
     ]);
+  });
+
+  test('a grid line hits only where it is drawn, not inside a merged cell', async () => {
+    const e = await open(deck(true));
+    const frame = tableItem(layout(e), frameId(e))!;
+    const line = columnX(e)[1];
+    // Row 0: the line between columns 0 and 1 is drawn there.
+    expect(gridLineAt(frame, at(e, line, rowY(e)[0] + ROW / 2), 2 * PX)).toEqual({
+      axis: 'column',
+      index: 1,
+    });
+    // Row 1: its merged cell spans columns 0 and 1, so the line is not there.
+    expect(gridLineAt(frame, at(e, line, rowY(e)[1] + ROW / 2), 2 * PX)).toBeUndefined();
   });
 
   test('a line inside a merged cell inserts from the cell that ends there', async () => {
