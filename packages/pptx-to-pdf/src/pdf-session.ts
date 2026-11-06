@@ -6,6 +6,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // After DOCX Editor's `docx-to-pdf` (`packages/docx-to-pdf/src/pdf-session.ts`, commit
 // 398963c7f67207cebf3c38dcc41d5f0bd1339b5f).
 
+import { installDrawing } from '@pptx-editor.dev/pro/drawing';
 import { openExportSession } from './open-session.ts';
 import { validateOptions } from './options.ts';
 import type { OpenPdfDocumentForExportOptions, OpenPdfDocumentForExportResult } from './types.ts';
@@ -40,5 +41,7 @@ export async function openDocumentForExport(
     if ((options as Record<string, unknown>)[key] !== undefined)
       throw new TypeError(`${key} must be configured in exportPdfFrom`);
   }
+  // PDF export always paints every effect (`@pptx-editor.dev/pro/drawing`).
+  installDrawing();
   return openExportSession(source, options, options.signal);
 }

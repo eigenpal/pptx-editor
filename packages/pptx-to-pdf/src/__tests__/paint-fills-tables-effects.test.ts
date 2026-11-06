@@ -217,13 +217,20 @@ describe('tables', () => {
 });
 
 describe('effects', () => {
-  test('shadows, glow, and inner shadows draw as transparency groups', async () => {
+  test('shadows, glow, inner shadows, and reflections draw as transparency groups', async () => {
     const result = await exportPdf(deck('effects'), BEST);
     const all = await pages(result);
     for (const page of all) expect(count(page.ops, OPS.beginGroup)).toBeGreaterThan(0);
-    // The blur approximations and the effects not drawn are reported, never hidden.
+    // The blur approximations are reported, never hidden.
     expect(codes(result)).toContain('effect.inner-shadow-blur');
-    expect(codes(result)).toContain('effect.reflection');
+    expect(codes(result)).toContain('effect.reflection-blur');
+    // Reflections are drawn now: nothing in the deck is reported as not drawn.
+    expect(codes(result)).not.toContain('effect.reflection');
+  });
+
+  test('a reflection draws through a luminosity soft mask', async () => {
+    const text = new TextDecoder('latin1').decode((await exportPdf(deck('effects'), BEST)).bytes);
+    expect(text).toMatch(/\/S\s*\/Luminosity/);
   });
 
   test('an inner shadow moves in slide space, whatever the rotation of the shape', () => {

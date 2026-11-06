@@ -8,6 +8,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // `openPresentation` → `session.layout(i)`, and paint each layout into a PDF page.
 
 import { PDFDocument } from 'pdf-lib';
+import { installDrawing } from '@pptx-editor.dev/pro/drawing';
 import type { RegisteredFace, SlideLayout } from '@pptx-editor.dev/core/layout';
 import { deckMetadata } from './metadata.ts';
 import {
@@ -60,6 +61,8 @@ export async function exportPdf(
 ): Promise<PdfExportResult> {
   if (!(source instanceof Uint8Array)) throw new TypeError('source must be a Uint8Array');
   validateOptions(options);
+  // PDF export always paints every effect (`@pptx-editor.dev/pro/drawing`).
+  installDrawing();
   return withPdfWork(options, async (work, phase) => {
     const { fonts, substitutes } = options;
     const opened = await openExportSession(
@@ -104,6 +107,7 @@ export async function exportPdfFrom(
   options: PdfProjectionOptions = {}
 ): Promise<PdfExportResult> {
   validateOptions(options);
+  installDrawing();
   for (const key of Object.keys(options)) {
     if ([...PROJECTION_KEYS, 'signal'].includes(key)) continue;
     throw new TypeError(

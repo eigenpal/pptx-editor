@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { parseXmlPart } from '../../store/index.ts';
 import { resolveEffects, type EffectPlacement } from '../../cascade/index.ts';
 import { apply, boxMatrix } from '../../layout/index.ts';
-import { effectMatrix, fadeLine } from '../effect-transforms.ts';
+import { effectMatrix } from '../effect-transforms.ts';
 
 const IN = 914_400;
 const base: EffectPlacement = {
@@ -56,12 +56,6 @@ describe('effect transform', () => {
     );
     near(apply(still, center.x, center.y), { x: center.x + 100, y: center.y });
     near(apply(turns, center.x, center.y), { x: center.x, y: center.y + 100 });
-  });
-
-  test('the fade line spans the bounds along the fade direction', () => {
-    const l = fadeLine({ x: 0, y: 0, r: 200, b: 100 }, 90);
-    near({ x: l.x1, y: l.y1 }, { x: 100, y: 0 });
-    near({ x: l.x2, y: l.y2 }, { x: 100, y: 100 });
   });
 });
 

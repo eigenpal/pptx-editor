@@ -3,6 +3,8 @@
 
 export * from './slide-layout.ts';
 export * from './table-layout.ts';
+// Internal: the renderers a capability package installs (`@pptx-editor.dev/pro/drawing`).
+export * from './drawing-renderers.ts';
 export * from './geometry/geometry.ts';
 export type { PresetShapeDefinition } from '@eigenpal/ooxml-core';
 export * from './text/measurer.ts';

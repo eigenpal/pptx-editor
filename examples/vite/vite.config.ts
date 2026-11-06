@@ -11,11 +11,15 @@ export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? '/',
   resolve: {
     alias: [
-      { find: /^@pptx-editor\.dev\/core\/styles\/editor\.css$/, replacement: pkg('core/src/styles/editor.css') },
+      {
+        find: /^@pptx-editor\.dev\/core\/styles\/editor\.css$/,
+        replacement: pkg('core/src/styles/editor.css'),
+      },
       { find: /^@pptx-editor\.dev\/core\/(\w+)$/, replacement: pkg('core/src/$1/index.ts') },
       { find: /^@pptx-editor\.dev\/core$/, replacement: pkg('core/src/index.ts') },
       { find: /^@pptx-editor\.dev\/react$/, replacement: pkg('react/src/index.ts') },
       { find: /^@pptx-editor\.dev\/i18n$/, replacement: pkg('i18n/src/index.ts') },
+      { find: /^@pptx-editor\.dev\/pro\/drawing$/, replacement: pkg('pro/src/drawing/index.ts') },
     ],
   },
   // Both packages resolve assets relative to their own module URL; pre-bundling would move them.

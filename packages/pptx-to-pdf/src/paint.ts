@@ -27,7 +27,12 @@ import {
   type PathCommand,
   type SlideLayout,
 } from '@pptx-editor.dev/core/layout';
-import { drawEffectsBehind, drawInnerShadow, effectDiagnostics } from './paint-effects.ts';
+import {
+  drawEffectsBehind,
+  drawInnerShadow,
+  drawReflection,
+  effectDiagnostics,
+} from './paint-effects.ts';
 import {
   canDrawPicture,
   drawPicture,
@@ -238,21 +243,25 @@ async function drawItem(
   const own = ownFill(item.element.fill, local);
   const shown = own.fill.type !== 'picture' || (await canDrawPicture(own.sourcePart, own.fill, p));
   if (shown) effectDiagnostics(item, p, local);
-  // Shadows and glow paint under the content, as in the SVG paint.
-  if (shown) await drawEffectsBehind(item, p, local);
-  p.push(pushGraphicsState());
-  p.matrix(item.matrix);
-  await drawGeometry(item, p, local, groupScale);
-  p.push(popGraphicsState());
-  // Over the geometry and under the text, in slide space.
-  if (shown) await drawInnerShadow(item, p, local);
-  // An empty body's caret line draws nothing: no operators for it.
-  if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text)) {
+  const drawContent = async (): Promise<void> => {
     p.push(pushGraphicsState());
-    p.matrix(item.textMatrix);
-    await drawText(item.text, p, local);
+    p.matrix(item.matrix);
+    await drawGeometry(item, p, local, groupScale);
     p.push(popGraphicsState());
-  }
+    // Over the geometry and under the text, in slide space.
+    if (shown) await drawInnerShadow(item, p, local);
+    // An empty body's caret line draws nothing: no operators for it.
+    if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text)) {
+      p.push(pushGraphicsState());
+      p.matrix(item.textMatrix);
+      await drawText(item.text, p, local);
+      p.push(popGraphicsState());
+    }
+  };
+  // The reflection, shadows, and glow paint under the content, as in the SVG paint.
+  if (shown) await drawReflection(item, p, drawContent);
+  if (shown) await drawEffectsBehind(item, p, local);
+  await drawContent();
 }
 
 /** Map layout's fidelity notes to PDF diagnostics, with fixed codes. */

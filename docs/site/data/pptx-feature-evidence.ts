@@ -119,9 +119,16 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['color-transforms', 'gray-transform'],
   },
   // --- Effects -----------------------------------------------------------
-  'effects.shadow-glow-reflection': {
+  'effects.outer-shadow': {
     fixtures: ['effects', 'shape-effects-presets'],
-    approximations: ['blur', 'shadow-skew', 'glow-soft-edge'],
+    approximations: ['blur', 'shadow-skew'],
+  },
+  // Painted by the drawing module of @pptx-editor.dev/pro: the harness installs it
+  // (`examples/vite/src/harness.ts`), and `packages/pro/src/drawing/__tests__/effects-paint.test.ts`
+  // proves that the free engine paints none of these effects.
+  'effects.shadow-glow-reflection': {
+    fixtures: ['effects', 'shape-effects-presets', 'picture-editing'],
+    approximations: ['blur', 'glow-soft-edge'],
   },
   'effects.fill-overlay': {
     fixtures: ['fill-fidelity'],

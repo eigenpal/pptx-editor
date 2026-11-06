@@ -105,7 +105,7 @@ Each diagnostic has a fixed `code`. Handle an unknown code by its `severity`. Th
 | `effect.inner-shadow` | `approximation` | An inner shadow starts at the fill, so an outline wider than 1 pt, an unfilled outline, and overlapping paths are shaded differently. |  |
 | `effect.silhouette` | `approximation` | A shadow or glow uses an opaque silhouette: picture and fill transparency do not shape it. |  |
 | `effect.soft-edge` | `approximation` | Soft edges are drawn hard. |  |
-| `effect.reflection` | `unsupported` | Reflections are not drawn. |  |
+| `effect.reflection-blur` | `approximation` | A reflection is drawn without its blur. |  |
 | `effect.not-rendered` | `unsupported` | An effect the engine does not render (`a:presetShdw`, `a:blur`, and others). |  |
 | `text.outline` | `unsupported` | Text outlines are not drawn. |  |
 | `text.underline-style` | `approximation` | A dotted, dashed, wavy, heavy, or word-only underline is drawn as a single line, as in the editor. |  |
@@ -151,7 +151,8 @@ One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`sho
 - A blurred shadow or glow is up to 13 rings, each a transparency group, so overlapping rings never darken, with σ = `blurRad` × 0.5 from the editor. DOCX Editor draws 6 rings at fixed σ multiples (σ = `blurRad` ÷ 4) over a core at half alpha, without groups.
 - Past the paint budget, the export throws `PdfWorkLimitError` with the code `operations`, for operations and content bytes alike, next to `timeout` and `aborted`. DOCX Editor's `PdfWorkLimitError` has the one code `workLimitExceeded` for all of its budgets.
 - Each gradient's stop functions are written once per document, and at most 64 stops are drawn. DOCX Editor writes the stops of each gradient as given; a PPTX group, layout, or theme gradient can fill thousands of shapes.
-- Soft edges, reflections, and picture brightness and contrast are not drawn yet. DOCX Editor draws them with luminosity masks and the image `Decode` array (`picture-effects.ts`, `images.ts`), which is the pattern to follow.
+- A reflection is a transparency group of the shape under the reflection transform, through a luminosity soft mask of its fade; its blur is left out. Soft edges and picture brightness and contrast are not drawn yet. DOCX Editor draws them with luminosity masks and the image `Decode` array (`picture-effects.ts`, `images.ts`), which is the pattern to follow.
+- The export always installs the drawing module of `@pptx-editor.dev/pro/drawing`, so a PDF paints glow, inner shadow, reflection, and soft edge, as DOCX Editor's PDF export always includes its drawing module.
 - Diagnostic codes are dotted by area (`fill.*`, `picture.*`, `line.*`, `effect.*`, `text.*`, `font.*`, `frame.*`). DOCX Editor's codes are kebab-case, as its Markdown warnings are. The table above names the DOCX Editor code where the idea is the same. Handle an unknown code by its `severity`.
 - A refused open gives core's open error reason, and the package re-exports core's `OpenError` type, so a host reads one vocabulary with core's `openPresentation`. DOCX Editor re-exports its reason union `HeadlessDocumentRejection`; PPTX Core has no separate union to re-export.
 
@@ -180,11 +181,12 @@ One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`sho
 | Engine approximations and font substitutions | Reported as `information` |
 | Outer and inner shadows, glow | Drawn; the blur is layered rings (`approximation`) |
 | Soft edges | Drawn hard (`approximation`) |
+| Reflections | Drawn with their fade; the blur is left out (`approximation`) |
 | Gradient fills on text | Drawn: the glyphs clip the gradient, which spans the text body |
 | Gradient fills on lines | Drawn in the gradient's middle color (`approximation`) |
 | Tiled pictures; picture color effects (grayscale, duotone, brightness, black and white) | Drawn stretched; effects not applied (`approximation`) |
 | Dashes, compound lines | Drawn solid and single (`approximation`) |
-| Pattern fills, reflections | Not drawn (`unsupported`) |
+| Pattern fills | Not drawn (`unsupported`) |
 | Underline styles other than single and double | Drawn as a single line (`approximation`) |
 | Arrowheads, text outlines | Not drawn (`unsupported`) |
 | Upright East Asian vertical text, synthetic bold and italic | Drawn as normal text (`approximation`) |

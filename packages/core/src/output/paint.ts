@@ -10,6 +10,7 @@ import {
 } from '../cascade/index.ts';
 import {
   apply as applyMatrix,
+  drawingRenderers,
   hasCharacters,
   multiply as multiplyMatrix,
   type GeometryPath,
@@ -17,13 +18,7 @@ import {
   type Matrix,
   type SlideLayout,
 } from '../layout/index.ts';
-import {
-  bodyFilter,
-  glowFilter,
-  reflectionCopy,
-  shadowCopy,
-  type EffectSource,
-} from './paint-effects.ts';
+import { effectDefs, effectElement, shadowCopy, type EffectSource } from './paint-effects.ts';
 import { boundsOf, cornersUnder, grow, PX } from './effect-transforms.ts';
 import {
   fillPaint,
@@ -581,14 +576,19 @@ function paintItem(
     case 'picture': {
       const outer = svg(doc, 'g', { ...common, 'data-kind': item.kind });
       const effects = item.element.effects;
+      // Glow, inner shadow, reflection, and soft edge paint only through the installed effects
+      // renderer (`@pptx-editor.dev/pro/drawing`); the outer shadow is the engine's.
+      const pro = effects ? drawingRenderers().effects : undefined;
+      const ids = ctx.defs;
       const body = svg(doc, 'g', { transform: matrixAttr(item.matrix) });
       for (const node of paintGeometry(doc, item, local, parentScale)) body.appendChild(node);
       const bodyFx =
-        effects && (effects.softEdge || effects.innerShadow)
-          ? bodyFilter(ctx.defs, effects, boundsOf(boxCorners(item)))
-          : undefined;
+        pro && effects && (effects.softEdge || effects.innerShadow)
+          ? pro.body(effects, boundsOf(boxCorners(item)), ids)
+          : null;
+      if (bodyFx) effectDefs(ctx.defs, bodyFx.defs);
       const content = svg(doc, 'g', {}, [
-        bodyFx ? svg(doc, 'g', { filter: bodyFx }, [body]) : body,
+        bodyFx ? svg(doc, 'g', { filter: `url(#${bodyFx.filter})` }, [body]) : body,
       ]);
       // An empty body's caret line draws nothing: no group for it.
       if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text))
@@ -597,7 +597,8 @@ function paintItem(
             paintText(doc, item.text, local),
           ])
         );
-      if (!effects || !(effects.outerShadow || effects.reflection || effects.glow)) {
+      const copies = effects?.outerShadow || (pro && (effects?.reflection || effects?.glow));
+      if (!effects || !copies) {
         outer.appendChild(content);
         return outer;
       }
@@ -611,12 +612,18 @@ function paintItem(
         height: el.xfrm.cy,
         corners: contentCorners(item),
       };
-      const reflection = reflectionCopy(ctx.defs, effects, source);
-      if (reflection) outer.appendChild(reflection);
+      const reflection = pro && effects.reflection ? pro.reflection(effects, source, ids) : null;
+      if (reflection) {
+        effectDefs(ctx.defs, reflection.defs);
+        outer.appendChild(effectElement(doc, reflection.node));
+      }
       const shadow = shadowCopy(ctx.defs, effects, source);
       if (shadow) outer.appendChild(shadow);
-      const glow = glowFilter(ctx.defs, effects, boundsOf(source.corners));
-      outer.appendChild(glow ? svg(doc, 'g', { filter: glow }, [content]) : content);
+      const glow = pro && effects.glow ? pro.glow(effects, boundsOf(source.corners), ids) : null;
+      if (glow) effectDefs(ctx.defs, glow.defs);
+      outer.appendChild(
+        glow ? svg(doc, 'g', { filter: `url(#${glow.filter})` }, [content]) : content
+      );
       return outer;
     }
   }

@@ -111,6 +111,8 @@ export const BROWSER_FORBIDDEN_DEPENDENCIES: readonly string[] = [
   'node:fs',
   'node:net',
   'node:http',
+  // `@pptx-editor.dev/pptx-to-pdf` depends on the pro package for its drawing renderers.
+  '@pptx-editor.dev/pro',
 ];
 
 /** The core package root (`packages/core`). */

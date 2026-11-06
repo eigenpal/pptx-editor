@@ -7,6 +7,10 @@
 
 import { useEffect, useState } from 'react';
 import { PptxEditor } from '@pptx-editor.dev/react';
+import { drawingModule } from '@pptx-editor.dev/pro/drawing';
+
+// Glow, inner shadow, reflection, and soft edge (EigenPal Pro License).
+const modules = [drawingModule({ licenseKey: process.env.NEXT_PUBLIC_PPTX_LICENSE })];
 
 export function Editor() {
   const [bytes, setBytes] = useState<Uint8Array | undefined>();
@@ -19,6 +23,7 @@ export function Editor() {
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <PptxEditor
         {...(bytes ? { document: bytes } : {})}
+        modules={modules}
         onReady={(editor) => {
           // The e2e suite and the verification scripts drive the editor through this handle.
           (window as unknown as { __pptxEditor?: unknown }).__pptxEditor = editor;
