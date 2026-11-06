@@ -166,7 +166,7 @@ A new entry or kind is written only with `--accept-worse`. In CI, `scripts/fidel
 | `bun scripts/fidelity/run.ts --list <jobs> --out <dir>` | Corpus mode for `eigenpal/pptx-eval`: a job list of `{ "id", "deck", "pdf" }` in, one result line per deck out. `--help` lists every flag. |
 | `bun run fidelity:roundtrip`, `fidelity:census`, `fidelity:calibrate` | Save checks with no browser, feature counts, and line model calibration over private decks. `--help` lists the flags. |
 
-`PPTX_FIDELITY_JOBS` sets the number of parallel lanes (default: one for each core, at most 4).
+`PPTX_FIDELITY_JOBS` sets the number of parallel lanes (default: one for each core, at most 4). Every fixture deck gets the same fonts, so each lane opens the fixture decks in one harness page. The page fetches, hashes, and loads each font file once (Noto Sans CJK JP is 16 MB), and the next decks use the same faces. A corpus deck gets the fonts that it names, so each corpus deck opens in a new browser context.
 
 Schema validation cannot show a repair prompt. `bun run fidelity:roundtrip -- --list <fixture jobs> --out <dir> --saved <dir>` writes a saved and an edited copy of each fixture. Add a fixture to `SAVE_VERIFIED_FIXTURES` (`docs/site/data/save-verified-fixtures.ts`) only after both copies open with no prompt.
 

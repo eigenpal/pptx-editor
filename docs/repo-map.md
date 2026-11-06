@@ -211,7 +211,7 @@ All chrome CSS and tokens (`--doc-*`, shadcn HSL names shared with DOCX Editor).
 | `src/styles.css`, `../shared/shell.css`, `src/BrandLogo.tsx` | The core stylesheet and the shared shell styles (from EigenPal's `docx-editor.dev` site repository), and the brand lockup (adapted from DOCX Editor's demo) |
 | `src/ThemeToggle.tsx`, `src/AdapterSwitcher.tsx` | The light/dark toggle (the root's `colorMode`) and the React \| Vue switcher; the Vue demo has twins of both |
 | `src/fonts.ts` | The demo's `fonts`: the packaged substitutes, then the pinned Google Fonts catalog from `@docx-editor.dev/fonts`; the Vue demo has a twin in `examples/vue/src/fonts.ts` |
-| `src/harness.ts`, `harness.html` | The page the fidelity harness paints and prints through, and that draws both PDFs with pdf.js |
+| `src/harness.ts`, `harness.html` | The page the fidelity harness paints and prints through, and that draws both PDFs with pdf.js. It loads each font file once and keeps its face for the next decks |
 | `public/sample.pptx`, `public/blank.pptx` | Built by `bun run sample:build` (`scripts/sample-deck/build.ts`) |
 | `public/icon.svg`, `favicon.ico`, `*.png` | App icons, built by `bun run icons:build` |
 
