@@ -104,7 +104,8 @@ describe('chart spacing rules match the reference PDFs', () => {
   });
 
   test('the plot ends 14.2 pt and 0.59 sizes past the key centre line of a bottom legend', () => {
-    // [text size, measured gap], from the category labels above the legend.
+    // [text size, measured gap from the key centre line to the bottom of the plot box]. The
+    // plot's bottom comes from where the reference puts the category labels.
     for (const [size, measured] of [
       [9, 19.51],
       [11.97, 21.16],

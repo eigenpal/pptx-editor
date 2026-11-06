@@ -154,7 +154,11 @@ export function rowKeyInset(size: number): number {
   return 9 + 0.6045 * size;
 }
 
-/** How far past a row legend's key centre line the plot ends: 14.2 pt and 0.59 sizes. */
+/**
+ * How far past a row legend's key centre line the plot box ends, for a bottom or top legend:
+ * 14.2 pt and 0.59 sizes. Measured on bottom legends at 9 to 20 pt; the top legends of the
+ * reference PDFs pass the fidelity check with the same rule.
+ */
 export function rowPlotGap(size: number): number {
   return 14.2 + 0.59 * size;
 }
