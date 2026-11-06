@@ -1,10 +1,11 @@
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import {
   createPptxEditor,
   panelItems,
   type PptxEditorInstance,
 } from '@pptx-editor.dev/core/editor';
+import { installDrawingRenderers, type DrawingEffectsRenderer } from '@pptx-editor.dev/core/layout';
 import { buildPptx, shape, solid } from '../../../../scripts/fixtures/builder.ts';
 import { PptxEditorContext } from '../context.ts';
 import { PptxEditor, Toolbar, useEditorValueCommand } from '../index.ts';
@@ -62,6 +63,25 @@ afterAll(() => {
   if (width) Object.defineProperty(HTMLElement.prototype, 'clientWidth', width);
 });
 afterEach(() => cleanup());
+
+/** An effects renderer that paints nothing: the chrome reads only that one is installed. */
+const EFFECTS: DrawingEffectsRenderer = {
+  body: () => null,
+  glow: () => null,
+  reflection: () => null,
+};
+// The Shape Effects tests below use glow, so they run with the drawing module's renderer
+// installed; `Pro effect controls` turns it off. A late install logs a warning once, which these
+// tests do not need to see.
+let warn: ReturnType<typeof spyOn>;
+beforeAll(() => {
+  warn = spyOn(console, 'warn').mockImplementation(() => {});
+  installDrawingRenderers({ effects: EFFECTS });
+});
+afterAll(() => {
+  installDrawingRenderers({ effects: undefined });
+  warn.mockRestore();
+});
 
 describe('Shape Format controls', () => {
   test('the new slots compose with preset={false}', async () => {
@@ -334,5 +354,120 @@ describe('Shape effects in a menu', () => {
     expect(document.querySelector('[aria-checked="true"]')!.getAttribute('role')).toBe(
       'menuitemradio'
     );
+  });
+});
+
+const PNG = Uint8Array.from(
+  atob(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+  ),
+  (c) => c.charCodeAt(0)
+);
+const IMAGE_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
+
+async function openPicture(): Promise<PptxEditorInstance> {
+  const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  const bytes = buildPptx({
+    slides: [
+      {
+        layout: 'blank',
+        rels: [['rIdImg', IMAGE_REL, '../media/image1.png']],
+        shapes:
+          '<p:pic><p:nvPicPr><p:cNvPr id="2" name="Picture 1"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>' +
+          '<p:blipFill><a:blip r:embed="rIdImg"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>' +
+          `<p:spPr><a:xfrm><a:off x="${IN}" y="${IN}"/><a:ext cx="${IN}" cy="${IN}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`,
+      },
+    ],
+    media: [{ name: 'image1.png', bytes: PNG, contentType: 'image/png' }],
+  });
+  expect((await editor.load(bytes)).ok).toBe(true);
+  return editor;
+}
+
+/** The labels of the rows the open menus show. */
+const rows = (): string[] =>
+  [...document.querySelectorAll('[role="menuitem"], [role="menuitemradio"]')].map(
+    (r) => r.textContent?.trim() ?? ''
+  );
+
+describe('Pro effect controls', () => {
+  afterEach(() => installDrawingRenderers({ effects: EFFECTS }));
+
+  test('without the drawing module, Shape effects offers only the outer shadows', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const editor = await open();
+    render(
+      <PptxEditorContext.Provider value={editor}>
+        <PptxEditor.Toolbar preset={false}>
+          <Toolbar.Slot slotId="shape.effects" />
+        </PptxEditor.Toolbar>
+      </PptxEditorContext.Provider>
+    );
+    act(() => editor.setSelection({ kind: 'shapes', nodeIds: [firstId(editor)] }));
+    const button = screen.getByRole('button', { name: 'Shape effects' });
+    act(() => void fireEvent.click(button));
+    for (const name of ['Reflection', 'Glow', 'Soft edges'])
+      expect(screen.queryByRole('menuitem', { name })).toBeNull();
+    act(() => void fireEvent.click(screen.getByRole('menuitem', { name: 'Shadow' })));
+    expect(rows()).toContain('Offset: top');
+    expect(rows().some((r) => r.startsWith('Inside:'))).toBe(false);
+    act(() => void fireEvent.click(screen.getByRole('menuitemradio', { name: 'Offset: top' })));
+    expect(editor.snapshot().geometry?.effects?.shadow).toBe('outerTop');
+
+    // A module installed later shows its effects the next time the menu opens.
+    installDrawingRenderers({ effects: EFFECTS });
+    act(() => void fireEvent.click(button));
+    for (const name of ['Shadow', 'Reflection', 'Glow', 'Soft edges'])
+      expect(screen.getByRole('menuitem', { name })).toBeTruthy();
+  });
+
+  test('without the drawing module, a Shape effects menu row has only the Shadow submenu', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const editor = await open();
+    act(() => editor.setSelection({ kind: 'shapes', nodeIds: [firstId(editor)] }));
+    render(
+      <PptxEditorContext.Provider value={editor}>
+        <PptxEditor.Menu>
+          <PptxEditor.Menu.Entry id="acme" label="Acme">
+            <PptxEditor.Menu.Item slotId="shape.effects" />
+          </PptxEditor.Menu.Entry>
+        </PptxEditor.Menu>
+      </PptxEditorContext.Provider>
+    );
+    act(() => void fireEvent.click(screen.getByRole('menuitem', { name: 'Acme' })));
+    act(() => void fireEvent.click(screen.getByRole('menuitem', { name: 'Shape effects' })));
+    expect(screen.getByRole('menuitem', { name: 'Shadow' })).toBeTruthy();
+    for (const name of ['Reflection', 'Glow', 'Soft edges'])
+      expect(screen.queryByRole('menuitem', { name })).toBeNull();
+    act(() => void fireEvent.click(screen.getByRole('menuitem', { name: 'Shadow' })));
+    expect(rows().some((r) => r.startsWith('Inside:'))).toBe(false);
+  });
+
+  test('Picture styles leaves out the reflection and soft edge styles without the module', async () => {
+    const styles = async (): Promise<string[]> => {
+      const editor = await openPicture();
+      render(
+        <PptxEditorContext.Provider value={editor}>
+          <PptxEditor.Toolbar preset={false}>
+            <Toolbar.Slot slotId="image.styles" />
+          </PptxEditor.Toolbar>
+        </PptxEditorContext.Provider>
+      );
+      act(() => editor.setSelection({ kind: 'shapes', nodeIds: [firstId(editor)] }));
+      act(() => void fireEvent.click(screen.getByRole('button', { name: 'Picture styles' })));
+      const shown = rows();
+      cleanup();
+      return shown;
+    };
+    installDrawingRenderers({ effects: undefined });
+    expect(await styles()).toEqual(['Simple frame, white', 'Simple frame, black']);
+    installDrawingRenderers({ effects: EFFECTS });
+    expect(await styles()).toEqual([
+      'Simple frame, white',
+      'Reflected rounded rectangle',
+      'Soft edge rectangle',
+      'Simple frame, black',
+      'Soft edge oval',
+    ]);
   });
 });

@@ -99,6 +99,14 @@ export function deferFonts(origin: FontOrigin): MarkedFontResolver;
 // @public
 export function defineFontResolver<T extends FontResolver>(resolve: T): MarkedFontResolver<T>;
 
+// @public
+export interface DrawingCapabilities {
+    readonly effects: boolean;
+}
+
+// @public
+export function drawingCapabilities(): DrawingCapabilities;
+
 // @internal
 export interface DrawingEffectsRenderer {
     readonly body: (effects: ResolvedEffects, bounds: EffectBounds, ids: EffectIds) => EffectFilterPaint | null;

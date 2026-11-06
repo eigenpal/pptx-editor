@@ -208,6 +208,7 @@ export {
   type ArrangedRibbonTab,
   type RibbonTabOverride,
 } from './ribbon-arrange.ts';
+export { chromeOfferedControl } from './chrome-offered.ts';
 export {
   GLOW_ACCENTS,
   SHAPE_STYLE_GALLERY,

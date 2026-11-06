@@ -10,8 +10,9 @@ Production use requires a commercial agreement: licensing@eigenpal.com
  * shadows, text, tables, and groups. This module adds the shape and picture effects glow, inner
  * shadow, reflection, and soft edge (ECMA-376 Part 1, 20.1.8).
  *
- * Without it, a shape or picture paints without those effects. The effect commands and the
- * format controls still write them to the file, and save keeps them. PDF export
+ * Without it, a shape or picture paints without those effects, and the editor chrome does not
+ * offer them (Shape Effects shows only the outer shadows, Picture Styles only the frame styles).
+ * The effect commands still write them to the file, and save keeps them. PDF export
  * (`@pptx-editor.dev/pptx-to-pdf`) always includes this module.
  *
  * The renderers serve every editor and export in the process. Install them before any document

@@ -8,6 +8,7 @@ import { Fragment, useCallback, useRef, useState, type ReactNode } from 'react';
 import {
   GLOW_ACCENTS,
   SHAPE_STYLE_GALLERY,
+  chromeOfferedControl,
   chromeOptionChecked,
   effectSeparatorBefore,
   glowGridRows,
@@ -282,6 +283,7 @@ export function EffectMenuControl({
     disabled: !cmd.isEnabled,
   });
   const close = useCallback(() => setOpen(false), []);
+  const offered = chromeOfferedControl(slot, control);
   return (
     <>
       <button
@@ -303,8 +305,9 @@ export function EffectMenuControl({
       {off.note}
       {open ? (
         <Popover anchor={anchor.current} onClose={close}>
-          {control.optionGroups?.map((group) => {
-            const options = control.options?.filter((o) => o.group === group.id) ?? [];
+          {/* The effects this build paints: without the drawing module, only the outer shadows. */}
+          {offered.optionGroups?.map((group) => {
+            const options = offered.options?.filter((o) => o.group === group.id) ?? [];
             const pick = (value: string) => (cmd.execute(value), close());
             const row = (o: EffectOption) => (
               <MenuRow

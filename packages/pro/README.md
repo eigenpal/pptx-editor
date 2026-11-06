@@ -25,7 +25,7 @@ Commercial capabilities for PPTX Editor, delivered as `EditorModule`s, in the sa
   - **Status:** `statusSnapshot()` and `subscribeStatus()` report the state and a typed `CollaborationFailureCode`, as in DOCX Editor. Call `setConnected()` from your provider's status event.
   - **Concurrent edits:** two peers that add or replace an element that a slide, shape, or paragraph holds once end with one element, and the other peer's copy stays hidden in the room until the winner undoes. Property elements merge. Concurrent splits of one run keep its text once, and a node moved into content that a peer removes at once goes back. The `collaboration.realtime` row in `docs/site/data/pptx-features.ts` states what is supported and its limits. A room from a pre-release build (room format 1) refuses to attach.
   - **Presence:** with a Yjs `awareness` (`y-protocols/awareness`), the editor publishes its selection, and the canvas shows each peer's selected shapes and text caret, with the peer's name and color. Your caret stays on its character while peers type before it.
-- `drawingModule()` from `@pptx-editor.dev/pro/drawing`: paints the shape and picture effects glow, inner shadow, reflection, and soft edge (ECMA-376 Part 1, 20.1.8). The free engine paints outer shadows. Without the module, a shape or picture paints without these four effects; the effect commands still write them, and save keeps them. PDF export (`@pptx-editor.dev/pptx-to-pdf`) always includes the module.
+- `drawingModule()` from `@pptx-editor.dev/pro/drawing`: paints the shape and picture effects glow, inner shadow, reflection, and soft edge (ECMA-376 Part 1, 20.1.8). The free engine paints outer shadows. Without the module, a shape or picture paints without these four effects, and the editor chrome does not offer them: Shape Effects shows only the outer shadows, and Picture Styles shows only the frame styles. The effect commands still write them, and save keeps them. PDF export (`@pptx-editor.dev/pptx-to-pdf`) always includes the module.
 
 This package uses the EigenPal Pro License (`LICENSE.md`): you may evaluate it freely, and production use requires a commercial agreement.
 
@@ -53,7 +53,7 @@ const editor = createPptxEditor({
 });
 ```
 
-The drawing renderers serve every editor and export in the process. Create the module before the first document opens; a later install logs a console warning once. For headless rendering without an editor, call `installDrawing()` from the same entry.
+The drawing renderers serve every editor and export in the process. Create the module before the first document opens; a later install logs a console warning once, and the chrome offers the effects the next time a menu opens. For headless rendering without an editor, call `installDrawing()` from the same entry.
 
 In the React or Vue adapter, pass the same list in the `modules` prop of `PptxEditor` or its root. The editor reads it once, when it is created. Keep the list stable, for example in `useMemo` or a `const` in `setup`:
 

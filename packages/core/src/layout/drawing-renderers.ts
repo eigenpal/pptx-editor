@@ -161,6 +161,30 @@ export function installDrawingRenderers(renderers: Partial<DrawingRenderers>): v
   installed = Object.freeze({ ...installed, ...guardedRenderers(renderers) });
 }
 
+/**
+ * What the installed drawing renderers paint in this process.
+ *
+ * @public
+ */
+export interface DrawingCapabilities {
+  /** Glow, inner shadow, reflection, and soft edge paint (`@pptx-editor.dev/pro/drawing`). */
+  readonly effects: boolean;
+}
+
+const WITHOUT_EFFECTS: DrawingCapabilities = Object.freeze({ effects: false });
+const WITH_EFFECTS: DrawingCapabilities = Object.freeze({ effects: true });
+
+/**
+ * What the installed drawing renderers paint, read at the time of the call. The chrome reads it
+ * when it renders, to offer only the controls whose result paints. Unlike a paint, this query
+ * does not count as a use, so an install after it logs no warning.
+ *
+ * @public
+ */
+export function drawingCapabilities(): DrawingCapabilities {
+  return installed.effects ? WITH_EFFECTS : WITHOUT_EFFECTS;
+}
+
 /** The installed renderers. @internal */
 export function drawingRenderers(): DrawingRenderers {
   consulted = true;

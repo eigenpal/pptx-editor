@@ -18,6 +18,7 @@ import {
 } from 'vue';
 import {
   colorMenuSelection,
+  chromeOfferedControl,
   chromeSlotIsToggle,
   requestDialogSection,
   dispatchFindRequest,
@@ -132,7 +133,8 @@ const DropdownControl = defineComponent({
       const paths = icon();
       const base = `pptx-toolbar__button ${paths ? 'pptx-toolbar__button--wide' : 'pptx-toolbar__button--caret'}`;
       const attrs = trigger();
-      const options = props.control.options ?? [];
+      // The choices this build offers: a choice whose result does not paint stays out.
+      const options = chromeOfferedControl(props.slot, props.control).options ?? [];
       const glyphs = options.some((x) => x.glyph);
       return [
         <button

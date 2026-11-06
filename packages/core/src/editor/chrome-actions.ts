@@ -14,6 +14,7 @@ import {
   runToolbarCommand,
 } from './chrome-controls.ts';
 import { chromeCommandState, type ChromeCommandState } from './adapter-support.ts';
+import { chromeOfferedControl } from './chrome-offered.ts';
 import type { PptxEditorInstance } from './pptx-editor-types.ts';
 import { focusSurfaceOf, surfaceInputOf, surfaceRootOf } from './surface-registry.ts';
 import { warnNoAltTextPopup, warnNoLinkPopup } from './dev-warnings.ts';
@@ -158,15 +159,18 @@ function typedSlotValue(slot: string, raw: unknown): unknown {
 }
 
 /**
- * The choices of a typed value slot, from its registry options, for `useEditorValueCommand`'s
- * `options` (DOCX Editor's shape), as the slot's type. A slot with free values (`font.size`,
- * `shape.fill`) has none. @internal
+ * The choices of a typed value slot, from the options it offers in this build
+ * (`chromeOfferedControl`), for `useEditorValueCommand`'s `options` (DOCX Editor's shape), as the
+ * slot's type. A slot with free values (`font.size`, `shape.fill`) has none. @internal
  */
 export function valueSlotOptions<K extends keyof ToolbarValueMap>(
   slot: K
 ): readonly ToolbarValueMap[K][] {
+  const control = chromeControlForSlot(slot);
   // A dialog row ("Line spacing options…") opens a dialog: it is not a value.
-  const options = (chromeControlForSlot(slot)?.options ?? []).filter((o) => !o.dialog);
+  const options = (control ? (chromeOfferedControl(slot, control).options ?? []) : []).filter(
+    (o) => !o.dialog
+  );
   return options.map((option) => typedSlotValue(slot, option.value) as ToolbarValueMap[K]);
 }
 

@@ -10,6 +10,7 @@ import { defineComponent, ref, type ExtractPublicPropTypes, type PropType } from
 import {
   GLOW_ACCENTS,
   SHAPE_STYLE_GALLERY,
+  chromeOfferedControl,
   chromeOptionChecked,
   effectSeparatorBefore,
   glowGridRows,
@@ -323,6 +324,7 @@ export const EffectMenuControl = defineComponent({
       cmd.execute(value);
       close();
     };
+    const offered = () => chromeOfferedControl(props.slot, props.control);
     const row = (o: EffectOption) => (
       <MenuRow
         key={o.value}
@@ -368,15 +370,16 @@ export const EffectMenuControl = defineComponent({
       open.value ? (
         <Popover anchor={anchor.value} onClose={close}>
           {{
+            // The effects this build paints: without the drawing module, only the outer shadows.
             default: () => (
               <>
-                {props.control.optionGroups?.map((group) => (
+                {offered().optionGroups?.map((group) => (
                   <MenuSubmenu key={group.id} label={t(group.labelKey as TranslationKey)}>
                     {{
                       default: () =>
                         groupRows(
                           group.id,
-                          props.control.options?.filter((o) => o.group === group.id) ?? []
+                          offered().options?.filter((o) => o.group === group.id) ?? []
                         ),
                     }}
                   </MenuSubmenu>
