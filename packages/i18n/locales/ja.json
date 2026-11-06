@@ -897,6 +897,9 @@
     "level": "{percent}%",
     "levelAriaLabel": "ズーム: {percent}%"
   },
+  "viewport": {
+    "ariaLabel": "プレゼンテーション エディター"
+  },
   "canvas": {
     "ariaLabel": "スライド {index}/{total}",
     "inputAriaLabel": "選択した図形のテキスト",

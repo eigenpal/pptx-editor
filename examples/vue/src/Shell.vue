@@ -154,7 +154,9 @@ function onDrop(e: DragEvent): void {
 </script>
 
 <template>
-  <PptxEditorViewport class="demo-root">
+  <!-- The page has its own landmarks, such as the top bar's banner, so the viewport renders no
+       region of its own. -->
+  <PptxEditorViewport class="demo-root" :label="false">
     <header class="demo-topbar" @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
       <BrandLogo :name="t('app.productName')" />
       <AdapterSwitcher v-if="showAdapterSwitcher" current="vue" />

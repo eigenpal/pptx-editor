@@ -139,7 +139,7 @@ describe('rail keys', () => {
   test('Ctrl+M adds a slide; Cmd+M and Cmd+Ctrl+M do not', async () => {
     const editor = await rail();
     const count = editor.snapshot().slides.length;
-    const first = screen.getByLabelText('Slide 1');
+    const first = slide('Slide 1');
     act(() => first.focus());
     fireEvent.keyDown(first, { key: 'm', metaKey: true });
     fireEvent.keyDown(first, { key: 'm', metaKey: true, ctrlKey: true });
@@ -180,7 +180,7 @@ describe('rail focus', () => {
     const count = editor.snapshot().slides.length;
     act(() => editor.goToSlide(count - 1));
     // A rail with sections is a tree: its slides are tree items, not options.
-    const last = screen.getByLabelText(`Slide ${count}`);
+    const last = slide(`Slide ${count}`);
     act(() => last.focus());
     fireEvent.keyDown(last, { key: 'Delete' });
     expect(editor.snapshot().slides.length).toBe(count - 1);
@@ -191,7 +191,7 @@ describe('rail focus', () => {
     expect(editor.snapshot().slides.length).toBe(count);
     // Ctrl+D on the last slide, then Ctrl+Z, which removes the focused copy.
     act(() => editor.goToSlide(count - 1));
-    const end = screen.getByLabelText(`Slide ${count}`);
+    const end = slide(`Slide ${count}`);
     act(() => end.focus());
     fireEvent.keyDown(end, { key: 'd', ctrlKey: true });
     fireEvent.keyDown(document.activeElement!, { key: 'z', ctrlKey: true });

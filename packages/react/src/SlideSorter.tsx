@@ -22,6 +22,7 @@ import {
   openSlideInNormalView,
   refocusAfterSorterHides,
   sectionOfSlide,
+  slideItemName,
   slideMenuPoint,
   slideSorterMounted,
   sorterKeyDown,
@@ -139,9 +140,6 @@ export function SlideSorter({ className }: SlideSorterProps = {}) {
       role={grouped ? 'treeitem' : 'option'}
       aria-selected={selected.includes(s.index)}
       aria-current={s.index === current}
-      aria-label={t(s.hidden ? 'rail.hiddenSlideLabel' : 'rail.slideLabel', {
-        index: s.index + 1,
-      })}
       data-hidden={s.hidden ? '' : undefined}
       data-index={s.index}
       {...dragProps(s.index)}
@@ -158,7 +156,10 @@ export function SlideSorter({ className }: SlideSorterProps = {}) {
       }}
     >
       <Thumbnail slide={s} ratio={ratio} />
-      <span className="pptx-sorter__number">{s.index + 1}</span>
+      <span className="pptx-sorter__number" aria-hidden="true">
+        {s.index + 1}
+      </span>
+      <span className="pptx-sr-only">{slideItemName(t, s)}</span>
     </li>
   );
 

@@ -532,7 +532,7 @@
     },
     "PptxEditorViewport": {
       "reactProps": "PptxEditorViewportProps",
-      "paired": ["className"],
+      "paired": ["className", "label"],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {},
       "reactRenderPropsAsVueSlots": {

@@ -154,6 +154,20 @@ In dark mode, the rail's slide numbers, the side panel tabs, and the notes place
 
 Dark mode never changes the slide, and it never writes a color into the `.pptx` file.
 
+### High contrast themes
+
+With a forced-colors theme (`@media (forced-colors: active)`), the browser replaces the chrome colors with system colors and removes shadows. The stylesheet then draws each state with system colors:
+
+- A selected slide in the rail and in the slide sorter, and the current layout tile, get a `Highlight` border inside the thumbnail.
+- Pressed toolbar toggles, the checked view switch option, selected tabs, and the hovered or focused menu row use `Highlight` with `HighlightText`.
+- Focus rings use `Highlight`. Disabled controls use `GrayText`.
+- Menus, the find bar, the zoom pill, the tooltip, and the notes card get a `CanvasText` edge.
+- Color swatches and gradient previews keep their own colors (`forced-color-adjust: none`).
+
+If you override these states, use system colors in a `forced-colors` media query of your own.
+
+Each color swatch in the color menus and the Format Background dialog is 24 by 24 pixels, the minimum target size of WCAG 2.5.8.
+
 ## React and Vue reference
 
 <FrameworkTabs variant="block">

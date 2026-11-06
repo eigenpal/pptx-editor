@@ -897,6 +897,9 @@
     "level": "{percent}%",
     "levelAriaLabel": "缩放：{percent}%"
   },
+  "viewport": {
+    "ariaLabel": "演示文稿编辑器"
+  },
   "canvas": {
     "ariaLabel": "第 {index} 张幻灯片，共 {total} 张",
     "inputAriaLabel": "所选形状的文本",

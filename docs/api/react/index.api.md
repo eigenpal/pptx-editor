@@ -1244,6 +1244,7 @@ export function PptxEditorViewport(input: PptxEditorViewportProps): react.JSX.El
 export interface PptxEditorViewportProps {
     children?: ReactNode;
     className?: string;
+    label?: string | false;
 }
 
 export { PptxFontOrigin }

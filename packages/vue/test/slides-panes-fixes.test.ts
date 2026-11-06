@@ -80,10 +80,13 @@ async function mount(render: () => unknown, editor?: PptxEditorInstance): Promis
 
 const byLabel = (role: string, name: RegExp | string): HTMLElement => {
   const all = [...document.querySelectorAll<HTMLElement>(`[role="${role}"]`)];
+  // A slide item takes its name from hidden text (`.pptx-sr-only`), not `aria-label`.
+  const label = (el: HTMLElement): string | null =>
+    el.getAttribute('aria-label') ??
+    el.querySelector(':scope > .pptx-sr-only')?.textContent ??
+    null;
   const found = all.find((el) =>
-    typeof name === 'string'
-      ? el.getAttribute('aria-label') === name
-      : name.test(el.getAttribute('aria-label') ?? el.textContent ?? '')
+    typeof name === 'string' ? label(el) === name : name.test(label(el) ?? el.textContent ?? '')
   );
   if (!found) throw new Error(`no ${role} ${String(name)}`);
   return found;
