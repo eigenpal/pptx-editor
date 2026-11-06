@@ -10,7 +10,6 @@ import { defineComponent, ref, type ExtractPublicPropTypes, type PropType } from
 import {
   GLOW_ACCENTS,
   SHAPE_STYLE_GALLERY,
-  chromeOfferedControl,
   chromeOptionChecked,
   effectSeparatorBefore,
   glowGridRows,
@@ -24,7 +23,7 @@ import {
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { Icon, Popover, keepFocus, useAriaDisabled } from './chrome.tsx';
 import { MenuRow, MenuSeparator, MenuSubmenu } from './menu-row.tsx';
-import { useEditorState, useTranslation } from './composables.ts';
+import { useEditorState, useOfferedControl, useTranslation } from './composables.ts';
 import { useSlot } from './slot.ts';
 import { useTriggerAttributes } from './slot-override.ts';
 
@@ -324,7 +323,12 @@ export const EffectMenuControl = defineComponent({
       cmd.execute(value);
       close();
     };
-    const offered = () => chromeOfferedControl(props.slot, props.control);
+    // The choices of this build and selection: they follow each change while the menu is open.
+    const shown = useOfferedControl(
+      () => props.slot,
+      () => props.control
+    );
+    const offered = (): ChromeControl => shown.value ?? props.control;
     const row = (o: EffectOption) => (
       <MenuRow
         key={o.value}
@@ -340,7 +344,10 @@ export const EffectMenuControl = defineComponent({
       if (group === 'glow' && first)
         return [
           row(first),
-          <GlowGrid slot={props.slot} options={rest} value={cmd.value.value} onPick={pick} />,
+          // Without the drawing module, No Glow can be the only row.
+          ...(rest.length
+            ? [<GlowGrid slot={props.slot} options={rest} value={cmd.value.value} onPick={pick} />]
+            : []),
         ];
       // Shadows: a line between the outer and the inner presets (the Outer and Inner sections).
       return options.flatMap((o, i) =>
