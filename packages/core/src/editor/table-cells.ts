@@ -271,6 +271,7 @@ export function cellRangeRects(
     : [columnX[range.c0], columnX[range.c1 + 1]];
   const [y0, y1] = [rowY[range.r0], rowY[range.r1 + 1]];
   const box = [x0, x1, y0, y1].every(Number.isFinite) && x1 > x0 && y1 > y0;
+  const tinted = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
   for (const c of frame.table.cells) {
     const cr1 = c.cell.row + c.cell.rowSpan - 1;
     const cc1 = c.cell.col + c.cell.gridSpan - 1;
@@ -295,16 +296,20 @@ export function cellRangeRects(
     r.setAttribute('width', String(right - left));
     r.setAttribute('height', String(bottom - top));
     g.append(r);
+    tinted.x0 = Math.min(tinted.x0, left);
+    tinted.y0 = Math.min(tinted.y0, top);
+    tinted.x1 = Math.max(tinted.x1, right);
+    tinted.y1 = Math.max(tinted.y1, bottom);
   }
-  // One edge around the range's own grid lines, so the cells' borders stay visible inside it
-  // and a merged cell that crosses a selected band stays outside the edge.
-  if (box) {
+  // One edge around the tinted cells, the cells a command changes: the borders inside stay
+  // visible, and a merged cell anchored outside a band stays outside the edge, untinted.
+  if (tinted.x1 > tinted.x0 && tinted.y1 > tinted.y0) {
     const edge = doc.createElementNS(SVG_NS, 'rect');
     edge.setAttribute('class', `${className}-edge`);
-    edge.setAttribute('x', String(x0));
-    edge.setAttribute('y', String(y0));
-    edge.setAttribute('width', String(x1 - x0));
-    edge.setAttribute('height', String(y1 - y0));
+    edge.setAttribute('x', String(tinted.x0));
+    edge.setAttribute('y', String(tinted.y0));
+    edge.setAttribute('width', String(tinted.x1 - tinted.x0));
+    edge.setAttribute('height', String(tinted.y1 - tinted.y0));
     g.append(edge);
   }
   return [g];

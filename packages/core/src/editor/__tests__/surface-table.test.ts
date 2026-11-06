@@ -311,9 +311,17 @@ describe('table gestures: grid lines', () => {
       dx: slide.width - right,
       dy: slide.height - bottom,
     });
-    // A shrink, the west handle, and a shape that is not a table keep the pointer's move.
+    // The west, north, and north-west handles stop at the slide's left and top edges.
+    const [left, top] = [frame.matrix[4], frame.matrix[5]];
+    expect(clampTableResize(frame, [0, 0.5], -20 * IN, 0, slide)).toEqual({ dx: -left, dy: 0 });
+    expect(clampTableResize(frame, [0.5, 0], 0, -20 * IN, slide)).toEqual({ dx: 0, dy: -top });
+    expect(clampTableResize(frame, [0, 0], -20 * IN, -20 * IN, slide)).toEqual({
+      dx: -left,
+      dy: -top,
+    });
+    // A shrink and a shape that is not a table keep the pointer's move.
     expect(clampTableResize(frame, [1, 0.5], -IN, 0, slide)).toEqual({ dx: -IN, dy: 0 });
-    expect(clampTableResize(frame, [0, 0.5], -20 * IN, 0, slide)).toEqual({ dx: -20 * IN, dy: 0 });
+    expect(clampTableResize(frame, [0, 0.5], IN, 0, slide)).toEqual({ dx: IN, dy: 0 });
     // Shift on a corner keeps the aspect: the scale stops where the first edge meets the slide.
     const { cx, cy } = frame.element.xfrm;
     const grow = Math.min((slide.width - right) / cx, (slide.height - bottom) / cy);
