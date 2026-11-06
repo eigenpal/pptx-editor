@@ -4,8 +4,9 @@
 // come from the chrome registry, and the demo adds its own rows: opening and exporting files,
 // slide structure, slide numbers, and Help. Every built-in row runs a registered slot, so its
 // state and action are the toolbar's.
+import { onBeforeUnmount, shallowRef } from 'vue';
 import { PptxEditorMenu, useTranslation } from '@pptx-editor.dev/vue';
-import type { PictureExport } from '../../shared/demo-files.ts';
+import { watchPdfExport, type SlideExport } from '../../shared/demo-files.ts';
 import DuplicateSlideRow from './DuplicateSlideRow.vue';
 import SlideNumbersRow from './SlideNumbersRow.vue';
 
@@ -15,9 +16,12 @@ const emit = defineEmits<{
   new: [];
   example: [];
   export: [];
-  exportPicture: [kind: PictureExport];
+  exportSlides: [kind: SlideExport];
 }>();
 const { t } = useTranslation();
+// The PDF row waits while the server makes a PDF, as the Export menu's row does.
+const pdfBusy = shallowRef(false);
+onBeforeUnmount(watchPdfExport((busy) => (pdfBusy.value = busy)));
 </script>
 
 <template>
@@ -46,19 +50,26 @@ const { t } = useTranslation();
           @select="emit('export')"
         />
         <PptxEditorMenu.Row
+          :label="t('menu.exportPdf')"
+          icon="description"
+          :disabled="pdfBusy"
+          :reason="t('menu.exportPdfBusy')"
+          @select="emit('exportSlides', 'pdf')"
+        />
+        <PptxEditorMenu.Row
           :label="t('menu.exportSlidePng')"
           icon="image"
-          @select="emit('exportPicture', 'png')"
+          @select="emit('exportSlides', 'png')"
         />
         <PptxEditorMenu.Row
           :label="t('menu.exportSlidesPng')"
           icon="folder_zip"
-          @select="emit('exportPicture', 'zip')"
+          @select="emit('exportSlides', 'zip')"
         />
         <PptxEditorMenu.Row
           :label="t('menu.exportSlideSvg')"
           icon="photo_library"
-          @select="emit('exportPicture', 'svg')"
+          @select="emit('exportSlides', 'svg')"
         />
       </PptxEditorMenu.Group>
     </PptxEditorMenu.File>

@@ -1,0 +1,54 @@
+---
+title: 'PDF export'
+description: 'Add a PDF export to the editor: the browser sends the saved deck to your server, and the server converts it with @pptx-editor.dev/pptx-to-pdf.'
+category: 'Guides'
+---
+
+`@pptx-editor.dev/pptx-to-pdf` converts a deck to a PDF with the editor's own layout. It runs on Node.js and needs the EigenPal Pro License. The browser cannot run it, so the PDF export is a server request that the user starts.
+
+## The server
+
+Add a route that reads the PPTX bytes and sends back the PDF:
+
+```ts
+import { exportPdf } from '@pptx-editor.dev/pptx-to-pdf';
+
+export async function POST(request: Request): Promise<Response> {
+  const deck = new Uint8Array(await request.arrayBuffer());
+  const { bytes } = await exportPdf(deck, { fidelityPolicy: 'best-effort' });
+  return new Response(bytes, { headers: { 'Content-Type': 'application/pdf' } });
+}
+```
+
+`best-effort` gives a PDF for content that the PDF can only approximate, and lists each approximation in `diagnostics`. The default `strict` policy throws `PdfFidelityError` instead. Hidden slides stay out of the PDF.
+
+Keep limits on the route:
+
+- Accept only requests from your own page. An `Origin` check stops other pages, but it is not authentication. Add authentication or a rate limit for a public route.
+- Limit the upload size. A serverless platform can also cap the request and response bodies, so check the platform limit.
+- Pass `timeoutMs`, and pass a `signal` that aborts when the client disconnects.
+- Send fixed error text. An exception message can name parts of the uploaded file.
+
+## The browser
+
+Save the deck and post the bytes when the user picks the export:
+
+```ts
+const deck = editor.save();
+if (deck) {
+  const response = await fetch('/api/convert', { method: 'POST', body: deck });
+  if (response.ok) {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(await response.blob());
+    link.download = 'deck.pdf';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  }
+}
+```
+
+`save()` returns `null` when a slide is damaged. The editor then shows why. Ignore a second pick while a conversion runs, and show a translated message for each failure status.
+
+## The demo
+
+The React and Vue demos add **Presentation as PDF** to the Export menu and to **File > Export**. The function is `api/convert.ts` in the repository. The Vite development servers serve the same handler through `examples/shared/pdf-export-plugin.ts`, so `bun run dev` exports PDF with no package build. The demo accepts decks up to 4 MiB.

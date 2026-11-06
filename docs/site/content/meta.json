@@ -55,6 +55,7 @@
     "guides/undo-history",
     "---Export formats---",
     "guides/export",
+    "guides/pdf-export",
     "guides/print",
     "export/pdf/index",
     "export/pdf/fonts",

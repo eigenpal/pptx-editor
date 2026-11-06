@@ -1,17 +1,22 @@
 <script setup lang="ts">
-// The Export button and its menu (PPTX, PNG, ZIP, SVG): the Vue twin of `ExportMenu` in
+// The Export button and its menu (PPTX, PDF, PNG, ZIP, SVG): the Vue twin of `ExportMenu` in
 // examples/vite/src/TopBarMenus.tsx. The trigger names its menu; a row's name is its label, its
 // hint is its description.
-import { shallowRef, useId } from 'vue';
+import { computed, onBeforeUnmount, shallowRef, useId } from 'vue';
 import { Icon, MenuItem, Popover, keepFocus, useTranslation } from '@pptx-editor.dev/vue';
-import { PICTURE_WIDTH, type PictureExport } from '../../shared/demo-files.ts';
+import { PICTURE_WIDTH, watchPdfExport, type SlideExport } from '../../shared/demo-files.ts';
 
-const emit = defineEmits<{ export: []; exportPicture: [kind: PictureExport] }>();
+const emit = defineEmits<{ export: []; exportSlides: [kind: SlideExport] }>();
 const { t } = useTranslation();
 const anchor = shallowRef<HTMLButtonElement | null>(null);
 const open = shallowRef(false);
 const id = useId();
-const pictures = [
+// While the server makes the PDF, the button says so and the PDF row waits.
+const pdfBusy = shallowRef(false);
+onBeforeUnmount(watchPdfExport((busy) => (pdfBusy.value = busy)));
+const buttonLabel = computed(() => (pdfBusy.value ? t('menu.exportPdfBusy') : t('menu.export')));
+const slideExports = [
+  ['pdf', 'PDF', 'menu.exportPdf', 'menu.exportPdfHint'],
   ['png', 'PNG', 'menu.exportSlidePng', 'menu.exportSlidePngHint'],
   ['zip', 'ZIP', 'menu.exportSlidesPng', 'menu.exportSlidesPngHint'],
   ['svg', 'SVG', 'menu.exportSlideSvg', 'menu.exportSlideSvgHint'],
@@ -22,8 +27,8 @@ function exportDeck(): void {
   open.value = false;
 }
 
-function exportPicture(kind: PictureExport): void {
-  emit('exportPicture', kind);
+function exportSlides(kind: SlideExport): void {
+  emit('exportSlides', kind);
   open.value = false;
 }
 </script>
@@ -37,13 +42,14 @@ function exportPicture(kind: PictureExport): void {
       aria-haspopup="menu"
       :aria-expanded="open"
       :aria-controls="open ? id : undefined"
-      :aria-label="t('menu.export')"
-      :data-pptx-tooltip="t('menu.export')"
+      :aria-label="buttonLabel"
+      :aria-busy="pdfBusy || undefined"
+      :data-pptx-tooltip="buttonLabel"
       @mousedown="keepFocus"
       @click="open = !open"
     >
       <Icon name="file_download" className="" /><span class="demo-btn__label" aria-hidden="true">{{
-        t('menu.export')
+        buttonLabel
       }}</span
       ><Icon name="expand_more" className="demo-btn__chev" />
     </button>
@@ -63,10 +69,12 @@ function exportPicture(kind: PictureExport): void {
         </span>
       </MenuItem>
       <MenuItem
-        v-for="[kind, type, label, hint] in pictures"
+        v-for="[kind, type, label, hint] in slideExports"
         :key="kind"
+        :disabled="kind === 'pdf' && pdfBusy"
+        :reason="t('menu.exportPdfBusy')"
         :description="t(hint, { width: PICTURE_WIDTH })"
-        @select="exportPicture(kind)"
+        @select="exportSlides(kind)"
       >
         <span class="demo-filetype" aria-hidden="true">{{ type }}</span>
         <span class="demo-menu__text">

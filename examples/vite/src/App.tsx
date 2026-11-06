@@ -39,7 +39,7 @@ import {
   dismissRailOverlay,
   PPTX_MIME,
   exportDeck as saveDeck,
-  exportPicture as savePicture,
+  exportSlides as saveSlides,
   fetchDeck,
   fileTitle,
   followPanelWidth,
@@ -55,7 +55,7 @@ import {
   ribbonChrome,
   showDeckTitle,
   trackUnsavedEdits,
-  type PictureExport,
+  type SlideExport,
   type UnsavedEdits,
 } from '../../shared/demo-files.ts';
 
@@ -139,9 +139,9 @@ function Shell({
     saveDeck(editor, title || t('app.untitled'));
     onSaved();
   }, [editor, title, t, onSaved]);
-  // Slide pictures come from the editor's own paint; nothing leaves the browser.
-  const exportPicture = useCallback(
-    (kind: PictureExport) => savePicture(editor, kind, title || t('app.untitled')),
+  // Slide pictures come from the editor's own paint. Only the PDF goes to the demo's server.
+  const exportSlides = useCallback(
+    (kind: SlideExport) => saveSlides(editor, kind, title || t('app.untitled')),
     [editor, title, t]
   );
   // A file dropped on the top bar or the workspace opens; the hint hides when the drag leaves
@@ -199,7 +199,7 @@ function Shell({
           onNew={onNew}
           onExample={onExample}
           onExport={exportDeck}
-          onExportPicture={(kind) => void exportPicture(kind)}
+          onExportSlides={(kind) => void exportSlides(kind)}
         />
         <div className="demo-topbar__actions">
           {/* On a narrow window the slide thumbnails open over the slide (shell.css). */}
@@ -253,7 +253,7 @@ function Shell({
             <Icon name="note_add" className="" />
             <span className="demo-btn__label">{t('menu.new').split(' ')[0]}</span>
           </button>
-          <ExportMenu onExport={exportDeck} onExportPicture={(kind) => void exportPicture(kind)} />
+          <ExportMenu onExport={exportDeck} onExportSlides={(kind) => void exportSlides(kind)} />
           <button
             type="button"
             className="demo-icon-btn demo-panel-toggle"
