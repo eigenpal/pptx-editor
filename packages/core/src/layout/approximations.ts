@@ -52,7 +52,6 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'picture-recolor', title: 'Picture recolor', perSlide: true },
   { id: 'picture-border-dots', title: 'Dashes on picture borders', perSlide: true },
   { id: 'emf-wmf', title: 'EMF and WMF pictures', perSlide: false },
-  { id: 'arrowhead-joins', title: 'Arrowhead joins', perSlide: true },
   { id: 'inset-lines', title: 'Inset lines', perSlide: false },
   { id: 'hyperlink-text', title: 'Hyperlink text', perSlide: true },
   { id: 'compound-lines', title: 'Compound lines', perSlide: true },
@@ -86,7 +85,6 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
 const CONTENT_PLACEHOLDERS = new Set(['pic', 'tbl', 'chart', 'clipArt', 'dgm', 'media']);
 const ROTATED_TEXT = new Set(['vert', 'vert270', 'eaVert', 'wordArtVert', 'mongolianVert']);
 const DRAWN_UNDERLINES = new Set(['none', 'sng', 'dbl']);
-const JOINED_ENDS = new Set(['triangle', 'stealth', 'arrow']);
 const RECOLOR_EFFECTS = new Set(['grayscale', 'duotone', 'biLevel']);
 
 /**
@@ -145,14 +143,12 @@ class Collector {
       this.add('fill-rotation');
   }
 
-  line(line: ResolvedLine | undefined, open: boolean, picture = false): void {
+  line(line: ResolvedLine | undefined, picture = false): void {
     if (!line || line.fill.type === 'none') return;
     this.fill(line.fill, false);
     // Any dash on a picture border: dashes outside a picture are not checked against a reference PDF.
     if (picture && line.dash !== 'solid') this.add('picture-border-dots');
     if (line.compound !== 'sng') this.add('compound-lines');
-    if (open && (JOINED_ENDS.has(line.head?.type ?? '') || JOINED_ENDS.has(line.tail?.type ?? '')))
-      this.add('arrowhead-joins');
   }
 
   /** `overlay` is false when paint drops the fill overlay (more than `MAX_OVERLAY_PATHS` paths). */
@@ -253,10 +249,7 @@ class Collector {
         const rotated = el.xfrm.rot % 360 !== 0;
         this.effects(item.element.effects, item.geometry.paths.length <= MAX_OVERLAY_PATHS);
         this.fill(item.element.fill, rotated);
-        const open = item.geometry.paths.some(
-          (p) => p.stroke && p.commands.length > 1 && !p.commands.some((c) => c.op === 'Z')
-        );
-        this.line(item.element.line, item.kind === 'shape' && open, item.kind === 'picture');
+        this.line(item.element.line, item.kind === 'picture');
         for (const p of item.geometry.paths)
           if (p.fill !== 'norm' && p.fill !== 'none') this.add('path-fill-modes');
         if (item.kind === 'shape' && item.text && hasCharacters(item.text)) {

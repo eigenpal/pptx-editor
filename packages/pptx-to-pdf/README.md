@@ -99,8 +99,7 @@ Each diagnostic has a fixed `code`. Handle an unknown code by its `severity`. Th
 | `picture.svg-fallback` | `information` | An SVG picture is drawn from its PNG fallback, the raster copy that the file stores beside it. |  |
 | `picture.tile` | `approximation` | A tiled picture is drawn stretched. |  |
 | `picture.color-effects` | `approximation` | Picture color effects are not applied. | `image-effects` |
-| `line.dash`, `line.compound` | `approximation` | Dashed and compound lines are drawn as one solid line. |  |
-| `line.ends` | `unsupported` | Arrowheads on an open path are not drawn. |  |
+| `line.compound` | `approximation` | Compound lines are drawn as one line. |  |
 | `effect.shadow-blur`, `effect.inner-shadow-blur`, `effect.glow` | `approximation` | The blur is drawn as layered rings. |  |
 | `effect.inner-shadow` | `approximation` | An inner shadow starts at the fill, so an outline wider than 1 pt, an unfilled outline, and overlapping paths are shaded differently. |  |
 | `effect.silhouette` | `approximation` | A shadow or glow uses an opaque silhouette: picture and fill transparency do not shape it. |  |
@@ -185,10 +184,11 @@ One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`sho
 | Gradient fills on text | Drawn: the glyphs clip the gradient, which spans the text body |
 | Gradient fills on lines | Drawn in the gradient's middle color (`approximation`) |
 | Tiled pictures; picture color effects (grayscale, duotone, brightness, black and white) | Drawn stretched; effects not applied (`approximation`) |
-| Dashes, compound lines | Drawn solid and single (`approximation`) |
+| Dashes and line ends | Drawn with the editor's geometry |
+| Compound lines | Drawn as one line (`approximation`) |
 | Pattern fills | Not drawn (`unsupported`) |
 | Underline styles other than single and double | Drawn as a single line (`approximation`) |
-| Arrowheads, text outlines | Not drawn (`unsupported`) |
+| Text outlines | Not drawn (`unsupported`) |
 | Upright East Asian vertical text, synthetic bold and italic | Drawn as normal text (`approximation`) |
 | Diagrams with a saved drawing | Drawn from the saved drawing, read-only, as in the editor |
 | Charts: bar, column, line, area, scatter, pie, doughnut, and radar, from the values cached in the chart part | Drawn, from the engine's layout of the shapes and labels that `@pptx-editor.dev/pro/drawing` gives |

@@ -89,7 +89,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['path-start'],
   },
   'shapes.groups': { fixtures: ['groups-transforms'] },
-  'shapes.connectors': { fixtures: ['lines-arrows'], approximations: ['arrowhead-joins'] },
+  'shapes.connectors': { fixtures: ['lines-arrows', 'line-ends-dashes'] },
   'shapes.arrange': { fixtures: ['arrange-flip-hidden'] },
   'shapes.flip-rotate': {
     fixtures: ['arrange-flip-hidden', 'groups-transforms'],
@@ -114,8 +114,8 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['pattern-bitmaps', 'fill-rotation', 'tiled-pictures'],
   },
   'fills-lines.lines': {
-    fixtures: ['lines-arrows', 'fills-lines'],
-    approximations: ['arrowhead-joins', 'inset-lines', 'compound-lines'],
+    fixtures: ['lines-arrows', 'line-ends-dashes', 'fills-lines'],
+    approximations: ['inset-lines', 'compound-lines'],
   },
   'fills-lines.theme-colors': {
     fixtures: ['colors', 'follow-ups'],

@@ -6,6 +6,8 @@ export * from './table-layout.ts';
 // Internal: the renderers a capability package installs (`@pptx-editor.dev/pro/drawing`).
 export * from './drawing-renderers.ts';
 export * from './geometry/geometry.ts';
+// Internal: the dashes and line ends that the SVG paint and `pptx-to-pdf` both draw.
+export * from './line-strokes.ts';
 export type { PresetShapeDefinition } from '@eigenpal/ooxml-core';
 export * from './text/measurer.ts';
 export * from './text/harfbuzz-measurer.ts';
