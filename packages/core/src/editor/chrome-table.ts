@@ -9,14 +9,17 @@ import type {
   EditorCommand,
   EditorSnapshot,
   TableBorderEdgeTarget,
+  TableBorderSpec,
   TableBorderTarget,
   TableContext,
   TableStyleOption,
+  LineDash,
 } from '../contracts/index.ts';
 import { DEFAULT_TABLE_STYLE_ID } from '../cascade/index.ts';
 import type { ChromeGroup, ChromeSlotId, ToolbarCommandState } from './chrome-controls.ts';
 import { ICON_PATHS } from './icon-paths.ts';
 import { isColorChoice } from '../automation/commands/style-commands.ts';
+import { LINE_DASHES, LINE_WIDTHS } from './line-presets.ts';
 
 const icon = (name: string): readonly string[] => ICON_PATHS[name] ?? [];
 
@@ -83,8 +86,71 @@ const OPTION_ICONS: Record<keyof typeof OPTIONS, string> = {
   bandedColumns: 'view_column',
 };
 
-/** The pen the Borders menu draws with: 1 pt in the theme's Text 1, the default. */
-const PEN = { color: { theme: 'tx1' }, width: 1 } as const;
+/**
+ * The border pen, as DOCX Editor's table chrome draft: the last border target and the line the
+ * Borders menu draws. Picking a target draws the pen there and makes it the active target;
+ * picking a pen color, style, or weight redraws the active target with the new pen. @public
+ */
+export interface TableBorderPen {
+  /** The target the pen last drew (All Borders until the first pick). */
+  readonly target: TableBorderEdgeTarget;
+  /** The line the pen draws. */
+  readonly spec: TableBorderSpec;
+}
+
+/** The pen before any pick: all borders, 1 pt solid in the theme's Text 1. @public */
+export const DEFAULT_TABLE_BORDER_PEN: TableBorderPen = {
+  target: 'all',
+  spec: { color: { theme: 'tx1' }, width: 1 },
+};
+
+// One pen per editor. The pen is chrome state: it is not in the document and never syncs.
+const PENS = new WeakMap<object, TableBorderPen>();
+
+/** The border pen of `editor`, or the default pen. @public */
+export function tableBorderPen(editor: object | null | undefined): TableBorderPen {
+  return (editor && PENS.get(editor)) || DEFAULT_TABLE_BORDER_PEN;
+}
+
+/** The pen after a pick of a border slot, or null when `slot` is not one or `value` is invalid. */
+function nextPen(pen: TableBorderPen, slot: string, value: unknown): TableBorderPen | null {
+  switch (slot) {
+    case 'table.borderTarget':
+      return BORDERS.includes(value as TableBorderTarget) && value !== 'none'
+        ? { ...pen, target: value as TableBorderEdgeTarget }
+        : null;
+    case 'table.borderColor':
+      // The reset row is the automatic color: the theme's Text 1.
+      return isColorChoice(value) || value === null
+        ? { ...pen, spec: { ...pen.spec, color: value ?? { theme: 'tx1' } } }
+        : null;
+    case 'table.borderStyle': {
+      if (!LINE_DASHES.includes(value as LineDash)) return null;
+      const { color, width } = pen.spec;
+      return {
+        ...pen,
+        spec: value === 'solid' ? { color, width } : { color, width, dash: value as LineDash },
+      };
+    }
+    case 'table.borderWidth': {
+      const width = typeof value === 'string' && value.trim() ? Number(value) : value;
+      return typeof width === 'number' && width > 0 && width <= 1584
+        ? { ...pen, spec: { ...pen.spec, width } }
+        : null;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * Remember the pen that a run of a border slot picks, as `runToolbarCommand` runs it. A pick that
+ * the engine refuses (no table selected) still sets the pen, because a pen is a setting. @internal
+ */
+export function rememberTableBorderPen(editor: object, slot: string, value: unknown): void {
+  const pen = nextPen(tableBorderPen(editor), slot, value);
+  if (pen) PENS.set(editor, pen);
+}
 
 /**
  * The `table` group, as DOCX Editor's: Insert > Table, then the controls of the Table
@@ -140,6 +206,36 @@ export const TABLE_GROUPS: readonly ChromeGroup[] = [
           value: b,
           labelKey: `table.border.${b}` as const,
           paths: icon(BORDER_ICONS[b]),
+        })),
+        state: { kind: 'value' },
+      },
+      {
+        // The pen: its color, style, and weight redraw the last border target.
+        id: 'borderColor',
+        shape: 'colorSplit',
+        labelKey: 'table.borderColor',
+        paths: icon('border_color'),
+        state: { kind: 'value' },
+      },
+      {
+        id: 'borderStyle',
+        shape: 'dropdown',
+        labelKey: 'table.borderStyle',
+        toggle: 'choice',
+        paths: icon('line_style'),
+        options: LINE_DASHES.map((d) => ({ value: d, labelKey: `toolbar.dashes.${d}` as const })),
+        state: { kind: 'value' },
+      },
+      {
+        id: 'borderWidth',
+        shape: 'dropdown',
+        labelKey: 'table.borderWidth',
+        toggle: 'choice',
+        paths: icon('line_weight'),
+        options: LINE_WIDTHS.map((w) => ({
+          value: String(w),
+          labelKey: 'toolbar.lineWidthValue' as const,
+          labelParams: { value: w },
         })),
         state: { kind: 'value' },
       },
@@ -252,8 +348,16 @@ export const TABLE_SLOT_COMMANDS: Readonly<Record<string, EditorCommand>> = {
   'table.distributeColumns': { type: 'distributeColumns' },
 };
 
-/** The command a table value slot dispatches for a picked value, or null. */
-export function tableCommandForSlotValue(slot: string, value: unknown): EditorCommand | null {
+/**
+ * The command a table value slot dispatches for a picked value, or null. The border slots draw
+ * with `pen` (`tableBorderPen(editor)`): a target pick draws the pen there; a pen pick redraws
+ * the pen's last target with the new color, style, or weight.
+ */
+export function tableCommandForSlotValue(
+  slot: string,
+  value: unknown,
+  pen: TableBorderPen = DEFAULT_TABLE_BORDER_PEN
+): EditorCommand | null {
   switch (slot) {
     case 'table.insert': {
       const v = value as { rows?: unknown; cols?: unknown } | null;
@@ -266,14 +370,14 @@ export function tableCommandForSlotValue(slot: string, value: unknown): EditorCo
     case 'table.cellFill':
       return isColorChoice(value) || value === null ? { type: 'setCellFill', color: value } : null;
     case 'table.borderTarget':
-      if (!BORDERS.includes(value as TableBorderTarget)) return null;
-      return value === 'none'
-        ? { type: 'setTableBorders', scope: 'none' }
-        : {
-            type: 'setTableBorders',
-            scope: value as TableBorderEdgeTarget,
-            spec: PEN,
-          };
+    case 'table.borderColor':
+    case 'table.borderStyle':
+    case 'table.borderWidth': {
+      if (slot === 'table.borderTarget' && value === 'none')
+        return { type: 'setTableBorders', scope: 'none' };
+      const next = nextPen(pen, slot, value);
+      return next ? { type: 'setTableBorders', scope: next.target, spec: next.spec } : null;
+    }
     case 'table.select':
       return value === 'table' || value === 'row' || value === 'column'
         ? { type: 'selectTableRegion', region: value }
@@ -311,6 +415,9 @@ export const TABLE_PROBES: Readonly<Record<string, unknown>> = {
   'table.style': DEFAULT_TABLE_STYLE_ID,
   'table.cellFill': '#000000',
   'table.borderTarget': 'all',
+  'table.borderColor': '#000000',
+  'table.borderStyle': 'solid',
+  'table.borderWidth': '1',
   'table.select': 'table',
   'table.delete': 'rows',
   'table.cellMargins': 'normal',
@@ -322,10 +429,19 @@ export function tableSlotActive(slot: string, snap: EditorSnapshot): boolean {
   return slot.startsWith('table.') && !!option && !!snap.table?.options.includes(option);
 }
 
-/** The value a table slot shows: the table style, or the first selected cell's shading. */
-export function tableSlotValue(slot: string, snap: EditorSnapshot): string | undefined {
+/**
+ * The value a table slot shows: the table style, the first selected cell's shading, or the
+ * border pen's style and weight. The pen color shows on the split button's swatch.
+ */
+export function tableSlotValue(
+  slot: string,
+  snap: EditorSnapshot,
+  pen: TableBorderPen = DEFAULT_TABLE_BORDER_PEN
+): string | undefined {
   if (slot === 'table.style') return snap.table?.styleId;
   if (slot === 'table.cellFill') return snap.table?.cellFill;
+  if (slot === 'table.borderStyle') return pen.spec.dash ?? 'solid';
+  if (slot === 'table.borderWidth') return String(pen.spec.width);
   return undefined;
 }
 
@@ -345,6 +461,33 @@ export function tableSlotState(editor: Editor, id: ChromeSlotId): ToolbarCommand
     active: false,
   };
 }
+
+/** The slots of the `table` group, part of `ChromeSlotId`. @public */
+export type TableSlotId =
+  | 'table.insert'
+  | 'table.style'
+  | 'table.headerRow'
+  | 'table.totalRow'
+  | 'table.bandedRows'
+  | 'table.firstColumn'
+  | 'table.lastColumn'
+  | 'table.bandedColumns'
+  | 'table.cellFill'
+  | 'table.borderTarget'
+  | 'table.borderColor'
+  | 'table.borderStyle'
+  | 'table.borderWidth'
+  | 'table.select'
+  | 'table.delete'
+  | 'table.insertRowAbove'
+  | 'table.insertRowBelow'
+  | 'table.insertColumnLeft'
+  | 'table.insertColumnRight'
+  | 'table.mergeCells'
+  | 'table.splitCell'
+  | 'table.distributeRows'
+  | 'table.distributeColumns'
+  | 'table.cellMargins';
 
 /** A slot of the `table` group that a table selection shows (every one but Insert > Table). @public */
 export type TableChromeSlotId = Exclude<Extract<ChromeSlotId, `table.${string}`>, 'table.insert'>;

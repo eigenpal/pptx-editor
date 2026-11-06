@@ -430,6 +430,9 @@
     "bandedColumns": "Banded columns",
     "cellFill": "Shading",
     "borderTarget": "Borders",
+    "borderColor": "Pen color",
+    "borderStyle": "Pen style",
+    "borderWidth": "Pen weight",
     "border": {
       "all": "All borders",
       "outside": "Outside borders",
@@ -440,6 +443,7 @@
       "right": "Right border",
       "none": "No border"
     },
+    "insertSubmenu": "Insert",
     "select": "Select",
     "region": {
       "table": "Select table",
@@ -809,7 +813,11 @@
         "connector": "Connector",
         "graphicFrame": "Embedded object",
         "table": "Table"
-      }
+      },
+      "table": "Table",
+      "rowHeight": "Row height",
+      "columnWidth": "Column width",
+      "styleOptions": "Table style options"
     },
     "comments": {
       "emptyTitle": "No comments",

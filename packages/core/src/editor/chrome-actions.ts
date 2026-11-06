@@ -18,6 +18,7 @@ import type { PptxEditorInstance } from './pptx-editor-types.ts';
 import { focusSurfaceOf, surfaceInputOf, surfaceRootOf } from './surface-registry.ts';
 import { warnNoAltTextPopup, warnNoLinkPopup } from './dev-warnings.ts';
 import { asCut } from './removal-notice.ts';
+import { pastedCells } from './table-clipboard.ts';
 import type { ToolbarShownValue, ToolbarValueMap } from './toolbar-values.ts';
 import { canRenameSectionInPlace, runSectionSlot } from './section-renamers.ts';
 
@@ -286,7 +287,8 @@ export function runClipboardSlot(
     return;
   }
   const sel = editor.snapshot().selection;
-  const text = sel.kind === 'text';
+  // A cell range copies and pastes as text does: through the surface's own clipboard events.
+  const text = sel.kind === 'text' || sel.kind === 'cells';
   const input = surfaceInputOf(editor) ?? surfaceInput;
   if (!text && (slot === 'edit.copy' || slot === 'edit.cut')) {
     // Shapes copy through the surface's copy event, which writes the system clipboard; where
@@ -308,7 +310,13 @@ export function runClipboardSlot(
     if (slot === 'edit.paste') {
       void globalThis.navigator?.clipboard
         ?.readText()
-        .then((data) => data && editor.input('text', data))
+        .then((data) => {
+          if (!data) return;
+          // Tab-separated text, or any text on a cell range, fills cells (`table-clipboard.ts`).
+          const texts = pastedCells(editor.snapshot().selection, { text: data });
+          if (texts) editor.exec({ type: 'pasteCells', texts });
+          else editor.input('text', data);
+        })
         .catch(() => undefined);
       return;
     }

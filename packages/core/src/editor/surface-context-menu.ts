@@ -2,8 +2,8 @@
 // before its context menu opens: a shape that is not selected becomes the
 // selection; a shape in the selection keeps it, and so does the shape whose text is being
 // edited; empty slide area clears the selection. A right-click on a table cell places the caret
-// in that cell (a cell range in the table stays), so the table menu acts on the cell under the
-// pointer. The chrome then reads the selection and
+// in that cell (a cell range in the table stays, and so does a table selected as an object), so
+// the table menu acts on the cell under the pointer. The chrome then reads the selection and
 // draws its menu at the event's point, so no DOM type crosses the editor contract.
 
 import type { EditorSelection } from '../contracts/index.ts';
@@ -20,6 +20,8 @@ export function contextMenuSelection(
   cell?: Extract<EditorSelection, { kind: 'text' }>
 ): EditorSelection | null {
   if (!id) return selection.kind === 'none' ? null : { kind: 'none' };
+  // A table selected as an object stays selected: its menu is the object menu.
+  if (selection.kind === 'shapes' && selection.nodeIds.includes(id)) return null;
   if (cell && !(selection.kind === 'cells' && selection.nodeId === id)) {
     const same =
       selection.kind === 'text' &&
@@ -31,7 +33,6 @@ export function contextMenuSelection(
   // A caret or a cell range in the table under the pointer stays, as a text selection does.
   if ((selection.kind === 'text' || selection.kind === 'cells') && selection.nodeId === id)
     return null;
-  if (selection.kind === 'shapes' && selection.nodeIds.includes(id)) return null;
   return { kind: 'shapes', nodeIds: [id], ...(group ? { group } : {}) };
 }
 

@@ -29,7 +29,12 @@ import {
 } from '../../store/index.ts';
 import { DEFAULT_TABLE_STYLE_ID, resolveSlide } from '../../cascade/index.ts';
 import type { EditorSelection } from '../../contracts/index.ts';
-import { createPptxEditor, toolbarCommandState, type PptxEditorInstance } from '../index.ts';
+import {
+  createPptxEditor,
+  runToolbarCommand,
+  toolbarCommandState,
+  type PptxEditorInstance,
+} from '../index.ts';
 import { OpBatch } from '../../automation/commands/op-batch.ts';
 import { applyTableKey, tableKeyAction } from '../table-keys.ts';
 import {
@@ -430,6 +435,30 @@ describe('merge, split, and formatting (editor-ui-parity 4.3)', () => {
     roundTrip(e);
   });
 
+  test('the border pen: a target pick draws the pen, a pen pick redraws the last target', async () => {
+    const e = await open();
+    caretIn(e, 1, 1);
+    const tcPr = () => child(model(e).tcs[1][1], 'a:tcPr')!;
+    expect(toolbarCommandState(e, 'table.borderWidth').value).toBe('1');
+    // A pen pick before any target pick draws all borders.
+    expect(runToolbarCommand(e, 'table.borderColor', '#00FF00').ok).toBe(true);
+    expect(attr(find(child(tcPr(), 'a:lnT')!, 'a:srgbClr'), 'val')).toBe('00FF00');
+    expect(runToolbarCommand(e, 'table.borderTarget', 'outside').ok).toBe(true);
+    expect(runToolbarCommand(e, 'table.borderWidth', '3').ok).toBe(true);
+    expect(attr(child(tcPr(), 'a:lnL'), 'w')).toBe('38100');
+    expect(toolbarCommandState(e, 'table.borderWidth').value).toBe('3');
+    expect(runToolbarCommand(e, 'table.borderStyle', 'dash').ok).toBe(true);
+    expect(attr(find(child(tcPr(), 'a:lnB')!, 'a:prstDash'), 'val')).toBe('dash');
+    expect(toolbarCommandState(e, 'table.borderStyle').value).toBe('dash');
+    // The pen keeps its color: the outside borders stay green.
+    expect(attr(find(child(tcPr(), 'a:lnB')!, 'a:srgbClr'), 'val')).toBe('00FF00');
+    // An invalid pen value changes nothing.
+    expect(runToolbarCommand(e, 'table.borderWidth', '-1' as never).ok).toBe(false);
+    expect(toolbarCommandState(e, 'table.borderWidth').value).toBe('3');
+    expectValid(e);
+    roundTrip(e);
+  });
+
   test('row height, column width, distribute, and a grid drag as one undo step', async () => {
     const e = await open(deck(undefined, [IN, 2 * IN, IN]));
     caretIn(e, 0, 0);
@@ -580,6 +609,26 @@ describe('structure edits through merges, and repair edge cases', () => {
     );
   const cellsOf = (e: PptxEditorInstance, r: number): Element[] =>
     children(children(find(root(e), 'a:tbl')!, 'a:tr')[r], 'a:tc');
+
+  test('Select column under a merged header selects one column; Delete Columns deletes it', async () => {
+    const e = await open(merged());
+    caretIn(e, 1, 1);
+    expect(e.exec({ type: 'selectTableRegion', region: 'column' }).ok).toBe(true);
+    expect(e.snapshot().selection).toMatchObject({
+      kind: 'cells',
+      anchor: { row: 0, column: 1 },
+      focus: { row: 2, column: 1 },
+    });
+    expect(e.exec({ type: 'deleteColumn' }).ok).toBe(true);
+    // One column goes; the merged header shrinks to the column that is left.
+    expect(grid(e)).toEqual([
+      ['AB', 'C'],
+      ['D', 'F'],
+      ['G', 'I'],
+    ]);
+    expectValid(e);
+    roundTrip(e);
+  });
 
   test('a column inserted inside a horizontal merge widens the merge', async () => {
     const e = await open(merged());
@@ -825,6 +874,28 @@ describe('round 4: repair order, a second text body, and chrome state', () => {
     });
     expect(press(e, 'ArrowLeft', true)).toBe(true);
     expect(e.snapshot().selection).toMatchObject({ kind: 'text', cell: { row: 0, column: 0 } });
+  });
+
+  test('Shift+arrow at the edge of the cell text starts a cell range', async () => {
+    const e = await open();
+    // Inside the text, Shift+arrow extends the text selection as usual.
+    caretIn(e, 1, 1, 0);
+    expect(press(e, 'ArrowRight', true)).toBe(false);
+    // At the end of the text, it selects this cell and the next one.
+    caretIn(e, 1, 1, 1);
+    expect(press(e, 'ArrowRight', true)).toBe(true);
+    expect(e.snapshot().selection).toEqual({
+      kind: 'cells',
+      nodeId: frameId(e),
+      anchor: { row: 1, column: 1 },
+      focus: { row: 1, column: 2 },
+    });
+    // The range then grows down with Shift+ArrowDown.
+    expect(press(e, 'ArrowDown', true)).toBe(true);
+    expect(e.snapshot().selection).toMatchObject({ kind: 'cells', focus: { row: 2, column: 2 } });
+    // At the table's edge, nothing to extend to: the key is left to text editing.
+    caretIn(e, 0, 2, 1);
+    expect(press(e, 'ArrowRight', true)).toBe(false);
   });
 });
 

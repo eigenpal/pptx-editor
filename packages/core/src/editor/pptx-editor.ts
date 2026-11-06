@@ -81,6 +81,7 @@ import { selectionBody, snapCellAddress, textItemOf } from './table-cells.ts';
 import { repairTablesForSave } from '../automation/commands/table-repair.ts';
 import { withoutStaleCopies } from '../automation/commands/alternate-copies.ts';
 import { applyTableKey, firstCellCaret, tableKeyAction } from './table-keys.ts';
+import { cellsFrom, copyCellsTo } from './table-clipboard.ts';
 import { createTableStateSource } from './table-state.ts';
 import { createThemeColorSource } from './theme-palette.ts';
 import { createSlideSummaries, SlideSelection } from './slide-selection.ts';
@@ -704,6 +705,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
 
   /** Fill a clipboard event: shapes as the editor's format plus plain text. */
   const copyTo = (data: DataTransfer, cut: boolean): boolean => {
+    // A cell range: its text as tab-separated text and as this editor's cells format.
+    if (copyCellsTo(data, layout(), selection))
+      return (cut && mode !== 'view' && exec({ type: 'delete' }), true);
     if (selection.kind === 'text') {
       const text = selectedText(layout(), selection);
       if (!text) return false;
@@ -724,7 +728,11 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
    * is a clipboard that holds neither this editor's format nor the text of the last copy.
    */
   const pasteFrom = (data: DataTransfer): boolean => {
-    if (selection.kind === 'text' || mode === 'view') return false;
+    if (mode === 'view') return false;
+    // Copied cells, or tab-separated text, fill the cells of a table selection.
+    const texts = cellsFrom(data, selection);
+    if (texts) return (exec({ type: 'pasteCells', texts }), true);
+    if (selection.kind === 'text') return false;
     // A payload parsed once is cached by its text, so a paste series keeps one identity.
     const read = readClipboard(data, lastCopied, (raw) => {
       if (raw === lastParsed.raw) return lastParsed.payload;

@@ -154,14 +154,17 @@ export const TOOLBAR_PICTURE_GROUPS: readonly ChromeGroup[] = PICTURE_BAR_GROUPS
 
 /**
  * The table controls of the preset bar, as DOCX Editor's short table group: the style, cell
- * fill, and borders, then select, delete, insert, merge, and split. The whole group is 700 px
- * wide and would never fit beside the text controls; the style options, distribute, and cell
- * margins stay on the ribbon's Table Design and Table Layout tabs and in `Toolbar.Slot`.
+ * fill, borders, and the pen color and weight, then select, delete, insert, merge, and split.
+ * The whole group would never fit beside the text controls; the style options, pen style,
+ * distribute, and cell margins stay on the ribbon's Table Design and Table Layout tabs and in
+ * `Toolbar.Slot`.
  */
 const BAR_TABLE_CONTROLS: ReadonlySet<string> = new Set([
   'style',
   'cellFill',
   'borderTarget',
+  'borderColor',
+  'borderWidth',
   'select',
   'delete',
   'insertRowAbove',

@@ -270,7 +270,9 @@ describe('the table context menu', () => {
       r.kind === 'item'
         ? [r.value ? `${r.slot}.${r.value}` : r.slot]
         : r.kind === 'submenu'
-          ? r.items.map((i) => (i.kind === 'item' ? `${i.slot}.${i.value}` : ''))
+          ? r.items.map((i) =>
+              i.kind === 'item' ? (i.value ? `${i.slot}.${i.value}` : i.slot) : ''
+            )
           : []
     );
     for (const slot of [
@@ -283,11 +285,14 @@ describe('the table context menu', () => {
       'table.delete.table',
       'table.mergeCells',
       'table.splitCell.cols2',
+      'table.select.table',
+      'table.select.row',
+      'table.select.column',
     ])
       expect(rows).toContain(slot);
   });
 
-  test('a right-click on a table cell places the caret there; a cell range stays', () => {
+  test('a right-click on a table cell places the caret there; a range or a selected table stays', () => {
     const at: Extract<EditorSelection, { kind: 'text' }> = {
       kind: 'text',
       nodeId: 'f',
@@ -296,7 +301,11 @@ describe('the table context menu', () => {
       focus: caret(0, 1),
     };
     expect(contextMenuSelection({ kind: 'none' }, 'f', undefined, at)).toEqual(at);
-    expect(contextMenuSelection({ kind: 'shapes', nodeIds: ['f'] }, 'f', undefined, at)).toEqual(
+    // A table selected as an object keeps that selection: its menu is the object menu.
+    expect(contextMenuSelection({ kind: 'shapes', nodeIds: ['f'] }, 'f', undefined, at)).toBeNull();
+    expect(canvasMenuKind({ selection: { kind: 'shapes', nodeIds: ['f'] } })).toBe('shapes');
+    // Another shape selected: the cell under the pointer gets the caret.
+    expect(contextMenuSelection({ kind: 'shapes', nodeIds: ['g'] }, 'f', undefined, at)).toEqual(
       at
     );
     expect(contextMenuSelection(at, 'f', undefined, { ...at, anchor: caret(0, 0) })).toBeNull();

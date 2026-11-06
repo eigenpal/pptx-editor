@@ -13,6 +13,8 @@ import {
 } from 'vue';
 import {
   elementKindLabelKey,
+  elementRotates,
+  TABLE_OPTION_ROWS,
   platformShortcuts,
   radioGroupStep,
 } from '@pptx-editor.dev/core/editor';
@@ -128,6 +130,48 @@ const FormatTab = defineComponent({
       };
       const inch = (v: number): number => Math.round(v * EMU_PER_INCH);
       const unit = t('panel.format.inchUnit');
+      const tableSection = () => {
+        const tb = table.value;
+        if (!tb) return null;
+        return (
+          <div class="pptx-panel__section">
+            <h3 class="pptx-panel__title">{t('panel.format.table')}</h3>
+            <div class="pptx-panel__grid">
+              <PanelNumberField
+                label={t('panel.format.rowHeight')}
+                value={inches(tb.rowHeight)}
+                unit={unit}
+                disabled={readOnly.value}
+                onCommit={(v: number) =>
+                  editor.value?.exec({ type: 'setRowHeight', height: inch(v) })
+                }
+              />
+              <PanelNumberField
+                label={t('panel.format.columnWidth')}
+                value={inches(tb.columnWidth)}
+                unit={unit}
+                disabled={readOnly.value}
+                onCommit={(v: number) =>
+                  editor.value?.exec({ type: 'setColumnWidth', width: inch(v) })
+                }
+              />
+            </div>
+            <div class="pptx-radios" role="group" aria-label={t('panel.format.styleOptions')}>
+              {TABLE_OPTION_ROWS.map(({ option, labelKey }) => (
+                <label key={option} class="pptx-radio">
+                  <input
+                    type="checkbox"
+                    checked={tb.options.includes(option)}
+                    disabled={readOnly.value}
+                    onChange={() => editor.value?.exec({ type: 'toggleTableStyleOption', option })}
+                  />
+                  {t(labelKey)}
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+      };
       const field = (key: 'x' | 'y' | 'cx' | 'cy', labelKey: TranslationKey) => (
         <PanelNumberField
           label={t(labelKey)}
@@ -156,18 +200,21 @@ const FormatTab = defineComponent({
             {field('y', 'panel.format.y')}
           </div>
         </div>,
-        <div class="pptx-panel__section">
-          <h3 class="pptx-panel__title">{t('panel.format.rotation')}</h3>
-          <div class="pptx-panel__grid">
-            <PanelNumberField
-              label={t('panel.format.angle')}
-              value={String(Math.round(g.rot * 10) / 10)}
-              unit="°"
-              disabled={readOnly.value}
-              onCommit={(v: number) => move({ rot: ((v % 360) + 360) % 360 })}
-            />
+        elementRotates(g, table.value) ? (
+          <div class="pptx-panel__section">
+            <h3 class="pptx-panel__title">{t('panel.format.rotation')}</h3>
+            <div class="pptx-panel__grid">
+              <PanelNumberField
+                label={t('panel.format.angle')}
+                value={String(Math.round(g.rot * 10) / 10)}
+                unit="°"
+                disabled={readOnly.value}
+                onCommit={(v: number) => move({ rot: ((v % 360) + 360) % 360 })}
+              />
+            </div>
           </div>
-        </div>,
+        ) : null,
+        tableSection(),
         g.textFitting ? (
           <div class="pptx-panel__section">
             <h3 class="pptx-panel__title">{t('panel.format.textFitting')}</h3>

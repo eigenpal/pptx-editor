@@ -446,6 +446,16 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
     arrange: atCell(0, 0),
     command: () => ({ type: 'setCellMargins', margins: { left: IN / 8, top: IN / 16 } }),
   },
+  pasteCells: {
+    arrange: atCell(0, 1),
+    command: () => ({
+      type: 'pasteCells',
+      texts: [
+        ['x', 'y'],
+        ['two\nlines', 'w'],
+      ],
+    }),
+  },
   setRowHeight: { arrange: atCell(1, 0), command: () => ({ type: 'setRowHeight', height: IN }) },
   setColumnWidth: {
     arrange: atCell(0, 1),

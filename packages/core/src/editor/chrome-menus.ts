@@ -278,26 +278,51 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     SEPARATOR,
     item('image.altText', 'contextMenu.altText'),
   ],
-  // The table cell menu, as DOCX Editor's table context menu: the text rows, then the row and
-  // column commands of the Table Layout tab on the cell (or the cell range).
+  // The table cell menu, on the cell (or the cell range): the clipboard rows, then the row and
+  // column commands of the Table Layout tab in three short submenus (Insert, Delete, Select),
+  // then Merge and Split, then the text dialogs. A table selected as an object takes the
+  // shapes menu.
   table: [
     item('edit.cut', 'contextMenu.cut', 'contextMenu.shortcuts.cut'),
     item('edit.copy', 'contextMenu.copy', 'contextMenu.shortcuts.copy'),
     item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
     SEPARATOR,
-    { kind: 'item', slot: 'table.select', value: 'table', labelKey: 'table.region.table' },
-    SEPARATOR,
-    item('table.insertRowAbove'),
-    item('table.insertRowBelow'),
-    item('table.insertColumnLeft'),
-    item('table.insertColumnRight'),
-    SEPARATOR,
-    ...(['rows', 'columns', 'table'] as const).map((v): ChromeMenuItemEntry => ({
-      kind: 'item',
-      slot: 'table.delete',
-      value: v,
-      labelKey: `table.deleteRegion.${v}`,
-    })),
+    {
+      kind: 'submenu',
+      id: 'tableInsert',
+      labelKey: 'table.insertSubmenu',
+      paths: ICON_PATHS['add'] ?? null,
+      items: [
+        item('table.insertRowAbove'),
+        item('table.insertRowBelow'),
+        item('table.insertColumnLeft'),
+        item('table.insertColumnRight'),
+      ],
+    },
+    {
+      kind: 'submenu',
+      id: 'tableDelete',
+      labelKey: 'table.delete',
+      paths: ICON_PATHS['delete_sweep'] ?? null,
+      items: (['rows', 'columns', 'table'] as const).map((v): ChromeMenuItemEntry => ({
+        kind: 'item',
+        slot: 'table.delete',
+        value: v,
+        labelKey: `table.deleteRegion.${v}`,
+      })),
+    },
+    {
+      kind: 'submenu',
+      id: 'tableSelect',
+      labelKey: 'table.select',
+      paths: ICON_PATHS['select_all'] ?? null,
+      items: (['table', 'row', 'column'] as const).map((v): ChromeMenuItemEntry => ({
+        kind: 'item',
+        slot: 'table.select',
+        value: v,
+        labelKey: `table.region.${v}`,
+      })),
+    },
     SEPARATOR,
     item('table.mergeCells'),
     {

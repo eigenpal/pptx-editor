@@ -686,3 +686,66 @@ function clearCell(batch: OpBatch, part: string, tc: Element): void {
 export function clearRange(batch: OpBatch, m: TableModel, range: CellRange): void {
   for (const a of anchorsIn(m, range)) clearCell(batch, m.part, m.tcs[a.row][a.column]);
 }
+
+const textRun = (line: string, rPr: Element | undefined): NodeSpec => ({
+  ns: NS.a,
+  local: 'r',
+  prefix: 'a',
+  children: [
+    ...(rPr ? [specOf(rPr)] : []),
+    { ns: NS.a, local: 't', prefix: 'a', children: [{ text: line }] },
+  ],
+});
+
+/**
+ * Replace the text of the cell at grid position `at` (a drawn cell's top-left position) with
+ * plain `text`: one paragraph for each line, each with the first paragraph's properties, and
+ * every run in the character format of the cell's first run.
+ */
+export function setCellText(
+  batch: OpBatch,
+  m: TableModel,
+  at: TableCellAddress,
+  text: string
+): void {
+  const tc = m.tcs[at.row][at.column];
+  if (!child(tc, 'a:txBody'))
+    batch.insert({
+      op: 'insertNode',
+      part: m.part,
+      parent: tc.id,
+      index: 0,
+      spec: emptyBodySpec(tc),
+    });
+  const body = child(batch.element(m.part, tc.id), 'a:txBody')!;
+  const [first] = paragraphsOf(body);
+  const run = first ? elements(first).find((e) => e.kind === 'run') : undefined;
+  const rPr = run ? child(run, 'a:rPr') : undefined;
+  const pPr = first ? child(first, 'a:pPr') : undefined;
+  const endPr = first ? child(first, 'a:endParaRPr') : undefined;
+  clearCell(batch, m.part, batch.element(m.part, tc.id));
+  const lines = text.split(/\r\n|\r|\n/);
+  if (!first) return;
+  if (lines[0])
+    batch.insert({
+      op: 'insertNode',
+      part: m.part,
+      parent: first.id,
+      index: pPr ? 1 : 0,
+      spec: textRun(lines[0], rPr),
+    });
+  const at0 = body.children.indexOf(first);
+  lines.slice(1).forEach((line, i) => {
+    const spec: NodeSpec = {
+      ns: NS.a,
+      local: 'p',
+      prefix: 'a',
+      children: [
+        ...(pPr ? [specOf(pPr)] : []),
+        ...(line ? [textRun(line, rPr)] : []),
+        ...(endPr ? [specOf(endPr)] : []),
+      ],
+    };
+    batch.insert({ op: 'insertNode', part: m.part, parent: body.id, index: at0 + 1 + i, spec });
+  });
+}

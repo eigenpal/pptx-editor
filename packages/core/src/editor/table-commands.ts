@@ -31,6 +31,7 @@ import {
   blockOf,
   cellBody,
   clearRange,
+  setCellText,
   deleteColumns,
   deleteRows,
   expandRange,
@@ -178,11 +179,28 @@ function insertTable(ctx: CommandContext, batch: OpBatch, rows: number, cols: nu
   return insertTableFrame(batch, slidePart(ctx), rows, cols, slideW, slideH);
 }
 
-/** The cells a region command selects. */
+/**
+ * The cells a region command selects. A row or column region names only its own grid lines,
+ * as slide editors select a column: a merged cell that crosses into the next column does not
+ * widen it, so Delete Columns then deletes that one column and the merged cell shrinks.
+ */
 function region(m: TableModel, range: CellRange, which: 'table' | 'row' | 'column'): CellRange {
   if (which === 'table') return wholeTable(m);
-  if (which === 'row') return expandRange(m, { ...range, c0: 0, c1: m.nC - 1 });
-  return expandRange(m, { ...range, r0: 0, r1: m.nR - 1 });
+  if (which === 'row') return { ...range, c0: 0, c1: m.nC - 1 };
+  return { ...range, r0: 0, r1: m.nR - 1 };
+}
+
+/**
+ * The rows (or columns) a delete removes: the cell range's own grid lines on that axis, not the
+ * merged cells it touches; a caret's merged cell, or a selected table, as `tableTarget` reads.
+ */
+function deletedLines(ctx: CommandContext, range: CellRange, axis: 'row' | 'column'): CellRange {
+  const sel = ctx.selection;
+  if (sel.kind !== 'cells') return range;
+  const own = cellRangeOf(sel);
+  return axis === 'row'
+    ? { ...range, r0: own.r0, r1: own.r1 }
+    : { ...range, c0: own.c0, c1: own.c1 };
 }
 
 const cells = (nodeId: string, r: CellRange): EditorSelection => ({
@@ -194,7 +212,9 @@ const cells = (nodeId: string, r: CellRange): EditorSelection => ({
 
 /** Delete rows or columns; the whole table goes when none would remain. */
 function deleteLines(ctx: CommandContext, batch: OpBatch, axis: 'row' | 'column'): Compiled {
-  const { m, range } = tableTarget(ctx, batch);
+  const target = tableTarget(ctx, batch);
+  const m = target.m;
+  const range = deletedLines(ctx, target.range, axis);
   const id = m.frame.id;
   const all =
     axis === 'row'
@@ -349,6 +369,31 @@ export function compileTable(ctx: CommandContext, batch: OpBatch, command: Table
         setAttr(batch, m.part, m.gridCols[c].id, 'w', w);
       refit(ctx, batch, m);
       return { batch, effect: { label: 'columnWidth' } };
+    }
+    case 'pasteCells': {
+      const { m, range } = tableTarget(ctx, batch);
+      const texts = command.texts;
+      if (!Array.isArray(texts) || texts.length === 0 || texts.length > m.nR * 4)
+        throw new CommandRefusal('errors.unsupported', 'texts');
+      let r1 = range.r0;
+      let c1 = range.c0;
+      texts.forEach((row, i) => {
+        if (!Array.isArray(row)) throw new CommandRefusal('errors.unsupported', 'texts');
+        row.forEach((text, j) => {
+          if (typeof text !== 'string') throw new CommandRefusal('errors.unsupported', 'texts');
+          const r = range.r0 + i;
+          const c = range.c0 + j;
+          if (r >= m.nR || c >= m.nC) return;
+          const a = m.anchors[r][c];
+          if (a.row !== r || a.column !== c) return;
+          setCellText(batch, m, a, text);
+          r1 = Math.max(r1, r);
+          c1 = Math.max(c1, c);
+        });
+      });
+      refit(ctx, batch, m);
+      const filled = { r0: range.r0, c0: range.c0, r1, c1 };
+      return { batch, effect: { label: 'pasteCells', selection: cells(m.frame.id, filled) } };
     }
     case 'distributeRows':
     case 'distributeColumns': {

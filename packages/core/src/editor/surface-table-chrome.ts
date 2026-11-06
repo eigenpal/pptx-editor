@@ -20,8 +20,6 @@ const EMU_PER_PX = 9_525;
  */
 const HANDLE_PX = 16;
 const HANDLE_GAP_PX = 6;
-/** The rotation handle is 22 px above the top center: no column button within this of it. */
-const ROTATION_CLEAR_PX = 14;
 /** An insert button: a 16 px circle whose center is 14 px out from the table's edge. */
 const INSERT_RADIUS_PX = 8;
 const INSERT_OFFSET_PX = 14;
@@ -164,14 +162,8 @@ export class TableChrome {
       if (inLeftBand && !inTopBand && t.rowY.length > 1)
         return { id, insert: { axis: 'row', index: nearestLine(t.rowY, local.y) } };
       // The grid of a right-to-left table runs the other way; its columns insert from the menus.
-      if (inTopBand && !inLeftBand && !t.rtl && t.columnX.length > 1) {
-        const index = nearestLine(t.columnX, local.x);
-        // A selected table shows its rotation handle over the top center: no button under it.
-        const clear =
-          id !== selected ||
-          Math.abs(t.columnX[index] - frame.element.xfrm.cx / 2) >= ROTATION_CLEAR_PX * lp;
-        return clear ? { id, insert: { axis: 'column', index } } : { id };
-      }
+      if (inTopBand && !inLeftBand && !t.rtl && t.columnX.length > 1)
+        return { id, insert: { axis: 'column', index: nearestLine(t.columnX, local.x) } };
       if (onTable || id === hit) return { id };
       // Outside the table and its bands, the selected table keeps its handle; a hovered one does not.
       if (id === selected) return null;

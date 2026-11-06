@@ -1,7 +1,12 @@
 // Labels and tones the adapters show about the slide canvas: the Format panel's element kind,
 // and the tone of the edit notice. Shared by React and Vue, so the two cannot drift.
 
-import type { EditorRejection, EditorSnapshot, SelectionGeometry } from '../contracts/index.ts';
+import type {
+  EditorRejection,
+  EditorSnapshot,
+  SelectionGeometry,
+  TableStyleOption,
+} from '../contracts/index.ts';
 
 /** The i18n key that names a selected element in the Format panel. */
 export type ElementKindLabelKey =
@@ -24,6 +29,39 @@ export function elementKindLabelKey(
     return 'panel.format.elementKind.table';
   return `panel.format.elementKind.${geometry.kind}`;
 }
+
+/**
+ * The Format panel shows Rotation for the selected element: a table frame does not rotate, as
+ * in slide editors. @internal
+ */
+export function elementRotates(
+  geometry: Pick<SelectionGeometry, 'nodeId'>,
+  table: EditorSnapshot['table']
+): boolean {
+  return table?.nodeId !== geometry.nodeId;
+}
+
+/** One style option check box of the Format panel's Table section. @internal */
+export interface TableOptionRow {
+  readonly option: TableStyleOption;
+  readonly labelKey:
+    | 'table.headerRow'
+    | 'table.totalRow'
+    | 'table.bandedRows'
+    | 'table.firstColumn'
+    | 'table.lastColumn'
+    | 'table.bandedColumns';
+}
+
+/** The Format panel's style option check boxes, in the Table Design order. @internal */
+export const TABLE_OPTION_ROWS: readonly TableOptionRow[] = [
+  { option: 'firstRow', labelKey: 'table.headerRow' },
+  { option: 'lastRow', labelKey: 'table.totalRow' },
+  { option: 'bandRow', labelKey: 'table.bandedRows' },
+  { option: 'firstCol', labelKey: 'table.firstColumn' },
+  { option: 'lastCol', labelKey: 'table.lastColumn' },
+  { option: 'bandCol', labelKey: 'table.bandedColumns' },
+];
 
 /**
  * The tone of the edit notice for a refusal: `info` for a state the edit cannot run in

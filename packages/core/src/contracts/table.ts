@@ -152,6 +152,13 @@ export type TableCommand =
   | { readonly type: 'setRowHeight'; readonly height: number }
   /** The width of the selected columns in EMU (`a:gridCol/@w`). */
   | { readonly type: 'setColumnWidth'; readonly width: number }
+  /**
+   * Fill cells with plain text from the top-left cell of the selection (a paste of copied
+   * cells): one array for each row, one string for each cell. Each written cell keeps the format
+   * of its first run. Text past the table's edge is left out, and a position inside a merged
+   * cell is skipped.
+   */
+  | { readonly type: 'pasteCells'; readonly texts: readonly (readonly string[])[] }
   /** Give the selected rows (or every row) the same height. */
   | { readonly type: 'distributeRows' }
   /** Give the selected columns (or every column) the same width. */

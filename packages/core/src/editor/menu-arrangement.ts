@@ -147,6 +147,9 @@ export const CONTEXT_MENU_NAMED_PARTS = {
   DeleteTableRow: row('table.delete', 'rows'),
   DeleteTableColumn: row('table.delete', 'columns'),
   DeleteTable: row('table.delete', 'table'),
+  SelectTable: row('table.select', 'table'),
+  SelectTableRow: row('table.select', 'row'),
+  SelectTableColumn: row('table.select', 'column'),
 } as const satisfies Record<string, MenuNamedRow>;
 
 /**

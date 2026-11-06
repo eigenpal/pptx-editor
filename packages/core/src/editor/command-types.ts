@@ -136,6 +136,7 @@ const COMMAND_TABLE = {
   setColumnWidth: true,
   distributeRows: true,
   distributeColumns: true,
+  pasteCells: true,
   setTableGrid: true,
 } as const satisfies Record<EditorCommandType, true>;
 

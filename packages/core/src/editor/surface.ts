@@ -1,7 +1,7 @@
 // The editable slide surface translates input into editor commands and paints layout geometry.
 
 import { paintSlide } from '../output/index.ts';
-import { apply, type LayoutItem, type Matrix, type SlideLayout } from '../layout/index.ts';
+import type { LayoutItem, SlideLayout } from '../layout/index.ts';
 import type { EditorSelection, ImageCrop, TransformItem } from '../contracts/index.ts';
 import { SVG_NS } from '../output/index.ts';
 import { ghostBullet } from './surface-ghost.ts';
@@ -33,7 +33,6 @@ import {
   lineEnds,
   lineTransform,
   rotationAfterDrag,
-  rotationHandle,
   slideCenter,
   toFile,
   toParent,
@@ -52,6 +51,7 @@ import { hitItem, inText, onBorder } from './surface-hit.ts';
 import { fitZoom, outsideVeil, scrollBoxIntoView } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
 import { resizeOne, scaleMany } from './surface-resize.ts';
+import { HANDLE_POS, handleElements, type Handle } from './surface-handles.ts';
 
 const EMU_PER_PX = 9_525;
 
@@ -90,21 +90,6 @@ export interface SurfaceHost extends SurfaceInputHost {
   /** Whether an element's aspect ratio is locked: every resize handle keeps the ratio. */
   aspectLocked?(nodeId: string): boolean;
 }
-
-type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'rot' | 'start' | 'end';
-type BoxHandle = Exclude<Handle, 'start' | 'end'>;
-const HANDLES: readonly BoxHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w', 'rot'];
-const HANDLE_POS: Record<Exclude<Handle, 'start' | 'end'>, [number, number]> = {
-  nw: [0, 0],
-  n: [0.5, 0],
-  ne: [1, 0],
-  e: [1, 0.5],
-  se: [1, 1],
-  s: [0.5, 1],
-  sw: [0, 1],
-  w: [0, 0.5],
-  rot: [0.5, 0],
-};
 
 /** Find a slide item by node id, inside groups too. */
 export function itemById(layout: SlideLayout | undefined, id: string): LayoutItem | undefined {
@@ -357,60 +342,8 @@ export class SlideSurface {
       parts.push(g);
     }
     // Handles show while text is edited too, so a text box can be resized without leaving it.
-    if (line && !this.editor.readOnly()) {
-      for (const [handle, p] of [
-        ['start', line.start],
-        ['end', line.end],
-      ] as const) {
-        const node = doc.createElementNS(ns, 'circle');
-        node.setAttribute('class', 'pptx-surface__handle pptx-surface__handle--point');
-        node.setAttribute('data-handle', handle);
-        node.setAttribute('cx', String(p.x));
-        node.setAttribute('cy', String(p.y));
-        node.setAttribute('r', String(px * 5));
-        node.setAttribute('stroke-width', String(px));
-        parts.push(node);
-      }
-    } else if (sel.kind !== 'none' && selected.length > 0 && !crop && !this.editor.readOnly()) {
-      const single = selected.length === 1 ? selected[0] : undefined;
-      const u = unionBounds(selected);
-      // One shape: handles on its own (rotated) box. Several: on their common bounds.
-      const m: Matrix = single ? single.matrix : [1, 0, 0, 1, u.x, u.y];
-      const cx = single ? single.element.xfrm.cx : u.r - u.x;
-      const cy = single ? single.element.xfrm.cy : u.b - u.y;
-      if (!single) {
-        const box = doc.createElementNS(ns, 'rect');
-        box.setAttribute('class', 'pptx-surface__group-outline');
-        box.setAttribute('x', String(u.x));
-        box.setAttribute('y', String(u.y));
-        box.setAttribute('width', String(cx));
-        box.setAttribute('height', String(cy));
-        box.setAttribute('stroke-width', String(px));
-        box.setAttribute('stroke-dasharray', `${px * 2} ${px * 2}`);
-        parts.push(box);
-      }
-      for (const handle of HANDLES) {
-        if (handle === 'rot' && !single) continue;
-        const [hx, hy] = HANDLE_POS[handle];
-        const p = apply(m, hx * cx, hy * cy);
-        const hp = handle === 'rot' && single ? rotationHandle(single, 22 * px) : p;
-        const node = doc.createElementNS(ns, handle === 'rot' ? 'circle' : 'rect');
-        node.setAttribute('class', `pptx-surface__handle pptx-surface__handle--${handle}`);
-        node.setAttribute('data-handle', handle);
-        if (handle === 'rot') {
-          node.setAttribute('cx', String(hp.x));
-          node.setAttribute('cy', String(hp.y));
-          node.setAttribute('r', String(px * 5));
-        } else {
-          node.setAttribute('x', String(p.x - px * 4));
-          node.setAttribute('y', String(p.y - px * 4));
-          node.setAttribute('width', String(px * 8));
-          node.setAttribute('height', String(px * 8));
-        }
-        node.setAttribute('stroke-width', String(px));
-        parts.push(node);
-      }
-    }
+    if (sel.kind !== 'none' && !crop && !this.editor.readOnly())
+      parts.push(...handleElements(doc, selected, line, px));
     parts.push(...presenceElements(doc, layout, this.editor.presence?.() ?? [], px));
     parts.push(...guideElements(doc, this.#guides, px));
     if (this.#marquee) {

@@ -232,17 +232,12 @@ describe('the table chrome', () => {
     expect(c.elements(doc, layout(e))).toEqual([]);
   });
 
-  test('a selected table offers no column button under its rotation handle', async () => {
+  test('a selected table offers the column button on its middle line', async () => {
     const e = await open(deck(false, 4));
     const { c } = chrome(e);
-    // Hovered only: the middle line has its button.
-    c.hover(layout(e), at(e, columnX(e)[2], -10 * PX), frameId(e));
-    expect(classes(c.elements(doc, layout(e)))).toContain('pptx-surface__table-insert');
-    // Selected: the rotation handle sits over the top center, so the button stays away.
+    // A table has no rotation handle, so the top center keeps its button when selected.
     e.setSelection({ kind: 'shapes', nodeIds: [frameId(e)] });
     c.hover(layout(e), at(e, columnX(e)[2], -10 * PX), frameId(e));
-    expect(classes(c.elements(doc, layout(e)))).toEqual(['pptx-surface__table-handle']);
-    c.hover(layout(e), at(e, columnX(e)[1], -10 * PX), frameId(e));
     expect(classes(c.elements(doc, layout(e)))).toContain('pptx-surface__table-insert');
   });
 

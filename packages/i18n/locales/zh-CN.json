@@ -430,6 +430,9 @@
     "bandedColumns": "镶边列",
     "cellFill": "底纹",
     "borderTarget": "边框",
+    "borderColor": "笔颜色",
+    "borderStyle": "笔样式",
+    "borderWidth": "笔画粗细",
     "border": {
       "all": "所有框线",
       "outside": "外侧框线",
@@ -440,6 +443,7 @@
       "right": "右框线",
       "none": "无框线"
     },
+    "insertSubmenu": "插入",
     "select": "选择",
     "region": {
       "table": "选择表格",
@@ -809,7 +813,11 @@
         "connector": "连接符",
         "graphicFrame": "嵌入对象",
         "table": "表格"
-      }
+      },
+      "table": "表格",
+      "rowHeight": "行高",
+      "columnWidth": "列宽",
+      "styleOptions": "表格样式选项"
     },
     "comments": {
       "emptyTitle": "没有批注",

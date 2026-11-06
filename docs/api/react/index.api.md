@@ -1660,7 +1660,10 @@ export interface ToolbarNamedParts {
     readonly Superscript: ToolbarPartComponent;
     readonly TableBandedColumns: ToolbarPartComponent;
     readonly TableBandedRows: ToolbarPartComponent;
+    readonly TableBorderColor: ToolbarColorSplitComponent;
+    readonly TableBorderStyle: ToolbarSlotPartComponent;
     readonly TableBorderTarget: ToolbarSlotPartComponent;
+    readonly TableBorderWidth: ToolbarSlotPartComponent;
     readonly TableCellFill: ToolbarColorSplitComponent;
     readonly TableCellMargins: ToolbarSlotPartComponent;
     readonly TableDelete: ToolbarSlotPartComponent;

@@ -64,6 +64,26 @@ An address inside a merged cell moves to the merged cell's top-left grid positio
 
 Every text command works in a cell, in each cell of a range, and in each cell of a selected table: font, size, bold, alignment, bullets, and the others. Type with `editor.input('text', value)` while the caret is in a cell. Tab selects the text of the next cell, and Shift+Tab the text of the cell before. Tab in the last cell adds a row. An arrow key at the edge of a cell's text moves to the next cell, and Escape selects the table. Typing with a range of cells selected is refused with `disabled.typeInOneCell`.
 
+Shift+Arrow extends the text selection in the cell. At the edge of the cell's text, it selects a range of cells, and later Shift+Arrow presses grow the range one cell at a time.
+
+## Copy and paste cells
+
+With a range of cells selected, Copy and Cut put the cells on the clipboard as tab-separated text, one line for each row. Cut also clears the cells. Paste into a range of cells, or paste text that holds tabs at a caret in a cell, to fill cells from the top-left cell of the range or the caret's cell. Text pasted at a caret without tabs goes into the cell's text, as usual.
+
+The paste runs `pasteCells`, so a host can run it too:
+
+```ts
+editor.exec({
+  type: 'pasteCells',
+  texts: [
+    ['Q1', 'Q2'],
+    ['12', '15'],
+  ],
+});
+```
+
+A paste fills as many cells as the table has, and adds no rows or columns. A covered position of a merged cell takes no text. A line break in a value makes a new paragraph in its cell. A paste reads at most 75 rows, 75 columns, and 32,768 characters in each cell. After the paste, the filled cells are selected.
+
 ## Edit on the canvas
 
 The canvas shows table chrome while the pointer is over a table or the selection is in it, as DOCX Editor does:
@@ -71,9 +91,10 @@ The canvas shows table chrome while the pointer is over a table or the selection
 - **Select handle.** A small box with a move symbol sits out from the table's top-left corner. Click it to select the table. Drag it to move the table.
 - **Grid lines.** The grid line under the pointer is marked across the table. Drag it to resize the columns or rows beside it; the right and bottom edges resize the last column or row. The drag selects the table and is one undo step. A click on a line places no caret. A table in a group shows its chrome after you enter the group.
 - **Insert buttons.** Point at the left edge of the table to show a "+" button just outside it, at the nearest row line. Click it to insert a row below that line. The top edge shows the same button for a column to the right of a column line. A right-to-left table inserts columns from the menus only.
-- **Context menu.** Right-click a cell for Select table, insert and delete rows and columns, merge, and split.
+- **Context menu.** Right-click a cell for Cut, Copy, and Paste, the **Insert**, **Delete**, and **Select** submenus, Merge cells, Split cells, and the Font and Paragraph dialogs. Right-click a table that is selected as an object for the object menu.
+- **Format panel.** The Format panel shows the size and position of a selected table, its row height and column width, and the table style options. A table has no rotation.
 
-The chrome does not show in view mode. The toolbar shows a short table group while the selection is in a table: the style, cell fill, borders, select, delete, insert, merge, and split. The style options, distribute, and cell margins are on the ribbon's Table Design and Table Layout tabs, and a host places any table slot with `Toolbar.Slot`.
+The chrome does not show in view mode. The toolbar shows a short table group while the selection is in a table: the style, cell fill, borders, select, delete, insert, merge, and split. The style options, the border pen, distribute, and cell margins are on the ribbon's Table Design and Table Layout tabs, and a host places any table slot with `Toolbar.Slot`.
 
 ## Edit structure
 
@@ -83,7 +104,7 @@ The chrome does not show in view mode. The toolbar shows a short table group whi
 | `{ type: 'insertColumn', where: 'left' \| 'right' }` | The same for columns |
 | `{ type: 'deleteRow' }`, `{ type: 'deleteColumn' }` | Deletes the selected rows or columns; the table goes when none would stay |
 | `{ type: 'deleteTable' }` | Deletes the table |
-| `{ type: 'selectTableRegion', region: 'table' \| 'row' \| 'column' }` | Selects the table, or the rows or columns of the selection |
+| `{ type: 'selectTableRegion', region: 'table' \| 'row' \| 'column' }` | Selects the table, or the rows or columns of the selection. A merged cell does not widen the region, so Select column and then Delete columns under a merged header deletes one column |
 | `{ type: 'setRowHeight', height }`, `{ type: 'setColumnWidth', width }` | Sizes in EMU; a row height is a minimum, so rows still grow to fit their text |
 | `{ type: 'distributeRows' }`, `{ type: 'distributeColumns' }` | Gives the selected rows or columns the same size |
 | `{ type: 'setTableGrid', columns?, rows? }` | Sets every grid column width or row height at once, in EMU, as a grid line drag does. Run the steps of one drag with one `historyGroup` to undo them as one step (see [Undo and history groups](/docs/guides/undo-history)) |
@@ -110,7 +131,20 @@ editor.exec({ type: 'splitCell', rows: 2, cols: 1 });
 | `{ type: 'setCellFill', color }` | A color, or `null` for No Fill |
 | `{ type: 'setTableBorders', scope, spec }` | `all`, `outside`, `inside`, `top`, `bottom`, `left`, or `right`, with `{ color, width, dash? }` in points; `{ scope: 'none' }` removes every border of the selected cells |
 | `{ type: 'setCellMargins', margins }` | `left`, `right`, `top`, `bottom` in EMU |
+| `{ type: 'pasteCells', texts }` | Fills cells from the top-left cell of the selection with rows of text (see [Copy and paste cells](#copy-and-paste-cells)) |
 | `{ type: 'setVerticalAlign', anchor }` | `t`, `ctr`, or `b` for the selected cells |
+
+### Draw borders with the pen
+
+The Borders menu (`table.borderTarget`) draws with the border pen: Pen color (`table.borderColor`), Pen style (`table.borderStyle`, a `LineDash`), and Pen weight (`table.borderWidth`, in points). Pick a border target to draw the pen there. Pick a pen color, style, or weight to redraw the last target with the new pen. Until the first pick, the pen draws all borders, 1 pt solid, in the theme's Text 1.
+
+The pen is a setting of each editor, not part of the document. `tableBorderPen(editor)` returns it, and `runToolbarCommand` keeps it current:
+
+```ts
+runToolbarCommand(editor, 'table.borderTarget', 'outside');
+runToolbarCommand(editor, 'table.borderColor', '#1F4E79'); // redraws the outside borders
+tableBorderPen(editor); // { target: 'outside', spec: { color: '#1F4E79', width: 1 } }
+```
 
 ## Customize the table chrome
 
@@ -139,7 +173,7 @@ Give a button your own icon, or render your own element with `asChild`. The name
 </PptxEditor.Toolbar>
 ```
 
-`table.insert` (the Insert Table grid button) takes `icon` and `asChild` too, and `table.cellFill` takes `icon` for its color split. The dropdown pickers (`table.style`, `table.borderTarget`, `table.select`, `table.delete`, `table.splitCell`, and `table.cellMargins`) take `className` and `hidden`, and warn in development on `icon` or `asChild`. `PptxEditor.Menu`'s Insert menu already holds the Table grid; `PptxEditor.Menu.TableGrid` places it in your own menu, and it closes that menu after an insert.
+`table.insert` (the Insert Table grid button) takes `icon` and `asChild` too, and `table.cellFill` and `table.borderColor` take `icon` for their color splits. The dropdown pickers (`table.style`, `table.borderTarget`, `table.borderStyle`, `table.borderWidth`, `table.select`, `table.delete`, `table.splitCell`, and `table.cellMargins`) take `className` and `hidden`, and warn in development on `icon` or `asChild`. `PptxEditor.Menu`'s Insert menu already holds the Table grid; `PptxEditor.Menu.TableGrid` places it in your own menu, and it closes that menu after an insert.
 
 In Vue, the same parts are `PptxEditorToolbar`, `ToolbarGroup`, and `ToolbarSlot`:
 

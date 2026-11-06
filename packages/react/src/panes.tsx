@@ -37,6 +37,8 @@ import {
   zoomStep,
   zoomLimitReason,
   elementKindLabelKey,
+  elementRotates,
+  TABLE_OPTION_ROWS,
   platformShortcuts,
   type SlideRailOrientation,
   type SlideSummary,
@@ -680,18 +682,54 @@ function FormatTab() {
           {field('y', 'panel.format.y')}
         </div>
       </div>
-      <div className="pptx-panel__section">
-        <h3 className="pptx-panel__title">{t('panel.format.rotation')}</h3>
-        <div className="pptx-panel__grid">
-          <NumberField
-            label={t('panel.format.angle')}
-            value={String(Math.round(g.rot * 10) / 10)}
-            unit="°"
-            disabled={readOnly}
-            onCommit={(v) => move({ rot: ((v % 360) + 360) % 360 })}
-          />
+      {elementRotates(g, table) ? (
+        <div className="pptx-panel__section">
+          <h3 className="pptx-panel__title">{t('panel.format.rotation')}</h3>
+          <div className="pptx-panel__grid">
+            <NumberField
+              label={t('panel.format.angle')}
+              value={String(Math.round(g.rot * 10) / 10)}
+              unit="°"
+              disabled={readOnly}
+              onCommit={(v) => move({ rot: ((v % 360) + 360) % 360 })}
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
+      {table ? (
+        <div className="pptx-panel__section">
+          <h3 className="pptx-panel__title">{t('panel.format.table')}</h3>
+          <div className="pptx-panel__grid">
+            <NumberField
+              label={t('panel.format.rowHeight')}
+              value={inches(table.rowHeight)}
+              unit={unit}
+              disabled={readOnly}
+              onCommit={(v) => editor?.exec({ type: 'setRowHeight', height: inch(v) })}
+            />
+            <NumberField
+              label={t('panel.format.columnWidth')}
+              value={inches(table.columnWidth)}
+              unit={unit}
+              disabled={readOnly}
+              onCommit={(v) => editor?.exec({ type: 'setColumnWidth', width: inch(v) })}
+            />
+          </div>
+          <div className="pptx-radios" role="group" aria-label={t('panel.format.styleOptions')}>
+            {TABLE_OPTION_ROWS.map(({ option, labelKey }) => (
+              <label key={option} className="pptx-radio">
+                <input
+                  type="checkbox"
+                  checked={table.options.includes(option)}
+                  disabled={readOnly}
+                  onChange={() => editor?.exec({ type: 'toggleTableStyleOption', option })}
+                />
+                {t(labelKey)}
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {g.textFitting ? (
         <div className="pptx-panel__section">
           <h3 className="pptx-panel__title">{t('panel.format.textFitting')}</h3>
