@@ -2324,7 +2324,7 @@ export interface FontReport {
     }[];
     // (undocumented)
     readonly refusedEmbedded: readonly string[];
-    readonly substituteFailures: readonly string[];
+    readonly substituteFailures: readonly SubstituteFontFailure[];
 }
 
 // @public
@@ -2942,6 +2942,9 @@ export interface LoadingSheetSize {
 
 // @internal
 export function loadingSheetSize(snapshot: EditorSnapshot): LoadingSheetSize;
+
+// @internal
+export function loadSubstitute(family: DefaultFamily, fetcher?: typeof fetch | undefined): Promise<SubstituteLoad>;
 
 // @internal
 export function localeContentKey(locale: unknown): string;
@@ -4718,6 +4721,19 @@ export function subscribeSystemDark(listener: () => void): () => void;
 
 // @public
 export function substituteFamiliesFor(pkg: PptxPackage): DefaultFamily[];
+
+// @public
+export interface SubstituteFontFailure {
+    readonly diagnostic: string;
+    readonly family: string;
+    readonly file: string;
+}
+
+// @internal
+export interface SubstituteLoad {
+    readonly failures: readonly SubstituteFontFailure[];
+    readonly sources: readonly FontSource_2[];
+}
 
 // @internal
 export const SUPER_OFFSET = "30";

@@ -74,11 +74,24 @@ export interface FontReport {
   readonly embeddedFaces: number;
   readonly refusedEmbedded: readonly string[];
   /**
-   * Packaged substitute faces that failed to load, each as `family (file): reason`. Text in
-   * those families measures and paints with another face, or with none.
+   * Packaged substitute faces that failed to load. Text in those families measures and paints
+   * with another face, or with none.
    */
-  readonly substituteFailures: readonly string[];
+  readonly substituteFailures: readonly SubstituteFontFailure[];
   readonly faces: readonly { readonly family: string; readonly origin: string }[];
+}
+
+/**
+ * A packaged substitute face that failed to load, as DOCX Editor's `DefaultFontLoadFailure`
+ * reports it. @public
+ */
+export interface SubstituteFontFailure {
+  /** The family the face substitutes for, for example `Calibri`. */
+  readonly family: string;
+  /** The packaged file, for example `Carlito-Regular.ttf`. Empty when the whole family failed. */
+  readonly file: string;
+  /** Why it failed. Do not use this text for program control. */
+  readonly diagnostic: string;
 }
 
 /** Elements whose `typeface` names a family layout measures with. */
@@ -161,10 +174,12 @@ export function substituteFamiliesFor(pkg: PptxPackage): DefaultFamily[] {
   return [...families];
 }
 
-/** The packaged substitutes of one family, and the faces that failed to load. */
-interface SubstituteLoad {
+/** The packaged substitutes of one family, and the faces that failed to load. @internal */
+export interface SubstituteLoad {
+  /** The faces that loaded. */
   readonly sources: readonly FontSource[];
-  readonly failures: readonly string[];
+  /** The faces that did not load. */
+  readonly failures: readonly SubstituteFontFailure[];
 }
 
 const substituteCache = new Map<DefaultFamily, Promise<SubstituteLoad>>();
@@ -184,8 +199,11 @@ function substituteFetch(): typeof fetch | undefined {
   return substituteFetcher;
 }
 
-function loadSubstitute(family: DefaultFamily): Promise<SubstituteLoad> {
-  const fetcher = substituteFetch();
+/** Load one family's packaged substitutes. `fetcher` is injectable for tests. @internal */
+export function loadSubstitute(
+  family: DefaultFamily,
+  fetcher: typeof fetch | undefined = substituteFetch()
+): Promise<SubstituteLoad> {
   return loadDefaultFonts({ families: [family], ...(fetcher ? { fetcher } : {}) }).then(
     (fragment) => ({
       sources: fragment.sources.map((s) => ({
@@ -195,11 +213,21 @@ function loadSubstitute(family: DefaultFamily): Promise<SubstituteLoad> {
         bytes: s.bytes,
         origin: 'substitute',
       })),
-      failures: fragment.failures.map((f) => `${f.family} (${f.file}): ${f.diagnostic}`),
+      failures: fragment.failures.map((f) => ({
+        family: f.family,
+        file: f.file,
+        diagnostic: f.diagnostic,
+      })),
     }),
     (error: unknown) => ({
       sources: [],
-      failures: [`${family}: ${error instanceof Error ? error.message : String(error)}`],
+      failures: [
+        {
+          family,
+          file: '',
+          diagnostic: error instanceof Error ? error.message : String(error),
+        },
+      ],
     })
   );
 }
@@ -291,7 +319,7 @@ interface FontSet {
   readonly configured: HostFaces;
   readonly substitutes: readonly FontSource[];
   readonly refused: readonly string[];
-  readonly substituteFailures: readonly string[];
+  readonly substituteFailures: readonly SubstituteFontFailure[];
   readonly fixed: boolean;
 }
 
@@ -582,7 +610,7 @@ export async function openPresentation(
     refused,
     configured: NO_HOST_FACES,
     substitutes: [] as readonly FontSource[],
-    substituteFailures: [] as readonly string[],
+    substituteFailures: [] as readonly SubstituteFontFailure[],
   };
   if (options.fixedMeasurer)
     return { ok: true, session: new DocumentSession(store, { ...base, fixed: true }) };

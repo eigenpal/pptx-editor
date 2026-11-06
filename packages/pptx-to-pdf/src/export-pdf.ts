@@ -152,6 +152,15 @@ async function renderSession(
       for (const d of diag.list) diagnostics.push(d);
     }
   }
+  // A packaged substitute that failed to load changes how text measures on every page: one
+  // document-wide diagnostic per face, with no slide or page, as DOCX Editor reports
+  // font source failures.
+  for (const f of state.fontResolution.substituteFailures)
+    diagnostics.push({
+      code: 'font.substitute-failed',
+      severity: 'approximation',
+      message: `The ${clip(f.family)} substitute${f.file ? ` (${clip(f.file)})` : ''} did not load: ${clip(f.diagnostic, 200)}.`,
+    });
   const layoutMs = phase() - openMs;
 
   const doc = await PDFDocument.create({ updateMetadata: false });
@@ -178,15 +187,6 @@ async function renderSession(
   for (const [pageIndex, { index, layout }] of layouts.entries()) {
     step();
     const diag = new SlideDiagnostics(index, pageIndex);
-    // A packaged substitute that failed to load changes how text measures on every page, so
-    // the first page names each failure once.
-    if (pageIndex === 0)
-      for (const failure of state.fontResolution.substituteFailures)
-        diag.add(
-          'font.substitute-failed',
-          'approximation',
-          `A packaged substitute font failed to load: ${clip(failure, 200)}.`
-        );
     // Let the timer and the caller's signal run between slides, as DOCX Editor does.
     await work.yield();
     await paintSlide(layout, res, diag);

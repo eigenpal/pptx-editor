@@ -1,11 +1,12 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { FONT_ASSET_ROOT } from '@docx-editor.dev/fonts';
 import { createPackagedFileFetch } from '../packaged-file-fetch.ts';
-import { openPresentation } from '../document-session.ts';
+import { loadSubstitute, openPresentation } from '../document-session.ts';
 import { buildPptx } from '../../../../../scripts/fixtures/builder.ts';
 
 const base = mkdtempSync(join(tmpdir(), 'pptx-packaged-fetch-'));
@@ -56,6 +57,21 @@ describe('createPackagedFileFetch', () => {
     }
   );
 
+  test('refuses a folder and a FIFO without blocking', async () => {
+    mkdirSync(join(root, 'folder.ttf'));
+    expect((await read(at('folder.ttf'))).status).toBe(404);
+    // Opening a FIFO for reading blocks until a writer comes, unless the reader passes O_NONBLOCK.
+    if (process.platform !== 'win32' && spawnSync('mkfifo', [join(root, 'pipe.ttf')]).status === 0)
+      expect((await read(at('pipe.ttf'))).status).toBe(404);
+  });
+
+  test("stops on an aborted Request's own signal", async () => {
+    const controller = new AbortController();
+    controller.abort(new Error('stop'));
+    const request = { url: at('face.ttf'), signal: controller.signal } as unknown as Request;
+    await expect(read(request)).rejects.toThrow('stop');
+  });
+
   test('refuses a file over maxBytes before it reads it', async () => {
     expect((await read(at('big.ttf'))).status).toBe(413);
   });
@@ -100,6 +116,24 @@ describe('packaged substitutes', () => {
       opened.session.dispose();
     } finally {
       globalThis.fetch = saved;
+    }
+  });
+});
+
+describe('substitute failures', () => {
+  test('name the family, the file, and the reason of each face that fails', async () => {
+    const refuse = (async () => new Response(null, { status: 404 })) as unknown as typeof fetch;
+    const load = await loadSubstitute('Arial', refuse);
+    expect(load.sources).toEqual([]);
+    expect(load.failures.map((f) => f.file)).toEqual([
+      'LiberationSans-Regular.ttf',
+      'LiberationSans-Bold.ttf',
+      'LiberationSans-Italic.ttf',
+      'LiberationSans-BoldItalic.ttf',
+    ]);
+    for (const f of load.failures) {
+      expect(f.family).toBe('Arial');
+      expect(f.diagnostic.length).toBeGreaterThan(0);
     }
   });
 });

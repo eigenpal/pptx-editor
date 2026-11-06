@@ -111,7 +111,7 @@ Each diagnostic has a fixed `code`. Handle an unknown code by its `severity`. Th
 | `text.underline-style` | `approximation` | A dotted, dashed, wavy, heavy, or word-only underline is drawn as a single line, as in the editor. |  |
 | `text.synthetic-style`, `text.upright`, `text.missing-glyph` | `approximation` | Synthetic bold and italic, upright vertical characters, and characters the face lacks. | `missing-glyph` |
 | `font.missing`, `font.not-embedded` | `unsupported` | A face has no bytes, or may not be embedded; its text is not drawn. The message names the font. | `font-embedding` |
-| `font.substitute-failed` | `approximation` | A packaged substitute face did not load, so its text measures and draws with another face. The message names the family and the file; `fontResolution.substituteFailures` lists every failure. |  |
+| `font.substitute-failed` | `approximation` | A packaged substitute face did not load, so its text measures and draws with another face. The diagnostic is document-wide: it has no slide or page. `fontResolution.substituteFailures` lists each failure as `{ family, file, diagnostic }`. | `font-origin-failed` |
 | `frame.chart`, `frame.diagram`, `frame.ole`, `frame.unknown` | `unsupported` | A chart, diagram, OLE object with no PNG, JPEG, GIF, or BMP picture, or other graphic frame is not drawn. Tables and OLE pictures draw. | `drawing` |
 | `frame.table` | `unsupported` | A table frame with no grid (no `a:tbl`, or no rows or columns) is not drawn. |  |
 | `geometry.unknown-preset` | `approximation` | An unknown preset geometry is drawn as a rectangle. |  |
@@ -131,7 +131,7 @@ The names follow DOCX Editor's `@docx-editor.dev/docx-to-pdf` where the concept 
 | `OpenPdfDocumentForExportOptions`, `PdfProjectionOptions` | The session options (`fonts`, `substitutes`, `signal`) and the output options of `exportPdfFrom` |
 | `PdfExportSession` | `fontResolution` and `dispose()` |
 | `PdfExportResult.slideNumbers` | The one-based deck slide number of each page. Hidden slides (unless `includeHiddenSlides` is true) and slides that cannot be laid out have no page. |
-| `PdfDiagnostic` | `code` (a fixed string), `message`, `severity` (`unsupported`, `approximation`, `information`), `slideIndex`, `slideNumber`, and `pageIndex`, `pageNumber` of the output page |
+| `PdfDiagnostic` | `code` (a fixed string), `message`, `severity` (`unsupported`, `approximation`, `information`), `slideIndex`, `slideNumber`, and `pageIndex`, `pageNumber` of the output page. A document-wide diagnostic has no slide or page. |
 | `PdfFontResolution` | The faces the conversion drew with, the substituted families, and the embedded faces the deck may not use |
 | Errors | `PdfDocumentOpenError`, `PdfFidelityError`, `PdfPageLimitError`, `PdfOutputLimitError`, `PdfEncodingError`, `PdfWorkLimitError` (`timeout`, `aborted`, `operations`), `ExportResourceError` (`disposed`, `aborted`) |
 

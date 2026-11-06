@@ -174,8 +174,10 @@ function checkNodePdf(report, out) {
   if (report.pages < 1) out.push('node pdf: the export has no pages');
   if (report.embeddedFonts < 1) out.push('node pdf: the PDF embeds no font, so it has no text');
   if (report.substituteFaces < 1) out.push('node pdf: no packaged substitute font loaded');
-  for (const failure of report.substituteFailures)
-    out.push(`node pdf: a substitute font failed to load: ${failure}`);
+  for (const f of report.substituteFailures)
+    out.push(
+      `node pdf: a substitute font failed to load: ${f.family} (${f.file}): ${f.diagnostic}`
+    );
   for (const message of report.fontDiagnostics) out.push(`node pdf: ${message}`);
 }
 

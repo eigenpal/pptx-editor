@@ -202,7 +202,18 @@
           }
         },
         "refusedEmbedded": { "type": "array", "items": { "type": "string" } },
-        "substituteFailures": { "type": "array", "items": { "type": "string" } }
+        "substituteFailures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["family", "file", "diagnostic"],
+            "properties": {
+              "family": { "type": "string" },
+              "file": { "type": "string" },
+              "diagnostic": { "type": "string" }
+            }
+          }
+        }
       }
     },
     "font-plan-identity": {

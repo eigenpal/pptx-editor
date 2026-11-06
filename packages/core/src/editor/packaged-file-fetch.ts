@@ -11,8 +11,15 @@
 // `process.getBuiltinModule` (as `layout/node-module-shim.ts` does), so no bundler sees a
 // Node specifier and the browser build never touches this path.
 
+interface FileStats {
+  readonly size: number;
+  readonly dev: number;
+  readonly ino: number;
+  isFile(): boolean;
+}
+
 interface FileHandle {
-  stat(): Promise<{ size: number }>;
+  stat(): Promise<FileStats>;
   read(
     buffer: Uint8Array,
     offset: number,
@@ -25,8 +32,9 @@ interface FileHandle {
 interface NodeBuiltins {
   readonly open: (path: string, flags: number | string) => Promise<FileHandle>;
   readonly realpath: (path: string) => Promise<string>;
-  readonly noFollow: number | undefined;
-  readonly readOnly: number;
+  readonly stat: (path: string) => Promise<FileStats>;
+  /** `O_RDONLY | O_NOFOLLOW | O_NONBLOCK` where the platform has them, else `'r'`. */
+  readonly flags: number | string;
   readonly fileURLToPath: (url: string) => string;
   readonly path: {
     resolve(...paths: string[]): string;
@@ -45,14 +53,18 @@ function builtinLoader(): BuiltinLoader | undefined {
 }
 
 function nodeBuiltins(load: BuiltinLoader): NodeBuiltins {
-  const fsp = load('node:fs/promises') as Pick<NodeBuiltins, 'open' | 'realpath'>;
-  const fs = load('node:fs') as { constants: { O_RDONLY: number; O_NOFOLLOW?: number } };
+  const fsp = load('node:fs/promises') as Pick<NodeBuiltins, 'open' | 'realpath' | 'stat'>;
+  const { constants: c } = load('node:fs') as {
+    constants: { O_RDONLY: number; O_NOFOLLOW?: number; O_NONBLOCK?: number };
+  };
   const url = load('node:url') as Pick<NodeBuiltins, 'fileURLToPath'>;
   return {
     open: fsp.open,
     realpath: fsp.realpath,
-    readOnly: fs.constants.O_RDONLY,
-    noFollow: fs.constants.O_NOFOLLOW,
+    stat: fsp.stat,
+    // No following a final symbolic link, and no blocking on a FIFO before the type check.
+    // Windows has neither flag; the real path and identity checks below still hold there.
+    flags: c.O_NOFOLLOW === undefined ? 'r' : c.O_RDONLY | c.O_NOFOLLOW | (c.O_NONBLOCK ?? 0),
     fileURLToPath: url.fileURLToPath,
     path: load('node:path') as NodeBuiltins['path'],
   };
@@ -84,21 +96,28 @@ async function readConfined(
     throw new PackagedFileError(404);
   }
   if (!isInside(root, requested, node.path)) throw new PackagedFileError(404);
-  const flags = node.noFollow === undefined ? 'r' : node.readOnly | node.noFollow;
   let handle: FileHandle;
   try {
-    handle = await node.open(requested, flags);
+    handle = await node.open(requested, node.flags);
   } catch (error) {
     const code = (error as { code?: unknown }).code;
-    if (code === 'ENOENT' || code === 'ENOTDIR' || code === 'ELOOP')
+    // ELOOP: a final symbolic link (`O_NOFOLLOW`). EISDIR: a folder on some platforms.
+    if (code === 'ENOENT' || code === 'ENOTDIR' || code === 'ELOOP' || code === 'EISDIR')
       throw new PackagedFileError(404);
     throw error;
   }
   try {
-    // A symbolic link in a parent directory can still point outside: compare real paths.
+    // Only a regular file: never a folder, a FIFO, or a device.
+    const opened = await handle.stat();
+    if (!opened.isFile()) throw new PackagedFileError(404);
+    // A symbolic link in a parent folder can still point outside: compare real paths. Then
+    // check that the open file IS the file at that real path, so a link swapped between the
+    // open and the check cannot pass.
     const actual = await node.realpath(requested);
     if (!isInside(await node.realpath(root), actual, node.path)) throw new PackagedFileError(404);
-    const size = (await handle.stat()).size;
+    const there = await node.stat(actual);
+    if (there.dev !== opened.dev || there.ino !== opened.ino) throw new PackagedFileError(404);
+    const size = opened.size;
     if (!Number.isSafeInteger(size) || size < 0 || size > maxBytes)
       throw new PackagedFileError(413);
     const bytes = new Uint8Array(size);
@@ -140,16 +159,19 @@ export function createPackagedFileFetch(options: {
     const href = typeof input === 'string' ? input : 'href' in input ? input.href : input.url;
     const url = new URL(href);
     if (url.protocol !== 'file:') return fetch(input, init);
-    if (init?.signal?.aborted) throw init.signal.reason;
+    // The init's signal wins, as in `fetch`; a `Request` carries its own.
+    const signal =
+      init?.signal ?? (typeof input === 'object' && 'signal' in input ? input.signal : undefined);
+    if (signal?.aborted) throw signal.reason;
     if (url.username !== '' || url.password !== '' || (url.host !== '' && url.host !== 'localhost'))
       return new Response(null, { status: 404 });
     try {
       const bytes = await readConfined(node, root, url.href, maxBytes);
-      if (init?.signal?.aborted) throw init.signal.reason;
+      if (signal?.aborted) throw signal.reason;
       return new Response(bytes as unknown as BodyInit, { status: 200 });
     } catch (error) {
       if (error instanceof PackagedFileError) return new Response(null, { status: error.status });
-      if (init?.signal?.aborted) throw error;
+      if (signal?.aborted) throw error;
       // A file system error message holds the absolute path, and these messages reach the
       // font report and PDF diagnostics. Keep only the error code.
       const code = (error as { code?: unknown }).code;
