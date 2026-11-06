@@ -1,13 +1,14 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
+import { pdfExportPlugin } from '../shared/pdf-export-plugin.ts';
 
 const pkg = (p: string): string => fileURLToPath(new URL(`../../packages/${p}`, import.meta.url));
 
 // The demo builds against workspace SOURCE, so `bun install && bun run dev` works from a clean
 // clone with no package build step. Port 5274 avoids DOCX Editor's 5173.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), pdfExportPlugin()],
   base: process.env.VITE_BASE_PATH ?? '/',
   resolve: {
     alias: [
@@ -20,6 +21,8 @@ export default defineConfig({
       { find: /^@pptx-editor\.dev\/react$/, replacement: pkg('react/src/index.ts') },
       { find: /^@pptx-editor\.dev\/i18n$/, replacement: pkg('i18n/src/index.ts') },
       { find: /^@pptx-editor\.dev\/pro\/drawing$/, replacement: pkg('pro/src/drawing/index.ts') },
+      // The development server's PDF export (`pdfExportPlugin`) runs the converter from source.
+      { find: /^@pptx-editor\.dev\/pptx-to-pdf$/, replacement: pkg('pptx-to-pdf/src/index.ts') },
     ],
   },
   // Both packages resolve assets relative to their own module URL; pre-bundling would move them.

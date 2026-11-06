@@ -6,7 +6,7 @@
 
 import { useId, useRef, useState } from 'react';
 import { Icon, MenuItem, Popover, keepFocus, useTranslation } from '@pptx-editor.dev/react';
-import { PICTURE_WIDTH, type PictureExport } from '../../shared/demo-files.ts';
+import { PICTURE_WIDTH, type SlideExport } from '../../shared/demo-files.ts';
 
 export function ModePill({
   mode,
@@ -67,7 +67,8 @@ export function ModePill({
   );
 }
 
-const PICTURES = [
+const SLIDE_EXPORTS = [
+  ['pdf', 'PDF', 'menu.exportPdf', 'menu.exportPdfHint'],
   ['png', 'PNG', 'menu.exportSlidePng', 'menu.exportSlidePngHint'],
   ['zip', 'ZIP', 'menu.exportSlidesPng', 'menu.exportSlidesPngHint'],
   ['svg', 'SVG', 'menu.exportSlideSvg', 'menu.exportSlideSvgHint'],
@@ -75,10 +76,10 @@ const PICTURES = [
 
 export function ExportMenu({
   onExport,
-  onExportPicture,
+  onExportSlides,
 }: {
   onExport: () => void;
-  onExportPicture: (kind: PictureExport) => void;
+  onExportSlides: (kind: SlideExport) => void;
 }) {
   const { t } = useTranslation();
   const anchor = useRef<HTMLButtonElement>(null);
@@ -126,11 +127,11 @@ export function ExportMenu({
               </span>
             </span>
           </MenuItem>
-          {PICTURES.map(([kind, type, label, hint]) => (
+          {SLIDE_EXPORTS.map(([kind, type, label, hint]) => (
             <MenuItem
               key={kind}
               description={t(hint, { width: PICTURE_WIDTH })}
-              onSelect={() => (onExportPicture(kind), setOpen(false))}
+              onSelect={() => (onExportSlides(kind), setOpen(false))}
             >
               <span className="demo-filetype" aria-hidden="true">
                 {type}

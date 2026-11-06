@@ -1,7 +1,7 @@
 // The demo's file handling, shared by the React demo (examples/vite) and the Vue demo
-// (examples/vue): the decks it opens, the download helper, and the slide picture exports. It
-// imports only `@pptx-editor.dev/core`, so it has no framework code. Everything loads and saves
-// in the browser; nothing is uploaded.
+// (examples/vue): the decks it opens, the download helper, and the slide exports. It imports only
+// `@pptx-editor.dev/core`, so it has no framework code. Everything loads and saves in the
+// browser. Only the PDF export sends the deck to the demo's own server, when the user picks it.
 
 import {
   exportSlidePng,
@@ -18,7 +18,10 @@ export const PPTX_MIME =
 export const PICTURE_WIDTH = 1920;
 
 /** What File > Export makes besides the deck. */
-export type PictureExport = 'png' | 'zip' | 'svg';
+export type SlideExport = 'pdf' | 'png' | 'zip' | 'svg';
+
+/** The demo's PDF export function: the root `api/convert.ts`, also served by the dev servers. */
+export const PDF_ENDPOINT = '/api/convert';
 
 /**
  * The decks the demo opens: the sample presentation (`showcase.pptx`, every feature, with demo
@@ -113,12 +116,32 @@ export function exportDeck(editor: PptxEditorInstance | null | undefined, name: 
 }
 
 /**
- * Save slide pictures from the editor's own paint: the current slide as PNG or SVG, or every
- * slide as PNG files in a ZIP. Nothing leaves the browser.
+ * Convert the saved deck to a PDF on the demo's server (`api/convert.ts`). The deck leaves the
+ * browser only here, after the user picks the export. Throws with the server's fixed message.
  */
-export async function exportPicture(
+export async function convertToPdf(deck: Uint8Array): Promise<Blob> {
+  const response = await fetch(PDF_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': PPTX_MIME },
+    body: deck.slice().buffer,
+    signal: AbortSignal.timeout(90_000),
+  });
+  const type = response.headers.get('content-type') ?? '';
+  if (response.ok && type.startsWith('application/pdf')) return response.blob();
+  const failure = type.includes('application/json')
+    ? ((await response.json()) as { message?: string })
+    : {};
+  throw new Error(failure.message ?? `HTTP ${response.status}`);
+}
+
+/**
+ * Export from the editor's current deck: the whole deck as PDF (made on the demo's server), the
+ * current slide as PNG or SVG, or every slide as PNG files in a ZIP. The pictures come from the
+ * editor's own paint and never leave the browser. A failure shows as the editor's notice.
+ */
+export async function exportSlides(
   editor: PptxEditorInstance | null | undefined,
-  kind: PictureExport,
+  kind: SlideExport,
   name: string
 ): Promise<void> {
   const session = editor?.session;
@@ -126,7 +149,11 @@ export async function exportPicture(
   const slide = editor.snapshot().currentSlide;
   const options = { width: PICTURE_WIDTH };
   try {
-    if (kind === 'png')
+    if (kind === 'pdf') {
+      // `save` is null for a damaged slide; the editor already shows why.
+      const deck = editor.save();
+      if (deck) download(await convertToPdf(deck), `${name}.pdf`);
+    } else if (kind === 'png')
       download(await exportSlidePng(session, slide, options), `${name} ${slide + 1}.png`);
     else if (kind === 'zip')
       download(await exportSlidesPngZip(session, options), `${name}.zip`, 'application/zip');
@@ -137,6 +164,7 @@ export async function exportPicture(
       );
   } catch (e) {
     console.error(e);
+    if (kind === 'pdf') editor.reject('app.pdfExportFailed', e instanceof Error ? e.message : '');
   }
 }
 

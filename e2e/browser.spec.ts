@@ -54,6 +54,24 @@ test('slide pictures: File > Current slide as PNG and All slides as PNG draw the
   for (const entry of Object.values(entries)) expect([...entry.subarray(0, 8)]).toEqual(PNG);
 });
 
+test('PDF export: File > Presentation as PDF downloads one page per slide', async ({
+  page,
+}, info) => {
+  // The round trip to the development server's `/api/convert` (examples/shared/pdf-export-plugin.ts).
+  await ready(page);
+  await page.getByRole('menuitem', { name: 'File', exact: true }).click();
+  const [pdf] = await Promise.all([
+    page.waitForEvent('download', { timeout: 60_000 }),
+    page.getByRole('menuitem', { name: 'Presentation as PDF' }).click(),
+  ]);
+  expect(pdf.suggestedFilename()).toMatch(/\.pdf$/);
+  const file = info.outputPath('deck.pdf');
+  await pdf.saveAs(file);
+  const bytes = readFileSync(file);
+  expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  expect(bytes.toString('latin1').match(/\/Type \/Page\b(?!s)/g)).toHaveLength(5);
+});
+
 test('layout: the find bar keeps the slide clear, and a zoomed slide scrolls to every edge', async ({
   page,
 }) => {

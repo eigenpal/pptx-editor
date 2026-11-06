@@ -1,8 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "bun run build:preview",
+  "buildCommand": "bun run build:pdf && bun run build:preview",
   "outputDirectory": "examples/parity/dist",
   "installCommand": "HUSKY=0 bun install --frozen-lockfile",
+  "functions": {
+    "api/convert.ts": {
+      "maxDuration": 90,
+      "memory": 3008,
+      "includeFiles": "node_modules/.bun/{@docx-editor.dev+fonts@*,@docx-editor.dev+fonts-cjk@*,harfbuzzjs@*}/node_modules/**"
+    }
+  },
   "rewrites": [
     { "source": "/react/(.*)", "destination": "/react/index.html" },
     { "source": "/vue/(.*)", "destination": "/vue/index.html" },
