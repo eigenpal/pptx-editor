@@ -643,6 +643,11 @@
   .demo-root {
     --doc-slide-padding: 12px;
   }
+  /* The Slide Sorter has no zoom: on a phone only the view switch stays, so less of the last
+     thumbnail sits under the controls. */
+  .demo-docpane:has(> .pptx-sorter) .demo-status .pptx-zoom:not(.pptx-view-switch) {
+    display: none;
+  }
 }
 
 /* A portrait window up to a tablet (the rail is an overlay here): the slide area takes the
