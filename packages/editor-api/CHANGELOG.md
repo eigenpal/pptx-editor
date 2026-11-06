@@ -1,5 +1,41 @@
 # @pptx-editor.dev/editor-api
 
+## 0.2.0
+
+### Patch Changes
+
+- 5a03952: Published packages no longer ship source maps, so a stack trace points into `dist/`. Every JavaScript file of `pro`, `pptx-to-pdf`, and `editor-api` starts with its license header, and these packages are minified. The preset shape geometry in `core` carries the Ecma copyright notice in a legal comment, so bundlers that keep legal comments carry the notice into your app bundle.
+- 60ed234: A long deck with a damaged slide or notes slide is refused at once, wherever the slide is read. After edits, the deck stays open read-only with `snapshot().readOnlyReason`, a status bar message says why, its other slides go on opening, and commands, undo, save, and automation writes and exports are refused. `snapshot().isOpening` is true until the first slide shows, `load` accepts any `startSlide` number, and the slide rail mounts in steps of about 8 ms.
+- cd341f2: Each package now accepts only the same minor version of `@pptx-editor.dev/core` as a peer, for example `~0.1.0`. The links in the package READMEs now open from npm.
+- Updated dependencies [4594311]
+- Updated dependencies [0057839]
+- Updated dependencies [db9407d]
+- Updated dependencies [7d4b0be]
+- Updated dependencies [5a11387]
+- Updated dependencies [bfca3d6]
+- Updated dependencies [159eb87]
+- Updated dependencies [0653436]
+- Updated dependencies [5a03952]
+- Updated dependencies [136b3b5]
+- Updated dependencies [6bed74e]
+- Updated dependencies [0593988]
+- Updated dependencies [b906153]
+- Updated dependencies [a3afcdd]
+- Updated dependencies [c292536]
+- Updated dependencies [c292536]
+- Updated dependencies [60ed234]
+- Updated dependencies [60ed234]
+- Updated dependencies [84256e4]
+- Updated dependencies [0653436]
+- Updated dependencies [60c621b]
+- Updated dependencies [6bed74e]
+- Updated dependencies [db11b83]
+- Updated dependencies [14a9bc9]
+- Updated dependencies [1358a9d]
+- Updated dependencies [aa99dad]
+- Updated dependencies [cd341f2]
+  - @pptx-editor.dev/core@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes

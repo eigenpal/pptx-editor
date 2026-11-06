@@ -1,5 +1,15 @@
 # @pptx-editor.dev/i18n
 
+## 0.2.0
+
+### Patch Changes
+
+- 0057839: The editor chrome is easier to use with assistive technology and high contrast themes. `PptxEditor.Viewport` is a landmark region named "Presentation editor"; its new `label` prop gives another name, and `label={false}` removes the region. If your own `header` or `main` is inside the viewport, set `label={false}`, so your landmarks stay at the top level. Slides in the rail and the slide sorter take their name ("Slide 3", "Slide 3 (hidden)") from hidden text, and the thumbnail art is hidden from screen readers. The items have no `aria-label` now, so a test that finds a slide by its label (`getByLabelText('Slide 3')`, `[aria-label="Slide 3"]`) must find it by role and name (`getByRole('option', { name: 'Slide 3' })`). With a forced-colors theme, selected slides, pressed and checked toggles, focus rings, disabled controls, and card edges stay visible in system colors. Color swatches are 24 by 24 pixels, and 20 by 20 pixels in a dialog that is too narrow for them.
+- ba27037: Add the strings for the demos' PDF export: `menu.exportPdf`, `menu.exportPdfHint`, `menu.exportPdfBusy`, `app.pdfExportFailed`, `app.pdfTooLarge`, `app.pdfTooComplex`, and `app.pdfBusy`.
+- 5a03952: Published packages no longer ship source maps, so a stack trace points into `dist/`. Every JavaScript file of `pro`, `pptx-to-pdf`, and `editor-api` starts with its license header, and these packages are minified. The preset shape geometry in `core` carries the Ecma copyright notice in a legal comment, so bundlers that keep legal comments carry the notice into your app bundle.
+- b906153: A screen reader now hears the alt text of a picture on the slide. A described picture is an image named by its description. A screen reader skips a decorative picture and a picture with no description. When Tab selects an object, the screen reader hears its kind, its name, and its description. The selection overlay is hidden from assistive technology. In the slide show, a screen reader reads the slide text and the alt text of its pictures. `PaintOptions` takes an optional `altText` port. Without it, the paint has no ARIA.
+- 60ed234: A long deck with a damaged slide or notes slide is refused at once, wherever the slide is read. After edits, the deck stays open read-only with `snapshot().readOnlyReason`, a status bar message says why, its other slides go on opening, and commands, undo, save, and automation writes and exports are refused. `snapshot().isOpening` is true until the first slide shows, `load` accepts any `startSlide` number, and the slide rail mounts in steps of about 8 ms.
+
 ## 0.1.0
 
 ### Minor Changes
