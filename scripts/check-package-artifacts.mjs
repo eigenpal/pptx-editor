@@ -153,7 +153,7 @@ for (const packageDir of packageDirs) {
   for (const file of [...scripts, ...declarations]) {
     const content = readFileSync(path.join(packageRoot, file), 'utf8');
     // Every file of a proprietary package opens with its license header (license-header.txt).
-    if (proprietary && !/^\/\*!\s*Copyright \(c\) \d{4} EigenPal, Inc\./.test(content))
+    if (proprietary && !/^\/\*!\s*Copyright \(c\) \d{4} Eigenpal, Inc\./.test(content))
       errors.push(`${name} ${file} does not start with the license header`);
   }
   // The Ecma notice travels with the bundled preset geometry, inside the code itself.

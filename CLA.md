@@ -1,7 +1,7 @@
-# EigenPal, Inc. Individual Contributor License Agreement
+# Eigenpal, Inc. Individual Contributor License Agreement
 
 Thank you for your interest in contributing to software projects
-maintained by EigenPal, Inc. ("Us"). This Agreement clarifies the
+maintained by Eigenpal, Inc. ("Us"). This Agreement clarifies the
 intellectual property license granted with Contributions from any
 person or entity. This license is for Your protection as a
 Contributor as well as the protection of Us and recipients of
@@ -111,4 +111,4 @@ personally aware, and conspicuously marking the work as
 
 By signing this Agreement on a pull request as instructed by the
 project's CLA assistant, You accept and agree to these terms for
-Your present and future Contributions to EigenPal, Inc. projects.
+Your present and future Contributions to Eigenpal, Inc. projects.

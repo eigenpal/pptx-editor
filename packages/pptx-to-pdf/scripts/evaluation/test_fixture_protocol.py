@@ -1,4 +1,4 @@
-# Copyright (c) 2026 EigenPal, Inc. All rights reserved.
+# Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 # Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 # Production use requires a commercial agreement: licensing@eigenpal.com
 """The whole protocol on synthetic fixtures: export with Bun, then measure and compare.

@@ -111,7 +111,7 @@
     "typescript": "^5.9.3",
     "vite": "^8.0.10"
   },
-  "author": "EigenPal, Inc.",
+  "author": "Eigenpal, Inc.",
   "license": "Apache-2.0",
   "homepage": "https://pptx-editor.dev/",
   "repository": {
