@@ -142,7 +142,7 @@ describe('the stylesheet', () => {
   test('forced colors keep selection, pressed, focus, and disabled states visible', () => {
     expect(forced.length > 0 && css.includes('@media (forced-colors: active)')).toBe(true);
     for (const rule of [
-      ".pptx-toolbar__button:is([aria-pressed='true'], [data-active])",
+      ".pptx-toolbar__button:is([aria-pressed='true'], [data-active]):not(",
       ".pptx-view-switch .pptx-view-switch__option[aria-checked='true']",
       ".pptx-rail__item:is([aria-selected='true'], [aria-current='true']) .pptx-rail__thumb::after",
       ".pptx-sorter__item:is([aria-selected='true'], [aria-current='true']) .pptx-rail__thumb::after",
@@ -157,8 +157,19 @@ describe('the stylesheet', () => {
     }
   });
 
-  test('a color swatch is a 24px target', () => {
+  test('a highlighted state gives every part inside it the highlight text color', () => {
+    // A part with its own color (a shortcut, a font role) would keep it on `Highlight`.
+    expect(forced).toContain(".pptx-font-picker__option[aria-selected='true'] *,");
+    expect(forced).toMatch(
+      /\.pptx-menu__item:is\(:hover, :focus-visible\):not\(\[aria-disabled='true'\]\) \*/
+    );
+  });
+
+  test('a color swatch is a 24px target, and 20px in a container narrower than the grid', () => {
     expect(css).toMatch(/\.pptx-swatch \{\s*width: 24px;\s*height: 24px;/);
-    expect(css).toContain('grid-template-columns: repeat(10, 24px);');
+    expect(css).toContain('grid-template-columns: repeat(10, minmax(20px, 24px));');
+    expect(css).toMatch(
+      /\.pptx-swatches > \.pptx-swatch \{\s*width: 100%;\s*height: auto;\s*aspect-ratio: 1;/
+    );
   });
 });

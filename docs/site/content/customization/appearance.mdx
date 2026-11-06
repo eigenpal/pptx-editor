@@ -160,13 +160,13 @@ With a forced-colors theme (`@media (forced-colors: active)`), the browser repla
 
 - A selected slide in the rail and in the slide sorter, and the current layout tile, get a `Highlight` border inside the thumbnail.
 - Pressed toolbar toggles, the checked view switch option, selected tabs, and the hovered or focused menu row use `Highlight` with `HighlightText`.
-- Focus rings use `Highlight`. Disabled controls use `GrayText`.
+- Focus rings use `Highlight`. Disabled controls use `GrayText`, and a disabled pressed toggle gets a `GrayText` edge.
 - Menus, the find bar, the zoom pill, the tooltip, and the notes card get a `CanvasText` edge.
 - Color swatches and gradient previews keep their own colors (`forced-color-adjust: none`).
 
 If you override these states, use system colors in a `forced-colors` media query of your own.
 
-Each color swatch in the color menus and the Format Background dialog is 24 by 24 pixels, the minimum target size of WCAG 2.5.8.
+Each color swatch in the color menus and the Format Background dialog is 24 by 24 pixels, the minimum target size of WCAG 2.5.8. In a dialog that is too narrow for the ten columns, as on a phone, the swatches shrink to 20 by 20 pixels.
 
 ## React and Vue reference
 

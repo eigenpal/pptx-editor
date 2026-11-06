@@ -1053,7 +1053,8 @@
   height: 18px;
 }
 /* Color menus: titled sections of ten columns. Each swatch is a 24px target (WCAG 2.5.8), so
- * the variant columns can touch. */
+ * the variant columns can touch. A container narrower than the grid, as the Format Background
+ * dialog on a phone, shrinks the swatches to 20px, so the ten columns stay inside it. */
 .pptx-swatches__section + .pptx-swatches__section {
   border-top: 1px solid var(--doc-border);
 }
@@ -1066,7 +1067,7 @@
 }
 .pptx-swatches {
   display: grid;
-  grid-template-columns: repeat(10, 24px);
+  grid-template-columns: repeat(10, minmax(20px, 24px));
   gap: 4px;
   padding: 6px 8px 8px;
 }
@@ -1087,6 +1088,11 @@
   border: 1px solid var(--doc-border);
   border-radius: 4px;
   cursor: pointer;
+}
+.pptx-swatches > .pptx-swatch {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
 }
 .pptx-swatch:hover {
   transform: scale(1.1);
@@ -3487,13 +3493,18 @@ legend.pptx-dialog__label {
   /* Pressed toggles, the checked view, selected tabs and options, the active row, and the
    * hovered or focused menu row (a menu that the pointer opened draws no focus ring). The
    * browser draws no text backplate here (`forced-color-adjust: none`), so the text and icons
-   * take `HighlightText` on `Highlight`. */
-  .pptx-toolbar__button:is([aria-pressed='true'], [data-active]),
+   * take `HighlightText` on `Highlight`, also in the hover state, and every part inside takes
+   * the same text color. A disabled control never takes `Highlight`: `GrayText` on `Highlight`
+   * can be unreadable. */
+  .pptx-toolbar__button:is([aria-pressed='true'], [data-active]):not(
+      :disabled,
+      [aria-disabled='true']
+    ),
   .pptx-view-switch .pptx-view-switch__option[aria-checked='true'],
   .pptx-segmented button:is([aria-checked='true'], [aria-selected='true']),
   .pptx-tabs__tab[aria-selected='true'],
   .pptx-font-picker__option[aria-selected='true'],
-  .pptx-menu__row[data-active],
+  .pptx-menu__row[data-active]:not([aria-disabled='true']),
   .pptx-table-grid__cell[data-active],
   .pptx-menu__item:is(:hover, :focus-visible):not([aria-disabled='true']),
   .pptx-layout-gallery__item:is(:hover, :focus-visible):not([aria-disabled='true']) {
@@ -3501,10 +3512,27 @@ legend.pptx-dialog__label {
     background: Highlight;
     color: HighlightText;
   }
-  .pptx-menu__item:is(:hover, :focus-visible, [data-active])
-    :is(.pptx-menu__shortcut, .pptx-menu__check, .pptx-menu__icon),
-  .pptx-layout-gallery__item:is(:hover, :focus-visible) .pptx-layout-gallery__name {
+  .pptx-toolbar__button:is([aria-pressed='true'], [data-active]):not(
+      :disabled,
+      [aria-disabled='true']
+    )
+    *,
+  .pptx-view-switch .pptx-view-switch__option[aria-checked='true'] *,
+  .pptx-segmented button:is([aria-checked='true'], [aria-selected='true']) *,
+  .pptx-tabs__tab[aria-selected='true'] *,
+  .pptx-font-picker__option[aria-selected='true'] *,
+  .pptx-menu__row[data-active]:not([aria-disabled='true']) *,
+  .pptx-menu__item:is(:hover, :focus-visible):not([aria-disabled='true']) *,
+  .pptx-layout-gallery__item:is(:hover, :focus-visible):not([aria-disabled='true']) * {
     color: inherit;
+  }
+  /* A pressed toggle that is disabled keeps its pressed state as a system-colored edge. */
+  .pptx-toolbar__button:is([aria-pressed='true'], [data-active]):is(
+      :disabled,
+      [aria-disabled='true']
+    ) {
+    outline: 1px solid GrayText;
+    outline-offset: -1px;
   }
   .pptx-ribbon__tab[aria-selected='true']::after {
     background: Highlight;

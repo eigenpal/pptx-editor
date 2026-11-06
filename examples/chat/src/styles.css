@@ -613,9 +613,18 @@ button {
   .composer {
     padding: 0 10px 10px;
   }
-  .composer__hint,
-  .chat-head__new-label {
+  .composer__hint {
     display: none;
+  }
+  /* The label leaves the screen but stays the button's name for screen readers. */
+  .chat-head__new-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .composer__bar {
     justify-content: flex-end;
