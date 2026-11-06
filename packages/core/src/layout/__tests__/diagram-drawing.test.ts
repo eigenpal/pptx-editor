@@ -1,0 +1,331 @@
+// A diagram frame draws its saved drawing (`dsp:drawing`; ECMA-376 Part 1, 21.4) through the
+// normal shape cascade and layout, or shows its placeholder when the drawing is missing,
+// hostile, or outside the supported subset.
+
+import { describe, expect, test } from 'bun:test';
+import { buildPptx } from '../../../../../scripts/fixtures/builder.ts';
+import {
+  binaryPartOf,
+  elements,
+  path,
+  PptxDocumentStore,
+  xmlPartOf,
+  readPptx,
+  writePptx,
+  type PptxPackage,
+} from '../../store/index.ts';
+import { resolveSlide, type ResolvedGraphicFrame } from '../../cascade/index.ts';
+import {
+  apply,
+  createFixedMeasurer,
+  layoutSlide,
+  type LayoutItem,
+  type SlideLayout,
+} from '../index.ts';
+
+const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+const DGM = 'http://schemas.openxmlformats.org/drawingml/2006/diagram';
+const DSP = 'http://schemas.microsoft.com/office/drawing/2008/diagram';
+const A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+const DRAWING_REL = 'http://schemas.microsoft.com/office/2007/relationships/diagramDrawing';
+const DATA_CT = 'application/vnd.openxmlformats-officedocument.drawingml.diagramData+xml';
+const DRAWING_CT = 'application/vnd.ms-office.drawingml.diagramDrawing+xml';
+
+const FRAME = { x: 1_000_000, y: 2_000_000, cx: 4_000_000, cy: 2_000_000 };
+
+const frame =
+  '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="3" name="Diagram 1"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr>' +
+  `<p:xfrm><a:off x="${FRAME.x}" y="${FRAME.y}"/><a:ext cx="${FRAME.cx}" cy="${FRAME.cy}"/></p:xfrm>` +
+  `<a:graphic><a:graphicData uri="${DGM}"><dgm:relIds xmlns:dgm="${DGM}" r:dm="rIdData"/></a:graphicData></a:graphic></p:graphicFrame>`;
+
+const dataModel = (relId = 'rIdDrawing', bg = ''): string =>
+  `<dgm:dataModel xmlns:dgm="${DGM}" xmlns:a="${A}"><dgm:ptLst/><dgm:cxnLst/>${bg || '<dgm:bg/><dgm:whole/>'}` +
+  `<dgm:extLst><a:ext uri="http://schemas.microsoft.com/office/drawing/2008/diagram">` +
+  `<dsp:dataModelExt xmlns:dsp="${DSP}" relId="${relId}" minVer="${DGM}"/></a:ext></dgm:extLst></dgm:dataModel>`;
+
+interface SpOptions {
+  readonly off?: [number, number];
+  readonly ext?: [number, number];
+  readonly rot?: number;
+  readonly preset?: string;
+  readonly text?: string;
+  readonly txXfrm?: [number, number, number, number];
+  readonly hidden?: boolean;
+}
+
+const sp = (o: SpOptions = {}): string => {
+  const [x, y] = o.off ?? [100_000, 200_000];
+  const [cx, cy] = o.ext ?? [1_000_000, 500_000];
+  const tx = o.txXfrm;
+  return (
+    `<dsp:sp modelId="{1}"><dsp:nvSpPr><dsp:cNvPr id="0" name=""${o.hidden ? ' hidden="1"' : ''}/><dsp:cNvSpPr/></dsp:nvSpPr>` +
+    `<dsp:spPr><a:xfrm${o.rot ? ` rot="${o.rot}"` : ''}><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm>` +
+    `<a:prstGeom prst="${o.preset ?? 'roundRect'}"><a:avLst/></a:prstGeom>` +
+    '<a:solidFill><a:srgbClr val="9BBB59"><a:hueOff val="0"/></a:srgbClr></a:solidFill>' +
+    '<a:ln w="25400"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:ln></dsp:spPr>' +
+    '<dsp:style><a:lnRef idx="2"><a:scrgbClr r="0" g="0" b="0"/></a:lnRef><a:fillRef idx="1"><a:scrgbClr r="0" g="0" b="0"/></a:fillRef>' +
+    '<a:effectRef idx="0"><a:scrgbClr r="0" g="0" b="0"/></a:effectRef><a:fontRef idx="minor"><a:srgbClr val="FFFFFF"/></a:fontRef></dsp:style>' +
+    (o.text
+      ? '<dsp:txBody><a:bodyPr lIns="0" tIns="0" rIns="0" bIns="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/>' +
+        `<a:p><a:r><a:rPr lang="en-US" sz="1800"/><a:t>${o.text}</a:t></a:r></a:p></dsp:txBody>`
+      : '') +
+    (tx
+      ? `<dsp:txXfrm><a:off x="${tx[0]}" y="${tx[1]}"/><a:ext cx="${tx[2]}" cy="${tx[3]}"/></dsp:txXfrm>`
+      : '') +
+    '</dsp:sp>'
+  );
+};
+
+const drawing = (shapes: string, root = ''): string =>
+  `<dsp:drawing xmlns:dgm="${DGM}" xmlns:dsp="${DSP}" xmlns:a="${A}"><dsp:spTree>` +
+  `<dsp:nvGrpSpPr><dsp:cNvPr id="0" name=""/><dsp:cNvGrpSpPr/></dsp:nvGrpSpPr><dsp:grpSpPr>${root}</dsp:grpSpPr>` +
+  `${shapes}</dsp:spTree></dsp:drawing>`;
+
+interface DeckOptions {
+  readonly data?: string;
+  readonly drawingXml?: string;
+  readonly drawingRel?:
+    readonly [string, string, string] | readonly [string, string, string, 'External'] | null;
+}
+
+function deck(shapes: string, o: DeckOptions = {}): Uint8Array {
+  const drawingRel =
+    o.drawingRel === undefined
+      ? (['rIdDrawing', DRAWING_REL, '../diagrams/drawing1.xml'] as const)
+      : o.drawingRel;
+  return buildPptx({
+    slides: [
+      {
+        layout: 'blank',
+        shapes: frame,
+        rels: [
+          ['rIdData', `${R}/diagramData`, '../diagrams/data1.xml'],
+          ...(drawingRel ? [drawingRel] : []),
+        ],
+      },
+    ],
+    extraParts: [
+      ['ppt/diagrams/data1.xml', DATA_CT, o.data ?? dataModel()],
+      ['ppt/diagrams/drawing1.xml', DRAWING_CT, o.drawingXml ?? drawing(shapes)],
+    ],
+  });
+}
+
+function open(bytes: Uint8Array): { pkg: PptxPackage; layout: SlideLayout } {
+  const r = readPptx(bytes);
+  if (!r.ok) throw new Error('open failed');
+  return { pkg: r.pkg, layout: layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer()) };
+}
+
+function frameOf(layout: SlideLayout): Extract<LayoutItem, { kind: 'frame' }> {
+  const item = layout.items.find((i) => i.kind === 'frame');
+  if (item?.kind !== 'frame') throw new Error('no frame');
+  return item;
+}
+
+const PLACEHOLDER = 'graphic frame rendered as placeholder: diagram';
+
+function expectPlaceholder(bytes: Uint8Array): void {
+  const { layout } = open(bytes);
+  const f = frameOf(layout);
+  expect(f.drawing).toBeUndefined();
+  expect(layout.diagnostics).toContain(PLACEHOLDER);
+}
+
+describe('diagram saved drawing: shapes', () => {
+  test('a shape lays out in the frame space, with the geometry of its own size', () => {
+    const { layout } = open(deck(sp()));
+    const f = frameOf(layout);
+    expect(layout.diagnostics).not.toContain(PLACEHOLDER);
+    expect(f.drawing).toHaveLength(1);
+    const shape = f.drawing![0]!;
+    if (shape.kind !== 'shape') throw new Error('not a shape');
+    expect(shape.element.partName).toBe('/ppt/diagrams/drawing1.xml');
+    expect(shape.element.fill).toEqual({
+      type: 'solid',
+      color: { r: 0x9b, g: 0xbb, b: 0x59, a: 1 },
+    });
+    expect(shape.element.line?.width).toBe(25_400);
+    const topLeft = apply(shape.matrix, 0, 0);
+    expect(topLeft.x).toBeCloseTo(FRAME.x + 100_000, 3);
+    expect(topLeft.y).toBeCloseTo(FRAME.y + 200_000, 3);
+    const bottomRight = apply(shape.matrix, 1_000_000, 500_000);
+    expect(bottomRight.x).toBeCloseTo(FRAME.x + 1_100_000, 3);
+    expect(shape.geometry.paths.length).toBeGreaterThan(0);
+  });
+
+  test('a nested group places its children through its child space', () => {
+    const group =
+      '<dsp:grpSp><dsp:nvGrpSpPr><dsp:cNvPr id="0" name=""/><dsp:cNvGrpSpPr/></dsp:nvGrpSpPr>' +
+      '<dsp:grpSpPr><a:xfrm><a:off x="1000000" y="0"/><a:ext cx="2000000" cy="1000000"/>' +
+      '<a:chOff x="0" y="0"/><a:chExt cx="1000000" cy="500000"/></a:xfrm></dsp:grpSpPr>' +
+      `${sp({ off: [0, 0], ext: [500_000, 500_000] })}</dsp:grpSp>`;
+    const f = frameOf(open(deck(group)).layout);
+    const g = f.drawing![0]!;
+    if (g.kind !== 'group') throw new Error('not a group');
+    const child = g.children[0]!;
+    // The group doubles its child space: the 500 000 child is 1 000 000 wide on the slide.
+    expect(apply(child.matrix, 0, 0).x).toBeCloseTo(FRAME.x + 1_000_000, 3);
+    expect(child.element.xfrm.cx).toBeCloseTo(1_000_000, 3);
+  });
+
+  test('a hidden shape is not drawn, and the rest of the diagram is', () => {
+    const f = frameOf(open(deck(sp({ hidden: true }) + sp({ off: [0, 0] }))).layout);
+    expect(f.drawing).toHaveLength(1);
+  });
+
+  test('the data model background paints under the shapes over the whole frame', () => {
+    const bg =
+      '<dgm:bg><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill></dgm:bg>' +
+      '<dgm:whole><a:ln w="12700"><a:solidFill><a:srgbClr val="0000FF"/></a:solidFill></a:ln></dgm:whole>';
+    const f = frameOf(open(deck(sp(), { data: dataModel('rIdDrawing', bg) })).layout);
+    expect(f.drawing).toHaveLength(2);
+    const back = f.drawing![0]!;
+    if (back.kind !== 'shape') throw new Error('not a shape');
+    expect(back.element.fill).toEqual({ type: 'solid', color: { r: 255, g: 0, b: 0, a: 1 } });
+    expect(back.element.line?.width).toBe(12_700);
+    expect(apply(back.matrix, FRAME.cx, FRAME.cy)).toEqual({
+      x: FRAME.x + FRAME.cx,
+      y: FRAME.y + FRAME.cy,
+    });
+  });
+});
+
+describe('diagram saved drawing: text rectangle', () => {
+  test('text lays out in the dsp:txXfrm rectangle, not in the geometry text rectangle', () => {
+    const shape = sp({ text: 'Plan', txXfrm: [150_000, 250_000, 400_000, 300_000] });
+    const item = frameOf(open(deck(shape)).layout).drawing![0]!;
+    if (item.kind !== 'shape' || !item.text || !item.textMatrix) throw new Error('no text');
+    expect(item.text.box.width).toBeCloseTo(400_000, 3);
+    expect(item.text.box.height).toBeCloseTo(300_000, 3);
+    const origin = apply(item.textMatrix, item.text.box.x, item.text.box.y);
+    expect(origin.x).toBeCloseTo(FRAME.x + 150_000, 3);
+    expect(origin.y).toBeCloseTo(FRAME.y + 250_000, 3);
+  });
+
+  test("the text rectangle's turn adds to the shape's turn", () => {
+    const shape = sp({ rot: 5_400_000, text: 'Plan', txXfrm: [0, 0, 400_000, 200_000] });
+    const item = frameOf(open(deck(shape)).layout).drawing![0]!;
+    if (item.kind !== 'shape' || !item.textMatrix) throw new Error('no text');
+    const m = item.textMatrix;
+    expect(m[0]).toBeCloseTo(0, 6);
+    expect(m[1]).toBeCloseTo(1, 6);
+    // Turned about its own center, which stays where the file puts it.
+    const c = apply(m, 200_000, 100_000);
+    expect(c.x).toBeCloseTo(FRAME.x + 200_000, 3);
+    expect(c.y).toBeCloseTo(FRAME.y + 100_000, 3);
+  });
+
+  test('a shape with no dsp:txXfrm uses its geometry text rectangle', () => {
+    const item = frameOf(open(deck(sp({ text: 'Plan' }))).layout).drawing![0]!;
+    if (item.kind !== 'shape') throw new Error('not a shape');
+    expect(item.element.textXfrm).toBeUndefined();
+    expect(item.text).toBeDefined();
+  });
+});
+
+describe('diagram saved drawing: whole or not at all', () => {
+  test('one shape with an unknown preset geometry gives the placeholder', () => {
+    expectPlaceholder(deck(sp() + sp({ preset: 'notAPreset' })));
+    const { layout } = open(deck(sp({ preset: 'notAPreset' })));
+    expect(layout.diagnostics.some((d) => d.startsWith('unknown preset'))).toBe(false);
+  });
+
+  test('an element outside the drawing schema gives the placeholder', () => {
+    expectPlaceholder(deck(sp() + '<dsp:pic/>'));
+    expectPlaceholder(
+      deck(`${sp()}<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>`)
+    );
+  });
+
+  test('a shape with no box gives the placeholder', () => {
+    expectPlaceholder(deck(sp().replace(/<a:xfrm>.*?<\/a:xfrm>/, '')));
+  });
+});
+
+describe('diagram saved drawing: missing and hostile parts', () => {
+  test('no drawing relationship gives the placeholder', () => {
+    expectPlaceholder(deck(sp(), { drawingRel: null }));
+  });
+
+  test('a data model with no dsp:dataModelExt gives the placeholder', () => {
+    expectPlaceholder(
+      deck(sp(), { data: `<dgm:dataModel xmlns:dgm="${DGM}"><dgm:ptLst/></dgm:dataModel>` })
+    );
+  });
+
+  test('a relationship of another type gives the placeholder', () => {
+    expectPlaceholder(
+      deck(sp(), { drawingRel: ['rIdDrawing', `${R}/image`, '../diagrams/drawing1.xml'] })
+    );
+  });
+
+  test('an external drawing target is never followed', () => {
+    expectPlaceholder(
+      deck(sp(), {
+        drawingRel: ['rIdDrawing', DRAWING_REL, 'https://example.com/drawing1.xml', 'External'],
+      })
+    );
+  });
+
+  test('a drawing part with another root gives the placeholder', () => {
+    expectPlaceholder(deck(sp(), { drawingXml: `<dgm:dataModel xmlns:dgm="${DGM}"/>` }));
+  });
+
+  test('a drawing with an entity declaration is refused by the bounded reader', () => {
+    const xml = `<!DOCTYPE d [<!ENTITY e "x">]>${drawing(sp({ text: '&e;' }))}`;
+    expectPlaceholder(deck(sp(), { drawingXml: xml }));
+  });
+
+  test('a drawing past the shape limit gives the placeholder', () => {
+    expectPlaceholder(deck(sp().repeat(513)));
+    expect(frameOf(open(deck(sp().repeat(512))).layout).drawing).toHaveLength(512);
+  });
+
+  test('groups nested past the depth limit give the placeholder', () => {
+    const nest = (depth: number): string =>
+      depth === 0
+        ? sp()
+        : `<dsp:grpSp><dsp:nvGrpSpPr><dsp:cNvPr id="0" name=""/><dsp:cNvGrpSpPr/></dsp:nvGrpSpPr><dsp:grpSpPr/>${nest(depth - 1)}</dsp:grpSp>`;
+    expect(frameOf(open(deck(nest(8))).layout).drawing).toHaveLength(1);
+    expectPlaceholder(deck(nest(9)));
+  });
+});
+
+describe('diagram saved drawing: preservation', () => {
+  test('an edit and a save keep the diagram parts byte-identical', () => {
+    const bytes = deck(sp({ text: 'Plan', txXfrm: [0, 0, 400_000, 200_000] }));
+    const r = readPptx(bytes);
+    if (!r.ok) throw new Error('open failed');
+    const before = binaryPartOf(r.pkg, '/ppt/diagrams/drawing1.xml')!;
+    const data = binaryPartOf(r.pkg, '/ppt/diagrams/data1.xml')!;
+    const store = new PptxDocumentStore(r.pkg);
+    const resolved = resolveSlide(store.package, 0)!;
+    const f = resolved.elements.find((e) => e.kind === 'graphicFrame') as ResolvedGraphicFrame;
+    expect(f.drawing).toHaveLength(1);
+    const cNvPr = path(
+      elements(xmlPartOf(store.package, f.partName)!.root.children[0] as never).find(
+        (e) => e.local === 'spTree'
+      ),
+      'p:graphicFrame',
+      'p:nvGraphicFramePr',
+      'p:cNvPr'
+    )!;
+    const result = store.transact([
+      {
+        op: 'setAttribute',
+        part: f.partName,
+        node: cNvPr.id,
+        name: { ns: '', local: 'name' },
+        value: 'Renamed',
+      },
+    ]);
+    expect(result.ok).toBe(true);
+    const again = readPptx(writePptx(store.package));
+    if (!again.ok) throw new Error('reopen failed');
+    expect(binaryPartOf(again.pkg, '/ppt/diagrams/drawing1.xml')).toEqual(before);
+    expect(binaryPartOf(again.pkg, '/ppt/diagrams/data1.xml')).toEqual(data);
+    const reopened = frameOf(layoutSlide(resolveSlide(again.pkg, 0)!, createFixedMeasurer()));
+    expect(reopened.drawing).toHaveLength(1);
+  });
+});

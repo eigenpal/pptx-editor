@@ -389,6 +389,7 @@ export type LayoutItem = ItemPlacement & ({
     readonly poster?: Extract<LayoutItem, {
         kind: 'picture';
     }>;
+    readonly drawing?: readonly LayoutItem[];
 });
 
 // @public

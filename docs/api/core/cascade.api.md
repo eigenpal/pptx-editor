@@ -542,6 +542,7 @@ export interface ResolvedShape extends ResolvedBase {
     // (undocumented)
     readonly text?: ResolvedTextBody;
     readonly textBox?: true;
+    readonly textXfrm?: Xfrm;
 }
 
 // @public

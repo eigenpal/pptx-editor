@@ -222,6 +222,11 @@ async function drawItem(
   if (item.kind === 'frame') {
     // An OLE object shows its picture, as in the SVG paint.
     if (item.poster) return drawItem(item.poster, p, local, groupScale);
+    // A diagram draws its saved drawing, as in the SVG paint.
+    if (item.drawing) {
+      for (const child of item.drawing) await drawItem(child, p, scope, matrixScale(item.matrix));
+      return;
+    }
     if (!item.table) {
       const kind = item.element.frameKind;
       p.diag.add(`frame.${kind}`, 'unsupported', `${kind} frames are not drawn yet.`);
