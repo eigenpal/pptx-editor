@@ -26,59 +26,57 @@ const identity = (deck: string, pdf: string) => ({
 });
 
 describe('the known gaps only shrink', () => {
-  const base = list({ 'a/1': { pixels: 0.01, lines: 4 } });
+  const base = list({ 'a/1': ['pixels'] });
 
   const source = ['packages/core/src/output/paint.ts'];
 
-  test('a smaller or removed entry is allowed', () => {
-    expect(
-      looserGaps(base, list({ 'a/1': { pixels: 0.005, lines: 4 } }), new Set(), source)
-    ).toEqual([]);
+  test('a removed entry or kind is allowed', () => {
     expect(looserGaps(base, list({}), new Set(), source)).toEqual([]);
+    const two = list({ 'a/1': ['pixels', 'baseline'] });
+    expect(looserGaps(two, base, new Set(), source)).toEqual([]);
   });
 
-  test('with a source change, a new entry, a new kind, a looser value, or fewer lines is refused', () => {
+  test('with a source change, a new entry or a new kind is refused', () => {
     expect(
       looserGaps(
         base,
-        list({ 'a/1': { pixels: 0.02, baseline: 1, lines: 3 }, 'b/1': { pixels: 0.1 } }),
+        list({ 'a/1': ['pixels', 'baseline'], 'b/1': ['pixels'] }),
         new Set(),
         source
       )
     ).toEqual([
-      'a/1: fewer checked lines (4 → 3)',
-      'a/1: a looser pixels score (0.01 → 0.02)',
       'a/1: a new kind, baseline',
-      'b/1: a new entry',
-      'the change also touches source (packages/core/src/output/paint.ts): record looser entries in a pull request that changes only tools, fixtures, or references',
+      'b/1: a new entry (pixels)',
+      'the change also touches source (packages/core/src/output/paint.ts): record new failures in a pull request that changes only tools, fixtures, or references',
     ]);
   });
 
-  test('a change with no source, or a new fixture, may loosen', () => {
-    const head = list({ 'a/1': { pixels: 0.02, lines: 4 } });
+  test('a change with no source, or a new fixture, may add failures', () => {
+    const head = list({ 'a/1': ['pixels', 'baseline'] });
     expect(looserGaps(base, head, new Set(), [])).toEqual([]);
     expect(looserGaps(base, head, new Set(['a']), source)).toEqual([]);
-    // A base from before the PDF comparison has no pdf.js version: every value is new.
-    expect(looserGaps({ slides: {} } as unknown as KnownGapList, head, new Set(), source)).toEqual(
-      []
-    );
+    // A base list with values (before kinds-only entries) allows any entry.
+    const old = { ...base, slides: { 'a/1': { pixels: 0.1 } } } as unknown as KnownGapList;
+    expect(looserGaps(old, head, new Set(), source)).toEqual([]);
   });
 
   test('fewer checked lines in a deck are refused', () => {
-    const head = list({ 'a/1': { pixels: 0.01, lines: 4 } }, { deckLines: { a: 10 } });
+    const head = list({ 'a/1': ['pixels'] }, { deckLines: { a: 10 } });
     expect(looserGaps({ ...base, deckLines: { a: 12 } }, head, new Set(), source)).toEqual([
       'a: checks fewer lines (12 → 10)',
-      'the change also touches source (packages/core/src/output/paint.ts): record looser entries in a pull request that changes only tools, fixtures, or references',
+      'the change also touches source (packages/core/src/output/paint.ts): record new failures in a pull request that changes only tools, fixtures, or references',
     ]);
   });
 
-  test('newFixtures names only the fixtures that the base lacks', () => {
+  test('newFixtures names the fixtures that the base lacks, unless a base fixture is gone', () => {
     const base: ReferenceManifest = { version: 1, references: { a: identity('1', '2') } };
     const head: ReferenceManifest = {
       version: 1,
       references: { a: identity('9', '3'), b: identity('4', '5') },
     };
     expect([...newFixtures(base, head)]).toEqual(['b']);
+    const renamed: ReferenceManifest = { version: 1, references: { b: identity('1', '2') } };
+    expect([...newFixtures(base, renamed)]).toEqual([]);
   });
 
   test('only versions of the tool packages count as a tools change', () => {

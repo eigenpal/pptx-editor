@@ -127,7 +127,7 @@ When a change alters a pinned problem (for example, a fix changes the text that 
 
 ## Fidelity harness
 
-The harness prints each fixture in `fixtures/` to PDF with the editor's own paint, and compares that PDF with the fixture's reference PDF. pdf.js draws and reads both PDFs in the same way. The check uses no system tools and no system fonts. Run it on your own machine; no container or second system is needed. Each slide must pass these checks (`scripts/fidelity/thresholds.ts`): at most 0.5 % of the pixels differ, every reference text line is in our page, our page has no other text lines, and each baseline is within 0.5 pt. Rotated, vertical, and right-to-left text is checked by pixels only. Save, reopen, and paint again must give the same SVG markup.
+The harness prints each fixture in `fixtures/` to PDF with the editor's own paint, and compares that PDF with the fixture's reference PDF. pdf.js draws and reads both PDFs in the same way. The check uses no system tools and no system fonts. Run it on your own machine; no container or second system is needed. Each slide must pass these checks (`scripts/fidelity/thresholds.ts`): at most 0.5 % of the pixels differ, every reference text line is in our page, our page has no other text lines, and each line is within 0.5 pt of the reference line, vertically (baseline) and horizontally (its nearer edge). Rotated, vertical, and right-to-left text is checked by pixels only. Save, reopen, and paint again must give the same SVG markup.
 
 Our PDF must draw only with fonts that the harness loaded: the fixture fonts, the engine's fonts, and two open fallback faces. A system font in our PDF fails the gate. A fixture's reference PDF must embed only the open fonts that its deck names. `NON_OPEN_FONT_DECKS` in `scripts/fidelity/local-fonts.ts` lists the exceptions (`font-substitution`).
 
@@ -142,15 +142,13 @@ Each deck prints one line. The gate summary says what to do next. The report is 
 
 ### Update the known gaps
 
-`FIXTURE_KNOWN_GAPS` in `scripts/fidelity/thresholds.ts` lists the slides that fail today, with their scores. The gate fails when a slide fails in a new way, scores worse, or scores better than its entry. When your change makes a slide better, record it:
+`FIXTURE_KNOWN_GAPS` in `scripts/fidelity/thresholds.ts` lists, for each slide that fails today, the checks it fails. It records no values, because rasters differ slightly between machines. The gate fails when a slide fails a check that is not listed, or passes a listed check. When your change fixes a check, remove it:
 
 ```bash
 bun run fidelity --update-gaps
 ```
 
-The command prints each change of the tools and each looser, new, and removed entry. It writes a new entry, a looser value, or fewer checked lines only with `--accept-worse`: a worse score is a regression to fix, never to record. Review the diff of `thresholds.ts`.
-
-In CI, `scripts/fidelity/check-known-gaps.ts` accepts a new or looser entry only for a new fixture, or in a pull request that changes no engine or harness source (only tool packages, `fixtures/`, the fixture builder, and `thresholds.ts`). A limit can go away only with its reason in `RETIRED_LIMITS`.
+A new entry or kind is written only with `--accept-worse`. In CI, `scripts/fidelity/check-known-gaps.ts` accepts it only for a new fixture, or in a pull request that changes no engine or harness source. A limit can go away only with its reason in `RETIRED_LIMITS`.
 
 ### Add a fixture
 

@@ -8,7 +8,7 @@ export const RUN_USAGE = `Usage:
       Print each fixture in fixtures/ with the editor, and compare it with its reference PDF.
       <deck>          only these fixtures, for example: bun run fidelity tables
       --update-gaps   write this run's failing slides to FIXTURE_KNOWN_GAPS in thresholds.ts
-      --accept-worse  also write new entries and looser values (a new fixture, a changed deck,
+      --accept-worse  also write new entries and kinds (a new fixture, a changed deck,
                       a new reference PDF, or new tools)
   bun run fidelity:corpus [<deckN>...]
       The private corpus in demo-presentations/ (local only): a report, no known gaps.
@@ -27,7 +27,7 @@ export type RunArgs =
       /** Only these decks; empty for all. */
       readonly decks: readonly string[];
       readonly updateGaps: boolean;
-      /** With `updateGaps`: write new entries and looser values too. */
+      /** With `updateGaps`: write new entries and kinds too. */
       readonly acceptWorse: boolean;
     }
   | {

@@ -56,6 +56,15 @@ describe('compareLines', () => {
     expect(compareLines(ours, [{ ...word, marker: true }]).matched).toBe(1);
   });
 
+  test('a matched line must start or end within 0.5 pt of the reference line', () => {
+    const ref = [{ text: 'Centered title', xMin: 100, xMax: 200, baseline: 40 }];
+    // Another width, the same left edge: the nearer edge counts.
+    expect(compareLines([{ ...ref[0], xMax: 210 }], ref).worstShift).toBe(0);
+    const moved = compareLines([{ ...ref[0], xMin: 101, xMax: 201 }], ref);
+    expect(moved.worstShift).toBe(1);
+    expect(slidePasses({ mismatch: 0 }, moved)).toBe(false);
+  });
+
   test('our text that the reference lacks fails the slide', () => {
     const ref = [{ text: 'Title text', xMin: 10, xMax: 90, baseline: 40 }];
     const ours = [...ref, { text: 'Frame label', xMin: 10, xMax: 90, baseline: 80 }];

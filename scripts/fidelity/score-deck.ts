@@ -219,6 +219,7 @@ export async function scoreDeck(
       s.linesMatched = lines.matched;
       s.linesTotal = lines.total;
       s.baselineDelta = lines.matched ? lines.worstBaseline : undefined;
+      s.lineShift = lines.matched ? lines.worstShift : undefined;
       s.missingLines = lines.missing;
       s.extraLines = lines.extra;
       const pass = slidePasses(px, lines);

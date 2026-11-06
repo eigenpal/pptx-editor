@@ -41,6 +41,8 @@ export function lineCauses(r: SlideResult): string[] {
   }
   if (r.baselineDelta !== undefined && r.baselineDelta > THRESHOLDS.maxBaselineDeltaPt)
     causes.push('line height or baseline model');
+  if (r.lineShift !== undefined && r.lineShift > THRESHOLDS.maxLineShiftPt)
+    causes.push('line position: indent, alignment, or glyph advances');
   if ((r.extraLines?.length ?? 0) > THRESHOLDS.maxExtraLines && !causes.length)
     causes.push('our page has text that the reference page lacks');
   return causes;
@@ -94,6 +96,8 @@ export interface SlideResult {
   linesTotal?: number;
   /** Worst baseline distance of a matched line; undefined when no line matched. */
   baselineDelta?: number;
+  /** Worst horizontal distance of a matched line (`LineScore.worstShift`). */
+  lineShift?: number;
   /** Reference lines that our page does not hold, and our lines that the reference lacks. */
   missingLines?: readonly string[];
   extraLines?: readonly string[];
@@ -151,10 +155,12 @@ function slideHtml(out: string, s: SlideResult): string {
     s.baselineDelta === undefined
       ? ''
       : ` <span>baseline Δ ${s.baselineDelta.toFixed(2)} pt</span>`;
+  const shift =
+    s.lineShift === undefined ? '' : ` <span>position Δ ${s.lineShift.toFixed(2)} pt</span>`;
   const badge = s.knownGap ? 'fail (known gap)' : s.status;
   return (
     `<article class="${s.status}"><header><b>Slide ${s.index}</b> <span class="badge ${s.status}">${badge}</span>` +
-    ` <span>pixels ${pct(s.pixelMismatch)}</span> <span>${lines}</span>${baseline}` +
+    ` <span>pixels ${pct(s.pixelMismatch)}</span> <span>${lines}</span>${baseline}${shift}` +
     (s.selfConsistent === false ? ' <span class="fail">save/reopen DIFFERS</span>' : '') +
     `</header>` +
     (s.verdict ? `<p class="cause">${esc(s.verdict)}</p>` : '') +
@@ -219,7 +225,7 @@ figcaption{font-size:12px;color:#75716b}.empty div{aspect-ratio:16/9;display:gri
 @media (max-width:800px){.imgs{grid-template-columns:1fr}}
 </style></head><body><h1>Fidelity report: ${esc(set)}</h1>
 <p class="summary"><span>Slides: ${all.length}</span><span>Pass: ${count('pass')}</span><span>Fail: ${count('fail')} (known gaps: ${all.filter((x) => x.knownGap).length})</span><span>No reference: ${count('no-reference')}</span><span>Stale reference: ${count('stale')}</span><span>Hidden: ${hidden}</span></p>
-<p class="diag">Our PDF is printed with the editor's own paint. pdf.js draws and reads both PDFs. Thresholds: pixels ≤ ${pct(THRESHOLDS.maxPixelMismatch)}, every reference line, no extra lines, baseline ≤ ${THRESHOLDS.maxBaselineDeltaPt} pt (<code>scripts/fidelity/thresholds.ts</code>). ${esc(context.tools)}. Rotated, vertical, and right-to-left text is checked by pixels only.</p>
+<p class="diag">Our PDF is printed with the editor's own paint. pdf.js draws and reads both PDFs. Thresholds: pixels ≤ ${pct(THRESHOLDS.maxPixelMismatch)}, every reference line, no extra lines, baseline ≤ ${THRESHOLDS.maxBaselineDeltaPt} pt, line position ≤ ${THRESHOLDS.maxLineShiftPt} pt (<code>scripts/fidelity/thresholds.ts</code>). ${esc(context.tools)}. Rotated, vertical, and right-to-left text is checked by pixels only.</p>
 ${gate}
 ${rows}</body></html>`;
   writeFileSync(join(out, 'index.html'), html);

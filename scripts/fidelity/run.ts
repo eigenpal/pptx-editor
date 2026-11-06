@@ -2,8 +2,8 @@
 //
 //   bun run fidelity                  # every fixture: the gate
 //   bun run fidelity tables           # one fixture
-//   bun run fidelity --update-gaps    # record better scores in thresholds.ts
-//   bun run fidelity x --update-gaps --accept-worse   # also new entries and looser values
+//   bun run fidelity --update-gaps    # remove checks that pass now from thresholds.ts
+//   bun run fidelity x --update-gaps --accept-worse   # also add new entries and kinds
 //   bun run fidelity:corpus           # the private corpus in demo-presentations/ (local only)
 //   bun scripts/fidelity/run.ts --list jobs.jsonl --out <dir> ...   # corpus mode for pptx-eval
 //
@@ -50,7 +50,7 @@ const pct = (v: number): string => `${(v * 100).toFixed(2)} %`;
 
 /**
  * One console line for a scored deck: slides that pass, failing slides that the known-gap list
- * names, the worst pixel score, and the time.
+ * names, hidden slides, the worst pixel score, and the time.
  */
 function deckLine(r: DeckResult, list?: KnownGapList): string {
   if (r.error) return `${r.name}: not scored: ${r.error}`;
@@ -62,12 +62,14 @@ function deckLine(r: DeckResult, list?: KnownGapList): string {
       ).length
     : 0;
   const known = listed ? `, ${listed} known ${listed === 1 ? 'gap' : 'gaps'}` : '';
+  const hidden = r.slides.filter((s) => s.hidden).length;
+  const hiddenText = hidden ? `, ${hidden} hidden` : '';
   const worst = Math.max(0, ...compared.map((s) => s.pixelMismatch ?? 0));
   const gap =
     r.reference === 'pdf' ? '' : ` (${r.reference === 'stale' ? 'stale' : 'no'} reference)`;
   const saved = r.slides.some((s) => s.selfConsistent === false) ? ', save/reopen DIFFERS' : '';
   const time = `${((r.milliseconds ?? 0) / 1000).toFixed(1)} s`;
-  return `${r.name}: ${passing}/${r.slides.length} pass${known}, worst pixels ${pct(worst)}${gap}${saved}, ${time}`;
+  return `${r.name}: ${passing}/${r.slides.length - hidden} pass${known}${hiddenText}, worst pixels ${pct(worst)}${gap}${saved}, ${time}`;
 }
 
 /** `bun run fidelity` and `bun run fidelity:corpus`: decks in a folder, an HTML report. */
@@ -152,6 +154,9 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
   if (args.updateGaps) {
     // A partial run, or a deck that did not finish, replaces no entry of the decks it lacks.
     const plan = planUpdate(list, results, tools, args.acceptWorse, !only.length);
+    // The regressions first: an update does not record them away.
+    for (const p of checkFixtureGate(results, list, tools, !only.length).problems)
+      if (p.kind === 'fix') console.log(`FIX: ${p.text}`);
     for (const e of plan.changes.tools) console.log(`TOOLS: ${e}`);
     for (const e of plan.changes.looser) console.log(`LOOSER: ${e}`);
     for (const e of plan.changes.added) console.log(`NEW: ${e}`);
@@ -175,13 +180,13 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
     ? 'The list was measured with other tools (TOOLS above): record it in a pull request that changes only the tools, with bun run fidelity --update-gaps --accept-worse.'
     : '';
   const step = refused
-    ? 'Nothing was written: the run has new or looser entries (LOOSER, NEW above). Fix the regression. Only a new fixture or a pull request that changes no engine or harness source may record them, with: bun run fidelity <deck> --update-gaps --accept-worse'
+    ? 'Nothing was written: the run has new entries or kinds (LOOSER, NEW above). Fix the regression. Only a new fixture or a pull request that changes no engine or harness source may record them, with: bun run fidelity <deck> --update-gaps --accept-worse'
     : args.updateGaps
-      ? 'FIXTURE_KNOWN_GAPS in scripts/fidelity/thresholds.ts now records this run. Review its diff: a worse value is a regression to fix, not to record.'
+      ? 'FIXTURE_KNOWN_GAPS in scripts/fidelity/thresholds.ts now records this run. Review its diff: a new kind is a regression to fix, not to record.'
       : fixes.length
         ? `Fix the problems above; see ${report}.`
         : records.length
-          ? 'The list records other scores or line counts than this run (RECORD above). Record a better score with: bun run fidelity --update-gaps'
+          ? 'The list names checks that pass now (RECORD above). Remove them with: bun run fidelity --update-gaps'
           : toolsStep
             ? ''
             : 'Nothing to do.';

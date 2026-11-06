@@ -97,6 +97,11 @@ export interface LineScore {
   readonly total: number;
   /** Largest baseline distance of a matched line, in points. */
   readonly worstBaseline: number;
+  /**
+   * Largest horizontal distance of a matched line, in points: the nearer of the left-edge and
+   * the right-edge distances.
+   */
+  readonly worstShift: number;
   /** Reference lines that our page does not hold (first 60 characters each). */
   readonly missing: readonly string[];
   /**
@@ -129,6 +134,7 @@ export function compareLines(ours: readonly PdfLine[], reference: readonly PdfLi
   let matched = 0;
   let total = 0;
   let worst = 0;
+  let worstShift = 0;
   const missing: string[] = [];
   for (const line of reference) {
     const key = lineKey(line.text);
@@ -170,11 +176,17 @@ export function compareLines(ours: readonly PdfLine[], reference: readonly PdfLi
     for (const p of hit) p.used = true;
     matched += 1;
     worst = Math.max(worst, Math.abs(hit[0].baseline - line.baseline));
+    const last = hit[hit.length - 1];
+    worstShift = Math.max(
+      worstShift,
+      Math.min(Math.abs(hit[0].xMin - line.xMin), Math.abs(last.xMax - line.xMax))
+    );
   }
   return {
     matched,
     total,
     worstBaseline: worst,
+    worstShift,
     missing,
     extra: pool.filter((p) => p.key && !p.used).map((p) => normalize(p.text).slice(0, 60)),
   };
@@ -187,6 +199,7 @@ export function slidePasses(pixels: PixelScore, lines: LineScore): boolean {
     pixels.mismatch <= THRESHOLDS.maxPixelMismatch &&
     lineMatch >= THRESHOLDS.minLineBreakMatch &&
     lines.worstBaseline <= THRESHOLDS.maxBaselineDeltaPt &&
+    lines.worstShift <= THRESHOLDS.maxLineShiftPt &&
     lines.extra.length <= THRESHOLDS.maxExtraLines
   );
 }

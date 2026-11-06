@@ -73,21 +73,6 @@ async function browserPid(page: Page): Promise<number> {
   return info.processInfo.find((p) => p.type === 'browser')!.id;
 }
 
-/** Playwright's Chromium processes (pid, parent, group, state, type), for a failure. */
-function chromiumProcesses(): string {
-  const all = execFileSync('ps', ['-eo', 'pid=,ppid=,pgid=,stat=,command='], {
-    encoding: 'utf8',
-  });
-  const rows: string[] = [];
-  for (const line of all.split('\n')) {
-    const [pid, ppid, pgid, stat, binary, ...args] = line.trim().split(/\s+/);
-    if (!binary?.includes('ms-playwright')) continue;
-    const type = args.find((a) => a.startsWith('--type='))?.slice(7) ?? 'browser';
-    rows.push(`${pid} ${ppid} ${pgid} ${stat} ${type}`);
-  }
-  return rows.join('\n');
-}
-
 /** The processes of a process group, by its leader's pid. */
 function groupMembers(pgid: number): number[] {
   try {
@@ -116,7 +101,6 @@ describe.skipIf(!hasChromium)('a browser that dies in the middle of a deck', () 
       const deck = join(dir, 'deck.pptx');
       writeFileSync(deck, buildPptx({ slides: [{ shapes: '' }, { shapes: '' }] }));
       const input = { file: deck, name: 'd' };
-      let stopping = 0;
       const [crashed, next] = await withHarnessPage(async (first, control) => {
         // Kill Chromium with SIGKILL when the deck renders its first slide, as an
         // out-of-memory kill does. The deck has opened by then.
@@ -132,7 +116,6 @@ describe.skipIf(!hasChromium)('a browser that dies in the middle of a deck', () 
                 const gone = new Promise<void>((done) =>
                   browser.once('disconnected', () => done())
                 );
-                console.log(`killing browser ${pid}:\n${chromiumProcesses()}`);
                 process.kill(pid, 'SIGKILL');
                 await gone;
               }
@@ -142,15 +125,9 @@ describe.skipIf(!hasChromium)('a browser that dies in the middle of a deck', () 
         }) as Page;
         const a = await scoreSafely(dying, control, input, { redact: true });
         expect(a.fatal).toBeUndefined();
-        console.log(`after the reset (${a.result.error}):\n${chromiumProcesses()}`);
         const b = await scoreSafely(a.page, control, input, { redact: true });
-        console.log(
-          `the next deck took ${b.result.milliseconds ?? '?'} ms${b.result.error ? `, and failed:\n${chromiumProcesses()}` : ''}`
-        );
-        stopping = Date.now();
         return [a, b];
       });
-      console.log(`the harness stopped in ${Date.now() - stopping} ms`);
       expect(crashed.result.error).toStartWith(
         `${BROWSER_CRASHED} (the next deck gets a new browser): `
       );
@@ -166,7 +143,6 @@ describe.skipIf(!hasChromium)('a browser that dies in the middle of a deck', () 
   test('a browser that stops answering is replaced, and the next deck is scored', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'pptx-hang-'));
     const stopped: number[] = [];
-    let stopping = 0;
     try {
       const deck = join(dir, 'deck.pptx');
       writeFileSync(deck, buildPptx({ slides: [{ shapes: '' }] }));
@@ -178,11 +154,8 @@ describe.skipIf(!hasChromium)('a browser that dies in the middle of a deck', () 
         for (const pid of stopped) process.kill(pid, 'SIGSTOP');
         const a = await scoreSafely(first, control, input, { redact: true, timeoutMs: 1_000 });
         const b = await scoreSafely(a.page, control, input, { redact: true });
-        console.log(`the next deck took ${b.result.milliseconds ?? '?'} ms`);
-        stopping = Date.now();
         return [a, b];
       }, 3_000);
-      console.log(`the harness stopped in ${Date.now() - stopping} ms`);
       expect(hung.result.error).toBe(
         `${BROWSER_HUNG} (the next deck gets a new browser): the deck did not finish within 1 s`
       );

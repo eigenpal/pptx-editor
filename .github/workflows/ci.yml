@@ -164,9 +164,10 @@ jobs:
           # deck). The shards run the rest of scripts/fidelity/. These run first and do not stop
           # the gate, so a red gate still has its report and these results.
           bun test scripts/fidelity/harness-page.test.ts || tests=$?
-          bun run fidelity
-          bun run validate:xsd
-          exit "${tests:-0}"
+          # The schema check runs also when the gate fails.
+          bun run fidelity || gate=$?
+          bun run validate:xsd || xsd=$?
+          exit "$(( ${tests:-0} || ${gate:-0} || ${xsd:-0} ))"
       # Only what needs a real browser: canvas pixels and CSS layout (e2e/browser.spec.ts). The
       # demo flows and the open-every-deck check run in happy-dom in the unit shards (`bun run test`).
       - name: Browser checks of the demo

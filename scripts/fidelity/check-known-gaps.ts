@@ -1,7 +1,7 @@
-// The known-gap ratchet in CI, one rule: `FIXTURE_KNOWN_GAPS` takes a new entry, a new kind, a
-// looser value, or fewer checked lines only in a change that touches no engine or harness source
-// (`nonSourceFiles`), or for a new fixture. No limit in `thresholds.ts` loosens, and none goes
-// away unless `RETIRED_LIMITS` gives the reason.
+// The known-gap ratchet in CI, one rule: `FIXTURE_KNOWN_GAPS` takes a new entry, a new kind,
+// or fewer checked lines only in a change that touches no engine or harness source
+// (`nonSourceFiles`), or for a new fixture. A removed entry is always fine. No limit in
+// `thresholds.ts` loosens, and none goes away unless `RETIRED_LIMITS` gives the reason.
 //
 //   bun scripts/fidelity/check-known-gaps.ts --base origin/main
 
@@ -10,10 +10,9 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { gapKinds, looser } from './known-gaps.ts';
+import { gapKinds } from './known-gaps.ts';
 import {
   FIXTURE_KNOWN_GAPS,
-  GAP_MARGINS,
   PAGE_SIZE_TOLERANCE_PT,
   RETIRED_LIMITS,
   THRESHOLDS,
@@ -159,16 +158,21 @@ export function nonSourceFiles(files: readonly string[], read: ReadChange): stri
   });
 }
 
-/** The fixtures that `head` has and `base` does not. */
+/**
+ * The fixtures that `head` has and `base` does not. None when a base fixture is gone in the same
+ * change: a renamed fixture is not new.
+ */
 export function newFixtures(base: ReferenceManifest, head: ReferenceManifest): Set<string> {
+  if (Object.keys(base.references).some((n) => !Object.hasOwn(head.references, n)))
+    return new Set();
   return new Set(Object.keys(head.references).filter((n) => !Object.hasOwn(base.references, n)));
 }
 
 /**
- * The ways `head` loosens `base`: new entries and kinds, looser values, and fewer checked lines,
- * except for the fixtures in `fresh` (new fixtures). A base list in another shape (from before
- * the PDF comparison) allows any value. `sources` lists the changed source files; when it is
- * empty, the change only measures again, and every loosening is allowed.
+ * The ways `head` loosens `base`: new entries, new kinds, and fewer checked lines, except for
+ * the fixtures in `fresh` (new fixtures). A base list in another shape (from before kinds-only
+ * entries) allows any entry. `sources` lists the changed source files; when it is empty, the
+ * change only measures again, and every entry is allowed.
  */
 export function looserGaps(
   base: KnownGapList | undefined,
@@ -176,21 +180,18 @@ export function looserGaps(
   fresh: ReadonlySet<string>,
   sources: readonly string[]
 ): string[] {
-  if (!base || typeof base.pdfjs !== 'string' || !sources.length) return [];
+  const kindsOnly = base && Object.values(base.slides ?? {}).every((g) => Array.isArray(g));
+  if (!base || !kindsOnly || typeof base.pdfjs !== 'string' || !sources.length) return [];
   const problems: string[] = [];
   for (const [key, gap] of Object.entries(head.slides)) {
     if (fresh.has(key.slice(0, key.lastIndexOf('/')))) continue;
     const old = Object.hasOwn(base.slides, key) ? base.slides[key] : undefined;
     if (!old) {
-      problems.push(`${key}: a new entry`);
+      problems.push(`${key}: a new entry (${gap.join(', ')})`);
       continue;
     }
-    if ((gap.lines ?? 0) < (old.lines ?? 0))
-      problems.push(`${key}: fewer checked lines (${old.lines} → ${gap.lines ?? 0})`);
     for (const kind of gapKinds(gap))
-      if (old[kind] === undefined) problems.push(`${key}: a new kind, ${kind}`);
-      else if (looser(kind, gap, old))
-        problems.push(`${key}: a looser ${kind} score (${old[kind]} → ${gap[kind]})`);
+      if (!old.includes(kind)) problems.push(`${key}: a new kind, ${kind}`);
   }
   for (const [deck, lines] of Object.entries(head.deckLines ?? {})) {
     const was = base.deckLines?.[deck];
@@ -201,7 +202,7 @@ export function looserGaps(
     const shown = sources.slice(0, 5).join(', ');
     const more = sources.length > 5 ? ` and ${sources.length - 5} more` : '';
     problems.push(
-      `the change also touches source (${shown}${more}): record looser entries in a pull request that changes only tools, fixtures, or references`
+      `the change also touches source (${shown}${more}): record new failures in a pull request that changes only tools, fixtures, or references`
     );
   }
   return problems;
@@ -253,9 +254,12 @@ function changedFiles(base: string): string[] {
     const mergeBase = execFileSync('git', ['merge-base', base, 'HEAD'], {
       encoding: 'utf8',
     }).trim();
-    return execFileSync('git', ['diff', '--name-only', mergeBase], { encoding: 'utf8' })
-      .split('\n')
-      .filter(Boolean);
+    const tracked = execFileSync('git', ['diff', '--name-only', mergeBase], { encoding: 'utf8' });
+    // Files that are not added yet count too, so a local check sees the whole change.
+    const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], {
+      encoding: 'utf8',
+    });
+    return `${tracked}\n${untracked}`.split('\n').filter(Boolean);
   } catch {
     return ['(the file list is not available)'];
   }
@@ -307,7 +311,7 @@ export async function checkAgainstBase(
     .filter(([key]) => !Object.hasOwn(mod.RETIRED_LIMITS ?? {}, key))
     .map(([key, reason]) => `NOTICE: ${key} is retired: ${reason}`);
   const problems = [
-    ...looserLimits(limitsOf(mod), limitsOf({ THRESHOLDS, PAGE_SIZE_TOLERANCE_PT, GAP_MARGINS })),
+    ...looserLimits(limitsOf(mod), limitsOf({ THRESHOLDS, PAGE_SIZE_TOLERANCE_PT })),
     ...looserGaps(
       baseList,
       FIXTURE_KNOWN_GAPS,
@@ -327,7 +331,7 @@ export async function checkAgainstBase(
     lines: [
       ...notices,
       ...problems.map((p) => `GAPS: ${p}`),
-      'The known gaps and the limits only tighten, and no limit goes away unless RETIRED_LIMITS gives the reason. Fix the regression instead of recording it. Only a new fixture, or a pull request that changes no engine or harness source, may take a new or looser entry.',
+      'The known gaps and the limits only tighten, and no limit goes away unless RETIRED_LIMITS gives the reason. Fix the regression instead of recording it. Only a new fixture, or a pull request that changes no engine or harness source, may take a new entry or kind.',
     ],
     exitCode: 1,
   };

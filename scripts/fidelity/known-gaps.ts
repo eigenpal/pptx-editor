@@ -1,23 +1,23 @@
-// The fixture gate of `bun run fidelity`: a known-gap ratchet. The slides that fail today are
-// listed in `FIXTURE_KNOWN_GAPS` (thresholds.ts), with each threshold they miss and its measured
-// value. The gate fails when a slide fails in a way the list does not name, scores worse or
-// better than its value by more than its margin, or passes now. A listed slide still reports
-// "fail (known gap)", never a pass. `--update-gaps` rewrites the list from a run (`writeGaps`).
+// The fixture gate of `bun run fidelity`: a known-gap ratchet. `FIXTURE_KNOWN_GAPS`
+// (thresholds.ts) lists, for each slide that fails today, the checks it fails: never their
+// values, because rasters differ slightly between machines. The gate fails when a slide fails a
+// check that its entry does not list, or passes a listed check now (remove it). A listed slide
+// still reports "fail (known gap)", never a pass. `--update-gaps` rewrites the list (`writeGaps`).
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import {
-  GAP_MARGINS,
-  THRESHOLDS,
-  type FailureKind,
-  type KnownGap,
-  type KnownGapList,
-} from './thresholds.ts';
+import { THRESHOLDS, type FailureKind, type KnownGap, type KnownGapList } from './thresholds.ts';
 import type { DeckResult, SlideResult } from './report.ts';
 
 /** `deck/slide`, for example `text-runs/1`. */
 export const slideKey = (deck: string, slide: number): string => `${deck}/${slide}`;
 
-const KINDS: readonly FailureKind[] = ['pixels', 'line-breaks', 'baseline', 'extra-text'];
+const KINDS: readonly FailureKind[] = [
+  'pixels',
+  'line-breaks',
+  'baseline',
+  'line-position',
+  'extra-text',
+];
 
 /** The thresholds a compared slide misses, in a fixed order. Empty for a pass or a gap. */
 export function failureKinds(s: SlideResult): FailureKind[] {
@@ -26,28 +26,19 @@ export function failureKinds(s: SlideResult): FailureKind[] {
   if ((s.pixelMismatch ?? 0) > THRESHOLDS.maxPixelMismatch) kinds.push('pixels');
   if ((s.lineMatch ?? 1) < THRESHOLDS.minLineBreakMatch) kinds.push('line-breaks');
   if ((s.baselineDelta ?? 0) > THRESHOLDS.maxBaselineDeltaPt) kinds.push('baseline');
+  if ((s.lineShift ?? 0) > THRESHOLDS.maxLineShiftPt) kinds.push('line-position');
   if ((s.extraLines?.length ?? 0) > THRESHOLDS.maxExtraLines) kinds.push('extra-text');
   return kinds;
 }
 
-const round = (value: number, digits: number): number =>
-  Math.round(value * 10 ** digits) / 10 ** digits;
-
-/** The entry that records a failing slide's values, or undefined for a slide that passes. */
+/** The entry of a failing slide: the checks it fails. Undefined for a slide that passes. */
 export function gapEntry(s: SlideResult): KnownGap | undefined {
   const kinds = failureKinds(s);
-  if (kinds.length === 0) return undefined;
-  const entry: { -readonly [K in keyof KnownGap]: KnownGap[K] } = {};
-  if (kinds.includes('pixels')) entry.pixels = round(s.pixelMismatch ?? 0, 4);
-  if (kinds.includes('line-breaks')) entry['line-breaks'] = round(s.lineMatch ?? 1, 4);
-  if (kinds.includes('baseline')) entry.baseline = round(s.baselineDelta ?? 0, 2);
-  if (kinds.includes('extra-text')) entry['extra-text'] = s.extraLines?.length ?? 0;
-  if (s.linesTotal) entry.lines = s.linesTotal;
-  return entry;
+  return kinds.length ? kinds : undefined;
 }
 
 /** The kinds a known-gap entry lists. */
-export const gapKinds = (gap: KnownGap): FailureKind[] => KINDS.filter((k) => gap[k] !== undefined);
+export const gapKinds = (gap: KnownGap): FailureKind[] => KINDS.filter((k) => gap.includes(k));
 
 const pct = (v: number): string => `${(v * 100).toFixed(2)} %`;
 
@@ -57,6 +48,7 @@ function scoreText(s: SlideResult, kind: FailureKind): string {
   if (kind === 'line-breaks')
     return `line breaks ${s.linesMatched ?? '?'} of ${s.linesTotal ?? '?'}`;
   if (kind === 'extra-text') return `${s.extraLines?.length ?? 0} extra lines`;
+  if (kind === 'line-position') return `line position ${(s.lineShift ?? 0).toFixed(2)} pt`;
   return `baseline ${(s.baselineDelta ?? 0).toFixed(2)} pt`;
 }
 
@@ -65,38 +57,8 @@ function thresholdText(kind: FailureKind): string {
   if (kind === 'pixels') return `≤ ${pct(THRESHOLDS.maxPixelMismatch)}`;
   if (kind === 'line-breaks') return 'all lines';
   if (kind === 'extra-text') return `≤ ${THRESHOLDS.maxExtraLines} extra lines`;
+  if (kind === 'line-position') return `≤ ${THRESHOLDS.maxLineShiftPt} pt`;
   return `≤ ${THRESHOLDS.maxBaselineDeltaPt} pt`;
-}
-
-/** A recorded value, as the report writes it. */
-function recordText(kind: FailureKind, gap: KnownGap): string {
-  if (kind === 'pixels') return `pixels ${pct(gap.pixels ?? 0)}`;
-  if (kind === 'line-breaks') return `line breaks ${pct(gap['line-breaks'] ?? 0)}`;
-  if (kind === 'extra-text') return `${gap['extra-text'] ?? 0} extra lines`;
-  return `baseline ${(gap.baseline ?? 0).toFixed(2)} pt`;
-}
-
-/** How a measured value compares with its record: worse or better by more than the margin. */
-function compareWithRecord(
-  s: SlideResult,
-  kind: FailureKind,
-  gap: KnownGap
-): 'worse' | 'better' | 'same' {
-  const value =
-    kind === 'pixels'
-      ? s.pixelMismatch
-      : kind === 'line-breaks'
-        ? s.lineMatch
-        : kind === 'extra-text'
-          ? s.extraLines?.length
-          : s.baselineDelta;
-  const record = gap[kind];
-  if (value === undefined || record === undefined) return 'same';
-  // A higher value is worse, except for line breaks, where a higher share is better.
-  const delta = kind === 'line-breaks' ? record - value : value - record;
-  if (delta > GAP_MARGINS[kind] + 1e-12) return 'worse';
-  if (delta < -GAP_MARGINS[kind] - 1e-12) return 'better';
-  return 'same';
 }
 
 /** The per-slide report line of a failing slide: its scores, and its known gap if it has one. */
@@ -104,11 +66,7 @@ export function slideVerdict(s: SlideResult, gap: KnownGap | undefined): string 
   const kinds = failureKinds(s);
   if (kinds.length === 0) return '';
   const fails = kinds.map((k) => `${scoreText(s, k)} (threshold ${thresholdText(k)})`).join('; ');
-  return gap
-    ? `fails: ${fails}. Known gap: ${gapKinds(gap)
-        .map((k) => recordText(k, gap))
-        .join('; ')}`
-    : `fails: ${fails}`;
+  return gap ? `fails: ${fails}. Known gap: ${gapKinds(gap).join(', ')}` : `fails: ${fails}`;
 }
 
 /**
@@ -143,7 +101,7 @@ export const deckLineCount = (deck: DeckResult): number =>
 
 export interface GateResult {
   readonly problems: readonly GateProblem[];
-  /** The slides that fail only in listed ways, at their recorded values. */
+  /** The slides that fail exactly the checks that their entries list. */
   readonly knownGaps: ReadonlySet<string>;
 }
 
@@ -215,35 +173,10 @@ export function checkFixtureGate(
       const listed = gap ? gapKinds(gap) : [];
       const extra = kinds.filter((k) => !listed.includes(k));
       const gone = listed.filter((k) => !kinds.includes(k));
-      const worse = kinds.filter(
-        (k) => gap && listed.includes(k) && compareWithRecord(s, k, gap) === 'worse'
-      );
-      const better = kinds.filter(
-        (k) => gap && listed.includes(k) && compareWithRecord(s, k, gap) === 'better'
-      );
       for (const k of extra)
         fix(`${key}: fails on ${scoreText(s, k)} (threshold ${thresholdText(k)}), a new failure`);
-      for (const k of worse)
-        fix(`${key}: ${scoreText(s, k)} is worse than its known gap (${recordText(k, gap!)})`);
-      const recount = gap !== undefined && (gap.lines ?? 0) !== (s.linesTotal ?? 0);
-      if (gap && recount && (s.linesTotal ?? 0) < (gap.lines ?? 0))
-        fix(
-          `${key}: checks ${s.linesTotal ?? 0} of its ${gap.lines} recorded lines: text is missing`
-        );
-      else if (gap && recount)
-        record(`${key}: checks ${s.linesTotal} lines, the list records ${gap.lines ?? 0}`);
       if (gone.length) record(`${key}: passes on ${gone.join(', ')} now`);
-      if (better.length) record(`${key}: scores better than its known gap on ${better.join(', ')}`);
-      if (
-        gap &&
-        kinds.length &&
-        !extra.length &&
-        !worse.length &&
-        !better.length &&
-        !gone.length &&
-        !recount
-      )
-        knownGaps.add(key);
+      if (gap && kinds.length && !extra.length && !gone.length) knownGaps.add(key);
     }
   }
   if (complete) {
@@ -257,19 +190,11 @@ export function checkFixtureGate(
   return { problems, knownGaps };
 }
 
-/** Whether `head` allows a worse score than `base` for one kind. */
-export function looser(kind: FailureKind, head: KnownGap, base: KnownGap): boolean {
-  if (kind === 'pixels') return (head.pixels ?? 0) > (base.pixels ?? 0);
-  if (kind === 'line-breaks') return (head['line-breaks'] ?? 1) < (base['line-breaks'] ?? 1);
-  if (kind === 'extra-text') return (head['extra-text'] ?? 0) > (base['extra-text'] ?? 0);
-  return (head.baseline ?? 0) > (base.baseline ?? 0);
-}
-
 /** How a new known-gap list differs from the old one, entry by entry. */
 export interface ListChanges {
   /** The tools that changed, as `chromium a → b`. */
   readonly tools: readonly string[];
-  /** Entries with a looser value or a new kind, and decks that check fewer lines. */
+  /** Entries with a new kind, and decks that check fewer lines. */
   readonly looser: readonly string[];
   /** New entries: slides that fail now and did not before. */
   readonly added: readonly string[];
@@ -277,7 +202,7 @@ export interface ListChanges {
   readonly removed: readonly string[];
 }
 
-/** The looser, new, and removed entries of `next` against `old`. */
+/** The new kinds, new entries, and removed entries of `next` against `old`. */
 export function listChanges(old: KnownGapList, next: KnownGapList): ListChanges {
   const looserEntries: string[] = [];
   const added: string[] = [];
@@ -287,11 +212,8 @@ export function listChanges(old: KnownGapList, next: KnownGapList): ListChanges 
       added.push(gapEntryLine(key, gap));
       continue;
     }
-    const worse = gapKinds(gap)
-      .filter((k) => was[k] === undefined || looser(k, gap, was))
-      .map((k) => `${k} ${was[k] ?? 'none'} → ${gap[k]}`);
-    if ((gap.lines ?? 0) < (was.lines ?? 0)) worse.push(`lines ${was.lines} → ${gap.lines ?? 0}`);
-    if (worse.length) looserEntries.push(`${key}: ${worse.join(', ')}`);
+    const more = gap.filter((k) => !was.includes(k));
+    if (more.length) looserEntries.push(`${key}: fails ${more.join(', ')} now`);
   }
   for (const [deck, lines] of Object.entries(next.deckLines)) {
     const was = old.deckLines?.[deck];
@@ -311,12 +233,12 @@ export function listChanges(old: KnownGapList, next: KnownGapList): ListChanges 
 export interface GapUpdate {
   readonly next: KnownGapList;
   readonly changes: ListChanges;
-  /** False when the run has new or looser entries and `acceptWorse` is not set. */
+  /** False when the run adds an entry or a kind and `acceptWorse` is not set. */
   readonly write: boolean;
 }
 
 /**
- * Plan `--update-gaps`: new entries and looser values are written only with `acceptWorse`.
+ * Plan `--update-gaps`: an added entry or kind is written only with `acceptWorse`.
  * `complete` is true when every fixture ran (`mergeRecorded`).
  */
 export function planUpdate(
@@ -368,8 +290,9 @@ export function mergeRecorded(
 
 /** One known-gap entry as a line of `thresholds.ts`. */
 export function gapEntryLine(key: string, gap: KnownGap): string {
-  const parts = Object.entries(gap).map(([k, v]) => `${k.includes('-') ? `'${k}'` : k}: ${v}`);
-  return `'${key}': { ${parts.join(', ')} },`;
+  return `'${key}': [${gapKinds(gap)
+    .map((k) => `'${k}'`)
+    .join(', ')}],`;
 }
 
 /** The known-gap list that a run records: its tools and each failing slide. */

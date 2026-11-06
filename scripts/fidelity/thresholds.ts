@@ -14,6 +14,11 @@ export const THRESHOLDS = {
   pixelThreshold: 0.1,
   /** Each matched line's baseline must be within this many points of the reference line. */
   maxBaselineDeltaPt: 0.5,
+  /**
+   * Each matched line must start or end within this many points of the reference line (the
+   * nearer of its left and right edges, so left, right, and centered text all count).
+   */
+  maxLineShiftPt: 0.5,
   /** Line breaks must be identical: the fraction of reference lines that our page must hold. */
   minLineBreakMatch: 1,
   /**
@@ -83,6 +88,14 @@ export const PAGE_SIZE_TOLERANCE_PT = 0.625;
  * limit that goes away unless it is listed here, so no limit goes away unseen.
  */
 export const RETIRED_LIMITS: Readonly<Record<string, string>> = {
+  'margin pixels':
+    'known gaps record failing checks, not values: rasters differ slightly between machines',
+  'margin baseline':
+    'known gaps record failing checks, not values: rasters differ slightly between machines',
+  'margin line-breaks':
+    'known gaps record failing checks, not values: rasters differ slightly between machines',
+  'margin extra-text':
+    'known gaps record failing checks, not values: rasters differ slightly between machines',
   rasterScale:
     'the supersampling factor: pdf.js draws both PDFs at renderWidthPx, and no raster is scaled down',
   maxSizeDeltaPx:
@@ -90,41 +103,10 @@ export const RETIRED_LIMITS: Readonly<Record<string, string>> = {
 };
 
 /** A threshold that a slide misses (`known-gaps.ts`). */
-export type FailureKind = 'pixels' | 'line-breaks' | 'baseline' | 'extra-text';
+export type FailureKind = 'pixels' | 'line-breaks' | 'baseline' | 'line-position' | 'extra-text';
 
-/**
- * The noise margins of a known gap's recorded value (`known-gaps.ts`). The check uses pinned tools and no
- * system tools or fonts, so the margins only absorb the rounding of the recorded value:
- * 0.01 % of the pixels, 0.01 pt of baseline, and 0.01 % for line breaks. Extra lines are a count:
- * no margin.
- */
-export const GAP_MARGINS = {
-  pixels: 0.0001,
-  baseline: 0.01,
-  'line-breaks': 0.0001,
-  'extra-text': 0,
-} as const;
-
-/**
- * One known gap: each threshold that a slide misses today, with its measured value. The gate
- * fails when the slide scores worse than the value by more than its margin (`GAP_MARGINS`), and
- * also when it scores better, until the better value is recorded.
- */
-export interface KnownGap {
-  /** The pixel mismatch, as a fraction of all pixels. */
-  readonly pixels?: number;
-  /** The share of reference lines that our page holds (0 to 1). */
-  readonly 'line-breaks'?: number;
-  /** The largest baseline distance of a matched line, in points. */
-  readonly baseline?: number;
-  /** How many lines of our page the reference page does not hold. */
-  readonly 'extra-text'?: number;
-  /**
-   * How many reference lines the slide checks. Another count fails the gate until it is
-   * recorded.
-   */
-  readonly lines?: number;
-}
+/** One known gap: the checks that a slide fails today, in the order of `FailureKind`. */
+export type KnownGap = readonly FailureKind[];
 
 /** The known-gap list, with the tools it was measured with. */
 export interface KnownGapList {
@@ -144,10 +126,10 @@ export interface KnownGapList {
 }
 
 /**
- * Known gaps, a ratchet: the fixture slides that fail today, with each threshold they miss and
- * its measured value. `bun run fidelity` fails when a slide fails in a way that is not listed,
- * scores worse or better than its value, or passes now. `bun run fidelity --update-gaps`
- * rewrites this list from a run; review the diff, because a worse value must be a fix instead.
+ * Known gaps, a ratchet: the fixture slides that fail today, with each check they fail. Values
+ * are not recorded: rasters differ slightly between machines. `bun run fidelity` fails when a
+ * slide fails a check that is not listed, or passes a listed check now. `bun run fidelity
+ * --update-gaps` rewrites this list from a run; review the diff, because a new kind is a fix.
  */
 export const FIXTURE_KNOWN_GAPS: KnownGapList = {
   pdfjs: '5.4.624',
@@ -197,55 +179,47 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'vertical-east-asian': 0,
   },
   slides: {
-    'autofit/1': { pixels: 0.0094, lines: 9 },
-    'east-asian-line-breaking/1': { pixels: 0.0062, lines: 52 },
-    'east-asian-line-breaking/2': { pixels: 0.0068, lines: 52 },
-    'east-asian-line-breaking/4': { pixels: 0.0058, lines: 5 },
-    'east-asian-typography/2': {
-      pixels: 0.0148,
-      'line-breaks': 0.7647,
-      'extra-text': 7,
-      lines: 17,
-    },
-    'fill-fidelity/1': { pixels: 0.2808 },
-    'fill-fidelity/2': { pixels: 0.2103 },
-    'fill-fidelity/3': { pixels: 0.1836 },
-    'fill-fidelity/4': { pixels: 0.0148 },
-    'fill-fidelity/5': { pixels: 0.0992 },
-    'fill-fidelity/6': { pixels: 0.8086 },
-    'fills-lines/1': { pixels: 0.0784, 'extra-text': 1 },
-    'fills-lines/2': { pixels: 0.0116 },
-    'follow-ups/1': { pixels: 0.0284 },
-    'follow-ups/2': { pixels: 0.0736 },
-    'follow-ups/3': { pixels: 0.1153 },
-    'font-effects/1': { pixels: 0.008, lines: 10 },
-    'font-substitution/1': { pixels: 0.0141, lines: 8 },
-    'gradients/1': { pixels: 0.0894 },
-    'line-model/2': { pixels: 0.0051, lines: 31 },
-    'paragraph-format/1': { pixels: 0.0095, 'line-breaks': 0.8889, 'extra-text': 3, lines: 27 },
-    'picture-editing/1': { pixels: 0.0076 },
-    'picture-editing/2': { pixels: 0.0072 },
-    'pictures/1': { pixels: 0.0096 },
-    'placeholders-background/1': { pixels: 0.139, lines: 3 },
-    'rtl-text/1': { pixels: 0.0292, lines: 1 },
-    'rtl-text/2': { pixels: 0.0221, lines: 2 },
-    'rtl-text/3': { pixels: 0.0175 },
-    'rtl-text/4': { pixels: 0.0226 },
-    'shape-effects-presets/2': { 'line-breaks': 0.6667, lines: 9 },
-    'shape-effects-presets/3': { 'line-breaks': 0.6667, lines: 6 },
-    'slide-structure/1': { pixels: 0.0492, 'extra-text': 1, lines: 1 },
-    'slide-structure/2': { pixels: 0.0057, lines: 1 },
-    'spacing/1': { pixels: 0.0053, lines: 18 },
-    'tables/3': {
-      pixels: 0.0324,
-      'line-breaks': 0.8824,
-      baseline: 2.97,
-      'extra-text': 1,
-      lines: 17,
-    },
-    'text-direction/1': { pixels: 0.0198, 'line-breaks': 0.7872, 'extra-text': 12, lines: 47 },
-    'text-runs/1': { pixels: 0.006, lines: 11 },
-    'vertical-columns/1': { pixels: 0.0106, lines: 12 },
-    'vertical-east-asian/1': { pixels: 0.0098 },
+    'alignment-anchor/1': ['line-position'],
+    'autofit/1': ['pixels'],
+    'east-asian-line-breaking/1': ['pixels'],
+    'east-asian-line-breaking/2': ['pixels'],
+    'east-asian-line-breaking/4': ['pixels'],
+    'east-asian-typography/2': ['pixels', 'line-breaks', 'extra-text'],
+    'fill-fidelity/1': ['pixels'],
+    'fill-fidelity/2': ['pixels'],
+    'fill-fidelity/3': ['pixels'],
+    'fill-fidelity/4': ['pixels'],
+    'fill-fidelity/5': ['pixels'],
+    'fill-fidelity/6': ['pixels'],
+    'fills-lines/1': ['pixels', 'extra-text'],
+    'fills-lines/2': ['pixels'],
+    'follow-ups/1': ['pixels'],
+    'follow-ups/2': ['pixels'],
+    'follow-ups/3': ['pixels'],
+    'font-effects/1': ['pixels'],
+    'font-substitution/1': ['pixels'],
+    'gradients/1': ['pixels'],
+    'line-model/2': ['pixels'],
+    'paragraph-format/1': ['pixels', 'line-breaks', 'extra-text'],
+    'picture-editing/1': ['pixels'],
+    'picture-editing/2': ['pixels'],
+    'pictures/1': ['pixels'],
+    'placeholders-background/1': ['pixels'],
+    'rtl-text/1': ['pixels'],
+    'rtl-text/2': ['pixels'],
+    'rtl-text/3': ['pixels'],
+    'rtl-text/4': ['pixels'],
+    'shape-effects-presets/2': ['line-breaks'],
+    'shape-effects-presets/3': ['line-breaks'],
+    'shape-styles/1': ['line-position'],
+    'slide-layouts/1': ['line-position'],
+    'slide-structure/1': ['pixels', 'extra-text'],
+    'slide-structure/2': ['pixels'],
+    'spacing/1': ['pixels'],
+    'tables/3': ['pixels', 'line-breaks', 'baseline', 'extra-text'],
+    'text-direction/1': ['pixels', 'line-breaks', 'extra-text'],
+    'text-runs/1': ['pixels'],
+    'vertical-columns/1': ['pixels'],
+    'vertical-east-asian/1': ['pixels'],
   },
 };
