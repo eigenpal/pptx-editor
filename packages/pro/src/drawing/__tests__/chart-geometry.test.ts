@@ -9,6 +9,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 
 import { describe, expect, test } from 'bun:test';
 import type { ChartComponent, Point } from '../chart-scene.ts';
+import { outsideLabelRoom } from '../chart-pie.ts';
 import { renderFixture } from './chart-support.ts';
 
 interface Box {
@@ -153,6 +154,22 @@ describe('chart geometry', () => {
     const outer = (box.r - box.l) / 2;
     const inner = Math.min(...all.map((p) => Math.hypot(p.x - cx, p.y - cy)));
     expect(inner / outer).toBeCloseTo(plot.holeSize / 100, 2);
+  });
+
+  test('pie and doughnut: room for outside labels grows with the plot area, not the label size', () => {
+    // The reference renderings of `charts.pdf` draw the pie 320 pt wide and the doughnut 325 pt.
+    const diameter = (index: number) => {
+      const slices = renderFixture(index).rendered.scene.components.filter(
+        (c) => c.closed && c.fill && c.subpaths[0]!.length > 10
+      );
+      const box = boxOf(slices.flatMap((c) => c.subpaths[0]!));
+      return box.r - box.l;
+    };
+    expect(Math.abs(diameter(5) - 320)).toBeLessThan(3);
+    expect(Math.abs(diameter(6) - 325)).toBeLessThan(3);
+    // A 1.5-inch-tall plot keeps 17 pt, a 6.8-inch-tall one 64 pt.
+    expect(outsideLabelRoom(86)).toBeCloseTo(17, 0);
+    expect(outsideLabelRoom(467.6)).toBeCloseTo(64, 0);
   });
 
   test('radar: one polygon per series with a vertex on each category spoke', () => {

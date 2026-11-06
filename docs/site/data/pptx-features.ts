@@ -638,6 +638,7 @@ export const pptxFeatures: PptxFeature[] = [
     tier: 'premium',
     notes:
       'The drawing module of @pptx-editor.dev/pro draws charts from the values cached in the chart part, in the editor and in the PDF export. It draws bar and column charts (clustered, stacked, and percent stacked), line, area, scatter, pie, doughnut, and radar charts, with titles, legends, axes, gridlines, data labels, and number formats. 3-D, of-pie, stock, bubble, and surface charts, and charts with trendlines or error bars, show a labeled placeholder. Without the module, every chart shows the placeholder. Charts are not editable, and the chart part saves unchanged. The module needs the EigenPal Pro License.',
+    docsLink: '/docs/guides/charts',
   },
   {
     id: 'objects.diagrams',

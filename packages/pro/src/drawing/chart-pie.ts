@@ -77,6 +77,17 @@ const LEADER_RUN = 0.5;
 const LEADER_GAP = 0.16;
 /** Labels further than this from their slice edge, in sizes, take a leader line. */
 const LEADER_REACH = 0.75;
+/**
+ * The room an automatic plot area keeps round a pie whose labels may sit outside it, in points,
+ * across both sides: a share of the plot area's shorter side plus a fixed margin. Reference
+ * renderings of one pie in frames from 1.5 to 6.8 inches tall fit this within a point, and the
+ * room does not change with the label size.
+ */
+export function outsideLabelRoom(side: number): number {
+  return side * OUTSIDE_ROOM_SHARE + OUTSIDE_ROOM_PT;
+}
+const OUTSIDE_ROOM_SHARE = 0.123;
+const OUTSIDE_ROOM_PT = 6.4;
 /** How far outside labels may reach past the plot area, in points. */
 const LABEL_REACH = 10;
 const DEFAULT_LEADER: ChartStroke = {
@@ -150,9 +161,9 @@ export function paintPie(plot: ChartPlot, box: Box, context: PieContext): void {
       return spec !== null && spec.position !== 'inEnd' && spec.position !== 'ctr';
     })
   );
-  const labelStyle = elementText(context.baseText, null);
-  const room = outsideLabels && !context.placed ? 2 * 1.38 * labelStyle.sizePt : 0;
-  const diameter = Math.max(1, Math.min(box.r - box.l, box.b - box.t) - room);
+  const side = Math.min(box.r - box.l, box.b - box.t);
+  const room = outsideLabels && !context.placed ? outsideLabelRoom(side) : 0;
+  const diameter = Math.max(1, side - room);
   const cx = (box.l + box.r) / 2;
   const cy = (box.t + box.b) / 2;
   // Exploded slices move out from the full radius; the pie does not shrink to fit them.
