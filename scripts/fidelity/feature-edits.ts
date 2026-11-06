@@ -7,29 +7,32 @@
 // writes each edited copy as `<row id>.pptx`, so the copies can be opened in other
 // presentation applications to check for a repair prompt (CONTRIBUTING.md, "Fidelity harness").
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   attr,
   elements,
   find,
+  imagePartFor,
   presentationInfo,
-  readPptx,
   textOf,
   xmlPartOf,
+  type PptxPackage,
 } from '../../packages/core/src/store/index.ts';
 import {
+  added,
   all,
-  FIXTURES,
   firstRun,
   has,
   lacks,
   MEDIA,
   nameOf,
   NEW_SLIDES,
+  paragraphOf,
   PNG,
   PRESENTATION,
+  removed,
   runFeatureEdit,
   shapeElement,
   shapesIn,
@@ -50,10 +53,19 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
         bold: true,
         italic: true,
         underline: 'double',
+        underlineColor: '#00B0F0',
         strike: 'single',
       });
     },
-    check: (d) => has(d.shapeXml(0, 'Shape 2'), 'b="1"', 'i="1"', 'u="dbl"', 'strike="sngStrike"'),
+    check: (d) =>
+      has(
+        firstRun(d.shapeXml(0, 'Shape 2')),
+        'b="1"',
+        'i="1"',
+        'u="dbl"',
+        'strike="sngStrike"',
+        '<a:uFill><a:solidFill><a:srgbClr val="00B0F0"/>'
+      ),
   },
   'text.font-family-size': {
     fixture: 'open-font-families',
@@ -62,7 +74,7 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       t.run({ type: 'setFontFamily', family: 'Lato' });
       t.run({ type: 'setFontSize', points: 31 });
     },
-    check: (d) => has(d.shapeXml(0, 'Shape 2'), 'typeface="Lato"', 'sz="3100"'),
+    check: (d) => has(firstRun(d.shapeXml(0, 'Shape 2')), 'typeface="Lato"', 'sz="3100"'),
   },
   'text.color-highlight': {
     fixture: 'text-runs',
@@ -147,10 +159,10 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
     },
     check: (d) =>
       has(
-        d.shapeXml(0, 'Shape 2'),
-        '<a:spcPct val="150000"/>',
-        '<a:spcPts val="900"/>',
-        '<a:spcPts val="700"/>'
+        paragraphOf(d.shapeXml(0, 'Shape 2'), 0),
+        '<a:lnSpc><a:spcPct val="150000"/></a:lnSpc>',
+        '<a:spcBef><a:spcPts val="900"/></a:spcBef>',
+        '<a:spcAft><a:spcPts val="700"/></a:spcAft>'
       ),
   },
   'paragraphs.indent-tabs': {
@@ -159,15 +171,7 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       t.selectText('Shape 2', 0, 1, 1);
       t.run({ type: 'indent', direction: 1 });
     },
-    check: (d) => {
-      const p = elements(
-        elements(shapeElement(d.pkg, 0, 'Shape 2')).find((c) => c.local === 'txBody')!
-      ).filter((c) => c.local === 'p')[1];
-      const pPr = p && elements(p).find((c) => c.local === 'pPr');
-      return attr(pPr, 'lvl') || attr(pPr, 'marL')
-        ? undefined
-        : 'the second paragraph has no indent';
-    },
+    check: (d) => has(paragraphOf(d.shapeXml(0, 'Shape 2'), 1), '<a:pPr lvl="1">'),
   },
   'paragraphs.autofit': {
     fixture: 'autofit',
@@ -388,14 +392,19 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       t.run({ type: 'setShapeEffect', effect: { kind: 'glow', size: 8, color: '#FFC000' } });
       t.run({ type: 'setShapeEffect', effect: { kind: 'reflection', preset: 'halfTouching' } });
       t.run({ type: 'setShapeEffect', effect: { kind: 'softEdge', size: 5 } });
+      t.select('Shape 7');
+      t.run({ type: 'setShapeEffect', effect: { kind: 'shadow', preset: 'innerTopLeft' } });
     },
     check: (d) =>
-      has(
-        d.shapeXml(0, 'Shape 3'),
-        '<a:glow rad="101600"',
-        'val="FFC000"',
-        '<a:reflection',
-        '<a:softEdge rad="63500"'
+      all(
+        has(
+          d.shapeXml(0, 'Shape 3'),
+          '<a:glow rad="101600"',
+          'val="FFC000"',
+          '<a:reflection',
+          '<a:softEdge rad="63500"'
+        ),
+        has(d.shapeXml(0, 'Shape 7'), '<a:innerShdw')
       ),
   },
   'pictures.raster-svg': {
@@ -409,18 +418,16 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       const pictures = shapesIn(xmlPartOf(d.pkg, slidePart(d.pkg, 0))!.root).filter(
         (s) => s.local === 'pic'
       );
-      const media = [...d.pkg.parts.keys()].filter((p) => p.startsWith('/ppt/media/'));
-      const same = media.filter((p) => {
-        const part = d.pkg.parts.get(p);
-        return (
-          part?.kind === 'binary' &&
-          part.bytes.length === PNG.length &&
-          part.bytes.every((b, i) => b === PNG[i])
-        );
-      });
+      const embed = /r:embed="([^"]+)"/.exec(d.shapeXml(0, 'Picture 0'))?.[1];
+      const target = embed && imagePartFor(d.pkg, slidePart(d.pkg, 0), embed);
+      const part = target ? d.pkg.parts.get(target) : undefined;
+      const replaced =
+        part?.kind === 'binary' &&
+        part.bytes.length === PNG.length &&
+        part.bytes.every((b, i) => b === PNG[i]);
       return all(
         pictures.length === 7 ? undefined : `${pictures.length} pictures`,
-        same.length >= 1 ? undefined : 'the new picture bytes are missing'
+        replaced ? undefined : `Picture 0 shows ${target}, not the new picture`
       );
     },
     parts: MEDIA,
@@ -456,7 +463,12 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       t.select('Picture 3');
       t.run({ type: 'setImageStyle', style: 'simpleFrameBlack' });
     },
-    check: (d) => has(d.shapeXml(0, 'Picture 3'), '<a:ln'),
+    check: (d) =>
+      has(
+        d.shapeXml(0, 'Picture 3'),
+        '<a:ln w="88900" cap="sq"><a:solidFill><a:srgbClr val="000000"/>',
+        '<a:outerShdw blurRad="55000"'
+      ),
   },
   'pictures.alt-text': {
     fixture: 'picture-editing',
@@ -484,8 +496,14 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       t.run({ type: 'toggleTableStyleOption', option: 'firstCol' });
     },
     check: (d) => {
-      const tblPr = d.shapeXml(0, 'Table 1').match(/<a:tblPr[^>]*>/)?.[0] ?? '';
-      return tblPr.includes('firstCol="1"') ? undefined : `table options ${tblPr}`;
+      const options = (xml: string) => /<a:tblPr[^>]*>/.exec(xml)?.[0] ?? '';
+      const before = options(shapeXmlOf(d.original, 0, 'Table 1'));
+      const after = options(d.shapeXml(0, 'Table 1'));
+      const flag = (tag: string, name: string) => tag.includes(`${name}="1"`);
+      return flag(after, 'bandRow') !== flag(before, 'bandRow') &&
+        flag(after, 'firstCol') !== flag(before, 'firstCol')
+        ? undefined
+        : `table options ${after}, were ${before}`;
     },
   },
   'tables.cell-text': {
@@ -505,32 +523,39 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       t.run({ type: 'insertTable', rows: 2, cols: 3 });
     },
     check: (d) => {
-      const tables = d.slideXml(0).match(/<a:tbl>/g)?.length ?? 0;
-      const rows = d.shapeXml(0, 'Table 1').match(/<a:tr /g)?.length ?? 0;
-      const original = readPptx(new Uint8Array(readFileSync(join(FIXTURES, 'table-editing.pptx'))));
-      const before = original.ok
-        ? (shapeXmlOf(original.pkg, 0, 'Table 1').match(/<a:tr /g)?.length ?? 0)
-        : 0;
+      const count = (xml: string, re: RegExp) => xml.match(re)?.length ?? 0;
+      const before = shapeXmlOf(d.original, 0, 'Table 1');
+      const after = d.shapeXml(0, 'Table 1');
       return all(
-        tables === 2 ? undefined : `${tables} tables`,
-        rows === before + 1 ? undefined : `${rows} rows, was ${before}`
+        count(d.slideXml(0), /<a:tbl>/g) === 2 ? undefined : 'no new table',
+        count(after, /<a:tr /g) === count(before, /<a:tr /g) + 1 ? undefined : 'no new row',
+        count(after, /<a:gridCol /g) === count(before, /<a:gridCol /g) + 1
+          ? undefined
+          : 'no new column'
       );
     },
   },
   'tables.merge-split': {
     fixture: 'table-editing',
     edit: (t) => {
+      const table = t.node('Table 1');
       t.editor.setSelection({
         kind: 'cells',
-        nodeId: t.node('Table 1'),
+        nodeId: table,
         anchor: { row: 3, column: 0 },
         focus: { row: 3, column: 1 },
       });
       t.run({ type: 'mergeCells' });
+      // The fixture merges rows 1 and 2 of columns 0 and 1: split that block into four cells.
+      t.selectCell('Table 1', 1, 0);
+      t.run({ type: 'splitCell', rows: 2, cols: 2 });
     },
     check: (d) => {
       const rows = d.shapeXml(0, 'Table 1').split('<a:tr ');
-      return has(rows[rows.length - 1], 'gridSpan="2"', 'hMerge="1"');
+      return all(
+        has(rows[rows.length - 1], 'gridSpan="2"', 'hMerge="1"'),
+        lacks(rows[2] + rows[3], 'gridSpan=', 'rowSpan=', 'hMerge=', 'vMerge=')
+      );
     },
   },
   'tables.styles': {
@@ -544,8 +569,7 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
     },
     check: (d) => {
       const styleOf = (xml: string) => /<a:tableStyleId>([^<]*)</.exec(xml)?.[1];
-      const original = readPptx(new Uint8Array(readFileSync(join(FIXTURES, 'tables.pptx'))));
-      const before = original.ok ? styleOf(shapeXmlOf(original.pkg, 0, 'Table 1')) : undefined;
+      const before = styleOf(shapeXmlOf(d.original, 0, 'Table 1'));
       const after = styleOf(d.shapeXml(0, 'Table 1'));
       return after && after !== before ? undefined : `table style ${after}, was ${before}`;
     },
@@ -590,15 +614,29 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       t.run({ type: 'addSlide' });
     },
     check: (d) => {
-      const n = presentationInfo(d.pkg).slides.length;
-      return n === 5 ? undefined : `${n} slides`;
+      const titleOf = (pkg: PptxPackage, i: number) =>
+        textOf(find(xmlPartOf(pkg, slidePart(pkg, i))!.root, 'p:spTree')).match(
+          /^(Intro|Body) \d/
+        )?.[0] ?? '';
+      const titles = presentationInfo(d.pkg).slides.map((_, i) => titleOf(d.pkg, i));
+      const kept = titles.filter(Boolean).join(', ');
+      const expected = 'Intro 2, Intro 2, Body 1, Intro 1';
+      // The duplicate keeps every shape of its source.
+      const shapes = (i: number) =>
+        shapesIn(xmlPartOf(d.pkg, slidePart(d.pkg, i))!.root)
+          .map(nameOf)
+          .join(', ');
+      return all(
+        titles.length === 5 ? undefined : `${titles.length} slides`,
+        kept === expected ? undefined : `slide order ${kept}, expected ${expected}`,
+        shapes(0) === shapes(1) ? undefined : `the duplicate has ${shapes(1)}`
+      );
     },
     parts: [
-      ...PRESENTATION,
       ...NEW_SLIDES,
-      /^\/ppt\/media\//,
-      /^\/ppt\/charts\//,
-      /^\/ppt\/embeddings\//,
+      removed(/^\/ppt\/(slides|notesSlides|comments|embeddings)\//),
+      removed(/^\/ppt\/slides\/_rels\//),
+      /^\/ppt\/commentAuthors\.xml$/,
     ],
   },
   'slides.hidden': {
@@ -616,13 +654,14 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
     fixture: 'slide-layouts',
     edit: (t) => {
       const layout = t.editor.snapshot().layouts?.find((l) => /content/i.test(l.name));
-      t.run({ type: 'addSlide', ...(layout ? { layoutId: layout.id } : {}) });
+      if (!layout) throw new Error('the fixture has no content layout');
+      t.run({ type: 'addSlide', layoutId: layout.id });
     },
     check: (d) => {
       const xml = d.slideXml(1);
       return all(has(xml, '<p:ph'), /<a:t>/.test(xml) ? 'the new slide has text' : undefined);
     },
-    parts: [...PRESENTATION, ...NEW_SLIDES],
+    parts: NEW_SLIDES,
   },
   'slides.notes': {
     fixture: 'slide-layouts',
@@ -631,28 +670,22 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       t.run({ type: 'formatNotes', index: 0, start: 0, end: 5, format: 'bold', value: true });
     },
     check: (d) => {
-      const notes = [...d.pkg.parts.keys()].filter((p) =>
-        /^\/ppt\/notesSlides\/[^/]+\.xml$/.test(p)
-      );
-      const xml = notes.map((p) => d.partXml(p)).find((x) => x.includes('&lt;kept&gt;'));
-      if (!xml) return 'no notes slide has the text';
-      const text = textOf(
-        xmlPartOf(
-          d.pkg,
-          notes.find((p) => d.partXml(p) === xml)
-        )!.root
-      );
+      const rels = d.partXml(slidePart(d.pkg, 0).replace(/\/([^/]+)$/, '/_rels/$1.rels'));
+      const target = /Target="\.\.\/notesSlides\/([^"]+)"/.exec(rels)?.[1];
+      if (!target) return 'slide 1 has no notes slide';
+      const part = `/ppt/notesSlides/${target}`;
+      const text = textOf(xmlPartOf(d.pkg, part)!.root);
       return all(
         text.includes('Notes & <kept>') && text.includes('Second line')
           ? undefined
           : `notes text "${text}"`,
-        has(xml, 'b="1"/><a:t>Notes</a:t>')
+        has(d.partXml(part), 'b="1"/><a:t>Notes</a:t>')
       );
     },
     parts: [
-      /^\/ppt\/notesSlides\//,
-      /^\/ppt\/notesMasters\//,
-      /^\/ppt\/theme\//,
+      added(/^\/ppt\/notesSlides\//),
+      added(/^\/ppt\/notesMasters\//),
+      added(/^\/ppt\/theme\//),
       /^\/\[Content_Types\]\.xml$/,
       ...PRESENTATION,
     ],
@@ -692,10 +725,9 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       t.run({ type: 'applyLayout', layoutId: other.id, indices: [1] });
     },
     check: (d) => {
-      const ref = presentationInfo(d.pkg).slides[1];
-      const original = readPptx(new Uint8Array(readFileSync(join(FIXTURES, 'slide-layouts.pptx'))));
-      const before = original.ok ? presentationInfo(original.pkg).slides[1]?.layoutPart : undefined;
-      return ref?.layoutPart && ref.layoutPart !== before ? undefined : `layout ${ref?.layoutPart}`;
+      const after = presentationInfo(d.pkg).slides[1]?.layoutPart;
+      const before = presentationInfo(d.original).slides[1]?.layoutPart;
+      return after && after !== before ? undefined : `layout ${after}, was ${before}`;
     },
   },
 };

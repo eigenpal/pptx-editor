@@ -229,7 +229,7 @@ describe('pptx-features: evidence for claims', () => {
 
   test('round trip "full" needs the row\'s own edit on one of its fixtures, checked for a prompt', () => {
     // feature-edits.test.ts runs each recipe: edit, save, reopen, and find the edit again.
-    const verified = new Set(SAVE_VERIFIED_FEATURE_EDITS);
+    const verified = new Set(Object.keys(SAVE_VERIFIED_FEATURE_EDITS));
     const unproven = pptxFeatures
       .filter((row) => row.roundTrip === 'full')
       .flatMap((row) => {
@@ -244,7 +244,7 @@ describe('pptx-features: evidence for claims', () => {
   });
 
   test('every save-verified feature edit names a row with a recipe', () => {
-    const orphans = SAVE_VERIFIED_FEATURE_EDITS.filter(
+    const orphans = Object.keys(SAVE_VERIFIED_FEATURE_EDITS).filter(
       (id) => !pptxFeatureById[id] || !FEATURE_EDITS[id]
     );
     expect(orphans).toEqual([]);

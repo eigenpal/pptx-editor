@@ -4,6 +4,7 @@
 // reopened copy, its check must fail on the unedited deck, a second save must give the same
 // package, and only the parts the edit owns may change.
 
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { EditorCommand } from '../../packages/core/src/contracts/index.ts';
@@ -53,6 +54,8 @@ export interface EditTools {
 /** What a recipe uses to check the reopened copy. */
 export interface SavedDeck {
   readonly pkg: PptxPackage;
+  /** The fixture as committed, before any edit. */
+  readonly original: PptxPackage;
   readonly editor: PptxEditorInstance;
   /** The XML of slide `index` (0-based), with prefixes, as saved. */
   slideXml(index: number): string;
@@ -72,11 +75,21 @@ export interface FeatureEdit {
   /** A failure message, or undefined when the reopened copy has the edit. */
   readonly check: (d: SavedDeck) => string | undefined;
   /**
-   * Parts the edit may change besides the slide it runs on and that slide's relationships, as
-   * patterns of part names. Absent: only that slide.
+   * Parts the edit may change besides the slide it runs on and that slide's relationships.
+   * A pattern lets a part change; `added` and `removed` let a part only appear or go. Absent:
+   * only that slide.
    */
-  readonly parts?: readonly RegExp[];
+  readonly parts?: readonly PartRule[];
 }
+
+/** A part the edit may change: any change to matching names, or only a new or removed part. */
+export type PartRule = RegExp | { readonly added: RegExp } | { readonly removed: RegExp };
+
+/** Parts that match `re` may appear, but existing parts may not change. */
+export const added = (re: RegExp): PartRule => ({ added: re });
+
+/** Parts that match `re` may go, but existing parts may not change. */
+export const removed = (re: RegExp): PartRule => ({ removed: re });
 
 export const SHAPE_KINDS = new Set(['sp', 'pic', 'cxnSp', 'grpSp', 'graphicFrame']);
 
@@ -145,20 +158,40 @@ export function runsOf(shapeXml: string): { readonly rPr: string; readonly text:
 /** The `a:rPr` of the first run of the first paragraph. */
 export const firstRun = (shapeXml: string): string => runsOf(shapeXml)[0]?.rPr ?? '';
 
+/** The XML of paragraph `index` (0-based) of the first text body in `shapeXml`. */
+export function paragraphOf(shapeXml: string, index: number): string {
+  const paragraphs = shapeXml.match(/<a:p>.*?<\/a:p>|<a:p [^>]*>.*?<\/a:p>/g) ?? [];
+  return paragraphs[index] ?? '';
+}
+
+/** The fixture as committed. */
+export function readFixture(name: string): PptxPackage {
+  const read = readPptx(new Uint8Array(readFileSync(join(FIXTURES, `${name}.pptx`))));
+  if (!read.ok) throw new Error(`the fixture ${name} does not read`);
+  return read.pkg;
+}
+
 /** The first failure of several checks. */
 export const all = (...results: (string | undefined)[]): string | undefined =>
   results.find(Boolean);
 
-/** Parts that every slide edit may touch when it adds a picture. */
-export const MEDIA = [/^\/ppt\/media\//, /^\/\[Content_Types\]\.xml$/];
-export const PRESENTATION = [
+const CONTENT_TYPES = /^\/\[Content_Types\]\.xml$/;
+
+/** The parts an edit changes when it adds a picture. */
+export const MEDIA: readonly PartRule[] = [added(/^\/ppt\/media\//), CONTENT_TYPES];
+
+/** The parts an edit changes when it changes the slide list or the sections. */
+export const PRESENTATION: readonly PartRule[] = [
   /^\/ppt\/presentation\.xml$/,
   /^\/ppt\/_rels\/presentation\.xml\.rels$/,
 ];
-export const NEW_SLIDES = [
-  /^\/ppt\/slides\//,
-  /^\/ppt\/notesSlides\//,
-  /^\/\[Content_Types\]\.xml$/,
+
+/** The parts an edit changes when it adds slides. */
+export const NEW_SLIDES: readonly PartRule[] = [
+  ...PRESENTATION,
+  added(/^\/ppt\/slides\//),
+  added(/^\/ppt\/notesSlides\//),
+  CONTENT_TYPES,
   /^\/docProps\/app\.xml$/,
 ];
 
@@ -169,6 +202,8 @@ export interface FeatureEditResult {
   readonly failure?: string;
   /** The edited copy, as saved. */
   readonly bytes?: Uint8Array;
+  /** The canonical fingerprint of the edited copy (`SAVE_VERIFIED_FEATURE_EDITS`). */
+  readonly fingerprint?: string;
 }
 
 async function open(bytes: Uint8Array): Promise<PptxEditorInstance> {
@@ -225,7 +260,7 @@ function tools(editor: PptxEditorInstance): EditTools {
   };
 }
 
-function saved(pkg: PptxPackage, editor: PptxEditorInstance): SavedDeck {
+function saved(pkg: PptxPackage, original: PptxPackage, editor: PptxEditorInstance): SavedDeck {
   const partXml = (part: string): string => {
     const xml = xmlPartOf(pkg, part);
     if (!xml) throw new Error(`no part ${part}`);
@@ -233,6 +268,7 @@ function saved(pkg: PptxPackage, editor: PptxEditorInstance): SavedDeck {
   };
   return {
     pkg,
+    original,
     editor,
     partXml,
     slideXml: (index) => partXml(slidePart(pkg, index)),
@@ -248,6 +284,19 @@ function partContent(pkg: PptxPackage, name: string): string | undefined {
   return Buffer.from(part.bytes).toString('base64');
 }
 
+/**
+ * A fingerprint of the content of every part. A GUID that an edit makes (a new section's id)
+ * differs on each run, so GUIDs count as equal.
+ */
+export function editFingerprint(pkg: PptxPackage): string {
+  const hash = createHash('sha256');
+  for (const name of [...pkg.parts.keys()].sort()) {
+    const content = partContent(pkg, name) ?? '';
+    hash.update(`${name}\n${content.replace(/\{[0-9A-Fa-f-]{36}\}/g, '{GUID}')}\n`);
+  }
+  return `sha256:${hash.digest('hex')}`;
+}
+
 /** The names of the parts whose content differs, or that only one package has. */
 function differentParts(a: PptxPackage, b: PptxPackage): string[] {
   const names = new Set([...a.parts.keys(), ...b.parts.keys()]);
@@ -257,6 +306,7 @@ function differentParts(a: PptxPackage, b: PptxPackage): string[] {
 /** Run one recipe: edit, save, reopen, check, save again. */
 export async function runFeatureEdit(id: string, recipe: FeatureEdit): Promise<FeatureEditResult> {
   const fixture = new Uint8Array(readFileSync(join(FIXTURES, `${recipe.fixture}.pptx`)));
+  const original = readFixture(recipe.fixture);
   const slide = recipe.slide ?? 0;
   const editor = await open(fixture);
   let reopened: PptxEditorInstance | undefined;
@@ -276,7 +326,7 @@ export async function runFeatureEdit(id: string, recipe: FeatureEdit): Promise<F
       baseline.goToSlide(slide);
       let vacuous: boolean;
       try {
-        vacuous = recipe.check(saved(before.pkg, baseline)) === undefined;
+        vacuous = recipe.check(saved(before.pkg, original, baseline)) === undefined;
       } catch {
         vacuous = false;
       }
@@ -286,7 +336,7 @@ export async function runFeatureEdit(id: string, recipe: FeatureEdit): Promise<F
     }
     reopened = await open(bytes);
     reopened.goToSlide(slide);
-    const failure = recipe.check(saved(after.pkg, reopened));
+    const failure = recipe.check(saved(after.pkg, original, reopened));
     if (failure) return { id, ok: false, failure, bytes };
     const again = reopened.save();
     const second = again && readPptx(again);
@@ -300,17 +350,22 @@ export async function runFeatureEdit(id: string, recipe: FeatureEdit): Promise<F
         bytes,
       };
     const own = slidePart(before.pkg, slide);
+    const allows = (rule: PartRule, p: string): boolean => {
+      if (rule instanceof RegExp) return rule.test(p);
+      if ('added' in rule) return rule.added.test(p) && !before.pkg.parts.has(p);
+      return rule.removed.test(p) && !after.pkg.parts.has(p);
+    };
     const allowed = [
       (p: string) => p === own,
       (p: string) => p === own.replace(/\/([^/]+)$/, '/_rels/$1.rels'),
-      ...(recipe.parts ?? []).map((re) => (p: string) => re.test(p)),
+      ...(recipe.parts ?? []).map((rule) => (p: string) => allows(rule, p)),
     ];
     const collateral = differentParts(before.pkg, after.pkg).filter(
       (p) => !allowed.some((ok) => ok(p))
     );
     if (collateral.length)
       return { id, ok: false, failure: `the edit also changed ${collateral.join(', ')}`, bytes };
-    return { id, ok: true, bytes };
+    return { id, ok: true, bytes, fingerprint: editFingerprint(after.pkg) };
   } catch (error) {
     return { id, ok: false, failure: error instanceof Error ? error.message : String(error) };
   } finally {

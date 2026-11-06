@@ -255,7 +255,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'paragraphs',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'full',
+    roundTrip: 'partial',
     tier: 'community',
     notes:
       'The Paragraph dialog sets the indent before text and a first-line or hanging indent. Indent and outdent change the list level. Tab stops are approximate and not editable. No ruler.',
@@ -369,7 +369,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'The Rotate control flips and turns 90° on the slide, also inside groups. Every resize handle of one object keeps a locked ratio; a resize of several objects ignores it. No lock control yet.',
+      'The Rotate control flips and turns 90° on the slide, also inside groups. Every resize handle of one object keeps a locked ratio; a resize of several objects ignores it. The default editor has no lock control; `setLockAspectRatio` sets the lock.',
   },
   {
     id: 'shapes.selection-pane',
@@ -380,7 +380,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Commands show, hide, and rename objects, also inside mc:AlternateContent. There, other edits of a drawn choice remove the out-of-date copies in the other branches: an approximation. The selection pane itself is not built yet.',
+      'Commands show, hide, and rename objects, also inside mc:AlternateContent. There, other edits of a drawn choice remove the out-of-date copies in the other branches: an approximation. The default editor has no selection pane.',
   },
   {
     id: 'shapes.styles-gallery',
@@ -490,7 +490,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'pictures',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'full',
+    roundTrip: 'partial',
     tier: 'community',
     notes:
       'Insert, move, resize, rotate, and Change Picture. Change Picture fits the new image in the old frame; this rule is not measured. Change Picture takes PNG, JPEG, and GIF only, not SVG.',
@@ -791,7 +791,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'themes',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'full',
+    roundTrip: 'partial',
     tier: 'community',
     notes:
       'Change layout and reset slide work. Placeholders without a place, animated empty placeholders, and placeholders in mc:AlternateContent keep their box: an approximation. The placeholder match order is not measured. Themes and the slide master cannot be edited.',
