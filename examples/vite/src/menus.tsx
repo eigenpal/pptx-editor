@@ -3,10 +3,10 @@
 // adds its own rows: opening and exporting files, slide structure, slide numbers, and Help.
 // Every built-in row runs a registered slot, so its state and action are the toolbar's.
 
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { PptxEditor, useEditorState, usePptxEditor, useTranslation } from '@pptx-editor.dev/react';
 import { translateKeyOrText, type EditorCommand } from '@pptx-editor.dev/core/editor';
-import type { PictureExport } from '../../shared/demo-files.ts';
+import { watchPdfExport, type SlideExport } from '../../shared/demo-files.ts';
 
 /** A host row bound to a command: disabled with the engine's reason when `Editor.can` refuses it. */
 function CommandRow({
@@ -81,16 +81,19 @@ export function MenuBar({
   onNew,
   onExample,
   onExport,
-  onExportPicture,
+  onExportSlides,
 }: {
   onRename: () => void;
   onOpen: () => void;
   onNew: () => void;
   onExample: () => void;
   onExport: () => void;
-  onExportPicture: (kind: PictureExport) => void;
+  onExportSlides: (kind: SlideExport) => void;
 }) {
   const { t } = useTranslation();
+  // The PDF row waits while the server makes a PDF, as the Export menu's row does.
+  const [pdfBusy, setPdfBusy] = useState(false);
+  useEffect(() => watchPdfExport(setPdfBusy), []);
   return (
     <PptxEditor.Menu className="demo-menubar">
       {/* File: the demo's own file rows around the built-in Page setup. */}
@@ -109,19 +112,26 @@ export function MenuBar({
             onSelect={onExport}
           />
           <PptxEditor.Menu.Row
+            label={t('menu.exportPdf')}
+            icon="description"
+            disabled={pdfBusy}
+            reason={t('menu.exportPdfBusy')}
+            onSelect={() => onExportSlides('pdf')}
+          />
+          <PptxEditor.Menu.Row
             label={t('menu.exportSlidePng')}
             icon="image"
-            onSelect={() => onExportPicture('png')}
+            onSelect={() => onExportSlides('png')}
           />
           <PptxEditor.Menu.Row
             label={t('menu.exportSlidesPng')}
             icon="folder_zip"
-            onSelect={() => onExportPicture('zip')}
+            onSelect={() => onExportSlides('zip')}
           />
           <PptxEditor.Menu.Row
             label={t('menu.exportSlideSvg')}
             icon="photo_library"
-            onSelect={() => onExportPicture('svg')}
+            onSelect={() => onExportSlides('svg')}
           />
         </PptxEditor.Menu.Group>
       </PptxEditor.Menu.File>

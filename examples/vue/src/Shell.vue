@@ -34,7 +34,7 @@ import {
   dismissPanelOverlay,
   dismissRailOverlay,
   exportDeck as saveDeck,
-  exportPicture as savePicture,
+  exportSlides as saveSlides,
   followPanelWidth,
   isPptxFile,
   carriesFiles,
@@ -42,7 +42,7 @@ import {
   panelStartsOpen,
   refuseDroppedFile,
   ribbonChrome,
-  type PictureExport,
+  type SlideExport,
 } from '../../shared/demo-files.ts';
 import AdapterSwitcher from './AdapterSwitcher.vue';
 import BrandLogo from './BrandLogo.vue';
@@ -120,9 +120,9 @@ function exportDeck(): void {
   emit('saved');
 }
 
-// Slide pictures come from the editor's own paint; nothing leaves the browser.
-function exportPicture(kind: PictureExport): void {
-  void savePicture(editor.value, kind, title.value || t('app.untitled'));
+// Slide pictures come from the editor's own paint. Only the PDF goes to the demo's server.
+function exportSlides(kind: SlideExport): void {
+  void saveSlides(editor.value, kind, title.value || t('app.untitled'));
 }
 
 function onFile(e: Event): void {
@@ -180,7 +180,7 @@ function onDrop(e: DragEvent): void {
         @new="emit('new')"
         @example="emit('example')"
         @export="exportDeck"
-        @export-picture="exportPicture"
+        @export-slides="exportSlides"
       />
       <div class="demo-topbar__actions">
         <!-- On a narrow window the slide thumbnails open over the slide (shell.css). -->
@@ -236,7 +236,7 @@ function onDrop(e: DragEvent): void {
             t('menu.new').split(' ')[0]
           }}</span>
         </button>
-        <ExportMenu @export="exportDeck" @export-picture="exportPicture" />
+        <ExportMenu @export="exportDeck" @export-slides="exportSlides" />
         <button
           type="button"
           class="demo-icon-btn demo-panel-toggle"

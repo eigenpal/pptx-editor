@@ -1,7 +1,7 @@
 // The demo's file handling, shared by the React demo (examples/vite) and the Vue demo
-// (examples/vue): the decks it opens, the download helper, and the slide picture exports. It
-// imports only `@pptx-editor.dev/core`, so it has no framework code. Everything loads and saves
-// in the browser; nothing is uploaded.
+// (examples/vue): the decks it opens, the download helper, and the slide exports. It imports only
+// `@pptx-editor.dev/core`, so it has no framework code. Everything loads and saves in the
+// browser. Only the PDF export sends the deck to the demo's own server, when the user picks it.
 
 import {
   exportSlidePng,
@@ -18,7 +18,10 @@ export const PPTX_MIME =
 export const PICTURE_WIDTH = 1920;
 
 /** What File > Export makes besides the deck. */
-export type PictureExport = 'png' | 'zip' | 'svg';
+export type SlideExport = 'pdf' | 'png' | 'zip' | 'svg';
+
+/** The demo's PDF export function: the root `api/convert.ts`, also served by the dev servers. */
+export const PDF_ENDPOINT = '/api/convert';
 
 /**
  * The decks the demo opens: the sample presentation (`showcase.pptx`, every feature, with demo
@@ -112,13 +115,87 @@ export function exportDeck(editor: PptxEditorInstance | null | undefined, name: 
   if (bytes) download(bytes, `${name}.pptx`);
 }
 
+/** The largest deck the demo's PDF function accepts (`MAX_UPLOAD` in `api/convert.ts`). */
+export const PDF_MAX_UPLOAD = 4 * 1024 * 1024;
+
+/** Why the PDF export failed, as the `app.*` key of the editor's notice. */
+export class PdfExportFailure extends Error {
+  constructor(
+    readonly key: 'app.pdfTooLarge' | 'app.pdfTooComplex' | 'app.pdfBusy' | 'app.pdfExportFailed'
+  ) {
+    super(key);
+    this.name = 'PdfExportFailure';
+  }
+}
+
 /**
- * Save slide pictures from the editor's own paint: the current slide as PNG or SVG, or every
- * slide as PNG files in a ZIP. Nothing leaves the browser.
+ * The notice for a failure of the PDF function: its HTTP status and the `error` name of its JSON
+ * body. Only the name is read, never the server's message.
  */
-export async function exportPicture(
+function failureFor(status: number, error: unknown): PdfExportFailure {
+  if (status === 413) return new PdfExportFailure('app.pdfTooLarge');
+  // Too many slides, too much paint, a PDF past its size limit, or past the conversion deadline:
+  // a retry fails the same way.
+  if (status === 507 || (status === 408 && error === 'PdfWorkLimitError'))
+    return new PdfExportFailure('app.pdfTooComplex');
+  if (status === 503) return new PdfExportFailure('app.pdfBusy');
+  return new PdfExportFailure('app.pdfExportFailed');
+}
+
+/**
+ * Convert the saved deck to a PDF on the demo's server (`api/convert.ts`). The deck leaves the
+ * browser only here, after the user picks the export. Throws `PdfExportFailure`.
+ */
+export async function convertToPdf(deck: Uint8Array): Promise<Blob> {
+  if (deck.byteLength > PDF_MAX_UPLOAD) throw new PdfExportFailure('app.pdfTooLarge');
+  let response: Response;
+  try {
+    response = await fetch(PDF_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': PPTX_MIME },
+      body: deck.slice().buffer,
+      // Longer than the function can run (`maxDuration` in `api/convert.ts`).
+      signal: AbortSignal.timeout(130_000),
+    });
+  } catch {
+    // Offline, no server, or past the timeout.
+    throw new PdfExportFailure('app.pdfExportFailed');
+  }
+  const type = response.headers.get('content-type') ?? '';
+  if (response.ok && type.startsWith('application/pdf')) return response.blob();
+  const body: unknown = type.includes('application/json')
+    ? await response.json().catch(() => null)
+    : null;
+  throw failureFor(response.status, (body as { error?: unknown } | null)?.error);
+}
+
+/** Whether a PDF export is running. A second pick does nothing until it ends. */
+let pdfRunning = false;
+const pdfListeners = new Set<(busy: boolean) => void>();
+
+function setPdfRunning(busy: boolean): void {
+  pdfRunning = busy;
+  for (const listener of pdfListeners) listener(busy);
+}
+
+/**
+ * Follow whether a PDF export is running, so the Export button shows that the PDF is being made.
+ * Calls `listener` now and on each change. Returns the cleanup.
+ */
+export function watchPdfExport(listener: (busy: boolean) => void): () => void {
+  pdfListeners.add(listener);
+  listener(pdfRunning);
+  return () => pdfListeners.delete(listener);
+}
+
+/**
+ * Export from the editor's current deck: the whole deck as PDF (made on the demo's server), the
+ * current slide as PNG or SVG, or every slide as PNG files in a ZIP. The pictures come from the
+ * editor's own paint and never leave the browser. A failure shows as the editor's notice.
+ */
+export async function exportSlides(
   editor: PptxEditorInstance | null | undefined,
-  kind: PictureExport,
+  kind: SlideExport,
   name: string
 ): Promise<void> {
   const session = editor?.session;
@@ -126,7 +203,18 @@ export async function exportPicture(
   const slide = editor.snapshot().currentSlide;
   const options = { width: PICTURE_WIDTH };
   try {
-    if (kind === 'png')
+    if (kind === 'pdf') {
+      if (pdfRunning) return;
+      // `save` is null for a damaged slide; the editor already shows why.
+      const deck = editor.save();
+      if (!deck) return;
+      setPdfRunning(true);
+      try {
+        download(await convertToPdf(deck), `${name}.pdf`);
+      } finally {
+        setPdfRunning(false);
+      }
+    } else if (kind === 'png')
       download(await exportSlidePng(session, slide, options), `${name} ${slide + 1}.png`);
     else if (kind === 'zip')
       download(await exportSlidesPngZip(session, options), `${name}.zip`, 'application/zip');
@@ -137,6 +225,8 @@ export async function exportPicture(
       );
   } catch (e) {
     console.error(e);
+    if (kind === 'pdf')
+      editor.reject(e instanceof PdfExportFailure ? e.key : 'app.pdfExportFailed');
   }
 }
 

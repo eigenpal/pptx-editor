@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { fileURLToPath } from 'node:url';
+import { pdfExportPlugin } from '../shared/pdf-export-plugin.ts';
 
 const pkg = (p: string): string => fileURLToPath(new URL(`../../packages/${p}`, import.meta.url));
 
@@ -9,7 +10,7 @@ const pkg = (p: string): string => fileURLToPath(new URL(`../../packages/${p}`, 
 // It serves the React demo's decks and icons (`publicDir`), so both demos open the same files.
 // Port 5275 is next to the React demo's 5274.
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), pdfExportPlugin()],
   base: process.env.VITE_BASE_PATH ?? '/',
   publicDir: fileURLToPath(new URL('../vite/public', import.meta.url)),
   resolve: {
@@ -23,6 +24,8 @@ export default defineConfig({
       { find: /^@pptx-editor\.dev\/vue$/, replacement: pkg('vue/src/index.ts') },
       { find: /^@pptx-editor\.dev\/i18n$/, replacement: pkg('i18n/src/index.ts') },
       { find: /^@pptx-editor\.dev\/pro\/drawing$/, replacement: pkg('pro/src/drawing/index.ts') },
+      // The development server's PDF export (`pdfExportPlugin`) runs the converter from source.
+      { find: /^@pptx-editor\.dev\/pptx-to-pdf$/, replacement: pkg('pptx-to-pdf/src/index.ts') },
     ],
   },
   // Both packages resolve assets relative to their own module URL; pre-bundling would move them.
