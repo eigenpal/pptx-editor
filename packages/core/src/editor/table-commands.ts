@@ -18,6 +18,7 @@ import { refitTable } from '../automation/commands/table-fit.ts';
 import { insertTableFrame } from '../automation/commands/table-insert.ts';
 import { markStructureEdit } from '../automation/commands/table-edit-marks.ts';
 import { repairTable } from '../automation/commands/table-repair.ts';
+import { paragraphLength, paragraphsOf } from '../automation/commands/text-model.ts';
 import {
   setCellAnchor,
   setCellFill,
@@ -31,11 +32,14 @@ import {
   blockOf,
   cellBody,
   clearRange,
+  setCellText,
   deleteColumns,
   deleteRows,
   expandRange,
+  selectedRange,
   insertColumns,
   insertRows,
+  MAX_ROWS,
   MAX_TABLE_SIZE,
   mergeRange,
   readTable,
@@ -90,7 +94,7 @@ export function tableTarget(
     sel.kind === 'text' && sel.cell
       ? blockOf(m, sel.cell)
       : sel.kind === 'cells'
-        ? expandRange(m, cellRangeOf(sel))
+        ? selectedRange(m, cellRangeOf(sel))
         : wholeTable(m);
   return { m, range };
 }
@@ -121,7 +125,7 @@ export function tableTextTargets(
         range: { from: sel.anchor, to: sel.focus },
       },
     ];
-  const range = sel.kind === 'cells' ? expandRange(m, cellRangeOf(sel)) : wholeTable(m);
+  const range = sel.kind === 'cells' ? selectedRange(m, cellRangeOf(sel)) : wholeTable(m);
   return anchorsIn(m, range).map((a) => ({ txBodyId: cellBody(m, a).id, shapeId: frameId }));
 }
 
@@ -133,6 +137,19 @@ const caretIn = (nodeId: string, cell: TableCellAddress): EditorSelection => ({
   anchor: { paragraph: 0, offset: 0 },
   focus: { paragraph: 0, offset: 0 },
 });
+
+/** The inserted rows or columns, across the other lines of a cell range `sel`. */
+function newLines(
+  sel: Extract<EditorSelection, { kind: 'cells' }>,
+  axis: 'row' | 'column',
+  at: number,
+  count: number
+): EditorSelection {
+  const r = cellRangeOf(sel);
+  return axis === 'row'
+    ? { ...sel, anchor: { row: at, column: r.c0 }, focus: { row: at + count - 1, column: r.c1 } }
+    : { ...sel, anchor: { row: r.r0, column: at }, focus: { row: r.r1, column: at + count - 1 } };
+}
 
 /** The selection moved by whole rows or columns, as cells shift after an insert. */
 function shifted(sel: EditorSelection, dr: number, dc: number): EditorSelection {
@@ -178,11 +195,83 @@ function insertTable(ctx: CommandContext, batch: OpBatch, rows: number, cols: nu
   return insertTableFrame(batch, slidePart(ctx), rows, cols, slideW, slideH);
 }
 
-/** The cells a region command selects. */
+/** The sum of the grid column widths, EMU. */
+const gridWidth = (m: TableModel): number =>
+  m.gridCols.reduce((sum, g) => sum + (intAttr(g, 'w') ?? 0), 0);
+
+/**
+ * Scale the grid columns back to `width` after an insert, so the table keeps its width and the
+ * columns keep their proportions, as slide editors insert a column.
+ */
+function keepGridWidth(batch: OpBatch, m: TableModel, width: number): void {
+  const after = readTable(batch, m.part, m.frame.id);
+  const total = gridWidth(after);
+  if (width <= 0 || total <= width) return;
+  let left = width;
+  after.gridCols.forEach((g, i) => {
+    const last = i === after.gridCols.length - 1;
+    const w = last ? left : Math.round(((intAttr(g, 'w') ?? 0) * width) / total);
+    left -= w;
+    setAttr(batch, m.part, g.id, 'w', String(Math.max(1, w)));
+  });
+}
+
+/**
+ * The table after a paste grows it: rows and columns are added at the bottom and right for the
+ * text past its edge, as many as the table limits allow. New columns share the table's width.
+ */
+function grownForPaste(
+  ctx: CommandContext,
+  batch: OpBatch,
+  m: TableModel,
+  range: CellRange,
+  texts: readonly unknown[]
+): TableModel {
+  const widest = texts.reduce<number>(
+    (n, row) => (Array.isArray(row) ? Math.max(n, row.length) : n),
+    0
+  );
+  const rows = Math.min(range.r0 + texts.length - m.nR, MAX_ROWS - m.nR);
+  const columns = Math.min(range.c0 + widest - m.nC, MAX_TABLE_SIZE - m.nC);
+  if (rows <= 0 && columns <= 0) return m;
+  // Plain cells: a merged edge row or column is not repeated, so every pasted value has a cell.
+  if (rows > 0) insertRows(batch, m, m.nR, rows, m.nR - 1, true);
+  let grown = readTable(batch, m.part, m.frame.id);
+  if (columns > 0) {
+    const width = gridWidth(grown);
+    insertColumns(batch, grown, grown.nC, columns, grown.nC - 1, true);
+    keepGridWidth(batch, grown, width);
+    grown = readTable(batch, m.part, m.frame.id);
+  }
+  structureEdited(ctx, batch, grown);
+  return grown;
+}
+
+/** The most characters one cell takes from a paste, as the clipboard parser reads. */
+const MAX_PASTED_CELL_CHARS = 32_768;
+
+/**
+ * The cells a region command selects. A row or column region names only its own grid lines,
+ * as slide editors select a column: a merged cell that crosses into the next column does not
+ * widen it, so Delete Columns then deletes that one column and the merged cell shrinks.
+ */
 function region(m: TableModel, range: CellRange, which: 'table' | 'row' | 'column'): CellRange {
   if (which === 'table') return wholeTable(m);
-  if (which === 'row') return expandRange(m, { ...range, c0: 0, c1: m.nC - 1 });
-  return expandRange(m, { ...range, r0: 0, r1: m.nR - 1 });
+  if (which === 'row') return { ...range, c0: 0, c1: m.nC - 1 };
+  return { ...range, r0: 0, r1: m.nR - 1 };
+}
+
+/**
+ * The rows (or columns) a delete removes: the cell range's own grid lines on that axis, not the
+ * merged cells it touches; a caret's merged cell, or a selected table, as `tableTarget` reads.
+ */
+function deletedLines(ctx: CommandContext, range: CellRange, axis: 'row' | 'column'): CellRange {
+  const sel = ctx.selection;
+  if (sel.kind !== 'cells') return range;
+  const own = cellRangeOf(sel);
+  return axis === 'row'
+    ? { ...range, r0: own.r0, r1: own.r1 }
+    : { ...range, c0: own.c0, c1: own.c1 };
 }
 
 const cells = (nodeId: string, r: CellRange): EditorSelection => ({
@@ -194,7 +283,9 @@ const cells = (nodeId: string, r: CellRange): EditorSelection => ({
 
 /** Delete rows or columns; the whole table goes when none would remain. */
 function deleteLines(ctx: CommandContext, batch: OpBatch, axis: 'row' | 'column'): Compiled {
-  const { m, range } = tableTarget(ctx, batch);
+  const target = tableTarget(ctx, batch);
+  const m = target.m;
+  const range = deletedLines(ctx, target.range, axis);
   const id = m.frame.id;
   const all =
     axis === 'row'
@@ -233,31 +324,39 @@ export function compileTable(ctx: CommandContext, batch: OpBatch, command: Table
       const { m, range } = tableTarget(ctx, batch);
       const count = lineCount(ctx.selection, range.r0, range.r1);
       const above = command.where === 'above';
-      insertRows(batch, m, above ? range.r0 : range.r1 + 1, count, above ? range.r0 : range.r1);
+      const at = above ? range.r0 : range.r1 + 1;
+      insertRows(batch, m, at, count, above ? range.r0 : range.r1);
       structureEdited(ctx, batch, m);
       refit(ctx, batch, m);
-      return {
-        batch,
-        effect: {
-          label: 'insertRow',
-          selection: above ? shifted(ctx.selection, count, 0) : ctx.selection,
-        },
-      };
+      // A cell range selects the new rows, ready to fill; a caret stays in its cell.
+      const sel = ctx.selection;
+      const selection =
+        sel.kind === 'cells'
+          ? newLines(sel, 'row', at, count)
+          : above
+            ? shifted(sel, count, 0)
+            : sel;
+      return { batch, effect: { label: 'insertRow', selection } };
     }
     case 'insertColumn': {
       const { m, range } = tableTarget(ctx, batch);
       const count = lineCount(ctx.selection, range.c0, range.c1);
       const left = command.where === 'left';
-      insertColumns(batch, m, left ? range.c0 : range.c1 + 1, count, left ? range.c0 : range.c1);
+      const width = gridWidth(m);
+      const at = left ? range.c0 : range.c1 + 1;
+      insertColumns(batch, m, at, count, left ? range.c0 : range.c1);
+      keepGridWidth(batch, m, width);
       structureEdited(ctx, batch, m);
       refit(ctx, batch, m);
-      return {
-        batch,
-        effect: {
-          label: 'insertColumn',
-          selection: left ? shifted(ctx.selection, 0, count) : ctx.selection,
-        },
-      };
+      // A cell range selects the new columns, ready to fill; a caret stays in its cell.
+      const sel = ctx.selection;
+      const selection =
+        sel.kind === 'cells'
+          ? newLines(sel, 'column', at, count)
+          : left
+            ? shifted(sel, 0, count)
+            : sel;
+      return { batch, effect: { label: 'insertColumn', selection } };
     }
     case 'deleteRow':
       return deleteLines(ctx, batch, 'row');
@@ -279,15 +378,25 @@ export function compileTable(ctx: CommandContext, batch: OpBatch, command: Table
       };
     }
     case 'mergeCells': {
-      const { m, range } = tableTarget(ctx, batch);
+      const target = tableTarget(ctx, batch);
+      const m = target.m;
+      // A merge is a rectangle: a band grows over the merged cells that cross it.
+      const range = expandRange(m, target.range);
       mergeRange(batch, m, range);
       structureEdited(ctx, batch, m);
       refit(ctx, batch, m);
+      // The caret goes after the merged text, so the next key adds to it.
+      const at = { row: range.r0, column: range.c0 };
+      const paragraphs = paragraphsOf(cellBody(readTable(batch, m.part, m.frame.id), at));
+      const end = {
+        paragraph: Math.max(0, paragraphs.length - 1),
+        offset: paragraphs.length ? paragraphLength(paragraphs[paragraphs.length - 1]) : 0,
+      };
       return {
         batch,
         effect: {
           label: 'mergeCells',
-          selection: caretIn(m.frame.id, { row: range.r0, column: range.c0 }),
+          selection: { kind: 'text', nodeId: m.frame.id, cell: at, anchor: end, focus: end },
         },
       };
     }
@@ -349,6 +458,33 @@ export function compileTable(ctx: CommandContext, batch: OpBatch, command: Table
         setAttr(batch, m.part, m.gridCols[c].id, 'w', w);
       refit(ctx, batch, m);
       return { batch, effect: { label: 'columnWidth' } };
+    }
+    case 'pasteCells': {
+      const target = tableTarget(ctx, batch);
+      const range = target.range;
+      const texts = command.texts;
+      if (!Array.isArray(texts) || texts.length === 0)
+        throw new CommandRefusal('errors.unsupported', 'texts');
+      const m = grownForPaste(ctx, batch, target.m, range, texts);
+      let r1 = range.r0;
+      let c1 = range.c0;
+      // Text past the largest table is left out: only the rows and columns that fit are read.
+      texts.slice(0, m.nR - range.r0).forEach((row, i) => {
+        if (!Array.isArray(row)) throw new CommandRefusal('errors.unsupported', 'texts');
+        row.slice(0, m.nC - range.c0).forEach((text, j) => {
+          if (typeof text !== 'string') throw new CommandRefusal('errors.unsupported', 'texts');
+          const r = range.r0 + i;
+          const c = range.c0 + j;
+          const a = m.anchors[r][c];
+          if (a.row !== r || a.column !== c) return;
+          setCellText(batch, m, a, text.slice(0, MAX_PASTED_CELL_CHARS));
+          r1 = Math.max(r1, r);
+          c1 = Math.max(c1, c);
+        });
+      });
+      refit(ctx, batch, m);
+      const filled = { r0: range.r0, c0: range.c0, r1, c1 };
+      return { batch, effect: { label: 'pasteCells', selection: cells(m.frame.id, filled) } };
     }
     case 'distributeRows':
     case 'distributeColumns': {

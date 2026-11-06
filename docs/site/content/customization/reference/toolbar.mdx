@@ -49,7 +49,7 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 | `edit` (contextual) | `edit.cut`, `edit.copy`, `edit.paste`, `edit.selectAll` |
 | `slide` (contextual) | `slide.background`, `slide.add`, `slide.layout`, `slide.reset`, `slide.hide` |
 | `section` (contextual) | `section.add`, `section.rename`, `section.remove`, `section.removeAll`, `section.collapseAll`, `section.expandAll` |
-| `table` (contextual, shown in a table) | `table.insert`, `table.headerRow`, `table.totalRow`, `table.bandedRows`, `table.firstColumn`, `table.lastColumn`, `table.bandedColumns`, `table.style`, `table.cellFill`, `table.borderTarget`, `table.select`, `table.delete`, `table.insertRowAbove`, `table.insertRowBelow`, `table.insertColumnLeft`, `table.insertColumnRight`, `table.mergeCells`, `table.splitCell`, `table.distributeRows`, `table.distributeColumns`, `table.cellMargins` |
+| `table` (contextual, shown in a table) | `table.insert`, `table.headerRow`, `table.totalRow`, `table.bandedRows`, `table.firstColumn`, `table.lastColumn`, `table.bandedColumns`, `table.style`, `table.cellFill`, `table.borderTarget`, `table.borderColor`, `table.borderStyle`, `table.borderWidth`, `table.select`, `table.delete`, `table.insertRowAbove`, `table.insertRowBelow`, `table.insertColumnLeft`, `table.insertColumnRight`, `table.mergeCells`, `table.splitCell`, `table.distributeRows`, `table.distributeColumns`, `table.cellMargins` |
 | `image` (contextual) | `image.corrections`, `image.color`, `image.transparency`, `image.change`, `image.reset`, `image.styles`, `image.altText`, `image.crop`, `image.cropToShape`, `image.cropFit`, `image.properties` |
 
 ## Named parts
@@ -139,6 +139,9 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 | `Toolbar.TableBandedColumns`     | `table.bandedColumns`     |
 | `Toolbar.TableCellFill`          | `table.cellFill`          |
 | `Toolbar.TableBorderTarget`      | `table.borderTarget`      |
+| `Toolbar.TableBorderColor`       | `table.borderColor`       |
+| `Toolbar.TableBorderStyle`       | `table.borderStyle`       |
+| `Toolbar.TableBorderWidth`       | `table.borderWidth`       |
 | `Toolbar.TableSelect`            | `table.select`            |
 | `Toolbar.TableDelete`            | `table.delete`            |
 | `Toolbar.TableInsertRowAbove`    | `table.insertRowAbove`    |
@@ -194,7 +197,7 @@ In a preset bar, an `image` part replaces that control in the picture group. Tha
 
 ### Overflow order
 
-When the toolbar runs out of width, a whole group moves into the **More** menu. A built-in group's priority is its place in `TOOLBAR_COLLAPSE_ORDER`, in steps of 10: `view` is 10 and `history` is 180. The view, file, Find, clipboard, and slide groups move first. The arrange, table, format, shape, and script groups move next. The insert group (text box, line, shape, picture) moves after them. The list, paragraph, font, text, and history groups stay longest, on the toolbar and on every ribbon tab.
+When the toolbar runs out of width, a whole group moves into the **More** menu. A built-in group's priority is its place in `TOOLBAR_COLLAPSE_ORDER`, in steps of 10: `view` is 10 and `history` is 180. The view, file, Find, clipboard, and slide groups move first. The arrange, format, shape, and script groups move next. The insert group (text box, line, shape, picture) moves after them, then the list and paragraph groups. The table group, which shows only while the selection is in a table, moves after those. The font, text, and history groups stay longest, on the toolbar and on every ribbon tab.
 
 The contextual `image` group's priority is 190, so it stays longest, because the selection asked for it. DOCX Editor's `image` group moves first instead. A group without a priority moves first.
 

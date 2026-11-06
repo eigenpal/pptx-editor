@@ -29,6 +29,7 @@ import {
   followCurrentSlide,
   groupSlideSections,
   keepCurrentSlideInView,
+  panelHistoryKey,
   radioGroupStep,
   railDragAxis,
   railKeyDown,
@@ -45,6 +46,8 @@ import {
   zoomStep,
   zoomLimitReason,
   elementKindLabelKey,
+  elementRotates,
+  TABLE_OPTION_ROWS,
   platformShortcuts,
   type SlideRailOrientation,
   type SlideSummary,
@@ -711,10 +714,13 @@ function NumberField({
           aria-label={label}
           value={draft ?? value}
           disabled={disabled}
+          // Uncommitted typing keeps Ctrl/Cmd+Z for the field's own undo (`panelHistoryKey`).
+          data-draft={draft !== null}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+            // Enter commits and keeps the focus here, so the next key still reaches the panel.
+            if (e.key === 'Enter') commit();
             if (e.key === 'Escape') setDraft(null);
           }}
         />
@@ -805,18 +811,54 @@ function FormatTab() {
           {field('y', 'panel.format.y')}
         </div>
       </div>
-      <div className="pptx-panel__section">
-        <h3 className="pptx-panel__title">{t('panel.format.rotation')}</h3>
-        <div className="pptx-panel__grid">
-          <NumberField
-            label={t('panel.format.angle')}
-            value={String(Math.round(g.rot * 10) / 10)}
-            unit="°"
-            disabled={readOnly}
-            onCommit={(v) => move({ rot: ((v % 360) + 360) % 360 })}
-          />
+      {elementRotates(g, table) ? (
+        <div className="pptx-panel__section">
+          <h3 className="pptx-panel__title">{t('panel.format.rotation')}</h3>
+          <div className="pptx-panel__grid">
+            <NumberField
+              label={t('panel.format.angle')}
+              value={String(Math.round(g.rot * 10) / 10)}
+              unit="°"
+              disabled={readOnly}
+              onCommit={(v) => move({ rot: ((v % 360) + 360) % 360 })}
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
+      {table ? (
+        <div className="pptx-panel__section">
+          <h3 className="pptx-panel__title">{t('panel.format.table')}</h3>
+          <div className="pptx-panel__grid">
+            <NumberField
+              label={t('panel.format.rowHeight')}
+              value={inches(table.rowHeight)}
+              unit={unit}
+              disabled={readOnly}
+              onCommit={(v) => editor?.exec({ type: 'setRowHeight', height: inch(v) })}
+            />
+            <NumberField
+              label={t('panel.format.columnWidth')}
+              value={inches(table.columnWidth)}
+              unit={unit}
+              disabled={readOnly}
+              onCommit={(v) => editor?.exec({ type: 'setColumnWidth', width: inch(v) })}
+            />
+          </div>
+          <div className="pptx-radios" role="group" aria-label={t('panel.format.styleOptions')}>
+            {TABLE_OPTION_ROWS.map(({ option, labelKey }) => (
+              <label key={option} className="pptx-radio">
+                <input
+                  type="checkbox"
+                  checked={table.options.includes(option)}
+                  disabled={readOnly}
+                  onChange={() => editor?.exec({ type: 'toggleTableStyleOption', option })}
+                />
+                {t(labelKey)}
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {g.textFitting ? (
         <div className="pptx-panel__section">
           <h3 className="pptx-panel__title">{t('panel.format.textFitting')}</h3>
@@ -855,6 +897,7 @@ export interface SidePanelProps {
 /** The side panel: Format · Comments. @public */
 export function SidePanel({ onClose, className, paneWidth, style }: SidePanelProps) {
   const { t } = useTranslation();
+  const editor = usePptxEditor();
   const [tab, setTab] = useState<'format' | 'comments'>('format');
   return (
     <aside
@@ -893,7 +936,11 @@ export function SidePanel({ onClose, className, paneWidth, style }: SidePanelPro
         </div>
         {onClose ? <ToolButton label={t('panel.close')} icon="close" onClick={onClose} /> : null}
       </div>
-      <div className="pptx-panel__body" role="tabpanel">
+      <div
+        className="pptx-panel__body"
+        role="tabpanel"
+        onKeyDown={(e) => panelHistoryKey(e, editor)}
+      >
         {tab === 'format' ? <FormatTab /> : null}
         {tab === 'comments' ? (
           <div className="pptx-empty">

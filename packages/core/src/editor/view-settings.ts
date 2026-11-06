@@ -1,13 +1,58 @@
 // View settings: how the editor shows the deck, not what the deck holds. Smart guides, the
-// presentation view (Normal or Slide Sorter), and the collapsed sections change no part, take
-// no undo step, and are never saved.
+// presentation view (Normal or Slide Sorter), the collapsed sections, and the table border pen
+// change no part, take no undo step, and are never saved.
 
-import type { EditorCommand, PresentationView } from '../contracts/index.ts';
+import type { EditorCommand, PresentationView, TableBorderPen } from '../contracts/index.ts';
+import { isColorChoice } from '../automation/commands/style-commands.ts';
+import { LINE_DASHES } from './line-presets.ts';
+
+/** A deep copy of a pen that no one can change: the pen, its line, and the line's color. */
+function frozenPen(pen: TableBorderPen): TableBorderPen {
+  const copy = JSON.parse(JSON.stringify(pen)) as TableBorderPen;
+  if (typeof copy.spec.color === 'object' && copy.spec.color) Object.freeze(copy.spec.color);
+  Object.freeze(copy.spec);
+  return Object.freeze(copy);
+}
+
+/** The pen before any pick: all borders, 1 pt solid in the theme's Text 1. Frozen. @public */
+export const DEFAULT_TABLE_BORDER_PEN: TableBorderPen = frozenPen({
+  target: 'all',
+  drawn: false,
+  spec: { color: { theme: 'tx1' }, width: 1 },
+});
+
+const PEN_TARGETS: ReadonlySet<unknown> = new Set([
+  'all',
+  'outside',
+  'inside',
+  'top',
+  'bottom',
+  'left',
+  'right',
+]);
+
+/** Whether a host's pen is one the Borders menu can draw: an edge target and a valid line. */
+function validPen(pen: unknown): pen is TableBorderPen {
+  if (typeof pen !== 'object' || pen === null) return false;
+  const { target, drawn, spec } = pen as Partial<TableBorderPen>;
+  if (!PEN_TARGETS.has(target) || typeof drawn !== 'boolean' || !spec) return false;
+  const width = spec.width;
+  return (
+    isColorChoice(spec.color) &&
+    typeof width === 'number' &&
+    width > 0 &&
+    width <= 1584 &&
+    (spec.dash === undefined || LINE_DASHES.includes(spec.dash))
+  );
+}
 
 /** The commands that change a view setting. */
 export type ViewCommand = Extract<
   EditorCommand,
-  { readonly type: 'toggleSmartGuides' | 'setPresentationView' | 'setSectionsCollapsed' }
+  {
+    readonly type:
+      'toggleSmartGuides' | 'setPresentationView' | 'setSectionsCollapsed' | 'setTableBorderPen';
+  }
 >;
 
 const VIEWS: ReadonlySet<PresentationView> = new Set(['normal', 'slideSorter']);
@@ -17,7 +62,8 @@ export function isViewCommand(command: EditorCommand): command is ViewCommand {
   return (
     command.type === 'toggleSmartGuides' ||
     command.type === 'setPresentationView' ||
-    command.type === 'setSectionsCollapsed'
+    command.type === 'setSectionsCollapsed' ||
+    command.type === 'setTableBorderPen'
   );
 }
 
@@ -28,6 +74,8 @@ export class ViewSettings {
   presentationView: PresentationView = 'normal';
   /** The collapsed section ids, reference-stable while they do not change. */
   collapsedSections: readonly string[] = NONE;
+  /** The table border pen; it stays when another deck opens, as a pen is a setting. */
+  tableBorderPen: TableBorderPen = DEFAULT_TABLE_BORDER_PEN;
 
   constructor(smartGuides: boolean) {
     this.smartGuides = smartGuides;
@@ -39,6 +87,7 @@ export class ViewSettings {
    */
   refusal(command: ViewCommand, all: readonly string[]): string | null {
     if (command.type === 'setPresentationView' && !VIEWS.has(command.view)) return 'errors.view';
+    if (command.type === 'setTableBorderPen' && !validPen(command.pen)) return 'errors.unsupported';
     if (command.type === 'setSectionsCollapsed' && !all.length) return 'disabled.noSections';
     return null;
   }
@@ -53,6 +102,8 @@ export class ViewSettings {
   apply(command: ViewCommand, all: readonly string[]): boolean {
     if (this.refusal(command, all)) return false;
     if (command.type === 'toggleSmartGuides') this.smartGuides = !this.smartGuides;
+    // A copy the host cannot change after it passed `validPen`.
+    else if (command.type === 'setTableBorderPen') this.tableBorderPen = frozenPen(command.pen);
     else if (command.type === 'setPresentationView') this.presentationView = command.view;
     else {
       const ids = new Set(this.collapsedSections);
@@ -77,9 +128,15 @@ export class ViewSettings {
     smartGuides: boolean;
     presentationView: PresentationView;
     collapsedSections: readonly string[];
+    tableBorderPen: TableBorderPen;
   } {
-    const { smartGuides, presentationView } = this;
-    return { smartGuides, presentationView, collapsedSections: this.collapsedIn(all) };
+    const { smartGuides, presentationView, tableBorderPen } = this;
+    return {
+      smartGuides,
+      presentationView,
+      collapsedSections: this.collapsedIn(all),
+      tableBorderPen,
+    };
   }
 
   /** The collapsed ids that are sections of the deck, reference-stable while they stay. */
@@ -97,6 +154,8 @@ export class ViewSettings {
 
   /** A new document opens in the Normal view with every section open. */
   reset(): void {
+    // The pen keeps its line; it redraws no target until a border pick in the new deck.
+    this.tableBorderPen = { ...this.tableBorderPen, drawn: false };
     this.presentationView = 'normal';
     this.collapsedSections = NONE;
   }

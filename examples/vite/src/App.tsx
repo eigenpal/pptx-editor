@@ -339,7 +339,7 @@ export function App() {
   const [title, setTitle] = useState<string>(EXAMPLES[initial].title);
   const [mode, setMode] = useState<'edit' | 'view'>('edit');
   const [theme, setThemeState] = useState<'light' | 'dark'>(() => initialTheme(location.search));
-  // A theme picked here is kept; until then the demo follows the system color scheme.
+  // A theme picked here is kept; until then the demo starts light.
   const setTheme = useCallback((next: 'light' | 'dark') => {
     rememberTheme(next);
     setThemeState(next);

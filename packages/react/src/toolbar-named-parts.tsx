@@ -218,6 +218,12 @@ export interface ToolbarNamedParts {
   readonly TableCellFill: ToolbarColorSplitComponent;
   /** `table.borderTarget`. */
   readonly TableBorderTarget: ToolbarSlotPartComponent;
+  /** `table.borderColor`. */
+  readonly TableBorderColor: ToolbarColorSplitComponent;
+  /** `table.borderStyle`. */
+  readonly TableBorderStyle: ToolbarSlotPartComponent;
+  /** `table.borderWidth`. */
+  readonly TableBorderWidth: ToolbarSlotPartComponent;
   /** `table.select`. */
   readonly TableSelect: ToolbarSlotPartComponent;
   /** `table.delete`. */

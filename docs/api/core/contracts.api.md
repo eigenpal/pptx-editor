@@ -393,6 +393,14 @@ export type EditorCommand = {
 | {
     readonly type: 'toggleSmartGuides';
 }
+/**
+* Set the table border pen (`snapshot.tableBorderPen`) that the Borders menu draws with. A
+* setting of this editor, not an edit: no undo step, never saved.
+*/
+| {
+    readonly type: 'setTableBorderPen';
+    readonly pen: TableBorderPen;
+}
 /** View > Normal or Slide Sorter. A view setting, not an edit: no undo step, never saved. */
 | {
     readonly type: 'setPresentationView';
@@ -688,6 +696,7 @@ export interface EditorSnapshot {
     readonly status: 'empty' | 'loading' | 'ready' | 'error';
     readonly substitutedFonts: readonly EditorFontSubstitution[];
     readonly table?: TableContext | null;
+    readonly tableBorderPen?: TableBorderPen;
     readonly themeColors: readonly (readonly ThemeSwatch[])[];
     // (undocumented)
     readonly zoom: number;
@@ -1289,6 +1298,13 @@ export type StrikeStyle = 'none' | 'single' | 'double';
 export type TableBorderEdgeTarget = Exclude<TableBorderTarget, 'none'>;
 
 // @public
+export interface TableBorderPen {
+    readonly drawn: boolean;
+    readonly spec: TableBorderSpec;
+    readonly target: TableBorderEdgeTarget;
+}
+
+// @public
 export interface TableBorderSpec {
     readonly color: ColorChoice;
     readonly dash?: LineDash;
@@ -1386,6 +1402,17 @@ export type TableCommand =
 | {
     readonly type: 'setColumnWidth';
     readonly width: number;
+}
+/**
+* Fill cells with plain text from the top-left cell of the selection (a paste of copied
+* cells): one array for each row, one string for each cell. Each written cell keeps the format
+* of its first run. Text past the table's edge adds rows at the bottom and columns at the end of the grid (the right, or the left in a right-to-left table)
+* (new columns share the table's width), up to the table limits; a position inside a merged
+* cell is skipped.
+*/
+| {
+    readonly type: 'pasteCells';
+    readonly texts: readonly (readonly string[])[];
 }
 /** Give the selected rows (or every row) the same height. */
 | {
