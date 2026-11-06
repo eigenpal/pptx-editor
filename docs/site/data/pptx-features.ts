@@ -449,7 +449,7 @@ export const pptxFeatures: PptxFeature[] = [
       'Gallery presets set and clear the shadow. Inherited and theme effects stay. Groups, tables, and charts are refused, and so is a theme effect style with a:effectDag. No perspective shadows. The shadow blur is measured for small radii.',
   },
   {
-    id: 'effects.shadow-glow-reflection',
+    id: 'effects.glow-reflection',
     name: 'Glow, inner shadow, soft edge, and reflection',
     category: 'effects',
     editing: 'partial',

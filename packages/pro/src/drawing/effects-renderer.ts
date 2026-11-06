@@ -20,7 +20,6 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import { toCss, type ResolvedEffects } from '@pptx-editor.dev/core/cascade';
 import {
   apply,
-  multiply,
   type DrawingEffectsRenderer,
   type EffectBounds,
   type EffectCopyPaint,
@@ -30,16 +29,15 @@ import {
   type EffectNode,
   type Matrix,
 } from '@pptx-editor.dev/core/layout';
-import { blurSigma, effectMatrix } from '@pptx-editor.dev/core/output';
+import { blurSigma } from '@pptx-editor.dev/core/output';
 import {
   boundsOf,
-  cornersUnder,
-  fadeLine,
   glowSpread,
   grow,
   innerShadowShift,
   PX,
   reflectionBlurSigma,
+  reflectionFade,
   softEdgeSpread,
 } from './effects-math.ts';
 
@@ -228,18 +226,17 @@ export function reflectionEffect(
 ): EffectCopyPaint | null {
   const ref = effects.reflection;
   if (!ref || (ref.startAlpha <= 0 && ref.endAlpha <= 0)) return null;
-  const m = effectMatrix(ref, source.matrix, source.width, source.height);
+  const {
+    matrix: m,
+    line,
+    start,
+    end,
+  } = reflectionFade(ref, source.matrix, source.width, source.height);
   const sigma = reflectionBlurSigma(ref.blur);
   const contentBounds = grow(
     boundsOf(source.corners.map((p) => apply(m, p.x, p.y))),
     3 * sigma + PX
   );
-  // The fade runs across the reflected shape box, in the slide's frame or the shape's.
-  const box = boundsOf(cornersUnder(multiply(m, source.matrix), source.width, source.height));
-  const turn = ref.rotWithShape
-    ? (Math.atan2(source.matrix[1], source.matrix[0]) * 180) / Math.PI
-    : 0;
-  const line = fadeLine(box, ref.fadeDir + turn);
   const defs: EffectNode[] = [];
   const gradId = ids.id('fade');
   defs.push(
@@ -255,12 +252,12 @@ export function reflectionEffect(
       },
       [
         node('stop', {
-          offset: num(ref.startPos),
+          offset: num(start),
           'stop-color': '#ffffff',
           'stop-opacity': num(ref.startAlpha),
         }),
         node('stop', {
-          offset: num(Math.max(ref.startPos, ref.endPos)),
+          offset: num(end),
           'stop-color': '#ffffff',
           'stop-opacity': num(ref.endAlpha),
         }),

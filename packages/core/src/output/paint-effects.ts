@@ -28,12 +28,60 @@ function region(b: Bounds): Record<string, string> {
   };
 }
 
-/** Build one renderer node as SVG: attributes through `setAttribute`, never parsed markup. */
+/**
+ * The elements an effects renderer may return: paint servers, masks, filters, their primitives,
+ * groups, and copies of painted content. Anything else (a script, foreign content, a link)
+ * builds as an empty group.
+ */
+const EFFECT_TAGS: ReadonlySet<string> = new Set([
+  'g',
+  'use',
+  'rect',
+  'mask',
+  'linearGradient',
+  'stop',
+  'filter',
+  'feBlend',
+  'feColorMatrix',
+  'feComponentTransfer',
+  'feComposite',
+  'feFlood',
+  'feFuncA',
+  'feFuncB',
+  'feFuncG',
+  'feFuncR',
+  'feGaussianBlur',
+  'feMerge',
+  'feMergeNode',
+  'feMorphology',
+  'feOffset',
+]);
+
+/** Whether a renderer attribute may be set: no event handlers, and links only within the slide. */
+function effectAttr(name: string, value: string): boolean {
+  const key = name.toLowerCase();
+  if (key.startsWith('on')) return false;
+  if (key === 'href' || key === 'xlink:href') return value.startsWith('#');
+  // A paint, mask, or filter reference names a definition of the slide, never a URL.
+  return !/url\(\s*(?!['"]?#)/i.test(value);
+}
+
+/**
+ * Build one renderer node as SVG: attributes through `setAttribute`, never parsed markup. Only
+ * effect elements and attributes build (`EFFECT_TAGS`, `effectAttr`), so a renderer can never
+ * add script or fetch a resource.
+ */
 export function effectElement(doc: Document, node: EffectNode): SVGElement {
+  if (!EFFECT_TAGS.has(node.tag)) return svg(doc, 'g');
+  const attrs = Object.fromEntries(
+    Object.entries(node.attrs).filter(
+      ([name, value]) => typeof value === 'string' && effectAttr(name, value)
+    )
+  );
   return svg(
     doc,
     node.tag,
-    node.attrs,
+    attrs,
     (node.children ?? []).map((child) => effectElement(doc, child))
   );
 }

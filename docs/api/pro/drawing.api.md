@@ -5,18 +5,11 @@
 ```ts
 
 import { EditorModule } from '@pptx-editor.dev/core/editor';
-import { EffectBounds } from '@pptx-editor.dev/core/layout';
+import { Matrix } from '@pptx-editor.dev/core/layout';
+import { ResolvedEffects } from '@pptx-editor.dev/core/cascade';
 
 // @public
 export function drawingModule(options?: ProLicenseOptions): EditorModule;
-
-// @internal
-export function fadeLine(bounds: EffectBounds, fadeDir: number): {
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-};
 
 // @internal
 export function glowSpread(rad: number): SpreadBlur;
@@ -34,6 +27,25 @@ export function installDrawing(options?: ProLicenseOptions): void;
 export interface ProLicenseOptions {
     readonly licenseKey?: string;
 }
+
+// @internal
+export function reflectionBlurSigma(blurRad: number): number;
+
+// @internal
+export interface ReflectionFade {
+    readonly end: number;
+    readonly line: {
+        readonly x1: number;
+        readonly y1: number;
+        readonly x2: number;
+        readonly y2: number;
+    };
+    readonly matrix: Matrix;
+    readonly start: number;
+}
+
+// @internal
+export function reflectionFade(ref: NonNullable<ResolvedEffects['reflection']>, shape: Matrix, w: number, h: number): ReflectionFade;
 
 // @internal
 export interface SpreadBlur {

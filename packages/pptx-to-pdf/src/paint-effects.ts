@@ -5,10 +5,11 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Reflections, outer shadows, and glow as PDF paint, under the shape, and inner shadows over its
 // geometry. The placement is the editor's (`effectMatrix` and `blurSigma`, shared with
-// `packages/core/src/output/`; `glowSpread`, `innerShadowShift`, and `fadeLine`, shared with
-// `@pptx-editor.dev/pro/drawing`). Glow, inner shadow, and reflection paint only while the Pro
-// drawing renderers are installed, as in the SVG paint; `exportPdf` always installs them. The blur is an APPROXIMATION: the writer has no blur filter, so a
-// blurred silhouette is drawn as a few layers, each the silhouette grown by a ring and painted as
+// `packages/core/src/output/`; `glowSpread`, `innerShadowShift`, `reflectionFade`, and
+// `reflectionBlurSigma`, shared with `@pptx-editor.dev/pro/drawing`). Glow, inner shadow, and
+// reflection paint only while the Pro drawing renderers are installed, as in the SVG paint;
+// opening an export session always installs them. The blur is an APPROXIMATION: the writer has
+// no blur filter, so a blurred silhouette is drawn as a few layers, each the silhouette grown by a ring and painted as
 // one transparency group, at alphas that add up to the Gaussian edge (an approximation).
 //
 // The silhouette has parts: filled paths, outlines of unfilled paths, and the text's glyph
@@ -48,7 +49,12 @@ import {
   type PathCommand,
 } from '@pptx-editor.dev/core/layout';
 import { blurSigma, effectMatrix } from '@pptx-editor.dev/core/output';
-import { fadeLine, glowSpread, innerShadowShift } from '@pptx-editor.dev/pro/drawing';
+import {
+  glowSpread,
+  innerShadowShift,
+  reflectionBlurSigma,
+  reflectionFade,
+} from '@pptx-editor.dev/pro/drawing';
 import { flatColor, ownFill, type FillScope } from './paint-fill.ts';
 import { fillTextOutlines } from './paint-text.ts';
 import {
@@ -68,12 +74,6 @@ type Drawable = Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>;
 
 /** A blur below half a point is drawn as a hard edge: it is under one output pixel. */
 const MIN_SIGMA = 6_350;
-
-/**
- * The SVG paint blurs a reflection by σ = `blurRad` / 2 (`REFLECTION_BLUR_SIGMA_PER_RADIUS` in
- * `@pptx-editor.dev/pro/drawing`); this writer reports the blur it leaves out from the same σ.
- */
-const REFLECTION_SIGMA_PER_RADIUS = 0.5;
 
 /** A typical stem of a glyph, as a fraction of the font size: the width of a text silhouette. */
 const STEM_PER_EM = 0.1;
@@ -146,7 +146,7 @@ export function effectDiagnostics(item: Drawable, p: PageOps, scope: FillScope):
     pro &&
     reflection &&
     (reflection.startAlpha > 0 || reflection.endAlpha > 0) &&
-    reflection.blur * REFLECTION_SIGMA_PER_RADIUS >= MIN_SIGMA
+    reflectionBlurSigma(reflection.blur) >= MIN_SIGMA
   )
     p.diag.add('effect.reflection-blur', 'approximation', 'Reflections are drawn without blur.');
 }
@@ -493,7 +493,8 @@ export async function drawReflection(
   const ref = item.element.effects?.reflection;
   if (!ref || (ref.startAlpha <= 0 && ref.endAlpha <= 0) || !proEffects()) return;
   const { cx: w, cy: h } = item.element.xfrm;
-  const m = effectMatrix(ref, item.matrix, w, h);
+  // The SVG renderer's placement and fade, so the two reflections agree.
+  const { matrix: m, line, start, end: last } = reflectionFade(ref, item.matrix, w, h);
   // A transform with no area paints nothing.
   if (Math.abs(m[0] * m[3] - m[1] * m[2]) < 1e-12) return;
   const content = await p.capture(async () => {
@@ -502,17 +503,8 @@ export async function drawReflection(
     p.push(popGraphicsState());
   });
   const group = p.form(content, formBox(p), { S: 'Transparency' });
-  // The fade runs across the reflected shape box, in the slide's frame or the shape's.
-  const full = multiply(m, item.matrix);
-  const corners = [apply(full, 0, 0), apply(full, w, 0), apply(full, w, h), apply(full, 0, h)];
-  const xs = corners.map((c) => c.x);
-  const ys = corners.map((c) => c.y);
-  const box = { x: Math.min(...xs), y: Math.min(...ys), r: Math.max(...xs), b: Math.max(...ys) };
-  const turn = ref.rotWithShape ? (Math.atan2(item.matrix[1], item.matrix[0]) * 180) / Math.PI : 0;
-  const line = fadeLine(box, ref.fadeDir + turn);
-  const start = Math.max(0, Math.min(1, ref.startPos));
-  // The SVG gradient ends at the later of the two positions; equal positions are a hard step.
-  const end = Math.max(start + 1e-6, Math.min(1, Math.max(ref.startPos, ref.endPos)));
+  // Equal positions are a hard step; the shading needs a line of some length.
+  const end = Math.max(start + 1e-6, last);
   const at = (t: number): [number, number] => [
     line.x1 + (line.x2 - line.x1) * t,
     line.y1 + (line.y2 - line.y1) * t,

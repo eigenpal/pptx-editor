@@ -9,8 +9,9 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // are the engine's (`blurSigma` and `effectMatrix` in `@pptx-editor.dev/core/output`), because
 // the outer shadow uses them too.
 
-import { blurSigma } from '@pptx-editor.dev/core/output';
-import { apply, type EffectBounds, type Matrix } from '@pptx-editor.dev/core/layout';
+import type { ResolvedEffects } from '@pptx-editor.dev/core/cascade';
+import { blurSigma, effectMatrix } from '@pptx-editor.dev/core/output';
+import { apply, multiply, type EffectBounds, type Matrix } from '@pptx-editor.dev/core/layout';
 
 const DEG = Math.PI / 180;
 
@@ -25,7 +26,11 @@ export const PX = 9525;
  */
 export const REFLECTION_BLUR_SIGMA_PER_RADIUS = 0.5;
 
-/** The Gaussian σ for a reflection's blur radius. */
+/**
+ * The Gaussian σ for a reflection's blur radius.
+ *
+ * @internal
+ */
 export function reflectionBlurSigma(blurRad: number): number {
   return Math.max(0, blurRad) * REFLECTION_BLUR_SIGMA_PER_RADIUS;
 }
@@ -143,5 +148,55 @@ export function fadeLine(
     y1: cy + (lo - mid) * dy,
     x2: cx + (hi - mid) * dx,
     y2: cy + (hi - mid) * dy,
+  };
+}
+
+/**
+ * Where a reflection paints and how it fades. The SVG renderer and the PDF writer
+ * (`@pptx-editor.dev/pptx-to-pdf`) both paint from it, so their reflections agree.
+ *
+ * @internal
+ */
+export interface ReflectionFade {
+  /** The slide-space matrix that moves the shape's content to its reflection. */
+  readonly matrix: Matrix;
+  /** The fade's gradient line: offset 0 at (`x1`, `y1`), offset 1 at (`x2`, `y2`). */
+  readonly line: {
+    readonly x1: number;
+    readonly y1: number;
+    readonly x2: number;
+    readonly y2: number;
+  };
+  /** The offset of the first fade stop, in [0, 1]. */
+  readonly start: number;
+  /** The offset of the last fade stop, in [`start`, 1]. */
+  readonly end: number;
+}
+
+const unit = (v: number): number => Math.max(0, Math.min(1, v));
+
+/**
+ * The placement and fade of a reflection (ECMA-376 Part 1, 20.1.8, CT_ReflectionEffect, as the
+ * cascade resolves it) of a `w` × `h` shape whose local box maps to the slide
+ * through `shape`. The fade runs across the reflected shape box, in the slide's frame, or in
+ * the shape's when `rotWithShape` is set. The last stop is at the later of the two positions.
+ *
+ * @internal
+ */
+export function reflectionFade(
+  ref: NonNullable<ResolvedEffects['reflection']>,
+  shape: Matrix,
+  w: number,
+  h: number
+): ReflectionFade {
+  const matrix = effectMatrix(ref, shape, w, h);
+  const box = boundsOf(cornersUnder(multiply(matrix, shape), w, h));
+  const turn = ref.rotWithShape ? (Math.atan2(shape[1], shape[0]) * 180) / Math.PI : 0;
+  const start = unit(ref.startPos);
+  return {
+    matrix,
+    line: fadeLine(box, ref.fadeDir + turn),
+    start,
+    end: Math.max(start, unit(ref.endPos)),
   };
 }

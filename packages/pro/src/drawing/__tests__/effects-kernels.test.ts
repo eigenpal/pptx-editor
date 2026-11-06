@@ -16,6 +16,7 @@ import {
   glowSpread,
   innerShadowShift,
   reflectionBlurSigma,
+  reflectionFade,
   softEdgeSpread,
 } from '../effects-math.ts';
 import { bodyEffects, glowEffect } from '../effects-renderer.ts';
@@ -57,6 +58,40 @@ describe('reflection kernel', () => {
     expect(l.y1).toBeCloseTo(0, 6);
     expect(l.x2).toBeCloseTo(100, 6);
     expect(l.y2).toBeCloseTo(100, 6);
+  });
+
+  test('the fade spans the reflected box, clamps its stops, and turns with the shape', () => {
+    const ref = {
+      blur: 0,
+      dist: 0,
+      dir: 90,
+      sx: 1,
+      sy: -1,
+      kx: 0,
+      ky: 0,
+      align: 'bl' as const,
+      rotWithShape: false,
+      startAlpha: 0.5,
+      startPos: -0.2,
+      endAlpha: 0,
+      endPos: 0.4,
+      fadeDir: 90,
+    };
+    // A 200 × 100 shape at the origin, mirrored below its bottom edge.
+    const flat = reflectionFade(ref, [1, 0, 0, 1, 0, 0], 200, 100);
+    expect(flat.line.y1).toBeCloseTo(100, 6);
+    expect(flat.line.y2).toBeCloseTo(200, 6);
+    expect([flat.start, flat.end]).toEqual([0, 0.4]);
+    // An end before the start is a hard step at the start.
+    expect(
+      reflectionFade({ ...ref, startPos: 0.5, endPos: 0.1 }, [1, 0, 0, 1, 0, 0], 200, 100).end
+    ).toBe(0.5);
+    // Turned a quarter: with the shape, the fade runs along the turned frame.
+    const quarter = [0, 1, -1, 0, 0, 0] as const;
+    const still = reflectionFade(ref, quarter, 200, 100).line;
+    const turned = reflectionFade({ ...ref, rotWithShape: true }, quarter, 200, 100).line;
+    expect(Math.abs(still.x2 - still.x1)).toBeCloseTo(0, 6);
+    expect(Math.abs(turned.y2 - turned.y1)).toBeCloseTo(0, 6);
   });
 });
 

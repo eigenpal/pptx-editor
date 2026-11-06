@@ -62,5 +62,12 @@ export function drawingModule(options: ProLicenseOptions = {}): EditorModule {
 
 // Internal: the effect rules that the PDF writer (`@pptx-editor.dev/pptx-to-pdf`) shares with
 // the SVG renderer.
-export { fadeLine, glowSpread, innerShadowShift, type SpreadBlur } from './effects-math.ts';
+export {
+  glowSpread,
+  innerShadowShift,
+  reflectionBlurSigma,
+  reflectionFade,
+  type ReflectionFade,
+  type SpreadBlur,
+} from './effects-math.ts';
 export type { ProLicenseOptions } from '../license.ts';
