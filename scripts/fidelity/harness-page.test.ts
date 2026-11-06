@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { chromium, type Page } from '@playwright/test';
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { buildPptx } from '../fixtures/builder.ts';
 import {
   fileDigest,
@@ -381,13 +382,25 @@ describe.skipIf(!hasChromium)('printDeck and rasterPdf', () => {
 
 describe.skipIf(!hasChromium)('the fallback faces', () => {
   test('the paint names the open fallback faces where it names sans-serif', async () => {
-    // Slide 1 of slide-structure has a frame label, which the paint sets in sans-serif.
-    const fixture = join(import.meta.dir, '../../fixtures/slide-structure.pptx');
-    await withHarnessPage(async (page) => {
-      await openDeck(page, fixture, []);
-      const { markup } = await renderSlide(page, 0);
-      expect(markup).toContain('font-family="pptx-harness-fallback-0, pptx-harness-fallback-1"');
-      expect(markup).not.toContain('sans-serif');
-    });
+    // Slide 1 of slide-structure has a chart. As a 3-D chart, which the drawing module leaves
+    // out, it keeps its frame label, which the paint sets in sans-serif.
+    const files = unzipSync(
+      new Uint8Array(readFileSync(join(import.meta.dir, '../../fixtures/slide-structure.pptx')))
+    );
+    const chart = strFromU8(files['ppt/charts/chart1.xml']!);
+    files['ppt/charts/chart1.xml'] = strToU8(chart.replaceAll('c:barChart>', 'c:bar3DChart>'));
+    const dir = mkdtempSync(join(tmpdir(), 'pptx-fallback-'));
+    const fixture = join(dir, 'chart-3d.pptx');
+    writeFileSync(fixture, zipSync(files));
+    try {
+      await withHarnessPage(async (page) => {
+        await openDeck(page, fixture, []);
+        const { markup } = await renderSlide(page, 0);
+        expect(markup).toContain('font-family="pptx-harness-fallback-0, pptx-harness-fallback-1"');
+        expect(markup).not.toContain('sans-serif');
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }, 60_000);
 });
