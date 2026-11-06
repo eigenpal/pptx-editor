@@ -26,8 +26,10 @@
  * - `rendering: 'full'` needs a current reference PDF next to every fixture of the row
  *   (`fixtures/<name>.pdf` with its identity in `fixtures/references.json`, see CONTRIBUTING.md
  *   "Fidelity harness"), and no slide of those fixtures in `FIXTURE_KNOWN_GAPS`: the fixture
- *   passes the harness in every gated environment. Until then, `partial` is the most a row can
- *   claim, however good the render looks.
+ *   passes the harness in every gated environment. The row also owns no approximation but the
+ *   three that every text row shares (`PAGE_WIDE_APPROXIMATIONS` in pptx-features.test.ts), and
+ *   its notes name no rendering gap. Until then, `partial` is the most a row can claim, however
+ *   good the render looks.
  * - `roundTrip: 'full'` needs at least one fixture, and its saved copies opened with no repair
  *   prompt (`SAVE_VERIFIED_FIXTURES` in `save-verified-fixtures.ts`). That is necessary, not
  *   enough: the row's own edits must also survive save and reopen.
@@ -121,7 +123,7 @@ export const pptxFeatures: PptxFeature[] = [
     name: 'Font family and size',
     category: 'text',
     editing: 'full',
-    rendering: 'partial',
+    rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
     notes:
@@ -155,7 +157,7 @@ export const pptxFeatures: PptxFeature[] = [
     name: 'Character spacing and kerning',
     category: 'text',
     editing: 'partial',
-    rendering: 'partial',
+    rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
     notes:
@@ -341,7 +343,7 @@ export const pptxFeatures: PptxFeature[] = [
     name: 'Lines and connectors',
     category: 'shapes',
     editing: 'partial',
-    rendering: 'partial',
+    rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
     notes:
@@ -374,7 +376,7 @@ export const pptxFeatures: PptxFeature[] = [
     name: 'Selection pane',
     category: 'shapes',
     editing: 'partial',
-    rendering: 'partial',
+    rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
     notes:
@@ -577,7 +579,7 @@ export const pptxFeatures: PptxFeature[] = [
     name: 'Insert tables, rows, and columns',
     category: 'tables',
     editing: 'partial',
-    rendering: 'partial',
+    rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
     notes: `Insert a table from a grid. Insert and delete rows and columns, and select a row, a column, or the table. A new table does not fill an empty content placeholder. ${TABLE_SAVE}`,
@@ -690,7 +692,7 @@ export const pptxFeatures: PptxFeature[] = [
     name: 'Hidden slides',
     category: 'slides',
     editing: 'partial',
-    rendering: 'partial',
+    rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
     notes:
@@ -744,7 +746,7 @@ export const pptxFeatures: PptxFeature[] = [
     name: 'Sections',
     category: 'slides',
     editing: 'partial',
-    rendering: 'partial',
+    rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
     notes:

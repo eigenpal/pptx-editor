@@ -34,6 +34,13 @@ const DOCX_ROW_FIELDS = new Set([
   'docsLink',
 ]);
 
+/**
+ * The approximations that every text row shares: the line model, the shaper's glyph advances,
+ * and missing glyphs. They do not keep a row from full rendering when its fixtures pass the
+ * harness. Any other approximation is a rendering limit of its row.
+ */
+const PAGE_WIDE_APPROXIMATIONS = new Set(['line-model', 'glyph-advances', 'missing-glyphs']);
+
 const NO_EVIDENCE: FeatureEvidence = { fixtures: [] };
 
 /** The evidence entry of a row. A missing entry fails its own test below. */
@@ -193,6 +200,17 @@ describe('pptx-features: evidence for claims', () => {
           .map((name) => `${row.id}: ${name} is in FIXTURE_KNOWN_GAPS`)
       );
     expect(unproven).toEqual([]);
+  });
+
+  test('rendering "full" owns no approximation but the page-wide text ones', () => {
+    const owned = pptxFeatures
+      .filter((row) => row.rendering === 'full')
+      .flatMap((row) =>
+        (evidence(row).approximations ?? [])
+          .filter((id) => !PAGE_WIDE_APPROXIMATIONS.has(id))
+          .map((id) => `${row.id}: ${id}`)
+      );
+    expect(owned).toEqual([]);
   });
 
   test('round trip "full" needs fixtures whose saved copies opened with no repair prompt', () => {
