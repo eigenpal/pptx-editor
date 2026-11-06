@@ -411,6 +411,9 @@ export const HARFBUZZ_VERSION = "15.0.0";
 // @public
 export function hasCharacters(layout: TextLayout): boolean;
 
+// @public
+export const HOST_SUBSTITUTE_ORIGIN = "host-substitute";
+
 // @public (undocumented)
 export const IDENTITY: Matrix;
 

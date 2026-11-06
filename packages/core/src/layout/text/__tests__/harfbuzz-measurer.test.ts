@@ -5,6 +5,7 @@ import {
   createHarfBuzzMeasurer,
   EAST_ASIAN_FALLBACK_FAMILIES,
   eastAsianFallbackFamilies,
+  HOST_SUBSTITUTE_ORIGIN,
   initializeHarfBuzz,
   type TextMeasurer,
 } from '../../index.ts';
@@ -277,6 +278,19 @@ describe('kerning', () => {
     const face = measurer.resolve({ family: 'Liberation Sans', bold: false, italic: false });
     expect(sum(measurer.advances(face, 'AVATAR WAVE', { kerning: true }))).toBeLessThan(
       sum(measurer.advances(face, 'AVATAR WAVE'))
+    );
+  });
+
+  test('a host substitution keeps the kerning pairs of the face it draws', () => {
+    // The host registers Carlito under the family that the deck names (`FontSourceSubstitution`):
+    // it stands in for Calibri, as the measurer's own substitute does.
+    const m = createHarfBuzzMeasurer([
+      { ...carlito(), family: 'Calibri', origin: HOST_SUBSTITUTE_ORIGIN },
+    ]);
+    const face = m.resolve({ family: 'Calibri', bold: false, italic: false });
+    expect(face.substituted).toBe(false);
+    expect(sum(m.advances(face, 'AVATAR WAVE', { kerning: true }))).toBeLessThan(
+      sum(m.advances(face, 'AVATAR WAVE'))
     );
   });
 
