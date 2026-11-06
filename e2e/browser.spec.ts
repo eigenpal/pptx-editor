@@ -445,6 +445,57 @@ test('long deck: the rail paints the thumbnails in view first, then the rest', a
   await expect.poll(painted, { timeout: 30_000 }).toBe(300);
 });
 
+test('long deck: the first slide takes input while the rest opens, and every slide is there after', async ({
+  page,
+}) => {
+  // Frames and tasks of a real browser: the rail mounts over frames, and the slides parse in
+  // tasks between them.
+  await ready(page);
+  const n = 3000;
+  await page.locator('input[type=file][accept*=".pptx"]').setInputFiles({
+    name: 'long.pptx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    buffer: Buffer.from(textDeck(n)),
+  });
+  await page.waitForFunction(
+    () => document.querySelector('.pptx-surface__slide')?.textContent?.includes('Slide 1 title'),
+    undefined,
+    { timeout: 60_000 }
+  );
+  type Ed = {
+    snapshot(): { pendingSlides?: number; slides: { pending?: true }[] };
+    session: { layout(i: number): { items: { element: { name?: string; nodeId: string } }[] } };
+    setSelection(s: unknown): void;
+    focus(): void;
+  };
+  // Type into the first slide at once.
+  await page.evaluate(() => {
+    const ed = (window as unknown as { __pptxEditor: Ed }).__pptxEditor;
+    const body = ed.session.layout(0).items.find((x) => x.element.name === 'Body')!;
+    const at = { paragraph: 0, offset: 0 };
+    ed.setSelection({ kind: 'text', nodeId: body.element.nodeId, anchor: at, focus: at });
+    ed.focus();
+  });
+  await page.keyboard.type('Hello ');
+  await expect(page.locator('.pptx-surface__slide')).toContainText('Hello');
+  // The rest opens: every rail item mounts, and no slide is pending.
+  await expect(page.locator('.pptx-rail__item')).toHaveCount(n, { timeout: 60_000 });
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __pptxEditor: Ed }).__pptxEditor.snapshot().pendingSlides ?? 0
+        ),
+      { timeout: 60_000 }
+    )
+    .toBe(0);
+  // The thumbnails in view paint.
+  await expect(
+    page.locator('.pptx-rail__item').first().locator('.pptx-rail__thumb > svg')
+  ).toHaveCount(1);
+});
+
 test('shape drag: the preview puts the shape where the release does', async ({ page }) => {
   // Boxes of the painted SVG: happy-dom lays nothing out.
   await ready(page);

@@ -2,7 +2,10 @@
 // URLs. The editor facade and the fidelity harness both open documents through this, so the
 // harness measures and paints exactly what the editor shows.
 
-import { withoutEditorMarks } from '../automation/commands/table-edit-marks.ts';
+import {
+  partWithoutEditorMarks,
+  withoutEditorMarks,
+} from '../automation/commands/table-edit-marks.ts';
 import {
   loadDefaultFonts,
   ALL_DEFAULT_FONT_FAMILIES,
@@ -18,6 +21,12 @@ import {
   NS,
   readPptx,
   relTarget,
+  isDeferredPending,
+  parseDeferredPart,
+  parseDeferredParts,
+  pendingDeferredBytes,
+  deferredRejection,
+  PPTX_ZIP_LIMITS,
   type Element,
   type XmlPart,
   type PackageRejection,
@@ -45,6 +54,11 @@ import { OpBatch } from '../automation/commands/op-batch.ts';
 import { createPackagedFileFetch } from './packaged-file-fetch.ts';
 import { replicaBindingOf } from './replica-ids.ts';
 import { sameDependencies, slideDependencies } from './slide-dependencies.ts';
+import {
+  openingOrder,
+  ProgressiveOpen,
+  PROGRESSIVE_OPEN_CONTENT_BYTES,
+} from './progressive-open.ts';
 
 /** The resolution of a tiled image whose header states none (measured on `fixtures/fills-lines.pdf`). */
 const TILE_DPI = 72;
@@ -57,6 +71,12 @@ export interface OpenOptions {
   readonly substitutes?: boolean;
   /** Use the deterministic fixed measurer (tests only). */
   readonly fixedMeasurer?: boolean;
+  /**
+   * Open a long deck progressively: only slide `startSlide` (and its notes) parses now, and
+   * the session's `opening` parses the rest (`progressive-open.ts`). A deck whose other slides
+   * hold less than `PROGRESSIVE_OPEN_CONTENT_BYTES` parses whole. @internal
+   */
+  readonly progressive?: { readonly startSlide?: number };
 }
 
 /** A family the deck names that measures with another face. @public */
@@ -130,6 +150,8 @@ export function namedFamilies(pkg: PptxPackage): string[] {
   for (const part of pkg.parts.values()) {
     if (part.kind !== 'xml' || !(FAMILY_PARTS.test(part.partName) || themes.has(part.partName)))
       continue;
+    // A slide still opening names its families once it parses (`progressive-open.ts`).
+    if (isDeferredPending(part)) continue;
     for (const f of partFamilies(part.xml))
       if (!byKey.has(f.toLowerCase())) byKey.set(f.toLowerCase(), f);
   }
@@ -332,6 +354,8 @@ interface FontSet {
   readonly substitutes: readonly FontSource[];
   readonly refused: readonly string[];
   readonly substituteFailures: readonly SubstituteFontFailure[];
+  /** The substitute families loaded, or null when the open loads none. */
+  readonly substituteFamilies: readonly DefaultFamily[] | null;
   readonly fixed: boolean;
 }
 
@@ -376,8 +400,15 @@ export class DocumentSession {
   #urls = new Map<string, string>();
   #usedPartNames = new Set<string>();
 
-  constructor(store: PptxDocumentStore, fonts: FontSet) {
+  /**
+   * The background parse of a progressive open, until it settles; null for a deck that parsed
+   * whole. The editor runs it (`continueOpening`) and drops it once it settles. @internal
+   */
+  opening: ProgressiveOpen | null;
+
+  constructor(store: PptxDocumentStore, fonts: FontSet, opening: ProgressiveOpen | null = null) {
     this.store = store;
+    this.opening = opening;
     this.#fonts = fonts;
     const built = buildMeasurer(fonts);
     this.#measurer = built.measurer;
@@ -473,6 +504,28 @@ export class DocumentSession {
     this.#remeasure();
   }
 
+  /**
+   * Load the packaged substitutes that slides parsed after the open need: a progressive open
+   * chose them from the parts it had parsed, and a slide parsed later can name another family.
+   * Re-measures only when a family was added. Resolves true when it was. @internal
+   */
+  async addMissingSubstitutes(): Promise<boolean> {
+    const loaded = this.#fonts.substituteFamilies;
+    if (this.#fonts.fixed || !loaded) return false;
+    const missing = substituteFamiliesFor(this.store.package).filter((f) => !loaded.includes(f));
+    if (missing.length === 0) return false;
+    const more = await substituteFonts(missing);
+    const now = this.#fonts;
+    this.#fonts = {
+      ...now,
+      substitutes: [...now.substitutes, ...more.sources],
+      substituteFailures: [...now.substituteFailures, ...more.failures],
+      substituteFamilies: [...(now.substituteFamilies ?? []), ...missing],
+    };
+    this.#remeasure();
+    return true;
+  }
+
   /** Remove every host face. @internal */
   clearHostFaces(): void {
     this.setHostFaces(NO_HOST_FACES);
@@ -529,6 +582,17 @@ export class DocumentSession {
 
   get info(): PresentationInfo {
     return presentationInfo(this.store.package);
+  }
+
+  /**
+   * Whether slide `index` is still opening: its part has not parsed (`progressive-open.ts`).
+   * Reading its layout parses it at once. `EditorSnapshot.pendingSlides` is the public count.
+   * @internal
+   */
+  slidePending(index: number): boolean {
+    if (!this.opening) return false;
+    const part = this.info.slides[index]?.partName;
+    return !!part && isDeferredPending(this.store.package.parts.get(part));
   }
 
   /**
@@ -611,8 +675,12 @@ export async function openPresentation(
   options: OpenOptions = {}
 ): Promise<{ ok: true; session: DocumentSession } | { ok: false; error: OpenError }> {
   if (bytes.length === 0) return { ok: false, error: { reason: 'empty' } };
-  const read = readPptx(bytes);
+  const read = options.progressive
+    ? readPptx(bytes, PPTX_ZIP_LIMITS, { defer: () => true, finish: partWithoutEditorMarks })
+    : readPptx(bytes);
   if (!read.ok) return { ok: false, error: read.error };
+  const opened = options.progressive ? firstSlideOnly(read.pkg, options.progressive) : null;
+  if (opened && !opened.ok) return { ok: false, error: opened.error };
   const { sources: embedded, refused } = embeddedFontSources(read.pkg);
   const store = new PptxDocumentStore(withoutEditorMarks(read.pkg));
   const host = options.fonts ?? [];
@@ -623,19 +691,43 @@ export async function openPresentation(
     configured: NO_HOST_FACES,
     substitutes: [] as readonly FontSource[],
     substituteFailures: [] as readonly SubstituteFontFailure[],
+    substituteFamilies: null,
   };
+  const opening = opened?.opening ?? null;
   if (options.fixedMeasurer)
-    return { ok: true, session: new DocumentSession(store, { ...base, fixed: true }) };
+    return { ok: true, session: new DocumentSession(store, { ...base, fixed: true }, opening) };
   await initializeHarfBuzz();
-  const loaded =
-    options.substitutes === false
-      ? { sources: [], failures: [] }
-      : await substituteFonts(substituteFamiliesFor(read.pkg));
+  const families = options.substitutes === false ? null : substituteFamiliesFor(read.pkg);
+  const loaded = families ? await substituteFonts(families) : { sources: [], failures: [] };
   const fonts: FontSet = {
     ...base,
     substitutes: loaded.sources,
     substituteFailures: loaded.failures,
+    substituteFamilies: families,
     fixed: false,
   };
-  return { ok: true, session: new DocumentSession(store, fonts) };
+  return { ok: true, session: new DocumentSession(store, fonts, opening) };
+}
+
+/**
+ * Parse slide `startSlide` of a package read with every slide deferred, with its notes; then
+ * the rest too when it is small. The background parse of what is left, or null. A deferred part
+ * that did not parse here refuses the deck, as the reader does.
+ */
+function firstSlideOnly(
+  pkg: PptxPackage,
+  options: { readonly startSlide?: number }
+):
+  | { readonly ok: true; readonly opening: ProgressiveOpen | null }
+  | { readonly ok: false; readonly error: OpenError } {
+  const info = presentationInfo(pkg);
+  const start = Math.max(0, Math.min(options.startSlide ?? 0, info.slides.length - 1));
+  const first = info.slides[start];
+  if (first) parseDeferredPart(pkg, first.partName);
+  if (first?.notesPart) parseDeferredPart(pkg, first.notesPart);
+  if (pendingDeferredBytes(pkg) < PROGRESSIVE_OPEN_CONTENT_BYTES) parseDeferredParts(pkg);
+  const rejection = deferredRejection(pkg);
+  if (rejection) return { ok: false, error: rejection };
+  if (pendingDeferredBytes(pkg) === 0) return { ok: true, opening: null };
+  return { ok: true, opening: new ProgressiveOpen(pkg, openingOrder(info, start)) };
 }

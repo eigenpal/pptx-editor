@@ -98,6 +98,9 @@ export class ThumbnailPainter {
   #render(index: number, container: HTMLElement, defer: boolean): void {
     const session = this.#host.session();
     if (!session) return;
+    // A slide still opening waits as a placeholder in a deferred list. A caller that paints at
+    // once (no `defer`) gets the slide now: its layout parses it.
+    if (defer && session.slidePending(index)) return this.#placeholder(session, index, container);
     const key = renderKey(session.store.package, index, session.fontGeneration);
     const part = session.info.slides[index]?.partName;
     if (!key || !part) return;
@@ -176,9 +179,27 @@ export class ThumbnailPainter {
   }
 
   /**
+   * A slide still opening: the container stays empty (the rail marks it `data-pending` from the
+   * slide's summary and styles it as a placeholder), and in view, the slide parses before the
+   * others. Its summary changes once it is ready, and the rail asks again. Nothing is written
+   * to a container that is already empty: the rail mounts many at once, and a write between two
+   * of the queue's style reads would make each read lay the page out again.
+   */
+  #placeholder(session: DocumentSession, index: number, container: HTMLElement): void {
+    this.#pending.delete(container);
+    if (this.#painted.delete(container) || container.firstChild) container.replaceChildren();
+    const part = session.info.slides[index]?.partName;
+    if (!part) return;
+    // In view, it parses first; out of view, when it scrolls into view (`#paintFirst`).
+    if (!this.#queue.paintNow(container, { index, part }, false)) return;
+    this.#queue.drop(container);
+    session.opening?.want(part);
+  }
+
+  /**
    * A first paint that waited: the slide as it is now, unless something painted it since. The
    * slide is the one asked for: when slides moved since, it is found by its part, and a slide
-   * that is gone leaves the container empty.
+   * that is gone leaves the container empty. A slide still opening parses first instead.
    */
   #paintFirst(container: HTMLElement, ask: Ask): void {
     const session = this.#host.session();
@@ -193,6 +214,7 @@ export class ThumbnailPainter {
       container.replaceChildren();
       return;
     }
+    if (session.slidePending(index)) return void session.opening?.want(ask.part);
     const key = renderKey(session.store.package, index, session.fontGeneration);
     const was = this.#painted.get(container);
     if (was?.session === session && was.key === key) return;

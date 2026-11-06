@@ -131,6 +131,12 @@ export {
   showsLoading,
   type LoadingSheetSize,
 } from './loading.ts';
+export {
+  createProgressiveMount,
+  MOUNT_CHUNK_ITEMS,
+  MOUNT_FIRST_ITEMS,
+  type ProgressiveMount,
+} from './progressive-mount.ts';
 export { STANDARD_COLORS, gradientCss, presetGradient, swatchName } from './palette.ts';
 export { focusEdge, handleMenuKey, panelItems } from './menu-keyboard.ts';
 export {

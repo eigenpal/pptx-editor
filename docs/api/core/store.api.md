@@ -114,6 +114,37 @@ export type DecodeEmbeddedFontResult = {
 // @public
 export const DEFAULT_ZIP_LIMITS: ZipLimits;
 
+// @internal
+export function deferredParseCount(): number;
+
+// @public
+export type DeferredPartFinish = (part: XmlPart) => XmlPart;
+
+// @public
+export function deferredPartRejection(part: PackagePart): Extract<PackageRejection, {
+    reason: 'xml';
+}> | undefined;
+
+// @public
+export interface DeferredReadOptions {
+    readonly defer: (partName: string) => boolean;
+    readonly finish?: DeferredPartFinish;
+}
+
+// @public
+export function deferredRejection(pkg: PptxPackage): Extract<PackageRejection, {
+    reason: 'xml';
+}> | undefined;
+
+// @public
+export function deferredRejectionCount(): number;
+
+// @public
+export function deferredXmlPart(partName: string, bytes: Uint8Array, decode: (bytes: Uint8Array) => string, options: {
+    readonly notes: boolean;
+    readonly finish?: DeferredPartFinish;
+}): PackagePart;
+
 // @public
 export interface DocumentStoreOptions {
     readonly onListenerError?: (error: unknown, change: StoreChange) => void;
@@ -254,6 +285,12 @@ export function intAttr(el: Element_2 | undefined, name: string | QName): number
 
 // @public
 export function is(el: Element_2 | undefined, name: string | QName): el is Element_2;
+
+// @public
+export function isDeferredPart(part: PackagePart | undefined): boolean;
+
+// @public
+export function isDeferredPending(part: PackagePart | undefined): boolean;
 
 // @internal
 export function isEmptiedTable(frame: Element_2 | undefined): boolean;
@@ -482,13 +519,31 @@ export type PackageResult = {
 };
 
 // @public
+export function parseDeferredPart(pkg: PptxPackage, partName: string): boolean;
+
+// @public
+export function parseDeferredParts(pkg: PptxPackage): void;
+
+// @public
 export function parseXmlPart(partName: string, xml: string, limits?: XmlLimits): TreeResult;
 
 // @public
 export function path(el: Element_2 | undefined, ...names: string[]): Element_2 | undefined;
 
 // @public
+export function peekDeferredRootAttribute(part: PackagePart, name: string): string | undefined | null;
+
+// @public
+export function pendingDeferredBytes(pkg: PptxPackage): number;
+
+// @public
+export function pendingDeferredParts(pkg: PptxPackage): string[];
+
+// @public
 export const PPTX_OP_KINDS: readonly PptxOpKind[];
+
+// @public
+export const PPTX_ZIP_LIMITS: ZipLimits;
 
 // @public
 export class PptxDocumentStore {
@@ -596,7 +651,7 @@ export interface QName {
 }
 
 // @public
-export function readPptx(bytes: Uint8Array, limits?: ZipLimits): PackageResult;
+export function readPptx(bytes: Uint8Array, limits?: ZipLimits, deferred?: DeferredReadOptions): PackageResult;
 
 // @public
 export function readZip(bytes: Uint8Array, limits?: ZipLimits): ZipReadResult;

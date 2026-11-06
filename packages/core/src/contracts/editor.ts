@@ -10,6 +10,7 @@ import type {
   EditorCommand,
   EditorMode,
   EditorSnapshot,
+  LoadOptions,
   SlideSelectMode,
 } from './neutral.ts';
 
@@ -54,7 +55,12 @@ export interface Editor {
    * ```
    */
   beginHistoryGroup(): HistoryGroup;
-  load(bytes: Uint8Array): Promise<CommandResult>;
+  /**
+   * Open `bytes` in place of the current presentation. Resolves once the presentation can be
+   * edited. A long deck resolves when its first slide is ready (`options.startSlide`, or the
+   * first one) and opens the other slides in the background (`EditorSnapshot.pendingSlides`).
+   */
+  load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
   /**
    * The presentation as `.pptx` bytes, or `null` when no presentation is open. The bytes own an
    * `ArrayBuffer`, so `new Blob([bytes])` takes them as they are.

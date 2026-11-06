@@ -13,6 +13,7 @@ import {
   xmlPartOf,
   type PptxPackage,
 } from './package.ts';
+import { peekDeferredRootAttribute } from './deferred-parts.ts';
 import { attr, child, children, intAttr, path } from './query.ts';
 import { NS, REL } from './namespaces.ts';
 import type { Element, XmlPart } from './tree.ts';
@@ -141,12 +142,12 @@ export function presentationInfo(pkg: PptxPackage): PresentationInfo {
     // OPC part names fold ASCII case (ECMA-376 Part 2, 6.2.2.3), as the writer's repair does
     // (`liveRelationshipIds`): a target that differs only in case names the part.
     const partName = target ? equivalentPartName(pkg, target) : undefined;
-    if (!rId || !partName || !xmlPartOf(pkg, partName)) continue;
+    if (!rId || !partName || pkg.parts.get(partName)?.kind !== 'xml') continue;
     const layoutPart = relTargetByType(pkg, partName, REL.slideLayout);
     const masterPart = layoutPart ? relTargetByType(pkg, layoutPart, REL.slideMaster) : undefined;
     const themePart = masterPart ? relTargetByType(pkg, masterPart, REL.theme) : undefined;
     const notesPart = relTargetByType(pkg, partName, REL.notesSlide);
-    const sld = xmlPartOf(pkg, partName)?.root;
+    const show = slideShow(pkg, partName);
     slides.push({
       sldId: attr(el, 'id') ?? '',
       rId,
@@ -155,7 +156,7 @@ export function presentationInfo(pkg: PptxPackage): PresentationInfo {
       ...(masterPart ? { masterPart } : {}),
       ...(themePart ? { themePart } : {}),
       ...(notesPart ? { notesPart } : {}),
-      hidden: attr(sld, 'show') === '0' || attr(sld, 'show') === 'false',
+      hidden: show === '0' || show === 'false',
       nodeId: el.id,
     });
   }
@@ -184,6 +185,18 @@ export function presentationInfo(pkg: PptxPackage): PresentationInfo {
     ...(notesMasterPart ? { notesMasterPart } : {}),
   };
   return remember(pkg, info);
+}
+
+/**
+ * `p:sld/@show` of slide `partName`. A deferred slide not parsed yet answers from its start
+ * tag, so the slide list does not parse every slide (`deferred-parts.ts`).
+ */
+function slideShow(pkg: PptxPackage, partName: string): string | undefined {
+  const part = pkg.parts.get(partName);
+  if (!part) return undefined;
+  const peeked = peekDeferredRootAttribute(part, 'show');
+  if (peeked !== null) return peeked;
+  return attr(xmlPartOf(pkg, partName)?.root, 'show');
 }
 
 /** The `p:cSld/p:spTree` of a slide, layout, or master part. */

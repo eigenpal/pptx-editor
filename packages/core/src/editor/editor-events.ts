@@ -14,7 +14,11 @@ export interface PptxEditorEvents {
    * failed. Selection, zoom, and view changes do not fire it.
    */
   change: (snapshot: EditorSnapshot) => void;
-  /** The shape or text selection, the current slide, or the selected slides changed. */
+  /**
+   * The shape or text selection, the current slide, or the selected slides changed; or, while a
+   * long deck opens, the count of slides still opening (`EditorSnapshot.pendingSlides`), as
+   * DOCX Editor reports pages laid out in the background.
+   */
   selectionChange: (snapshot: EditorSnapshot) => void;
   /** The editor refused an edit (`EditorSnapshot.lastRejection`). */
   rejection: (rejection: EditorRejection, snapshot: EditorSnapshot) => void;
@@ -44,7 +48,8 @@ function happened(event: keyof PptxEditorEvents, prev: EditorSnapshot, next: Edi
       return (
         prev.selection !== next.selection ||
         prev.currentSlide !== next.currentSlide ||
-        !sameSlides(prev.selectedSlides, next.selectedSlides)
+        !sameSlides(prev.selectedSlides, next.selectedSlides) ||
+        (prev.pendingSlides ?? 0) !== (next.pendingSlides ?? 0)
       );
     case 'rejection':
       return !!next.lastRejection && next.lastRejection !== prev.lastRejection;

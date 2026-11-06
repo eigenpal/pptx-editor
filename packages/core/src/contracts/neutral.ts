@@ -695,6 +695,11 @@ export interface SlideSummary {
   readonly key: string;
   /** The slide's layout (`SlideLayoutSummary.id`); absent when the slide names none. */
   readonly layoutId?: string;
+  /**
+   * The slide is still opening (`EditorSnapshot.pendingSlides`): its thumbnail shows a
+   * placeholder until it is ready. Absent once it is.
+   */
+  readonly pending?: true;
 }
 
 /**
@@ -721,6 +726,15 @@ export interface SlideSection {
  * crosses a size or count limit), and `unknown`. @public
  */
 export type DocumentOpenFailureReason = 'damaged' | 'not-pptx' | 'too-large' | 'unknown';
+
+/** Options of `Editor.load`. @public */
+export interface LoadOptions {
+  /**
+   * The slide to show first, zero-based; clamped to the deck. In a long deck it is the slide
+   * that parses first. Default 0.
+   */
+  readonly startSlide?: number;
+}
 
 /**
  * A file the editor refused to open. It carries a stable code only, never the file's content
@@ -842,6 +856,14 @@ export interface EditorSnapshot {
   readonly revision: number;
   readonly mode: EditorMode;
   readonly slides: readonly SlideSummary[];
+  /**
+   * How many slides are still opening. A long deck shows its first slide and takes input while
+   * the other slides parse in the background; each one's summary carries `pending` until it is
+   * ready. Edits, undo, search, and save work before then: a slide that is needed parses at
+   * once, and `save` parses the rest first. Moves at most every 300 ms, and `selectionChange`
+   * fires when it does. Optional and additive: absent reads as 0.
+   */
+  readonly pendingSlides?: number;
   readonly currentSlide: number;
   /**
    * The slides selected in the slide rail, ascending. Always holds `currentSlide`. Shift+click

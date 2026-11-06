@@ -1,0 +1,42 @@
+---
+title: 'Long decks'
+description: 'How a deck with thousands of slides opens: the first slide first, the rest in the background, and what works before the rest is ready.'
+category: 'Guides'
+---
+
+A long deck shows its first slide and takes input before the rest of the deck is ready. The other slides open in the background, in short tasks that give way to typing and clicks.
+
+## What opens first
+
+`editor.load(bytes)` resolves when the first slide is ready to edit. To show another slide first, pass `startSlide`:
+
+```ts
+await editor.load(bytes, { startSlide: 41 });
+```
+
+The slides after the start slide open next, then the slides before it. The slide rail mounts its first screen with the first slide and the other items over the next frames. A thumbnail shows an empty placeholder until its slide is ready. The slides in view in the rail open before the others.
+
+A deck whose other slides hold less than 512 KiB of slide content opens whole, as before.
+
+## Follow the progress
+
+`snapshot().pendingSlides` is the number of slides still opening, and 0 when the deck is ready. Each `SlideSummary` in `snapshot().slides` has `pending: true` until its slide is ready. The count moves at most every 300 ms, and `selectionChange` fires when it moves:
+
+```ts
+import { onEditorEvent } from '@pptx-editor.dev/core';
+
+onEditorEvent(editor, 'selectionChange', (snapshot) => {
+  setProgress(snapshot.pendingSlides ?? 0);
+});
+```
+
+## What works before the deck is ready
+
+Everything. A slide that the editor needs opens at once: a slide you go to, a slide that Find searches, and a slide that a command changes. Edits, undo, and redo work on every slide. `save()` opens the rest of the deck first, so the saved file holds every slide, and the parts that you did not edit save as they do after a full open.
+
+A slide whose XML is damaged refuses the deck when it opens: `snapshot().openFailure` reports it, and the editor holds no deck. A save before then refuses the deck too.
+
+## Collaboration and fonts
+
+- An editor with a collaboration module opens the whole deck before its first slide shows, because the room needs every slide.
+- The fonts load for the families of the slides that are open. When the deck is ready, the fonts of families that only later slides name load too, and those slides lay out again with them.
