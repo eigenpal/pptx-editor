@@ -857,7 +857,8 @@ export class SlideSurface {
     this.#drag = null;
     this.#cropDrag = null;
     this.#textDrag = null;
-    this.#table.up();
+    // After a grid line drag, a caret that stayed in the table takes the keys again.
+    if (this.#table.up()) this.focus();
     if (this.#guides.length) {
       this.#guides = [];
       this.render();

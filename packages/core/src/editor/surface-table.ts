@@ -197,11 +197,13 @@ export class TableGestures {
     return true;
   }
 
-  /** The gesture ended. */
-  up(): void {
-    this.#grid?.historyGroup.end();
+  /** The gesture ended. Returns true when it was a grid line drag. */
+  up(): boolean {
+    const grid = this.#grid;
+    grid?.historyGroup.end();
     this.#text = null;
     this.#grid = null;
+    return !!grid;
   }
 
   /** The text item of the cell under a point of table `id`, for a double-click. */

@@ -1624,12 +1624,15 @@
   fill: var(--doc-selection);
 }
 
-/* A selected range of table cells (surface-table.ts): a light tint and a 1px edge on each
-   cell, so a cell fill shows through and a new fill is visible at once. */
+/* A selected range of table cells (surface-table.ts): a light tint on each cell and one 2px
+   edge around the range, so a new fill and the borders inside the range stay visible. */
 .pptx-surface__cell-selection {
   fill: var(--doc-cell-selection);
+}
+.pptx-surface__cell-selection-edge {
+  fill: none;
   stroke: var(--doc-cell-selection-edge);
-  stroke-width: 1px;
+  stroke-width: 2px;
   vector-effect: non-scaling-stroke;
 }
 /* The table chrome (surface-table-chrome.ts), after DOCX Editor's: the select handle at the

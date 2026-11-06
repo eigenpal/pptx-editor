@@ -232,7 +232,9 @@ describe('the table chrome', () => {
     const e = await open(deck(true));
     const nodeId = frameId(e);
     const rects = (sel: EditorSelection) =>
-      cellsOverlay(doc, layout(e), sel)[0].querySelectorAll('rect').length;
+      cellsOverlay(doc, layout(e), sel)[0].querySelectorAll('.pptx-surface__cell-selection').length;
+    const edges = (sel: EditorSelection) =>
+      cellsOverlay(doc, layout(e), sel)[0].querySelectorAll('.pptx-surface__cell-selection-edge');
     // Column 1: rows 0 and 2 have their own cell; row 1's merged cell starts in column 0.
     const column = {
       kind: 'cells',
@@ -249,6 +251,8 @@ describe('the table chrome', () => {
       focus: { row: 1, column: 1 },
     } as const;
     expect(rects(block)).toBe(3);
+    // One edge around the whole range, not one on each cell.
+    expect(edges(block).length).toBe(1);
   });
 
   test('a selected column under a merged cell inserts, deletes, and fills its own line', async () => {

@@ -294,6 +294,26 @@ describe('table surface', () => {
   });
 });
 
+describe('focus after a grid drag', () => {
+  test('a caret that stays in the table takes the keys again after a line drag', async () => {
+    const editor = await open();
+    const host = surface(editor);
+    const stage = stageOf(host);
+    const frame = frames(editor)[0];
+    const at0 = { paragraph: 0, offset: 1 };
+    const cell = { row: 0, column: 0 };
+    act(() =>
+      editor.setSelection({ kind: 'text', nodeId: frame.id, cell, anchor: at0, focus: at0 })
+    );
+    stage.dispatchEvent(new PointerEvent('pointerdown', { ...at(2 * IN, 1.5 * IN), button: 0 }));
+    document.dispatchEvent(new PointerEvent('pointermove', at(2 * IN + 20 * PX, 1.5 * IN)));
+    document.dispatchEvent(new PointerEvent('pointerup', at(2 * IN + 20 * PX, 1.5 * IN)));
+    expect(editor.snapshot().selection.kind).toBe('text');
+    expect(document.activeElement?.className).toBe('pptx-surface__input');
+    editor.destroy();
+  });
+});
+
 describe('table edge over a shape', () => {
   test('a press just outside the edge resizes the selected table, not the shape behind', async () => {
     const editor = await open('behind');
