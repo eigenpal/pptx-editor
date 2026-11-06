@@ -801,11 +801,9 @@ button {
     --pptx-rail-thumb-width: 88px;
   }
 }
-/* Stacked: the slide asks for the height that fits the width (an inline `flex-basis`) and
-   takes the spare height, the rail keeps its own height, and the open notes keep a reading
-   height. A short panel shrinks the slide and the notes together. */
 /* Stacked: the slide takes only its fitted height (the inline flex-basis from DeckPanel), so
-   no empty bands appear above and below it. The open notes take the spare height. */
+   no empty bands appear above and below it. The rail keeps its own height, and a short panel
+   shrinks the slide and the notes together. */
 .deck-ws[data-mode='stacked'] .deck-ws__canvas {
   flex-grow: 0;
   flex-shrink: 1;
@@ -829,9 +827,14 @@ button {
 .deck-ws__status .pptx-zoom {
   position: static;
 }
+/* The open notes take the height their text needs, up to half the panel, and then scroll. */
 .deck-ws[data-mode='stacked'] .deck-ws__notes[data-open='true'] {
-  flex: 1 1 0;
+  flex: 0 1 auto;
   min-height: 96px;
+  max-height: 50%;
+}
+.deck-ws[data-mode='stacked'] .deck-ws__notes[data-open='true'] .pptx-notes__text {
+  height: auto;
 }
 
 /* ============================================================================

@@ -650,32 +650,17 @@
   }
 }
 
-/* A portrait window up to a tablet (the rail is an overlay here): the slide area takes the
-   slide's own shape, and an open notes pane takes the height left under it. The height is the
-   slide's width (the pane less the workspace and surface padding) times its ratio, plus the
-   surface padding. A tall slide gives up height, so the notes keep their head and two lines.
-   With the notes closed, the slide area takes the whole height, so a zoomed slide has room. */
+/* A portrait window up to a tablet (the rail is an overlay here): the open notes take the
+   height their text needs, up to half the pane, and then scroll. The slide area takes the
+   rest, as it does with the notes closed, so the slide sits in the middle of it. */
 @media (max-width: 900px) and (orientation: portrait) {
-  .demo-root {
-    --demo-slide-pad: var(--doc-slide-padding, 24px);
-  }
-  .demo-docpane:has(> .pptx-notes[data-open='true']) > .demo-canvas {
-    flex: 0 1 auto;
-    height: calc(
-      (100vw - 24px - 2 * var(--demo-slide-pad)) * var(--demo-slide-ratio, 0.5625) + 2 *
-        var(--demo-slide-pad)
-    );
-  }
-  /* The strip under the slide, when the view switch and the zoom show (not in ribbon mode). */
-  .demo-docpane:has(> .demo-status):has(> .pptx-notes[data-open='true']) > .demo-canvas {
-    height: calc(
-      (100vw - 24px - 2 * var(--demo-slide-pad)) * var(--demo-slide-ratio, 0.5625) + 2 *
-        var(--demo-slide-pad) + var(--demo-status-strip)
-    );
-  }
   .demo-root .pptx-notes[data-open='true'] {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-height: 84px;
+    max-height: 50%;
+  }
+  .demo-root .pptx-notes[data-open='true'] .pptx-notes__text {
+    height: auto;
   }
 }
 
