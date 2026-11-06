@@ -14,15 +14,24 @@ Production use requires a commercial agreement: licensing@eigenpal.com
  * The success body is the PDF itself (`application/pdf`). A failure is JSON with a fixed
  * `message`: raw exception text can name parts of the upload, so it never goes back.
  *
- * Limits: a 20 MiB upload, a 60 second conversion, and one conversion at a time per instance.
- * Neither the upload nor the PDF is kept. The request must carry an `Origin` that matches the
- * host: a browser sends `Origin` on every `POST`, so a request without one is not the demo page.
+ * Limits: a 4 MiB upload and a 4 MiB PDF (the platform caps each function body at 4.5 MB), a
+ * 15 second upload, a 60 second conversion, and one conversion at a time per instance. The body
+ * is read before the instance lock, so a slow upload never holds the lock. A closed connection
+ * cancels the conversion. Neither the upload nor the PDF is kept.
+ *
+ * The request must carry an `Origin` that matches the host: a browser sends `Origin` on every
+ * `POST`, so a request without one is not the demo page. This keeps other pages from using the
+ * function. It is not authentication: a script can send any `Origin`. Rate limits belong to the
+ * host's firewall.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { exportPdf } from '@pptx-editor.dev/pptx-to-pdf';
 
-const MAX_UPLOAD = 20 * 1024 * 1024;
+const MAX_UPLOAD = 4 * 1024 * 1024;
+const MAX_OUTPUT = 4 * 1024 * 1024;
+const UPLOAD_MS = 15_000;
 const DEADLINE_MS = 60_000;
+const TOO_LARGE = { ok: false, error: 'UploadTooLarge', message: 'The upload limit is 4 MiB.' };
 
 /** Time the function may hold the request; the conversion's own deadline is shorter. */
 export const maxDuration = 90;
@@ -38,16 +47,28 @@ function json(res: ServerResponse, status: number, value: Record<string, unknown
   res.end(JSON.stringify(value));
 }
 
-async function readBody(req: IncomingMessage): Promise<Uint8Array | null> {
-  const chunks: Buffer[] = [];
-  let length = 0;
-  for await (const chunk of req) {
-    const bytes = chunk as Buffer;
-    length += bytes.length;
-    if (length > MAX_UPLOAD) return null;
-    chunks.push(bytes);
+/** The body, `'large'` past `MAX_UPLOAD`, or `'slow'` when it takes more than `UPLOAD_MS`. */
+async function readBody(req: IncomingMessage): Promise<Uint8Array | 'large' | 'slow'> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const slow = new Promise<'slow'>((resolve) => {
+    timer = setTimeout(() => resolve('slow'), UPLOAD_MS);
+  });
+  const read = (async () => {
+    const chunks: Buffer[] = [];
+    let length = 0;
+    for await (const chunk of req) {
+      const bytes = chunk as Buffer;
+      length += bytes.length;
+      if (length > MAX_UPLOAD) return 'large' as const;
+      chunks.push(bytes);
+    }
+    return new Uint8Array(Buffer.concat(chunks));
+  })();
+  try {
+    return await Promise.race([read, slow]);
+  } finally {
+    clearTimeout(timer);
   }
-  return new Uint8Array(Buffer.concat(chunks));
 }
 
 /** Fixed public failure responses. Never return raw exception messages. */
@@ -78,24 +99,37 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   const origin = req.headers.origin;
   if (!origin || (origin !== `https://${host}` && origin !== `http://${host}`))
     return json(res, 403, { ok: false, message: 'Use the same-origin demo.' });
-  if (Number(req.headers['content-length']) > MAX_UPLOAD)
-    return json(res, 413, { ok: false, message: 'The upload limit is 20 MiB.' });
+  if (Number(req.headers['content-length']) > MAX_UPLOAD) return json(res, 413, TOO_LARGE);
+  const bytes = await readBody(req);
+  if (bytes === 'large') return json(res, 413, TOO_LARGE);
+  if (bytes === 'slow') {
+    json(res, 408, { ok: false, error: 'UploadTimeout', message: 'The upload was too slow.' });
+    // Stop reading the rest of the upload.
+    req.destroy?.();
+    return;
+  }
+  if (bytes.byteLength === 0)
+    return json(res, 400, { ok: false, message: 'The request has no presentation.' });
   if (active)
     return json(res, 503, {
       ok: false,
+      error: 'Busy',
       message: 'A conversion is already running. Try again when it finishes.',
     });
   active = true;
+  // A closed connection (a closed tab, the client's timeout) stops the conversion.
+  const abort = new AbortController();
+  const closed = (): void => {
+    if (!res.writableFinished) abort.abort();
+  };
+  res.on?.('close', closed);
   try {
-    const bytes = await readBody(req);
-    if (bytes === null)
-      return json(res, 413, { ok: false, message: 'The upload limit is 20 MiB.' });
-    if (bytes.byteLength === 0)
-      return json(res, 400, { ok: false, message: 'The request has no presentation.' });
     // The demo exports what the editor shows, so approximations become diagnostics, not refusals.
     const result = await exportPdf(bytes, {
       fidelityPolicy: 'best-effort',
       timeoutMs: DEADLINE_MS,
+      maxOutputBytes: MAX_OUTPUT,
+      signal: abort.signal,
     });
     if (res.destroyed || res.writableEnded) return;
     res.writeHead(200, {
@@ -111,5 +145,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return json(res, failure.status, failure.body);
   } finally {
     active = false;
+    res.off?.('close', closed);
   }
 }

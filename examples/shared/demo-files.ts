@@ -115,24 +115,49 @@ export function exportDeck(editor: PptxEditorInstance | null | undefined, name: 
   if (bytes) download(bytes, `${name}.pptx`);
 }
 
+/** The largest deck the demo's PDF function accepts (`MAX_UPLOAD` in `api/convert.ts`). */
+export const PDF_MAX_UPLOAD = 4 * 1024 * 1024;
+
+/** Why the PDF export failed, as the `app.*` key of the editor's notice. */
+export class PdfExportFailure extends Error {
+  constructor(readonly key: 'app.pdfTooLarge' | 'app.pdfBusy' | 'app.pdfExportFailed') {
+    super(key);
+    this.name = 'PdfExportFailure';
+  }
+}
+
+/** The notice for an HTTP status of the PDF function. */
+function failureFor(status: number): PdfExportFailure {
+  if (status === 413 || status === 507) return new PdfExportFailure('app.pdfTooLarge');
+  if (status === 503) return new PdfExportFailure('app.pdfBusy');
+  return new PdfExportFailure('app.pdfExportFailed');
+}
+
 /**
  * Convert the saved deck to a PDF on the demo's server (`api/convert.ts`). The deck leaves the
- * browser only here, after the user picks the export. Throws with the server's fixed message.
+ * browser only here, after the user picks the export. Throws `PdfExportFailure`.
  */
 export async function convertToPdf(deck: Uint8Array): Promise<Blob> {
-  const response = await fetch(PDF_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': PPTX_MIME },
-    body: deck.slice().buffer,
-    signal: AbortSignal.timeout(90_000),
-  });
+  if (deck.byteLength > PDF_MAX_UPLOAD) throw new PdfExportFailure('app.pdfTooLarge');
+  let response: Response;
+  try {
+    response = await fetch(PDF_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': PPTX_MIME },
+      body: deck.slice().buffer,
+      signal: AbortSignal.timeout(90_000),
+    });
+  } catch {
+    // Offline, no server, or past the timeout.
+    throw new PdfExportFailure('app.pdfExportFailed');
+  }
   const type = response.headers.get('content-type') ?? '';
   if (response.ok && type.startsWith('application/pdf')) return response.blob();
-  const failure = type.includes('application/json')
-    ? ((await response.json()) as { message?: string })
-    : {};
-  throw new Error(failure.message ?? `HTTP ${response.status}`);
+  throw failureFor(response.status);
 }
+
+/** Whether a PDF export is running. A second pick does nothing until it ends. */
+let pdfRunning = false;
 
 /**
  * Export from the editor's current deck: the whole deck as PDF (made on the demo's server), the
@@ -150,9 +175,16 @@ export async function exportSlides(
   const options = { width: PICTURE_WIDTH };
   try {
     if (kind === 'pdf') {
+      if (pdfRunning) return;
       // `save` is null for a damaged slide; the editor already shows why.
       const deck = editor.save();
-      if (deck) download(await convertToPdf(deck), `${name}.pdf`);
+      if (!deck) return;
+      pdfRunning = true;
+      try {
+        download(await convertToPdf(deck), `${name}.pdf`);
+      } finally {
+        pdfRunning = false;
+      }
     } else if (kind === 'png')
       download(await exportSlidePng(session, slide, options), `${name} ${slide + 1}.png`);
     else if (kind === 'zip')
@@ -164,7 +196,8 @@ export async function exportSlides(
       );
   } catch (e) {
     console.error(e);
-    if (kind === 'pdf') editor.reject('app.pdfExportFailed', e instanceof Error ? e.message : '');
+    if (kind === 'pdf')
+      editor.reject(e instanceof PdfExportFailure ? e.key : 'app.pdfExportFailed');
   }
 }
 

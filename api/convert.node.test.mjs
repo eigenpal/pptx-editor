@@ -30,8 +30,25 @@ function request({ method = 'POST', headers = {}, body } = {}) {
 
 function response() {
   const out = { status: 0, headers: {}, chunks: [], destroyed: false, writableEnded: false };
+  const listeners = new Set();
   return {
     out,
+    /** The client went away: the socket closes before the response finished. */
+    disconnect() {
+      out.destroyed = true;
+      for (const listener of listeners) listener();
+    },
+    on(event, listener) {
+      if (event === 'close') listeners.add(listener);
+      return this;
+    },
+    off(event, listener) {
+      listeners.delete(listener);
+      return this;
+    },
+    get writableFinished() {
+      return out.writableEnded;
+    },
     get destroyed() {
       return out.destroyed;
     },
@@ -74,11 +91,15 @@ test(
       (await call(handler, { headers: { origin: 'https://elsewhere.example' } })).status,
       403
     );
-    assert.equal(
-      (await call(handler, { headers: { ...ORIGIN, 'content-length': String(21 * 1024 * 1024) } }))
-        .status,
-      413
-    );
+    // The platform caps a function body at 4.5 MB, so the function's own limit is 4 MiB.
+    const declared = await call(handler, {
+      headers: { ...ORIGIN, 'content-length': String(5 * 1024 * 1024) },
+    });
+    assert.equal(declared.status, 413);
+    assert.equal(declared.json.message, 'The upload limit is 4 MiB.');
+    // A body that does not declare its length is counted as it arrives.
+    const sent = await call(handler, { headers: ORIGIN, body: Buffer.alloc(5 * 1024 * 1024) });
+    assert.equal(sent.status, 413);
     const empty = await call(handler, { headers: ORIGIN, body: Buffer.alloc(0) });
     assert.equal(empty.status, 400);
     assert.equal(empty.json.message, 'The request has no presentation.');
@@ -99,6 +120,24 @@ test('one conversion at a time per instance, then a PDF of every slide', { skip 
   assert.equal(result.headers['X-Pdf-Page-Count'], '5');
   assert.equal(result.headers['Content-Length'], String(result.body.length));
 });
+
+test(
+  'a client that disconnects stops its conversion and frees the instance',
+  { skip },
+  async () => {
+    const { default: handler } = await import('./convert.ts');
+    const deck = await readFile(new URL('../examples/vite/public/sample.pptx', import.meta.url));
+    const gone = response();
+    const running = handler(request({ headers: ORIGIN, body: deck }), gone);
+    // Leave once the conversion started: the instance is busy for anyone else.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    gone.disconnect();
+    await running;
+    assert.equal(gone.out.status, 0, 'nothing is written to a closed connection');
+    const next = await call(handler, { headers: ORIGIN, body: deck });
+    assert.equal(next.status, 200);
+  }
+);
 
 test("failures answer with fixed text, never with the file's own details", { skip }, async () => {
   const { default: handler, pdfFailureResponse } = await import('./convert.ts');

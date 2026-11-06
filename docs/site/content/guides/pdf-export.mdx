@@ -22,7 +22,12 @@ export async function POST(request: Request): Promise<Response> {
 
 `best-effort` gives a PDF for content that the PDF can only approximate, and lists each approximation in `diagnostics`. The default `strict` policy throws `PdfFidelityError` instead. Hidden slides stay out of the PDF.
 
-Keep limits on the route. Accept only requests from your own page, limit the upload size, and pass `timeoutMs`. Send fixed error text: an exception message can name parts of the uploaded file.
+Keep limits on the route:
+
+- Accept only requests from your own page. An `Origin` check stops other pages, but it is not authentication. Add authentication or a rate limit for a public route.
+- Limit the upload size. A serverless platform can also cap the request and response bodies, so check the platform limit.
+- Pass `timeoutMs`, and pass a `signal` that aborts when the client disconnects.
+- Send fixed error text. An exception message can name parts of the uploaded file.
 
 ## The browser
 
@@ -32,12 +37,18 @@ Save the deck and post the bytes when the user picks the export:
 const deck = editor.save();
 if (deck) {
   const response = await fetch('/api/convert', { method: 'POST', body: deck });
-  if (response.ok) download(await response.blob(), 'deck.pdf');
+  if (response.ok) {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(await response.blob());
+    link.download = 'deck.pdf';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  }
 }
 ```
 
-`save()` returns `null` when a slide is damaged. The editor then shows why.
+`save()` returns `null` when a slide is damaged. The editor then shows why. Ignore a second pick while a conversion runs, and show a translated message for each failure status.
 
 ## The demo
 
-The React and Vue demos add **Presentation as PDF** to the Export menu and to **File > Export**. The function is `api/convert.ts` in the repository. The Vite development servers serve the same handler through `examples/shared/pdf-export-plugin.ts`, so `bun run dev` exports PDF with no package build.
+The React and Vue demos add **Presentation as PDF** to the Export menu and to **File > Export**. The function is `api/convert.ts` in the repository. The Vite development servers serve the same handler through `examples/shared/pdf-export-plugin.ts`, so `bun run dev` exports PDF with no package build. The demo accepts decks up to 4 MiB.
