@@ -20,7 +20,7 @@ jobs:
     # Never act on a run from a fork. A scheduled run is a canary: it publishes no stable
     # release, and its head commit can carry an older release tag.
     if: github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.event != 'schedule'
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       published: ${{ steps.source.outputs.published }}
@@ -64,7 +64,7 @@ jobs:
     name: Release comments and roadmap
     needs: source
     if: needs.source.outputs.published == 'true'
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -305,7 +305,7 @@ jobs:
     name: Report a failure
     needs: [source, announcements]
     if: failure()
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
     steps:
