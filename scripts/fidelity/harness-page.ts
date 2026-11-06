@@ -17,7 +17,14 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createServer, type Plugin } from 'vite';
-import { collectionFace, deckFontFamilies, localFonts, type LocalFont } from './local-fonts.ts';
+import {
+  collectionFace,
+  deckFontFamilies,
+  FALLBACK_FONTS,
+  localFonts,
+  type LocalFont,
+} from './local-fonts.ts';
+import { MAX_IMAGE_PIXELS, PDFJS_DIR } from './pdf.ts';
 
 /** One painted slide (`renderSlide`). */
 export interface HarnessRender {
@@ -142,6 +149,19 @@ function receive(): {
   return { url: `${UPLOAD_PATH}${token}`, bytes, release: () => uploads.delete(token) };
 }
 
+/**
+ * Hand bytes to the upload that waits at `url` (`receive`). False when no upload waits there.
+ * The middleware calls it for each PUT; a test without a browser calls it directly.
+ */
+export function deliverUpload(url: string, bytes: Uint8Array<ArrayBuffer>): boolean {
+  const token = url.startsWith(UPLOAD_PATH) ? url.slice(UPLOAD_PATH.length) : url;
+  const done = uploads.get(token);
+  if (!done) return false;
+  uploads.delete(token);
+  done(bytes);
+  return true;
+}
+
 /** The Vite middleware for `servedFiles` and `uploads`. */
 function harnessFiles(): Plugin {
   return {
@@ -149,17 +169,15 @@ function harnessFiles(): Plugin {
     configureServer(server) {
       server.middlewares.use(UPLOAD_PATH, (req, res) => {
         const token = (req.url ?? '').slice(1);
-        const done = uploads.get(token);
-        if (!done || req.method !== 'PUT') {
+        if (!uploads.has(token) || req.method !== 'PUT') {
           res.statusCode = 404;
           res.end();
           return;
         }
-        uploads.delete(token);
         const chunks: Buffer[] = [];
         req.on('data', (c: Buffer) => chunks.push(c));
         req.on('end', () => {
-          done(new Uint8Array(Buffer.concat(chunks)));
+          deliverUpload(token, new Uint8Array(Buffer.concat(chunks)));
           res.end();
         });
       });
@@ -233,8 +251,8 @@ export interface HarnessControl {
 export const RESET_TIMEOUT_MS = 60_000;
 
 /**
- * A browser close that takes longer than this ends with a kill. A close takes about 0.1 s. On
- * Linux (CI, Chromium headless shell 1248), the close of the browser that replaced a crashed one
+ * A browser close that takes longer than this ends with a kill. A close takes about 0.1 s. In
+ * CI (Chromium headless shell 1248), the close of the browser that replaced a crashed one
  * never ended: Playwright waits for the browser's output pipes, and they stayed open. The cause
  * is not known; the kill ends the close.
  */
@@ -446,6 +464,7 @@ export async function openDeck(
     sources.push(source);
   }
   const served = [serveFile(file), ...sources.map(serveFile)];
+  const fallback = FALLBACK_FONTS.map((f) => serveFile(f));
   try {
     const source = {
       deck: served[0].url,
@@ -455,10 +474,11 @@ export async function openDeck(
         italic: f.italic,
         url: served[i + 1].url,
       })),
+      fallback: fallback.map((f) => f.url),
     };
     return await page.evaluate((s) => (window as any).__pptxHarness.open(s), source);
   } finally {
-    for (const s of served) s.release();
+    for (const s of [...served, ...fallback]) s.release();
   }
 }
 
@@ -499,6 +519,9 @@ export async function rasterPdf(
       pdf: served.url,
       ...size,
       scale,
+      maxImageSize: MAX_IMAGE_PIXELS,
+      // The page fetches the CMaps from the harness server (Vite serves the package files).
+      cMapUrl: `/@fs${join(PDFJS_DIR, 'cmaps')}/`,
       pages: targets.map((t) => ({ rgba: t.rgba.url, png: t.png.url })),
     });
     return await Promise.all(

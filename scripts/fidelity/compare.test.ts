@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { compareLines, comparePixels, lineKey } from './compare.ts';
+import { compareLines, comparePixels, lineKey, slidePasses } from './compare.ts';
 import { groupLines, type PdfLine, type TextItem } from './pdf.ts';
 
 const line = (text: string, baseline = 100, xMin = 50): PdfLine => ({
@@ -49,8 +49,27 @@ describe('compareLines', () => {
     expect(r).toMatchObject({ matched: 1, total: 1, extra: [] });
   });
 
+  test('a one-letter first word matches without it only when it is a list marker', () => {
+    const ours = [{ text: 'Hollow square', xMin: 20, xMax: 120, baseline: 50 }];
+    const word = { text: 'a Hollow square', xMin: 10, xMax: 120, baseline: 50 };
+    expect(compareLines(ours, [word]).matched).toBe(0);
+    expect(compareLines(ours, [{ ...word, marker: true }]).matched).toBe(1);
+  });
+
+  test('our text that the reference lacks fails the slide', () => {
+    const ref = [{ text: 'Title text', xMin: 10, xMax: 90, baseline: 40 }];
+    const ours = [...ref, { text: 'Frame label', xMin: 10, xMax: 90, baseline: 80 }];
+    const lines = compareLines(ours, ref);
+    expect(lines.extra).toEqual(['Frame label']);
+    expect(slidePasses({ mismatch: 0 }, lines)).toBe(false);
+    expect(slidePasses({ mismatch: 0 }, compareLines(ref, ref))).toBe(true);
+  });
+
   test('a bullet that one PDF writes as a letter matches a symbol bullet', () => {
-    const r = compareLines([line('❑ Hollow square')], [line('q Hollow square')]);
+    const r = compareLines(
+      [line('❑ Hollow square')],
+      [{ ...line('q Hollow square'), marker: true }]
+    );
     expect(r.matched).toBe(1);
   });
 });

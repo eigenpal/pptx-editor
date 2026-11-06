@@ -2,9 +2,10 @@
 // paragraphs (`a:pPr/@rtl`, ECMA-376 Part 1, 21.1.2.2.7 pPr) with Arabic and Hebrew runs, mixed
 // directions in one line, numbers in right-to-left text, right-to-left bullets and numbering,
 // and alignment and indents. `east-asian-line-breaking` holds CJK text with `eaLnBrk`,
-// `latinLnBrk`, and `hangingPunct` on and off, punctuation at line ends, and the `a:ea`, `a:cs`,
-// and `a:sym` run fonts (21.1.2.3.3 ea, 21.1.2.3.1 cs, 21.1.2.3.10 sym). Every run names its
-// fonts, so no theme fallback decides the face. `east-asian-theme-fonts` names no run font: its
+// `latinLnBrk`, and `hangingPunct` on and off, punctuation at line ends, and the `a:ea` and
+// `a:cs` run fonts (21.1.2.3.3 ea, 21.1.2.3.1 cs). Every run names its open fonts, so no theme
+// fallback decides the face. `namedFacesSlide` (on `font-substitution`) names faces that are not
+// open, with the `a:sym` run font (21.1.2.3.10 sym) and Wingdings bullets. `east-asian-theme-fonts` names no run font: its
 // theme's `a:ea` is empty, and the theme script fonts (20.1.4.1.16 font) with each run's `lang`
 // and `altLang` decide the face. It also holds shared symbols in East Asian and Latin runs, and
 // Korean and Chinese text in narrow boxes. `east-asian-typography` holds custom `p:kinsoku`
@@ -211,8 +212,6 @@ const rtlText: FixtureSlide[] = [
 // --- east-asian-line-breaking ------------------------------------------------
 
 const YU_GOTHIC = '<a:latin typeface="Noto Sans CJK JP"/><a:ea typeface="Noto Sans CJK JP"/>';
-/** The slide that names fonts on purpose keeps Yu Gothic: it checks which face each name gets. */
-const NAMED_YU_GOTHIC = '<a:latin typeface="Yu Gothic"/><a:ea typeface="Yu Gothic"/>';
 const ja = (text: string, fonts = YU_GOTHIC, attrs?: string): string => r(text, 'ja-JP', fonts, attrs);
 const brk = (ea: 0 | 1, latin: 0 | 1, hang: 0 | 1): string =>
   `<a:pPr eaLnBrk="${ea}" latinLnBrk="${latin}" hangingPunct="${hang}"/>`;
@@ -256,8 +255,8 @@ const eastAsian: FixtureSlide[] = [
         .join(''),
   },
   {
-    // The run fonts: `a:ea` for CJK text, `a:latin` for Latin text in the same run, `a:cs` for
-    // Arabic and Hebrew, and `a:sym` for symbol characters (U+F020 to U+F0FF).
+    // The run fonts: `a:ea` for CJK text, `a:latin` for Latin text in the same run, and `a:cs`
+    // for Arabic and Hebrew. Each slot names another open face, so the face shows the slot.
     shapes:
       box(
         2,
@@ -265,13 +264,11 @@ const eastAsian: FixtureSlide[] = [
         0.3,
         6.2,
         6.9,
-        p(ja('游ゴシックの日本語 Arial', '<a:latin typeface="Arial"/><a:ea typeface="Yu Gothic"/>')) +
-          p(ja('游明朝の日本語 Arial', '<a:latin typeface="Arial"/><a:ea typeface="Yu Mincho"/>')) +
-          p(ja('メイリオの日本語 Arial', '<a:latin typeface="Arial"/><a:ea typeface="Meiryo"/>')) +
-          p(r('宋体的中文文本 Arial', 'zh-CN', '<a:latin typeface="Arial"/><a:ea typeface="SimSun"/>')) +
-          p(r('等线的中文文本 Arial', 'zh-CN', '<a:latin typeface="Arial"/><a:ea typeface="DengXian"/>')) +
-          p(r('맑은 고딕 한국어 텍스트 Arial', 'ko-KR', '<a:latin typeface="Arial"/><a:ea typeface="Malgun Gothic"/>')) +
-          p(r('Latin text only, with an ea font that it does not use', 'en-US', '<a:latin typeface="Arial"/><a:ea typeface="Yu Mincho"/>'))
+        p(ja('日本語の文 Liberation Serif', '<a:latin typeface="Liberation Serif"/><a:ea typeface="Noto Sans CJK JP"/>')) +
+          p(ja('日本語の文 Liberation Sans', '<a:latin typeface="Liberation Sans"/><a:ea typeface="Noto Sans CJK JP"/>')) +
+          p(r('简体中文的文本 Liberation Serif', 'zh-CN', '<a:latin typeface="Liberation Serif"/><a:ea typeface="Noto Sans CJK JP"/>')) +
+          p(r('한국어 텍스트 Liberation Serif', 'ko-KR', '<a:latin typeface="Liberation Serif"/><a:ea typeface="Noto Sans CJK JP"/>')) +
+          p(r('Latin text only, with an ea font that it does not use', 'en-US', '<a:latin typeface="Liberation Serif"/><a:ea typeface="Noto Sans CJK JP"/>'))
       ) +
       box(
         3,
@@ -279,21 +276,13 @@ const eastAsian: FixtureSlide[] = [
         0.3,
         6.1,
         6.9,
-        p(r('نص عربي بخط Tahoma', 'ar-SA', '<a:latin typeface="Arial"/><a:cs typeface="Tahoma"/>'), RTL_R) +
-          p(r('טקסט בעברית בגופן David', 'he-IL', '<a:latin typeface="Arial"/><a:cs typeface="David"/>'), RTL_R) +
+        p(r('نص عربي بخط Noto Sans Arabic', 'ar-SA', '<a:latin typeface="Liberation Sans"/><a:cs typeface="Noto Sans Arabic"/>'), RTL_R) +
+          p(r('טקסט בעברית בגופן Liberation Serif', 'he-IL', '<a:latin typeface="Liberation Sans"/><a:cs typeface="Liberation Serif"/>'), RTL_R) +
           p(
-            r('Wingdings: ', 'en-US', '<a:latin typeface="Arial"/>') +
-              r('', 'en-US', '<a:latin typeface="Arial"/><a:sym typeface="Wingdings"/>')
-          ) +
-          p(
-            r('Symbol: ', 'en-US', '<a:latin typeface="Arial"/>') +
-              r('', 'en-US', '<a:latin typeface="Arial"/><a:sym typeface="Symbol"/>')
-          ) +
-          p(
-            ja('混在：', NAMED_YU_GOTHIC) +
-              r('Arial ', 'en-US', '<a:latin typeface="Arial"/>') +
-              r('عربي', 'ar-SA', '<a:latin typeface="Arial"/><a:cs typeface="Tahoma"/>') +
-              ja(' 日本語', NAMED_YU_GOTHIC)
+            ja('混在：') +
+              r('Liberation Sans ', 'en-US', '<a:latin typeface="Liberation Sans"/>') +
+              r('عربي', 'ar-SA', '<a:latin typeface="Liberation Sans"/><a:cs typeface="Noto Sans Arabic"/>') +
+              ja(' 日本語')
           )
       ),
   },
@@ -303,11 +292,11 @@ const eastAsian: FixtureSlide[] = [
 
 /** The theme script fonts of `east-asian-theme-fonts`, in both theme font collections. */
 const THEME_SCRIPT_FONTS: readonly (readonly [string, string])[] = [
-  ['Jpan', 'Yu Gothic'],
-  ['Hans', 'DengXian'],
-  ['Hant', 'Microsoft JhengHei'],
-  ['Hang', 'Malgun Gothic'],
-  ['Arab', 'Tahoma'],
+  ['Jpan', 'Noto Sans CJK JP'],
+  ['Hans', 'Noto Sans CJK JP'],
+  ['Hant', 'Noto Sans CJK JP'],
+  ['Hang', 'Noto Sans CJK JP'],
+  ['Arab', 'Noto Sans Arabic'],
 ];
 
 /** A run that names no font: the theme decides each slot. */
@@ -317,34 +306,35 @@ const lr = (text: string, lang: string, altLang?: string): string =>
 /** The `east-asian-theme-fonts` deck: the theme names the East Asian faces by script. */
 export function eastAsianThemeFontsDeck(): FixtureOptions {
   return {
-    majorFont: 'Arial',
-    minorFont: 'Arial',
+    majorFont: 'Liberation Serif',
+    minorFont: 'Liberation Serif',
     scriptFonts: THEME_SCRIPT_FONTS,
     slides: [
       {
         shapes:
-          // Each language takes its script font; Latin text in the same run stays Arial.
+          // Each language takes its script font; Latin text in the same run stays Liberation Serif.
           box(
             2,
             0.4,
             0.3,
             6.2,
             4.2,
-            p(lr('日本語のテーマ Arial', 'ja-JP')) +
-              p(lr('简体中文的主题 Arial', 'zh-CN')) +
-              p(lr('繁體中文的主題 Arial', 'zh-TW')) +
-              p(lr('한국어 테마 글꼴 Arial', 'ko-KR')) +
-              p(lr('代替言語の日本語 Arial', 'en-US', 'ja-JP')) +
-              p(lr('نص عربي Arial', 'ar-SA'), RTL_R)
+            p(lr('日本語のテーマ Latin', 'ja-JP')) +
+              p(lr('简体中文的主题 Latin', 'zh-CN')) +
+              p(lr('繁體中文的主題 Latin', 'zh-TW')) +
+              p(lr('한국어 테마 글꼴 Latin', 'ko-KR')) +
+              p(lr('代替言語の日本語 Latin', 'en-US', 'ja-JP')) +
+              p(lr('نص عربي Latin', 'ar-SA'), RTL_R)
           ) +
           // Shared symbols: curly quotes, the ellipsis, and arrows in a Japanese and a Latin run.
+          // Only symbols that the open faces hold: any other symbol takes a fallback face.
           box(
             3,
             6.8,
             0.3,
             6.1,
             2,
-            p(lr('“引用”…→ ①②③ ※', 'ja-JP')) + p(lr('“Quote”…→ ①②③ ※', 'en-US'))
+            p(lr('“引用”…→ ①②③', 'ja-JP')) + p(lr('“Quote”…→', 'en-US'))
           ) +
           // Korean and Chinese text in narrow boxes: where each line breaks.
           box(
@@ -431,6 +421,70 @@ export function eastAsianTypographyDeck(): FixtureOptions {
     ],
   };
 }
+
+// --- font-substitution, slide 2 -----------------------------------------------
+
+/**
+ * The faces that are not open, on purpose: run fonts and bullets that name East Asian, complex
+ * script, and symbol faces that no fixture font provides. The slide checks which face the engine
+ * draws for each name (`NON_OPEN_FONT_DECKS` in scripts/fidelity/local-fonts.ts).
+ */
+const WINGDINGS = '<a:buFont typeface="Wingdings" panose="05000000000000000000" pitchFamily="2" charset="2"/>';
+const NAMED_YU_GOTHIC = '<a:latin typeface="Yu Gothic"/><a:ea typeface="Yu Gothic"/>';
+
+export const namedFacesSlide: FixtureSlide = {
+  shapes:
+    box(
+      2,
+      0.4,
+      0.3,
+      6.2,
+      6.9,
+      p(ja('游ゴシックの日本語 Arial', '<a:latin typeface="Arial"/><a:ea typeface="Yu Gothic"/>')) +
+        p(ja('游明朝の日本語 Arial', '<a:latin typeface="Arial"/><a:ea typeface="Yu Mincho"/>')) +
+        p(ja('メイリオの日本語 Arial', '<a:latin typeface="Arial"/><a:ea typeface="Meiryo"/>')) +
+        p(r('宋体的中文文本 Arial', 'zh-CN', '<a:latin typeface="Arial"/><a:ea typeface="SimSun"/>')) +
+        p(r('等线的中文文本 Arial', 'zh-CN', '<a:latin typeface="Arial"/><a:ea typeface="DengXian"/>')) +
+        p(r('맑은 고딕 한국어 텍스트 Arial', 'ko-KR', '<a:latin typeface="Arial"/><a:ea typeface="Malgun Gothic"/>')) +
+        p(r('نص عربي بخط Tahoma', 'ar-SA', '<a:latin typeface="Arial"/><a:cs typeface="Tahoma"/>'), RTL_R) +
+        p(r('טקסט בעברית בגופן David', 'he-IL', '<a:latin typeface="Arial"/><a:cs typeface="David"/>'), RTL_R) +
+        p(
+          ja('混在：', NAMED_YU_GOTHIC) +
+            r('Arial ', 'en-US', '<a:latin typeface="Arial"/>') +
+            r('عربي', 'ar-SA', '<a:latin typeface="Arial"/><a:cs typeface="Tahoma"/>') +
+            ja(' 日本語', NAMED_YU_GOTHIC)
+        )
+    ) +
+    box(
+      3,
+      6.8,
+      0.3,
+      6.1,
+      6.9,
+      p(
+        r('Wingdings: ', 'en-US', '<a:latin typeface="Arial"/>') +
+          r('', 'en-US', '<a:latin typeface="Arial"/><a:sym typeface="Wingdings"/>')
+      ) +
+        p(
+          r('Symbol: ', 'en-US', '<a:latin typeface="Arial"/>') +
+            r('', 'en-US', '<a:latin typeface="Arial"/><a:sym typeface="Symbol"/>')
+        ) +
+        [
+          ['Filled square', '§'],
+          ['Hollow square', 'q'],
+          ['Star', 'v'],
+          ['Arrow', 'Ø'],
+          ['Checkmark', 'ü'],
+        ]
+          .map(([text, char]) =>
+            p(
+              r(`Wingdings bullet: ${text}`, 'en-US', '<a:latin typeface="Arial"/>'),
+              `<a:pPr marL="342900" indent="-342900">${WINGDINGS}<a:buChar char="${char}"/></a:pPr>`
+            )
+          )
+          .join('')
+    ),
+};
 
 export const textScriptFixtures: Record<string, FixtureSlide[]> = {
   'rtl-text': rtlText,

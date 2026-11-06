@@ -4,11 +4,43 @@
 // harness-page.ts). No system tool takes part. Test tools only; nothing here is bundled.
 
 import { readFileSync } from 'node:fs';
-import { getDocument, version as pdfjsVersion } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { dirname, join } from 'node:path';
+import { getDocument, OPS, version as pdfjsVersion } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type { PDFDocumentProxy } from 'pdfjs-dist/types/src/display/api';
 
 /** The pdf.js version that draws and reads both PDFs. */
 export const PDFJS_VERSION: string = pdfjsVersion;
+
+/** The pdf.js package folder: its CMaps and standard font data. */
+export const PDFJS_DIR = dirname(Bun.resolveSync('pdfjs-dist/package.json', import.meta.dir));
+
+/**
+ * pdf.js skips an image with more pixels than this. A PDF is untrusted input and can ask for any
+ * image size; a skipped image shows as differing pixels.
+ */
+export const MAX_IMAGE_PIXELS = 2 ** 27;
+
+/** A PDF with more pages than the caller allows (`openPdf`). */
+export class PdfPageLimit extends Error {
+  constructor(readonly pages: number) {
+    super(`the PDF has ${pages} pages, more than allowed`);
+  }
+}
+
+/** Load PDF bytes with the options that both PDFs of a comparison get. */
+function load(bytes: Uint8Array): Promise<PDFDocumentProxy> {
+  return getDocument({
+    // pdf.js takes the buffer over: give it a copy.
+    data: new Uint8Array(bytes),
+    useSystemFonts: false,
+    isEvalSupported: false,
+    maxImageSize: MAX_IMAGE_PIXELS,
+    cMapUrl: `${join(PDFJS_DIR, 'cmaps')}/`,
+    cMapPacked: true,
+    standardFontDataUrl: `${join(PDFJS_DIR, 'standard_fonts')}/`,
+    verbosity: 0,
+  }).promise;
+}
 
 /** Pixels, RGBA, row by row. */
 export interface Raster {
@@ -43,6 +75,17 @@ export interface PdfLine {
   readonly xMax: number;
   /** The baseline: the origin y of the item with the most characters. */
   readonly baseline: number;
+  /**
+   * The line starts with a one-character item in another font than the next item: a list
+   * marker, such as a bullet that a symbol font writes as a letter.
+   */
+  readonly marker?: boolean;
+}
+
+/** A font that a PDF draws with: its name without a subset prefix, and whether it is embedded. */
+export interface PdfFont {
+  readonly name: string;
+  readonly embedded: boolean;
 }
 
 /** An open PDF. Call `close` when done. */
@@ -53,18 +96,21 @@ export interface Pdf {
   readonly producer: string;
   /** The text lines of page `index` (0-based): unrotated text on the page only (`groupLines`). */
   lines(index: number): Promise<PdfLine[]>;
+  /** Every font that the pages draw with, each name and state once, sorted by name. */
+  fonts(): Promise<PdfFont[]>;
   close(): Promise<void>;
 }
 
-/** Open PDF bytes with pdf.js. Throws when pdf.js cannot read them. */
-export async function openPdf(bytes: Uint8Array): Promise<Pdf> {
-  const doc: PDFDocumentProxy = await getDocument({
-    // pdf.js takes the buffer over: give it a copy.
-    data: new Uint8Array(bytes),
-    useSystemFonts: false,
-    isEvalSupported: false,
-    verbosity: 0,
-  }).promise;
+/**
+ * Open PDF bytes with pdf.js. Throws when pdf.js cannot read them, and `PdfPageLimit` when the
+ * PDF has more than `maxPages` pages (before any page is read).
+ */
+export async function openPdf(bytes: Uint8Array, maxPages = Infinity): Promise<Pdf> {
+  const doc = await load(bytes);
+  if (doc.numPages > maxPages) {
+    await doc.destroy();
+    throw new PdfPageLimit(doc.numPages);
+  }
   const pages: (readonly [number, number])[] = [];
   for (let n = 1; n <= doc.numPages; n += 1) {
     const page = await doc.getPage(n);
@@ -92,10 +138,27 @@ export async function openPdf(bytes: Uint8Array): Promise<Pdf> {
         // Rotated, mirrored, and vertical text is checked by pixels only.
         if (Math.abs(b) > 1e-6 || Math.abs(c) > 1e-6 || a <= 0 || d <= 0) continue;
         const [x, y] = viewport.convertToViewportPoint(e, f);
-        items.push({ text: item.str, x, y, width: item.width, size: d });
+        items.push({ text: item.str, x, y, width: item.width, size: d, font: item.fontName });
       }
       page.cleanup();
       return groupLines(items, viewport.width, viewport.height);
+    },
+    async fonts() {
+      const out = new Map<string, PdfFont>();
+      for (let n = 1; n <= doc.numPages; n += 1) {
+        const page = await doc.getPage(n);
+        const ops = await page.getOperatorList();
+        ops.fnArray.forEach((fn, i) => {
+          if (fn !== OPS.setFont) return;
+          const font = page.commonObjs.get(ops.argsArray[i][0]) as
+            { name?: unknown; missingFile?: boolean } | undefined;
+          const name = String(font?.name ?? 'unnamed').replace(/^[A-Z]{6}\+/, '');
+          const embedded = font?.missingFile !== true;
+          out.set(`${name}\0${embedded}`, { name, embedded });
+        });
+        page.cleanup();
+      }
+      return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
     },
     async close() {
       await doc.destroy();
@@ -104,8 +167,8 @@ export async function openPdf(bytes: Uint8Array): Promise<Pdf> {
 }
 
 /** Open a PDF file (`openPdf`). */
-export const openPdfFile = (path: string): Promise<Pdf> =>
-  openPdf(new Uint8Array(readFileSync(path)));
+export const openPdfFile = (path: string, maxPages?: number): Promise<Pdf> =>
+  openPdf(new Uint8Array(readFileSync(path)), maxPages);
 
 /** One text item of a page: its text, origin, advance width, and font size, in points. */
 export interface TextItem {
@@ -115,6 +178,8 @@ export interface TextItem {
   readonly y: number;
   readonly width: number;
   readonly size: number;
+  /** The PDF font of the item (pdf.js `fontName`). */
+  readonly font?: string;
 }
 
 /** Items whose baselines are this close (points) share a row. */
@@ -179,11 +244,13 @@ function lineOf(run: readonly TextItem[]): PdfLine {
     if (item.text.trim().length > main.text.trim().length) main = item;
   });
   const end = run.at(-1)!;
+  const marker = run.length > 1 && run[0].text.trim().length === 1 && run[0].font !== run[1].font;
   return {
     text: text.replace(/\s+/g, ' ').trim(),
     xMin: run[0].x,
     xMax: end.x + end.width,
     baseline: main.y,
+    ...(marker ? { marker } : {}),
   };
 }
 
@@ -222,12 +289,7 @@ export interface GlyphOrigin {
  * angles than 0° and 180° are left out.
  */
 export async function glyphOrigins(pdf: string): Promise<GlyphOrigin[][]> {
-  const doc = await getDocument({
-    data: new Uint8Array(readFileSync(pdf)),
-    useSystemFonts: false,
-    isEvalSupported: false,
-    verbosity: 0,
-  }).promise;
+  const doc = await load(new Uint8Array(readFileSync(pdf)));
   try {
     const pages: GlyphOrigin[][] = [];
     for (let n = 1; n <= doc.numPages; n += 1) {

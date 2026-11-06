@@ -12,7 +12,7 @@ import { slideLayoutsDeck } from './slide-layouts.ts';
 import { fillFidelityDeck } from './fill-fidelity.ts';
 import { slideStructureDeck } from './slide-structure.ts';
 import { shapeFormatFixtures } from './shape-format.ts';
-import { eastAsianThemeFontsDeck, eastAsianTypographyDeck, textScriptFixtures } from './text-scripts.ts';
+import { eastAsianThemeFontsDeck, eastAsianTypographyDeck, namedFacesSlide, textScriptFixtures } from './text-scripts.ts';
 import { followUpFixtures } from './follow-ups.ts';
 import { chartsDeck, diagramsDeck } from './drawingml.ts';
 
@@ -317,8 +317,8 @@ const fixtures: Record<string, FixtureSlide[]> = {
     },
   ],
   // What the Bullets and Numbering galleries write: the standard bullet characters with their
-  // fonts (Wingdings with charset="2"), a custom character in the text font, the numbering
-  // schemes, a size, a color, and startAt.
+  // fonts (an open symbol face here; the Wingdings bullets are on `font-substitution` slide 2), a
+  // custom character in the text font, the numbering schemes, a size, a color, and startAt.
   'bullets-gallery': [
     {
       shapes:
@@ -326,11 +326,11 @@ const fixtures: Record<string, FixtureSlide[]> = {
           [
             ['Filled round', '<a:buFont typeface="Liberation Sans"/><a:buChar char="•"/>'],
             ['Hollow round', '<a:buFont typeface="Liberation Mono"/><a:buChar char="o"/>'],
-            ['Filled square', '<a:buFont typeface="Wingdings" panose="05000000000000000000" pitchFamily="2" charset="2"/><a:buChar char="§"/>'],
-            ['Hollow square', '<a:buFont typeface="Wingdings" panose="05000000000000000000" pitchFamily="2" charset="2"/><a:buChar char="q"/>'],
-            ['Star', '<a:buFont typeface="Wingdings" panose="05000000000000000000" pitchFamily="2" charset="2"/><a:buChar char="v"/>'],
-            ['Arrow', '<a:buFont typeface="Wingdings" panose="05000000000000000000" pitchFamily="2" charset="2"/><a:buChar char="Ø"/>'],
-            ['Checkmark', '<a:buFont typeface="Wingdings" panose="05000000000000000000" pitchFamily="2" charset="2"/><a:buChar char="ü"/>'],
+            ['Filled square', '<a:buFont typeface="Noto Sans Symbols 2"/><a:buChar char="▪"/>'],
+            ['Hollow square', '<a:buFont typeface="Noto Sans Symbols 2"/><a:buChar char="❑"/>'],
+            ['Star', '<a:buFont typeface="Noto Sans Symbols 2"/><a:buChar char="❖"/>'],
+            ['Arrow', '<a:buFont typeface="Noto Sans Symbols 2"/><a:buChar char="➢"/>'],
+            ['Checkmark', '<a:buFont typeface="Noto Sans Symbols 2"/><a:buChar char="✓"/>'],
             ['Size 150 %, accent color', '<a:buClr><a:schemeClr val="accent2"/></a:buClr><a:buSzPct val="150000"/><a:buFont typeface="Liberation Sans"/><a:buChar char="•"/>'],
             ['Custom en dash, text font', '<a:buChar char="–"/>'],
           ]
@@ -770,7 +770,7 @@ const fixtures: Record<string, FixtureSlide[]> = {
           text: para(run('縦書きのテキストです。ABC 123', 'sz="2800"', '<a:ea typeface="Noto Sans CJK JP"/>')) }) +
         shape({ id: 3, x: 2.4 * IN, y: 0.5 * IN, cx: 1.4 * IN, cy: 6 * IN, fill: solid('E3F2FD'),
           bodyPr: '<a:bodyPr vert="vert" wrap="square"><a:noAutofit/></a:bodyPr>',
-          text: para(run('横に回転 vert', 'sz="2800"')) }) +
+          text: para(run('横に回転 vert', 'sz="2800"', '<a:ea typeface="Noto Sans CJK JP"/>')) }) +
         shape({ id: 4, x: 4.2 * IN, y: 0.5 * IN, cx: 1.2 * IN, cy: 6 * IN, fill: solid('F3E5F5'),
           bodyPr: '<a:bodyPr vert="wordArtVert" wrap="square"><a:noAutofit/></a:bodyPr>',
           text: para(run('STACK', 'sz="3200" b="1"')) }),
@@ -789,6 +789,7 @@ const fixtures: Record<string, FixtureSlide[]> = {
             para(run(`${label}. ${LOREM}`, 'sz="2000"', `<a:latin typeface="${face}"/>`))))
         .join(''),
     },
+    namedFacesSlide,
   ],
   // Shapes on the edges of an ISO A4 slide, whose height is not whole points.
   'slide-size': [

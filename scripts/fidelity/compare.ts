@@ -18,7 +18,11 @@ export interface PixelScore {
 
 /** Compare two rasters of the same size. */
 export function comparePixels(ours: Raster, reference: Raster, withDiff = false): PixelScore {
-  if (ours.width !== reference.width || ours.height !== reference.height)
+  // pixelmatch compares rasters of one size, so `maxSizeDeltaPx` stays 0.
+  if (
+    Math.abs(ours.width - reference.width) > THRESHOLDS.maxSizeDeltaPx ||
+    Math.abs(ours.height - reference.height) > THRESHOLDS.maxSizeDeltaPx
+  )
     throw new Error('the two rasters have different sizes');
   const { width: w, height: h } = ours;
   const diff = new PNG({ width: w, height: h });
@@ -79,11 +83,14 @@ export function lineKey(text: string): string {
 }
 
 /**
- * The key without a first one-character word: a bullet that a symbol font writes as a letter
- * (`q Hollow square`). Used only when the full keys do not match.
+ * The key without a first one-character word, for a line that starts with a list marker
+ * (`PdfLine.marker`): a bullet that a symbol font writes as a letter (`q Hollow square`). Empty
+ * for any other line, so a one-letter word of the text must match exactly. Used only when the
+ * full keys do not match.
  */
-function bulletless(text: string): string {
-  const n = normalize(text).replace(LEADING_BULLET, '');
+function bulletless(line: PdfLine): string {
+  if (!line.marker) return '';
+  const n = normalize(line.text).replace(LEADING_BULLET, '');
   return /^\S\s/u.test(n) ? lineKey(n.slice(2)) : '';
 }
 
@@ -96,7 +103,10 @@ export interface LineScore {
   readonly worstBaseline: number;
   /** Reference lines that our page does not hold (first 60 characters each). */
   readonly missing: readonly string[];
-  /** Our lines that the reference page does not hold (first 60 characters each). */
+  /**
+   * Our checked lines (`lineKey`) that the reference page does not hold (first 60 characters
+   * each). Each one fails the slide (`THRESHOLDS.maxExtraLines`).
+   */
   readonly extra: readonly string[];
 }
 
@@ -115,7 +125,7 @@ export function compareLines(ours: readonly PdfLine[], reference: readonly PdfLi
   const pool = ours.map((l) => ({
     ...l,
     key: lineKey(l.text),
-    alt: bulletless(l.text),
+    alt: bulletless(l),
     bare: normalize(l.text).replace(/\s+/g, ''),
     used: false,
   }));
@@ -139,7 +149,7 @@ export function compareLines(ours: readonly PdfLine[], reference: readonly PdfLi
     };
     for (const p of pool) if (!p.used && p.key === key) consider([p]);
     // A bullet that one PDF writes as a letter and the other as a symbol.
-    const alt = hit ? '' : bulletless(line.text);
+    const alt = hit ? '' : bulletless(line);
     if (!hit)
       for (const p of pool)
         if (!p.used && ((alt && (p.alt === alt || p.key === alt)) || (p.alt && p.alt === key)))
@@ -180,6 +190,7 @@ export function slidePasses(pixels: PixelScore, lines: LineScore): boolean {
   return (
     pixels.mismatch <= THRESHOLDS.maxPixelMismatch &&
     lineMatch >= THRESHOLDS.minLineBreakMatch &&
-    lines.worstBaseline <= THRESHOLDS.maxBaselineDeltaPt
+    lines.worstBaseline <= THRESHOLDS.maxBaselineDeltaPt &&
+    lines.extra.length <= THRESHOLDS.maxExtraLines
   );
 }

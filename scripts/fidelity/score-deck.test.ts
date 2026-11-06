@@ -1,27 +1,40 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { buildPptx } from '../fixtures/builder.ts';
-import { ResetFailed } from './harness-page.ts';
+import { deliverUpload, ResetFailed } from './harness-page.ts';
 import { scoreDeck, scoreSafely } from './score-deck.ts';
+
+/** A real PDF of two 960 × 540 pt pages in the open fonts that ship with the engine. */
+const TWO_PAGES = join(import.meta.dir, '../../fixtures/groups-transforms.pdf');
 
 /**
  * A harness page without Chromium. It answers the calls of `harness-page.ts` to the page's
- * `__pptxHarness` API (open, render, print, endPrint, reopenSaved) and `page.pdf`. Each slide
- * paints `markup(reopened)`.
+ * `__pptxHarness` API (open, render, print, endPrint, reopenSaved, rasterPdf) and `page.pdf`.
+ * Each slide paints `markup(reopened)`; `page.pdf` gives `printed`; every PDF page draws white.
  */
 function fakePage(
   slides: number,
   evaluate?: (code: string) => Promise<unknown>,
-  markup: (reopened: boolean) => string = () => 'same'
+  markup: (reopened: boolean) => string = () => 'same',
+  printed: Uint8Array = new Uint8Array(readFileSync(TWO_PAGES))
 ): Page {
   let reopened = false;
   return {
-    async evaluate(fn: unknown) {
+    async evaluate(fn: unknown, arg?: unknown) {
       const code = String(fn);
       if (evaluate) return evaluate(code);
+      if (code.includes('.rasterPdf(')) {
+        const a = arg as { width: number; height: number; pages: { rgba: string; png: string }[] };
+        const white = Bun.gzipSync(new Uint8Array(a.width * a.height * 4).fill(255));
+        for (const p of a.pages) {
+          deliverUpload(p.rgba, new Uint8Array(white));
+          deliverUpload(p.png, new Uint8Array([0x89]));
+        }
+        return undefined;
+      }
       if (code.includes('.open('))
         return { slides, received: { deck: { bytes: 0, sha256: '' }, fonts: [] } };
       if (code.includes('.reopenSaved(')) {
@@ -33,7 +46,7 @@ function fakePage(
       if (code.includes('.print(') || code.includes('.endPrint(')) return undefined;
       throw new Error(`unexpected harness call: ${code}`);
     },
-    pdf: async () => Buffer.from('%PDF-1.4\n%%EOF\n'),
+    pdf: async () => Buffer.from(printed),
   } as unknown as Page;
 }
 
@@ -95,6 +108,37 @@ describe('scoreDeck', () => {
     const r = await scoreDeck(fakePage(3), { file: deck, name: 'd', pdf });
     expect(r.referenceIssues).toEqual(['the PDF has 4 pages, the deck has 2 visible slides']);
     expect(r.slides.map((s) => s.status)).toEqual(['stale', 'no-reference', 'stale']);
+  });
+
+  test('with real PDFs, the visible slides compare page by page and the hidden one has no page', async () => {
+    const r = await scoreDeck(fakePage(3), { file: deck, name: 'd', pdf: TWO_PAGES });
+    expect(r.reference).toBe('pdf');
+    expect(r.foreignFonts).toEqual([]);
+    expect(r.slides.map((s) => [s.index, s.page, s.hidden, s.status])).toEqual([
+      [1, 1, false, 'pass'],
+      [2, undefined, true, 'no-reference'],
+      [3, 2, false, 'pass'],
+    ]);
+    expect(r.slides[0].linesTotal).toBeGreaterThan(0);
+    expect(r.slides[0].pixelMismatch).toBe(0);
+  });
+
+  test('fonts of our PDF that the harness did not load are listed', async () => {
+    // The fonts that are not open, on purpose: the reference of `font-substitution`.
+    const ours = join(import.meta.dir, '../../fixtures/font-substitution.pdf');
+    const page = fakePage(3, undefined, undefined, new Uint8Array(readFileSync(ours)));
+    const r = await scoreDeck(page, { file: deck, name: 'd', pdf: TWO_PAGES });
+    expect(r.foreignFonts).toContain('Calibri');
+    expect(r.foreignFonts).toContain('Wingdings-Regular');
+    expect(r.foreignFonts).not.toContain('LiberationSans');
+  });
+
+  test('our PDF must have one page of the slide size for each visible slide', async () => {
+    const ours = join(import.meta.dir, '../../fixtures/slide-size.pdf'); // A4, one page
+    const page = fakePage(3, undefined, undefined, new Uint8Array(readFileSync(ours)));
+    await expect(scoreDeck(page, { file: deck, name: 'd', pdf: TWO_PAGES })).rejects.toThrow(
+      'our PDF has 1 pages for 2 slides'
+    );
   });
 
   test('the editor and the package reader must count the same slides', async () => {

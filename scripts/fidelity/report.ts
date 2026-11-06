@@ -115,6 +115,10 @@ export interface DeckResult {
   /** Our PDF and the reference PDF, when the run keeps images. */
   oursPdf?: string;
   referencePdf?: string;
+  /** Fonts of our PDF that the harness page did not load, or that it does not embed. */
+  foreignFonts?: readonly string[];
+  /** Fonts of a fixture's reference PDF that are not open fonts that its deck names. */
+  foreignReferenceFonts?: readonly string[];
   slides: SlideResult[];
 }
 
@@ -169,7 +173,9 @@ export function writeReport(
   context: ReportContext
 ): void {
   const all = decks.flatMap((d) => d.slides);
-  const count = (s: SlideResult['status']): number => all.filter((x) => x.status === s).length;
+  const count = (s: SlideResult['status']): number =>
+    all.filter((x) => x.status === s && !x.hidden).length;
+  const hidden = all.filter((x) => x.hidden).length;
   const rows = decks
     .map((d) => {
       if (d.error)
@@ -182,7 +188,10 @@ export function writeReport(
         d.reference === 'pdf'
           ? pdfs.join(' · ')
           : `${d.reference === 'stale' ? 'stale reference' : 'no reference'}: ${esc((d.referenceIssues ?? []).join('; '))}`;
-      return `<section><h2>${esc(d.name)} <small>${reference}</small></h2>${d.slides.map((s) => slideHtml(out, s)).join('')}</section>`;
+      const fonts =
+        list('Fonts of our PDF that the harness did not load', d.foreignFonts ?? []) +
+        list('Reference fonts that are not open fonts of the deck', d.foreignReferenceFonts ?? []);
+      return `<section><h2>${esc(d.name)} <small>${reference}</small></h2>${fonts}${d.slides.map((s) => slideHtml(out, s)).join('')}</section>`;
     })
     .join('');
   const gate = context.gate
@@ -207,8 +216,8 @@ article header span{margin-left:12px;color:#44413d}
 figcaption{font-size:12px;color:#75716b}.empty div{aspect-ratio:16/9;display:grid;place-items:center;border:1px dashed #d9d5ce;color:#a29e97}
 @media (max-width:800px){.imgs{grid-template-columns:1fr}}
 </style></head><body><h1>Fidelity report: ${esc(set)}</h1>
-<p class="summary"><span>Slides: ${all.length}</span><span>Pass: ${count('pass')}</span><span>Fail: ${count('fail')} (known gaps: ${all.filter((x) => x.knownGap).length})</span><span>No reference: ${count('no-reference')}</span><span>Stale reference: ${count('stale')}</span></p>
-<p class="diag">Our PDF is printed with the editor's own paint. pdf.js draws and reads both PDFs. Thresholds: pixels ≤ ${pct(THRESHOLDS.maxPixelMismatch)}, every reference line, baseline ≤ ${THRESHOLDS.maxBaselineDeltaPt} pt (<code>scripts/fidelity/thresholds.ts</code>). ${esc(context.tools)}. Rotated and vertical text is checked by pixels only.</p>
+<p class="summary"><span>Slides: ${all.length}</span><span>Pass: ${count('pass')}</span><span>Fail: ${count('fail')} (known gaps: ${all.filter((x) => x.knownGap).length})</span><span>No reference: ${count('no-reference')}</span><span>Stale reference: ${count('stale')}</span><span>Hidden: ${hidden}</span></p>
+<p class="diag">Our PDF is printed with the editor's own paint. pdf.js draws and reads both PDFs. Thresholds: pixels ≤ ${pct(THRESHOLDS.maxPixelMismatch)}, every reference line, no extra lines, baseline ≤ ${THRESHOLDS.maxBaselineDeltaPt} pt (<code>scripts/fidelity/thresholds.ts</code>). ${esc(context.tools)}. Rotated and vertical text is checked by pixels only.</p>
 ${gate}
 ${rows}</body></html>`;
   writeFileSync(join(out, 'index.html'), html);
@@ -220,6 +229,8 @@ ${rows}</body></html>`;
         error: d.error,
         reference: d.reference,
         referenceIssues: d.referenceIssues,
+        foreignFonts: d.foreignFonts,
+        foreignReferenceFonts: d.foreignReferenceFonts,
         slides: d.slides.map(({ ours: _o, reference: _r, diff: _d, ...s }) => ({
           ...s,
           approximations: approximationTitles(s.diagnostics),

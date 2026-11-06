@@ -4,6 +4,7 @@ import {
   checkAgainstBase,
   looserGaps,
   looserLimits,
+  nonToolFiles,
 } from './check-known-gaps.ts';
 import type { KnownGapList } from './thresholds.ts';
 import type { ReferenceManifest } from './reference-identity.ts';
@@ -48,8 +49,31 @@ describe('the known gaps only shrink', () => {
     const head = list({ 'a/1': { pixels: 0.02, lines: 4 } });
     expect(looserGaps(base, head, new Set(['a']))).toEqual([]);
     expect(looserGaps(base, { ...head, chromium: '2' }, new Set())).toEqual([]);
+    expect(looserGaps(base, { ...head, chromium: '2' }, new Set(), [])).toEqual([]);
     // A base from before the PDF comparison has no pdf.js version: every value is new.
     expect(looserGaps({ slides: {} } as unknown as KnownGapList, head, new Set())).toEqual([]);
+  });
+
+  test('new tools do not excuse a looser value when the change touches other files', () => {
+    const head = list({ 'a/1': { pixels: 0.02, lines: 4 } }, { chromium: '2' });
+    expect(looserGaps(base, head, new Set(), ['packages/core/src/output/paint.ts'])).toEqual([
+      'a/1: a looser pixels score (0.01 → 0.02)',
+      'the list was measured with new tools (chromium), but the change also touches packages/core/src/output/paint.ts: move the tools change to its own pull request',
+    ]);
+    expect(
+      nonToolFiles(
+        [
+          'bun.lock',
+          'package.json',
+          'examples/vite/package.json',
+          'scripts/fidelity/thresholds.ts',
+          'fixtures/fonts/New.ttf',
+          'scripts/fidelity/compare.ts',
+        ],
+        false
+      )
+    ).toEqual(['fixtures/fonts/New.ttf', 'scripts/fidelity/compare.ts']);
+    expect(nonToolFiles(['fixtures/fonts/New.ttf'], true)).toEqual([]);
   });
 
   test('changedReferences names new fixtures and new decks or PDFs', () => {
@@ -71,6 +95,16 @@ describe('the known gaps only shrink', () => {
       'maxPixelMismatch is looser (0.005 → 0.01)',
       'minLineBreakMatch is looser (1 → 0.9)',
     ]);
+  });
+
+  test('a limit that goes away is reported', () => {
+    const base = { maxPixelMismatch: 0.005, maxSizeDeltaPx: 0 };
+    expect(looserLimits(base, { maxPixelMismatch: 0.005 })).toEqual([
+      'maxSizeDeltaPx was removed (it was 0); list it in RETIRED_LIMITS with the reason',
+    ]);
+    expect(looserLimits(base, { maxPixelMismatch: 0.005 }, { maxSizeDeltaPx: 'a reason' })).toEqual(
+      []
+    );
   });
 });
 

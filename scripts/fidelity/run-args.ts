@@ -4,10 +4,12 @@
 import { parseArgs } from 'node:util';
 
 export const RUN_USAGE = `Usage:
-  bun run fidelity [<deck>...] [--update-gaps]
+  bun run fidelity [<deck>...] [--update-gaps [--accept-worse]]
       Print each fixture in fixtures/ with the editor, and compare it with its reference PDF.
       <deck>          only these fixtures, for example: bun run fidelity tables
       --update-gaps   write this run's failing slides to FIXTURE_KNOWN_GAPS in thresholds.ts
+      --accept-worse  also write new entries and looser values (a new fixture, a changed deck,
+                      a new reference PDF, or new tools)
   bun run fidelity:corpus [<deckN>...]
       The private corpus in demo-presentations/ (local only): a report, no known gaps.
   bun scripts/fidelity/run.ts --list <jobs.json|jobs.jsonl> --out <dir> [--shard i/n] [--resume | --fresh] [--images]
@@ -25,6 +27,8 @@ export type RunArgs =
       /** Only these decks; empty for all. */
       readonly decks: readonly string[];
       readonly updateGaps: boolean;
+      /** With `updateGaps`: write new entries and looser values too. */
+      readonly acceptWorse: boolean;
     }
   | {
       readonly mode: 'list';
@@ -45,6 +49,7 @@ export function parseRunArgs(argv: readonly string[]): RunArgs {
     options: {
       set: { type: 'string' },
       'update-gaps': { type: 'boolean' },
+      'accept-worse': { type: 'boolean' },
       list: { type: 'string' },
       out: { type: 'string' },
       shard: { type: 'string' },
@@ -58,6 +63,7 @@ export function parseRunArgs(argv: readonly string[]): RunArgs {
   if (v.list !== undefined) {
     if (v.set !== undefined) throw new Error('--set does not go with --list');
     if (v['update-gaps']) throw new Error('--update-gaps does not go with --list');
+    if (v['accept-worse']) throw new Error('--accept-worse does not go with --list');
     if (positionals.length) throw new Error('deck names do not go with --list');
     if (!v.out) throw new Error('--list needs --out <dir>');
     if (v.resume && v.fresh) throw new Error('--resume and --fresh do not go together');
@@ -80,5 +86,13 @@ export function parseRunArgs(argv: readonly string[]): RunArgs {
     throw new Error(`--set must be fixtures or corpus, not ${set}`);
   if (v['update-gaps'] && set !== 'fixtures')
     throw new Error('--update-gaps goes only with the fixtures');
-  return { mode: 'set', set, decks: positionals, updateGaps: v['update-gaps'] ?? false };
+  if (v['accept-worse'] && !v['update-gaps'])
+    throw new Error('--accept-worse goes only with --update-gaps');
+  return {
+    mode: 'set',
+    set,
+    decks: positionals,
+    updateGaps: v['update-gaps'] ?? false,
+    acceptWorse: v['accept-worse'] ?? false,
+  };
 }

@@ -127,7 +127,9 @@ When a change alters a pinned problem (for example, a fix changes the text that 
 
 ## Fidelity harness
 
-The harness prints each fixture in `fixtures/` to PDF with the editor's own paint, and compares that PDF with the fixture's reference PDF. pdf.js draws and reads both PDFs in the same way, so the check gives the same scores on every machine. Each slide must pass these checks (`scripts/fidelity/thresholds.ts`): at most 0.5 % of the pixels differ, every reference text line is in our page, and each baseline is within 0.5 pt. Rotated, vertical, and right-to-left text is checked by pixels only. Save, reopen, and paint again must give the same SVG markup.
+The harness prints each fixture in `fixtures/` to PDF with the editor's own paint, and compares that PDF with the fixture's reference PDF. pdf.js draws and reads both PDFs in the same way, so the check gives the same scores on every machine. Each slide must pass these checks (`scripts/fidelity/thresholds.ts`): at most 0.5 % of the pixels differ, every reference text line is in our page, our page has no other text lines, and each baseline is within 0.5 pt. Rotated, vertical, and right-to-left text is checked by pixels only. Save, reopen, and paint again must give the same SVG markup.
+
+Our PDF must draw only with fonts that the harness loaded: the fixture fonts, the engine's fonts, and two open fallback faces. A system font in our PDF fails the gate. A fixture's reference PDF must embed only the open fonts that its deck names. `NON_OPEN_FONT_DECKS` in `scripts/fidelity/local-fonts.ts` lists the exceptions (`font-substitution`).
 
 ### Run
 
@@ -146,14 +148,14 @@ Each deck prints one line. The gate summary says what to do next. The report is 
 bun run fidelity --update-gaps
 ```
 
-Review the diff of `thresholds.ts`. A worse score is a regression to fix, never to record. In CI, `scripts/fidelity/check-known-gaps.ts` refuses a new or looser entry unless the fixture's deck or reference PDF changed, or the list was measured with other tools.
+The command prints each looser, new, and removed entry. It writes a new entry or a looser value only with `--accept-worse`: a worse score is a regression to fix, never to record. Review the diff of `thresholds.ts`. In CI, `scripts/fidelity/check-known-gaps.ts` refuses a new or looser entry, or a removed limit, unless the fixture's deck or reference PDF changed, or the pull request changes only the tools (pdf.js, Chromium, or the fixture fonts).
 
 ### Add a fixture
 
-1. Add the deck to `scripts/fixtures/build.ts` and run `bun run fixtures:build`. Use only the open fonts of the engine (Carlito, Liberation Sans, Serif, and Mono, Noto Sans CJK JP) and of `fixtures/fonts/`.
+1. Add the deck to `scripts/fixtures/build.ts` and run `bun run fixtures:build`. Use only the open fonts of the engine (Carlito, Liberation Sans, Serif, and Mono, Noto Sans CJK JP) and of `fixtures/fonts/` (Noto Sans Arabic, Noto Sans Symbols 2). Name a font for every script in the deck, also in the theme, so the presentation app uses no fallback font.
 2. Install those fonts where the presentation app runs, open the deck, and export `fixtures/<name>.pdf`. Any machine can export a reference.
 3. Record the deck and PDF hashes in `fixtures/references.json`. A missing or stale reference is a gap, never a pass.
-4. Run `bun run fidelity <name> --update-gaps`, and commit the deck, the PDF, `references.json`, and `thresholds.ts`.
+4. Run `bun run fidelity <name> --update-gaps --accept-worse`, and commit the deck, the PDF, `references.json`, and `thresholds.ts`.
 
 ### Other commands
 

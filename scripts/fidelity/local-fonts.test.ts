@@ -57,7 +57,7 @@ describe('local fonts', () => {
     expect(typeof referenceFontsInstalled()).toBe('boolean');
   });
 
-  test('the fixture set is fixtures/fonts and the packaged CJK face, without the system Arial', () => {
+  test('the fixture set is fixtures/fonts and the packaged CJK face', () => {
     const all = localFonts(undefined, 'fixtures');
     expect(all.filter((f) => f.family === 'Noto Sans CJK JP')).toHaveLength(1);
     const faces = all
@@ -75,6 +75,12 @@ describe('local fonts', () => {
         bold: false,
         italic: false,
         file: join(FIXTURE_FONTS_DIR, 'NotoSansArabic-Regular.ttf'),
+      },
+      {
+        family: 'Noto Sans Symbols 2',
+        bold: false,
+        italic: false,
+        file: join(FIXTURE_FONTS_DIR, 'NotoSansSymbols2-Regular.ttf'),
       },
     ]);
   });

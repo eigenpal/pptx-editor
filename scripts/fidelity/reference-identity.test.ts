@@ -152,21 +152,21 @@ describe('deck and PDF facts', () => {
     }
   });
 
-  test('referenceProblems refuses a PDF that another presentation tool made', () => {
+  test('referenceProblems refuses a PDF that our own tools made', () => {
     const deck = facts16x9();
     const page = [[960, 540]] as const;
-    expect(
-      referenceProblems(deck, { pages: page, producer: 'macOS Version 27.0.1 Quartz PDFContext' })
-    ).toEqual([]);
+    expect(referenceProblems(deck, { pages: page, producer: 'A presentation app 16.0' })).toEqual(
+      []
+    );
     expect(
       referenceProblems(deck, {
         pages: page,
-        producer: 'Keynote; macOS Version 27.0.1 Quartz PDFContext',
+        producer: 'Chromium; Skia/PDF m156',
       })
     ).toEqual([
-      'the PDF was made by Keynote; macOS Version 27.0.1 Quartz PDFContext, which never makes a reference PDF',
+      'the PDF was made by Chromium; Skia/PDF m156, our own output, never a reference PDF',
     ]);
-    expect(referenceProblems(deck, { pages: page, producer: 'LibreOffice 25.2' })).toHaveLength(1);
+    expect(referenceProblems(deck, { pages: page, producer: 'pptx-editor.dev' })).toHaveLength(1);
     expect(referenceProblems(deck, { pages: page, producer: '' })).toEqual([]);
   });
 

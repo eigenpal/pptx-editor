@@ -11,6 +11,8 @@ import type { FontSource, LayoutItem } from '@pptx-editor.dev/core/layout';
 interface DeckSource {
   deck: string;
   fonts: { family: string; bold: boolean; italic: boolean; url: string }[];
+  /** The fallback faces, in order (`FALLBACK_FONTS` in scripts/fidelity/local-fonts.ts). */
+  fallback?: string[];
 }
 
 /** The size and SHA-256 of a file that the page got. */
@@ -25,6 +27,9 @@ interface RasterRequest {
   width: number;
   height: number;
   scale: number;
+  /** pdf.js options from the harness server: the image limit and the CMap folder. */
+  maxImageSize: number;
+  cMapUrl: string;
   pages: { rgba: string; png: string }[];
 }
 
@@ -53,6 +58,9 @@ interface HarnessApi {
 let session: DocumentSession | null = null;
 let faces: FontFaceHandle | null = null;
 let fonts: FontSource[] = [];
+/** The registered fallback faces, and the family list that replaces `sans-serif` (`paintAt`). */
+let fallbackFaces: FontFace[] = [];
+let fallbackFamilies = '';
 /** The SHA-256 of each registered face's bytes, by its face id (`markupOf`). */
 let faceDigests = new Map<string, string>();
 /** The type and SHA-256 of each image blob, by its URL (`markupOf`). */
@@ -113,13 +121,26 @@ const EMU_PER_PT = 12_700;
 
 type Layout = NonNullable<ReturnType<DocumentSession['layout']>>;
 
-/** Paint a slide layout as an SVG at the slide size in points. */
+/**
+ * Paint a slide layout as an SVG at the slide size in points. Where the paint names the generic
+ * `sans-serif` family (a frame label, and the glyphs that a run's face lacks), the harness names
+ * its open fallback faces instead, so no system font takes part. A glyph that they also lack
+ * still takes a system font, and the fidelity check reports that font.
+ */
 function paintAt(layout: Layout, idPrefix: string): SVGSVGElement {
   const svg = paintSlide(document, layout, {
     images: session!.imageUrl,
     imageSize: session!.imageSize,
     idPrefix,
   });
+  if (fallbackFamilies)
+    for (const el of svg.querySelectorAll('[font-family]')) {
+      const family = el.getAttribute('font-family') ?? '';
+      el.setAttribute(
+        'font-family',
+        family.replace(/(^|,\s*)sans-serif$/, `$1${fallbackFamilies}`)
+      );
+    }
   svg.setAttribute('width', `${layout.slide.width / EMU_PER_PT}pt`);
   svg.setAttribute('height', `${layout.slide.height / EMU_PER_PT}pt`);
   return svg;
@@ -178,6 +199,18 @@ const api: HarnessApi = {
     fonts = [];
     faceDigests = new Map();
     blobDigests.clear();
+    for (const face of fallbackFaces) document.fonts.delete(face);
+    fallbackFaces = [];
+    fallbackFamilies = '';
+    for (const [i, url] of (source.fallback ?? []).entries()) {
+      const face = new FontFace(
+        `pptx-harness-fallback-${i}`,
+        await fetchBytes(url, 'a fallback font')
+      );
+      document.fonts.add(await face.load());
+      fallbackFaces.push(face);
+    }
+    fallbackFamilies = fallbackFaces.map((f) => f.family).join(', ');
     const deck = await fetchBytes(source.deck, 'the deck');
     const got = { deck: await received(deck), fonts: [] as (ReceivedFile & { family: string })[] };
     for (const f of source.fonts) {
@@ -243,9 +276,13 @@ const api: HarnessApi = {
     ).default;
     const doc = await pdfjs.getDocument({
       data: await fetchBytes(r.pdf, 'the PDF'),
-      // Glyphs as paths: no system font rasterizer takes part.
+      // Glyphs as paths: no system font rasterizer takes part. A PDF with a font that is not
+      // embedded never comes here (`score-deck.ts`), so no standard font data is needed.
       disableFontFace: true,
       isEvalSupported: false,
+      maxImageSize: r.maxImageSize,
+      cMapUrl: r.cMapUrl,
+      cMapPacked: true,
       verbosity: 0,
     }).promise;
     const send = async (url: string, body: BodyInit): Promise<void> => {

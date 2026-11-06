@@ -6,7 +6,10 @@
     "maxPixelMismatch": 0.005,
     "pixelThreshold": 0.1,
     "maxBaselineDeltaPt": 0.5,
-    "minLineBreakMatch": 1
+    "minLineBreakMatch": 1,
+    "maxExtraLines": 0,
+    "maxSizeDeltaPx": 0,
+    "maxSelfConsistencyMismatch": 0
   },
   "comparisonB": {
     "renderWidthPx": 1920,

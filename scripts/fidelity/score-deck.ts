@@ -7,7 +7,7 @@
 import type { Page } from '@playwright/test';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { THRESHOLDS } from './thresholds.ts';
+import { PAGE_SIZE_TOLERANCE_PT, THRESHOLDS } from './thresholds.ts';
 import {
   openDeck,
   printDeck,
@@ -20,8 +20,16 @@ import {
 } from './harness-page.ts';
 import { comparePixels, compareLines, slidePasses } from './compare.ts';
 import { redactPaths } from './corpus-list.ts';
-import { localFonts, type FontSet } from './local-fonts.ts';
-import { openPdf, openPdfFile, rasterSizePx, type Pdf } from './pdf.ts';
+import {
+  deckFontFamilies,
+  foreignOurFonts,
+  foreignReferenceFonts,
+  harnessFontFiles,
+  localFonts,
+  postScriptFamilies,
+  type FontSet,
+} from './local-fonts.ts';
+import { openPdf, openPdfFile, PdfPageLimit, rasterSizePx, type Pdf } from './pdf.ts';
 import { deckFacts, referenceProblems, slidePages } from './reference-identity.ts';
 import { probableCause, type DeckResult, type SlideResult } from './report.ts';
 
@@ -56,16 +64,18 @@ export async function scoreDeck(
 ): Promise<DeckResult> {
   const started = Date.now();
   let facts;
+  let deckBytes: Uint8Array;
   try {
-    facts = deckFacts(new Uint8Array(readFileSync(input.file)));
+    deckBytes = new Uint8Array(readFileSync(input.file));
+    facts = deckFacts(deckBytes);
   } catch (e) {
     return { name: input.name, error: (e as Error).message, slides: [] };
   }
-  const opened = await openDeck(
-    page,
-    input.file,
-    input.fontSet === 'fixtures' ? localFonts(undefined, 'fixtures') : undefined
-  );
+  const fixtures = input.fontSet === 'fixtures';
+  const fonts = fixtures
+    ? localFonts(undefined, 'fixtures')
+    : localFonts(deckFontFamilies(deckBytes));
+  const opened = await openDeck(page, input.file, fonts);
   if (opened.error)
     return { name: input.name, error: `the deck does not open: ${opened.error}`, slides: [] };
   if (opened.slides !== facts.slides)
@@ -83,12 +93,14 @@ export async function scoreDeck(
   const oursBytes = visible.length ? await printDeck(page, visible) : undefined;
   const reopened = await reopenSaved(page);
   const consistent: boolean[] = [];
-  for (let i = 0; i < opened.slides; i += 1)
-    consistent.push(
+  for (let i = 0; i < opened.slides; i += 1) {
+    const same =
       !reopened.error &&
-        reopened.slides === opened.slides &&
-        (await renderSlide(page, i)).markup === renders[i].markup
-    );
+      reopened.slides === opened.slides &&
+      (await renderSlide(page, i)).markup === renders[i].markup;
+    // The markup is the same or not: a share of 0 or 1.
+    consistent.push((same ? 0 : 1) <= THRESHOLDS.maxSelfConsistencyMismatch);
+  }
 
   let gap = input.gap;
   if (!gap && !input.pdf) gap = { status: 'no-reference', reasons: ['no reference PDF'] };
@@ -96,20 +108,50 @@ export async function scoreDeck(
   let ours: Pdf | undefined;
   const result: DeckResult = { name: input.name, slides: [] };
   try {
-    if (!gap && input.pdf) {
-      try {
-        reference = await openPdfFile(input.pdf);
-        const issues = referenceProblems(facts, reference);
-        if (issues.length) gap = { status: 'stale', reasons: issues };
-      } catch {
-        // A fixed reason, never the tool's message: it can name the PDF's path.
-        gap = { status: 'stale', reasons: ['pdf.js cannot read the PDF'] };
-      }
-    }
-    if (!gap && oursBytes) {
-      ours = await openPdf(oursBytes);
+    const size = rasterSizePx(facts, THRESHOLDS.renderWidthPx);
+    const scale = THRESHOLDS.renderWidthPx / facts.widthPt;
+    if (oursBytes) {
+      ours = await openPdf(oursBytes, visible.length);
       if (ours.pages.length !== visible.length)
         throw new Error(`our PDF has ${ours.pages.length} pages for ${visible.length} slides`);
+      // The same bound as the reference's pages (`referenceProblems`).
+      const wrong = ours.pages.findIndex(
+        ([w, h]) =>
+          Math.abs(w - facts.widthPt) > PAGE_SIZE_TOLERANCE_PT + 1e-6 ||
+          Math.abs(h - facts.heightPt) > PAGE_SIZE_TOLERANCE_PT + 1e-6
+      );
+      if (wrong >= 0)
+        throw new Error(
+          `our PDF page ${wrong + 1} is ${ours.pages[wrong][0]} × ${ours.pages[wrong][1]} pt, the slide is ${facts.widthPt} × ${facts.heightPt} pt`
+        );
+      // Every font of our PDF must be a face that the page loaded: never a system font.
+      const loaded = postScriptFamilies(harnessFontFiles(fonts.map((f) => f.file)));
+      result.foreignFonts = foreignOurFonts(await ours.fonts(), loaded);
+    }
+    if (!gap && input.pdf) {
+      try {
+        // More pages than slides is stale, and no page of such a PDF is read.
+        reference = await openPdfFile(input.pdf, facts.slides);
+        const issues = referenceProblems(facts, reference);
+        const refFonts = await reference.fonts();
+        for (const f of refFonts)
+          if (!f.embedded) issues.push(`the PDF does not embed the font ${f.name}`);
+        if (issues.length) gap = { status: 'stale', reasons: issues };
+        if (fixtures)
+          result.foreignReferenceFonts = foreignReferenceFonts(
+            input.name,
+            refFonts,
+            deckFontFamilies(deckBytes, false),
+            postScriptFamilies(harnessFontFiles(fonts.map((f) => f.file)))
+          );
+      } catch (e) {
+        // A fixed reason, never the tool's message: it can name the PDF's path.
+        const reason =
+          e instanceof PdfPageLimit
+            ? `the PDF has ${e.pages} pages, the deck has ${visible.length} visible slides`
+            : 'pdf.js cannot read the PDF';
+        gap = { status: 'stale', reasons: [reason] };
+      }
     }
     if (imagesDir) {
       mkdirSync(imagesDir, { recursive: true });
@@ -117,8 +159,6 @@ export async function scoreDeck(
       if (input.pdf && reference)
         copyFileSync(input.pdf, (result.referencePdf = join(imagesDir, 'reference.pdf')));
     }
-    const size = rasterSizePx(facts, THRESHOLDS.renderWidthPx);
-    const scale = THRESHOLDS.renderWidthPx / facts.widthPt;
     // Both PDFs are drawn by the same pdf.js in the harness page.
     const drawer = rasterPage ? await rasterPage() : page;
     const [oursPages, referencePages] =

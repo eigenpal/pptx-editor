@@ -7,7 +7,9 @@ import {
   failureKinds,
   gapEntry,
   gapEntryLine,
+  listChanges,
   listSource,
+  mergeRecorded,
   recordedList,
   slideVerdict,
   writeGaps,
@@ -54,6 +56,19 @@ describe('failure kinds and entries', () => {
     expect(gapEntryLine('a/1', { pixels: 0.02, 'line-breaks': 0.5 })).toBe(
       "'a/1': { pixels: 0.02, 'line-breaks': 0.5 },"
     );
+  });
+
+  test('extra lines of our page are a failure kind with a count', () => {
+    const s = slide(1, { status: 'fail', extraLines: ['Our own text', 'More text'] });
+    expect(failureKinds(s)).toEqual(['extra-text']);
+    expect(gapEntry(s)).toEqual({ 'extra-text': 2, lines: 4 });
+    const gate = checkFixtureGate(
+      [deck('a', [s])],
+      list({ 'a/1': { 'extra-text': 1, lines: 4 } }),
+      tools,
+      true
+    );
+    expect(texts(gate)).toEqual(['a/1: 2 extra lines is worse than its known gap (1 extra lines)']);
   });
 
   test('a verdict names the scores and the known gap', () => {
@@ -135,6 +150,29 @@ describe('the fixture gate', () => {
     ]);
   });
 
+  test('a failed slide that no threshold names needs a fix', () => {
+    const r = checkFixtureGate([deck('a', [slide(1, { status: 'fail' })])], list({}), tools, true);
+    expect(r.problems).toEqual([
+      { kind: 'fix', text: 'a/1: fails, but no threshold names the failure' },
+    ]);
+  });
+
+  test('fonts that the harness did not load, and reference fonts that are not open, need a fix', () => {
+    const r = checkFixtureGate(
+      [deck('a', [slide(1)], { foreignFonts: ['Helvetica'], foreignReferenceFonts: ['ArialMT'] })],
+      list({}),
+      tools,
+      true
+    );
+    expect(r.problems.map((p) => p.kind)).toEqual(['fix', 'fix']);
+    expect(texts(r)[0]).toStartWith(
+      'a: our PDF draws with fonts that the harness did not load: Helvetica.'
+    );
+    expect(texts(r)[1]).toStartWith(
+      'a: the reference PDF embeds fonts that are not open fonts of the deck: ArialMT.'
+    );
+  });
+
   test('a partial run does not ask for the slides it did not score', () => {
     const r = checkFixtureGate(
       [deck('a', [slide(1)])],
@@ -164,6 +202,38 @@ describe('--update-gaps', () => {
     expect(text).toContain('export const AFTER = 1;');
     const mod = (await import(file)) as { FIXTURE_KNOWN_GAPS: KnownGapList };
     expect(mod.FIXTURE_KNOWN_GAPS).toEqual(recorded);
+  });
+
+  test('a partial run, or a deck that did not finish, keeps the entries of the decks it lacks', () => {
+    const old = list({
+      'a/1': { pixels: 0.1 },
+      'b/1': { pixels: 0.2 },
+      'c/1': { pixels: 0.3 },
+    });
+    const next = mergeRecorded(
+      old,
+      [
+        deck('a', [slide(1)]),
+        deck('b', [], { error: 'the browser crashed while rendering the deck' }),
+      ],
+      tools
+    );
+    expect(next.slides).toEqual({ 'b/1': { pixels: 0.2 }, 'c/1': { pixels: 0.3 } });
+  });
+
+  test('listChanges names looser, new, and removed entries', () => {
+    const old = list({ 'a/1': { pixels: 0.1, lines: 4 }, 'b/1': { pixels: 0.2 } });
+    const next = list({ 'a/1': { pixels: 0.2, baseline: 1, lines: 3 }, 'c/1': { pixels: 0.3 } });
+    expect(listChanges(old, next)).toEqual({
+      looser: ['a/1: pixels 0.1 → 0.2, baseline none → 1, lines 4 → 3'],
+      added: ["'c/1': { pixels: 0.3 },"],
+      removed: ['b/1'],
+    });
+    expect(listChanges(old, list({ 'a/1': { pixels: 0.05, lines: 4 } }))).toEqual({
+      looser: [],
+      added: [],
+      removed: ['b/1'],
+    });
   });
 
   test('the committed list was measured with the tools and fonts in use', () => {

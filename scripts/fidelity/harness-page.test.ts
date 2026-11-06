@@ -289,8 +289,8 @@ describe.skipIf(!hasChromium)('openDeck', () => {
       });
       expect(second.received.fonts).toEqual([]);
       expect(rendered.markup.length).toBeGreaterThan(0);
-      // The deck and three fonts, then the deck alone.
-      expect(after.files).toBe(5);
+      // The deck, three fonts, and the two fallback faces; then the deck and the fallback faces.
+      expect(after.files).toBe(9);
       expect(new Set(after.statuses)).toEqual(new Set([404]));
     } finally {
       rmSync(dir, { recursive: true, force: true });

@@ -8,13 +8,22 @@ describe('the harness command line', () => {
       set: 'fixtures',
       decks: [],
       updateGaps: false,
+      acceptWorse: false,
     });
     expect(parseRunArgs(['tables', 'colors', '--update-gaps'])).toEqual({
       mode: 'set',
       set: 'fixtures',
       decks: ['tables', 'colors'],
       updateGaps: true,
+      acceptWorse: false,
     });
+    expect(parseRunArgs(['tables', '--update-gaps', '--accept-worse'])).toMatchObject({
+      updateGaps: true,
+      acceptWorse: true,
+    });
+    expect(() => parseRunArgs(['--accept-worse'])).toThrow(
+      '--accept-worse goes only with --update-gaps'
+    );
     expect(parseRunArgs(['--set', 'corpus', 'deck2'])).toMatchObject({
       set: 'corpus',
       decks: ['deck2'],

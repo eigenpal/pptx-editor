@@ -16,6 +16,23 @@ export const THRESHOLDS = {
   maxBaselineDeltaPt: 0.5,
   /** Line breaks must be identical: the fraction of reference lines that our page must hold. */
   minLineBreakMatch: 1,
+  /**
+   * Lines of our page (with two letters in a row) that the reference page does not hold: text
+   * that the editor paints and the reference does not.
+   */
+  maxExtraLines: 0,
+  /**
+   * Our page raster and the reference page raster may differ in size by this many pixels
+   * (`comparePixels`). Both PDFs are drawn onto one raster of the slide size, and each PDF page
+   * must be the slide size within `PAGE_SIZE_TOLERANCE_PT`, so a short page shows as differing
+   * pixels.
+   */
+  maxSizeDeltaPx: 0,
+  /**
+   * Save, reopen, and paint again: the share of slide markup that may differ from the first
+   * paint (`markupOf` in the harness page). 0: the markup must be identical.
+   */
+  maxSelfConsistencyMismatch: 0,
 } as const;
 
 /**
@@ -58,23 +75,40 @@ export const COMPARISON_B = {
 } as const;
 
 /**
- * A reference PDF page may differ from the slide size (`p:sldSz`) by this many points. The reference
- * app makes each page side a whole number of points. Measured: a fraction of 0.375 pt or less
+ * A PDF page, ours or the reference, may differ from the slide size (`p:sldSz`) by this many
+ * points. Chromium prints each page side as a whole number of 1/300 inch, not always the nearest
+ * one (measured: up to 0.46 pt off). The reference app makes each page side a whole number of
+ * points. Measured: a fraction of 0.375 pt or less
  * rounds down, and 0.45 pt and every fraction from 0.5 pt round up. Fractions from 0.375 to
  * 0.45 pt are not measured; if they round up, a page side is off by less than
  * 1 − 0.375 = 0.625 pt, the bound here.
  */
 export const PAGE_SIZE_TOLERANCE_PT = 0.625;
 
+/**
+ * Limits that the harness no longer has, each with the reason. `check-known-gaps.ts` refuses a
+ * limit that goes away unless it is listed here, so no limit goes away unseen.
+ */
+export const RETIRED_LIMITS: Readonly<Record<string, string>> = {
+  rasterScale:
+    'the supersampling factor: pdf.js draws both PDFs at renderWidthPx, and no raster is scaled down',
+};
+
 /** A threshold that a slide misses (`known-gaps.ts`). */
-export type FailureKind = 'pixels' | 'line-breaks' | 'baseline';
+export type FailureKind = 'pixels' | 'line-breaks' | 'baseline' | 'extra-text';
 
 /**
  * The noise margins of a known gap's recorded value (`known-gaps.ts`). The same tools give the
  * same scores on every machine, so the margins only absorb the rounding of the recorded value:
- * 0.01 % of the pixels, 0.01 pt of baseline, and 0.01 % for line breaks.
+ * 0.01 % of the pixels, 0.01 pt of baseline, and 0.01 % for line breaks. Extra lines are a count:
+ * no margin.
  */
-export const GAP_MARGINS = { pixels: 0.0001, baseline: 0.01, 'line-breaks': 0.0001 } as const;
+export const GAP_MARGINS = {
+  pixels: 0.0001,
+  baseline: 0.01,
+  'line-breaks': 0.0001,
+  'extra-text': 0,
+} as const;
 
 /**
  * One known gap: each threshold that a slide misses today, with its measured value. The gate
@@ -88,6 +122,8 @@ export interface KnownGap {
   readonly 'line-breaks'?: number;
   /** The largest baseline distance of a matched line, in points. */
   readonly baseline?: number;
+  /** How many lines of our page the reference page does not hold. */
+  readonly 'extra-text'?: number;
   /**
    * How many reference lines the slide checks. Another count fails the gate until it is
    * recorded.
@@ -117,30 +153,35 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
   pdfjs: '5.4.624',
   chromium: '156.0.8078.4',
   fonts:
-    '@docx-editor.dev/fonts 2.34.0, @docx-editor.dev/fonts-cjk 2.34.0, fixtures/fonts 602beb9f174c',
+    '@docx-editor.dev/fonts 2.34.0, @docx-editor.dev/fonts-cjk 2.34.0, fixtures/fonts 6e44cd4f58fb',
   slides: {
     'autofit/1': { pixels: 0.0094, lines: 9 },
     'east-asian-line-breaking/1': { pixels: 0.0062, lines: 52 },
     'east-asian-line-breaking/2': { pixels: 0.0068, lines: 52 },
-    'east-asian-line-breaking/4': { pixels: 0.0094, 'line-breaks': 0.8, lines: 10 },
-    'east-asian-theme-fonts/1': { pixels: 0.0219, 'line-breaks': 0.75, lines: 16 },
-    'east-asian-typography/2': { pixels: 0.0148, 'line-breaks': 0.7647, lines: 17 },
+    'east-asian-line-breaking/4': { pixels: 0.0058, lines: 5 },
+    'east-asian-typography/2': {
+      pixels: 0.0148,
+      'line-breaks': 0.7647,
+      'extra-text': 7,
+      lines: 17,
+    },
     'fill-fidelity/1': { pixels: 0.2808 },
     'fill-fidelity/2': { pixels: 0.2103 },
     'fill-fidelity/3': { pixels: 0.1836 },
     'fill-fidelity/4': { pixels: 0.0148 },
     'fill-fidelity/5': { pixels: 0.0992 },
     'fill-fidelity/6': { pixels: 0.8086 },
-    'fills-lines/1': { pixels: 0.0784 },
+    'fills-lines/1': { pixels: 0.0784, 'extra-text': 1 },
     'fills-lines/2': { pixels: 0.0116 },
     'follow-ups/1': { pixels: 0.0284 },
     'follow-ups/2': { pixels: 0.0736 },
     'follow-ups/3': { pixels: 0.1153 },
     'font-effects/1': { pixels: 0.008, lines: 10 },
     'font-substitution/1': { pixels: 0.0141, lines: 8 },
+    'font-substitution/2': { pixels: 0.0098, 'line-breaks': 0.8462, lines: 13 },
     'gradients/1': { pixels: 0.0894 },
     'line-model/2': { pixels: 0.0051, lines: 31 },
-    'paragraph-format/1': { pixels: 0.0095, 'line-breaks': 0.8889, lines: 27 },
+    'paragraph-format/1': { pixels: 0.0095, 'line-breaks': 0.8889, 'extra-text': 3, lines: 27 },
     'picture-editing/1': { pixels: 0.0076 },
     'picture-editing/2': { pixels: 0.0072 },
     'pictures/1': { pixels: 0.0096 },
@@ -151,11 +192,17 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'rtl-text/4': { pixels: 0.0226 },
     'shape-effects-presets/2': { 'line-breaks': 0.6667, lines: 9 },
     'shape-effects-presets/3': { 'line-breaks': 0.6667, lines: 6 },
-    'slide-structure/1': { pixels: 0.0492, lines: 1 },
+    'slide-structure/1': { pixels: 0.0492, 'extra-text': 1, lines: 1 },
     'slide-structure/2': { pixels: 0.0057, lines: 1 },
     'spacing/1': { pixels: 0.0053, lines: 18 },
-    'tables/3': { pixels: 0.0324, 'line-breaks': 0.8824, baseline: 2.97, lines: 17 },
-    'text-direction/1': { pixels: 0.0198, 'line-breaks': 0.7872, lines: 47 },
+    'tables/3': {
+      pixels: 0.0324,
+      'line-breaks': 0.8824,
+      baseline: 2.97,
+      'extra-text': 1,
+      lines: 17,
+    },
+    'text-direction/1': { pixels: 0.0198, 'line-breaks': 0.7872, 'extra-text': 12, lines: 47 },
     'text-runs/1': { pixels: 0.006, lines: 11 },
     'vertical-columns/1': { pixels: 0.0106, lines: 12 },
     'vertical-east-asian/1': { pixels: 0.0098 },

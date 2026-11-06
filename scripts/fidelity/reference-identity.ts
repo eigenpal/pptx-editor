@@ -128,19 +128,23 @@ export interface PdfFacts {
   readonly producer?: string;
 }
 
-/** Tools whose PDFs are never references (AGENTS.md, "Fidelity rules"). */
-const NOT_REFERENCE = /keynote|libreoffice|openoffice|google|pages/i;
+/**
+ * Our own PDF tools: the harness prints with Chromium (`Skia/PDF`), and `pptx-to-pdf` writes
+ * `pptx-editor.dev`. A PDF from either one is never a reference: it would compare our output
+ * with itself.
+ */
+const OUR_TOOLS = /skia\/pdf|pptx-editor\.dev/i;
 
 /**
  * The problems that make a PDF unusable as the reference of a deck: the page count must equal
  * the visible slide count, every page must be the slide size within `PAGE_SIZE_TOLERANCE_PT`,
- * and no tool in `NOT_REFERENCE` may be its creator or producer.
+ * and none of `OUR_TOOLS` may be its creator or producer.
  */
 export function referenceProblems(deck: DeckFacts, pdf: PdfFacts): string[] {
   const visible = deck.slides - deck.hidden.length;
   const out: string[] = [];
-  if (pdf.producer && NOT_REFERENCE.test(pdf.producer))
-    out.push(`the PDF was made by ${pdf.producer}, which never makes a reference PDF`);
+  if (pdf.producer && OUR_TOOLS.test(pdf.producer))
+    out.push(`the PDF was made by ${pdf.producer}, our own output, never a reference PDF`);
   if (pdf.pages.length !== visible)
     out.push(`the PDF has ${pdf.pages.length} pages, the deck has ${visible} visible slides`);
   const wrong = pdf.pages.findIndex(
