@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { compareLines, comparePixels, lineKey, slidePasses } from './compare.ts';
+import {
+  compareLines,
+  comparePixels,
+  LINE_PAIR_LIMIT_PT,
+  lineKey,
+  slidePasses,
+} from './compare.ts';
 import { groupLines, type PdfLine, type TextItem } from './pdf.ts';
 
 const line = (text: string, baseline = 100, xMin = 50): PdfLine => ({
@@ -80,6 +86,76 @@ describe('compareLines', () => {
       [{ ...line('q Hollow square'), marker: true }]
     );
     expect(r.matched).toBe(1);
+  });
+
+  test('repeated text in two shapes pairs within its shape: a missing line stays missing', () => {
+    // Two shapes hold "Total": one at the top left, one lower in another column. Our page lost
+    // the first one. The second reference line must not take the first one's place.
+    const reference = [line('Total', 100, 50), line('Total', 300, 400)];
+    const r = compareLines([line('Total', 300.2, 400)], reference);
+    expect(r).toMatchObject({ matched: 1, total: 2, missing: ['Total'], extra: [] });
+    expect(r.worstBaseline).toBeCloseTo(0.2, 6);
+    // Both present, the reference lines in either order: each pairs with its own shape's line.
+    for (const ref of [reference, [...reference].reverse()]) {
+      const both = compareLines([line('Total', 300.1, 400), line('Total', 100.3, 50)], ref);
+      expect(both).toMatchObject({ matched: 2, total: 2, missing: [], extra: [] });
+      expect(both.worstBaseline).toBeCloseTo(0.3, 6);
+    }
+  });
+
+  test('two shapes with the same text side by side on one baseline pair by column', () => {
+    const reference = [line('Revenue', 200, 60), line('Revenue', 200, 460)];
+    // Our right column moved 1 pt to the right: a shift, not a swap of columns.
+    const r = compareLines([line('Revenue', 200, 461), line('Revenue', 200, 60)], reference);
+    expect(r).toMatchObject({ matched: 2, missing: [], extra: [] });
+    expect(r.worstShift).toBe(1);
+    // Our left column lost its line: the right one stays with the right column.
+    const lost = compareLines([line('Revenue', 200, 460)], reference);
+    expect(lost).toMatchObject({ matched: 1, missing: ['Revenue'], extra: [] });
+    expect(lost.worstShift).toBe(0);
+  });
+
+  test('a line past the pair limit is missing and extra; within it, out of place', () => {
+    expect(LINE_PAIR_LIMIT_PT).toBe(4);
+    const ref = [line('Quarterly results', 100)];
+    const far = compareLines([line('Quarterly results', 100 + LINE_PAIR_LIMIT_PT + 0.5)], ref);
+    expect(far).toMatchObject({ matched: 0, missing: ['Quarterly results'] });
+    expect(far.extra).toEqual(['Quarterly results']);
+    expect(far.worstBaseline).toBe(0);
+    const near = compareLines([line('Quarterly results', 102)], ref);
+    expect(near).toMatchObject({ matched: 1, missing: [], extra: [] });
+    expect(near.worstBaseline).toBe(2);
+    expect(slidePasses({ mismatch: 0 }, near)).toBe(false);
+    expect(slidePasses({ mismatch: 0 }, far)).toBe(false);
+  });
+
+  test('the pairs do not depend on which page is which, or on the order of the lines', () => {
+    const a = [
+      line('Total', 100, 50),
+      line('Total', 103.4, 52),
+      line('Net income', 130, 50),
+      line('Total', 300, 400),
+    ];
+    const b = [line('Total', 100.4, 50), line('Total', 103, 52), line('Total', 299.8, 401)];
+    const ab = compareLines(a, b);
+    const ba = compareLines(b, a);
+    expect(ab.matched).toBe(ba.matched);
+    expect(ab.worstBaseline).toBeCloseTo(ba.worstBaseline, 9);
+    expect(ab.worstShift).toBeCloseTo(ba.worstShift, 9);
+    expect([...ab.extra].sort()).toEqual([...ba.missing].sort());
+    expect([...ab.missing].sort()).toEqual([...ba.extra].sort());
+    const shuffled = compareLines([...a].reverse(), [b[1], b[2], b[0]]);
+    expect(shuffled.matched).toBe(ab.matched);
+    expect(shuffled.worstBaseline).toBeCloseTo(ab.worstBaseline, 9);
+    expect(shuffled.worstShift).toBeCloseTo(ab.worstShift, 9);
+  });
+
+  test('a reference line set word by word joins to hold our line, as ours joins to hold its', () => {
+    const r = compareLines(
+      [line('wizards quietly judge', 100, 50)],
+      [line('wizards', 100, 50), line('quietly', 100, 150), line('judge', 100, 250)]
+    );
+    expect(r).toMatchObject({ matched: 3, total: 3, missing: [], extra: [] });
   });
 });
 
