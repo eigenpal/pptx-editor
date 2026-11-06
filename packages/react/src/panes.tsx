@@ -89,8 +89,11 @@ export const Thumbnail = memo(function Thumbnail({
 }) {
   const editor = usePptxEditor();
   const box = useRef<HTMLDivElement>(null);
+  // A deferred paint: a long list paints the thumbnails in view first. The disposer runs on
+  // unmount and on an editor change, so the old editor forgets the container.
   useEffect(() => {
-    if (editor && box.current) editor.renderThumbnail(slide.index, box.current);
+    if (!editor || !box.current) return undefined;
+    return editor.renderThumbnail(slide.index, box.current, { defer: true });
   }, [editor, slide]);
   return (
     <div
@@ -311,7 +314,7 @@ export function SlideRail(props: SlideRailProps = {}) {
   /** One slide of the rail. */
   const item = (s: SlideSummary) => (
     <li
-      key={s.index}
+      key={s.id}
       className="pptx-rail__item"
       role={grouped ? 'treeitem' : 'option'}
       aria-selected={selected.includes(s.index)}

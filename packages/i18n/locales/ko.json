@@ -906,6 +906,7 @@
     "tableCell": "{row}행, {column}열",
     "shapeSelected": "{kind} {name} 선택됨",
     "shapeSelectedWithAltText": "{kind} {name}, {description} 선택됨",
+    "dragCanceled": "끌기가 취소됨",
     "placeholderObject": "{kind}(이 버전에서는 표시되지 않음)",
     "kinds": {
       "chart": "차트",

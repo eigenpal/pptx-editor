@@ -1237,7 +1237,7 @@ export interface Editor {
     goToSlide(index: number): void;
     // (undocumented)
     load(bytes: Uint8Array): Promise<CommandResult>;
-    renderThumbnail(index: number, container: HTMLElement): void;
+    renderThumbnail(index: number, container: HTMLElement, options?: RenderThumbnailOptions): () => void;
     save(): Uint8Array<ArrayBuffer> | null;
     selectAll(): void;
     selectSlide(index: number, mode?: SlideSelectMode): void;
@@ -3911,6 +3911,11 @@ export function renderImageWith(session: DocumentSession, index: number, request
 
 // @internal
 export function renderNotes(root: HTMLElement, paragraphs: readonly NotesParagraph[]): void;
+
+// @public
+export interface RenderThumbnailOptions {
+    readonly defer?: boolean;
+}
 
 // @internal
 export function repaintSurfaceOf(editor: object): boolean;

@@ -152,7 +152,7 @@ export interface Editor {
     goToSlide(index: number): void;
     // (undocumented)
     load(bytes: Uint8Array): Promise<CommandResult>;
-    renderThumbnail(index: number, container: HTMLElement): void;
+    renderThumbnail(index: number, container: HTMLElement, options?: RenderThumbnailOptions): () => void;
     save(): Uint8Array<ArrayBuffer> | null;
     selectAll(): void;
     selectSlide(index: number, mode?: SlideSelectMode): void;
@@ -1049,6 +1049,11 @@ export type PresentationView = 'normal' | 'slideSorter';
 
 // @public
 export type ReflectionPreset = 'tightTouching' | 'halfTouching' | 'fullTouching' | 'tight4pt' | 'half4pt' | 'full4pt' | 'tight8pt' | 'half8pt' | 'full8pt';
+
+// @public
+export interface RenderThumbnailOptions {
+    readonly defer?: boolean;
+}
 
 // @public
 export type RotateChoice = 'right90' | 'left90' | 'flipVertical' | 'flipHorizontal';

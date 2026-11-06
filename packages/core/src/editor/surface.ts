@@ -23,35 +23,26 @@ import {
 import { presenceElements } from './surface-presence.ts';
 import type { PaintedPresence } from './collaboration-presence.ts';
 import {
-  boxOf,
   cornersOf,
-  deltaToParent,
   findItem,
   selectionScope,
   isLineItem,
   lineEnds,
-  lineTransform,
-  rotationAfterDrag,
   rotationHandle,
-  slideCenter,
-  toFile,
-  toParent,
   unionBounds,
-  type Box,
 } from '../automation/commands/placement.ts';
 import { bindSurfaceInput, type SurfaceInputHost } from './surface-input.ts';
 import { selectForContextMenu } from './surface-context-menu.ts';
-import { guideElements, snapContext, snapMove, snapResize, SNAP_PX } from './surface-guides.ts';
-import type { SnapContext } from './surface-guides.ts';
-import type { SnapGuide, SnapResult } from './snapping.ts';
+import { guideElements, SNAP_PX } from './surface-guides.ts';
 import { cropAt, cropOverlay, onCropImage, startCropDrag } from './surface-crop.ts';
 import type { CropDrag, CropHandle } from './surface-crop.ts';
 import { withHalos } from './surface-halo.ts';
 import { hitItem, inText, onBorder } from './surface-hit.ts';
 import { outsideVeil, scrollBoxIntoView, surfacePadding } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
-import { resizeOne, scaleMany } from './surface-resize.ts';
 import { selectionAnnouncement } from './surface-announce.ts';
+import { HANDLE_POS, HANDLES, ShapeDrag, type Handle } from './surface-drag.ts';
+import type { Relayout } from './drag-preview.ts';
 
 const EMU_PER_PX = 9_525;
 
@@ -72,7 +63,7 @@ export interface SurfaceHost extends SurfaceInputHost {
   select(selection: EditorSelection): void;
   /** Collaboration peers on this slide, painted as editing chrome. */
   presence?(): readonly PaintedPresence[];
-  /** New boxes in file coordinates; one gesture merges into one undo step. */
+  /** The boxes a shape drag writes on release, in file coordinates: one undo step. */
   transform(items: readonly TransformItem[], gesture: string): void;
   fitChanged(zoom: number): void;
   zoom(): number;
@@ -91,48 +82,13 @@ export interface SurfaceHost extends SurfaceInputHost {
   crop?(crop: ImageCrop, gesture: string): void;
   /** Whether an element's aspect ratio is locked: every resize handle keeps the ratio. */
   aspectLocked?(nodeId: string): boolean;
+  /** Lay out a dragged item at a new box, for the drag preview (drag-preview.ts). */
+  relayout?: Relayout;
 }
-
-type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'rot' | 'start' | 'end';
-type BoxHandle = Exclude<Handle, 'start' | 'end'>;
-const HANDLES: readonly BoxHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w', 'rot'];
-const HANDLE_POS: Record<Exclude<Handle, 'start' | 'end'>, [number, number]> = {
-  nw: [0, 0],
-  n: [0.5, 0],
-  ne: [1, 0],
-  e: [1, 0.5],
-  se: [1, 1],
-  s: [0.5, 1],
-  sw: [0, 1],
-  w: [0, 0.5],
-  rot: [0.5, 0],
-};
 
 /** Find a slide item by node id, inside groups too. */
 export function itemById(layout: SlideLayout | undefined, id: string): LayoutItem | undefined {
   return layout ? findItem(layout.items, id) : undefined;
-}
-
-/** A shape being dragged: its laid-out box in parent space and its slide-space center. */
-interface DragItem {
-  readonly item: LayoutItem;
-  readonly box: Box;
-  readonly center: { x: number; y: number };
-}
-
-const xy = (p: { x: number; y: number }): [number, number] => [p.x, p.y];
-
-/** Bounds as `x`, `y`, right, bottom, in slide EMU. */
-type Bounds = { x: number; y: number; r: number; b: number };
-
-/** A pointer drag of a selection or one of its handles. */
-interface Drag {
-  readonly handle: Handle | 'move';
-  readonly items: readonly DragItem[];
-  readonly start: { x: number; y: number };
-  readonly bounds: Bounds;
-  readonly gesture: string;
-  readonly snap: SnapContext;
 }
 
 /** The editable slide surface bound to one host element. */
@@ -143,7 +99,8 @@ export class SlideSurface {
   readonly #input: HTMLTextAreaElement;
   readonly #live: HTMLDivElement;
   readonly #resize: ResizeObserver;
-  #drag: Drag | null = null;
+  /** A shape drag: it previews while the pointer moves and writes on release (surface-drag.ts). */
+  readonly #drag: ShapeDrag;
   #cropDrag: CropDrag | null = null;
   #marquee: null | { start: { x: number; y: number }; at: { x: number; y: number } } = null;
   #textDrag: TextDrag | null = null;
@@ -155,8 +112,6 @@ export class SlideSurface {
   #renderedZoom: number | null = null;
   #paintKey: unknown = null;
   #gestures = 0;
-  /** The smart guides of the drag in progress. */
-  #guides: readonly SnapGuide[] = [];
   #pressed = false;
   /** The caret the view last followed (`#keepCaretInView`). */
   #caretKey = '';
@@ -204,6 +159,20 @@ export class SlideSurface {
     doc.addEventListener('pointermove', this.#onPointerMove);
     doc.addEventListener('pointerup', this.#onPointerUp);
     doc.addEventListener('pointercancel', this.#onPointerCancel);
+    this.#drag = new ShapeDrag(
+      {
+        label: (key) => editor.label(key),
+        layout: () => editor.layout(),
+        transform: (items, gesture) => editor.transform(items, gesture),
+        ...(editor.relayout ? { relayout: editor.relayout } : {}),
+        ...(editor.paintLayout ? { paintLayout: editor.paintLayout } : {}),
+        slide: () => this.#stage.querySelector('.pptx-surface__slide'),
+        paintOptions: (layout) => this.#paintOptions(layout),
+        repaint: () => this.render(),
+        overlay: (layout) => this.#renderOverlay(layout, editor.zoom()),
+      },
+      doc
+    );
     this.#unbindInput = bindSurfaceInput(this.#input, this.root, editor);
     this.root.tabIndex = 0;
     this.root.setAttribute('role', 'group');
@@ -218,7 +187,8 @@ export class SlideSurface {
     doc.removeEventListener('pointermove', this.#onPointerMove);
     doc.removeEventListener('pointerup', this.#onPointerUp);
     doc.removeEventListener('pointercancel', this.#onPointerCancel);
-    // A drag in progress ends here: its history group closes with it.
+    // A drag in progress ends here: its history group closes with it; a preview writes nothing.
+    this.#drag.dispose();
     this.#table.up();
     this.#resize.disconnect();
     this.host.removeEventListener('wheel', this.#onWheel);
@@ -264,6 +234,8 @@ export class SlideSurface {
     this.#input.readOnly = this.editor.readOnly();
     const layout = this.editor.layout();
     const zoom = this.editor.zoom();
+    // A dragged shape that changed under the drag (a peer's edit) ends the drag.
+    this.#drag.check(layout);
     if (!layout) {
       this.#stage.querySelector('.pptx-surface__slide')?.remove();
       this.#paintKey = null;
@@ -290,7 +262,8 @@ export class SlideSurface {
     });
     if (this.root.getAttribute('aria-label') !== name) this.root.setAttribute('aria-label', name);
     const said = selectionAnnouncement(layout, this.editor);
-    if (this.#live.textContent !== said) this.#live.textContent = said;
+    // A canceled drag is said in place of the selection, until the selection changes.
+    this.#drag.speak(this.#live, said);
     const w = (layout.slide.width / EMU_PER_PX) * zoom;
     const h = (layout.slide.height / EMU_PER_PX) * zoom;
     this.#stage.style.width = `${w}px`;
@@ -304,22 +277,22 @@ export class SlideSurface {
     if (this.#paintKey !== painted) {
       this.#paintKey = painted;
       const svg = paintSlide(this.host.ownerDocument, painted, {
-        images: this.editor.imageUrl,
-        ...(this.editor.imageSize ? { imageSize: this.editor.imageSize } : {}),
-        idPrefix: `${this.editor.idPrefix}s${layout.slide.index}`,
+        ...this.#paintOptions(layout),
         ...(this.editor.altText ? { altText: this.editor.altText } : {}),
       });
       svg.setAttribute('class', 'pptx-surface__slide');
       const old = this.#stage.querySelector('.pptx-surface__slide');
       if (old) old.replaceWith(svg);
       else this.#stage.prepend(svg);
+      // A repaint during a drag (a peer's edit to another shape) keeps the preview.
+      this.#drag.repainted(layout);
     }
     for (const svg of [this.#stage.querySelector('.pptx-surface__slide'), this.#overlay]) {
       svg?.setAttribute('width', String(w));
       svg?.setAttribute('height', String(h));
     }
     this.#overlay.setAttribute('viewBox', `0 0 ${layout.slide.width} ${layout.slide.height}`);
-    this.#renderOverlay(layout, zoom);
+    this.#renderOverlay(this.#drag.overlayLayout(layout), zoom);
     this.#reportFit();
   }
 
@@ -417,7 +390,7 @@ export class SlideSurface {
       }
     }
     parts.push(...presenceElements(doc, layout, this.editor.presence?.() ?? [], px));
-    parts.push(...guideElements(doc, this.#guides, px));
+    parts.push(...guideElements(doc, this.#drag.guides, px));
     if (this.#marquee) {
       const { start: a, at: b } = this.#marquee;
       const r = doc.createElementNS(ns, 'rect');
@@ -551,20 +524,7 @@ export class SlideSurface {
     ids: readonly string[],
     start: { x: number; y: number }
   ): void {
-    const layout = this.editor.layout();
-    const items = ids
-      .map((id) => itemById(layout, id))
-      .filter((i): i is LayoutItem => !!i)
-      .map((item) => ({ item, box: boxOf(item), center: slideCenter(item) }));
-    if (items.length === 0) return;
-    this.#drag = {
-      handle,
-      items,
-      start,
-      bounds: unionBounds(items.map((i) => i.item)),
-      gesture: `g${++this.#gestures}`,
-      snap: layout ? snapContext(layout, ids) : { targets: [], slide: { width: 0, height: 0 } },
-    };
+    this.#drag.start(handle, ids, start, `g${++this.#gestures}`);
   }
 
   #onPointerDown = (e: PointerEvent): void => {
@@ -775,7 +735,7 @@ export class SlideSurface {
     if (!layout) return;
     const p = this.#slidePoint(e);
     if (
-      !this.#drag &&
+      !this.#drag.active &&
       !this.#textDrag &&
       !this.#table.active &&
       !this.#marquee &&
@@ -812,82 +772,31 @@ export class SlideSurface {
         this.editor.crop?.(cropAt(c, p), c.gesture);
       return;
     }
-    const d = this.#drag;
-    if (!d) return;
-    let dx = p.x - d.start.x;
-    let dy = p.y - d.start.y;
-    if (Math.abs(dx) + Math.abs(dy) < 2 * EMU_PER_PX) return;
-    if (d.handle === 'move') {
-      ({ dx, dy } = this.#guided(snapMove(d.snap, d.bounds, dx, dy, e.shiftKey, this.#snapTo(e))));
-      this.editor.transform(
-        d.items.map(({ item, box }) => {
-          const dp = deltaToParent(item, dx, dy);
-          return toFile(item, { ...box, x: box.x + dp.x, y: box.y + dp.y });
-        }),
-        d.gesture
-      );
-      return;
-    }
-    if (d.handle === 'start' || d.handle === 'end') {
-      this.editor.transform([this.#moveLineEnd(d, p, e.shiftKey)], d.gesture);
-      return;
-    }
-    const [hx, hy] = HANDLE_POS[d.handle];
-    // A resize snaps its dragged edges.
-    if (d.handle !== 'rot') {
-      const items = d.items.map((i) => i.item);
-      const tolerance = this.#snapTo(e);
-      const s = snapResize(d.snap, items, d.bounds, [hx, hy], [dx, dy], e.shiftKey, tolerance);
-      ({ dx, dy } = this.#guided(s));
-    }
-    if (d.items.length > 1) {
-      const many = scaleMany(d.bounds, d.items, [hx, hy], dx, dy, e.shiftKey);
-      this.editor.transform(many, d.gesture);
-      return;
-    }
-    // One shape: work in its parent's space, where its box lives (`surface-resize.ts`).
-    const { item, box: x } = d.items[0];
-    if (d.handle === 'rot') {
-      const rot = rotationAfterDrag(item, x, d.start, p, e.shiftKey);
-      this.editor.transform([toFile(item, { ...x, rot })], d.gesture);
-      return;
-    }
-    const s0 = toParent(item, d.start.x, d.start.y);
-    const s1 = toParent(item, d.start.x + dx, d.start.y + dy);
-    const locked = !!this.editor.aspectLocked?.(item.element.nodeId);
-    const keep = { shift: e.shiftKey, locked };
-    const one = resizeOne(item, x, [hx, hy], s1.x - s0.x, s1.y - s0.y, keep);
-    this.editor.transform([one], d.gesture);
+    // A preview, not an edit: the release writes the boxes (surface-drag.ts).
+    this.#drag.move(layout, p, 2 * EMU_PER_PX, {
+      shift: e.shiftKey,
+      snapTo: this.#snapTo(e),
+      aspectLocked: (id) => !!this.editor.aspectLocked?.(id),
+    });
   };
+
+  #paintOptions(layout: SlideLayout) {
+    return {
+      images: this.editor.imageUrl,
+      ...(this.editor.imageSize ? { imageSize: this.editor.imageSize } : {}),
+      idPrefix: `${this.editor.idPrefix}s${layout.slide.index}`,
+    };
+  }
+
+  /** End a shape drag with no edit (an undo or a redo). A drag that moved says so. */
+  cancelDrag(): void {
+    this.#drag.cancel();
+  }
 
   /** The snap distance in EMU, or null when Alt is down or View > Smart guides is off. */
   #snapTo(e: PointerEvent): number | null {
     if (e.altKey || !this.editor.smartGuides()) return null;
     return (SNAP_PX * EMU_PER_PX) / this.editor.zoom();
-  }
-
-  /** Keep a snap's guides for the overlay. */
-  #guided(snap: SnapResult): SnapResult {
-    this.#guides = snap.guides;
-    return snap;
-  }
-
-  /** A line with one end at the pointer; Shift snaps its angle to 45° steps. */
-  #moveLineEnd(d: Drag, p: { x: number; y: number }, snap: boolean): TransformItem {
-    const { item } = d.items[0];
-    const ends = lineEnds(item)!;
-    const fixed = toParent(item, ...xy(d.handle === 'start' ? ends.end : ends.start));
-    let moved = toParent(item, p.x, p.y);
-    if (snap) {
-      const len = Math.hypot(moved.x - fixed.x, moved.y - fixed.y);
-      const angle =
-        Math.round(Math.atan2(moved.y - fixed.y, moved.x - fixed.x) / (Math.PI / 4)) *
-        (Math.PI / 4);
-      moved = { x: fixed.x + Math.cos(angle) * len, y: fixed.y + Math.sin(angle) * len };
-    }
-    return d.handle === 'start'
-      ? lineTransform(item, moved, fixed)
-      : lineTransform(item, fixed, moved);
   }
 
   #onPointerUp = (e: PointerEvent): void => {
@@ -898,9 +807,9 @@ export class SlideSurface {
   };
 
   /**
-   * The browser took the pointer (a touch scroll, a system gesture): the drag ends where it is,
-   * keeping the steps it applied as one undo step. A marquee selects nothing, and the format
-   * painter does not paint.
+   * The browser took the pointer (a touch scroll, a system gesture): a shape drag writes its
+   * preview as one undo step, and a crop or grid line drag keeps the steps it applied as one. A
+   * marquee selects nothing, and the format painter does not paint.
    */
   #onPointerCancel = (e: PointerEvent): void => {
     this.#pressed = false;
@@ -912,14 +821,11 @@ export class SlideSurface {
   };
 
   #endGesture(e: PointerEvent): void {
-    this.#drag = null;
     this.#cropDrag = null;
     this.#textDrag = null;
     this.#table.up();
-    if (this.#guides.length) {
-      this.#guides = [];
-      this.render();
-    }
+    // A shape drag writes its last boxes as one edit.
+    this.#drag.release();
     const m = this.#marquee;
     if (!m) return;
     this.#marquee = null;
