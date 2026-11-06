@@ -1,14 +1,15 @@
 // The known-gap ratchet in CI: `FIXTURE_KNOWN_GAPS` only shrinks, and no limit in
-// `thresholds.ts` loosens or goes away. This check compares the list with the base branch. A new
-// entry, a new kind, or a looser value is allowed only for a fixture whose deck or reference PDF
-// changed in `references.json`, or when the list was measured with other tools (pdf.js,
-// Chromium, fixture fonts) and the change touches nothing but those tools: the lockfile,
-// `package.json` files, `thresholds.ts`, and, for new fixture fonts, `fixtures/fonts/`.
+// `thresholds.ts` loosens or goes away unless `RETIRED_LIMITS` gives the reason. This check
+// compares the list with the base branch. A new entry, a new kind, a looser value, or fewer
+// checked lines is allowed only for a new fixture, a fixture whose reference PDF changed in
+// `references.json`, or when the list was measured with other tools (pdf.js, Chromium, fixture
+// fonts) and the change touches nothing but those tools (`TOOL_PACKAGES`, `fixtures/fonts/`,
+// and `thresholds.ts`).
 //
 //   bun scripts/fidelity/check-known-gaps.ts --base origin/main
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -25,27 +26,148 @@ import { readManifest, type ReferenceManifest } from './reference-identity.ts';
 
 const TOOLS = ['pdfjs', 'chromium', 'fonts'] as const;
 
-/**
- * The changed files that are not tool files: everything but the lockfile, `package.json` files,
- * `thresholds.ts`, and (when the fixture fonts changed) `fixtures/fonts/`.
- */
-export function nonToolFiles(files: readonly string[], fontsChanged: boolean): string[] {
-  return files.filter(
-    (f) =>
-      f !== 'bun.lock' &&
-      f !== 'package.json' &&
-      !f.endsWith('/package.json') &&
-      f !== 'scripts/fidelity/thresholds.ts' &&
-      !(fontsChanged && f.startsWith('fixtures/fonts/'))
+/** The packages that are measuring tools: pdf.js, Playwright and its Chromium, the engine fonts. */
+export const TOOL_PACKAGES: ReadonlySet<string> = new Set([
+  'pdfjs-dist',
+  'playwright',
+  'playwright-core',
+  '@playwright/test',
+  '@docx-editor.dev/fonts',
+  '@docx-editor.dev/fonts-cjk',
+]);
+
+const DEPENDENCY_FIELDS = [
+  'dependencies',
+  'devDependencies',
+  'peerDependencies',
+  'optionalDependencies',
+] as const;
+
+type Json = Record<string, unknown>;
+
+/** A copy of a manifest object without the tool packages in its dependency fields. */
+function withoutTools(manifest: Json, tools: ReadonlySet<string>): Json {
+  const out: Json = { ...manifest };
+  for (const field of DEPENDENCY_FIELDS) {
+    const deps = manifest[field];
+    if (deps && typeof deps === 'object')
+      out[field] = Object.fromEntries(
+        Object.entries(deps as Json).filter(([name]) => !tools.has(name))
+      );
+  }
+  return out;
+}
+
+/** JSON with trailing commas (`bun.lock`). Undefined when it does not parse. */
+function parseLoose(text: string | undefined): Json | undefined {
+  if (text === undefined) return undefined;
+  try {
+    return JSON.parse(text.replace(/,(\s*[}\]])/g, '$1')) as Json;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Whether a `package.json` changed only in the versions of tool packages. */
+export function toolOnlyManifestChange(
+  base: string | undefined,
+  head: string | undefined
+): boolean {
+  const [b, h] = [parseLoose(base), parseLoose(head)];
+  if (!b || !h) return false;
+  return (
+    JSON.stringify(withoutTools(b, TOOL_PACKAGES)) ===
+    JSON.stringify(withoutTools(h, TOOL_PACKAGES))
   );
 }
 
-/** The fixtures whose deck or reference PDF differs between two manifests, or that are new. */
+/** The package name of a `bun.lock` entry: `["name@version", ...]`. */
+const lockName = (entry: unknown): string | undefined => {
+  const id = Array.isArray(entry) ? entry[0] : undefined;
+  return typeof id === 'string' ? id.slice(0, id.lastIndexOf('@')) : undefined;
+};
+
+/** The tool packages and every package that they depend on, in one lockfile. */
+function toolClosure(lock: Json): Set<string> {
+  const packages = (lock.packages ?? {}) as Json;
+  const byName = new Map<string, unknown>();
+  for (const entry of Object.values(packages)) {
+    const name = lockName(entry);
+    if (name) byName.set(name, entry);
+  }
+  const out = new Set<string>();
+  const queue = [...TOOL_PACKAGES];
+  while (queue.length) {
+    const name = queue.pop()!;
+    if (out.has(name)) continue;
+    out.add(name);
+    const meta = (byName.get(name) as unknown[] | undefined)?.find(
+      (part) => part && typeof part === 'object' && !Array.isArray(part)
+    ) as Json | undefined;
+    for (const field of DEPENDENCY_FIELDS)
+      for (const dep of Object.keys((meta?.[field] as Json | undefined) ?? {})) queue.push(dep);
+  }
+  return out;
+}
+
+/** A lockfile without the tool packages and their dependencies. */
+function lockWithoutTools(lock: Json, tools: ReadonlySet<string>): Json {
+  const workspaces = Object.fromEntries(
+    Object.entries((lock.workspaces ?? {}) as Json).map(([k, w]) => [
+      k,
+      withoutTools(w as Json, tools),
+    ])
+  );
+  const packages = Object.fromEntries(
+    Object.entries((lock.packages ?? {}) as Json).filter(([, entry]) => {
+      const name = lockName(entry);
+      return !name || !tools.has(name);
+    })
+  );
+  return { ...lock, workspaces, packages };
+}
+
+/** Whether `bun.lock` changed only in the resolved versions of the tool packages. */
+export function toolOnlyLockChange(base: string | undefined, head: string | undefined): boolean {
+  const [b, h] = [parseLoose(base), parseLoose(head)];
+  if (!b || !h) return false;
+  const tools = new Set([...toolClosure(b), ...toolClosure(h)]);
+  return JSON.stringify(lockWithoutTools(b, tools)) === JSON.stringify(lockWithoutTools(h, tools));
+}
+
+/** A changed file at the base and in the checkout (undefined where it does not exist). */
+export type ReadChange = (file: string) => { base?: string; head?: string };
+
+/**
+ * The changed files that are not a change of the tools alone. Tool files are `fixtures/fonts/`,
+ * `thresholds.ts`, and a `package.json` or `bun.lock` whose only change is the versions of
+ * `TOOL_PACKAGES` (and of the packages they depend on).
+ */
+export function nonToolFiles(files: readonly string[], read: ReadChange): string[] {
+  return files.filter((f) => {
+    if (f.startsWith('fixtures/fonts/') || f === 'scripts/fidelity/thresholds.ts') return false;
+    if (f === 'package.json' || f.endsWith('/package.json')) {
+      const { base, head } = read(f);
+      return !toolOnlyManifestChange(base, head);
+    }
+    if (f === 'bun.lock') {
+      const { base, head } = read(f);
+      return !toolOnlyLockChange(base, head);
+    }
+    return true;
+  });
+}
+
+/**
+ * The fixtures whose entries may take new values: new fixtures, and fixtures whose reference PDF
+ * changed. A deck that changed with the same reference PDF opens nothing: its reference is
+ * stale until the PDF is exported again.
+ */
 export function changedReferences(base: ReferenceManifest, head: ReferenceManifest): Set<string> {
   const changed = new Set<string>();
   for (const [name, h] of Object.entries(head.references)) {
     const b = Object.hasOwn(base.references, name) ? base.references[name] : undefined;
-    if (!b || b.deck !== h.deck || b.pdf !== h.pdf) changed.add(name);
+    if (!b || b.pdf !== h.pdf) changed.add(name);
   }
   return changed;
 }
@@ -79,6 +201,11 @@ export function looserGaps(
       if (old[kind] === undefined) problems.push(`${key}: a new kind, ${kind}`);
       else if (looser(kind, gap, old))
         problems.push(`${key}: a looser ${kind} score (${old[kind]} → ${gap[kind]})`);
+  }
+  for (const [deck, lines] of Object.entries(head.deckLines ?? {})) {
+    const was = base.deckLines?.[deck];
+    if (!changed.has(deck) && was !== undefined && lines < was)
+      problems.push(`${deck}: checks fewer lines (${was} → ${lines})`);
   }
   if (problems.length && newTools.length) {
     const shown = otherFiles.slice(0, 5).join(', ');
@@ -167,7 +294,10 @@ export async function checkAgainstBase(
     return { lines: [`${base} is not a commit. Fetch the base branch first.`], exitCode: 2 };
   }
   const source = gitShow(base, 'scripts/fidelity/thresholds.ts');
-  let mod: Parameters<typeof limitsOf>[0] & { FIXTURE_KNOWN_GAPS?: KnownGapList } = {};
+  let mod: Parameters<typeof limitsOf>[0] & {
+    FIXTURE_KNOWN_GAPS?: KnownGapList;
+    RETIRED_LIMITS?: Record<string, string>;
+  } = {};
   if (source) {
     const dir = mkdtempSync(join(tmpdir(), 'pptx-gaps-'));
     try {
@@ -179,7 +309,13 @@ export async function checkAgainstBase(
   }
   const manifest = gitShow(base, 'fixtures/references.json');
   const baseList = mod.FIXTURE_KNOWN_GAPS;
-  const fontsChanged = baseList !== undefined && baseList.fonts !== FIXTURE_KNOWN_GAPS.fonts;
+  const read: ReadChange = (file) => ({
+    base: gitShow(base, file),
+    head: existsSync(file) ? readFileSync(file, 'utf8') : undefined,
+  });
+  const notices = Object.entries(RETIRED_LIMITS)
+    .filter(([key]) => !Object.hasOwn(mod.RETIRED_LIMITS ?? {}, key))
+    .map(([key, reason]) => `NOTICE: ${key} is retired: ${reason}`);
   const problems = [
     ...looserLimits(limitsOf(mod), limitsOf({ THRESHOLDS, PAGE_SIZE_TOLERANCE_PT, GAP_MARGINS })),
     ...looserGaps(
@@ -189,18 +325,19 @@ export async function checkAgainstBase(
         manifest ? (JSON.parse(manifest) as ReferenceManifest) : { version: 1, references: {} },
         readManifest('fixtures')
       ),
-      nonToolFiles(changedFiles(base), fontsChanged)
+      nonToolFiles(changedFiles(base), read)
     ),
   ];
   if (!problems.length)
     return {
-      lines: [`Nothing in the known gaps or the limits loosens against ${base}.`],
+      lines: [...notices, `Nothing in the known gaps or the limits loosens against ${base}.`],
       exitCode: 0,
     };
   return {
     lines: [
+      ...notices,
       ...problems.map((p) => `GAPS: ${p}`),
-      'The known gaps and the limits only tighten, and no limit goes away. Fix the regression instead of recording it. Only a new fixture, a changed deck, a new reference PDF, or a pull request that changes only the tools may take a new or looser entry.',
+      'The known gaps and the limits only tighten, and no limit goes away unless RETIRED_LIMITS gives the reason. Fix the regression instead of recording it. Only a new fixture, a new reference PDF, or a pull request that changes only the tools may take a new or looser entry.',
     ],
     exitCode: 1,
   };

@@ -357,7 +357,8 @@ interface PdfFontName {
 
 /**
  * The fonts of our PDF that are not faces the harness page loaded (`harnessFontFiles`), or not
- * embedded: a system font took part in the paint.
+ * embedded: a system font took part in the paint. A font is known by its PostScript name only:
+ * a system font with the PostScript name of a loaded face passes unseen.
  */
 export function foreignOurFonts(
   fonts: readonly PdfFontName[],

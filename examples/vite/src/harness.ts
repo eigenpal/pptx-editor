@@ -91,7 +91,7 @@ async function received(bytes: Uint8Array<ArrayBuffer>): Promise<ReceivedFile> {
  * The painted SVG with every session-bound name replaced by the digest of the bytes behind it:
  * each image blob URL (with its type), and each face id (`pptx-f<measurer>-<face>`, new for each session). Two
  * paints with the same markup draw the same bytes with the same instructions, so the save check
- * compares markup first and screenshots only when it differs.
+ * compares the markup alone.
  */
 async function markupOf(svg: SVGSVGElement): Promise<string> {
   const urls = new Set<string>();

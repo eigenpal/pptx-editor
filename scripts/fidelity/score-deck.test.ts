@@ -7,6 +7,35 @@ import { buildPptx } from '../fixtures/builder.ts';
 import { deliverUpload, ResetFailed } from './harness-page.ts';
 import { scoreDeck, scoreSafely } from './score-deck.ts';
 
+/**
+ * A PDF of two 960 × 540 pt pages whose text uses Helvetica without embedding it, built by hand
+ * with a correct cross-reference table.
+ */
+function pdfWithoutEmbeddedFont(): Uint8Array {
+  const page = (content: number) =>
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 960 540] /Resources << /Font << /F1 5 0 R >> >> /Contents ${content} 0 R >>`;
+  const text = 'BT /F1 24 Tf 72 400 Td (Not embedded) Tj ET';
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+    page(6),
+    page(6),
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${text.length} >>\nstream\n${text}\nendstream`,
+  ];
+  let out = '%PDF-1.4\n';
+  const offsets: number[] = [];
+  objects.forEach((body, i) => {
+    offsets.push(out.length);
+    out += `${i + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const o of offsets) out += `${String(o).padStart(10, '0')} 00000 n \n`;
+  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return new TextEncoder().encode(out);
+}
+
 /** A real PDF of two 960 × 540 pt pages in the open fonts that ship with the engine. */
 const TWO_PAGES = join(import.meta.dir, '../../fixtures/groups-transforms.pdf');
 
@@ -125,12 +154,29 @@ describe('scoreDeck', () => {
 
   test('fonts of our PDF that the harness did not load are listed', async () => {
     // The fonts that are not open, on purpose: the reference of `font-substitution`.
-    const ours = join(import.meta.dir, '../../fixtures/font-substitution.pdf');
-    const page = fakePage(3, undefined, undefined, new Uint8Array(readFileSync(ours)));
+    const pdf = join(import.meta.dir, '../../fixtures/font-substitution.pdf'); // one page
+    const one = join(dir, 'one.pptx');
+    writeFileSync(
+      one,
+      buildPptx({ width: 12_192_000, height: 6_858_000, slides: [{ shapes: '' }] })
+    );
+    const page = fakePage(1, undefined, undefined, new Uint8Array(readFileSync(pdf)));
+    const r = await scoreDeck(page, { file: one, name: 'd', pdf });
+    expect(r.foreignFonts).toEqual(['Aptos', 'ArialMT', 'Calibri', 'SegoeUI']);
+  });
+
+  test('a reference PDF with a font that it does not embed is stale', async () => {
+    const pdf = join(dir, 'reference.pdf');
+    writeFileSync(pdf, pdfWithoutEmbeddedFont());
+    const r = await scoreDeck(fakePage(3), { file: deck, name: 'd', pdf });
+    expect(r.reference).toBe('stale');
+    expect(r.referenceIssues).toEqual(['the PDF does not embed the font Helvetica']);
+  });
+
+  test('a font of our PDF that is not embedded is listed', async () => {
+    const page = fakePage(3, undefined, undefined, pdfWithoutEmbeddedFont());
     const r = await scoreDeck(page, { file: deck, name: 'd', pdf: TWO_PAGES });
-    expect(r.foreignFonts).toContain('Calibri');
-    expect(r.foreignFonts).toContain('Wingdings-Regular');
-    expect(r.foreignFonts).not.toContain('LiberationSans');
+    expect(r.foreignFonts).toEqual(['Helvetica (not embedded)']);
   });
 
   test('our PDF must have one page of the slide size for each visible slide', async () => {

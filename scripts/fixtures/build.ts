@@ -12,7 +12,7 @@ import { slideLayoutsDeck } from './slide-layouts.ts';
 import { fillFidelityDeck } from './fill-fidelity.ts';
 import { slideStructureDeck } from './slide-structure.ts';
 import { shapeFormatFixtures } from './shape-format.ts';
-import { eastAsianThemeFontsDeck, eastAsianTypographyDeck, namedFacesSlide, textScriptFixtures } from './text-scripts.ts';
+import { eastAsianThemeFontsDeck, eastAsianTypographyDeck, textScriptFixtures } from './text-scripts.ts';
 import { followUpFixtures } from './follow-ups.ts';
 import { chartsDeck, diagramsDeck } from './drawingml.ts';
 
@@ -317,8 +317,8 @@ const fixtures: Record<string, FixtureSlide[]> = {
     },
   ],
   // What the Bullets and Numbering galleries write: the standard bullet characters with their
-  // fonts (an open symbol face here; the Wingdings bullets are on `font-substitution` slide 2), a
-  // custom character in the text font, the numbering schemes, a size, a color, and startAt.
+  // fonts (an open symbol face here), a custom character in the text font, the numbering schemes,
+  // a size, a color, and startAt.
   'bullets-gallery': [
     {
       shapes:
@@ -789,7 +789,6 @@ const fixtures: Record<string, FixtureSlide[]> = {
             para(run(`${label}. ${LOREM}`, 'sz="2000"', `<a:latin typeface="${face}"/>`))))
         .join(''),
     },
-    namedFacesSlide,
   ],
   // Shapes on the edges of an ISO A4 slide, whose height is not whole points.
   'slide-size': [

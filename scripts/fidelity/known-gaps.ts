@@ -111,11 +111,35 @@ export function slideVerdict(s: SlideResult, gap: KnownGap | undefined): string 
     : `fails: ${fails}`;
 }
 
-/** One problem of the gate. `record` problems go away with `--update-gaps`; `fix` ones do not. */
+/**
+ * One problem of the gate. `record` problems go away with `--update-gaps`; `fix` ones do not.
+ * `tools` says that the list was measured with other tools: record it in a change of the tools
+ * alone (`check-known-gaps.ts`).
+ */
 export interface GateProblem {
-  readonly kind: 'fix' | 'record';
+  readonly kind: 'fix' | 'record' | 'tools';
   readonly text: string;
 }
+
+/** The tools that a known-gap list was measured with. */
+export interface GapTools {
+  readonly pdfjs: string;
+  readonly chromium: string;
+  readonly fonts: string;
+}
+
+const TOOL_KEYS = ['pdfjs', 'chromium', 'fonts'] as const;
+
+/** The tools that differ between a list and a run, as `chromium a → b`. */
+export function toolChanges(list: GapTools, tools: GapTools): string[] {
+  return TOOL_KEYS.filter((k) => tools[k] !== list[k]).map(
+    (k) => `${k} ${list[k] || 'none'} → ${tools[k]}`
+  );
+}
+
+/** The reference lines that a deck checks over all its compared slides. */
+export const deckLineCount = (deck: DeckResult): number =>
+  deck.slides.reduce((n, s) => n + (s.linesTotal ?? 0), 0);
 
 export interface GateResult {
   readonly problems: readonly GateProblem[];
@@ -130,17 +154,19 @@ export interface GateResult {
 export function checkFixtureGate(
   decks: readonly DeckResult[],
   list: KnownGapList,
-  tools: { readonly pdfjs: string; readonly chromium: string; readonly fonts: string },
+  tools: GapTools,
   complete: boolean
 ): GateResult {
   const gaps = list.slides;
   const problems: GateProblem[] = [];
   const fix = (text: string): void => void problems.push({ kind: 'fix', text });
   const record = (text: string): void => void problems.push({ kind: 'record', text });
-  const changed = (['pdfjs', 'chromium', 'fonts'] as const)
-    .filter((k) => tools[k] !== list[k])
-    .map((k) => `${k} ${tools[k]} (the list: ${list[k] || 'none'})`);
-  if (changed.length) record(`the list was measured with other tools: ${changed.join(', ')}`);
+  const changed = toolChanges(list, tools);
+  if (changed.length)
+    problems.push({
+      kind: 'tools',
+      text: `the list was measured with other tools: ${changed.join(', ')}`,
+    });
   const knownGaps = new Set<string>();
   const seen = new Set<string>();
   const unscored = new Set<string>();
@@ -153,6 +179,18 @@ export function checkFixtureGate(
       fix(
         `${deck.name}: the reference PDF embeds fonts that are not open fonts of the deck: ${deck.foreignReferenceFonts.join(', ')}. Name open fonts in the deck, or list the deck in NON_OPEN_FONT_DECKS (local-fonts.ts)`
       );
+    if (!deck.error && deck.reference === 'pdf') {
+      const lines = deckLineCount(deck);
+      const recorded = list.deckLines?.[deck.name];
+      if (recorded === undefined)
+        record(`${deck.name}: checks ${lines} lines, the list records none`);
+      else if (lines < recorded)
+        fix(
+          `${deck.name}: checks ${lines} of its ${recorded} recorded lines: a change drops text from the check`
+        );
+      else if (lines > recorded)
+        record(`${deck.name}: checks ${lines} lines, the list records ${recorded}`);
+    }
     if (deck.error) {
       fix(`${deck.name}: the deck was not scored (${deck.error})`);
       unscored.add(deck.name);
@@ -225,7 +263,9 @@ export function looser(kind: FailureKind, head: KnownGap, base: KnownGap): boole
 
 /** How a new known-gap list differs from the old one, entry by entry. */
 export interface ListChanges {
-  /** Entries with a looser value or a new kind. */
+  /** The tools that changed, as `chromium a → b`. */
+  readonly tools: readonly string[];
+  /** Entries with a looser value or a new kind, and decks that check fewer lines. */
   readonly looser: readonly string[];
   /** New entries: slides that fail now and did not before. */
   readonly added: readonly string[];
@@ -249,8 +289,34 @@ export function listChanges(old: KnownGapList, next: KnownGapList): ListChanges 
     if ((gap.lines ?? 0) < (was.lines ?? 0)) worse.push(`lines ${was.lines} → ${gap.lines ?? 0}`);
     if (worse.length) looserEntries.push(`${key}: ${worse.join(', ')}`);
   }
+  for (const [deck, lines] of Object.entries(next.deckLines)) {
+    const was = old.deckLines?.[deck];
+    if (was !== undefined && lines < was)
+      looserEntries.push(`${deck}: checks fewer lines (${was} → ${lines})`);
+  }
   const removed = Object.keys(old.slides).filter((key) => !Object.hasOwn(next.slides, key));
-  return { looser: looserEntries, added, removed };
+  return { tools: toolChanges(old, next), looser: looserEntries, added, removed };
+}
+
+/** What `--update-gaps` does with a run: the list it records, the changes, and whether to write. */
+export interface GapUpdate {
+  readonly next: KnownGapList;
+  readonly changes: ListChanges;
+  /** False when the run has new or looser entries and `acceptWorse` is not set. */
+  readonly write: boolean;
+}
+
+/** Plan `--update-gaps`: new entries and looser values are written only with `acceptWorse`. */
+export function planUpdate(
+  list: KnownGapList,
+  decks: readonly DeckResult[],
+  tools: GapTools,
+  acceptWorse: boolean
+): GapUpdate {
+  const next = mergeRecorded(list, decks, tools);
+  const changes = listChanges(list, next);
+  const worse = changes.looser.length > 0 || changes.added.length > 0;
+  return { next, changes, write: acceptWorse || !worse };
 }
 
 /**
@@ -260,15 +326,22 @@ export function listChanges(old: KnownGapList, next: KnownGapList): ListChanges 
 export function mergeRecorded(
   list: KnownGapList,
   decks: readonly DeckResult[],
-  tools: { readonly pdfjs: string; readonly chromium: string; readonly fonts: string }
+  tools: GapTools
 ): KnownGapList {
   const scored = decks.filter((d) => !d.error);
   const ran = new Set(scored.map((d) => d.name));
   const kept = Object.fromEntries(
     Object.entries(list.slides).filter(([key]) => !ran.has(key.slice(0, key.lastIndexOf('/'))))
   );
+  const keptLines = Object.fromEntries(
+    Object.entries(list.deckLines ?? {}).filter(([deck]) => !ran.has(deck))
+  );
   const recorded = recordedList(scored, tools);
-  return { ...recorded, slides: { ...kept, ...recorded.slides } };
+  return {
+    ...recorded,
+    deckLines: { ...keptLines, ...recorded.deckLines },
+    slides: { ...kept, ...recorded.slides },
+  };
 }
 
 /** One known-gap entry as a line of `thresholds.ts`. */
@@ -278,17 +351,17 @@ export function gapEntryLine(key: string, gap: KnownGap): string {
 }
 
 /** The known-gap list that a run records: its tools and each failing slide. */
-export function recordedList(
-  decks: readonly DeckResult[],
-  tools: { readonly pdfjs: string; readonly chromium: string; readonly fonts: string }
-): KnownGapList {
+export function recordedList(decks: readonly DeckResult[], tools: GapTools): KnownGapList {
   const slides: Record<string, KnownGap> = {};
-  for (const deck of decks)
+  const deckLines: Record<string, number> = {};
+  for (const deck of decks) {
+    if (!deck.error && deck.reference === 'pdf') deckLines[deck.name] = deckLineCount(deck);
     for (const s of deck.slides) {
       const gap = gapEntry(s);
       if (gap) slides[slideKey(deck.name, s.index)] = gap;
     }
-  return { ...tools, slides };
+  }
+  return { ...tools, deckLines, slides };
 }
 
 /** The `FIXTURE_KNOWN_GAPS` constant as source text. */
@@ -296,11 +369,15 @@ export function listSource(list: KnownGapList): string {
   const entries = Object.keys(list.slides)
     .sort()
     .map((key) => `    ${gapEntryLine(key, list.slides[key])}`);
+  const lines = Object.keys(list.deckLines)
+    .sort()
+    .map((deck) => `    '${deck}': ${list.deckLines[deck]},`);
   return [
     'export const FIXTURE_KNOWN_GAPS: KnownGapList = {',
     `  pdfjs: '${list.pdfjs}',`,
     `  chromium: '${list.chromium}',`,
     `  fonts: '${list.fonts}',`,
+    lines.length ? `  deckLines: {\n${lines.join('\n')}\n  },` : '  deckLines: {},',
     entries.length ? `  slides: {\n${entries.join('\n')}\n  },` : '  slides: {},',
     '};',
   ].join('\n');

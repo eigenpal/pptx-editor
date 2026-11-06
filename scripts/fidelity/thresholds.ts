@@ -22,13 +22,6 @@ export const THRESHOLDS = {
    */
   maxExtraLines: 0,
   /**
-   * Our page raster and the reference page raster may differ in size by this many pixels
-   * (`comparePixels`). Both PDFs are drawn onto one raster of the slide size, and each PDF page
-   * must be the slide size within `PAGE_SIZE_TOLERANCE_PT`, so a short page shows as differing
-   * pixels.
-   */
-  maxSizeDeltaPx: 0,
-  /**
    * Save, reopen, and paint again: the share of slide markup that may differ from the first
    * paint (`markupOf` in the harness page). 0: the markup must be identical.
    */
@@ -92,6 +85,8 @@ export const PAGE_SIZE_TOLERANCE_PT = 0.625;
 export const RETIRED_LIMITS: Readonly<Record<string, string>> = {
   rasterScale:
     'the supersampling factor: pdf.js draws both PDFs at renderWidthPx, and no raster is scaled down',
+  maxSizeDeltaPx:
+    'the raster size difference: pdf.js draws both PDFs onto one raster of the slide size, so it cannot differ; each PDF page must be the slide size within PAGE_SIZE_TOLERANCE_PT instead',
 };
 
 /** A threshold that a slide misses (`known-gaps.ts`). */
@@ -135,10 +130,15 @@ export interface KnownGap {
 export interface KnownGapList {
   /** The pdf.js version that draws and reads both PDFs. */
   readonly pdfjs: string;
-  /** Playwright's Chromium, which prints our PDF. */
+  /** Playwright's pinned Chromium revision, which prints our PDF (`pinnedChromium`). */
   readonly chromium: string;
   /** The fixture fonts (`fixtureFontsIdentity`). */
   readonly fonts: string;
+  /**
+   * How many reference lines each fixture checks, over all its slides. Fewer lines fail the gate,
+   * so a comparator or layout change that drops lines shows, also on slides that pass.
+   */
+  readonly deckLines: Readonly<Record<string, number>>;
   /** By `deck/slide`, for example `text-runs/1`. */
   readonly slides: Readonly<Record<string, KnownGap>>;
 }
@@ -151,9 +151,51 @@ export interface KnownGapList {
  */
 export const FIXTURE_KNOWN_GAPS: KnownGapList = {
   pdfjs: '5.4.624',
-  chromium: '156.0.8078.4',
+  chromium: 'chromium-headless-shell 1248',
   fonts:
     '@docx-editor.dev/fonts 2.34.0, @docx-editor.dev/fonts-cjk 2.34.0, fixtures/fonts 6e44cd4f58fb',
+  deckLines: {
+    'alignment-anchor': 19,
+    'arrange-flip-hidden': 3,
+    autofit: 9,
+    'bullets-gallery': 17,
+    'bullets-numbering': 21,
+    colors: 0,
+    'custom-geometry': 0,
+    'east-asian-line-breaking': 136,
+    'east-asian-theme-fonts': 16,
+    'east-asian-typography': 79,
+    effects: 4,
+    'fill-fidelity': 0,
+    'fills-lines': 0,
+    'follow-ups': 0,
+    'font-effects': 10,
+    'font-substitution': 8,
+    gradients: 0,
+    'groups-transforms': 4,
+    'line-model': 65,
+    'lines-arrows': 0,
+    'paragraph-format': 27,
+    'picture-editing': 0,
+    pictures: 0,
+    'placeholders-background': 3,
+    'preserve-unsupported': 1,
+    'preset-shapes': 0,
+    'rtl-text': 3,
+    'shape-effects-presets': 24,
+    'shape-styles': 24,
+    'slide-layouts': 10,
+    'slide-size': 0,
+    'slide-size-rounding': 0,
+    'slide-structure': 4,
+    spacing: 18,
+    'table-editing': 10,
+    tables: 29,
+    'text-direction': 47,
+    'text-runs': 11,
+    'vertical-columns': 12,
+    'vertical-east-asian': 0,
+  },
   slides: {
     'autofit/1': { pixels: 0.0094, lines: 9 },
     'east-asian-line-breaking/1': { pixels: 0.0062, lines: 52 },
@@ -178,7 +220,6 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'follow-ups/3': { pixels: 0.1153 },
     'font-effects/1': { pixels: 0.008, lines: 10 },
     'font-substitution/1': { pixels: 0.0141, lines: 8 },
-    'font-substitution/2': { pixels: 0.0098, 'line-breaks': 0.8462, lines: 13 },
     'gradients/1': { pixels: 0.0894 },
     'line-model/2': { pixels: 0.0051, lines: 31 },
     'paragraph-format/1': { pixels: 0.0095, 'line-breaks': 0.8889, 'extra-text': 3, lines: 27 },

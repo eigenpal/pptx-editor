@@ -70,7 +70,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   'paragraphs.text-warp': { fixtures: [], approximations: ['text-warp'] },
   // --- Bullets & numbering -----------------------------------------------
   'lists.bullets-numbering': {
-    fixtures: ['bullets-numbering', 'bullets-gallery', 'rtl-text', 'font-substitution'],
+    fixtures: ['bullets-numbering', 'bullets-gallery', 'rtl-text'],
     approximations: [
       'line-model',
       'aligned-bullets',

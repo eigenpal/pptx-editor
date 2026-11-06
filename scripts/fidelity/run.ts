@@ -17,15 +17,8 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSyn
 import { execFileSync } from 'node:child_process';
 import { join, relative, resolve } from 'node:path';
 import { FIXTURE_KNOWN_GAPS, type KnownGapList } from './thresholds.ts';
-import {
-  checkFixtureGate,
-  listChanges,
-  mergeRecorded,
-  slideKey,
-  slideVerdict,
-  writeGaps,
-} from './known-gaps.ts';
-import { withHarnessPage } from './harness-page.ts';
+import { checkFixtureGate, planUpdate, slideKey, slideVerdict, writeGaps } from './known-gaps.ts';
+import { pinnedChromium, withHarnessPage } from './harness-page.ts';
 import { laneCount, scoreInLanes, type LaneJob } from './lanes.ts';
 import {
   corpusThresholds,
@@ -128,10 +121,10 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
   const tools = {
     pdfjs: PDFJS_VERSION,
-    chromium: scored.chromium ?? 'unknown',
+    chromium: pinnedChromium(),
     fonts: set === 'fixtures' ? fixtureFontsIdentity() : localFontsIdentity(),
   };
-  const toolsText = `pdf.js ${tools.pdfjs}, Chromium ${tools.chromium}, fonts ${tools.fonts}`;
+  const toolsText = `pdf.js ${tools.pdfjs}, ${tools.chromium} (Chromium ${scored.chromium ?? 'unknown'}), fonts ${tools.fonts}`;
   const report = join(relative(process.cwd(), out) || '.', 'index.html');
 
   if (set !== 'fixtures') {
@@ -149,15 +142,15 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
   let refused = false;
   if (args.updateGaps) {
     // A partial run, or a deck that did not finish, replaces no entry of the decks it lacks.
-    const next = mergeRecorded(list, results, tools);
-    const changes = listChanges(list, next);
-    for (const e of changes.looser) console.log(`LOOSER: ${e}`);
-    for (const e of changes.added) console.log(`NEW: ${e}`);
-    for (const e of changes.removed) console.log(`REMOVED: ${e}`);
-    refused = !args.acceptWorse && (changes.looser.length > 0 || changes.added.length > 0);
-    if (!refused) {
-      await writeGaps(THRESHOLDS_FILE, next);
-      list = next;
+    const plan = planUpdate(list, results, tools, args.acceptWorse);
+    for (const e of plan.changes.tools) console.log(`TOOLS: ${e}`);
+    for (const e of plan.changes.looser) console.log(`LOOSER: ${e}`);
+    for (const e of plan.changes.added) console.log(`NEW: ${e}`);
+    for (const e of plan.changes.removed) console.log(`REMOVED: ${e}`);
+    refused = !plan.write;
+    if (plan.write) {
+      await writeGaps(THRESHOLDS_FILE, plan.next);
+      list = plan.next;
     }
   }
   const gate = checkFixtureGate(results, list, tools, !only.length);
@@ -168,21 +161,24 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
       s.verdict = slideVerdict(s, Object.hasOwn(list.slides, key) ? list.slides[key] : undefined);
     }
   const fixes = gate.problems.filter((p) => p.kind === 'fix');
+  const records = gate.problems.filter((p) => p.kind === 'record');
   const next = refused
-    ? 'Nothing was written: the run has new or looser entries (LOOSER, NEW above). Fix the regression. Only a new fixture, a changed deck, a new reference PDF, or new tools may record them, with: bun run fidelity <deck> --update-gaps --accept-worse'
+    ? 'Nothing was written: the run has new or looser entries (LOOSER, NEW above). Fix the regression. Only a new fixture, a new reference PDF, or a change of the tools alone may record them, with: bun run fidelity <deck> --update-gaps --accept-worse'
     : args.updateGaps
-      ? `FIXTURE_KNOWN_GAPS in scripts/fidelity/thresholds.ts now records this run. Review its diff: a worse value is a regression to fix, not to record.`
+      ? 'FIXTURE_KNOWN_GAPS in scripts/fidelity/thresholds.ts now records this run. Review its diff: a worse value is a regression to fix, not to record.'
       : fixes.length
-        ? `Fix the problems above; see ${report}. A new fixture, a changed deck, or a new reference PDF may take new entries with: bun run fidelity <deck> --update-gaps --accept-worse`
-        : gate.problems.length
-          ? 'The scores are better than the known gaps record. Record them with: bun run fidelity --update-gaps'
-          : 'Nothing to do.';
+        ? `Fix the problems above; see ${report}. A new fixture or a new reference PDF may take new entries with: bun run fidelity <deck> --update-gaps --accept-worse`
+        : records.length
+          ? 'The list records other scores or line counts than this run (RECORD above). Record a better score with: bun run fidelity --update-gaps'
+          : gate.problems.length
+            ? 'The list was measured with other tools (TOOLS above). Record it in a pull request that changes only the tools: bun run fidelity --update-gaps --accept-worse'
+            : 'Nothing to do.';
   const problems = gate.problems.map((p) => p.text);
   writeReport(out, set, results, { tools: toolsText, gate: { problems, next } });
   console.log(
     `\n${passing} of ${all.length} slides pass; ${gate.knownGaps.size} fail as known gaps${hiddenText}. ${seconds} s. Report: ${report}`
   );
-  for (const p of gate.problems) console.log(`${p.kind === 'fix' ? 'FIX' : 'RECORD'}: ${p.text}`);
+  for (const p of gate.problems) console.log(`${p.kind.toUpperCase()}: ${p.text}`);
   console.log(
     `Gate: ${gate.problems.length ? 'fails' : 'passes'}${only.length ? ` (only ${only.join(', ')})` : ''}. ${next}`
   );
@@ -252,7 +248,7 @@ async function runList(args: Extract<RunArgs, { mode: 'list' }>): Promise<number
   writeRun();
   await withHarnessPage(async (first, control) => {
     let page = first;
-    runInfo.chromium = page.context().browser()?.version() ?? null;
+    runInfo.chromium = `${pinnedChromium()} (Chromium ${page.context().browser()?.version() ?? 'unknown'})`;
     writeRun();
     for (const job of todo) {
       let r: DeckResult;

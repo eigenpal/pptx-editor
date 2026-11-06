@@ -37,7 +37,8 @@ function load(bytes: Uint8Array): Promise<PDFDocumentProxy> {
     maxImageSize: MAX_IMAGE_PIXELS,
     cMapUrl: `${join(PDFJS_DIR, 'cmaps')}/`,
     cMapPacked: true,
-    standardFontDataUrl: `${join(PDFJS_DIR, 'standard_fonts')}/`,
+    // No standard font data: a font that the PDF does not embed stays `missingFile`, and the
+    // harness refuses it (`fonts`), so no substitute font takes part.
     verbosity: 0,
   }).promise;
 }

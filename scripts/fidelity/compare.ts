@@ -18,11 +18,7 @@ export interface PixelScore {
 
 /** Compare two rasters of the same size. */
 export function comparePixels(ours: Raster, reference: Raster, withDiff = false): PixelScore {
-  // pixelmatch compares rasters of one size, so `maxSizeDeltaPx` stays 0.
-  if (
-    Math.abs(ours.width - reference.width) > THRESHOLDS.maxSizeDeltaPx ||
-    Math.abs(ours.height - reference.height) > THRESHOLDS.maxSizeDeltaPx
-  )
+  if (ours.width !== reference.width || ours.height !== reference.height)
     throw new Error('the two rasters have different sizes');
   const { width: w, height: h } = ours;
   const diff = new PNG({ width: w, height: h });

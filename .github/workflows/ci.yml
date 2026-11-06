@@ -177,8 +177,9 @@ jobs:
       - name: API change has a changeset
         if: matrix.check == 'changeset' && github.event_name == 'pull_request' && !startsWith(github.head_ref, 'changeset-release/')
         run: node scripts/check-api-changeset.mjs --base origin/${{ github.base_ref }}
-      # FIXTURE_KNOWN_GAPS only shrinks: no new entry, new kind, or looser score
-      # unless the fixture's reference PDF changes too. Needs the base branch (full history).
+      # FIXTURE_KNOWN_GAPS only shrinks, and no limit loosens or goes away unseen
+      # (scripts/fidelity/check-known-gaps.ts says when a new or looser entry may stay).
+      # Needs the base branch (full history).
       - name: Known gaps only shrink
         if: matrix.check == 'changeset' && github.event_name == 'pull_request'
         run: bun scripts/fidelity/check-known-gaps.ts --base origin/${{ github.base_ref }}

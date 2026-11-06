@@ -3,13 +3,15 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  checkFixtureGate,
+  checkFixtureGate as gateOf,
+  deckLineCount,
   failureKinds,
   gapEntry,
   gapEntryLine,
   listChanges,
   listSource,
   mergeRecorded,
+  planUpdate,
   recordedList,
   slideVerdict,
   writeGaps,
@@ -17,6 +19,7 @@ import {
 import { FIXTURE_KNOWN_GAPS, type KnownGapList } from './thresholds.ts';
 import { fixtureFontsIdentity } from './local-fonts.ts';
 import { PDFJS_VERSION } from './pdf.ts';
+import { pinnedChromium } from './harness-page.ts';
 import type { DeckResult, SlideResult } from './report.ts';
 
 const slide = (index: number, over: Partial<SlideResult> = {}): SlideResult => ({
@@ -41,9 +44,33 @@ const deck = (name: string, slides: SlideResult[], over: Partial<DeckResult> = {
 });
 
 const tools = { pdfjs: '5', chromium: '1', fonts: 'f' };
-const list = (slides: KnownGapList['slides']): KnownGapList => ({ ...tools, slides });
+const list = (
+  slides: KnownGapList['slides'],
+  deckLines: KnownGapList['deckLines'] = {}
+): KnownGapList => ({ ...tools, deckLines, slides });
 const baselineFail = { status: 'fail' as const, baselineDelta: 0.9 };
 const texts = (r: ReturnType<typeof checkFixtureGate>): string[] => r.problems.map((p) => p.text);
+
+/**
+ * The gate, with each deck's checked lines recorded as the run counts them when the list records
+ * none, so a test sees only the problems it is about.
+ */
+function checkFixtureGate(
+  decks: readonly DeckResult[],
+  l: KnownGapList,
+  t: typeof tools,
+  complete: boolean
+): ReturnType<typeof gateOf> {
+  const counted = Object.fromEntries(
+    decks.filter((d) => !d.error && d.reference === 'pdf').map((d) => [d.name, deckLineCount(d)])
+  );
+  return gateOf(
+    decks,
+    Object.keys(l.deckLines).length ? l : { ...l, deckLines: counted },
+    t,
+    complete
+  );
+}
 
 describe('failure kinds and entries', () => {
   test('name each threshold a failing slide misses, and record its values', () => {
@@ -142,12 +169,28 @@ describe('the fixture gate', () => {
       true
     );
     expect(texts(r)).toEqual([
-      'the list was measured with other tools: pdfjs 6 (the list: 5)',
+      'the list was measured with other tools: pdfjs 5 → 6',
       'a/1: save and reopen paint another slide',
       'b: the deck was not scored (boom)',
       'c: no usable reference (no reference PDF). Put its reference PDF next to it and record it in references.json',
       'z/1: listed, but no such fixture slide exists',
     ]);
+  });
+
+  test('a deck that checks fewer lines than recorded needs a fix; more or none needs a record', () => {
+    const decks = [deck('a', [slide(1)]), deck('b', [slide(1)]), deck('c', [slide(1)])];
+    const r = gateOf(decks, list({}, { a: 6, b: 2 }), tools, true);
+    expect(r.problems).toEqual([
+      {
+        kind: 'fix',
+        text: 'a: checks 4 of its 6 recorded lines: a change drops text from the check',
+      },
+      { kind: 'record', text: 'b: checks 4 lines, the list records 2' },
+      { kind: 'record', text: 'c: checks 4 lines, the list records none' },
+    ]);
+    expect(
+      gateOf(decks, list({}, { a: 4, b: 4, c: 4 }), { ...tools, chromium: '2' }, true).problems
+    ).toEqual([{ kind: 'tools', text: 'the list was measured with other tools: chromium 1 → 2' }]);
   });
 
   test('a failed slide that no threshold names needs a fix', () => {
@@ -225,19 +268,48 @@ describe('--update-gaps', () => {
     const old = list({ 'a/1': { pixels: 0.1, lines: 4 }, 'b/1': { pixels: 0.2 } });
     const next = list({ 'a/1': { pixels: 0.2, baseline: 1, lines: 3 }, 'c/1': { pixels: 0.3 } });
     expect(listChanges(old, next)).toEqual({
+      tools: [],
       looser: ['a/1: pixels 0.1 → 0.2, baseline none → 1, lines 4 → 3'],
       added: ["'c/1': { pixels: 0.3 },"],
       removed: ['b/1'],
     });
     expect(listChanges(old, list({ 'a/1': { pixels: 0.05, lines: 4 } }))).toEqual({
+      tools: [],
       looser: [],
       added: [],
       removed: ['b/1'],
     });
   });
 
+  test('listChanges names a change of the tools and fewer lines in a deck', () => {
+    const old = list({}, { a: 10 });
+    const next = { ...list({}, { a: 8 }), chromium: '2' };
+    expect(listChanges(old, next)).toMatchObject({
+      tools: ['chromium 1 → 2'],
+      looser: ['a: checks fewer lines (10 → 8)'],
+    });
+  });
+
+  test('--update-gaps writes better scores, and worse ones only with --accept-worse', () => {
+    const old = list({ 'a/1': { baseline: 0.9, lines: 4 } }, { a: 4 });
+    const better = [deck('a', [slide(1)])];
+    expect(planUpdate(old, better, tools, false)).toMatchObject({
+      write: true,
+      changes: { removed: ['a/1'] },
+    });
+    const worse = [deck('a', [slide(1, { status: 'fail', baselineDelta: 2 })])];
+    expect(planUpdate(old, worse, tools, false).write).toBe(false);
+    expect(planUpdate(old, worse, tools, true).write).toBe(true);
+    const added = [deck('a', [slide(1)]), deck('b', [slide(1, baselineFail)])];
+    expect(planUpdate(old, added, tools, false)).toMatchObject({
+      write: false,
+      changes: { added: ["'b/1': { baseline: 0.9, lines: 4 },"] },
+    });
+  });
+
   test('the committed list was measured with the tools and fonts in use', () => {
     expect(FIXTURE_KNOWN_GAPS.pdfjs).toBe(PDFJS_VERSION);
     expect(FIXTURE_KNOWN_GAPS.fonts).toBe(fixtureFontsIdentity());
+    expect(FIXTURE_KNOWN_GAPS.chromium).toBe(pinnedChromium());
   });
 });

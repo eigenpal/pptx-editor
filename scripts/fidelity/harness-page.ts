@@ -15,7 +15,7 @@ import {
   statSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { createServer, type Plugin } from 'vite';
 import {
   collectionFace,
@@ -275,6 +275,22 @@ function within<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
       );
     }),
   ]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * The Chromium that prints our PDF, as Playwright pins it (`browsers.json` of `playwright-core`):
+ * the headless shell and its revision. The same Playwright gives the same revision everywhere;
+ * the version that the browser reports can differ between builds of one revision.
+ */
+export function pinnedChromium(): string {
+  const test = dirname(Bun.resolveSync('@playwright/test/package.json', import.meta.dir));
+  const core = dirname(Bun.resolveSync('playwright-core/package.json', test));
+  const { browsers } = JSON.parse(readFileSync(join(core, 'browsers.json'), 'utf8')) as {
+    browsers: { name: string; revision: string }[];
+  };
+  const shell = browsers.find((b) => b.name === 'chromium-headless-shell');
+  if (!shell) throw new Error('playwright-core pins no chromium-headless-shell');
+  return `${shell.name} ${shell.revision}`;
 }
 
 /** A launched Chromium and the pid of its browser process, when CDP gives it. */

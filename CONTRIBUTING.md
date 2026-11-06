@@ -148,13 +148,15 @@ Each deck prints one line. The gate summary says what to do next. The report is 
 bun run fidelity --update-gaps
 ```
 
-The command prints each looser, new, and removed entry. It writes a new entry or a looser value only with `--accept-worse`: a worse score is a regression to fix, never to record. Review the diff of `thresholds.ts`. In CI, `scripts/fidelity/check-known-gaps.ts` refuses a new or looser entry, or a removed limit, unless the fixture's deck or reference PDF changed, or the pull request changes only the tools (pdf.js, Chromium, or the fixture fonts).
+The command prints each change of the tools and each looser, new, and removed entry. It writes a new entry, a looser value, or fewer checked lines only with `--accept-worse`: a worse score is a regression to fix, never to record. Review the diff of `thresholds.ts`.
+
+In CI, `scripts/fidelity/check-known-gaps.ts` refuses a new or looser entry and fewer checked lines, with three exceptions: a new fixture, a fixture with a new reference PDF, and a pull request that changes only the tools. The tools are pdf.js, Playwright and its pinned Chromium, the engine fonts, and `fixtures/fonts/`. A changed deck with its old reference PDF is no exception. A limit can go away only with its reason in `RETIRED_LIMITS`.
 
 ### Add a fixture
 
 1. Add the deck to `scripts/fixtures/build.ts` and run `bun run fixtures:build`. Use only the open fonts of the engine (Carlito, Liberation Sans, Serif, and Mono, Noto Sans CJK JP) and of `fixtures/fonts/` (Noto Sans Arabic, Noto Sans Symbols 2). Name a font for every script in the deck, also in the theme, so the presentation app uses no fallback font.
 2. Install those fonts where the presentation app runs, open the deck, and export `fixtures/<name>.pdf`. Any machine can export a reference.
-3. Record the deck and PDF hashes in `fixtures/references.json`. A missing or stale reference is a gap, never a pass.
+3. Run `bun run fidelity:record-reference <name>`. It records the deck and PDF hashes, the page count, and the page size in `fixtures/references.json`. A missing or stale reference is a gap, never a pass.
 4. Run `bun run fidelity <name> --update-gaps --accept-worse`, and commit the deck, the PDF, `references.json`, and `thresholds.ts`.
 
 ### Other commands
