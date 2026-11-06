@@ -118,8 +118,7 @@ export const FALLBACK_FONTS: readonly string[] = [
  * reference PDF embeds only the open fonts that its deck names (`foreignReferenceFonts`).
  */
 export const NON_OPEN_FONT_DECKS: Readonly<Record<string, string>> = {
-  'font-substitution':
-    'it checks which open face the engine draws for each face that is not open, symbol faces included',
+  'font-substitution': 'it checks which open face the engine draws for each face that is not open',
 };
 
 /** Noto Sans CJK JP of `@docx-editor.dev/fonts-cjk`, part of the fixture set. */
@@ -312,7 +311,10 @@ export function fixtureFontsIdentity(): string {
       ) as { version: string }
     ).version;
   const hash = createHash('sha256');
-  for (const file of readdirSync(FIXTURE_FONTS_DIR).sort())
+  // The font files only: a license or a note does not change a score.
+  for (const file of readdirSync(FIXTURE_FONTS_DIR)
+    .filter((f) => /\.(ttf|otf|ttc|otc)$/i.test(f))
+    .sort())
     hash
       .update(file)
       .update('\0')

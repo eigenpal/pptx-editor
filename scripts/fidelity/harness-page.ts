@@ -380,11 +380,24 @@ export async function withHarnessPage<T>(
       return next;
     };
     let page = await open();
+    // The page that draws PDFs stays open across decks. A renderer crash leaves `isClosed()`
+    // false, so the `crash` event drops it, and so does every `reset`.
     let raster: Page | undefined;
+    const dropRaster = async (): Promise<void> => {
+      const old = raster;
+      raster = undefined;
+      if (old && !old.isClosed())
+        await within(old.close(), resetTimeoutMs, 'closing the raster page').catch(() => undefined);
+    };
     return await fn(page, {
       async rasterPage() {
-        if (!raster || raster.isClosed() || raster.context().browser() !== current!.browser)
-          raster = await within(open(), resetTimeoutMs, 'opening the raster page');
+        if (!raster || raster.isClosed() || raster.context().browser() !== current!.browser) {
+          const next = await within(open(), resetTimeoutMs, 'opening the raster page');
+          next.on('crash', () => {
+            if (raster === next) raster = undefined;
+          });
+          raster = next;
+        }
         return raster;
       },
       async restart() {
@@ -398,6 +411,7 @@ export async function withHarnessPage<T>(
         // call fails, so the cause is read here, after a new page did not open: the
         // `disconnected` event, or Playwright's "has been closed" when the event comes late.
         let newBrowser: 'exited' | 'hung' | undefined = 'exited';
+        await dropRaster();
         if (!current!.exited) {
           await within(page.close(), resetTimeoutMs, 'closing the page').catch(() => undefined);
           try {

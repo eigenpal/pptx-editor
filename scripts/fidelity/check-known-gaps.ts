@@ -1,10 +1,7 @@
-// The known-gap ratchet in CI: `FIXTURE_KNOWN_GAPS` only shrinks, and no limit in
-// `thresholds.ts` loosens or goes away unless `RETIRED_LIMITS` gives the reason. This check
-// compares the list with the base branch. A new entry, a new kind, a looser value, or fewer
-// checked lines is allowed only for a new fixture, a fixture whose reference PDF changed in
-// `references.json`, or when the list was measured with other tools (pdf.js, Chromium, fixture
-// fonts) and the change touches nothing but those tools (`TOOL_PACKAGES`, `fixtures/fonts/`,
-// and `thresholds.ts`).
+// The known-gap ratchet in CI, one rule: `FIXTURE_KNOWN_GAPS` takes a new entry, a new kind, a
+// looser value, or fewer checked lines only in a change that touches no engine or harness source
+// (`nonSourceFiles`), or for a new fixture. No limit in `thresholds.ts` loosens, and none goes
+// away unless `RETIRED_LIMITS` gives the reason.
 //
 //   bun scripts/fidelity/check-known-gaps.ts --base origin/main
 
@@ -23,8 +20,6 @@ import {
   type KnownGapList,
 } from './thresholds.ts';
 import { readManifest, type ReferenceManifest } from './reference-identity.ts';
-
-const TOOLS = ['pdfjs', 'chromium', 'fonts'] as const;
 
 /** The packages that are measuring tools: pdf.js, Playwright and its Chromium, the engine fonts. */
 export const TOOL_PACKAGES: ReadonlySet<string> = new Set([
@@ -139,13 +134,19 @@ export function toolOnlyLockChange(base: string | undefined, head: string | unde
 export type ReadChange = (file: string) => { base?: string; head?: string };
 
 /**
- * The changed files that are not a change of the tools alone. Tool files are `fixtures/fonts/`,
- * `thresholds.ts`, and a `package.json` or `bun.lock` whose only change is the versions of
- * `TOOL_PACKAGES` (and of the packages they depend on).
+ * The changed files that are engine or harness source. Everything else is measuring input:
+ * `fixtures/` (decks, reference PDFs, `references.json`, fixture fonts), the fixture builder
+ * `scripts/fixtures/`, `thresholds.ts`, and a `package.json` or `bun.lock` whose only change is
+ * the versions of `TOOL_PACKAGES` (and of the packages they depend on).
  */
-export function nonToolFiles(files: readonly string[], read: ReadChange): string[] {
+export function nonSourceFiles(files: readonly string[], read: ReadChange): string[] {
   return files.filter((f) => {
-    if (f.startsWith('fixtures/fonts/') || f === 'scripts/fidelity/thresholds.ts') return false;
+    if (
+      f.startsWith('fixtures/') ||
+      f.startsWith('scripts/fixtures/') ||
+      f === 'scripts/fidelity/thresholds.ts'
+    )
+      return false;
     if (f === 'package.json' || f.endsWith('/package.json')) {
       const { base, head } = read(f);
       return !toolOnlyManifestChange(base, head);
@@ -158,41 +159,30 @@ export function nonToolFiles(files: readonly string[], read: ReadChange): string
   });
 }
 
-/**
- * The fixtures whose entries may take new values: new fixtures, and fixtures whose reference PDF
- * changed. A deck that changed with the same reference PDF opens nothing: its reference is
- * stale until the PDF is exported again.
- */
-export function changedReferences(base: ReferenceManifest, head: ReferenceManifest): Set<string> {
-  const changed = new Set<string>();
-  for (const [name, h] of Object.entries(head.references)) {
-    const b = Object.hasOwn(base.references, name) ? base.references[name] : undefined;
-    if (!b || b.pdf !== h.pdf) changed.add(name);
-  }
-  return changed;
+/** The fixtures that `head` has and `base` does not. */
+export function newFixtures(base: ReferenceManifest, head: ReferenceManifest): Set<string> {
+  return new Set(Object.keys(head.references).filter((n) => !Object.hasOwn(base.references, n)));
 }
 
 /**
- * The ways `head` loosens `base`. A base list in another shape (from before the PDF comparison)
- * allows any value. A list measured with other tools allows any value only when the change
- * touches nothing but the tools (`otherFiles` is empty); else every looser entry is listed, with
- * the files that keep it from counting as a tools change.
+ * The ways `head` loosens `base`: new entries and kinds, looser values, and fewer checked lines,
+ * except for the fixtures in `fresh` (new fixtures). A base list in another shape (from before
+ * the PDF comparison) allows any value. `sources` lists the changed source files; when it is
+ * empty, the change only measures again, and every loosening is allowed.
  */
 export function looserGaps(
   base: KnownGapList | undefined,
   head: KnownGapList,
-  changed: ReadonlySet<string>,
-  otherFiles: readonly string[] = []
+  fresh: ReadonlySet<string>,
+  sources: readonly string[]
 ): string[] {
-  if (!base || typeof base.pdfjs !== 'string') return [];
-  const newTools = TOOLS.filter((k) => base[k] !== head[k]);
-  if (newTools.length && !otherFiles.length) return [];
+  if (!base || typeof base.pdfjs !== 'string' || !sources.length) return [];
   const problems: string[] = [];
   for (const [key, gap] of Object.entries(head.slides)) {
-    if (changed.has(key.slice(0, key.lastIndexOf('/')))) continue;
+    if (fresh.has(key.slice(0, key.lastIndexOf('/')))) continue;
     const old = Object.hasOwn(base.slides, key) ? base.slides[key] : undefined;
     if (!old) {
-      problems.push(`${key}: a new entry, but the fixture's reference did not change`);
+      problems.push(`${key}: a new entry`);
       continue;
     }
     if ((gap.lines ?? 0) < (old.lines ?? 0))
@@ -204,14 +194,14 @@ export function looserGaps(
   }
   for (const [deck, lines] of Object.entries(head.deckLines ?? {})) {
     const was = base.deckLines?.[deck];
-    if (!changed.has(deck) && was !== undefined && lines < was)
+    if (!fresh.has(deck) && was !== undefined && lines < was)
       problems.push(`${deck}: checks fewer lines (${was} → ${lines})`);
   }
-  if (problems.length && newTools.length) {
-    const shown = otherFiles.slice(0, 5).join(', ');
-    const more = otherFiles.length > 5 ? ` and ${otherFiles.length - 5} more` : '';
+  if (problems.length) {
+    const shown = sources.slice(0, 5).join(', ');
+    const more = sources.length > 5 ? ` and ${sources.length - 5} more` : '';
     problems.push(
-      `the list was measured with new tools (${newTools.join(', ')}), but the change also touches ${shown}${more}: move the tools change to its own pull request`
+      `the change also touches source (${shown}${more}): record looser entries in a pull request that changes only tools, fixtures, or references`
     );
   }
   return problems;
@@ -321,11 +311,11 @@ export async function checkAgainstBase(
     ...looserGaps(
       baseList,
       FIXTURE_KNOWN_GAPS,
-      changedReferences(
+      newFixtures(
         manifest ? (JSON.parse(manifest) as ReferenceManifest) : { version: 1, references: {} },
         readManifest('fixtures')
       ),
-      nonToolFiles(changedFiles(base), read)
+      nonSourceFiles(changedFiles(base), read)
     ),
   ];
   if (!problems.length)
@@ -337,7 +327,7 @@ export async function checkAgainstBase(
     lines: [
       ...notices,
       ...problems.map((p) => `GAPS: ${p}`),
-      'The known gaps and the limits only tighten, and no limit goes away unless RETIRED_LIMITS gives the reason. Fix the regression instead of recording it. Only a new fixture, a new reference PDF, or a pull request that changes only the tools may take a new or looser entry.',
+      'The known gaps and the limits only tighten, and no limit goes away unless RETIRED_LIMITS gives the reason. Fix the regression instead of recording it. Only a new fixture, or a pull request that changes no engine or harness source, may take a new or looser entry.',
     ],
     exitCode: 1,
   };

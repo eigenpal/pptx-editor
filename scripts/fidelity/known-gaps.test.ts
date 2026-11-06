@@ -259,9 +259,27 @@ describe('--update-gaps', () => {
         deck('a', [slide(1)]),
         deck('b', [], { error: 'the browser crashed while rendering the deck' }),
       ],
-      tools
+      { ...tools, chromium: '2' },
+      false
     );
     expect(next.slides).toEqual({ 'b/1': { pixels: 0.2 }, 'c/1': { pixels: 0.3 } });
+    // A partial run does not stamp new tools.
+    expect(next.chromium).toBe('1');
+  });
+
+  test('a complete run drops entries of fixtures that are gone, and stamps new tools', () => {
+    const old = list({ 'a/1': { pixels: 0.1 }, 'gone/1': { pixels: 0.3 } }, { a: 4, gone: 3 });
+    const next = mergeRecorded(old, [deck('a', [slide(1)])], { ...tools, chromium: '2' }, true);
+    expect(next).toMatchObject({ chromium: '2', slides: {}, deckLines: { a: 4 } });
+    expect(listChanges(old, next).removed).toEqual(['a/1', 'gone/1', 'gone (its line count)']);
+    // A deck error keeps the old tools: the run did not measure every fixture.
+    const failed = mergeRecorded(
+      old,
+      [deck('a', [slide(1)]), deck('gone', [], { error: 'boom' })],
+      { ...tools, chromium: '2' },
+      true
+    );
+    expect(failed).toMatchObject({ chromium: '1', slides: { 'gone/1': { pixels: 0.3 } } });
   });
 
   test('listChanges names looser, new, and removed entries', () => {
@@ -293,15 +311,15 @@ describe('--update-gaps', () => {
   test('--update-gaps writes better scores, and worse ones only with --accept-worse', () => {
     const old = list({ 'a/1': { baseline: 0.9, lines: 4 } }, { a: 4 });
     const better = [deck('a', [slide(1)])];
-    expect(planUpdate(old, better, tools, false)).toMatchObject({
+    expect(planUpdate(old, better, tools, false, true)).toMatchObject({
       write: true,
       changes: { removed: ['a/1'] },
     });
     const worse = [deck('a', [slide(1, { status: 'fail', baselineDelta: 2 })])];
-    expect(planUpdate(old, worse, tools, false).write).toBe(false);
-    expect(planUpdate(old, worse, tools, true).write).toBe(true);
+    expect(planUpdate(old, worse, tools, false, true).write).toBe(false);
+    expect(planUpdate(old, worse, tools, true, true).write).toBe(true);
     const added = [deck('a', [slide(1)]), deck('b', [slide(1, baselineFail)])];
-    expect(planUpdate(old, added, tools, false)).toMatchObject({
+    expect(planUpdate(old, added, tools, false, true)).toMatchObject({
       write: false,
       changes: { added: ["'b/1': { baseline: 0.9, lines: 4 },"] },
     });

@@ -246,10 +246,14 @@ export function checkFixtureGate(
         knownGaps.add(key);
     }
   }
-  if (complete)
+  if (complete) {
     for (const key of Object.keys(gaps))
       if (!seen.has(key) && !unscored.has(key.slice(0, key.lastIndexOf('/'))))
         record(`${key}: listed, but no such fixture slide exists`);
+    const names = new Set(decks.map((d) => d.name));
+    for (const deck of Object.keys(list.deckLines ?? {}))
+      if (!names.has(deck)) record(`${deck}: a line count is listed, but no such fixture exists`);
+  }
   return { problems, knownGaps };
 }
 
@@ -294,7 +298,12 @@ export function listChanges(old: KnownGapList, next: KnownGapList): ListChanges 
     if (was !== undefined && lines < was)
       looserEntries.push(`${deck}: checks fewer lines (${was} → ${lines})`);
   }
-  const removed = Object.keys(old.slides).filter((key) => !Object.hasOwn(next.slides, key));
+  const removed = [
+    ...Object.keys(old.slides).filter((key) => !Object.hasOwn(next.slides, key)),
+    ...Object.keys(old.deckLines ?? {})
+      .filter((deck) => !Object.hasOwn(next.deckLines, deck))
+      .map((deck) => `${deck} (its line count)`),
+  ];
   return { tools: toolChanges(old, next), looser: looserEntries, added, removed };
 }
 
@@ -306,37 +315,50 @@ export interface GapUpdate {
   readonly write: boolean;
 }
 
-/** Plan `--update-gaps`: new entries and looser values are written only with `acceptWorse`. */
+/**
+ * Plan `--update-gaps`: new entries and looser values are written only with `acceptWorse`.
+ * `complete` is true when every fixture ran (`mergeRecorded`).
+ */
 export function planUpdate(
   list: KnownGapList,
   decks: readonly DeckResult[],
   tools: GapTools,
-  acceptWorse: boolean
+  acceptWorse: boolean,
+  complete: boolean
 ): GapUpdate {
-  const next = mergeRecorded(list, decks, tools);
+  const next = mergeRecorded(list, decks, tools, complete);
   const changes = listChanges(list, next);
   const worse = changes.looser.length > 0 || changes.added.length > 0;
   return { next, changes, write: acceptWorse || !worse };
 }
 
 /**
- * The list after a run: the entries of the decks that were scored come from the run, and every
- * other entry stays (decks that did not run, or that did not finish).
+ * The list after a run: the entries of the decks that were scored come from the run. The entries
+ * of decks that did not finish stay, and so do those of decks that did not run in a partial run.
+ * A complete run drops the entries of fixtures that no longer exist. Only a complete run with no
+ * deck error records new tools: a partial run measured too little to stamp them.
  */
 export function mergeRecorded(
   list: KnownGapList,
   decks: readonly DeckResult[],
-  tools: GapTools
+  tools: GapTools,
+  complete: boolean
 ): KnownGapList {
   const scored = decks.filter((d) => !d.error);
   const ran = new Set(scored.map((d) => d.name));
+  const failed = new Set(decks.filter((d) => d.error).map((d) => d.name));
+  const keep = (deck: string): boolean => (complete ? failed.has(deck) : !ran.has(deck));
   const kept = Object.fromEntries(
-    Object.entries(list.slides).filter(([key]) => !ran.has(key.slice(0, key.lastIndexOf('/'))))
+    Object.entries(list.slides).filter(([key]) => keep(key.slice(0, key.lastIndexOf('/'))))
   );
   const keptLines = Object.fromEntries(
-    Object.entries(list.deckLines ?? {}).filter(([deck]) => !ran.has(deck))
+    Object.entries(list.deckLines ?? {}).filter(([deck]) => keep(deck))
   );
-  const recorded = recordedList(scored, tools);
+  const stamp = complete && !failed.size;
+  const recorded = recordedList(
+    scored,
+    stamp ? tools : { pdfjs: list.pdfjs, chromium: list.chromium, fonts: list.fonts }
+  );
   return {
     ...recorded,
     deckLines: { ...keptLines, ...recorded.deckLines },

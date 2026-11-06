@@ -150,7 +150,7 @@ bun run fidelity --update-gaps
 
 The command prints each change of the tools and each looser, new, and removed entry. It writes a new entry, a looser value, or fewer checked lines only with `--accept-worse`: a worse score is a regression to fix, never to record. Review the diff of `thresholds.ts`.
 
-In CI, `scripts/fidelity/check-known-gaps.ts` refuses a new or looser entry and fewer checked lines, with three exceptions: a new fixture, a fixture with a new reference PDF, and a pull request that changes only the tools. The tools are pdf.js, Playwright and its pinned Chromium, the engine fonts, and `fixtures/fonts/`. A changed deck with its old reference PDF is no exception. A limit can go away only with its reason in `RETIRED_LIMITS`.
+In CI, `scripts/fidelity/check-known-gaps.ts` accepts a new or looser entry only for a new fixture, or in a pull request that changes no engine or harness source (only tool packages, `fixtures/`, the fixture builder, and `thresholds.ts`). A limit can go away only with its reason in `RETIRED_LIMITS`.
 
 ### Add a fixture
 

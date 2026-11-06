@@ -149,6 +149,8 @@ export function resultLine(job: CorpusJob, r: DeckResult): string {
       lineMatch: s.lineMatch ?? null,
       linesMatched: s.linesMatched ?? null,
       linesTotal: s.linesTotal ?? null,
+      // A count only; never line texts.
+      extraLines: s.extraLines?.length ?? null,
       baselineDeltaPt: s.baselineDelta ?? null,
       selfConsistent: s.selfConsistent ?? null,
       cause: redactPaths(s.cause),
@@ -209,6 +211,8 @@ export interface CorpusRunIdentity {
   readonly sources: string;
   readonly thresholds: unknown;
   readonly pdfjs: string;
+  /** Playwright's pinned Chromium revision (`pinnedChromium`). */
+  readonly chromium?: string;
   /** Whether the reference fonts are installed, and `localFontsIdentity` of the font files. */
   readonly referenceFonts: boolean;
   readonly fonts: string;
@@ -217,7 +221,7 @@ export interface CorpusRunIdentity {
 /**
  * Decide how a corpus run starts in `out`: the ids already done, or why it may not start. A run
  * without `resume` refuses an existing `results.jsonl` unless `fresh` says to replace it. A
- * resume refuses an earlier run with another list, shard, source set, thresholds, or pdf.js.
+ * resume refuses an earlier run with another list, shard, source set, thresholds, pdf.js, or Chromium revision.
  */
 export function startCorpusRun(
   out: string,

@@ -388,4 +388,33 @@ describe.skipIf(!hasChromium)('printDeck and rasterPdf', () => {
       expect(differ / (480 * 270)).toBeLessThan(0.01);
     });
   }, 60_000);
+
+  test('a crashed raster page is replaced, and a reset closes it', async () => {
+    await withHarnessPage(async (_page, control) => {
+      const drawer = await control.rasterPage();
+      const crashed = new Promise<void>((done) => drawer.once('crash', () => done()));
+      await drawer.goto('chrome://crash').catch(() => undefined);
+      await crashed;
+      // `isClosed()` stays false after a renderer crash.
+      expect(drawer.isClosed()).toBe(false);
+      const next = await control.rasterPage();
+      expect(next).not.toBe(drawer);
+      await control.reset();
+      expect(next.isClosed()).toBe(true);
+      expect(await control.rasterPage()).not.toBe(next);
+    });
+  }, 60_000);
+});
+
+describe.skipIf(!hasChromium)('the fallback faces', () => {
+  test('the paint names the open fallback faces where it names sans-serif', async () => {
+    // Slide 1 of slide-structure has a frame label, which the paint sets in sans-serif.
+    const fixture = join(import.meta.dir, '../../fixtures/slide-structure.pptx');
+    await withHarnessPage(async (page) => {
+      await openDeck(page, fixture, []);
+      const { markup } = await renderSlide(page, 0);
+      expect(markup).toContain('font-family="pptx-harness-fallback-0, pptx-harness-fallback-1"');
+      expect(markup).not.toContain('sans-serif');
+    });
+  }, 60_000);
 });

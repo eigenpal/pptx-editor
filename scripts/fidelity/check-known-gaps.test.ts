@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  changedReferences,
   checkAgainstBase,
   looserGaps,
   looserLimits,
-  nonToolFiles,
+  newFixtures,
+  nonSourceFiles,
   toolOnlyLockChange,
   toolOnlyManifestChange,
 } from './check-known-gaps.ts';
@@ -28,60 +28,57 @@ const identity = (deck: string, pdf: string) => ({
 describe('the known gaps only shrink', () => {
   const base = list({ 'a/1': { pixels: 0.01, lines: 4 } });
 
+  const source = ['packages/core/src/output/paint.ts'];
+
   test('a smaller or removed entry is allowed', () => {
-    expect(looserGaps(base, list({ 'a/1': { pixels: 0.005, lines: 4 } }), new Set())).toEqual([]);
-    expect(looserGaps(base, list({}), new Set())).toEqual([]);
+    expect(
+      looserGaps(base, list({ 'a/1': { pixels: 0.005, lines: 4 } }), new Set(), source)
+    ).toEqual([]);
+    expect(looserGaps(base, list({}), new Set(), source)).toEqual([]);
   });
 
-  test('a new entry, a new kind, a looser value, or fewer lines is refused', () => {
+  test('with a source change, a new entry, a new kind, a looser value, or fewer lines is refused', () => {
     expect(
       looserGaps(
         base,
         list({ 'a/1': { pixels: 0.02, baseline: 1, lines: 3 }, 'b/1': { pixels: 0.1 } }),
-        new Set()
+        new Set(),
+        source
       )
     ).toEqual([
       'a/1: fewer checked lines (4 → 3)',
       'a/1: a looser pixels score (0.01 → 0.02)',
       'a/1: a new kind, baseline',
-      "b/1: a new entry, but the fixture's reference did not change",
+      'b/1: a new entry',
+      'the change also touches source (packages/core/src/output/paint.ts): record looser entries in a pull request that changes only tools, fixtures, or references',
     ]);
   });
 
-  test('a changed reference or new tools allow new values', () => {
+  test('a change with no source, or a new fixture, may loosen', () => {
     const head = list({ 'a/1': { pixels: 0.02, lines: 4 } });
-    expect(looserGaps(base, head, new Set(['a']))).toEqual([]);
-    expect(looserGaps(base, { ...head, chromium: '2' }, new Set())).toEqual([]);
-    expect(looserGaps(base, { ...head, chromium: '2' }, new Set(), [])).toEqual([]);
+    expect(looserGaps(base, head, new Set(), [])).toEqual([]);
+    expect(looserGaps(base, head, new Set(['a']), source)).toEqual([]);
     // A base from before the PDF comparison has no pdf.js version: every value is new.
-    expect(looserGaps({ slides: {} } as unknown as KnownGapList, head, new Set())).toEqual([]);
-  });
-
-  test('new tools do not excuse a looser value when the change touches other files', () => {
-    const head = list({ 'a/1': { pixels: 0.02, lines: 4 } }, { chromium: '2' });
-    expect(looserGaps(base, head, new Set(), ['packages/core/src/output/paint.ts'])).toEqual([
-      'a/1: a looser pixels score (0.01 → 0.02)',
-      'the list was measured with new tools (chromium), but the change also touches packages/core/src/output/paint.ts: move the tools change to its own pull request',
-    ]);
+    expect(looserGaps({ slides: {} } as unknown as KnownGapList, head, new Set(), source)).toEqual(
+      []
+    );
   });
 
   test('fewer checked lines in a deck are refused', () => {
     const head = list({ 'a/1': { pixels: 0.01, lines: 4 } }, { deckLines: { a: 10 } });
-    expect(looserGaps({ ...base, deckLines: { a: 12 } }, head, new Set())).toEqual([
+    expect(looserGaps({ ...base, deckLines: { a: 12 } }, head, new Set(), source)).toEqual([
       'a: checks fewer lines (12 → 10)',
+      'the change also touches source (packages/core/src/output/paint.ts): record looser entries in a pull request that changes only tools, fixtures, or references',
     ]);
-    expect(looserGaps({ ...base, deckLines: { a: 12 } }, head, new Set(['a']))).toEqual([]);
   });
-  test('changedReferences names new fixtures and new PDFs, never a new deck alone', () => {
-    const base: ReferenceManifest = {
-      version: 1,
-      references: { a: identity('1', '2'), c: identity('6', '7') },
-    };
+
+  test('newFixtures names only the fixtures that the base lacks', () => {
+    const base: ReferenceManifest = { version: 1, references: { a: identity('1', '2') } };
     const head: ReferenceManifest = {
       version: 1,
-      references: { a: identity('1', '3'), b: identity('4', '5'), c: identity('8', '7') },
+      references: { a: identity('9', '3'), b: identity('4', '5') },
     };
-    expect([...changedReferences(base, head)]).toEqual(['a', 'b']);
+    expect([...newFixtures(base, head)]).toEqual(['b']);
   });
 
   test('only versions of the tool packages count as a tools change', () => {
@@ -121,18 +118,22 @@ describe('the known gaps only shrink', () => {
         ? { base, head: pkg({ 'pdfjs-dist': '5.5.0', react: '19.2.0' }) }
         : { base: old, head: lock('5.4.624', '0.1.80', '19.2.1') };
     expect(
-      nonToolFiles(
+      nonSourceFiles(
         [
           'bun.lock',
           'package.json',
           'packages/core/package.json',
           'scripts/fidelity/thresholds.ts',
           'fixtures/fonts/New.ttf',
+          'fixtures/tables.pdf',
+          'fixtures/references.json',
+          'scripts/fixtures/build.ts',
           'scripts/fidelity/compare.ts',
+          'packages/core/src/output/paint.ts',
         ],
         read
       )
-    ).toEqual(['bun.lock', 'scripts/fidelity/compare.ts']);
+    ).toEqual(['bun.lock', 'scripts/fidelity/compare.ts', 'packages/core/src/output/paint.ts']);
   });
 
   test('limits only tighten', () => {

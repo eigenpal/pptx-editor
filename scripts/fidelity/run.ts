@@ -48,17 +48,26 @@ const THRESHOLDS_FILE = resolve(import.meta.dir, 'thresholds.ts');
 
 const pct = (v: number): string => `${(v * 100).toFixed(2)} %`;
 
-/** One console line for a scored deck: slides that pass, the worst pixel score, and the time. */
-function deckLine(r: DeckResult): string {
+/**
+ * One console line for a scored deck: slides that pass, failing slides that the known-gap list
+ * names, the worst pixel score, and the time.
+ */
+function deckLine(r: DeckResult, list?: KnownGapList): string {
   if (r.error) return `${r.name}: not scored: ${r.error}`;
   const compared = r.slides.filter((s) => s.status === 'pass' || s.status === 'fail');
   const passing = compared.filter((s) => s.status === 'pass').length;
+  const listed = list
+    ? compared.filter(
+        (s) => s.status === 'fail' && Object.hasOwn(list.slides, slideKey(r.name, s.index))
+      ).length
+    : 0;
+  const known = listed ? `, ${listed} known ${listed === 1 ? 'gap' : 'gaps'}` : '';
   const worst = Math.max(0, ...compared.map((s) => s.pixelMismatch ?? 0));
   const gap =
     r.reference === 'pdf' ? '' : ` (${r.reference === 'stale' ? 'stale' : 'no'} reference)`;
   const saved = r.slides.some((s) => s.selfConsistent === false) ? ', save/reopen DIFFERS' : '';
   const time = `${((r.milliseconds ?? 0) / 1000).toFixed(1)} s`;
-  return `${r.name}: ${passing}/${r.slides.length} pass, worst pixels ${pct(worst)}${gap}${saved}, ${time}`;
+  return `${r.name}: ${passing}/${r.slides.length} pass${known}, worst pixels ${pct(worst)}${gap}${saved}, ${time}`;
 }
 
 /** `bun run fidelity` and `bun run fidelity:corpus`: decks in a folder, an HTML report. */
@@ -110,7 +119,7 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
     }));
   const started = Date.now();
   const scored = await scoreInLanes(jobs, laneCount(jobs.length), (_, r) =>
-    console.log(deckLine(r))
+    console.log(deckLine(r, set === 'fixtures' ? FIXTURE_KNOWN_GAPS : undefined))
   );
   const byName = new Map(scored.results.map((r, i) => [jobs[i].input.name, r]));
   const results = targets.map((d) => byName.get(d.name)!);
@@ -142,7 +151,7 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
   let refused = false;
   if (args.updateGaps) {
     // A partial run, or a deck that did not finish, replaces no entry of the decks it lacks.
-    const plan = planUpdate(list, results, tools, args.acceptWorse);
+    const plan = planUpdate(list, results, tools, args.acceptWorse, !only.length);
     for (const e of plan.changes.tools) console.log(`TOOLS: ${e}`);
     for (const e of plan.changes.looser) console.log(`LOOSER: ${e}`);
     for (const e of plan.changes.added) console.log(`NEW: ${e}`);
@@ -162,17 +171,21 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
     }
   const fixes = gate.problems.filter((p) => p.kind === 'fix');
   const records = gate.problems.filter((p) => p.kind === 'record');
-  const next = refused
-    ? 'Nothing was written: the run has new or looser entries (LOOSER, NEW above). Fix the regression. Only a new fixture, a new reference PDF, or a change of the tools alone may record them, with: bun run fidelity <deck> --update-gaps --accept-worse'
+  const toolsStep = gate.problems.some((p) => p.kind === 'tools')
+    ? 'The list was measured with other tools (TOOLS above): record it in a pull request that changes only the tools, with bun run fidelity --update-gaps --accept-worse.'
+    : '';
+  const step = refused
+    ? 'Nothing was written: the run has new or looser entries (LOOSER, NEW above). Fix the regression. Only a new fixture or a pull request that changes no engine or harness source may record them, with: bun run fidelity <deck> --update-gaps --accept-worse'
     : args.updateGaps
       ? 'FIXTURE_KNOWN_GAPS in scripts/fidelity/thresholds.ts now records this run. Review its diff: a worse value is a regression to fix, not to record.'
       : fixes.length
-        ? `Fix the problems above; see ${report}. A new fixture or a new reference PDF may take new entries with: bun run fidelity <deck> --update-gaps --accept-worse`
+        ? `Fix the problems above; see ${report}.`
         : records.length
           ? 'The list records other scores or line counts than this run (RECORD above). Record a better score with: bun run fidelity --update-gaps'
-          : gate.problems.length
-            ? 'The list was measured with other tools (TOOLS above). Record it in a pull request that changes only the tools: bun run fidelity --update-gaps --accept-worse'
+          : toolsStep
+            ? ''
             : 'Nothing to do.';
+  const next = [toolsStep, step].filter(Boolean).join(' ');
   const problems = gate.problems.map((p) => p.text);
   writeReport(out, set, results, { tools: toolsText, gate: { problems, next } });
   console.log(
@@ -222,6 +235,7 @@ async function runList(args: Extract<RunArgs, { mode: 'list' }>): Promise<number
     sources: sourcesHash(resolve('.')),
     thresholds: corpusThresholds(),
     pdfjs: PDFJS_VERSION,
+    chromium: pinnedChromium(),
     referenceFonts: referenceFontsInstalled(),
     fonts: localFontsIdentity(),
   };
@@ -238,7 +252,8 @@ async function runList(args: Extract<RunArgs, { mode: 'list' }>): Promise<number
     ...gitState(),
     /** Our PDF, printed with the editor's paint, against the reference PDF; pdf.js reads both. */
     method: 'pdf-vs-pdf',
-    chromium: null as string | null,
+    /** The version that the browser reports (`chromium` is the pinned revision). */
+    chromiumBuild: null as string | null,
     startedAt: new Date().toISOString(),
     finishedAt: null as string | null,
     decks: { total: mine.length, skipped: mine.length - todo.length, scored: 0, errors: 0 },
@@ -248,7 +263,7 @@ async function runList(args: Extract<RunArgs, { mode: 'list' }>): Promise<number
   writeRun();
   await withHarnessPage(async (first, control) => {
     let page = first;
-    runInfo.chromium = `${pinnedChromium()} (Chromium ${page.context().browser()?.version() ?? 'unknown'})`;
+    runInfo.chromiumBuild = page.context().browser()?.version() ?? null;
     writeRun();
     for (const job of todo) {
       let r: DeckResult;
