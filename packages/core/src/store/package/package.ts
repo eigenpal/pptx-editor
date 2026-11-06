@@ -209,6 +209,12 @@ function liveRelationshipIds(pkg: PptxPackage, main: string): Map<string, string
 const isSlideRoot = (root: Element): boolean => root.ns === NS.p && root.local === 'sld';
 
 const repaired = new WeakMap<PptxPackage, Element | undefined>();
+/**
+ * The package `repairedPresentationRoot` read last, by its presentation part. An edit that
+ * changes the repair changes that part or its relationships, so a package with another
+ * presentation part has nothing to share; two documents never share one.
+ */
+const repairedLast = new WeakMap<XmlPart, WeakRef<PptxPackage>>();
 
 /**
  * The presentation root as the writer saves it (`repairPresentationRoot`), or undefined
@@ -218,10 +224,29 @@ const repaired = new WeakMap<PptxPackage, Element | undefined>();
 export function repairedPresentationRoot(pkg: PptxPackage): Element | undefined {
   if (repaired.has(pkg)) return repaired.get(pkg);
   const main = mainPresentationPart(pkg);
-  const root = main ? xmlPartOf(pkg, main)?.root : undefined;
-  const out =
-    main && root ? repairPresentationRoot(root, liveRelationshipIds(pkg, main)) : undefined;
+  const xml = main ? xmlPartOf(pkg, main) : undefined;
+  const prev = xml ? repairedLast.get(xml)?.deref() : undefined;
+  // The repair reads the root relationships, the presentation part, its relationships, and
+  // the part names. A package that differs from the last one only in other XML parts (a text
+  // edit on a slide) has the same repaired root.
+  const changed = prev && repaired.has(prev) ? changedPartNames(prev, pkg, 32) : null;
+  const shared = changed?.every((name) => {
+    const a = prev!.parts.get(name);
+    const b = pkg.parts.get(name);
+    return (
+      a?.kind === 'xml' &&
+      b?.kind === 'xml' &&
+      name !== main &&
+      !name.toLowerCase().endsWith('.rels')
+    );
+  });
+  const out = shared
+    ? repaired.get(prev!)
+    : main && xml
+      ? repairPresentationRoot(xml.root, liveRelationshipIds(pkg, main))
+      : undefined;
   repaired.set(pkg, out);
+  if (xml) repairedLast.set(xml, new WeakRef(pkg));
   return out;
 }
 
@@ -323,10 +348,62 @@ export function relationshipsOf(pkg: PptxPackage, source: string): readonly Rela
   return out;
 }
 
+/** The relationships of one list by id; the first one wins for an id that repeats. */
+const relById = new WeakMap<readonly Relationship[], ReadonlyMap<string, Relationship>>();
+
+/**
+ * The relationship of a source part with id `id`, or undefined: the first one, as a search of
+ * `relationshipsOf` finds it. One map lookup: the presentation part names every slide by id.
+ * @internal
+ */
+export function relationshipById(
+  pkg: PptxPackage,
+  source: string,
+  id: string
+): Relationship | undefined {
+  const rels = relationshipsOf(pkg, source);
+  let byId = relById.get(rels);
+  if (!byId) {
+    const map = new Map<string, Relationship>();
+    for (const r of rels) if (!map.has(r.id)) map.set(r.id, r);
+    relById.set(rels, (byId = map));
+  }
+  return byId.get(id);
+}
+
 /** The internal target of a relationship id, or undefined. */
 export function relTarget(pkg: PptxPackage, source: string, id: string): string | undefined {
-  const rel = relationshipsOf(pkg, source).find((r) => r.id === id);
+  const rel = relationshipById(pkg, source, id);
   return rel && !rel.external ? rel.target : undefined;
+}
+
+/**
+ * The names of the parts that differ between two packages by object: added, removed, or
+ * replaced. Null when more than `limit` differ. An edit replaces only the parts it changes, so
+ * this is a short list after one edit, read in one pass over the part map. @internal
+ */
+export function changedPartNames(
+  prev: PptxPackage,
+  next: PptxPackage,
+  limit: number
+): string[] | null {
+  const out: string[] = [];
+  let added = 0;
+  for (const [name, part] of next.parts) {
+    const old = prev.parts.get(name);
+    if (old === part) continue;
+    if (old === undefined) added += 1;
+    out.push(name);
+    if (out.length > limit) return null;
+  }
+  // Same names in both, less the added ones: anything else in `prev` was removed.
+  if (prev.parts.size !== next.parts.size - added)
+    for (const name of prev.parts.keys()) {
+      if (next.parts.has(name)) continue;
+      out.push(name);
+      if (out.length > limit) return null;
+    }
+  return out;
 }
 
 /** The first internal target of a relationship type. */

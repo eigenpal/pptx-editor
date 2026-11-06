@@ -52,26 +52,39 @@ function contentOf(pkg: PptxPackage, partName: string | undefined): unknown {
 /**
  * Everything slide `index` renders from, in a fixed order, or undefined for a slide that does
  * not exist. Two lists with the same entries (by identity) render the same slide.
+ *
+ * `parts`, when given, receives the name of every part the list reads, beside the slide list
+ * itself: when none of them changed and the slide list is the same, the list is the same.
  */
-export function slideDependencies(pkg: PptxPackage, index: number): readonly unknown[] | undefined {
+export function slideDependencies(
+  pkg: PptxPackage,
+  index: number,
+  parts?: string[]
+): readonly unknown[] | undefined {
   const info = presentationInfo(pkg);
   const ref = info.slides[index];
   if (!ref) return undefined;
   const presentation = xmlPartOf(pkg, info.presentationPart)?.root;
+  const tableStyles = relTargetByType(pkg, info.presentationPart, REL.tableStyles);
+  const content = (name: string | undefined): unknown => {
+    if (name !== undefined) parts?.push(name);
+    return contentOf(pkg, name);
+  };
+  parts?.push(info.presentationPart, relsPartName(info.presentationPart));
   const out: unknown[] = [
     index,
     ref.partName,
-    contentOf(pkg, ref.themePart),
+    content(ref.themePart),
     child(presentation, 'p:sldSz'),
     child(presentation, 'p:defaultTextStyle'),
-    contentOf(pkg, relTargetByType(pkg, info.presentationPart, REL.tableStyles)),
+    content(tableStyles),
   ];
   for (const source of [ref.partName, ref.layoutPart, ref.masterPart]) {
-    out.push(source, contentOf(pkg, source));
+    out.push(source, content(source));
     if (!source) continue;
-    out.push(contentOf(pkg, relsPartName(source)));
+    out.push(content(relsPartName(source)));
     for (const rel of relationshipsOf(pkg, source))
-      if (!rel.external && !STRUCTURAL.has(rel.type)) out.push(contentOf(pkg, rel.target));
+      if (!rel.external && !STRUCTURAL.has(rel.type)) out.push(content(rel.target));
   }
   return out;
 }
@@ -108,9 +121,10 @@ function idOf(value: unknown): string {
 export function renderKey(
   pkg: PptxPackage,
   index: number,
-  fontGeneration: number
+  fontGeneration: number,
+  parts?: string[]
 ): string | undefined {
-  const deps = slideDependencies(pkg, index);
+  const deps = slideDependencies(pkg, index, parts);
   if (!deps) return undefined;
   let key = `f${fontGeneration}`;
   for (const d of deps) key += `.${idOf(d)}`;

@@ -260,7 +260,7 @@ All chrome CSS and tokens (`--doc-*`, shadcn HSL names shared with DOCX Editor).
 | Keyboard behavior while editing text | `editor/surface-input.ts`, `editor/list-keys.ts`, the `shortcut` function in `editor/pptx-editor.ts` |
 | Slide rail and multi-select | `packages/react/src/panes.tsx`, `editor/slide-selection.ts`, `editor/slide-multi.ts` |
 | Right-click menus | `packages/react/src/ContextMenu.tsx`, `RailContextMenu.tsx`, `CanvasContextMenu.tsx`, `editor/surface-context-menu.ts` |
-| Performance | `editor/thumbnails.ts`, `editor/slide-dependencies.ts`, `bun run bench:edit` |
+| Performance | `editor/thumbnails.ts`, `editor/slide-dependencies.ts`, `editor/can-cache.ts`, `bun run bench:edit` |
 | Security caps and untrusted input | `packages/ooxml-core/src/` (`limits.ts`, `zip.ts`, `zip-write.ts`, `opc-names.ts`, `xml-reader.ts`, `xml-fast-read.ts`, `xml-text.ts`, `sinks.ts`), `AGENTS.md` "Security". A fix there goes to DOCX Editor too: name it in the file header and the commit message |
 | Licenses and notices | `scripts/vendored-notices.mjs`, `generate-third-party-notices.mjs`, `reference/ecma-376/NOTICE` |
 

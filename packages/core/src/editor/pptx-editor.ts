@@ -4,7 +4,7 @@
 // state moves, so `useSyncExternalStore` selectors only re-render when their slice changes.
 
 import { documentOpenFailure, yieldToPaint } from './loading.ts';
-import { relationshipsOf, writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
+import { relationshipById, writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
 import { registerFontFaces, type FontFaceHandle } from '../output/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
 import type {
@@ -58,7 +58,7 @@ import { altTextAt, pictureStateAt, withAltText } from './picture-state.ts';
 import { isViewCommand, ViewSettings, type ViewCommand } from './view-settings.ts';
 import { PlaceholderPrompts } from './placeholder-prompts.ts';
 import { RemovalNotice } from './removal-notice.ts';
-import { CanCache } from './can-cache.ts';
+import { CanCache, createStructureKey, STRUCTURE_COMMANDS } from './can-cache.ts';
 import { itemById, SlideSurface } from './surface.ts';
 import { setSurfaceRoot } from './surface-registry.ts';
 import { refit } from '../automation/commands/autofit.ts';
@@ -146,18 +146,23 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
 
   // `can` compiles the command; toolbars ask for every slot on every change, so answers are
   // cached until the state a command compiles against moves: the package, the slide, the
-  // selection, or the mode. Zoom, hover, and fit changes keep them.
-  const canCache = new CanCache<CommandContext['active']>(() => [
-    session?.store.package,
-    slide,
-    slideSel.indices(session?.info.slides ?? [], slide).join(),
-    selection,
-    mode,
-    painter.state,
-    cropper.state,
-    arm.version,
-    views.presentationView,
-  ]);
+  // selection, or the mode. Zoom, hover, and fit changes keep them. New Slide and Add Section
+  // read no slide content and no selection: typing keeps their answers (`STRUCTURE_COMMANDS`).
+  const structureOf = createStructureKey();
+  const canCache = new CanCache<CommandContext['active']>(
+    () => [
+      session?.store.package,
+      slide,
+      slideSel.version,
+      selection,
+      mode,
+      painter.state,
+      cropper.state,
+      arm.version,
+      views.presentationView,
+    ],
+    () => [...structureOf(session), slide, mode, views.presentationView]
+  );
   const emit = (): void => {
     arm.sync();
     // The slide sorter shows no slide canvas: no shape or text selection there, whatever set it
@@ -201,7 +206,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       selection,
       format: formatAt(arm.layout() ?? lay, selection, (rId) => {
         const part = info?.slides[slide]?.partName;
-        const rel = pkg && part ? relationshipsOf(pkg, part).find((r) => r.id === rId) : undefined;
+        const rel = pkg && part ? relationshipById(pkg, part, rId) : undefined;
         return rel?.external ? rel.externalTarget : undefined;
       }),
       geometry: withAltText(
@@ -287,7 +292,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         ? // Commands carrying bytes are cached by object identity, not serialized.
           `${command.type}:${partVersion(command)}`
         : commandCacheKey(command);
-    return canCache.answer(key, () => canUncached(command));
+    return canCache.answer(key, () => canUncached(command), STRUCTURE_COMMANDS.has(command.type));
   };
 
   const sectionIds = () => sectionSummaries(session?.store.package).map((x) => x.id);
