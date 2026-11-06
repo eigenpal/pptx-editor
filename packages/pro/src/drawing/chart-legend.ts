@@ -105,14 +105,15 @@ export interface LegendLayout {
  * The key's width, the offset from the key to its text, and the room a row leaves after the
  * text, for one entry of `size` points. Measured on the `charts` and `chart-sizes` reference
  * PDFs at 9 to 20 pt:
- * - A square key is 0.55 sizes wide. Its text starts 0.275 sizes less 0.4 pt past the key, and
- *   the key and the room after the text take 1.65 sizes together (1.615 after a point entry).
+ * - A square key is 0.55 sizes wide. Its text starts 0.275 sizes less 0.4 pt past the key. The
+ *   key, its gap to the text, and the room after the text take 1.65 sizes together (1.615 for
+ *   a point entry).
  * - A line key is 19.2 pt long at every size, with its text 2.03 pt past it. A row leaves
  *   6.43 pt and 0.386 sizes after the text.
- * - A row of entries centres 0.18 sizes right of the chart's centre (1.76 pt for line keys),
- *   as `shift` gives for the row's first entry.
- * - A vertical legend keeps `gap` between its keys and the plot: 13.25 pt and half a square
- *   key, or 15.66 pt for line keys.
+ * - A row of entries centres 0.18 sizes right of the chart's centre (1.76 pt for line keys).
+ *   Every row of a legend takes the `shift` of the legend's first entry.
+ * - A right legend keeps `gap` between the plot and its keys: 13.25 pt and half a square key,
+ *   or 15.66 pt for line keys. A left legend keeps `LEFT_GAP` after its text.
  * A line entry whose line is hidden keys only its marker, as narrow as a square key.
  */
 export function keyMetrics(
@@ -149,8 +150,13 @@ const KEY_RISE = 0.27;
 const ROW_EDGE = 9;
 const ROW_HALF = 0.6;
 const ROW_PLOT_GAP = 14.2;
-/** The chart margin above `box.t` (`chart-render.ts`): a top legend measures from its outer edge. */
-const MARGIN_ABOVE = 11;
+/** The margin of an automatic chart layout on each side, in points (`chart-render.ts`). */
+export const CHART_MARGIN = 11;
+/**
+ * The room after the text of a left legend. It is measured at 12 pt only: the reference PDFs
+ * have no left legend at other sizes.
+ */
+const LEFT_GAP = 16.5;
 
 export interface LegendRoom {
   readonly layout: LegendLayout;
@@ -195,11 +201,13 @@ export function placeLegend(
     }
     const pitch = 1.84 * size;
     const edge = ROW_EDGE + ROW_HALF * size;
-    // The key centre line of the first row.
+    // The key centre line of the first row. A top legend measures from `CHART_MARGIN` above
+    // `box.t`: the top of the chart, or 1.5 pt below the title's lines (`chart-render.ts`).
     const firstCenter =
       legend.position === 'b'
         ? height - edge - (rows.length - 1) * pitch
-        : box.t - MARGIN_ABOVE + edge;
+        : box.t - CHART_MARGIN + edge;
+    const shift = keyMetrics(entries[0]!, size).shift;
     const lastCenter = firstCenter + (rows.length - 1) * pitch;
     const top = manual ? manual.y * height : null;
     for (const [rowIndex, row] of rows.entries()) {
@@ -207,7 +215,6 @@ export function placeLegend(
         (sum, item, index) => sum + item.width + (index > 0 ? row[index - 1]!.after : 0),
         0
       );
-      const shift = keyMetrics(row[0]!.entry, size).shift;
       let x = manual ? manual.x * width : width / 2 + shift - total / 2;
       const baseline =
         top === null
@@ -254,9 +261,11 @@ export function placeLegend(
     items.push({ entry, x: left, baseline });
   }
   if (!legend.overlay && !manual) {
-    const gap = Math.max(...entries.map((entry) => keyMetrics(entry, size).gap));
-    if (legend.position === 'l') plot.l = Math.max(plot.l, left + keyText + textWidth + gap);
-    else plot.r = Math.min(plot.r, left - gap);
+    if (legend.position === 'l') plot.l = Math.max(plot.l, left + keyText + textWidth + LEFT_GAP);
+    else {
+      const gap = Math.max(...entries.map((entry) => keyMetrics(entry, size).gap));
+      plot.r = Math.min(plot.r, left - gap);
+    }
   }
   return { layout: { items }, plot };
 }

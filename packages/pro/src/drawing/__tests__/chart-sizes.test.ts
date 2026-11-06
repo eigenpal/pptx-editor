@@ -77,6 +77,32 @@ describe('chart spacing rules match the reference PDFs', () => {
     }
   });
 
+  test('vertical legend rows are one line and 5.85 pt apart', () => {
+    // [text size, measured row pitch]
+    for (const [size, measured] of [
+      [9, 16.92],
+      [11.97, 20.45],
+      [14, 22.92],
+      [20, 30.24],
+    ] as const)
+      expect([size, Math.abs(CARLITO_LINE * size + 5.85 - measured) < 0.1]).toEqual([size, true]);
+  });
+
+  test('radar labels sit 0.04 radii past a side spoke, and 0.16 sizes more above the top one', () => {
+    // [text size, radius, measured side gap, measured gap below the top label's line]. The
+    // 12 pt radar has the largest radius, so the gaps follow the radius, not the text size.
+    for (const [size, radius, side, top] of [
+      [9, 99.21, 3.93, 5.36],
+      [11.97, 188.25, 7.49, 9.3],
+      [14, 131.12, 5.2, 7.37],
+      [20, 175.89, 6.99, 10.22],
+    ] as const) {
+      expect([size, Math.abs(0.04 * radius - side) < 0.1]).toEqual([size, true]);
+      // 0.08 sizes of `RISE_GAP`, and 0.08 sizes of `LABEL_LIFT`.
+      expect([size, Math.abs(0.04 * radius + 0.16 * size - top) < 0.15]).toEqual([size, true]);
+    }
+  });
+
   test('labelRoom is never negative', () => {
     expect(labelRoom(1)).toBe(0);
     expect(labelRoom(0)).toBe(0);
@@ -117,10 +143,10 @@ const gridBox = (components: readonly ChartComponent[]): Box =>
       .flatMap((c) => c.subpaths.flat())
   );
 
-/** The square legend key of the first series: 0.55 sizes wide. */
-const squareKey = (components: readonly ChartComponent[], size: number): Box =>
+/** The square legend key in `hex` (the first series by default): 0.55 sizes wide. */
+const squareKey = (components: readonly ChartComponent[], size: number, hex = '4472C4'): Box =>
   components
-    .filter((c) => c.closed && c.fill?.hex.toUpperCase() === '4472C4')
+    .filter((c) => c.closed && c.fill?.hex.toUpperCase() === hex)
     .map((c) => boxOf(c.subpaths[0]!))
     .find(
       (b) => Math.abs(b.r - b.l - 0.55 * size) < 0.01 && Math.abs(b.b - b.t - 0.55 * size) < 0.01
@@ -133,6 +159,8 @@ const lineKey = (components: readonly ChartComponent[]): Box =>
     .map((c) => boxOf(c.subpaths[0]!))
     .find((b) => Math.abs(b.r - b.l - 19.2) < 0.01 && b.b === b.t)!;
 
+/** The chart's box before the legend takes its room (`CHART_MARGIN` on each side). */
+const MARGIN = 11;
 const height = (index: number): number => charts[index]!.frame.xfrm.cy / 12_700;
 const width = (index: number): number => charts[index]!.frame.xfrm.cx / 12_700;
 
@@ -160,6 +188,12 @@ describe('the chart-sizes charts follow the rules', () => {
       const size = sizeOf(label(labels, first));
       const key = squareKey(scene.components, size);
       expect((key.t + key.b) / 2).toBeCloseTo(height(index) - (9 + 0.6 * size), 6);
+      // After the text, square keys leave 1.65 sizes less the text offset (1.615 for points).
+      const firstLabel = label(labels, first);
+      const next = squareKey(scene.components, size, 'ED7D31');
+      const text = 0.825 * size - 0.4;
+      const after = (index === 7 ? 1.615 : 1.65) * size - text;
+      expect(next.l - (firstLabel.x + textWidth(firstLabel))).toBeCloseTo(after, 6);
       // From the first key to the end of the last text, the row centres 0.18 sizes right.
       const last = label(labels, index === 7 ? 'West' : 'Forecast');
       const end = last.x + textWidth(last);
@@ -187,7 +221,7 @@ describe('the chart-sizes charts follow the rules', () => {
     }
   });
 
-  test('radars: the radius keeps the label room, and side labels sit 0.04 radii out', () => {
+  test('radars: the radius keeps the label room, and the labels keep their gaps', () => {
     for (const index of [9, 10, 11]) {
       const { scene, labels } = render(index);
       const south = label(labels, 'South');
@@ -195,19 +229,22 @@ describe('the chart-sizes charts follow the rules', () => {
       const ring = gridBox(scene.components);
       const radius = (ring.b - ring.t) / 2;
       const cx = (ring.l + ring.r) / 2;
-      expect(radius).toBeCloseTo(
-        (height(index) - 22) / 2 - (south.height / 2 + labelRoom(size)),
-        6
-      );
-      // A label frame is 1.3 text widths and two sizes wide (`paintRadar`).
-      const textWidth = (south.width - 2 * size) / 1.3;
-      expect(south.x + south.width / 2 - textWidth / 2 - (cx + radius)).toBeCloseTo(
-        0.04 * radius,
-        6
-      );
-      // The plot box ends 15.66 pt before the line keys, and the ring centres in it.
-      const key = lineKey(scene.components);
-      expect(key.l - (2 * cx - 11)).toBeCloseTo(15.66, 6);
+      const cy = (ring.t + ring.b) / 2;
+      const half = (height(index) - 2 * MARGIN) / 2;
+      expect(radius).toBeCloseTo(half - (south.height / 2 + labelRoom(size)), 6);
+      // The side label starts 0.04 radii past its spoke end.
+      const southLeft = south.x + south.width / 2 - textWidth(south) / 2;
+      expect(southLeft - (cx + radius)).toBeCloseTo(0.04 * radius, 6);
+      // The top label ends 0.04 radii and 0.16 sizes above its spoke end, and the bottom label
+      // starts 0.04 radii below its spoke end: `RISE_GAP` and `LABEL_LIFT` cancel there.
+      const north = label(labels, 'North');
+      expect(cy - radius - (north.y + north.height)).toBeCloseTo(0.04 * radius + 0.16 * size, 6);
+      const east = label(labels, 'East');
+      expect(east.y - (cy + radius)).toBeCloseTo(0.04 * radius, 6);
+      // The plot box (from the left margin) ends 15.66 pt before the line keys, and the ring
+      // centres in it.
+      const plotRight = 2 * cx - MARGIN;
+      expect(lineKey(scene.components).l - plotRight).toBeCloseTo(15.66, 6);
     }
   });
 });

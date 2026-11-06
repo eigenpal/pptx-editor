@@ -34,16 +34,19 @@ import {
 
 const MAX_SPOKES = 1_024;
 /**
- * Measured on the `charts` and `chart-sizes` reference PDFs, at 9 to 20 pt and radii of 99 to
- * 188 pt:
- * - The plot keeps half a category line and `labelRoom` of its box for the labels.
- * - Category labels sit `SIDE_GAP` radii past the spoke ends, beyond half their own extent.
- *   Labels above or below a spoke end sit a further 0.08 sizes away (`RISE_GAP`).
+ * The room that a radar keeps for its category labels, past half a category line, at each
+ * side of its box. Measured on the `charts` and `chart-sizes` reference PDFs at 9 to 20 pt.
  */
 export function labelRoom(sizePt: number): number {
   return Math.max(0, 0.9275 * sizePt - 5.25);
 }
+/**
+ * Category labels sit this many radii past the spoke ends, beyond half their own extent. The
+ * gap follows the radius, not the text size: the 12 pt radar of the `charts` PDF (radius 188 pt)
+ * keeps 7.5 pt, and the 20 pt radar of `chart-sizes` (radius 176 pt) keeps 7 pt.
+ */
 const SIDE_GAP = 0.04;
+/** Labels above or below a spoke end sit this many sizes further away. */
 const RISE_GAP = 0.08;
 /** Value labels end this many sizes before the first spoke. */
 const VALUE_GAP = 1;
