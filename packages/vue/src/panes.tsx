@@ -27,6 +27,7 @@ import {
 import {
   ZOOM_MENU_LEVELS,
   createProgressiveMount,
+  mountedSections,
   tooltipAttributes,
   followCurrentSlide,
   groupSlideSections,
@@ -124,6 +125,7 @@ export const Thumbnail = defineComponent({
       <div
         ref={box}
         class="pptx-rail__thumb"
+        data-pending={props.slide.pending ? '' : undefined}
         style={{ aspectRatio: String(1 / props.ratio) }}
         aria-hidden="true"
       />
@@ -542,6 +544,8 @@ const SlideRailRoot = defineComponent({
       const currentSection = groups ? sectionOfSlide(groups, current.value)?.id : undefined;
       void grown.value;
       const mounted = mount.limit(count(), current.value, opening.value);
+      // A grouped rail mounts whole sections, so no header shows with no slides under it.
+      const inView = groups ? mountedSections(groups, mounted) : null;
       return (
         <nav
           {...restAttrs(attrs)}
@@ -566,8 +570,8 @@ const SlideRailRoot = defineComponent({
               trackCollapse(e);
             }}
           >
-            {groups
-              ? groups.map((sec) => {
+            {groups && inView
+              ? inView.sections.map((sec) => {
                   const shut = collapsed.value.includes(sec.id);
                   return (
                     <SectionNode
@@ -588,7 +592,10 @@ const SlideRailRoot = defineComponent({
                     >
                       {() =>
                         slides.value
-                          .slice(sec.firstSlide, Math.min(sec.firstSlide + sec.slideCount, mounted))
+                          .slice(
+                            sec.firstSlide,
+                            Math.min(sec.firstSlide + sec.slideCount, inView.limit)
+                          )
                           .map(item)
                       }
                     </SectionNode>

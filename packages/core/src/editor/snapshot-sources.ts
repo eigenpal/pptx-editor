@@ -2,7 +2,7 @@
 // them does not re-render on every edit. Moved out of `pptx-editor.ts` (the 1000-line cap).
 
 import type { EditorSnapshot } from '../contracts/index.ts';
-import type { PptxPackage } from '../store/index.ts';
+import { deferredParseCount, type PptxPackage } from '../store/index.ts';
 import { namedFamilies, type DocumentSession } from './document-session.ts';
 import { notesParagraphs, notesText } from '../automation/commands/notes-commands.ts';
 import { FONT_NAME, STANDARD_FONT_FAMILIES } from './selection-state.ts';
@@ -89,6 +89,7 @@ export function createFontFamilySource(
     session: unknown;
     revision: number;
     fonts: number;
+    parsed: number;
     list: readonly string[];
   } | null = null;
   return {
@@ -102,7 +103,14 @@ export function createFontFamilySource(
     list(session) {
       const revision = session?.store.revision ?? -1;
       const fonts = session?.fontGeneration ?? -1;
-      if (cache?.session === session && cache.revision === revision && cache.fonts === fonts)
+      // A slide that finishes opening can name new families, but changes no revision.
+      const parsed = session?.opening ? deferredParseCount() : -1;
+      if (
+        cache?.session === session &&
+        cache.revision === revision &&
+        cache.fonts === fonts &&
+        cache.parsed === parsed
+      )
         return cache.list;
       const byFold = new Map<string, string>();
       const add = (f: string | undefined): void => {
@@ -118,7 +126,7 @@ export function createFontFamilySource(
         for (const f of namedFamilies(session.store.package)) add(f);
       }
       const list = [...byFold.values()].sort((a, b) => a.localeCompare(b));
-      cache = { session, revision, fonts, list };
+      cache = { session, revision, fonts, parsed, list };
       return list;
     },
   };

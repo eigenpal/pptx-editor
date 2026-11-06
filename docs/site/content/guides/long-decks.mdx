@@ -14,11 +14,15 @@ A long deck shows its first slide and takes input before the rest of the deck is
 await editor.load(bytes, { startSlide: 41 });
 ```
 
-The slides after the start slide open next, then the slides before it. The slide rail mounts its first screen with the first slide and the other items over the next frames. A thumbnail shows an empty placeholder until its slide is ready. The slides in view in the rail open before the others.
+A start slide that is not a whole number rounds down, and a start slide outside the deck goes to the nearest slide. A value that is not a finite number opens the first slide.
+
+The slides after the start slide open next, then the slides before it. The slide rail mounts its first screen with the first slide and the other items over the next frames. A thumbnail shows an empty placeholder until its slide is ready. The slides in view in the rail open before the others. In a rail with sections, a section mounts with all of its slides, so a section header never shows without its slides.
 
 A deck whose other slides hold less than 512 KiB of slide content opens whole, as before.
 
 ## Follow the progress
+
+`snapshot().isOpening` is true until the first slide shows. Show an opening screen while it holds.
 
 `snapshot().pendingSlides` is the number of slides still opening, and 0 when the deck is ready. Each `SlideSummary` in `snapshot().slides` has `pending: true` until its slide is ready. The count moves at most every 300 ms, and `selectionChange` fires when it moves:
 
@@ -34,7 +38,7 @@ onEditorEvent(editor, 'selectionChange', (snapshot) => {
 
 Everything. A slide that the editor needs opens at once: a slide you go to, a slide that Find searches, and a slide that a command changes. Edits, undo, and redo work on every slide. `save()` opens the rest of the deck first, so the saved file holds every slide, and the parts that you did not edit save as they do after a full open.
 
-A slide whose XML is damaged refuses the deck when it opens: `snapshot().openFailure` reports it, and the editor holds no deck. A save before then refuses the deck too.
+A slide or a notes slide whose XML is damaged refuses the deck when it is read, in the background or for a command. `snapshot().openFailure` reports it, and the `openFailure` event fires. With no edits, the editor holds no deck. After edits, the deck stays open in view mode, so the edits stay on screen. The editor then refuses every command, undo, `save()`, and automation write or export. A save or an export before the damage is read opens the rest of the deck first, and refuses the deck too.
 
 ## Collaboration and fonts
 

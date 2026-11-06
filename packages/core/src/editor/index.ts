@@ -135,6 +135,8 @@ export {
   createProgressiveMount,
   MOUNT_CHUNK_ITEMS,
   MOUNT_FIRST_ITEMS,
+  mountedSections,
+  type MountedSections,
   type ProgressiveMount,
 } from './progressive-mount.ts';
 export { STANDARD_COLORS, gradientCss, presetGradient, swatchName } from './palette.ts';

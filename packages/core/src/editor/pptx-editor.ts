@@ -22,7 +22,7 @@ import { tableStyleList } from '../cascade/index.ts';
 import { createClipboardHost } from './clipboard-host.ts';
 import { createOpeningLane } from './pptx-editor-opening.ts';
 import { commandCacheKey, compile, type CommandContext } from './commands.ts';
-import { openPresentation, type DocumentSession } from './document-session.ts';
+import { clampSlide, openPresentation, type DocumentSession } from './document-session.ts';
 import { changedSlide, isHistoryMark, validSelection, type HistoryMark } from './history-marks.ts';
 import { EditorHistoryGroups } from './history-groups.ts';
 import {
@@ -178,6 +178,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       mode,
       slides,
       pendingSlides: opening.pending(),
+      isOpening: status === 'loading',
       currentSlide: slide,
       selectedSlides: slideSel.indices(info?.slides ?? [], slide),
       slideNumbers: pkg ? hasSlideNumber(pkg, slide) : false,
@@ -632,9 +633,18 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     paste: (payload) => void exec({ type: 'paste', payload }),
   });
 
-  /** Refuse the deck `drop` opened (a slide that did not parse), or a file that did not open. */
+  /**
+   * Refuse a file that did not open, or the deck `drop` opened when one of its slides did not
+   * parse. A deck with no edits goes. A deck with edits stays open for viewing, as DOCX Editor's
+   * write guard keeps a document readable: its store refuses every commit, and the notice says
+   * why, so the user can still read and copy the work.
+   */
   const refuseOpen = (code: string, drop?: DocumentSession): CommandResult => {
-    if (drop && drop === session) {
+    if (drop && drop !== session) return { ok: false, reason: 'errors.malformed', detail: code };
+    if (drop && drop.store.edited) {
+      drop.opening = null;
+      instance.setMode('view');
+    } else if (drop) {
       (detachModules(), thumbnails.clear(), drop.dispose());
       session = null;
       selection = { kind: 'none' };
@@ -667,7 +677,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     await yieldToPaint();
     if (stale()) return superseded();
     // A collaboration room needs every part, so a deck that joins one opens whole.
-    const startSlide = loadOptions?.startSlide ?? 0;
+    const startSlide = clampSlide(loadOptions?.startSlide, Number.MAX_SAFE_INTEGER);
     const progressive = modules.collaboration ? {} : { progressive: { startSlide } };
     const r = await openPresentation(bytes, { ...openOptionsOf(options), ...progressive });
     if (r.ok && !stale()) await hostFonts.open(r.session, stale);
@@ -715,7 +725,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     thumbnails.clear();
     status = 'ready';
     failure = undefined;
-    slide = Math.max(0, Math.min(Math.trunc(startSlide) || 0, session.info.slides.length - 1));
+    slide = clampSlide(startSlide, session.info.slides.length);
     slideSel.reset(session.info.slides[slide]?.partName);
     selection = { kind: 'none' };
     lastRejection = null;
@@ -763,7 +773,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     load,
     // A deck still opening parses the rest first; a slide that does not parse refuses the deck.
     save: () =>
-      session && opening.finish() && session
+      session && !session.damage && opening.finish() && session && !session.damage
         ? writePptx(repairTablesForSave(session.store.package))
         : null,
     setZoom(value) {
@@ -775,7 +785,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       emit();
     },
     setMode(next) {
-      mode = next;
+      // A deck with a slide that did not parse is open for viewing only.
+      mode = session?.damage ? 'view' : next;
       if (next === 'view') painter.reset();
       if (next === 'view') cropper.cancel();
       // View mode edits no text and no cells: the element stays selected.
@@ -851,6 +862,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     renderThumbnail: (index, container, opts) =>
       thumbnails.render(index, container, opts?.defer === true),
     renderLayoutThumbnail: (layoutId, container) => thumbnails.renderLayout(layoutId, container),
+    finishOpening: () => !session || (!session.damage && opening.finish() && !session?.damage),
     reject: refuse,
     destroy() {
       // A `load` still in flight sees the flag and disposes what it opened.

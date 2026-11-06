@@ -121,6 +121,11 @@ export function deferredParseCount(): number;
 export type DeferredPartFinish = (part: XmlPart) => XmlPart;
 
 // @public
+export type DeferredPartReject = (rejection: Extract<PackageRejection, {
+    reason: 'xml';
+}>) => void;
+
+// @internal
 export function deferredPartRejection(part: PackagePart): Extract<PackageRejection, {
     reason: 'xml';
 }> | undefined;
@@ -129,6 +134,7 @@ export function deferredPartRejection(part: PackagePart): Extract<PackageRejecti
 export interface DeferredReadOptions {
     readonly defer: (partName: string) => boolean;
     readonly finish?: DeferredPartFinish;
+    readonly onReject?: DeferredPartReject;
 }
 
 // @public
@@ -136,13 +142,14 @@ export function deferredRejection(pkg: PptxPackage): Extract<PackageRejection, {
     reason: 'xml';
 }> | undefined;
 
-// @public
+// @internal
 export function deferredRejectionCount(): number;
 
-// @public
+// @internal
 export function deferredXmlPart(partName: string, bytes: Uint8Array, decode: (bytes: Uint8Array) => string, options: {
     readonly notes: boolean;
     readonly finish?: DeferredPartFinish;
+    readonly onReject?: DeferredPartReject;
 }): PackagePart;
 
 // @public
@@ -256,6 +263,9 @@ export function fontEmbeddingPermission(fsType: number): EmbeddingPermission;
 // @public
 export type HistoryGroup = symbol;
 
+// @internal
+export function holdsStandIn(part: PackagePart): boolean;
+
 // @public
 export function imagePartFor(pkg: PptxPackage, source: string, rId: string): string | undefined;
 
@@ -286,7 +296,7 @@ export function intAttr(el: Element_2 | undefined, name: string | QName): number
 // @public
 export function is(el: Element_2 | undefined, name: string | QName): el is Element_2;
 
-// @public
+// @internal
 export function isDeferredPart(part: PackagePart | undefined): boolean;
 
 // @public
@@ -518,10 +528,10 @@ export type PackageResult = {
     readonly error: PackageRejection;
 };
 
-// @public
+// @internal
 export function parseDeferredPart(pkg: PptxPackage, partName: string): boolean;
 
-// @public
+// @internal
 export function parseDeferredParts(pkg: PptxPackage): void;
 
 // @public
@@ -530,13 +540,13 @@ export function parseXmlPart(partName: string, xml: string, limits?: XmlLimits):
 // @public
 export function path(el: Element_2 | undefined, ...names: string[]): Element_2 | undefined;
 
-// @public
+// @internal
 export function peekDeferredRootAttribute(part: PackagePart, name: string): string | undefined | null;
 
-// @public
+// @internal
 export function pendingDeferredBytes(pkg: PptxPackage): number;
 
-// @public
+// @internal
 export function pendingDeferredParts(pkg: PptxPackage): string[];
 
 // @public
@@ -548,12 +558,18 @@ export const PPTX_ZIP_LIMITS: ZipLimits;
 // @public
 export class PptxDocumentStore {
     constructor(pkg: PptxPackage, options?: DocumentStoreOptions);
+    // @internal
+    block(detail: string): void;
+    // @internal
+    get blocked(): string | null;
     // (undocumented)
     get canRedo(): boolean;
     // (undocumented)
     get canUndo(): boolean;
     closeHistoryGroup(): void;
     dryRun(ops: readonly PptxOp[]): TransactResult;
+    // @internal
+    get edited(): boolean;
     get package(): PptxPackage;
     redo(): {
         readonly ok: boolean;

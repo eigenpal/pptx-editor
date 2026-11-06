@@ -68,6 +68,12 @@ export interface AutomationDocumentPort {
   committed?(): void;
   /** The document as `.pptx` bytes, or null when there is none. */
   save(): Uint8Array | null;
+  /**
+   * Make the whole document ready for a reader of every part, as `save` does: a deck that is
+   * still opening opens the rest now. False when the document cannot be read whole (a slide
+   * did not parse). A port without it is always whole.
+   */
+  wholeDocument?(): boolean;
   /** Change notification for commits by anyone. */
   subscribe(listener: () => void): () => void;
   /** The measurer text writes re-fit with, when the host has one. */
@@ -239,6 +245,18 @@ export function createAutomationHost(composition: AutomationHostComposition): Au
           count,
           index,
           automationError('unsupported-capability', 'this host draws no pictures', 'images'),
+          revision
+        );
+      // An export reads every slide: a deck still opening opens the rest first.
+      if (name === 'exportSlides' && port.wholeDocument?.() === false)
+        return refuse(
+          count,
+          index,
+          automationError(
+            'document-unavailable',
+            'a slide of this presentation did not open',
+            'damaged'
+          ),
           revision
         );
       try {

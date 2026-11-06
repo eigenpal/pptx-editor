@@ -8,6 +8,7 @@ import { readZip, writeZip } from '@eigenpal/ooxml-core';
 import {
   canonicalPackageFingerprint,
   deferredRejection,
+  deferredXmlPart,
   isDeferredPart,
   isDeferredPending,
   parseDeferredParts,
@@ -18,6 +19,7 @@ import {
   serializeXmlPart,
   writePptx,
   PPTX_ZIP_LIMITS,
+  PptxDocumentStore,
   type PptxPackage,
 } from '../index.ts';
 
@@ -140,5 +142,76 @@ describe('deferred parts', () => {
     const eager = readPptx(bytes);
     if (!eager.ok) throw new Error('eager');
     expect(writePptx(deferAll(bytes))).toEqual(writePptx(eager.pkg));
+  });
+
+  test('an edited stand-in still refuses the write', () => {
+    const base = deck(2);
+    const name = presentationInfo(deferAll(base)).slides[1]!.partName;
+    const pkg = deferAll(withEntry(base, name, '<p:sld xmlns:p="urn:x"><p:cSld>'));
+    const store = new PptxDocumentStore(pkg);
+    const part = store.package.parts.get(name)!;
+    if (part.kind !== 'xml') throw new Error('kind');
+    const r = store.transact([
+      {
+        op: 'setAttribute',
+        part: name,
+        node: part.xml.root.id,
+        name: { ns: '', local: 'show' },
+        value: '0',
+      },
+    ]);
+    expect(r.ok).toBe(true);
+    const edited = store.package.parts.get(name)!;
+    expect(edited).not.toBe(part);
+    expect(() => writePptx(store.package)).toThrow(/did not parse/);
+  });
+});
+
+/** The root attribute `show` of a deferred slide over `xml`, read without parsing. */
+const peek = (xml: string | Uint8Array, name = 'show') =>
+  peekDeferredRootAttribute(
+    deferredXmlPart(
+      '/ppt/slides/slide1.xml',
+      typeof xml === 'string' ? new TextEncoder().encode(xml) : xml,
+      (b) => new TextDecoder().decode(b),
+      { notes: false }
+    ),
+    name
+  );
+
+describe('the root start tag scan', () => {
+  const NS = 'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
+  test('skips a byte order mark and the declaration', () => {
+    const body = new TextEncoder().encode(`<?xml version="1.0"?><p:sld ${NS} show="0"/>`);
+    expect(peek(new Uint8Array([0xef, 0xbb, 0xbf, ...body]))).toBe('0');
+  });
+
+  test('skips a processing instruction and a comment before the root', () => {
+    expect(peek(`<?xml version="1.0"?><?pi a > b?><!-- a > b --><p:sld ${NS} show="0">`)).toBe('0');
+  });
+
+  test('reads single-quoted values', () => {
+    expect(peek(`<p:sld ${NS} show='0'>`)).toBe('0');
+  });
+
+  test('reads past a `>` or an entity in another value', () => {
+    expect(peek(`<p:sld ${NS} a="x>y" show="0">`)).toBe('0');
+    expect(peek(`<p:sld ${NS} a="x&gt;y" show="0">`)).toBe('0');
+    // The value asked for needs decoding: the reader parses instead.
+    expect(peek(`<p:sld ${NS} show="&#48;">`)).toBeNull();
+  });
+
+  test('reads a self-closing root', () => {
+    expect(peek(`<p:sld ${NS} show="0"/>`)).toBe('0');
+    expect(peek(`<p:sld ${NS}/>`)).toBeUndefined();
+  });
+
+  test('a prefixed attribute is another attribute', () => {
+    expect(peek(`<p:sld ${NS} xmlns:x="urn:x" x:show="0">`)).toBeUndefined();
+  });
+
+  test('UTF-16 and a DOCTYPE answer null', () => {
+    expect(peek(new Uint8Array([0xff, 0xfe, 0x3c, 0x00]))).toBeNull();
+    expect(peek(`<!DOCTYPE p:sld><p:sld ${NS} show="0">`)).toBeNull();
   });
 });

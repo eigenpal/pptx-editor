@@ -39,10 +39,11 @@ const sameSlides = (a: readonly number[], b: readonly number[]): boolean =>
 function happened(event: keyof PptxEditorEvents, prev: EditorSnapshot, next: EditorSnapshot) {
   switch (event) {
     case 'change':
-      // A load that finishes (or fails) counts; the start of a load does not.
+      // A load that finishes (or fails) counts; the start of a load does not. A slide summary
+      // that changes with no revision (a slide that finishes opening) counts too.
       return (
         prev.revision !== next.revision ||
-        (prev.status !== next.status && next.status !== 'loading')
+        (next.status !== 'loading' && (prev.status !== next.status || prev.slides !== next.slides))
       );
     case 'selectionChange':
       return (

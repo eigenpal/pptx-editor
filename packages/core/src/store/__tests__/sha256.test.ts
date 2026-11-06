@@ -49,16 +49,25 @@ describe('P5: fingerprints use the native hash', () => {
   });
 
   test('a large binary part hashes far faster than the pure path', () => {
-    const bytes = new Uint8Array(8 * 1024 * 1024);
+    const bytes = new Uint8Array(4 * 1024 * 1024);
     for (let i = 0; i < bytes.length; i += 4096) bytes[i] = i & 0xff;
     bytesFingerprint(bytes.subarray(0, 1024)); // warm up
-    let t = performance.now();
-    const pure = sha256FontBytesPure(bytes);
-    const pureMs = performance.now() - t;
-    t = performance.now();
-    const fast = bytesFingerprint(bytes);
-    const fastMs = performance.now() - t;
-    expect(fast).toBe(pure);
+    const time = (run: () => string): { ms: number; digest: string } => {
+      const t = performance.now();
+      const digest = run();
+      return { ms: performance.now() - t, digest };
+    };
+    // Interleaved rounds see the same load, and the fastest round of each drops the stalls a
+    // parallel test run puts into any one round. The comparison itself is unchanged.
+    let pureMs = Number.POSITIVE_INFINITY;
+    let fastMs = Number.POSITIVE_INFINITY;
+    for (let round = 0; round < 5; round += 1) {
+      const pure = time(() => sha256FontBytesPure(bytes));
+      const fast = time(() => bytesFingerprint(bytes));
+      expect(fast.digest).toBe(pure.digest);
+      pureMs = Math.min(pureMs, pure.ms);
+      fastMs = Math.min(fastMs, fast.ms);
+    }
     // The native hash is 40 to 80 times faster; a 4x margin keeps this stable under load.
     expect(fastMs * 4).toBeLessThan(pureMs);
   });

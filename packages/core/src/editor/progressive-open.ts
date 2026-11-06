@@ -16,6 +16,7 @@
 // counts as settled.
 
 import {
+  deferredParseCount,
   deferredPartRejection,
   deferredRejectionCount,
   isDeferredPending,
@@ -69,7 +70,6 @@ export class ProgressiveOpen {
     parsed: -1,
     count: 0,
   };
-  #parsed = 0;
 
   /**
    * `pkg` is the package that opened; `order` the deferred part names in the order they
@@ -107,11 +107,13 @@ export class ProgressiveOpen {
   pendingSlides(pkg: PptxPackage, info: PresentationInfo): number {
     if (this.#settled) return 0;
     const memo = this.#pendingMemo;
-    if (memo.pkg === pkg && memo.parsed === this.#parsed) return memo.count;
+    // Any read parses a part, not only `step`: the page's parse count is the key.
+    const parsed = deferredParseCount();
+    if (memo.pkg === pkg && memo.parsed === parsed) return memo.count;
     let count = 0;
     for (const slide of info.slides)
       if (isDeferredPending(pkg.parts.get(slide.partName))) count += 1;
-    this.#pendingMemo = { pkg, parsed: this.#parsed, count };
+    this.#pendingMemo = { pkg, parsed, count };
     return count;
   }
 
@@ -159,7 +161,6 @@ export class ProgressiveOpen {
       }
       if (!isDeferredPending(part) || part.kind !== 'xml') continue;
       void part.xml;
-      this.#parsed += 1;
       if (fromWanted) wanted = true;
       const rejection = deferredPartRejection(part);
       if (rejection) this.#rejection = rejection;
@@ -235,6 +236,8 @@ export function continueOpening(open: ProgressiveOpen, hooks: OpeningHooks): voi
 export function openingOrder(info: PresentationInfo, start: number): string[] {
   const out: string[] = [];
   const n = info.slides.length;
+  if (n === 0) return out;
+  start = Number.isFinite(start) ? Math.max(0, Math.min(Math.trunc(start), n - 1)) : 0;
   for (let k = 1; k < n; k += 1) {
     const slide = info.slides[(start + k) % n]!;
     out.push(slide.partName);

@@ -312,6 +312,11 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
   // Host refusals with a detail of their own.
   ['document', 'host.no-document', 'The host holds no presentation. Open one before you run.'],
   [
+    'damaged',
+    'host.damaged-document',
+    'A slide of the presentation did not open, so the editor holds it read-only. Repair the file and open it again.',
+  ],
+  [
     'internal',
     'host.internal',
     'The engine could not complete the request, and nothing changed. Report the call that failed.',

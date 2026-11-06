@@ -23,6 +23,7 @@ import {
 import {
   ZOOM_MENU_LEVELS,
   createProgressiveMount,
+  mountedSections,
   tooltipAttributes,
   followCurrentSlide,
   groupSlideSections,
@@ -104,6 +105,7 @@ export const Thumbnail = memo(function Thumbnail({
     <div
       ref={box}
       className="pptx-rail__thumb"
+      data-pending={slide.pending ? '' : undefined}
       style={{ aspectRatio: String(1 / ratio) }}
       aria-hidden="true"
     />
@@ -311,6 +313,8 @@ export function SlideRail(props: SlideRailProps = {}) {
   const sections = useSlideSections();
   // Sections group the rail when they cover every slide in order; otherwise it stays flat.
   const grouped = groupSlideSections(sections, count);
+  // A grouped rail mounts whole sections, so no header shows with no slides under it.
+  const inView = grouped ? mountedSections(grouped, mounted) : null;
   const orientation = resolveRailOrientation(props.orientation, 'PptxEditor.SlideRail');
   // A right-to-left row mirrors the move buttons, as its arrow keys do. The direction comes
   // from the mounted rail, so it is read after the rail mounts or changes.
@@ -497,8 +501,8 @@ export function SlideRail(props: SlideRailProps = {}) {
         onKeyDown={onKeyDown}
         onFocus={trackFocus}
       >
-        {grouped
-          ? grouped.map((sec) => {
+        {grouped && inView
+          ? inView.sections.map((sec) => {
               const shut = collapsed.includes(sec.id);
               return (
                 <SectionNode
@@ -514,7 +518,7 @@ export function SlideRail(props: SlideRailProps = {}) {
                   onRemoved={focusCurrent}
                 >
                   {slides
-                    .slice(sec.firstSlide, Math.min(sec.firstSlide + sec.slideCount, mounted))
+                    .slice(sec.firstSlide, Math.min(sec.firstSlide + sec.slideCount, inView.limit))
                     .map(item)}
                 </SectionNode>
               );

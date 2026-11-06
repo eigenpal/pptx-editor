@@ -404,11 +404,17 @@ export class DocumentSession {
    * The background parse of a progressive open, until it settles; null for a deck that parsed
    * whole. The editor runs it (`continueOpening`) and drops it once it settles. @internal
    */
-  opening: ProgressiveOpen | null;
+  opening: ProgressiveOpen | null = null;
+  /**
+   * The refusal of a slide of a progressive open that did not parse, once one did. The store
+   * refuses every commit from then on (`PptxDocumentStore.block`). @internal
+   */
+  damage: Extract<PackageRejection, { reason: 'xml' }> | null = null;
+  /** Hears `damage` at once, where the read happened. The editor sets it. @internal */
+  onDamage: ((rejection: Extract<PackageRejection, { reason: 'xml' }>) => void) | null = null;
 
-  constructor(store: PptxDocumentStore, fonts: FontSet, opening: ProgressiveOpen | null = null) {
+  constructor(store: PptxDocumentStore, fonts: FontSet) {
     this.store = store;
-    this.opening = opening;
     this.#fonts = fonts;
     const built = buildMeasurer(fonts);
     this.#measurer = built.measurer;
@@ -584,6 +590,14 @@ export class DocumentSession {
     return presentationInfo(this.store.package);
   }
 
+  /** Record that a slide of a progressive open did not parse: block commits, and tell. @internal */
+  markDamaged(rejection: Extract<PackageRejection, { reason: 'xml' }>): void {
+    if (this.damage) return;
+    this.damage = rejection;
+    this.store.block(`${rejection.partName} did not parse`);
+    this.onDamage?.(rejection);
+  }
+
   /**
    * Whether slide `index` is still opening: its part has not parsed (`progressive-open.ts`).
    * Reading its layout parses it at once. `EditorSnapshot.pendingSlides` is the public count.
@@ -675,8 +689,19 @@ export async function openPresentation(
   options: OpenOptions = {}
 ): Promise<{ ok: true; session: DocumentSession } | { ok: false; error: OpenError }> {
   if (bytes.length === 0) return { ok: false, error: { reason: 'empty' } };
+  // A slide that does not parse after the open marks the session at once, wherever it is read.
+  let made: DocumentSession | null = null;
+  let early: Extract<PackageRejection, { reason: 'xml' }> | null = null;
+  const onReject = (rejection: Extract<PackageRejection, { reason: 'xml' }>): void => {
+    if (made) made.markDamaged(rejection);
+    else early ??= rejection;
+  };
   const read = options.progressive
-    ? readPptx(bytes, PPTX_ZIP_LIMITS, { defer: () => true, finish: partWithoutEditorMarks })
+    ? readPptx(bytes, PPTX_ZIP_LIMITS, {
+        defer: () => true,
+        finish: partWithoutEditorMarks,
+        onReject,
+      })
     : readPptx(bytes);
   if (!read.ok) return { ok: false, error: read.error };
   const opened = options.progressive ? firstSlideOnly(read.pkg, options.progressive) : null;
@@ -693,9 +718,13 @@ export async function openPresentation(
     substituteFailures: [] as readonly SubstituteFontFailure[],
     substituteFamilies: null,
   };
-  const opening = opened?.opening ?? null;
-  if (options.fixedMeasurer)
-    return { ok: true, session: new DocumentSession(store, { ...base, fixed: true }, opening) };
+  const make = (fonts: FontSet): DocumentSession => {
+    made = new DocumentSession(store, fonts);
+    made.opening = opened?.opening ?? null;
+    if (early) made.markDamaged(early);
+    return made;
+  };
+  if (options.fixedMeasurer) return { ok: true, session: make({ ...base, fixed: true }) };
   await initializeHarfBuzz();
   const families = options.substitutes === false ? null : substituteFamiliesFor(read.pkg);
   const loaded = families ? await substituteFonts(families) : { sources: [], failures: [] };
@@ -706,7 +735,13 @@ export async function openPresentation(
     substituteFamilies: families,
     fixed: false,
   };
-  return { ok: true, session: new DocumentSession(store, fonts, opening) };
+  return { ok: true, session: make(fonts) };
+}
+
+/** A slide index: a finite number truncated and clamped to `count` slides, else 0. @internal */
+export function clampSlide(index: number | undefined, count: number): number {
+  const asked = typeof index === 'number' && Number.isFinite(index) ? Math.trunc(index) : 0;
+  return Math.max(0, Math.min(asked, count - 1));
 }
 
 /**
@@ -721,7 +756,7 @@ function firstSlideOnly(
   | { readonly ok: true; readonly opening: ProgressiveOpen | null }
   | { readonly ok: false; readonly error: OpenError } {
   const info = presentationInfo(pkg);
-  const start = Math.max(0, Math.min(options.startSlide ?? 0, info.slides.length - 1));
+  const start = clampSlide(options.startSlide, info.slides.length);
   const first = info.slides[start];
   if (first) parseDeferredPart(pkg, first.partName);
   if (first?.notesPart) parseDeferredPart(pkg, first.notesPart);

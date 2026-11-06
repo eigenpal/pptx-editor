@@ -864,6 +864,13 @@ export interface EditorSnapshot {
    * fires when it does. Optional and additive: absent reads as 0.
    */
   readonly pendingSlides?: number;
+  /**
+   * Whether a deck is still on its way to its first painted slide (`status` is `loading`).
+   * Show an opening screen while it holds. It turns false when the first slide paints; that
+   * slide takes input while the others open (`pendingSlides`). Optional and additive: absent
+   * reads as `false`.
+   */
+  readonly isOpening?: boolean;
   readonly currentSlide: number;
   /**
    * The slides selected in the slide rail, ascending. Always holds `currentSlide`. Shift+click

@@ -22,10 +22,11 @@ import { repairPresentationRoot } from './presentation-repair.ts';
 import { markFileTimings, repairTimingRoot } from './timing.ts';
 import { sha256FontBytes } from '@eigenpal/ooxml-core';
 import {
-  deferredPartRejection,
   deferredXmlPart,
+  holdsStandIn,
   isDeferredPending,
   type DeferredPartFinish,
+  type DeferredPartReject,
 } from './deferred-parts.ts';
 
 /** One part of the package. */
@@ -149,6 +150,8 @@ export interface DeferredReadOptions {
   readonly defer: (partName: string) => boolean;
   /** Runs on a deferred part's tree once it parses. */
   readonly finish?: DeferredPartFinish;
+  /** Hears, at once, a deferred part that does not parse, wherever it is read. */
+  readonly onReject?: DeferredPartReject;
 }
 
 /**
@@ -182,6 +185,7 @@ export function readPptx(
         partName,
         deferredXmlPart(partName, data, decodeXml, {
           notes: kind === 'notes',
+          ...(deferred!.onReject ? { onReject: deferred!.onReject } : {}),
           finish: (tree) => {
             if (isSlideRoot(tree.root)) markFileTimings(tree.root);
             return finish ? finish(tree) : tree;
@@ -223,8 +227,7 @@ function deferrableKind(partName: string, types: ContentTypeIndex): 'slide' | 'n
 export function writePptx(pkg: PptxPackage): Uint8Array<ArrayBuffer> {
   for (const part of pkg.parts.values()) {
     if (isDeferredPending(part) && part.kind === 'xml') void part.xml;
-    const rejection = deferredPartRejection(part);
-    if (rejection) throw new Error(`writePptx: ${rejection.partName} did not parse`);
+    if (holdsStandIn(part)) throw new Error(`writePptx: ${part.partName} did not parse`);
   }
   const encoder = new TextEncoder();
   const entries = new Map<string, Uint8Array>();

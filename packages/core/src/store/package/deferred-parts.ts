@@ -11,15 +11,19 @@
 // The parse is the reader's own (`parseXmlPart`, bounded, entity-free), with the same limits.
 // A part that does not parse cannot refuse the deck at the trust boundary any more, because the
 // boundary has passed. It reads as a stand-in with an empty shape tree, so no reader fails,
-// and its refusal is recorded: the editor then refuses the deck (`deferredRejection`), and
-// `writePptx` refuses to write a package that holds a stand-in, so a stand-in never leaves the
-// session.
+// and its refusal is recorded and reported at once (`onReject`): the editor then blocks every
+// commit, so no edit is built on a stand-in. `writePptx` refuses to write a package that holds
+// a stand-in, also one that an edit copied (the copy keeps the stand-in's namespace list), so a
+// stand-in never leaves the session.
 
 import type { PackagePart, PackageRejection, PptxPackage } from './package.ts';
 import { parseXmlPart, type XmlPart } from './tree.ts';
 
 /** What happens to a deferred part's tree right after it parses (the editor drops its marks). */
 export type DeferredPartFinish = (part: XmlPart) => XmlPart;
+
+/** Called once, where the read happens, when a deferred part does not parse. */
+export type DeferredPartReject = (rejection: Extract<PackageRejection, { reason: 'xml' }>) => void;
 
 interface DeferredState {
   bytes: Uint8Array | null;
@@ -28,6 +32,8 @@ interface DeferredState {
 }
 
 const states = new WeakMap<PackagePart, DeferredState>();
+/** The namespace lists of stand-in roots: an edit that copies a root keeps its list. */
+const standIns = new WeakSet<object>();
 let parsedCount = 0;
 let rejectionCount = 0;
 
@@ -40,18 +46,33 @@ function standIn(partName: string, notes: boolean): XmlPart {
   const xml = `<p:${local} xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld></p:${local}>`;
   const parsed = parseXmlPart(partName, xml);
   if (!parsed.ok) throw new Error('the deferred stand-in does not parse');
+  standIns.add(parsed.part.root.nsDecls);
   return parsed.part;
 }
 
 /**
+ * Whether `part` is, or was edited from, the stand-in of a deferred part that did not parse:
+ * `writePptx` refuses to write it. @internal
+ */
+export function holdsStandIn(part: PackagePart): boolean {
+  if (states.get(part)?.rejection) return true;
+  return part.kind === 'xml' && !isDeferredPending(part) && standIns.has(part.xml.root.nsDecls);
+}
+
+/**
  * A deferred XML part over `bytes`. `decode` turns the bytes into text, as the reader does;
- * `finish` runs on the tree once it parses; `notes` picks the stand-in's root.
+ * `finish` runs on the tree once it parses; `onReject` hears a part that does not parse;
+ * `notes` picks the stand-in's root. @internal
  */
 export function deferredXmlPart(
   partName: string,
   bytes: Uint8Array,
   decode: (bytes: Uint8Array) => string,
-  options: { readonly notes: boolean; readonly finish?: DeferredPartFinish }
+  options: {
+    readonly notes: boolean;
+    readonly finish?: DeferredPartFinish;
+    readonly onReject?: DeferredPartReject;
+  }
 ): PackagePart {
   const state: DeferredState = { bytes, xml: null, rejection: null };
   const part = {
@@ -68,6 +89,7 @@ export function deferredXmlPart(
         state.rejection = { reason: 'xml', partName, detail: tree.reason };
         rejectionCount += 1;
         state.xml = standIn(partName, options.notes);
+        options.onReject?.(state.rejection);
       }
       return state.xml;
     },
@@ -83,13 +105,14 @@ export function isDeferredPending(part: PackagePart | undefined): boolean {
   return !!state && state.xml === null;
 }
 
-/** Whether `part` was read as a deferred part (parsed since or not). */
+/** Whether `part` was read as a deferred part (parsed since or not). @internal */
 export function isDeferredPart(part: PackagePart | undefined): boolean {
   return !!part && states.has(part);
 }
 
 /**
  * The names of the deferred parts of `pkg` that have not been parsed yet, in package order.
+ * @internal
  */
 export function pendingDeferredParts(pkg: PptxPackage): string[] {
   const out: string[] = [];
@@ -97,7 +120,10 @@ export function pendingDeferredParts(pkg: PptxPackage): string[] {
   return out;
 }
 
-/** Parse the deferred part `partName` of `pkg` now. False when there was nothing to parse. */
+/**
+ * Parse the deferred part `partName` of `pkg` now. False when there was nothing to parse.
+ * @internal
+ */
 export function parseDeferredPart(pkg: PptxPackage, partName: string): boolean {
   const part = pkg.parts.get(partName);
   if (!part || !isDeferredPending(part) || part.kind !== 'xml') return false;
@@ -105,7 +131,7 @@ export function parseDeferredPart(pkg: PptxPackage, partName: string): boolean {
   return true;
 }
 
-/** Parse every deferred part of `pkg` that has not been parsed yet. */
+/** Parse every deferred part of `pkg` that has not been parsed yet. @internal */
 export function parseDeferredParts(pkg: PptxPackage): void {
   for (const part of pkg.parts.values())
     if (isDeferredPending(part) && part.kind === 'xml') void part.xml;
@@ -122,7 +148,7 @@ export function deferredRejection(
   return undefined;
 }
 
-/** The refusal of `part` when it is a deferred part that did not parse. */
+/** The refusal of `part` when it is a deferred part that did not parse. @internal */
 export function deferredPartRejection(
   part: PackagePart
 ): Extract<PackageRejection, { reason: 'xml' }> | undefined {
@@ -134,6 +160,7 @@ export function deferredPartRejection(
  * parsed, read from its first bytes without parsing the part. Undefined when the attribute is
  * absent; null when the start tag cannot be read this way, and the caller then reads `xml`:
  * a UTF-16 part, a start tag past the first 8 KiB, or a value that needs entity decoding.
+ * @internal
  */
 export function peekDeferredRootAttribute(
   part: PackagePart,
@@ -226,12 +253,15 @@ function rootAttribute(tag: string, name: string): string | undefined | null {
   }
 }
 
-/** How many deferred parts have failed to parse in this page: a change means a new refusal. */
+/**
+ * How many deferred parts have failed to parse in this page: a change means a new refusal.
+ * @internal
+ */
 export function deferredRejectionCount(): number {
   return rejectionCount;
 }
 
-/** The bytes of the deferred parts of `pkg` that have not been parsed yet, uncompressed. */
+/** The bytes of the deferred parts of `pkg` that have not been parsed yet, uncompressed. @internal */
 export function pendingDeferredBytes(pkg: PptxPackage): number {
   let total = 0;
   for (const part of pkg.parts.values()) {

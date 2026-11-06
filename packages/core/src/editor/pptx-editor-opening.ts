@@ -33,18 +33,35 @@ export function createOpeningLane(editor: OpeningEditor) {
   const asked = new WeakMap<DocumentSession, ReadonlySet<string>>();
   const settle = (owner: DocumentSession): void => {
     owner.opening = null;
-    void owner.addMissingSubstitutes().then((added) => {
-      if (added && editor.session() === owner) return editor.facesChanged(owner);
-    });
+    void owner
+      .addMissingSubstitutes()
+      .then((added) => {
+        if (added && editor.session() === owner) return editor.facesChanged(owner);
+      })
+      // A face that does not load is in the session's font report; nothing else to do.
+      .catch(() => undefined);
     const before = asked.get(owner) ?? new Set<string>();
     const more = deckFontFamilies(owner.store.package).filter(
       (family) => !before.has(family.toLowerCase())
     );
     if (more.length > 0) void editor.requestFamilies(more);
   };
+  const refused = new WeakSet<DocumentSession>();
+  /** Refuse `owner`'s deck once, now: the caller is not inside a read of the deck. */
+  const refuseNow = (owner: DocumentSession, rejection: XmlRejection): void => {
+    if (refused.has(owner)) return;
+    refused.add(owner);
+    editor.refuse(owner, rejection);
+  };
+  /** Refuse `owner`'s deck once, after the read that found the damage has returned. */
+  const refuse = (owner: DocumentSession, rejection: XmlRejection): void =>
+    queueMicrotask(() => refuseNow(owner, rejection));
   return {
     /** Parse the rest of `owner`'s deck in background tasks, if any is left. */
     start(owner: DocumentSession): void {
+      // A slide that does not parse, wherever it is read, refuses the deck at once.
+      owner.onDamage = (rejection) => refuse(owner, rejection);
+      if (owner.damage) refuse(owner, owner.damage);
       const open = owner.opening;
       if (!open) return;
       // What the open asked for: the parts parsed so far, as `hostFonts.open` read them.
@@ -54,7 +71,7 @@ export function createOpeningLane(editor: OpeningEditor) {
         current: () => editor.session() === owner && owner.opening === open,
         publish: () => editor.emit(),
         settled: () => (settle(owner), editor.emit()),
-        failed: (rejection) => editor.refuse(owner, rejection),
+        failed: (rejection) => refuseNow(owner, rejection),
       });
     },
     /**
@@ -66,7 +83,7 @@ export function createOpeningLane(editor: OpeningEditor) {
       const open = owner?.opening;
       if (!owner || !open) return true;
       const rejection = open.complete();
-      if (rejection) return (editor.refuse(owner, rejection), false);
+      if (rejection) return (refuseNow(owner, rejection), false);
       settle(owner);
       editor.emit();
       return true;

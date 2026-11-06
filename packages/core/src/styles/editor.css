@@ -1238,8 +1238,8 @@
 .pptx-rail__thumb svg {
   display: block;
 }
-/* A thumbnail not painted yet (a slide still opening, or one waiting to scroll into view). */
-.pptx-rail__thumb:empty {
+/* The thumbnail of a slide still opening in a long deck (`SlideSummary.pending`). */
+.pptx-rail__thumb[data-pending] {
   background: var(--doc-bg-hover);
 }
 /* Sections: a header per section that collapses its slides. */

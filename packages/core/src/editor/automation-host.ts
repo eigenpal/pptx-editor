@@ -209,6 +209,7 @@ function editorPort(editor: PptxEditorInstance): AutomationDocumentPort {
       if (session) session.store.setSelectionAfter(markOf(editor, session.store.package));
     },
     save: () => editor.save(),
+    wholeDocument: () => editor.finishOpening(),
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);

@@ -657,6 +657,7 @@ export interface EditorSnapshot {
     readonly geometry: SelectionGeometry | null;
     readonly image?: SelectedImageState | null;
     readonly insertions: number;
+    readonly isOpening?: boolean;
     readonly lastRejection?: EditorRejection | null;
     readonly lastRemoval?: EditorRemoval | null;
     readonly layouts?: readonly SlideLayoutSummary[];
