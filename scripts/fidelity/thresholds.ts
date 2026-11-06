@@ -142,6 +142,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     autofit: 9,
     'bullets-gallery': 17,
     'bullets-numbering': 21,
+    'chart-sizes': 88,
     charts: 58,
     colors: 0,
     'custom-geometry': 0,

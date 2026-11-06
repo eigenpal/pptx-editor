@@ -34,13 +34,17 @@ import {
 
 const MAX_SPOKES = 1_024;
 /**
- * Category labels centre this far past the spoke ends, beyond half their own extent, and keep
- * the room of the gap less 2.6 pt from the plot box. Measured on the `charts` reference PDF.
+ * Measured on the `charts` and `chart-sizes` reference PDFs, at 9 to 20 pt and radii of 99 to
+ * 188 pt:
+ * - The plot keeps half a category line and `labelRoom` of its box for the labels.
+ * - Category labels sit `SIDE_GAP` radii past the spoke ends, beyond half their own extent.
+ *   Labels above or below a spoke end sit a further 0.08 sizes away (`RISE_GAP`).
  */
-const LABEL_GAP = 8.5;
-const LABEL_ROOM = LABEL_GAP - 2.6;
-/** Labels beside a spoke end sit 0.85 pt nearer to it than labels above or below it. */
-const SIDE_GAP = LABEL_GAP - 0.85;
+export function labelRoom(sizePt: number): number {
+  return Math.max(0, 0.9275 * sizePt - 5.25);
+}
+const SIDE_GAP = 0.04;
+const RISE_GAP = 0.08;
 /** Value labels end this many sizes before the first spoke. */
 const VALUE_GAP = 1;
 const DEFAULT_GRID: ChartStroke = {
@@ -91,11 +95,12 @@ export function paintRadar(plots: readonly ChartPlot[], box: Box, context: Radar
   );
   const labelled =
     categoryAxis !== null && !categoryAxis.deleted && categoryAxis.tickLabelPosition !== 'none';
+  const room = labelRoom(categoryStyle.sizePt);
   const radius = Math.max(
     1,
     Math.min(
-      (box.b - box.t) / 2 - (labelled ? categoryLine / 2 + LABEL_ROOM : 0),
-      (box.r - box.l) / 2 - (labelled ? widest + LABEL_ROOM : 0)
+      (box.b - box.t) / 2 - (labelled ? categoryLine / 2 + room : 0),
+      (box.r - box.l) / 2 - (labelled ? widest + room : 0)
     )
   );
   const cx = (box.l + box.r) / 2;
@@ -228,10 +233,12 @@ export function paintRadar(plots: readonly ChartPlot[], box: Box, context: Radar
       const cos = Math.cos(angle);
       const end = at(index, scale.max);
       const width = measureTextWidth(text, categoryStyle);
-      const centerX = end.x + SIDE_GAP * sin + (width / 2) * sin;
+      const side = SIDE_GAP * radius;
+      const rise = side + RISE_GAP * categoryStyle.sizePt;
+      const centerX = end.x + side * sin + (width / 2) * sin;
       // Like the labels beside an axis, they sit a little above their centre line.
       const centerY =
-        end.y - LABEL_GAP * cos - (categoryLine / 2) * cos - LABEL_LIFT * categoryStyle.sizePt;
+        end.y - rise * cos - (categoryLine / 2) * cos - LABEL_LIFT * categoryStyle.sizePt;
       const frame = width * 1.3 + categoryStyle.sizePt * 2;
       context.labels.push({
         paragraphs: [[{ text, style: categoryStyle }]],
