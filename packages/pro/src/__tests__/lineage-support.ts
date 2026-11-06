@@ -86,6 +86,8 @@ export async function openPeer(
   const editor = createPptxEditor({
     fixedMeasurer: true,
     substitutes: false,
+    // The ledger counts each typed character; AutoCorrect would change some of them.
+    autoCorrect: false,
     modules: [collaborationModule({ session })],
   });
   expect((await editor.load(bytes)).ok).toBe(true);

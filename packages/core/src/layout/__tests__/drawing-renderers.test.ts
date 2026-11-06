@@ -85,4 +85,27 @@ describe('drawing renderers', () => {
     expect(layout.diagnostics).toContain('graphic frame rendered as placeholder: chart');
     expect(typeof drawingRenderers().chart).toBe('function');
   });
+
+  test("chart labels space their lines on the face's line, slide text on 1.2 × its size", () => {
+    const slide = firstSlide();
+    // The slide title as a chart label: the same text, laid out once on the slide and once in
+    // the chart.
+    const title = slide.elements.find((e) => e.kind === 'shape' && e.text)!;
+    installDrawingRenderers({ chart: () => [{ ...title, nodeId: `${title.nodeId}#label` }] });
+    const measurer = createFixedMeasurer();
+    const layout = layoutSlide(slide, measurer);
+    const lineOf = (item: LayoutItem | undefined) => {
+      if (item?.kind !== 'shape' || !item.text) throw new Error('no text');
+      return item.text.lines[0]!;
+    };
+    const onSlide = lineOf(layout.items.find((i) => i.element.nodeId === title.nodeId));
+    const inChart = lineOf(frameOf(layout.items).chart![0]);
+    const { ascent, descent } = measurer.resolve({
+      family: 'x',
+      bold: false,
+      italic: false,
+    }).metrics;
+    // The same spacing scales both single lines.
+    expect(inChart.height / onSlide.height).toBeCloseTo((ascent + descent) / 1.2, 6);
+  });
 });

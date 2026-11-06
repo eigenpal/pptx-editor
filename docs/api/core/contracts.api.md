@@ -206,6 +206,13 @@ export type EditorCommand = {
 } | {
     readonly type: 'indent';
     readonly direction: 1 | -1;
+}
+/**
+* Backspace at the start of a list item: remove the bullet or number of every list item the
+* selection touches. The item keeps its level, and its text moves to where the bullet was.
+*/
+| {
+    readonly type: 'removeBullet';
 } | {
     readonly type: 'setLineSpacing';
     readonly multiple: number;

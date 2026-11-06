@@ -168,7 +168,8 @@ export function measureTextWidth(text: string, style: ChartTextStyle): number {
 
 /**
  * The ascent and descent of the face that sets `style`, as multiples of the size. The engine
- * sets each line of chart text on these (`BodyProps.faceLines`), so the room that a chart keeps
+ * lays out the lines of chart labels on the face's line (`LineBasis` `'face'` in
+ * `@pptx-editor.dev/core/layout`), so the room that a chart keeps
  * for its labels follows the face, not one font.
  */
 function faceExtent(style: ChartTextStyle): { readonly ascent: number; readonly descent: number } {

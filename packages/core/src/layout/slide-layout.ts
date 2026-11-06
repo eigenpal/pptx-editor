@@ -15,7 +15,8 @@ import { slideApproximations } from './approximations.ts';
 import { drawingRenderers } from './drawing-renderers.ts';
 import { evaluateGeometry, type EvaluatedGeometry } from './geometry/geometry.ts';
 import { layoutTable, type TableLayout } from './table-layout.ts';
-import { layoutText, type TextLayout } from './text/text-layout.ts';
+import { layoutTextOn, type TextLayout } from './text/text-layout.ts';
+import type { LineBasis } from './text/line-metrics.ts';
 import type { TextMeasurer } from './text/measurer.ts';
 
 /** An affine matrix `[a, b, c, d, e, f]` (SVG convention). EMU units. */
@@ -228,7 +229,9 @@ function layoutElement(
   parent: Matrix,
   map: ChildMap | null,
   measurer: TextMeasurer,
-  diagnostics: Set<string>
+  diagnostics: Set<string>,
+  /** The single line that text in a shape's own geometry is spaced on (`LineBasis`). */
+  basis: LineBasis = 'size'
 ): LayoutItem | null {
   if (source.hidden) return null;
   const el = placeInGroup(source, map);
@@ -249,8 +252,10 @@ function layoutElement(
       if (el.text && tx) {
         // A diagram shape's own text rectangle, in the parent's space. Its turn adds to the
         // shape's turn, and it never flips. A flipped frame or group keeps the glyphs upright,
-        // as for any other shape.
-        text = layoutText(el.text, { x: 0, y: 0, width: tx.cx, height: tx.cy }, measurer);
+        // as for any other shape. Diagram text spaces its lines on the face's line
+        // (`LineBasis` in `line-metrics.ts`).
+        const box = { x: 0, y: 0, width: tx.cx, height: tx.cy };
+        text = layoutTextOn(el.text, box, measurer, 'face');
         for (const s of text.substitutions) diagnostics.add(`font substituted: ${s}`);
         textMatrix = uprightTextMatrix(
           multiply(parent, boxMatrix({ ...tx, rot: tx.rot + el.xfrm.rot }, false)),
@@ -258,10 +263,11 @@ function layoutElement(
         );
       } else if (el.text && el.text.paragraphs.length > 0) {
         const r = geometry.textRect;
-        text = layoutText(
+        text = layoutTextOn(
           el.text,
           { x: r.l, y: r.t, width: r.r - r.l, height: r.b - r.t },
-          measurer
+          measurer,
+          basis
         );
         for (const s of text.substitutions) diagnostics.add(`font substituted: ${s}`);
         textMatrix = uprightTextMatrix(matrix, text.box);
@@ -345,8 +351,11 @@ function layoutChart(
   const elements = render?.({ frame, chart, measurer });
   if (!elements) return null;
   const items: LayoutItem[] = [];
+  // Chart labels space their lines on the face's line, as diagram text does: each label line is
+  // as tall as its face's ascent plus descent, with the baseline at the ascent (the chart
+  // labels of the `charts` and `slide-structure` reference PDFs).
   for (const el of elements) {
-    const item = layoutElement(el, matrix, null, measurer, diagnostics);
+    const item = layoutElement(el, matrix, null, measurer, diagnostics, 'face');
     if (item) items.push(item);
   }
   return items;

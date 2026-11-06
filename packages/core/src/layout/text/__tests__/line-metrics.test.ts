@@ -9,11 +9,13 @@ import { createFixedMeasurer, layoutSlide, type TextLayout } from '../../index.t
 import type { FaceMetrics } from '../measurer.ts';
 import {
   autofitSizePt,
+  baselineInLinePt,
   baselineOffsetPt,
-  faceLinePt,
+  lineHeightInPt,
   lineHeightPt,
   paragraphSpacingPt,
   roundToWholePoint,
+  singleLinePt,
   WHOLE_POINT_BASELINES,
 } from '../line-metrics.ts';
 
@@ -194,28 +196,44 @@ describe('layout', () => {
   });
 });
 
-describe('chart text lines (faceLinePt)', () => {
-  // Calibri's win ascent and descent, 1950 and 550 of 2048 units.
-  const calibri = face(1950 / 2048, 550 / 2048);
-  test('a single line is the ascent plus the descent, with the baseline at the ascent', () => {
-    const line = faceLinePt(10, { pct: 1 }, 0, calibri)!;
-    expect(line.height).toBeCloseTo(12.207, 3);
-    expect(line.baseline).toBeCloseTo(9.521, 3);
-    // The whole-point rule puts it at 10 pt below the line top, as `slide-structure.pdf` shows
-    // for its 10 pt axis labels; the 1.2 × size line puts it at 9 pt.
-    expect(roundToWholePoint(line.baseline * EMU_PER_PT) / EMU_PER_PT).toBe(10);
-    expect(
-      roundToWholePoint(
-        baselineOffsetPt(10, lineHeightPt(10, { pct: 1 }, 0), calibri) * EMU_PER_PT
-      ) / EMU_PER_PT
-    ).toBe(9);
+describe('diagram text: lines on the face line', () => {
+  test('the single line is the face ascent plus descent, not 1.2 × the size', () => {
+    expect(singleLinePt(20, CALIBRI, 'size')).toBeCloseTo(24, 6);
+    expect(singleLinePt(20, CALIBRI, 'face')).toBeCloseTo(20 * 1.2207, 6);
   });
-  test('percent spacing puts 75 % of the extra space above the baseline', () => {
-    const line = faceLinePt(10, { pct: 2 }, 0, calibri)!;
-    expect(line.height).toBeCloseTo(24.414, 3);
-    expect(line.baseline).toBeCloseTo(9.521 + 0.75 * 12.207, 2);
+
+  test('percent spacing scales the face line, and exact spacing stays', () => {
+    const single = singleLinePt(22.64, CALIBRI, 'face');
+    expect(lineHeightInPt(single, { pct: 0.9 }, 0)).toBeCloseTo(0.9 * 1.2207 * 22.64, 6);
+    expect(lineHeightInPt(single, { pct: 0.9 }, 0.1)).toBeCloseTo(0.8 * 1.2207 * 22.64, 6);
+    expect(lineHeightInPt(single, { pts: 2400 }, 0)).toBe(24);
+    // The size basis is lineHeightPt.
+    expect(lineHeightInPt(singleLinePt(18, CALIBRI, 'size'), { pct: 0.9 }, 0)).toBeCloseTo(
+      lineHeightPt(18, { pct: 0.9 }, 0),
+      9
+    );
   });
-  test('exact spacing keeps the slide line model', () => {
-    expect(faceLinePt(10, { pts: 1200 }, 0, calibri)).toBeUndefined();
+
+  test('a tighter line keeps the face descent below the baseline', () => {
+    // diagrams/2: 22.64 pt at 90 %, centered. The reference PDF puts the baseline 19 pt below
+    // the text top (288.48 pt); 1.2 × the size gives 18.47 pt, which rounds to 18.
+    const single = singleLinePt(22.64, CALIBRI, 'face');
+    const line = lineHeightInPt(single, { pct: 0.9 }, 0);
+    const baseline = baselineInLinePt(single, line, CALIBRI);
+    expect(baseline).toBeCloseTo(line - 22.64 * 0.2686, 6);
+    expect(Math.round(baseline)).toBe(19);
+    const sizeLine = lineHeightPt(22.64, { pct: 0.9 }, 0);
+    expect(Math.round(baselineOffsetPt(22.64, sizeLine, CALIBRI))).toBe(18);
+  });
+
+  test('the size basis gives baselineOffsetPt', () => {
+    for (const pct of [0.9, 1, 1.5]) {
+      const line = lineHeightPt(18, { pct }, 0);
+      const single = singleLinePt(18, CALIBRI, 'size');
+      expect(baselineInLinePt(single, line, CALIBRI)).toBeCloseTo(
+        baselineOffsetPt(18, line, CALIBRI),
+        9
+      );
+    }
   });
 });

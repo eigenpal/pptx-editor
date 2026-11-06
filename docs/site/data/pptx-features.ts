@@ -170,7 +170,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'partial',
     tier: 'community',
     notes:
-      'Five modes rewrite the letters and keep the formatting; at a caret, the word around it. A letter whose other case has a different length (ß) stays, and the run language is not used.',
+      'Five modes rewrite the letters and keep the formatting; at a caret, the word around it. Shift+F3 steps through Capitalize Each Word, UPPER CASE, and lower case. A letter whose other case has a different length (ß) stays, and the run language is not used.',
   },
   {
     id: 'text.hyperlinks',
@@ -301,7 +301,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'partial',
     tier: 'community',
     notes:
-      'Toggle bullets and numbering. The galleries set common bullet characters and a:buAutoNum numbering schemes, and the Bullets and Numbering dialog sets the size, color, start number, and a custom character and font. Enter continues the list. Tab demotes a level, and Shift+Tab promotes one. Where a symbol font is not installed, a Wingdings or Symbol bullet draws its Unicode twin (approximate). Picture bullets do not draw and cannot be set.',
+      'Toggle bullets and numbering. The galleries set common bullet characters and a:buAutoNum numbering schemes, and the Bullets and Numbering dialog sets the size, color, start number, and a custom character and font. Enter continues the list, also on an empty item. At the start of a list item or across paragraphs, Tab demotes a level and Shift+Tab promotes one; elsewhere both keys type a tab. Backspace at the start of a list item removes its bullet and keeps its level. Typing 1., 1), *, or - and a space at the start of a paragraph starts a list (AutoCorrect). Where a symbol font is not installed, a Wingdings or Symbol bullet draws its Unicode twin (approximate). Picture bullets do not draw and cannot be set.',
   },
 
   // --- Shapes, groups & connectors -------------------------------------

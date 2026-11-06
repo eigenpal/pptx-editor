@@ -28,6 +28,12 @@
 //   are the first column of `tables/2` (the table style's major face, bold italic), which the
 //   PDF puts one grid step above the other cells of its row; the rounding moves them from
 //   0.04 pt to 0.36 pt off.
+// - Diagram text (`dsp:txBody`, ECMA-376 Part 1, 21.4) has another single line: the face's
+//   ascent plus descent (the values above), not 1.2 × the size. Percent spacing and the baseline
+//   rules above then take that line (`LineBasis`). Measured on 6 November 2026 on the reference
+//   PDF of `diagrams` and on the same target diagram laid out at three other frame sizes, at
+//   15 to 34 pt with 90 % spacing: all 45 lines are within 0.12 pt, against up to 0.91 pt with
+//   1.2 × the size. Plain shapes with the same text body keep 1.2 × the size.
 
 import type { FaceMetrics } from './measurer.ts';
 
@@ -66,32 +72,37 @@ export function lineHeightPt(
   spacing: { pct: number } | { pts: number },
   reduction: number
 ): number {
-  if ('pts' in spacing) return Math.round(spacing.pts / 100);
-  return SINGLE_LINE_FACTOR * sizePt * effectivePct(spacing.pct, reduction);
+  return lineHeightInPt(SINGLE_LINE_FACTOR * sizePt, spacing, reduction);
 }
 
 /**
- * The line of chart text (`BodyProps.faceLines`), in points: a single line is as tall as the
- * face's ascent plus descent, and its baseline sits at the ascent. Measured on the chart labels
- * of the `charts` and `slide-structure` reference PDFs: at 10, 11.97, and 18.62 pt, every
- * label's glyph origin is the ascent, rounded to a whole point, below its line top (Calibri:
- * 0.952 em, so 10, 11, and 18 pt). The 1.2 × size line puts it 0.9 pt higher at 10 pt. Percent
- * spacing scales the line, and the extra space goes 75 % above the baseline, as above.
- * Exact spacing keeps `lineHeightPt`.
+ * What a text body's single line is: 1.2 × the size (`size`), or the face's ascent plus
+ * descent (`face`, diagram text).
  * @internal
  */
-export function faceLinePt(
-  sizePt: number,
+export type LineBasis = 'size' | 'face';
+
+/**
+ * The single line (points) of a line whose largest font is `sizePt` in a face with `metrics`.
+ * @internal
+ */
+export function singleLinePt(sizePt: number, metrics: FaceMetrics, basis: LineBasis): number {
+  return basis === 'face'
+    ? sizePt * Math.max(0.01, metrics.ascent + metrics.descent)
+    : SINGLE_LINE_FACTOR * sizePt;
+}
+
+/**
+ * `lineHeightPt` for a single line of `singlePt` points (`singleLinePt`).
+ * @internal
+ */
+export function lineHeightInPt(
+  singlePt: number,
   spacing: { pct: number } | { pts: number },
-  reduction: number,
-  metrics: FaceMetrics
-): { readonly height: number; readonly baseline: number } | undefined {
-  if ('pts' in spacing) return undefined;
-  const natural = (metrics.ascent + metrics.descent) * sizePt;
-  if (!(natural > 0)) return undefined;
-  const height = natural * effectivePct(spacing.pct, reduction);
-  const baseline = metrics.ascent * sizePt + LOOSE_BASELINE_SHARE * (height - natural);
-  return { height, baseline: Math.max(0, Math.min(height, baseline)) };
+  reduction: number
+): number {
+  if ('pts' in spacing) return Math.round(spacing.pts / 100);
+  return singlePt * effectivePct(spacing.pct, reduction);
 }
 
 /** Distance from the line box top to the baseline (points), before rounding. */
@@ -112,7 +123,14 @@ export function baselineOffsetPt(
   metrics: FaceMetrics,
   _spacing?: { pct: number } | { pts: number }
 ): number {
-  const single = SINGLE_LINE_FACTOR * sizePt;
+  return baselineInLinePt(SINGLE_LINE_FACTOR * sizePt, lineHeight, metrics);
+}
+
+/**
+ * `baselineOffsetPt` for a single line of `single` points (`singleLinePt`).
+ * @internal
+ */
+export function baselineInLinePt(single: number, lineHeight: number, metrics: FaceMetrics): number {
   const loose = lineHeight * LOOSE_BASELINE_SHARE;
   const share = metrics.ascent / Math.max(0.01, metrics.ascent + metrics.descent);
   // Taller than the single line: the extra space goes 75 % above the baseline, but the

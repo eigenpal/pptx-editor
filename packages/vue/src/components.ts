@@ -81,6 +81,12 @@ const pptxEditorRootProps = {
    * effect and prints a development warning. Create the list once, outside the component.
    */
   modules: { type: Array as PropType<readonly EditorModule[]>, default: undefined },
+  /**
+   * AutoCorrect while typing (default `true`): curly quotes, symbols, fractions, en dashes,
+   * sentence capitals, and lists started by typing `1.`, `1)`, `*`, or `-` and a space. Read
+   * once, when the editor is created.
+   */
+  autoCorrect: { type: Boolean, default: true },
   /** Customize the dialogs the editor mounts. Set an entry to `false` to turn one off. */
   popups: { type: Object as PropType<PptxEditorPopups>, default: undefined },
   /** The chrome color mode: `'light'` (default), `'dark'`, or `'system'`. */
@@ -177,6 +183,7 @@ export const PptxEditorRoot = defineComponent({
         ...(props.fontFamilies ? { fontFamilies: props.fontFamilies } : {}),
         ...(props.fonts ? { fonts: props.fonts } : {}),
         ...(props.modules ? { modules: props.modules } : {}),
+        ...(props.autoCorrect === false ? { autoCorrect: false } : {}),
         onFontError,
         translate: (key, params) => translateKeyOrText(t.value, key, params),
       });

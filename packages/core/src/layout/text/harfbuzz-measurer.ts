@@ -64,7 +64,8 @@ export function isHarfBuzzReady(): boolean {
 const featureSets = new Map<boolean, InstanceType<HarfBuzzModule['Feature']>[]>();
 /**
  * Slide text takes no standard or contextual ligatures, and kerning only when the run asks
- * for it (`a:rPr/@kern` at or below the run size).
+ * for it (`a:rPr/@kern` at or below the run size) and the face can kern
+ * (`LoadedFace.kerns`).
  */
 function shapingFeatures(
   module: HarfBuzzModule,
@@ -85,9 +86,18 @@ export interface FontSource {
   readonly bold: boolean;
   readonly italic: boolean;
   readonly bytes: Uint8Array;
-  /** Where the bytes came from, for the report: `embedded`, `substitute`, `system`. */
+  /**
+   * Where the bytes came from, for the report: `embedded`, `substitute`, `system`, or
+   * `HOST_SUBSTITUTE_ORIGIN`.
+   */
   readonly origin: string;
 }
+
+/**
+ * The `origin` of a host substitution's face: the face of another family, registered under the
+ * family that the deck names.
+ */
+export const HOST_SUBSTITUTE_ORIGIN = 'host-substitute';
 
 /** A registered face: the source plus the internal id paint uses. */
 export interface RegisteredFace extends FontSource {
@@ -99,6 +109,16 @@ interface LoadedFace {
   readonly font: InstanceType<HarfBuzzModule['Font']>;
   readonly upem: number;
   readonly metrics: FaceMetrics;
+  /**
+   * Whether the face kerns when a run asks for it. A face that the deck names kerns only when it
+   * has a `kern` table: the reference PDFs draw a face whose pairs are only in `GPOS` (Carlito)
+   * without kerning, also where the run asks for it (`font-effects`, `diagrams`, and every
+   * fixture through the default text style), and kern Liberation Sans, which has both tables
+   * (`rtl-text`, `east-asian-line-breaking`). A stand-in for a missing face keeps its `GPOS`
+   * pairs, as the face it replaces may have a `kern` table (`font-substitution`): a face that
+   * the measurer substitutes, and a host substitution (`HOST_SUBSTITUTE_ORIGIN`).
+   */
+  readonly kerns: boolean;
 }
 
 const MAX_TEXT = 100_000;
@@ -154,6 +174,8 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
         entry,
         font,
         upem,
+        kerns:
+          entry.origin === HOST_SUBSTITUTE_ORIGIN || (face.referenceTable('kern')?.length ?? 0) > 0,
         metrics: {
           ascent: (line ? line[0] : Math.abs(ext.ascender)) / upem,
           descent: (line ? line[1] : Math.abs(ext.descender)) / upem,
@@ -243,12 +265,12 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     text: string,
     options?: { readonly kerning?: boolean }
   ): Float64Array => {
-    const kerning = options?.kerning === true;
+    const lf = loaded.get(face.id);
+    const kerning = options?.kerning === true && (lf?.kerns === true || face.substituted);
     const key = `${face.id}${kerning ? 'k' : ''}\u0000${text}`;
     const hit = cache.get(key);
     if (hit) return hit;
     const out = new Float64Array(text.length);
-    const lf = loaded.get(face.id);
     if (!lf || text.length === 0 || text.length > MAX_TEXT) {
       for (let i = 0; i < text.length; i += 1) out[i] = 0.5;
       return out;

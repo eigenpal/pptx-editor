@@ -244,10 +244,10 @@ describe('demo context menus', () => {
   test('text context menu: right-click selected text keeps it, and Bold applies to it', async () => {
     const demo = await openDemo();
     await click(byRole('button', { name: 'Text box' }));
-    await type('alpha beta');
+    await type('Alpha beta');
     await press('Home');
     for (let i = 0; i < 5; i += 1) await press('Shift+ArrowRight');
-    await clickAt(wordPoint('alpha'), { button: 'right' });
+    await clickAt(wordPoint('Alpha'), { button: 'right' });
     const menu = () => screen.queryByRole('menu', { name: 'Text actions' });
     expect(menu()).not.toBeNull();
     expect(isDisabled(within(menu()!).getByRole('menuitem', { name: 'Copy' }))).toBe(false);
@@ -261,7 +261,7 @@ describe('demo context menus', () => {
   test('a menu opened from the keyboard takes focus, and its checked row shows a check mark', async () => {
     const demo = await openDemo();
     await click(byRole('button', { name: 'Text box' }));
-    await type('alpha beta');
+    await type('Alpha beta');
     await press('ControlOrMeta+a');
     // Focus the Align trigger and open it with Enter: focus moves into the menu.
     await step(() => document.querySelector<HTMLElement>('[data-slot="paragraph.align"]')!.focus());
@@ -283,7 +283,7 @@ describe('demo context menus', () => {
   test('the font search takes the typed name, and the size stepper steps', async () => {
     const demo = await openDemo();
     await click(byRole('button', { name: 'Text box' }));
-    await type('alpha beta');
+    await type('Alpha beta');
     await press('ControlOrMeta+a');
     // The font search field takes the keys, so the slide text stays as it is.
     const family = () => document.querySelector<HTMLElement>('[data-slot="font.family"]')!;
@@ -301,7 +301,7 @@ describe('demo context menus', () => {
     await fill(size(), '40');
     await press('Enter');
     expect(size().value).toBe('40');
-    expect(document.querySelector('.pptx-surface__slide')!.textContent).toContain('alpha beta');
+    expect(document.querySelector('.pptx-surface__slide')!.textContent).toContain('Alpha beta');
     // Increase Font Size steps up from the current size.
     const before = Number(size().value);
     await click(byRole('button', { name: /Increase font size/ }));

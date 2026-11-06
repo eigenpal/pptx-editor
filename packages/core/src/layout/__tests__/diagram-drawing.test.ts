@@ -19,6 +19,7 @@ import {
   apply,
   createFixedMeasurer,
   layoutSlide,
+  layoutText,
   type LayoutItem,
   type SlideLayout,
 } from '../index.ts';
@@ -57,6 +58,8 @@ interface SpOptions {
   /** The `dsp:style` references; the default names fill 1, line 2, and the minor font. */
   readonly style?: string;
   readonly rPr?: string;
+  /** The `a:pPr` of each paragraph. */
+  readonly pPr?: string;
 }
 
 const sp = (o: SpOptions = {}): string => {
@@ -77,7 +80,14 @@ const sp = (o: SpOptions = {}): string => {
     '</dsp:style>' +
     (o.text
       ? '<dsp:txBody><a:bodyPr lIns="0" tIns="0" rIns="0" bIns="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/>' +
-        `<a:p><a:r>${o.rPr ?? '<a:rPr lang="en-US" sz="1800"/>'}<a:t>${o.text}</a:t></a:r></a:p></dsp:txBody>`
+        o.text
+          .split('|')
+          .map(
+            (t) =>
+              `<a:p>${o.pPr ?? ''}<a:r>${o.rPr ?? '<a:rPr lang="en-US" sz="1800"/>'}<a:t>${t}</a:t></a:r></a:p>`
+          )
+          .join('') +
+        '</dsp:txBody>'
       : '') +
     (tx
       ? `<dsp:txXfrm><a:off x="${tx[0]}" y="${tx[1]}"/><a:ext cx="${tx[2]}" cy="${tx[3]}"/></dsp:txXfrm>`
@@ -290,6 +300,25 @@ describe('diagram saved drawing: text rectangle', () => {
     const c = apply(m, 200_000, 100_000);
     expect(c.x).toBeCloseTo(FRAME.x + 200_000, 3);
     expect(c.y).toBeCloseTo(FRAME.y + 100_000, 3);
+  });
+
+  test('percent line spacing scales the face line, not 1.2 × the size', () => {
+    // The fixed measurer's face: ascent 0.9 and descent 0.25, so its line is 1.15 × the size.
+    const shape = sp({
+      text: 'Plan|Write',
+      txXfrm: [0, 0, 1_000_000, 1_000_000],
+      rPr: '<a:rPr lang="en-US" sz="2000"/>',
+      pPr: '<a:pPr><a:lnSpc><a:spcPct val="90000"/></a:lnSpc></a:pPr>',
+    });
+    const item = frameOf(open(deck(shape)).layout).drawing![0]!;
+    if (item.kind !== 'shape' || !item.text?.lines[1]) throw new Error('no text');
+    const [first, second] = item.text.lines;
+    expect(first!.height).toBeCloseTo(0.9 * 1.15 * 20 * 12_700, 3);
+    expect(second!.top - first!.top).toBeCloseTo(0.9 * 1.15 * 20 * 12_700, 3);
+    // The same body in a slide shape spaces its lines on 1.2 × the size.
+    const box = { x: 0, y: 0, width: 1_000_000, height: 1_000_000 };
+    const plain = layoutText(item.element.text!, box, createFixedMeasurer());
+    expect(plain.lines[0]!.height).toBeCloseTo(0.9 * 1.2 * 20 * 12_700, 3);
   });
 
   test('a shape with no dsp:txXfrm uses its geometry text rectangle', () => {

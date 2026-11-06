@@ -19,10 +19,11 @@ import {
 import type { ResolvedFace, TextMeasurer } from './measurer.ts';
 import {
   autofitSizePt,
-  baselineOffsetPt,
-  faceLinePt,
-  lineHeightPt,
+  baselineInLinePt,
+  lineHeightInPt,
   paragraphSpacingPt,
+  singleLinePt,
+  type LineBasis,
   SCRIPT_SIZE_SCALE,
   SMALL_CAPS_SCALE,
   placeBaseline,
@@ -353,6 +354,20 @@ export function layoutText(
   rect: { x: number; y: number; width: number; height: number },
   measurer: TextMeasurer
 ): TextLayout {
+  return layoutTextOn(body, rect, measurer, 'size');
+}
+
+/**
+ * `layoutText` with the single line that the body's lines are spaced on (`LineBasis`): diagram
+ * text takes the face's line (`face`).
+ * @internal
+ */
+export function layoutTextOn(
+  body: ResolvedTextBody,
+  rect: { x: number; y: number; width: number; height: number },
+  measurer: TextMeasurer,
+  basis: LineBasis
+): TextLayout {
   const bp = body.body;
   const vert = bp.vert;
   const rotated = ROTATED_VERT.has(vert);
@@ -539,15 +554,11 @@ export function layoutText(
       }
       // A bullet larger than the text does not make its line taller (fixture
       // `bullets-numbering`, "Custom character, 150%").
-      // Chart text sets each line on its face's own ascent and descent (`faceLinePt`).
-      const faceLine = bp.faceLines
-        ? faceLinePt(maxSize, p.lineSpacing, reduction, metrics ?? maxFace.metrics)
-        : undefined;
-      const heightPt = faceLine?.height ?? lineHeightPt(maxSize, p.lineSpacing, reduction);
+      const lineMetrics = metrics ?? maxFace.metrics;
+      const single = singleLinePt(maxSize, lineMetrics, basis);
+      const heightPt = lineHeightInPt(single, p.lineSpacing, reduction);
       const height = heightPt * EMU_PER_PT;
-      const baseline =
-        (faceLine?.baseline ?? baselineOffsetPt(maxSize, heightPt, metrics ?? maxFace.metrics)) *
-        EMU_PER_PT;
+      const baseline = baselineInLinePt(single, heightPt, lineMetrics) * EMU_PER_PT;
 
       // Positions, then alignment. Positions include the left inset, so no later pass copies
       // the position arrays to add it.

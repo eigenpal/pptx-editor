@@ -506,6 +506,8 @@ const pptxEditorProps = {
   fontFamilies: { type: Array as PropType<readonly string[]>, default: undefined },
   /** Capability modules (`@pptx-editor.dev/pro`), as on `PptxEditorRoot`. Read at mount. */
   modules: { type: Array as PropType<readonly EditorModule[]>, default: undefined },
+  /** AutoCorrect while typing, as on `PptxEditorRoot`. Read at mount. */
+  autoCorrect: { type: Boolean, default: true },
   /** Customize the dialogs the editor mounts, as on `PptxEditorRoot`. */
   popups: { type: Object as PropType<PptxEditorPopups>, default: undefined },
   /** The chrome color mode, as on `PptxEditorRoot`. */
@@ -656,6 +658,7 @@ const PptxEditorDefault = defineComponent({
           ...(props.colorMode ? { colorMode: props.colorMode } : {}),
           ...(props.fonts ? { fonts: props.fonts } : {}),
           ...(props.modules ? { modules: props.modules } : {}),
+          ...(props.autoCorrect === false ? { autoCorrect: false } : {}),
           // Forwarded only with a listener, so the root still warns when nobody listens.
           ...(instance?.vnode.props?.onFontError
             ? { onFontError: (error: EditorFontError) => emit('fontError', error) }

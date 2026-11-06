@@ -2254,6 +2254,10 @@ export const PptxEditor: {
             readonly type: PropType<readonly EditorModule[]>;
             readonly default: undefined;
         };
+        readonly autoCorrect: {
+            readonly type: BooleanConstructor;
+            readonly default: true;
+        };
         readonly popups: {
             readonly type: PropType<PptxEditorPopups>;
             readonly default: undefined;
@@ -2315,6 +2319,7 @@ export const PptxEditor: {
         readonly openFailure: boolean | PptxEditorOpenFailureProps;
         readonly fontFamilies: readonly string[];
         readonly modules: readonly EditorModule[];
+        readonly autoCorrect: boolean;
         readonly popups: PptxEditorPopups;
         readonly colorMode: ColorMode;
         readonly hyperlinkPopup: boolean;
@@ -2350,6 +2355,10 @@ export const PptxEditor: {
         readonly modules: {
             readonly type: PropType<readonly EditorModule[]>;
             readonly default: undefined;
+        };
+        readonly autoCorrect: {
+            readonly type: BooleanConstructor;
+            readonly default: true;
         };
         readonly popups: {
             readonly type: PropType<PptxEditorPopups>;
@@ -2408,6 +2417,7 @@ export const PptxEditor: {
         readonly openFailure: boolean | PptxEditorOpenFailureProps;
         readonly fontFamilies: readonly string[];
         readonly modules: readonly EditorModule[];
+        readonly autoCorrect: boolean;
         readonly popups: PptxEditorPopups;
         readonly colorMode: ColorMode;
         readonly hyperlinkPopup: boolean;
@@ -2437,6 +2447,10 @@ export const PptxEditor: {
     readonly modules: {
         readonly type: PropType<readonly EditorModule[]>;
         readonly default: undefined;
+    };
+    readonly autoCorrect: {
+        readonly type: BooleanConstructor;
+        readonly default: true;
     };
     readonly popups: {
         readonly type: PropType<PptxEditorPopups>;
@@ -2499,6 +2513,7 @@ export const PptxEditor: {
     readonly openFailure: boolean | PptxEditorOpenFailureProps;
     readonly fontFamilies: readonly string[];
     readonly modules: readonly EditorModule[];
+    readonly autoCorrect: boolean;
     readonly popups: PptxEditorPopups;
     readonly colorMode: ColorMode;
     readonly hyperlinkPopup: boolean;
@@ -2532,6 +2547,10 @@ export const PptxEditor: {
         readonly modules: {
             readonly type: PropType<readonly EditorModule[]>;
             readonly default: undefined;
+        };
+        readonly autoCorrect: {
+            readonly type: BooleanConstructor;
+            readonly default: true;
         };
         readonly popups: {
             readonly type: PropType<PptxEditorPopups>;
@@ -2574,6 +2593,10 @@ export const PptxEditor: {
             readonly type: PropType<readonly EditorModule[]>;
             readonly default: undefined;
         };
+        readonly autoCorrect: {
+            readonly type: BooleanConstructor;
+            readonly default: true;
+        };
         readonly popups: {
             readonly type: PropType<PptxEditorPopups>;
             readonly default: undefined;
@@ -2593,6 +2616,7 @@ export const PptxEditor: {
         readonly fonts: EditorFontsOption;
         readonly fontFamilies: readonly string[];
         readonly modules: readonly EditorModule[];
+        readonly autoCorrect: boolean;
         readonly popups: PptxEditorPopups;
         readonly colorMode: ColorMode;
     }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
@@ -5887,6 +5911,10 @@ export const PptxEditorRoot: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: PropType<readonly EditorModule[]>;
         readonly default: undefined;
     };
+    readonly autoCorrect: {
+        readonly type: BooleanConstructor;
+        readonly default: true;
+    };
     readonly popups: {
         readonly type: PropType<PptxEditorPopups>;
         readonly default: undefined;
@@ -5928,6 +5956,10 @@ export const PptxEditorRoot: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: PropType<readonly EditorModule[]>;
         readonly default: undefined;
     };
+    readonly autoCorrect: {
+        readonly type: BooleanConstructor;
+        readonly default: true;
+    };
     readonly popups: {
         readonly type: PropType<PptxEditorPopups>;
         readonly default: undefined;
@@ -5947,6 +5979,7 @@ export const PptxEditorRoot: vue.DefineComponent<vue.ExtractPropTypes<{
     readonly fonts: EditorFontsOption;
     readonly fontFamilies: readonly string[];
     readonly modules: readonly EditorModule[];
+    readonly autoCorrect: boolean;
     readonly popups: PptxEditorPopups;
     readonly colorMode: ColorMode;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;

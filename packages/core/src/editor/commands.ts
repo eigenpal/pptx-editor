@@ -93,7 +93,11 @@ export { selectedIds };
 import { normalizePresentation } from '../automation/commands/slide-sections.ts';
 import { deckLayout, newSlideLayout } from '../automation/commands/slide-layouts.ts';
 import { findMatches, replaceMatches } from '../automation/commands/find.ts';
-import { setListKind, shiftListLevel } from '../automation/commands/list-commands.ts';
+import {
+  removeBulletInPlace,
+  setListKind,
+  shiftListLevel,
+} from '../automation/commands/list-commands.ts';
 import { selectionBody, textItemOf } from './table-cells.ts';
 import { coversWholeBody } from './text-drag.ts';
 import { commandWordAt } from '../automation/commands/command-word.ts';
@@ -541,6 +545,17 @@ export function compile(
         shiftListLevel(batch, part, pPr, command.direction);
       });
       return { batch, effect: { label: 'indent' } };
+    }
+    case 'removeBullet': {
+      const part = slidePart(ctx);
+      const targets = textTargets(batch, part, ctx.selection);
+      let removed = false;
+      for (const t of targets)
+        removed =
+          removeBulletInPlace(batch, part, ctx.slide, listTarget(batch, part, t)) || removed;
+      if (!removed) throw new CommandRefusal('disabled.noList');
+      refitTargets(batch, ctx, part, targets);
+      return { batch, effect: { label: 'removeBullet' } };
     }
     case 'setLineSpacing': {
       const part = slidePart(ctx);

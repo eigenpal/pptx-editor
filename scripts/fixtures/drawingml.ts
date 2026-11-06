@@ -2,7 +2,9 @@
 // Diagrams). Each chart slide holds one chart part with cached values and no workbook, so a
 // reader draws it from the cache. The diagram parts in `diagrams/` are the anonymous diagram
 // parts of DOCX Editor's default sample (docx-editor/scripts/demo-doc/diagrams, EigenPal):
-// data, layout, quick style, colors, and the saved drawing.
+// data, layout, quick style, colors, and the saved drawing. `drawing1.xml` is the drawing that
+// the presentation app saves for this frame: a reader that lays the diagram out again gets the
+// same text sizes and insets as a reader of the saved drawing.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

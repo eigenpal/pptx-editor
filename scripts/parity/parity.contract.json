@@ -68,6 +68,7 @@
       "reactProps": "PptxEditorProps",
       "topLevel": true,
       "paired": [
+        "autoCorrect",
         "colorMode",
         "contextMenu",
         "document",
@@ -102,6 +103,7 @@
     "PptxEditorRoot": {
       "reactProps": "PptxEditorRootProps",
       "paired": [
+        "autoCorrect",
         "colorMode",
         "document",
         "fontFamilies",
