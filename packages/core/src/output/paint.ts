@@ -578,6 +578,16 @@ function paintItem(
         }
         return g;
       }
+      // A chart drawn by an installed renderer: its shapes and labels, under the frame's hit id.
+      if (item.chart) {
+        const inner = { ...opts, hitTargets: false };
+        const parts: SVGElement[] = [];
+        for (const child of item.chart) {
+          const painted = paintItem(doc, child, local, inner, parentScale);
+          if (painted) parts.push(painted);
+        }
+        return svg(doc, 'g', { ...common, 'data-kind': 'chart' }, parts);
+      }
       const { cx: w, cy: h } = el.xfrm;
       const label = opts.frameLabel?.(item.element.frameKind) ?? item.element.frameKind;
       // Points under a scale: browsers clamp font sizes as large as EMU values.

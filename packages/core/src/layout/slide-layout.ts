@@ -12,6 +12,7 @@ import type {
   Xfrm,
 } from '../cascade/index.ts';
 import { slideApproximations } from './approximations.ts';
+import { drawingRenderers } from './drawing-renderers.ts';
 import { evaluateGeometry, type EvaluatedGeometry } from './geometry/geometry.ts';
 import { layoutTable, type TableLayout } from './table-layout.ts';
 import { layoutText, type TextLayout } from './text/text-layout.ts';
@@ -128,6 +129,12 @@ export type LayoutItem = ItemPlacement &
          * groups placed in the frame's box. A frame with none draws a labeled placeholder.
          */
         readonly drawing?: readonly LayoutItem[];
+        /**
+         * The laid-out chart, for a chart frame that an installed chart renderer draws: shapes
+         * and labels in the frame's box, in paint order. They carry ids under the frame's id
+         * and are never hit targets: the frame is the object.
+         */
+        readonly chart?: readonly LayoutItem[];
       }
   );
 
@@ -310,6 +317,8 @@ function layoutElement(
         diagnostics
       );
       if (drawing) return { ...placement, kind: 'frame', element: el, matrix, drawing };
+      const chart = el.chart && layoutChart(el, matrix, measurer, diagnostics);
+      if (chart) return { ...placement, kind: 'frame', element: el, matrix, chart };
       diagnostics.add(`graphic frame rendered as placeholder: ${el.frameKind}`);
       // A drawing that resolved but holds a shape layout cannot draw (an unknown preset).
       const element: ResolvedGraphicFrame = el.drawing
@@ -318,6 +327,29 @@ function layoutElement(
       return { ...placement, kind: 'frame', element, matrix };
     }
   }
+}
+
+/**
+ * Lay out a chart frame through the installed chart renderer, or null when none is installed or
+ * it does not draw this chart. The renderer's elements sit in the frame's local box.
+ */
+function layoutChart(
+  frame: ResolvedGraphicFrame,
+  matrix: Matrix,
+  measurer: TextMeasurer,
+  diagnostics: Set<string>
+): LayoutItem[] | null {
+  const chart = frame.chart;
+  if (!chart) return null;
+  const render = drawingRenderers().chart;
+  const elements = render?.({ frame, chart, measurer });
+  if (!elements) return null;
+  const items: LayoutItem[] = [];
+  for (const el of elements) {
+    const item = layoutElement(el, matrix, null, measurer, diagnostics);
+    if (item) items.push(item);
+  }
+  return items;
 }
 
 /** Lay out a resolved slide. */

@@ -245,6 +245,11 @@ async function drawItem(
       for (const child of item.drawing) await drawItem(child, p, scope, matrixScale(item.matrix));
       return;
     }
+    // A chart drawn by an installed renderer, as in the SVG paint.
+    if (item.chart) {
+      for (const child of item.chart) await drawItem(child, p, local, groupScale);
+      return;
+    }
     if (!item.table) {
       const kind = item.element.frameKind;
       p.diag.add(`frame.${kind}`, 'unsupported', frameMessage(kind, item.element.drawingFallback));

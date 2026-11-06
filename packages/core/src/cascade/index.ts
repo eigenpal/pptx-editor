@@ -7,6 +7,7 @@ export * from './theme.ts';
 export * from './paint-props.ts';
 export * from './text-style.ts';
 export { inheritedPlaceholders, layoutPlaceholderOf, resolveSlide, XFRM_BOUND } from './slide.ts';
+export { CHART_CONTENT_TYPE, resolveChartPart, type ResolvedChartPart } from './chart-part.ts';
 export { alternateBranch, contentElements, isAlternateContent } from './alternate-content.ts';
 export { resolveTable, type TableScope } from './table.ts';
 export {

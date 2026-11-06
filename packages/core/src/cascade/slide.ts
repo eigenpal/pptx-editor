@@ -21,6 +21,7 @@ import {
   type PptxPackage,
 } from '../store/index.ts';
 import { contentElements } from './alternate-content.ts';
+import { resolveChartPart } from './chart-part.ts';
 import { colorChild, resolveColor, type ColorContext } from './color.ts';
 import {
   effectContainer,
@@ -692,6 +693,10 @@ function resolveElement(
         kind === 'diagram'
           ? resolveDiagram(el, graphicData, xfrm, layer, partName, scope)
           : undefined;
+      const chart =
+        kind === 'chart'
+          ? resolveChartPart(scope.pkg, partName, graphicData, scope.ctx, scope.theme)
+          : undefined;
       return {
         kind: 'graphicFrame',
         nodeId: el.id,
@@ -705,6 +710,7 @@ function resolveElement(
         ...(table ? { table } : {}),
         ...(poster ? { poster } : {}),
         ...diagram,
+        ...(chart ? { chart } : {}),
       };
     }
   }
