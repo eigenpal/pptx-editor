@@ -523,7 +523,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'partial',
     tier: 'community',
     notes:
-      'Description, title, and "Mark as decorative" for one selected object. Automatic descriptions are not built.',
+      'Description, title, and "Mark as decorative" for one selected object. On the slide and in the slide show, a screen reader reads the description of a picture. It skips a decorative picture and a picture with no description. When Tab selects an object, the screen reader also hears its description. Automatic descriptions are not built.',
   },
   {
     id: 'pictures.emf-wmf',

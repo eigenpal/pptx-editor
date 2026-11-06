@@ -901,7 +901,8 @@
     "ariaLabel": "第 {index} 张幻灯片，共 {total} 张",
     "inputAriaLabel": "所选形状的文本",
     "tableCell": "第 {row} 行，第 {column} 列",
-    "shapeSelected": "已选择 {name}",
+    "shapeSelected": "已选择 {kind} {name}",
+    "shapeSelectedWithAltText": "已选择 {kind} {name}，{description}",
     "placeholderObject": "{kind}(此版本中不呈现)",
     "kinds": {
       "chart": "图表",

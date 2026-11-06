@@ -1,7 +1,7 @@
 // The `output` lane: the painter over layout records. Browser-only (it builds SVG DOM).
 // Never re-derives geometry or resolves properties.
 
-export { paintSlide, pathData, type PaintOptions } from './paint.ts';
+export { paintSlide, pathData, type AltTextPort, type PaintOptions } from './paint.ts';
 export type { ImageSizePort, ImageUrlPort, PaintContext } from './paint-fill.ts';
 export { STORED_PIXELS_STYLE } from './paint-fill.ts';
 // Internal: the pure rules that `pptx-to-pdf` shares with this paint.

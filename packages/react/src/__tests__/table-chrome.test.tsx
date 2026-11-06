@@ -137,7 +137,7 @@ describe('table surface', () => {
     expect(live?.textContent).toBe('Row 2, column 3');
     // The selected table is named, as any selected shape is (Tab moves through them).
     act(() => editor.setSelection({ kind: 'shapes', nodeIds: [id] }));
-    expect(live?.textContent).toBe('Table 1 selected');
+    expect(live?.textContent).toBe('Table 1, selected');
     act(() => editor.setSelection({ kind: 'none' }));
     expect(live?.textContent).toBe('');
     editor.destroy();
