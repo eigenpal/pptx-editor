@@ -10,9 +10,10 @@
 // The boundary is DOM-free: an effects renderer returns SVG as plain data (`EffectNode`), and
 // the SVG paint (`output/paint.ts`) builds the elements. A chart renderer returns resolved
 // shapes in the frame's box; `layoutSlide` lays them out with the same geometry and text
-// pipeline as every other shape, and the SVG paint and the PDF writer draw those records. Installation is process-wide, because every
-// editor and export in the process paints with the same engine; install renderers before any
-// document opens. Looking up a renderer is one property read.
+// pipeline as every other shape, and the SVG paint and the PDF writer draw those records.
+// Installation is process-wide, because every editor and export in the process paints with the
+// same engine; install renderers before any document opens. Looking up a renderer is one
+// property read.
 
 import type {
   ResolvedChartPart,
