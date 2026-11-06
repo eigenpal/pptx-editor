@@ -130,18 +130,26 @@ export function parseCellsJson(raw: string): string[][] | null {
 /** What a paste does in a table: fill cells, insert one cell's text at the caret, or neither. */
 export type TablePaste = { readonly cells: string[][] } | { readonly text: string } | null;
 
-/** Text in quotes, with only doubled quotes inside: each step has one choice, so linear. */
-const QUOTED = /^"(?:[^"]|"")*"$/;
-/** What made a copy quote a cell: a tab, a line break, or a quote (doubled). */
-const NEEDS_QUOTES = /[\t\r\n]|""/;
-
 /**
  * Whether `text` is one quoted cell, as a copy of one cell writes it: quoted only because it
- * holds a tab, a line break, or a quote. Other text in quotes ("Hello") is text, and keeps its
- * quotes. Two linear tests on text within the paste limit: untrusted text never backtracks.
+ * holds a tab, a line break, or a quote (doubled). Other text in quotes ("Hello") is text, and
+ * keeps its quotes. One scan of text within the paste limit, the same in every engine.
  */
-const oneQuotedCell = (text: string): boolean =>
-  text.length <= MAX_RAW_CHARS && QUOTED.test(text) && NEEDS_QUOTES.test(text.slice(1, -1));
+function oneQuotedCell(text: string): boolean {
+  if (text.length < 2 || text.length > MAX_RAW_CHARS) return false;
+  if (text[0] !== '"' || text[text.length - 1] !== '"') return false;
+  let needs = false;
+  for (let i = 1; i < text.length - 1; i += 1) {
+    const ch = text[i];
+    if (ch === '"') {
+      // Inside, a quote is doubled; a single one ends the cell before its last character.
+      if (text[i + 1] !== '"' || i + 1 === text.length - 1) return false;
+      needs = true;
+      i += 1;
+    } else if (ch === '\t' || ch === '\n' || ch === '\r') needs = true;
+  }
+  return needs;
+}
 
 /**
  * What a paste does in a table. A cell range takes any text as cells. A caret in a cell takes a

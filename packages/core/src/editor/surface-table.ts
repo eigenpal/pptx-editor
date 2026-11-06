@@ -304,7 +304,8 @@ export function clampTableResize(
 ): { dx: number; dy: number } {
   if (item.kind !== 'frame' || !item.table) return { dx, dy };
   const { cx, cy } = item.element.xfrm;
-  const end = apply(item.matrix, cx, cy);
+  // The drawn grid's far corner: rows that grow to fit their text can pass the frame's.
+  const end = apply(item.matrix, item.table.width, item.table.height);
   const roomX = handle[0] === 1 ? Math.max(0, slide.width - end.x) : Infinity;
   const roomY = handle[1] === 1 ? Math.max(0, slide.height - end.y) : Infinity;
   const corner = handle[0] !== 0.5 && handle[1] !== 0.5;

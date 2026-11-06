@@ -62,8 +62,10 @@ export function handleElements(
   const u = unionBounds(selected);
   // One shape: handles on its own (rotated) box. Several: on their common bounds.
   const m: Matrix = single ? single.matrix : [1, 0, 0, 1, u.x, u.y];
-  const cx = single ? single.element.xfrm.cx : u.r - u.x;
-  const cy = single ? single.element.xfrm.cy : u.b - u.y;
+  // A table's handles sit on its drawn grid, which rows that grow can make taller than xfrm.
+  const grid = single?.kind === 'frame' ? single.table : undefined;
+  const cx = grid ? grid.width : single ? single.element.xfrm.cx : u.r - u.x;
+  const cy = grid ? grid.height : single ? single.element.xfrm.cy : u.b - u.y;
   if (!single) {
     const box = doc.createElementNS(SVG_NS, 'rect');
     box.setAttribute('class', 'pptx-surface__group-outline');
