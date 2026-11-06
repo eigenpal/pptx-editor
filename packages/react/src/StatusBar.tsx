@@ -39,7 +39,6 @@ export function StatusBarSlideNumber({ className, hidden }: StatusBarPartProps):
       aria-live="polite"
     >
       {status ? t('statusBar.slide', status) : null}
-      <ReadOnlyBadge />
     </span>
   );
 }
@@ -172,7 +171,13 @@ export function StatusBar({ className, preset = true, children }: StatusBarProps
       {content}
     </div>
   );
-  if (!preset) return bar(children);
+  if (!preset)
+    return bar(
+      <>
+        {children}
+        <ReadOnlyBadge />
+      </>
+    );
   const overrides = new Map<unknown, ReactNode>();
   const extras: ReactNode[] = [];
   for (const child of flatten(children)) {
@@ -184,6 +189,8 @@ export function StatusBar({ className, preset = true, children }: StatusBarProps
   return bar(
     <>
       {part(StatusBarSlideNumber)}
+      {/* Its own part of the bar: hiding the slide number does not hide it. */}
+      <ReadOnlyBadge />
       <span className="pptx-statusbar__spacer" />
       {part(StatusBarNotes)}
       {extras}

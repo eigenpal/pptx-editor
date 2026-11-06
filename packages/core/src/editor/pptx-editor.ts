@@ -87,7 +87,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   let failure: ReturnType<typeof documentOpenFailure> | undefined;
   /** Why the open deck is read-only, after edits, because a slide of it did not parse. */
   let readOnly: EditorSnapshot['readOnlyReason'] = null;
-  let mode: EditorMode = options.mode ?? 'edit';
+  /** The mode the host asked for (`setMode`, `options.mode`). */
+  let hostMode: EditorMode = options.mode ?? 'edit';
+  /** The mode in effect: view while the deck is read-only (`readOnlyReason`). */
+  let mode: EditorMode = hostMode;
   // The caret and the store revision just after AutoCorrect started a list.
   let autoListed: { readonly sel: EditorSelection; readonly rev: number } | null = null;
   const typeText = withAutoCorrect(options.autoCorrect !== false);
@@ -642,13 +645,26 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
    * write guard keeps a document readable: its store refuses every commit, and the notice says
    * why, so the user can still read and copy the work.
    */
+  /**
+   * Put the mode in effect: the host's, or view while the deck is read-only. The host's mode is
+   * kept, so the next deck opens in it.
+   */
+  const applyMode = (): void => {
+    mode = readOnly || session?.damage ? 'view' : hostMode;
+    if (mode !== 'view') return;
+    painter.reset();
+    cropper.cancel();
+    // View mode edits no text and no cells: the element stays selected.
+    if (selection.kind === 'text' || selection.kind === 'cells')
+      selection = { kind: 'shapes', nodeIds: [selection.nodeId] };
+  };
   const refuseOpen = (code: string, drop?: DocumentSession): CommandResult => {
     const refused: CommandResult = { ok: false, reason: 'errors.malformed', detail: code };
     if (drop && drop !== session) return refused;
     if (drop && drop.store.edited) {
       // The deck opened and holds edits: it stays on screen, read-only. It is no failed open.
       readOnly = 'damaged-slide';
-      instance.setMode('view');
+      applyMode();
       opening.keepReading(drop);
       emit();
       return refused;
@@ -672,7 +688,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     requestFamilies: (families) => hostFonts.request(families),
   });
 
-  const load: PptxEditorInstance['load'] = async (bytes, loadOptions) => {
+  const openFile: PptxEditorInstance['load'] = async (bytes, loadOptions) => {
     if (destroyed) return { ok: false, reason: 'disabled.destroyed' };
     // A later `load` (or `destroy`) supersedes this one: its result is disposed, not shown.
     const token = ++generation;
@@ -741,6 +757,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     status = 'ready';
     failure = undefined;
     readOnly = null;
+    mode = hostMode;
     slide = clampSlide(startSlide, session.info.slides.length);
     slideSel.reset(session.info.slides[slide]?.partName);
     selection = { kind: 'none' };
@@ -786,7 +803,16 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     can,
     exec,
     beginHistoryGroup: () => groups.begin(),
-    load,
+    load: async (bytes, loadOptions) => {
+      const before = session;
+      try {
+        return await openFile(bytes, loadOptions);
+      } catch (error) {
+        // The open threw before it replaced the deck: the old deck's background parse goes on.
+        if (session === before) opening.resume(before);
+        throw error;
+      }
+    },
     // A deck still opening parses the rest first; a slide that does not parse refuses the deck.
     save: () =>
       session && !session.damage && opening.finish() && session && !session.damage
@@ -801,13 +827,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       emit();
     },
     setMode(next) {
-      // A deck with a slide that did not parse is open for viewing only.
-      mode = session?.damage ? 'view' : next;
-      if (next === 'view') painter.reset();
-      if (next === 'view') cropper.cancel();
-      // View mode edits no text and no cells: the element stays selected.
-      if (next === 'view' && (selection.kind === 'text' || selection.kind === 'cells'))
-        selection = { kind: 'shapes', nodeIds: [selection.nodeId] };
+      hostMode = next;
+      applyMode();
       emit();
     },
     goToSlide(index) {
@@ -922,6 +943,6 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     emit();
   }
 
-  if (options.document) void load(options.document);
+  if (options.document) void instance.load(options.document);
   return seam.withCollaborationFlag(removal.attach(instance), modules);
 }

@@ -428,9 +428,24 @@ test('embedding: Ctrl/Cmd+F with the focus outside the editor stays with the bro
 
 test('long deck: the rail paints the thumbnails in view first, then the rest', async ({ page }) => {
   // Visibility from CSS layout and the browser's IntersectionObserver: happy-dom has neither.
-  // Enough slides that the idle paints cannot catch up with the rail while it mounts in steps.
   const SLIDES = 1000;
   await ready(page);
+  // The order thumbnails paint in, read from the page as each one gets its slide picture. The
+  // order, not a count at one moment: the idle paints can finish before a check reads them.
+  await page.evaluate(() => {
+    const order: number[] = [];
+    (window as unknown as { paintOrder: number[] }).paintOrder = order;
+    new MutationObserver((records) => {
+      for (const r of records)
+        for (const node of r.addedNodes) {
+          if (!(node instanceof SVGElement)) continue;
+          const thumb = node.parentElement;
+          if (!thumb?.classList.contains('pptx-rail__thumb')) continue;
+          const item = thumb.closest<HTMLElement>('.pptx-rail__item');
+          if (item) order.push(Number(item.dataset.index));
+        }
+    }).observe(document.body, { childList: true, subtree: true });
+  });
   await page.locator('input[type=file][accept*=".pptx"]').setInputFiles({
     name: 'long.pptx',
     mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -438,13 +453,19 @@ test('long deck: the rail paints the thumbnails in view first, then the rest', a
   });
   await expect(page.locator('.pptx-rail__item')).toHaveCount(SLIDES, { timeout: 60_000 });
   const painted = () => page.locator('.pptx-rail__thumb > svg').count();
-  expect(await painted()).toBeLessThan(SLIDES);
-  // Scrolled to the end, the last thumbnails paint before the idle time reaches them.
+  // In idle time, every thumbnail paints.
+  await expect.poll(painted, { timeout: 30_000 }).toBe(SLIDES);
+  const order = await page.evaluate(
+    () => (window as unknown as { paintOrder: number[] }).paintOrder
+  );
+  // The first thumbnails to paint are the ones on the first screen of the rail.
+  const first = order.slice(0, 10);
+  expect(first.length).toBe(10);
+  expect(Math.max(...first)).toBeLessThan(40);
+  // Scrolled to the end, the last thumbnails are there to see.
   await page.locator('.pptx-rail__list').evaluate((el) => (el.scrollTop = el.scrollHeight));
   const last = page.locator('.pptx-rail__item').last().locator('.pptx-rail__thumb > svg');
   await expect(last).toHaveCount(1);
-  // In idle time, every thumbnail paints.
-  await expect.poll(painted, { timeout: 30_000 }).toBe(SLIDES);
 });
 
 test('long deck: the first slide takes input while the rest opens, and every slide is there after', async ({

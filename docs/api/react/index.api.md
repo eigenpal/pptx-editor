@@ -70,6 +70,7 @@ import { isFontResolver } from '@pptx-editor.dev/core/editor';
 import { loadFonts } from '@pptx-editor.dev/core/editor';
 import { LoadFontsRequest } from '@pptx-editor.dev/core/editor';
 import { LoadFontsResult } from '@pptx-editor.dev/core/editor';
+import { LoadOptions } from '@pptx-editor.dev/core/editor';
 import { LocaleCatalog } from '@pptx-editor.dev/i18n';
 import { MarkedFontResolver } from '@pptx-editor.dev/core/editor';
 import { MAX_RESOLVER_FAMILIES } from '@pptx-editor.dev/core/editor';
@@ -1199,7 +1200,7 @@ export interface PptxEditorRef {
     exec(command: EditorCommand, options?: EditorExecOptions): CommandResult;
     focus(): void;
     getEditor(): PptxEditorInstance | null;
-    load(bytes: Uint8Array): Promise<CommandResult>;
+    load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
     save(): Uint8Array<ArrayBuffer> | null;
     snapshot(): EditorSnapshot;
 }

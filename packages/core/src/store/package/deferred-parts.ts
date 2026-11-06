@@ -19,10 +19,13 @@
 import type { PackagePart, PackageRejection, PptxPackage } from './package.ts';
 import { parseXmlPart, type XmlPart } from './tree.ts';
 
-/** What happens to a deferred part's tree right after it parses (the editor drops its marks). */
+/**
+ * What happens to a deferred part's tree right after it parses (the editor drops its marks).
+ * @internal
+ */
 export type DeferredPartFinish = (part: XmlPart) => XmlPart;
 
-/** Called once, where the read happens, when a deferred part does not parse. */
+/** Called once, where the read happens, when a deferred part does not parse. @internal */
 export type DeferredPartReject = (rejection: Extract<PackageRejection, { reason: 'xml' }>) => void;
 
 interface DeferredState {

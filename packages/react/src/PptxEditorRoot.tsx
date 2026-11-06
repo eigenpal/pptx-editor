@@ -25,6 +25,7 @@ import {
   warnModulesChanged,
   type ColorMode,
   type CommandResult,
+  type LoadOptions,
   type EditorCommand,
   type EditorExecOptions,
   type EditorSnapshot,
@@ -115,8 +116,11 @@ export interface PptxEditorRootProps {
  * returns. @public
  */
 export interface PptxEditorRef {
-  /** Open `.pptx` bytes. Resolves when the presentation is open, or with the refusal. */
-  load(bytes: Uint8Array): Promise<CommandResult>;
+  /**
+   * Open `.pptx` bytes. Resolves when the presentation is open, or with the refusal. A long
+   * deck resolves when `options.startSlide` (or the first slide) is ready.
+   */
+  load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
   /**
    * The presentation as `.pptx` bytes, or `null` when no presentation is open. The bytes own an
    * `ArrayBuffer`, so `new Blob([bytes])` takes them as they are.

@@ -1797,7 +1797,7 @@ export interface EditorRefApi {
     // (undocumented)
     getEditor(): PptxEditorInstance | null;
     // (undocumented)
-    load(bytes: Uint8Array): Promise<CommandResult>;
+    load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
     // (undocumented)
     save(): Uint8Array<ArrayBuffer> | null;
     // (undocumented)

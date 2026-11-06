@@ -12,6 +12,8 @@ A long deck shows its first slide and takes input before the rest of the deck is
 
 ```ts
 await editor.load(bytes, { startSlide: 41 });
+// The adapters' editor ref takes the same options:
+await editorRef.current?.load(bytes, { startSlide: 41 });
 ```
 
 A start slide that is not a whole number rounds down, and a start slide outside the deck goes to the nearest slide. A value that is not a finite number opens the first slide.
@@ -41,7 +43,7 @@ Everything. A slide that the editor needs opens at once: a slide you go to, a sl
 A slide or a notes slide whose XML is damaged refuses the deck when it is read, in the background or for a command.
 
 - With no edits, the editor holds no deck. `snapshot().openFailure` reports it, and the `openFailure` event fires.
-- After edits, the deck stays open in view mode, so the edits stay on screen. `snapshot().readOnlyReason` is `'damaged-slide'`, and `openFailure` stays `null`, because the file did open. The status bar says: "A slide is damaged. You can view this presentation, but you cannot save changes." The other slides go on opening. Every command, undo, `save()`, and automation write or export is refused; `save()` returns `null`.
+- After edits, the deck stays open in view mode, so the edits stay on screen. `snapshot().readOnlyReason` is `'damaged-slide'`, and `openFailure` stays `null`, because the file did open. The status bar says: "A slide is damaged. You can view this presentation, but you cannot save changes." The `change` event fires once for the new state. The other slides go on opening. Every command, undo, `save()`, and automation write or export is refused, and `save()` returns `null`. An automation read of the damaged slide is refused with `document-unavailable`. The next file that you open uses your mode again.
 
 A save or an export before the damage is read opens the rest of the deck first, and finds the damage too. A damaged slide that you delete before it opens does not refuse the deck, unless an undo brings it back.
 

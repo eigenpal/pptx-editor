@@ -6,6 +6,7 @@ import {
   attr,
   child,
   elements,
+  holdsStandIn,
   presentationInfo,
   relationshipsOf,
   REL,
@@ -89,9 +90,24 @@ export function slideOf(pkg: PptxPackage, sldId: string): { ref: SlideRef; index
   return { ref: slides[index]!, index };
 }
 
+/**
+ * The part of the slide a sldId names, to read its content. A slide of a long deck that did
+ * not parse holds an empty stand-in: reading it would answer with no shapes, so the read is
+ * refused (`document-unavailable`, `damaged`) as the export is.
+ */
+export function slidePartOf(pkg: PptxPackage, sldId: string): string {
+  const part = slideOf(pkg, sldId).ref.partName;
+  // Reading the part parses a slide still opening.
+  void xmlPartOf(pkg, part);
+  const held = pkg.parts.get(part);
+  if (held && holdsStandIn(held))
+    throw new AutomationFailure('document-unavailable', 'that slide did not open', 'damaged');
+  return part;
+}
+
 /** The part that holds an owner's shape tree. */
 export function ownerPart(pkg: PptxPackage, owner: AutomationOwner): string {
-  if (owner.kind === 'slide') return slideOf(pkg, owner.sldId).ref.partName;
+  if (owner.kind === 'slide') return slidePartOf(pkg, owner.sldId);
   const root = xmlPartOf(pkg, owner.part)?.root;
   const local = owner.kind === 'slideLayout' ? 'sldLayout' : 'sldMaster';
   if (!root || root.local !== local)

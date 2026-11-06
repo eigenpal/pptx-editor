@@ -117,10 +117,10 @@ export const DEFAULT_ZIP_LIMITS: ZipLimits;
 // @internal
 export function deferredParseCount(): number;
 
-// @public
+// @internal
 export type DeferredPartFinish = (part: XmlPart) => XmlPart;
 
-// @public
+// @internal
 export type DeferredPartReject = (rejection: Extract<PackageRejection, {
     reason: 'xml';
 }>) => void;

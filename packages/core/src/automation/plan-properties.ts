@@ -39,7 +39,7 @@ import {
   edit,
   numberIn,
   shapeAt,
-  slideOf,
+  slidePartOf,
   targetOf,
   toEmu,
   type PlanContext,
@@ -297,7 +297,7 @@ function tagHost(ctx: PlanContext, ref: AutomationRef): TagHost {
     return { part, host, after: ['kinsoku', 'defaultTextStyle', 'modifyVerifier', 'extLst'] };
   }
   if (target.kind === 'slide') {
-    const part = slideOf(pkg, target.sldId).ref.partName;
+    const part = slidePartOf(pkg, target.sldId);
     const host = child(xmlPartOf(pkg, part)?.root, 'p:cSld');
     if (!host) throw new AutomationFailure('unsupported-content', 'the slide has no p:cSld');
     // CT_CommonSlideData (19.3.1.6): bg, spTree, custDataLst, controls, extLst.

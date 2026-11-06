@@ -186,6 +186,56 @@ describe('a damaged part in a progressive open', () => {
     editor.destroy();
   });
 
+  test('the next healthy deck opens in the host mode, and the read-only state fires change once', async () => {
+    const editor = editorFor();
+    let changes = 0;
+    onEditorEvent(editor, 'change', () => (changes += 1));
+    expect((await editor.load(withPart(BYTES, slidePart(BYTES, 3), BROKEN))).ok).toBe(true);
+    typeHere(editor, 'x');
+    const before = changes;
+    await readOnly(editor);
+    expect(editor.snapshot().mode).toBe('view');
+    // One change for the read-only state, and none for the slides that open after it.
+    for (let i = 0; i < 2000 && (editor.snapshot().pendingSlides ?? 0) > 0; i += 1) await wait(1);
+    expect(changes).toBe(before + 1);
+    expect((await editor.load(textDeck(10))).ok).toBe(true);
+    expect(editor.snapshot().readOnlyReason ?? null).toBeNull();
+    expect(editor.snapshot().mode).toBe('edit');
+    expect(editor.exec({ type: 'addSection', index: 1 }).ok).toBe(true);
+    editor.destroy();
+  });
+
+  test('automation reads of a damaged slide are refused, not answered with an empty slide', async () => {
+    const editor = editorFor();
+    expect((await editor.load(withPart(BYTES, slidePart(BYTES, SLIDES - 1), BROKEN))).ok).toBe(
+      true
+    );
+    const host = createBrowserAutomationHost(editor);
+    const read = host.execute({
+      operations: [
+        { op: 'getSlide', key: { index: SLIDES - 1 } },
+        { op: 'listShapes', container: { result: 0 } },
+      ],
+    });
+    expect(read.ok).toBe(false);
+    expect(read.results[1]).toMatchObject({
+      status: 'error',
+      error: { code: 'document-unavailable', detail: 'damaged' },
+    });
+    // A healthy slide still reads (the deck closes once the read returns: no edits).
+    const fresh = editorFor();
+    expect((await fresh.load(withPart(BYTES, slidePart(BYTES, SLIDES - 1), BROKEN))).ok).toBe(true);
+    const ok = createBrowserAutomationHost(fresh).execute({
+      operations: [
+        { op: 'getSlide', key: { index: 0 } },
+        { op: 'listShapes', container: { result: 0 } },
+      ],
+    });
+    expect(ok.ok).toBe(true);
+    editor.destroy();
+    fresh.destroy();
+  });
+
   test('a slide that finishes opening fires no change, so a host that saves on change does not', async () => {
     const editor = editorFor();
     let changes = 0;
