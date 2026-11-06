@@ -1,6 +1,6 @@
 // Chart and diagram fixtures (ECMA-376 Part 1, 21.2 DrawingML Charts and 21.4 DrawingML
 // Diagrams). Each chart slide holds one chart part with cached values and no workbook, so a
-// reader draws it from the cache. The diagram parts in `diagrams/` are the anonymous SmartArt
+// reader draws it from the cache. The diagram parts in `diagrams/` are the anonymous diagram
 // parts of DOCX Editor's default sample (docx-editor/scripts/demo-doc/diagrams, EigenPal):
 // data, layout, quick style, colors, and the saved drawing.
 
@@ -257,7 +257,7 @@ const diagramPart = (file: string): string =>
   readFileSync(join(import.meta.dirname, 'diagrams', file), 'utf8');
 
 /**
- * Two SmartArt diagrams, each with its saved drawing: a nested target (`target2`) and a grouped
+ * Two diagrams, each with its saved drawing: a nested target (`target2`) and a grouped
  * process list (`lProcess2`). Each frame keeps the extent the drawing was laid out in.
  */
 export function diagramsDeck(): FixtureOptions {

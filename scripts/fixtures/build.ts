@@ -844,6 +844,6 @@ writeFileSync(`${OUT}/east-asian-theme-fonts.pptx`, buildPptx(eastAsianThemeFont
 writeFileSync(`${OUT}/east-asian-typography.pptx`, buildPptx(eastAsianTypographyDeck()));
 // One chart type per slide, drawn from the cached values (ECMA-376 Part 1, 21.2).
 writeFileSync(`${OUT}/charts.pptx`, buildPptx(chartsDeck()));
-// SmartArt diagrams with their saved drawings (ECMA-376 Part 1, 21.4).
+// Diagrams with their saved drawings (ECMA-376 Part 1, 21.4).
 writeFileSync(`${OUT}/diagrams.pptx`, buildPptx(diagramsDeck()));
 console.log(`${Object.keys(fixtures).length + 5} fixtures written to ${OUT}/`);
