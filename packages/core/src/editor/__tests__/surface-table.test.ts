@@ -319,6 +319,15 @@ describe('table gestures: grid lines', () => {
       dx: -left,
       dy: -top,
     });
+    // A saved frame half the drawn grid's height: the move is in frame units, so the grid's
+    // bottom (and the handle on it) stops at the slide's edge, under the pointer.
+    const stale = {
+      ...frame,
+      element: { ...frame.element, xfrm: { ...frame.element.xfrm, cy: frame.table.height / 2 } },
+    };
+    const roomBelow = slide.height - (frame.matrix[5] + frame.table.height);
+    expect(clampTableResize(stale, [1, 1], 0, 20 * IN, slide).dy).toBeCloseTo(roomBelow / 2);
+    expect(clampTableResize(stale, [0.5, 1], 0, IN, slide).dy).toBeCloseTo(IN / 2);
     // A shrink and a shape that is not a table keep the pointer's move.
     expect(clampTableResize(frame, [1, 0.5], -IN, 0, slide)).toEqual({ dx: -IN, dy: 0 });
     expect(clampTableResize(frame, [0, 0.5], IN, 0, slide)).toEqual({ dx: IN, dy: 0 });

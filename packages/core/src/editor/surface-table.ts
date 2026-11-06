@@ -289,10 +289,13 @@ export class TableGestures {
 }
 
 /**
- * A table frame's resize: each dragged edge stops at the slide's edge, as the grid edges do, so
- * a handle never leaves the place where the pointer can grab it again. `handle` is
- * the dragged handle's place on the box; `dx` and `dy` are in slide units. With `aspect` (Shift
- * or a locked aspect ratio on a corner), the scale stops where the first edge meets the slide's.
+ * A table frame's resize, as the pointer moves its drawn grid. The handles sit on the grid,
+ * which rows that grow to fit their text can make larger than the saved frame (`xfrm`), and the
+ * resize scales the frame: the move is turned into frame units, so the handle stays under the
+ * pointer. Each dragged edge stops at the slide's edge, as the grid edges do, so a handle never
+ * leaves the place where the pointer can grab it again. `handle` is the dragged handle's place
+ * on the box; `dx` and `dy` are in slide units. With `aspect` (Shift or a locked aspect ratio on
+ * a corner), the scale stops where the first edge meets the slide's.
  */
 export function clampTableResize(
   item: LayoutItem,
@@ -304,8 +307,8 @@ export function clampTableResize(
 ): { dx: number; dy: number } {
   if (item.kind !== 'frame' || !item.table) return { dx, dy };
   const { cx, cy } = item.element.xfrm;
-  // The drawn grid's far corner: rows that grow to fit their text can pass the frame's.
-  const end = apply(item.matrix, item.table.width, item.table.height);
+  const { width, height } = item.table;
+  const end = apply(item.matrix, width, height);
   const start = apply(item.matrix, 0, 0);
   // Each dragged edge has room up to the slide's edge on its side: right and bottom, or left
   // and top. A table already past an edge cannot grow further there.
@@ -321,18 +324,25 @@ export function clampTableResize(
       : handle[1] === 0
         ? Math.max(0, start.y)
         : Infinity;
-  const corner = handle[0] !== 0.5 && handle[1] !== 0.5;
-  if (aspect && corner && cx > 0 && cy > 0) {
-    // The largest scale that keeps both dragged edges on the slide.
-    const grow = Math.min(roomX / cx, roomY / cy);
-    const limit = (d: number, size: number, toward: number): number =>
-      toward === 1 ? Math.min(d, grow * size) : toward === 0 ? Math.max(d, -grow * size) : d;
-    return { dx: limit(dx, cx, handle[0]), dy: limit(dy, cy, handle[1]) };
-  }
-  // A right or bottom handle grows with a positive move, a left or top one with a negative.
+  // A right or bottom edge grows with a positive move, a left or top one with a negative.
   const side = (d: number, room: number, toward: number): number =>
     toward === 1 ? Math.min(d, room) : toward === 0 ? Math.max(d, -room) : d;
-  return { dx: side(dx, roomX, handle[0]), dy: side(dy, roomY, handle[1]) };
+  let gx: number;
+  let gy: number;
+  if (aspect && handle[0] !== 0.5 && handle[1] !== 0.5 && width > 0 && height > 0) {
+    // The largest scale that keeps both dragged edges on the slide.
+    const grow = Math.min(roomX / width, roomY / height);
+    gx = side(dx, grow * width, handle[0]);
+    gy = side(dy, grow * height, handle[1]);
+  } else {
+    gx = side(dx, roomX, handle[0]);
+    gy = side(dy, roomY, handle[1]);
+  }
+  // Grid units to frame units: the resize scales the grid by the frame's change.
+  return {
+    dx: width > 0 && cx > 0 ? (gx * cx) / width : gx,
+    dy: height > 0 && cy > 0 ? (gy * cy) / height : gy,
+  };
 }
 
 /** Whether `p` is inside a table frame's drawn grid, which rows that grow can make taller. */
