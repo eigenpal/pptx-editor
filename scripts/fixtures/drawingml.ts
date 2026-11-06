@@ -224,7 +224,7 @@ const CHARTS: readonly (readonly [string, string])[] = [
     'Radar with markers',
     chartSpace(
       `<c:radarChart><c:radarStyle val="marker"/><c:varyColors val="0"/>${all('marker')}${AX_IDS}</c:radarChart>` +
-        axes('b', 'l').replace('<c:crossBetween val="between"/>', '<c:crossBetween val="between"/>'),
+        axes('b', 'l'),
       { legend: 'r' }
     ),
   ],
