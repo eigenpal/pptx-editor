@@ -11,6 +11,7 @@ import {
   defineComponent,
   onBeforeUnmount,
   onMounted,
+  onUpdated,
   ref,
   shallowRef,
   watch,
@@ -28,8 +29,10 @@ import {
   slideMenuPoint,
   slideSorterMounted,
   sorterKeyDown,
+  trackNotesInset,
   translateKeyOrText,
   warnSlideSorterUnmounted,
+  type NotesInsetTracker,
   type SlideSummary,
 } from '@pptx-editor.dev/core/editor';
 import { Icon, keepFocus, useAriaDisabled } from './chrome.tsx';
@@ -347,6 +350,17 @@ export const DefaultWorkspace = defineComponent({
       },
       { flush: 'post' }
     );
+    // The status area and the font notice float above the notes card, at every notes height.
+    let inset: NotesInsetTracker | null = null;
+    onMounted(() => {
+      if (box.value) inset = trackNotesInset(box.value);
+    });
+    // A view change or another `normal` slot can add or remove the notes card.
+    onUpdated(() => inset?.refresh());
+    onBeforeUnmount(() => {
+      inset?.dispose();
+      inset = null;
+    });
     return () => (
       <div ref={box} class="pptx-default__views">
         {view.value === 'slideSorter' ? (

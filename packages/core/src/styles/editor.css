@@ -2102,24 +2102,28 @@
   box-shadow: var(--doc-card-shadow-strong);
 }
 /* The views box holds the Normal or Slide Sorter workspace and, at its bottom right, the status
-   area, which stays mounted when the view changes. */
+   area, which stays mounted when the view changes. It is the size container of the font notice:
+   its width comes from the editor, never from its content. */
 .pptx-default__views {
   position: relative;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+  container: pptx-views / inline-size;
 }
 /* The view switch shows the chosen view as a pressed toggle, also inside the zoom pill. */
 .pptx-view-switch .pptx-view-switch__option[aria-checked='true'] {
   background: var(--doc-toggle-active-bg);
   color: var(--doc-toggle-active-fg);
 }
-/* The default editor's status area: the view switch and the zoom pill, bottom right. */
+/* The default editor's status area: the view switch and the zoom pill, bottom right. It floats
+   above the notes card at every notes height: `--pptx-notes-inset` (`notes-inset.ts`) is the
+   height that the card takes from the bottom of the workspace. The font notice uses it too. */
 .pptx-statusbar {
   position: absolute;
   right: 18px;
-  bottom: 16px;
+  bottom: calc(16px + var(--pptx-notes-inset, 0px));
   z-index: 25;
   display: flex;
   gap: 8px;
@@ -2195,13 +2199,14 @@
 .pptx-font-notice {
   position: absolute;
   left: 16px;
-  bottom: 16px;
+  bottom: calc(16px + var(--pptx-notes-inset, 0px));
   z-index: 25;
   display: flex;
   align-items: center;
   gap: 10px;
   width: max-content;
-  max-width: calc(100% - 200px);
+  /* It leaves room at the right for the status area: 18px, about 200px of controls, a gap. */
+  max-width: calc(100% - 256px);
   padding: 4px 4px 4px 12px;
   border: 1px solid var(--doc-warning);
   border-radius: var(--doc-radius-surface, 10px);
@@ -2236,6 +2241,21 @@
   width: 26px;
   height: 26px;
   color: var(--doc-warning-text);
+}
+/* In a narrow workspace there is no room beside the status area, so the notice takes the full
+   width above it (34px controls and a 12px gap), with its buttons on a second row. This block
+   comes after the notice's own rules, so it wins over them. */
+@container pptx-views (max-width: 799px) {
+  .pptx-font-notice {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    max-width: calc(100% - 32px);
+    padding-top: 6px;
+    bottom: calc(62px + var(--pptx-notes-inset, 0px));
+  }
+  .pptx-font-notice__text {
+    flex-basis: 100%;
+  }
 }
 .pptx-panel__list {
   display: flex;
