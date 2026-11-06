@@ -85,16 +85,20 @@ describe('Enter and Shift+Enter', () => {
     expect(resolved(e, 3)?.bullet).toBeNull();
   });
 
-  test('Enter on an empty list item leaves the list', async () => {
+  test('Enter on an empty list item starts another item at the same level', async () => {
     const e = await open(para(run('one')));
     caret(e, 0, 3);
     e.exec({ type: 'toggleBullets' });
+    caret(e, 0, 0);
+    press(e, 'Tab');
+    caret(e, 0, 3);
     press(e, 'Enter');
-    expect(resolved(e, 1)?.bullet?.type).toBe('char');
     press(e, 'Enter');
-    expect(paragraphs(e)).toHaveLength(2);
-    expect(resolved(e, 1)?.bullet).toBeNull();
-    expect(resolved(e, 1)?.marL).toBe(0);
+    expect(paragraphs(e)).toHaveLength(3);
+    for (const i of [1, 2]) {
+      expect(resolved(e, i)?.bullet?.type).toBe('char');
+      expect(resolved(e, i)?.level).toBe(1);
+    }
   });
 });
 
@@ -104,6 +108,7 @@ describe('Tab, Shift+Tab, and Backspace in lists', () => {
     caret(e, 1, 2);
     e.exec({ type: 'toggleBullets' });
     const before = resolved(e, 1)!.marL;
+    caret(e, 1, 0);
     press(e, 'Tab');
     expect(resolved(e, 1)!.level).toBe(1);
     expect(resolved(e, 1)!.marL).toBe(before + 457_200);
@@ -119,15 +124,130 @@ describe('Tab, Shift+Tab, and Backspace in lists', () => {
     expect(resolved(e, 0)!.level).toBe(0);
   });
 
-  test('Backspace at the start of a list item removes the bullet before it merges', async () => {
+  test('Tab inside the text of a list item types a tab, as does Shift+Tab', async () => {
+    const e = await open(para(run('ab')));
+    caret(e, 0, 0);
+    e.exec({ type: 'toggleBullets' });
+    caret(e, 0, 1);
+    expect(press(e, 'Tab')).toEqual({ kind: 'input', input: 'text', data: '\t' });
+    expect(press(e, 'Tab', true)).toEqual({ kind: 'input', input: 'text', data: '\t' });
+    expect(resolved(e, 0)!.level).toBe(0);
+  });
+
+  test('Tab at the start of a paragraph with no bullet types a tab to the next tab stop', async () => {
+    const e = await open(para(run('ab')));
+    caret(e, 0, 0);
+    expect(press(e, 'Tab')).toEqual({ kind: 'input', input: 'text', data: '\t' });
+    const text = resolved(e, 0)!
+      .runs.map((r) => (r.kind === 'text' ? r.text : ''))
+      .join('');
+    expect(text).toBe('\tab');
+    // The text after the tab starts at the first default tab stop (1 inch).
+    const item = e.session!.layout(0)!.items.find((x) => x.kind === 'shape' && x.element.text);
+    const line = item?.kind === 'shape' ? item.text!.lines[0] : undefined;
+    expect(line!.caretX[1]! - line!.caretX[0]!).toBeGreaterThan(IN / 2);
+  });
+
+  test('Tab over a selection that starts a list item, or across paragraphs, changes the level', async () => {
     const e = await open(para(run('one')) + para(run('two')));
+    const select = (from: [number, number], to: [number, number]) =>
+      e.setSelection({
+        kind: 'text',
+        nodeId: shapeId(e),
+        anchor: { paragraph: from[0], offset: from[1] },
+        focus: { paragraph: to[0], offset: to[1] },
+      });
+    select([0, 0], [1, 3]);
+    e.exec({ type: 'toggleBullets' });
+    select([1, 3], [1, 0]);
+    press(e, 'Tab');
+    expect(resolved(e, 1)!.level).toBe(1);
+    select([0, 2], [1, 1]);
+    press(e, 'Tab');
+    expect([resolved(e, 0)!.level, resolved(e, 1)!.level]).toEqual([1, 2]);
+    select([0, 1], [0, 2]);
+    expect(press(e, 'Tab')).toEqual({ kind: 'input', input: 'text', data: '\t' });
+  });
+
+  test('Backspace at the start of a list item removes the bullet, keeps the level, then merges', async () => {
+    const e = await open(para(run('one')) + para(run('two')));
+    caret(e, 1, 0);
+    e.exec({ type: 'toggleBullets' });
+    press(e, 'Tab');
+    const before = resolved(e, 1)!;
+    press(e, 'Backspace');
+    expect(paragraphs(e)).toHaveLength(2);
+    const after = resolved(e, 1)!;
+    expect(after.bullet).toBeNull();
+    expect(after.level).toBe(1);
+    // The text moves to where the bullet was.
+    expect(after.marL).toBe(before.marL + before.indent);
+    expect(after.indent).toBe(0);
+    expect(press(e, 'Backspace')).toBeNull();
+    expect(paragraphs(e)).toHaveLength(1);
+  });
+
+  test('Backspace in a body placeholder keeps the level and the bullet position of the master', async () => {
+    const e = await open(para(run('one')) + para(run('two'), '<a:pPr lvl="1"/>'), BODY);
+    const before = resolved(e, 1)!;
+    expect(before.bullet).not.toBeNull();
+    caret(e, 1, 0);
+    press(e, 'Backspace');
+    const after = resolved(e, 1)!;
+    expect(after.bullet).toBeNull();
+    expect(after.level).toBe(1);
+    expect(after.marL).toBe(before.marL + before.indent);
+    expect(child(pPr(e, 1)!, 'a:buNone')).toBeDefined();
+  });
+});
+
+describe('Backspace removes a bullet in place', () => {
+  test('bullets back on restore the placeholder hanging indent', async () => {
+    const e = await open(para(run('one')) + para(run('two'), '<a:pPr lvl="1"/>'), BODY);
+    const before = resolved(e, 1)!;
+    caret(e, 1, 0);
+    press(e, 'Backspace');
+    e.exec({ type: 'toggleBullets' });
+    const after = resolved(e, 1)!;
+    expect(after.bullet?.type).toBe(before.bullet?.type);
+    expect([after.level, after.marL, after.indent]).toEqual([1, before.marL, before.indent]);
+    expect(attr(pPr(e, 1)!, 'marL')).toBeUndefined();
+  });
+
+  test('bullets back on keep a margin the author wrote with no bullet', async () => {
+    const e = await open(
+      para(run('one'), '<a:pPr marL="914400" indent="0"><a:buNone/></a:pPr>'),
+      BODY
+    );
+    caret(e, 0, 0);
+    e.exec({ type: 'toggleBullets' });
+    expect(resolved(e, 0)?.bullet).not.toBeNull();
+    expect(resolved(e, 0)?.marL).toBe(914_400);
+  });
+
+  test('a numbered item and an empty item lose the number or bullet first', async () => {
+    const e = await open(para(run('one')) + para(''));
+    caret(e, 0, 0);
+    e.exec({ type: 'toggleNumbering' });
+    press(e, 'Backspace');
+    expect(resolved(e, 0)?.bullet).toBeNull();
     caret(e, 1, 0);
     e.exec({ type: 'toggleBullets' });
     press(e, 'Backspace');
     expect(paragraphs(e)).toHaveLength(2);
     expect(resolved(e, 1)?.bullet).toBeNull();
+  });
+
+  test('one undo brings the bullet back, and no bullet means nothing to do', async () => {
+    const e = await open(para(run('one')));
+    caret(e, 0, 0);
+    expect(e.can({ type: 'removeBullet' }).ok).toBe(false);
+    e.exec({ type: 'toggleBullets' });
+    expect(e.can({ type: 'removeBullet' }).ok).toBe(true);
     press(e, 'Backspace');
-    expect(paragraphs(e)).toHaveLength(1);
+    expect(resolved(e, 0)?.bullet).toBeNull();
+    e.exec({ type: 'undo' });
+    expect(resolved(e, 0)?.bullet?.type).toBe('char');
   });
 });
 

@@ -176,7 +176,7 @@ describe('demo interaction', () => {
   test('Enter starts paragraphs, bullets stay on their paragraph, and Tab sets the level', async () => {
     await openDemo();
     await click(byRole('button', { name: 'Text box' }));
-    for (const [i, line] of ['one', 'two', 'three'].entries()) {
+    for (const [i, line] of ['One', 'Two', 'Three'].entries()) {
       if (i > 0) await press('Enter');
       await type(line);
     }
@@ -193,19 +193,25 @@ describe('demo interaction', () => {
     let texts = painted();
     const bullets = texts.filter((t) => t[0] === '•');
     expect(bullets).toHaveLength(1);
-    expect(Math.abs(bullets[0][2] - at(texts, 'two')[2])).toBeLessThan(4);
-    expect(at(texts, 'one')[1]).toBeLessThan(at(texts, 'two')[1]);
+    expect(Math.abs(bullets[0][2] - at(texts, 'Two')[2])).toBeLessThan(4);
+    expect(at(texts, 'One')[1]).toBeLessThan(at(texts, 'Two')[1]);
 
     await press('End');
     await press('Enter');
-    await type('four');
+    await type('Four');
     texts = painted();
     expect(texts.filter((t) => t[0] === '•')).toHaveLength(2);
-    const x = at(texts, 'four')[1];
+    const x = at(texts, 'Four')[1];
+    // Tab changes the level at the start of a list item; inside the text it types a tab.
+    await press('Home');
     await press('Tab');
-    expect(at(painted(), 'four')[1]).toBeGreaterThan(x);
+    expect(at(painted(), 'Four')[1]).toBeGreaterThan(x);
     await press('Shift+Tab');
-    expect(at(painted(), 'four')[1]).toBe(x);
+    expect(at(painted(), 'Four')[1]).toBe(x);
+    // Backspace at the start removes the bullet; the text stays on its own line.
+    await press('Backspace');
+    expect(painted().filter((t) => t[0] === '•')).toHaveLength(1);
+    expect(at(painted(), 'Four')[1]).toBeLessThan(x);
   });
 
   test('format painter: bold a word, paint another word, and keep the painter on', async () => {

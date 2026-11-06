@@ -536,7 +536,7 @@ export function listsSlide(): FixtureSlide {
             [2, 'Up to nine levels in each list style'],
             [0, 'Press Tab to go one level down'],
             [1, 'Shift+Tab goes back up'],
-            [0, 'Enter on an empty item ends the list'],
+            [0, 'Backspace removes the bullet'],
           ])
         ) +
         label(6.77, 1.75, 5.86, 'Numbering, mixed with bullets') +
@@ -559,7 +559,7 @@ export function listsSlide(): FixtureSlide {
       'Both lists take their markers, sizes, and indents from the shape’s list style.',
       'Try: click at the end of a list item and press Enter. A ghost bullet shows where the new item starts.',
       'Try: press Tab to move an item one level down, and Shift+Tab to move it back up.',
-      'Try: press Backspace at the start of an item to leave the list.',
+      'Try: press Backspace at the start of an item to remove its bullet. Press it again to join the item to the one above.',
     ]
   );
 }

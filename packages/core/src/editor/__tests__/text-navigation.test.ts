@@ -102,15 +102,18 @@ describe('double-click word', () => {
 });
 
 describe('word steps', () => {
-  test('Alt or Ctrl with Left and Right steps by word, and at an edge into the next paragraph', async () => {
+  test('Alt or Ctrl with Right steps past a word and its spaces; Left to a word start', async () => {
     const e = await open(para(run('alpha beta')) + para(run('gamma')));
     const item = itemOf(e);
     const right = (paragraph: number, offset: number) =>
       moveCaret(item, { paragraph, offset }, 'ArrowRight', { altKey: true });
     const left = (paragraph: number, offset: number) =>
       moveCaret(item, { paragraph, offset }, 'ArrowLeft', { ctrlKey: true });
-    expect(right(0, 0)).toEqual({ paragraph: 0, offset: 5 });
-    expect(right(0, 5)).toEqual({ paragraph: 0, offset: 10 });
+    // Right lands at the start of the next word, past the space.
+    expect(right(0, 0)).toEqual({ paragraph: 0, offset: 6 });
+    // From a word end, the step crosses only the spaces, to the next word.
+    expect(right(0, 5)).toEqual({ paragraph: 0, offset: 6 });
+    expect(right(0, 6)).toEqual({ paragraph: 0, offset: 10 });
     expect(right(0, 10)).toEqual({ paragraph: 1, offset: 0 });
     expect(left(0, 10)).toEqual({ paragraph: 0, offset: 6 });
     expect(left(0, 6)).toEqual({ paragraph: 0, offset: 0 });
@@ -127,7 +130,7 @@ describe('word steps', () => {
     expect(moveCaret(item, { paragraph: 0, offset: 3 }, 'ArrowLeft', meta).offset).toBe(0);
     expect(
       moveCaret(item, { paragraph: 0, offset: 3 }, 'ArrowRight', { metaKey: true, altKey: true })
-    ).toEqual({ paragraph: 0, offset: 5 });
+    ).toEqual({ paragraph: 0, offset: 6 });
   });
 
   test('Ctrl or Cmd with Home, End, Up, and Down goes to the text body edges', async () => {
@@ -139,9 +142,25 @@ describe('word steps', () => {
     expect(moveCaret(item, at, 'End', { ctrlKey: true })).toEqual(end);
     expect(moveCaret(item, at, 'ArrowDown', { metaKey: true })).toEqual(end);
     expect(moveCaret(item, end, 'Home', { metaKey: true })).toEqual(start);
-    expect(moveCaret(item, end, 'ArrowUp', { ctrlKey: true })).toEqual(start);
+    expect(moveCaret(item, end, 'ArrowUp', { metaKey: true })).toEqual(start);
     // Without Ctrl or Cmd, Home and End stay in the paragraph.
     expect(moveCaret(item, at, 'End')).toEqual({ paragraph: 0, offset: 10 });
+  });
+
+  test('Alt or Ctrl with Up and Down goes to a paragraph start', async () => {
+    const e = await open(para(run('alpha beta')) + para(run('gamma')) + para(run('delta')));
+    const item = itemOf(e);
+    const up = (paragraph: number, offset: number, mods: { altKey?: boolean; ctrlKey?: boolean }) =>
+      moveCaret(item, { paragraph, offset }, 'ArrowUp', mods);
+    const down = (paragraph: number, offset: number) =>
+      moveCaret(item, { paragraph, offset }, 'ArrowDown', { altKey: true });
+    // Inside a paragraph, Up goes to its start; at its start, to the start of the one before.
+    expect(up(1, 3, { altKey: true })).toEqual({ paragraph: 1, offset: 0 });
+    expect(up(1, 0, { ctrlKey: true })).toEqual({ paragraph: 0, offset: 0 });
+    expect(up(0, 0, { altKey: true })).toEqual({ paragraph: 0, offset: 0 });
+    // Down goes to the start of the next paragraph, and in the last one to its end.
+    expect(down(0, 3)).toEqual({ paragraph: 1, offset: 0 });
+    expect(down(2, 1)).toEqual({ paragraph: 2, offset: 5 });
   });
 
   test('Home and End go to the edges of the laid-out line, as Cmd with Left and Right', async () => {
@@ -259,13 +278,13 @@ describe('the surface key and pointer path', () => {
     const nodeId = textShapeId(e);
     e.setSelection({ kind: 'text', nodeId, anchor: caret(0, 0), focus: caret(0, 0) });
     expect(key('ArrowRight', { altKey: true })).toBe(true);
-    expect(e.snapshot().selection).toMatchObject({ anchor: caret(0, 5), focus: caret(0, 5) });
+    expect(e.snapshot().selection).toMatchObject({ anchor: caret(0, 6), focus: caret(0, 6) });
     key('ArrowRight', { ctrlKey: true, shiftKey: true });
-    expect(e.snapshot().selection).toMatchObject({ anchor: caret(0, 5), focus: caret(0, 10) });
+    expect(e.snapshot().selection).toMatchObject({ anchor: caret(0, 6), focus: caret(0, 10) });
     key('ArrowRight', { altKey: true, shiftKey: true });
-    expect(e.snapshot().selection).toMatchObject({ anchor: caret(0, 5), focus: caret(1, 0) });
+    expect(e.snapshot().selection).toMatchObject({ anchor: caret(0, 6), focus: caret(1, 0) });
     // Alt+Left is the browser's Back key on some platforms: the editor takes the event. On the
-    // range from 5, the word step starts at the range start.
+    // range from 6, the word step starts at the range start.
     expect(key('ArrowLeft', { altKey: true })).toBe(true);
     expect(e.snapshot().selection).toMatchObject({ anchor: caret(0, 0), focus: caret(0, 0) });
     key('End', { ctrlKey: true });
@@ -284,7 +303,7 @@ describe('the surface key and pointer path', () => {
     expect(e.snapshot().selection).toMatchObject({ anchor: caret(0, 7), focus: caret(0, 7) });
     e.setSelection(range);
     key('ArrowRight', { altKey: true });
-    expect(e.snapshot().selection).toMatchObject({ anchor: caret(0, 13), focus: caret(0, 13) });
+    expect(e.snapshot().selection).toMatchObject({ anchor: caret(0, 8), focus: caret(0, 8) });
     e.setSelection(range);
     key('ArrowLeft', { ctrlKey: true });
     expect(e.snapshot().selection).toMatchObject({ anchor: caret(0, 4), focus: caret(0, 4) });

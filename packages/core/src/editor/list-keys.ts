@@ -4,11 +4,14 @@
 // no paragraphs. So Enter is handled on keydown, before the browser makes it a line break:
 // Enter starts a paragraph, Shift+Enter inserts a line break (`a:br`).
 //
-// Lists follow Google Slides' editing feel:
-// - Tab and Shift+Tab change the list level of the selected paragraphs, of a list item, or of
-//   a paragraph whose start holds the caret. Elsewhere, Tab inserts a tab.
-// - Backspace at the start of a list item leaves the list: one level up, or off at level 0.
-// - Enter on an empty list item does the same, so a list ends the way it does in an editor.
+// The list keys:
+// - Enter starts a paragraph with the same level and bullet, also on an empty list item. A list
+//   does not end on Enter. Backspace or the Bullets button ends it.
+// - Tab and Shift+Tab change the level of every paragraph a selection across paragraphs
+//   touches, and of a list item whose start holds the caret or the selection start. Anywhere
+//   else, both keys type a tab character, and a selection is replaced.
+// - Backspace at the start of a list item removes its bullet or number and keeps its level.
+//   The text moves to where the bullet was. The next Backspace joins the previous paragraph.
 
 import type { EditorCommand, EditorSelection } from '../contracts/index.ts';
 import type { LayoutItem } from '../layout/index.ts';
@@ -22,15 +25,6 @@ export type ListKeyAction =
   | { readonly kind: 'input'; readonly input: TextInputKind; readonly data?: string }
   | { readonly kind: 'command'; readonly command: EditorCommand };
 
-/** Leave the list one step: up one level, or off at level 0. */
-function leaveList(bullet: 'char' | 'autonum', level: number): ListKeyAction {
-  if (level > 0) return { kind: 'command', command: { type: 'indent', direction: -1 } };
-  return {
-    kind: 'command',
-    command: { type: bullet === 'char' ? 'toggleBullets' : 'toggleNumbering' },
-  };
-}
-
 export function listKeyAction(
   item: LayoutItem | undefined,
   sel: TextSelection,
@@ -40,24 +34,23 @@ export function listKeyAction(
   if (modifiers.other) return null;
   const paragraphs = item?.kind === 'shape' ? (item as ShapeItem).element.text?.paragraphs : null;
   if (!paragraphs) return null;
-  const p = paragraphs[sel.focus.paragraph];
   const collapsed =
     sel.anchor.paragraph === sel.focus.paragraph && sel.anchor.offset === sel.focus.offset;
-  const bullet = p?.bullet?.type;
-  const level = p?.level ?? 0;
-  const empty = !p || p.runs.every((r) => r.kind !== 'break' && r.text.length === 0);
-  if (key === 'Enter') {
-    if (!modifiers.shift && collapsed && bullet && empty) return leaveList(bullet, level);
-    return { kind: 'input', input: modifiers.shift ? 'lineBreak' : 'paragraph' };
-  }
+  if (key === 'Enter') return { kind: 'input', input: modifiers.shift ? 'lineBreak' : 'paragraph' };
   if (key === 'Tab') {
     const several = sel.anchor.paragraph !== sel.focus.paragraph;
-    const atStart = collapsed && sel.focus.offset === 0;
-    if (several || bullet || atStart || modifiers.shift)
+    const start =
+      sel.anchor.paragraph < sel.focus.paragraph ||
+      (sel.anchor.paragraph === sel.focus.paragraph && sel.anchor.offset <= sel.focus.offset)
+        ? sel.anchor
+        : sel.focus;
+    const listStart = start.offset === 0 && !!paragraphs[start.paragraph]?.bullet;
+    if (several || listStart)
       return { kind: 'command', command: { type: 'indent', direction: modifiers.shift ? -1 : 1 } };
     return { kind: 'input', input: 'text', data: '\t' };
   }
-  if (key === 'Backspace' && !modifiers.shift && collapsed && bullet && sel.focus.offset === 0)
-    return leaveList(bullet, level);
+  const p = paragraphs[sel.focus.paragraph];
+  if (key === 'Backspace' && !modifiers.shift && collapsed && p?.bullet && sel.focus.offset === 0)
+    return { kind: 'command', command: { type: 'removeBullet' } };
   return null;
 }
