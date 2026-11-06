@@ -1,5 +1,5 @@
 // Harness-only font discovery. The fixture set loads only `fixtures/fonts/`: open fonts that are
-// in the repository, so a fixture renders with the same bytes on every machine (with the fonts
+// in the repository, so a fixture renders with no system font (only these and the fonts
 // that ship with the engine). The corpus set loads the font folders of `PPTX_HARNESS_FONT_DIRS`
 // (separated by `:`, in priority order; a file name is read once): the reference fonts of
 // private decks, read at run time and NEVER copied into the repo. Arial, the fallback that every

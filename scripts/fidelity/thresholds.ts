@@ -93,8 +93,8 @@ export const RETIRED_LIMITS: Readonly<Record<string, string>> = {
 export type FailureKind = 'pixels' | 'line-breaks' | 'baseline' | 'extra-text';
 
 /**
- * The noise margins of a known gap's recorded value (`known-gaps.ts`). The same tools give the
- * same scores on every machine, so the margins only absorb the rounding of the recorded value:
+ * The noise margins of a known gap's recorded value (`known-gaps.ts`). The check uses pinned tools and no
+ * system tools or fonts, so the margins only absorb the rounding of the recorded value:
  * 0.01 % of the pixels, 0.01 pt of baseline, and 0.01 % for line breaks. Extra lines are a count:
  * no margin.
  */
