@@ -3,21 +3,32 @@
 // renderer for tests.
 
 import { openPresentation, type DocumentSession } from '@pptx-editor.dev/core/editor';
-import { paintSlide, registerFontFaces, type FontFaceHandle } from '@pptx-editor.dev/core/output';
+import { paintSlide, registerFontFaces } from '@pptx-editor.dev/core/output';
 import { writePptx } from '@pptx-editor.dev/core/store';
 import type { FontSource, LayoutItem } from '@pptx-editor.dev/core/layout';
+
+type RegisteredFace = DocumentSession['faces'][number];
 import { installDrawing } from '@pptx-editor.dev/pro/drawing';
 
 // The harness renders as the demos do: with the Pro drawing renderers (charts, glow, inner shadow,
 // reflection, and soft edge), installed before any deck opens.
 installDrawing();
 
+/**
+ * A font file on the harness server, with the SHA-256 of its bytes. A page that holds bytes with
+ * that digest from an earlier deck uses them, and does not fetch the file again.
+ */
+interface FontFile {
+  url: string;
+  sha256?: string;
+}
+
 /** A deck and its local fonts, as paths on the harness server (`openDeck`). */
 interface DeckSource {
   deck: string;
-  fonts: { family: string; bold: boolean; italic: boolean; url: string }[];
+  fonts: ({ family: string; bold: boolean; italic: boolean } & FontFile)[];
   /** The fallback faces, in order (`FALLBACK_FONTS` in scripts/fidelity/local-fonts.ts). */
-  fallback?: string[];
+  fallback?: FontFile[];
 }
 
 /** The size and SHA-256 of a file that the page got. */
@@ -61,13 +72,24 @@ interface HarnessApi {
 }
 
 let session: DocumentSession | null = null;
-let faces: FontFaceHandle | null = null;
 let fonts: FontSource[] = [];
 /** The registered fallback faces, and the family list that replaces `sans-serif` (`paintAt`). */
 let fallbackFaces: FontFace[] = [];
 let fallbackFamilies = '';
-/** The SHA-256 of each registered face's bytes, by its face id (`markupOf`). */
-let faceDigests = new Map<string, string>();
+/** The digests of the fallback faces, in order: the same list keeps the same faces. */
+let fallbackKey = '';
+/**
+ * The page's font faces, loaded once for each distinct font file: the bytes of each fetched
+ * font by its SHA-256, the SHA-256 of each face's bytes, and the digests registered: one
+ * `FontFace` for each, under the family `pptx-h-<sha256>`. Every deck of a lane that uses a font reuses them, so a
+ * large face (Noto Sans CJK JP, 16 MB) is fetched, hashed, and decoded once for each page, not
+ * for each deck and each reopen. A face of one digest draws the same in every deck.
+ */
+const fontBytes = new Map<string, Uint8Array<ArrayBuffer>>();
+const digestOf = new WeakMap<Uint8Array, string>();
+const pageFaces = new Set<string>();
+/** The page family of each face id of the open session (`pptx-f<measurer>-<face>`). */
+let faceFamilies = new Map<string, string>();
 /** The type and SHA-256 of each image blob, by its URL (`markupOf`). */
 const blobDigests = new Map<string, Promise<string>>();
 
@@ -88,8 +110,45 @@ async function sha256Of(bytes: BufferSource): Promise<string> {
   return [...digest].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/** The SHA-256 of face or font bytes, computed once for each array. */
+async function digestOfBytes(bytes: Uint8Array): Promise<string> {
+  let digest = digestOf.get(bytes);
+  if (!digest) {
+    digest = await sha256Of(bytes.slice());
+    digestOf.set(bytes, digest);
+  }
+  return digest;
+}
+
 async function received(bytes: Uint8Array<ArrayBuffer>): Promise<ReceivedFile> {
-  return { bytes: bytes.length, sha256: await sha256Of(bytes) };
+  return { bytes: bytes.length, sha256: await digestOfBytes(bytes) };
+}
+
+/** The bytes of a font file: the ones this page already holds with its digest, or a fetch. */
+async function fontFile(file: FontFile, what: string): Promise<Uint8Array<ArrayBuffer>> {
+  const held = file.sha256 ? fontBytes.get(file.sha256) : undefined;
+  if (held) return held;
+  const bytes = await fetchBytes(file.url, what);
+  fontBytes.set(await digestOfBytes(bytes), bytes);
+  return bytes;
+}
+
+/**
+ * Give each face of `list` its page family, and register (with the engine's
+ * `registerFontFaces`, under that family) each face whose bytes the page has not registered yet.
+ */
+async function registerFaces(list: readonly RegisteredFace[]): Promise<Map<string, string>> {
+  const families = new Map<string, string>();
+  const fresh: RegisteredFace[] = [];
+  for (const f of list) {
+    const digest = await digestOfBytes(f.bytes);
+    families.set(f.id, `pptx-h-${digest}`);
+    if (pageFaces.has(digest)) continue;
+    pageFaces.add(digest);
+    fresh.push(f);
+  }
+  await registerFontFaces(document, fresh, { family: (f) => families.get(f.id)! }).ready;
+  return families;
 }
 
 /**
@@ -118,7 +177,8 @@ async function markupOf(svg: SVGSVGElement): Promise<string> {
   }
   let markup = new XMLSerializer()
     .serializeToString(svg)
-    .replace(/pptx-f\d+-\d+/g, (id) => `face:${faceDigests.get(id) ?? id}`);
+    .replace(/pptx-h-([0-9a-f]{64})/g, (_, digest: string) => `face:${digest}`)
+    .replace(/pptx-f\d+-\d+/g, (id) => `face:${id}`);
   for (const [url, digest] of digests) markup = markup.split(url).join(`image:${digest}`);
   return markup;
 }
@@ -138,14 +198,15 @@ function paintAt(layout: Layout, idPrefix: string): SVGSVGElement {
     imageSize: session!.imageSize,
     idPrefix,
   });
-  if (fallbackFamilies)
-    for (const el of svg.querySelectorAll('[font-family]')) {
-      const family = el.getAttribute('font-family') ?? '';
-      el.setAttribute(
-        'font-family',
-        family.replace(/(^|,\s*)sans-serif$/, `$1${fallbackFamilies}`)
-      );
-    }
+  // Each face id of the session names the page's face of the same bytes (`registerFaces`).
+  for (const el of svg.querySelectorAll('[font-family]')) {
+    let family = (el.getAttribute('font-family') ?? '').replace(
+      /pptx-f\d+-\d+/g,
+      (id) => faceFamilies.get(id) ?? id
+    );
+    if (fallbackFamilies) family = family.replace(/(^|,\s*)sans-serif$/, `$1${fallbackFamilies}`);
+    el.setAttribute('font-family', family);
+  }
   svg.setAttribute('width', `${layout.slide.width / EMU_PER_PT}pt`);
   svg.setAttribute('height', `${layout.slide.height / EMU_PER_PT}pt`);
   return svg;
@@ -182,15 +243,8 @@ function collectFonts(items: readonly LayoutItem[], out: Set<string>): void {
 
 async function adopt(next: DocumentSession): Promise<void> {
   session?.dispose();
-  faces?.dispose();
   session = next;
-  faces = registerFontFaces(document, session.faces);
-  faceDigests = new Map(
-    await Promise.all(
-      session.faces.map(async (f) => [f.id, await sha256Of(f.bytes.slice())] as const)
-    )
-  );
-  await faces.ready;
+  faceFamilies = await registerFaces(session.faces);
 }
 
 const api: HarnessApi = {
@@ -198,28 +252,33 @@ const api: HarnessApi = {
     // No slide of the last deck may render, or reopen, with this deck's fonts, also when a
     // fetch below fails.
     session?.dispose();
-    faces?.dispose();
     session = null;
-    faces = null;
     fonts = [];
-    faceDigests = new Map();
+    faceFamilies = new Map();
     blobDigests.clear();
-    for (const face of fallbackFaces) document.fonts.delete(face);
-    fallbackFaces = [];
-    fallbackFamilies = '';
-    for (const [i, url] of (source.fallback ?? []).entries()) {
-      const face = new FontFace(
-        `pptx-harness-fallback-${i}`,
-        await fetchBytes(url, 'a fallback font')
-      );
-      document.fonts.add(await face.load());
-      fallbackFaces.push(face);
+    // The same fallback files keep their faces; another list replaces them.
+    const fallback = source.fallback ?? [];
+    const key = fallback.map((f) => f.sha256 ?? f.url).join('\u0000');
+    if (key !== fallbackKey || fallback.some((f) => !f.sha256)) {
+      for (const face of fallbackFaces) document.fonts.delete(face);
+      fallbackFaces = [];
+      fallbackFamilies = '';
+      fallbackKey = '';
+      for (const [i, file] of fallback.entries()) {
+        const face = new FontFace(
+          `pptx-harness-fallback-${i}`,
+          await fontFile(file, 'a fallback font')
+        );
+        document.fonts.add(await face.load());
+        fallbackFaces.push(face);
+      }
+      fallbackFamilies = fallbackFaces.map((f) => f.family).join(', ');
+      fallbackKey = key;
     }
-    fallbackFamilies = fallbackFaces.map((f) => f.family).join(', ');
     const deck = await fetchBytes(source.deck, 'the deck');
     const got = { deck: await received(deck), fonts: [] as (ReceivedFile & { family: string })[] };
     for (const f of source.fonts) {
-      const bytes = await fetchBytes(f.url, `the font ${f.family}`);
+      const bytes = await fontFile(f, `the font ${f.family}`);
       got.fonts.push({ family: f.family, ...(await received(bytes)) });
       fonts.push({ family: f.family, bold: f.bold, italic: f.italic, bytes, origin: 'local' });
     }

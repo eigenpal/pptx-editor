@@ -30,6 +30,7 @@ import {
 } from '../package/package.ts';
 import { carryFileTimings } from '../package/timing.ts';
 import { isDeferredPending } from '../package/deferred-parts.ts';
+import { DerivedParts } from '../package/parts-map.ts';
 import { applyOps, type OpRejection, type PptxOp } from './ops.ts';
 import type { HistoryGroup, TransactOrigin } from './history-group.ts';
 import { introducedViolation } from './part-checks.ts';
@@ -297,7 +298,7 @@ export class PptxDocumentStore {
     if (parts.length === 0 && removed.length === 0) return { ok: true, revision: this.#revision };
     if (this.#blocked !== null)
       return { ok: false, rejection: { code: 'unsupported', detail: this.#blocked } };
-    const next = new Map(this.#pkg.parts);
+    const next = DerivedParts.from(this.#pkg.parts);
     for (const part of parts) {
       const name = normalizePartName(part.partName);
       if (!name.ok || name.partName !== part.partName)
@@ -323,7 +324,7 @@ export class PptxDocumentStore {
     if (this.#blocked !== null)
       return { ok: false, rejection: { code: 'unsupported', detail: this.#blocked } };
     const before = this.#pkg;
-    const after: PptxPackage = { parts: next };
+    const after: PptxPackage = { parts: next.seal() };
     const changed = changedParts(before, after);
     this.#clearForRemote();
     return this.#publish(after, 'remote', changed, options.label);
@@ -418,16 +419,16 @@ export class PptxDocumentStore {
    * Restored parts get the highest counter their part ever reached.
    */
   #withIdFloor(pkg: PptxPackage, parts: readonly string[]): PptxPackage {
-    let out: Map<string, PackagePart> | null = null;
+    let out: DerivedParts | null = null;
     for (const name of parts) {
       const part = pkg.parts.get(name);
       if (!part || part.kind !== 'xml' || isDeferredPending(part)) continue;
       const floor = this.#highWater.get(name) ?? 0;
       if (part.xml.nextId >= floor) continue;
-      out ??= new Map(pkg.parts);
+      out ??= DerivedParts.from(pkg.parts);
       out.set(name, { ...part, xml: { ...part.xml, nextId: floor } });
     }
-    return out ? { parts: out } : pkg;
+    return out ? { parts: out.seal() } : pkg;
   }
 
   #recordIds(pkg: PptxPackage, parts: readonly string[]): void {

@@ -263,13 +263,54 @@ describe.skipIf(!hasChromium)('openDeck', () => {
       });
       expect(second.received.fonts).toEqual([]);
       expect(rendered.markup.length).toBeGreaterThan(0);
-      // The deck, three fonts, and the two fallback faces; then the deck and the fallback faces.
-      expect(after.files).toBe(9);
+      // The deck, three fonts, and the two fallback faces; then the deck alone: the page keeps
+      // the fallback faces it loaded.
+      expect(after.files).toBe(7);
       expect(new Set(after.statuses)).toEqual(new Set([404]));
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   }, 120_000);
+
+  test('a later deck with the same fonts fetches only the deck, and loads no face again', async () => {
+    const fixtureFonts = join(import.meta.dir, '../../fixtures/fonts');
+    const fonts = [
+      {
+        family: 'Noto Sans Arabic',
+        bold: false,
+        italic: false,
+        file: join(fixtureFonts, 'NotoSansArabic-Regular.ttf'),
+      },
+    ];
+    const deck = join(import.meta.dir, '../../fixtures/text-runs.pptx');
+    const [first, again, fetched, faces] = await withHarnessPage(async (page) => {
+      const urls: string[] = [];
+      page.on('request', (r) => {
+        if (r.url().includes('/__harness/file/')) urls.push(r.url());
+      });
+      const count = () => page.evaluate(() => document.fonts.size);
+      const a = await openDeck(page, deck, fonts);
+      const markupA = (await renderSlide(page, 0)).markup;
+      const opened = urls.length;
+      const facesA = await count();
+      const b = await openDeck(page, deck, fonts);
+      const markupB = (await renderSlide(page, 0)).markup;
+      await reopenSaved(page);
+      return [
+        { ...a, markup: markupA },
+        { ...b, markup: markupB },
+        { opened, later: urls.length - opened },
+        { first: facesA, later: await count() },
+      ];
+    });
+    // The second deck: the deck file alone. Every face and font is the one the page holds.
+    expect(fetched.opened).toBe(4);
+    expect(fetched.later).toBe(1);
+    expect(faces.later).toBe(faces.first);
+    expect(again.received).toEqual(first.received);
+    expect(again.markup).toBe(first.markup);
+    expect(first.markup).toContain('face:');
+  }, 60_000);
 
   test('a face of a font collection reaches the page as that face alone', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'pptx-collection-'));

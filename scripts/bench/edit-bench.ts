@@ -20,7 +20,7 @@
 // Model: DOCX Editor's `scripts/bench/edit-bench.ts` (EigenPal, same owner).
 //
 // Usage:
-//   bun scripts/bench/edit-bench.ts [--sizes 10,60,200,800] [--runs 40] [--warmup 5] [--json]
+//   bun scripts/bench/edit-bench.ts [--sizes 10,60,200,800,5000] [--runs 40] [--warmup 5] [--json]
 
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { textDeck } from './text-deck.ts';
@@ -47,7 +47,7 @@ function parseArgs(argv: readonly string[]): Args {
     return i >= 0 ? argv[i + 1] : undefined;
   };
   return {
-    sizes: (value('--sizes') ?? '10,60,200,800').split(',').map(Number),
+    sizes: (value('--sizes') ?? '10,60,200,800,5000').split(',').map(Number),
     runs: Number(value('--runs') ?? 40),
     warmup: Number(value('--warmup') ?? 5),
     json: argv.includes('--json'),

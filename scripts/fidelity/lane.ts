@@ -38,8 +38,11 @@ try {
     for await (const line of stdinLines()) {
       const job = JSON.parse(line) as LaneJob;
       if (job.imagesDir) rmSync(job.imagesDir, { recursive: true, force: true });
-      // Each deck in a new browser context, so its scores do not depend on the decks before it.
-      if (started) page = await control.restart();
+      // A corpus deck gets the fonts that it names, so each one opens in a new browser context:
+      // its scores do not depend on the fonts of the decks before it. Every fixture deck gets
+      // the same fonts (`localFonts(undefined, 'fixtures')`), so the fixture decks of a lane
+      // share one page, which loads each font once (`harness.ts`) and scores as a new page does.
+      if (started && job.input.fontSet !== 'fixtures') page = await control.restart();
       started = true;
       const scored = await scoreSafely(page, control, job.input, {
         imagesDir: job.imagesDir,

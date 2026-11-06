@@ -21,6 +21,7 @@ import { CONTENT_TYPE, NS, REL } from './namespaces.ts';
 import { repairPresentationRoot } from './presentation-repair.ts';
 import { markFileTimings, repairTimingRoot } from './timing.ts';
 import { sha256FontBytes } from '@eigenpal/ooxml-core';
+import { DerivedParts } from './parts-map.ts';
 import {
   deferredXmlPart,
   holdsStandIn,
@@ -460,13 +461,25 @@ export function relTarget(pkg: PptxPackage, source: string, id: string): string 
 /**
  * The names of the parts that differ between two packages by object: added, removed, or
  * replaced. Null when more than `limit` differ. An edit replaces only the parts it changes, so
- * this is a short list after one edit, read in one pass over the part map. @internal
+ * this is a short list after one edit. Two maps derived from one root are compared by their
+ * recorded changes only; other maps in one pass over the part map. @internal
  */
 export function changedPartNames(
   prev: PptxPackage,
   next: PptxPackage,
   limit: number
 ): string[] | null {
+  // Two maps derived from one root (`parts-map.ts`) can differ only where they record changes.
+  const candidates = DerivedParts.candidates(prev.parts, next.parts);
+  if (candidates) {
+    const found: string[] = [];
+    for (const name of candidates) {
+      if (prev.parts.get(name) === next.parts.get(name)) continue;
+      found.push(name);
+      if (found.length > limit) return null;
+    }
+    return found;
+  }
   const out: string[] = [];
   let added = 0;
   for (const [name, part] of next.parts) {

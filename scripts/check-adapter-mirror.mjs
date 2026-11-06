@@ -28,6 +28,8 @@ export const VUE_ONLY = {
     'The draft state of the form dialogs as Vue refs; React keeps it in the dialog hooks of dialog-form.tsx.',
   'loading.ts': 'PptxEditorLoading; the React twin is Loading.tsx.',
   'menu-row.tsx': 'MenuRow and MenuSubmenu; React holds them in menu-rows.tsx.',
+  'rail-memo.ts':
+    'The rail item vnode cache with the v-memo mark; React uses the core cache in panes.tsx.',
   'ribbon.ts': 'PptxEditorRibbon and RibbonTab; the React twin is Ribbon.tsx.',
   'SidePanel.tsx': 'The side panel; React holds it in panes.tsx.',
   'status-bar.ts': 'PptxEditorStatusBar and its parts; the React twin is StatusBar.tsx.',

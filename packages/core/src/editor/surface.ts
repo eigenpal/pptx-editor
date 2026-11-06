@@ -112,6 +112,16 @@ export class SlideSurface {
   #zoomAnchor: { x: number; y: number } | null = null;
   #renderedZoom: number | null = null;
   #paintKey: unknown = null;
+  /**
+   * The slide size the fit zoom was last computed for. The fit reads computed styles and the
+   * host's size, which make the browser lay out the whole document. A render that keeps the
+   * slide size keeps the fit, so a keystroke reads no style. The ResizeObserver refits when the
+   * host's size changes, and when the surface's content box changes: a new zoom, or a new
+   * surface padding (`--doc-slide-padding`, a style sheet that loads late). At the fit zoom the
+   * surface fills the host, so a new padding changes its content box at once; zoomed in, the
+   * fit follows at the next zoom change.
+   */
+  #fitSlide = '';
   #gestures = 0;
   #pressed = false;
   /** The caret the view last followed (`#keepCaretInView`). */
@@ -182,6 +192,7 @@ export class SlideSurface {
     host.addEventListener('wheel', this.#onWheel, { passive: false });
     this.#resize = new ResizeObserver(() => this.#reportFit());
     this.#resize.observe(host);
+    this.#resize.observe(this.root);
   }
 
   destroy(): void {
@@ -207,6 +218,7 @@ export class SlideSurface {
   #reportFit(): void {
     const layout = this.editor.layout();
     if (!layout) return;
+    this.#fitSlide = `${layout.slide.width}x${layout.slide.height}`;
     this.editor.fitChanged(fitZoom(this.host, this.root, layout.slide));
   }
 
@@ -283,7 +295,7 @@ export class SlideSurface {
     }
     this.#overlay.setAttribute('viewBox', `0 0 ${layout.slide.width} ${layout.slide.height}`);
     this.#renderOverlay(this.#drag.overlayLayout(layout), zoom);
-    this.#reportFit();
+    if (this.#fitSlide !== `${layout.slide.width}x${layout.slide.height}`) this.#reportFit();
   }
 
   #renderOverlay(layout: SlideLayout, zoom: number): void {

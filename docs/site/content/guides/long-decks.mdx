@@ -47,6 +47,18 @@ A slide or a notes slide whose XML is damaged refuses the deck when it is read, 
 
 A save or an export before the damage is read opens the rest of the deck first, and finds the damage too. A damaged slide that you delete before it opens does not refuse the deck, unless an undo brings it back.
 
+## Typing in a long deck
+
+A keystroke costs about the same in a deck of 5,000 slides as in a deck of 50.
+
+- An edit keeps every part that it does not change, and records only its changes. It copies no list of all the parts of the deck.
+- The slide summaries, the font list, and the font notice update from the parts that the edit changed.
+- The slide rail renders again only the items whose slide changed. The other items keep their elements and their names.
+- A thumbnail out of view in the rail takes no layout or paint (`content-visibility: auto`). The rail can paint thumbnails in idle time without delaying the next key.
+- The canvas reads its fit zoom again only when the slide size or the canvas size changes.
+
+`bun run bench:edit` and `bun run bench:open:browser` measure these costs on synthetic decks of up to 5,000 slides.
+
 ## Collaboration and fonts
 
 - An editor with a collaboration module opens the whole deck before its first slide shows, because the room needs every slide.

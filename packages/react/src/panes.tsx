@@ -17,6 +17,7 @@ import {
   type FocusEvent,
   type KeyboardEvent,
   type MouseEvent,
+  type ReactElement,
   type ReactNode,
   type RefObject,
 } from 'react';
@@ -41,6 +42,8 @@ import {
   sectionOfSlide,
   slideClickMode,
   slideItemName,
+  slideItemLabels,
+  createItemMemo,
   slideMenuPoint,
   stepCommand,
   zoomStep,
@@ -408,6 +411,7 @@ export function SlideRail(props: SlideRailProps = {}) {
     });
   // The items' handlers read the latest render, so the object stays the same and a memoized
   // item does not render again for a new closure.
+  const [memoItem] = useState(() => createItemMemo<ReactElement>());
   const latest = useRef({ editor, dragProps, openMenu });
   useLayoutEffect(() => {
     latest.current = { editor, dragProps, openMenu };
@@ -432,26 +436,37 @@ export function SlideRail(props: SlideRailProps = {}) {
     }),
     []
   );
-  /** One slide of the rail. */
+  /**
+   * One slide of the rail. The element is reused while its slide summary and its inputs are
+   * the same (core's `createItemMemo`), so a keystroke in a long deck makes one new element,
+   * translates no other name, and React skips the other items at once.
+   */
   const itemLimit = inView ? inView.limit : mounted;
+  const isSelected = new Set(selected);
+  const labels = slideItemLabels(t);
   const item = (s: SlideSummary) => {
     const place = railItemPosition(s.index, count, itemLimit, grouped);
-    return (
+    const role = grouped ? 'treeitem' : 'option';
+    const chosen = isSelected.has(s.index);
+    const here = s.index === current;
+    const drop = dropMarker(s.index);
+    const inputs = [place?.setSize, place?.posInSet, ratio, chosen, here, role, t, labels];
+    return memoItem(s, [...inputs, drop, readOnly, on], () => (
       <RailItem
         key={s.id}
         setSize={place?.setSize}
         posInSet={place?.posInSet}
         slide={s}
         ratio={ratio}
-        selected={selected.includes(s.index)}
-        current={s.index === current}
-        role={grouped ? 'treeitem' : 'option'}
+        selected={chosen}
+        current={here}
+        role={role}
         name={slideItemName(t, s)}
-        drop={dropMarker(s.index)}
+        drop={drop}
         draggable={!readOnly}
         on={on}
       />
-    );
+    ));
   };
   const railActions: RailActions = {
     t,

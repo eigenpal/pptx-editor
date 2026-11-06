@@ -975,6 +975,9 @@ export function createHyperlinkPopupController(editor: Editor, clipboard?: () =>
 export function createHyperlinkPopupStore(): HyperlinkPopupStore;
 
 // @internal
+export function createItemMemo<V>(): (key: object, inputs: readonly unknown[], make: () => V) => V;
+
+// @internal
 export function createNotesFindPainter(): {
     paint(editor: PptxEditorInstance | null, root: HTMLElement | null, paragraphs: readonly NotesParagraph[], drafting?: boolean): boolean;
     stop(): void;
@@ -4571,6 +4574,9 @@ export interface SlideImageOptions {
     readonly frameLabel?: (kind: string) => string;
     readonly width?: number;
 }
+
+// @internal
+export function slideItemLabels(t: Translate): string;
 
 // @internal
 export function slideItemName(t: Translate, slide: {

@@ -5,6 +5,7 @@
 // The keys, the drag, and the focus moves come from core (`pane-support.ts`).
 
 import { chromeTranslateProp, useChromeTranslateScope } from './headless-hooks.ts';
+import { createRailItemMemo } from './rail-memo.ts';
 import {
   computed,
   defineComponent,
@@ -43,6 +44,7 @@ import {
   sectionOfSlide,
   slideClickMode,
   slideItemName,
+  slideItemLabels,
   slideMenuPoint,
   slideStep,
   stepCommand,
@@ -505,27 +507,40 @@ const SlideRailRoot = defineComponent({
       dragEnd: (index) => drag.itemProps(index).onDragend(),
       drop: (index, e) => drag.itemProps(index).onDrop(e),
     };
-    /** One slide of the rail. */
     /** The item limit of the render in progress, for `railItemPosition`. */
     let itemLimit = Number.POSITIVE_INFINITY;
+    /** The selection and the item labels of the render in progress. */
+    let isSelected = new Set<number>();
+    let labels = '';
+    const memoItem = createRailItemMemo();
+    /**
+     * One slide of the rail. The vnode is reused while its slide summary and its inputs are the
+     * same (core's `createItemMemo`, as `v-memo`), so a keystroke in a long deck makes one new
+     * vnode, translates no other name, and Vue skips the other items at once.
+     */
     const item = (s: SlideSummary) => {
       const place = railItemPosition(s.index, count(), itemLimit, grouped.value);
-      return (
+      const role = grouped.value ? 'treeitem' : 'option';
+      const chosen = isSelected.has(s.index);
+      const here = s.index === current.value;
+      const drop = drag.marker(s.index);
+      const inputs = [place?.setSize, place?.posInSet, ratio.value, chosen, here, role, props.t];
+      return memoItem(s, [...inputs, labels, drop, readOnly.value], () => (
         <RailItem
           key={s.id}
           setSize={place?.setSize}
           posInSet={place?.posInSet}
           slide={s}
           ratio={ratio.value}
-          selected={selected.value.includes(s.index)}
-          current={s.index === current.value}
-          role={grouped.value ? 'treeitem' : 'option'}
+          selected={chosen}
+          current={here}
+          role={role}
           name={slideItemName(t, s)}
-          drop={drag.marker(s.index)}
+          drop={drop}
           draggable={!readOnly.value}
           on={on}
         />
-      );
+      ));
     };
     return () => {
       const toggle = props.toggle !== false;
@@ -562,6 +577,8 @@ const SlideRailRoot = defineComponent({
       // A grouped rail mounts whole sections, so no header shows with no slides under it.
       const inView = groups ? mountedSections(groups, mounted) : null;
       itemLimit = inView ? inView.limit : mounted;
+      isSelected = new Set(selected.value);
+      labels = slideItemLabels(t);
       return (
         <nav
           {...restAttrs(attrs)}
