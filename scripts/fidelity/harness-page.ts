@@ -5,12 +5,21 @@
 
 import { chromium, type Browser, type CDPSession, type Page } from '@playwright/test';
 import { createHash, randomUUID } from 'node:crypto';
-import { createReadStream, readFileSync, statSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  createReadStream,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { createServer, type Plugin } from 'vite';
 import { PNG } from 'pngjs';
 import { collectionFace, deckFontFamilies, localFonts, type LocalFont } from './local-fonts.ts';
-import { downsample, type Raster } from './supersample.ts';
+import { downsample, encodePng, type Raster } from './supersample.ts';
 import { THRESHOLDS } from './thresholds.ts';
 
 /** One laid-out text line, in points from the slide's top-left. */
@@ -42,12 +51,48 @@ export interface HarnessRender {
   diagnostics: readonly string[];
   /** The families that the slide's text asks for. */
   fonts: readonly string[];
+  /**
+   * The painted SVG, with image URLs and face ids replaced by the digests of their bytes, so two
+   * sessions that paint the same thing give the same markup (`slideMarkup`).
+   */
+  markup: string;
 }
 
 export interface HarnessServer {
   /** The server's address, for example `http://127.0.0.1:53712/`. */
   readonly url: string;
   close(): Promise<void>;
+}
+
+/**
+ * The folder of the harness servers' Vite caches, one folder for each server. One root for each
+ * user: in a shared temp folder, another user's folders cannot be removed.
+ */
+const VITE_CACHE_ROOT = join(tmpdir(), `pptx-harness-vite-${process.getuid?.() ?? 'user'}`);
+
+/**
+ * A new Vite cache folder for one harness server. Lanes that share the demo's folder write it at
+ * the same time and fail with ENOTEMPTY. Each folder starts with its process id, and the folders
+ * of processes that no longer run (a lane that was killed) are removed first.
+ */
+function viteCacheDir(): string {
+  mkdirSync(VITE_CACHE_ROOT, { recursive: true });
+  for (const entry of readdirSync(VITE_CACHE_ROOT)) {
+    const pid = Number(entry.split('-')[0]);
+    let running = false;
+    try {
+      running = Number.isInteger(pid) && pid > 0 && process.kill(pid, 0);
+    } catch (e) {
+      // EPERM: the process runs under another user.
+      running = (e as NodeJS.ErrnoException).code === 'EPERM';
+    }
+    try {
+      if (!running) rmSync(join(VITE_CACHE_ROOT, entry), { recursive: true, force: true });
+    } catch {
+      // A folder that cannot be removed only takes space.
+    }
+  }
+  return mkdtempSync(join(VITE_CACHE_ROOT, `${process.pid}-`));
 }
 
 /**
@@ -58,20 +103,32 @@ export interface HarnessServer {
  * edits during a run do not reload the page.
  */
 export async function startHarnessServer(): Promise<HarnessServer> {
+  const cacheDir = viteCacheDir();
   const server = await createServer({
     configFile: resolve('examples/vite/vite.config.ts'),
     root: resolve('examples/vite'),
     plugins: [harnessFiles()],
     server: { host: '127.0.0.1', port: 0, strictPort: true, hmr: false, watch: null },
+    // The harness page imports only ES modules, so the server discovers no dependencies. The
+    // React plugin still adds React, which the harness page never loads.
+    optimizeDeps: { noDiscovery: true, include: [] },
+    cacheDir,
     logLevel: 'error',
   });
+  const close = async (): Promise<void> => {
+    try {
+      await server.close();
+    } finally {
+      rmSync(cacheDir, { recursive: true, force: true });
+    }
+  };
   await server.listen();
   const url = server.resolvedUrls?.local[0];
   if (!url) {
-    await server.close();
+    await close();
     throw new Error('the harness server has no local address');
   }
-  return { url, close: () => server.close() };
+  return { url, close };
 }
 
 /** The path under which the harness server gives a file to its page (`openDeck`). */
@@ -460,13 +517,30 @@ export async function renderSlide(
       return filtered();
     },
     get png() {
-      return (png ??= scale === 1 ? shot : PNG.sync.write(filtered()));
+      return (png ??= scale === 1 ? shot : encodePng(filtered()));
     },
     lines: r.lines,
     diagnostics: r.diagnostics,
     fonts: r.fonts ?? [],
+    markup: r.markup,
   };
 }
+
+/**
+ * Paint one slide (0-based) of the open deck as `renderSlide` does, without the screenshot, and
+ * return its markup (`HarnessRender.markup`). The same markup in one page is the same pixels, so
+ * the save check takes a screenshot only when the markup differs.
+ */
+export async function slideMarkup(page: Page, index: number, widthPx: number): Promise<string> {
+  const r = await page.evaluate(
+    ([n, w]) => (window as any).__pptxHarness.render(n, w),
+    [index, widthPx]
+  );
+  return r.markup;
+}
+
+/** Screenshot the slide that the page shows now, at the device scale (PNG). */
+export const captureSlide = (page: Page): Promise<Buffer> => capture(page);
 
 /**
  * Decode an image file (JPEG, PNG) with Chromium's own decoder, at its natural size, without

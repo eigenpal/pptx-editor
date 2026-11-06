@@ -94,6 +94,58 @@ describe('scoreDeck', () => {
     expect(r.slides.every((s) => s.selfConsistent)).toBe(true);
   });
 
+  test('the save check screenshots only a slide whose markup changed after reopen', async () => {
+    // Every slide paints other markup after reopen, and its screenshot after reopen is black.
+    let reopened = false;
+    let shots = 0;
+    const dark = new PNG({ width: 4, height: 3 });
+    dark.data.fill(0);
+    for (let i = 3; i < dark.data.length; i += 4) dark.data[i] = 255;
+    const black = upscale(PNG.sync.write(dark), THRESHOLDS.rasterScale);
+    const page = {
+      ...fakePage(3),
+      async evaluate(fn: unknown) {
+        const code = String(fn);
+        if (code.includes('document.fonts.ready')) return undefined;
+        if (code.includes('.open('))
+          return { slides: 3, received: { deck: { bytes: 0, sha256: '' }, fonts: [] } };
+        if (code.includes('.reopenSaved(')) {
+          reopened = true;
+          return { slides: 3 };
+        }
+        if (code.includes('.render('))
+          return { lines: [], diagnostics: [], markup: reopened ? 'after' : 'before' };
+        throw new Error(`unexpected harness call: ${code}`);
+      },
+      locator: () => ({
+        boundingBox: async () => null,
+        screenshot: async () => {
+          shots += 1;
+          return reopened ? black : upscale(WHITE, THRESHOLDS.rasterScale);
+        },
+      }),
+    } as unknown as Page;
+    const r = await scoreDeck(page, { file: deck, name: 'd' });
+    // Each slide is captured again and compared by pixels.
+    expect(shots).toBe(6);
+    expect(r.slides.map((s) => s.selfConsistent)).toEqual([false, false, false]);
+
+    // The same markup after reopen: no second screenshot, and the slides are consistent.
+    reopened = false;
+    shots = 0;
+    const same = {
+      ...page,
+      async evaluate(fn: unknown) {
+        const code = String(fn);
+        if (code.includes('.render(')) return { lines: [], diagnostics: [], markup: 'same' };
+        return page.evaluate(fn as () => unknown);
+      },
+    } as unknown as Page;
+    const r2 = await scoreDeck(same, { file: deck, name: 'd' });
+    expect(shots).toBe(3);
+    expect(r2.slides.map((s) => s.selfConsistent)).toEqual([true, true, true]);
+  });
+
   test('a PDF that does not open is stale, with a fixed reason and never its path', async () => {
     const pdf = join(dir, 'secret client name.pdf');
     writeFileSync(pdf, 'not a PDF');

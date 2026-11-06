@@ -17,7 +17,7 @@ import {
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import { EMU_PER_POINT } from '../../packages/core/src/store/index.ts';
-import { downsample, type Raster } from './supersample.ts';
+import { downsample, encodePng, type Raster } from './supersample.ts';
 import { THRESHOLDS } from './thresholds.ts';
 
 /** The Poppler version (`pdftoppm -v`), or null when Poppler is not installed. */
@@ -134,6 +134,8 @@ export interface ReferencePage {
   readonly image: PNG;
   /** The page before the filter, at the raster scale. Decompressed at each call. */
   device(): Raster;
+  /** The page came from the raster cache (`rasterizePages`). */
+  readonly cached?: boolean;
 }
 
 const isSpace = (b: number | undefined): boolean =>
@@ -186,13 +188,19 @@ function unpack(p: Packed): Raster {
 }
 
 /** Change it when the cache layout, or the way a page is rasterized, changes. */
-const RASTER_CACHE_FORMAT = 1;
+const RASTER_CACHE_FORMAT = 2;
+
+/** The SHA-256 of `supersample.ts`: the entry keeps filtered pages, so a filter change must miss. */
+const FILTER_SOURCE = createHash('sha256')
+  .update(readFileSync(new URL('./supersample.ts', import.meta.url)))
+  .digest('hex');
 
 /**
- * The cache entry of a reference raster: the PDF's SHA-256, the Poppler version, and the exact
- * `pdftoppm` options. A change to any of them rasterizes the PDF again.
+ * The cache entry of a reference raster: the PDF's SHA-256, the Poppler version, the exact
+ * `pdftoppm` options, the raster scale, and the source of the filter (`FILTER_SOURCE`). A change
+ * to any of them rasterizes the PDF again.
  */
-export function rasterCacheKey(pdf: string, options: readonly string[]): string {
+export function rasterCacheKey(pdf: string, options: readonly string[], scale = 1): string {
   return createHash('sha256')
     .update(
       JSON.stringify({
@@ -200,25 +208,48 @@ export function rasterCacheKey(pdf: string, options: readonly string[]): string 
         pdf: createHash('sha256').update(readFileSync(pdf)).digest('hex'),
         poppler: popplerVersion(),
         options,
+        scale,
+        filter: FILTER_SOURCE,
       })
     )
     .digest('hex')
     .slice(0, 32);
 }
 
+/** One page of a cache entry: the device raster, packed, and the filtered page. */
+interface CachedPage {
+  readonly device: Packed;
+  readonly image: Raster;
+  /** The PNG bytes of `image`. */
+  readonly png: Uint8Array;
+}
+
+/** The files of page `n` (0-based) in a cache entry. */
+const pageFiles = (dir: string, n: number) => ({
+  device: join(dir, `page-${n + 1}.rgba.zst`),
+  image: join(dir, `page-${n + 1}.filtered.rgba.zst`),
+  png: join(dir, `page-${n + 1}.png`),
+});
+
 /** The pages of a cache entry, or undefined when it is missing, incomplete, or damaged. */
-function readCached(dir: string): Raster[] | undefined {
+function readCached(dir: string): CachedPage[] | undefined {
   try {
     const meta = JSON.parse(readFileSync(join(dir, 'meta.json'), 'utf8')) as {
-      pages: { width: number; height: number }[];
+      pages: { width: number; height: number; filtered: { width: number; height: number } }[];
     };
-    const pages = meta.pages.map((p, n) =>
-      unpack({
-        width: p.width,
-        height: p.height,
-        zst: new Uint8Array(readFileSync(join(dir, `page-${n + 1}.rgba.zst`))),
-      })
-    );
+    const pages = meta.pages.map((p, n): CachedPage => {
+      const files = pageFiles(dir, n);
+      return {
+        device: {
+          width: p.width,
+          height: p.height,
+          zst: new Uint8Array(readFileSync(files.device)),
+        },
+        // Unpacked here, so a damaged entry is a miss, never a failed reference.
+        image: unpack({ ...p.filtered, zst: new Uint8Array(readFileSync(files.image)) }),
+        png: new Uint8Array(readFileSync(files.png)),
+      };
+    });
     // A used entry survives `pruneRasterCache`.
     const now = new Date();
     utimesSync(join(dir, 'meta.json'), now, now);
@@ -228,19 +259,42 @@ function readCached(dir: string): Raster[] | undefined {
   }
 }
 
-/** Write a cache entry. `meta.json` comes last, through a rename, so a reader sees it whole. */
-function writeCached(dir: string, pages: readonly Packed[]): void {
+/**
+ * Write a cache entry: into a folder of its own, renamed into place whole, so a run that shares
+ * the cache never reads a page that another run is still writing. The last writer replaces the
+ * entry; a reader reads every file of an entry in one step (`readCached`), so it gets one whole
+ * entry or a miss.
+ */
+function writeCached(
+  dir: string,
+  pages: readonly { device: Packed; image: Packed; png: Buffer }[]
+): void {
+  const tmp = `${dir}.tmp-${process.pid}`;
   try {
-    mkdirSync(dir, { recursive: true });
-    pages.forEach((p, n) => writeFileSync(join(dir, `page-${n + 1}.rgba.zst`), p.zst));
-    const meta = join(dir, `meta.json.${process.pid}`);
+    rmSync(tmp, { recursive: true, force: true });
+    mkdirSync(tmp, { recursive: true });
+    pages.forEach((p, n) => {
+      const files = pageFiles(tmp, n);
+      writeFileSync(files.device, p.device.zst);
+      writeFileSync(files.image, p.image.zst);
+      writeFileSync(files.png, p.png);
+    });
     writeFileSync(
-      meta,
-      JSON.stringify({ pages: pages.map((p) => ({ width: p.width, height: p.height })) })
+      join(tmp, 'meta.json'),
+      JSON.stringify({
+        pages: pages.map((p) => ({
+          width: p.device.width,
+          height: p.device.height,
+          filtered: { width: p.image.width, height: p.image.height },
+        })),
+      })
     );
-    renameSync(meta, join(dir, 'meta.json'));
+    // An older, damaged entry (a miss in `readCached`) is replaced.
+    rmSync(dir, { recursive: true, force: true });
+    renameSync(tmp, dir);
   } catch {
     // A cache that cannot be written only costs time.
+    rmSync(tmp, { recursive: true, force: true });
   }
 }
 
@@ -267,12 +321,20 @@ export function pruneRasterCache(cacheDir: string, since: number): void {
   }
 }
 
+/** A pngjs image over raw pixels, for the callers that take pngjs images. */
+function asPng(r: Raster): PNG {
+  const png = new PNG({ width: r.width, height: r.height });
+  png.data.set(r.data);
+  return png;
+}
+
 /**
  * Rasterize the slide area of every page at `scale` times `widthPx` wide (`rasterOptions`), and
  * box-filter each page down to `widthPx` wide (`supersample.ts`) into `outDir` as a PNG. Returns
  * the pages in order. `pdftoppm` writes PPM, the same pixels as its PNG without the encoding.
- * With `cacheDir`, the device rasters are kept there, compressed, under `rasterCacheKey`, and a
- * later run reads them instead of running `pdftoppm`.
+ * With `cacheDir`, each page is kept there under `rasterCacheKey`: the device raster and the
+ * filtered page, compressed, and the filtered page's PNG. A later run reads them, and does not
+ * run `pdftoppm`, filter, or encode again.
  */
 export function rasterizePages(
   pdf: string,
@@ -285,35 +347,47 @@ export function rasterizePages(
 ): ReferencePage[] {
   mkdirSync(outDir, { recursive: true });
   const options = rasterOptions(slide, widthPx, scale);
-  const entry = cacheDir ? join(cacheDir, rasterCacheKey(pdf, options)) : undefined;
-  let rasters = entry ? readCached(entry) : undefined;
-  if (!rasters) {
-    const tmp = join(outDir, 'ppm');
+  const entry =
+    cacheDir && scale > 1 ? join(cacheDir, rasterCacheKey(pdf, options, scale)) : undefined;
+  const cached = entry ? readCached(entry) : undefined;
+  if (cached)
+    return cached.map((page, n) => {
+      const path = join(outDir, `page-${n + 1}.png`);
+      writeFileSync(path, page.png);
+      return { path, image: asPng(page.image), device: () => unpack(page.device), cached: true };
+    });
+  const tmp = join(outDir, 'ppm');
+  rmSync(tmp, { recursive: true, force: true });
+  mkdirSync(tmp, { recursive: true });
+  let rasters: Raster[];
+  try {
+    execFileSync('pdftoppm', [...options, pdf, join(tmp, 'page')], {
+      ...POPPLER,
+      timeout: timeoutMs,
+    });
+    rasters = readdirSync(tmp)
+      .filter((f) => /^page-\d+\.ppm$/.test(f))
+      .sort((a, b) => Number(/\d+/.exec(a)![0]) - Number(/\d+/.exec(b)![0]))
+      .map((f) => readPpm(readFileSync(join(tmp, f))));
+  } finally {
     rmSync(tmp, { recursive: true, force: true });
-    mkdirSync(tmp, { recursive: true });
-    try {
-      execFileSync('pdftoppm', [...options, pdf, join(tmp, 'page')], {
-        ...POPPLER,
-        timeout: timeoutMs,
-      });
-      rasters = readdirSync(tmp)
-        .filter((f) => /^page-\d+\.ppm$/.test(f))
-        .sort((a, b) => Number(/\d+/.exec(a)![0]) - Number(/\d+/.exec(b)![0]))
-        .map((f) => readPpm(readFileSync(join(tmp, f))));
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-    }
-    if (entry && scale > 1) writeCached(entry, rasters.map(pack));
   }
-  return rasters.map((device, n) => {
+  const pages = rasters.map((device, n) => {
     const image = downsample(device, scale);
+    const png = encodePng(image);
     const path = join(outDir, `page-${n + 1}.png`);
-    writeFileSync(path, PNG.sync.write(image));
-    // At scale 1 the device raster is the image; above it, it stays packed until it is needed.
-    if (scale === 1) return { path, image, device: () => image };
-    const packed = pack(device);
-    return { path, image, device: () => unpack(packed) };
+    writeFileSync(path, png);
+    return { device, image, png, path };
   });
+  // At scale 1 the device raster is the image; above it, it stays packed until it is needed.
+  if (scale === 1) return pages.map(({ path, image }) => ({ path, image, device: () => image }));
+  const packed = pages.map((p) => ({ device: pack(p.device), image: pack(p.image), png: p.png }));
+  if (entry) writeCached(entry, packed);
+  return pages.map(({ path, image }, n) => ({
+    path,
+    image,
+    device: () => unpack(packed[n].device),
+  }));
 }
 
 /** `rasterizePages` without a cache: the paths of the filtered pages, in page order. */

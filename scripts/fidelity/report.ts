@@ -210,6 +210,8 @@ export interface DeckResult {
   /** Why the deck has no usable reference. */
   referenceIssues?: readonly string[];
   milliseconds?: number;
+  /** The reference rasters came from the raster cache. */
+  referenceCached?: boolean;
   slides: SlideResult[];
 }
 
@@ -311,7 +313,7 @@ export function writeReport(
             (otherCauses(s) ? `<p class="cause">Probable cause: ${esc(otherCauses(s))}</p>` : '') +
             list('Approximations', approximationTitles(s.diagnostics)) +
             list('Diagnostics', otherDiagnostics(s.diagnostics)) +
-            `<div class="imgs">${img(s.referenceImage, 'Reference')}${img(s.render, 'PPTX Editor')}${img(s.diff, 'Diff')}</div></article>`
+            `<div class="imgs">${img(s.referenceImage, 'Reference')}${img(s.render, 'PPTX Editor')}${s.diff || s.pixelMismatch === undefined ? img(s.diff, 'Diff') : '<figure class="empty"><div>no differing pixels</div><figcaption>Diff</figcaption></figure>'}</div></article>`
           );
         })
         .join('');

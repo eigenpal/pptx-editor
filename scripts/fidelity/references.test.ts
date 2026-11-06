@@ -431,8 +431,17 @@ describe.skipIf(!hasPoppler())('the reference raster cache', () => {
       // The same PNG file as without a cache.
       const plain = rasterize(file, join(dir, 'c'), A4, 480, undefined, 4);
       expect(readFileSync(cached[0].path).equals(readFileSync(plain[0]))).toBe(true);
-      // An entry that no run used since a time is removed; a used one stays.
+      // A damaged entry is a miss: the PDF is rasterized again, and the entry is replaced whole.
       const [entry] = readdirSync(cache);
+      writeFileSync(join(cache, entry, 'page-1.filtered.rgba.zst'), 'damaged');
+      const again = rasterizePages(file, join(dir, 'd'), A4, 480, undefined, 4, cache);
+      expect(Buffer.from(again[0].image.data).equals(Buffer.from(fresh[0].image.data))).toBe(true);
+      expect(readdirSync(cache)).toEqual([entry]);
+      const repaired = rasterizePages(file, join(dir, 'e'), A4, 480, undefined, 4, cache);
+      expect(Buffer.from(repaired[0].image.data).equals(Buffer.from(fresh[0].image.data))).toBe(
+        true
+      );
+      // An entry that no run used since a time is removed; a used one stays.
       utimesSync(join(cache, entry, 'meta.json'), new Date(1000), new Date(1000));
       pruneRasterCache(cache, Date.now() - 60_000);
       expect(readdirSync(cache)).toHaveLength(0);
