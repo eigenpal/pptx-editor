@@ -35,7 +35,7 @@ const bytes = shallowRef<Uint8Array | undefined>();
 const title = shallowRef<string>(EXAMPLES[initial].title);
 const mode = shallowRef<'edit' | 'view'>('edit');
 const theme = shallowRef<'light' | 'dark'>(initialTheme(location.search));
-// A theme picked here is kept; until then the demo follows the system color scheme.
+// A theme picked here is kept; until then the demo starts light.
 watch(theme, rememberTheme);
 
 const editor = shallowRef<PptxEditorInstance | null>(null);
