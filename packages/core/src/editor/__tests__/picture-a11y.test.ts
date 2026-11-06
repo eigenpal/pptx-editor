@@ -8,6 +8,8 @@ import { GlobalWindow } from 'happy-dom';
 import { createTranslator, isTranslationKey } from '@pptx-editor.dev/i18n';
 import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { createPptxEditor, paintSlideshowSlide, type PptxEditorInstance } from '../index.ts';
+import { nonVisualOf } from '../picture-commands.ts';
+import { nodeIndex, xmlPartOf, type Element as XmlElement } from '../../store/index.ts';
 
 const IN = 914_400;
 const R_IMAGE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
@@ -38,7 +40,8 @@ function deck(): Uint8Array {
           pic(3, 'Ornament', 3 * IN, ' descr="Swirl"', DECORATIVE) +
           pic(4, 'Photo', 5 * IN) +
           shape({ id: 5, name: 'Box', x: 7 * IN, y: IN, cx: IN, cy: IN, text: para(run('Trip')) }) +
-          pic(6, 'Picture 6', 9 * IN, ' descr="A bar chart"'),
+          pic(6, 'Picture 6', 9 * IN, ' descr="A bar chart"') +
+          shape({ id: 7, name: 'Shapely', x: 11 * IN, y: IN, cx: IN, cy: IN }),
       },
     ],
     media: [
@@ -114,6 +117,9 @@ describe('pictures for assistive technology', () => {
     tab();
     // A name that starts with the kind says the kind once.
     expect(said()).toBe('Picture 6, A bar chart, selected');
+    tab();
+    // The kind is a whole word: "Shapely" does not start with the kind "Shape".
+    expect(said()).toBe('Shape Shapely, selected');
     e.destroy();
   });
 
@@ -131,6 +137,40 @@ describe('pictures for assistive technology', () => {
     expect(e.exec({ type: 'setAltText', decorative: true }).ok).toBe(true);
     expect(picture(host, e, 'Photo').getAttribute('aria-hidden')).toBe('true');
     expect(root.querySelector('[aria-live]')?.textContent).toBe('Picture Photo, selected');
+    e.destroy();
+  });
+
+  test('undo, redo, and a remote edit re-derive the name and the announcement', async () => {
+    const { e, host, root, tab } = await attached();
+    const said = () => root.querySelector('[aria-live]')?.textContent;
+    tab();
+    tab();
+    tab();
+    expect(e.exec({ type: 'setAltText', description: 'A portrait' }).ok).toBe(true);
+    expect(e.exec({ type: 'undo' }).ok).toBe(true);
+    expect(picture(host, e, 'Photo').getAttribute('aria-hidden')).toBe('true');
+    expect(said()).toBe('Picture Photo, selected');
+    expect(e.exec({ type: 'redo' }).ok).toBe(true);
+    expect(picture(host, e, 'Photo').getAttribute('aria-label')).toBe('A portrait');
+    // A peer's edit arrives as a remote transaction: the paint derives the ARIA again.
+    const item = e.session!.layout(0)!.items.find((i) => i.element.name === 'Landscape')!;
+    const part = item.element.partName;
+    const pic = nodeIndex(xmlPartOf(e.session!.store.package, part)!).get(item.element.nodeId)!;
+    const cNvPr = nonVisualOf(pic.node as XmlElement)!;
+    const r = e.session!.store.transact(
+      [
+        {
+          op: 'setAttribute',
+          part,
+          node: cNvPr.id,
+          name: { ns: '', local: 'descr' },
+          value: 'A storm over a lake',
+        },
+      ],
+      { origin: 'remote' }
+    );
+    expect(r.ok).toBe(true);
+    expect(picture(host, e, 'Landscape').getAttribute('aria-label')).toBe('A storm over a lake');
     e.destroy();
   });
 

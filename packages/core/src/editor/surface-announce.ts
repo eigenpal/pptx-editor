@@ -22,6 +22,15 @@ function kindKey(item: LayoutItem): string {
 }
 
 /**
+ * Whether a name starts with the kind as a whole word ("Picture 3", "Table 1"), so the kind is
+ * said once. "Tablet photo" does not start with the word "Table".
+ */
+function startsWithWord(name: string, kind: string): boolean {
+  if (!kind || !name.toLocaleLowerCase().startsWith(kind.toLocaleLowerCase())) return false;
+  return !/^\p{L}/u.test(name.slice(kind.length));
+}
+
+/**
  * The live region text for a selection, or an empty string. A shape is said as its kind, its
  * name, and its description, unless it is decorative or has none. Spaces collapse, so an empty
  * kind leaves no gap.
@@ -47,11 +56,7 @@ export function selectionAnnouncement(layout: SlideLayout, host: AnnouncementHos
   const description = alt && !alt.decorative ? alt.description.trim() : '';
   const name = item.element.name;
   const kind = label(kindKey(item));
-  // A name that starts with the kind ("Picture 3", "Table 1") says the kind once.
-  const params = {
-    kind: name.toLocaleLowerCase().startsWith(kind.toLocaleLowerCase()) ? '' : kind,
-    name,
-  };
+  const params = { kind: startsWithWord(name, kind) ? '' : kind, name };
   const said = description
     ? label('canvas.shapeSelectedWithAltText', { ...params, description })
     : label('canvas.shapeSelected', params);
