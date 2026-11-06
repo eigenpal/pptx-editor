@@ -11,6 +11,7 @@ import type {
   EditorCommand,
   EditorExecOptions,
   EditorSnapshot,
+  LoadOptions,
 } from '../contracts/index.ts';
 import { EMPTY_EDITOR_SNAPSHOT } from './adapter-support.ts';
 import type { PptxEditorInstance } from './pptx-editor.ts';
@@ -20,7 +21,7 @@ import type { PptxEditorInstance } from './pptx-editor.ts';
  * live instance and is safe to call before it mounts or after it unmounts. @internal
  */
 export interface EditorRefApi {
-  load(bytes: Uint8Array): Promise<CommandResult>;
+  load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
   save(): Uint8Array<ArrayBuffer> | null;
   getEditor(): PptxEditorInstance | null;
   focus(): void;
@@ -38,7 +39,7 @@ const NO_EDITOR: CommandResult = Object.freeze({ ok: false, reason: 'disabled.no
  */
 export function createEditorRefApi(getEditor: () => PptxEditorInstance | null): EditorRefApi {
   return {
-    load: (bytes) => getEditor()?.load(bytes) ?? Promise.resolve(NO_EDITOR),
+    load: (bytes, options) => getEditor()?.load(bytes, options) ?? Promise.resolve(NO_EDITOR),
     save: () => getEditor()?.save() ?? null,
     getEditor: () => getEditor(),
     focus: () => {

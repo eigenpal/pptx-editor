@@ -30,6 +30,8 @@ export interface UseSlideDragReturn {
   readonly itemProps: (index: number) => SlideDragItemProps;
   /** Drop a drag in progress. */
   readonly cancel: () => void;
+  /** The drop marker of slide `index`, without the handlers (a rail item reads it). */
+  readonly marker: (index: number) => SlideDragItemProps['data-drop'];
 }
 
 /**
@@ -72,5 +74,6 @@ export function useSlideDrag(
     cancel: () => {
       drag.value = null;
     },
+    marker: (index) => slideDropMarker(drag.value, index),
   };
 }

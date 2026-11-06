@@ -6,6 +6,7 @@ export * from './package/tree.ts';
 export * from './package/query.ts';
 export * from './package/package.ts';
 export * from './package/presentation.ts';
+export * from './package/deferred-parts.ts';
 export * from './package/table-grid.ts';
 export * from './package/table-marks.ts';
 export { animatedShapeIds, timingRemovals } from './package/timing.ts';

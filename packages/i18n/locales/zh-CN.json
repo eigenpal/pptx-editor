@@ -1287,6 +1287,7 @@
   "statusBar": {
     "ariaLabel": "状态栏",
     "slide": "幻灯片第 {current} 张，共 {total} 张",
+    "readOnlyDamaged": "有一张幻灯片已损坏。您可以查看此演示文稿，但无法保存更改。",
     "notes": "备注"
   }
 }

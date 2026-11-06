@@ -1287,6 +1287,7 @@
   "statusBar": {
     "ariaLabel": "ステータス バー",
     "slide": "スライド {current}/{total}",
+    "readOnlyDamaged": "スライドが破損しています。このプレゼンテーションは表示できますが、変更は保存できません。",
     "notes": "ノート"
   }
 }

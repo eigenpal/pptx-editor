@@ -1288,6 +1288,7 @@
   "statusBar": {
     "ariaLabel": "Status bar",
     "slide": "Slide {current} of {total}",
+    "readOnlyDamaged": "A slide is damaged. You can view this presentation, but you cannot save changes.",
     "notes": "Notes"
   }
 }

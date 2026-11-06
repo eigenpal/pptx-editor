@@ -131,6 +131,18 @@ export {
   showsLoading,
   type LoadingSheetSize,
 } from './loading.ts';
+export {
+  createProgressiveMount,
+  MOUNT_CHUNK_ITEMS,
+  MOUNT_FIRST_ITEMS,
+  MOUNT_FIRST_STEP_ITEMS,
+  MOUNT_FRAME_MS,
+  MOUNT_MIN_STEP_ITEMS,
+  mountedSections,
+  railItemPosition,
+  type MountedSections,
+  type ProgressiveMount,
+} from './progressive-mount.ts';
 export { STANDARD_COLORS, gradientCss, presetGradient, swatchName } from './palette.ts';
 export { focusEdge, handleMenuKey, panelItems } from './menu-keyboard.ts';
 export {

@@ -259,6 +259,24 @@ export const PptxEditorSlideSorter = defineComponent({
 });
 
 /**
+ * Says that the open deck is read-only (`EditorSnapshot.readOnlyReason`), as React's
+ * `ReadOnlyBadge`. Nothing when the deck can be edited. @internal
+ */
+export const ReadOnlyBadge = defineComponent({
+  name: 'ReadOnlyBadge',
+  setup() {
+    const { t } = useTranslation();
+    const damaged = useEditorState((s) => s.readOnlyReason === 'damaged-slide');
+    return () =>
+      damaged.value ? (
+        <span class="pptx-statusbar__read-only" role="status" data-reason="damaged-slide">
+          {t('statusBar.readOnlyDamaged')}
+        </span>
+      ) : null;
+  },
+});
+
+/**
  * Normal and Slide Sorter as two buttons, as in a status bar: the default editor's view switch,
  * a one-of-two choice (`radiogroup`). Hosts place the `view.presentationView` slot instead. The
  * twin of React's `ViewSwitch`. @internal
@@ -385,6 +403,7 @@ export const DefaultWorkspace = defineComponent({
           slots.status()
         ) : (
           <div class="pptx-statusbar">
+            <ReadOnlyBadge />
             <ViewSwitch />
             <PptxEditorZoomPill />
           </div>

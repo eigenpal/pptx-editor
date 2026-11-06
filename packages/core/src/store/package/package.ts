@@ -21,6 +21,13 @@ import { CONTENT_TYPE, NS, REL } from './namespaces.ts';
 import { repairPresentationRoot } from './presentation-repair.ts';
 import { markFileTimings, repairTimingRoot } from './timing.ts';
 import { sha256FontBytes } from '@eigenpal/ooxml-core';
+import {
+  deferredXmlPart,
+  holdsStandIn,
+  isDeferredPending,
+  type DeferredPartFinish,
+  type DeferredPartReject,
+} from './deferred-parts.ts';
 
 /** One part of the package. */
 export type PackagePart =
@@ -123,8 +130,44 @@ function decodeXml(bytes: Uint8Array): string {
   return text;
 }
 
+/**
+ * The archive caps of a presentation when a host configures none. A slide is at least two
+ * entries (its part and its relationships), and four with speaker notes, so the format-neutral
+ * cap of 10,000 entries refused a deck of 5,000 slides. This cap admits about 10,000 slides with
+ * notes. It stays below `ZIP_HARD_LIMITS`, and the byte and ratio caps do not change.
+ */
+export const PPTX_ZIP_LIMITS: ZipLimits = Object.freeze({
+  ...DEFAULT_ZIP_LIMITS,
+  maxEntries: 40_000,
+});
+
+/** How `readPptxDeferred` defers parts; see `deferred-parts.ts`. @internal */
+export interface DeferredReadOptions {
+  /**
+   * Whether to keep the slide or notes slide `partName` as its bytes, to parse on first read.
+   * Asked only for parts of those two content types; every other part parses as before.
+   */
+  readonly defer: (partName: string) => boolean;
+  /** Runs on a deferred part's tree once it parses. */
+  readonly finish?: DeferredPartFinish;
+  /** Hears, at once, a deferred part that does not parse, wherever it is read. */
+  readonly onReject?: DeferredPartReject;
+}
+
 /** Read a `.pptx` at the trust boundary. Never throws. */
-export function readPptx(bytes: Uint8Array, limits: ZipLimits = DEFAULT_ZIP_LIMITS): PackageResult {
+export function readPptx(bytes: Uint8Array, limits: ZipLimits = PPTX_ZIP_LIMITS): PackageResult {
+  return readPptxDeferred(bytes, limits);
+}
+
+/**
+ * `readPptx`, where the slides and notes slides that `deferred` names stay unparsed until
+ * first read (`deferred-parts.ts`), for a progressive open. @internal
+ */
+export function readPptxDeferred(
+  bytes: Uint8Array,
+  limits: ZipLimits,
+  deferred?: DeferredReadOptions
+): PackageResult {
   const zip = readZip(bytes, limits);
   if (!zip.ok) return { ok: false, error: { reason: 'zip', detail: zip.reason } };
   const ctBytes = zip.entries.get(CONTENT_TYPES_PART);
@@ -138,6 +181,22 @@ export function readPptx(bytes: Uint8Array, limits: ZipLimits = DEFAULT_ZIP_LIMI
     const role = partRole(partName, types);
     if (role === 'binary') {
       parts.set(partName, { kind: 'binary', partName, bytes: data });
+      continue;
+    }
+    const kind = deferred ? deferrableKind(partName, types) : undefined;
+    if (kind && deferred!.defer(partName)) {
+      const finish = deferred!.finish;
+      parts.set(
+        partName,
+        deferredXmlPart(partName, data, decodeXml, {
+          notes: kind === 'notes',
+          ...(deferred!.onReject ? { onReject: deferred!.onReject } : {}),
+          finish: (tree) => {
+            if (isSlideRoot(tree.root)) markFileTimings(tree.root);
+            return finish ? finish(tree) : tree;
+          },
+        })
+      );
       continue;
     }
     const tree = partName === CONTENT_TYPES_PART ? ct : parseXmlPart(partName, decodeXml(data));
@@ -154,11 +213,27 @@ export function readPptx(bytes: Uint8Array, limits: ZipLimits = DEFAULT_ZIP_LIMI
   return { ok: true, pkg };
 }
 
+const SLIDE_TYPE = asciiFold(`${PML}slide+xml`);
+const NOTES_TYPE = asciiFold(`${PML}notesSlide+xml`);
+
+/** Whether `partName` is a slide or a notes slide, the parts a progressive open may defer. */
+function deferrableKind(partName: string, types: ContentTypeIndex): 'slide' | 'notes' | undefined {
+  const type = lookupContentType(types, partName);
+  const folded = type === undefined ? undefined : asciiFold(type.trim());
+  return folded === SLIDE_TYPE ? 'slide' : folded === NOTES_TYPE ? 'notes' : undefined;
+}
+
 /**
  * Write the package back to `.pptx` bytes. XML parts re-emit normalized; binaries verbatim. The
- * bytes own an `ArrayBuffer`, so they are a valid `BlobPart` as they are.
+ * bytes own an `ArrayBuffer`, so they are a valid `BlobPart` as they are. A deferred part that
+ * has not been read parses here; one that did not parse refuses the write (it throws), so a
+ * stand-in never leaves the session.
  */
 export function writePptx(pkg: PptxPackage): Uint8Array<ArrayBuffer> {
+  for (const part of pkg.parts.values()) {
+    if (isDeferredPending(part) && part.kind === 'xml') void part.xml;
+    if (holdsStandIn(part)) throw new Error(`writePptx: ${part.partName} did not parse`);
+  }
   const encoder = new TextEncoder();
   const entries = new Map<string, Uint8Array>();
   // [Content_Types].xml first: some readers sniff the first entry.

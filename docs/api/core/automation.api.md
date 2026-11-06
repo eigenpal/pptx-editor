@@ -197,6 +197,7 @@ export interface AutomationDocumentPort {
     save(): Uint8Array | null;
     readonly selection?: AutomationSelectionPort;
     subscribe(listener: () => void): () => void;
+    wholeDocument?(): boolean;
 }
 
 // @public
