@@ -14,7 +14,7 @@ import { ToolbarAction } from './toolbar-action.tsx';
 import { useEditorState, useTranslation } from './context.ts';
 import { useNotesPane } from './pane-state.ts';
 import { ZoomPill } from './panes.tsx';
-import { ViewSwitch } from './SlideSorter.tsx';
+import { ReadOnlyBadge, ViewSwitch } from './SlideSorter.tsx';
 
 /** Props of every status bar part. @public */
 export interface StatusBarPartProps {
@@ -171,7 +171,13 @@ export function StatusBar({ className, preset = true, children }: StatusBarProps
       {content}
     </div>
   );
-  if (!preset) return bar(children);
+  if (!preset)
+    return bar(
+      <>
+        {children}
+        <ReadOnlyBadge />
+      </>
+    );
   const overrides = new Map<unknown, ReactNode>();
   const extras: ReactNode[] = [];
   for (const child of flatten(children)) {
@@ -183,6 +189,8 @@ export function StatusBar({ className, preset = true, children }: StatusBarProps
   return bar(
     <>
       {part(StatusBarSlideNumber)}
+      {/* Its own part of the bar: hiding the slide number does not hide it. */}
+      <ReadOnlyBadge />
       <span className="pptx-statusbar__spacer" />
       {part(StatusBarNotes)}
       {extras}

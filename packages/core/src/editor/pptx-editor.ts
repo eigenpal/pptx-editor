@@ -9,7 +9,6 @@ import { registerFontFaces, type FontFaceHandle } from '../output/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
 import type {
   CanResult,
-  ClipboardPayload,
   CommandResult,
   EditorCommand,
   EditorExecOptions,
@@ -20,15 +19,10 @@ import type {
   TextPoint,
 } from '../contracts/index.ts';
 import { tableStyleList } from '../cascade/index.ts';
-import {
-  CLIPBOARD_MIME,
-  clipboardText,
-  copySelection,
-  parseClipboardText,
-  readClipboard,
-} from './clipboard.ts';
+import { createClipboardHost } from './clipboard-host.ts';
+import { createOpeningLane } from './pptx-editor-opening.ts';
 import { commandCacheKey, compile, type CommandContext } from './commands.ts';
-import { openPresentation, type DocumentSession } from './document-session.ts';
+import { clampSlide, openPresentation, type DocumentSession } from './document-session.ts';
 import { changedSlide, isHistoryMark, validSelection, type HistoryMark } from './history-marks.ts';
 import { EditorHistoryGroups } from './history-groups.ts';
 import {
@@ -45,7 +39,7 @@ import {
 } from './snapshot-sources.ts';
 import { createShapeListSource, elementIn } from './shape-list.ts';
 import { activeOf, createBackgroundSource } from './selection-state.ts';
-import { formatAt, geometryOf, selectedText } from './selection-state.ts';
+import { formatAt, geometryOf } from './selection-state.ts';
 import { FormatPainter } from './format-painter.ts';
 import { CropMode } from './crop-mode.ts';
 import { pictureStateAt, withAltText } from './picture-state.ts';
@@ -91,7 +85,12 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   let fonts: FontFaceHandle | null = null;
   let status: EditorSnapshot['status'] = 'empty';
   let failure: ReturnType<typeof documentOpenFailure> | undefined;
-  let mode: EditorMode = options.mode ?? 'edit';
+  /** Why the open deck is read-only, after edits, because a slide of it did not parse. */
+  let readOnly: EditorSnapshot['readOnlyReason'] = null;
+  /** The mode the host asked for (`setMode`, `options.mode`). */
+  let hostMode: EditorMode = options.mode ?? 'edit';
+  /** The mode in effect: view while the deck is read-only (`readOnlyReason`). */
+  let mode: EditorMode = hostMode;
   // The caret and the store revision just after AutoCorrect started a list.
   let autoListed: { readonly sel: EditorSelection; readonly rev: number } | null = null;
   const typeText = withAutoCorrect(options.autoCorrect !== false);
@@ -105,11 +104,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   let cached: EditorSnapshot | null = null;
   // The typing burst, the drag, and the host handles that make one undo step each.
   const groups = new EditorHistoryGroups();
-  let lastCopied: ClipboardPayload | null = null;
   // Repeated pastes of one payload cascade; a payload parsed from the clipboard is cached by
   // its text so the series survives re-reading it.
   let pasteSeries: { payload: unknown; count: number } = { payload: null, count: 0 };
-  let lastParsed: { raw: string; payload: unknown } = { raw: '', payload: null };
   let lastRejection: EditorRejection | null = null;
   const removal = new RemovalNotice(); // `snapshot.lastRemoval`
   const painter = new FormatPainter();
@@ -185,6 +182,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       revision,
       mode,
       slides,
+      pendingSlides: opening.pending(),
+      isOpening: status === 'loading',
+      readOnlyReason: readOnly,
       currentSlide: slide,
       selectedSlides: slideSel.indices(info?.slides ?? [], slide),
       slideNumbers: pkg ? hasSlideNumber(pkg, slide) : false,
@@ -626,63 +626,75 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     select(all);
   };
 
-  /** The selected shapes as a clipboard payload. */
-  const copy = (): ClipboardPayload | null => {
-    if (!session || selection.kind !== 'shapes') return null;
-    const ref = session.info.slides[slide];
-    if (!ref) return null;
-    const payload = copySelection(
-      session.store.package,
-      ref.partName,
-      layout()?.items ?? [],
-      selection,
-      session.id
-    );
-    if (payload) {
-      lastCopied = payload;
-      // Paste's enabled state reads `lastCopied`: tell the chrome it changed.
-      emit();
-    }
-    return payload;
-  };
-
-  /** Fill a clipboard event: shapes as the editor's format plus plain text. */
-  const copyTo = (data: DataTransfer, cut: boolean): boolean => {
-    if (selection.kind === 'text') {
-      const text = selectedText(layout(), selection);
-      if (!text) return false;
-      data.setData('text/plain', text);
-      if (cut) textInput('deleteBackward');
-      return true;
-    }
-    const payload = copy();
-    if (!payload) return false;
-    data.setData(CLIPBOARD_MIME, JSON.stringify(payload));
-    data.setData('text/plain', clipboardText(payload));
-    if (cut) removal.cut(() => exec({ type: 'delete' }));
-    return true;
-  };
+  const clipboard = createClipboardHost({
+    session: () => session,
+    slide: () => slide,
+    selection: () => selection,
+    layout,
+    readOnly: () => mode === 'view',
+    emit,
+    deleteText: () => void textInput('deleteBackward'),
+    cutShapes: () => removal.cut(() => exec({ type: 'delete' })),
+    refuse: (reason) => void refuse(reason),
+    paste: (payload) => void exec({ type: 'paste', payload }),
+  });
 
   /**
-   * Paste shapes from a clipboard event. Text pastes into text editing are left alone, and so
-   * is a clipboard that holds neither this editor's format nor the text of the last copy.
+   * Put the mode in effect: the host's, or view while the deck is read-only. The host's mode is
+   * kept, so the next deck opens in it.
    */
-  const pasteFrom = (data: DataTransfer): boolean => {
-    if (selection.kind === 'text' || mode === 'view') return false;
-    // A payload parsed once is cached by its text, so a paste series keeps one identity.
-    const read = readClipboard(data, lastCopied, (raw) => {
-      if (raw === lastParsed.raw) return lastParsed.payload;
-      const payload = parseClipboardText(raw);
-      if (payload) lastParsed = { raw, payload };
-      return payload;
-    });
-    if (!read) return false;
-    if ('refused' in read) return (refuse('errors.clipboard'), true);
-    exec({ type: 'paste', payload: read.payload as ClipboardPayload });
-    return true;
+  const applyMode = (): void => {
+    mode = readOnly || session?.damage ? 'view' : hostMode;
+    if (mode !== 'view') return;
+    painter.reset();
+    cropper.cancel();
+    // View mode edits no text and no cells: the element stays selected.
+    if (selection.kind === 'text' || selection.kind === 'cells')
+      selection = { kind: 'shapes', nodeIds: [selection.nodeId] };
   };
+  /**
+   * Refuse a file that did not open, or the deck `drop` opened when one of its slides did not
+   * parse. A deck with no edits goes. A deck with edits stays open for viewing, as DOCX Editor's
+   * write guard keeps a document readable: its store refuses every commit, and the notice says
+   * why, so the user can still read and copy the work.
+   */
+  const refuseOpen = (code: string, drop?: DocumentSession): CommandResult => {
+    const refused: CommandResult = { ok: false, reason: 'errors.malformed', detail: code };
+    if (drop && drop !== session) return refused;
+    if (drop && drop.store.edited) {
+      // The deck opened and holds edits: it stays on screen, read-only. It is no failed open.
+      readOnly = 'damaged-slide';
+      applyMode();
+      opening.keepReading(drop);
+      emit();
+      return refused;
+    }
+    if (drop) {
+      (detachModules(), thumbnails.clear(), drop.dispose());
+      // The deck goes with its fonts, its slide, and any gesture still open on it.
+      fonts?.dispose();
+      fonts = null;
+      session = null;
+      selection = { kind: 'none' };
+      slide = 0;
+      slideSel.reset(undefined);
+      groups.closeAll();
+    }
+    // A deck that was open stays open. A load that runs keeps its own status.
+    if (!drop || status !== 'loading') status = session ? 'ready' : 'error';
+    failure = documentOpenFailure(code);
+    emit();
+    return { ok: false, reason: 'errors.malformed', detail: code };
+  };
+  const opening = createOpeningLane({
+    session: () => session,
+    emit,
+    refuse: (owner, rejection) => void refuseOpen(rejection.reason, owner),
+    facesChanged: refreshFaces,
+    requestFamilies: (families) => hostFonts.request(families),
+  });
 
-  const load = async (bytes: Uint8Array): Promise<CommandResult> => {
+  const openFile: PptxEditorInstance['load'] = async (bytes, loadOptions) => {
     if (destroyed) return { ok: false, reason: 'disabled.destroyed' };
     // A later `load` (or `destroy`) supersedes this one: its result is disposed, not shown.
     const token = ++generation;
@@ -692,21 +704,24 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       reason: destroyed ? 'disabled.destroyed' : 'errors.superseded',
     });
     status = 'loading';
+    // The open deck's background parse waits: the new file gets the thread.
+    opening.pause(session);
     emit();
     // Let the loading screen paint before the parse blocks the main thread (a large deck).
     await yieldToPaint();
     if (stale()) return superseded();
-    const r = await openPresentation(bytes, openOptionsOf(options));
+    // A collaboration room needs every part, so a deck that joins one opens whole.
+    const startSlide = clampSlide(loadOptions?.startSlide, Number.MAX_SAFE_INTEGER);
+    const progressive = modules.collaboration ? {} : { progressive: { startSlide } };
+    const r = await openPresentation(bytes, { ...openOptionsOf(options), ...progressive });
     if (r.ok && !stale()) await hostFonts.open(r.session, stale);
     if (stale()) {
       if (r.ok) r.session.dispose();
       return superseded();
     }
     if (!r.ok) {
-      status = session ? 'ready' : 'error'; // A deck that was open stays open.
-      failure = documentOpenFailure(r.error.reason);
-      emit();
-      return { ok: false, reason: 'errors.malformed', detail: r.error.reason };
+      opening.resume(session);
+      return refuseOpen(r.error.reason);
     }
     let faces: FontFaceHandle | null = null;
     if (typeof document !== 'undefined') {
@@ -747,8 +762,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     thumbnails.clear();
     status = 'ready';
     failure = undefined;
-    slide = 0;
-    slideSel.reset(session.info.slides[0]?.partName);
+    readOnly = null;
+    mode = hostMode;
+    slide = clampSlide(startSlide, session.info.slides.length);
+    slideSel.reset(session.info.slides[slide]?.partName);
     selection = { kind: 'none' };
     lastRejection = null;
     removal.clear();
@@ -756,6 +773,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     painter.reset(true);
     groups.closeAll();
     emit();
+    opening.start(opened);
     return { ok: true };
   };
 
@@ -767,12 +785,12 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       return hostFonts.current();
     },
     get lastCopied() {
-      return lastCopied;
+      return clipboard.lastCopied;
     },
     fontFamilies,
     tableStyles: () => (session ? tableStyleList(session.store.package) : []),
     setSelection: (next) => select(next),
-    copy,
+    copy: clipboard.copy,
     selectAll,
     focus: () => surface?.focus(),
     input: (kind, data) => textInput(kind, data),
@@ -791,8 +809,21 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     can,
     exec,
     beginHistoryGroup: () => groups.begin(),
-    load,
-    save: () => (session ? writePptx(repairTablesForSave(session.store.package)) : null),
+    load: async (bytes, loadOptions) => {
+      const before = session;
+      try {
+        return await openFile(bytes, loadOptions);
+      } catch (error) {
+        // The open threw before it replaced the deck: the old deck's background parse goes on.
+        if (session === before) opening.resume(before);
+        throw error;
+      }
+    },
+    // A deck still opening parses the rest first; a slide that does not parse refuses the deck.
+    save: () =>
+      session && !session.damage && opening.finish() && session && !session.damage
+        ? writePptx(repairTablesForSave(session.store.package))
+        : null,
     setZoom(value) {
       if (value === 'fit') fitZoom = true;
       else {
@@ -802,12 +833,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       emit();
     },
     setMode(next) {
-      mode = next;
-      if (next === 'view') painter.reset();
-      if (next === 'view') cropper.cancel();
-      // View mode edits no text and no cells: the element stays selected.
-      if (next === 'view' && (selection.kind === 'text' || selection.kind === 'cells'))
-        selection = { kind: 'shapes', nodeIds: [selection.nodeId] };
+      hostMode = next;
+      applyMode();
       emit();
     },
     goToSlide(index) {
@@ -835,8 +862,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         layout,
         label: (key, params) => (options.translate ? options.translate(key, params) : key),
         select,
-        copy: copyTo,
-        paste: pasteFrom,
+        copy: clipboard.copyTo,
+        paste: clipboard.pasteFrom,
         cropping,
         textInput,
         shortcut,
@@ -878,6 +905,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     renderThumbnail: (index, container, opts) =>
       thumbnails.render(index, container, opts?.defer === true),
     renderLayoutThumbnail: (layoutId, container) => thumbnails.renderLayout(layoutId, container),
+    finishOpening: () => !session || (!session.damage && opening.finish() && !session?.damage),
     reject: refuse,
     destroy() {
       // A `load` still in flight sees the flag and disposes what it opened.
@@ -921,6 +949,6 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     emit();
   }
 
-  if (options.document) void load(options.document);
+  if (options.document) void instance.load(options.document);
   return seam.withCollaborationFlag(removal.attach(instance), modules);
 }

@@ -42,6 +42,7 @@ import {
   shapeHandle,
   shapesIn,
   slideOf,
+  slidePartOf,
   targetOf,
   type PlanContext,
 } from './targets.ts';
@@ -190,7 +191,7 @@ function textLinks(
 
 export function listHyperlinks(ctx: PlanContext, ref: AutomationRef): AutomationValue {
   const { sldId } = targetOf(ctx, ref, 'slide');
-  const part = slideOf(ctx.batch.pkg, sldId).ref.partName;
+  const part = slidePartOf(ctx.batch.pkg, sldId);
   const address = linkAddress(ctx, part);
   const owner = { kind: 'slide' as const, sldId };
   const n = slideNumberOf(ctx.batch, part);

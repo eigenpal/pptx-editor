@@ -19,11 +19,13 @@ import {
 } from 'vue';
 import {
   createPptxEditor,
+  MOUNT_FIRST_ITEMS,
   resetDevWarnings,
   type PptxEditorInstance,
 } from '@pptx-editor.dev/core/editor';
 import { buildPptx, para, run, shape } from '../../../scripts/fixtures/builder.ts';
 import { buildSlideLayoutsDeck } from '../../../scripts/fixtures/slide-layouts.ts';
+import { textDeck } from '../../../scripts/bench/text-deck.ts';
 import { PptxEditorContext } from '../../react/src/context.ts';
 import {
   NotesPane as RNotesPane,
@@ -528,5 +530,46 @@ describe('the Vue zoom pill', () => {
     const editor = await flatDeck();
     act(() => editor.setZoom(1.5));
     await same(createElement(ZoomPill), () => h(PptxEditorZoomPill), editor);
+  });
+});
+
+describe('the rails of a long deck that opens progressively', () => {
+  const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+  test('React and Vue mount the same items, whole sections, and the same placeholders', async () => {
+    const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    expect((await editor.load(textDeck(300))).ok).toBe(true);
+    // Sections of 30 and 15 slides: item 40 falls in the second, so it mounts whole.
+    expect(editor.exec({ type: 'addSection', index: 30 }).ok).toBe(true);
+    expect(editor.exec({ type: 'addSection', index: 45 }).ok).toBe(true);
+    editor.goToSlide(0);
+    expect(editor.snapshot().pendingSlides ?? 0).toBeGreaterThan(0);
+    // Both rails mount in the same task, while the deck still opens.
+    const react = mountReact(createElement(SlideRail), editor);
+    const vue = await mountVue(() => h(PptxEditorSlideRail), editor);
+    const shape = (root: ParentNode) => ({
+      items: railItems(root).length,
+      headers: root.querySelectorAll('.pptx-rail__section').length,
+      pending: root.querySelectorAll('.pptx-rail__thumb[data-pending]').length,
+    });
+    const first = shape(react);
+    expect(first.items).toBe(45);
+    expect(first.items).toBeGreaterThan(MOUNT_FIRST_ITEMS);
+    expect(first.headers).toBe(2);
+    expect(first.pending).toBeGreaterThan(0);
+    expect(shape(vue)).toEqual(first);
+    // When the open settles and the frames paint, both mount every item, none pending.
+    for (let i = 0; i < 500 && (shape(react).items < 300 || shape(vue).items < 300); i += 1)
+      await act(async () => {
+        await wait(5);
+        await nextTick();
+      });
+    for (let i = 0; i < 500 && (editor.snapshot().pendingSlides ?? 0) > 0; i += 1)
+      await act(() => wait(5));
+    await nextTick();
+    const last = shape(react);
+    expect(last).toEqual({ items: 300, headers: 3, pending: 0 });
+    expect(shape(vue)).toEqual(last);
+    editor.destroy();
   });
 });

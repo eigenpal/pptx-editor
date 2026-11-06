@@ -61,5 +61,7 @@ export function useSlideDrag(
     },
   });
   const cancel = useCallback(() => setDrag(null), [setDrag]);
-  return { itemProps, cancel };
+  /** The drop marker of slide `index`, without the handlers (a memoized item reads it). */
+  const marker = (index: number) => slideDropMarker(drag, index);
+  return { itemProps, cancel, marker };
 }

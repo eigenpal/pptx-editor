@@ -6,7 +6,12 @@
 // slide and is never reused in a session, so a selection survives moves, inserts, and undo.
 
 import type { EditorSnapshot, SlideSelectMode } from '../contracts/index.ts';
-import { changedPartNames, presentationInfo, type PptxPackage } from '../store/index.ts';
+import {
+  changedPartNames,
+  deferredParseCount,
+  presentationInfo,
+  type PptxPackage,
+} from '../store/index.ts';
 import type { DocumentSession } from './document-session.ts';
 import { renderKey } from './slide-dependencies.ts';
 
@@ -112,14 +117,21 @@ export function createSlideSummaries(): (
   pkg: PptxPackage | undefined
 ) => EditorSnapshot['slides'] {
   let cachedSlides: EditorSnapshot['slides'] = [];
-  let slidesOf: { pkg: PptxPackage | undefined; fonts: number } = { pkg: undefined, fonts: -1 };
+  let slidesOf: { pkg: PptxPackage | undefined; fonts: number; parsed: number } = {
+    pkg: undefined,
+    fonts: -1,
+    parsed: -1,
+  };
   /** The parts each slide's key read, by slide index, for `slidesOf.pkg`. */
   let readParts: (readonly string[])[] = [];
   return (session, pkg) => {
     const fonts = session?.fontGeneration ?? -1;
-    if (slidesOf.pkg === pkg && slidesOf.fonts === fonts) return cachedSlides;
+    // A slide that finished opening changes its summary, but not the package.
+    const parsed = deferredParseCount();
+    if (slidesOf.pkg === pkg && slidesOf.fonts === fonts && slidesOf.parsed === parsed)
+      return cachedSlides;
     const before = slidesOf;
-    slidesOf = { pkg, fonts };
+    slidesOf = { pkg, fonts, parsed };
     const prev = cachedSlides;
     if (!session || !pkg) {
       readParts = [];
@@ -136,8 +148,22 @@ export function createSlideSummaries(): (
     const parts: (readonly string[])[] = [];
     const next = slides.map((s, index) => {
       const old = prev[index];
+      // A slide still opening: a placeholder, with no key read (it would parse the slide).
+      if (session.slidePending(index)) {
+        parts.push([]);
+        return old?.pending && old.id === s.partName && old.hidden === s.hidden
+          ? old
+          : {
+              index,
+              id: s.partName,
+              hidden: s.hidden,
+              key: `pending:${s.partName}`,
+              pending: true as const,
+              ...(s.layoutPart ? { layoutId: s.layoutPart } : {}),
+            };
+      }
       const read = readParts[index];
-      if (dirty && old && read && !read.some((name) => dirty.has(name))) {
+      if (dirty && old && !old.pending && read && !read.some((name) => dirty.has(name))) {
         parts.push(read);
         return old;
       }

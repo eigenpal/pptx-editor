@@ -695,6 +695,11 @@ export interface SlideSummary {
   readonly key: string;
   /** The slide's layout (`SlideLayoutSummary.id`); absent when the slide names none. */
   readonly layoutId?: string;
+  /**
+   * The slide is still opening (`EditorSnapshot.pendingSlides`): its thumbnail shows a
+   * placeholder until it is ready. Absent once it is.
+   */
+  readonly pending?: true;
 }
 
 /**
@@ -721,6 +726,15 @@ export interface SlideSection {
  * crosses a size or count limit), and `unknown`. @public
  */
 export type DocumentOpenFailureReason = 'damaged' | 'not-pptx' | 'too-large' | 'unknown';
+
+/** Options of `Editor.load`. @public */
+export interface LoadOptions {
+  /**
+   * The slide to show first, zero-based; clamped to the deck. In a long deck it is the slide
+   * that parses first. Default 0.
+   */
+  readonly startSlide?: number;
+}
 
 /**
  * A file the editor refused to open. It carries a stable code only, never the file's content
@@ -839,9 +853,33 @@ export interface EditorSnapshot {
    * starts to open.
    */
   readonly openFailure?: DocumentOpenFailure | null;
+  /**
+   * Why the open presentation is read-only, or `null`. `'damaged-slide'`: a long deck that
+   * opened and holds edits had a slide or a notes slide that did not parse. It stays on screen
+   * in view mode with its edits, and its other slides go on opening; commands, undo, `save()`,
+   * and automation writes are refused. `openFailure` stays `null`: the file did open. `change`
+   * fires once when it is set. It clears when the next file opens, and that file opens in the
+   * mode the host set (`setMode`): only `snapshot().mode` shows view meanwhile. Optional and additive: absent reads as `null`.
+   */
+  readonly readOnlyReason?: 'damaged-slide' | null;
   readonly revision: number;
   readonly mode: EditorMode;
   readonly slides: readonly SlideSummary[];
+  /**
+   * How many slides are still opening. A long deck shows its first slide and takes input while
+   * the other slides parse in the background; each one's summary carries `pending` until it is
+   * ready. Edits, undo, search, and save work before then: a slide that is needed parses at
+   * once, and `save` parses the rest first. Moves at most every 300 ms, and `selectionChange`
+   * fires when it does. Optional and additive: absent reads as 0.
+   */
+  readonly pendingSlides?: number;
+  /**
+   * Whether a deck is still on its way to its first painted slide (`status` is `loading`).
+   * Show an opening screen while it holds. It turns false when the first slide paints; that
+   * slide takes input while the others open (`pendingSlides`). Optional and additive: absent
+   * reads as `false`.
+   */
+  readonly isOpening?: boolean;
   readonly currentSlide: number;
   /**
    * The slides selected in the slide rail, ascending. Always holds `currentSlide`. Shift+click

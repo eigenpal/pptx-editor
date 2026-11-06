@@ -116,3 +116,28 @@ Copying and pasting shapes SHALL carry their pictures and refuse to carry extern
 
 - **WHEN** a picture is copied from one deck and pasted into another
 - **THEN** the second deck gains the image part, a relationship to it, and the picture renders
+
+### Requirement: Progressive open
+
+A long deck SHALL show its start slide and take input before its other slides parse, and SHALL parse them in background tasks that give way to input. Every read, edit, undo, search, and save before then SHALL give the result of a deck that parsed whole, and a save SHALL parse the rest first. A slide that does not parse SHALL refuse the deck (or, after edits, make it read-only), and SHALL never be saved. An editor with a collaboration module SHALL parse the whole deck before its first slide shows.
+
+#### Scenario: Edit before the deck is ready
+
+- **WHEN** a user types on the first slide of a long deck and saves before the other slides parse
+- **THEN** the saved file holds every slide, and is the file a whole open with the same edits saves
+
+#### Scenario: A damaged slide in a long deck
+
+- **WHEN** a slide or a notes slide that has not parsed yet holds XML that does not parse, and the user has not edited the deck
+- **THEN** the deck is refused when the slide parses, and a save before then is refused too
+
+#### Scenario: A damaged slide after edits
+
+- **WHEN** a slide or a notes slide of a long deck that the user has edited does not parse
+- **THEN** the deck stays open in view mode with its edits, and `readOnlyReason` is `damaged-slide` while `openFailure` stays `null`
+- **AND** commands, undo, save, and automation writes and exports are refused, and the other slides go on opening in background tasks
+
+#### Scenario: A damaged slide that the user deleted
+
+- **WHEN** the user deletes a slide that has not parsed yet and does not parse
+- **THEN** the deck is not refused, and saves without it, unless an undo brings the slide back and a reader reads it

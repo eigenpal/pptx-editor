@@ -14,6 +14,8 @@
 // `open` row is one load, from the bytes to a rail with every container asked to paint: its
 // thumbnail paints are the ones the editor made before it could be used, and its idle paints
 // the rest.
+// The `open-ready` row is the time until no slide is still opening (`pendingSlides` is 0): a
+// long deck shows its first slide first and parses the rest in the background.
 //
 // Model: DOCX Editor's `scripts/bench/edit-bench.ts` (EigenPal, same owner).
 //
@@ -329,6 +331,9 @@ async function benchDeck(n: number, args: Args): Promise<ScenarioResult[]> {
   editor.attach(h.host);
   h.syncRail(editor.snapshot().slides);
   const opened = performance.now() - t0;
+  // (o2) Ready: a long deck opens progressively; the rest of its slides parse in the background.
+  while ((editor.snapshot().pendingSlides ?? 0) > 0) await idle(1);
+  const ready = performance.now() - t0;
   h.counters.thumbnailCalls = n;
   // Thumbnails painted later, when the editor is idle (every one, at the latest after this).
   for (let wait = 0; wait < 600 && h.thumbs.some((b) => !b.firstElementChild); wait += 1)
@@ -336,7 +341,10 @@ async function benchDeck(n: number, args: Args): Promise<ScenarioResult[]> {
   h.countPaints('idleThumbnailPaints');
   if (h.thumbs.some((b) => !b.firstElementChild))
     throw new Error('a thumbnail never painted after open');
-  const out: ScenarioResult[] = [result(h, 'open', n, 1, [opened], [0], [0])];
+  const out: ScenarioResult[] = [
+    result(h, 'open', n, 1, [opened], [0], [0]),
+    result(h, 'open-ready', n, 1, [ready], [0], [0]),
+  ];
   h.reset();
   h.instrument();
   const middle = Math.floor(n / 2);

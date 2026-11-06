@@ -29,6 +29,7 @@ import {
   type PptxPackage,
 } from '../package/package.ts';
 import { carryFileTimings } from '../package/timing.ts';
+import { isDeferredPending } from '../package/deferred-parts.ts';
 import { applyOps, type OpRejection, type PptxOp } from './ops.ts';
 import type { HistoryGroup, TransactOrigin } from './history-group.ts';
 import { introducedViolation } from './part-checks.ts';
@@ -157,10 +158,26 @@ export class PptxDocumentStore {
    */
   #cutGroup: HistoryGroup | undefined;
   readonly #onListenerError: (error: unknown, change: StoreChange) => void;
+  /** Why the store refuses every commit, once `block` ran. */
+  #blocked: string | null = null;
 
   constructor(pkg: PptxPackage, options: DocumentStoreOptions = {}) {
     this.#pkg = pkg;
     this.#onListenerError = options.onListenerError ?? reportListenerError;
+  }
+
+  /**
+   * Refuse every later commit, undo, and redo with `unsupported` and `detail`: a slide of a
+   * progressive open did not parse, so the package holds a stand-in that must never become an
+   * edit (`deferred-parts.ts`). There is no way back. @internal
+   */
+  block(detail: string): void {
+    this.#blocked ??= detail;
+  }
+
+  /** Why the store refuses every commit, or null. @internal */
+  get blocked(): string | null {
+    return this.#blocked;
   }
 
   /** The current package. Reference-stable until the next commit. */
@@ -174,11 +191,16 @@ export class PptxDocumentStore {
   }
 
   get canUndo(): boolean {
-    return this.#undo.length > 0;
+    return this.#blocked === null && this.#undo.length > 0;
   }
 
   get canRedo(): boolean {
-    return this.#redo.length > 0;
+    return this.#blocked === null && this.#redo.length > 0;
+  }
+
+  /** Whether any commit landed since the store opened (undo history aside). @internal */
+  get edited(): boolean {
+    return this.#revision > 0;
   }
 
   /** Validate ops, and the parts they leave, without committing. */
@@ -217,8 +239,13 @@ export class PptxDocumentStore {
     // on to land, to change nothing, or to be refused. A frame of the same group keeps it open.
     if (records && this.#openGroup() !== options.historyGroup) this.closeHistoryGroup();
     if (ops.length === 0) return { ok: true, revision: this.#revision };
+    if (this.#blocked !== null)
+      return { ok: false, rejection: { code: 'unsupported', detail: this.#blocked } };
     const r = this.#stage(ops);
     if (!r.ok) return r;
+    // Staging reads parts, and a read can find a damaged one and block the store.
+    if (this.#blocked !== null)
+      return { ok: false, rejection: { code: 'unsupported', detail: this.#blocked } };
     const before = this.#pkg;
     const parts = r.parts;
     if (origin === 'remote') {
@@ -268,6 +295,8 @@ export class PptxDocumentStore {
     options: { readonly label?: string } = {}
   ): TransactResult {
     if (parts.length === 0 && removed.length === 0) return { ok: true, revision: this.#revision };
+    if (this.#blocked !== null)
+      return { ok: false, rejection: { code: 'unsupported', detail: this.#blocked } };
     const next = new Map(this.#pkg.parts);
     for (const part of parts) {
       const name = normalizePartName(part.partName);
@@ -290,6 +319,9 @@ export class PptxDocumentStore {
         return { ok: false, rejection: { code: 'unsafe-part-name', part: name } };
       next.delete(name);
     }
+    // Reading a prior part can find a damaged one and block the store.
+    if (this.#blocked !== null)
+      return { ok: false, rejection: { code: 'unsupported', detail: this.#blocked } };
     const before = this.#pkg;
     const after: PptxPackage = { parts: next };
     const changed = changedParts(before, after);
@@ -347,6 +379,7 @@ export class PptxDocumentStore {
 
   /** Undo one entry. Returns the selection captured before it, if any. */
   undo(): { readonly ok: boolean; readonly selection?: unknown } {
+    if (this.#blocked !== null) return { ok: false };
     const entry = this.#undo.pop();
     if (!entry) return { ok: false };
     // Undo is a boundary: the entry now on top must not collect a gesture that resumes.
@@ -361,6 +394,7 @@ export class PptxDocumentStore {
 
   /** Redo one entry. Returns the selection captured after it, if any. */
   redo(): { readonly ok: boolean; readonly selection?: unknown } {
+    if (this.#blocked !== null) return { ok: false };
     const entry = this.#redo.pop();
     if (!entry) return { ok: false };
     this.closeHistoryGroup();
@@ -387,7 +421,7 @@ export class PptxDocumentStore {
     let out: Map<string, PackagePart> | null = null;
     for (const name of parts) {
       const part = pkg.parts.get(name);
-      if (!part || part.kind !== 'xml') continue;
+      if (!part || part.kind !== 'xml' || isDeferredPending(part)) continue;
       const floor = this.#highWater.get(name) ?? 0;
       if (part.xml.nextId >= floor) continue;
       out ??= new Map(pkg.parts);
@@ -399,6 +433,8 @@ export class PptxDocumentStore {
   #recordIds(pkg: PptxPackage, parts: readonly string[]): void {
     for (const name of parts) {
       const part = pkg.parts.get(name);
+      // A part still unparsed minted no id; reading it here would parse a removed slide.
+      if (isDeferredPending(part)) continue;
       if (part?.kind === 'xml' && part.xml.nextId > (this.#highWater.get(name) ?? 0))
         this.#highWater.set(name, part.xml.nextId);
     }

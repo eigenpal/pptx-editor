@@ -103,6 +103,11 @@ export interface PptxEditorInstance extends Editor {
    */
   renderLayoutThumbnail(layoutId: string, container: HTMLElement): void;
   /**
+   * Open the rest of a deck that is still opening, now, for a reader of the whole deck (the
+   * automation host's export). False when a slide did not parse. @internal
+   */
+  finishOpening(): boolean;
+  /**
    * Publish a refusal as `lastRejection`, for chrome that refuses an action itself (Change
    * Picture after the selection changed while the file loaded). @internal
    */

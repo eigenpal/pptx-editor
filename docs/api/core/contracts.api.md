@@ -150,8 +150,7 @@ export interface Editor {
     focus(): void;
     // (undocumented)
     goToSlide(index: number): void;
-    // (undocumented)
-    load(bytes: Uint8Array): Promise<CommandResult>;
+    load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
     renderThumbnail(index: number, container: HTMLElement, options?: RenderThumbnailOptions): () => void;
     save(): Uint8Array<ArrayBuffer> | null;
     selectAll(): void;
@@ -657,6 +656,7 @@ export interface EditorSnapshot {
     readonly geometry: SelectionGeometry | null;
     readonly image?: SelectedImageState | null;
     readonly insertions: number;
+    readonly isOpening?: boolean;
     readonly lastRejection?: EditorRejection | null;
     readonly lastRemoval?: EditorRemoval | null;
     readonly layouts?: readonly SlideLayoutSummary[];
@@ -666,7 +666,9 @@ export interface EditorSnapshot {
     readonly notes: string;
     readonly notesFormatted?: readonly NotesParagraph[];
     readonly openFailure?: DocumentOpenFailure | null;
+    readonly pendingSlides?: number;
     readonly presentationView?: PresentationView;
+    readonly readOnlyReason?: 'damaged-slide' | null;
     // (undocumented)
     readonly revision: number;
     readonly sections?: readonly SlideSection[];
@@ -898,6 +900,11 @@ export type LineEndType = 'none' | 'triangle' | 'arrow' | 'stealth' | 'oval' | '
 
 // @public
 export type LineKind = 'line' | 'arrow' | 'elbow' | 'curved';
+
+// @public
+export interface LoadOptions {
+    readonly startSlide?: number;
+}
 
 // @public
 export type NotesFormat = 'bold' | 'italic' | 'underline' | 'strike';
@@ -1272,6 +1279,7 @@ export interface SlideSummary {
     readonly index: number;
     readonly key: string;
     readonly layoutId?: string;
+    readonly pending?: true;
 }
 
 // @public
