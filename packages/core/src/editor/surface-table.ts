@@ -255,8 +255,9 @@ export class TableGestures {
     if (!frame || !this.onLine(frame, p)) return undefined;
     if (!outside) return id;
     const local = apply(invert(frame.matrix), p.x, p.y);
-    const { cx, cy } = frame.element.xfrm;
-    const inside = local.x >= 0 && local.x <= cx && local.y >= 0 && local.y <= cy;
+    // The drawn grid, which rows that grow to fit their text can make taller than the frame.
+    const { width, height } = frame.table;
+    const inside = local.x >= 0 && local.x <= width && local.y >= 0 && local.y <= height;
     return inside ? undefined : id;
   }
 

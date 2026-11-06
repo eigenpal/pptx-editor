@@ -266,6 +266,11 @@ describe('paste into cells', () => {
     expect(tablePaste(sel, { text: '"hi" she said' })).toBeNull();
     expect(tablePaste(sel, { text: '"Hello world"' })).toBeNull();
     expect(tablePaste(sel, { text: '""' })).toBeNull();
+    // A long quoted text with no closing quote is decided at once: the test never backtracks.
+    const long = '"' + 'line of a log\n'.repeat(200_000);
+    const start = performance.now();
+    expect(tablePaste(sel, { text: long })).toBeNull();
+    expect(performance.now() - start).toBeLessThan(500);
   });
 
   test('pasteCells refuses texts that are not rows of strings', async () => {

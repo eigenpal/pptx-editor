@@ -127,11 +127,18 @@ export function parseCellsJson(raw: string): string[][] | null {
 /** What a paste does in a table: fill cells, insert one cell's text at the caret, or neither. */
 export type TablePaste = { readonly cells: string[][] } | { readonly text: string } | null;
 
+/** Text in quotes, with only doubled quotes inside: each step has one choice, so linear. */
+const QUOTED = /^"(?:[^"]|"")*"$/;
+/** What made a copy quote a cell: a tab, a line break, or a quote (doubled). */
+const NEEDS_QUOTES = /[\t\r\n]|""/;
+
 /**
- * One quoted cell, as a copy of one cell writes it: quoted only because it holds a tab, a line
- * break, or a doubled quote. Other text in quotes ("Hello") is text, and keeps its quotes.
+ * Whether `text` is one quoted cell, as a copy of one cell writes it: quoted only because it
+ * holds a tab, a line break, or a quote. Other text in quotes ("Hello") is text, and keeps its
+ * quotes. Two linear tests on text within the paste limit: untrusted text never backtracks.
  */
-const ONE_QUOTED = /^"(?:[^"]|"")*(?:[\t\r\n]|"")(?:[^"]|"")*"$/;
+const oneQuotedCell = (text: string): boolean =>
+  text.length <= MAX_RAW_CHARS && QUOTED.test(text) && NEEDS_QUOTES.test(text.slice(1, -1));
 
 /**
  * What a paste does in a table. A cell range takes any text as cells. A caret in a cell takes a
@@ -149,7 +156,7 @@ export function tablePaste(
   const text = data.text ?? '';
   const rows =
     copied ??
-    (text && (sel.kind === 'cells' || text.includes('\t') || ONE_QUOTED.test(text))
+    (text && (sel.kind === 'cells' || text.includes('\t') || oneQuotedCell(text))
       ? parseTabSeparated(text)
       : null);
   if (!rows) return null;
