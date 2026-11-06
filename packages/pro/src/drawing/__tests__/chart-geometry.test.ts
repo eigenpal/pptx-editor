@@ -10,7 +10,9 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import { describe, expect, test } from 'bun:test';
 import type { ChartComponent, Point } from '../chart-scene.ts';
 import { outsideLabelRoom } from '../chart-pie.ts';
-import { renderFixture } from './chart-support.ts';
+import { readChartModel } from '../chart-model.ts';
+import { renderChart } from '../chart-render.ts';
+import { chartSpace, numericSeries, renderFixture } from './chart-support.ts';
 
 interface Box {
   l: number;
@@ -181,5 +183,35 @@ describe('chart geometry', () => {
     expect(outline).toBeDefined();
     const labels = labelTexts(7);
     expect(labels).toEqual(expect.arrayContaining(['North', 'South', 'East', 'West']));
+  });
+});
+
+describe('axis marks and chart area', () => {
+  // A column chart whose axes name no tick marks and whose chart area has no c:spPr, as in
+  // `slide-structure.pptx`.
+  const render = (minor: string) =>
+    renderChart(
+      readChartModel(
+        chartSpace(
+          `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/>${numericSeries([1, 2])}` +
+            '<c:axId val="10"/><c:axId val="20"/></c:barChart>' +
+            '<c:catAx><c:axId val="10"/><c:axPos val="b"/><c:crossAx val="20"/></c:catAx>' +
+            `<c:valAx><c:axId val="20"/><c:axPos val="l"/>${minor}<c:crossAx val="10"/></c:valAx>`
+        )
+      )!,
+      432,
+      288
+    )!;
+  const marks = (minor: string) =>
+    render(minor)
+      .scene.components.filter((c) => !c.closed)
+      .reduce((sum, c) => sum + c.subpaths.length, 0);
+
+  test('an axis without c:minorTickMark draws five minor marks to a major step', () => {
+    expect(marks('')).toBeGreaterThan(marks('<c:minorTickMark val="none"/>') + 10);
+  });
+
+  test('a chart area without c:spPr draws no border', () => {
+    expect(render('').scene.components[0]!.stroke ?? null).toBeNull();
   });
 });
