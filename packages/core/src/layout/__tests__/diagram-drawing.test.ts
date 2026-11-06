@@ -380,6 +380,16 @@ describe('diagram saved drawing: missing and hostile parts', () => {
     expect(frameOf(open(deck(nest(8))).layout).drawing).toHaveLength(1);
     expectPlaceholder(deck(nest(9)));
   });
+
+  test('a placeholder names why: no drawing, unsupported content, or a limit', () => {
+    const reason = (bytes: Uint8Array): unknown =>
+      frameOf(open(bytes).layout).element.drawingFallback;
+    expect(reason(deck(sp()))).toBeUndefined();
+    expect(reason(deck(sp(), { drawingRel: null }))).toBe('no-drawing');
+    expect(reason(deck(sp() + '<dsp:pic/>'))).toBe('unsupported');
+    expect(reason(deck(sp({ preset: 'notAPreset' })))).toBe('unsupported');
+    expect(reason(deck(sp().repeat(513)))).toBe('limit');
+  });
 });
 
 describe('diagram saved drawing: preservation', () => {

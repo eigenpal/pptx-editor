@@ -50,6 +50,7 @@ import {
 import type {
   Autofit,
   BodyProps,
+  DiagramFallback,
   GeometrySpec,
   KinsokuRules,
   Layer,
@@ -476,6 +477,18 @@ function resolveOlePoster(
 /** A shape of a diagram drawing that fails the supported subset: the whole diagram falls back. */
 const UNSUPPORTED = Symbol('unsupported');
 
+/** The shapes one diagram drawing has resolved, and whether a limit stopped it. */
+interface DiagramBudget {
+  shapes: number;
+  overLimit: boolean;
+}
+
+/** Stop a diagram at a shape, depth, or slide limit, and remember why. */
+function overLimit(budget: DiagramBudget): typeof UNSUPPORTED {
+  budget.overLimit = true;
+  return UNSUPPORTED;
+}
+
 /**
  * One element of a diagram drawing's shape tree (`dsp:spTree`), in its parent's space. Shapes
  * resolve as slide shapes do. Undefined for the tree's own properties; {@link UNSUPPORTED} for
@@ -488,7 +501,7 @@ function resolveDiagramElement(
   drawingPart: string,
   scope: SlideScope,
   depth: number,
-  budget: { shapes: number }
+  budget: DiagramBudget
 ): ResolvedElement | undefined | typeof UNSUPPORTED {
   if (el.ns !== NS.dsp) return UNSUPPORTED;
   switch (el.local) {
@@ -499,15 +512,15 @@ function resolveDiagramElement(
     case 'sp': {
       budget.shapes += 1;
       scope.diagramShapes.count += 1;
-      if (budget.shapes > MAX_DIAGRAM_SHAPES) return UNSUPPORTED;
-      if (scope.diagramShapes.count > MAX_SLIDE_DIAGRAM_SHAPES) return UNSUPPORTED;
+      if (budget.shapes > MAX_DIAGRAM_SHAPES) return overLimit(budget);
+      if (scope.diagramShapes.count > MAX_SLIDE_DIAGRAM_SHAPES) return overLimit(budget);
       if (!path(el, 'dsp:spPr', 'a:xfrm')) return UNSUPPORTED;
       return resolveShapeLike(el, 'shape', layer, drawingPart, scope);
     }
     case 'grpSp': {
       scope.diagramShapes.count += 1;
-      if (depth >= MAX_DIAGRAM_GROUP_DEPTH) return UNSUPPORTED;
-      if (scope.diagramShapes.count > MAX_SLIDE_DIAGRAM_SHAPES) return UNSUPPORTED;
+      if (depth >= MAX_DIAGRAM_GROUP_DEPTH) return overLimit(budget);
+      if (scope.diagramShapes.count > MAX_SLIDE_DIAGRAM_SHAPES) return overLimit(budget);
       const kids = resolveDiagramTree(el, layer, drawingPart, scope, depth + 1, budget);
       if (!kids) return UNSUPPORTED;
       return diagramGroup(el, kids, layer, drawingPart, scope);
@@ -522,7 +535,7 @@ function resolveDiagramTree(
   drawingPart: string,
   scope: SlideScope,
   depth: number,
-  budget: { shapes: number }
+  budget: DiagramBudget
 ): ResolvedElement[] | undefined {
   const out: ResolvedElement[] = [];
   for (const c of elements(tree)) {
@@ -594,9 +607,9 @@ function diagramBackground(
 
 /**
  * The saved drawing of a diagram frame (ECMA-376 Part 1, 21.4; see `diagram.ts`): its shapes in
- * the frame's local space, behind the data model's background. Undefined when the diagram has
- * no saved drawing, when a part does not resolve, or when one element of the drawing falls
- * outside the supported subset: a diagram renders whole or not at all.
+ * the frame's local space, behind the data model's background. Otherwise the reason it shows
+ * its placeholder: no saved drawing (or a part that does not resolve), an element outside the
+ * supported subset, or a shape, depth, or slide limit. A diagram renders whole or not at all.
  */
 function resolveDiagram(
   frame: Element,
@@ -605,18 +618,19 @@ function resolveDiagram(
   layer: Layer,
   partName: string,
   scope: SlideScope
-): readonly ResolvedElement[] | undefined {
+): { drawing: readonly ResolvedElement[] } | { drawingFallback: DiagramFallback } {
   const parts = diagramParts(scope.pkg, partName, graphicData);
   const tree = child(parts?.drawing, 'dsp:spTree');
-  if (!parts || !tree) return undefined;
-  const budget = { shapes: 0 };
+  if (!parts || !tree) return { drawingFallback: 'no-drawing' };
+  const budget: DiagramBudget = { shapes: 0, overLimit: false };
   const shapes = resolveDiagramTree(tree, layer, parts.drawingPart, scope, 0, budget);
-  if (!shapes || shapes.length === 0) return undefined;
+  if (!shapes) return { drawingFallback: budget.overLimit ? 'limit' : 'unsupported' };
+  if (shapes.length === 0) return { drawingFallback: 'no-drawing' };
   const root = child(child(tree, 'dsp:grpSpPr'), 'a:xfrm')
     ? [diagramGroup(tree, shapes, layer, parts.drawingPart, scope)]
     : shapes;
   const background = diagramBackground(frame, parts.dataModel, xfrm, layer, parts.dataPart, scope);
-  return background ? [background, ...root] : root;
+  return { drawing: background ? [background, ...root] : root };
 }
 
 function resolveElement(
@@ -674,7 +688,7 @@ function resolveElement(
         kind === 'ole'
           ? resolveOlePoster(el, graphicData, xfrm, layer, partName, scope)
           : undefined;
-      const drawing =
+      const diagram =
         kind === 'diagram'
           ? resolveDiagram(el, graphicData, xfrm, layer, partName, scope)
           : undefined;
@@ -690,7 +704,7 @@ function resolveElement(
         frameKind: kind,
         ...(table ? { table } : {}),
         ...(poster ? { poster } : {}),
-        ...(drawing ? { drawing } : {}),
+        ...diagram,
       };
     }
   }

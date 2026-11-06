@@ -311,7 +311,11 @@ function layoutElement(
       );
       if (drawing) return { ...placement, kind: 'frame', element: el, matrix, drawing };
       diagnostics.add(`graphic frame rendered as placeholder: ${el.frameKind}`);
-      return { ...placement, kind: 'frame', element: el, matrix };
+      // A drawing that resolved but holds a shape layout cannot draw (an unknown preset).
+      const element: ResolvedGraphicFrame = el.drawing
+        ? { ...el, drawing: undefined, drawingFallback: 'unsupported' }
+        : el;
+      return { ...placement, kind: 'frame', element, matrix };
     }
   }
 }

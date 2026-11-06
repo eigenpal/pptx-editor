@@ -127,6 +127,9 @@ export const DEFAULT_TABLE_STYLE_ID = "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}";
 export function defaultTableStyleId(pkg: PptxPackage): string;
 
 // @public
+export type DiagramFallback = 'no-drawing' | 'unsupported' | 'limit';
+
+// @public
 export type EffectAlign = 'tl' | 't' | 'tr' | 'l' | 'ctr' | 'r' | 'bl' | 'b' | 'br';
 
 // @public
@@ -397,6 +400,7 @@ export type ResolvedFill = {
 // @public
 export interface ResolvedGraphicFrame extends ResolvedBase {
     readonly drawing?: readonly ResolvedElement[];
+    readonly drawingFallback?: DiagramFallback;
     // @deprecated (undocumented)
     readonly fallbackRId?: string;
     // (undocumented)

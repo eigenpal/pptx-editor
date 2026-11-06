@@ -286,7 +286,16 @@ export interface ResolvedGraphicFrame extends ResolvedBase {
    * limits; the frame then shows a placeholder.
    */
   readonly drawing?: readonly ResolvedElement[];
+  /**
+   * Why a diagram frame shows its placeholder: `no-drawing` (no saved drawing, or a part that
+   * does not resolve), `unsupported` (an element outside the supported subset), or `limit` (past
+   * the shape, depth, or slide limit). Absent when `drawing` is present and for other frames.
+   */
+  readonly drawingFallback?: DiagramFallback;
 }
+
+/** Why a diagram frame shows its placeholder (`ResolvedGraphicFrame.drawingFallback`). @public */
+export type DiagramFallback = 'no-drawing' | 'unsupported' | 'limit';
 
 export type ResolvedElement =
   ResolvedShape | ResolvedPicture | ResolvedGroup | ResolvedGraphicFrame;
