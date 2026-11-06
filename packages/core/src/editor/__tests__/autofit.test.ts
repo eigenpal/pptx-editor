@@ -23,11 +23,17 @@ const LINE = para(run('x', 'sz="1800"'), SINGLE);
 const EMPTY = `<a:p>${SINGLE}<a:endParaRPr lang="en-US" sz="1800"/></a:p>`;
 
 /**
- * Five one-line paragraphs of 18 pt at 100 % (21.6 pt each) in a box `heightPt` tall, set to
- * shrink on overflow. `ph` makes the box a placeholder; `after` is XML after the fifth line.
+ * Five one-line paragraphs (`line`, 18 pt at 100 % by default: 21.6 pt each) in a box
+ * `heightPt` tall, set to shrink on overflow. `ph` makes the box a placeholder; `after` is XML
+ * after the fifth line.
  */
-async function shrinkEditor(heightPt: number, ph = '', after = ''): Promise<PptxEditorInstance> {
-  const lines = LINE.repeat(5) + after;
+async function shrinkEditor(
+  heightPt: number,
+  ph = '',
+  after = '',
+  line = LINE
+): Promise<PptxEditorInstance> {
+  const lines = line.repeat(5) + after;
   const bytes = buildPptx({
     slides: [
       {
@@ -59,8 +65,12 @@ function normAutofit(e: PptxEditorInstance): Record<string, string> {
   return Object.fromEntries(norm!.attrs.map((a) => [a.local, a.value]));
 }
 
-const shrink = async (heightPt: number, ph = '', after = ''): Promise<Record<string, string>> =>
-  normAutofit(await shrinkEditor(heightPt, ph, after));
+const shrink = async (
+  heightPt: number,
+  ph = '',
+  after = '',
+  line = LINE
+): Promise<Record<string, string>> => normAutofit(await shrinkEditor(heightPt, ph, after, line));
 
 describe('shrink on overflow', () => {
   test('a small overflow reduces line spacing and keeps the font size', async () => {
@@ -96,12 +106,37 @@ describe('shrink on overflow', () => {
   test('empty paragraphs at the end do not count', async () => {
     // The five lines fit 130 pt at 100 % (115.2 pt). Two empty lines more would need 158.4 pt.
     expect(await shrink(130, '', EMPTY + EMPTY)).toEqual({});
+    // A body of empty paragraphs only measures the first: 21.6 + 7.2 = 28.8 pt fits 30 pt.
+    expect(await shrink(30, '', EMPTY.repeat(3), '')).toEqual({});
     // An empty paragraph before text counts: seven lines need 158.4 pt, 143.3 pt with the 10 %
     // reduction, and 135.7 pt at 92.5 % (17 pt runs) with it; with the 20 % reduction they
     // need 7 × 1.2 × 17 × 0.8 + 7.2 = 121.4 pt, which fits.
     expect(await shrink(130, '', EMPTY + LINE)).toEqual({
       fontScale: '92500',
       lnSpcReduction: '20000',
+    });
+  });
+
+  test('a paragraph at the end with a line break or a field counts', async () => {
+    // Each makes the text seven lines (158.4 pt at 100 %), as in the test above.
+    const shrunk = { fontScale: '92500', lnSpcReduction: '20000' };
+    const br = `<a:p>${SINGLE}<a:br><a:rPr lang="en-US" sz="1800"/></a:br><a:endParaRPr lang="en-US" sz="1800"/></a:p>`;
+    expect(await shrink(130, '', br)).toEqual(shrunk);
+    // A field counts even when its stored text is empty.
+    const field = `<a:p>${SINGLE}<a:fld id="{B6F15528-21DE-4FAA-801E-634DDDAF4B2B}" type="datetime1"><a:rPr lang="en-US" sz="1800"/><a:t></a:t></a:fld><a:endParaRPr lang="en-US" sz="1800"/></a:p>`;
+    expect(await shrink(130, '', EMPTY + field)).toEqual(shrunk);
+  });
+
+  test('with spacing in points, 85 % takes the 10 % reduction before the 20 %', async () => {
+    // 20 pt before lines 2 to 5 (80 pt) does not scale. 92.5 % with 20 % needs
+    // 5 × 1.2 × 17 × 0.8 + 80 + 7.2 = 168.8 pt; 85 % (15 pt runs) with 10 % needs 168.2 pt.
+    const spaced = para(
+      run('x', 'sz="1800"'),
+      '<a:pPr><a:lnSpc><a:spcPct val="100000"/></a:lnSpc><a:spcBef><a:spcPts val="2000"/></a:spcBef></a:pPr>'
+    );
+    expect(await shrink(168.5, '', '', spaced)).toEqual({
+      fontScale: '85000',
+      lnSpcReduction: '10000',
     });
   });
 

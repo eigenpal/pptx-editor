@@ -24,9 +24,10 @@
 //     no 20 % step at full size. Measured on a text box of three 72 pt lines at 21 heights from
 //     80 pt to 280 pt: every step from 100 % to 55 % appeared in this order, except 85 % with
 //     10 %, which lines alone never pick (it is taller than 92.5 % with 20 %). A body with
-//     spacing in points picks it (measured), and does not pick 62.5 % with 10 % with 7 pt to
-//     spare, so the 10 % steps stop at 85 %. The steps below 55 % follow the same 7.5 % rule
-//     and are not measured. This is an APPROXIMATION, listed on the public fidelity page.
+//     spacing in points picks it (measured). The same body takes 62.5 % with 20 % where 62.5 %
+//     with 10 % fits with 7 pt to spare, so the 10 % steps stop at 85 %. The steps below 55 %
+//     follow the same 7.5 % rule and are not measured. This is an APPROXIMATION, listed on the
+//     public fidelity page.
 //   - Empty paragraphs at the end of the text do not count: the text fits when the paragraphs
 //     before them fit (measured with none, one, and two at the end of a body placeholder).
 

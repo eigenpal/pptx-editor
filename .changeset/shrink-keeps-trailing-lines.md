@@ -2,4 +2,4 @@
 '@pptx-editor.dev/core': patch
 ---
 
-Shrink on overflow no longer shrinks text for empty paragraphs at the end of a text box, so a new line or a small edit in a box with room keeps the text size. An 85 % font scale now tries the 10 % line spacing reduction before the 20 % one.
+Shrink on overflow now ignores empty paragraphs at the end of the text. A new empty line at the end no longer makes the text smaller. At an 85 % font scale, shrink on overflow tries 10 % less line spacing before 20 % less.
