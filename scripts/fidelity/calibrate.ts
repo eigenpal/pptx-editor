@@ -15,7 +15,7 @@ import { openPresentation } from '../../packages/core/src/editor/index.ts';
 import { WHOLE_POINT_BASELINES, type LayoutItem } from '../../packages/core/src/layout/index.ts';
 import { deckFontFamilies, localFonts, referenceFontsInstalled } from './local-fonts.ts';
 import { deckFacts, slidePages } from './reference-identity.ts';
-import { glyphOrigins, normalize, type GlyphOrigin } from './references.ts';
+import { glyphOrigins, normalize, type GlyphOrigin } from './pdf.ts';
 
 const bare = (s: string): string => s.replace(/\s+/g, '');
 
@@ -108,7 +108,7 @@ function pairLines(items: readonly LayoutItem[], runs: Origin[], out: Pair[]): n
       candidates += 1;
       const x = (m[0] * (it.text.box.x + lead.x[0]) + m[4]) / EMU_PER_PT;
       const y = (m[3] * (it.text.box.y + line.baseline) + m[5]) / EMU_PER_PT;
-      // Compare without whitespace: `pdftotext` and pdf.js add spaces inside letter-spaced text.
+      // Compare without whitespace: pdf.js adds spaces inside letter-spaced text.
       // A short run (a raised digit, a single capital) pairs when it starts the line's text.
       const lineKey = bare(text);
       let best: Origin | undefined;

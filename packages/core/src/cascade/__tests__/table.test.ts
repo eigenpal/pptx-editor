@@ -136,6 +136,8 @@ describe('shape style font reference', () => {
       '<p:style><a:lnRef idx="0"><a:schemeClr val="accent1"/></a:lnRef><a:fillRef idx="1"><a:schemeClr val="accent1"/></a:fillRef>' +
       '<a:effectRef idx="0"><a:schemeClr val="accent1"/></a:effectRef><a:fontRef idx="major"><a:schemeClr val="lt1"/></a:fontRef></p:style>';
     const bytes = buildPptx({
+      // A major font that differs from the minor one, so the test shows which one applies.
+      majorFont: 'Liberation Serif',
       slides: [
         {
           layout: 'blank',
@@ -153,6 +155,6 @@ describe('shape style font reference', () => {
       }
     ).text!.paragraphs[0].runs[0].props;
     expect(hex(props.fill)).toBe('ffffff');
-    expect(props.latin).toBe('Calibri Light');
+    expect(props.latin).toBe('Liberation Serif');
   });
 });

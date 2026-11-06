@@ -7,7 +7,6 @@ This guide covers setup, checks, and pull requests for the monorepo.
 - [Bun](https://bun.sh/) 1.4.3, the CI version.
 - [Node.js](https://nodejs.org/) 22 or later.
 - Playwright Chromium for the fidelity harness: `bunx playwright install chromium`.
-- Poppler (`pdftoppm`, `pdftotext`) for the comparison with the reference PDFs.
 
 ## Development setup
 
@@ -128,91 +127,49 @@ When a change alters a pinned problem (for example, a fix changes the text that 
 
 ## Fidelity harness
 
-Every rendering feature lands with a synthetic fixture in `fixtures/` (`bun run fixtures:build`) and its harness result. Add its reference PDF next to it, with the same base name and its `fixtures/references.json` entry. Never commit content from the private corpus in `demo-presentations/`.
+The harness prints each fixture in `fixtures/` to PDF with the editor's own paint, and compares that PDF with the fixture's reference PDF. pdf.js draws and reads both PDFs in the same way. The check uses no system tools and no system fonts. Run it on your own machine; no container or second system is needed. Each slide must pass these checks (`scripts/fidelity/thresholds.ts`): at most 0.5 % of the pixels differ, every reference text line is in our page, our page has no other text lines, and each line is within 0.5 pt of the reference line, vertically (baseline) and horizontally (its nearer edge). Rotated, vertical, and right-to-left text is checked by pixels only. Save, reopen, and paint again must give the same SVG markup.
 
-### Commands
+Our PDF must draw only with fonts that the harness loaded: the fixture fonts, the engine's fonts, and two open fallback faces. A system font in our PDF fails the gate. A fixture's reference PDF must embed only the open fonts that its deck names. `NON_OPEN_FONT_DECKS` in `scripts/fidelity/local-fonts.ts` lists the exceptions (`font-substitution`).
 
-| Command | What it does |
+### Run
+
+```bash
+bun run fidelity          # every fixture: the gate
+bun run fidelity tables   # one fixture
+```
+
+Each deck prints one line. The gate summary says what to do next. The report is `fidelity-report/fixtures/index.html`: for each slide, our page, the reference page, the diff, and the scores. Both PDFs are in `fidelity-report/fixtures/<deck>/`.
+
+### Update the known gaps
+
+`FIXTURE_KNOWN_GAPS` in `scripts/fidelity/thresholds.ts` lists, for each slide that fails today, the checks it fails. It records no values, because rasters differ slightly between machines. The gate fails when a slide fails a check that is not listed, or passes a listed check. When your change fixes a check, remove it:
+
+```bash
+bun run fidelity --update-gaps
+```
+
+A new entry or kind is written only with `--accept-worse`. In CI, `scripts/fidelity/check-known-gaps.ts` accepts it only for a new fixture, or in a pull request that changes no engine or harness source. A limit can go away only with its reason in `RETIRED_LIMITS`.
+
+### Add a fixture
+
+1. Add the deck to `scripts/fixtures/build.ts` and run `bun run fixtures:build`. Use only the open fonts of the engine (Carlito, Liberation Sans, Serif, and Mono, Noto Sans CJK JP) and of `fixtures/fonts/` (Noto Sans Arabic, Noto Sans Symbols 2). Name a font for every script in the deck, also in the theme, so the presentation app uses no fallback font.
+2. Install those fonts where the presentation app runs, open the deck, and export `fixtures/<name>.pdf`. Any machine can export a reference.
+3. Run `bun run fidelity:record-reference <name>`. It records the deck and PDF hashes, the page count, and the page size in `fixtures/references.json`. A missing or stale reference is a gap, never a pass.
+4. Run `bun run fidelity <name> --update-gaps --accept-worse`, and commit the deck, the PDF, `references.json`, and `thresholds.ts`.
+
+### Other commands
+
+| Command | Use |
 | --- | --- |
-| `bun run fidelity` | Renders every fixture slide and compares it with the fixture's reference PDF. This is the CI gate. |
-| `bun run fidelity -- --print-gaps` | Prints the `FIXTURE_KNOWN_GAPS` entries that this run's values record. |
-| `bun run fidelity:check-gaps -- --base origin/main` | Checks that the known-gap list only tightens against the base branch. |
-| `bun run fidelity:missing` | Lists missing and stale references. `--check` exits 1 when one is missing or stale. |
-| `bun run fidelity:roundtrip -- --list <jobs> --out <dir> [--saved <dir>]` | Opens, saves, reopens, and edits each deck of a job list, with no browser. `--saved` keeps the saved copies for the save check. `--help` lists every flag. |
-| `bun run fidelity:corpus`, `bun run fidelity:census`, `bun run fidelity:calibrate --smoke` | Local checks over private decks. Never run them in CI. |
-| `bun scripts/fidelity/run.ts --list <jobs> --out <dir>` | Corpus mode: a JSON or JSON Lines job list of `{ "id", "deck", "pdf" }` in, one result line per deck out. `--shard i/n`, `--resume`, `--fresh`, and `--images` are available. |
-| `bun run validate:xsd` | Validates parts against the ECMA-376 Transitional schemas before and after save and after an edit session. |
+| `bun run fidelity:corpus` | The private decks in `demo-presentations/` (local only). `PPTX_HARNESS_FONT_DIRS` names the font folders of their reference fonts. Never commit these fonts. |
+| `bun scripts/fidelity/run.ts --list <jobs> --out <dir>` | Corpus mode for `eigenpal/pptx-eval`: a job list of `{ "id", "deck", "pdf" }` in, one result line per deck out. `--help` lists every flag. |
+| `bun run fidelity:roundtrip`, `fidelity:census`, `fidelity:calibrate` | Save checks with no browser, feature counts, and line model calibration over private decks. `--help` lists the flags. |
 
-The harness starts the demo's Vite server, opens `examples/vite/harness.html` in Playwright Chromium, and renders each slide through the editor's own `openPresentation`, `layoutSlide`, and `paintSlide`. It needs Poppler (`pdftoppm`, `pdftotext`) and Playwright Chromium.
+`PPTX_FIDELITY_JOBS` sets the number of parallel lanes (default: one for each core, at most 4).
 
-### Environment variables
+Schema validation cannot show a repair prompt. `bun run fidelity:roundtrip -- --list <fixture jobs> --out <dir> --saved <dir>` writes a saved and an edited copy of each fixture. Add a fixture to `SAVE_VERIFIED_FIXTURES` (`docs/site/data/save-verified-fixtures.ts`) only after both copies open with no prompt.
 
-Bun reads them from the git-ignored `.env.local`.
-
-| Variable | Use |
-| --- | --- |
-| `PPTX_HARNESS_FONT_DIRS` | The font folders that the harness loads fonts from, separated by `:`, in priority order. The first folders hold the reference fonts. A font collection (`.ttc`, `.otc`) gives the page each of its faces as a single font. Without it, the harness uses the metric-compatible substitutes. Never commit these fonts. |
-| `PPTX_FIDELITY_JOBS` | The number of harness lanes: child processes that score decks in parallel, each deck in a new browser context, so no score depends on the decks before it. The default is one for each core, at most 4. The report is the same for any number. |
-| `PPTX_FIDELITY_RASTER_CACHE` | The folder that keeps the fixture rasters between runs. The default is `.cache/fidelity-rasters`. |
-| `PPTX_EVAL_CORPUS` | The corpus folder for `bun run fidelity:calibrate --smoke`. |
-| `PPTX_EVAL_GENERATION` | The default reference generation for `bun run fidelity:calibrate --smoke`. `--generation` overrides it. |
-
-### Checks
-
-Thresholds and tolerances live in one file, `scripts/fidelity/thresholds.ts`. For each slide the harness checks the following.
-
-| Check | Rule |
-| --- | --- |
-| Slide size | The render and the raster are exactly their expected sizes. A reference page side is a whole number of points, so the raster is cut where the page rounds a side down (`PAGE_SIZE_TOLERANCE_PT`). |
-| Pixels | At most 0.5 % of the pixels differ, with anti-aliasing tolerance judged at the device scale. |
-| Line breaks | Every laid-out line appears as a PDF line with the same characters. Whitespace is ignored, and a bullet or number may lead. |
-| Baselines | Each baseline is within 0.5 pt of the glyph origin in the PDF. |
-| Save consistency | Save, reopen, and render again give identical pixels, compared at the device scale (see Supersampled rasters, below). |
-
-A reference is current while the deck and the PDF are the bytes that `fixtures/references.json` records. A stale or missing reference is a gap, never a pass. Hidden slides are not in the reference PDFs, so PDF pages map to the visible slides in order.
-
-Text in table cells, rotated text, and vertical text are checked by pixels only. Geometry is checked by pixels only.
-
-### Supersampled rasters
-
-The two rasterizers snap glyphs to the pixel grid in different ways. Chromium rounds each glyph's y to a whole device pixel. Poppler's Splash rasterizer floors it. At the comparison size of 2 px per point, an exactly placed line is then 1 px low in our image whenever the PDF baseline has a pixel fraction of 0.5 or more.
-
-So the harness works at `THRESHOLDS.rasterScale` (4) device pixels for each comparison pixel:
-
-1. Chromium paints the slide at device scale 4, and `pdftoppm` rasterizes the page at 4 times the resolution.
-2. `scripts/fidelity/supersample.ts` box-filters each image down to 1920 px wide with the same filter. The snapping now moves a glyph by at most 0.25 px.
-3. The pixel check finds the pixels that differ on the filtered images. It decides which differences are anti-aliasing on the device-scale images (`deviceAntialiased`): a differing pixel counts when its 4 × 4 block of device pixels has more real differences than anti-aliased ones. The filter turns every edge into a ramp, so pixelmatch's anti-aliasing test on the filtered images would excuse a stroke moved by 1 px.
-4. The save-consistency check compares the two device-scale renders, before the filter.
-
-`pdftoppm` writes PPM, which holds the same pixels as its PNG without the encoding. The fixture set keeps each device raster in `.cache/fidelity-rasters/`, compressed, under a key of the PDF's SHA-256, the Poppler version, and the `pdftoppm` options, so a later run reads it and does not run `pdftoppm`. A run over every fixture removes the entries that it did not use. CI restores this folder, and pushes to `main` save it. The save-consistency check compares the PNG bytes first: the same bytes are the same pixels.
-
-The thresholds are the same as at scale 1. These measurements on every fixture slide (macOS, reference fonts) support the method:
-
-- At scale 1, lines whose PDF baseline has a pixel fraction of 0.5 or more are 0.85 px low (median of 180 lines), and the other lines are 0.14 px high (142 lines). At scale 4, the two groups are 0.02 px high and 0.12 px low.
-- A text box moved down by 0.25, 0.5, 0.75, and 1 px scores higher at each step (`line-model/1`: 0.45 %, 0.55 %, 0.73 %, 0.95 %, 1.27 %). At scale 1 the score jumps at 0.5 px (0.29 % to 0.51 %).
-- Errors put into fixture decks fail or score worse, as at scale 1: a 1 pt move of the text on `line-model/1`, `line-model/2`, `text-runs/1`, `spacing/1`, and `alignment-anchor/1`; a 1 px move of a shape with a 1.5 pt outline; a 1 px move of a 4.5 pt double line; and a fill color that is 24 levels off in one channel. A fill 16 levels off passes at both scales (`THRESHOLDS.pixelThreshold`).
-- 39 slides pass, at scale 1 and at scale 4. 4 slides that fail on lines (`autofit/1`, `fills-lines/1`, `paragraph-format/1`, `vertical-columns/1`) fail on pixels too, and most pixel scores are higher, because a 1 px move of a stroke now counts.
-- Scale 8 breaks a pattern fill (`fill-fidelity/5`, 0.00 % to 1.56 %) and takes about 8 times longer than scale 1. Scale 4 takes about 2.5 times longer: about 5 minutes for the fixtures on a laptop.
-
-Each known-gap list records the `rasterScale` and the `antialiasing` mode that it was measured with. Each changed once, and every list was measured again in that change: the scale from 1 to 4, then the anti-aliasing test from the compared images (`images`) to the device-scale images (`device`). `bun run fidelity:check-gaps` rejects any other change of `THRESHOLDS.rasterScale` or `THRESHOLDS.antialiasing` (`RASTER_SCALE_MOVE` and `ANTIALIASING_MOVE` in `scripts/fidelity/check-known-gaps.ts`), so neither can re-record the lists again.
-
-The baseline of a PDF line is the glyph origin that carries most of the line's own text, so a raised or lowered run does not stand in for its line.
-
-### Known gaps
-
-`FIXTURE_KNOWN_GAPS` in `scripts/fidelity/thresholds.ts` lists, for each font environment, the slides that fail today, each threshold they miss, and the measured value. `bun run fidelity` exits 1 when a slide fails in a way its entry does not list, when a listed slide scores worse or better than its entry, when a reference is missing or stale, or when Poppler is not installed. When a slide gets better, record the new value in the same change.
-
-The list only tightens. A new entry, a new kind, or a looser value is allowed only for a new fixture, a changed deck with its new reference PDF, or a reference PDF from another macOS version or font set. A list that is measured again with other Poppler or Chromium versions records them in the list and may take new values. A renamed fixture keeps the entries of its old name. One looser value or smaller line count has an owner exception: `OWNER_GAP_EXCEPTION` in `scripts/fidelity/check-known-gaps.ts` names its exact slide, environment, kind, and values, and gives the evidence.
-
-The report is in `fidelity-report/<set>/index.html`. `gate.json` holds the gate's verdict, and `summary.json` holds each slide's scores. The CI artifact gives the `linux` entries.
-
-### Save check
-
-Schema validation cannot show a repair prompt. `bun run fidelity:roundtrip -- --list <fixture jobs> --out <dir> --saved <dir>` writes `<id>.saved.pptx` (open, save) and `<id>.edited.pptx` (a scripted edit session, then save) for each fixture. Open each copy and note any repair prompt. Add a fixture to `SAVE_VERIFIED_FIXTURES` in `docs/site/data/save-verified-fixtures.ts` only after both copies open with no prompt and with every slide. Repeat the check after a change to the store, the writer, or an op.
-
-### Approximations
-
-Name every approximation in `packages/core/src/layout/approximations.ts` and in the known approximations of `docs/site/content/pptx-fidelity.mdx`. A test keeps the two lists equal. Then name its id in `approximations` of the evidence entry of each feature row whose behavior it changes (`docs/site/data/pptx-feature-evidence.ts`). A test checks that every approximation that layout finds on a fixture is named by a row that lists such a fixture.
+Name every approximation in `packages/core/src/layout/approximations.ts`, in `docs/site/content/pptx-fidelity.mdx`, and in the evidence of each feature row that it changes (`docs/site/data/pptx-feature-evidence.ts`). Tests keep the lists equal.
 
 ## Write documentation
 

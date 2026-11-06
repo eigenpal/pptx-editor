@@ -7,5 +7,13 @@
   "proseWrap": "never",
   "bracketSpacing": true,
   "arrowParens": "always",
-  "endOfLine": "lf"
+  "endOfLine": "lf",
+  "overrides": [
+    {
+      "files": "AGENTS.md",
+      "options": {
+        "proseWrap": "preserve"
+      }
+    }
+  ]
 }

@@ -2,9 +2,9 @@
 // paragraphs (`a:pPr/@rtl`, ECMA-376 Part 1, 21.1.2.2.7 pPr) with Arabic and Hebrew runs, mixed
 // directions in one line, numbers in right-to-left text, right-to-left bullets and numbering,
 // and alignment and indents. `east-asian-line-breaking` holds CJK text with `eaLnBrk`,
-// `latinLnBrk`, and `hangingPunct` on and off, punctuation at line ends, and the `a:ea`, `a:cs`,
-// and `a:sym` run fonts (21.1.2.3.3 ea, 21.1.2.3.1 cs, 21.1.2.3.10 sym). Every run names its
-// fonts, so no theme fallback decides the face. `east-asian-theme-fonts` names no run font: its
+// `latinLnBrk`, and `hangingPunct` on and off, punctuation at line ends, and the `a:ea` and
+// `a:cs` run fonts (21.1.2.3.3 ea, 21.1.2.3.1 cs). Every run names its open fonts, so no theme
+// fallback decides the face. `east-asian-theme-fonts` names no run font: its
 // theme's `a:ea` is empty, and the theme script fonts (20.1.4.1.16 font) with each run's `lang`
 // and `altLang` decide the face. It also holds shared symbols in East Asian and Latin runs, and
 // Korean and Chinese text in narrow boxes. `east-asian-typography` holds custom `p:kinsoku`
@@ -37,17 +37,18 @@ function box(id: number, x: number, y: number, cx: number, cy: number, text: str
 
 // --- rtl-text ----------------------------------------------------------------
 
-const ARIAL = '<a:latin typeface="Arial"/><a:cs typeface="Arial"/>';
-const TAHOMA = '<a:latin typeface="Tahoma"/><a:cs typeface="Tahoma"/>';
-const DAVID = '<a:latin typeface="Arial"/><a:cs typeface="David"/>';
-const ar = (text: string, fonts = ARIAL, attrs?: string): string => r(text, 'ar-SA', fonts, attrs);
-const he = (text: string, fonts = ARIAL, attrs?: string): string => r(text, 'he-IL', fonts, attrs);
-const en = (text: string, fonts = ARIAL, attrs?: string): string => r(text, 'en-US', fonts, attrs);
+const LATIN = '<a:latin typeface="Liberation Sans"/><a:cs typeface="Liberation Sans"/>';
+/** Arabic: Liberation Sans has no Arabic glyphs, so the Arabic face is Noto Sans Arabic. */
+const ARABIC = '<a:latin typeface="Liberation Sans"/><a:cs typeface="Noto Sans Arabic"/>';
+const HEBREW_SERIF = '<a:latin typeface="Liberation Serif"/><a:cs typeface="Liberation Serif"/>';
+const ar = (text: string, fonts = ARABIC, attrs?: string): string => r(text, 'ar-SA', fonts, attrs);
+const he = (text: string, fonts = LATIN, attrs?: string): string => r(text, 'he-IL', fonts, attrs);
+const en = (text: string, fonts = LATIN, attrs?: string): string => r(text, 'en-US', fonts, attrs);
 const RTL_R = '<a:pPr algn="r" rtl="1"/>';
 
 const rtlText: FixtureSlide[] = [
   {
-    // Right-to-left paragraphs in Arabic and Hebrew, right aligned, in three faces.
+    // Right-to-left paragraphs in Arabic and Hebrew, right aligned; the last Hebrew paragraph in a serif face.
     shapes:
       box(
         2,
@@ -57,7 +58,7 @@ const rtlText: FixtureSlide[] = [
         3,
         p(ar('هذا نص عربي يبدأ من اليمين إلى اليسار.'), RTL_R) +
           p(ar('تتدفق الفقرة من اليمين، وتلتف الأسطر داخل المربع حسب عرضه دون أن تتغير الكلمات.'), RTL_R) +
-          p(ar('خط آخر للنص نفسه في فقرة ثالثة.', TAHOMA), RTL_R)
+          p(ar('خط آخر للنص نفسه في فقرة ثالثة.', ARABIC), RTL_R)
       ) +
       box(
         3,
@@ -67,7 +68,7 @@ const rtlText: FixtureSlide[] = [
         3,
         p(he('זהו טקסט בעברית שנכתב מימין לשמאל.'), RTL_R) +
           p(he('השורות נשברות בתוך התיבה לפי הרוחב שלה, והמילים נשארות שלמות.'), RTL_R) +
-          p(he('גופן אחר לאותו טקסט בפסקה שלישית.', DAVID), RTL_R)
+          p(he('גופן אחר לאותו טקסט בפסקה שלישית.', HEBREW_SERIF), RTL_R)
       ) +
       box(
         4,
@@ -75,8 +76,8 @@ const rtlText: FixtureSlide[] = [
         3.9,
         12.3,
         3,
-        p(ar('عنوان كبير بخط عريض', ARIAL, 'sz="3600" b="1"'), RTL_R) +
-          p(he('כותרת משנה בגופן נטוי', ARIAL, 'sz="2800" i="1"'), RTL_R) +
+        p(ar('عنوان كبير بخط عريض', ARABIC, 'sz="3600" b="1"'), RTL_R) +
+          p(he('כותרת משנה בגופן נטוי', LATIN, 'sz="2800" i="1"'), RTL_R) +
           p(ar('فقرة من اليمين إلى اليسار بمحاذاة إلى اليسار.'), '<a:pPr algn="l" rtl="1"/>') +
           p(en('A left-to-right paragraph in the same box, aligned left.'), '<a:pPr algn="l" rtl="0"/>')
       ),
@@ -127,10 +128,10 @@ const rtlText: FixtureSlide[] = [
         3.4,
         ['البند الأول من القائمة', 'البند الثاني أطول قليلا ويلتف إلى سطر جديد', 'البند الثالث']
           .map((t) =>
-            p(ar(t), '<a:pPr marL="342900" indent="-342900" algn="r" rtl="1"><a:buFont typeface="Arial"/><a:buChar char="•"/></a:pPr>')
+            p(ar(t), '<a:pPr marL="342900" indent="-342900" algn="r" rtl="1"><a:buFont typeface="Liberation Sans"/><a:buChar char="•"/></a:pPr>')
           )
           .join('') +
-          p(ar('بند فرعي في المستوى الثاني'), '<a:pPr marL="800100" lvl="1" indent="-342900" algn="r" rtl="1"><a:buFont typeface="Arial"/><a:buChar char="–"/></a:pPr>')
+          p(ar('بند فرعي في المستوى الثاني'), '<a:pPr marL="800100" lvl="1" indent="-342900" algn="r" rtl="1"><a:buFont typeface="Liberation Sans"/><a:buChar char="–"/></a:pPr>')
       ) +
       box(
         3,
@@ -164,7 +165,7 @@ const rtlText: FixtureSlide[] = [
         2.8,
         ['פריט עם תבליט', 'פריט נוסף']
           .map((t) =>
-            p(he(t), '<a:pPr marL="342900" indent="-342900" algn="r" rtl="1"><a:buFont typeface="Arial"/><a:buChar char="•"/></a:pPr>')
+            p(he(t), '<a:pPr marL="342900" indent="-342900" algn="r" rtl="1"><a:buFont typeface="Liberation Sans"/><a:buChar char="•"/></a:pPr>')
           )
           .join('') +
           p(ar('أ. بند مرقم بالحروف'), '<a:pPr marL="457200" indent="-457200" algn="r" rtl="1"><a:buFont typeface="+mj-lt"/><a:buAutoNum type="arabic1Minus"/></a:pPr>') +
@@ -209,7 +210,7 @@ const rtlText: FixtureSlide[] = [
 
 // --- east-asian-line-breaking ------------------------------------------------
 
-const YU_GOTHIC = '<a:latin typeface="Yu Gothic"/><a:ea typeface="Yu Gothic"/>';
+const YU_GOTHIC = '<a:latin typeface="Noto Sans CJK JP"/><a:ea typeface="Noto Sans CJK JP"/>';
 const ja = (text: string, fonts = YU_GOTHIC, attrs?: string): string => r(text, 'ja-JP', fonts, attrs);
 const brk = (ea: 0 | 1, latin: 0 | 1, hang: 0 | 1): string =>
   `<a:pPr eaLnBrk="${ea}" latinLnBrk="${latin}" hangingPunct="${hang}"/>`;
@@ -248,13 +249,13 @@ const eastAsian: FixtureSlide[] = [
         [0, 'Internationalization and localization in a narrow box, with latinLnBrk off.'],
       ]
         .map(([latin, text], i) =>
-          box(6 + i, 0.4 + i * 6.3, 3.8, 2.4, 3.2, p(r(String(text), 'en-US', '<a:latin typeface="Arial"/>', 'sz="2400"'), brk(1, latin as 0 | 1, 1)))
+          box(6 + i, 0.4 + i * 6.3, 3.8, 2.4, 3.2, p(r(String(text), 'en-US', '<a:latin typeface="Liberation Sans"/>', 'sz="2400"'), brk(1, latin as 0 | 1, 1)))
         )
         .join(''),
   },
   {
-    // The run fonts: `a:ea` for CJK text, `a:latin` for Latin text in the same run, `a:cs` for
-    // Arabic and Hebrew, and `a:sym` for symbol characters (U+F020 to U+F0FF).
+    // The run fonts: `a:ea` for CJK text, `a:latin` for Latin text in the same run, and `a:cs`
+    // for Arabic and Hebrew. Each slot names another open face, so the face shows the slot.
     shapes:
       box(
         2,
@@ -262,13 +263,11 @@ const eastAsian: FixtureSlide[] = [
         0.3,
         6.2,
         6.9,
-        p(ja('游ゴシックの日本語 Arial', '<a:latin typeface="Arial"/><a:ea typeface="Yu Gothic"/>')) +
-          p(ja('游明朝の日本語 Arial', '<a:latin typeface="Arial"/><a:ea typeface="Yu Mincho"/>')) +
-          p(ja('メイリオの日本語 Arial', '<a:latin typeface="Arial"/><a:ea typeface="Meiryo"/>')) +
-          p(r('宋体的中文文本 Arial', 'zh-CN', '<a:latin typeface="Arial"/><a:ea typeface="SimSun"/>')) +
-          p(r('等线的中文文本 Arial', 'zh-CN', '<a:latin typeface="Arial"/><a:ea typeface="DengXian"/>')) +
-          p(r('맑은 고딕 한국어 텍스트 Arial', 'ko-KR', '<a:latin typeface="Arial"/><a:ea typeface="Malgun Gothic"/>')) +
-          p(r('Latin text only, with an ea font that it does not use', 'en-US', '<a:latin typeface="Arial"/><a:ea typeface="Yu Mincho"/>'))
+        p(ja('日本語の文 Liberation Serif', '<a:latin typeface="Liberation Serif"/><a:ea typeface="Noto Sans CJK JP"/>')) +
+          p(ja('日本語の文 Liberation Sans', '<a:latin typeface="Liberation Sans"/><a:ea typeface="Noto Sans CJK JP"/>')) +
+          p(r('简体中文的文本 Liberation Serif', 'zh-CN', '<a:latin typeface="Liberation Serif"/><a:ea typeface="Noto Sans CJK JP"/>')) +
+          p(r('한국어 텍스트 Liberation Serif', 'ko-KR', '<a:latin typeface="Liberation Serif"/><a:ea typeface="Noto Sans CJK JP"/>')) +
+          p(r('Latin text only, with an ea font that it does not use', 'en-US', '<a:latin typeface="Liberation Serif"/><a:ea typeface="Noto Sans CJK JP"/>'))
       ) +
       box(
         3,
@@ -276,21 +275,13 @@ const eastAsian: FixtureSlide[] = [
         0.3,
         6.1,
         6.9,
-        p(r('نص عربي بخط Tahoma', 'ar-SA', '<a:latin typeface="Arial"/><a:cs typeface="Tahoma"/>'), RTL_R) +
-          p(r('טקסט בעברית בגופן David', 'he-IL', '<a:latin typeface="Arial"/><a:cs typeface="David"/>'), RTL_R) +
+        p(r('نص عربي بخط Noto Sans Arabic', 'ar-SA', '<a:latin typeface="Liberation Sans"/><a:cs typeface="Noto Sans Arabic"/>'), RTL_R) +
+          p(r('טקסט בעברית בגופן Liberation Serif', 'he-IL', '<a:latin typeface="Liberation Sans"/><a:cs typeface="Liberation Serif"/>'), RTL_R) +
           p(
-            r('Wingdings: ', 'en-US', '<a:latin typeface="Arial"/>') +
-              r('', 'en-US', '<a:latin typeface="Arial"/><a:sym typeface="Wingdings"/>')
-          ) +
-          p(
-            r('Symbol: ', 'en-US', '<a:latin typeface="Arial"/>') +
-              r('', 'en-US', '<a:latin typeface="Arial"/><a:sym typeface="Symbol"/>')
-          ) +
-          p(
-            ja('混在：', YU_GOTHIC) +
-              r('Arial ', 'en-US', '<a:latin typeface="Arial"/>') +
-              r('عربي', 'ar-SA', '<a:latin typeface="Arial"/><a:cs typeface="Tahoma"/>') +
-              ja(' 日本語', YU_GOTHIC)
+            ja('混在：') +
+              r('Liberation Sans ', 'en-US', '<a:latin typeface="Liberation Sans"/>') +
+              r('عربي', 'ar-SA', '<a:latin typeface="Liberation Sans"/><a:cs typeface="Noto Sans Arabic"/>') +
+              ja(' 日本語')
           )
       ),
   },
@@ -300,11 +291,11 @@ const eastAsian: FixtureSlide[] = [
 
 /** The theme script fonts of `east-asian-theme-fonts`, in both theme font collections. */
 const THEME_SCRIPT_FONTS: readonly (readonly [string, string])[] = [
-  ['Jpan', 'Yu Gothic'],
-  ['Hans', 'DengXian'],
-  ['Hant', 'Microsoft JhengHei'],
-  ['Hang', 'Malgun Gothic'],
-  ['Arab', 'Tahoma'],
+  ['Jpan', 'Noto Sans CJK JP'],
+  ['Hans', 'Noto Sans CJK JP'],
+  ['Hant', 'Noto Sans CJK JP'],
+  ['Hang', 'Noto Sans CJK JP'],
+  ['Arab', 'Noto Sans Arabic'],
 ];
 
 /** A run that names no font: the theme decides each slot. */
@@ -314,34 +305,35 @@ const lr = (text: string, lang: string, altLang?: string): string =>
 /** The `east-asian-theme-fonts` deck: the theme names the East Asian faces by script. */
 export function eastAsianThemeFontsDeck(): FixtureOptions {
   return {
-    majorFont: 'Arial',
-    minorFont: 'Arial',
+    majorFont: 'Liberation Serif',
+    minorFont: 'Liberation Serif',
     scriptFonts: THEME_SCRIPT_FONTS,
     slides: [
       {
         shapes:
-          // Each language takes its script font; Latin text in the same run stays Arial.
+          // Each language takes its script font; Latin text in the same run stays Liberation Serif.
           box(
             2,
             0.4,
             0.3,
             6.2,
             4.2,
-            p(lr('日本語のテーマ Arial', 'ja-JP')) +
-              p(lr('简体中文的主题 Arial', 'zh-CN')) +
-              p(lr('繁體中文的主題 Arial', 'zh-TW')) +
-              p(lr('한국어 테마 글꼴 Arial', 'ko-KR')) +
-              p(lr('代替言語の日本語 Arial', 'en-US', 'ja-JP')) +
-              p(lr('نص عربي Arial', 'ar-SA'), RTL_R)
+            p(lr('日本語のテーマ Latin', 'ja-JP')) +
+              p(lr('简体中文的主题 Latin', 'zh-CN')) +
+              p(lr('繁體中文的主題 Latin', 'zh-TW')) +
+              p(lr('한국어 테마 글꼴 Latin', 'ko-KR')) +
+              p(lr('代替言語の日本語 Latin', 'en-US', 'ja-JP')) +
+              p(lr('نص عربي Latin', 'ar-SA'), RTL_R)
           ) +
           // Shared symbols: curly quotes, the ellipsis, and arrows in a Japanese and a Latin run.
+          // Only symbols that the open faces hold: any other symbol takes a fallback face.
           box(
             3,
             6.8,
             0.3,
             6.1,
             2,
-            p(lr('“引用”…→ ①②③ ※', 'ja-JP')) + p(lr('“Quote”…→ ①②③ ※', 'en-US'))
+            p(lr('“引用”…→ ①②③', 'ja-JP')) + p(lr('“Quote”…→', 'en-US'))
           ) +
           // Korean and Chinese text in narrow boxes: where each line breaks.
           box(
@@ -421,8 +413,8 @@ export function eastAsianTypographyDeck(): FixtureOptions {
             0.2,
             3.2,
             5.4,
-            p(r('한국어 문단을 양쪽 맞춤으로 정렬하면 단어 사이와 글자 사이의 간격이 넓어집니다.', 'ko-KR', '<a:latin typeface="Arial"/><a:ea typeface="Malgun Gothic"/>'), '<a:pPr algn="just"/>') +
-              p(r('균등 분할 정렬은 마지막 줄도 채웁니다.', 'ko-KR', '<a:latin typeface="Arial"/><a:ea typeface="Malgun Gothic"/>'), '<a:pPr algn="dist"/>')
+            p(r('한국어 문단을 양쪽 맞춤으로 정렬하면 단어 사이와 글자 사이의 간격이 넓어집니다.', 'ko-KR', '<a:latin typeface="Liberation Sans"/><a:ea typeface="Noto Sans CJK JP"/>'), '<a:pPr algn="just"/>') +
+              p(r('균등 분할 정렬은 마지막 줄도 채웁니다.', 'ko-KR', '<a:latin typeface="Liberation Sans"/><a:ea typeface="Noto Sans CJK JP"/>'), '<a:pPr algn="dist"/>')
           ),
       },
     ],

@@ -1,63 +1,81 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
-import { PNG } from 'pngjs';
 import { buildPptx } from '../fixtures/builder.ts';
-import { hasPoppler } from './references.ts';
-import { ResetFailed } from './harness-page.ts';
+import { deliverUpload, ResetFailed } from './harness-page.ts';
 import { scoreDeck, scoreSafely } from './score-deck.ts';
-import { THRESHOLDS } from './thresholds.ts';
 
-/** A white PNG of `width` × `height` px. */
-function white(width: number, height: number): Buffer {
-  const p = new PNG({ width, height });
-  p.data.fill(255);
-  return PNG.sync.write(p);
+/**
+ * A PDF of two 960 × 540 pt pages whose text uses Helvetica without embedding it, built by hand
+ * with a correct cross-reference table.
+ */
+function pdfWithoutEmbeddedFont(): Uint8Array {
+  const page = (content: number) =>
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 960 540] /Resources << /Font << /F1 5 0 R >> >> /Contents ${content} 0 R >>`;
+  const text = 'BT /F1 24 Tf 72 400 Td (Not embedded) Tj ET';
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+    page(6),
+    page(6),
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${text.length} >>\nstream\n${text}\nendstream`,
+  ];
+  let out = '%PDF-1.4\n';
+  const offsets: number[] = [];
+  objects.forEach((body, i) => {
+    offsets.push(out.length);
+    out += `${i + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const o of offsets) out += `${String(o).padStart(10, '0')} 00000 n \n`;
+  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return new TextEncoder().encode(out);
 }
-const WHITE = white(4, 3);
 
-/** A PNG made `scale` times larger, each pixel repeated, as Chromium paints at a device scale. */
-function upscale(png: Buffer, scale: number): Buffer {
-  const src = PNG.sync.read(png);
-  const out = new PNG({ width: src.width * scale, height: src.height * scale });
-  for (let y = 0; y < out.height; y += 1)
-    for (let x = 0; x < out.width; x += 1)
-      src.data.copy(
-        out.data,
-        (y * out.width + x) * 4,
-        (((y / scale) | 0) * src.width + ((x / scale) | 0)) * 4,
-        (((y / scale) | 0) * src.width + ((x / scale) | 0)) * 4 + 4
-      );
-  return PNG.sync.write(out);
-}
+/** A real PDF of two 960 × 540 pt pages in the open fonts that ship with the engine. */
+const TWO_PAGES = join(import.meta.dir, '../../fixtures/groups-transforms.pdf');
 
 /**
  * A harness page without Chromium. It answers the calls of `harness-page.ts` to the page's
- * `__pptxHarness` API: open, render, and reopenSaved. Its screenshot of `render` is at the raster
- * scale, as the real page paints it (`THRESHOLDS.rasterScale`).
+ * `__pptxHarness` API (open, render, print, endPrint, reopenSaved, rasterPdf) and `page.pdf`.
+ * Each slide paints `markup(reopened)`; `page.pdf` gives `printed`; every PDF page draws white.
  */
 function fakePage(
   slides: number,
   evaluate?: (code: string) => Promise<unknown>,
-  render: Buffer = WHITE
+  markup: (reopened: boolean) => string = () => 'same',
+  printed: Uint8Array = new Uint8Array(readFileSync(TWO_PAGES))
 ): Page {
-  const shot = upscale(render, THRESHOLDS.rasterScale);
+  let reopened = false;
   return {
-    async evaluate(fn: unknown) {
+    async evaluate(fn: unknown, arg?: unknown) {
       const code = String(fn);
-      // The capture waits for fonts, as Playwright's screenshot does.
-      if (code.includes('document.fonts.ready')) return undefined;
       if (evaluate) return evaluate(code);
+      if (code.includes('.rasterPdf(')) {
+        const a = arg as { width: number; height: number; pages: { rgba: string; png: string }[] };
+        const white = Bun.gzipSync(new Uint8Array(a.width * a.height * 4).fill(255));
+        for (const p of a.pages) {
+          deliverUpload(p.rgba, new Uint8Array(white));
+          deliverUpload(p.png, new Uint8Array([0x89]));
+        }
+        return undefined;
+      }
       if (code.includes('.open('))
         return { slides, received: { deck: { bytes: 0, sha256: '' }, fonts: [] } };
-      if (code.includes('.reopenSaved(')) return { slides };
-      if (code.includes('.render(')) return { lines: [], diagnostics: [] };
+      if (code.includes('.reopenSaved(')) {
+        reopened = true;
+        return { slides };
+      }
+      if (code.includes('.render('))
+        return { diagnostics: [], fonts: [], markup: markup(reopened) };
+      if (code.includes('.print(') || code.includes('.endPrint(')) return undefined;
       throw new Error(`unexpected harness call: ${code}`);
     },
-    viewportSize: () => null,
-    locator: () => ({ boundingBox: async () => null, screenshot: async () => shot }),
+    pdf: async () => Buffer.from(printed),
   } as unknown as Page;
 }
 
@@ -94,145 +112,80 @@ describe('scoreDeck', () => {
     expect(r.slides.every((s) => s.selfConsistent)).toBe(true);
   });
 
+  test('a slide is save-consistent only when it paints the same markup after reopen', async () => {
+    const r = await scoreDeck(
+      fakePage(3, undefined, (again) => (again ? 'after' : 'before')),
+      {
+        file: deck,
+        name: 'd',
+      }
+    );
+    expect(r.slides.map((s) => s.selfConsistent)).toEqual([false, false, false]);
+  });
+
   test('a PDF that does not open is stale, with a fixed reason and never its path', async () => {
     const pdf = join(dir, 'secret client name.pdf');
     writeFileSync(pdf, 'not a PDF');
     const r = await scoreDeck(fakePage(3), { file: deck, name: 'd', pdf });
     expect(r.reference).toBe('stale');
-    expect(r.referenceIssues).toEqual(['the PDF does not open (pdfinfo failed)']);
+    expect(r.referenceIssues).toEqual(['pdf.js cannot read the PDF']);
     expect(JSON.stringify(r)).not.toContain('secret');
   });
 
-  test.skipIf(!hasPoppler())('a PDF with another page count is stale', async () => {
+  test('a PDF with another page count is stale', async () => {
     const pdf = join(import.meta.dir, '../../fixtures/slide-structure.pdf'); // 4 pages
     const r = await scoreDeck(fakePage(3), { file: deck, name: 'd', pdf });
     expect(r.referenceIssues).toEqual(['the PDF has 4 pages, the deck has 2 visible slides']);
     expect(r.slides.map((s) => s.status)).toEqual(['stale', 'no-reference', 'stale']);
   });
 
-  test.skipIf(!hasPoppler())(
-    'an A4 slide is compared with the slide area of its 842 × 596 pt page, and its render size is checked',
-    async () => {
-      // The render of the 842 × 595.5 pt `slide-size` fixture is 1920 × 1358 px. Scaled to
-      // 1920 px wide, the whole page would be 1360 px high.
-      const fixtures = join(import.meta.dir, '../../fixtures');
-      const r = await scoreDeck(fakePage(1, undefined, white(1920, 1358)), {
-        file: join(fixtures, 'slide-size.pptx'),
-        name: 'slide-size',
-        pdf: join(fixtures, 'slide-size.pdf'),
-      });
-      expect(r.reference).toBe('pdf');
-      expect(r.slides[0].sizeMismatch).toBe(false);
-      // A white render misses the fixture's shapes: the pixels are compared, not refused.
-      expect(r.slides[0].pixelMismatch).toBeGreaterThan(0);
-      expect(r.slides[0].pixelMismatch).toBeLessThan(1);
-      // A render that is cut short fails on size, with the sizes.
-      const cut = await scoreDeck(fakePage(1, undefined, white(1920, 1300)), {
-        file: join(fixtures, 'slide-size.pptx'),
-        name: 'slide-size',
-        pdf: join(fixtures, 'slide-size.pdf'),
-      });
-      expect(cut.slides[0]).toMatchObject({
-        status: 'fail',
-        sizeMismatch: true,
-        renderSizePx: [1920, 1300],
-        referenceSizePx: [1920, 1358],
-      });
-      // No pixel score: the images were not compared.
-      expect(cut.slides[0].pixelMismatch).toBeUndefined();
-      expect(cut.slides[0].cause).toBe(
-        'slide size differs: the render does not have its expected size'
-      );
-      expect(cut.slides[0].sizeDetail).toBe(
-        'the render is 1920 × 1300 px, 1920 × 1358 px expected, and the PDF raster is 1920 × 1358 px, as expected'
-      );
-      // A size failure adds only measured line causes; the diagnostics cannot explain a size.
-      const noisy = fakePage(
-        1,
-        async (code) => {
-          if (code.includes('.open(')) return { slides: 1, substitutions: [] };
-          if (code.includes('.reopenSaved(')) return { slides: 1 };
-          if (code.includes('.render('))
-            return { lines: [], diagnostics: ['font substituted: Calibri', 'approximation: blur'] };
-          throw new Error(code);
-        },
-        white(1920, 1300)
-      );
-      const sized = await scoreDeck(noisy, {
-        file: join(fixtures, 'slide-size.pptx'),
-        name: 'slide-size',
-        pdf: join(fixtures, 'slide-size.pdf'),
-      });
-      expect(sized.slides[0].cause).toBe(
-        'slide size differs: the render does not have its expected size'
-      );
-      // A measured line cause follows the size cause.
-      const withLine = fakePage(
-        1,
-        async (code) => {
-          if (code.includes('.open(')) return { slides: 1, substitutions: [] };
-          if (code.includes('.reopenSaved(')) return { slides: 1 };
-          if (code.includes('.render('))
-            return {
-              lines: [{ node: 'n', text: 'A line', baselinePt: 100, leftPt: 0 }],
-              diagnostics: ['font substituted: Calibri'],
-            };
-          throw new Error(code);
-        },
-        white(1920, 1300)
-      );
-      const both = await scoreDeck(withLine, {
-        file: join(fixtures, 'slide-size.pptx'),
-        name: 'slide-size',
-        pdf: join(fixtures, 'slide-size.pdf'),
-      });
-      expect(both.slides[0].cause).toBe(
-        'slide size differs: the render does not have its expected size; the PDF has no text for the laid-out line'
-      );
-    },
-    // Four real Poppler scorings at the supersampled raster size: about 22 s alone, and more
-    // than 30 s while the parallel suite runs every other file beside it.
-    120_000
-  );
+  test('with real PDFs, the visible slides compare page by page and the hidden one has no page', async () => {
+    const r = await scoreDeck(fakePage(3), { file: deck, name: 'd', pdf: TWO_PAGES });
+    expect(r.reference).toBe('pdf');
+    expect(r.foreignFonts).toEqual([]);
+    expect(r.slides.map((s) => [s.index, s.page, s.hidden, s.status])).toEqual([
+      [1, 1, false, 'pass'],
+      [2, undefined, true, 'no-reference'],
+      [3, 2, false, 'pass'],
+    ]);
+    expect(r.slides[0].linesTotal).toBeGreaterThan(0);
+    expect(r.slides[0].pixelMismatch).toBe(0);
+  });
 
-  test.skipIf(!hasPoppler())(
-    'a slide whose page the reference PDF rounded down expects the shorter raster',
-    async () => {
-      // 400.25 × 300.5 pt on a 400 × 301 pt page: the render is 1920 px wide, the raster 1919 px.
-      const fixtures = join(import.meta.dir, '../../fixtures');
-      const r = await scoreDeck(fakePage(1, undefined, white(1920, 1441)), {
-        file: join(fixtures, 'slide-size-rounding.pptx'),
-        name: 'slide-size-rounding',
-        pdf: join(fixtures, 'slide-size-rounding.pdf'),
-      });
-      expect(r.slides[0]).toMatchObject({
-        sizeMismatch: false,
-        renderSizePx: [1920, 1441],
-        referenceSizePx: [1919, 1441],
-      });
-    },
-    // A real Poppler scoring; under load it takes more than the default 5 s.
-    30_000
-  );
+  test('fonts of our PDF that the harness did not load are listed', async () => {
+    // The fonts that are not open, on purpose: the reference of `font-substitution`.
+    const pdf = join(import.meta.dir, '../../fixtures/font-substitution.pdf'); // one page
+    const one = join(dir, 'one.pptx');
+    writeFileSync(
+      one,
+      buildPptx({ width: 12_192_000, height: 6_858_000, slides: [{ shapes: '' }] })
+    );
+    const page = fakePage(1, undefined, undefined, new Uint8Array(readFileSync(pdf)));
+    const r = await scoreDeck(page, { file: one, name: 'd', pdf });
+    expect(r.foreignFonts).toEqual(['Aptos', 'ArialMT', 'Calibri', 'SegoeUI']);
+  });
 
-  test.skipIf(!hasPoppler())(
-    'a PDF that does not rasterize in time is not scored, and is no stale reference',
-    async () => {
-      const pdf = join(import.meta.dir, '../../fixtures/slide-structure.pdf');
-      const four = join(dir, 'four.pptx');
-      writeFileSync(
-        four,
-        buildPptx({
-          width: 12_192_000,
-          height: 6_858_000,
-          slides: [{ shapes: '' }, { shapes: '' }, { shapes: '' }, { shapes: '' }],
-        })
-      );
-      await expect(
-        scoreDeck(fakePage(4), { file: four, name: 'd', pdf, rasterLimitMs: 1 })
-      ).rejects.toThrow('Poppler did not finish within 0.001 s, so the deck is not scored');
-    }
-  );
+  test('a reference PDF with a font that it does not embed is stale', async () => {
+    const pdf = join(dir, 'reference.pdf');
+    writeFileSync(pdf, pdfWithoutEmbeddedFont());
+    const r = await scoreDeck(fakePage(3), { file: deck, name: 'd', pdf });
+    expect(r.reference).toBe('stale');
+    expect(r.referenceIssues).toEqual(['the PDF does not embed the font Helvetica']);
+  });
+
+  test('a font of our PDF that is not embedded is listed', async () => {
+    const page = fakePage(3, undefined, undefined, pdfWithoutEmbeddedFont());
+    const r = await scoreDeck(page, { file: deck, name: 'd', pdf: TWO_PAGES });
+    expect(r.foreignFonts).toEqual(['Helvetica (not embedded)']);
+  });
+
+  test('our PDF must have one page of the slide size for each visible slide', async () => {
+    const ours = join(import.meta.dir, '../../fixtures/slide-size.pdf'); // A4, one page
+    const page = fakePage(3, undefined, undefined, new Uint8Array(readFileSync(ours)));
+    await expect(scoreDeck(page, { file: deck, name: 'd', pdf: TWO_PAGES })).rejects.toThrow(
+      'our PDF has 1 pages for 2 slides'
+    );
+  });
 
   test('the editor and the package reader must count the same slides', async () => {
     const r = await scoreDeck(fakePage(5), { file: deck, name: 'd' });
