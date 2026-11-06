@@ -31,8 +31,12 @@ export const MAX_LABEL_UNITS = 512;
 const MAX_FACE_UNITS = 128;
 const MAX_LINES = 16;
 
-/** Line height of the default chart face, as a multiple of the size. */
-export const CHART_LINE_HEIGHT = 1.22;
+/**
+ * The ascent and descent of the default chart face (Calibri: 1950 and 550 of 2048 units), as
+ * multiples of the size, for chart text laid out without a measurer.
+ */
+const DEFAULT_ASCENT = 0.952;
+const DEFAULT_DESCENT = 0.268;
 
 export interface ChartTextStyle {
   readonly sizePt: number;
@@ -142,24 +146,47 @@ export function chartTypeface(face: string, theme: Theme): string {
   return resolveThemeFont(face, theme) ?? theme.minorFont.latin ?? 'Calibri';
 }
 
+/** The face the layout's measurer sets `style` in. */
+function faceOf(style: ChartTextStyle, { measurer, theme }: ChartTextContext) {
+  return measurer.resolve({
+    family: chartTypeface(style.latin, theme),
+    bold: style.bold,
+    italic: style.italic,
+  });
+}
+
 /** Advance width of `text` in points, measured with the layout's measurer. */
 export function measureTextWidth(text: string, style: ChartTextStyle): number {
   if (!context) return 0;
   const measured = text.length > MAX_LABEL_UNITS ? text.slice(0, MAX_LABEL_UNITS) : text;
   if (measured === '') return 0;
-  const face = context.measurer.resolve({
-    family: chartTypeface(style.latin, context.theme),
-    bold: style.bold,
-    italic: style.italic,
-  });
+  const face = faceOf(style, context);
   let total = 0;
   for (const advance of context.measurer.advances(face, measured)) total += advance;
   return total * style.sizePt;
 }
 
-/** Height of one line of `style`, in points. */
+/**
+ * The ascent and descent of the face that sets `style`, as multiples of the size. The engine
+ * sets each line of chart text on these (`BodyProps.faceLines`), so the room that a chart keeps
+ * for its labels follows the face, not one font.
+ */
+function faceExtent(style: ChartTextStyle): { readonly ascent: number; readonly descent: number } {
+  const metrics = context ? faceOf(style, context).metrics : null;
+  return metrics && metrics.ascent > 0 && metrics.descent >= 0
+    ? metrics
+    : { ascent: DEFAULT_ASCENT, descent: DEFAULT_DESCENT };
+}
+
+/** Height of one line of `style`, in points: the face's ascent plus descent. */
 export function lineHeight(style: ChartTextStyle): number {
-  return style.sizePt * CHART_LINE_HEIGHT;
+  const { ascent, descent } = faceExtent(style);
+  return style.sizePt * (ascent + descent);
+}
+
+/** Distance from the top of a line of `style` to its baseline, in points: the face's ascent. */
+export function baselineDrop(style: ChartTextStyle): number {
+  return style.sizePt * faceExtent(style).ascent;
 }
 
 /** One run of label text with its style. */

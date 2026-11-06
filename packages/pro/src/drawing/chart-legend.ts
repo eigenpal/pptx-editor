@@ -17,6 +17,7 @@ import {
   type SeriesLook,
 } from './chart-series.ts';
 import {
+  baselineDrop,
   measureTextWidth,
   lineHeight,
   type ChartLabel,
@@ -141,7 +142,7 @@ export function placeLegend(
   const line = lineHeight(style);
   const plot = { ...box };
   const items: { entry: LegendEntry; x: number; baseline: number }[] = [];
-  const baselineOffset = size * 0.952;
+  const baselineOffset = baselineDrop(style);
   if (entries.length === 0) return { layout: { items }, plot };
   const manual = legend.layout;
   if (legend.position === 'b' || legend.position === 't') {
@@ -281,7 +282,7 @@ export function paintLegend(
       paragraphs: [[{ text: entry.text, style }]],
       align: 'l',
       x: textX,
-      y: item.baseline - size * 0.952,
+      y: item.baseline - baselineDrop(style),
       width: estimate * 1.3 + size * 2,
       height: line,
       rotation: 0,
