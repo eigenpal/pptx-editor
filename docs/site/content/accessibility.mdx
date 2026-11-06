@@ -34,7 +34,7 @@ The editor renders inside your page. It does not add page-level structure. Give 
 </html>
 ```
 
-The [quickstart](/docs/quickstart) and the demos in `examples/` follow these rules.
+The demos in `examples/` follow these rules. The [quickstart](/docs/quickstart) shows the `<main>` landmark and the file input label.
 
 If you build your own controls, keep them accessible. A disabled control stays focusable with `aria-disabled` and tells the user why it is off. See [Customization](/docs/customization).
 
@@ -60,12 +60,12 @@ The slide is one Tab stop (role `group`). When the slide has focus, these keys a
 
 Inside a group, Tab and Shift+Tab cycle through the shapes of the group.
 
-While you edit text, Tab changes the list level of a list paragraph, and inserts a tab elsewhere. Press Escape first to move with Tab again. In a table cell, Tab and Shift+Tab move to the next or the previous cell. See [Tables](/docs/guides/tables).
+While you edit text, Tab and Shift+Tab change the list level. This applies in a list, at the start of a paragraph, or across paragraphs. Elsewhere, Tab inserts a tab. Press Escape first to move with Tab again. In a table cell, Tab and Shift+Tab move to the next or the previous cell. See [Tables](/docs/guides/tables).
 
 ### Toolbar, menus, and dialogs
 
 - The toolbar is one Tab stop. The Left and Right arrow keys, Home, and End move through its controls. In a right-to-left interface, Left and Right change places.
-- The ribbon tabs are a `tablist`. The arrow keys, Home, and End move between tabs.
+- The ribbon tabs are a `tablist`. The Left and Right arrow keys, Home, and End move between tabs.
 - The menu bar is one Tab stop. Escape closes a menu and keeps focus on its menu bar item.
 - A popover, such as a color or font picker, returns focus to its trigger on Escape.
 - A context menu returns focus to where it was on Escape. Shift+F10 and the context menu key open it from the keyboard.
@@ -86,13 +86,13 @@ The slide list in the rail is one Tab stop. The focused slide is the current sli
 | Ctrl/Cmd+D                                  | Duplicate the selected slides.        |
 | Shift+F10, context menu key                 | Open the slide menu.                  |
 
-In the viewing mode, the keys that change the deck do nothing and the editor tells why. With sections, the list is a tree: the arrow keys also stop on each section header.
+In the viewing mode, the slide list keys that change the deck do nothing, and the editor tells why. With sections, the list is a tree: the arrow keys also stop on each section header. Home and End go to the first and the last row, which can be a section header.
 
-The slide sorter is one Tab stop. The arrow keys move through the grid of slides. Home and End go to the start and the end of the grid.
+The slide sorter is one Tab stop. The arrow keys move through the grid of slides. Home and End go to the start and the end of the grid. Enter opens the focused slide. Shift+arrow, Ctrl/Cmd+arrow, Delete, Ctrl/Cmd+D, Ctrl+M, and Shift+F10 work as in the slide list.
 
 ### Slide show
 
-F5 starts the show from the first slide. Shift+F5 starts it from the current slide.
+F5 starts the show from the first slide that is not hidden. Shift+F5 starts it from the current slide.
 
 | Key                                     | Action                         |
 | --------------------------------------- | ------------------------------ |
@@ -116,7 +116,7 @@ The editor takes its accessible names from the locale catalog, so they change wi
 | Text editing | The text input "Text of the selected shape". |
 | Table cell | A polite announcement, "Row 2, column 3", when the caret moves to a cell. |
 | Link in the text | A polite announcement, "Link: https://example.com. Press F6 for its actions." F6 moves focus to the link actions. |
-| Slide list | A list box "Slides" with items "Slide 4", or "Slide 4 (hidden)" for a hidden slide. |
+| Slide list | A navigation region "Slides" with a list box "Slides". With sections, the list is a tree. Items are "Slide 4", or "Slide 4 (hidden)" for a hidden slide. |
 | Speaker notes | A region "Speaker notes", with a multiline text box. |
 | Status bar | A polite announcement, "Slide 3 of 12", when the slide changes. |
 | Slide show | A modal dialog "Slide show". A polite announcement gives the position, "Slide 3 of 12", at each slide. When you type a number, a status message says "Go to slide 5". |
@@ -131,8 +131,8 @@ The editor takes its accessible names from the locale catalog, so they change wi
 
 These limits apply today:
 
-- **Picture alt text.** You can set alt text, a title, and "Mark as decorative" in the Alt Text dialog. The editor saves them in the file. The slide does not yet give the alt text to a screen reader.
-- **Slide content structure.** The slide is drawn as SVG. A screen reader gets no headings, lists, or reading order from the slide. It gets the shape name only when a shape is selected. When more than one shape is selected, it hears no announcement.
+- **Picture alt text.** You can set alt text, a title, and "Mark as decorative" in the Alt text dialog. The editor saves them in the file. The slide does not yet give the alt text to a screen reader.
+- **Slide content structure.** The slide is drawn as SVG. A screen reader gets the slide text only as flat text, in z-order. It gets no headings, lists, or reading order. It gets the shape name only when a shape is selected. When more than one shape is selected, it hears no announcement.
 - **Slide show content.** In the slide show, each slide is an image with no text alternative. A screen reader hears the slide position, not the slide text.
 - **Forced colors.** The chrome does not yet change for a forced colors (high contrast) mode.
 
