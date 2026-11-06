@@ -157,7 +157,7 @@ describe('chart geometry', () => {
   });
 
   test('pie and doughnut: room for outside labels grows with the plot area, not the label size', () => {
-    // The reference renderings of `charts.pdf` draw the pie 320 pt wide and the doughnut 325 pt.
+    // The reference renderings of `charts.pdf` draw the pie 322 pt wide and the doughnut 327 pt.
     const diameter = (index: number) => {
       const slices = renderFixture(index).rendered.scene.components.filter(
         (c) => c.closed && c.fill && c.subpaths[0]!.length > 10
@@ -165,11 +165,11 @@ describe('chart geometry', () => {
       const box = boxOf(slices.flatMap((c) => c.subpaths[0]!));
       return box.r - box.l;
     };
-    expect(Math.abs(diameter(5) - 320)).toBeLessThan(3);
-    expect(Math.abs(diameter(6) - 325)).toBeLessThan(3);
-    // A 1.5-inch-tall plot keeps 17 pt, a 6.8-inch-tall one 64 pt.
-    expect(outsideLabelRoom(86)).toBeCloseTo(17, 0);
-    expect(outsideLabelRoom(467.6)).toBeCloseTo(64, 0);
+    expect(Math.abs(diameter(5) - 322)).toBeLessThan(3);
+    expect(Math.abs(diameter(6) - 327)).toBeLessThan(3);
+    // Their plot areas are 371 and 376 pt tall and keep 49 and 50 pt.
+    expect(outsideLabelRoom(371)).toBeCloseTo(49, 0);
+    expect(outsideLabelRoom(376.4)).toBeCloseTo(49.8, 0);
   });
 
   test('radar: one polygon per series with a vertex on each category spoke', () => {

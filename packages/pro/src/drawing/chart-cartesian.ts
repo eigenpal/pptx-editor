@@ -42,6 +42,23 @@ const MAX_CATEGORIES = 4_096;
 const TICK_LENGTH = 3.1;
 /** Labels beside a vertical axis sit this many sizes above their tick's centre line. */
 export const LABEL_LIFT = 0.08;
+/** Labels beside a vertical axis end this many sizes before it. */
+const SIDE_LABEL_GAP = 0.91;
+/** The line of a label below or above a horizontal axis starts this many sizes from it. */
+const LABEL_GAP = 0.64;
+/**
+ * How far the labels of an axis reach into the chart's 11 pt margin: their outer edge stays
+ * 6.5 pt from the chart edge, or from the legend's room. Measured on the `charts` and
+ * `slide-structure` reference PDFs at 10 and 11.97 pt, with and without tick marks: the plot
+ * edges are then within 0.3 pt of the PDF's axis lines.
+ */
+const LABEL_MARGIN_REACH = 4.5;
+/**
+ * How far the top label of a vertical value axis may reach above the plot's room. A taller
+ * label lowers the plot's top edge: at 11.97 pt by 1.3 pt, below the chart edge, the title, or
+ * the legend alike, and at 10 pt not at all (the `charts` and `slide-structure` reference PDFs).
+ */
+const TOP_LABEL_REACH = 7;
 const DEFAULT_AXIS_LINE: ChartStroke = {
   hex: '000000',
   alpha: 1,
@@ -74,10 +91,6 @@ interface AxisView {
 
 function vertical(side: AxisView['side']): boolean {
   return side === 'l' || side === 'r';
-}
-
-function tickOut(axis: ChartAxis | null): number {
-  return axis && (axis.majorTickMark === 'out' || axis.majorTickMark === 'cross') ? 1 : 0;
 }
 
 function axisStroke(axis: ChartAxis | null, context: CartesianContext): ChartStroke | null {
@@ -306,18 +319,26 @@ export function paintCartesian(
         : '';
       const band =
         maxWidth(texts.length ? texts : [fallbackText], view.style) +
-        0.417 * view.style.sizePt +
-        0.5 * tickOut(view.axis);
+        SIDE_LABEL_GAP * view.style.sizePt -
+        LABEL_MARGIN_REACH;
       if (view.side === 'l') box.l += band;
       else box.r -= band;
     }
+    // The top label of a vertical value axis centres on the plot's top edge.
+    let overhang = 0;
+    for (const view of views) {
+      if (!view.labelled || !view.value || !vertical(view.side)) continue;
+      const half = lineHeight(view.style) / 2 + LABEL_LIFT * view.style.sizePt;
+      overhang = Math.max(overhang, half - TOP_LABEL_REACH);
+    }
+    box.t += overhang;
     let rotation = 0;
     let skip = 1;
     let wrap = 0;
     for (const view of views) {
       if (!view.labelled || vertical(view.side)) continue;
       const size = view.style.sizePt;
-      let band = 1.338 * size + 0.6 * tickOut(view.axis);
+      let band = lineHeight(view.style) + LABEL_GAP * size - LABEL_MARGIN_REACH;
       if (view.role === 'category' && categories) {
         const slot = categorySlot(categories, box.r - box.l);
         const widest = maxWidth(categories.labels, view.style);
@@ -344,7 +365,10 @@ export function paintCartesian(
         if (rotation !== 0) {
           const radians = (Math.abs(rotation) * Math.PI) / 180;
           band =
-            widest * Math.sin(radians) + lineHeight(view.style) * Math.cos(radians) + 0.625 * size;
+            widest * Math.sin(radians) +
+            lineHeight(view.style) * Math.cos(radians) +
+            LABEL_GAP * size -
+            LABEL_MARGIN_REACH;
           const pitch = lineHeight(view.style) / Math.sin(radians);
           skip = Math.max(1, Math.ceil(pitch / Math.max(slot, 1e-6)));
         }
@@ -562,7 +586,7 @@ export function paintCartesian(
     if (!view.labelled) continue;
     const size = view.style.sizePt;
     const height = lineHeight(view.style);
-    const offset = 0.91 * size;
+    const offset = SIDE_LABEL_GAP * size;
     if (view.value?.scale) {
       const texts = valueLabels(view, model);
       for (const [index, tick] of view.value.scale.ticks.entries()) {
@@ -582,7 +606,8 @@ export function paintCartesian(
             rotation: 0,
           });
         } else {
-          const top = view.side === 'b' ? plot.b + 0.625 * size : plot.t - 0.625 * size - height;
+          const top =
+            view.side === 'b' ? plot.b + LABEL_GAP * size : plot.t - LABEL_GAP * size - height;
           context.labels.push({
             paragraphs: [[{ text, style: view.style }]],
             align: 'ctr',
@@ -622,7 +647,7 @@ export function paintCartesian(
         continue;
       }
       const edge = crossLine ?? (view.side === 'b' ? plot.b : plot.t);
-      const top = view.side === 'b' ? edge + 0.625 * size : edge - 0.625 * size - height;
+      const top = view.side === 'b' ? edge + LABEL_GAP * size : edge - LABEL_GAP * size - height;
       if (inner.categoryRotation !== 0) {
         const radians = (inner.categoryRotation * Math.PI) / 180;
         const half = frame / 2;

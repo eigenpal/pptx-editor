@@ -94,12 +94,19 @@ export interface LegendLayout {
 function keyMetrics(
   entry: LegendEntry,
   size: number
-): { readonly key: number; readonly text: number } {
+): { readonly key: number; readonly text: number; readonly after: number } {
   // A line entry whose line is hidden keys only its marker, as narrow as a square key.
+  // Measured on the `charts` reference PDF: a line key is 1.6 sizes long, a square key 0.55
+  // sizes wide, and a row leaves 0.92 or 0.86 sizes after each entry's text.
   return entry.line && entry.look.line
-    ? { key: 2.1 * size, text: 2.32 * size }
-    : { key: 0.54 * size, text: 0.77 * size };
+    ? { key: 1.6 * size, text: 1.77 * size, after: 0.92 * size }
+    : { key: 0.55 * size, text: 0.79 * size, after: 0.86 * size };
 }
+
+/** Rows of a vertical legend are 1.4 lines apart (the `charts` reference PDF). */
+const ROW_PITCH = 1.4;
+/** A key's centre sits this many sizes above its entry's baseline (`paintLegend`). */
+const KEY_RISE = 0.27;
 
 export interface LegendRoom {
   readonly layout: LegendLayout;
@@ -128,18 +135,19 @@ export function placeLegend(
   const manual = legend.layout;
   if (legend.position === 'b' || legend.position === 't') {
     const available = width - 20;
-    const rows: { entry: LegendEntry; width: number }[][] = [[]];
+    const rows: { entry: LegendEntry; width: number; after: number }[][] = [[]];
     let rowWidth = 0;
     for (const entry of entries) {
       const metrics = keyMetrics(entry, size);
       const entryWidth = metrics.text + measureTextWidth(entry.text, style);
-      const gap = rows[rows.length - 1]!.length > 0 ? 0.81 * size : 0;
-      if (rowWidth + gap + entryWidth > available && rows[rows.length - 1]!.length > 0) {
+      const row = rows[rows.length - 1]!;
+      const gap = row.length > 0 ? row[row.length - 1]!.after : 0;
+      if (rowWidth + gap + entryWidth > available && row.length > 0) {
         rows.push([]);
         rowWidth = 0;
-      }
-      rowWidth += (rows[rows.length - 1]!.length > 0 ? 0.81 * size : 0) + entryWidth;
-      rows[rows.length - 1]!.push({ entry, width: entryWidth });
+      } else rowWidth += gap;
+      rowWidth += entryWidth;
+      rows[rows.length - 1]!.push({ entry, width: entryWidth, after: metrics.after });
     }
     const pitch = 1.84 * size;
     const blockHeight = line + (rows.length - 1) * pitch;
@@ -150,13 +158,13 @@ export function placeLegend(
         : box.t - 2.9;
     for (const [rowIndex, row] of rows.entries()) {
       const total = row.reduce(
-        (sum, item, index) => sum + item.width + (index > 0 ? 0.81 * size : 0),
+        (sum, item, index) => sum + item.width + (index > 0 ? row[index - 1]!.after : 0),
         0
       );
       let x = manual ? manual.x * width : width / 2 + 1.8 - total / 2;
       for (const item of row) {
         items.push({ entry: item.entry, x, baseline: top + rowIndex * pitch + baselineOffset });
-        x += item.width + 0.81 * size;
+        x += item.width + item.after;
       }
     }
     if (!legend.overlay && !manual) {
@@ -166,7 +174,7 @@ export function placeLegend(
     return { layout: { items }, plot };
   }
   // Vertical: one entry per row.
-  const pitch = 1.84 * size;
+  const pitch = ROW_PITCH * line;
   const textWidth = Math.max(...entries.map((entry) => measureTextWidth(entry.text, style)));
   const keyText = Math.max(...entries.map((entry) => keyMetrics(entry, size).text));
   // A placed legend shows the entries its box holds, centred in the box.
@@ -185,12 +193,17 @@ export function placeLegend(
     : legend.position === 'tr'
       ? box.t
       : center - blockHeight / 2;
+  // An automatic legend centres its keys: the middle key sits on the centre line.
+  const centred = !manual && legend.position !== 'tr';
   for (const [index, entry] of shown.entries()) {
-    items.push({ entry, x: left, baseline: top + index * pitch + baselineOffset });
+    const baseline = centred
+      ? center + (index - (shown.length - 1) / 2) * pitch + KEY_RISE * size
+      : top + index * pitch + baselineOffset;
+    items.push({ entry, x: left, baseline });
   }
   if (!legend.overlay && !manual) {
-    if (legend.position === 'l') plot.l = Math.max(plot.l, left + keyText + textWidth + 15.7);
-    else plot.r = Math.min(plot.r, left - 15.7);
+    if (legend.position === 'l') plot.l = Math.max(plot.l, left + keyText + textWidth + 16.5);
+    else plot.r = Math.min(plot.r, left - 16.5);
   }
   return { layout: { items }, plot };
 }
@@ -207,7 +220,7 @@ export function paintLegend(
   for (const item of layout.items) {
     const { entry } = item;
     const metrics = keyMetrics(entry, size);
-    const centerY = item.baseline - 0.27 * size;
+    const centerY = item.baseline - KEY_RISE * size;
     if (entry.line) {
       if (entry.look.line) {
         scene.line(

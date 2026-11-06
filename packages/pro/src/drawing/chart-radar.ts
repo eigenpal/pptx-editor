@@ -16,6 +16,7 @@ import {
   type Box,
   type ValueInfo,
 } from './chart-axes.ts';
+import { LABEL_LIFT } from './chart-cartesian.ts';
 import { dataLabelBlock } from './chart-data-label.ts';
 import { dataLabelFor, elementText } from './chart-labels.ts';
 import { child, type ChartModel, type ChartPlot } from './chart-model.ts';
@@ -32,6 +33,12 @@ import {
 } from './chart-text.ts';
 
 const MAX_SPOKES = 1_024;
+/**
+ * Category labels centre this far past the spoke ends, beyond half their own extent, and keep
+ * the room of the gap less 2.6 pt from the plot box. Measured on the `charts` reference PDF.
+ */
+const LABEL_GAP = 8.5;
+const LABEL_ROOM = LABEL_GAP - 2.6;
 const DEFAULT_GRID: ChartStroke = {
   hex: '000000',
   alpha: 1,
@@ -83,8 +90,8 @@ export function paintRadar(plots: readonly ChartPlot[], box: Box, context: Radar
   const radius = Math.max(
     1,
     Math.min(
-      (box.b - box.t) / 2 - (labelled ? categoryLine / 2 + 3 : 0),
-      (box.r - box.l) / 2 - (labelled ? widest + 3.5 : 0)
+      (box.b - box.t) / 2 - (labelled ? categoryLine / 2 + LABEL_ROOM : 0),
+      (box.r - box.l) / 2 - (labelled ? widest + LABEL_ROOM : 0)
     )
   );
   const cx = (box.l + box.r) / 2;
@@ -217,8 +224,10 @@ export function paintRadar(plots: readonly ChartPlot[], box: Box, context: Radar
       const cos = Math.cos(angle);
       const end = at(index, scale.max);
       const width = measureTextWidth(text, categoryStyle);
-      const centerX = end.x + 3.5 * sin + (width / 2) * sin;
-      const centerY = end.y - 3.5 * cos - (categoryLine / 2) * cos;
+      const centerX = end.x + LABEL_GAP * sin + (width / 2) * sin;
+      // Like the labels beside an axis, they sit a little above their centre line.
+      const centerY =
+        end.y - LABEL_GAP * cos - (categoryLine / 2) * cos - LABEL_LIFT * categoryStyle.sizePt;
       const frame = width * 1.3 + categoryStyle.sizePt * 2;
       context.labels.push({
         paragraphs: [[{ text, style: categoryStyle }]],
