@@ -208,6 +208,10 @@ describe('line ends', () => {
     const plan = planStroke(short, line({ tail: end('triangle') }));
     expect(plan.ends.length).toBe(1);
     expect(plan.commands.some((c) => c.op === 'L')).toBe(false);
+    // With a head too, both ends draw, and the tail still points along the line.
+    const both = planStroke(short, line({ head: end('triangle'), tail: end('triangle') }));
+    expect(both.ends.length).toBe(2);
+    expect(points(both.ends[1].commands)[0]).toEqual([2, 0]);
   });
 
   test('the reach of the widest head bounds every line end', () => {

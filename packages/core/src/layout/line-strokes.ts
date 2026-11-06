@@ -144,7 +144,7 @@ function drawsEnd(end: LineEnd | undefined): end is LineEnd {
 }
 
 /**
- * The miter limit of an open arrow's tip: its sharpest tip (sm width, lg length) needs 4.13.
+ * The miter limit of an open arrow's tip: its sharpest tip (sm width, lg length) needs 3.74.
  * @internal
  */
 export const ARROW_MITER_LIMIT = 10;
@@ -516,9 +516,13 @@ export function planStroke(
   }
   const parts = [first, ...subpaths.slice(1)];
   if (tail) {
-    const placed = placeEnd(parts[lastIndex], tail, unit, width);
-    changed ||= placed.path !== parts[lastIndex];
-    parts[lastIndex] = placed.path;
+    // A head can take all of a short line; the tail then still points along the line itself.
+    const emptied = !parts[lastIndex].segs.length;
+    const placed = placeEnd(emptied ? subpaths[lastIndex] : parts[lastIndex], tail, unit, width);
+    if (!emptied) {
+      changed ||= placed.path !== parts[lastIndex];
+      parts[lastIndex] = placed.path;
+    }
     if (placed.shape) ends.push(placed.shape);
   }
   const caps: PathCommand[][] = [];
