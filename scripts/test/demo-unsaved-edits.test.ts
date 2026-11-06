@@ -56,25 +56,22 @@ describe('trackUnsavedEdits', () => {
 describe('initialTheme', () => {
   const g = globalThis as { matchMedia?: unknown; localStorage?: unknown };
 
-  test('the URL, then the theme picked before, then the system color scheme', () => {
+  test('the URL, then the theme picked before, then light', () => {
     const saved = { matchMedia: g.matchMedia, localStorage: g.localStorage };
     const store = new Map<string, string>();
-    let dark = true;
-    g.matchMedia = (q: string) => ({ matches: dark && q === '(prefers-color-scheme: dark)' });
+    // A dark system color scheme does not change the first theme.
+    g.matchMedia = (q: string) => ({ matches: q === '(prefers-color-scheme: dark)' });
     g.localStorage = {
       getItem: (k: string) => store.get(k) ?? null,
       setItem: (k: string, v: string) => void store.set(k, v),
     };
     try {
-      // Nothing stored: the system decides.
-      expect(initialTheme('')).toBe('dark');
-      dark = false;
       expect(initialTheme('')).toBe('light');
       expect(initialTheme('?theme=dark')).toBe('dark');
       rememberTheme('dark');
       expect(initialTheme('')).toBe('dark');
       expect(initialTheme('?theme=light')).toBe('light');
-      // Storage that throws (a private window) falls back to the system.
+      // Storage that throws (a private window) starts light.
       g.localStorage = {
         getItem: () => {
           throw new Error('off');
