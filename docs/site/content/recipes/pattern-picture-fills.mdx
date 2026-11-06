@@ -1,0 +1,82 @@
+---
+title: 'Fill with a pattern or picture'
+description: 'Set a preset pattern or a picture on shapes and slide backgrounds, as one undo step.'
+category: 'Task recipes'
+---
+
+Use the `setShapePattern` and `setShapePicture` commands to fill the selected shapes with a preset pattern or a picture. Use `setSlideBackground` for the slide background. Each command is one undo step.
+
+## Fill shapes with a pattern
+
+This helper accepts an open `PptxEditorInstance` and fills the selected shapes:
+
+```ts
+import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+export function hatchSelection(editor: PptxEditorInstance) {
+  const result = editor.exec({
+    type: 'setShapePattern',
+    pattern: {
+      preset: 'dkDnDiag', // one of the 54 ECMA-376 preset patterns
+      foreground: '#C00000',
+      background: '#FFFFFF',
+    },
+  });
+  if (!result.ok) throw new Error(result.reason);
+}
+```
+
+`preset` is a `PatternPreset`, such as `pct25`, `smGrid`, or `horzBrick`. Colors are `#RRGGBB`.
+
+## Fill shapes with a picture
+
+This browser-only helper reads a file from an `<input type="file">` and fills the selected shapes. The picture stretches over each shape. Set `tile: true` to repeat it at its own size instead:
+
+```ts
+import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+export async function fillWithPicture(editor: PptxEditorInstance, file: File) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const result = editor.exec({
+    type: 'setShapePicture',
+    bytes,
+    mime: file.type,
+    tile: false,
+  });
+  if (!result.ok) throw new Error(result.reason);
+}
+```
+
+The editor accepts PNG, JPEG, and GIF. It reads the type from the bytes, so a wrong `mime` does not matter. All selected shapes share one media part.
+
+## Set a pattern or a tiled picture as the background
+
+`setSlideBackground` takes the same pattern, or a picture with `tile`:
+
+```ts
+editor.exec({
+  type: 'setSlideBackground',
+  background: {
+    kind: 'pattern',
+    pattern: { preset: 'smGrid', foreground: '#D9D9D9', background: '#FFFFFF' },
+  },
+  allSlides: true,
+});
+```
+
+## Limits
+
+- Only shapes take a fill. With no shape selected, the commands are refused with `disabled.noShapeFill`.
+- An unknown preset, a color that is not `#RRGGBB`, or bytes that are no PNG, JPEG, or GIF with a readable size are refused with `errors.unsupported`.
+- A picture fill does not set a crop, offset, scale, or transparency.
+- The selection state reports `geometry.fill` as `pattern` or `picture`, and `geometry.pattern` for a pattern. `slideBackground.kind` is `pattern` or `picture`.
+
+## Let users pick a fill
+
+In the default editor, the fill color menu has **Pattern…** and **Picture…**. **Pattern…** opens a dialog with the 54 patterns, the foreground and background colors, and a preview. The **Format Background** dialog has a **Pattern** section and a **Tile the picture** option. To show the pattern dialog from your own control, render `PatternDialog` from the React or Vue package.
+
+## See also
+
+- [Undo history](/docs/guides/undo-history)
+- [Dialogs reference](/docs/customization/reference/dialogs)
+- [PPTX fidelity](/docs/pptx-fidelity)

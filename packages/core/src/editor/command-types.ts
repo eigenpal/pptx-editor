@@ -75,6 +75,8 @@ const COMMAND_TABLE = {
   // Shape format
   setShapeFill: true,
   setShapeGradient: true,
+  setShapePattern: true,
+  setShapePicture: true,
   setLineColor: true,
   setLineWidth: true,
   setLineDash: true,

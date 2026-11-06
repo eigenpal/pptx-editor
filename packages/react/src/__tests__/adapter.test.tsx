@@ -236,7 +236,7 @@ describe('menu keyboard access', () => {
     expect(active()).toBe('Background 1');
     // Home and End go to the first and last rows.
     fireEvent.keyDown(document.activeElement!, { key: 'End' });
-    expect(document.activeElement?.textContent).toContain('Custom gradient');
+    expect(document.activeElement?.textContent).toContain('Picture…');
     fireEvent.keyDown(document.activeElement!, { key: 'Home' });
     expect(active()).toBe('Background 1');
   });

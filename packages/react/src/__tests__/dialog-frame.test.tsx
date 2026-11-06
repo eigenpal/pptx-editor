@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { PNG } from 'pngjs';
 import { useState, type ReactNode } from 'react';
 import {
   createPptxEditor,
@@ -158,7 +159,7 @@ describe('Background dialog paths', () => {
     act(() => void fireEvent.click(part('apply')!));
     const error = part('error')!;
     expect(error.textContent).toBe(
-      "To apply a fill to all slides, pick a color, gradient, or picture. The slide's current fill cannot be copied."
+      "To apply a fill to all slides, pick a color, gradient, pattern, or picture. The slide's current fill cannot be copied."
     );
     expect(box.getAttribute('aria-invalid')).toBe('true');
     expect(box.getAttribute('aria-describedby')).toBe(error.id);
@@ -169,9 +170,9 @@ describe('Background dialog paths', () => {
     const editor = await open();
     withEditor(editor, <BackgroundDialog open onClose={() => {}} />);
     const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
-    const png = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'p.png', {
-      type: 'image/png',
-    });
+    const img = new PNG({ width: 2, height: 2 });
+    img.data.fill(128);
+    const png = new File([new Uint8Array(PNG.sync.write(img))], 'p.png', { type: 'image/png' });
     await act(async () => {
       fireEvent.change(input, { target: { files: [png] } });
       await new Promise((r) => setTimeout(r, 0));

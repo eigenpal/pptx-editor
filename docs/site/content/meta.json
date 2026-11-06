@@ -31,6 +31,7 @@
     "recipes/replace-text",
     "recipes/slide-size",
     "recipes/shape-adjustments",
+    "recipes/pattern-picture-fills",
     "---React---",
     "react/index",
     "react/composition",

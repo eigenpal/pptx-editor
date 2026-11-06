@@ -147,6 +147,7 @@ export {
   type ProgressiveMount,
 } from './progressive-mount.ts';
 export { STANDARD_COLORS, gradientCss, presetGradient, swatchName } from './palette.ts';
+export { PATTERN_CHOICES, patternCss, patternDialogStart, patternLabel } from './pattern-fields.ts';
 export { focusEdge, handleMenuKey, panelItems } from './menu-keyboard.ts';
 export {
   POINTER_OPEN_ATTRIBUTE,

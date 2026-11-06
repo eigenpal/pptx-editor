@@ -1,20 +1,29 @@
 // Shape commands that `commands.ts` sends here: the adjust values of a preset shape, which its
-// adjust handles drag (`surface-adjust.ts`). Each compiles to one transaction, so one undo step.
+// adjust handles drag (`surface-adjust.ts`), and the pattern and picture fills. Each compiles to
+// one transaction, so one undo step.
 
 import type { EditorCommand } from '../contracts/index.ts';
 import { child, type Element } from '../store/index.ts';
 import { presetAdjustments } from '../layout/index.ts';
 import { findItem } from '../automation/commands/placement.ts';
 import { writeAdjustments } from '../automation/commands/adjust-commands.ts';
+import { setShapePattern, setShapePicture } from '../automation/commands/style-commands.ts';
 import { CommandRefusal, type OpBatch } from '../automation/commands/op-batch.ts';
 import type { CommandContext, CommandEffect } from './commands.ts';
 import { selectedIds } from './commands.ts';
 import { slidePart } from './text-targets.ts';
 
 /** The commands this table compiles. */
-export type ShapeCommand = Extract<EditorCommand, { readonly type: 'setAdjustments' }>;
+export type ShapeCommand = Extract<
+  EditorCommand,
+  { readonly type: 'setAdjustments' | 'setShapePattern' | 'setShapePicture' }
+>;
 
-const TYPES: ReadonlySet<string> = new Set(['setAdjustments']);
+const TYPES: ReadonlySet<string> = new Set([
+  'setAdjustments',
+  'setShapePattern',
+  'setShapePicture',
+]);
 
 export function isShapeCommand(command: EditorCommand): command is ShapeCommand {
   return TYPES.has(command.type);
@@ -25,6 +34,15 @@ export function compileShapeCommand(
   batch: OpBatch,
   command: ShapeCommand
 ): CommandEffect {
+  if (command.type === 'setShapePattern') {
+    setShapePattern(batch, slidePart(ctx), selectedIds(ctx.selection), command.pattern);
+    return { label: 'shapeFill' };
+  }
+  if (command.type === 'setShapePicture') {
+    const ids = selectedIds(ctx.selection);
+    setShapePicture(batch, slidePart(ctx), ids, command.bytes, command.tile === true);
+    return { label: 'shapeFill' };
+  }
   const ids = selectedIds(ctx.selection);
   if (ids.length !== 1) throw new CommandRefusal('disabled.selectOne');
   const id = ids[0]!;

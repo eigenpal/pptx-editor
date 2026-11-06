@@ -1,6 +1,6 @@
 /** @jsxImportSource react */
 // Shape controls: the insert-shape gallery (previews drawn by the engine's own geometry), the
-// fill menu (theme colors and gradients), and the custom gradient dialog.
+// fill menu (theme colors, gradients, a pattern, and a picture), and the custom gradient dialog.
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
@@ -26,7 +26,9 @@ import {
   type ChromeSlotId,
   type ColorChoice,
   type GradientFill,
+  type PatternFill,
 } from '@pptx-editor.dev/core/editor';
+import { PatternDialog } from './PatternDialog.tsx';
 import {
   Icon,
   MenuItem,
@@ -180,9 +182,12 @@ export interface FillControlProps {
   control: ChromeControl;
 }
 
+/** The picture types a picture fill accepts. */
+const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/gif'];
+
 /**
  * Fill color: one menu with the theme and standard colors, Transparent, gradient presets from
- * the theme colors, and a custom gradient dialog. @public
+ * the theme colors, a custom gradient dialog, a pattern dialog, and a picture. @public
  */
 export function FillControl({ slot, control }: FillControlProps) {
   const { cmd, label, reason, tip } = useSlot(slot, control);
@@ -190,6 +195,20 @@ export function FillControl({ slot, control }: FillControlProps) {
   const editor = usePptxEditor();
   const { t } = useTranslation();
   const current = useEditorState((s) => s.geometry?.gradient);
+  const currentPattern = useEditorState((s) => s.geometry?.pattern);
+  const [pattern, setPattern] = useState<PatternFill | null | false>(false);
+  const file = useRef<HTMLInputElement>(null);
+  const onFile = async (f: File | undefined): Promise<void> => {
+    if (!f || !PICTURE_TYPES.includes(f.type)) return;
+    let bytes: Uint8Array;
+    try {
+      bytes = new Uint8Array(await f.arrayBuffer());
+    } catch {
+      return; // An unreadable file fills nothing.
+    }
+    editor?.exec({ type: 'setShapePicture', bytes, mime: f.type });
+    focusText(editor, anchor.current);
+  };
   // The solid fill of the selection, marked in the menu.
   const selected = useEditorState((s) => colorMenuSelection(slot, s));
   const bases = useThemeBases();
@@ -277,8 +296,45 @@ export function FillControl({ slot, control }: FillControlProps) {
             <Icon name="add" />
             {t('toolbar.gradientCustom')}
           </MenuItem>
+          <div className="pptx-menu__sep" />
+          <MenuItem
+            onSelect={() => {
+              setPattern(currentPattern ?? null);
+              setOpen(false);
+            }}
+          >
+            {t('toolbar.pattern')}
+          </MenuItem>
+          <MenuItem
+            onSelect={() => {
+              file.current?.click();
+              setOpen(false);
+            }}
+          >
+            {t('toolbar.pictureFill')}
+          </MenuItem>
         </Popover>
       ) : null}
+      <input
+        ref={file}
+        type="file"
+        accept={PICTURE_TYPES.join(',')}
+        hidden
+        onChange={(e) => {
+          void onFile(e.target.files?.[0]);
+          e.target.value = '';
+        }}
+      />
+      <PatternDialog
+        open={pattern !== false}
+        initial={pattern || null}
+        base={accent1}
+        onClose={() => setPattern(false)}
+        onApply={(p) => {
+          editor?.exec({ type: 'setShapePattern', pattern: p });
+          setPattern(false);
+        }}
+      />
       <GradientDialog
         open={dialog !== null}
         initial={dialog}

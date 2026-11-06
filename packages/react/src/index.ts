@@ -554,6 +554,7 @@ export {
   type ShapeGridProps,
   type ShapeIconProps,
 } from './ShapeControls.tsx';
+export { PatternDialog, type PatternDialogProps } from './PatternDialog.tsx';
 export { SlideSorter, type SlideSorterProps } from './SlideSorter.tsx';
 export { requestSectionRename } from './RailSections.tsx';
 export {

@@ -139,6 +139,7 @@ export async function vueAdapterShape(contract?: ParityContract): Promise<VueAda
     PptxEditorZoomPill: { component: vue.PptxEditorZoomPill },
     PptxEditorSlideSorter: { component: vue.PptxEditorSlideSorter },
     GradientDialog: { component: vue.GradientDialog, props: { open: false } },
+    PatternDialog: { component: vue.PatternDialog, props: { open: false } },
     // The form dialogs render only while open; the host's content renders beside the default
     // parts, and the host class lands on the dialog surface.
     BackgroundDialog: {

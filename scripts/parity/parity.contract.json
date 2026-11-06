@@ -215,6 +215,15 @@
       "reactClassNameAsVueClass": {},
       "vueExclusive": {}
     },
+    "PatternDialog": {
+      "reactProps": "PatternDialogProps",
+      "paired": ["base", "initial", "onApply", "onClose", "open"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
     "BackgroundDialog": {
       "reactProps": "BackgroundDialogProps",
       "paired": ["className", "onClose", "open", "preset", "style"],
@@ -1166,6 +1175,8 @@
       "FillControl",
       "GradientDialog",
       "GradientDialogProps",
+      "PatternDialog",
+      "PatternDialogProps",
       "LayoutControl",
       "LayoutGallery",
       "LayoutGalleryProps",

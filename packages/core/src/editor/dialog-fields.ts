@@ -24,7 +24,7 @@ export interface BackgroundDraftFields {
 }
 
 /**
- * The draft a Background dialog opens with: the slide's own solid or gradient fill, `null`
+ * The draft a Background dialog opens with: the slide's own solid, gradient, or pattern fill, `null`
  * when it follows the layout, or `undefined` for a fill the dialog cannot hand back. @internal
  */
 export function backgroundDraftFrom(state: SlideBackgroundState): BackgroundDraftFields {
@@ -33,6 +33,8 @@ export function backgroundDraftFrom(state: SlideBackgroundState): BackgroundDraf
     return { background: { kind: 'solid', color: state.color }, allSlides: false };
   if (state.kind === 'gradient' && state.gradient)
     return { background: { kind: 'gradient', gradient: state.gradient }, allSlides: false };
+  if (state.kind === 'pattern' && state.pattern)
+    return { background: { kind: 'pattern', pattern: state.pattern }, allSlides: false };
   return { background: undefined, allSlides: false };
 }
 

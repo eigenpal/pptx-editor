@@ -81,6 +81,17 @@ export type {
 } from './shape-format.ts';
 
 import type { PictureCommand, SelectedImageState, AltText } from './picture.ts';
+import type { FillCommand, GradientFill, PatternFill, SlideBackground } from './fill.ts';
+import type { SlideBackgroundState } from './fill.ts';
+
+export type {
+  FillCommand,
+  GradientFill,
+  PatternFill,
+  PatternPreset,
+  SlideBackground,
+  SlideBackgroundState,
+} from './fill.ts';
 
 export type {
   ImageCropPercent,
@@ -361,6 +372,7 @@ export type EditorCommand =
   | { readonly type: 'pasteFormat' }
   | TextFormatCommand
   | PictureCommand
+  | FillCommand
   /**
    * Shape Effects: set or remove one effect of the selected shapes, connectors, and pictures.
    * A shape whose effects come from its theme style (`a:effectRef`) gets that style's effects
@@ -424,34 +436,6 @@ export interface FindMatch {
   readonly end: number;
   /** The text the match covers. */
   readonly text: string;
-}
-
-/** A gradient fill as the chrome edits it. @public */
-export interface GradientFill {
-  /** `linear` (`a:lin`) or `radial` from the center (`a:path path="circle"`). */
-  readonly kind: 'linear' | 'radial';
-  /** Degrees clockwise from left-to-right (`a:lin/@ang`); 90 runs top to bottom. */
-  readonly angle: number;
-  /** Two to ten stops; `pos` from 0 to 1, `color` as `#RRGGBB`. */
-  readonly stops: readonly { readonly pos: number; readonly color: string }[];
-  /** The gradient turns with the shape (`rotWithShape`). */
-  readonly rotWithShape: boolean;
-}
-
-/** A slide background the chrome sets. @public */
-export type SlideBackground =
-  | { readonly kind: 'solid'; readonly color: ColorChoice }
-  | { readonly kind: 'gradient'; readonly gradient: GradientFill }
-  | { readonly kind: 'picture'; readonly bytes: Uint8Array; readonly mime: string };
-
-/** The current slide's background, as the chrome shows it. @public */
-export interface SlideBackgroundState {
-  /** `none` is white; `other` is a pattern or another fill the chrome does not edit. */
-  readonly kind: 'solid' | 'gradient' | 'picture' | 'none' | 'other';
-  readonly color?: string;
-  readonly gradient?: GradientFill;
-  /** True when the background comes from the layout or master, not the slide. */
-  readonly inherited: boolean;
 }
 
 /**
@@ -667,10 +651,12 @@ export interface SelectionGeometry {
   readonly rot: number;
   /** The element's node id; position and size are in its file coordinates. */
   readonly nodeId: string;
-  /** Solid fill as `#RRGGBB`, `none`, `gradient`, or `other` (picture, pattern). Shapes only. */
+  /** Solid fill as `#RRGGBB`, `none`, `gradient`, `pattern`, `picture`, or `other`. Shapes only. */
   readonly fill?: string;
   /** The gradient, when `fill` is `gradient`. */
   readonly gradient?: GradientFill;
+  /** The pattern, when `fill` is `pattern`. */
+  readonly pattern?: PatternFill;
   /** Outline color as `#RRGGBB`, `none`, or `other`. */
   readonly lineColor?: string;
   /** Outline width in points. */

@@ -411,12 +411,13 @@ export const pptxFeatures: PptxFeature[] = [
     id: 'fills-lines.pattern-picture',
     name: 'Pattern and picture fills',
     category: 'fills-lines',
-    editing: 'none',
+    editing: 'partial',
     rendering: 'partial',
     roundTrip: 'partial',
     tier: 'community',
     notes:
-      'Tiles use the image resolution, or 72 DPI when it states none, and keep their recolor; the 72 DPI rule is measured on PNG only. Pattern tiles are 8 × 8 pt on the slide grid; 12 of the 54 preset bitmaps are measured, and the others are approximate.',
+      'The fill menu sets a preset pattern with two colors (`setShapePattern`), or a stretched picture (`setShapePicture`, which can also tile). Picture crop, offset, scale, and transparency of a fill are not editable. Tiles use the image resolution, or 72 DPI when it states none, and keep their recolor; the 72 DPI rule is measured on PNG only, and the tile size of a PNG that states no resolution is approximate. Pattern tiles are 8 × 8 pt on the slide grid; 12 of the 54 preset bitmaps are measured, and the others are approximate.',
+    docsLink: '/docs/recipes/pattern-picture-fills',
   },
   {
     id: 'fills-lines.lines',
@@ -784,7 +785,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'The Background dialog sets a color, gradient, or picture. OK applies it as one undo step. Pattern fills are not editable.',
+      'The Background dialog sets a color, gradient, pattern, or stretched or tiled picture. OK applies it as one undo step.',
   },
   {
     id: 'themes.change-layout-theme',

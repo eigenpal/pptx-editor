@@ -1,6 +1,7 @@
 /** @jsxImportSource vue */
 // Shape controls: the insert-shape gallery (previews drawn by the engine's own geometry), the
-// fill menu (theme colors and gradients), the custom gradient dialog, and the line menus. The Vue
+// fill menu (theme colors, gradients, a pattern, and a picture), the custom gradient dialog, and
+// the line menus. The Vue
 // twin of the React adapter's `ShapeControls.tsx`: the same markup, classes, ARIA, and keys, on
 // the same core rules (`insert-controls.ts`, `shape-gallery.ts`, `palette.ts`).
 
@@ -39,7 +40,9 @@ import {
   type ChromeSlotId,
   type ColorChoice,
   type GradientFill,
+  type PatternFill,
 } from '@pptx-editor.dev/core/editor';
+import { PatternDialog } from './PatternDialog.tsx';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import {
   Icon,
@@ -219,6 +222,9 @@ export type FillControlProps = ExtractPublicPropTypes<typeof slotPartProps>;
  * Fill color: one menu with the theme and standard colors, Transparent, gradient presets from
  * the theme colors, and a custom gradient dialog. @public
  */
+/** The picture types a picture fill accepts. */
+const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/gif'];
+
 export const FillControl = defineComponent({
   name: 'FillControl',
   props: slotPartProps,
@@ -244,6 +250,20 @@ export const FillControl = defineComponent({
     const dialog = shallowRef<GradientFill | null>(null);
     const applyGradient = (g: GradientFill): void => {
       editor.value?.exec({ type: 'setShapeGradient', gradient: g });
+    };
+    const currentPattern = useEditorState((s) => s.geometry?.pattern);
+    const pattern = shallowRef<PatternFill | null | false>(false);
+    const file = ref<HTMLInputElement | null>(null);
+    const onFile = async (f: File | undefined): Promise<void> => {
+      if (!f || !PICTURE_TYPES.includes(f.type)) return;
+      let bytes: Uint8Array;
+      try {
+        bytes = new Uint8Array(await f.arrayBuffer());
+      } catch {
+        return; // An unreadable file fills nothing.
+      }
+      editor.value?.exec({ type: 'setShapePicture', bytes, mime: f.type });
+      focusText(editor.value, anchor.value);
     };
     const done = (): void => {
       focusText(editor.value, anchor.value);
@@ -337,11 +357,49 @@ export const FillControl = defineComponent({
                       ),
                     }}
                   </MenuItem>
+                  <div class="pptx-menu__sep" />
+                  <MenuItem
+                    onSelect={() => {
+                      pattern.value = currentPattern.value ?? null;
+                      open.value = false;
+                    }}
+                  >
+                    {{ default: () => t('toolbar.pattern') }}
+                  </MenuItem>
+                  <MenuItem
+                    onSelect={() => {
+                      file.value?.click();
+                      open.value = false;
+                    }}
+                  >
+                    {{ default: () => t('toolbar.pictureFill') }}
+                  </MenuItem>
                 </>
               ),
             }}
           </Popover>
         ) : null}
+        <input
+          ref={file}
+          type="file"
+          accept={PICTURE_TYPES.join(',')}
+          hidden
+          onChange={(e: Event) => {
+            const input = e.target as HTMLInputElement;
+            void onFile(input.files?.[0]);
+            input.value = '';
+          }}
+        />
+        <PatternDialog
+          open={pattern.value !== false}
+          initial={pattern.value || null}
+          base={bases.value[4]?.color}
+          onClose={() => (pattern.value = false)}
+          onApply={(p: PatternFill) => {
+            editor.value?.exec({ type: 'setShapePattern', pattern: p });
+            pattern.value = false;
+          }}
+        />
         <GradientDialog
           open={dialog.value !== null}
           initial={dialog.value}

@@ -277,6 +277,16 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
       ],
     },
   })),
+  setShapePattern: onA(() => ({
+    type: 'setShapePattern',
+    pattern: { preset: 'dkDnDiag', foreground: '#C00000', background: '#FFFFFF' },
+  })),
+  setShapePicture: onA(() => ({
+    type: 'setShapePicture',
+    bytes: png(4, 4, 120),
+    mime: 'image/png',
+    tile: true,
+  })),
   setLineColor: onA(() => ({ type: 'setLineColor', color: { theme: 'accent2', shift: -25 } })),
   setLineWidth: onA(() => ({ type: 'setLineWidth', points: 4 })),
   setLineDash: onA(() => ({ type: 'setLineDash', dash: 'dash' })),

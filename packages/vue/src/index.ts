@@ -412,6 +412,7 @@ export {
   type ShapeGridProps,
   type ShapeIconProps,
 } from './ShapeControls.tsx';
+export { PatternDialog, type PatternDialogProps } from './PatternDialog.tsx';
 export { ShapeStyleGallery, type ShapeStyleGalleryProps } from './ShapeFormatControls.tsx';
 export { MenuTableGrid, type MenuTableGridProps } from './TableControls.tsx';
 export {

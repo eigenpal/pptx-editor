@@ -13,6 +13,8 @@ import type {
   SelectionFormat,
   SelectionGeometry,
   SlideBackgroundState,
+  PatternFill,
+  PatternPreset,
   TextFitting,
   VerticalAlign,
 } from '../contracts/index.ts';
@@ -413,6 +415,21 @@ export function fillName(fill: ResolvedFill | undefined): string {
   return fill.type === 'solid' ? hexOf(fill.color) : 'other';
 }
 
+/** A shape fill as the chrome shows it: a `fillName`, or `pattern` or `picture`. */
+export function shapeFillName(fill: ResolvedFill | undefined): string {
+  return fill?.type === 'pattern' || fill?.type === 'picture' ? fill.type : fillName(fill);
+}
+
+/** A pattern fill as the chrome edits it, with its colors as `#RRGGBB`. */
+export function patternOf(fill: ResolvedFill): PatternFill | undefined {
+  if (fill.type !== 'pattern') return undefined;
+  return {
+    preset: fill.preset as PatternPreset,
+    foreground: hexOf(fill.fg),
+    background: hexOf(fill.bg),
+  };
+}
+
 /** A linear or circular gradient as the chrome edits it. */
 export function gradientOf(fill: ResolvedFill): GradientFill | undefined {
   if (fill.type !== 'linear' && !(fill.type === 'path' && fill.path === 'circle')) return undefined;
@@ -434,19 +451,23 @@ export function createBackgroundSource(): (lay: SlideLayout | undefined) => Slid
     if (!lay) return last;
     const fill = lay.slide.background;
     const gradient = gradientOf(fill);
+    const pattern = patternOf(fill);
     const next: SlideBackgroundState = {
       kind:
         fill.type === 'solid'
           ? 'solid'
           : gradient
             ? 'gradient'
-            : fill.type === 'picture'
-              ? 'picture'
-              : fill.type === 'none'
-                ? 'none'
-                : 'other',
+            : pattern
+              ? 'pattern'
+              : fill.type === 'picture'
+                ? 'picture'
+                : fill.type === 'none'
+                  ? 'none'
+                  : 'other',
       ...(fill.type === 'solid' ? { color: hexOf(fill.color) } : {}),
       ...(gradient ? { gradient } : {}),
+      ...(pattern ? { pattern } : {}),
       inherited: lay.slide.backgroundPart !== lay.slide.partName,
     };
     if (JSON.stringify(next) !== JSON.stringify(last)) last = next;
@@ -500,8 +521,9 @@ export function geometryOf(
     cx: box.cx,
     cy: box.cy,
     rot: box.rot,
-    ...(e.kind === 'shape' ? { fill: fillName(e.fill) } : {}),
+    ...(e.kind === 'shape' ? { fill: shapeFillName(e.fill) } : {}),
     ...(e.kind === 'shape' && gradientOf(e.fill) ? { gradient: gradientOf(e.fill) } : {}),
+    ...(e.kind === 'shape' && patternOf(e.fill) ? { pattern: patternOf(e.fill) } : {}),
     ...(e.kind === 'shape' || e.kind === 'connector' || e.kind === 'picture'
       ? {
           lineColor: lineVisible ? fillName(line.fill) : 'none',

@@ -179,7 +179,7 @@ describe('dialog commits and messages', () => {
       })
     ).toEqual({
       background:
-        "To apply a fill to all slides, pick a color, gradient, or picture. The slide's current fill cannot be copied.",
+        "To apply a fill to all slides, pick a color, gradient, pattern, or picture. The slide's current fill cannot be copied.",
       form: 'The file is locked',
     });
   });

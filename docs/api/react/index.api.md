@@ -80,6 +80,7 @@ import { MouseEvent as MouseEvent_2 } from 'react';
 import { ParagraphDialogFields } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatCommand } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatRead } from '@pptx-editor.dev/core/editor';
+import { PatternFill } from '@pptx-editor.dev/core/editor';
 import { platformShortcuts } from '@pptx-editor.dev/core/editor';
 import { PopoverAnchorRect } from '@pptx-editor.dev/core/editor';
 import { PptxEditorEvents } from '@pptx-editor.dev/core/editor';
@@ -122,7 +123,7 @@ export const BackgroundDialog: typeof BackgroundDialogRoot & {
 };
 
 // @public
-export type BackgroundDialogFieldName = 'solid' | 'gradient' | 'picture' | 'allSlides';
+export type BackgroundDialogFieldName = 'solid' | 'gradient' | 'pattern' | 'picture' | 'allSlides';
 
 // @public
 export interface BackgroundDialogFields {
@@ -959,6 +960,18 @@ export interface ParagraphDialogProps extends DialogCustomizationProps {
 export { ParagraphFormatCommand }
 
 export { ParagraphFormatRead }
+
+// @public
+export function PatternDialog(input: PatternDialogProps): react.JSX.Element;
+
+// @public
+export interface PatternDialogProps {
+    readonly base?: string;
+    readonly initial: PatternFill | null;
+    readonly onApply: (pattern: PatternFill) => void;
+    readonly onClose: () => void;
+    readonly open: boolean;
+}
 
 export { platformShortcuts }
 

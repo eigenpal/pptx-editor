@@ -6,6 +6,7 @@ import { attr, child, NS, type Element } from '../../store/index.ts';
 import type {
   ColorChoice,
   GradientFill,
+  PatternFill,
   LineDash,
   LineEndType,
   TextFitting,
@@ -13,7 +14,8 @@ import type {
   VerticalAlign,
 } from '../../contracts/neutral.ts';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
-import { specFromXml } from './shape-commands.ts';
+import { patternXml, pictureFillXml, pictureType } from './fill-commands.ts';
+import { addImagePart, specFromXml } from './shape-commands.ts';
 
 const FILLS = new Set(['noFill', 'solidFill', 'gradFill', 'blipFill', 'pattFill', 'grpFill']);
 const GEOMETRY = new Set(['xfrm', 'custGeom', 'prstGeom']);
@@ -163,6 +165,33 @@ export function setShapeGradient(
   const shapes = ids.filter((id) => batch.element(part, id).kind === 'sp');
   if (shapes.length === 0) throw new CommandRefusal('disabled.noShapeFill');
   const xml = gradientXml(gradient);
+  for (const id of shapes) replaceIn(batch, part, spPrOf(batch, part, id).id, FILLS, GEOMETRY, xml);
+}
+
+/** Set a preset pattern fill on shapes. */
+export function setShapePattern(
+  batch: OpBatch,
+  part: string,
+  ids: readonly string[],
+  pattern: PatternFill
+): void {
+  const shapes = ids.filter((id) => batch.element(part, id).kind === 'sp');
+  if (shapes.length === 0) throw new CommandRefusal('disabled.noShapeFill');
+  const xml = patternXml(pattern);
+  for (const id of shapes) replaceIn(batch, part, spPrOf(batch, part, id).id, FILLS, GEOMETRY, xml);
+}
+
+/** Set a picture fill on shapes: one media part, stretched or tiled. */
+export function setShapePicture(
+  batch: OpBatch,
+  part: string,
+  ids: readonly string[],
+  bytes: Uint8Array,
+  tile: boolean
+): void {
+  const shapes = ids.filter((id) => batch.element(part, id).kind === 'sp');
+  if (shapes.length === 0) throw new CommandRefusal('disabled.noShapeFill');
+  const xml = pictureFillXml(addImagePart(batch, part, bytes, pictureType(bytes)), tile === true);
   for (const id of shapes) replaceIn(batch, part, spPrOf(batch, part, id).id, FILLS, GEOMETRY, xml);
 }
 

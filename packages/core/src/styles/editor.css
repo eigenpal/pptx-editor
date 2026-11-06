@@ -2909,6 +2909,39 @@ legend.pptx-dialog__label {
   border: 1px solid var(--doc-border);
   border-radius: 8px;
 }
+/* The pattern fill dialog (PatternDialog): 54 preset swatches, two colors, and a preview. */
+.pptx-pattern {
+  max-width: 420px;
+}
+/* Six rows of nine: the 54 presets. */
+.pptx-pattern .pptx-swatches {
+  grid-template-columns: repeat(9, 36px);
+  padding: 6px 0 8px;
+}
+.pptx-pattern__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 14px;
+}
+.pptx-pattern__row .pptx-field {
+  flex: 0 0 auto;
+}
+.pptx-pattern__row .pptx-dialog__section {
+  flex: 1 1 120px;
+}
+.pptx-pattern__preview {
+  height: 64px;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+}
+.pptx-pattern__chip {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--doc-border);
+  border-radius: 6px;
+}
 .pptx-gradient__bar {
   position: relative;
   height: 14px;
@@ -3667,6 +3700,8 @@ legend.pptx-dialog__label {
   .pptx-swatch,
   .pptx-toolbar__swatch,
   .pptx-gradient__preview,
+  .pptx-pattern__preview,
+  .pptx-pattern__chip,
   .pptx-gradient__bar,
   .pptx-gradient__handle,
   .pptx-style-gallery__swatch,
@@ -3675,6 +3710,8 @@ legend.pptx-dialog__label {
   }
   .pptx-swatch,
   .pptx-gradient__preview,
+  .pptx-pattern__preview,
+  .pptx-pattern__chip,
   .pptx-gradient__bar {
     border-color: CanvasText;
   }

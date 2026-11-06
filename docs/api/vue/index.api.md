@@ -88,6 +88,7 @@ import { MenuRowPartName } from '@pptx-editor.dev/core/editor';
 import { ParagraphDialogFields } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatCommand } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatRead } from '@pptx-editor.dev/core/editor';
+import { PatternFill } from '@pptx-editor.dev/core/editor';
 import { PopoverAnchorRect } from '@pptx-editor.dev/core/editor';
 import * as _pptx_editor_dev_core_contracts from '@pptx-editor.dev/core/contracts';
 import * as _pptx_editor_dev_core_editor from '@pptx-editor.dev/core/editor';
@@ -231,7 +232,7 @@ export const BackgroundDialog: {
 };
 
 // @public
-export type BackgroundDialogFieldName = 'solid' | 'gradient' | 'picture' | 'allSlides';
+export type BackgroundDialogFieldName = 'solid' | 'gradient' | 'pattern' | 'picture' | 'allSlides';
 
 // @public
 export interface BackgroundDialogFields {
@@ -657,7 +658,7 @@ export { EditorRemoval }
 
 export { EditorSnapshot }
 
-// @public
+// @public (undocumented)
 export const FillControl: vue.DefineComponent<vue.ExtractPropTypes<{
     readonly slot: {
         readonly type: PropType<ChromeSlotId>;
@@ -2126,6 +2127,57 @@ export type ParagraphDialogProps = ExtractPublicPropTypes<typeof paragraphDialog
 export { ParagraphFormatCommand }
 
 export { ParagraphFormatRead }
+
+// @public
+export const PatternDialog: vue.DefineComponent<vue.ExtractPropTypes<{
+    readonly open: {
+        readonly type: BooleanConstructor;
+        readonly required: true;
+    };
+    readonly initial: {
+        readonly type: PropType<PatternFill | null>;
+        readonly default: null;
+    };
+    readonly base: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly onClose: {
+        readonly type: PropType<() => void>;
+        readonly required: true;
+    };
+    readonly onApply: {
+        readonly type: PropType<(pattern: PatternFill) => void>;
+        readonly required: true;
+    };
+}>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    readonly open: {
+        readonly type: BooleanConstructor;
+        readonly required: true;
+    };
+    readonly initial: {
+        readonly type: PropType<PatternFill | null>;
+        readonly default: null;
+    };
+    readonly base: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly onClose: {
+        readonly type: PropType<() => void>;
+        readonly required: true;
+    };
+    readonly onApply: {
+        readonly type: PropType<(pattern: PatternFill) => void>;
+        readonly required: true;
+    };
+}>> & Readonly<{}>, {
+    readonly base: string;
+    readonly initial: PatternFill | null;
+}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+// @public
+export type PatternDialogProps = ExtractPublicPropTypes<typeof patternDialogProps>;
 
 // @internal
 export const Popover: vue.DefineComponent<vue.ExtractPropTypes<{
