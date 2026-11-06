@@ -28,18 +28,23 @@ function request({ method = 'POST', headers = {}, body } = {}) {
   });
 }
 
-function response() {
+/**
+ * A response stand-in. With `leaveAfterStart`, the client goes away just after the handler
+ * listens for `close`, before the request gets its turn to convert.
+ */
+function response({ leaveAfterStart = false } = {}) {
   const out = { status: 0, headers: {}, chunks: [], destroyed: false, writableEnded: false };
   const listeners = new Set();
+  const disconnect = () => {
+    out.destroyed = true;
+    for (const listener of listeners) listener();
+  };
   return {
     out,
-    /** The client went away: the socket closes before the response finished. */
-    disconnect() {
-      out.destroyed = true;
-      for (const listener of listeners) listener();
-    },
     on(event, listener) {
-      if (event === 'close') listeners.add(listener);
+      if (event !== 'close') return this;
+      listeners.add(listener);
+      if (leaveAfterStart) queueMicrotask(disconnect);
       return this;
     },
     off(event, listener) {
@@ -106,15 +111,17 @@ test(
   }
 );
 
-test('one conversion at a time per instance, then a PDF of every slide', { skip }, async () => {
+test('one conversion converts and one waits; a third request is refused', { skip }, async () => {
   const { default: handler } = await import('./convert.ts');
   const deck = await readFile(new URL('../examples/vite/public/sample.pptx', import.meta.url));
-  const first = call(handler, { headers: ORIGIN, body: deck });
-  // Arrives while the first request still reads its body.
-  const second = await call(handler, { headers: ORIGIN, body: deck });
-  assert.equal(second.status, 503);
-  const result = await first;
-  assert.equal(result.status, 200);
+  // The three bodies arrive within a few ticks, long before the first conversion ends, so two
+  // requests are in line when the third one asks for a turn.
+  const results = await Promise.all(
+    [1, 2, 3].map(() => call(handler, { headers: ORIGIN, body: deck }))
+  );
+  assert.deepEqual(results.map((r) => r.status).sort(), [200, 200, 503]);
+  assert.equal(results.find((r) => r.status === 503).json.error, 'Busy');
+  const result = results.find((r) => r.status === 200);
   assert.equal(result.headers['Content-Type'], 'application/pdf');
   assert.equal(result.body.subarray(0, 5).toString('latin1'), '%PDF-');
   assert.equal(result.headers['X-Pdf-Page-Count'], '5');
@@ -122,17 +129,13 @@ test('one conversion at a time per instance, then a PDF of every slide', { skip 
 });
 
 test(
-  'a client that disconnects stops its conversion and frees the instance',
+  'a client that leaves before its turn gets no conversion, and its turn is freed',
   { skip },
   async () => {
     const { default: handler } = await import('./convert.ts');
     const deck = await readFile(new URL('../examples/vite/public/sample.pptx', import.meta.url));
-    const gone = response();
-    const running = handler(request({ headers: ORIGIN, body: deck }), gone);
-    // Leave once the conversion started: the instance is busy for anyone else.
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    gone.disconnect();
-    await running;
+    const gone = response({ leaveAfterStart: true });
+    await handler(request({ headers: ORIGIN, body: deck }), gone);
     assert.equal(gone.out.status, 0, 'nothing is written to a closed connection');
     const next = await call(handler, { headers: ORIGIN, body: deck });
     assert.equal(next.status, 200);

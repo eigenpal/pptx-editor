@@ -15,9 +15,11 @@ Production use requires a commercial agreement: licensing@eigenpal.com
  * `message`: raw exception text can name parts of the upload, so it never goes back.
  *
  * Limits: a 4 MiB upload and a 4 MiB PDF (the platform caps each function body at 4.5 MB), a
- * 15 second upload, a 60 second conversion, and one conversion at a time per instance. The body
- * is read before the instance lock, so a slow upload never holds the lock. A closed connection
- * cancels the conversion. Neither the upload nor the PDF is kept.
+ * 15 second upload, and a 40 second conversion. One instance can get parallel requests, so it
+ * converts one deck at a time and keeps one more request waiting: two turns fit in `maxDuration`.
+ * A third request gets 503. The body is read before the request waits, so a slow upload never
+ * holds a turn. A closed connection cancels its conversion. Neither the upload nor the PDF is
+ * kept.
  *
  * The request must carry an `Origin` that matches the host: a browser sends `Origin` on every
  * `POST`, so a request without one is not the demo page. This keeps other pages from using the
@@ -30,16 +32,37 @@ import { exportPdf } from '@pptx-editor.dev/pptx-to-pdf';
 const MAX_UPLOAD = 4 * 1024 * 1024;
 const MAX_OUTPUT = 4 * 1024 * 1024;
 const UPLOAD_MS = 15_000;
-const DEADLINE_MS = 60_000;
+const DEADLINE_MS = 40_000;
+/** The conversion that runs and the one that waits. */
+const MAX_IN_FLIGHT = 2;
 const TOO_LARGE = { ok: false, error: 'UploadTooLarge', message: 'The upload limit is 4 MiB.' };
 
-/** Time the function may hold the request; the conversion's own deadline is shorter. */
+/** Time the function may hold the request: one wait and one conversion, each at most 40 s. */
 export const maxDuration = 90;
-/** The body is the PPTX bytes; the platform must not parse it. */
-export const config = { api: { bodyParser: false } };
 
-/** One conversion per instance, so one instance never lays out two decks at once. */
-let active = false;
+/** The end of the last conversion in line on this instance. */
+let line: Promise<void> = Promise.resolve();
+/** The requests that convert or wait on this instance. */
+let inFlight = 0;
+
+/**
+ * Run `work` after the conversions before it, so one instance never lays out two decks at once.
+ * `'busy'` when `MAX_IN_FLIGHT` requests already convert or wait.
+ */
+async function inTurn<T>(work: () => Promise<T>): Promise<T | 'busy'> {
+  if (inFlight >= MAX_IN_FLIGHT) return 'busy';
+  inFlight++;
+  const before = line;
+  let done!: () => void;
+  line = new Promise<void>((resolve) => (done = resolve));
+  try {
+    await before;
+    return await work();
+  } finally {
+    inFlight--;
+    done();
+  }
+}
 
 function json(res: ServerResponse, status: number, value: Record<string, unknown>): void {
   if (res.destroyed || res.writableEnded) return;
@@ -47,8 +70,11 @@ function json(res: ServerResponse, status: number, value: Record<string, unknown
   res.end(JSON.stringify(value));
 }
 
-/** The body, `'large'` past `MAX_UPLOAD`, or `'slow'` when it takes more than `UPLOAD_MS`. */
-async function readBody(req: IncomingMessage): Promise<Uint8Array | 'large' | 'slow'> {
+/**
+ * The body; `'large'` past `MAX_UPLOAD`; `'slow'` when it takes more than `UPLOAD_MS`; or
+ * `'aborted'` when the client stops the upload.
+ */
+async function readBody(req: IncomingMessage): Promise<Uint8Array | 'large' | 'slow' | 'aborted'> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const slow = new Promise<'slow'>((resolve) => {
     timer = setTimeout(() => resolve('slow'), UPLOAD_MS);
@@ -63,7 +89,7 @@ async function readBody(req: IncomingMessage): Promise<Uint8Array | 'large' | 's
       chunks.push(bytes);
     }
     return new Uint8Array(Buffer.concat(chunks));
-  })();
+  })().catch(() => 'aborted' as const);
   try {
     return await Promise.race([read, slow]);
   } finally {
@@ -85,7 +111,7 @@ export function pdfFailureResponse(error: unknown): {
   if (name === 'PdfDocumentOpenError')
     return fail(400, 'The file is not a presentation this converter can open.');
   if (name === 'PdfWorkLimitError' && code === 'timeout')
-    return fail(408, 'The conversion took more than 60 seconds.');
+    return fail(408, 'The conversion took more than 40 seconds.');
   if (
     ['RangeError', 'PdfWorkLimitError', 'PdfPageLimitError', 'PdfOutputLimitError'].includes(name)
   )
@@ -108,15 +134,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     req.destroy?.();
     return;
   }
+  if (bytes === 'aborted') return;
   if (bytes.byteLength === 0)
     return json(res, 400, { ok: false, message: 'The request has no presentation.' });
-  if (active)
-    return json(res, 503, {
-      ok: false,
-      error: 'Busy',
-      message: 'A conversion is already running. Try again when it finishes.',
-    });
-  active = true;
   // A closed connection (a closed tab, the client's timeout) stops the conversion.
   const abort = new AbortController();
   const closed = (): void => {
@@ -124,13 +144,24 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   };
   res.on?.('close', closed);
   try {
-    // The demo exports what the editor shows, so approximations become diagnostics, not refusals.
-    const result = await exportPdf(bytes, {
-      fidelityPolicy: 'best-effort',
-      timeoutMs: DEADLINE_MS,
-      maxOutputBytes: MAX_OUTPUT,
-      signal: abort.signal,
+    const result = await inTurn(() => {
+      // The client left while the request waited.
+      if (abort.signal.aborted) return Promise.resolve(null);
+      // The demo exports what the editor shows, so approximations become diagnostics.
+      return exportPdf(bytes, {
+        fidelityPolicy: 'best-effort',
+        timeoutMs: DEADLINE_MS,
+        maxOutputBytes: MAX_OUTPUT,
+        signal: abort.signal,
+      });
     });
+    if (result === 'busy')
+      return json(res, 503, {
+        ok: false,
+        error: 'Busy',
+        message: 'Too many conversions are running. Try again soon.',
+      });
+    if (result === null) return;
     if (res.destroyed || res.writableEnded) return;
     res.writeHead(200, {
       'Content-Type': 'application/pdf',
@@ -144,7 +175,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const failure = pdfFailureResponse(error);
     return json(res, failure.status, failure.body);
   } finally {
-    active = false;
     res.off?.('close', closed);
   }
 }

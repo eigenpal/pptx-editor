@@ -120,7 +120,9 @@ export const PDF_MAX_UPLOAD = 4 * 1024 * 1024;
 
 /** Why the PDF export failed, as the `app.*` key of the editor's notice. */
 export class PdfExportFailure extends Error {
-  constructor(readonly key: 'app.pdfTooLarge' | 'app.pdfBusy' | 'app.pdfExportFailed') {
+  constructor(
+    readonly key: 'app.pdfTooLarge' | 'app.pdfTooComplex' | 'app.pdfBusy' | 'app.pdfExportFailed'
+  ) {
     super(key);
     this.name = 'PdfExportFailure';
   }
@@ -128,7 +130,9 @@ export class PdfExportFailure extends Error {
 
 /** The notice for an HTTP status of the PDF function. */
 function failureFor(status: number): PdfExportFailure {
-  if (status === 413 || status === 507) return new PdfExportFailure('app.pdfTooLarge');
+  if (status === 413) return new PdfExportFailure('app.pdfTooLarge');
+  // Too many slides, too much paint, or a PDF past its size limit.
+  if (status === 507) return new PdfExportFailure('app.pdfTooComplex');
   if (status === 503) return new PdfExportFailure('app.pdfBusy');
   return new PdfExportFailure('app.pdfExportFailed');
 }
@@ -158,6 +162,22 @@ export async function convertToPdf(deck: Uint8Array): Promise<Blob> {
 
 /** Whether a PDF export is running. A second pick does nothing until it ends. */
 let pdfRunning = false;
+const pdfListeners = new Set<(busy: boolean) => void>();
+
+function setPdfRunning(busy: boolean): void {
+  pdfRunning = busy;
+  for (const listener of pdfListeners) listener(busy);
+}
+
+/**
+ * Follow whether a PDF export is running, so the Export button shows that the PDF is being made.
+ * Calls `listener` now and on each change. Returns the cleanup.
+ */
+export function watchPdfExport(listener: (busy: boolean) => void): () => void {
+  pdfListeners.add(listener);
+  listener(pdfRunning);
+  return () => pdfListeners.delete(listener);
+}
 
 /**
  * Export from the editor's current deck: the whole deck as PDF (made on the demo's server), the
@@ -179,11 +199,11 @@ export async function exportSlides(
       // `save` is null for a damaged slide; the editor already shows why.
       const deck = editor.save();
       if (!deck) return;
-      pdfRunning = true;
+      setPdfRunning(true);
       try {
         download(await convertToPdf(deck), `${name}.pdf`);
       } finally {
-        pdfRunning = false;
+        setPdfRunning(false);
       }
     } else if (kind === 'png')
       download(await exportSlidePng(session, slide, options), `${name} ${slide + 1}.png`);
