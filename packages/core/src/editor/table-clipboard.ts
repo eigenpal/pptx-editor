@@ -19,6 +19,12 @@ const MAX_CELL_CHARS = 32_768;
 /** The most clipboard characters a paste reads, before it parses them. */
 const MAX_RAW_CHARS = 4_000_000;
 
+/** Control characters a cell cannot hold (all but tab and line break); a paste drops them. */
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
+/** A pasted cell's text: no control characters, at most the cell limit. */
+const cellText = (text: string): string => text.replace(CONTROL, '').slice(0, MAX_CELL_CHARS);
+
 /** The plain text of each cell of a cell range, row by row; a covered position is ''. */
 export function cellRangeTexts(
   layout: SlideLayout | undefined,
@@ -65,7 +71,7 @@ export function parseTabSeparated(raw: string): string[][] {
   let quoted = false;
   let i = 0;
   const push = (): void => {
-    rows[rows.length - 1].push(cell.slice(0, MAX_CELL_CHARS));
+    rows[rows.length - 1].push(cellText(cell));
     cell = '';
   };
   while (i < text.length) {
@@ -113,7 +119,7 @@ export function parseCellsJson(raw: string): string[][] | null {
   const rows: string[][] = [];
   for (const row of value.slice(0, MAX_LINES)) {
     if (!Array.isArray(row) || !row.every((c) => typeof c === 'string')) return null;
-    rows.push((row as string[]).slice(0, MAX_LINES).map((c) => c.slice(0, MAX_CELL_CHARS)));
+    rows.push((row as string[]).slice(0, MAX_LINES).map(cellText));
   }
   return rows;
 }
@@ -132,6 +138,8 @@ export function pastedCells(
   const copied = data.cells ? parseCellsJson(data.cells) : null;
   const many = !!copied && (copied.length > 1 || copied[0].length > 1);
   if (copied && (sel.kind === 'cells' || many)) return copied;
+  // One copied cell at a caret: its plain text (unquoted, see copyCellsTo) goes in as text.
+  if (copied) return null;
   const text = data.text ?? '';
   if (!text) return null;
   if (sel.kind === 'cells' || text.includes('\t')) return parseTabSeparated(text);
@@ -139,8 +147,8 @@ export function pastedCells(
 }
 
 /**
- * Write a cell range to a clipboard event's data: tab-separated text, and the cells format that
- * a paste in this editor reads. Returns false when the selection is not a cell range.
+ * Write a cell range to a clipboard event's data: tab-separated text (one cell: its own text),
+ * and the cells format that a paste in this editor reads. Returns false when the selection is not a cell range.
  */
 export function copyCellsTo(
   data: { setData(format: string, value: string): void },
@@ -150,7 +158,9 @@ export function copyCellsTo(
   const rows = cellRangeTexts(layout, sel);
   if (!rows) return false;
   data.setData(CELLS_MIME, JSON.stringify(rows));
-  data.setData('text/plain', toTabSeparated(rows));
+  // One cell is its own text, unquoted, so a paste at a caret inserts it as typed.
+  const one = rows.length === 1 && rows[0].length === 1;
+  data.setData('text/plain', one ? rows[0][0] : toTabSeparated(rows));
   return true;
 }
 

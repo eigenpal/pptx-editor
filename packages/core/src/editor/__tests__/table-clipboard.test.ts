@@ -18,6 +18,7 @@ import { readTable } from '../../automation/commands/table-model.ts';
 import {
   CELLS_MIME,
   cellRangeTexts,
+  copyCellsTo,
   parseCellsJson,
   parseTabSeparated,
   pastedCells,
@@ -239,6 +240,25 @@ describe('paste into cells', () => {
     expect(e.exec({ type: 'pasteCells', texts: [['a']] }).ok).toBe(true);
     expect(elements(body()).filter((n) => n.local === 'p')).toHaveLength(1);
     expect(grid(e)[0][0]).toBe('a');
+  });
+
+  test('one copied cell is its own text, unquoted; more cells are tab-separated', async () => {
+    const e = await open();
+    const written = new Map<string, string>();
+    const data = { setData: (format: string, value: string) => void written.set(format, value) };
+    range(e, 0, 0, 0, 0);
+    expect(copyCellsTo(data, e.session!.layout(0), e.snapshot().selection)).toBe(true);
+    expect(written.get('text/plain')).toBe('A');
+    range(e, 0, 0, 0, 1);
+    copyCellsTo(data, e.session!.layout(0), e.snapshot().selection);
+    expect(written.get('text/plain')).toBe('A\tB');
+    // A control character in a pasted cell is dropped, not a refused paste.
+    expect(parseTabSeparated('a\u0001b\tc')).toEqual([['ab', 'c']]);
+    expect(parseCellsJson('[["a\\u0001b"]]')).toEqual([['ab']]);
+    // One copied cell at a caret pastes as text, even when that text holds a tab.
+    caretIn(e, 1, 1);
+    const sel = e.snapshot().selection;
+    expect(pastedCells(sel, { cells: '[["a\\tb"]]', text: 'a\tb' })).toBeNull();
   });
 
   test('pasteCells refuses texts that are not rows of strings', async () => {

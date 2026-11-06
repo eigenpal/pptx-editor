@@ -52,8 +52,8 @@ type GridDrag = {
   readonly start: { x: number; y: number };
   readonly sizes: readonly number[];
   /**
-   * How far the right or bottom edge may grow: to the slide's edge, so the edge stays where the
-   * pointer can reach it again. Infinite for an inner line.
+   * How far, in table units, the right or bottom edge may grow: to the slide's edge, so the edge
+   * stays where the pointer can reach it again. Infinite for an inner line.
    */
   readonly room: number;
   /** Every step of the drag runs with it: the drag is one undo step. */
@@ -110,13 +110,18 @@ export class TableGestures {
           ? apply(frame.matrix, t.width, 0).x
           : apply(frame.matrix, 0, t.height).y;
       const slideEnd = line.axis === 'column' ? layout.slide.width : layout.slide.height;
+      // Slide units for each table unit along the axis: a table in a scaled group is not 1.
+      const origin = apply(frame.matrix, 0, 0);
+      const length = line.axis === 'column' ? t.width : t.height;
+      const scale =
+        length > 0 ? (end - (line.axis === 'column' ? origin.x : origin.y)) / length : 1;
       this.#grid = {
         pending: !on,
         id,
         ...line,
         start: apply(invert(frame.matrix), p.x, p.y),
         sizes,
-        room: outer ? Math.max(0, slideEnd - end) : Infinity,
+        room: outer && scale > 0 ? Math.max(0, slideEnd - end) / scale : Infinity,
         historyGroup: this.host.beginHistoryGroup(),
       };
       return 'grid';
