@@ -220,11 +220,12 @@ function grownForPaste(
   const rows = Math.min(range.r0 + texts.length - m.nR, MAX_ROWS - m.nR);
   const columns = Math.min(range.c0 + widest - m.nC, MAX_TABLE_SIZE - m.nC);
   if (rows <= 0 && columns <= 0) return m;
-  if (rows > 0) insertRows(batch, m, m.nR, rows, m.nR - 1);
+  // Plain cells: a merged edge row or column is not repeated, so every pasted value has a cell.
+  if (rows > 0) insertRows(batch, m, m.nR, rows, m.nR - 1, true);
   let grown = readTable(batch, m.part, m.frame.id);
   if (columns > 0) {
     const width = gridWidth(grown);
-    insertColumns(batch, grown, grown.nC, columns, grown.nC - 1);
+    insertColumns(batch, grown, grown.nC, columns, grown.nC - 1, true);
     keepGridWidth(batch, grown, width);
     grown = readTable(batch, m.part, m.frame.id);
   }

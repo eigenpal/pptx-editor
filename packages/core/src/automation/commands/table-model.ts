@@ -335,14 +335,16 @@ function afterLast(parent: Element, locals: readonly string[]): number {
 /**
  * Insert `count` rows at row index `at` (0 to the row count), formatted like row `source`. A
  * merged block that crosses the insertion line grows over the new rows; elsewhere the new rows
- * repeat the source row's horizontal merges.
+ * repeat the source row's horizontal merges, or hold one cell per column when `plain` (a paste
+ * fills every new cell).
  */
 export function insertRows(
   batch: OpBatch,
   m: TableModel,
   at: number,
   count: number,
-  source: number
+  source: number,
+  plain = false
 ): void {
   if (m.nR + count > MAX_ROWS) throw new CommandRefusal('disabled.tableTooLarge');
   const grown = new Set<string>();
@@ -364,7 +366,7 @@ export function insertRows(
         rows[i].push(newCellSpec(m.tcs[at][c], blockAttrs(grownBlock, at + i, c)));
     } else {
       const b = blockOf(m, m.anchors[source][c]);
-      const line = { r0: 0, r1: 0, c0: b.c0, c1: b.c1 };
+      const line = plain ? { r0: 0, r1: 0, c0: c, c1: c } : { r0: 0, r1: 0, c0: b.c0, c1: b.c1 };
       for (let i = 0; i < count; i += 1)
         rows[i].push(newCellSpec(m.tcs[source][c], blockAttrs(line, 0, c)));
     }
@@ -388,14 +390,16 @@ export function insertRows(
 /**
  * Insert `count` columns at grid index `at`, as wide as column `source` and formatted like it.
  * A merged block that crosses the insertion line grows over the new columns; elsewhere the new
- * columns repeat the source column's vertical merges.
+ * columns repeat the source column's vertical merges, or hold one cell per row when `plain` (a
+ * paste fills every new cell).
  */
 export function insertColumns(
   batch: OpBatch,
   m: TableModel,
   at: number,
   count: number,
-  source: number
+  source: number,
+  plain = false
 ): void {
   if (m.nC + count > MAX_TABLE_SIZE) throw new CommandRefusal('disabled.tableTooLarge');
   const w = String(intAttr(m.gridCols[source], 'w') ?? 0);
@@ -429,7 +433,7 @@ export function insertColumns(
         specs.push(newCellSpec(m.tcs[r][at], blockAttrs(grownBlock, r, at + i)));
     } else {
       const b = blockOf(m, m.anchors[r][source]);
-      const line = { r0: b.r0, r1: b.r1, c0: 0, c1: 0 };
+      const line = plain ? { r0: r, r1: r, c0: 0, c1: 0 } : { r0: b.r0, r1: b.r1, c0: 0, c1: 0 };
       for (let i = 0; i < count; i += 1)
         specs.push(newCellSpec(m.tcs[r][source], blockAttrs(line, r, 0)));
     }

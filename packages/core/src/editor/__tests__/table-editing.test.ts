@@ -470,6 +470,11 @@ describe('merge, split, and formatting (editor-ui-parity 4.3)', () => {
     const cleared = xml(e);
     expect(runToolbarCommand(e, 'table.borderColor', '#0000FF').ok).toBe(true);
     expect(xml(e)).toBe(cleared);
+    // In view mode a pen pick is refused, as a draw would be, and the pen stays.
+    e.setMode('view');
+    expect(runToolbarCommand(e, 'table.borderWidth', '6').ok).toBe(false);
+    expect(toolbarCommandState(e, 'table.borderWidth').value).toBe('3');
+    e.setMode('edit');
     expectValid(e);
     roundTrip(e);
   });

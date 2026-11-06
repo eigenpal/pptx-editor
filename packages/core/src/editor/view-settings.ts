@@ -94,7 +94,11 @@ export class ViewSettings {
   apply(command: ViewCommand, all: readonly string[]): boolean {
     if (this.refusal(command, all)) return false;
     if (command.type === 'toggleSmartGuides') this.smartGuides = !this.smartGuides;
-    else if (command.type === 'setTableBorderPen') this.tableBorderPen = command.pen;
+    // A copy the host cannot change after it passed `validPen`.
+    else if (command.type === 'setTableBorderPen')
+      this.tableBorderPen = Object.freeze(
+        JSON.parse(JSON.stringify(command.pen)) as TableBorderPen
+      );
     else if (command.type === 'setPresentationView') this.presentationView = command.view;
     else {
       const ids = new Set(this.collapsedSections);
@@ -145,6 +149,8 @@ export class ViewSettings {
 
   /** A new document opens in the Normal view with every section open. */
   reset(): void {
+    // The pen keeps its line; it redraws no target until a border pick in the new deck.
+    this.tableBorderPen = { ...this.tableBorderPen, drawn: false };
     this.presentationView = 'normal';
     this.collapsedSections = NONE;
   }

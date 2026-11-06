@@ -5,6 +5,7 @@
 // (`EditorSnapshot.table`, `tableChromeVisible`).
 
 import type {
+  CommandResult,
   Editor,
   EditorCommand,
   EditorSnapshot,
@@ -134,14 +135,17 @@ function nextPen(pen: TableBorderPen, slot: string, value: unknown): TableBorder
 export function armTableBorderPen(
   editor: Editor,
   slot: string,
-  value: unknown
-): { readonly ok: true } | null {
+  value: unknown,
+  draw: EditorCommand
+): CommandResult | null {
   if (slot === 'table.borderTarget') return null;
   const pen = tableBorderPen(editor);
   const next = nextPen(pen, slot, value);
   if (!next || pen.drawn) return null;
-  const result = editor.exec({ type: 'setTableBorderPen', pen: next });
-  return result.ok ? { ok: true } : null;
+  // The same answer as a draw: a pick the engine would refuse (no table, view mode) is refused.
+  const can = editor.can(draw);
+  if (!can.ok) return can;
+  return editor.exec({ type: 'setTableBorderPen', pen: next });
 }
 
 /**

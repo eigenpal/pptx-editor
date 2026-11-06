@@ -4108,14 +4108,7 @@ export function runSectionSlot(editor: PptxEditorInstance, slot: 'section.rename
 export function runSlideStep(editor: PptxEditorInstance | null, command: EditorCommand | null): boolean;
 
 // @public
-export function runToolbarCommand<K extends ChromeSlotId>(editor: Editor | null, id: K, value?: ToolbarSlotValue<K>, options?: EditorExecOptions): {
-    readonly ok: true;
-} | {
-    readonly ok: false;
-    readonly reason: string;
-    readonly detail?: string;
-    readonly noop?: boolean;
-};
+export function runToolbarCommand<K extends ChromeSlotId>(editor: Editor | null, id: K, value?: ToolbarSlotValue<K>, options?: EditorExecOptions): CommandResult;
 
 // @public
 export function safeParticipantColor(value: string | undefined): string | undefined;

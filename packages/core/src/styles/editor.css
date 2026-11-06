@@ -1502,6 +1502,8 @@
   outline: none;
 }
 .pptx-surface__stage {
+  /* The slide inherits this until the pointer names a cursor (surface.ts `#updateCursor`). */
+  cursor: default;
   flex: none;
   margin: auto;
   position: relative;

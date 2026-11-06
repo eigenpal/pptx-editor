@@ -980,7 +980,7 @@ export function runToolbarCommand<K extends ChromeSlotId>(
     return { ok: false as const, reason: 'disabled.invalidValue' };
   }
   // A pen pick before any border target pick arms the pen and writes nothing.
-  const armed = armTableBorderPen(editor, id, value);
+  const armed = armTableBorderPen(editor, id, value, command);
   if (armed) return armed;
   rememberTableBorderPen(editor, id, value);
   return editor.exec(command, options);

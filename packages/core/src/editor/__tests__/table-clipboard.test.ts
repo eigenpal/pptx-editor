@@ -206,6 +206,22 @@ describe('paste into cells', () => {
     expect(model(e).tcs.every((row) => row.length === model(e).nC)).toBe(true);
   });
 
+  test('rows a paste adds are plain cells, also under a merged last row', async () => {
+    const e = await open();
+    range(e, 2, 0, 2, 2);
+    expect(e.exec({ type: 'mergeCells' }).ok).toBe(true);
+    caretIn(e, 1, 0);
+    const texts = [
+      ['1', '2', '3'],
+      ['4', '5', '6'],
+      ['7', '8', '9'],
+    ];
+    expect(e.exec({ type: 'pasteCells', texts }).ok).toBe(true);
+    // Row 2 stays one merged cell and takes its first value; the new row 3 takes all three.
+    expect(grid(e)[3]).toEqual(['7', '8', '9']);
+    expect(model(e).tcs[3].every((tc) => !tc.attrs.some((a) => a.local === 'hMerge'))).toBe(true);
+  });
+
   test('pasteCells refuses texts that are not rows of strings', async () => {
     const e = await open();
     caretIn(e, 0, 0);
