@@ -460,7 +460,8 @@ export function paintCartesian(
       if (!stroke) continue;
       const lines: Point[][] = [];
       if (view.value?.scale) {
-        for (const value of gridValues(view.value.scale, minor)) {
+        const scale = view.value.scale;
+        for (const value of gridValues(scale, minor, minorStep(scale, view.axis))) {
           const at = valueAt(view.value, value);
           lines.push(
             vertical(view.side)
@@ -578,18 +579,17 @@ export function paintCartesian(
             { x: at, y: position + outward * to },
           ];
     };
-    // Minor marks: five to a major step of a linear value axis, and one at each category's
-    // centre on a category axis whose major marks sit between the categories.
+    // Minor marks: one at each minor unit of a linear value axis (`c:minorUnit`, or five to a
+    // major step), and one at each category's centre on a category axis whose major marks sit
+    // between the categories.
     const minorMark = view.axis!.minorTickMark;
     const minor: number[] = [];
     const scale = view.value?.scale;
-    if (minorMark !== 'none' && scale && scale.logBase === undefined && scale.major > 0) {
-      const count = Math.min(
-        MAX_MINOR_MARKS,
-        Math.round(((scale.max - scale.min) / scale.major) * 5)
-      );
+    const step = scale ? minorStep(scale, view.axis!) : 0;
+    if (minorMark !== 'none' && scale && scale.logBase === undefined && step > 0) {
+      const count = Math.min(MAX_MINOR_MARKS, Math.floor((scale.max - scale.min) / step + 1e-9));
       for (let index = 0; index <= count; index += 1)
-        minor.push(valueAt(view.value!, scale.min + (index * scale.major) / 5));
+        minor.push(valueAt(view.value!, scale.min + index * step));
     } else if (minorMark !== 'none' && !scale && categories?.between) {
       for (let index = 0; index < Math.min(categories.count, MAX_MINOR_MARKS); index += 1)
         minor.push(categoryAt(index));
@@ -750,10 +750,22 @@ function crossesInside(view: AxisView, scale: ValueScale): boolean {
 }
 
 /**
- * The values of an axis's gridlines: the ticks, or for minor gridlines five steps per interval
- * on a linear scale and each whole multiple between powers on a logarithmic one. Bounded.
+ * The minor unit of a linear value axis: its `c:minorUnit` (ECMA-376 Part 1, 21.2.2.112), or a
+ * fifth of the major unit when it has none or when its own would give more than
+ * `MAX_MINOR_MARKS` steps. Zero when the scale has no step.
  */
-function gridValues(scale: ValueScale, minor: boolean): number[] {
+function minorStep(scale: ValueScale, axis: ChartAxis): number {
+  const own = axis.minorUnit;
+  if (own !== null && own > 0 && (scale.max - scale.min) / own <= MAX_MINOR_MARKS) return own;
+  return scale.major > 0 ? scale.major / 5 : 0;
+}
+
+/**
+ * The values of an axis's gridlines: the ticks, or for minor gridlines one per minor unit
+ * (`minorStep`) on a linear scale and each whole multiple between powers on a logarithmic one.
+ * Bounded.
+ */
+function gridValues(scale: ValueScale, minor: boolean, minorUnit: number): number[] {
   const values: number[] = [];
   if (scale.logBase !== undefined) {
     if (!minor) return [...scale.ticks];
@@ -765,7 +777,8 @@ function gridValues(scale: ValueScale, minor: boolean): number[] {
     }
     return values;
   }
-  const step = minor ? scale.major / 5 : scale.major;
+  const step = minor ? minorUnit : scale.major;
+  if (!(step > 0)) return values;
   for (
     let index = 0, value = scale.min;
     value <= scale.max + step * 1e-9 && index < 1_000;

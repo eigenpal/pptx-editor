@@ -158,6 +158,8 @@ export interface ChartAxis {
   readonly min: number | null;
   readonly max: number | null;
   readonly majorUnit: number | null;
+  /** `c:minorUnit`; null for automatic, a fifth of the major unit. */
+  readonly minorUnit: number | null;
   readonly logBase: number | null;
   readonly formatCode: string | null;
   readonly sourceLinked: boolean;
@@ -548,6 +550,7 @@ function readAxis(element: OoxmlElement): ChartAxis | null {
     min: childNumber(scaling, 'min', -1e300, 1e300),
     max: childNumber(scaling, 'max', -1e300, 1e300),
     majorUnit: childNumber(element, 'majorUnit', 1e-300, 1e300),
+    minorUnit: childNumber(element, 'minorUnit', 1e-300, 1e300),
     logBase: childNumber(scaling, 'logBase', 2, 1000),
     formatCode: numFmt ? (schemaAttributeValue(numFmt.attrs, 'formatCode') ?? null) : null,
     sourceLinked: numFmt ? schemaAttributeValue(numFmt.attrs, 'sourceLinked') === '1' : true,
