@@ -8,12 +8,14 @@
 // object changed (as the rail's memoized `Thumbnail` does). Timings include that work.
 //
 // Timings depend on the machine; the counters do not. Read the counters first: layout runs,
-// `renderThumbnail` calls, and thumbnail repaints per operation.
+// `renderThumbnail` calls, thumbnail repaints, and the `can` probes compiled per operation. A
+// probe compiles a command on a copy of the deck; New Slide and Add Section probes cost more as
+// the deck grows, so typing and dragging compile none (`Deck probes` stays 0).
 //
 // Model: DOCX Editor's `scripts/bench/edit-bench.ts` (EigenPal, same owner).
 //
 // Usage:
-//   bun scripts/bench/edit-bench.ts [--sizes 10,60,200] [--runs 40] [--warmup 5] [--json]
+//   bun scripts/bench/edit-bench.ts [--sizes 10,60,200,800] [--runs 40] [--warmup 5] [--json]
 
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { textDeck } from './text-deck.ts';
@@ -40,7 +42,7 @@ function parseArgs(argv: readonly string[]): Args {
     return i >= 0 ? argv[i + 1] : undefined;
   };
   return {
-    sizes: (value('--sizes') ?? '10,60,200').split(',').map(Number),
+    sizes: (value('--sizes') ?? '10,60,200,800').split(',').map(Number),
     runs: Number(value('--runs') ?? 40),
     warmup: Number(value('--warmup') ?? 5),
     json: argv.includes('--json'),
@@ -63,7 +65,14 @@ interface Counters {
   thumbnailPaints: number;
   /** Thumbnails repainted after the operation, when the editor was idle. */
   idleThumbnailPaints: number;
+  /** `can` answers compiled (a probe batch opened), not answered from the cache. */
+  probes: number;
+  /** Of those, New Slide and Add Section: probes that run a whole-deck command. */
+  deckProbes: number;
 }
+
+/** Commands whose probe runs a whole-deck command. */
+const DECK_COMMANDS: ReadonlySet<string> = new Set(['addSlide', 'addSection']);
 
 interface ScenarioResult {
   name: string;
@@ -110,6 +119,8 @@ class Harness {
       thumbnailCalls: 0,
       thumbnailPaints: 0,
       idleThumbnailPaints: 0,
+      probes: 0,
+      deckProbes: 0,
     };
   }
 
@@ -124,6 +135,20 @@ class Harness {
       if (r && !this.#seen.has(r)) {
         this.#seen.add(r);
         this.counters.layoutsComputed += 1;
+      }
+      return r;
+    };
+    // A compiled `can` answer opens one probe batch; a cached one opens none.
+    let batches = 0;
+    const probeBatch = session.probeBatch.bind(session);
+    session.probeBatch = (base) => ((batches += 1), probeBatch(base));
+    const can = this.editor.can.bind(this.editor);
+    this.editor.can = (command, options) => {
+      const before = batches;
+      const r = can(command, options);
+      if (batches > before) {
+        this.counters.probes += 1;
+        if (DECK_COMMANDS.has(command.type)) this.counters.deckProbes += 1;
       }
       return r;
     };
@@ -224,6 +249,8 @@ async function measure(
       thumbnailCalls: per(c.thumbnailCalls),
       thumbnailPaints: per(c.thumbnailPaints),
       idleThumbnailPaints: per(c.idleThumbnailPaints),
+      probes: per(c.probes),
+      deckProbes: per(c.deckProbes),
     },
   };
 }
@@ -313,18 +340,27 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const results: ScenarioResult[] = [];
   for (const n of args.sizes) results.push(...(await benchDeck(n, args)));
+  // An edit on one slide keeps the deck's structure: no whole-deck probe may run again.
+  const regressions = results.filter(
+    (r) => r.name !== 'slide-switch' && r.perOperation.deckProbes > 0
+  );
+  for (const r of regressions)
+    console.error(
+      `${r.name} at ${r.slides} slides compiled ${r.perOperation.deckProbes} deck probes`
+    );
+  if (regressions.length) process.exitCode = 1;
   if (args.json) {
     console.log(JSON.stringify({ schema: 1, runtime: `bun ${Bun.version}`, args, results }));
     return;
   }
   console.log(
-    '| Scenario | Slides | Total ms (median / p95) | Toolbar ms | Rail ms | Layout calls | Layouts computed | Thumbnail calls | Thumbnail paints | Idle paints |'
+    '| Scenario | Slides | Total ms (median / p95) | Toolbar ms | Rail ms | Layout calls | Layouts computed | Thumbnail calls | Thumbnail paints | Idle paints | Probes | Deck probes |'
   );
-  console.log('| --- | --: | --: | --: | --: | --: | --: | --: | --: | --: |');
+  console.log('| --- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |');
   for (const r of results) {
     const c = r.perOperation;
     console.log(
-      `| ${r.name} | ${r.slides} | ${fmt(r.total)} | ${fmt(r.toolbar)} | ${fmt(r.rail)} | ${c.layoutCalls} | ${c.layoutsComputed} | ${c.thumbnailCalls} | ${c.thumbnailPaints} | ${c.idleThumbnailPaints} |`
+      `| ${r.name} | ${r.slides} | ${fmt(r.total)} | ${fmt(r.toolbar)} | ${fmt(r.rail)} | ${c.layoutCalls} | ${c.layoutsComputed} | ${c.thumbnailCalls} | ${c.thumbnailPaints} | ${c.idleThumbnailPaints} | ${c.probes} | ${c.deckProbes} |`
     );
   }
 }

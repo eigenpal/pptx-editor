@@ -22,7 +22,12 @@
 // the current change has reached every listener, so every listener sees changes in order.
 
 import { normalizePartName } from '@eigenpal/ooxml-core';
-import { CONTENT_TYPES_PART, type PackagePart, type PptxPackage } from '../package/package.ts';
+import {
+  changedPartNames,
+  CONTENT_TYPES_PART,
+  type PackagePart,
+  type PptxPackage,
+} from '../package/package.ts';
 import { carryFileTimings } from '../package/timing.ts';
 import { applyOps, type OpRejection, type PptxOp } from './ops.ts';
 import type { HistoryGroup, TransactOrigin } from './history-group.ts';
@@ -132,10 +137,7 @@ function reportListenerError(error: unknown): void {
 
 /** Part names whose part object differs between two packages. */
 export function changedParts(a: PptxPackage, b: PptxPackage): string[] {
-  const out: string[] = [];
-  for (const [name, part] of b.parts) if (a.parts.get(name) !== part) out.push(name);
-  for (const name of a.parts.keys()) if (!b.parts.has(name)) out.push(name);
-  return out;
+  return changedPartNames(a, b, Infinity) ?? [];
 }
 
 /** The transactional document store. */
