@@ -3,6 +3,7 @@
 // share this path. A shape that takes its geometry from its layout or master gets its own
 // `a:prstGeom` first, with the values it showed, so the edit changes only that shape.
 
+import { escapeXmlAttributeChecked } from '@eigenpal/ooxml-core';
 import { attr, child, elements, type Element } from '../../store/index.ts';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
 import { specFromXml } from './shape-commands.ts';
@@ -23,9 +24,9 @@ export interface PresetTarget {
 }
 
 /**
- * Write `values` (guide name to whole guide units) into the shape's `a:avLst`. The names must
- * be names of the preset table, never text from a file or a caller, because they are written
- * as attribute values.
+ * Write `values` (guide name to whole guide units) into the shape's `a:avLst`. The names in
+ * `values` must be names of the preset table, never text from a caller. The names in
+ * `t.adjust` can come from a layout, so they are escaped.
  */
 export function writeAdjustments(
   batch: OpBatch,
@@ -42,7 +43,11 @@ export function writeAdjustments(
     const kids = batch.element(part, t.spPr.id).children;
     const xfrm = kids.findIndex((n) => n.type === 'element' && n.local === 'xfrm');
     const gds = [...t.adjust]
-      .map(([name, v]) => `<a:gd name="${name}" fmla="val ${Math.round(v)}"/>`)
+      .map(([name, v]) => {
+        // An inherited guide name comes from the file: escape it.
+        const n = escapeXmlAttributeChecked(name, 'guide name');
+        return `<a:gd name="${n}" fmla="val ${Math.round(v)}"/>`;
+      })
       .join('');
     const id = batch.insert({
       op: 'insertNode',

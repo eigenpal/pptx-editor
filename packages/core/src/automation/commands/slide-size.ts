@@ -24,6 +24,7 @@ import {
   xmlPartOf,
   type Element,
 } from '../../store/index.ts';
+import { decodeXml } from '../../store/package/package.ts';
 import { CommandRefusal, OpBatch } from './op-batch.ts';
 import { coordinate, positiveCoordinate } from './package-edits.ts';
 
@@ -122,13 +123,17 @@ export function setSlideSize(
   const s = Math.min(cx / info.width, cy / info.height);
   const scale: Scale = { s, dx: (cx - info.width * s) / 2, dy: (cy - info.height * s) / 2 };
   for (const [name, p] of [...batch.pkg.parts]) {
-    if (p.kind === 'xml') {
+    const drawing = DRAWING_TYPES.has(contentTypeOf(batch.pkg, name) ?? '');
+    if (p.kind === 'xml' && drawing) {
+      // A drawing that an earlier edit wrote back is held as a tree: it scales in place.
+      scaleDrawing(batch, name, p.xml.root, s);
+    } else if (p.kind === 'xml') {
       const root = p.xml.root;
       if (root.ns !== NS.p || !CANVAS_ROOTS.has(root.local)) continue;
       const tree = find(root, 'p:spTree');
       if (tree) scaleShapes(batch, name, tree, scale, 0);
       scaleText(batch, name, root, s, 0);
-    } else if (DRAWING_TYPES.has(contentTypeOf(batch.pkg, name) ?? '')) {
+    } else if (drawing) {
       scaleDrawingPart(batch, name, p.bytes, s);
     }
   }
@@ -151,19 +156,22 @@ const DRAWING_TYPES: ReadonlySet<string> = new Set([
  * lays a diagram out again from its data at the new size, with the text size of its layout.
  */
 function scaleDrawingPart(batch: OpBatch, name: string, bytes: Uint8Array, s: number): void {
-  const r = parseXmlPart(name, new TextDecoder().decode(bytes));
+  const r = parseXmlPart(name, decodeXml(bytes));
   if (!r.ok) return;
-  const root = r.part.root;
   const scratch = new OpBatch({
     parts: new Map([[name, { kind: 'xml', partName: name, xml: r.part }]]),
   });
-  if (root.ns === NS.dsp && root.local === 'drawing') scaleDiagram(scratch, name, root, s);
-  else if (root.ns === NS.c && root.local === 'chartSpace') scaleText(scratch, name, root, s, 0);
-  else return;
+  scaleDrawing(scratch, name, r.part.root, s);
   const scaled = xmlPartOf(scratch.pkg, name);
   if (scratch.ops.length === 0 || !scaled) return;
   batch.push({ op: 'removePart', part: name });
   batch.push({ op: 'addPart', part: name, xml: serializeXmlPart(scaled) });
+}
+
+/** Scale the root of a diagram drawing (its shapes) or of a chart (its text). */
+function scaleDrawing(batch: OpBatch, name: string, root: Element, s: number): void {
+  if (root.ns === NS.dsp && root.local === 'drawing') scaleDiagram(batch, name, root, s);
+  else if (root.ns === NS.c && root.local === 'chartSpace') scaleText(batch, name, root, s, 0);
 }
 
 /**

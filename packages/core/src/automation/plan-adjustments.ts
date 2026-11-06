@@ -75,8 +75,8 @@ function presetOf(ctx: TextPlanContext, at: ShapeLocation): PresetOf {
   const xfrm = child(spPr, 'a:xfrm');
   const w = resolved?.xfrm.cx ?? intAttr(child(xfrm, 'a:ext'), 'cx') ?? 0;
   const h = resolved?.xfrm.cy ?? intAttr(child(xfrm, 'a:ext'), 'cy') ?? 0;
-  // An unknown name is refused here, so a preset and its guide names written below are always
-  // names of the preset table, never text from the file.
+  // An unknown preset is refused here, so the preset written below is a name of the preset
+  // table. Guide names that a layout gives are text from the file; the writer escapes them.
   const adjustments = presetAdjustments(preset, w, h, adjust);
   if (!adjustments) noPreset();
   return { preset, adjust, own, spPr, adjustments };

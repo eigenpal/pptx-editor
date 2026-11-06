@@ -170,6 +170,9 @@ describe('setSlideSize', () => {
     expect(was).toContain('x="390" y="208259"');
     expect(now).toContain('x="293" y="156194"');
     expect(now).toContain('cx="1186523" cy="590070"');
+    // A second resize scales the drawing that the first one wrote back.
+    expect(e.exec({ type: 'setSlideSize', width: 6_858_000, height: 5_143_500 }).ok).toBe(true);
+    expect(drawing(reopen(e))).toContain('cx="889892" cy="442553"');
     // Diagram text keeps its size and insets.
     const sizes0 = [...was.matchAll(/ sz="(\d+)"| lIns="(\d+)"/g)].map((m) => m[0]);
     expect([...now.matchAll(/ sz="(\d+)"| lIns="(\d+)"/g)].map((m) => m[0])).toEqual(sizes0);
@@ -179,7 +182,10 @@ describe('setSlideSize', () => {
     const before = sizes(pkg(c));
     expect(before).toContain('1862');
     expect(c.exec({ type: 'setSlideSize', width: 9_144_000, height: 6_858_000 }).ok).toBe(true);
-    expect(sizes(reopen(c))).toEqual(before.map((v) => String(Math.round(Number(v) * 0.75))));
+    const once = before.map((v) => Math.round(Number(v) * 0.75));
+    expect(sizes(reopen(c))).toEqual(once.map(String));
+    expect(c.exec({ type: 'setSlideSize', width: 6_858_000, height: 5_143_500 }).ok).toBe(true);
+    expect(sizes(reopen(c))).toEqual(once.map((v) => String(Math.round(v * 0.75))));
   });
 
   test('keep leaves every box where it is', async () => {
