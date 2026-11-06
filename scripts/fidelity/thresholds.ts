@@ -259,6 +259,10 @@ export const FIXTURE_KNOWN_GAPS: Readonly<Record<FidelityEnvironment, KnownGapLi
   // text"), and lines with Malgun Gothic and Arial miss on baseline by about 1 pt ("Line
   // model"). `east-asian-typography/1` passes. `linux` values for this change come from its CI
   // run.
+  // 6 November 2026, the new `charts` and `diagrams` fixtures: all 10 slides fail on pixels.
+  // This change adds the decks and their reference PDFs, and no renderer for either: a chart
+  // and a diagram draw as a placeholder (the gate allows entries for a new fixture). `linux`
+  // from the CI run of eigenpal/pptx-editor#35. `macos-reference` is not measured here.
   linux: {
     poppler: '24.02.0',
     chromium: '156.0.8078.4',
@@ -267,6 +271,16 @@ export const FIXTURE_KNOWN_GAPS: Readonly<Record<FidelityEnvironment, KnownGapLi
     slides: {
       'autofit/1': { pixels: 0.0061, lines: 9 },
       'bullets-numbering/1': { pixels: 0.0091, lines: 9 },
+      'charts/1': { pixels: 0.1845, lines: 1 },
+      'charts/2': { pixels: 0.1695, lines: 1 },
+      'charts/3': { pixels: 0.0142, lines: 1 },
+      'charts/4': { pixels: 0.2492, lines: 1 },
+      'charts/5': { pixels: 0.0075, lines: 1 },
+      'charts/6': { pixels: 0.1578, lines: 1 },
+      'charts/7': { pixels: 0.1127, lines: 1 },
+      'charts/8': { pixels: 0.0146, lines: 1 },
+      'diagrams/1': { pixels: 0.103, lines: 1 },
+      'diagrams/2': { pixels: 0.0628, lines: 1 },
       'east-asian-line-breaking/1': { pixels: 0.076, 'line-breaks': 0.6538, lines: 52 },
       'east-asian-line-breaking/2': { pixels: 0.0594, lines: 52 },
       'east-asian-line-breaking/3': { pixels: 0.0242, 'line-breaks': 0.5556, lines: 27 },
