@@ -30,6 +30,7 @@ import { partNameKey } from '@eigenpal/ooxml-core';
 import { resolveSlide } from '../cascade/index.ts';
 import {
   HARD_MAX_FONT_BYTES,
+  HOST_SUBSTITUTE_ORIGIN,
   createFixedMeasurer,
   createHarfBuzzMeasurer,
   initializeHarfBuzz,
@@ -321,8 +322,7 @@ export interface HostFaces {
 
 export const NO_HOST_FACES: HostFaces = Object.freeze({ faces: [], substitutions: [] });
 
-/** The `origin` of a host substitution's face, for the report. */
-export const HOST_SUBSTITUTE_ORIGIN = 'host-substitute';
+export { HOST_SUBSTITUTE_ORIGIN } from '../layout/index.ts';
 
 /** The face sources a session measures with, in priority order. */
 interface FontSet {

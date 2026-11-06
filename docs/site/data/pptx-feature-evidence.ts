@@ -34,7 +34,10 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     fixtures: ['text-runs', 'font-effects'],
     approximations: ['line-model', 'small-caps', 'script-size'],
   },
-  'text.character-spacing': { fixtures: ['text-runs', 'font-effects'] },
+  'text.character-spacing': {
+    fixtures: ['text-runs', 'font-effects'],
+    approximations: ['glyph-advances'],
+  },
   'text.change-case': { fixtures: ['font-effects'] },
   'text.hyperlinks': { fixtures: [], approximations: ['hyperlink-text'] },
   'text.input-method': { fixtures: ['text-runs'] },
@@ -173,7 +176,10 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   'tables.sizes': { fixtures: ['tables', 'table-editing'] },
   // --- Charts, diagrams, media & OLE -------------------------------------
   'objects.charts': { fixtures: ['charts', 'preserve-unsupported', 'slide-structure'] },
-  'objects.diagrams': { fixtures: ['diagrams'], approximations: ['diagram-drawing'] },
+  'objects.diagrams': {
+    fixtures: ['diagrams'],
+    approximations: ['diagram-drawing', 'line-model'],
+  },
   'objects.media-ole': { fixtures: ['preserve-unsupported', 'slide-structure'] },
   'objects.equations': { fixtures: [] },
   // --- Slides, layouts & notes -------------------------------------------

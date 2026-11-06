@@ -9,10 +9,13 @@ import { createFixedMeasurer, layoutSlide, type TextLayout } from '../../index.t
 import type { FaceMetrics } from '../measurer.ts';
 import {
   autofitSizePt,
+  baselineInLinePt,
   baselineOffsetPt,
+  lineHeightInPt,
   lineHeightPt,
   paragraphSpacingPt,
   roundToWholePoint,
+  singleLinePt,
   WHOLE_POINT_BASELINES,
 } from '../line-metrics.ts';
 
@@ -190,5 +193,47 @@ describe('layout', () => {
     );
     const run = t.lines[0].runs.find((x) => x.kind === 'text')!;
     expect(run.sizePt).toBe(18);
+  });
+});
+
+describe('diagram text: lines on the face line', () => {
+  test('the single line is the face ascent plus descent, not 1.2 × the size', () => {
+    expect(singleLinePt(20, CALIBRI, 'size')).toBeCloseTo(24, 6);
+    expect(singleLinePt(20, CALIBRI, 'face')).toBeCloseTo(20 * 1.2207, 6);
+  });
+
+  test('percent spacing scales the face line, and exact spacing stays', () => {
+    const single = singleLinePt(22.64, CALIBRI, 'face');
+    expect(lineHeightInPt(single, { pct: 0.9 }, 0)).toBeCloseTo(0.9 * 1.2207 * 22.64, 6);
+    expect(lineHeightInPt(single, { pct: 0.9 }, 0.1)).toBeCloseTo(0.8 * 1.2207 * 22.64, 6);
+    expect(lineHeightInPt(single, { pts: 2400 }, 0)).toBe(24);
+    // The size basis is lineHeightPt.
+    expect(lineHeightInPt(singleLinePt(18, CALIBRI, 'size'), { pct: 0.9 }, 0)).toBeCloseTo(
+      lineHeightPt(18, { pct: 0.9 }, 0),
+      9
+    );
+  });
+
+  test('a tighter line keeps the face descent below the baseline', () => {
+    // diagrams/2: 22.64 pt at 90 %, centered. The reference PDF puts the baseline 19 pt below
+    // the text top (288.48 pt); 1.2 × the size gives 18.47 pt, which rounds to 18.
+    const single = singleLinePt(22.64, CALIBRI, 'face');
+    const line = lineHeightInPt(single, { pct: 0.9 }, 0);
+    const baseline = baselineInLinePt(single, line, CALIBRI);
+    expect(baseline).toBeCloseTo(line - 22.64 * 0.2686, 6);
+    expect(Math.round(baseline)).toBe(19);
+    const sizeLine = lineHeightPt(22.64, { pct: 0.9 }, 0);
+    expect(Math.round(baselineOffsetPt(22.64, sizeLine, CALIBRI))).toBe(18);
+  });
+
+  test('the size basis gives baselineOffsetPt', () => {
+    for (const pct of [0.9, 1, 1.5]) {
+      const line = lineHeightPt(18, { pct }, 0);
+      const single = singleLinePt(18, CALIBRI, 'size');
+      expect(baselineInLinePt(single, line, CALIBRI)).toBeCloseTo(
+        baselineOffsetPt(18, line, CALIBRI),
+        9
+      );
+    }
   });
 });
