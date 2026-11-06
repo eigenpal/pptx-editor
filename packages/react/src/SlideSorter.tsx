@@ -135,7 +135,7 @@ export function SlideSorter({ className }: SlideSorterProps = {}) {
 
   const item = (s: SlideSummary): ReactNode => (
     <li
-      key={s.index}
+      key={s.id}
       className="pptx-sorter__item"
       role={grouped ? 'treeitem' : 'option'}
       aria-selected={selected.includes(s.index)}

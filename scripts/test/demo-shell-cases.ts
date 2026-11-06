@@ -148,6 +148,45 @@ export function demoShellCases(
     });
   });
 
+  describe(`${name} demo: rail thumbnails`, () => {
+    test('a slide move keeps every painted thumbnail, with no repaint', async () => {
+      const demo = await openDemo();
+      const thumbs = () =>
+        rail().map((item) => item.querySelector('.pptx-rail__thumb > svg') as Element | null);
+      const ids = () => demo.editor.snapshot().slides.map((s) => s.id);
+      const painted = new Map(ids().map((id, i) => [id, thumbs()[i]]));
+      expect([...painted.values()].every((svg) => svg !== null)).toBe(true);
+      // The first slide moves to the end: each item follows its slide, picture and all.
+      await step(() => demo.editor.exec({ type: 'moveSlides', indices: [0], to: 4 }));
+      const after = thumbs();
+      // Compare identities, not elements: a failing match would print the whole DOM.
+      expect(ids().map((id, i) => after[i] === painted.get(id))).toEqual(ids().map(() => true));
+    });
+
+    test('a removed slide releases its thumbnail container', async () => {
+      const demo = await openDemo();
+      const ed = demo.editor;
+      const own = ed.renderThumbnail.bind(ed);
+      const released = new Set<Element>();
+      ed.renderThumbnail = (index, container, options) => {
+        const dispose = own(index, container, options);
+        return () => (released.add(container), dispose());
+      };
+      try {
+        // The first two slides swap, so both items ask again through the wrapper.
+        const first = ed.snapshot().slides[0]!.id;
+        await step(() => ed.exec({ type: 'moveSlides', indices: [0], to: 1 }));
+        const index = ed.snapshot().slides.findIndex((s) => s.id === first);
+        const box = rail()[index]!.querySelector('.pptx-rail__thumb')!;
+        released.clear();
+        await step(() => ed.exec({ type: 'deleteSlides', indices: [index] }));
+        expect(released.has(box)).toBe(true);
+      } finally {
+        ed.renderThumbnail = own;
+      }
+    });
+  });
+
   describe(`${name} demo: a narrow window`, () => {
     test('the narrow rail overlay closes on a pick, Escape, and a press outside', async () => {
       const demo = await openDemo({ width: 820, css: true });

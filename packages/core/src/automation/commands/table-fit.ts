@@ -87,20 +87,31 @@ export function resizeTable(
   if (laid.rowY.length !== rows.length + 1) return (restore(), true);
   const drawn = rows.map((_, i) => laid.rowY[i + 1] - laid.rowY[i]);
   const total = laid.rowY[rows.length] - laid.rowY[0];
-  const target = (total * box.cy) / bcy;
   if (total <= 0) return (restore(), true);
-  if (target >= total) {
-    rows.forEach((r, i) => set(r, 'h', (drawn[i] * target) / total));
-    return true;
-  }
-  const held = rows.map((_, i) => drawn[i] > mins[i] + 1);
+  const heights = scaledRowHeights(drawn, mins, (total * box.cy) / bcy);
+  rows.forEach((r, i) => set(r, 'h', heights[i]!));
+  return true;
+}
+
+/**
+ * The row heights of a table resized to `target` in height, from the rows' `drawn` heights and
+ * their minimums (`a:tr/@h`): rows grow in proportion to their drawn heights; to shrink, rows
+ * that text holds above their minimum keep their height and the others share what is left.
+ * `resizeTable` writes them, and the drag preview lays the table out with them.
+ */
+export function scaledRowHeights(
+  drawn: readonly number[],
+  mins: readonly number[],
+  target: number
+): number[] {
+  const total = drawn.reduce((n, d) => n + d, 0);
+  if (total <= 0) return [...mins];
+  if (target >= total) return drawn.map((d) => (d * target) / total);
+  const held = drawn.map((d, i) => d > mins[i]! + 1);
   const heldSum = drawn.reduce((n, d, i) => n + (held[i] ? d : 0), 0);
   const freeSum = mins.reduce((n, m, i) => n + (held[i] ? 0 : m), 0);
   const room = Math.max(target - heldSum, 1);
-  rows.forEach((r, i) =>
-    set(r, 'h', held[i] || freeSum <= 0 ? mins[i] : (mins[i] * room) / freeSum)
-  );
-  return true;
+  return mins.map((m, i) => (held[i] || freeSum <= 0 ? m : (m * room) / freeSum));
 }
 
 /** The element `id` under `root`, or undefined. */

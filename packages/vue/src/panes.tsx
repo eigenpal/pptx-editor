@@ -9,6 +9,7 @@ import {
   computed,
   defineComponent,
   nextTick,
+  onBeforeUnmount,
   onMounted,
   onUpdated,
   provide,
@@ -101,11 +102,22 @@ export const Thumbnail = defineComponent({
   setup(props) {
     const editor = usePptxEditor();
     const box = ref<HTMLDivElement | null>(null);
+    // A deferred paint: a long list paints the thumbnails in view first. The disposer runs on
+    // unmount and before each new paint, so an old editor forgets the container.
+    let dispose: (() => void) | null = null;
     const paint = (): void => {
-      if (editor.value && box.value) editor.value.renderThumbnail(props.slide.index, box.value);
+      dispose?.();
+      dispose =
+        editor.value && box.value
+          ? editor.value.renderThumbnail(props.slide.index, box.value, { defer: true })
+          : null;
     };
     onMounted(paint);
     watch(() => [editor.value, props.slide] as const, paint, { flush: 'post' });
+    onBeforeUnmount(() => {
+      dispose?.();
+      dispose = null;
+    });
     return () => (
       <div
         ref={box}
@@ -395,7 +407,7 @@ const SlideRailRoot = defineComponent({
     /** One slide of the rail. */
     const item = (s: SlideSummary) => (
       <li
-        key={s.index}
+        key={s.id}
         class="pptx-rail__item"
         role={grouped.value ? 'treeitem' : 'option'}
         aria-selected={selected.value.includes(s.index)}

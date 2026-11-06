@@ -43,27 +43,24 @@ import {
   createSubstitutionSource,
   createVersionSource,
 } from './snapshot-sources.ts';
-import { aspectLockedIn, createShapeListSource, elementIn } from './shape-list.ts';
-import { parentGroupOf } from '../automation/commands/placement.ts';
-import { activeOf, formatKeyTarget, createBackgroundSource } from './selection-state.ts';
+import { createShapeListSource, elementIn } from './shape-list.ts';
+import { activeOf, createBackgroundSource } from './selection-state.ts';
 import { formatAt, geometryOf, selectedText } from './selection-state.ts';
 import { FormatPainter } from './format-painter.ts';
 import { CropMode } from './crop-mode.ts';
-import { altTextAt, pictureStateAt, withAltText } from './picture-state.ts';
+import { pictureStateAt, withAltText } from './picture-state.ts';
 import { isViewCommand, ViewSettings, type ViewCommand } from './view-settings.ts';
 import { PlaceholderPrompts } from './placeholder-prompts.ts';
 import { RemovalNotice } from './removal-notice.ts';
 import { CanCache, createStructureKey, STRUCTURE_COMMANDS } from './can-cache.ts';
 import { itemById, SlideSurface } from './surface.ts';
+import { createShortcut, createSurfaceHost, type SurfaceHostBase } from './surface-host.ts';
 import { setSurfaceRoot } from './surface-registry.ts';
 import { refit } from '../automation/commands/autofit.ts';
-import { listKeyAction } from './list-keys.ts';
-import { formatKeyCommand } from './format-keys.ts';
 import { withAutoCorrect } from './autocorrect.ts';
-import { selectAllOf, shapeKeyAction } from './shape-keys.ts';
-import { clampZoom, zoomKeyAction } from './zoom.ts';
-import { isCaretKey, moveTextSelection, snapTextSelection } from './text-input.ts';
-import type { TextInputKind } from './text-input.ts';
+import { selectAllOf } from './shape-keys.ts';
+import { clampZoom } from './zoom.ts';
+import { snapTextSelection, type TextInputKind } from './text-input.ts';
 import { comparePoints } from '../automation/commands/text-model.ts';
 import { CaretArm, armedCaretOf, caretSelection } from './caret-arm.ts';
 import { fontFamilyOf } from '../automation/commands/font-format.ts';
@@ -71,7 +68,7 @@ import { createHostFonts, openOptionsOf } from './host-fonts.ts';
 import { selectionBody, snapCellAddress, textItemOf } from './table-cells.ts';
 import { repairTablesForSave } from '../automation/commands/table-repair.ts';
 import { withoutStaleCopies } from '../automation/commands/alternate-copies.ts';
-import { applyTableKey, firstCellCaret, tableKeyAction } from './table-keys.ts';
+import { firstCellCaret } from './table-keys.ts';
 import { createTableStateSource } from './table-state.ts';
 import { createThemeColorSource } from './theme-palette.ts';
 import { createSlideSummaries, SlideSelection } from './slide-selection.ts';
@@ -133,6 +130,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     idPrefix,
     frameLabel: (kind) => frameLabelOf(options.translate, kind),
     layoutPreview: (owner, id) => prompts.preview(owner, id),
+    currentSlide: () => slide,
   });
 
   const effectiveZoom = (): number => (fitZoom ? fitValue : zoom);
@@ -385,6 +383,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     if (!session) return { ok: false, reason: 'disabled.noEditor' };
     if (command.type === 'undo' || command.type === 'redo') {
       if (mode === 'view') return refuse('disabled.viewing');
+      surface?.cancelDrag();
       const undo = command.type === 'undo';
       // An armed format is the last step, as in DOCX Editor: the first undo ends it alone.
       if (undo && arm.current()) return (arm.clear(), emit(), { ok: true });
@@ -536,86 +535,24 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     return { ok: true };
   };
 
-  /** Move the caret (arrow keys), optionally extending the selection. */
-  const moveCaret = (key: string, e: KeyboardEvent): void => {
-    if (!session || selection.kind !== 'text') return;
-    const item = textItemOf(layout(), selection);
-    if (!item?.text) return;
-    selection = moveTextSelection(item, selection, key, e.shiftKey, e);
-    groups.boundary();
-    emit();
-  };
-
-  const shortcut = (key: string, e: KeyboardEvent): boolean => {
-    const mod = e.metaKey || e.ctrlKey;
-    const lower = key.toLowerCase();
-    // The format and history keys (format-keys.ts); in text, Ctrl/Cmd+= is subscript.
-    const keyed = formatKeyCommand(key, e, formatKeyTarget(layout(), selection));
-    if (keyed) return (exec(keyed), true);
-    // Ctrl/Cmd + = and − zoom, and Ctrl/Cmd + 0 fits the slide to the window (zoom.ts).
-    const zoomed = zoomKeyAction(key, mod);
-    if (zoomed) return (zoomed === 'fit' ? instance.setZoom('fit') : surface?.zoomBy(zoomed), true);
-    // The format painter: Escape puts it away.
-    if (key === 'Escape' && (painter.cancel() || cropper.cancel())) return (emit(), true);
-    // Ctrl/Cmd+K asks the chrome for its link popover; Ctrl/Cmd+\\ clears formatting.
-    if (mod && lower === 'k') {
-      // The detail names the editor, so a toolbar answers only its own editor's request.
-      surface?.root.dispatchEvent(
-        new CustomEvent('pptx-link-request', { bubbles: true, detail: { editor: instance } })
-      );
-      return true;
-    }
-    // Tab, Shift+Tab, and arrows at a cell's edge move between table cells (table-keys.ts).
-    const cellKey = tableKeyAction(layout(), selection, key, e.shiftKey, mod || e.altKey);
-    if (cellKey) return (applyTableKey(cellKey, exec, layout, select), true);
-    if (selection.kind === 'text') {
-      if (isCaretKey(key)) {
-        moveCaret(key, e);
-        return true;
-      }
-      if (mod && lower === 'a') return (selectAll(), true);
-      if (key === 'Escape') {
-        const group = parentGroupOf(layout()?.items ?? [], selection.nodeId);
-        selection = { kind: 'shapes', nodeIds: [selection.nodeId], ...(group ? { group } : {}) };
-        emit();
-        surface?.focus();
-        return true;
-      }
-      // Backspace right after AutoCorrect started a list gives the typed marker back (undo).
-      const fresh = autoListed?.sel === selection && autoListed.rev === session?.store.revision;
-      const plain = !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey;
-      if (key === 'Backspace' && plain && fresh) return (exec({ type: 'undo' }), true);
-      // Enter, Tab, and Backspace with lists (list-keys.ts).
-      const list = listKeyAction(textItemOf(layout(), selection), selection, key, {
-        shift: e.shiftKey,
-        other: mod || e.altKey,
-      });
-      if (list)
-        return (
-          list.kind === 'input' ? textInput(list.input, list.data) : exec(list.command),
-          true
-        );
-      return false;
-    }
-    if (mod && lower === 'a') return (selectAll(), true);
-    if (mod && lower === 'g') return (exec({ type: e.shiftKey ? 'ungroup' : 'group' }), true);
-    if (selection.kind === 'shapes' || selection.kind === 'none') {
-      // Tab, nudge, delete, duplicate, Escape, and Enter on selected shapes (shape-keys.ts).
-      const keys = { shift: e.shiftKey, mod, alt: e.altKey };
-      const act = shapeKeyAction(key, keys, selection, layout(), mode);
-      if (act?.kind === 'leave') return (select({ kind: 'none' }), false);
-      if (act?.kind === 'exec') return (exec(act.command), true);
-      if (act?.kind === 'select') return (select(act.selection), true);
-      if (act?.kind === 'enterText') {
-        if (!enterText(act.nodeId, null)) return true;
-        if (act.type) textInput('text', act.type);
-        else selectAll();
-        return true;
-      }
-      if (act) return true;
-    }
-    return false;
-  };
+  const shortcut = createShortcut({
+    editor: () => instance,
+    layout: () => layout(),
+    selection: () => selection,
+    setSelection: (next) => ((selection = next), emit()),
+    mode: () => mode,
+    exec: (command) => exec(command),
+    select: (next) => select(next),
+    selectAll: () => selectAll(),
+    textInput: (kind, data) => textInput(kind, data),
+    enterText: (id) => enterText(id, null),
+    surface: () => surface,
+    fitZoom: () => instance.setZoom('fit'),
+    cancelTools: () => (painter.cancel() || cropper.cancel() ? (emit(), true) : false),
+    boundary: () => groups.boundary(),
+    // Backspace right after AutoCorrect started a list gives the typed marker back (undo).
+    autoListed: () => autoListed?.sel === selection && autoListed.rev === session?.store.revision,
+  });
 
   /** Enter text editing at the end of a shape's text. */
   const enterText = (id: string, point: TextPoint | null): boolean => {
@@ -893,33 +830,16 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       surface?.destroy();
       const focus = (): void => surface?.focus();
       setSurfaceRoot(instance, element, focus, () => surface?.render());
-      surface = new SlideSurface(element, {
+      const base: SurfaceHostBase = {
         idPrefix,
         layout,
-        paintLayout: (l) => prompts.paint(session, l, selection, mode === 'view') ?? l,
-        selection: () => selection,
-        readOnly: () => mode === 'view',
-        imageUrl: (p, id) => session?.imageUrl(p, id),
-        imageSize: (p, id) => session?.imageSize(p, id),
-        altText: (p, id) => altTextAt(session?.store.package, p, id),
         label: (key, params) => (options.translate ? options.translate(key, params) : key),
         select,
-        presence: () => presence.painted(session?.store.package, partAt(slide)),
         copy: copyTo,
         paste: pasteFrom,
-        transform: (items, gesture) => {
-          if (!session) return;
-          // The package when this drag started: a table resize scales from it.
-          const base = groups.drag(surface, gesture, session.store.package).base ?? undefined;
-          gestureEdit({ type: 'setTransforms', items }, gesture, base);
-        },
         cropping,
-        crop: (crop, gesture) => gestureEdit({ type: 'cropImage', crop }, gesture),
         textInput,
         shortcut,
-        painting: () => painter.mode !== 'off',
-        // A selection made with the pointer while the painter is on takes the copied format.
-        pointerUp: () => void (painter.mode !== 'off' && exec({ type: 'pasteFormat' })),
         run: (command, options) => void exec(command, options),
         beginHistoryGroup: () => groups.begin(),
         refuse: (reason, detail) => void refuse(reason, detail),
@@ -934,10 +854,18 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         },
         zoom: effectiveZoom,
         setZoom: (value) => instance.setZoom(value),
-        slideCount: () => session?.info.slides.length ?? 0,
-        smartGuides: () => views.smartGuides,
-        aspectLocked: (id) => aspectLockedIn(session?.store.package, partAt(slide), id),
-      });
+      };
+      surface = new SlideSurface(
+        element,
+        createSurfaceHost(base, {
+          session: () => session,
+          selection: () => selection,
+          viewing: () => mode === 'view',
+          part: () => partAt(slide),
+          surface: () => surface,
+          ...{ prompts, presence, painter, views, groups, gestureEdit },
+        })
+      );
       surface.render();
     },
     detach() {
@@ -947,9 +875,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     },
     setFonts: (next) => hostFonts.setFonts(next),
     setFontFamilies: (next) => void (familySource.set(next) && emit()),
-    renderThumbnail(index, container) {
-      thumbnails.render(index, container);
-    },
+    renderThumbnail: (index, container, opts) =>
+      thumbnails.render(index, container, opts?.defer === true),
     renderLayoutThumbnail: (layoutId, container) => thumbnails.renderLayout(layoutId, container),
     reject: refuse,
     destroy() {

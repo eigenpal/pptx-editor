@@ -13,6 +13,17 @@ import type {
   SlideSelectMode,
 } from './neutral.ts';
 
+/** Options of `renderThumbnail`. @public */
+export interface RenderThumbnailOptions {
+  /**
+   * Defer the first paint, for a list with one container per slide (the rail, the slide
+   * sorter). The first containers asked for in one task and the current slide's paint at once;
+   * the others paint when they scroll into view or when the browser is idle, and stay empty
+   * until then. A container that is not on the page paints at once.
+   */
+  readonly defer?: boolean;
+}
+
 /** The editor contract adapters render. @public */
 export interface Editor {
   snapshot(): EditorSnapshot;
@@ -69,7 +80,19 @@ export interface Editor {
    * selection, else the slide surface. Host pickers call it after a pick.
    */
   focus(): void;
-  /** Paint a slide thumbnail into a container (the rail). */
-  renderThumbnail(index: number, container: HTMLElement): void;
+  /**
+   * Paint a slide thumbnail into a container. The first paint is synchronous, unless
+   * `options.defer` is set (see {@link RenderThumbnailOptions}). A container repaints when its
+   * slide changes, when the editor is idle.
+   *
+   * Returns a disposer. Call it when the container leaves the page for good (an unmounted list
+   * item): a deferred paint then never runs, and nothing watches the container. A disposer
+   * does nothing after a later call for the same container.
+   */
+  renderThumbnail(
+    index: number,
+    container: HTMLElement,
+    options?: RenderThumbnailOptions
+  ): () => void;
   destroy(): void;
 }

@@ -159,7 +159,7 @@ export const PptxEditorSlideSorter = defineComponent({
       const shut = !!own && collapsed.value.includes(own.id);
       const item = (s: SlideSummary): VNodeChild => (
         <li
-          key={s.index}
+          key={s.id}
           class="pptx-sorter__item"
           role={groups ? 'treeitem' : 'option'}
           aria-selected={selected.value.includes(s.index)}

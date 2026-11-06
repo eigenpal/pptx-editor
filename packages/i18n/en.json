@@ -907,6 +907,7 @@
     "tableCell": "Row {row}, column {column}",
     "shapeSelected": "{kind} {name}, selected",
     "shapeSelectedWithAltText": "{kind} {name}, {description}, selected",
+    "dragCanceled": "Drag canceled",
     "placeholderObject": "{kind} (not rendered in this version)",
     "kinds": {
       "chart": "Chart",

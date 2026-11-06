@@ -388,6 +388,7 @@ Mount the banner in the default slot of `<PptxEditor :document="bytes" :open-fai
 - Render one notes pane in each root. A second one keeps its own state and prints a development warning.
 - In the Slide Sorter view, mount `PptxEditor.SlideSorter`. Without it, a development warning says so.
 - Mount `PptxEditor.Slideshow` once inside the viewport, and `PptxEditor.FindBar` for Find and Replace.
+- In a long deck, the slide rail and the Slide Sorter do not paint every thumbnail when they open. The current slide, the first thumbnails of the list, and the thumbnails in view paint at once. The others paint when they scroll into view or when the browser is idle, and stay empty until then. A custom list gets the same behavior with `editor.renderThumbnail(index, element, { defer: true })`. Call the function that it returns when the list removes the element.
 
 ## See also
 
