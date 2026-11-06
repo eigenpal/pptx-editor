@@ -1,0 +1,116 @@
+---
+title: 'Load and save presentations'
+description: 'Open PPTX bytes, save changes, and connect the editor to your storage.'
+category: 'Guides'
+---
+
+Use `load()` to open PPTX bytes and `save()` to get the edited file. Your application owns storage and downloads.
+
+The examples accept an existing `Editor`. Get it from your adapter or [create a core editor](/docs/core).
+
+## Open a file
+
+Read a browser `File` as bytes. Check the result before you report success:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export async function openFile(editor: Editor, file: File) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const result = await editor.load(bytes);
+  if (!result.ok) throw new Error(result.reason);
+}
+```
+
+Before replacing a presentation, ask the user to save or discard unsaved changes. `load()` replaces the document and its history.
+
+## Open from a URL
+
+Check the HTTP response before passing its body to the editor:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export async function openUrl(editor: Editor, url: string) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Download failed: ${response.status}`);
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const result = await editor.load(bytes, { startSlide: 0 });
+  if (!result.ok) throw new Error(result.reason);
+}
+```
+
+`startSlide` uses a zero-based index. For a long presentation, `load()` resolves when the first requested slide is ready. See [Long decks](/docs/guides/long-decks).
+
+## Download the edited file
+
+`save()` is synchronous. It returns `Uint8Array` bytes, or `null` when saving is unavailable:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function downloadPresentation(editor: Editor) {
+  const bytes = editor.save();
+  if (!bytes) throw new Error('The presentation cannot be saved.');
+
+  const blob = new Blob([bytes], {
+    type: 'application/vnd.openxmlformats-officedocument.' + 'presentationml.presentation',
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'presentation.pptx';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+```
+
+Saving finishes any pending slide parsing. It can discover damage and return `null`. Show a failure message instead of downloading an empty file.
+
+## Save to your server
+
+Send the bytes to your own authenticated endpoint. This example expects an application route at `/api/presentations/current`:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export async function uploadPresentation(editor: Editor) {
+  const bytes = editor.save();
+  if (!bytes) throw new Error('The presentation cannot be saved.');
+  const response = await fetch('/api/presentations/current', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: bytes,
+  });
+  if (!response.ok) throw new Error(`Save failed: ${response.status}`);
+}
+```
+
+Clear your unsaved indicator only after storage succeeds. Serialize uploads or use version checks to prevent older saves from replacing newer saves.
+
+## Follow document changes
+
+Use `onEditorEvent` instead of saving after every state notification:
+
+```ts
+import { onEditorEvent } from '@pptx-editor.dev/core/editor';
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function watchChanges(editor: Editor, notify: () => void) {
+  return onEditorEvent(editor, 'change', notify);
+}
+```
+
+Call the returned function when your integration unmounts. The `change` event includes completed or failed loads and read-only transitions. It excludes zoom and selection changes.
+
+If you autosave, debounce edits and handle `save()` returning `null`. A revision counter tracks changes, not whether undo restored the saved file.
+
+## See also
+
+- [Handle open failures](/docs/guides/open-failures)
+- [Export presentations](/docs/guides/export)
+- [Undo history](/docs/guides/undo-history)

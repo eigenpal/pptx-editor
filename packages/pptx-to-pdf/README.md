@@ -20,6 +20,8 @@ Convert a `.pptx` to PDF on Node.js, with searchable text and embedded fonts. Th
 
 The package is a foundation for Node.js. Its license is the EigenPal Pro License (`LICENSE.md`): you may evaluate it freely, and production use requires a commercial agreement.
 
+For task guides and API details, see the [developer documentation](https://pptx-editor.dev/docs/export/pdf).
+
 ## Use
 
 ```ts

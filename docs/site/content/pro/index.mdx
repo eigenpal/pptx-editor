@@ -1,0 +1,104 @@
+---
+title: 'Pro modules'
+description: 'Add collaboration, legacy comment reading, and advanced drawing through editor modules.'
+category: 'Pro'
+---
+
+`@pptx-editor.dev/pro` provides collaboration, legacy comment reading, and advanced drawing modules. Use the same modules with React, Vue, or the core editor. Production use requires the EigenPal Pro License. Evaluation is permitted.
+
+## Install the package
+
+Install Pro with your adapter and the core engine:
+
+<FrameworkTabs>
+<Framework value="react">
+
+```bash
+npm install @pptx-editor.dev/react @pptx-editor.dev/core @pptx-editor.dev/pro
+```
+
+</Framework>
+<Framework value="vue">
+
+```bash
+npm install @pptx-editor.dev/vue @pptx-editor.dev/core @pptx-editor.dev/pro
+```
+
+</Framework>
+</FrameworkTabs>
+
+## Register a module
+
+Pass a stable module array when you create the editor:
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { PptxEditor } from '@pptx-editor.dev/react';
+import { drawingModule } from '@pptx-editor.dev/pro/drawing';
+import '@pptx-editor.dev/react/styles.css';
+
+const modules = [drawingModule()];
+
+export function Presentation({ bytes }: { bytes: Uint8Array }) {
+  return (
+    <div style={{ height: '100vh' }}>
+      <PptxEditor document={bytes} modules={modules} />
+    </div>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { PptxEditor } from '@pptx-editor.dev/vue';
+import { drawingModule } from '@pptx-editor.dev/pro/drawing';
+import '@pptx-editor.dev/vue/styles.css';
+
+defineProps<{ bytes: Uint8Array }>();
+const modules = [drawingModule()];
+</script>
+
+<template>
+  <div style="height: 100vh">
+    <PptxEditor :document="bytes" :modules="modules" />
+  </div>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+The editor reads `modules` during creation. Changing the array does not reconfigure an existing editor. Install drawing before opening the first presentation.
+
+## Choose a module
+
+| Module | Entry point | Guide |
+| --- | --- | --- |
+| `reviewModule()` | `@pptx-editor.dev/pro` | [Comments](/docs/pro/comments) |
+| `collaborationModule({ session })` | `@pptx-editor.dev/pro` | [Collaboration](/docs/pro/collaboration) |
+| `drawingModule()` | `@pptx-editor.dev/pro/drawing` | [Drawing](/docs/pro/drawing) |
+
+Pro has no `/react` or `/vue` entry. The adapters receive framework-neutral modules. The review module reads legacy comments. It does not add a review pane or comment editing controls. PresentationML has no tracked-change markup for text revisions.
+
+## Configure licensing
+
+Each module accepts an optional `licenseKey`:
+
+```ts
+import { drawingModule } from '@pptx-editor.dev/pro/drawing';
+
+const modules = [drawingModule({ licenseKey: 'your-license-key' })];
+```
+
+Licensing makes no network requests. The key does not replace the required commercial agreement. For the license terms, see the [EigenPal Pro License](https://github.com/eigenpal/pptx-editor/blob/main/packages/pro/LICENSE.md).
+
+## See also
+
+- [Collaboration](/docs/pro/collaboration)
+- [Drawing](/docs/pro/drawing)
+- [PDF export](/docs/export/pdf)

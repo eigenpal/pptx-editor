@@ -185,7 +185,9 @@ Name every approximation in `packages/core/src/layout/approximations.ts`, in `do
 
 ## Write documentation
 
-Follow the [Google developer documentation style guide](https://developers.google.com/style/highlights). Use the second person, active voice, present tense, sentence-case headings, and descriptive link text.
+Follow the [developer documentation rules](AGENTS.md#developer-documentation) and [site source conventions](docs/site/README.md). Lead with the developer task and a useful code example. Use concise prose for prerequisites, defaults, lifecycle, and limits. Keep shared SDK tasks in the established page structure.
+
+Verify samples against public exports and types. Register pages in both navigation files. Run `bun test docs`, `node scripts/check-public-terminology.mjs`, and Prettier on edited documentation. Source checks do not replace a website build or browser review.
 
 ## Releases and canary builds
 

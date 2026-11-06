@@ -515,15 +515,25 @@ test('long deck: the rail paints the thumbnails in view first, then the rest', a
   await page.addInitScript(HOLD_IDLE);
   await ready(page);
   const base64 = Buffer.from(textDeck(SLIDES)).toString('base64');
-  await page.evaluate(async (data) => {
+  const opened = await page.evaluate(async (data) => {
     const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
     const editor = (
       window as unknown as {
-        __pptxEditor: { load(b: Uint8Array, o: { startSlide: number }): Promise<unknown> };
+        __pptxEditor: {
+          load(b: Uint8Array, o: { startSlide: number }): Promise<unknown>;
+          save(): Uint8Array | null;
+          snapshot(): { pendingSlides?: number };
+        };
       }
     ).__pptxEditor;
     await editor.load(bytes, { startSlide: 600 });
+    // Finish parsing before testing paint priority. Background progress updates each allow
+    // a first-paint burst, so their timing must not decide which offscreen items paint here.
+    // The next test separately checks input while a long presentation opens progressively.
+    const saved = editor.save();
+    return { saved: saved !== null, pending: editor.snapshot().pendingSlides ?? 0 };
   }, base64);
+  expect(opened).toEqual({ saved: true, pending: 0 });
   // The current slide's item is mounted and scrolled into view, and the items in view paint.
   await expect
     .poll(async () => {

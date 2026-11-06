@@ -1,0 +1,46 @@
+---
+title: 'API member directory'
+description: 'Find editing API object families, runtime members, and task guides.'
+category: 'Editing API'
+---
+
+Use this directory to find the public object families and their task guides. Your installed package supplies TypeScript signatures and member documentation. The [Office.js compatibility](/docs/editor-api/office-js-api) page records behavioral differences.
+
+## Runtime and requests
+
+| Member | Purpose |
+| --- | --- |
+| `PptxEditor.createServer(bytes, options?)` | Open a server runtime with `save()` and `dispose()` |
+| `PptxEditor.createBrowser(editor)` | Borrow an editor through the `/browser` entry |
+| `runtime.run(callback)` | Create a request context and return the callback result |
+| `runtime.capabilities` | Check host capabilities before selection or image operations |
+| `ClientObject.load(properties)` | Queue property reads |
+| `RequestContext.sync()` | Execute queued calls |
+| `ClientResult.value` | Read a result after synchronization |
+| `TrackedObjects.add()` and `remove()` | Manage proxies that survive a run |
+| `isPptxEditorError(error)` | Narrow an error before checking its stable code |
+
+For lifecycle and tracking rules, see [Batching, loading, and errors](/docs/editor-api/batching-and-errors).
+
+## Presentation objects
+
+| Object family | Starting point | Guide |
+| --- | --- | --- |
+| `Presentation`, `SlideCollection`, `Slide` | `context.presentation.slides` | [Slides and shapes](/docs/editor-api/slides-and-shapes) |
+| `ShapeCollection`, `Shape`, `ShapeGroup` | `slide.shapes` | [Slides and shapes](/docs/editor-api/slides-and-shapes) |
+| `TextFrame`, `TextRange`, `ShapeFont`, `ParagraphFormat` | `shape.textFrame` | [Text and ranges](/docs/editor-api/text-and-ranges) |
+| `Table`, `TableCell`, rows, columns, borders, and margins | `shape.getTable()` | [Tables](/docs/editor-api/tables) |
+| `ShapeFill`, `ShapeLineFormat` | `shape.fill`, `shape.lineFormat` | [Office.js compatibility](/docs/editor-api/office-js-api) |
+| `SlideBackground`, fill objects | `slide.background` | [Office.js compatibility](/docs/editor-api/office-js-api) |
+| `SlideLayout`, `SlideMaster`, `ThemeColorScheme` | Layout and master collections | [Office.js compatibility](/docs/editor-api/office-js-api) |
+| `DocumentProperties`, `CustomPropertyCollection` | `context.presentation.properties` | [Office.js compatibility](/docs/editor-api/office-js-api) |
+| `Hyperlink`, `HyperlinkCollection` | Slide and text hyperlinks | [Office.js compatibility](/docs/editor-api/office-js-api) |
+| `TagCollection`, `CustomXmlPartCollection`, `BindingCollection` | Presentation metadata and bindings | [Office.js compatibility](/docs/editor-api/office-js-api) |
+
+Bindings exist only for the runtime lifetime. They are not saved in the PPTX file. A declared member can refuse unsupported operations. A type signature alone does not establish runtime support.
+
+## See also
+
+- [Editing API](/docs/editor-api)
+- [Runtime and lifecycle](/docs/editor-api/runtime)
+- [Pictures](/docs/editor-api/pictures)

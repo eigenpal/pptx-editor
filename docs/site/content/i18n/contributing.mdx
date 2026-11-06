@@ -1,0 +1,43 @@
+---
+title: 'Contribute translations'
+description: 'Add or update a language catalog while preserving keys and placeholders.'
+category: 'Reference'
+---
+
+Use a custom `LocaleCatalog` in your application, or contribute a catalog to the package.
+
+## Add an application catalog
+
+1. Copy `@pptx-editor.dev/i18n/en.json` into your application.
+2. Translate values while keeping keys and placeholders unchanged.
+3. Use `null` where you want the English fallback.
+4. Type the imported object as `LocaleCatalog` and pass it to `locale`.
+
+See [Language](/docs/customization/language) for React and Vue examples.
+
+## Update the package
+
+In a repository checkout, `packages/i18n/en.json` defines the keys. Catalogs live in `packages/i18n/locales/`.
+
+Use the repository commands to create and validate a catalog:
+
+```bash
+bun run i18n:new de
+bun run i18n:validate
+bun run i18n:status
+```
+
+Replace `de` with your locale tag. When adding a packaged locale, update its package exports and build entries too.
+
+## Review the translation
+
+Preserve `{name}` placeholders exactly. Keep shortcut labels in the catalog format, such as `Ctrl+B`.
+
+Use consistent terms across menus, buttons, dialogs, and accessibility labels. Check long strings in both React and Vue controls.
+
+Do not translate technical identifiers or file extensions. Keep the product name and `EigenPal Pro License` unchanged.
+
+## See also
+
+- [Interface translations](/docs/i18n)
+- [Language](/docs/customization/language)

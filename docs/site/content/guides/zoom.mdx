@@ -1,0 +1,51 @@
+---
+title: 'Zoom'
+description: 'Set the slide scale or fit the slide to the editor viewport.'
+category: 'Guides'
+---
+
+Set zoom with a scale factor. A value of `1` means 100%; `1.5` means 150%.
+
+## Set the scale
+
+These helpers accept the editor exposed by either adapter:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function setZoomPercent(editor: Editor, percent: number) {
+  if (!Number.isFinite(percent)) return;
+  editor.setZoom(percent / 100);
+}
+
+export function fitSlide(editor: Editor) {
+  editor.setZoom('fit');
+}
+```
+
+Numeric zoom is clamped from 10% to 400%. Validate user input before passing it to `setZoom()`.
+
+## Read the scale
+
+`snapshot().zoom` gives the effective numeric scale. `snapshot().fitZoom` tells you whether fit mode is active.
+
+Fit mode follows the available viewport size. Give the editor container an explicit height. See [Layout](/docs/customization/layout).
+
+## Use the built-in controls
+
+The status bar exposes zoom controls in both adapters. The slide surface also handles these shortcuts:
+
+| Shortcut         | Action              |
+| ---------------- | ------------------- |
+| Ctrl/Cmd + `+`   | Increase the scale. |
+| Ctrl/Cmd + `-`   | Decrease the scale. |
+| Ctrl/Cmd + `0`   | Fit the slide.      |
+| Ctrl/Cmd + wheel | Adjust the scale.   |
+
+Zoom changes the local view. It does not resize slides or change the saved presentation.
+
+## See also
+
+- [Navigate a presentation](/docs/guides/navigation)
+- [React hooks](/docs/react/hooks)
+- [Vue composables](/docs/vue/composables)

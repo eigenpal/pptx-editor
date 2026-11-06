@@ -1,0 +1,40 @@
+---
+title: 'Find and replace text'
+description: 'Replace matching text across slides, tables, and notes as one undo step.'
+category: 'Task recipes'
+---
+
+Use `editor.find.replaceAll()` to replace text across a presentation. The editor records the replacements as one undo step.
+
+## Replace a repeated label
+
+This helper accepts an open `PptxEditorInstance` and returns the number of replacements:
+
+```ts
+import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+export function replaceLabel(editor: PptxEditorInstance, previous: string, replacement: string) {
+  if (!previous) throw new Error('Enter text to find.');
+  const result = editor.find.replaceAll(previous, replacement);
+  if (!result.ok) throw new Error(result.reason);
+  return result.count;
+}
+```
+
+The search includes slide text, table cells, and speaker notes. It can finish pending slide parsing in a long presentation.
+
+## Review a match first
+
+Call `find.next(query)` to select a match. Then call `find.replace(query, replacement)` to replace it and select the next match.
+
+If no match is selected, `replace()` selects the next match without changing text. Check the returned result before updating your interface.
+
+## Save the result
+
+Call `editor.save()` after the user accepts the changes. Check for `null` and report storage failures separately from editing failures.
+
+## See also
+
+- [Navigate a presentation](/docs/guides/navigation)
+- [Load and save presentations](/docs/guides/loading-and-saving)
+- [Undo history](/docs/guides/undo-history)

@@ -156,7 +156,7 @@ In Vue, write `<PptxEditorViewport :label="false">`.
 
 ## Change one part of the packaged editor
 
-The packaged `<PptxEditor>` takes DOCX Editor's part props. Each prop takes `true`, `false`, or the props object of its part. An object adds the part with those props, so you can change one part and keep the packaged editor.
+Use part props to configure the packaged `<PptxEditor>`. Each prop takes `true`, `false`, or the props object of its part. An object adds the part with those props, so you can change one part and keep the packaged editor.
 
 ```tsx
 <PptxEditor
@@ -174,11 +174,11 @@ The packaged `<PptxEditor>` takes DOCX Editor's part props. Each prop takes `tru
 | `menu` | `PptxEditor.Menu` (`MenuProps`), above the toolbar. | `false` |
 | `contextMenu` | `PptxEditor.ContextMenu` (`PptxEditorContextMenuProps`). It sets `popups.contextMenu`, and a `popups.contextMenu` entry wins over it. | `true` |
 | `hyperlinkPopup` | The packaged link popup. `false` acts as `popups.hyperlink: false`. | `true` |
-| `slideRail` | `PptxEditor.SlideRail` (`SlideRailProps`), as DOCX Editor's `navigation`. | `true` |
+| `slideRail` | `PptxEditor.SlideRail` (`SlideRailProps`). | `true` |
 | `notesPane` | `PptxEditor.NotesPane` (`NotesPaneProps`). | `true` |
 | `openFailure` | `PptxEditor.OpenFailure` (`PptxEditorOpenFailureProps`). See [Open failure](#open-failure). | `true` |
 
-In Vue, pass the same props to `PptxEditor`, for example `:menu="true"` and `:notes-pane="false"`. DOCX Editor has no status bar prop, so the packaged editor has none either. To show `PptxEditor.StatusBar`, compose the editor.
+In Vue, pass the same props to `PptxEditor`, for example `:menu="true"` and `:notes-pane="false"`. To show `PptxEditor.StatusBar`, compose the editor.
 
 ## Switch between Normal and Slide Sorter
 

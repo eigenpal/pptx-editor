@@ -102,18 +102,18 @@ Set CSS color values for these properties. Override related foreground and backg
 | Complete shadow values | `--doc-card-shadow` (the toolbar, rail, notes, and dialogs), `--doc-card-shadow-strong` (menus and popovers), `--doc-shadow-lg` (tooltips) |
 | Slide show | `--doc-slideshow-bg`, `--doc-slideshow-black`, `--doc-slideshow-white`, `--doc-slideshow-text`, `--doc-slideshow-bar-bg`, `--doc-slideshow-bar-hover`, `--doc-slideshow-focus` |
 
-The shadow properties accept CSS `box-shadow` values. The stylesheet also defines the other DOCX Editor `--doc-*` names, such as `--doc-bg-subtle` and `--doc-border-light`, for parity; no PPTX Editor rule reads them yet.
+The shadow properties accept CSS `box-shadow` values. Tokens such as `--doc-bg-subtle` and `--doc-border-light` are defined, but do not affect the editor's built-in styles.
 
 ### Utility palette reference
 
-The stylesheet defines the shadcn HSL properties with DOCX Editor's names and values, for parity. PPTX Editor has no utility classes, so only two of them change the chrome:
+The stylesheet defines shadcn HSL properties. Only these two properties affect the built-in controls:
 
 | Property | Value type | Use |
 | --- | --- | --- |
 | `--foreground` | HSL components, such as `222.2 84% 4.9%` | The active toggle background in light mode (through `--doc-toggle-active-bg`). |
 | `--radius` | CSS length | The corner radius of the slide show controls. |
 
-The other names, such as `--primary` and `--ring`, are present for DOCX Editor parity only.
+Other names, such as `--primary` and `--ring`, do not affect the built-in controls.
 
 ### Size, typography, and layer reference
 

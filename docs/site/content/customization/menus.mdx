@@ -70,7 +70,7 @@ A menu `icon` is an element or the name of a packaged Material Symbol, such as `
 
 ## Customize the context menu
 
-Place `PptxEditor.ContextMenu` inside `PptxEditor.Root` or `PptxEditor.Viewport`, as in DOCX Editor. Render a row's slot with `hidden` to remove the row in place. Its command keeps working from the toolbar, keyboard shortcuts, and the API.
+Place `PptxEditor.ContextMenu` inside `PptxEditor.Root` or `PptxEditor.Viewport`. Render a row's slot with `hidden` to remove the row in place. Its command keeps working from the toolbar, keyboard shortcuts, and the API.
 
 <FrameworkTabs>
 <Framework value="react">
@@ -180,11 +180,11 @@ Rename in your own menu calls `onRename`, which opens the name field in the rail
 - A row that opens a dialog stays in the menu, disabled with a reason, when its `popups` entry is `false`. See [Rows for dialogs and popups](/docs/customization/reference/menus#rows-for-dialogs-and-popups).
 - The built-in menu bar places no `slide.layout`, `slide.reset`, or `section.*` row. See [Menu-only slots](/docs/customization/reference/menus#menu-only-slots).
 
-**Not built yet**, compared with DOCX Editor's menus:
+For application-owned menus, account for these limits:
 
-- The File menu props `onOpen`, `onSave`, `fileName`, and `exporters`, with their packaged rows. Add your own rows with `Menu.Row` in `Menu.File`.
-- Menu overflow into a **More** menu on narrow widths.
-- The `{ t }` argument for a `popups.contextMenu` renderer. Pass `t` to `PptxEditor.ContextMenu` in the renderer, or call `useChromeTranslate()` in a component that you register with `definePopup()`.
+- Add file actions with `Menu.Row` inside `Menu.File`. There are no `onOpen`, `onSave`, `fileName`, or `exporters` props.
+- The menu bar does not move overflow into a **More** menu. Reserve enough width for your menu labels.
+- A `popups.contextMenu` renderer receives no `{ t }` argument. Pass `t` to `PptxEditor.ContextMenu` in the renderer, or call `useChromeTranslate()` in a component that you register with `definePopup()`.
 
 ## See also
 

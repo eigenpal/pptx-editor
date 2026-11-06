@@ -5,7 +5,9 @@ category: 'React'
 order: 33
 ---
 
-Call these hooks from components inside `PptxEditor.Root`. The packaged `<PptxEditor>` provides that root for its `children`.
+Call editor-state hooks inside `PptxEditor.Root`. The packaged `<PptxEditor>` provides that root for its `children`.
+
+`usePptxSource` and `useFonts` prepare input for the root, so you can call them in the parent component.
 
 ## Connect a command button
 
@@ -127,18 +129,18 @@ A direct `snapshot()` call does not subscribe the component. Use `useEditorState
 | `useContextMenuRequest()` | The open canvas context menu request, or `null`. |
 | `useContextMenuTarget()` | The element the open context menu opened on, or `null`. |
 | `useOpenFailure({ t? })` | `failure`, `message`, `kept`, and `dismiss()` for a file that did not open. `t` translates `message`. See [Show a banner or a toast](/docs/customization/layout#show-a-banner-or-a-toast). |
-| `useHyperlinkPopup()`, `useHyperlinkPopupInstance(active?)` | The link popup's `state` and actions, with no UI, as DOCX Editor's hooks. See [Build your own link panel](/docs/customization/dialogs#build-your-own-link-panel). |
+| `useHyperlinkPopup()`, `useHyperlinkPopupInstance(active?)` | The link popup's `state` and actions, with no UI. See [Build your own link panel](/docs/customization/dialogs#build-your-own-link-panel). |
 
 ### Fonts
 
 | Hook | Returns |
 | --- | --- |
 | `useFonts(source, ...fragments)` or `useFonts(...origins)` | A font resolver with a stable identity, for the `fonts` prop. See [Fonts](/docs/customization/fonts). |
-| `useFontFamily()` | `UseFontFamilyReturn`: `value`, `theme`, `options`, `groups`, `isCurrent(row)`, `setValue(family)`, `isEnabled`, and `disabledReason`, as DOCX Editor's hook of the same name. Use it for your own font picker. See [Build the list from `useFontFamily`](/docs/customization/toolbar#build-the-list-from-usefontfamily). |
+| `useFontFamily()` | `UseFontFamilyReturn`: `value`, `theme`, `options`, `groups`, `isCurrent(row)`, `setValue(family)`, `isEnabled`, and `disabledReason`. Use it for your own font picker. See [Build the list from `useFontFamily`](/docs/customization/toolbar#build-the-list-from-usefontfamily). |
 
 ### Open a presentation
 
-`usePptxSource(source, { fonts?, fetchOptions? })` is the twin of DOCX Editor's `useDocxSource`. It fetches a URL (or takes bytes), resolves the fonts, and cancels both when the component unmounts or the source changes:
+`usePptxSource(source, { fonts?, fetchOptions? })` loads bytes from a URL and resolves fonts. It cancels stale fetches when the source changes or the component unmounts:
 
 ```tsx
 import { PptxEditor, usePptxSource } from '@pptx-editor.dev/react';
@@ -158,11 +160,11 @@ export function Deck({ url }: { url: string }) {
 | `error` | `Error \| null` | Why the presentation did not open. A font failure never shows here. |
 | `isLoading` | `boolean` | True until the presentation arrives or fails, and while eager fonts load. |
 
-The fonts follow DOCX Editor's two paths. Eager fonts (a value, a promise, or a zero-argument loader) hold the deck back until they settle, so the slides lay out once. An on-demand resolver (`packagedFonts()`, `googleFonts()`) needs the parsed deck, so the bytes go through at once, and `fonts` is one resolver for the life of the hook. A string source is always a URL, fetched as you wrote it. Check a URL from user input first.
+Eager fonts (a value, a promise, or a zero-argument loader) hold the deck back until they settle, so the slides lay out once. An on-demand resolver (`packagedFonts()`, `googleFonts()`) needs the parsed deck, so the bytes go through at once, and `fonts` is one resolver for the life of the hook. A string source is always a URL, fetched as you wrote it. Check a URL from user input first.
 
 ## Build your own chrome
 
-These hooks have the names and the shapes of DOCX Editor's hooks.
+Use these hooks to connect your controls to the editor.
 
 ### Zoom
 
@@ -201,7 +203,7 @@ export function ZoomControl() {
 | `canZoomIn`, `canZoomOut` | `boolean` | Whether a step is possible. |
 | `levels` | `readonly number[]` | The steps that the zoom buttons use. |
 
-PPTX Editor has one fit mode, so `useZoom` has `fit()` in place of DOCX Editor's `mode`, `setMode`, `fitToWidth`, and `auto`.
+Use `fit()` to fit the whole slide. Use `setZoom()` for a fixed zoom level.
 
 ### Events
 
@@ -269,11 +271,11 @@ export function SizeSlider() {
 | `useToolbarLabel()` | `(key) => string` | The label for a key: the compound's `t`, else the locale catalog. |
 | `useToolbarLabelFor(t)` | `(key) => string` | The same, for a resolver that you pass. |
 
-`Toolbar`, `Menu`, `ContextMenu`, `SlideRail`, `StatusBar`, `FindBar`, `OpenFailure`, `FontNotice`, and `EditNotice` take DOCX Editor's `t` prop. With it, the compound and its parts take every label from your function. The dialogs take their labels from the root's `locale`, as DOCX Editor's dialogs do.
+`Toolbar`, `Menu`, `ContextMenu`, `SlideRail`, `StatusBar`, `FindBar`, `OpenFailure`, `FontNotice`, and `EditNotice` take a `t` prop. With it, the compound and its parts take every label from your function. The dialogs take their labels from the root's `locale`.
 
-### Not built
+### Search selection
 
-DOCX Editor's `useHighlights` and the `highlight` option of its `useDocumentSearch` have no PPTX twin. The slide is painted, not laid out as page text, so there is no named highlight layer for slide text. Find shows its match as the selection on the slide.
+Find shows the active match as the slide selection. `useDocumentSearch` does not expose a named text highlight layer.
 
 ## Apply a value
 
@@ -312,7 +314,7 @@ export function FontSizeSlider() {
 | `options` | `readonly V[]` | The slot's fixed choices. A slot with a free value has none. |
 | `isEnabled`, `disabledReason` | `boolean`, `string \| null` | As `useEditorCommand` gives them. |
 
-The two hooks return different results from `execute`, as in DOCX Editor: `useEditorCommand` returns a `boolean`, because a toolbar button only needs to know if the command ran, and `useEditorValueCommand` returns the `CommandResult`, because a value control shows why the engine refused a value.
+The two hooks return different results from `execute`: `useEditorCommand` returns a `boolean`, because a toolbar button only needs to know if the command ran, and `useEditorValueCommand` returns the `CommandResult`, because a value control shows why the engine refused a value.
 
 To make the values of one slider drag one undo step, pass `{ historyGroup }` from `editor.beginHistoryGroup()`. See [Group a slider or a stepper](/docs/guides/undo-history#group-a-slider-or-a-stepper).
 

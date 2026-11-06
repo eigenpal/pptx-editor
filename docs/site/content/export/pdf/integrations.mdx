@@ -1,0 +1,65 @@
+---
+title: 'PDF integrations'
+description: 'Reuse export sessions and serve PDF results from a Node.js application.'
+category: 'Export formats'
+---
+
+Keep PDF conversion on your Node.js server. Use `exportPdf()` for one output or a reusable session for several outputs from the same presentation.
+
+## Reuse a presentation layout
+
+This example writes visible slides and all slides from one session:
+
+```ts
+import { readFile, writeFile } from 'node:fs/promises';
+import { exportPdfFrom, openDocumentForExport } from '@pptx-editor.dev/pptx-to-pdf';
+
+const opened = await openDocumentForExport(await readFile('deck.pptx'));
+if (!opened.ok) throw new Error(`Cannot open: ${opened.reason}`);
+try {
+  const visible = await exportPdfFrom(opened.session);
+  const all = await exportPdfFrom(opened.session, {
+    includeHiddenSlides: true,
+  });
+  await writeFile('visible.pdf', visible.bytes);
+  await writeFile('all.pdf', all.bytes);
+} finally {
+  opened.session.dispose();
+}
+```
+
+The session resolves fonts once and reuses each slide’s layout. A failed export does not dispose the session. Always dispose it when you finish. A session represents immutable source bytes. Open another session after editing the presentation.
+
+## Return a PDF response
+
+This function accepts already authorized presentation bytes and an optional request cancellation signal:
+
+```ts
+import { exportPdf } from '@pptx-editor.dev/pptx-to-pdf';
+
+export async function pdfResponse(source: Uint8Array, signal?: AbortSignal): Promise<Response> {
+  const result = await exportPdf(source, {
+    signal,
+    timeoutMs: 30_000,
+    maxPages: 200,
+    maxOutputBytes: 16 * 1024 * 1024,
+  });
+  return new Response(new Uint8Array(result.bytes), {
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'attachment; filename="presentation.pdf"',
+      'Cache-Control': 'private, no-store',
+    },
+  });
+}
+```
+
+Apply upload size limits before buffering request bodies. Check document access before conversion. Map typed export errors to your application’s error response. The example retains strict fidelity so unsupported content fails explicitly.
+
+For background jobs, bound job concurrency and retain diagnostic codes with the result. Do not automatically retry an aborted job.
+
+## See also
+
+- [PDF API](/docs/export/pdf/api)
+- [PDF fonts](/docs/export/pdf/fonts)
+- [Editing API](/docs/editor-api)

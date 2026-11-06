@@ -8,11 +8,8 @@ Pass a font configuration through `fonts`. The editor measures text with font by
 
 Without `fonts`, the editor measures with the deck's embedded fonts, then with the metric-compatible substitutes of `@docx-editor.dev/fonts`, from the package's own bytes. It makes no network request.
 
-Embedded faces must permit installable or editable embedding.
-The editor does not load restricted, preview-and-print-only, or bitmap-only embedded faces for measurement or display.
-It uses an available host face or substitute instead.
-This rule also applies in viewer mode, because the same session can later allow editing.
-Save preserves the original embedded font bytes and relationships.
+Embedded faces must permit installable or editable embedding. The editor does not load restricted, preview-and-print-only, or bitmap-only embedded faces for measurement or display. It uses an available host face or substitute instead. This rule also applies in viewer mode, because the same session can later allow editing. Save preserves the original embedded font bytes and relationships.
+
 Substitution can change text layout. Supply font bytes with appropriate rights when you need the original appearance.
 
 ## Load application fonts
@@ -219,13 +216,13 @@ Keep `fonts` stable across renders, because each new value resolves fonts again.
 
 ## Which face measures each family
 
-| Rank | Source |
-| --- | --- |
-| 1 | Embedded deck faces |
-| 2 | Host faces, in origin order (`fonts`) |
-| 3 | Host substitutions whose target face a host origin supplied |
-| 4 | Packaged substitutes from `@docx-editor.dev/fonts` |
-| 5 | Fallback measurement |
+| Rank | Source                                                      |
+| ---- | ----------------------------------------------------------- |
+| 1    | Embedded deck faces                                         |
+| 2    | Host faces, in origin order (`fonts`)                       |
+| 3    | Host substitutions whose target face a host origin supplied |
+| 4    | Packaged substitutes from `@docx-editor.dev/fonts`          |
+| 5    | Fallback measurement                                        |
 
 A lower rank still serves a style that a higher rank lacks. `snapshot().substitutedFonts` lists the families that measure with another face, and `PptxEditor.FontNotice` shows them.
 

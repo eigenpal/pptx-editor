@@ -1,0 +1,100 @@
+---
+title: 'Collaboration'
+description: 'Connect a Yjs document, report provider status, and release collaboration resources.'
+category: 'Pro'
+---
+
+Use `createYjsCollaborationSession()` with a Yjs document and your network provider. Register the session through `collaborationModule()` when you create the editor. Your application owns transport, authentication, authorization, and persistence.
+
+For supported edits and concurrent editing limits, see <FeatureBadge id="collaboration.realtime" />.
+
+## Install the dependencies
+
+Install the session package and the Yjs dependencies that your host imports:
+
+```bash
+npm install @pptx-editor.dev/core @pptx-editor.dev/pro yjs y-protocols
+```
+
+Add your React or Vue adapter separately.
+
+## Create one session per editor
+
+This function accepts a provider-connected document and awareness instance. Call it after the provider has loaded the room state. Pass a container with a nonzero height, such as `height: 100vh`:
+
+```ts
+import type * as Y from 'yjs';
+import type { Awareness } from 'y-protocols/awareness';
+import { createPptxEditor } from '@pptx-editor.dev/core/editor';
+import '@pptx-editor.dev/core/styles/editor.css';
+import { collaborationModule, createYjsCollaborationSession } from '@pptx-editor.dev/pro';
+
+export function openCollaborativeEditor(
+  bytes: Uint8Array,
+  container: HTMLElement,
+  doc: Y.Doc,
+  awareness: Awareness,
+  documentId: string,
+  actorId: string,
+  name: string
+) {
+  const session = createYjsCollaborationSession({
+    doc,
+    awareness,
+    documentId,
+    identity: { actorId, name, color: '#2563EB' },
+  });
+  const editor = createPptxEditor({
+    document: bytes,
+    modules: [collaborationModule({ session })],
+  });
+  container.classList.add('pptx-editor');
+  editor.attach(container);
+  return {
+    editor,
+    session,
+    destroy() {
+      editor.destroy();
+      session.destroy();
+    },
+  };
+}
+```
+
+The first editor seeds an empty room from its presentation. An editor joining an existing room adopts the room content. Use the same `documentId` for participants in the same presentation and distinct actor identifiers for participants.
+
+In React or Vue, pass `[collaborationModule({ session })]` through the adapter’s `modules` prop instead. Keep that list stable. Create a separate session for each editor instance.
+
+## Connect your provider
+
+The session does not open a network connection. Your provider synchronizes Yjs document updates and awareness messages. Reuse the provider’s awareness instance so remote names, colors, and selections reach the editor. Without awareness, the session lists only the local participant.
+
+Report connection changes through `setConnected()`:
+
+```ts
+// Call these from your provider's connection event handlers.
+session.setConnected(false); // Disconnected; local edits can continue.
+session.setConnected(true); // Connected again.
+```
+
+Read `session.statusSnapshot()` for state and failure details. Subscribe with `session.subscribeStatus(listener)` and release the returned subscription when your UI unmounts. A connection flag reports transport state; it does not authenticate a participant.
+
+## Save and close a room
+
+Save the PPTX through the editor. Persist Yjs room updates separately when you need a durable collaboration room. A saved PPTX does not replace your provider’s room persistence.
+
+Destroy the editor before its session. Then disconnect and destroy provider resources that your application owns, including awareness and the Yjs document. Do not destroy a document shared by another active consumer.
+
+## Handle history and access
+
+Undo and redo operate on the local participant’s changes through the collaboration session. Concurrent changes can affect what an undo retains. Check the feature matrix for the precise supported cases.
+
+Authenticate users before connecting them to a room. Authorize document access and enforce write permissions in your provider or server. A `documentId` is an identifier, not an access token. Use encrypted transport and disconnect participants when access ends.
+
+A room with an unsupported schema is refused. Do not reset a populated room to bypass that refusal.
+
+## See also
+
+- [Pro modules](/docs/pro)
+- [Undo history](/docs/guides/undo-history)
+- [PPTX fidelity](/docs/pptx-fidelity)

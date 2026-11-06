@@ -7,6 +7,8 @@ seoTitle: 'Vite Vue PPTX editor setup'
 
 ## Install
 
+In your existing Vue application, install the adapter and its engine peer:
+
 ```bash
 npm install @pptx-editor.dev/vue @pptx-editor.dev/core
 ```
@@ -29,24 +31,20 @@ Render the editor in a container with a height:
 ```vue
 <!-- src/App.vue -->
 <script setup lang="ts">
-import { onMounted, shallowRef } from 'vue';
-import { PptxEditor } from '@pptx-editor.dev/vue';
+import { PptxEditor, usePptxSource } from '@pptx-editor.dev/vue';
 
-const bytes = shallowRef<Uint8Array>();
-onMounted(async () => {
-  const response = await fetch('/deck.pptx');
-  bytes.value = new Uint8Array(await response.arrayBuffer());
-});
+const { document: bytes, error } = usePptxSource('/deck.pptx');
 </script>
 
 <template>
-  <div style="height: 100vh">
+  <p v-if="error" role="alert">{{ error.message }}</p>
+  <div v-else style="height: 100vh">
     <PptxEditor :document="bytes" />
   </div>
 </template>
 ```
 
-Put `deck.pptx` in the `public` folder. Keep the bytes in a `shallowRef`, so Vue does not wrap the array in a proxy. To open and download local files, use the Vue component from the [quickstart](/docs/quickstart).
+Put `deck.pptx` in the `public` folder. `usePptxSource` checks HTTP failures and cancels its fetch when the component unmounts. To open and download local files, use the Vue component from the [quickstart](/docs/quickstart).
 
 ## Limits
 

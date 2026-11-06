@@ -1,6 +1,6 @@
 ---
 title: 'Long decks'
-description: 'How a deck with thousands of slides opens: the first slide first, the rest in the background, and what works before the rest is ready.'
+description: 'Open long presentations progressively, track pending slides, and handle damaged content.'
 category: 'Guides'
 ---
 
@@ -11,16 +11,21 @@ A long deck shows its first slide and takes input before the rest of the deck is
 `editor.load(bytes)` resolves when the first slide is ready to edit. To show another slide first, pass `startSlide`:
 
 ```ts
-await editor.load(bytes, { startSlide: 41 });
-// The adapters' editor ref takes the same options:
-await editorRef.current?.load(bytes, { startSlide: 41 });
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export async function openAtSlide42(editor: Editor, bytes: Uint8Array) {
+  const result = await editor.load(bytes, { startSlide: 41 });
+  if (!result.ok) throw new Error(result.reason);
+}
 ```
+
+`startSlide` is zero-based, so `41` opens slide 42. Adapter refs accept the same load options.
 
 A start slide that is not a whole number rounds down, and a start slide outside the deck goes to the nearest slide. A value that is not a finite number opens the first slide.
 
 The slides after the start slide open next, then the slides before it. The slide rail mounts its first screen with the first slide and the other items over the next frames. A thumbnail shows an empty placeholder until its slide is ready. The slides in view in the rail open before the others. Each rail step mounts what fits in about 8 ms, so a key press waits for one short task. In a rail with sections, a section header never shows without its slides. While the rail mounts, each item carries `aria-setsize` and `aria-posinset`, so a screen reader still hears the slide count.
 
-A deck whose other slides hold less than 512 KiB of slide content opens whole, as before.
+A deck whose other slides hold less than 512 KiB of slide content opens whole.
 
 ## Follow the progress
 
@@ -28,17 +33,25 @@ A deck whose other slides hold less than 512 KiB of slide content opens whole, a
 
 `snapshot().pendingSlides` is the number of slides still opening, and 0 when the deck is ready. Each `SlideSummary` in `snapshot().slides` has `pending: true` until its slide is ready. The count moves at most every 300 ms, and `selectionChange` fires when it moves. A slide that finishes opening does not fire `change`, because the document does not change: a host that saves on `change` does not save while the deck opens.
 
-```ts
-import { onEditorEvent } from '@pptx-editor.dev/core';
+Use a subscription to update your loading indicator:
 
-onEditorEvent(editor, 'selectionChange', (snapshot) => {
-  setProgress(snapshot.pendingSlides ?? 0);
-});
+```ts
+import { onEditorEvent } from '@pptx-editor.dev/core/editor';
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function watchPendingSlides(editor: Editor, setProgress: (count: number) => void) {
+  setProgress(editor.snapshot().pendingSlides ?? 0);
+  return onEditorEvent(editor, 'selectionChange', (snapshot) => {
+    setProgress(snapshot.pendingSlides ?? 0);
+  });
+}
 ```
+
+Call the returned function when you remove the indicator.
 
 ## What works before the deck is ready
 
-Everything. A slide that the editor needs opens at once: a slide you go to, a slide that Find searches, and a slide that a command changes. The first Find in a long deck searches every slide, so it opens the rest of the deck in one step. Edits, undo, and redo work on every slide. `save()` opens the rest of the deck first, so the saved file holds every slide, and the parts that you did not edit save as they do after a full open.
+The editor opens a required slide immediately: a slide you go to, a slide that Find searches, and a slide that a command changes. The first Find in a long deck searches every slide, so it opens the rest of the deck in one step. Edits, undo, and redo work on every slide. `save()` opens the rest of the deck first, so the saved file holds every slide, and the parts that you did not edit save as they do after a full open.
 
 A slide or a notes slide whose XML is damaged refuses the deck when it is read, in the background or for a command.
 
@@ -63,3 +76,9 @@ A keystroke costs about the same in a deck of 5,000 slides as in a deck of 50.
 
 - An editor with a collaboration module opens the whole deck before its first slide shows, because the room needs every slide.
 - The fonts load for the families of the slides that are open. When the deck is ready, the fonts of families that only later slides name load too, and those slides lay out again with them.
+
+## See also
+
+- [Load and save presentations](/docs/guides/loading-and-saving)
+- [Handle open failures](/docs/guides/open-failures)
+- [Editor mount modes](/docs/core/mount-modes)

@@ -1,0 +1,117 @@
+---
+title: 'Batching, loading, and errors'
+description: 'Load proxy values, batch edits, and recover from errors without repeating applied writes.'
+category: 'Editing API'
+---
+
+Queue operations inside `runtime.run()`, then execute them with `context.sync()`. Proxy properties contain values only after a load completes.
+
+## Load, read, and write
+
+This function trims shape names on the first slide. It accepts an open runtime:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function trimNames(runtime: PptxEditorRuntime) {
+  await runtime.run(async (context) => {
+    const shapes = context.presentation.slides.getItemAt(0).shapes;
+    shapes.load('items/name');
+    await context.sync();
+    for (const shape of shapes.items) {
+      shape.name = shape.name.trim();
+    }
+    await context.sync();
+  });
+}
+```
+
+The first sync fills the collection and its names. The second sync applies all name writes together. Keep synchronization outside item loops. Always synchronize queued writes before returning from the callback. Calls left queued when the callback returns do not apply.
+
+## Select properties explicitly
+
+Use `load('name')` for one property and `load('items/name')` for collection items. Navigation paths also work, such as `load('shapes/items/name')` on a slide. Each collection level needs another host batch; items at one level load together.
+
+`load({ select, top, skip })` supports collection queries. `load()` and `load('items')` load every scalar property of each item. `$all` loads scalar properties but does not load navigation properties. Load only the values your task needs.
+
+Reading before loading throws `PropertyNotLoaded`. Invalid load paths throw `InvalidArgument` immediately and queue nothing. Existing queued calls remain queued after that load error.
+
+## Check optional objects
+
+Use `getItemOrNullObject()` when a target can be absent:
+
+```ts
+// context belongs to the active run; slideId identifies a slide.
+const slide = context.presentation.slides.getItemOrNullObject(slideId);
+slide.load('id');
+await context.sync();
+if (slide.isNullObject) return;
+slide.moveTo(0);
+await context.sync();
+```
+
+Check `isNullObject` after synchronization. Writing to a null object is refused. Use `getItem()` when absence should fail with `ItemNotFound`.
+
+## Understand commit boundaries
+
+A batch of independent writes is atomic: all writes apply or none apply. However, a single `sync()` can contain multiple host batches. A dependent lookup can split synchronization after earlier writes have committed. Collection reads queued after writes can also fail after those writes apply.
+
+A failure after a split retains the earlier writes. Its diagnostic hint identifies that boundary. The diagnostic `edit.read-after-commit` also means writes applied before a read failed. Do not replay the whole sync after either failure.
+
+Queue collection loads before writes when they share a sync. For explicit boundaries, complete the reads in one sync and then queue writes in another. In a live editor, one sync that writes remains one undo step, including a split sync.
+
+## Recover from errors
+
+Check `isPptxEditorError(error)` before using the stable `code`. This function returns an explicit stale result for the caller to reconsider:
+
+```ts
+import { isPptxEditorError, type PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function normalizeName(runtime: PptxEditorRuntime) {
+  try {
+    await runtime.run(async (context) => {
+      const shape = context.presentation.slides.getItemAt(0).shapes.getItemAt(0);
+      shape.load('name');
+      await context.sync();
+      shape.name = shape.name.trim();
+      await context.sync();
+    });
+    return { ok: true as const };
+  } catch (error) {
+    if (isPptxEditorError(error) && error.code === 'StaleDocument') {
+      return { ok: false as const, reason: 'stale' as const };
+    }
+    throw error;
+  }
+}
+```
+
+This example requires a first slide with a shape. After `StaleDocument`, read again and reconsider the edit. Do not blindly retry a model-generated replacement.
+
+| Code | Action |
+| --- | --- |
+| `PropertyNotLoaded`, `ValueNotLoaded` | Load or synchronize before reading |
+| `InvalidArgument` | Correct the argument or load path |
+| `ItemNotFound` | Find the target again or handle its absence |
+| `NotSupported`, `NotImplemented` | Choose an operation supported by this host and content |
+| `StaleDocument` | Read the changed presentation and reconsider the write |
+| `InvalidObjectPath`, `ObjectInUse`, `InvalidRequestContext` | Correct proxy ownership or lifetime |
+| `RuntimeDisposed` | Create a new runtime |
+| `ResourceLimitExceeded`, `DocumentUnavailable` | Inspect input or host availability |
+| `GeneralException` | Inspect the diagnostic and underlying failure |
+
+Most invalid operation arguments are reported at the next sync. Invalid loads, unloaded property reads, and invalid object lifetimes can throw immediately. `error.debugInfo.innerError` provides a stable engine diagnostic when available. Error messages do not contain presentation content.
+
+A refused batch drops its queued calls. Existing proxies remain usable within their run. After correcting a known argument error, queue only the corrected operations again. Recreate objects that the refused batch would have added; those objects never existed.
+
+## Keep proxies within their lifetime
+
+Return plain values from a run for use in jobs, UI state, or model requests. To retain a proxy deliberately, call `context.trackedObjects.add(object)` during its run. Adopt it with `runtime.run(object, callback)` in a later run and remove it when finished.
+
+Await each sync. Concurrent sync calls execute in order, but each rejected promise still needs error handling.
+
+## See also
+
+- [Runtime and lifecycle](/docs/editor-api/runtime)
+- [Office.js compatibility](/docs/editor-api/office-js-api)
+- [API member directory](/docs/editor-api/reference)

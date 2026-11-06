@@ -1,0 +1,84 @@
+---
+title: 'Insert and format images'
+description: 'Insert image bytes, resize pictures, set alt text, and handle selection-dependent edits.'
+category: 'Guides'
+---
+
+Use image commands on an open presentation. Each command returns a result that you must check.
+
+## Insert image bytes
+
+Pass the encoded file bytes, MIME type, and stored pixel dimensions. This function inserts a PNG:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function insertPng(editor: Editor, bytes: Uint8Array, width: number, height: number) {
+  const result = editor.exec({
+    type: 'insertImage',
+    bytes,
+    mime: 'image/png',
+    width,
+    height,
+  });
+  if (!result.ok) throw new Error(result.reason);
+}
+```
+
+The editor centers the picture and reduces it when needed to fit the slide. The inserted picture becomes selected.
+
+The command inserts on the current slide at execution time. If you load image bytes asynchronously, confirm the target before you execute.
+
+## Resize the selected picture
+
+Picture geometry uses English Metric Units (EMU). One inch equals 914,400 EMU; one point equals 12,700 EMU.
+
+Set both dimensions to preserve the desired aspect ratio:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function resizePicture(editor: Editor) {
+  const result = editor.exec({
+    type: 'setImageProperties',
+    widthEmu: 3 * 914400,
+    heightEmu: 2 * 914400,
+  });
+  if (!result.ok) throw new Error(result.reason);
+}
+```
+
+`setImageProperties` also accepts `rotationDegrees` and `crop`. Omitted fields retain their values.
+
+## Set alt text
+
+Describe a picture after selecting it. Set `decorative: true` only when the picture adds no information:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function describePicture(editor: Editor, description: string) {
+  const result = editor.exec({
+    type: 'setAltText',
+    description,
+    decorative: false,
+  });
+  if (!result.ok) throw new Error(result.reason);
+}
+```
+
+## Replace or reset a picture
+
+`replaceImage` replaces the selected picture with encoded image bytes. It accepts `bytes`, `mime`, and optional pixel `width` and `height`.
+
+Replacement fits the image into the existing frame and resets its crop. Border, effects, and adjustments remain.
+
+`resetImage` removes picture adjustments, border, effects, and crop-to-shape formatting. Add `size: true` to restore its natural size and remove the crop.
+
+A selection can change while a file loads. Recheck the selected picture before replacement, or use the built-in picture dialog.
+
+## See also
+
+- [Dialogs](/docs/customization/dialogs)
+- [Accessibility](/docs/accessibility)
+- [Export presentations](/docs/guides/export)
