@@ -10,8 +10,21 @@ export interface FontFaceHandle {
   dispose(): void;
 }
 
+/** Options of `registerFontFaces`. */
+export interface RegisterFontFacesOptions {
+  /**
+   * The family name of each face in the font set: the face's id when not given. A host that
+   * paints under other names (and rewrites the painted family names) gives them here.
+   */
+  readonly family?: (face: RegisteredFace) => string;
+}
+
 /** Add faces to `doc.fonts`. Bytes are copied into the FontFace; nothing touches disk. */
-export function registerFontFaces(doc: Document, faces: readonly RegisteredFace[]): FontFaceHandle {
+export function registerFontFaces(
+  doc: Document,
+  faces: readonly RegisteredFace[],
+  options: RegisterFontFacesOptions = {}
+): FontFaceHandle {
   const added: FontFace[] = [];
   const loads: Promise<unknown>[] = [];
   // A DOM without the CSS Font Loading API (a test DOM, an old embedded view) draws with the
@@ -24,7 +37,11 @@ export function registerFontFaces(doc: Document, faces: readonly RegisteredFace[
   for (const f of faces) {
     // Every face is the only member of its family and is declared regular, so the page draws
     // it as-is; paint adds font-weight/font-style only to synthesize a missing style.
-    const face = new FontFaceCtor(f.id, f.bytes.slice().buffer, { weight: '400', style: 'normal' });
+    const family = options.family?.(f) ?? f.id;
+    const face = new FontFaceCtor(family, f.bytes.slice().buffer, {
+      weight: '400',
+      style: 'normal',
+    });
     loads.push(face.load().catch(() => undefined));
     doc.fonts.add(face);
     added.push(face);

@@ -101,7 +101,12 @@ export function paintSlide(doc: Document, layout: SlideLayout, opts: PaintOption
 export function pathData(path: GeometryPath): string;
 
 // @public
-export function registerFontFaces(doc: Document, faces: readonly RegisteredFace[]): FontFaceHandle;
+export function registerFontFaces(doc: Document, faces: readonly RegisteredFace[], options?: RegisterFontFacesOptions): FontFaceHandle;
+
+// @public
+export interface RegisterFontFacesOptions {
+    readonly family?: (face: RegisteredFace) => string;
+}
 
 // @internal
 export function serializeSvgElement(root: Element): string;

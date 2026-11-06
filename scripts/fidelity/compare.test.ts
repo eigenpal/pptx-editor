@@ -115,18 +115,34 @@ describe('compareLines', () => {
     expect(lost.worstShift).toBe(0);
   });
 
-  test('a line past the pair limit is missing and extra; within it, out of place', () => {
+  test('a line that moved is out of place by its distance, within the pair limit or past it', () => {
     expect(LINE_PAIR_LIMIT_PT).toBe(4);
     const ref = [line('Quarterly results', 100)];
-    const far = compareLines([line('Quarterly results', 100 + LINE_PAIR_LIMIT_PT + 0.5)], ref);
-    expect(far).toMatchObject({ matched: 0, missing: ['Quarterly results'] });
-    expect(far.extra).toEqual(['Quarterly results']);
-    expect(far.worstBaseline).toBe(0);
+    // Past the limit, a line with no other partner still pairs: a move, not missing and extra.
+    const far = compareLines([line('Quarterly results', 100 + LINE_PAIR_LIMIT_PT + 30, 80)], ref);
+    expect(far).toMatchObject({ matched: 1, missing: [], extra: [] });
+    expect(far.worstBaseline).toBe(LINE_PAIR_LIMIT_PT + 30);
+    expect(far.worstShift).toBe(30);
     const near = compareLines([line('Quarterly results', 102)], ref);
     expect(near).toMatchObject({ matched: 1, missing: [], extra: [] });
     expect(near.worstBaseline).toBe(2);
     expect(slidePasses({ mismatch: 0 }, near)).toBe(false);
     expect(slidePasses({ mismatch: 0 }, far)).toBe(false);
+  });
+
+  test('repeated text: the line that moved far pairs after the others, in either page', () => {
+    const reference = [line('Total', 100, 50), line('Total', 300, 400)];
+    // Our first "Total" moved 40 pt down; the second one is in place and pairs with its own.
+    const ours = [line('Total', 300.1, 400), line('Total', 140, 50)];
+    for (const [a, b] of [
+      [ours, reference],
+      [reference, ours],
+    ]) {
+      const r = compareLines(a!, b!);
+      expect(r).toMatchObject({ matched: 2, missing: [], extra: [] });
+      expect(r.worstBaseline).toBe(40);
+      expect(r.worstShift).toBe(0);
+    }
   });
 
   test('the pairs do not depend on which page is which, or on the order of the lines', () => {

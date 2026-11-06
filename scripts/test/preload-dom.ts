@@ -17,8 +17,14 @@ import { prototypeChanges, shadowingCopies, snapshotPrototypes } from './dom-pro
 if (!GlobalRegistrator.isRegistered) GlobalRegistrator.register();
 
 const baseline = snapshotPrototypes(globalThis);
-const RESTORE =
-  'Restore the saved property descriptor, or delete an own property that was not there.';
+// The usual causes: an assignment such as `HTMLElement.prototype.getBoundingClientRect = saved`,
+// and `spyOn(HTMLElement.prototype, 'getBoundingClientRect')` with `mockRestore()`. Both leave
+// an own copy of a method that `Element.prototype` holds, and the copy hides later patches.
+const RESTORE = [
+  'An assignment of the saved method, and spyOn(...) with mockRestore() on an inherited method, leave such a copy.',
+  'Save the descriptor first: const own = Object.getOwnPropertyDescriptor(HTMLElement.prototype, name).',
+  'Then restore it: if (own) Object.defineProperty(HTMLElement.prototype, name, own); else delete HTMLElement.prototype[name].',
+].join(' ');
 
 // A preloaded `afterEach` runs after the test file's own `afterEach` hooks.
 afterEach(() => {

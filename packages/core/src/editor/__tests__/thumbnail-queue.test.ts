@@ -144,6 +144,27 @@ describe('thumbnails of a long deck', () => {
     list.remove();
   });
 
+  test('a container released and asked for again in one task keeps its place: no burst', async () => {
+    const editor = await open(40);
+    // Containers 20 to 25 are in the list's box; 17 to 28 within the overscan.
+    const { list, boxes } = rail(40, { top: 2000 });
+    const disposers = boxes.map((box, i) => editor.renderThumbnail(i, box, DEFER));
+    await endOfTask();
+    expect(painted(boxes.slice(17, 29))).toBe(12);
+    expect(painted(boxes.slice(29))).toBe(0);
+    // The rail renders again (a slide finished opening): each item's effect releases its
+    // container, then asks for it again, in the same task. The ones out of view still wait.
+    boxes.slice(29).forEach((box, k) => {
+      disposers[29 + k]!();
+      editor.renderThumbnail(29 + k, box, DEFER);
+    });
+    expect(painted(boxes.slice(29))).toBe(0);
+    await endOfTask();
+    expect(painted(boxes.slice(29))).toBe(0);
+    editor.destroy();
+    list.remove();
+  });
+
   test('a container that scrolls into view paints at once', async () => {
     type Entry = { target: Element; isIntersecting: boolean };
     const observers: { cb: (e: Entry[]) => void; root: Element | null; seen: Element[] }[] = [];

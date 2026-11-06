@@ -115,8 +115,11 @@ export class SlideSurface {
   /**
    * The slide size the fit zoom was last computed for. The fit reads computed styles and the
    * host's size, which make the browser lay out the whole document. A render that keeps the
-   * slide size keeps the fit, and the ResizeObserver reports a new host size, so a keystroke
-   * reads no style.
+   * slide size keeps the fit, so a keystroke reads no style. The ResizeObserver refits when the
+   * host's size changes, and when the surface's content box changes: a new zoom, or a new
+   * surface padding (`--doc-slide-padding`, a style sheet that loads late). At the fit zoom the
+   * surface fills the host, so a new padding changes its content box at once; zoomed in, the
+   * fit follows at the next zoom change.
    */
   #fitSlide = '';
   #gestures = 0;
@@ -189,6 +192,7 @@ export class SlideSurface {
     host.addEventListener('wheel', this.#onWheel, { passive: false });
     this.#resize = new ResizeObserver(() => this.#reportFit());
     this.#resize.observe(host);
+    this.#resize.observe(this.root);
   }
 
   destroy(): void {

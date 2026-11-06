@@ -3,7 +3,7 @@
 // renderer for tests.
 
 import { openPresentation, type DocumentSession } from '@pptx-editor.dev/core/editor';
-import { paintSlide } from '@pptx-editor.dev/core/output';
+import { paintSlide, registerFontFaces } from '@pptx-editor.dev/core/output';
 import { writePptx } from '@pptx-editor.dev/core/store';
 import type { FontSource, LayoutItem } from '@pptx-editor.dev/core/layout';
 
@@ -80,14 +80,14 @@ let fallbackFamilies = '';
 let fallbackKey = '';
 /**
  * The page's font faces, loaded once for each distinct font file: the bytes of each fetched
- * font by its SHA-256, the SHA-256 of each face's bytes, and one `FontFace` for each digest,
- * under the family `pptx-h-<sha256>`. Every deck of a lane that uses a font reuses them, so a
+ * font by its SHA-256, the SHA-256 of each face's bytes, and the digests registered: one
+ * `FontFace` for each, under the family `pptx-h-<sha256>`. Every deck of a lane that uses a font reuses them, so a
  * large face (Noto Sans CJK JP, 16 MB) is fetched, hashed, and decoded once for each page, not
  * for each deck and each reopen. A face of one digest draws the same in every deck.
  */
 const fontBytes = new Map<string, Uint8Array<ArrayBuffer>>();
 const digestOf = new WeakMap<Uint8Array, string>();
-const pageFaces = new Map<string, FontFace>();
+const pageFaces = new Set<string>();
 /** The page family of each face id of the open session (`pptx-f<measurer>-<face>`). */
 let faceFamilies = new Map<string, string>();
 /** The type and SHA-256 of each image blob, by its URL (`markupOf`). */
@@ -134,24 +134,20 @@ async function fontFile(file: FontFile, what: string): Promise<Uint8Array<ArrayB
 }
 
 /**
- * Give each face of `list` its page family, registering a face whose bytes the page has not
- * registered yet: one family for each regular face, as the engine's `registerFontFaces` does
- * (the paint adds font-weight and font-style only to synthesize a missing style).
+ * Give each face of `list` its page family, and register (with the engine's
+ * `registerFontFaces`, under that family) each face whose bytes the page has not registered yet.
  */
 async function registerFaces(list: readonly RegisteredFace[]): Promise<Map<string, string>> {
   const families = new Map<string, string>();
-  const loads: Promise<unknown>[] = [];
+  const fresh: RegisteredFace[] = [];
   for (const f of list) {
     const digest = await digestOfBytes(f.bytes);
-    const family = `pptx-h-${digest}`;
-    families.set(f.id, family);
+    families.set(f.id, `pptx-h-${digest}`);
     if (pageFaces.has(digest)) continue;
-    const face = new FontFace(family, f.bytes.slice().buffer, { weight: '400', style: 'normal' });
-    loads.push(face.load().catch(() => undefined));
-    document.fonts.add(face);
-    pageFaces.set(digest, face);
+    pageFaces.add(digest);
+    fresh.push(f);
   }
-  await Promise.all(loads);
+  await registerFontFaces(document, fresh, { family: (f) => families.get(f.id)! }).ready;
   return families;
 }
 

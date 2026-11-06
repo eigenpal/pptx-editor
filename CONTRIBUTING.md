@@ -40,7 +40,18 @@ The demo builds against workspace source, so it needs no package build.
    `bun run test` runs one `bun test` process per test file over a pool of workers, slowest file first, as DOCX Editor does (`scripts/test/run-parallel.mjs`). Only the React and Vue adapter tests preload happy-dom. The engine tests run with no global DOM. Other test commands:
    - `bun run test:changed` runs only the test files that your change can affect. Add `--list` to print them.
    - `bun run test:serial` runs the suite in two `bun test` processes. Use it to find a test that depends on file order.
-   - `bun run test:dom` runs the React and Vue adapter tests in one process, so they share one set of DOM classes. A test that patches a DOM prototype must restore the saved property descriptor, or delete an own property that was not there. An assignment such as `HTMLElement.prototype.getBoundingClientRect = saved` adds a copy that hides later patches of `Element.prototype`. The preload fails a test that leaves such a copy, and fails the run when a prototype differs at the end.
+   - `bun run test:dom` runs the React and Vue adapter tests in one process, so they share one set of DOM classes. A test that patches a DOM prototype must restore the saved property descriptor, or delete an own property that was not there. An assignment such as `HTMLElement.prototype.getBoundingClientRect = saved` adds a copy that hides later patches of `Element.prototype`. `spyOn(HTMLElement.prototype, 'getBoundingClientRect')` followed by `mockRestore()` also leaves such a copy, because the method is inherited. Save and restore the descriptor instead:
+
+     ```ts
+     const own = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'getBoundingClientRect');
+     HTMLElement.prototype.getBoundingClientRect = fake;
+     // ... the test ...
+     if (own) Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', own);
+     else delete (HTMLElement.prototype as Partial<HTMLElement>).getBoundingClientRect;
+     ```
+
+     The preload fails a test that leaves such a copy, and fails the run when a prototype differs at the end.
+
    - `bun run test --shard 1/3 --balance` runs one CI shard. `--only FILE`, `--exclude PREFIX`, `--jobs N`, `--fail-fast`, and `--retry-failed` are also available. Arguments after `--` go to each `bun test`.
 5. Add a changeset for code changes with `bun changeset`. Documentation, test, and CI-only changes do not need one.
 6. Submit a pull request against `main` with a conventional-commit title.
@@ -128,7 +139,7 @@ When a change alters a pinned problem (for example, a fix changes the text that 
 
 ## Fidelity harness
 
-The harness prints each fixture in `fixtures/` to PDF with the editor's own paint, and compares that PDF with the fixture's reference PDF. pdf.js draws and reads both PDFs in the same way. The check uses no system tools and no system fonts. Run it on your own machine; no container or second system is needed. Each slide must pass these checks (`scripts/fidelity/thresholds.ts`): at most 0.5 % of the pixels differ, every reference text line is in our page, our page has no other text lines, and each line is within 0.5 pt of the reference line, vertically (baseline) and horizontally (its nearer edge). A line pairs with a line of the same text in the other PDF only within 4 pt (`LINE_PAIR_LIMIT_PT` in `scripts/fidelity/compare.ts`, 8 times the line tolerance), nearest pair first. pdf.js lines carry no shape, so the limit keeps repeated text in one shape from pairing with the same text in another shape. A line past the limit is missing or extra. Both PDFs follow the same rules, so the pairs do not depend on which PDF is the reference. Rotated, vertical, and right-to-left text is checked by pixels only. Save, reopen, and paint again must give the same SVG markup.
+The harness prints each fixture in `fixtures/` to PDF with the editor's own paint, and compares that PDF with the fixture's reference PDF. pdf.js draws and reads both PDFs in the same way. The check uses no system tools and no system fonts. Run it on your own machine; no container or second system is needed. Each slide must pass these checks (`scripts/fidelity/thresholds.ts`): at most 0.5 % of the pixels differ, every reference text line is in our page, our page has no other text lines, and each line is within 0.5 pt of the reference line, vertically (baseline) and horizontally (its nearer edge). A line pairs with a line of the same text in the other PDF only within 4 pt (`LINE_PAIR_LIMIT_PT` in `scripts/fidelity/compare.ts`, 8 times the line tolerance), nearest pair first. pdf.js lines carry no shape, so the limit keeps repeated text in one shape from pairing with the same text in another shape. After that, lines of the same text that are left pair at any distance, nearest first: a line that moved fails by its distance, and is not reported as missing and extra. Both PDFs follow the same rules, so the pairs do not depend on which PDF is the reference. Rotated, vertical, and right-to-left text is checked by pixels only. Save, reopen, and paint again must give the same SVG markup.
 
 Our PDF must draw only with fonts that the harness loaded: the fixture fonts, the engine's fonts, and two open fallback faces. A system font in our PDF fails the gate. A fixture's reference PDF must embed only the open fonts that its deck names. `NON_OPEN_FONT_DECKS` in `scripts/fidelity/local-fonts.ts` lists the exceptions (`font-substitution`).
 

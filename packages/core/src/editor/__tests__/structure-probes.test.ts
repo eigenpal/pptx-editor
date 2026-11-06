@@ -218,6 +218,22 @@ describe('structure answers of can', () => {
     expect(probes.count()).toBe(commands(editor).length);
     editor.destroy();
   });
+
+  test('moving between slides on one layout compiles no New Slide probe again', async () => {
+    const editor = await open(textDeck(6));
+    const addSlide: EditorCommand = { type: 'addSlide' };
+    editor.goToSlide(1);
+    editor.can(addSlide);
+    const probes = countProbes(editor);
+    for (const i of [2, 4, 5, 0, 3]) {
+      editor.goToSlide(i);
+      const before = probes.count();
+      const answer = editor.can(addSlide);
+      expect(probes.count()).toBe(before);
+      expect(answer).toEqual(dryRun(editor, addSlide));
+    }
+    editor.destroy();
+  });
 });
 
 /** A small seeded generator (mulberry32), so a failing seed replays. */

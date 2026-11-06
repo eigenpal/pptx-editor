@@ -108,15 +108,35 @@ describe('a keystroke renders one rail item', () => {
         },
       }) as Component
     );
+    // Each rail item's instance, and the items that render again. A patch that compares the
+    // props of an item, even one that then skips its render, gives the instance a new vnode;
+    // with the memo mark, Vue skips the item before that (`rail-memo.ts`).
+    type Instance = { vnode: unknown; props: { slide: { index: number } } };
+    const instances: Instance[] = [];
+    const updated: number[] = [];
+    app.mixin({
+      mounted(this: { $: Instance; $options: { name?: string } }) {
+        if (this.$options.name === 'PptxRailItem') instances.push(this.$);
+      },
+      updated(this: { $: Instance; $options: { name?: string } }) {
+        if (this.$options.name === 'PptxRailItem') updated.push(this.$.props.slide.index);
+      },
+    });
     app.mount(host);
     await nextTick();
     expect(items()).toHaveLength(SLIDES);
+    expect(instances).toHaveLength(SLIDES);
     const before = items();
+    const vnodes = instances.map((i) => i.vnode);
     named.length = 0;
     typeOn(editor, 9);
     await nextTick();
     expect(itemNames(named)).toEqual([10]);
     expect(items()).toEqual(before);
+    // Only slide 10's item rendered again; Vue did not patch any other item.
+    expect(updated).toEqual([9]);
+    const patched = instances.filter((inst, i) => inst.vnode !== vnodes[i]);
+    expect(patched.map((i) => i.props.slide.index)).toEqual([9]);
     translate.value = countingT('Folie ').t;
     await nextTick();
     expect(names().every((n) => n?.startsWith('Folie '))).toBe(true);

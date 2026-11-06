@@ -14,7 +14,11 @@ export {
   linearGradientEnds,
   lumTransfer,
 } from './painter-math.ts';
-export { registerFontFaces, type FontFaceHandle } from './font-faces.ts';
+export {
+  registerFontFaces,
+  type FontFaceHandle,
+  type RegisterFontFacesOptions,
+} from './font-faces.ts';
 export { SVG_NS } from './svg.ts';
 // Internal: the DOM-free document that a host without a DOM paints into.
 export { createSvgDocument, elementsWithAttribute, serializeSvgElement } from './svg-document.ts';

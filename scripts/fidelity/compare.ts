@@ -115,13 +115,15 @@ export interface LineScore {
 const SAME_BASELINE_PT = 0.25;
 
 /**
- * Two lines pair only when their baselines, and their nearer edges, are this close (points):
+ * Lines pair first only when their baselines, and their nearer edges, are this close (points):
  * 8 times the larger line tolerance of `THRESHOLDS`, so 4 pt. pdf.js lines carry no shape, so a
  * line of one shape could otherwise pair with a line of the same text in another shape, at any
  * distance. A line of the same text in another shape is at least one line pitch away (about 1.2
  * times the text size: 4 pt is less than half the pitch of 6.5 pt text), or in another column.
  * A pair past the tolerance but within this limit is one line out of place: it fails the slide
- * by its distance. A line past this limit has no partner: it is missing, or extra.
+ * by its distance. Lines of the same text that no pair within the limit took then pair at any
+ * distance, nearest first: a line that moved far fails the slide by its distance, and is not
+ * missing and extra.
  */
 export const LINE_PAIR_LIMIT_PT =
   8 * Math.max(THRESHOLDS.maxBaselineDeltaPt, THRESHOLDS.maxLineShiftPt);
@@ -157,13 +159,17 @@ interface Pair {
   readonly distance: number;
 }
 
-/** The pair of `ref` and `ours` (each in left-to-right order), or null past the limit. */
-function pairOf(ref: readonly Entry[], ours: readonly Entry[]): Pair | null {
+/** The pair of `ref` and `ours` (each in left-to-right order), or null past `limit`. */
+function pairOf(
+  ref: readonly Entry[],
+  ours: readonly Entry[],
+  limit = LINE_PAIR_LIMIT_PT
+): Pair | null {
   const [r0, r1] = [ref[0].line, ref[ref.length - 1].line];
   const [o0, o1] = [ours[0].line, ours[ours.length - 1].line];
   const baseline = Math.abs(o0.baseline - r0.baseline);
   const shift = Math.min(Math.abs(o0.xMin - r0.xMin), Math.abs(o1.xMax - r1.xMax));
-  if (baseline > LINE_PAIR_LIMIT_PT || shift > LINE_PAIR_LIMIT_PT) return null;
+  if (baseline > limit || shift > limit) return null;
   return { ref, ours, baseline, shift, distance: Math.hypot(o0.xMin - r0.xMin, baseline) };
 }
 
@@ -209,7 +215,8 @@ function joinings(line: Entry, pool: readonly Entry[]): Entry[][] {
  * page with the same text (`lineKey`); failing that, the same text after a one-letter bullet;
  * failing that, several lines of the other page on its baseline that together hold its text.
  * Only pairs within `LINE_PAIR_LIMIT_PT` count, and the nearest are taken first, so repeated
- * text pairs within its shape, never with a line of another shape.
+ * text pairs within its shape, never with a line of another shape. Last, the lines of the same
+ * text that are left pair at any distance, nearest first: a line that moved is out of place.
  */
 export function compareLines(ours: readonly PdfLine[], reference: readonly PdfLine[]): LineScore {
   const mine = ours.map(entry);
@@ -224,12 +231,12 @@ export function compareLines(ours: readonly PdfLine[], reference: readonly PdfLi
     worstShift = Math.max(worstShift, p.shift);
   };
   /** The single-line pairs of unused lines that `same` accepts. */
-  const pairs = (same: (r: Entry, o: Entry) => boolean): Pair[] => {
+  const pairs = (same: (r: Entry, o: Entry) => boolean, limit?: number): Pair[] => {
     const out: Pair[] = [];
     for (const r of checked)
       for (const o of mine) {
         if (r.used || o.used || !same(r, o)) continue;
-        const p = pairOf([r], [o]);
+        const p = pairOf([r], [o], limit);
         if (p) out.push(p);
       }
     return out;
@@ -261,6 +268,11 @@ export function compareLines(ours: readonly PdfLine[], reference: readonly PdfLi
         if (p) joined.push(p);
       }
   assign(joined, take);
+  // The same text left over, at any distance: a line out of place, not missing and extra.
+  assign(
+    pairs((r, o) => r.key === o.key, Infinity),
+    take
+  );
   return {
     matched,
     total: checked.length,
