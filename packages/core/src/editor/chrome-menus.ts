@@ -285,6 +285,8 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     item('edit.copy', 'contextMenu.copy', 'contextMenu.shortcuts.copy'),
     item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
     SEPARATOR,
+    { kind: 'item', slot: 'table.select', value: 'table', labelKey: 'table.region.table' },
+    SEPARATOR,
     item('table.insertRowAbove'),
     item('table.insertRowBelow'),
     item('table.insertColumnLeft'),

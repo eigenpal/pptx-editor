@@ -3,7 +3,7 @@
 // extends to a range, and a drag on an inner grid line resizes the columns or rows beside it.
 // Moved out of `surface.ts` (the 1000-line cap); the surface calls these before its own hits.
 
-import type { SlideLayout } from '../layout/index.ts';
+import type { LayoutItem, SlideLayout } from '../layout/index.ts';
 import type {
   EditorCommand,
   EditorExecOptions,
@@ -14,6 +14,7 @@ import type {
 } from '../contracts/index.ts';
 import { apply, invert } from '../layout/index.ts';
 import { pointAt } from './surface-geometry.ts';
+import { parentGroupOf } from '../automation/commands/placement.ts';
 import {
   cellAtPoint,
   cellItem,
@@ -52,6 +53,8 @@ type GridDrag = {
   readonly sizes: readonly number[];
   /** Every step of the drag runs with it: the drag is one undo step. */
   readonly historyGroup: HistoryGroup;
+  /** The table is not the selection: the first move selects it, a plain click does not. */
+  pending: boolean;
 };
 
 /** The table gestures of one surface. */
@@ -70,15 +73,6 @@ export class TableGestures {
     return (4 * EMU_PER_PX) / this.host.zoom();
   }
 
-  /** The table's selection state: the frame id when the selection is in or on it. */
-  #selectedTable(): string | undefined {
-    const sel = this.host.selection();
-    if (sel.kind === 'text' && sel.cell) return sel.nodeId;
-    if (sel.kind === 'cells') return sel.nodeId;
-    if (sel.kind === 'shapes' && sel.nodeIds.length === 1) return sel.nodeIds[0];
-    return undefined;
-  }
-
   /**
    * A press on element `id`. Returns `text` when a caret or cell range was set (the surface
    * focuses its input), `grid` for a grid line drag, or null when the press is not for a table.
@@ -92,16 +86,21 @@ export class TableGestures {
   ): 'text' | 'grid' | null {
     const frame = tableItem(layout, id);
     if (!frame || this.host.readOnly()) return null;
-    // The format painter never drags a grid line.
-    const line =
-      !painting && this.#selectedTable() === id
-        ? gridLineAt(frame, p, this.#tolerance())
-        : undefined;
+    // The format painter never drags a grid line. Any table's lines drag, as the table chrome
+    // marks the line under the pointer (`surface-table-chrome.ts`).
+    const line = painting ? undefined : gridLineAt(frame, p, this.#tolerance());
     if (line) {
       const t = frame.table;
       const lines = line.axis === 'column' ? t.columnX : t.rowY;
       const sizes = lines.slice(1).map((v, i) => Math.round(v - lines[i]));
+      // The grid commands act on the selection's table: a drag on another table's line selects it.
+      const sel = this.host.selection();
+      const on =
+        sel.kind === 'shapes'
+          ? sel.nodeIds.length === 1 && sel.nodeIds[0] === id
+          : sel.kind !== 'none' && sel.nodeId === id;
       this.#grid = {
+        pending: !on,
         id,
         ...line,
         start: apply(invert(frame.matrix), p.x, p.y),
@@ -140,6 +139,11 @@ export class TableGestures {
     if (g) {
       const frame = tableItem(layout, g.id);
       if (!frame) return true;
+      if (g.pending) {
+        g.pending = false;
+        const group = parentGroupOf(layout.items, g.id);
+        this.host.select({ kind: 'shapes', nodeIds: [g.id], ...(group ? { group } : {}) });
+      }
       const local = apply(invert(frame.matrix), p.x, p.y);
       const delta = g.axis === 'column' ? local.x - g.start.x : local.y - g.start.y;
       const sizes = [...g.sizes];
@@ -211,11 +215,38 @@ export class TableGestures {
     return same && (cursor === undefined || cursor === 'text');
   }
 
-  /** The pointer over table `id`: resize on a grid line of the selected table, else text. */
+  /**
+   * The selected table when `p` is on its outer grid line, just outside its box, where the hit
+   * test finds no element: the right and bottom edges resize the last column or row.
+   */
+  edgeAt(layout: SlideLayout | undefined, p: { x: number; y: number }): string | undefined {
+    const sel = this.host.selection();
+    const id =
+      sel.kind === 'shapes'
+        ? sel.nodeIds.length === 1
+          ? sel.nodeIds[0]
+          : undefined
+        : sel.kind === 'none'
+          ? undefined
+          : sel.nodeId;
+    const frame = id ? tableItem(layout, id) : undefined;
+    return frame && this.onLine(frame, p) ? id : undefined;
+  }
+
+  /**
+   * A press at `p` on table item `item` drags a grid line: true wherever the resize cursor
+   * shows. The border band of a selected table yields to it, so its outer lines resize.
+   */
+  onLine(item: LayoutItem, p: { x: number; y: number }): boolean {
+    if (item.kind !== 'frame' || !item.table || this.host.readOnly()) return false;
+    return !!gridLineAt(item as Parameters<typeof gridLineAt>[0], p, this.#tolerance());
+  }
+
+  /** The pointer over table `id`: resize on a grid line, else text in a cell. */
   cursor(layout: SlideLayout, id: string, p: { x: number; y: number }): string | undefined {
     const frame = tableItem(layout, id);
     if (!frame || this.host.readOnly()) return undefined;
-    const line = this.#selectedTable() === id ? gridLineAt(frame, p, this.#tolerance()) : undefined;
+    const line = gridLineAt(frame, p, this.#tolerance());
     if (line) return line.axis === 'column' ? 'col-resize' : 'row-resize';
     return cellAtPoint(frame, p) ? 'text' : undefined;
   }

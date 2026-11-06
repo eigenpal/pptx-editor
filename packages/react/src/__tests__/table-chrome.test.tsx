@@ -418,10 +418,9 @@ describe('table toolbar', () => {
       })
     );
     expect(groups(container).at(-1)).toBe('table');
-    const header = container.querySelector<HTMLButtonElement>('[data-slot="table.headerRow"]')!;
-    expect(header.getAttribute('aria-pressed')).toBe('true');
-    act(() => void fireEvent.click(header));
-    expect(header.getAttribute('aria-pressed')).toBe('false');
+    // The bar's short table group: the style options stay on the ribbon and in Toolbar.Slot.
+    expect(container.querySelector('[data-slot="table.headerRow"]')).toBeNull();
+    expect(container.querySelector('[data-slot="table.style"]')).not.toBeNull();
     act(() => void fireEvent.click(container.querySelector('[data-slot="table.insertRowBelow"]')!));
     expect(rowsOf(frames(editor)[0])).toHaveLength(3);
     // One cell: Merge Cells is disabled with the engine's reason.

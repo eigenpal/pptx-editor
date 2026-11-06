@@ -1625,6 +1625,52 @@
 .pptx-surface__cell-selection {
   fill: var(--doc-selection);
 }
+/* The table chrome (surface-table-chrome.ts), after DOCX Editor's: the select handle at the
+   table's top-left corner, the grid line under the pointer, and the insert buttons. */
+.pptx-surface__table-handle {
+  pointer-events: all;
+  cursor: move;
+}
+.pptx-surface__table-handle-box {
+  fill: var(--doc-surface);
+  stroke: var(--doc-border-dark);
+}
+.pptx-surface__table-handle-icon {
+  fill: var(--doc-text-muted);
+}
+.pptx-surface__table-handle:hover .pptx-surface__table-handle-box {
+  stroke: var(--doc-primary);
+}
+.pptx-surface__table-handle:hover .pptx-surface__table-handle-icon {
+  fill: var(--doc-primary);
+}
+.pptx-surface__table-line {
+  stroke: var(--doc-primary);
+  stroke-opacity: 0.75;
+}
+.pptx-surface__table-insert {
+  pointer-events: all;
+  cursor: pointer;
+}
+.pptx-surface__table-insert-dot {
+  fill: var(--doc-surface);
+  stroke: var(--doc-primary);
+}
+.pptx-surface__table-insert-plus {
+  fill: none;
+  stroke: var(--doc-primary);
+  stroke-linecap: round;
+}
+.pptx-surface__table-insert:hover .pptx-surface__table-insert-dot {
+  fill: var(--doc-primary);
+}
+.pptx-surface__table-insert:hover .pptx-surface__table-insert-plus {
+  stroke: var(--doc-surface);
+}
+.pptx-surface__table-insert-guide {
+  stroke: var(--doc-primary);
+  stroke-opacity: 0.6;
+}
 
 /* Collaboration peers (surface-presence.ts), after DOCX Editor's remote carets: the
    participant color comes from `--pptx-remote-color`, the accent when there is none. */

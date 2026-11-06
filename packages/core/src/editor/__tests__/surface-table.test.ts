@@ -1,6 +1,6 @@
 // Table pointer gestures (surface-table.ts): a press in a cell places the caret, a drag across
 // cells selects a cell range, Shift+press extends to a range, and a drag on a grid line of the
-// selected table resizes its columns or rows. The host is a stub over a real editor and its
+// table resizes its columns or rows (and selects that table). The host is a stub over a real editor and its
 // layout; `TableGestures` uses no DOM.
 
 import { describe, expect, test } from 'bun:test';
@@ -280,6 +280,26 @@ describe('table gestures: grid lines', () => {
     g.up();
   });
 
+  test('the outer edges are grid lines, so the border band of the selected table yields', async () => {
+    const e = await open();
+    const { g } = gestures(e);
+    const frame = frameOf(e);
+    const t = frame.table;
+    const y = rowMid(e, 0);
+    expect(g.onLine(frame, at(e, t.columnX.at(-1)!, y))).toBe(true);
+    expect(g.onLine(frame, at(e, (t.columnX[0] + t.columnX[1]) / 2, y))).toBe(false);
+    // A shape that is not a table never has grid lines.
+    const box = layout(e).items.find((i) => i.element.nodeId === boxId(e))!;
+    expect(g.onLine(box, at(e, t.columnX.at(-1)!, y))).toBe(false);
+    expect(gestures(e, true).g.onLine(frame, at(e, t.columnX.at(-1)!, y))).toBe(false);
+    // Just outside the right edge, the hit test finds the selected table only.
+    const outside = at(e, t.columnX.at(-1)! + 2 * 9_525, y);
+    expect(g.edgeAt(layout(e), outside)).toBeUndefined();
+    e.setSelection({ kind: 'shapes', nodeIds: [frameId(e)] });
+    expect(g.edgeAt(layout(e), outside)).toBe(frameId(e));
+    expect(g.edgeAt(layout(e), at(e, -2 * 9_525, y))).toBeUndefined();
+  });
+
   test('a row line shows the row cursor and a drag resizes the rows', async () => {
     const e = await open();
     const { g, commands } = gestures(e);
@@ -298,19 +318,31 @@ describe('table gestures: grid lines', () => {
     g.up();
   });
 
-  test('a grid line of a table that is not selected places a caret', async () => {
+  test('a grid line of a table that is not selected drags too, as the chrome marks it', async () => {
     const e = await open();
-    const { g, commands } = gestures(e);
+    const { g } = gestures(e);
     const id = frameId(e);
     e.setSelection({ kind: 'shapes', nodeIds: [boxId(e)] });
     const p = at(e, frameOf(e).table.columnX[1], rowMid(e, 1));
-    expect(g.cursor(layout(e), id, p)).toBe('text');
-    expect(g.down(layout(e), id, p, false)).toBe('text');
-    expect(e.snapshot().selection).toMatchObject({ kind: 'text', nodeId: id, cell: { row: 1 } });
-    expect(g.move(layout(e), p)).toBe(true);
+    expect(g.cursor(layout(e), id, p)).toBe('col-resize');
+    expect(g.down(layout(e), id, p, false)).toBe('grid');
+    // A press alone selects nothing; the first move selects the table, and the drag resizes.
+    expect(e.snapshot().selection).toMatchObject({ kind: 'shapes', nodeIds: [boxId(e)] });
+    g.move(layout(e), at(e, frameOf(e).table.columnX[1] + IN / 4, rowMid(e, 1)));
+    expect(e.snapshot().selection).toMatchObject({ kind: 'shapes', nodeIds: [id] });
+    g.up();
+    expect(widths(e)).toEqual([IN + IN / 4, IN - IN / 4, IN]);
+  });
+
+  test('a click on a line of a table that is not selected changes nothing', async () => {
+    const e = await open();
+    const { g, commands } = gestures(e);
+    e.setSelection({ kind: 'shapes', nodeIds: [boxId(e)] });
+    const p = at(e, frameOf(e).table.columnX[1], rowMid(e, 1));
+    expect(g.down(layout(e), frameId(e), p, false)).toBe('grid');
     g.up();
     expect(commands).toEqual([]);
-    expect(widths(e)).toEqual([IN, IN, IN]);
+    expect(e.snapshot().selection).toMatchObject({ kind: 'shapes', nodeIds: [boxId(e)] });
   });
 
   test('read-only: a press is not a table gesture and shows no cursor', async () => {

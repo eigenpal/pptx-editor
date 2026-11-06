@@ -612,7 +612,7 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'partial',
     tier: 'community',
-    notes: `Drag an inner grid line, distribute rows and columns, or resize the frame by its handles (the columns and rows scale; how the change is shared among them is approximate). Row heights stay minimums, so rows grow to fit text. ${TABLE_SAVE}`,
+    notes: `Drag a grid line (the line under the pointer is marked), distribute rows and columns, or resize the frame by its handles (the columns and rows scale; how the change is shared among them is approximate). Row heights stay minimums, so rows grow to fit text. ${TABLE_SAVE}`,
     docsLink: '/docs/guides/tables',
   },
 

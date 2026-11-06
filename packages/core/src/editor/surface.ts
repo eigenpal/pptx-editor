@@ -10,6 +10,7 @@ import { caretAt, linkedAt, linkedAtPoint, pointAt, textFrameMatrix } from './su
 export { caretAt, pointAt, textFrameMatrix };
 import { selectionRects } from './surface-text-selection.ts';
 import { cellsOverlay, TableGestures } from './surface-table.ts';
+import { TableChrome } from './surface-table-chrome.ts';
 import { textItemOf } from './table-cells.ts';
 import { paragraphUnits, wordSelectionAt } from '../automation/commands/text-units.ts';
 import {
@@ -48,7 +49,7 @@ import { cropAt, cropOverlay, onCropImage, startCropDrag } from './surface-crop.
 import type { CropDrag, CropHandle } from './surface-crop.ts';
 import { withHalos } from './surface-halo.ts';
 import { hitItem, inText, onBorder } from './surface-hit.ts';
-import { outsideVeil, scrollBoxIntoView, surfacePadding } from './surface-view.ts';
+import { fitZoom, outsideVeil, scrollBoxIntoView } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
 import { resizeOne, scaleMany } from './surface-resize.ts';
 
@@ -147,6 +148,7 @@ export class SlideSurface {
   /** The last press selected a word or a paragraph, so the browser's `dblclick` keeps it. */
   #unitPress = false;
   readonly #table: TableGestures;
+  readonly #tableChrome: TableChrome;
   readonly #unbindInput: () => void;
   #zoomAnchor: { x: number; y: number } | null = null;
   #renderedZoom: number | null = null;
@@ -172,6 +174,7 @@ export class SlideSurface {
     this.#overlay = doc.createElementNS(SVG_NS, 'svg') as SVGSVGElement;
     this.#overlay.setAttribute('class', 'pptx-surface__overlay');
     this.#table = new TableGestures(editor);
+    this.#tableChrome = new TableChrome(editor);
     this.#input = doc.createElement('textarea');
     this.#input.className = 'pptx-surface__input';
     // The input receives keystrokes and IME composition for the engine; it is focusable and
@@ -231,19 +234,7 @@ export class SlideSurface {
   #reportFit(): void {
     const layout = this.editor.layout();
     if (!layout) return;
-    const w = layout.slide.width / EMU_PER_PX;
-    const h = layout.slide.height / EMU_PER_PX;
-    // The host's own padding (an open find bar reserves its top) is not room for the slide.
-    const pad = this.host.ownerDocument.defaultView?.getComputedStyle(this.host);
-    const padX =
-      (parseFloat(pad?.paddingLeft ?? '') || 0) + (parseFloat(pad?.paddingRight ?? '') || 0);
-    const padY =
-      (parseFloat(pad?.paddingTop ?? '') || 0) + (parseFloat(pad?.paddingBottom ?? '') || 0);
-    // The surface's own padding (`--doc-slide-padding`, 24px a side) stays around the slide.
-    const { x: ownX, y: ownY } = surfacePadding(this.root);
-    const availW = Math.max(100, this.host.clientWidth - padX - ownX);
-    const availH = Math.max(100, this.host.clientHeight - padY - ownY);
-    this.editor.fitChanged(Math.max(0.1, Math.min(availW / w, availH / h)));
+    this.editor.fitChanged(fitZoom(this.host, this.root, layout.slide));
   }
 
   /** Zoom by a factor, keeping the slide point under (`clientX`, `clientY`) in place. */
@@ -433,7 +424,7 @@ export class SlideSurface {
       r.setAttribute('stroke-width', String(px));
       parts.push(r);
     }
-    parts.push(...cellsOverlay(doc, layout, sel));
+    parts.push(...cellsOverlay(doc, layout, sel), ...this.#tableChrome.elements(doc, layout));
     if (sel.kind === 'text') {
       const item = textItemOf(layout, sel);
       if (item) {
@@ -546,7 +537,8 @@ export class SlideSurface {
 
   /** The editable element under a slide point in a scope (`surface-hit.ts`). */
   #hit(p: { x: number; y: number }, scope?: string): string | undefined {
-    return hitItem(this.editor.layout(), p, this.editor.zoom(), scope);
+    const layout = this.editor.layout();
+    return hitItem(layout, p, this.editor.zoom(), scope) ?? this.#table.edgeAt(layout, p);
   }
 
   /** Start dragging the selected items (or a handle of their box). */
@@ -590,6 +582,17 @@ export class SlideSurface {
     if (crop && (cropHandle || onCropImage(crop, p))) {
       this.#cropDrag = startCropDrag(crop, cropHandle ?? 'move', p, `g${++this.#gestures}`);
       this.root.focus({ preventScroll: true });
+      e.preventDefault();
+      return;
+    }
+    // The table chrome: the select handle selects and drags the table; "+" inserts a row or column.
+    const chrome = painting ? null : this.#tableChrome.press(layout, target);
+    if (chrome) {
+      if (chrome.kind === 'move') {
+        this.editor.select({ kind: 'shapes', nodeIds: [chrome.id], ...chrome.scope });
+        this.#startDrag('move', [chrome.id], p);
+      }
+      this.focus();
       e.preventDefault();
       return;
     }
@@ -728,7 +731,7 @@ export class SlideSurface {
   }
 
   #onBorder(item: LayoutItem, p: { x: number; y: number }): boolean {
-    return onBorder(item, p, this.editor.zoom());
+    return onBorder(item, p, this.editor.zoom()) && !this.#table.onLine(item, p);
   }
 
   /** The pointer shows what a click does: a text cursor over text, a move cursor on shapes. */
@@ -778,15 +781,12 @@ export class SlideSurface {
     const layout = this.editor.layout();
     if (!layout) return;
     const p = this.#slidePoint(e);
-    if (
-      !this.#drag &&
-      !this.#textDrag &&
-      !this.#table.active &&
-      !this.#marquee &&
-      e.target instanceof Node &&
-      this.#stage.contains(e.target)
-    )
-      this.#updateCursor(p);
+    const idle = !this.#drag && !this.#textDrag && !this.#marquee && !this.#cropDrag;
+    const free = idle && !this.#table.active;
+    const inStage = free && e.target instanceof Node && this.#stage.contains(e.target);
+    if (idle && this.#tableChrome.hover(layout, p, inStage ? this.#hit(p) : undefined))
+      this.#renderOverlay(layout, this.editor.zoom());
+    if (inStage) this.#updateCursor(p);
     if (this.#table.move(layout, p)) return;
     if (this.#textDrag) {
       const drag = this.#textDrag;

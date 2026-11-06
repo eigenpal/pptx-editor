@@ -64,6 +64,17 @@ An address inside a merged cell moves to the merged cell's top-left grid positio
 
 Every text command works in a cell, in each cell of a range, and in each cell of a selected table: font, size, bold, alignment, bullets, and the others. Type with `editor.input('text', value)` while the caret is in a cell. Tab selects the text of the next cell, and Shift+Tab the text of the cell before. Tab in the last cell adds a row. An arrow key at the edge of a cell's text moves to the next cell, and Escape selects the table. Typing with a range of cells selected is refused with `disabled.typeInOneCell`.
 
+## Edit on the canvas
+
+The canvas shows table chrome while the pointer is over a table or the selection is in it, as DOCX Editor does:
+
+- **Select handle.** A small box with a move symbol sits out from the table's top-left corner. Click it to select the table. Drag it to move the table.
+- **Grid lines.** The grid line under the pointer is marked across the table. Drag it to resize the columns or rows beside it; the right and bottom edges resize the last column or row. The drag selects the table and is one undo step. A click on a line places no caret. A table in a group shows its chrome after you enter the group.
+- **Insert buttons.** Point at the left edge of the table to show a "+" button just outside it, at the nearest row line. Click it to insert a row below that line. The top edge shows the same button for a column to the right of a column line. A right-to-left table inserts columns from the menus only.
+- **Context menu.** Right-click a cell for Select table, insert and delete rows and columns, merge, and split.
+
+The chrome does not show in view mode. The toolbar shows a short table group while the selection is in a table: the style, cell fill, borders, select, delete, insert, merge, and split. The style options, distribute, and cell margins are on the ribbon's Table Design and Table Layout tabs, and a host places any table slot with `Toolbar.Slot`.
+
 ## Edit structure
 
 | Command | Effect |
