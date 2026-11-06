@@ -151,9 +151,18 @@ export function createPackagedFileFetch(options: {
   } catch {
     return undefined;
   }
-  const root = node.path.resolve(node.fileURLToPath(new URL('./', options.trustedRoot).href));
+  const rootUrl = new URL('./', options.trustedRoot);
+  let root: string;
+  try {
+    // Throws for a root this platform cannot name, such as a drive-less path on Windows.
+    root = node.path.resolve(node.fileURLToPath(rootUrl.href));
+  } catch {
+    return undefined;
+  }
   // A filesystem root is not a confinement.
   if (node.path.resolve(root, '..') === root) return undefined;
+  // A package installed on a Windows network share has a host in its URLs: accept that one.
+  const rootHost = rootUrl.host === 'localhost' ? '' : rootUrl.host;
   const { maxBytes } = options;
   return (async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const href = typeof input === 'string' ? input : 'href' in input ? input.href : input.url;
@@ -163,7 +172,8 @@ export function createPackagedFileFetch(options: {
     const signal =
       init?.signal ?? (typeof input === 'object' && 'signal' in input ? input.signal : undefined);
     if (signal?.aborted) throw signal.reason;
-    if (url.username !== '' || url.password !== '' || (url.host !== '' && url.host !== 'localhost'))
+    const host = url.host === 'localhost' ? '' : url.host;
+    if (url.username !== '' || url.password !== '' || host !== rootHost)
       return new Response(null, { status: 404 });
     try {
       const bytes = await readConfined(node, root, url.href, maxBytes);

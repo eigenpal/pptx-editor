@@ -132,7 +132,7 @@ The names follow DOCX Editor's `@docx-editor.dev/docx-to-pdf` where the concept 
 | `PdfExportSession` | `fontResolution` and `dispose()` |
 | `PdfExportResult.slideNumbers` | The one-based deck slide number of each page. Hidden slides (unless `includeHiddenSlides` is true) and slides that cannot be laid out have no page. |
 | `PdfDiagnostic` | `code` (a fixed string), `message`, `severity` (`unsupported`, `approximation`, `information`), `slideIndex`, `slideNumber`, and `pageIndex`, `pageNumber` of the output page. A document-wide diagnostic has no slide or page. |
-| `PdfFontResolution` | The faces the conversion drew with, the substituted families, and the embedded faces the deck may not use |
+| `PdfFontResolution` | The faces the conversion drew with, the substituted families, the embedded faces the deck may not use, and the substitute faces that failed to load |
 | Errors | `PdfDocumentOpenError`, `PdfFidelityError`, `PdfPageLimitError`, `PdfOutputLimitError`, `PdfEncodingError`, `PdfWorkLimitError` (`timeout`, `aborted`, `operations`), `ExportResourceError` (`disposed`, `aborted`) |
 
 One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`show="0"`) are left out, unless `includeHiddenSlides` is true. The output is deterministic: the same deck gives the same bytes. The PDF carries the deck's title, author, subject, and keywords from `docProps/core.xml`, and fixed dates, as in DOCX Editor.
@@ -185,7 +185,8 @@ One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`sho
 | Tiled pictures; picture color effects (grayscale, duotone, brightness, black and white) | Drawn stretched; effects not applied (`approximation`) |
 | Dashes, compound lines | Drawn solid and single (`approximation`) |
 | Pattern fills, reflections | Not drawn (`unsupported`) |
-| Arrowheads, underline, strikethrough, text outlines | Not drawn (`unsupported`) |
+| Underline styles other than single and double | Drawn as a single line (`approximation`) |
+| Arrowheads, text outlines | Not drawn (`unsupported`) |
 | Upright East Asian vertical text, synthetic bold and italic | Drawn as normal text (`approximation`) |
 | Charts, diagrams, OLE objects with no PNG, JPEG, GIF, or BMP picture | Not drawn (`unsupported`) |
 | Video and audio | The poster picture is drawn; the media is not embedded or played |
@@ -196,6 +197,7 @@ One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`sho
 ## Fonts
 
 - Text uses the same font bytes that layout measured with: fonts passed in `fonts`, fonts embedded in the deck (decoded in memory for this conversion only), and the metric-compatible substitutes from `@docx-editor.dev/fonts`.
+- Under Node, the substitutes are read from the `assets/` folder of `@docx-editor.dev/fonts`, and from no other folder. A single-file bundle must ship a copy of that folder and set `DOCX_EDITOR_FONT_ASSET_ROOT` to it before the package loads. Otherwise each face reports `font.substitute-failed`.
 - Fonts are embedded with DOCX Editor's own embedder (`fonts.ts`, `pdf-font-embedding.ts`): a subset per face, written as a CID font with a `ToUnicode` map, so text stays searchable. A slide that uses four faces gives a PDF of about 25 KB.
 - A face is not embedded when its OS/2 `fsType` forbids embedding or subsetting, permits bitmaps only, or is missing. Its text is not drawn, and the conversion reports `font.not-embedded`. Variable fonts are refused the same way, as in DOCX Editor. DOCX Editor embeds a face that has no OS/2 table; this package refuses it.
 - Each character draws the glyph the face's `cmap` gives, as the editor's SVG text does, so there are no ligatures. A character the face lacks is not drawn (`text.missing-glyph`).

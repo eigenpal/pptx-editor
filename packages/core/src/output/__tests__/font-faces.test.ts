@@ -45,4 +45,26 @@ describe('registerFontFaces', () => {
       delete host.FontFace;
     }
   });
+
+  test("takes the constructor from the document's own window", async () => {
+    const created: string[] = [];
+    class FrameFontFace {
+      constructor(readonly family: string) {
+        created.push(family);
+      }
+      load(): Promise<this> {
+        return Promise.resolve(this);
+      }
+    }
+    const fonts = new Set<unknown>();
+    const doc = {
+      defaultView: { FontFace: FrameFontFace },
+      fonts: { add: (f: unknown) => fonts.add(f), delete: (f: unknown) => fonts.delete(f) },
+    };
+    const handle = registerFontFaces(doc as unknown as Document, [face]);
+    await handle.ready;
+    expect(created).toEqual(['pptx-face-1']);
+    expect([...fonts][0]).toBeInstanceOf(FrameFontFace);
+    handle.dispose();
+  });
 });

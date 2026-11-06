@@ -76,6 +76,25 @@ describe('createPackagedFileFetch', () => {
     expect((await read(at('big.ttf'))).status).toBe(413);
   });
 
+  test('refuses a file: URL on another host, and accepts localhost', async () => {
+    expect((await read(at('face.ttf').replace('file://', 'file://elsewhere'))).status).toBe(404);
+    expect((await read(at('face.ttf').replace('file://', 'file://localhost'))).status).toBe(200);
+  });
+
+  test('is undefined for a filesystem root, which confines nothing', () => {
+    expect(
+      createPackagedFileFetch({ trustedRoot: pathToFileURL('/'), maxBytes: 1 })
+    ).toBeUndefined();
+  });
+
+  test('is undefined for a root this platform cannot name, instead of throwing', () => {
+    // A host other than localhost has no path on POSIX; Windows reads it as a network share.
+    if (process.platform === 'win32') return;
+    expect(
+      createPackagedFileFetch({ trustedRoot: new URL('file://share/fonts/'), maxBytes: 1 })
+    ).toBeUndefined();
+  });
+
   test('leaves a non-file folder to the global fetch', () => {
     expect(
       createPackagedFileFetch({ trustedRoot: new URL('https://example.test/'), maxBytes: 1 })
@@ -106,6 +125,16 @@ describe('packaged substitutes', () => {
       return saved(input);
     }) as typeof fetch;
     try {
+      // `loadSubstitute` skips the per-page cache, which another test file in this worker
+      // may have filled already through Bun's `fetch`.
+      const load = await loadSubstitute('Calibri');
+      expect(load.failures).toEqual([]);
+      expect(load.sources.map((s) => [s.bold, s.italic]).sort()).toEqual([
+        [false, false],
+        [false, true],
+        [true, false],
+        [true, true],
+      ]);
       const opened = await openPresentation(
         buildPptx({ slides: [{ layout: 'blank', shapes: '' }] })
       );
