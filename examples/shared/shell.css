@@ -612,6 +612,13 @@
   }
 }
 
+/* A tablet in portrait or a phone held sideways: the bar has room for more of the deck name. */
+@media (pointer: coarse) and (min-width: 601px) and (max-width: 900px) {
+  .demo-file__name {
+    max-width: 240px;
+  }
+}
+
 /* A phone: the bar keeps one row, and the slide gets more of the width. */
 @media (max-width: 600px) {
   .demo-topbar .demo-theme-toggle,
@@ -641,12 +648,13 @@
 /* A portrait window up to a tablet (the rail is an overlay here): the slide area takes the
    slide's own shape, and an open notes pane takes the height left under it. The height is the
    slide's width (the pane less the workspace and surface padding) times its ratio, plus the
-   surface padding. A tall slide gives up height, so the notes keep their head and two lines. */
+   surface padding. A tall slide gives up height, so the notes keep their head and two lines.
+   With the notes closed, the slide area takes the whole height, so a zoomed slide has room. */
 @media (max-width: 900px) and (orientation: portrait) {
   .demo-root {
     --demo-slide-pad: var(--doc-slide-padding, 24px);
   }
-  .demo-canvas {
+  .demo-docpane:has(> .pptx-notes[data-open='true']) > .demo-canvas {
     flex: 0 1 auto;
     height: calc(
       (100vw - 24px - 2 * var(--demo-slide-pad)) * var(--demo-slide-ratio, 0.5625) + 2 *
@@ -654,7 +662,7 @@
     );
   }
   /* The strip under the slide, when the view switch and the zoom show (not in ribbon mode). */
-  .demo-docpane:has(> .demo-status) > .demo-canvas {
+  .demo-docpane:has(> .demo-status):has(> .pptx-notes[data-open='true']) > .demo-canvas {
     height: calc(
       (100vw - 24px - 2 * var(--demo-slide-pad)) * var(--demo-slide-ratio, 0.5625) + 2 *
         var(--demo-slide-pad) + var(--demo-status-strip)
@@ -769,6 +777,11 @@
   .demo-root .pptx-notes__head .pptx-toolbar__button {
     min-width: 36px;
     height: 36px;
+  }
+  /* The side panel's close button: it covers the slide on a phone, so it must be easy to hit. */
+  .demo-root .pptx-panel__head .pptx-toolbar__button {
+    min-width: 40px;
+    height: 40px;
   }
 }
 

@@ -59,8 +59,9 @@ import {
 } from '../../shared/demo-files.ts';
 
 const base = import.meta.env.BASE_URL;
-/** A short screen (a phone held sideways) opens with the notes closed, so the slide gets the height. */
-const SHORT_SCREEN = typeof matchMedia === 'function' && matchMedia('(max-height: 500px)').matches;
+/** A phone opens with the notes closed, so the slide gets the room; one tap opens them. */
+const PHONE_SCREEN =
+  typeof matchMedia === 'function' && matchMedia('(max-height: 500px), (max-width: 600px)').matches;
 /** The notes pane stays mounted in the slide sorter, so its open state and draft stay. */
 const HIDDEN: CSSProperties = { display: 'none' };
 
@@ -305,7 +306,7 @@ function Shell({
             </div>
           )}
           <PptxEditor.NotesPane
-            defaultOpen={!SHORT_SCREEN}
+            defaultOpen={!PHONE_SCREEN}
             {...(sorter ? { style: HIDDEN } : {})}
           />
           <PptxEditor.EditNotice />
