@@ -29,6 +29,7 @@
     "---Task recipes---",
     "recipes/index",
     "recipes/replace-text",
+    "recipes/slide-size",
     "---React---",
     "react/index",
     "react/composition",

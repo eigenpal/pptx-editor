@@ -111,7 +111,7 @@ The draft hooks are `usePageSetupDialog`, `useBackgroundDialog`, `useFontDialog`
 
 Apply validates and commits the draft. A refusal keeps the dialog open with the engine's reason in the `Error` part. The draft rules live in core (`createDialogDraft`), so the React and Vue dialogs commit the same way.
 
-OK applies the draft. The Background, Font, Paragraph, Bullets and Numbering, Columns, Alt Text, and Format Picture dialogs commit it as one undo step. The Page setup dialog runs no command and reports the appearance through `onThemeChange`. Cancel discards the draft.
+OK applies the draft. The Background, Font, Paragraph, Bullets and Numbering, Columns, Alt Text, and Format Picture dialogs commit it as one undo step. The Page setup dialog sends one `setSlideSize` command when the slide size changed, and reports the appearance through `onThemeChange`. Cancel discards the draft.
 
 ## Dialog fields
 
@@ -119,7 +119,7 @@ OK applies the draft. The Background, Font, Paragraph, Bullets and Numbering, Co
 
 | Field | Value |
 | --- | --- |
-| `slideSize` | The slide size, read-only in this version. |
+| `slideSize` | The slide size: `size` (`widescreen`, `standard`, `a4`, `letter`, or `custom`), `width` and `height` in inches as typed text, `orientation`, and `scaleContent`. Each side must be from 1 to 56 inches. With `scaleContent`, every box, text size, and inset scales by one factor and stays centered. The fields are off in viewing mode. |
 | `theme` | The appearance (`light` or `dark`), shown with `onThemeChange`. Apply it yourself through `colorMode` on `PptxEditor.Root`. |
 | `fonts` | The embedded fonts, read-only. |
 | `substitutes` | The substituted fonts, read-only. |

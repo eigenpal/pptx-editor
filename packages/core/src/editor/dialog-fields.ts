@@ -13,30 +13,6 @@ import type { Translate } from '@pptx-editor.dev/i18n';
 import { translateKeyOrText } from './adapter-support.ts';
 import type { DialogCommitResult, DialogErrors } from './dialog-draft.ts';
 
-const EMU_PER_INCH = 914_400;
-
-/** The display name of a slide size, by aspect ratio. @internal */
-export function pageSetupSizeName(
-  width: number,
-  height: number
-): 'widescreen' | 'standard' | 'custom' {
-  const ratio = width / height;
-  if (Math.abs(ratio - 16 / 9) < 0.01) return 'widescreen';
-  if (Math.abs(ratio - 4 / 3) < 0.01) return 'standard';
-  return 'custom';
-}
-
-/** A slide size in inches, two decimals, for the slide size text. @internal */
-export function slideSizeInches(
-  width: number,
-  height: number
-): { readonly width: string; readonly height: string } {
-  return {
-    width: (width / EMU_PER_INCH).toFixed(2),
-    height: (height / EMU_PER_INCH).toFixed(2),
-  };
-}
-
 /**
  * The draft of the Background dialog. `background` is the fill to apply: a fill, `null` for
  * the layout's background, or `undefined` to keep the slide's background as it is (a picture

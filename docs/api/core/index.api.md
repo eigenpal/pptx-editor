@@ -1652,6 +1652,16 @@ export type EditorCommand = {
     readonly background: SlideBackground | null;
     readonly allSlides?: boolean;
 }
+/**
+* The slide size in EMU, 1 to 56 inches a side. `content: 'scale'` (the default) scales boxes
+* and text by the smaller ratio and centers them; `'keep'` changes only the size.
+*/
+| {
+    readonly type: 'setSlideSize';
+    readonly width: number;
+    readonly height: number;
+    readonly content?: 'scale' | 'keep';
+}
 /** Insert a line, an arrow, or an elbow or curved connector. */
 | {
     readonly type: 'insertLine';
@@ -3460,9 +3470,6 @@ export function openSlideshowLink(doc: Document, href: string): void;
 export type OrderMove = 'forward' | 'backward' | 'front' | 'back';
 
 // @internal
-export function pageSetupSizeName(width: number, height: number): 'widescreen' | 'standard' | 'custom';
-
-// @internal
 export function paintedNotesFindRange(root: HTMLElement): {
     start: number;
     end: number;
@@ -4287,6 +4294,9 @@ export function seedFontFields(f: FontFormatRead | null): FontDialogFields;
 // @internal
 export function seedParagraphFields(format: ParagraphFormatRead | null): ParagraphDialogFields;
 
+// @internal
+export function seedSlideSizeFields(width: number, height: number): SlideSizeFields;
+
 // @public
 export interface SelectedImageState {
     readonly brightness: number;
@@ -4526,6 +4536,15 @@ export function sizeErrorPlace(box: HTMLElement | null): {
     top: number;
 };
 
+// @internal
+export const SLIDE_SIZE_CHOICES: readonly SlideSizePreset[];
+
+// @internal
+export const SLIDE_SIZE_PRESETS: Readonly<Record<Exclude<SlideSizePreset, 'custom'>, {
+    readonly width: number;
+    readonly height: number;
+}>>;
+
 // @public
 export type SlideBackground = {
     readonly kind: 'solid';
@@ -4627,6 +4646,9 @@ export function slideMenuPoint(item: HTMLElement, at: {
 };
 
 // @public
+export type SlideOrientation = 'landscape' | 'portrait';
+
+// @public
 export type SlideRailOrientation = 'vertical' | 'horizontal';
 
 // @public
@@ -4723,10 +4745,32 @@ export interface SlideshowState {
 }
 
 // @internal
-export function slideSizeInches(width: number, height: number): {
-    readonly width: string;
+export function slideSizeCommandOf(seed: SlideSizeFields, d: SlideSizeFields): EditorCommand | null;
+
+// @internal
+export function slideSizeFieldError(seed: SlideSizeFields, d: SlideSizeFields): {
+    readonly field: 'width' | 'height';
+    readonly key: 'errors.slideSizeRange';
+} | null;
+
+// @public
+export interface SlideSizeFields {
+    // (undocumented)
     readonly height: string;
-};
+    // (undocumented)
+    readonly orientation: SlideOrientation;
+    readonly scaleContent: boolean;
+    // (undocumented)
+    readonly size: SlideSizePreset;
+    // (undocumented)
+    readonly width: string;
+}
+
+// @public
+export type SlideSizePreset = 'widescreen' | 'standard' | 'a4' | 'letter' | 'custom';
+
+// @internal
+export function slideSizePresetOf(width: number, height: number): SlideSizePreset;
 
 // @internal
 export function slideSorterMounted(editor: PptxEditorInstance): boolean;
@@ -5795,6 +5839,15 @@ export function withFontOrigin(current: EditorFontsOption | undefined, added: Fo
 
 // @internal
 export function withScript(d: FontDialogFields, which: 'superscript' | 'subscript', on: boolean): FontDialogFields;
+
+// @internal
+export function withSlideDimension(d: SlideSizeFields, field: 'width' | 'height', text: string): SlideSizeFields;
+
+// @internal
+export function withSlideOrientation(d: SlideSizeFields, orientation: SlideOrientation): SlideSizeFields;
+
+// @internal
+export function withSlideSizePreset(d: SlideSizeFields, size: SlideSizePreset): SlideSizeFields;
 
 // @internal
 export function withSpaceUnit(d: ParagraphDialogFields, seed: ParagraphDialogFields, side: 'spaceBefore' | 'spaceAfter', unit: SpacingUnit): ParagraphDialogFields;

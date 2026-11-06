@@ -62,7 +62,7 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
  * change its fingerprint, only after you open its copy with no prompt. `feature-edits.test.ts`
  * fails when a recipe or an engine change gives a copy with another fingerprint: then open the new
  * copy, and record its fingerprint. Last checked on 6 November 2026: 45 copies written at
- * commit 74a4186, no prompt.
+ * commit 74a4186, and the `slides.size` copy written with its command, no prompt.
  */
 export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'effects.glow-reflection':
@@ -103,6 +103,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'slides.placeholder-prompts':
     'sha256:bc5500d4770b869cdc03744456a34dba357ea17d0207a46550f6e97c8f9a72ef',
   'slides.sections': 'sha256:e708cc676d8f24ca4ee0156233256430664540625fa2dcf43f90df180188cfd3',
+  'slides.size': 'sha256:cc819a1b4ad52d1d80284fa75ef418f773bf33f1fe4f6321b002241c4873addc',
   'slides.structure': 'sha256:4c94fe29b0f69573b04eb4a5cee860216e25d65ca035e5b963dac749828ad02d',
   'tables.cell-format': 'sha256:7d0f4cf1b2a0be903a54f7aa0cb2a9652540899a0c74ca077e913606af3c9133',
   'tables.cell-text': 'sha256:ac550e68680e930832758db43b0de7b44479aa8f518ee84928d769d8c4df06a2',

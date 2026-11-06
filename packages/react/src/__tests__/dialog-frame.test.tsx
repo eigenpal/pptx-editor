@@ -59,8 +59,13 @@ describe('DialogFrame', () => {
     expect(closed).toBe(2);
   });
 
-  test('a dialog without a field to type in starts on OK, so Return applies', async () => {
+  test('a dialog starts on its first field, or on OK when no field takes input', async () => {
     const editor = await open();
+    const view = withEditor(editor, <PageSetupDialog open onClose={() => {}} />);
+    expect(document.activeElement).toBe(screen.getByRole('combobox', { name: 'Size' }));
+    view.unmount();
+    // In viewing mode the slide size fields are off, so Return applies.
+    act(() => editor.setMode('view'));
     withEditor(editor, <PageSetupDialog open onClose={() => {}} />);
     expect(document.activeElement).toBe(part('apply'));
   });

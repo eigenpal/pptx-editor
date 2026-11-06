@@ -93,6 +93,11 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'The shape already has that name, so nothing changes.',
   ],
   [
+    'disabled.noSizeChange',
+    'edit.no-change',
+    'The slides already have that size, so nothing changes.',
+  ],
+  [
     'disabled.noVisibilityChange',
     'edit.no-change',
     'The shapes already have that visibility, so nothing changes.',
@@ -233,6 +238,11 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'errors.coordinateRange',
     'edit.coordinate-range',
     'The position or size is outside the range a slide can hold. Use values within the slide size limits.',
+  ],
+  [
+    'errors.slideSizeRange',
+    'edit.coordinate-range',
+    'A slide side is from 1 to 56 inches (914400 to 51206400 EMU). Pass a size in that range.',
   ],
   [
     'errors.exportFailed',

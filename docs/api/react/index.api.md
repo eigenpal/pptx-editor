@@ -100,6 +100,7 @@ import { SlideLayoutSummary } from '@pptx-editor.dev/core/editor';
 import { SlideRailOrientation } from '@pptx-editor.dev/core/editor';
 import { SlideSection } from '@pptx-editor.dev/core/editor';
 import { SlideshowController } from '@pptx-editor.dev/core/editor';
+import { SlideSizeFields } from '@pptx-editor.dev/core/editor';
 import { ToolbarShownValue } from '@pptx-editor.dev/core/editor';
 import { ToolbarValueMap } from '@pptx-editor.dev/core/editor';
 import { Translate } from '@pptx-editor.dev/i18n';
@@ -908,6 +909,7 @@ export type PageSetupDialogFieldName = 'slideSize' | 'theme' | 'fonts' | 'substi
 
 // @public
 export interface PageSetupDialogFields {
+    readonly slideSize: SlideSizeFields;
     readonly theme: 'light' | 'dark';
 }
 

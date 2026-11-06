@@ -430,14 +430,26 @@ export {
   backgroundDraftCommand,
   backgroundDraftFrom,
   commitDialogCommand,
-  pageSetupSizeName,
   radioGroupStep,
   sameBackground,
-  slideSizeInches,
   translateDialogErrors,
   validateBackgroundDraft,
   type BackgroundDraftFields,
 } from './dialog-fields.ts';
+export {
+  SLIDE_SIZE_CHOICES,
+  SLIDE_SIZE_PRESETS,
+  seedSlideSizeFields,
+  slideSizeCommandOf,
+  slideSizeFieldError,
+  slideSizePresetOf,
+  withSlideDimension,
+  withSlideOrientation,
+  withSlideSizePreset,
+  type SlideOrientation,
+  type SlideSizeFields,
+  type SlideSizePreset,
+} from './page-setup-fields.ts';
 export {
   MAX_ALT_TEXT,
   altTextDraftCommand,

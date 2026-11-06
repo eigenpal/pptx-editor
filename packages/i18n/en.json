@@ -729,6 +729,7 @@
     "noLockChange": "The aspect ratio already has this setting",
     "noArrangeChange": "The objects are already in this position",
     "noNameChange": "The object already has this name",
+    "noSizeChange": "The slides already have this size",
     "invalidValue": "This control does not have that choice",
     "sectionEdge": "The section is already at the edge",
     "selectNotesText": "Select the notes text to format",
@@ -837,7 +838,14 @@
     "light": "Light",
     "dark": "Dark",
     "slideSize": "Slide size",
-    "slideSizeValue": "{width} × {height} in",
+    "size": "Size",
+    "width": "Width",
+    "height": "Height",
+    "inches": "in",
+    "orientation": "Orientation",
+    "landscape": "Landscape",
+    "portrait": "Portrait",
+    "scaleContent": "Scale the content to fit the new size",
     "fonts": "Fonts",
     "fontsEmbedded": "{count} embedded font faces in use",
     "fontsNone": "No embedded fonts",
@@ -849,6 +857,8 @@
     "slideSizeName": {
       "widescreen": "Widescreen (16:9)",
       "standard": "Standard (4:3)",
+      "a4": "A4 paper (297 × 210 mm)",
+      "letter": "Letter paper (11 × 8.5 in)",
       "custom": "Custom"
     }
   },
@@ -901,7 +911,6 @@
     "copied": "Link copied",
     "edit": "Edit link",
     "insert": "Insert link",
-    "cancel": "Cancel",
     "unsafe": "This link cannot be opened",
     "announce": "Link: {url}. Press F6 for its actions."
   },
@@ -954,6 +963,7 @@
     "invalidText": "The text has no characters that a slide can hold.",
     "superseded": "Another presentation was opened before this one finished opening.",
     "coordinateRange": "The position or size is outside the range a slide can hold.",
+    "slideSizeRange": "The slide width and height must each be from 1 to 56 inches.",
     "findStale": "The text changed after the search. Search again.",
     "findTooLong": "The text is too long to search or replace.",
     "exportSize": "The picture size must be from 16 to 8192 pixels.",

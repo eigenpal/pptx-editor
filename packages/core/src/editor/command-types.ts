@@ -91,6 +91,7 @@ const COMMAND_TABLE = {
   moveSlides: true,
   setSlideNumbers: true,
   setSlideBackground: true,
+  setSlideSize: true,
   applyLayout: true,
   resetSlides: true,
   setSlidesHidden: true,

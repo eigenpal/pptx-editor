@@ -700,6 +700,30 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       ),
     parts: PRESENTATION,
   },
+  'slides.size': {
+    fixture: 'slide-size',
+    // A4 to 16:9: the height ratio (6858000 / 7562850) is the smaller one, so every box
+    // scales by it and the content is centered across the width.
+    edit: (t) => t.run({ type: 'setSlideSize', width: 12_192_000, height: 6_858_000 }),
+    check: (d) => {
+      const s = 6_858_000 / 7_562_850;
+      const dx = Math.round((12_192_000 - 10_693_400 * s) / 2);
+      return all(
+        has(d.partXml('/ppt/presentation.xml'), '<p:sldSz cx="12192000" cy="6858000"/>'),
+        has(
+          d.shapeXml(0, 'Shape 2'),
+          `<a:off x="${dx}" y="${Math.round(7_242_810 * s)}"/>`,
+          `<a:ext cx="${Math.round(10_693_400 * s)}" cy="${Math.round(320_040 * s)}"/>`
+        )
+      );
+    },
+    parts: [
+      /^\/ppt\/presentation\.xml$/,
+      /^\/ppt\/slides\/slide\d+\.xml$/,
+      /^\/ppt\/slideLayouts\/slideLayout\d+\.xml$/,
+      /^\/ppt\/slideMasters\/slideMaster\d+\.xml$/,
+    ],
+  },
   'themes.backgrounds': {
     fixture: 'placeholders-background',
     edit: (t) =>

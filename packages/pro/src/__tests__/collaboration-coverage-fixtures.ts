@@ -308,6 +308,10 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
       background: { kind: 'solid', color: '#F2F2F2' },
     }),
   },
+  // 4:3 from the 16:9 coverage deck: every box on the slides, layouts, and masters scales.
+  setSlideSize: {
+    command: () => ({ type: 'setSlideSize', width: 9_144_000, height: 6_858_000 }),
+  },
   applyLayout: {
     command: (e) => {
       // Slide 3 is on the Blank layout; put it on Title and Content.

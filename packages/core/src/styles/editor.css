@@ -468,6 +468,9 @@
   :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) input[type='radio']) {
   margin: 3px 3px 0 5px;
 }
+.pptx-editor :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) option) {
+  padding: 0 2px 1px;
+}
 .pptx-editor :focus-visible {
   outline: 2px solid var(--doc-focus-ring);
   outline-offset: 1px;

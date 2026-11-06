@@ -111,6 +111,7 @@ import {
   moveSlide,
   setSlideBackground,
 } from '../automation/commands/slide-commands.ts';
+import { setSlideSize } from '../automation/commands/slide-size.ts';
 import {
   aSpec,
   paragraphsOf,
@@ -778,6 +779,14 @@ export function compile(
       const slides = command.allSlides ? info.slides.map((_, i) => i) : [ctx.slide];
       for (const i of slides) setSlideBackground(batch, i, command.background);
       return { batch, effect: { label: 'slideBackground' } };
+    }
+    case 'setSlideSize': {
+      const content = command.content ?? 'scale';
+      if (content !== 'scale' && content !== 'keep')
+        throw new CommandRefusal('errors.unsupported', 'content');
+      if (!setSlideSize(batch, command.width, command.height, content))
+        throw new CommandRefusal('disabled.noSizeChange');
+      return { batch, effect: { label: 'slideSize' } };
     }
     case 'insertLine': {
       const id = insertLine(batch, slidePart(ctx), command.kind, slideW, slideH);

@@ -55,9 +55,12 @@ const mouse = (target: Element, type: string, x: number, y: number) =>
 describe('Vue DialogFrame', () => {
   test('text beside elements stays in the default arrangement', async () => {
     await mount(() => h(PageSetupDialog, { open: true, onClose: () => {} }));
-    const row = document.querySelector('[data-pptx-field="slideSize"] .pptx-dialog__value')!;
-    const size = row.querySelector('.pptx-dialog__muted')!;
-    expect(row.textContent!.length).toBeGreaterThan(size.textContent!.length);
+    // The Width label: its text, then the unit for screen readers, then the box.
+    const row = document
+      .querySelector('[data-pptx-field="slideSize"] input[name="width"]')!
+      .closest('label')!;
+    const unit = row.querySelector('.pptx-visually-hidden')!;
+    expect(row.textContent!.length).toBeGreaterThan(unit.textContent!.length);
   });
 
   test('Escape closes, Tab wraps, and the dialog starts on OK', async () => {
