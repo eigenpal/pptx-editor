@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createPptxEditor, type PptxEditorInstance } from '@pptx-editor.dev/core/editor';
 import { attr, children, find, xmlPartOf, type Element } from '@pptx-editor.dev/core/store';
 import { createTranslator } from '@pptx-editor.dev/i18n';
-import { buildPptx, cell, table } from '../../../../scripts/fixtures/builder.ts';
+import { buildPptx, cell, shape, table } from '../../../../scripts/fixtures/builder.ts';
 import { PptxEditorContext, useEditorCommand } from '../context.ts';
 import { Toolbar, ToolbarGroup, ToolbarSlot } from '../Toolbar.tsx';
 import { MenuTableGrid } from '../TableControls.tsx';
@@ -19,35 +19,38 @@ const PX = 9_525;
 const t = createTranslator();
 const STYLE = '{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}';
 
-const deck = (): Uint8Array =>
+/** `behind` puts a large shape under the table, as a slide's decoration sits. */
+const deck = (behind = false): Uint8Array =>
   buildPptx({
     slides: [
       {
         layout: 'blank',
-        shapes: table({
-          id: 2,
-          x: IN,
-          y: IN,
-          cx: 3 * IN,
-          cy: 2 * IN,
-          columns: [IN, IN, IN],
-          tblPr: `<a:tblPr firstRow="1" bandRow="1"><a:tableStyleId>${STYLE}</a:tableStyleId></a:tblPr>`,
-          rows: ['ABC', 'DEF']
-            .map((r) => `<a:tr h="${IN}">${[...r].map((c) => cell(c)).join('')}</a:tr>`)
-            .join(''),
-        }),
+        shapes:
+          (behind ? shape({ id: 3, x: 0, y: 0, cx: 8 * IN, cy: 5 * IN, fill: 'FF0000' }) : '') +
+          table({
+            id: 2,
+            x: IN,
+            y: IN,
+            cx: 3 * IN,
+            cy: 2 * IN,
+            columns: [IN, IN, IN],
+            tblPr: `<a:tblPr firstRow="1" bandRow="1"><a:tableStyleId>${STYLE}</a:tableStyleId></a:tblPr>`,
+            rows: ['ABC', 'DEF']
+              .map((r) => `<a:tr h="${IN}">${[...r].map((c) => cell(c)).join('')}</a:tr>`)
+              .join(''),
+          }),
       },
     ],
   });
 
-async function open(): Promise<PptxEditorInstance> {
+async function open(behind = false): Promise<PptxEditorInstance> {
   const editor = createPptxEditor({
     fixedMeasurer: true,
     substitutes: false,
     zoom: 1,
     translate: (key, params) => t(key as never, params),
   });
-  expect((await editor.load(deck())).ok).toBe(true);
+  expect((await editor.load(deck(behind))).ok).toBe(true);
   return editor;
 }
 
@@ -282,6 +285,38 @@ describe('table surface', () => {
     expect(widths()).toEqual([IN + 20 * PX, IN - 20 * PX, IN]);
     act(() => void editor.exec({ type: 'undo' }));
     expect(widths()).toEqual([IN, IN, IN]);
+    editor.destroy();
+  });
+});
+
+describe('table edge over a shape', () => {
+  test('a press just outside the edge resizes the selected table, not the shape behind', async () => {
+    const editor = await open(true);
+    const host = surface(editor);
+    const stage = stageOf(host);
+    const frame = frames(editor)[0];
+    const at0 = { paragraph: 0, offset: 0 };
+    act(() =>
+      editor.setSelection({
+        kind: 'text',
+        nodeId: frame.id,
+        cell: { row: 0, column: 0 },
+        anchor: at0,
+        focus: at0,
+      })
+    );
+    // The right edge is at x = 4 in; the press is 2 px outside it, over the shape.
+    const x = 4 * IN + 2 * PX;
+    stage.dispatchEvent(new PointerEvent('pointerdown', { ...at(x, 1.5 * IN), button: 0 }));
+    document.dispatchEvent(new PointerEvent('pointermove', at(x + 20 * PX, 1.5 * IN)));
+    document.dispatchEvent(new PointerEvent('pointerup', at(x + 20 * PX, 1.5 * IN)));
+    const widths = children(find(frames(editor)[0], 'a:tblGrid'), 'a:gridCol').map((g) =>
+      Number(attr(g, 'w'))
+    );
+    expect(widths).toEqual([IN, IN, IN + 20 * PX]);
+    const root = xmlPartOf(editor.session!.store.package, part(editor))!.root;
+    const sp = find(root, 'p:sp')!;
+    expect(attr(find(sp, 'a:off')!, 'x')).toBe('0');
     editor.destroy();
   });
 });

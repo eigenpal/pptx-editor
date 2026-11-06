@@ -352,8 +352,9 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     item('text.dialog', 'contextMenu.font'),
     item('paragraph.dialog', 'contextMenu.paragraph'),
   ],
-  // A table selected as an object (from the select handle): the shape rows, with the table's
-  // Insert and Delete submenus after the clipboard rows. Tables do not group-format or crop.
+  // A table selected as an object (from the select handle): the shape rows without the format
+  // painter, with the table's Insert submenu after the clipboard rows. On the whole table, the
+  // Delete row removes the table, so it has no Delete submenu.
   tableFrame: [
     item('edit.cut', 'contextMenu.cut', 'contextMenu.shortcuts.cut'),
     item('edit.copy', 'contextMenu.copy', 'contextMenu.shortcuts.copy'),
@@ -362,7 +363,6 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     item('more.delete', 'contextMenu.delete', 'contextMenu.shortcuts.delete'),
     SEPARATOR,
     TABLE_INSERT,
-    TABLE_DELETE,
     SEPARATOR,
     ...ORDER_ROWS,
     SEPARATOR,

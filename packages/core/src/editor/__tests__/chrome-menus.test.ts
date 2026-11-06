@@ -193,7 +193,8 @@ describe('rows the adapter runs', () => {
       '',
       'tableInsert',
     ]);
-    expect(ids).toContain('tableDelete');
+    // On the whole table, Delete removes it: no Delete submenu beside the Delete row.
+    expect(ids).not.toContain('tableDelete');
     expect(ids).not.toContain('tableSelect');
   });
 

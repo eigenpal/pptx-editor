@@ -465,6 +465,14 @@ describe('merge, split, and formatting (editor-ui-parity 4.3)', () => {
     // An invalid pen value changes nothing.
     expect(runToolbarCommand(e, 'table.borderWidth', '-1' as never).ok).toBe(false);
     expect(toolbarCommandState(e, 'table.borderWidth').value).toBe('3');
+    // In another cell, a pen pick arms only: the pen never draws where the user did not pick.
+    caretIn(e, 0, 0);
+    const moved = xml(e);
+    expect(runToolbarCommand(e, 'table.borderColor', '#FF0000').ok).toBe(true);
+    expect(xml(e)).toBe(moved);
+    expect(runToolbarCommand(e, 'table.borderTarget', 'outside').ok).toBe(true);
+    expect(runToolbarCommand(e, 'table.borderColor', '#00FF00').ok).toBe(true);
+    caretIn(e, 1, 1);
     // After No Border, a pen pick arms again and draws nothing.
     expect(runToolbarCommand(e, 'table.borderTarget', 'none').ok).toBe(true);
     const cleared = xml(e);

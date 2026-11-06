@@ -127,10 +127,24 @@ function nextPen(pen: TableBorderPen, slot: string, value: unknown): TableBorder
   }
 }
 
+/** The cells each editor's pen last drew on (`cellsKey`): a pen pick redraws only there. */
+const DRAWN_ON = new WeakMap<Editor, string>();
+
+/** The table cells a selection names: the caret's cell, the range, or the selected shapes. */
+function cellsKey(editor: Editor): string {
+  const sel = editor.snapshot().selection;
+  if (sel.kind === 'text')
+    return sel.cell ? `${sel.nodeId}:${sel.cell.row},${sel.cell.column}` : '';
+  if (sel.kind === 'cells')
+    return `${sel.nodeId}:${sel.anchor.row},${sel.anchor.column}:${sel.focus.row},${sel.focus.column}`;
+  return sel.kind === 'shapes' ? sel.nodeIds.join(',') : '';
+}
+
 /**
- * Arm the pen with a pen color, style, or weight pick while it has drawn no target: the pen
- * changes, the document does not. Returns the run's result, or null when the pick draws (the
- * pen has drawn a target) or is not a pen pick. @internal
+ * Arm the pen with a pen color, style, or weight pick while it has drawn no target on the
+ * selected cells: the pen changes, the document does not. A selection that moved away from the
+ * drawn cells arms too, so a pick in another cell never draws there. Returns the run's result,
+ * or null when the pick redraws the drawn cells or is not a pen pick. @internal
  */
 export function armTableBorderPen(
   editor: Editor,
@@ -141,11 +155,11 @@ export function armTableBorderPen(
   if (slot === 'table.borderTarget') return null;
   const pen = tableBorderPen(editor);
   const next = nextPen(pen, slot, value);
-  if (!next || pen.drawn) return null;
+  if (!next || (pen.drawn && DRAWN_ON.get(editor) === cellsKey(editor))) return null;
   // The same answer as a draw: a pick the engine would refuse (no table, view mode) is refused.
   const can = editor.can(draw);
   if (!can.ok) return can;
-  return editor.exec({ type: 'setTableBorderPen', pen: next });
+  return editor.exec({ type: 'setTableBorderPen', pen: { ...next, drawn: false } });
 }
 
 /**
@@ -154,7 +168,9 @@ export function armTableBorderPen(
  */
 export function rememberTableBorderPen(editor: Editor, slot: string, value: unknown): void {
   const pen = nextPen(tableBorderPen(editor), slot, value);
-  if (pen) editor.exec({ type: 'setTableBorderPen', pen });
+  if (!pen) return;
+  editor.exec({ type: 'setTableBorderPen', pen });
+  if (pen.drawn) DRAWN_ON.set(editor, cellsKey(editor));
 }
 
 /**
