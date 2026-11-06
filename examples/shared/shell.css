@@ -591,7 +591,9 @@
     font-size: 14px;
   }
 }
-@media (max-width: 800px) {
+/* On a touch screen the bar's controls are larger (below), so the full menu bar needs 900px:
+   a narrower one would cut off Slide Show and Help. */
+@media (max-width: 800px), (pointer: coarse) and (max-width: 900px) {
   /* Only File stays: it holds Open, New, the sample deck, Rename, and Export. */
   .demo-menubar .pptx-menubar__trigger:not([data-menu='file']) {
     display: none;
@@ -625,6 +627,11 @@
   .demo-file__name {
     max-width: none;
     min-width: 48px;
+  }
+  /* While Rename is on, the name takes the whole bar, so the full name shows as you type. */
+  .demo-topbar:has(.demo-file--open) .demo-menubar,
+  .demo-topbar:has(.demo-file--open) .demo-topbar__actions {
+    display: none;
   }
   .demo-root {
     --doc-slide-padding: 12px;
@@ -677,7 +684,7 @@
     --demo-status-strip: 0px;
   }
   .demo-docpane:has(> .demo-status) > .demo-canvas {
-    padding-inline-end: 224px;
+    padding-inline-end: var(--demo-status-column, 224px);
   }
 }
 
@@ -712,6 +719,27 @@
   .demo-root .pptx-menu__row {
     min-height: 40px;
   }
+  /* The view switch and the zoom under the slide too: the group grows, and so does the column
+     it takes on a short window. */
+  .demo-docpane {
+    --demo-status-h: 44px;
+    --demo-status-column: 264px;
+  }
+  .demo-status .pptx-zoom {
+    height: var(--demo-status-h);
+  }
+  .demo-status .pptx-toolbar__button,
+  .demo-status .pptx-zoom__level {
+    min-width: 40px;
+    height: 40px;
+  }
+}
+/* The strip under the slide is the group's height plus the 12px gap. A short window keeps no
+   strip (the group sits on the right). */
+@media (pointer: coarse) and (min-height: 501px) {
+  .demo-docpane {
+    --demo-status-strip: 56px;
+  }
 }
 @media (pointer: coarse) and (max-width: 600px) {
   .demo-topbar {
@@ -726,6 +754,21 @@
   }
   .demo-dock {
     padding-bottom: 4px;
+  }
+}
+
+/* A touch screen: the editor's toolbar and notes buttons get a finger size too. */
+@media (pointer: coarse) {
+  .demo-root .pptx-toolbar {
+    height: 48px;
+  }
+  .demo-root .pptx-toolbar .pptx-toolbar__button {
+    min-width: 40px;
+    height: 40px;
+  }
+  .demo-root .pptx-notes__head .pptx-toolbar__button {
+    min-width: 36px;
+    height: 36px;
   }
 }
 

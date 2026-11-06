@@ -77,6 +77,8 @@ export function positionPopover(
   const anchorRect = rect ?? anchor.getBoundingClientRect();
   // Measure the panel's full height: a cap from an earlier placement (a second render, a
   // resize) would make it look short enough to need no scrolling.
+  // Keep the scroll place, as removing the cap resets it.
+  const scrollTop = panel?.scrollTop ?? 0;
   if (panel) panel.style.maxHeight = '';
   const next = placeInFixedFrame(
     panel?.parentElement,
@@ -89,6 +91,7 @@ export function positionPopover(
     panel.style.maxHeight = `${next.maxHeight}px`;
     panel.style.overflowY = next.scroll ? 'auto' : '';
     panel.style.visibility = '';
+    if (next.scroll) panel.scrollTop = scrollTop;
   }
   return next;
 }

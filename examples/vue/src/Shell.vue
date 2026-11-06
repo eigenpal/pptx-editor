@@ -66,6 +66,9 @@ const sorter = useEditorState((s) => s.presentationView === 'slideSorter');
 // `?chrome=ribbon` shows the ribbon and the status bar in place of the flat toolbar.
 const ribbon = ribbonChrome(location.search);
 const canPresent = useEditorState((s) => s.status === 'ready' && s.slides.length > 0);
+// A short screen (a phone held sideways) opens with the notes closed, so the slide gets the
+// height.
+const shortScreen = typeof matchMedia === 'function' && matchMedia('(max-height: 500px)').matches;
 // A phone sizes the slide area to the slide's shape (shell.css).
 const slideRatio = useEditorState((s) => (s.slideWidth ? s.slideHeight / s.slideWidth : 0.5625));
 const show = useSlideshow();
@@ -272,7 +275,10 @@ function onDrop(e: DragEvent): void {
           <PptxEditorZoomPill />
         </div>
         <!-- The notes pane stays mounted in the slide sorter, so its open state and draft stay. -->
-        <PptxEditorNotesPane :style="sorter ? { display: 'none' } : undefined" />
+        <PptxEditorNotesPane
+          :default-open="!shortScreen"
+          :style="sorter ? { display: 'none' } : undefined"
+        />
         <PptxEditorEditNotice />
         <PptxEditorOpenFailure />
         <PptxEditorStatusBar v-if="ribbon" />

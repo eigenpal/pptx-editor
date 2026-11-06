@@ -59,6 +59,8 @@ import {
 } from '../../shared/demo-files.ts';
 
 const base = import.meta.env.BASE_URL;
+/** A short screen (a phone held sideways) opens with the notes closed, so the slide gets the height. */
+const SHORT_SCREEN = typeof matchMedia === 'function' && matchMedia('(max-height: 500px)').matches;
 /** The notes pane stays mounted in the slide sorter, so its open state and draft stay. */
 const HIDDEN: CSSProperties = { display: 'none' };
 
@@ -302,7 +304,10 @@ function Shell({
               <PptxEditor.ZoomPill />
             </div>
           )}
-          <PptxEditor.NotesPane {...(sorter ? { style: HIDDEN } : {})} />
+          <PptxEditor.NotesPane
+            defaultOpen={!SHORT_SCREEN}
+            {...(sorter ? { style: HIDDEN } : {})}
+          />
           <PptxEditor.EditNotice />
           <PptxEditor.OpenFailure />
           {ribbon ? <PptxEditor.StatusBar /> : null}
