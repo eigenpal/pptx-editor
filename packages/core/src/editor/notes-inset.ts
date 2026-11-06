@@ -32,8 +32,14 @@ export function trackNotesInset(box: HTMLElement): NotesInsetTracker {
     let inset = 0;
     if (notes?.isConnected) {
       const card = notes.getBoundingClientRect();
-      if (card.width > 0 || card.height > 0)
-        inset = Math.max(0, Math.round(box.getBoundingClientRect().bottom - card.top));
+      if (card.width > 0 || card.height > 0) {
+        const frame = box.getBoundingClientRect();
+        // The rectangles are in viewport pixels. In a scaled container (`transform: scale`),
+        // `bottom` counts in the box's own pixels, so divide by the scale.
+        const scale =
+          frame.height > 0 && box.offsetHeight > 0 ? frame.height / box.offsetHeight : 1;
+        inset = Math.max(0, Math.round((frame.bottom - card.top) / scale));
+      }
     }
     const value = `${inset}px`;
     if (value === last) return;

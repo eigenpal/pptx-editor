@@ -2128,6 +2128,13 @@
   display: flex;
   gap: 8px;
 }
+/* The status area stands over the bottom of the canvas, so the canvas pads its bottom: the
+   fitted slide stays clear of the controls, and a zoomed slide scrolls out from under them.
+   58px is the area's 16px offset, its 34px height, and an 8px gap; the surface's own padding
+   already gives part of it. */
+.pptx-default__views:has(> .pptx-statusbar) .pptx-default__main > .pptx-canvas {
+  padding-bottom: calc(58px - var(--doc-slide-padding, 24px));
+}
 .pptx-statusbar .pptx-zoom {
   position: static;
 }

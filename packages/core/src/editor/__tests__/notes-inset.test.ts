@@ -99,6 +99,24 @@ describe('trackNotesInset', () => {
     });
   });
 
+  test('in a scaled container the inset counts in the box pixels, not the viewport pixels', () => {
+    withObserver(() => {
+      const box = document.createElement('div');
+      const notes = document.createElement('section');
+      notes.className = 'pptx-notes';
+      box.append(notes);
+      document.body.append(box);
+      // `transform: scale(0.75)`: the 800px box shows as 600 viewport pixels.
+      Object.defineProperty(box, 'offsetHeight', { configurable: true, value: 800 });
+      place(box, 0, 600);
+      place(notes, 486, 591);
+      const tracker = trackNotesInset(box);
+      expect(box.style.getPropertyValue(NOTES_INSET_PROPERTY)).toBe('152px');
+      tracker.dispose();
+      box.remove();
+    });
+  });
+
   test('without ResizeObserver it still measures on refresh', () => {
     const view = win as unknown as { ResizeObserver: unknown };
     const saved = view.ResizeObserver;

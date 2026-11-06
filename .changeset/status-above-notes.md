@@ -4,4 +4,4 @@
 '@pptx-editor.dev/vue': patch
 ---
 
-The packaged editor keeps the view switch, the zoom, and the font notice above the speaker notes. They no longer cover the notes text.
+The packaged editor keeps the view switch, the zoom, and the font notice above the speaker notes. They no longer cover the notes text. The canvas leaves room under the slide for them, so they also do not cover the slide.
