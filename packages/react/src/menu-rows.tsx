@@ -113,7 +113,8 @@ export function SlotMenuRow({
   const control = chromeControlForSlot(entry.slot);
   // The choices this build offers for the selection: a choice whose result does not paint
   // stays out, and a row that removes an effect the selection has stays in.
-  const offeredControl = useOfferedControl(entry.slot, control);
+  // An option row (`entry.value`) draws no choices, so it reads none.
+  const offeredControl = useOfferedControl(entry.slot, entry.value === undefined ? control : null);
   if (!row || !control) {
     warnMenuPart('Menu.Item', 'unknownSlot', entry.slot);
     return null;

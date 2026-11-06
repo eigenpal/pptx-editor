@@ -314,6 +314,7 @@ const kinds = (): string[] =>
 
 describe('Removing an effect without the drawing module (Vue)', () => {
   test('Shape effects offers No glow for a shape with a glow, and it removes the glow', async () => {
+    installDrawingRenderers({ effects: undefined });
     const { editor, ids } = await openEffects();
     const [glow, plain] = ids;
     editor.setSelection({ kind: 'shapes', nodeIds: [plain!] });
@@ -343,6 +344,7 @@ describe('Removing an effect without the drawing module (Vue)', () => {
   });
 
   test('a menu row offers the No row of each effect that a selected shape has', async () => {
+    installDrawingRenderers({ effects: undefined });
     const { editor, ids } = await openEffects();
     editor.setSelection({ kind: 'shapes', nodeIds: [ids[0]!, ids[2]!] });
     await mount(editor, () =>
@@ -363,6 +365,7 @@ describe('Removing an effect without the drawing module (Vue)', () => {
   });
 
   test('useEditorValueCommand options follow the selection', async () => {
+    installDrawingRenderers({ effects: undefined });
     const { editor, ids } = await openEffects();
     editor.setSelection({ kind: 'shapes', nodeIds: [ids[1]!] });
     let options: { value: readonly string[] } | null = null;

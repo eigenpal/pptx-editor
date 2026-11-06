@@ -101,7 +101,8 @@ export const SlotMenuRow = defineComponent({
     // stays out, and a row that removes an effect the selection has stays in.
     const offeredControl = useOfferedControl(
       () => props.entry.slot,
-      () => chromeControlForSlot(props.entry.slot)
+      // An option row (`entry.value`) draws no choices, so it reads none.
+      () => (props.entry.value === undefined ? chromeControlForSlot(props.entry.slot) : null)
     );
     const state = useEditorState(
       () => chromeRowState(editor.value, props.entry.slot, props.entry.value, host ?? undefined),
