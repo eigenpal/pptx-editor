@@ -142,6 +142,30 @@ test(
   }
 );
 
+test(
+  'a client that leaves while it waits behind a conversion gets nothing, and the line moves on',
+  { skip },
+  async () => {
+    const { default: handler } = await import('./convert.ts');
+    const deck = await readFile(new URL('../examples/vite/public/sample.pptx', import.meta.url));
+    // The first request gets its turn first: both bodies are one chunk, read in order.
+    const running = call(handler, { headers: ORIGIN, body: deck });
+    const gone = response({ leaveAfterStart: true });
+    const waiting = handler(request({ headers: ORIGIN, body: deck }), gone);
+    assert.equal((await running).status, 200);
+    await waiting;
+    assert.equal(gone.out.status, 0, 'nothing is written to a closed connection');
+    // Both turns are free again: two new requests convert side by side in line.
+    const after = await Promise.all(
+      [1, 2].map(() => call(handler, { headers: ORIGIN, body: deck }))
+    );
+    assert.deepEqual(
+      after.map((r) => r.status),
+      [200, 200]
+    );
+  }
+);
+
 test("failures answer with fixed text, never with the file's own details", { skip }, async () => {
   const { default: handler, pdfFailureResponse } = await import('./convert.ts');
   const notPptx = await call(handler, { headers: ORIGIN, body: Buffer.from('not a zip at all') });

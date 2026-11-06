@@ -16,10 +16,14 @@ Production use requires a commercial agreement: licensing@eigenpal.com
  *
  * Limits: a 4 MiB upload and a 4 MiB PDF (the platform caps each function body at 4.5 MB), a
  * 15 second upload, and a 40 second conversion. One instance can get parallel requests, so it
- * converts one deck at a time and keeps one more request waiting: two turns fit in `maxDuration`.
- * A third request gets 503. The body is read before the request waits, so a slow upload never
- * holds a turn. A closed connection cancels its conversion. Neither the upload nor the PDF is
- * kept.
+ * converts one deck at a time and keeps one more request waiting. A third request gets 503. The
+ * body is read before the request waits, so a slow upload never holds a turn. A closed connection
+ * cancels its conversion. A request that closes while it waits keeps its turn until the
+ * conversion before it ends, and then gives it up. Neither the upload nor the PDF is kept.
+ *
+ * The time budget: 15 s of upload, 40 s of waiting, and 40 s of conversion make 95 s. The
+ * conversion checks its deadline between slides, so `maxDuration` keeps 25 s more for a slow
+ * slide. The browser waits 130 s, longer than the function can run.
  *
  * The request must carry an `Origin` that matches the host: a browser sends `Origin` on every
  * `POST`, so a request without one is not the demo page. This keeps other pages from using the
@@ -37,8 +41,8 @@ const DEADLINE_MS = 40_000;
 const MAX_IN_FLIGHT = 2;
 const TOO_LARGE = { ok: false, error: 'UploadTooLarge', message: 'The upload limit is 4 MiB.' };
 
-/** Time the function may hold the request: one wait and one conversion, each at most 40 s. */
-export const maxDuration = 90;
+/** Time the function may hold the request. See the time budget above. */
+export const maxDuration = 120;
 
 /** The end of the last conversion in line on this instance. */
 let line: Promise<void> = Promise.resolve();
@@ -64,10 +68,34 @@ async function inTurn<T>(work: () => Promise<T>): Promise<T | 'busy'> {
   }
 }
 
-function json(res: ServerResponse, status: number, value: Record<string, unknown>): void {
+function json(
+  res: ServerResponse,
+  status: number,
+  value: Record<string, unknown>,
+  headers: Record<string, string> = {}
+): void {
   if (res.destroyed || res.writableEnded) return;
-  res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
+    ...headers,
+  });
   res.end(JSON.stringify(value));
+}
+
+/**
+ * Refuse an upload that may still arrive. The reply goes out first, and then the connection
+ * closes, so the client reads the reason before the server stops the upload.
+ */
+function refuseUpload(
+  req: IncomingMessage,
+  res: ServerResponse,
+  status: number,
+  value: Record<string, unknown>
+): void {
+  json(res, status, value, { Connection: 'close' });
+  if (typeof res.once === 'function') res.once('finish', () => req.destroy?.());
+  else req.destroy?.();
 }
 
 /**
@@ -127,13 +155,13 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return json(res, 403, { ok: false, message: 'Use the same-origin demo.' });
   if (Number(req.headers['content-length']) > MAX_UPLOAD) return json(res, 413, TOO_LARGE);
   const bytes = await readBody(req);
-  if (bytes === 'large') return json(res, 413, TOO_LARGE);
-  if (bytes === 'slow') {
-    json(res, 408, { ok: false, error: 'UploadTimeout', message: 'The upload was too slow.' });
-    // Stop reading the rest of the upload.
-    req.destroy?.();
-    return;
-  }
+  if (bytes === 'large') return refuseUpload(req, res, 413, TOO_LARGE);
+  if (bytes === 'slow')
+    return refuseUpload(req, res, 408, {
+      ok: false,
+      error: 'UploadTimeout',
+      message: 'The upload was too slow.',
+    });
   if (bytes === 'aborted') return;
   if (bytes.byteLength === 0)
     return json(res, 400, { ok: false, message: 'The request has no presentation.' });

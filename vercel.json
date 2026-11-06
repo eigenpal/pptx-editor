@@ -5,7 +5,7 @@
   "installCommand": "HUSKY=0 bun install --frozen-lockfile",
   "functions": {
     "api/convert.ts": {
-      "maxDuration": 90,
+      "maxDuration": 120,
       "memory": 2048,
       "includeFiles": "{packages/core/dist/harfbuzz.wasm,node_modules/.bun/@docx-editor.dev+fonts*/node_modules/@docx-editor.dev/*/assets/**}"
     }

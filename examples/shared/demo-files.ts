@@ -149,7 +149,8 @@ export async function convertToPdf(deck: Uint8Array): Promise<Blob> {
       method: 'POST',
       headers: { 'Content-Type': PPTX_MIME },
       body: deck.slice().buffer,
-      signal: AbortSignal.timeout(90_000),
+      // Longer than the function can run (`maxDuration` in `api/convert.ts`).
+      signal: AbortSignal.timeout(130_000),
     });
   } catch {
     // Offline, no server, or past the timeout.

@@ -101,9 +101,17 @@ describe('exportSlides as PDF', () => {
   });
 
   test('each failure reaches the notice as its own key', async () => {
-    answer(503, 'application/json', '{}');
-    const { editor, rejected } = fakeEditor();
-    await exportSlides(editor, 'pdf', 'deck');
-    expect(rejected).toEqual(['app.pdfBusy']);
+    const cases = [
+      [413, 'app.pdfTooLarge'],
+      [507, 'app.pdfTooComplex'],
+      [503, 'app.pdfBusy'],
+      [500, 'app.pdfExportFailed'],
+    ] as const;
+    for (const [status, key] of cases) {
+      answer(status, 'application/json', '{}');
+      const { editor, rejected } = fakeEditor();
+      await exportSlides(editor, 'pdf', 'deck');
+      expect(rejected).toEqual([key]);
+    }
   });
 });

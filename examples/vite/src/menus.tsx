@@ -3,10 +3,10 @@
 // adds its own rows: opening and exporting files, slide structure, slide numbers, and Help.
 // Every built-in row runs a registered slot, so its state and action are the toolbar's.
 
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { PptxEditor, useEditorState, usePptxEditor, useTranslation } from '@pptx-editor.dev/react';
 import { translateKeyOrText, type EditorCommand } from '@pptx-editor.dev/core/editor';
-import type { SlideExport } from '../../shared/demo-files.ts';
+import { watchPdfExport, type SlideExport } from '../../shared/demo-files.ts';
 
 /** A host row bound to a command: disabled with the engine's reason when `Editor.can` refuses it. */
 function CommandRow({
@@ -91,6 +91,9 @@ export function MenuBar({
   onExportSlides: (kind: SlideExport) => void;
 }) {
   const { t } = useTranslation();
+  // The PDF row waits while the server makes a PDF, as the Export menu's row does.
+  const [pdfBusy, setPdfBusy] = useState(false);
+  useEffect(() => watchPdfExport(setPdfBusy), []);
   return (
     <PptxEditor.Menu className="demo-menubar">
       {/* File: the demo's own file rows around the built-in Page setup. */}
@@ -111,6 +114,8 @@ export function MenuBar({
           <PptxEditor.Menu.Row
             label={t('menu.exportPdf')}
             icon="description"
+            disabled={pdfBusy}
+            reason={t('menu.exportPdfBusy')}
             onSelect={() => onExportSlides('pdf')}
           />
           <PptxEditor.Menu.Row
