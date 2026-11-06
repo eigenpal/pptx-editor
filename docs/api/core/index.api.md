@@ -3865,6 +3865,9 @@ export type ReflectionPreset = 'tightTouching' | 'halfTouching' | 'fullTouching'
 export function refocusAfterCollapse(list: HTMLElement | null, was: HTMLElement | null): void;
 
 // @internal
+export function refocusAfterSorterHides(list: HTMLElement, editor: PptxEditorInstance | null): void;
+
+// @internal
 export function registerSectionRenamer(editor: object, take: (sectionId: string) => void): () => void;
 
 // @internal

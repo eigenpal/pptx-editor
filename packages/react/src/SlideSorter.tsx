@@ -5,7 +5,14 @@
 // Enter opens the slide in the Normal view. Every edit goes through the same commands as the
 // rail, so it is one undo step.
 
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import {
   chromeControlForSlot,
   focusSorterOnShow,
@@ -13,6 +20,7 @@ import {
   groupSlideSections,
   focusCurrentSlideOrCanvas,
   openSlideInNormalView,
+  refocusAfterSorterHides,
   sectionOfSlide,
   slideMenuPoint,
   slideSorterMounted,
@@ -79,6 +87,16 @@ export function SlideSorter({ className }: SlideSorterProps = {}) {
   // Shown from a menu, the sorter takes focus on the current slide (core's `focusSorterOnShow`),
   // after the hooks above listen for focus.
   useEffect(() => (list.current ? focusSorterOnShow(list.current) : undefined), []);
+  // Hidden while one of its slides has focus, the sorter hands focus to the Normal view (core's
+  // `refocusAfterSorterHides`). A layout effect's cleanup runs while the list is still on the page.
+  const editorNow = useRef(editor);
+  editorNow.current = editor;
+  useLayoutEffect(() => {
+    const el = list.current;
+    return () => {
+      if (el) refocusAfterSorterHides(el, editorNow.current);
+    };
+  }, []);
   // Tab goes to the current slide, or to its section's header when that section is shut.
   const own = sectionOfSlide(grouped, current);
   const shut = !!own && collapsed.includes(own.id);

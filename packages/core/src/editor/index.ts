@@ -261,6 +261,7 @@ export {
   notesWordAt,
   openSectionOfCurrent,
   openSlideInNormalView,
+  refocusAfterSorterHides,
   sectionMenuPoint,
   railKeyDown,
   refocusAfterCollapse,

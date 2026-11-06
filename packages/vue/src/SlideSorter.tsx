@@ -24,6 +24,7 @@ import {
   groupSlideSections,
   focusCurrentSlideOrCanvas,
   openSlideInNormalView,
+  refocusAfterSorterHides,
   sectionOfSlide,
   slideMenuPoint,
   slideSorterMounted,
@@ -107,7 +108,12 @@ export const PptxEditorSlideSorter = defineComponent({
     onMounted(() => {
       if (list.value) stopFocus = focusSorterOnShow(list.value);
     });
-    onBeforeUnmount(() => stopFocus());
+    // Hidden while one of its slides has focus, the sorter hands focus to the Normal view
+    // (core's `refocusAfterSorterHides`). `onBeforeUnmount` runs while the list is on the page.
+    onBeforeUnmount(() => {
+      stopFocus();
+      if (list.value) refocusAfterSorterHides(list.value, editor.value);
+    });
     const background = useEditorDialog('background');
     const stepTo = useSlideStepTarget(
       () => selected.value,
