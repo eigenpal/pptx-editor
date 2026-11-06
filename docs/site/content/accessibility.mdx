@@ -52,8 +52,8 @@ The slide is one Tab stop (role `group`). When the slide has focus, these keys a
 | --- | --- |
 | Tab, Shift+Tab | Select the next or the previous shape, in z-order. With no selection, Tab selects the backmost shape and Shift+Tab the frontmost. |
 | Tab on the last shape, Shift+Tab on the first | Clear the selection and move focus out of the slide. The slide never traps focus. |
-| Enter or F2 | Start to edit the text of the selected shape. On a group, Enter selects the shapes in the group. |
-| A character key | Start to edit the text of the selected shape, and type that character (in the editing mode only). |
+| Enter or F2 | Start to edit the text of the selected shape, with all of its text selected. On a group, Enter selects the shapes in the group. |
+| A character key | Start to edit the text of the selected shape, and type that character at the end of its text (in the editing mode only). |
 | Escape | Leave text editing and select the shape. Leave a group and select the group. Otherwise, clear the selection. |
 | Arrow keys | Nudge the selected shapes by 8 px. Ctrl/Cmd+arrow nudges by 1 px. Shift multiplies the step by 10. |
 | Delete, Backspace | Delete the selected shapes. |
@@ -62,7 +62,38 @@ The slide is one Tab stop (role `group`). When the slide has focus, these keys a
 
 Inside a group, Tab and Shift+Tab cycle through the shapes of the group.
 
-While you edit text, Tab and Shift+Tab change the list level. This applies in a list, at the start of a paragraph, or across paragraphs. Elsewhere, Tab inserts a tab. Press Escape first to move with Tab again. In a table cell, Tab and Shift+Tab move to the next or the previous cell. See [Tables](/docs/guides/tables).
+While you edit text, Tab and Shift+Tab change the list level at the start of a list item or across paragraphs. Elsewhere, both keys insert a tab. Enter starts a new item at the same level, also on an empty item. Backspace at the start of a list item removes its bullet or number and keeps its level. The next Backspace joins it to the previous paragraph. Press Escape first to move with Tab again. In a table cell, Tab and Shift+Tab move to the next or the previous cell. See [Tables](/docs/guides/tables).
+
+### While you edit text
+
+| Key | Action |
+| --- | --- |
+| Ctrl/Cmd+B, I, U | Bold, italic, underline. |
+| Ctrl/Cmd+L, E, R, J | Align the paragraph left, center, right, or justified. On selected shapes, align all of their text. |
+| Ctrl/Cmd+Shift+&gt;, Ctrl/Cmd+Shift+&lt; | The next larger or smaller font size. On selected shapes, all of their text. |
+| Ctrl/Cmd+], Ctrl/Cmd+[ | Move the paragraph one list level down or up. |
+| Shift+F3 | Change the case of the selection or of the word at the caret: Capitalize Each Word, UPPER CASE, lower case. |
+| Ctrl/Cmd+=, Ctrl/Cmd+Shift+= | Subscript, superscript. |
+| Ctrl/Cmd+\ | Clear the character formatting. |
+| Ctrl/Cmd+Shift+C, Ctrl/Cmd+Shift+V | Copy and paste the formatting. |
+| Alt/Ctrl+Left, Alt/Ctrl+Right | Move to the start of the previous word or of the next word. Add Shift to select. |
+| Alt/Ctrl+Up, Alt/Ctrl+Down | Move to the start of the paragraph, or of the next paragraph. |
+| Cmd+Up, Cmd+Down, Ctrl/Cmd+Home, Ctrl/Cmd+End | Move to the start or the end of the text. |
+| Alt/Ctrl+Backspace, Cmd+Backspace | Delete the word before the caret. |
+| Shift+Enter | Start a new line in the same paragraph. |
+
+AutoCorrect works while you type:
+
+- Straight quotes become curly quotes.
+- `(c)`, `(r)`, and `(tm)` become ©, ®, and ™.
+- `...` becomes …, and `1/2`, `1/4`, and `3/4` become fractions.
+- Two hyphens between words become an en dash.
+- The first word of a sentence, the word "i", and the names of the days get a capital letter.
+- `1.`, `1)`, `*`, or `-` and a space at the start of a paragraph start a numbered or bulleted list. Press Backspace or Ctrl/Cmd+Z right after to keep the typed text.
+
+To turn AutoCorrect off, pass `autoCorrect: false` to `createPptxEditor`, set `autoCorrect={false}` on the React editor, or set `:auto-correct="false"` on the Vue editor.
+
+In the speaker notes field, Ctrl/Cmd+B, I, and U format the text. The other keys in this table and AutoCorrect apply on the slide only.
 
 ### Toolbar, menus, and dialogs
 

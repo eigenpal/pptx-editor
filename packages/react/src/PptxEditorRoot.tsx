@@ -89,6 +89,12 @@ export interface PptxEditorRootProps {
    * effect and prints a development warning. Create the list once, outside the component.
    */
   readonly modules?: readonly EditorModule[];
+  /**
+   * AutoCorrect while typing (default `true`): curly quotes, symbols, fractions, en dashes,
+   * sentence capitals, and lists started by typing `1.`, `1)`, `*`, or `-` and a space. Read
+   * once, when the editor is created.
+   */
+  readonly autoCorrect?: boolean;
   /** Customize the dialogs the editor mounts. Set an entry to `false` to turn one off. */
   readonly popups?: PptxEditorPopups;
   /**
@@ -158,6 +164,7 @@ export const PptxEditorRoot = forwardRef<PptxEditorRef, PptxEditorRootProps>(
         ...(props.fontFamilies ? { fontFamilies: props.fontFamilies } : {}),
         ...(props.fonts ? { fonts: props.fonts } : {}),
         ...(props.modules ? { modules: props.modules } : {}),
+        ...(props.autoCorrect === false ? { autoCorrect: false } : {}),
         onFontError: (error) => reportFontError(error, callbacks.current.onFontError),
         translate: (key, params) => translateKeyOrText(tRef.current, key, params),
       });

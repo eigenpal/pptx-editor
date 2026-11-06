@@ -31,30 +31,30 @@ describe('demo editing workflow', () => {
   test('arrow keys collapse a text range before the next edit', async () => {
     await openDemo();
     await click(byRole('button', { name: 'Text box' }));
-    await type('alpha beta');
+    await type('Alpha beta');
     await press('Home');
     await shiftArrows('ArrowRight', 5);
     await press('ArrowLeft');
     await type('X');
-    expect(slideText()).toContain('Xalpha beta');
+    expect(slideText()).toContain('XAlpha beta');
     await press('ControlOrMeta+z');
     await press('End');
     await shiftArrows('ArrowLeft', 4);
     await press('ArrowRight');
     await type('Y');
-    expect(slideText()).toContain('alpha betaY');
+    expect(slideText()).toContain('Alpha betaY');
   });
 
   test('selected text formatting and object movement survive history and reopening', async () => {
     const demo = await openDemo();
     await click(byRole('button', { name: 'Text box' }));
-    await type('alpha beta');
+    await type('Alpha beta');
     await press('Home');
     await shiftArrows('ArrowRight', 5);
     await click(byRole('button', { name: /^Bold \(/ }));
     await click(screen.getAllByRole('button', { name: 'Text color' })[1]);
     await click(byRole('menuitem', { name: 'Red' }));
-    const word = () => paintedText(/^alpha$/)?.getAttribute('fill');
+    const word = () => paintedText(/^Alpha$/)?.getAttribute('fill');
     expect(word()).toBe('#ff0000');
     await press('ControlOrMeta+z');
     expect(word()).not.toBe('#ff0000');
@@ -83,7 +83,7 @@ describe('demo editing workflow', () => {
     await openFile(new File([blob], name));
     expect(word()).toBe('#ff0000');
     expect(paintedText(/^ beta$/)?.getAttribute('fill')).not.toBe('#ff0000');
-    await click(paintedText(/^alpha$/)!);
+    await click(paintedText(/^Alpha$/)!);
     await press('Home');
     await shiftArrows('ArrowRight', 5);
     expect(bold()).toBe('true');

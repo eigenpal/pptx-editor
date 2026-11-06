@@ -22,7 +22,7 @@ import { itemById } from './surface.ts';
 export type ShapeKeyAction =
   | { readonly kind: 'exec'; readonly command: EditorCommand }
   | { readonly kind: 'select'; readonly selection: EditorSelection }
-  /** Enter the shape's text; `type` is a character to type there. */
+  /** Enter the shape's text; `type` is a character to type at its end, else all text is selected. */
   | { readonly kind: 'enterText'; readonly nodeId: string; readonly type?: string }
   /** The key is handled and does nothing more (Enter on a group with nothing inside). */
   | { readonly kind: 'handled' }

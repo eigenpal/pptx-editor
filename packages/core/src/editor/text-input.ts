@@ -18,7 +18,7 @@ import {
   snapToStop,
   stopAfter,
   stopBefore,
-  wordEndAfter,
+  nextWordStart,
   wordStartBefore,
   type ParagraphUnits,
 } from '../automation/commands/text-units.ts';
@@ -73,7 +73,7 @@ function deletionEnd(item: ShapeItem, kind: TextInputKind, at: TextPoint): TextP
   if (at.offset < u.length) {
     const to =
       kind === 'deleteWordForward'
-        ? wordEndAfter(u, at.offset)
+        ? nextWordStart(u, at.offset)
         : line && line.end > at.offset
           ? line.end
           : stopAfter(u, at.offset);
@@ -100,7 +100,9 @@ export function editText(
   let at: TextPoint = sel.focus;
   const collapsed = comparePoints(sel.anchor, sel.focus) === 0;
   if (kind === 'text') {
-    const clean = cleanText(data ?? '').replace(/\t/g, ' ');
+    // The Tab key types a tab, which the layout moves to the next tab stop; a tab in pasted
+    // text stays a space.
+    const clean = data === '\t' ? data : cleanText(data ?? '').replace(/\t/g, ' ');
     if (!clean) throw new CommandRefusal('errors.invalidText');
     if (!collapsed) at = deleteRange(batch, part, txBodyId, sel.anchor, sel.focus);
     // Newlines start paragraphs; U+000B (the clipboard's line break) is a line break.
@@ -166,11 +168,14 @@ export interface CaretModifiers {
  * The caret after a navigation key, with the key map of DOCX Editor's `surface-input.ts`.
  * Left and Right step one character (a whole emoji, a whole field). With Alt (macOS) or Ctrl
  * (other platforms) they step to the start of the word before or the end of the word after
- * (UAX #29 words, the same units as a word deletion), and at a paragraph edge into the next
- * paragraph; both keys are accepted on every platform. With Cmd alone they go to the line
- * edges, as Home and End do, for keyboards without those keys. Up and Down keep the x position
- * on the next line. Home and End go to the edges of the laid-out line (`lineEdge`), and with
- * Ctrl or Cmd, as Up and Down with Ctrl or Cmd do, to the start or the end of the text body.
+ * (UAX #29 words, the same units as a word deletion; forward, past the spaces after the word,
+ * to the start of the next one), and at a paragraph edge into the next paragraph; both keys
+ * are accepted on every platform. With Cmd alone they go to the line edges, as Home and End
+ * do, for keyboards without those keys. Up and Down keep the x position on the next line; with
+ * Alt (macOS) or Ctrl alone they go to the start of the paragraph (Up, or of the one before
+ * when the caret is there already) or of the next paragraph (Down, or the end of the last).
+ * Home and End go to the edges of the laid-out line (`lineEdge`). Home and End with Ctrl or
+ * Cmd, and Up and Down with Cmd, go to the start or the end of the text body.
  */
 export function moveCaret(
   item: ShapeItem,
@@ -180,10 +185,21 @@ export function moveCaret(
 ): TextPoint {
   const lens = item.text?.paragraphLengths ?? [0];
   const accel = !!(mods.ctrlKey || mods.metaKey);
-  if (accel && (pressed === 'Home' || pressed === 'ArrowUp')) return { paragraph: 0, offset: 0 };
-  if (accel && (pressed === 'End' || pressed === 'ArrowDown')) {
-    const last = Math.max(0, lens.length - 1);
+  const vertical = pressed === 'ArrowUp' || pressed === 'ArrowDown';
+  const toEdge = vertical ? !!mods.metaKey : accel;
+  const last = Math.max(0, lens.length - 1);
+  if (toEdge && (pressed === 'Home' || pressed === 'ArrowUp')) return { paragraph: 0, offset: 0 };
+  if (toEdge && (pressed === 'End' || pressed === 'ArrowDown'))
     return { paragraph: last, offset: lens[last] ?? 0 };
+  if (vertical && (mods.altKey || mods.ctrlKey)) {
+    if (pressed === 'ArrowUp')
+      return {
+        paragraph: Math.max(0, focus.offset > 0 ? focus.paragraph : focus.paragraph - 1),
+        offset: 0,
+      };
+    return focus.paragraph < last
+      ? { paragraph: focus.paragraph + 1, offset: 0 }
+      : { paragraph: last, offset: lens[last] ?? 0 };
   }
   const sideways = pressed === 'ArrowLeft' || pressed === 'ArrowRight';
   const word = sideways && !!(mods.altKey || mods.ctrlKey);
@@ -195,7 +211,7 @@ export function moveCaret(
     if (offset > 0) offset = word ? wordStartBefore(u, offset) : stopBefore(u, offset);
     else if (paragraph > 0) offset = lens[--paragraph] ?? 0;
   } else if (key === 'ArrowRight') {
-    if (offset < u.length) offset = word ? wordEndAfter(u, offset) : stopAfter(u, offset);
+    if (offset < u.length) offset = word ? nextWordStart(u, offset) : stopAfter(u, offset);
     else if (paragraph < lens.length - 1) ((paragraph += 1), (offset = 0));
   } else if (key === 'Home' || key === 'End')
     offset =

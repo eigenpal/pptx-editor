@@ -1170,6 +1170,7 @@ export interface PptxEditorPopups {
 
 // @public
 export interface PptxEditorProps {
+    readonly autoCorrect?: boolean;
     readonly children?: ReactNode;
     readonly className?: string;
     readonly colorMode?: ColorMode;
@@ -1211,6 +1212,7 @@ export const PptxEditorRoot: react.ForwardRefExoticComponent<PptxEditorRootProps
 
 // @public
 export interface PptxEditorRootProps {
+    readonly autoCorrect?: boolean;
     readonly children?: ReactNode;
     readonly colorMode?: ColorMode;
     readonly document?: Uint8Array;

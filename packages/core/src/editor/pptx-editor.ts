@@ -45,13 +45,8 @@ import {
 } from './snapshot-sources.ts';
 import { aspectLockedIn, createShapeListSource, elementIn } from './shape-list.ts';
 import { parentGroupOf } from '../automation/commands/placement.ts';
-import {
-  activeOf,
-  createBackgroundSource,
-  formatAt,
-  geometryOf,
-  selectedText,
-} from './selection-state.ts';
+import { activeOf, formatKeyTarget, createBackgroundSource } from './selection-state.ts';
+import { formatAt, geometryOf, selectedText } from './selection-state.ts';
 import { FormatPainter } from './format-painter.ts';
 import { CropMode } from './crop-mode.ts';
 import { altTextAt, pictureStateAt, withAltText } from './picture-state.ts';
@@ -64,15 +59,11 @@ import { setSurfaceRoot } from './surface-registry.ts';
 import { refit } from '../automation/commands/autofit.ts';
 import { listKeyAction } from './list-keys.ts';
 import { formatKeyCommand } from './format-keys.ts';
+import { withAutoCorrect } from './autocorrect.ts';
 import { selectAllOf, shapeKeyAction } from './shape-keys.ts';
 import { clampZoom, zoomKeyAction } from './zoom.ts';
-import {
-  editText,
-  isCaretKey,
-  moveTextSelection,
-  snapTextSelection,
-  type TextInputKind,
-} from './text-input.ts';
+import { isCaretKey, moveTextSelection, snapTextSelection } from './text-input.ts';
+import type { TextInputKind } from './text-input.ts';
 import { comparePoints } from '../automation/commands/text-model.ts';
 import { CaretArm, armedCaretOf, caretSelection } from './caret-arm.ts';
 import { fontFamilyOf } from '../automation/commands/font-format.ts';
@@ -104,6 +95,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   let status: EditorSnapshot['status'] = 'empty';
   let failure: ReturnType<typeof documentOpenFailure> | undefined;
   let mode: EditorMode = options.mode ?? 'edit';
+  // The caret and the store revision just after AutoCorrect started a list.
+  let autoListed: { readonly sel: EditorSelection; readonly rev: number } | null = null;
+  const typeText = withAutoCorrect(options.autoCorrect !== false);
   let slide = 0;
   let selection: EditorSelection = { kind: 'none' };
   let zoom = typeof options.zoom === 'number' ? clampZoom(options.zoom) : 1;
@@ -508,10 +502,11 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     const armed = typed ? arm.current() : null;
     const batch = session.batch(armed?.pkg);
     let at: TextPoint;
+    let listed = false;
     try {
       const txBody = selectionBody(batch, part, sel);
       if (!txBody) throw new CommandRefusal('disabled.noText');
-      at = editText(batch, part, txBody.id, item, sel, kind, data);
+      ({ at, list: listed } = typeText(batch, part, slide, txBody.id, item, sel, kind, data));
       const caret = { part, nodeId: sel.nodeId, at, ...(sel.cell ? { cell: sel.cell } : {}) };
       if (carried) for (const op of arm.carry(batch.pkg, caret)) batch.push(op);
       refit(batch, slide, part, sel.nodeId, session.measurer);
@@ -521,7 +516,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     }
     // Typed text is one burst, one undo step; text typed over a range starts a new burst that
     // holds the replace, so one undo removes both. A break or a delete is a step of its own.
-    const burst = kind === 'text';
+    const burst = kind === 'text' && !listed;
     if (!burst || comparePoints(sel.anchor, sel.focus) !== 0) groups.boundary();
     const caret: EditorSelection = { ...sel, anchor: at, focus: at };
     // The entry's `selectionBefore`: an undo returns this object, so the arm finds its commands.
@@ -536,6 +531,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     if (armed) arm.typed(mark, armed.commands);
     if (!carried) arm.clear();
     selection = caret;
+    autoListed = listed ? { sel: caret, rev: session.store.revision } : null;
     emit();
     return { ok: true };
   };
@@ -554,7 +550,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     const mod = e.metaKey || e.ctrlKey;
     const lower = key.toLowerCase();
     // The format and history keys (format-keys.ts); in text, Ctrl/Cmd+= is subscript.
-    const keyed = formatKeyCommand(key, e, selection.kind === 'text');
+    const keyed = formatKeyCommand(key, e, formatKeyTarget(layout(), selection));
     if (keyed) return (exec(keyed), true);
     // Ctrl/Cmd + = and − zoom, and Ctrl/Cmd + 0 fits the slide to the window (zoom.ts).
     const zoomed = zoomKeyAction(key, mod);
@@ -585,6 +581,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         surface?.focus();
         return true;
       }
+      // Backspace right after AutoCorrect started a list gives the typed marker back (undo).
+      const fresh = autoListed?.sel === selection && autoListed.rev === session?.store.revision;
+      const plain = !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey;
+      if (key === 'Backspace' && plain && fresh) return (exec({ type: 'undo' }), true);
       // Enter, Tab, and Backspace with lists (list-keys.ts).
       const list = listKeyAction(textItemOf(layout(), selection), selection, key, {
         shift: e.shiftKey,
@@ -607,7 +607,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       if (act?.kind === 'exec') return (exec(act.command), true);
       if (act?.kind === 'select') return (select(act.selection), true);
       if (act?.kind === 'enterText') {
-        if (enterText(act.nodeId, null) && act.type) textInput('text', act.type);
+        if (!enterText(act.nodeId, null)) return true;
+        if (act.type) textInput('text', act.type);
+        else selectAll();
         return true;
       }
       if (act) return true;

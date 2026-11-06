@@ -10,7 +10,7 @@ import type { ResolvedParagraph } from '../../cascade/index.ts';
 /**
  * Text as it can go into a slide: CRLF and CR become LF, and characters XML 1.0 cannot hold
  * (control characters, U+FFFE, U+FFFF, unpaired surrogates) are removed. U+000B, the line
- * break that desktop apps put on the clipboard, is kept for the caller to map.
+ * break that other editors put on the clipboard, is kept for the caller to map.
  */
 export function cleanText(raw: string): string {
   const text = raw.replace(/\r\n?/g, '\n');
@@ -43,6 +43,8 @@ export interface WordSegment {
   readonly start: number;
   readonly end: number;
   readonly word: boolean;
+  /** White space only: a word step forward passes it with the word before it. */
+  readonly space?: boolean;
 }
 
 function wordSegments(text: string, base: number): WordSegment[] {
@@ -50,6 +52,7 @@ function wordSegments(text: string, base: number): WordSegment[] {
     start: base + s.utf16From,
     end: base + s.utf16To,
     word: s.wordLike,
+    ...(/^[^\S\n]+$/u.test(text.slice(s.utf16From, s.utf16To)) ? { space: true } : {}),
   }));
 }
 
@@ -132,6 +135,20 @@ export function wordEndAfter(u: ParagraphUnits, offset: number): number {
   let i = 0;
   while (i < segs.length && !segs[i].word) pos = segs[i++].end;
   if (i < segs.length) pos = segs[i].end;
+  return pos;
+}
+
+/**
+ * Where a word step forward stops: past the gap, one word, and the spaces after it, so the
+ * caret lands at the start of the next word. Ctrl or Alt with Right, Shift for a selection,
+ * and a word deletion forward take this step.
+ */
+export function nextWordStart(u: ParagraphUnits, offset: number): number {
+  // At a word end, the spaces after it are the step: the caret lands on the next word.
+  const gap = u.words.find((s) => s.start === offset && s.space);
+  if (gap) return gap.end;
+  let pos = wordEndAfter(u, offset);
+  for (const s of u.words) if (s.start === pos && s.space) pos = s.end;
   return pos;
 }
 

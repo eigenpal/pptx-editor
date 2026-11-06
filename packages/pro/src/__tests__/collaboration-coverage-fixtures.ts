@@ -139,6 +139,13 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
     },
     command: () => ({ type: 'indent', direction: 1 }),
   },
+  removeBullet: {
+    arrange: (e) => {
+      select('A')(e);
+      run(e, { type: 'toggleBullets' });
+    },
+    command: () => ({ type: 'removeBullet' }),
+  },
   setLineSpacing: onA(() => ({ type: 'setLineSpacing', multiple: 1.5 })),
   setLink: {
     arrange: selectText('A', 0, 5),
