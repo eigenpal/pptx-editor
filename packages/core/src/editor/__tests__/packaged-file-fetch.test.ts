@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -40,6 +40,21 @@ describe('createPackagedFileFetch', () => {
     expect((await read(rootUrl.href)).status).toBe(404);
     expect((await read(at('missing.ttf'))).status).toBe(404);
   });
+
+  // Root reads a file with no permissions, so the read error needs a normal user.
+  test.skipIf(process.getuid?.() === 0)(
+    'a read error keeps its code but not the local path',
+    async () => {
+      writeFileSync(join(root, 'locked.ttf'), new Uint8Array([1]));
+      chmodSync(join(root, 'locked.ttf'), 0o000);
+      const error = await read(at('locked.ttf')).then(
+        () => undefined,
+        (e: unknown) => e as Error
+      );
+      expect(error?.message).toMatch(/could not be read \(E[A-Z]+\)/);
+      expect(error?.message).not.toContain(base);
+    }
+  );
 
   test('refuses a file over maxBytes before it reads it', async () => {
     expect((await read(at('big.ttf'))).status).toBe(413);

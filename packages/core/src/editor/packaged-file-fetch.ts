@@ -149,7 +149,13 @@ export function createPackagedFileFetch(options: {
       return new Response(bytes as unknown as BodyInit, { status: 200 });
     } catch (error) {
       if (error instanceof PackagedFileError) return new Response(null, { status: error.status });
-      throw error;
+      if (init?.signal?.aborted) throw error;
+      // A file system error message holds the absolute path, and these messages reach the
+      // font report and PDF diagnostics. Keep only the error code.
+      const code = (error as { code?: unknown }).code;
+      throw new Error(
+        `the packaged font file could not be read (${typeof code === 'string' ? code : 'unknown error'})`
+      );
     }
   }) as typeof fetch;
 }
