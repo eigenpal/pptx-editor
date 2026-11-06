@@ -113,22 +113,22 @@ createApp({
 | `useParagraphFormat()` | `UseParagraphFormatReturn`: `format` (the selected paragraphs' `ParagraphFormatRead`, with `disagrees`), `isEnabled`, and `apply(update)`, which sends one `setParagraphFormat` and returns whether the engine accepted it |
 | `useSlideLayouts()` | `UseSlideLayoutsReturn`: the deck's slide layouts in gallery order, with their master's name, for a layout picker of your own |
 
-The table lists the composables most hosts need. For every composable and its `Use<Name>Return` type, such as `useEditorValueCommand`, `useEditorDialog`, `useSlideshow`, `useNotesPane`, `useOpenFailure`, and `useFonts`, see the [API report](../../docs/api/vue/index.api.md).
+The table lists the composables most hosts need. For every composable and its `Use<Name>Return` type, such as `useEditorValueCommand`, `useEditorDialog`, `useSlideshow`, `useNotesPane`, `useOpenFailure`, and `useFonts`, see the [API report](https://github.com/eigenpal/pptx-editor/blob/main/docs/api/vue/index.api.md).
 
 The state these composables report comes from the same core functions as the React hooks (`chromeCommandState`, `EMPTY_EDITOR_SNAPSHOT`), so both adapters show the same enabled state and the same refusal reasons. `PptxEditorRoot` holds one editor subscription and shares it with every composable below it.
 
 ## Dialogs
 
-`PptxEditorRoot` mounts the editor's dialogs from one `popups` registry, as React and DOCX Editor do. A render function replaces a packaged dialog, and `false` turns it off; the menu rows that open it show as disabled with the reason. Open a dialog from your own control with `useEditorDialog(key).open()`. See [Dialogs](../../docs/site/content/customization/dialogs.mdx).
+`PptxEditorRoot` mounts the editor's dialogs from one `popups` registry, as React and DOCX Editor do. A render function replaces a packaged dialog, and `false` turns it off; the menu rows that open it show as disabled with the reason. Open a dialog from your own control with `useEditorDialog(key).open()`. See [Dialogs](https://github.com/eigenpal/pptx-editor/blob/main/docs/site/content/customization/dialogs.mdx).
 
 ## Fonts
 
-Bind font bytes to the `fonts` prop of `PptxEditor` or `PptxEditorRoot`, as in DOCX Editor, and listen to `fontError`. Call `useFonts(...origins)` in `<script setup>` for one stable value. A new `fonts` value replaces the faces in place with `setFonts`. See [Fonts](../../docs/site/content/customization/fonts.mdx).
+Bind font bytes to the `fonts` prop of `PptxEditor` or `PptxEditorRoot`, as in DOCX Editor, and listen to `fontError`. Call `useFonts(...origins)` in `<script setup>` for one stable value. A new `fonts` value replaces the faces in place with `setFonts`. See [Fonts](https://github.com/eigenpal/pptx-editor/blob/main/docs/site/content/customization/fonts.mdx).
 
 ## Docs and demo
 
-- [Customization](../../docs/site/content/customization/index.mdx): the toolbar, ribbon, menus, dialogs, and layout, with React and Vue examples.
-- [Toolbar](../../docs/site/content/customization/toolbar.mdx): the customization ladder (`className`, `icon`, `as-child`, `hidden`, slot overrides).
+- [Customization](https://github.com/eigenpal/pptx-editor/blob/main/docs/site/content/customization/index.mdx): the toolbar, ribbon, menus, dialogs, and layout, with React and Vue examples.
+- [Toolbar](https://github.com/eigenpal/pptx-editor/blob/main/docs/site/content/customization/toolbar.mdx): the customization ladder (`className`, `icon`, `as-child`, `hidden`, slot overrides).
 - Live demo: `bun run dev:vue` in the monorepo (`examples/vue`).
 
 ## License

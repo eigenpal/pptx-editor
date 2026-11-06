@@ -26,7 +26,7 @@ The matrix reports editing, rendering, and round-trip support separately. A feat
 | Planned     | Not supported yet. Work on it is planned.                    |
 | No          | Is not supported.                                            |
 
-When a feature needs [`@pptx-editor.dev/pro`](https://github.com/eigenpal/pptx-editor/tree/main/packages/pro) or [`@pptx-editor.dev/pptx-to-pdf`](https://github.com/eigenpal/pptx-editor/tree/main/packages/pptx-to-pdf), its note says so. These packages are under the EigenPal Pro License.
+When a feature needs [`@pptx-editor.dev/pro`](https://www.npmjs.com/package/@pptx-editor.dev/pro) or [`@pptx-editor.dev/pptx-to-pdf`](https://www.npmjs.com/package/@pptx-editor.dev/pptx-to-pdf), its note says so. These packages are under the EigenPal Pro License.
 
 <FeatureSummary />
 
@@ -184,7 +184,7 @@ An edit lays out the slide again through the same pipeline, and applies the auto
 
 ## Approximations of the PDF export
 
-[`@pptx-editor.dev/pptx-to-pdf`](https://github.com/eigenpal/pptx-editor/tree/main/packages/pptx-to-pdf) paints the same layout as the editor, so the approximations above apply to it too. It adds these. Each one reports a diagnostic code on the export result, and the package README lists every code.
+[`@pptx-editor.dev/pptx-to-pdf`](https://www.npmjs.com/package/@pptx-editor.dev/pptx-to-pdf) paints the same layout as the editor, so the approximations above apply to it too. It adds these. Each one reports a diagnostic code on the export result, and the package README lists every code.
 
 - **Shadow and glow blur.** Drawn as layers of growing outlines, not as a Gaussian blur.
 - **Opaque silhouettes.** Fill transparency does not lighten a shadow, and a picture's shadow takes the shape of its frame.

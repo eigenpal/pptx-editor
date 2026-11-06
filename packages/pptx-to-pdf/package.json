@@ -29,7 +29,7 @@
   },
   "peerDependencies": {
     "@docx-editor.dev/fonts-cjk": "^2.34.0",
-    "@pptx-editor.dev/core": "0.x"
+    "@pptx-editor.dev/core": "~0.1.0"
   },
   "peerDependenciesMeta": {
     "@docx-editor.dev/fonts-cjk": {

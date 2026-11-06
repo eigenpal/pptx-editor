@@ -245,7 +245,7 @@ const fonts = useFonts(packagedFonts());
 <PptxEditor document={bytes} fonts={fonts} onFontError={(error) => report(error)} />;
 ```
 
-See [Fonts](../../docs/site/content/customization/fonts.mdx).
+See [Fonts](https://github.com/eigenpal/pptx-editor/blob/main/docs/site/content/customization/fonts.mdx).
 
 ## License
 

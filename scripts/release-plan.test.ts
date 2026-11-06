@@ -3,7 +3,7 @@
 // The packages are one fixed group, and the adapters have `core` as a peer. By
 // default changesets bumps a peer dependent to major whenever the peer changes, and the
 // fixed group then takes every package to major. `onlyUpdatePeerDependentsWhenOutOfRange`
-// and the `0.x` peer ranges keep 0.x minors as minors.
+// and the tilde peer ranges (`~0.1.0`, as DOCX Editor) keep 0.x minors as minors.
 import { afterEach, expect, test } from 'bun:test';
 import getReleasePlanModule from '@changesets/get-release-plan';
 import {

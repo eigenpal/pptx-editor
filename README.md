@@ -53,13 +53,13 @@ See the [React](#react) or [Vue](#vue) quick start.
 
 | Package | Description | Docs |
 | --- | --- | --- |
-| [`@pptx-editor.dev/react`](packages/react/README.md) | React editor components and hooks. | [React adapter](docs/site/content/react/index.mdx) |
-| [`@pptx-editor.dev/vue`](packages/vue/README.md) | Vue 3 editor components and composables. | [Vue adapter](docs/site/content/vue/index.mdx) |
-| [`@pptx-editor.dev/core`](packages/core/README.md) | The engine: parse, layout, paint, edit, and save. | [Core engine](packages/core/README.md) |
-| [`@pptx-editor.dev/i18n`](packages/i18n/README.md) | Interface strings. | [Language](docs/site/content/customization/language.mdx) |
-| [`@pptx-editor.dev/pro`](packages/pro/README.md) | Comments and real-time collaboration modules. | [Pro modules](packages/pro/README.md) |
-| [`@pptx-editor.dev/editor-api`](packages/editor-api/README.md) | A supported subset of the Office.js presentation API for browser and server editing. | [Presentation automation](docs/site/content/editor-api/index.mdx) |
-| [`@pptx-editor.dev/pptx-to-pdf`](packages/pptx-to-pdf/README.md) | Convert PPTX to PDF on Node.js. | [PDF export](packages/pptx-to-pdf/README.md) |
+| [`@pptx-editor.dev/react`](https://www.npmjs.com/package/@pptx-editor.dev/react) | React editor components and hooks. | [React adapter](docs/site/content/react/index.mdx) |
+| [`@pptx-editor.dev/vue`](https://www.npmjs.com/package/@pptx-editor.dev/vue) | Vue 3 editor components and composables. | [Vue adapter](docs/site/content/vue/index.mdx) |
+| [`@pptx-editor.dev/core`](https://www.npmjs.com/package/@pptx-editor.dev/core) | The engine: parse, layout, paint, edit, and save. | [Core engine](packages/core/README.md) |
+| [`@pptx-editor.dev/i18n`](https://www.npmjs.com/package/@pptx-editor.dev/i18n) | Interface strings. | [Language](docs/site/content/customization/language.mdx) |
+| [`@pptx-editor.dev/pro`](https://www.npmjs.com/package/@pptx-editor.dev/pro) | Comments and real-time collaboration modules. | [Pro modules](packages/pro/README.md) |
+| [`@pptx-editor.dev/editor-api`](https://www.npmjs.com/package/@pptx-editor.dev/editor-api) | A supported subset of the Office.js presentation API for browser and server editing. | [Presentation automation](docs/site/content/editor-api/index.mdx) |
+| [`@pptx-editor.dev/pptx-to-pdf`](https://www.npmjs.com/package/@pptx-editor.dev/pptx-to-pdf) | Convert PPTX to PDF on Node.js. | [PDF export](packages/pptx-to-pdf/README.md) |
 
 `@pptx-editor.dev/editor-api`, `@pptx-editor.dev/pro`, and `@pptx-editor.dev/pptx-to-pdf` use the EigenPal Pro License. See the license terms for [editor-api](packages/editor-api/LICENSE.md), [pro](packages/pro/LICENSE.md), and [pptx-to-pdf](packages/pptx-to-pdf/LICENSE.md).
 
@@ -106,7 +106,7 @@ defineProps<{ deck: Uint8Array }>();
 - [Editor API](docs/site/content/editor-api/index.mdx): edit slides, shapes, text, and tables from code on a server or in an open editor.
 - [PPTX fidelity](docs/site/content/pptx-fidelity.mdx): what you can edit, display, and save, and the known approximations.
 
-For collaboration, automation, and PDF export, see the package READMEs: [`pro`](packages/pro/README.md), [`editor-api`](packages/editor-api/README.md), and [`pptx-to-pdf`](packages/pptx-to-pdf/README.md). The [`react`](packages/react/README.md) and [`vue`](packages/vue/README.md) READMEs list every part.
+For collaboration, automation, and PDF export, see the package READMEs: [`pro`](https://www.npmjs.com/package/@pptx-editor.dev/pro), [`editor-api`](https://www.npmjs.com/package/@pptx-editor.dev/editor-api), and [`pptx-to-pdf`](https://www.npmjs.com/package/@pptx-editor.dev/pptx-to-pdf). The [`react`](packages/react/README.md) and [`vue`](packages/vue/README.md) READMEs list every part.
 
 ## Development
 

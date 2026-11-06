@@ -45,7 +45,7 @@
     "office-js"
   ],
   "peerDependencies": {
-    "@pptx-editor.dev/core": "0.x"
+    "@pptx-editor.dev/core": "~0.1.0"
   },
   "devDependencies": {
     "@pptx-editor.dev/core": "workspace:*"
