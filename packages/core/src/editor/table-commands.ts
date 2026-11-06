@@ -35,6 +35,7 @@ import {
   deleteColumns,
   deleteRows,
   expandRange,
+  selectedRange,
   insertColumns,
   insertRows,
   MAX_TABLE_SIZE,
@@ -91,7 +92,7 @@ export function tableTarget(
     sel.kind === 'text' && sel.cell
       ? blockOf(m, sel.cell)
       : sel.kind === 'cells'
-        ? expandRange(m, cellRangeOf(sel))
+        ? selectedRange(m, cellRangeOf(sel))
         : wholeTable(m);
   return { m, range };
 }
@@ -122,7 +123,7 @@ export function tableTextTargets(
         range: { from: sel.anchor, to: sel.focus },
       },
     ];
-  const range = sel.kind === 'cells' ? expandRange(m, cellRangeOf(sel)) : wholeTable(m);
+  const range = sel.kind === 'cells' ? selectedRange(m, cellRangeOf(sel)) : wholeTable(m);
   return anchorsIn(m, range).map((a) => ({ txBodyId: cellBody(m, a).id, shapeId: frameId }));
 }
 
@@ -325,7 +326,10 @@ export function compileTable(ctx: CommandContext, batch: OpBatch, command: Table
       };
     }
     case 'mergeCells': {
-      const { m, range } = tableTarget(ctx, batch);
+      const target = tableTarget(ctx, batch);
+      const m = target.m;
+      // A merge is a rectangle: a band grows over the merged cells that cross it.
+      const range = expandRange(m, target.range);
       mergeRange(batch, m, range);
       structureEdited(ctx, batch, m);
       refit(ctx, batch, m);

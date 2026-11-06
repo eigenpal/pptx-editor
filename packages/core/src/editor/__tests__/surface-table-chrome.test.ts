@@ -251,6 +251,43 @@ describe('the table chrome', () => {
     expect(rects(block)).toBe(3);
   });
 
+  test('a selected column under a merged cell inserts, deletes, and fills its own line', async () => {
+    const select = async () => {
+      const e = await open(deck(true));
+      const point = { paragraph: 0, offset: 0 };
+      e.setSelection({
+        kind: 'text',
+        nodeId: frameId(e),
+        cell: { row: 0, column: 1 },
+        anchor: point,
+        focus: point,
+      });
+      expect(e.exec({ type: 'selectTableRegion', region: 'column' }).ok).toBe(true);
+      return e;
+    };
+    for (const where of ['left', 'right'] as const) {
+      const e = await select();
+      expect(e.exec({ type: 'insertColumn', where }).ok).toBe(true);
+      expect(colCount(e)).toBe(4);
+    }
+    const e = await select();
+    expect(e.exec({ type: 'deleteColumn' }).ok).toBe(true);
+    expect(colCount(e)).toBe(2);
+    // Fill changes the two cells the highlight shows, not row 1's merged cell.
+    const f = await select();
+    expect(f.exec({ type: 'setCellFill', color: '#FF0000' }).ok).toBe(true);
+    const filled = find(root(f), 'a:tbl')!;
+    expect(
+      children(filled, 'a:tr').map((tr) =>
+        children(tr, 'a:tc').map((tc) => !!find(tc, 'a:srgbClr'))
+      )
+    ).toEqual([
+      [false, true, false],
+      [false, false, false],
+      [false, true, false],
+    ]);
+  });
+
   test('a line inside a merged cell inserts from the cell that ends there', async () => {
     const e = await open(deck(true));
     const { c, commands } = chrome(e);

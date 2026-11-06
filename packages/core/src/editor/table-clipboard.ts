@@ -6,7 +6,7 @@
 
 import type { EditorSelection } from '../contracts/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
-import { cellItem, cellRangeOf, expandLayoutRange, tableItem } from './table-cells.ts';
+import { cellItem, cellRangeOf, selectedLayoutRange, tableItem } from './table-cells.ts';
 
 /** The clipboard type of a copied cell range: JSON rows of cell texts. */
 export const CELLS_MIME = 'application/x-pptx-editor-cells+json';
@@ -27,7 +27,7 @@ export function cellRangeTexts(
   if (sel.kind !== 'cells') return null;
   const frame = tableItem(layout, sel.nodeId);
   if (!frame) return null;
-  const r = expandLayoutRange(frame.table, cellRangeOf(sel));
+  const r = selectedLayoutRange(frame.table, cellRangeOf(sel)).range;
   const rows: string[][] = [];
   for (let row = r.r0; row <= r.r1; row += 1) {
     const line: string[] = [];

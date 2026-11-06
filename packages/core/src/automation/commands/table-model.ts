@@ -115,6 +115,21 @@ export function blockOf(m: TableModel, at: TableCellAddress): CellRange {
   return { r0: a.row, r1, c0: a.column, c1 };
 }
 
+/**
+ * The cells a cell range selects: a whole row or column band (every row, or every column) is
+ * its own grid lines, as Select Row and Select Column name them; any other range grows over the
+ * merged cells that cross its edge (`expandRange`). The canvas highlight reads the same rule
+ * (`selectedLayoutRange`), so what shows selected is what a command changes.
+ */
+export function selectedRange(m: TableModel, range: CellRange): CellRange {
+  return isBand(range, m.nR, m.nC) ? range : expandRange(m, range);
+}
+
+/** Whether a range covers every row or every column of a grid of `rows` × `columns`. */
+export function isBand(range: CellRange, rows: number, columns: number): boolean {
+  return (range.r0 === 0 && range.r1 === rows - 1) || (range.c0 === 0 && range.c1 === columns - 1);
+}
+
 /** A range grown until no merged block crosses its edge. */
 export function expandRange(m: TableModel, range: CellRange): CellRange {
   let r0 = Math.max(0, Math.min(range.r0, m.nR - 1));

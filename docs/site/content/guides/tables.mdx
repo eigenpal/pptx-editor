@@ -104,7 +104,7 @@ The chrome does not show in view mode. The toolbar shows a short table group whi
 | `{ type: 'insertColumn', where: 'left' \| 'right' }` | The same for columns. The table keeps its width: the columns narrow in proportion |
 | `{ type: 'deleteRow' }`, `{ type: 'deleteColumn' }` | Deletes the selected rows or columns; the table goes when none would stay |
 | `{ type: 'deleteTable' }` | Deletes the table |
-| `{ type: 'selectTableRegion', region: 'table' \| 'row' \| 'column' }` | Selects the table, or the rows or columns of the selection. A merged cell does not widen the region, so Select column and then Delete columns under a merged header deletes one column |
+| `{ type: 'selectTableRegion', region: 'table' \| 'row' \| 'column' }` | Selects the table, or the rows or columns of the selection. A merged cell does not widen a whole row or column: the highlight, insert, delete, formatting, and copy all act on its own grid lines, so Delete columns under a merged header deletes one column. Merge cells still grows over the merged cells it crosses |
 | `{ type: 'setRowHeight', height }`, `{ type: 'setColumnWidth', width }` | Sizes in EMU; a row height is a minimum, so rows still grow to fit their text |
 | `{ type: 'distributeRows' }`, `{ type: 'distributeColumns' }` | Gives the selected rows or columns the same size |
 | `{ type: 'setTableGrid', columns?, rows? }` | Sets every grid column width or row height at once, in EMU, as a grid line drag does. Run the steps of one drag with one `historyGroup` to undo them as one step (see [Undo and history groups](/docs/guides/undo-history)) |

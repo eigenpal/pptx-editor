@@ -183,6 +183,21 @@ export function expandLayoutRange(table: TableLayout, range: CellRange): CellRan
   return { r0, r1, c0, c1 };
 }
 
+/**
+ * The cells a cell range selects on the canvas, as `selectedRange` reads them for commands: a
+ * whole row or column band is its own grid lines (`band`); any other range grows over its merged
+ * cells.
+ */
+export function selectedLayoutRange(
+  table: TableLayout,
+  range: CellRange
+): { readonly range: CellRange; readonly band: boolean } {
+  const band =
+    (range.r0 === 0 && range.r1 === table.rowY.length - 2) ||
+    (range.c0 === 0 && range.c1 === table.columnX.length - 2);
+  return { range: band ? range : expandLayoutRange(table, range), band };
+}
+
 /** The cell under a slide point, or undefined outside the table. */
 export function cellAtPoint(
   frame: TableFrame,
