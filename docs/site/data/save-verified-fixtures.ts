@@ -2,48 +2,109 @@
 // the matrix file, which the docs site syncs as site data.
 
 /**
- * Fixtures whose saved copies open with no repair prompt. Both copies
- * from `bun run fidelity:roundtrip -- --saved <dir>` count: `.saved.pptx` (open, save) and
- * `.edited.pptx` (a scripted edit session, then save). Add a name only after you do that check (CONTRIBUTING.md, "Fidelity harness"). Last checked on 31 October 2026: all
- * 23 fixtures, 46 copies, no prompt (21 fixtures on copies written at commit 76a46c2,
- * `slide-size` at commit eb683ac, `slide-size-rounding` from its deck as committed in 787540c).
- * `table-editing`: 2 copies written at commit 0073112, no prompt on
- * 31 October 2026. `fill-fidelity` and `line-model`: 4 copies written at commit 1558bb1, no
- * prompt on 1 November 2026. That gives 26 fixtures.
- * The rebuilt `open-font-families` fixture awaits verification of its saved copies.
+ * Fixtures whose saved copies open with no repair prompt. Both copies from
+ * `bun run fidelity:roundtrip -- --saved <dir>` count: `.saved.pptx` (open, save) and
+ * `.edited.pptx` (a scripted edit session, then save). Add a name only after you do that check
+ * (CONTRIBUTING.md, "Fidelity harness"). Last checked on 6 November 2026: all 44 fixtures,
+ * 88 copies written at commit 79a5d22, no prompt.
  */
 export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'alignment-anchor',
+  'arrange-flip-hidden',
   'autofit',
+  'bullets-gallery',
   'bullets-numbering',
+  'chart-sizes',
+  'charts',
   'colors',
   'custom-geometry',
+  'diagrams',
+  'east-asian-line-breaking',
+  'east-asian-theme-fonts',
+  'east-asian-typography',
   'effects',
   'fill-fidelity',
   'fills-lines',
+  'follow-ups',
+  'font-effects',
   'gradients',
   'groups-transforms',
+  'line-ends-dashes',
   'line-model',
   'lines-arrows',
+  'open-font-families',
+  'paragraph-format',
+  'picture-editing',
   'pictures',
   'placeholders-background',
   'preserve-unsupported',
   'preset-shapes',
+  'rtl-text',
+  'shape-effects-presets',
+  'shape-styles',
+  'slide-layouts',
   'slide-size',
   'slide-size-rounding',
   'slide-structure',
   'spacing',
-  // A saved copy, plain and after a table edit session, opened with no repair prompt
-  // (31 October 2026).
   'table-editing',
   'tables',
+  'text-direction',
   'text-runs',
   'vertical-columns',
   'vertical-east-asian',
-  // A saved copy opened with no repair prompt (31 October 2026, ui/pictures-engine).
-  'picture-editing',
-  // A saved copy opened with no repair prompt (31 October 2026, ui/shapes-engine).
-  'arrange-flip-hidden',
-  'shape-effects-presets',
-  'shape-styles',
+];
+
+/**
+ * Feature rows whose own edit (`FEATURE_EDITS` in `scripts/fidelity/feature-edits.ts`) writes a
+ * copy that opens with no repair prompt. `bun scripts/fidelity/feature-edits.ts --out <dir>`
+ * writes one copy per row. Add a row only after you do that check. Last checked on
+ * 6 November 2026: 45 copies written at commit 79a5d22, no prompt.
+ */
+export const SAVE_VERIFIED_FEATURE_EDITS: readonly string[] = [
+  'effects.glow-reflection',
+  'effects.outer-shadow',
+  'fills-lines.lines',
+  'fills-lines.solid-gradient',
+  'fills-lines.theme-colors',
+  'lists.bullets-numbering',
+  'paragraphs.alignment',
+  'paragraphs.autofit',
+  'paragraphs.indent-tabs',
+  'paragraphs.spacing',
+  'paragraphs.text-direction-columns',
+  'pictures.adjustments',
+  'pictures.alt-text',
+  'pictures.crop',
+  'pictures.raster-svg',
+  'pictures.styles-border',
+  'shapes.arrange',
+  'shapes.connectors',
+  'shapes.flip-rotate',
+  'shapes.groups',
+  'shapes.preset-geometry',
+  'shapes.selection-pane',
+  'shapes.styles-gallery',
+  'slides.hidden',
+  'slides.notes',
+  'slides.placeholder-prompts',
+  'slides.sections',
+  'slides.structure',
+  'tables.cell-format',
+  'tables.cell-text',
+  'tables.merge-split',
+  'tables.render',
+  'tables.sizes',
+  'tables.structure',
+  'tables.styles',
+  'text.basic-formatting',
+  'text.caps-baseline',
+  'text.change-case',
+  'text.character-spacing',
+  'text.color-highlight',
+  'text.complex-scripts',
+  'text.font-family-size',
+  'text.input-method',
+  'themes.backgrounds',
+  'themes.change-layout-theme',
 ];

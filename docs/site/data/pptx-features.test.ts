@@ -16,7 +16,8 @@ import {
   type FeatureStatus,
   type PptxFeature,
 } from './pptx-features.ts';
-import { SAVE_VERIFIED_FIXTURES } from './save-verified-fixtures.ts';
+import { FEATURE_EDITS } from '../../../scripts/fidelity/feature-edits.ts';
+import { SAVE_VERIFIED_FEATURE_EDITS, SAVE_VERIFIED_FIXTURES } from './save-verified-fixtures.ts';
 
 const FIXTURES = join(import.meta.dir, '../../../fixtures');
 
@@ -206,6 +207,29 @@ describe('pptx-features: evidence for claims', () => {
           .map((name) => `${row.id}: ${name} is not in SAVE_VERIFIED_FIXTURES`);
       });
     expect(unproven).toEqual([]);
+  });
+
+  test('round trip "full" needs the row\'s own edit on one of its fixtures, checked for a prompt', () => {
+    // feature-edits.test.ts runs each recipe: edit, save, reopen, and find the edit again.
+    const verified = new Set(SAVE_VERIFIED_FEATURE_EDITS);
+    const unproven = pptxFeatures
+      .filter((row) => row.roundTrip === 'full')
+      .flatMap((row) => {
+        const recipe = FEATURE_EDITS[row.id];
+        if (!recipe) return [`${row.id}: no recipe in FEATURE_EDITS`];
+        if (!evidence(row).fixtures.includes(recipe.fixture))
+          return [`${row.id}: the recipe fixture ${recipe.fixture} is not a fixture of the row`];
+        if (!verified.has(row.id)) return [`${row.id}: not in SAVE_VERIFIED_FEATURE_EDITS`];
+        return [];
+      });
+    expect(unproven).toEqual([]);
+  });
+
+  test('every save-verified feature edit names a row with a recipe', () => {
+    const orphans = SAVE_VERIFIED_FEATURE_EDITS.filter(
+      (id) => !pptxFeatureById[id] || !FEATURE_EDITS[id]
+    );
+    expect(orphans).toEqual([]);
   });
 
   test('every save-verified fixture exists in fixtures/', () => {

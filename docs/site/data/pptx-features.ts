@@ -112,9 +112,9 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'text',
     editing: 'full',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
-    notes: `Underline styles other than single are approximate. The Font dialog sets the underline color (a:uFill). ${SAVE_CHECKED} The save check does not yet cover the Font dialog effects.`,
+    notes: `Underline styles other than single are approximate. The Font dialog sets the underline color (a:uFill). ${SAVE_CHECKED}`,
   },
   {
     id: 'text.font-family-size',
@@ -122,7 +122,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'text',
     editing: 'full',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       "Theme fonts (+mj-lt, +mn-lt) resolve through the theme; the font picker's Headings and Body rows write these references. Missing fonts use metric-compatible substitutes. Embedded fonts decode in memory. Only installable and editable embedded faces enter the session. Other embedded faces use available host faces or substitutes; save preserves their original bytes. Hosts supply more faces through the `fonts` option and `setFonts` (the font configuration API of DOCX Editor); host faces rank after embedded faces and before the substitutes. A host face changes measurement only, and its fidelity is not measured.",
@@ -134,7 +134,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'text',
     editing: 'full',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Gradient and pattern text fills render. Their geometry is approximate. The Font dialog sets theme font colors.',
@@ -145,7 +145,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'text',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Superscript and subscript toggles. The Font dialog sets the offset, caps, and strikethrough kinds. Small caps and script size are approximate.',
@@ -156,7 +156,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'text',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'The Character Spacing menu has five presets, from Very Tight to Very Loose. The Font dialog sets any spacing and the kerning size.',
@@ -167,7 +167,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'text',
     editing: 'partial',
     rendering: 'none',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Five modes rewrite the letters and keep the formatting; at a caret, the word around it. Shift+F3 steps through Capitalize Each Word, UPPER CASE, and lower case. A letter whose other case has a different length (ß) stays, and the run language is not used.',
@@ -189,7 +189,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'text',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Typing re-lays out with HarfBuzz. The caret steps and deletes by grapheme cluster. Left and Right collapse a selected range to its start or end before typing. Alt or Ctrl with Left and Right steps by word, Ctrl or Cmd with Home and End goes to the start or end of the text, and a double-click or a format painter click takes a word (Unicode word boundaries) and a triple-click the paragraph; a drag after a double-click or triple-click extends by whole words or paragraphs. Home and End go to the edges of the laid-out line. An input method composes at the caret: the text being composed shows there underlined, and the result goes in once at composition end as one undo step. Keys during a composition, and the key that ends it, run no shortcut. Validate your target input methods.',
@@ -200,7 +200,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'text',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       "East Asian characters measure and draw with the run's ea font, complex-script characters with its cs font, and symbol characters with its sym font. A theme with an empty ea or cs font uses its script font (a:font) for the run's language (lang, altLang). Chinese and Japanese text breaks between characters and Korean text at spaces. eaLnBrk, latinLnBrk, hangingPunct, the presentation kinsoku lists (p:kinsoku), and justified and distributed East Asian lines follow the reference rules. A missing East Asian font falls back to a host CJK face, such as Noto Sans CJK JP from @docx-editor.dev/fonts-cjk, and a character that the run's face lacks uses another loaded face. Right-to-left text is approximate. Bidi line layout is not built, so the caret moves in logical order in right-to-left text. Caret steps keep combining marks and clusters whole, and word steps use dictionary words in Thai, Lao, Khmer, Myanmar, and CJK text.",
@@ -233,7 +233,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'paragraphs',
     editing: 'full',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
   },
   {
@@ -242,7 +242,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'paragraphs',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Line heights and baselines follow measured rules, and each baseline rounds to a whole point from the top of the text. Glyph advances are approximate. The Paragraph dialog sets space before and after in points or lines, and line spacing, on mixed selections too.',
@@ -253,7 +253,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'paragraphs',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'The Paragraph dialog sets the indent before text and a first-line or hanging indent. Indent and outdent change the list level. Tab stops are approximate and not editable. No ruler.',
@@ -264,7 +264,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'paragraphs',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Stored font scale and line spacing reduction render with whole-point sizes and a subtracted reduction, as measured. Refit after an edit starts from 100 %, not from the last state: a title shrinks to 90 % at most and then overflows, as measured; other text uses the measured step order down to a 55 % font scale, and estimated steps below it. Empty paragraphs at the end of the text do not count, as measured. The font size box shows the size the text is drawn at; the Font dialog shows and sets the size the text asks for. Increase steps up from that size, and Decrease on whole selected shapes steps down from the drawn size. The toolbar and the Format panel switch between no autofit, shrink text on overflow, and resize shape to fit text. Overflowing centered text is approximate. Resize to fit text across rotated text, several columns, or a shape that is not a rectangle is approximate.',
@@ -275,7 +275,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'paragraphs',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'The Text Direction and Columns menus set horizontal, rotated, stacked, and upright East Asian text, and one to three columns. More Columns sets up to 16 columns and the spacing. Mongolian and right-to-left stacked text are refused and approximate. Upright East Asian text has no vertical metrics.',
@@ -298,7 +298,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'lists',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Toggle bullets and numbering. The galleries set common bullet characters and a:buAutoNum numbering schemes, and the Bullets and Numbering dialog sets the size, color, start number, and a custom character and font. Enter continues the list, also on an empty item. At the start of a list item or across paragraphs, Tab demotes a level and Shift+Tab promotes one; elsewhere both keys type a tab. Backspace at the start of a list item removes its bullet and keeps its level. Typing 1., 1), *, or - and a space at the start of a paragraph starts a list (AutoCorrect). Where a symbol font is not installed, a Wingdings or Symbol bullet draws its Unicode twin (approximate). Picture bullets do not draw and cannot be set.',
@@ -311,7 +311,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'shapes',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'All 187 presets use the spec guide formulas. Insert, move, resize, and rotate. Adjust handles are not built.',
@@ -332,7 +332,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'shapes',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes: 'Group, ungroup, and edit inside a group. Group effects do not draw.',
   },
@@ -342,7 +342,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'shapes',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Connectors do not reroute or snap to shapes. Deleting a shape unglues the connector ends attached to it.',
@@ -353,7 +353,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'shapes',
     editing: 'partial',
     rendering: 'none',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Smart guides show while you drag. Distribute needs three objects. Align and distribute use the unrotated box of a turned object. There is no Align to Slide setting.',
@@ -364,7 +364,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'shapes',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'The Rotate control flips and turns 90° on the slide, also inside groups. Every resize handle of one object keeps a locked ratio; a resize of several objects ignores it. No lock control yet.',
@@ -375,7 +375,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'shapes',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Commands show, hide, and rename objects, also inside mc:AlternateContent. There, other edits of a drawn choice remove the out-of-date copies in the other branches: an approximation. The selection pane itself is not built yet.',
@@ -386,7 +386,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'shapes',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'The six theme style rows in seven colors. The cells get the same p:style that the table style defines for them. No preset (transparent) styles.',
@@ -399,7 +399,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'fills-lines',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Linear and circle path gradients are measured. Two-stop gradient colors (a measured rule that the specification does not state), rectangle path gradients (seams at the joins), shape path gradients (bands), a rectangle or shape gradient focus outside the shape, gradient tile rectangles on linear, rectangle, and shape gradients and inside the shape on circle gradients, gradient flips, and fill rotation are approximate.',
@@ -421,7 +421,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'fills-lines',
     editing: 'full',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Dashes and line ends draw at measured sizes, at every line width. Compound line bands are not measured.',
@@ -432,7 +432,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'fills-lines',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes: 'The color picker shows the theme palette. Transform color spaces are approximate.',
   },
@@ -444,7 +444,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'effects',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Gallery presets set and clear the shadow. Inherited and theme effects stay. Groups, tables, and charts are refused, and so is a theme effect style with a:effectDag. No perspective shadows. The shadow blur is measured for small radii.',
@@ -455,7 +455,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'effects',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'premium',
     notes:
       'The drawing module of @pptx-editor.dev/pro paints these effects and uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement. Without it, shapes and pictures paint without them. PDF export always paints them. With the module, the Shape Effects menu sets and clears each effect, glows in the six accent colors, and Picture Styles offers the reflection and soft edge styles. Without it, the chrome does not offer the choices that add these effects. It still offers No reflection, No glow, and No soft edges when the selection has that effect, and No shadow also removes an inner shadow. The commands still set and clear each effect. Save keeps them in every edition. No Preset, Bevel, or 3-D Rotation. Glow, inner shadow, and soft edge blurs are measured for small radii. The reflection blur is not measured.',
@@ -488,7 +488,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'pictures',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Insert, move, resize, rotate, and Change Picture. Change Picture fits the new image in the old frame; this rule is not measured. Change Picture takes PNG, JPEG, and GIF only, not SVG.',
@@ -499,7 +499,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'pictures',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Corrections, Recolor, Transparency, and Reset Picture in the `image` group. Reset and Corrections refuse a picture with `a14:imgProps` picture effects. Saturation, color tone, and artistic effects are not built. Luminance, recolor, and picture shape fills are approximate.',
@@ -510,7 +510,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'pictures',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Crop mode with crop handles, crop to a preset shape, Fill, Fit, aspect ratios, and crop position in Format Picture. A picture locked against cropping (`a:picLocks/@noCrop`) refuses crop mode, crops, the Format Picture crop fields, and Reset Picture & Size of a cropped picture; `noResize` also refuses a crop that changes the frame size (Fill and Fit pass); `noResize`, `noRot`, and `noChangeShapeType` refuse a new size, rotation, or shape (Crop to Shape, Picture Styles, Reset Picture) in the commands, and Change Picture honors them, but the canvas handles still resize and rotate. A tiled or inset picture fill (`a:tile`, an inset `a:fillRect`) refuses crop mode and crops. Fill, Fit, and aspect ratio centering are not measured. The editor ignores the EXIF orientation of a JPEG and draws and sizes the stored pixels, as measured.',
@@ -521,7 +521,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'pictures',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Five of the gallery styles, and border color, weight, and dashes. The written style XML is not measured. Dashes on a picture border are not measured, and round dots draw as squares.',
@@ -532,7 +532,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'pictures',
     editing: 'partial',
     rendering: 'none',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Description, title, and "Mark as decorative" for one selected object. On the slide and in the slide show, a screen reader reads the description of a picture. It skips a decorative picture and a picture with no description. When Tab selects an object, the screen reader also hears its description. Automatic descriptions are not built.',
@@ -555,7 +555,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'tables',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Tables render with merges, borders, and table styles. A cell with a merge marker that no span reaches draws as a normal cell (an approximation). The rows below list what you can edit.',
@@ -567,7 +567,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'tables',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes: `Click in a cell and type. Text commands work in a cell, a cell range, or the whole table. Tab and Shift+Tab move between cells. Tab in the last cell adds a row. Shift+Arrow at a cell's edge selects a cell range. Copy, cut, and paste a cell range as tab-separated text; a paste larger than the table adds rows and columns. ${TABLE_SAVE}`,
     docsLink: '/docs/guides/tables',
@@ -578,7 +578,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'tables',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes: `Insert a table from a grid. Insert and delete rows and columns, and select a row, a column, or the table. A new table does not fill an empty content placeholder. ${TABLE_SAVE}`,
     docsLink: '/docs/guides/tables',
@@ -589,7 +589,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'tables',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes: `Merge keeps the text of every cell. Split works on one cell. A merged cell splits only along even grid lines. When peers in a collaboration session change the rows, columns, or merged cells of one table at once, the canvas draws the table as a save writes it, with valid merge markers. ${TABLE_SAVE}`,
     docsLink: '/docs/guides/tables',
@@ -600,7 +600,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'tables',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes: `Toggle Header Row, Total Row, Banded Rows and Columns, and First and Last Column. The gallery lists the deck's styles and the default style only. ${TABLE_SAVE}`,
     docsLink: '/docs/guides/tables',
@@ -611,7 +611,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'tables',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes: `Shading takes a color or No Fill. Borders draw with a pen of a color, a preset dash, and a weight. Diagonal borders and cell effects are not editable. ${TABLE_SAVE}`,
     docsLink: '/docs/guides/tables',
@@ -622,7 +622,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'tables',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes: `Drag a grid line (the line under the pointer is marked), distribute rows and columns, type a row height or column width in the Format panel, or resize the frame by its handles (the columns and rows scale; how the change is shared among them is approximate). Row heights stay minimums, so rows grow to fit text. ${TABLE_SAVE}`,
     docsLink: '/docs/guides/tables',
@@ -680,7 +680,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'slides',
     editing: 'full',
     rendering: 'none',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'New slide takes a layout from a gallery that the engine draws. A delete shows what went, with an Undo button.',
@@ -691,10 +691,10 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'slides',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
-      'Hide slide works from the rail and the menus, and the slide show skips hidden slides. The PDF export leaves hidden slides out. The save is not yet checked for repair prompts.',
+      'Hide slide works from the rail and the menus, and the slide show skips hidden slides. The PDF export leaves hidden slides out.',
   },
   {
     id: 'slides.placeholder-prompts',
@@ -702,7 +702,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'slides',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Empty placeholders show their prompt in the editor only. A click in an empty text placeholder or text box places the caret. Content placeholders show no insert icons and no dotted outline.',
@@ -713,7 +713,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'slides',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Edit notes text, bold, italic, underline, and strikethrough, from the notes pane or the toolbar. A format at a caret outside a word does not carry to the next typed text. Other notes formatting is kept but not editable.',
@@ -745,10 +745,10 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'slides',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
-      'Add, rename, remove, move, and collapse sections from the section header menu in the rail and the slide sorter, and from the toolbar section parts (`section.*` slots). The default editor has no Section menu. Sections cannot be dragged. The save is not yet checked for repair prompts.',
+      'Add, rename, remove, move, and collapse sections from the section header menu in the rail and the slide sorter, and from the toolbar section parts (`section.*` slots). The default editor has no Section menu. Sections cannot be dragged.',
   },
   {
     id: 'slides.sorter',
@@ -778,7 +778,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'themes',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'The Background dialog sets a color, gradient, or picture. OK applies it as one undo step. Pattern fills are not editable.',
@@ -789,7 +789,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'themes',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Change layout and reset slide work. Placeholders without a place, animated empty placeholders, and placeholders in mc:AlternateContent keep their box: an approximation. The placeholder match order is not measured. Themes and the slide master cannot be edited.',

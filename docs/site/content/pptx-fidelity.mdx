@@ -95,6 +95,7 @@ When a feature needs [`@pptx-editor.dev/pro`](https://www.npmjs.com/package/@ppt
 - The editor keeps every part of the package that it does not edit. Unknown elements stay in place as generic nodes, so content the editor does not understand never blocks editing and survives save.
 - XML parts are written again in a normalized form. Binary parts, such as pictures, media, and embedded fonts, keep their exact bytes.
 - Every edit goes through one document store. An edit that the editor cannot make is refused with a reason. It is never dropped without notice.
+- A full round trip means that the feature's own edit is still in the file after save and reopen, that the edit changes no other part, and that the saved copy opens with no repair prompt.
 - Macros, OLE objects, audio, and video never run or play. The editor shows a poster or a labeled placeholder and keeps the object on save.
 
 ## Fonts
