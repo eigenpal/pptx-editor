@@ -40,6 +40,9 @@ import {
 
 const MAX_CATEGORIES = 4_096;
 const TICK_LENGTH = 3.1;
+/** Minor tick marks, measured on the `slide-structure` reference PDF: 2.3 pt each way. */
+const MINOR_TICK_LENGTH = 2.3;
+const MAX_MINOR_MARKS = 5_000;
 /** Labels beside a vertical axis sit this many sizes above their tick's centre line. */
 export const LABEL_LIFT = 0.08;
 /** Labels beside a vertical axis end this many sizes before it. */
@@ -548,10 +551,7 @@ export function paintCartesian(
         ];
     context.scene.line(segment, stroke);
     const mark = view.axis!.majorTickMark;
-    if (mark === 'none') continue;
     const outward = view.side === 'l' || view.side === 't' ? -1 : 1;
-    const from = mark === 'in' ? 0 : mark === 'cross' ? -TICK_LENGTH : 0;
-    const to = mark === 'in' ? -TICK_LENGTH : TICK_LENGTH;
     const ticks: number[] = [];
     if (view.value?.scale)
       for (const tick of view.value.scale.ticks) ticks.push(valueAt(view.value, tick));
@@ -565,18 +565,39 @@ export function paintCartesian(
         );
       }
     }
-    const marks = ticks.map((at) =>
-      vertical(view.side)
+    const markAt = (kind: ChartAxis['majorTickMark'], length: number) => (at: number) => {
+      const from = kind === 'cross' ? -length : 0;
+      const to = kind === 'in' ? -length : length;
+      return vertical(view.side)
         ? [
             { x: position + outward * from, y: at },
             { x: position + outward * to, y: at },
           ]
         : [
-            { x: at, y: position - outward * -from },
+            { x: at, y: position + outward * from },
             { x: at, y: position + outward * to },
-          ]
-    );
-    if (marks.length > 0) context.scene.path(marks, false, null, stroke);
+          ];
+    };
+    // Minor marks: five to a major step of a linear value axis, and one at each category's
+    // centre on a category axis whose major marks sit between the categories.
+    const minorMark = view.axis!.minorTickMark;
+    const minor: number[] = [];
+    const scale = view.value?.scale;
+    if (minorMark !== 'none' && scale && scale.logBase === undefined && scale.major > 0) {
+      const count = Math.min(
+        MAX_MINOR_MARKS,
+        Math.round(((scale.max - scale.min) / scale.major) * 5)
+      );
+      for (let index = 0; index <= count; index += 1)
+        minor.push(valueAt(view.value!, scale.min + (index * scale.major) / 5));
+    } else if (minorMark !== 'none' && !scale && categories?.between) {
+      for (let index = 0; index < Math.min(categories.count, MAX_MINOR_MARKS); index += 1)
+        minor.push(categoryAt(index));
+    }
+    if (minor.length > 0)
+      context.scene.path(minor.map(markAt(minorMark, MINOR_TICK_LENGTH)), false, null, stroke);
+    if (mark === 'none' || ticks.length === 0) continue;
+    context.scene.path(ticks.map(markAt(mark, TICK_LENGTH)), false, null, stroke);
   }
 
   for (const label of pending) context.labels.push(label);

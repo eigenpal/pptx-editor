@@ -164,6 +164,8 @@ export interface ChartAxis {
   readonly majorGridlines: OoxmlElement | null;
   readonly minorGridlines: OoxmlElement | null;
   readonly majorTickMark: 'none' | 'in' | 'out' | 'cross';
+  /** `c:minorTickMark`; an axis without one draws crossing marks, as the reference does. */
+  readonly minorTickMark: 'none' | 'in' | 'out' | 'cross';
   readonly tickLabelPosition: 'nextTo' | 'low' | 'high' | 'none';
   readonly spPr: OoxmlElement | null;
   readonly txPr: OoxmlElement | null;
@@ -531,6 +533,7 @@ function readAxis(element: OoxmlElement): ChartAxis | null {
   const crossesAt = childNumber(element, 'crossesAt', -1e300, 1e300);
   const crosses = childVal(element, 'crosses');
   const tickMark = childVal(element, 'majorTickMark');
+  const minorMark = childVal(element, 'minorTickMark');
   const labelPosition = childVal(element, 'tickLblPos');
   const crossBetween = childVal(element, 'crossBetween');
   const timeUnit = childVal(element, 'baseTimeUnit');
@@ -553,6 +556,10 @@ function readAxis(element: OoxmlElement): ChartAxis | null {
     majorTickMark:
       tickMark === 'none' || tickMark === 'in' || tickMark === 'out' || tickMark === 'cross'
         ? tickMark
+        : 'cross',
+    minorTickMark:
+      minorMark === 'none' || minorMark === 'in' || minorMark === 'out' || minorMark === 'cross'
+        ? minorMark
         : 'cross',
     tickLabelPosition:
       labelPosition === 'low' || labelPosition === 'high' || labelPosition === 'none'

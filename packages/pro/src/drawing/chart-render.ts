@@ -19,12 +19,7 @@ import { paintPie } from './chart-pie.ts';
 import { paintRadar } from './chart-radar.ts';
 import { ChartScene } from './chart-scene.ts';
 import type { LookContext } from './chart-series.ts';
-import {
-  mergeStroke,
-  readChartShapeProperties,
-  themeColor,
-  type ChartStroke,
-} from './chart-style.ts';
+import { readChartShapeProperties, themeColor } from './chart-style.ts';
 import { bodyRotation, paragraphsHeight, paragraphsWidth, type ChartLabel } from './chart-text.ts';
 
 const MARGIN = 11;
@@ -42,13 +37,6 @@ function manualBox(
     b: (layout.y + layout.h) * height,
   };
 }
-const DEFAULT_BORDER: ChartStroke = {
-  hex: '898989',
-  alpha: 1,
-  widthPt: 0.5,
-  cap: 'butt',
-  dash: null,
-};
 
 export interface ChartRender {
   readonly scene: ChartScene;
@@ -80,7 +68,8 @@ export function renderChart(
     width,
     height,
     background,
-    mergeStroke(area.line, model.spPr ? null : DEFAULT_BORDER)
+    // A chart area without `c:spPr` has no border (the `slide-structure` reference PDF).
+    area.line ?? null
   );
 
   const box = { l: MARGIN, t: MARGIN, r: width - MARGIN, b: height - MARGIN };
