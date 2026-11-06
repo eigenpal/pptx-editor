@@ -65,11 +65,13 @@ async function setup(
 }
 
 const at = (x: number, y: number) => ({ clientX: x / PX, clientY: y / PX, bubbles: true });
+/** A move with the button down, as a browser sends it during a drag. */
+const held = (x: number, y: number) => ({ ...at(x, y), buttons: 1 });
 
 function drag(from: Element, x0: number, y0: number, x1: number, y1: number): void {
   from.dispatchEvent(new PointerEvent('pointerdown', { ...at(x0, y0), button: 0 }));
-  document.dispatchEvent(new PointerEvent('pointermove', at((x0 + x1) / 2, (y0 + y1) / 2)));
-  document.dispatchEvent(new PointerEvent('pointermove', at(x1, y1)));
+  document.dispatchEvent(new PointerEvent('pointermove', held((x0 + x1) / 2, (y0 + y1) / 2)));
+  document.dispatchEvent(new PointerEvent('pointermove', held(x1, y1)));
   document.dispatchEvent(new PointerEvent('pointerup', at(x1, y1)));
 }
 
@@ -140,7 +142,7 @@ describe('crop mode on the surface', () => {
     editor.session!.store.transact([
       { op: 'setAttribute', part, node: locks.id, name: { ns: '', local: 'noCrop' }, value: '1' },
     ]);
-    document.dispatchEvent(new PointerEvent('pointermove', at(2 * IN, 2.5 * IN)));
+    document.dispatchEvent(new PointerEvent('pointermove', held(2 * IN, 2.5 * IN)));
     document.dispatchEvent(new PointerEvent('pointerup', at(2 * IN, 2.5 * IN)));
     expect(editor.snapshot().lastRejection?.reason).toBe('disabled.cropLocked');
     expect(editor.snapshot().image?.crop.left).toBe(0);
@@ -154,7 +156,7 @@ describe('crop mode on the surface', () => {
     // A size beyond `ST_PositiveCoordinate`: every step of the drag is refused.
     handle.dispatchEvent(new PointerEvent('pointerdown', { ...at(5 * IN, 4 * IN), button: 0 }));
     for (const x of [3e13, 4e13])
-      document.dispatchEvent(new PointerEvent('pointermove', at(x, 4 * IN)));
+      document.dispatchEvent(new PointerEvent('pointermove', held(x, 4 * IN)));
     document.dispatchEvent(new PointerEvent('pointerup', at(4e13, 4 * IN)));
     expect(editor.snapshot().lastRejection?.reason).toBe('errors.coordinateRange');
     expect(editor.snapshot().revision).toBe(before);

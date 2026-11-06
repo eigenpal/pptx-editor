@@ -11,7 +11,10 @@ import {
   presetHandles,
   type LayoutItem,
   type Matrix,
+  type SlideLayout,
 } from '../layout/index.ts';
+import type { EditorSelection } from '../contracts/index.ts';
+import { findItem } from '../automation/commands/placement.ts';
 import { SVG_NS } from '../output/index.ts';
 
 /** The preset geometry of an item whose handles the canvas shows, or null. */
@@ -91,6 +94,17 @@ export function startAdjustDrag(
     gesture,
     last,
   };
+}
+
+/**
+ * Whether a drag can go on: its shape is still the one selected shape, on the slide shown, with
+ * the size the drag started with.
+ */
+export function adjustDragLive(d: AdjustDrag, sel: EditorSelection, layout: SlideLayout): boolean {
+  if (sel.kind !== 'shapes' || sel.nodeIds.length !== 1 || sel.nodeIds[0] !== d.nodeId)
+    return false;
+  const g = presetOf(findItem(layout.items, d.nodeId));
+  return !!g && g.preset === d.preset && g.w === d.w && g.h === d.h;
 }
 
 /**

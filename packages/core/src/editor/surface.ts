@@ -44,6 +44,7 @@ import { ShapeDrag, type Handle } from './surface-drag.ts';
 import { handleElements } from './surface-handles.ts';
 import {
   adjustAt,
+  adjustDragLive,
   adjustHandleElements,
   startAdjustDrag,
   type AdjustDrag,
@@ -758,8 +759,17 @@ export class SlideSurface {
       this.#renderOverlay(layout, this.editor.zoom());
       return;
     }
+    // A press that ended out of sight (a lost pointerup) ends a handle drag: a hover edits nothing.
+    if ((this.#adjustDrag || this.#cropDrag) && (e.buttons & 1) === 0) {
+      this.#adjustDrag = this.#cropDrag = null;
+      return;
+    }
     const a = this.#adjustDrag;
     if (a) {
+      // The drag edits the shape it started on. Escape, an undo, or a peer's edit that changes
+      // the selection or removes the shape ends it.
+      if (!adjustDragLive(a, this.editor.selection(), layout))
+        return void (this.#adjustDrag = null);
       const values = adjustAt(a, p);
       if (values) this.editor.adjust?.(values, a.gesture);
       return;
@@ -786,9 +796,13 @@ export class SlideSurface {
     };
   }
 
-  /** End a shape drag with no edit (an undo or a redo). A drag that moved says so. */
+  /**
+   * End a drag (an undo or a redo). A shape drag ends with no edit, and says so when it moved. A
+   * crop or adjust handle drag keeps the steps it wrote, which the undo then reverts.
+   */
   cancelDrag(): void {
     this.#drag.cancel();
+    this.#adjustDrag = this.#cropDrag = null;
   }
 
   /** The snap distance in EMU, or null when Alt is down or View > Smart guides is off. */

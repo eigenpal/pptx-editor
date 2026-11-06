@@ -24,7 +24,7 @@ export function roundCorners(editor: PptxEditorInstance, nodeId: string) {
 }
 ```
 
-The keys are the guide names of the preset in ECMA-376, such as `adj`, `adj1`, and `adj2`. Each value uses the unit of its guide: 1/100000 of a side for a length, and 1/60000 of a degree for an angle. Values that you leave out keep their current values.
+The keys are the guide names of the preset in ECMA-376, such as `adj`, `adj1`, and `adj2`. Each value uses the unit of its guide. A length is in 1/100000 of the side that the preset's formula names, most often the shorter side. An angle is in 1/60000 of a degree. Values that you leave out keep their current values.
 
 ## Limits
 
@@ -33,10 +33,11 @@ The keys are the guide names of the preset in ECMA-376, such as `adj`, `adj1`, a
 - A shape with no adjust values, such as a rectangle or a freeform, is refused with `disabled.noAdjustHandles`.
 - A name that the preset does not have is refused with `errors.unsupported`.
 - Values that are already set give a `noop` result with `disabled.noAdjustChange`.
+- In viewing mode, the command is refused with `disabled.viewing`.
 
 ## Let users drag the handles
 
-When one preset shape with adjust values is selected, the default editor shows a yellow diamond at each adjust handle. Users drag a diamond to change the shape. One drag is one undo step. In viewing mode, the handles do not show.
+When one preset shape with adjust values is selected, the default editor shows a yellow diamond at each adjust handle. Users drag a diamond to change the shape. One drag is one undo step. Escape, an undo, or a change of the selection ends the drag. In viewing mode, the handles do not show.
 
 ## See also
 

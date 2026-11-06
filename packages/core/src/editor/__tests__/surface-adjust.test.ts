@@ -7,7 +7,12 @@ import { GlobalWindow } from 'happy-dom';
 import { buildPptx } from '../../../../../scripts/fixtures/builder.ts';
 import { apply, presetHandles, type LayoutItem } from '../../layout/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
-import { adjustAt, adjustHandleElements, startAdjustDrag } from '../surface-adjust.ts';
+import {
+  adjustAt,
+  adjustDragLive,
+  adjustHandleElements,
+  startAdjustDrag,
+} from '../surface-adjust.ts';
 import { itemById } from '../surface.ts';
 
 const shape = (id: number, name: string, prst: string): string =>
@@ -77,6 +82,25 @@ describe('adjust drag', () => {
     expect(Math.abs(now.x - (at.x - 457_200))).toBeLessThan(2_000);
     // The same place again writes nothing.
     expect(adjustAt(drag, { x: at.x - 457_200, y: at.y })).toBeNull();
+  });
+
+  test('a drag goes on only while its shape is the one selected shape', async () => {
+    const e = await open();
+    const drag = startAdjustDrag(item(e, 'Arrow'), 1, 'g1')!;
+    const live = () => adjustDragLive(drag, e.snapshot().selection, e.session!.layout(0)!);
+    expect(live()).toBe(true);
+    // Another shape selected, or no selection (Escape): the drag ends.
+    item(e, 'Box');
+    expect(live()).toBe(false);
+    e.setSelection({ kind: 'none' });
+    expect(live()).toBe(false);
+    // The shape resized under the drag: its handle places changed, so the drag ends.
+    const it = item(e, 'Arrow');
+    expect(live()).toBe(true);
+    const { x, y, cx, cy } = it.element.xfrm;
+    const nodeId = it.element.nodeId;
+    expect(e.exec({ type: 'setTransform', nodeId, x, y, cx: cx * 2, cy, rot: 0 }).ok).toBe(true);
+    expect(live()).toBe(false);
   });
 
   test('a handle index the shape does not have starts no drag', async () => {

@@ -1614,7 +1614,7 @@
 .pptx-surface__handle--adjust {
   fill: #ffd60a;
   stroke: #5c4a00;
-  cursor: default;
+  cursor: pointer;
 }
 /* Crop mode (surface-crop.ts): the image outside the frame, dimmed, and the crop handles. */
 .pptx-surface__crop-image {
