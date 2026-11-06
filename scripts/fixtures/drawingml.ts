@@ -89,13 +89,13 @@ const gridLine = `<c:majorGridlines><c:spPr><a:ln w="9525">${solidFill('D9D9D9')
 const axisLine = `<c:spPr><a:ln w="9525">${solidFill('BFBFBF')}</a:ln></c:spPr>`;
 
 /** A category axis and a value axis, `catPos` for the category side (`b` or `l`). */
-function axes(catPos: 'b' | 'l', valuePos: 'l' | 'b', valueFormat = 'General'): string {
+function axes(catPos: 'b' | 'l', valuePos: 'l' | 'b', valueFormat = 'General', size = 1197): string {
   return (
     `<c:catAx><c:axId val="1001"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${catPos}"/>` +
-    `<c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>${axisLine}${textProps()}` +
+    `<c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>${axisLine}${textProps(size)}` +
     '<c:crossAx val="1002"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>' +
     `<c:valAx><c:axId val="1002"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${valuePos}"/>${gridLine}` +
-    `<c:numFmt formatCode="${valueFormat}" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:spPr><a:ln><a:noFill/></a:ln></c:spPr>${textProps()}` +
+    `<c:numFmt formatCode="${valueFormat}" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:spPr><a:ln><a:noFill/></a:ln></c:spPr>${textProps(size)}` +
     '<c:crossAx val="1001"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>'
   );
 }
@@ -109,17 +109,20 @@ function chartTitle(text: string): string {
   );
 }
 
-function legend(pos: 'b' | 'r' | 't'): string {
-  return `<c:legend><c:legendPos val="${pos}"/><c:overlay val="0"/>${textProps()}</c:legend>`;
+function legend(pos: 'b' | 'r' | 't', size = 1197): string {
+  return `<c:legend><c:legendPos val="${pos}"/><c:overlay val="0"/>${textProps(size)}</c:legend>`;
 }
 
-function chartSpace(plot: string, opts: { title?: string; legend?: 'b' | 'r' | 't' }): string {
+function chartSpace(
+  plot: string,
+  opts: { title?: string; legend?: 'b' | 'r' | 't'; legendSize?: number }
+): string {
   return (
     `${XML}<c:chartSpace xmlns:c="${C}" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="${R}">` +
     '<c:date1904 val="0"/><c:roundedCorners val="0"/><c:chart>' +
     (opts.title ? chartTitle(opts.title) : '') +
     `<c:autoTitleDeleted val="${opts.title ? 0 : 1}"/><c:plotArea><c:layout/>${plot}</c:plotArea>` +
-    (opts.legend ? legend(opts.legend) : '') +
+    (opts.legend ? legend(opts.legend, opts.legendSize) : '') +
     '<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart>' +
     `<c:spPr>${solidFill('FFFFFF')}<a:ln><a:noFill/></a:ln></c:spPr>${textProps(1000, '404040')}</c:chartSpace>`
   );
@@ -137,11 +140,13 @@ const piePoints = PIE_COLORS.map(
     `<c:dPt><c:idx val="${i}"/><c:bubble3D val="0"/><c:spPr>${solidFill(color)}<a:ln w="19050">${solidFill('FFFFFF')}</a:ln></c:spPr></c:dPt>`
 ).join('');
 
-function pieSeries(): string {
+function pieSeries(labelSize = 1197): string {
   const s = SERIES[0]!;
   return (
     `<c:ser><c:idx val="0"/><c:order val="0"/><c:tx>${strCache('Sheet1!$B$1', [s.name])}</c:tx>${piePoints}` +
-    dataLabels('percent', 'ctr').replace('<c:dLblPos val="ctr"/>', '') +
+    dataLabels('percent', 'ctr')
+      .replace('<c:dLblPos val="ctr"/>', '')
+      .replace('sz="1197"', `sz="${labelSize}"`) +
     `<c:cat>${strCache('Sheet1!$A$2:$A$5', CATEGORIES)}</c:cat><c:val>${numCache('Sheet1!$B$2:$B$5', s.values)}</c:val></c:ser>`
   );
 }
@@ -242,6 +247,92 @@ export function chartsDeck(): FixtureOptions {
   return {
     slides,
     extraParts: CHARTS.map(([, xml], i): [string, string, string] => [`ppt/charts/chart${i + 1}.xml`, CHART_CT, xml]),
+  };
+}
+
+// --- Chart sizes -----------------------------------------------------------------------------
+
+/** Frame sizes in inches, each centred under the slide title. */
+const FRAMES = { large: [10, 5.9], medium: [7.5, 4.4], small: [5.5, 3.3] } as const;
+
+type ChartSizeSlide = readonly [
+  kind: 'column' | 'pie' | 'radar' | 'line',
+  legend: 'b' | 'r' | 't',
+  sizePt: number,
+  frame: keyof typeof FRAMES,
+];
+
+/**
+ * Legend-bearing charts at three frame sizes and three text sizes. Every text element of a chart
+ * (axes, legend, data labels) takes the slide's size, so the legend and radar spacing rules are
+ * measured beyond one text size and one frame.
+ */
+const CHART_SIZES: readonly ChartSizeSlide[] = [
+  ['column', 'r', 9, 'large'],
+  ['column', 'r', 14, 'medium'],
+  ['column', 'r', 20, 'small'],
+  ['column', 'b', 9, 'small'],
+  ['line', 'b', 9, 'small'],
+  ['column', 'b', 20, 'large'],
+  ['pie', 'b', 14, 'small'],
+  ['line', 't', 20, 'medium'],
+  ['radar', 'r', 9, 'small'],
+  ['radar', 'r', 9, 'large'],
+  ['radar', 'r', 14, 'medium'],
+  ['radar', 'r', 20, 'large'],
+];
+
+function sizedChart([kind, legendPos, sizePt]: ChartSizeSlide): string {
+  const sz = sizePt * 100;
+  const opts = { legend: legendPos, legendSize: sz };
+  switch (kind) {
+    case 'column':
+      return chartSpace(
+        `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${all('fill')}<c:gapWidth val="150"/><c:overlap val="-20"/>${AX_IDS}</c:barChart>${axes('b', 'l', 'General', sz)}`,
+        opts
+      );
+    case 'line':
+      return chartSpace(
+        `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${all('marker')}<c:marker val="1"/>${AX_IDS}</c:lineChart>${axes('b', 'l', 'General', sz)}`,
+        opts
+      );
+    case 'pie':
+      return chartSpace(
+        `<c:pieChart><c:varyColors val="1"/>${pieSeries(sz)}<c:firstSliceAng val="0"/></c:pieChart>`,
+        opts
+      );
+    case 'radar':
+      return chartSpace(
+        `<c:radarChart><c:radarStyle val="marker"/><c:varyColors val="0"/>${all('marker')}${AX_IDS}</c:radarChart>${axes('b', 'l', 'General', sz)}`,
+        opts
+      );
+  }
+}
+
+const KIND_NAMES = { column: 'Column', pie: 'Pie', radar: 'Radar', line: 'Line' } as const;
+const LEGEND_NAMES = { b: 'bottom', r: 'right', t: 'top' } as const;
+
+/** One legend-bearing chart per slide, at the text size and frame size of `CHART_SIZES`. */
+export function chartSizesDeck(): FixtureOptions {
+  const slides: FixtureSlide[] = CHART_SIZES.map((spec, i) => {
+    const [kind, legendPos, sizePt, size] = spec;
+    const [w, h] = FRAMES[size];
+    const box = [((13.333 - w) / 2) * IN, (1.1 + (5.9 - h) / 2) * IN, w * IN, h * IN];
+    return {
+      layout: 'blank',
+      shapes:
+        title(`${KIND_NAMES[kind]}, ${LEGEND_NAMES[legendPos]} legend, ${sizePt} pt text, ${w} x ${h} in`) +
+        frame(3, `Chart ${i + 1}`, box, C, `<c:chart xmlns:c="${C}" r:id="rIdChart"/>`),
+      rels: [['rIdChart', `${R}/chart`, `../charts/chart${i + 1}.xml`]],
+    };
+  });
+  return {
+    slides,
+    extraParts: CHART_SIZES.map((spec, i): [string, string, string] => [
+      `ppt/charts/chart${i + 1}.xml`,
+      CHART_CT,
+      sizedChart(spec),
+    ]),
   };
 }
 

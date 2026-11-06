@@ -13,7 +13,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import { type ColorContext } from './chart-xml.ts';
 import { paintCartesian } from './chart-cartesian.ts';
 import { chartBaseText, elementText, titleParagraphs } from './chart-labels.ts';
-import { legendEntries, paintLegend, placeLegend } from './chart-legend.ts';
+import { CHART_MARGIN, legendEntries, paintLegend, placeLegend } from './chart-legend.ts';
 import { child, childVal, readManualLayout, type ChartModel } from './chart-model.ts';
 import { paintPie } from './chart-pie.ts';
 import { paintRadar } from './chart-radar.ts';
@@ -21,8 +21,6 @@ import { ChartScene } from './chart-scene.ts';
 import type { LookContext } from './chart-series.ts';
 import { readChartShapeProperties, themeColor } from './chart-style.ts';
 import { bodyRotation, paragraphsHeight, paragraphsWidth, type ChartLabel } from './chart-text.ts';
-
-const MARGIN = 11;
 
 /** A manual layout's box in chart points. */
 function manualBox(
@@ -72,7 +70,12 @@ export function renderChart(
     area.line ?? null
   );
 
-  const box = { l: MARGIN, t: MARGIN, r: width - MARGIN, b: height - MARGIN };
+  const box = {
+    l: CHART_MARGIN,
+    t: CHART_MARGIN,
+    r: width - CHART_MARGIN,
+    b: height - CHART_MARGIN,
+  };
   // Pie labels keep clear of the title's text, by a little more than a character either side.
   const avoid: { l: number; t: number; r: number; b: number }[] = [];
 
