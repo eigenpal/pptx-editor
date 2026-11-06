@@ -429,10 +429,13 @@ function placeEnd(
     for (let i = path.segs.length - 1; i >= 0 && !dir; i -= 1) dir = arrival(path.segs[i]);
   }
   if (!dir) return { path };
-  return {
-    path: cut ? { start: path.start, segs: cut.segs } : path,
-    shape: endShape(end, tip, dir, unit, width),
-  };
+  // A line shorter than its inset lies wholly under the end, so none of it draws.
+  const kept = cut
+    ? { start: path.start, segs: cut.segs }
+    : by > 0
+      ? { start: tip, segs: [] }
+      : path;
+  return { path: kept, shape: endShape(end, tip, dir, unit, width) };
 }
 
 function reversed(path: Subpath): Subpath {
@@ -495,7 +498,8 @@ export function planStroke(
   if (!isOpenPath(commands) || (!head && !tail && !capsAtEndsOnly(line))) return plain;
   const width = strokeWidth(line, scale);
   const unit = lineEndUnit(line, scale);
-  const subpaths = subpathsOf(commands);
+  // A lone move draws nothing, so the ends go on the first and last subpaths that draw.
+  const subpaths = subpathsOf(commands).filter((s) => s.segs.length);
   if (!subpaths.length) return plain;
   const ends: LineEndShape[] = [];
   let first = subpaths[0];
@@ -520,14 +524,15 @@ export function planStroke(
   const caps: PathCommand[][] = [];
   const pattern = dashArray(line, width);
   if (pattern && capsAtEndsOnly(line)) {
-    // A dash pattern starts with a dash, so the start always gets its cap.
-    const start = parts[0];
-    const out = start.segs.length ? arrival(reverseSeg(start.segs[0])) : undefined;
-    if (out) caps.push(capPath(start.start, out, width));
-    const last = parts[lastIndex];
-    const lastSeg = last.segs[last.segs.length - 1];
-    const dir = lastSeg ? arrival(lastSeg) : undefined;
-    if (dir && inDash(pattern, lengthOf(last))) caps.push(capPath(lastSeg.to, dir, width));
+    // The dash pattern starts again with a dash on each subpath, so each start gets its cap.
+    for (const part of parts) {
+      if (!part.segs.length) continue;
+      const out = arrival(reverseSeg(part.segs[0]));
+      if (out) caps.push(capPath(part.start, out, width));
+      const lastSeg = part.segs[part.segs.length - 1];
+      const dir = arrival(lastSeg);
+      if (dir && inDash(pattern, lengthOf(part))) caps.push(capPath(lastSeg.to, dir, width));
+    }
   }
   return { commands: changed ? commandsOf(parts) : commands, ends, caps };
 }

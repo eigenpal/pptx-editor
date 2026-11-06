@@ -25,8 +25,12 @@ import {
   drawObject,
   LineCapStyle,
   LineJoinStyle,
+  PDFNumber,
+  PDFOperator,
+  PDFOperatorNames,
   popGraphicsState,
   pushGraphicsState,
+  setDashPattern,
   setFillingRgbColor,
   setLineCap,
   setLineJoin,
@@ -34,15 +38,17 @@ import {
   setStrokingRgbColor,
   stroke,
   type PDFName,
-  type PDFOperator,
 } from 'pdf-lib';
 import type { Rgba } from '@pptx-editor.dev/core/cascade';
 import {
   apply,
+  ARROW_MITER_LIMIT,
+  dashArray,
   drawingRenderers,
   hasCharacters,
   invert,
   multiply,
+  planStroke,
   type GeometryPath,
   type LayoutItem,
   type Matrix,
@@ -320,11 +326,46 @@ async function silhouette(
   const lines = line
     ? item.geometry.paths.filter((path) => path.stroke && !filled.includes(path))
     : [];
-  if (lines.length)
-    classes.push({
-      parts: [{ grown: await form(p, trace(lines, stroke())), width: (g) => lineWidth + 2 * g }],
-      bandWidth: lineWidth,
-    });
+  if (line && lines.length) {
+    // As the shape draws them (`planStroke`): open lines stop short under their line ends,
+    // dashes keep their gaps, and the ends cast their own shadow. The dashes take round caps,
+    // as every part of the silhouette does, so each dash keeps its drawn length.
+    const plans = lines.map((path) =>
+      item.kind === 'shape' ? planStroke(path.commands, line, matrixScale(item.matrix)) : undefined
+    );
+    const dashes = dashArray({ ...line, cap: 'rnd' }, lineWidth);
+    const arrows = plans.flatMap((plan) => plan?.ends.filter((e) => e.kind === 'stroke') ?? []);
+    const heads = plans.flatMap((plan) => plan?.ends.filter((e) => e.kind === 'fill') ?? []);
+    const strokes = (): void => {
+      if (dashes) p.push(setDashPattern([...dashes], 0));
+      lines.forEach((path, i) => {
+        tracePath(pathUnder(plans[i]?.commands ?? path.commands, full), p);
+        p.push(stroke());
+      });
+      if (!arrows.length) return;
+      p.push(
+        setDashPattern([], 0),
+        setLineJoin(LineJoinStyle.Miter),
+        PDFOperator.of(PDFOperatorNames.SetLineMiterLimit, [PDFNumber.of(ARROW_MITER_LIMIT)])
+      );
+      for (const arrow of arrows) tracePath(pathUnder(arrow.commands, full), p);
+      p.push(stroke());
+    };
+    const ends = (close: PDFOperator) => (): void => {
+      for (const head of heads) {
+        tracePath(pathUnder(head.commands, full), p);
+        p.push(close);
+      }
+    };
+    const parts: Part[] = [{ grown: await form(p, strokes), width: (g) => lineWidth + 2 * g }];
+    if (heads.length)
+      parts.push({
+        grown: await form(p, ends(fillEvenOddAndStroke())),
+        flat: await form(p, ends(fillEvenOdd())),
+        width: (grow) => 2 * grow,
+      });
+    classes.push({ parts, bandWidth: lineWidth });
+  }
   if (!fills && item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text)) {
     const { text, textMatrix: t } = item;
     const inner = multiply(m, t);

@@ -92,6 +92,15 @@ describe('dashes', () => {
     expect(planStroke(gap, dotted).caps.length).toBe(1);
     expect(planStroke(STRAIGHT, line({ dash: 'dot' })).caps).toEqual([]);
   });
+
+  test('each subpath starts its dash pattern again, so each gets its own caps', () => {
+    const two: PathCommand[] = [
+      ...STRAIGHT,
+      { op: 'M', x: 0, y: 10 * PT },
+      { op: 'L', x: 100 * PT, y: 10 * PT },
+    ];
+    expect(planStroke(two, line({ dash: 'dot', cap: 'sq' })).caps.length).toBe(4);
+  });
 });
 
 describe('line ends', () => {
@@ -178,6 +187,27 @@ describe('line ends', () => {
     const unknown = planStroke(STRAIGHT, line({ tail: end('star') }));
     expect(unknown.ends).toEqual([]);
     expect(unknown.commands).toBe(STRAIGHT);
+  });
+
+  test('a lone move at an end of the path does not take the line end', () => {
+    const trailing: PathCommand[] = [...STRAIGHT, { op: 'M', x: 50 * PT, y: 50 * PT }];
+    const leading: PathCommand[] = [{ op: 'M', x: 50 * PT, y: 50 * PT }, ...STRAIGHT];
+    for (const commands of [trailing, leading]) {
+      const plan = planStroke(commands, line({ head: end('triangle'), tail: end('triangle') }));
+      expect(plan.ends.length).toBe(2);
+      // Both ends of the drawn subpath stop 2.5 units (5 pt) inside the heads.
+      expect(points(plan.commands)).toEqual([
+        [5, 0],
+        [95, 0],
+      ]);
+    }
+  });
+
+  test('a line shorter than its line end draws only the end', () => {
+    const short: PathCommand[] = [STRAIGHT[0], { op: 'L', x: 2 * PT, y: 0 }];
+    const plan = planStroke(short, line({ tail: end('triangle') }));
+    expect(plan.ends.length).toBe(1);
+    expect(plan.commands.some((c) => c.op === 'L')).toBe(false);
   });
 
   test('the reach of the widest head bounds every line end', () => {
