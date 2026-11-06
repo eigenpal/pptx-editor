@@ -168,6 +168,14 @@ export interface BodyProps {
   readonly spcCol: number;
   readonly autofit: Autofit;
   readonly spcFirstLastPara: boolean;
+  /**
+   * Each single-spaced line is as tall as its face's ascent plus descent, with the baseline at
+   * the ascent, as the reference lays out chart text (ECMA-376 Part 1, 21.2). Without it, a line
+   * is 1.2 × its size (`line-metrics.ts`). Only chart labels set it; no `a:bodyPr` has it.
+   *
+   * @internal
+   */
+  readonly faceLines?: boolean;
 }
 
 /** A resolved text body. */

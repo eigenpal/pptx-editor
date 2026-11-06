@@ -128,6 +128,8 @@ const LABEL_BODY: BodyProps = {
   spcCol: 0,
   autofit: { kind: 'none' },
   spcFirstLastPara: false,
+  // Chart text sets each line on its face's ascent and descent, not on 1.2 × its size.
+  faceLines: true,
 };
 
 function runProps(run: ChartTextRun, theme: Theme): RunProps {

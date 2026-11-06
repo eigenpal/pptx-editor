@@ -20,6 +20,7 @@ import type { ResolvedFace, TextMeasurer } from './measurer.ts';
 import {
   autofitSizePt,
   baselineOffsetPt,
+  faceLinePt,
   lineHeightPt,
   paragraphSpacingPt,
   SCRIPT_SIZE_SCALE,
@@ -538,9 +539,15 @@ export function layoutText(
       }
       // A bullet larger than the text does not make its line taller (fixture
       // `bullets-numbering`, "Custom character, 150%").
-      const heightPt = lineHeightPt(maxSize, p.lineSpacing, reduction);
+      // Chart text sets each line on its face's own ascent and descent (`faceLinePt`).
+      const faceLine = bp.faceLines
+        ? faceLinePt(maxSize, p.lineSpacing, reduction, metrics ?? maxFace.metrics)
+        : undefined;
+      const heightPt = faceLine?.height ?? lineHeightPt(maxSize, p.lineSpacing, reduction);
       const height = heightPt * EMU_PER_PT;
-      const baseline = baselineOffsetPt(maxSize, heightPt, metrics ?? maxFace.metrics) * EMU_PER_PT;
+      const baseline =
+        (faceLine?.baseline ?? baselineOffsetPt(maxSize, heightPt, metrics ?? maxFace.metrics)) *
+        EMU_PER_PT;
 
       // Positions, then alignment. Positions include the left inset, so no later pass copies
       // the position arrays to add it.

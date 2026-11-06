@@ -70,6 +70,30 @@ export function lineHeightPt(
   return SINGLE_LINE_FACTOR * sizePt * effectivePct(spacing.pct, reduction);
 }
 
+/**
+ * The line of chart text (`BodyProps.faceLines`), in points: a single line is as tall as the
+ * face's ascent plus descent, and its baseline sits at the ascent. Measured on the chart labels
+ * of the `charts` and `slide-structure` reference PDFs: at 10, 11.97, and 18.62 pt, every
+ * label's glyph origin is the ascent, rounded to a whole point, below its line top (Calibri:
+ * 0.952 em, so 10, 11, and 18 pt). The 1.2 × size line puts it 0.9 pt higher at 10 pt. Percent
+ * spacing scales the line, and the extra space goes 75 % above the baseline, as above.
+ * Exact spacing keeps `lineHeightPt`.
+ * @internal
+ */
+export function faceLinePt(
+  sizePt: number,
+  spacing: { pct: number } | { pts: number },
+  reduction: number,
+  metrics: FaceMetrics
+): { readonly height: number; readonly baseline: number } | undefined {
+  if ('pts' in spacing) return undefined;
+  const natural = (metrics.ascent + metrics.descent) * sizePt;
+  if (!(natural > 0)) return undefined;
+  const height = natural * effectivePct(spacing.pct, reduction);
+  const baseline = metrics.ascent * sizePt + LOOSE_BASELINE_SHARE * (height - natural);
+  return { height, baseline: Math.max(0, Math.min(height, baseline)) };
+}
+
 /** Distance from the line box top to the baseline (points), before rounding. */
 export function baselineOffsetPt(sizePt: number, lineHeight: number, metrics: FaceMetrics): number;
 /**

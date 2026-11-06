@@ -59,6 +59,8 @@ export interface BodyProps {
     readonly autofit: Autofit;
     // (undocumented)
     readonly bIns: number;
+    // @internal
+    readonly faceLines?: boolean;
     // (undocumented)
     readonly lIns: number;
     // (undocumented)

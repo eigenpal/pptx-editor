@@ -10,6 +10,7 @@ import type { FaceMetrics } from '../measurer.ts';
 import {
   autofitSizePt,
   baselineOffsetPt,
+  faceLinePt,
   lineHeightPt,
   paragraphSpacingPt,
   roundToWholePoint,
@@ -190,5 +191,31 @@ describe('layout', () => {
     );
     const run = t.lines[0].runs.find((x) => x.kind === 'text')!;
     expect(run.sizePt).toBe(18);
+  });
+});
+
+describe('chart text lines (faceLinePt)', () => {
+  // Calibri's win ascent and descent, 1950 and 550 of 2048 units.
+  const calibri = face(1950 / 2048, 550 / 2048);
+  test('a single line is the ascent plus the descent, with the baseline at the ascent', () => {
+    const line = faceLinePt(10, { pct: 1 }, 0, calibri)!;
+    expect(line.height).toBeCloseTo(12.207, 3);
+    expect(line.baseline).toBeCloseTo(9.521, 3);
+    // The whole-point rule puts it at 10 pt below the line top, as `slide-structure.pdf` shows
+    // for its 10 pt axis labels; the 1.2 × size line puts it at 9 pt.
+    expect(roundToWholePoint(line.baseline * EMU_PER_PT) / EMU_PER_PT).toBe(10);
+    expect(
+      roundToWholePoint(
+        baselineOffsetPt(10, lineHeightPt(10, { pct: 1 }, 0), calibri) * EMU_PER_PT
+      ) / EMU_PER_PT
+    ).toBe(9);
+  });
+  test('percent spacing puts 75 % of the extra space above the baseline', () => {
+    const line = faceLinePt(10, { pct: 2 }, 0, calibri)!;
+    expect(line.height).toBeCloseTo(24.414, 3);
+    expect(line.baseline).toBeCloseTo(9.521 + 0.75 * 12.207, 2);
+  });
+  test('exact spacing keeps the slide line model', () => {
+    expect(faceLinePt(10, { pts: 1200 }, 0, calibri)).toBeUndefined();
   });
 });
