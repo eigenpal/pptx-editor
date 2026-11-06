@@ -36,7 +36,7 @@ const STUB: DrawingEffectsRenderer = {
 let warn: ReturnType<typeof spyOn>;
 beforeAll(() => (warn = spyOn(console, 'warn').mockImplementation(() => {})));
 afterAll(() => warn.mockRestore());
-afterEach(() => installDrawingRenderers({ effects: undefined }));
+afterEach(() => installDrawingRenderers({ effects: undefined, chart: undefined }));
 
 const control = (slot: ChromeSlotId): ChromeControl => chromeControlForSlot(slot)!;
 const values = (c: ChromeControl): string[] => (c.options ?? []).map((o) => o.value);
@@ -44,11 +44,25 @@ const values = (c: ChromeControl): string[] => (c.options ?? []).map((o) => o.va
 describe('drawingCapabilities', () => {
   test('follows the installed effects renderer', () => {
     installDrawingRenderers({ effects: undefined });
-    expect(drawingCapabilities()).toEqual({ effects: false });
+    expect(drawingCapabilities()).toEqual({ effects: false, chart: false });
     installDrawingRenderers({ effects: STUB });
-    expect(drawingCapabilities()).toEqual({ effects: true });
+    expect(drawingCapabilities()).toEqual({ effects: true, chart: false });
     installDrawingRenderers({ effects: undefined });
-    expect(drawingCapabilities()).toEqual({ effects: false });
+    expect(drawingCapabilities()).toEqual({ effects: false, chart: false });
+  });
+
+  test('follows the installed chart renderer, with one frozen answer per combination', () => {
+    const none = drawingCapabilities();
+    installDrawingRenderers({ chart: () => null });
+    const chart = drawingCapabilities();
+    expect(chart).toEqual({ effects: false, chart: true });
+    expect(Object.isFrozen(chart)).toBe(true);
+    installDrawingRenderers({ effects: STUB });
+    expect(drawingCapabilities()).toEqual({ effects: true, chart: true });
+    installDrawingRenderers({ effects: undefined });
+    expect(drawingCapabilities()).toBe(chart);
+    installDrawingRenderers({ chart: undefined });
+    expect(drawingCapabilities()).toBe(none);
   });
 
   test('an install raises the version and calls each subscriber', () => {

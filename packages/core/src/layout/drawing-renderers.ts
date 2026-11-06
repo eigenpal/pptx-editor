@@ -238,10 +238,17 @@ export function drawingRenderersListenerCount(): number {
 export interface DrawingCapabilities {
   /** Glow, inner shadow, reflection, and soft edge paint (`@pptx-editor.dev/pro/drawing`). */
   readonly effects: boolean;
+  /**
+   * Charts draw from their cached values (`@pptx-editor.dev/pro/drawing`). Without it, a chart
+   * frame keeps its labeled placeholder.
+   */
+  readonly chart: boolean;
 }
 
-const WITHOUT_EFFECTS: DrawingCapabilities = Object.freeze({ effects: false });
-const WITH_EFFECTS: DrawingCapabilities = Object.freeze({ effects: true });
+/** One frozen answer for each combination, so a caller can compare answers by identity. */
+const CAPABILITIES: readonly DrawingCapabilities[] = [0, 1, 2, 3].map((bits) =>
+  Object.freeze({ effects: (bits & 1) !== 0, chart: (bits & 2) !== 0 })
+);
 
 /**
  * What the installed drawing renderers paint, read at the time of the call. The chrome reads it
@@ -251,7 +258,7 @@ const WITH_EFFECTS: DrawingCapabilities = Object.freeze({ effects: true });
  * @public
  */
 export function drawingCapabilities(): DrawingCapabilities {
-  return installed.effects ? WITH_EFFECTS : WITHOUT_EFFECTS;
+  return CAPABILITIES[(installed.effects ? 1 : 0) | (installed.chart ? 2 : 0)]!;
 }
 
 /** The installed renderers. @internal */
