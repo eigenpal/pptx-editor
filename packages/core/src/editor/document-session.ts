@@ -32,7 +32,10 @@ import {
   type XmlPart,
   type PackageRejection,
   type PptxPackage,
+  type PackagePart,
   type PresentationInfo,
+  changedPartNames,
+  deferredParseCount,
   imageSize,
   imageSizeEmu,
 } from '../store/index.ts';
@@ -139,24 +142,107 @@ function partFamilies(part: XmlPart): ReadonlySet<string> {
 
 const FAMILY_PARTS = /^\/ppt\/(slides|slideLayouts|slideMasters)\//;
 
+/** The families of the parts that name measured text, for the last package read. */
+interface FamilyCount {
+  /** `deferredParseCount()` when counted: a slide that parses changes no part identity. */
+  readonly parsed: number;
+  readonly slides: PresentationInfo['slides'];
+  readonly themes: ReadonlySet<string | undefined>;
+  /** The number of parts that name each family, by its exact spelling. */
+  readonly counts: ReadonlyMap<string, number>;
+  readonly list: readonly string[];
+}
+
+const familyCounts = new WeakMap<PptxPackage, FamilyCount>();
+/** The last package counted, held weakly: a closed deck is not kept alive for it. */
+let lastFamilyPackage: WeakRef<PptxPackage> | null = null;
+const EMPTY_FAMILIES: ReadonlySet<string> = new Set();
+
+/** The families `part` adds to the count, or none. */
+function countedFamilies(
+  part: PackagePart | undefined,
+  themes: ReadonlySet<string | undefined>
+): ReadonlySet<string> {
+  if (part?.kind !== 'xml' || !(FAMILY_PARTS.test(part.partName) || themes.has(part.partName)))
+    return EMPTY_FAMILIES;
+  // A slide still opening names its families once it parses (`progressive-open.ts`).
+  if (isDeferredPending(part)) return EMPTY_FAMILIES;
+  return partFamilies(part.xml);
+}
+
+/**
+ * The sorted list, one entry per case-folded family, or null when two spellings of one family
+ * remain: a full pass then picks the spelling of the first part that names it.
+ */
+function familyList(counts: ReadonlyMap<string, number>): string[] | null {
+  const folded = new Set<string>();
+  for (const f of counts.keys()) {
+    const key = f.toLowerCase();
+    if (folded.has(key)) return null;
+    folded.add(key);
+  }
+  return [...counts.keys()].sort((a, b) => a.localeCompare(b));
+}
+
 /**
  * Every family the deck names for measured text: run fonts, symbol fonts, bullet fonts, and
  * the theme's font scheme. Cached per part identity, so an edit rescans only the parts it
- * changed.
+ * changed. After an edit that keeps the slide list, the count of the last package changes by
+ * the changed parts only, so a keystroke walks no other part. The result is the one a full
+ * pass gives.
  */
 export function namedFamilies(pkg: PptxPackage): string[] {
-  const byKey = new Map<string, string>();
-  // Only the themes slide masters use: a notes or handout master theme never reaches a slide.
-  const themes = new Set(presentationInfo(pkg).slides.map((s) => s.themePart));
-  for (const part of pkg.parts.values()) {
-    if (part.kind !== 'xml' || !(FAMILY_PARTS.test(part.partName) || themes.has(part.partName)))
-      continue;
-    // A slide still opening names its families once it parses (`progressive-open.ts`).
-    if (isDeferredPending(part)) continue;
-    for (const f of partFamilies(part.xml))
-      if (!byKey.has(f.toLowerCase())) byKey.set(f.toLowerCase(), f);
+  const info = presentationInfo(pkg);
+  const parsed = deferredParseCount();
+  const hit = familyCounts.get(pkg);
+  if (hit?.parsed === parsed) return rememberFamilies(pkg, hit);
+  const lastPkg = lastFamilyPackage?.deref();
+  const last = lastPkg && familyCounts.get(lastPkg);
+  const changed =
+    lastPkg && last && last.parsed === parsed && last.slides === info.slides
+      ? changedPartNames(lastPkg, pkg, 64)
+      : null;
+  if (last && changed) {
+    const counts = new Map(last.counts);
+    const add = (families: ReadonlySet<string>, by: number): void => {
+      for (const f of families) {
+        const n = (counts.get(f) ?? 0) + by;
+        if (n > 0) counts.set(f, n);
+        else counts.delete(f);
+      }
+    };
+    for (const name of changed) {
+      add(countedFamilies(lastPkg?.parts.get(name), last.themes), -1);
+      add(countedFamilies(pkg.parts.get(name), last.themes), 1);
+    }
+    const list = familyList(counts);
+    if (list) {
+      return rememberFamilies(pkg, {
+        parsed,
+        slides: info.slides,
+        themes: last.themes,
+        counts,
+        list,
+      });
+    }
   }
-  return [...byKey.values()].sort((a, b) => a.localeCompare(b));
+  // Only the themes slide masters use: a notes or handout master theme never reaches a slide.
+  const themes = new Set(info.slides.map((s) => s.themePart));
+  const counts = new Map<string, number>();
+  const byKey = new Map<string, string>();
+  for (const part of pkg.parts.values())
+    for (const f of countedFamilies(part, themes)) {
+      counts.set(f, (counts.get(f) ?? 0) + 1);
+      if (!byKey.has(f.toLowerCase())) byKey.set(f.toLowerCase(), f);
+    }
+  const list = [...byKey.values()].sort((a, b) => a.localeCompare(b));
+  return rememberFamilies(pkg, { parsed, slides: info.slides, themes, counts, list });
+}
+
+function rememberFamilies(pkg: PptxPackage, count: FamilyCount): string[] {
+  familyCounts.set(pkg, count);
+  lastFamilyPackage = new WeakRef(pkg);
+  return [...count.list];
 }
 
 const MIME_BY_EXT: Record<string, string> = {

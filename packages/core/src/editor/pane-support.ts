@@ -61,6 +61,37 @@ export function slideItemName(
   return t(slide.hidden ? 'rail.hiddenSlideLabel' : 'rail.slideLabel', { index: slide.index + 1 });
 }
 
+/**
+ * A text that changes when the translation of the slide item names changes: the names of the
+ * first slide, shown and hidden. A list keys its cached items on it, so a locale change names
+ * every item again, and a render with the same labels translates no item. @internal
+ */
+export function slideItemLabels(t: Translate): string {
+  return `${t('rail.slideLabel', { index: 1 })}\u0000${t('rail.hiddenSlideLabel', { index: 1 })}`;
+}
+
+/**
+ * A cache of rendered list items, as Vue's `v-memo`: the item made for a key object is reused
+ * while its inputs are the same. The slide rail keys it on the slide summary, which keeps its
+ * object while the slide renders the same, so a keystroke on one slide of a long deck makes
+ * one new item and the framework skips the others at once. @internal
+ */
+export function createItemMemo<V>(): (key: object, inputs: readonly unknown[], make: () => V) => V {
+  const cache = new WeakMap<object, { inputs: readonly unknown[]; value: V }>();
+  return (key, inputs, make) => {
+    const hit = cache.get(key);
+    if (
+      hit &&
+      hit.inputs.length === inputs.length &&
+      hit.inputs.every((v, i) => Object.is(v, inputs[i]))
+    )
+      return hit.value;
+    const value = make();
+    cache.set(key, { inputs, value });
+    return value;
+  };
+}
+
 /** The zoom levels of the zoom pill's menu, after Fit. @internal */
 export const ZOOM_MENU_LEVELS: readonly number[] = [0.5, 0.75, 1, 1.5, 2];
 

@@ -1207,6 +1207,10 @@
   flex: 1 1 auto;
   border-radius: 6px;
   overflow: hidden;
+  /* A thumbnail out of view costs no layout or paint. Its box keeps its size (the inline
+     aspect ratio), so the list does not move. While a long deck paints its thumbnails in idle
+     time, a keystroke then lays out only the thumbnails in view. */
+  content-visibility: auto;
   box-shadow: 0 0 0 1px var(--doc-border);
   background: var(--doc-page-bg);
   transition: box-shadow 0.15s ease;

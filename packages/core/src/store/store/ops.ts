@@ -8,6 +8,7 @@
 
 import { isCanonicalPartName, partNameKey } from '@eigenpal/ooxml-core';
 import type { PackagePart, PptxPackage } from '../package/package.ts';
+import { DerivedParts } from '../package/parts-map.ts';
 import { isValidXmlText } from '@eigenpal/ooxml-core';
 import { parseXmlPart } from '../package/tree.ts';
 import { MAX_XML_DEPTH } from '@eigenpal/ooxml-core';
@@ -177,7 +178,7 @@ const validIndex = (index: number, length: number): boolean =>
  */
 class Transaction {
   readonly #base: PptxPackage;
-  #parts: Map<string, PackagePart> | null = null;
+  #parts: DerivedParts | null = null;
   readonly #trees = new Map<string, WorkingTree>();
   /** OPC-equivalent part names (`partNameKey`), built on the first `addPart`. */
   #keys: Set<string> | null = null;
@@ -186,8 +187,9 @@ class Transaction {
     this.#base = base;
   }
 
-  #partsForWrite(): Map<string, PackagePart> {
-    this.#parts ??= new Map(this.#base.parts);
+  /** The writable part map: it records changes over the base, never a copy of every part. */
+  #partsForWrite(): DerivedParts {
+    this.#parts ??= DerivedParts.from(this.#base.parts);
     return this.#parts;
   }
 
@@ -331,7 +333,7 @@ class Transaction {
     for (const [name, tree] of this.#trees)
       if (tree.changed)
         this.#partsForWrite().set(name, { kind: 'xml', partName: name, xml: tree.result() });
-    return this.#parts ? { parts: this.#parts } : this.#base;
+    return this.#parts ? { parts: this.#parts.seal() } : this.#base;
   }
 }
 
