@@ -3,4 +3,4 @@
 '@pptx-editor.dev/i18n': minor
 ---
 
-Set the adjust values of a preset shape with the `setAdjustments` command, bounded to the ranges of its adjust handles, as one undo step.
+Drag the adjust handles of a selected preset shape on the canvas, or set its adjust values with the `setAdjustments` command. Values are bounded to the ranges of the handles, and one drag is one undo step.

@@ -13,6 +13,8 @@ import {
   shapeTreeOf,
   type PptxPackage,
 } from '../../store/index.ts';
+import { writeAdjustments } from '../../automation/commands/adjust-commands.ts';
+import { OpBatch } from '../../automation/commands/op-batch.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 
 const shape = (id: number, name: string, prst: string, av = ''): string =>
@@ -93,5 +95,32 @@ describe('setAdjustments', () => {
     if (!same.ok) expect([same.reason, same.noop]).toEqual(['disabled.noAdjustChange', true]);
     e.setSelection({ kind: 'none' });
     expect(e.can({ type: 'setAdjustments', values: { adj: 1 } }).ok).toBe(false);
+  });
+});
+
+describe('writeAdjustments', () => {
+  test('escapes guide names that a layout gives, so they stay one attribute', async () => {
+    const e = await open();
+    const pkg = pkgOf(e);
+    const part = presentationInfo(pkg).slides[0]!.partName;
+    const sp = elements(shapeTreeOf(pkg, part)).find(
+      (el) => attr(find(el, 'p:cNvPr'), 'name') === 'Box'
+    )!;
+    const name = 'a"/><a:foo x="';
+    const batch = new OpBatch(pkg);
+    const target = {
+      part,
+      spPr: child(sp, 'p:spPr')!,
+      own: undefined,
+      preset: 'roundRect',
+      adjust: new Map([[name, 1]]),
+    };
+    writeAdjustments(batch, target, new Map());
+    const insert = batch.ops.find((op) => op.op === 'insertNode');
+    const avLst = insert && 'spec' in insert ? insert.spec.children?.[0] : undefined;
+    const gds = avLst && 'children' in avLst ? (avLst.children ?? []) : [];
+    expect(gds.map((g) => ('local' in g ? [g.local, g.attrs?.[0]?.value] : []))).toEqual([
+      ['gd', name],
+    ]);
   });
 });

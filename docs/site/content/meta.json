@@ -30,6 +30,7 @@
     "recipes/index",
     "recipes/replace-text",
     "recipes/slide-size",
+    "recipes/shape-adjustments",
     "---React---",
     "react/index",
     "react/composition",

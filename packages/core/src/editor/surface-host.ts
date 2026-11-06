@@ -86,6 +86,7 @@ export function createSurfaceHost(base: SurfaceHostBase, s: SurfaceHostState): S
       s.gestureEdit({ type: 'setTransforms', items }, gesture, base);
     },
     crop: (crop, gesture) => s.gestureEdit({ type: 'cropImage', crop }, gesture),
+    adjust: (values, gesture) => s.gestureEdit({ type: 'setAdjustments', values }, gesture),
     painting: () => s.painter.mode !== 'off',
     // A selection made with the pointer while the painter is on takes the copied format.
     pointerUp: () => void (s.painter.mode !== 'off' && base.run({ type: 'pasteFormat' })),

@@ -956,6 +956,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       if (!r.ok) return void refuse('errors.unsupported', commitRefusalDetail(r.rejection));
     } catch (e) {
       const refusal = e instanceof CommandRefusal ? e : new CommandRefusal('errors.unsupported');
+      // A drag step that changes nothing (a pointer that moved within one value) is no error.
+      if (isNothingToDo(refusal.reason)) return;
       return void refuse(refusal.reason, refusal.detail);
     }
     emit();

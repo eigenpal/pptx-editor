@@ -931,6 +931,7 @@
   "canvas": {
     "ariaLabel": "スライド {index}/{total}",
     "inputAriaLabel": "選択した図形のテキスト",
+    "adjustHandle": "ドラッグして図形の形を変更",
     "tableCell": "{row} 行、{column} 列",
     "shapeSelected": "{kind} {name} を選択しました",
     "shapeSelectedWithAltText": "{kind} {name}、{description} を選択しました",

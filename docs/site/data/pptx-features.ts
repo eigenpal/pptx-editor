@@ -316,7 +316,8 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'All 187 presets use the spec guide formulas. Insert, move, resize, and rotate. Adjust handles are not built.',
+      'All 187 presets use the spec guide formulas. Insert, move, resize, rotate, and drag the adjust handles (`setAdjustments`). A shape cannot change to another preset.',
+    docsLink: '/docs/recipes/shape-adjustments',
   },
   {
     id: 'shapes.custom-geometry',
