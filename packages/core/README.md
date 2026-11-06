@@ -47,11 +47,11 @@ editor.exec({ type: 'toggleBold' });
 const saved = editor.save(); // Uint8Array, or null when no document is open
 ```
 
-For a React UI, use [`@pptx-editor.dev/react`](../react/README.md).
+For a React UI, use [`@pptx-editor.dev/react`](https://github.com/eigenpal/pptx-editor/blob/main/packages/react/README.md).
 
 ## Fonts
 
-`createPptxEditor({ fonts })` takes a `FontConfiguration`, a fragment, or a `FontResolver`, with the names and shapes of DOCX Editor's API: `loadFonts`, `createFontSource`, `customFonts`, `composeFontConfiguration`, `defineFontResolver`, and `deferFonts`. `editor.setFonts()` replaces the host faces in place, and `onFontError` receives each failure. Without `fonts`, the editor uses the deck's embedded fonts and the packaged substitutes, and makes no network request. See [Fonts](../../docs/site/content/customization/fonts.mdx).
+`createPptxEditor({ fonts })` takes a `FontConfiguration`, a fragment, or a `FontResolver`, with the names and shapes of DOCX Editor's API: `loadFonts`, `createFontSource`, `customFonts`, `composeFontConfiguration`, `defineFontResolver`, and `deferFonts`. `editor.setFonts()` replaces the host faces in place, and `onFontError` receives each failure. Without `fonts`, the editor uses the deck's embedded fonts and the packaged substitutes, and makes no network request. See [Fonts](https://github.com/eigenpal/pptx-editor/blob/main/docs/site/content/customization/fonts.mdx).
 
 ## Bundlers
 

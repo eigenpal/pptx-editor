@@ -29,7 +29,7 @@ npm install @pptx-editor.dev/vue @pptx-editor.dev/core
 
 ## Open and save a deck
 
-This component reads a file input, shows the deck in the editor, and downloads the result. The editor reloads when the identity of `document` changes. The ref's `save()` returns the saved package as bytes.
+This component reads a file input, shows the deck in the editor, and downloads the result. It mounts the editor after you pick a file. The editor reloads when the identity of `document` changes. The ref's `save()` returns the saved package as bytes.
 
 <FrameworkTabs>
 <Framework value="react">
@@ -70,7 +70,7 @@ export default function App() {
         </button>
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
-        <PptxEditor ref={editorRef} document={bytes} mode="edit" />
+        {bytes && <PptxEditor ref={editorRef} document={bytes} mode="edit" />}
       </div>
     </div>
   );
@@ -115,7 +115,7 @@ function download() {
       <button :disabled="!bytes" @click="download">Download</button>
     </div>
     <div style="flex: 1; min-height: 0">
-      <PptxEditor ref="editorRef" :document="bytes" mode="edit" />
+      <PptxEditor v-if="bytes" ref="editorRef" :document="bytes" mode="edit" />
     </div>
   </div>
 </template>
@@ -128,7 +128,7 @@ function download() {
 
 | Option | React | Vue | Use |
 | --- | --- | --- | --- |
-| `document` | `Uint8Array` | `Uint8Array` | The `.pptx` bytes. A new array loads a new deck. |
+| `document` | `Uint8Array` | `Uint8Array` | The `.pptx` bytes. A new array loads a new deck. Without `document`, the editor shows its loading sheet until bytes arrive. |
 | `mode` | `'edit'` or `'view'` | `'edit'` or `'view'` | Edit the deck, or only show it. The default is `'edit'`. |
 | Ready | `onReady(editor)` | `@ready` | Gives you the editor instance. Use `editor.save()`, `editor.exec(command)`, and `editor.snapshot()`. |
 | Ref | `ref` (`PptxEditorRef`) | `ref` (`PptxEditorRef`) | The imperative handle. See [Use the ref](#use-the-ref). |
