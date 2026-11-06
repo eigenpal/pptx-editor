@@ -47,7 +47,7 @@ editor.exec({ type: 'toggleBold' });
 const saved = editor.save(); // Uint8Array, or null when no document is open
 ```
 
-For a React UI, use [`@pptx-editor.dev/react`](https://github.com/eigenpal/pptx-editor/blob/main/packages/react/README.md).
+For a React UI, use [`@pptx-editor.dev/react`](https://www.npmjs.com/package/@pptx-editor.dev/react).
 
 ## Fonts
 
