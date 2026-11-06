@@ -105,7 +105,7 @@
             <a:alphaOff val="0"/>
           </a:srgbClr>
         </a:solidFill>
-        <a:ln w="25400" cap="flat" cmpd="sng" algn="ctr">
+        <a:ln w="12700" cap="flat" cmpd="sng" algn="ctr">
           <a:solidFill>
             <a:srgbClr val="FFFFFF">
               <a:hueOff val="0"/>
@@ -190,7 +190,7 @@
             <a:alphaOff val="0"/>
           </a:srgbClr>
         </a:solidFill>
-        <a:ln w="25400" cap="flat" cmpd="sng" algn="ctr">
+        <a:ln w="12700" cap="flat" cmpd="sng" algn="ctr">
           <a:solidFill>
             <a:srgbClr val="FFFFFF">
               <a:hueOff val="0"/>
@@ -351,7 +351,7 @@
             <a:alphaOff val="0"/>
           </a:srgbClr>
         </a:solidFill>
-        <a:ln w="25400" cap="flat" cmpd="sng" algn="ctr">
+        <a:ln w="12700" cap="flat" cmpd="sng" algn="ctr">
           <a:solidFill>
             <a:srgbClr val="FFFFFF">
               <a:hueOff val="0"/>
@@ -436,7 +436,7 @@
             <a:alphaOff val="0"/>
           </a:srgbClr>
         </a:solidFill>
-        <a:ln w="25400" cap="flat" cmpd="sng" algn="ctr">
+        <a:ln w="12700" cap="flat" cmpd="sng" algn="ctr">
           <a:solidFill>
             <a:srgbClr val="FFFFFF">
               <a:hueOff val="0"/>
@@ -597,7 +597,7 @@
             <a:alphaOff val="0"/>
           </a:srgbClr>
         </a:solidFill>
-        <a:ln w="25400" cap="flat" cmpd="sng" algn="ctr">
+        <a:ln w="12700" cap="flat" cmpd="sng" algn="ctr">
           <a:solidFill>
             <a:srgbClr val="FFFFFF">
               <a:hueOff val="0"/>
@@ -682,7 +682,7 @@
             <a:alphaOff val="0"/>
           </a:srgbClr>
         </a:solidFill>
-        <a:ln w="25400" cap="flat" cmpd="sng" algn="ctr">
+        <a:ln w="12700" cap="flat" cmpd="sng" algn="ctr">
           <a:solidFill>
             <a:srgbClr val="FFFFFF">
               <a:hueOff val="0"/>
