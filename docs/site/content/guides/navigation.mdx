@@ -1,0 +1,91 @@
+---
+title: 'Navigate a presentation'
+description: 'Select slides, build a slide counter, and find text through the editor API.'
+category: 'Guides'
+---
+
+Use zero-based slide indexes with editor methods. Add one when you display a slide number.
+
+## Go to a slide
+
+These helpers move within an open presentation:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function nextSlide(editor: Editor) {
+  editor.goToSlide(editor.snapshot().currentSlide + 1);
+}
+
+export function previousSlide(editor: Editor) {
+  editor.goToSlide(editor.snapshot().currentSlide - 1);
+}
+```
+
+The editor clamps the index to the presentation. Moving to another slide clears the shape or text selection.
+
+## Select several slides
+
+Use `selectSlide` when you build a custom slide rail:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function selectRange(editor: Editor, first: number, last: number) {
+  editor.selectSlide(first, 'replace');
+  editor.selectSlide(last, 'range');
+}
+```
+
+| Mode      | Behavior                                        |
+| --------- | ----------------------------------------------- |
+| `replace` | Select only this slide. This is the default.    |
+| `toggle`  | Add or remove this slide from the selection.    |
+| `range`   | Select from the selection anchor to this slide. |
+
+Read `snapshot().selectedSlides` for the sorted indexes. Use integer indexes from the current slide list.
+
+## Build a slide counter
+
+Subscribe once, then dispose the subscription when you remove the counter:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function bindSlideCounter(editor: Editor, label: HTMLElement) {
+  const update = () => {
+    const state = editor.snapshot();
+    label.textContent = state.slides.length
+      ? `${state.currentSlide + 1} / ${state.slides.length}`
+      : 'No presentation';
+  };
+  update();
+  return editor.subscribe(update);
+}
+```
+
+Use the adapters' `SlideRail` and state hooks when you do not need custom DOM. For thumbnail lifecycle, see [Editor mount modes](/docs/core/mount-modes).
+
+## Find text
+
+A `PptxEditorInstance` exposes `find`. It searches slide text, table cells, and speaker notes:
+
+```ts
+import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+export function findNext(editor: PptxEditorInstance, query: string) {
+  const result = editor.find.next(query);
+  if (!result.ok) throw new Error(result.reason);
+  return { position: result.index + 1, total: result.total };
+}
+```
+
+`next()` and `previous()` select a match and wrap through the presentation. A notes match moves to its slide. No match returns `index: -1` and `match: null`.
+
+The first search can finish parsing a long presentation. Use [Long decks](/docs/guides/long-decks) to plan loading feedback.
+
+## See also
+
+- [Zoom](/docs/guides/zoom)
+- [Find and replace text](/docs/recipes/replace-text)
+- [Layout](/docs/customization/layout)

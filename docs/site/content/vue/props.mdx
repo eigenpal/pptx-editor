@@ -13,6 +13,7 @@ This example loads `.pptx` bytes and saves the edited deck through the ref:
 <script setup lang="ts">
 import { ref } from 'vue';
 import { PptxEditor, type PptxEditorRef } from '@pptx-editor.dev/vue';
+import '@pptx-editor.dev/core/styles/editor.css';
 
 const props = defineProps<{
   bytes: Uint8Array;
@@ -45,6 +46,7 @@ For generated signatures, see `docs/api/vue/index.api.md` in the repository. The
 | Prop | Type | Description |
 | --- | --- | --- |
 | `document` | `Uint8Array` | The `.pptx` bytes. A new array loads a new deck. Without it, the editor shows its loading sheet. |
+| `autoCorrect` | `boolean` | Enables typing AutoCorrect. Defaults to `true`. Read when the editor is created; remount to change it. |
 | `mode` | `'edit' \| 'view'` | Edit the deck, or only show it. Defaults to `'edit'`. Changes apply without a reload. |
 
 ### Fonts
@@ -89,6 +91,21 @@ const modules = [reviewModule()];
 
 A host `class`, `style`, `id`, or `data-*` attribute goes on the viewport, after its `pptx-default` class.
 
+### Packaged parts
+
+Set a part to `false` to hide it, or pass its props object to configure it.
+
+| Prop             | Type                                    | Default |
+| ---------------- | --------------------------------------- | ------- |
+| `toolbar`        | `boolean \| ToolbarProps`               | `true`  |
+| `menu`           | `boolean \| MenuProps`                  | `false` |
+| `contextMenu`    | `boolean \| PptxEditorContextMenuProps` | `true`  |
+| `hyperlinkPopup` | `boolean`                               | `true`  |
+| `slideRail`      | `boolean \| SlideRailProps`             | `true`  |
+| `notesPane`      | `boolean \| NotesPaneProps`             | `true`  |
+
+A `popups.contextMenu` or `popups.hyperlink` entry takes precedence over the corresponding part prop. Hiding a control does not disable its editing command. For examples, see [Change one part of the packaged editor](/docs/customization/layout#change-one-part-of-the-packaged-editor).
+
 ### Chrome
 
 | Prop | Type | Description |
@@ -102,7 +119,7 @@ A host `class`, `style`, `id`, or `data-*` attribute goes on the viewport, after
 
 | Event | Payload | Description |
 | --- | --- | --- |
-| `@ready` | `editor: PptxEditorInstance` | Emitted once for each instance, after the editor mounts. |
+| `@ready` | `editor: PptxEditorInstance` | Emitted once for each instance, after the editor mounts. This does not mean the document has loaded. |
 | `@change` | `editor: PptxEditorInstance` | Emitted after every change of editor state, also for selection changes. |
 | `@font-error` | `error: EditorFontError` | A font failure: a failed origin, a refused face, or a failed resolution. Without a listener, each failure prints one warning. |
 

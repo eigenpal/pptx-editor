@@ -35,11 +35,11 @@ The pages use these components without imports. A site that renders this directo
 
 The three feature components are the DOCX Editor site components (`src/components/docs/FeatureMatrix.tsx` in the DOCX Editor website repository), bound to `pptxFeatures`, `pptxFeatureById`, and `FEATURE_CATEGORY_LABELS` from `data/pptx-features.ts` in place of the `word-features.ts` exports. The data file imports nothing, so the site can copy it as it is. A row has only the fields of a DOCX Editor row. The components show no `tier`, so a premium row says in its notes that it needs the EigenPal Pro License, as in DOCX Editor. The evidence for each row is in `data/pptx-feature-evidence.ts`, which the site does not sync.
 
-Update `data/pptx-features.ts` when the status of a feature changes. Never write support claims in prose. The notes show on the page, so they describe behavior only. `data/fidelity-page.test.ts` checks that each component tag names a category or a row that exists, and that each `docsLink` names a page.
+Update `data/pptx-features.ts` when the status of a feature changes. Use feature components for support status. Explain task behavior and limits in guides without creating a second support matrix. The notes show on the page, so they describe behavior only. `data/fidelity-page.test.ts` checks that each component tag names a category or a row that exists, and that each `docsLink` names a page.
 
 ## Conventions
 
-Follow the [Google developer documentation style guide](https://developers.google.com/style/highlights). Lead with the task or behavior. Use the active voice, address the reader as "you," and use sentence case for headings. Keep paragraphs short. Format identifiers as code and UI labels in bold.
+Follow the [developer documentation rules](../../AGENTS.md#developer-documentation) and the [Google developer documentation style guide](https://developers.google.com/style/highlights). Write for developers integrating the SDK. Start with the task, then show a useful example. Explain prerequisites, defaults, cleanup, and limits where readers need them. Link to reference tables instead of repeating them.
 
 - Describe only what the published packages ship.
 - Link between pages with root-relative paths: `[Fonts](/docs/customization/fonts)`.
@@ -48,12 +48,35 @@ Follow the [Google developer documentation style guide](https://developers.googl
 - Introduce each code sample, and keep it consistent with the public API.
 - Use Mermaid for diagrams. Add alt text to images and descriptive text to links.
 
+## Shared page structure
+
+Use the same sections and task names as the companion SDK documentation:
+
+| Section                | Reader task                                                     |
+| ---------------------- | --------------------------------------------------------------- |
+| Getting started        | Choose packages, install dependencies, and open a presentation. |
+| Customization          | Change appearance, layout, controls, fonts, and language.       |
+| Frameworks, React, Vue | Integrate the editor and use adapter APIs.                      |
+| Guides                 | Load, save, navigate, edit, and export presentations.           |
+| Export formats         | Convert presentations on the server.                            |
+| Pro                    | Configure licensed modules and collaboration.                   |
+| Editing API            | Automate presentation edits with batched operations.            |
+| Reference              | Use the core lifecycle and localization APIs.                   |
+
+Only add a section when the SDK provides the corresponding capability. Preserve existing page URLs.
+
+## Framework examples
+
+Use `FrameworkTabs` for equivalent React and Vue examples, with React first. Introduce the task before the switch. Keep blank lines around code fences inside each `Framework` panel. Use `variant="block"` when panels begin with prose or tables. On adapter-specific pages, use ordinary code fences and name the adapter.
+
 ## Validate changes
 
 Run the docs checks from the repository root:
 
 ```bash
 bun test docs
+node scripts/check-public-terminology.mjs
+bunx prettier --check "docs/site/content/**/*.{mdx,json}"
 ```
 
-The checks validate the component tags, the matrix, and its evidence. They do not build or render the site.
+The tests validate metadata, navigation coverage, internal page links, feature component tags, and feature evidence. They do not compile code samples, validate link fragments, or render the website. Review samples against exports and types, and check changed link fragments manually. The website application lives in a separate repository; report website validation separately.

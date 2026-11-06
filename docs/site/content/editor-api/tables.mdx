@@ -1,0 +1,59 @@
+---
+title: 'Tables'
+description: 'Create tables, populate cells, and apply cell formatting with the editing API.'
+category: 'Editing API'
+---
+
+Use `slide.shapes.addTable()` to create a table shape. Call `getTable()` to access its rows and cells. Row and column indexes start at zero.
+
+## Create and format a table
+
+This function requires a runtime and a presentation with at least one slide:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function addResults(runtime: PptxEditorRuntime) {
+  await runtime.run(async (context) => {
+    const slide = context.presentation.slides.getItemAt(0);
+    const table = slide.shapes
+      .addTable(2, 2, {
+        values: [
+          ['Region', 'Total'],
+          ['North', '42'],
+        ],
+      })
+      .getTable();
+    await context.sync();
+
+    const cell = table.getCellOrNullObject(1, 1);
+    cell.load('text');
+    await context.sync();
+    if (cell.isNullObject) return;
+    cell.text = '43';
+    cell.horizontalAlignment = 'Right';
+    cell.fill.setSolidColor('#FFF2CC');
+    await context.sync();
+  });
+}
+```
+
+The first sync creates the table. The next sync checks the cell before the final write. In a browser editor, each sync that writes creates an undo step.
+
+## Choose creation options
+
+`TableAddOptions` accepts `values`, `style`, widths, heights, merged areas, and cell properties. The API applies these options in that order. A cell accepts `text` or `textRuns`, but not both. An invalid creation option refuses the batch and adds no table.
+
+For bulk formatting, queue every cell change before one final `context.sync()`. For reads, load the required properties before reading cell values.
+
+## Work with existing tables
+
+Find the table shape by its identifier, then call `shape.getTable()`. Use `table.rows` and `table.columns` for structural changes. Use `getCellOrNullObject(row, column)` when a target might not exist.
+
+A cell resize that cuts through another merged cell is refused with diagnostic `edit.merge-overlap`. Split or resize the other cell first. Table styles must exist in the presentation, except `MediumStyle2Accent1` and `NoStyleNoGrid`.
+
+## See also
+
+- [Table editing](/docs/guides/tables)
+- [Office.js compatibility](/docs/editor-api/office-js-api)
+- [Batching, loading, and errors](/docs/editor-api/batching-and-errors)

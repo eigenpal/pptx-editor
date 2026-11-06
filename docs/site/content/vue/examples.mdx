@@ -7,15 +7,15 @@ order: 39
 
 ## Choose an example
 
-| Task | Source |
-| --- | --- |
-| Open a local file and download the edited deck | [Quickstart](/docs/quickstart) |
-| Save through the ref | [Use the ref](/docs/vue/props#use-the-ref) |
-| Build custom toolbar buttons | [Vue composables](/docs/vue/composables) |
-| Arrange editor parts | [Vue composition](/docs/vue/composition) |
-| Replace a dialog | [Dialogs](/docs/customization/dialogs) |
-| Translate the interface | [Language](/docs/customization/language) |
-| Run a command from your code | [Run a command](#run-a-command) |
+| Task                                           | Source                                     |
+| ---------------------------------------------- | ------------------------------------------ |
+| Open a local file and download the edited deck | [Quickstart](/docs/quickstart)             |
+| Save through the ref                           | [Use the ref](/docs/vue/props#use-the-ref) |
+| Build custom toolbar buttons                   | [Vue composables](/docs/vue/composables)   |
+| Arrange editor parts                           | [Vue composition](/docs/vue/composition)   |
+| Replace a dialog                               | [Dialogs](/docs/customization/dialogs)     |
+| Translate the interface                        | [Language](/docs/customization/language)   |
+| Run a command from your code                   | [Run a command](#run-a-command)            |
 
 ## Run a command
 
@@ -43,7 +43,7 @@ function add() {
 </template>
 ```
 
-`exec` returns a `CommandResult`: `ok` is `false` with a `reason` when the engine refuses the command. Each `exec` call is one undo step. For a control that a toolbar slot already describes, prefer `useEditorCommand(slot)`; see [Vue composables](/docs/vue/composables).
+`exec` returns a `CommandResult`: `ok` is `false` with a `reason` when the engine refuses the command. Commands that change the presentation normally create an undo step. No-op commands add none; history groups and consecutive nudges can combine edits. See [Undo and history groups](/docs/guides/undo-history). For a control that a toolbar slot already describes, prefer `useEditorCommand(slot)`; see [Vue composables](/docs/vue/composables).
 
 ## Run the Vue example
 

@@ -1,0 +1,56 @@
+---
+title: 'PDF export'
+description: 'Convert PPTX to PDF on Node.js and inspect conversion diagnostics.'
+category: 'Export formats'
+---
+
+Use `@pptx-editor.dev/pptx-to-pdf` to convert presentation bytes to PDF on Node.js. The exporter uses the editor’s layout and embeds fonts for searchable text. The package uses the EigenPal Pro License. Production use requires a commercial agreement.
+
+## Install the package
+
+Install the exporter and its engine peer:
+
+```bash
+npm install @pptx-editor.dev/pptx-to-pdf @pptx-editor.dev/core
+```
+
+Use Node.js 20.16 or later within version 20, or Node.js 22.3 or later. The package is a Node.js exporter; do not bundle it into browser code.
+
+## Convert a presentation
+
+This example exports `deck.pptx` and reports content that the PDF approximates or omits:
+
+```ts
+import { readFile, writeFile } from 'node:fs/promises';
+import { exportPdf } from '@pptx-editor.dev/pptx-to-pdf';
+
+const result = await exportPdf(await readFile('deck.pptx'), {
+  fidelityPolicy: 'best-effort',
+});
+await writeFile('deck.pdf', result.bytes);
+for (const diagnostic of result.diagnostics) {
+  if (diagnostic.severity !== 'information') {
+    console.warn(diagnostic.code, diagnostic.slideNumber);
+  }
+}
+```
+
+`best-effort` returns the PDF with diagnostics. Review those diagnostics before presenting the output as complete. The default policy is `strict`. It throws `PdfFidelityError` for any unsupported or approximate content. Information diagnostics, such as font substitution, do not block strict export.
+
+## Map pages to slides
+
+Each exported slide produces one PDF page at the presentation’s slide size. Hidden slides are excluded unless you set `includeHiddenSlides: true`. Use `result.slideNumbers[pageIndex]` to find the one-based presentation slide number for an output page. A slide that cannot be laid out has no page in a best-effort export.
+
+## Choose a guide
+
+| Task                                       | Guide                                             |
+| ------------------------------------------ | ------------------------------------------------- |
+| Configure fonts and deployment assets      | [PDF fonts](/docs/export/pdf/fonts)               |
+| Check options, results, and errors         | [PDF API](/docs/export/pdf/api)                   |
+| Reuse a session or return an HTTP response | [PDF integrations](/docs/export/pdf/integrations) |
+
+## See also
+
+- [PDF fonts](/docs/export/pdf/fonts)
+- [PDF API](/docs/export/pdf/api)
+- [PPTX fidelity](/docs/pptx-fidelity)

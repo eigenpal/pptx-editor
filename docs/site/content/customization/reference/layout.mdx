@@ -37,7 +37,7 @@ The `PptxEditor.StatusBar` parts are `StatusBar.SlideNumber`, `.Notes`, `.Views`
 
 ## Pane configuration
 
-The pane props follow DOCX Editor's `Navigation`:
+Use these props to control the pane:
 
 | Prop | Value | Behavior |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ The pane props follow DOCX Editor's `Navigation`:
 | `className` | CSS class | Styles the pane. |
 | `style` | Inline styles | Styles the pane. A `width` in `style` wins over `paneWidth`. |
 
-Unlike DOCX Editor's `Navigation`, the rail's `toggle` takes no part props. The rail has two toggle buttons in two places, so one set of props would not say which to change. Change the **Hide thumbnails** button with the `SlideRail.Collapse` part. Change the **Show thumbnails** button of the folded strip with the `SlideRail.Expand` part.
+The rail's `toggle` takes no part props. The rail has two toggle buttons in two places, so one set of props would not say which to change. Change the **Hide thumbnails** button with the `SlideRail.Collapse` part. Change the **Show thumbnails** button of the folded strip with the `SlideRail.Expand` part.
 
 A notes pane fills the height that you give it. Set a `height`, or a `flex` value in a flex column, on the pane's `className`, and the notes field grows into it. A short pane shrinks the field to 40 pixels. Without a height from you, the field keeps its own 96 pixels.
 

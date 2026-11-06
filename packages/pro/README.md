@@ -29,6 +29,8 @@ Commercial capabilities for PPTX Editor, delivered as `EditorModule`s, in the sa
 
 This package uses the EigenPal Pro License (`LICENSE.md`): you may evaluate it freely, and production use requires a commercial agreement.
 
+For task guides and API details, see the [developer documentation](https://pptx-editor.dev/docs/pro).
+
 ## Use
 
 ```ts

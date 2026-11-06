@@ -4,6 +4,8 @@ Drive a `.pptx` from code with an object model in the shape of the Office.js pre
 
 The package is not Office.js and does not run in an add-in host. It implements a documented subset of that API, and every type in it is authored here. Its license is the EigenPal Pro License (`LICENSE.md`): you may evaluate it freely, and production use requires a commercial agreement.
 
+For task guides and API details, see the [developer documentation](https://pptx-editor.dev/docs/editor-api).
+
 ## Edit a presentation on a server
 
 ```ts
@@ -48,7 +50,7 @@ Dispose the runtime before the editor. A browser runtime has no `save()`: save t
 ## Batches, loads, and null objects
 
 - Calls on proxy objects are queued. Nothing reaches the presentation until `await context.sync()`.
-- One `sync()` is one atomic batch. If one call is refused, nothing of that batch applies.
+- A host batch of independent writes is atomic. A `sync()` can split into several host batches for dependent reads; a later refusal keeps writes that already committed.
 - Every read and lookup sees the calls queued before it in the same `sync()`, for example `getItemOrNullObject` after an `add`, or `getSelectedShapes()` after `setSelectedShapes`. When a later call needs the answer of such a read to go on, for example a write to a `getItemOrNullObject` result or to the selected text, the sync splits before that read: the calls before it apply first. On a live editor, the whole sync is still one undo step. A refusal after the split keeps its own diagnostic, and its hint says that the writes before the read applied.
 - A call with an argument that the API does not accept does not throw. The next `sync()` refuses with `InvalidArgument`, `NotImplemented`, `NotSupported`, or `ItemNotFound`, and no call of that batch applies, as in Office.js. For example, a write of `ShadeFromTitle` or a bad `addTable` option refuses at the sync. A refused call that returns an object returns one that takes more calls and queues nothing.
 - Only three errors throw at the call: a read of a property that you did not load (`PropertyNotLoaded`), a bad `load(...)` argument, and an object or context that you use after its run. A bad `load(...)` argument includes a wrong name anywhere in a path, also below the items of a collection: `shapes.load('itmes/name')` throws `InvalidArgument` with the hint "Did you mean 'items'?". Such a call queues nothing, and the calls before it stay queued.
@@ -83,13 +85,16 @@ for (const shape of shapes.items) shape.name = shape.name.trim();
 await context.sync(); // One sync for all the writes.
 ```
 
-**A retry after a refusal.** A refused `sync()` applies nothing and drops only its own calls. Objects that you looked up before it still work, so queue the corrected calls again and sync. An object that the refused sync would have created was never created: create it again.
+**A retry after a refusal.** A refused host batch drops its own calls. If the sync split or reports `edit.read-after-commit`, earlier writes remain applied. Objects that you looked up before it still work, so queue the corrected calls again and sync. An object that the refused sync would have created was never created: create it again.
 
 ```ts
+// Import isPptxEditorError from @pptx-editor.dev/editor-api.
+// box and context belong to the active run.
 try {
   box.fill.setSolidColor('notacolor');
   await context.sync();
-} catch {
+} catch (error) {
+  if (!isPptxEditorError(error) || error.code !== 'InvalidArgument') throw error;
   box.fill.setSolidColor('#1F4E79'); // The same proxy works in the retry.
   await context.sync();
 }

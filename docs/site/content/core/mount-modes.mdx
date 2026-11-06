@@ -1,0 +1,67 @@
+---
+title: 'Editor mount modes'
+description: 'Attach, detach, and dispose a browser editor without replacing its presentation.'
+category: 'Reference'
+---
+
+Create one editor per presentation session. Mount its surface with `attach(element)` and remove it with `detach()`.
+
+## Move between containers
+
+`attach()` creates the surface in the supplied element. A second call replaces the previous surface:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function moveEditor(editor: Editor, destination: HTMLElement) {
+  editor.detach();
+  destination.classList.add('pptx-editor');
+  editor.attach(destination);
+  editor.focus();
+}
+```
+
+Detaching removes the surface. It keeps the document, selection state, and undo history in the editor instance.
+
+Use this pattern for containers in the same browser document. Do not assume that an iframe or another window has the same behavior.
+
+## Keep the container sized
+
+Put `class="pptx-editor"` on the mount element or an ancestor to scope editor styles. Give the mount element an explicit size. For example, use this CSS with a host element whose class is `presentation-surface`:
+
+```css
+.presentation-surface {
+  width: 100%;
+  height: 600px;
+  min-width: 0;
+  overflow: auto;
+}
+```
+
+Call `setZoom('fit')` to follow the available space. The React and Vue viewport components provide the adapter layout classes.
+
+## Dispose thumbnail containers
+
+`renderThumbnail()` paints a slide and returns a disposer. Request deferred paint for a long slide list:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function mountThumbnail(editor: Editor, slideIndex: number, container: HTMLElement) {
+  return editor.renderThumbnail(slideIndex, container, { defer: true });
+}
+```
+
+Call the returned function when you remove the thumbnail. Without `defer`, its first paint is synchronous.
+
+## End the session
+
+Call `destroy()` when the editor is no longer needed. Dispose application subscriptions and thumbnail registrations with their owners.
+
+Adapters own their editor lifecycle. Do not destroy an adapter-owned instance from a child control.
+
+## See also
+
+- [Core](/docs/core)
+- [Layout](/docs/customization/layout)
+- [Long decks](/docs/guides/long-decks)

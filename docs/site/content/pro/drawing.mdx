@@ -1,0 +1,51 @@
+---
+title: 'Drawing'
+description: 'Register advanced drawing renderers for charts and shape effects.'
+category: 'Pro'
+---
+
+Register `drawingModule()` before opening a presentation to enable Pro drawing renderers. The module shares the editor’s geometry, text measurement, and layout pipeline.
+
+## Enable drawing
+
+Pass the module when you create the editor:
+
+```ts
+import { createPptxEditor } from '@pptx-editor.dev/core/editor';
+import { drawingModule } from '@pptx-editor.dev/pro/drawing';
+
+export function createPresentation(bytes: Uint8Array) {
+  return createPptxEditor({
+    document: bytes,
+    modules: [drawingModule()],
+  });
+}
+```
+
+Attach the returned editor to your container. Call `editor.destroy()` when your application releases it. For React and Vue examples, see [Pro modules](/docs/pro#register-a-module).
+
+## Install renderers without an editor
+
+For headless layout, install drawing before opening the first document:
+
+```ts
+import { installDrawing } from '@pptx-editor.dev/pro/drawing';
+
+installDrawing();
+```
+
+The installed renderers serve all editors and exports in the process. A late install does not repaint slides that were already painted until those slides repaint.
+
+## Effects and charts
+
+The module adds glow, inner shadow, reflection, and soft-edge rendering. Without it, those effects remain in the saved file but do not paint in the editor. The free engine paints outer shadows.
+
+For chart status, see <FeatureBadge id="objects.charts" /> and [Charts](/docs/guides/charts). Charts use values cached in their chart parts. The engine does not fetch external chart data. Chart rendering does not add chart data editing.
+
+PDF export installs drawing automatically. PDF limitations appear in export diagnostics. A PDF can still require `fidelityPolicy: 'best-effort'` for approximate effects.
+
+## See also
+
+- [Charts](/docs/guides/charts)
+- [PDF export](/docs/export/pdf)
+- [PPTX fidelity](/docs/pptx-fidelity)

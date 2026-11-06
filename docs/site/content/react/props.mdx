@@ -12,6 +12,7 @@ This example loads `.pptx` bytes, keeps the instance, and saves the edited deck:
 ```tsx
 import { useState } from 'react';
 import { PptxEditor, type PptxEditorInstance } from '@pptx-editor.dev/react';
+import '@pptx-editor.dev/core/styles/editor.css';
 
 export function DeckEditor({
   bytes,
@@ -49,6 +50,7 @@ For generated signatures, see `docs/api/react/index.api.md` in the repository.
 | Prop | Type | Description |
 | --- | --- | --- |
 | `document` | `Uint8Array` | The `.pptx` bytes. A new array loads a new deck. Without it, the editor shows its loading sheet. |
+| `autoCorrect` | `boolean` | Enables typing AutoCorrect. Defaults to `true`. Read when the editor is created; remount to change it. |
 | `mode` | `'edit' \| 'view'` | Edit the deck, or only show it. Defaults to `'edit'`. Changes apply without a reload. |
 
 ### Fonts
@@ -89,6 +91,21 @@ export function ReviewedDeck({ bytes }: { bytes: Uint8Array }) {
 | `locale` | `LocaleCatalog` | The interface strings. English when you omit it. See [Language](/docs/customization/language). |
 | `className` | `string` | Added after the `pptx-default` class of the viewport. |
 
+### Packaged parts
+
+Set a part to `false` to hide it, or pass its props object to configure it.
+
+| Prop             | Type                                    | Default |
+| ---------------- | --------------------------------------- | ------- |
+| `toolbar`        | `boolean \| ToolbarProps`               | `true`  |
+| `menu`           | `boolean \| MenuProps`                  | `false` |
+| `contextMenu`    | `boolean \| PptxEditorContextMenuProps` | `true`  |
+| `hyperlinkPopup` | `boolean`                               | `true`  |
+| `slideRail`      | `boolean \| SlideRailProps`             | `true`  |
+| `notesPane`      | `boolean \| NotesPaneProps`             | `true`  |
+
+A `popups.contextMenu` or `popups.hyperlink` entry takes precedence over the corresponding part prop. Hiding a control does not disable its editing command. For examples, see [Change one part of the packaged editor](/docs/customization/layout#change-one-part-of-the-packaged-editor).
+
 ### Chrome
 
 | Prop | Type | Description |
@@ -102,7 +119,7 @@ export function ReviewedDeck({ bytes }: { bytes: Uint8Array }) {
 
 | Callback | Payload | Description |
 | --- | --- | --- |
-| `onReady` | `editor: PptxEditorInstance` | Called once for each instance, after the editor mounts. |
+| `onReady` | `editor: PptxEditorInstance` | Called once for each instance, after the editor mounts. This does not mean the document has loaded. |
 | `onChange` | `editor: PptxEditorInstance` | Called after every change of editor state, also for selection changes. |
 | `onFontError` | `error: EditorFontError` | Called for each font failure: a failed origin, a refused face, or a failed resolution. Without it, each failure prints one warning. |
 
@@ -124,6 +141,7 @@ Use the instance from `onReady` for actions and one-time reads:
 ```tsx
 import { useRef } from 'react';
 import { PptxEditor, type PptxEditorRef } from '@pptx-editor.dev/react';
+import '@pptx-editor.dev/core/styles/editor.css';
 
 export function DeckEditor({
   bytes,

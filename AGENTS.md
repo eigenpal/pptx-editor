@@ -57,6 +57,45 @@ Preserve format identifiers, namespace URIs, package names, Office.js identifier
 Document shipped behavior in [the public documentation](docs/site/content/).
 Keep [the repository map](docs/repo-map.md) current when modules move, appear, or disappear.
 
+## Developer documentation
+
+Write for developers who install, embed, customize, and automate the SDK.
+Follow the [Google developer documentation style guide](https://developers.google.com/style) and its [highlights](https://developers.google.com/style/highlights).
+Apply these rules to public guides, READMEs, API descriptions, feature descriptions, and release notes.
+
+- Lead with the developer's task and the result. Give the smallest useful code example early.
+- Use concise prose to explain decisions, prerequisites, defaults, lifecycle, and limits. Link to details instead of repeating them.
+- Address the reader as "you." Use active voice, present tense, American spelling, and sentence-case headings.
+- Put conditions before instructions. Use numbered lists for steps and parallel bullets for related items.
+- Avoid marketing, idioms, and words such as "simply," "easy," "just," and "please" in procedures.
+- Describe shipped behavior. Avoid time-dependent wording such as "currently," "soon," and "as of this writing."
+- Format identifiers, filenames, and placeholders as code. Use bold for UI labels and descriptive text for links.
+- Introduce every code sample. Include imports and required setup, or link to the setup and identify existing variables.
+- Use comments for omitted code. Keep sample lines near 80 characters where practical.
+- Show error handling and cleanup when the task requires them. Never leave resource ownership unclear.
+- Check samples against package exports, public types, and implementation. Never infer an API from another SDK's names.
+- For automation, load explicit properties, batch independent operations, and explain required `context.sync()` boundaries.
+- Keep proxies inside their runtime scope. State browser-only and server-only behavior beside the example.
+- Use proper heading order, image alt text, and accessible labels. Do not communicate meaning through color alone.
+- Use Mermaid for useful diagrams. Do not use ASCII box diagrams or images of code.
+
+Keep the DOCX Editor documentation structure for shared SDK concepts.
+Use getting started, customization, frameworks, React, Vue, guides, export, Pro, editing API, and reference sections.
+Use the same page names for equivalent tasks. Add presentation-specific pages where needed.
+Do not create pages for capabilities that PPTX Editor does not ship.
+Keep task guides separate from detailed API and component reference tables.
+Show equivalent React and Vue samples with `FrameworkTabs`, React first, when a task applies to both adapters.
+Use ordinary code fences on pages explicitly scoped to one adapter.
+
+Author public pages in `docs/site/content/`. Follow [the site source conventions](docs/site/README.md).
+Register every page in the root `meta.json` and its folder's `meta.json`.
+Keep existing URLs when restructuring documentation, and check internal links after changes.
+Keep feature-status claims in `docs/site/data/pptx-features.ts`; reference them with the site's feature components.
+Explain API behavior and limits in guides without maintaining a second support matrix.
+Update affected documentation in the same change as public behavior.
+Run `bun test docs`, the public terminology check, and formatting checks for edited documentation.
+Report source validation separately from a website build or browser review.
+
 ## Verification and release
 
 Use [the contribution guide](CONTRIBUTING.md) and repository scripts for the checks relevant to each change.

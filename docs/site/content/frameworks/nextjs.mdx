@@ -7,6 +7,8 @@ seoTitle: 'Next.js PPTX editor setup'
 
 ## Install
 
+In your existing application, install the adapter and its engine peer:
+
 ```bash
 npm install @pptx-editor.dev/react @pptx-editor.dev/core
 ```
@@ -58,16 +60,11 @@ The editor component fetches a deck and fills a container with a height:
 // app/components/Editor.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
-import { PptxEditor } from '@pptx-editor.dev/react';
+import { PptxEditor, usePptxSource } from '@pptx-editor.dev/react';
 
 export function Editor() {
-  const [bytes, setBytes] = useState<Uint8Array>();
-  useEffect(() => {
-    void fetch('/deck.pptx')
-      .then((response) => response.arrayBuffer())
-      .then((buffer) => setBytes(new Uint8Array(buffer)));
-  }, []);
+  const { document: bytes, error } = usePptxSource('/deck.pptx');
+  if (error) return <p role="alert">{error.message}</p>;
   return (
     <div style={{ height: '100vh' }}>
       <PptxEditor document={bytes} />
@@ -76,7 +73,7 @@ export function Editor() {
 }
 ```
 
-Put `deck.pptx` in the `public` folder. To open and download local files, use the component from the [quickstart](/docs/quickstart).
+Put `deck.pptx` in the `public` folder. `usePptxSource` checks HTTP failures and cancels its fetch on unmount. To open and download local files, use the component from the [quickstart](/docs/quickstart).
 
 ## Limits
 

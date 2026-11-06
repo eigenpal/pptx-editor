@@ -1,0 +1,84 @@
+---
+title: 'Runtime and lifecycle'
+description: 'Choose a server or browser runtime, configure fonts, and dispose resources.'
+category: 'Editing API'
+---
+
+## Choose a host
+
+| Host | Factory | Save through | Selection |
+| --- | --- | --- | --- |
+| Server | `PptxEditor.createServer(bytes, options?)` | `runtime.save()` | No |
+| Browser | `PptxEditor.createBrowser(editor)` from `@pptx-editor.dev/editor-api/browser` | The editor that owns the document | Yes |
+
+`createServer` takes the font options of the engine: `fonts` adds faces to measure text with, and `substitutes` loads the metric-compatible substitute fonts (default `true`). Text writes re-fit each text body by its autofit rule, so the saved layout matches the editor.
+
+`createBrowser` borrows a `PptxEditorInstance`. Each `sync()` that writes is one undo step in that editor. Undo goes back to the slide and the selection that the reader had before the sync. A browser runtime has no `save()`, and it refuses writes while the editor is open for viewing. Dispose the runtime before the editor.
+
+Read `runtime.capabilities` to check a host before you call a member that needs it, for example `capabilities.selection` before `getSelectedShapes()`, or `capabilities.images` before `getImageAsBase64()`.
+
+## Draw pictures on a server
+
+A browser runtime draws `getImageAsBase64` pictures on a canvas. A server has no canvas, so pass a `rasterize` function to `createServer`. The engine paints the picture with the editor's own renderer into a standalone SVG document, and your function turns that SVG into PNG bytes. The package ships no rasterizer, so choose one that fits your server, for example an SVG rasterizer library or a headless browser.
+
+The function gets `svg`, `width`, `height`, and `fonts`, and must answer a PNG of exactly `width` by `height` pixels. The SVG holds its pictures as data URLs and its fonts as `@font-face` rules. Each entry of `fonts` gives the `family` name that the SVG uses and the font bytes, for a rasterizer that does not read CSS fonts. Use the font bytes for that picture only: do not store them, cache them, or write them to disk. A rasterizer with a process-wide font registry must remove the faces before it returns, as the example does. Each `family` name is unique for each open presentation, so the faces of two presentations never collide.
+
+Install `@napi-rs/canvas` before using this example. The function returns a caller-owned server runtime:
+
+```ts
+import { createCanvas, GlobalFonts, loadImage } from '@napi-rs/canvas';
+import { PptxEditor } from '@pptx-editor.dev/editor-api';
+
+export async function openWithImages(bytes: Uint8Array) {
+  return PptxEditor.createServer(bytes, {
+    rasterize: async ({ svg, width, height, fonts }) => {
+      // Register the faces for this picture only, and remove them before returning.
+      const keys = fonts.map((font) => GlobalFonts.register(Buffer.from(font.bytes), font.family));
+      try {
+        const canvas = createCanvas(width, height);
+        canvas.getContext('2d').drawImage(await loadImage(Buffer.from(svg)), 0, 0, width, height);
+        return new Uint8Array(canvas.toBuffer('image/png'));
+      } finally {
+        for (const key of keys) if (key) GlobalFonts.remove(key);
+      }
+    },
+  });
+}
+```
+
+Call `runtime.dispose()` in `finally` after using the returned runtime.
+
+A rasterizer that throws, or that answers something other than a PNG of the asked size, refuses the sync with `GeneralException` and the diagnostic `image.failed`.
+
+## Release the runtime
+
+Use `try` and `finally` around work that can fail. A server runtime owns its document resources. A browser runtime borrows its editor and does not destroy it.
+
+This function adds a title to an existing browser editor:
+
+```ts
+import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import { PptxEditor } from '@pptx-editor.dev/editor-api/browser';
+
+export async function addTitle(editor: PptxEditorInstance) {
+  const runtime = PptxEditor.createBrowser(editor);
+  try {
+    await runtime.run(async (context) => {
+      context.presentation.slides
+        .getItemAt(0)
+        .shapes.addTextBox('Quarterly results', { left: 40, top: 40 });
+      await context.sync();
+    });
+  } finally {
+    runtime.dispose();
+  }
+}
+```
+
+Return plain values from `run()`. Proxy objects expire when their run ends unless you track and adopt them. Save browser changes through the editor after the run completes.
+
+## See also
+
+- [Batching, loading, and errors](/docs/editor-api/batching-and-errors)
+- [Pictures](/docs/editor-api/pictures)
+- [Loading and saving](/docs/guides/loading-and-saving)

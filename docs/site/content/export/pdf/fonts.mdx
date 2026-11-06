@@ -1,0 +1,70 @@
+---
+title: 'PDF fonts'
+description: 'Supply font bytes, deploy substitute fonts, and inspect font diagnostics.'
+category: 'Export formats'
+---
+
+PDF export uses the same font bytes for layout and output. Supply required faces through `fonts` when your presentation needs fonts outside its embedded or packaged substitute faces.
+
+## Supply font faces
+
+Pass regular and styled faces separately. Use fonts that permit embedding:
+
+```ts
+import { readFile, writeFile } from 'node:fs/promises';
+import { exportPdf } from '@pptx-editor.dev/pptx-to-pdf';
+
+const result = await exportPdf(await readFile('deck.pptx'), {
+  fonts: [
+    {
+      family: 'Example Sans',
+      bold: false,
+      italic: false,
+      origin: 'provided',
+      bytes: await readFile('fonts/ExampleSans-Regular.ttf'),
+    },
+    {
+      family: 'Example Sans',
+      bold: true,
+      italic: false,
+      origin: 'provided',
+      bytes: await readFile('fonts/ExampleSans-Bold.ttf'),
+    },
+  ],
+});
+await writeFile('deck.pdf', result.bytes);
+```
+
+Replace the example family and paths with your licensed font files. Earlier supplied faces take priority, followed by permitted embedded fonts and metric-compatible substitutes. Set `substitutes: false` to disable packaged substitutes.
+
+## Deploy font assets
+
+The exporter reads substitute assets from `@docx-editor.dev/fonts`. For a single-file server bundle, ship that package’s `assets/` folder separately. Set `DOCX_EDITOR_FONT_ASSET_ROOT` to its deployed path before importing the exporter.
+
+For East Asian fallback fonts, install the optional package:
+
+```bash
+npm install @docx-editor.dev/fonts-cjk
+```
+
+When a presentation contains East Asian text, the exporter can load Noto Sans CJK JP from this package. Keep its assets in your deployment output.
+
+## Inspect font resolution
+
+`result.fontResolution` records the faces used, substitutions, refused embedded faces, and failed substitute loads. Inspect it with the conversion diagnostics when investigating different line breaks or missing characters.
+
+| Diagnostic               | Meaning                                          |
+| ------------------------ | ------------------------------------------------ |
+| `font.substituted`       | A requested family uses another face             |
+| `font.substitute-failed` | A packaged substitute failed to load             |
+| `font.missing`           | No font bytes are available for a face           |
+| `font.not-embedded`      | Font embedding is refused; its text is not drawn |
+| `text.missing-glyph`     | The selected face lacks a required character     |
+
+The exporter respects font embedding permissions. It refuses variable fonts and faces whose permissions prevent its embedding or subsetting path. It does not install presentation fonts on the host system.
+
+## See also
+
+- [PDF export](/docs/export/pdf)
+- [PDF API](/docs/export/pdf/api)
+- [Fonts](/docs/customization/fonts)

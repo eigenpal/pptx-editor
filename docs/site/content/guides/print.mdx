@@ -1,0 +1,27 @@
+---
+title: 'Print a presentation'
+description: 'Create a PDF for a presentation printing workflow.'
+category: 'Guides'
+---
+
+Export a PDF, then let the user print it from a PDF viewer. This keeps editor controls out of the printed document.
+
+## Prepare a printable file
+
+1. Call `editor.save()` and check that it returns bytes.
+2. Send the bytes to your conversion endpoint.
+3. Convert them with `@pptx-editor.dev/pptx-to-pdf`.
+4. Return the PDF for download or display in your application.
+
+For a server example, see [PDF export](/docs/export/pdf). Conversion requires the EigenPal Pro License.
+
+## Keep printing under user control
+
+Provide a link or button that opens the returned PDF. The user chooses the printer, paper size, and scaling in the viewer.
+
+The editor has no `print()` method. Calling `window.print()` on your application prints the host page, including any visible controls.
+
+## See also
+
+- [Export presentations](/docs/guides/export)
+- [Load and save presentations](/docs/guides/loading-and-saving)

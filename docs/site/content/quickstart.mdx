@@ -8,7 +8,7 @@ Build a browser editor that opens a local `.pptx` and downloads the edited file.
 
 ## Install the editor
 
-Install an adapter with its peers:
+In an existing React or Vue app, install the adapter and its engine peer:
 
 <FrameworkTabs>
 <Framework value="react">
@@ -27,16 +27,18 @@ npm install @pptx-editor.dev/vue @pptx-editor.dev/core
 </Framework>
 </FrameworkTabs>
 
+These examples run in a client-rendered app. For server rendering, follow the [framework setup](/docs/frameworks).
+
 ## Open and save a deck
 
-This component reads a labeled file input, shows the deck in the editor, and downloads the result. It mounts the editor after you pick a file. The editor reloads when the identity of `document` changes. The ref's `save()` returns the saved package as bytes.
+This component opens a local file and downloads the edited presentation. The ref's `save()` returns the saved package as bytes.
 
 <FrameworkTabs>
 <Framework value="react">
 
 ```tsx
 // App.tsx
-import { useRef, useState } from 'react';
+import { useRef, useState, type ChangeEvent } from 'react';
 import { PptxEditor, type PptxEditorRef } from '@pptx-editor.dev/react';
 import '@pptx-editor.dev/core/styles/editor.css';
 
@@ -44,7 +46,7 @@ export default function App() {
   const [bytes, setBytes] = useState<Uint8Array>();
   const editorRef = useRef<PptxEditorRef>(null);
 
-  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
+  async function pick(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) setBytes(new Uint8Array(await file.arrayBuffer()));
   }
@@ -52,7 +54,9 @@ export default function App() {
   function download() {
     const saved = editorRef.current?.save();
     if (!saved) return;
-    const blob = new Blob([saved]);
+    const blob = new Blob([saved], {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -100,7 +104,9 @@ async function pick(e: Event) {
 function download() {
   const saved = editorRef.value?.save();
   if (!saved) return;
-  const blob = new Blob([saved]);
+  const blob = new Blob([saved], {
+    type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -126,40 +132,27 @@ function download() {
 </Framework>
 </FrameworkTabs>
 
-## Check the options
+## Check the required options
 
-| Option | React | Vue | Use |
-| --- | --- | --- | --- |
-| `document` | `Uint8Array` | `Uint8Array` | The `.pptx` bytes. A new array loads a new deck. Without `document`, the editor shows its loading sheet until bytes arrive. |
-| `mode` | `'edit'` or `'view'` | `'edit'` or `'view'` | Edit the deck, or only show it. The default is `'edit'`. |
-| Ready | `onReady(editor)` | `@ready` | Gives you the editor instance. Use `editor.save()`, `editor.exec(command)`, and `editor.snapshot()`. |
-| Ref | `ref` (`PptxEditorRef`) | `ref` (`PptxEditorRef`) | The imperative handle. See [Use the ref](#use-the-ref). |
-| `colorMode` | `'light'`, `'dark'`, or `'system'` | Same | The color mode of the chrome. The slides keep their own colors. |
-| `fonts` | `EditorFontsOption` | Same | Font bytes for layout. See [Fonts](/docs/customization/fonts). |
-| Font errors | `onFontError(error)` | `@font-error` | Called for each font that fails to load. |
-| `popups` | `PptxEditorPopups` | Same | Replace the editor's dialogs. See [Dialogs](/docs/customization/dialogs). |
-| `locale` | `LocaleCatalog` | Same | The UI strings. English when you omit it. |
-| `fontFamilies` | `readonly string[]` | Same | Extra families for the font picker. |
-| Changes | `onChange(editor)` | `@change` | Called after every change of editor state. |
-| `openFailure` | `boolean` or `PptxEditorOpenFailureProps` | Same | The notice for a file that does not open. `false` removes it. See [Open failure](/docs/customization/layout#open-failure). |
-| Open-failure actions | `renderOpenFailureActions(context)` | `#openFailureActions` slot | Your own buttons in the notice, before **Close**. |
-
-## Use the ref
-
-`PptxEditor` and `PptxEditor.Root` (`PptxEditorRoot` in Vue) take a ref to a `PptxEditorRef`. The two adapters give it the same members:
-
-| Member | Returns | Use |
+| Option | Values | Notes |
 | --- | --- | --- |
-| `load(bytes)` | `Promise<CommandResult>` | Open other `.pptx` bytes in the same editor. |
-| `save()` | `Uint8Array \| null` | The deck as `.pptx` bytes. `null` when no deck is open. |
-| `exec(command, options?)` | `CommandResult` | Run an editing command, as `editor.exec`. |
-| `snapshot()` | `EditorSnapshot` | The current editor state. |
-| `focus()` | `void` | Give the keyboard back to the slide. |
-| `getEditor()` | `PptxEditorInstance \| null` | The editor instance, for everything else. |
+| `document` | `Uint8Array` | A new array opens a new presentation. Keep its identity stable between renders. |
+| `mode` | `'edit'` or `'view'` | Defaults to `'edit'`. Changes apply without reopening the file. |
+| `save()` on the ref | `Uint8Array<ArrayBuffer> \| null` | Returns the `.pptx` bytes synchronously, or `null` when no presentation is open. |
+| Stylesheet | `@pptx-editor.dev/core/styles/editor.css` | Import once after your CSS reset. Both adapters also export `styles.css`. |
+| Container height | A nonzero CSS height | The editor fills its parent. Set `min-height: 0` on a flex child. |
 
-You can call each member before the editor mounts. Then `load` and `exec` return a refusal with the reason `disabled.noEditor`, `save` and `getEditor` return `null`, and `snapshot` returns an empty snapshot.
+The editor opens and saves the presentation in the browser. Your application owns downloads, uploads, and storage.
 
-`save()` returns `null` when no deck is open. The editor makes no network request: it reads the deck from the bytes you pass, and it never fetches external targets in the file.
+## Handle the editor lifecycle
+
+The adapter creates the editor instance and calls `destroy()` when the component unmounts.
+
+`onReady` in React and `@ready` in Vue report instance creation, not successful file loading. Read `snapshot().status` for document readiness. The packaged editor shows loading and open-failure notices.
+
+Opening another file replaces the presentation and its undo history. Add an unsaved-change check before replacing `document` in your application.
+
+For URL loading and storage, see [Loading and saving](/docs/guides/loading-and-saving). For every prop and ref method, see [React props](/docs/react/props) or [Vue props](/docs/vue/props).
 
 ## Next steps
 

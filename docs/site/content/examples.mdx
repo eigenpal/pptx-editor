@@ -1,0 +1,48 @@
+---
+title: 'Examples'
+description: 'Choose a React, Vue, Next.js, or chat panel integration for your application.'
+category: 'Getting started'
+---
+
+Start with the example closest to your application. Each browser integration uses the same core editor.
+
+## Choose a framework
+
+| Example                                    | Use it for                                        |
+| ------------------------------------------ | ------------------------------------------------- |
+| [React with Vite](/docs/frameworks/vite)   | A browser application with React.                 |
+| [Vue with Vite](/docs/frameworks/vite-vue) | A browser application with Vue 3.                 |
+| [Next.js](/docs/frameworks/nextjs)         | A client editor inside an App Router application. |
+| [Chat panel](/docs/guides/chat-panel)      | A presentation beside a chat interface.           |
+
+For component-level examples, see [React examples](/docs/react/examples) and [Vue examples](/docs/vue/examples).
+
+## Run repository examples
+
+Clone the repository and install its dependencies before starting a demo:
+
+```bash
+git clone https://github.com/eigenpal/pptx-editor.git
+cd pptx-editor
+bun install
+bun run dev
+```
+
+The React demo opens at `http://localhost:5274`. Run one of these commands for another example:
+
+| Command                                             | Application              |
+| --------------------------------------------------- | ------------------------ |
+| `bun run dev:vue`                                   | Vue at port 5275.        |
+| `bun run dev:chat`                                  | Chat panel at port 5276. |
+| `bun run build:packages`, then `bun run dev:nextjs` | Next.js at port 3000.    |
+
+## Adapt an example
+
+Use [Load and save presentations](/docs/guides/loading-and-saving) to connect your storage. Use [Customization](/docs/customization) to change controls and layout.
+
+The chat example uses a scripted assistant. Connect your own application logic through the [Editing API](/docs/editor-api).
+
+## See also
+
+- [Quickstart](/docs/quickstart)
+- [Task recipes](/docs/recipes)

@@ -1,0 +1,69 @@
+---
+title: 'Slides and shapes'
+description: 'Find slides, add shapes, and change their positions with the editing API.'
+category: 'Editing API'
+---
+
+Use `context.presentation.slides` to find slides. Each slide exposes a `shapes` collection. Positions and sizes use points. Collection indexes start at zero.
+
+The examples accept a runtime from [Runtime and lifecycle](/docs/editor-api/runtime). The first example requires a presentation with at least one slide.
+
+## Add a shape
+
+Create and format a shape in one batch:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function addLabel(runtime: PptxEditorRuntime) {
+  await runtime.run(async (context) => {
+    const shapes = context.presentation.slides.getItemAt(0).shapes;
+    const label = shapes.addGeometricShape('Rectangle', {
+      left: 40,
+      top: 80,
+      width: 240,
+      height: 60,
+    });
+    label.name = 'Summary';
+    label.fill.setSolidColor('#1F4E79');
+    label.textFrame.textRange.text = 'Quarterly results';
+    label.textFrame.textRange.font.color = '#FFFFFF';
+    await context.sync();
+  });
+}
+```
+
+`addTextBox()` creates a text box. `addGeometricShape()` creates a preset geometry. The returned shape works in the same batch without a preliminary load.
+
+## Add and find a slide
+
+`slides.add()` returns no slide proxy. Synchronize, load the collection, and then find the added slide:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function appendSlide(runtime: PptxEditorRuntime) {
+  return runtime.run(async (context) => {
+    const slides = context.presentation.slides;
+    slides.add();
+    await context.sync();
+    slides.load('items/id');
+    await context.sync();
+    return slides.items[slides.items.length - 1]!.id;
+  });
+}
+```
+
+Pass `layoutId` and `slideMasterId` to choose a layout and master explicitly. Use identifiers returned from the same presentation.
+
+## Move and remove content
+
+Use `slide.moveTo(index)` to reorder slides. Set a shape’s `left`, `top`, `width`, or `height` to reposition it. Use `shape.delete()` or `slide.delete()`, then synchronize. Deleting the last slide is refused with diagnostic `edit.last-slide`.
+
+A shape identifier belongs to its slide. Keep the slide identifier with stored shape identifiers. A duplicate shape identifier in one slide prevents writes to that shape.
+
+## See also
+
+- [Text and ranges](/docs/editor-api/text-and-ranges)
+- [Tables](/docs/editor-api/tables)
+- [Office.js compatibility](/docs/editor-api/office-js-api)

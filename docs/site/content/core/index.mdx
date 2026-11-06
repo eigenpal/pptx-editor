@@ -1,0 +1,109 @@
+---
+title: '@pptx-editor.dev/core'
+description: 'Create a framework-independent editor and use its state, commands, and lifecycle.'
+category: 'Reference'
+---
+
+Core provides the PPTX engine and browser editor. React and Vue add interface components around the same editor contract.
+
+## Install
+
+Install the package directly when your application imports its APIs:
+
+```bash
+npm install @pptx-editor.dev/core
+```
+
+Keep one resolved copy of core in your application. The adapters use it as a peer dependency.
+
+## Create an editor
+
+This browser helper mounts an editor into an existing element. It returns the instance for your controls and cleanup:
+
+```ts
+import { createPptxEditor } from '@pptx-editor.dev/core/editor';
+import '@pptx-editor.dev/core/styles/editor.css';
+
+export async function mountPresentation(container: HTMLElement, bytes: Uint8Array) {
+  const editor = createPptxEditor({ zoom: 'fit' });
+  container.classList.add('pptx-editor');
+  try {
+    editor.attach(container);
+    const result = await editor.load(bytes);
+    if (!result.ok) throw new Error(result.reason);
+    return editor;
+  } catch (error) {
+    editor.destroy();
+    throw error;
+  }
+}
+```
+
+Give the container a height and available width. Call `editor.destroy()` when your application removes this editor permanently.
+
+The core editor does not add a toolbar, slide rail, or menus. Use the adapters for those components.
+
+## Choose an import
+
+Use the editor entry point for browser integration. Other entry points expose the engine layers:
+
+| Entry point                               | Use                                                  |
+| ----------------------------------------- | ---------------------------------------------------- |
+| `@pptx-editor.dev/core`                   | Editor exports.                                      |
+| `@pptx-editor.dev/core/editor`            | Editor creation, commands, fonts, and image exports. |
+| `@pptx-editor.dev/core/contracts`         | Shared editor, snapshot, and command types.          |
+| `@pptx-editor.dev/core/store`             | Package read/write and document transactions.        |
+| `@pptx-editor.dev/core/cascade`           | Slide inheritance and theme resolution.              |
+| `@pptx-editor.dev/core/layout`            | Geometry and text layout without the DOM.            |
+| `@pptx-editor.dev/core/output`            | SVG paint from layout records.                       |
+| `@pptx-editor.dev/core/automation`        | Automation hosts.                                    |
+| `@pptx-editor.dev/core/styles/editor.css` | Editor styles.                                       |
+
+For server-side document editing, start with the [Editing API](/docs/editor-api).
+
+## Read state and run commands
+
+Use `snapshot()` for state and `exec()` for edits. This helper adds a slide when the command is available:
+
+```ts
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function addSlide(editor: Editor) {
+  const command = { type: 'addSlide' } as const;
+  const allowed = editor.can(command);
+  if (!allowed.ok) return allowed;
+  return editor.exec(command);
+}
+```
+
+Check the final result even after `can()`. Commands can be refused when their target is unavailable.
+
+| Member                         | Purpose                                                 |
+| ------------------------------ | ------------------------------------------------------- |
+| `snapshot()`                   | Read the presentation and local view state.             |
+| `subscribe(listener)`          | Observe state changes; returns an unsubscribe function. |
+| `can(command)`                 | Check whether a command can run.                        |
+| `exec(command)`                | Run a command and inspect its result.                   |
+| `load(bytes, options?)`        | Open a presentation asynchronously.                     |
+| `save()`                       | Return PPTX bytes synchronously, or `null`.             |
+| `attach(element)` / `detach()` | Mount or remove the surface.                            |
+| `destroy()`                    | Release the editor and its resources.                   |
+
+## Choose an event
+
+Use `onEditorEvent(editor, name, handler)` to observe a specific change. It returns an unsubscribe function.
+
+| Event             | Payload and trigger                                                        |
+| ----------------- | -------------------------------------------------------------------------- |
+| `change`          | Snapshot after an edit, completed or failed load, or read-only transition. |
+| `selectionChange` | Snapshot after selection, current slide, or pending slide count changes.   |
+| `rejection`       | Refused edit and its snapshot.                                             |
+| `openFailure`     | Refused file and its snapshot.                                             |
+
+Use `subscribe()` when you also need zoom or other view changes. Dispose every subscription when its consumer unmounts.
+
+## See also
+
+- [Editor mount modes](/docs/core/mount-modes)
+- [Engine architecture](/docs/core/architecture)
+- [Load and save presentations](/docs/guides/loading-and-saving)

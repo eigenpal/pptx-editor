@@ -1,0 +1,65 @@
+---
+title: 'Text and ranges'
+description: 'Read, replace, and format text with TextFrame and TextRange.'
+category: 'Editing API'
+---
+
+Use `shape.textFrame.textRange` for a shape’s full text. Use `getSubstring(start, length)` to work with a smaller range.
+
+The example accepts a runtime from [Runtime and lifecycle](/docs/editor-api/runtime). The target shape must have a text frame.
+
+## Replace one occurrence
+
+Load the text, find the target, and synchronize the replacement:
+
+```ts
+import type { PptxEditorRuntime } from '@pptx-editor.dev/editor-api';
+
+export async function replaceText(
+  runtime: PptxEditorRuntime,
+  slideId: string,
+  shapeId: string,
+  search: string,
+  replacement: string
+) {
+  if (!search) throw new Error('Search text must not be empty');
+  return runtime.run(async (context) => {
+    const slide = context.presentation.slides.getItem(slideId);
+    const range = slide.shapes.getItem(shapeId).textFrame.textRange;
+    range.load('text');
+    await context.sync();
+    const start = range.text.indexOf(search);
+    if (start === -1) return false;
+    range.getSubstring(start, search.length).text = replacement;
+    await context.sync();
+    return true;
+  });
+}
+```
+
+Offsets use UTF-16 code units, as JavaScript string indexes do. Do not split a surrogate pair. Paragraph breaks read as `\r`; line breaks read as `\v`. If another writer changes the presentation after the read, the write can fail with `StaleDocument`. Read the text again and reconsider the replacement before retrying.
+
+## Format a range
+
+Inside a `run()` callback, set properties on a known text range:
+
+```ts
+// range is the TextRange you selected in this run.
+range.font.bold = true;
+range.font.size = 24;
+range.font.color = '#1F4E79';
+range.paragraphFormat.horizontalAlignment = 'Center';
+await context.sync();
+```
+
+A formatting read returns `null` when the range has mixed values. Narrow that value before reusing it in a write. Paragraph formatting applies to the paragraphs that the range touches.
+
+## Check text targets
+
+Pictures, connectors, tables, and groups do not expose an editable text frame through this API. A direct text read on those shapes fails with `NotSupported` and diagnostic `edit.no-text-frame`. Use [Tables](/docs/editor-api/tables) for table cell text.
+
+## See also
+
+- [Slides and shapes](/docs/editor-api/slides-and-shapes)
+- [Batching, loading, and errors](/docs/editor-api/batching-and-errors)
+- [Office.js compatibility](/docs/editor-api/office-js-api)

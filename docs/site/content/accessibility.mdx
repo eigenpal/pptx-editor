@@ -4,7 +4,7 @@ description: 'What the host page provides, how the keyboard moves through the ed
 category: 'Getting started'
 ---
 
-The editor gives names, roles, and keyboard support to its controls. The page around the editor is yours. This page tells you what to add to the page, and what the editor does by itself today.
+The editor gives names, roles, and keyboard support to its controls. The page around the editor is yours. This page tells you what to add to the page, and what the editor provides.
 
 ## Prepare the host page
 
@@ -16,6 +16,8 @@ The editor renders inside your page. It adds one landmark, the region "Presentat
 - A page heading (`<h1>`). The heading can be visually hidden.
 - A label for each control of your own, such as the file input that opens a deck.
 - A `title` and `allow="fullscreen"` on an `<iframe>` that holds the editor. The slide show asks for full screen (see [Installation](/docs/installation#embed-in-a-page)).
+
+Use this host page structure:
 
 ```html
 <!doctype html>
@@ -74,7 +76,7 @@ While you edit text, Tab and Shift+Tab change the list level at the start of a l
 | Ctrl/Cmd+], Ctrl/Cmd+[ | Move the paragraph one list level down or up. |
 | Shift+F3 | Change the case of the selection or of the word at the caret: Capitalize Each Word, UPPER CASE, lower case. |
 | Ctrl/Cmd+=, Ctrl/Cmd+Shift+= | Subscript, superscript. |
-| Ctrl/Cmd+\ | Clear the character formatting. |
+| Ctrl/Cmd+\  | Clear the character formatting. |
 | Ctrl/Cmd+Shift+C, Ctrl/Cmd+Shift+V | Copy and paste the formatting. |
 | Alt/Ctrl+Left, Alt/Ctrl+Right | Move to the start of the previous word or of the next word. Add Shift to select. |
 | Alt/Ctrl+Up, Alt/Ctrl+Down | Move to the start of the paragraph, or of the next paragraph. |
@@ -164,9 +166,9 @@ The editor takes its accessible names from the locale catalog, so they change wi
 
 ## Known limits
 
-These limits apply today:
+These limits apply:
 
-- **Alt text of other objects.** Only pictures give their alt text to a screen reader on the slide. Charts, groups, and shapes do not yet. A picture with a title but no alt text is hidden.
+- **Alt text of other objects.** Only pictures give their alt text to a screen reader on the slide. Charts, groups, and shapes do not. A picture with a title but no alt text is hidden.
 - **Slide content structure.** The slide is drawn as SVG. A screen reader gets the slide text only as flat text, in z-order. It gets no headings, lists, or reading order. It gets the shape name only when a shape is selected. When more than one shape is selected, it hears no announcement.
 
 ## Next steps

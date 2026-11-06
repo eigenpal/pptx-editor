@@ -6,7 +6,7 @@ category: 'Customization'
 
 `PptxEditor.Ribbon` arranges the chrome groups on tabs: the Quick Access Toolbar, Home, Insert, Design, Slide Show, and View, and the contextual tabs Shape Format, Picture Format, Table Design, and Table Layout. Use it in place of `PptxEditor.Toolbar`, which stays as the flat form of the same groups.
 
-The ribbon is a layer over the toolbar. Each tab panel is the toolbar with that tab's groups, and every button is a toolbar slot (`ChromeSlotId`) that runs the same command as the toolbar and the menus. Every toolbar customization works inside a tab: `Toolbar.Slot`, named parts, `Toolbar.Group` with `priority`, `Toolbar.Action`, `hidden`, and the More menu. DOCX Editor has no ribbon; the equivalent of a tab there is a `Toolbar` with `preset={false}` and its groups.
+The ribbon is a layer over the toolbar. Each tab panel is the toolbar with that tab's groups, and every button is a toolbar slot (`ChromeSlotId`) that runs the same command as the toolbar and the menus. Every toolbar customization works inside a tab: `Toolbar.Slot`, named parts, `Toolbar.Group` with `priority`, `Toolbar.Action`, `hidden`, and the More menu.
 
 ## Ribbon configuration reference
 
