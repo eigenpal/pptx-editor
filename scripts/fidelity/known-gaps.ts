@@ -135,7 +135,7 @@ export function checkFixtureGate(
       );
     if (deck.foreignReferenceFonts?.length)
       fix(
-        `${deck.name}: the reference PDF embeds fonts that are not open fonts of the deck: ${deck.foreignReferenceFonts.join(', ')}. Name open fonts in the deck, or list the deck in NON_OPEN_FONT_DECKS (local-fonts.ts)`
+        `${deck.name}: the reference PDF embeds fonts that are not open fonts of the deck: ${deck.foreignReferenceFonts.join(', ')}. Name open fonts in the deck and export its reference PDF again`
       );
     if (!deck.error && deck.reference === 'pdf') {
       const lines = deckLineCount(deck);

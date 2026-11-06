@@ -10,7 +10,7 @@ import type {
   FontResolutionRequest,
   PptxEditorInstance,
 } from '@pptx-editor.dev/core/editor';
-import { face, fixture } from '../../../core/src/editor/__tests__/font-test-helpers.ts';
+import { face, missingFontsDeck } from '../../../core/src/editor/__tests__/font-test-helpers.ts';
 import { PptxEditor, useFonts, type FontConfigurationFragment } from '../index.ts';
 import { PptxEditorContent, PptxEditorRoot } from '../PptxEditorRoot.tsx';
 
@@ -36,7 +36,7 @@ afterAll(() => {
   if (!fontSet) Reflect.deleteProperty(document, 'fonts');
 });
 
-const deck = fixture('font-substitution.pptx');
+const deck = missingFontsDeck();
 
 async function ready(ref: { editor: PptxEditorInstance | null }): Promise<PptxEditorInstance> {
   for (let i = 0; i < 300 && ref.editor?.snapshot().status !== 'ready'; i += 1)

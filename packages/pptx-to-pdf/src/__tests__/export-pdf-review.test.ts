@@ -5,6 +5,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Limits, cancellation, metadata, fonts, pictures, and diagnostics placement.
 
+import { missingFontsDeck } from '../../../core/src/editor/__tests__/font-test-helpers.ts';
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -413,7 +414,7 @@ describe('diagnostics placement', () => {
   });
 
   test('the font resolution lists no substitute failures when the packaged faces load', async () => {
-    const result = await exportPdf(deck('font-substitution'), BEST);
+    const result = await exportPdf(missingFontsDeck(), BEST);
     expect(result.fontResolution.substituteFailures).toEqual([]);
     expect(result.diagnostics.map((d) => d.code)).not.toContain('font.substitute-failed');
   });
@@ -435,7 +436,7 @@ describe('diagnostics placement', () => {
   });
 
   test('diagnostic codes are fixed strings, not file text', async () => {
-    const result = await exportPdf(deck('font-substitution'), BEST);
+    const result = await exportPdf(missingFontsDeck(), BEST);
     for (const d of result.diagnostics) expect(d.code).toMatch(/^[a-z]+(\.[a-z-]+)+$/);
   });
 });

@@ -112,15 +112,6 @@ export const FALLBACK_FONTS: readonly string[] = [
   resolve(import.meta.dir, '../../fixtures/fonts/NotoSansSymbols2-Regular.ttf'),
 ];
 
-/**
- * The fixtures whose decks name fonts that are not open, on purpose, with the reason. Their
- * reference PDFs may embed any font. Every other fixture names only open fonts, and its
- * reference PDF embeds only the open fonts that its deck names (`foreignReferenceFonts`).
- */
-export const NON_OPEN_FONT_DECKS: Readonly<Record<string, string>> = {
-  'font-substitution': 'it checks which open face the engine draws for each face that is not open',
-};
-
 /** Noto Sans CJK JP of `@docx-editor.dev/fonts-cjk`, part of the fixture set. */
 const CJK_FACE = join(
   dirname(
@@ -373,16 +364,13 @@ export function foreignOurFonts(
 
 /**
  * The fonts of a fixture's reference PDF that are not open fonts that its deck names: each one
- * must be a face of `open` whose family is in `named`, and embedded. Empty for a deck in
- * `NON_OPEN_FONT_DECKS`.
+ * must be a face of `open` whose family is in `named`, and embedded.
  */
 export function foreignReferenceFonts(
-  deck: string,
   fonts: readonly PdfFontName[],
   named: ReadonlySet<string>,
   open: ReadonlyMap<string, string>
 ): string[] {
-  if (Object.hasOwn(NON_OPEN_FONT_DECKS, deck)) return [];
   return fonts
     .filter((f) => {
       const family = open.get(f.name);

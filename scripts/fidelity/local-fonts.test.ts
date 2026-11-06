@@ -5,6 +5,8 @@ import {
   MAX_COLLECTION_FACES,
   collectionFace,
   faceOffsets,
+  foreignReferenceFonts,
+  foreignOurFonts,
   localFonts,
   localFontsIdentity,
   referenceFontsInstalled,
@@ -50,6 +52,23 @@ function collection(): Uint8Array {
 }
 
 describe('local fonts', () => {
+  test('our PDF rejects a system face outside the loaded set', () => {
+    expect(
+      foreignOurFonts(
+        [{ name: 'ArialMT', embedded: true }],
+        new Map([['LiberationSans', 'Liberation Sans']])
+      )
+    ).toEqual(['ArialMT']);
+  });
+  test('every fixture rejects fonts outside the open font set', () => {
+    expect(
+      foreignReferenceFonts(
+        [{ name: 'UnapprovedFont', embedded: true }],
+        new Set(['UnapprovedFont']),
+        new Map()
+      )
+    ).toEqual(['UnapprovedFont']);
+  });
   test('the identity is a stable SHA-256 of the font files', () => {
     const a = localFontsIdentity();
     expect(a).toMatch(/^[0-9a-f]{64}$/);

@@ -8,14 +8,14 @@ import {
   type FontConfigurationFragment,
   type FontResolutionRequest,
 } from '../index.ts';
-import { deferred, face, fixture, settle } from './font-test-helpers.ts';
+import { deferred, face, settle, missingFontsDeck } from './font-test-helpers.ts';
 
 const substituted = (editor: ReturnType<typeof createPptxEditor>): string[] =>
   editor.snapshot().substitutedFonts.map((f) => f.family);
 
 test('setFonts replaces host faces and keeps the document, selection, and undo history', async () => {
   const editor = createPptxEditor({ fonts: { sources: [face('Segoe UI')] } });
-  await editor.load(fixture('font-substitution.pptx'));
+  await editor.load(missingFontsDeck());
   expect(editor.exec({ type: 'addSlide' }).ok).toBe(true);
   const session = editor.session;
   const selection = editor.snapshot().selection;
@@ -36,7 +36,7 @@ test('setFonts replaces host faces and keeps the document, selection, and undo h
 
 test('setFonts(undefined) removes the host faces and the substitutes return', async () => {
   const editor = createPptxEditor({ fonts: { sources: [face('Segoe UI')] } });
-  await editor.load(fixture('font-substitution.pptx'));
+  await editor.load(missingFontsDeck());
   expect(substituted(editor)).not.toContain('Segoe UI');
   await editor.setFonts(undefined);
   expect(editor.session!.hostFaces.faces).toHaveLength(0);
@@ -48,7 +48,7 @@ test('a replaced resolver is aborted and its late face cannot revive the retired
   const gate = deferred<void>();
   let first: FontResolutionRequest | undefined;
   const editor = createPptxEditor();
-  await editor.load(fixture('font-substitution.pptx'));
+  await editor.load(missingFontsDeck());
   const pending = editor.setFonts(async (request) => {
     first = request;
     await gate.promise;
@@ -69,7 +69,7 @@ test('a replaced resolver is aborted and its late face cannot revive the retired
 test('a replacement keeps the current faces until the new ones install', async () => {
   const gate = deferred<void>();
   const editor = createPptxEditor({ fonts: { sources: [face('Segoe UI')] } });
-  await editor.load(fixture('font-substitution.pptx'));
+  await editor.load(missingFontsDeck());
   const pending = editor.setFonts(async () => {
     await gate.promise;
     return { sources: [face('Aptos')] };
@@ -85,7 +85,7 @@ test('a replacement keeps the current faces until the new ones install', async (
 
 test('a replacement that supplies nothing usable still removes the replaced faces', async () => {
   const editor = createPptxEditor({ fonts: { sources: [face('Segoe UI')] } });
-  await editor.load(fixture('font-substitution.pptx'));
+  await editor.load(missingFontsDeck());
   await editor.setFonts(() => undefined);
   expect(substituted(editor)).toContain('Segoe UI');
   editor.destroy();
@@ -98,7 +98,7 @@ test('a failing resolver removes the previous host faces and reports its cause',
     fonts: { sources: [face('Segoe UI')] },
     onFontError: (e) => errors.push(e),
   });
-  await editor.load(fixture('font-substitution.pptx'));
+  await editor.load(missingFontsDeck());
   await editor.setFonts(() => Promise.reject(cause));
   expect(substituted(editor)).toContain('Segoe UI');
   expect(errors).toHaveLength(1);
@@ -114,9 +114,9 @@ test('loading a new document and destroying an editor abort their outstanding re
       return new Promise(() => undefined);
     },
   });
-  void editor.load(fixture('font-substitution.pptx'));
+  void editor.load(missingFontsDeck());
   await settle();
-  void editor.load(fixture('font-substitution.pptx'));
+  void editor.load(missingFontsDeck());
   await settle();
   expect(signals).toHaveLength(2);
   expect(signals[0]!.aborted).toBe(true);
@@ -133,7 +133,7 @@ test('setFonts after destroy throws', async () => {
 test('setFonts before a deck opens applies to the next deck', async () => {
   const editor = createPptxEditor();
   await editor.setFonts({ sources: [face('Segoe UI')] });
-  await editor.load(fixture('font-substitution.pptx'));
+  await editor.load(missingFontsDeck());
   expect(substituted(editor)).not.toContain('Segoe UI');
   editor.destroy();
 });

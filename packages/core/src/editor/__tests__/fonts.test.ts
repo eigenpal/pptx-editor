@@ -3,7 +3,7 @@ import { readPptx } from '../../store/index.ts';
 import { uprightPieces } from '../../output/paint-text.ts';
 import { createPptxEditor, namedFamilies, openPresentation, withFontOrigin } from '../index.ts';
 // `face` makes a Liberation Sans face under another name: it stands in for a licensed face.
-import { face, fixture } from './font-test-helpers.ts';
+import { face, missingFontsDeck } from './font-test-helpers.ts';
 import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 
 const substituted = (editor: ReturnType<typeof createPptxEditor>): string[] =>
@@ -11,7 +11,7 @@ const substituted = (editor: ReturnType<typeof createPptxEditor>): string[] =>
 
 describe('font coverage', () => {
   test('namedFamilies lists run, theme, and bullet fonts once', () => {
-    const r = readPptx(fixture('font-substitution.pptx'));
+    const r = readPptx(missingFontsDeck());
     if (!r.ok) throw new Error('fixture');
     const names = namedFamilies(r.pkg);
     for (const f of ['Aptos', 'Segoe UI', 'Calibri', 'Arial']) expect(names).toContain(f);
@@ -19,7 +19,7 @@ describe('font coverage', () => {
   });
 
   test('substitutions are reported, with metric compatibility', async () => {
-    const r = await openPresentation(fixture('font-substitution.pptx'));
+    const r = await openPresentation(missingFontsDeck());
     if (!r.ok) throw new Error('open');
     const subs = r.session.substitutedFamilies();
     expect(subs.find((s) => s.family === 'Aptos')?.metricCompatible).toBe(false);
@@ -66,7 +66,7 @@ describe('font coverage', () => {
         return { sources: [face('Aptos')] };
       },
     });
-    expect((await editor.load(fixture('font-substitution.pptx'))).ok).toBe(true);
+    expect((await editor.load(missingFontsDeck())).ok).toBe(true);
     expect(asked).toContain('Aptos');
     expect(asked).toContain('Segoe UI');
     expect(substituted(editor)).not.toContain('Aptos');
@@ -80,7 +80,7 @@ describe('font coverage', () => {
       fonts: () => Promise.reject(new Error('offline')),
       onFontError: (error) => void errors.push(error.code),
     });
-    expect((await editor.load(fixture('font-substitution.pptx'))).ok).toBe(true);
+    expect((await editor.load(missingFontsDeck())).ok).toBe(true);
     expect(errors.length).toBeGreaterThan(0);
     expect(substituted(editor)).toContain('Aptos');
     editor.destroy();
@@ -88,7 +88,7 @@ describe('font coverage', () => {
 
   test('setFonts re-measures and keeps the undo history', async () => {
     const editor = createPptxEditor();
-    expect((await editor.load(fixture('font-substitution.pptx'))).ok).toBe(true);
+    expect((await editor.load(missingFontsDeck())).ok).toBe(true);
     expect(editor.exec({ type: 'addSlide' }).ok).toBe(true);
     const before = editor.session!.layout(0);
     expect(substituted(editor)).toContain('Segoe UI');
@@ -104,7 +104,7 @@ describe('font coverage', () => {
   test('withFontOrigin adds faces after the host fonts and keeps them', async () => {
     const host = { sources: [face('Aptos')] };
     const editor = createPptxEditor({ fonts: host });
-    expect((await editor.load(fixture('font-substitution.pptx'))).ok).toBe(true);
+    expect((await editor.load(missingFontsDeck())).ok).toBe(true);
     expect(editor.fonts).toBe(host);
     expect(substituted(editor)).not.toContain('Aptos');
     expect(substituted(editor)).toContain('Segoe UI');
@@ -118,7 +118,7 @@ describe('font coverage', () => {
 
   test('the substitution list is reference-stable while unchanged', async () => {
     const editor = createPptxEditor();
-    await editor.load(fixture('font-substitution.pptx'));
+    await editor.load(missingFontsDeck());
     const a = editor.snapshot().substitutedFonts;
     editor.goToSlide(0);
     editor.setZoom(0.5);

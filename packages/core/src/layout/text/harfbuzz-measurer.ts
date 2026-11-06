@@ -115,8 +115,9 @@ interface LoadedFace {
    * without kerning, also where the run asks for it (`font-effects`, `diagrams`, and every
    * fixture through the default text style), and kern Liberation Sans, which has both tables
    * (`rtl-text`, `east-asian-line-breaking`). A stand-in for a missing face keeps its `GPOS`
-   * pairs, as the face it replaces may have a `kern` table (`font-substitution`): a face that
+   * pairs, as the face it replaces may have a `kern` table: a face that
    * the measurer substitutes, and a host substitution (`HOST_SUBSTITUTE_ORIGIN`).
+   * Unit tests cover this substitution rule; no reference PDF measures it.
    */
   readonly kerns: boolean;
 }

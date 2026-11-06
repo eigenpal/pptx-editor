@@ -776,13 +776,13 @@ const fixtures: Record<string, FixtureSlide[]> = {
           text: para(run('STACK', 'sz="3200" b="1"')) }),
     },
   ],
-  'font-substitution': [
+  'open-font-families': [
     {
       shapes: [
-        ['Aptos', 'Aptos: no metric-compatible open substitute'],
-        ['Segoe UI', 'Segoe UI: no metric-compatible open substitute'],
-        ['Calibri', 'Calibri: metric-compatible (Carlito)'],
-        ['Arial', 'Arial: metric-compatible (Liberation Sans)'],
+        ['Liberation Sans', 'Liberation Sans: packaged open sans-serif face'],
+        ['Liberation Sans', 'Liberation Sans: another line in the open face'],
+        ['Liberation Serif', 'Liberation Serif: packaged open serif face'],
+        ['Liberation Serif', 'Liberation Serif: another line in the open face'],
       ]
         .map(([face, label], i) =>
           box(2 + i, 0.6 * IN, (0.6 + i * 1.5) * IN, 11 * IN, 1.2 * IN,

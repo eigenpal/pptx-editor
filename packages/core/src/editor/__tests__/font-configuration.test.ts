@@ -16,7 +16,7 @@ import {
 import { deckDefaultFamily, deckFontFamilies } from '../deck-font-request.ts';
 import { resolveSlide } from '../../cascade/index.ts';
 import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
-import { face, fixture, fontBytes, settle, themedDeck } from './font-test-helpers.ts';
+import { face, fontBytes, settle, themedDeck, missingFontsDeck } from './font-test-helpers.ts';
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -120,7 +120,7 @@ describe('the request a deck makes', () => {
 describe('host faces', () => {
   test('a host face removes its family from the substitution report', async () => {
     const editor = createPptxEditor({ fonts: { sources: [face('Segoe UI')] } });
-    await editor.load(fixture('font-substitution.pptx'));
+    await editor.load(missingFontsDeck());
     expect(substituted(editor)).not.toContain('Segoe UI');
     expect(substituted(editor)).toContain('Aptos');
     editor.destroy();
@@ -138,7 +138,7 @@ describe('host faces', () => {
         ],
       },
     });
-    await editor.load(fixture('font-substitution.pptx'));
+    await editor.load(missingFontsDeck());
     const segoe = editor.snapshot().substitutedFonts.find((f) => f.family === 'Segoe UI');
     expect(segoe).toEqual({ family: 'Segoe UI', substitute: 'Acme Sans', metricCompatible: false });
     editor.destroy();
@@ -146,7 +146,7 @@ describe('host faces', () => {
 
   test('packagedFonts() is an origin: Calibri still measures with Carlito', async () => {
     const editor = createPptxEditor({ fonts: packagedFonts() });
-    await editor.load(fixture('font-substitution.pptx'));
+    await editor.load(missingFontsDeck());
     expect(editor.snapshot().substitutedFonts.find((f) => f.family === 'Calibri')).toEqual({
       family: 'Calibri',
       substitute: 'Carlito',
@@ -162,7 +162,7 @@ describe('host faces', () => {
       fonts: { sources: [{ ...good, hash: 'sha256:0000' }] },
       onFontError: (e) => errors.push(e),
     });
-    await editor.load(fixture('font-substitution.pptx'));
+    await editor.load(missingFontsDeck());
     expect(errors.map((e) => e.code)).toEqual(['hashMismatch']);
     expect(substituted(editor)).toContain('Segoe UI');
     editor.destroy();
@@ -180,7 +180,7 @@ describe('host faces', () => {
       },
       onFontError: (e) => errors.push(e),
     });
-    await editor.load(fixture('font-substitution.pptx'));
+    await editor.load(missingFontsDeck());
     expect(fontBytes('Carlito-Regular.ttf').byteLength).toBeGreaterThan(200_000);
     expect(errors.length).toBeGreaterThan(0);
     expect(substituted(editor)).toContain('Aptos');
@@ -193,7 +193,7 @@ describe('host faces', () => {
       fonts: () => Promise.reject(new Error('offline')),
       onFontError: (e) => errors.push(e),
     });
-    expect((await editor.load(fixture('font-substitution.pptx'))).ok).toBe(true);
+    expect((await editor.load(missingFontsDeck())).ok).toBe(true);
     expect(errors).toHaveLength(1);
     expect(errors[0]!.name).toBe('EditorFontError');
     expect(errors[0]!.diagnostic).toBe('offline');
@@ -236,7 +236,7 @@ describe('the default stays the same', () => {
       return realFetch(input, init);
     }) as typeof fetch;
     const editor = createPptxEditor();
-    await editor.load(fixture('font-substitution.pptx'));
+    await editor.load(missingFontsDeck());
     expect(editor.snapshot().substitutedFonts.find((f) => f.family === 'Calibri')?.substitute).toBe(
       'Carlito'
     );

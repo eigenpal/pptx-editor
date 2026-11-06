@@ -129,7 +129,7 @@ When a change alters a pinned problem (for example, a fix changes the text that 
 
 The harness prints each fixture in `fixtures/` to PDF with the editor's own paint, and compares that PDF with the fixture's reference PDF. pdf.js draws and reads both PDFs in the same way. The check uses no system tools and no system fonts. Run it on your own machine; no container or second system is needed. Each slide must pass these checks (`scripts/fidelity/thresholds.ts`): at most 0.5 % of the pixels differ, every reference text line is in our page, our page has no other text lines, and each line is within 0.5 pt of the reference line, vertically (baseline) and horizontally (its nearer edge). Rotated, vertical, and right-to-left text is checked by pixels only. Save, reopen, and paint again must give the same SVG markup.
 
-Our PDF must draw only with fonts that the harness loaded: the fixture fonts, the engine's fonts, and two open fallback faces. A system font in our PDF fails the gate. A fixture's reference PDF must embed only the open fonts that its deck names. `NON_OPEN_FONT_DECKS` in `scripts/fidelity/local-fonts.ts` lists the exceptions (`font-substitution`).
+Our PDF must draw only with fonts that the harness loaded: the fixture fonts, the engine's fonts, and two open fallback faces. A system font in our PDF fails the gate. A fixture's reference PDF must embed only the open fonts that its deck names. No fixture is exempt.
 
 ### Run
 

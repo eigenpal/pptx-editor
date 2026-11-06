@@ -27,9 +27,6 @@ export function face(
   return made.source;
 }
 
-export const fixture = (name: string): Uint8Array =>
-  new Uint8Array(readFileSync(join(import.meta.dir, '../../../../../fixtures', name)));
-
 const IN = 914_400;
 
 /**
@@ -75,3 +72,32 @@ export function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => voi
 export const settle = async (turns = 5): Promise<void> => {
   for (let i = 0; i < turns; i += 1) await new Promise((r) => setTimeout(r, 0));
 };
+
+/** A generated substitution test deck. It names missing faces but embeds no fonts. */
+export function missingFontsDeck(): Uint8Array {
+  const families = ['Aptos', 'Segoe UI', 'Calibri', 'Arial'];
+  return buildPptx({
+    slides: [
+      {
+        shapes: families
+          .map((family, i) =>
+            shape({
+              id: 2 + i,
+              x: 0.6 * IN,
+              y: (0.6 + i * 1.5) * IN,
+              cx: 11 * IN,
+              cy: 1.2 * IN,
+              text: para(
+                run(
+                  `${family}: font substitution sample.`,
+                  'sz="2000"',
+                  `<a:latin typeface="${family}"/>`
+                )
+              ),
+            })
+          )
+          .join(''),
+      },
+    ],
+  });
+}

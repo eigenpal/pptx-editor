@@ -3,7 +3,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test';
 import { createApp, defineComponent, h, nextTick, shallowRef, type App, type Component } from 'vue';
 import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
-import { face, fixture } from '../../core/src/editor/__tests__/font-test-helpers.ts';
+import { face, missingFontsDeck } from '../../core/src/editor/__tests__/font-test-helpers.ts';
 import {
   PptxEditor,
   PptxEditorRoot,
@@ -44,7 +44,7 @@ afterEach(() => {
   host = null;
 });
 
-const deck = fixture('font-substitution.pptx');
+const deck = missingFontsDeck();
 const substituted = (e: PptxEditorInstance) => e.snapshot().substitutedFonts.map((f) => f.family);
 
 function mount(component: Component): void {
