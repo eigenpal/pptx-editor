@@ -11,7 +11,6 @@ import type { EditorCommand } from '../../packages/core/src/contracts/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../../packages/core/src/editor/index.ts';
 import {
   attr,
-  canonicalForm,
   canonicalPackageFingerprint,
   elements,
   presentationInfo,
@@ -276,11 +275,14 @@ function saved(pkg: PptxPackage, original: PptxPackage, editor: PptxEditorInstan
   };
 }
 
-/** The content of a part, for comparing two packages that were read separately. */
+/**
+ * The content of a part as a save writes it, for comparing two packages that were read
+ * separately. The XML text keeps prefixes and namespace declarations, as the fingerprint does.
+ */
 function partContent(pkg: PptxPackage, name: string): string | undefined {
   const part = pkg.parts.get(name);
   if (!part) return undefined;
-  if (part.kind === 'xml') return canonicalForm(part.xml.root);
+  if (part.kind === 'xml') return serializeXmlPart(part.xml);
   return Buffer.from(part.bytes).toString('base64');
 }
 

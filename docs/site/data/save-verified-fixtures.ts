@@ -61,7 +61,8 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
  * `bun scripts/fidelity/feature-edits.ts --out <dir>` writes one copy per row. Add a row, or
  * change its fingerprint, only after you open its copy with no prompt. `feature-edits.test.ts`
  * fails when a recipe or an engine change gives a copy with another fingerprint: then open the new
- * copy, and record its fingerprint. Last checked on 6 November 2026: 45 copies, no prompt.
+ * copy, and record its fingerprint. Last checked on 6 November 2026: 45 copies written at
+ * commit 74a4186, no prompt.
  */
 export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'effects.glow-reflection':
