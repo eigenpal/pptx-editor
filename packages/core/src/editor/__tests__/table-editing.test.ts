@@ -465,6 +465,7 @@ describe('merge, split, and formatting (editor-ui-parity 4.3)', () => {
     expect(runToolbarCommand(e, 'table.borderStyle', 'dash').ok).toBe(true);
     expect(attr(find(child(tcPr(), 'a:lnB')!, 'a:prstDash'), 'val')).toBe('dash');
     expect(toolbarCommandState(e, 'table.borderStyle').value).toBe('dash');
+    expect(Object.isFrozen(e.snapshot().tableBorderPen!.spec)).toBe(true);
     // The pen keeps its color: the outside borders stay green.
     expect(attr(find(child(tcPr(), 'a:lnB')!, 'a:srgbClr'), 'val')).toBe('00FF00');
     // An invalid pen value changes nothing.

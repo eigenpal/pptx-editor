@@ -23,6 +23,14 @@ const PEN_TARGETS: ReadonlySet<unknown> = new Set([
   'right',
 ]);
 
+/** A deep copy of a pen that no one can change: the pen, its line, and the line's color. */
+function frozenPen(pen: TableBorderPen): TableBorderPen {
+  const copy = JSON.parse(JSON.stringify(pen)) as TableBorderPen;
+  if (typeof copy.spec.color === 'object' && copy.spec.color) Object.freeze(copy.spec.color);
+  Object.freeze(copy.spec);
+  return Object.freeze(copy);
+}
+
 /** Whether a host's pen is one the Borders menu can draw: an edge target and a valid line. */
 function validPen(pen: unknown): pen is TableBorderPen {
   if (typeof pen !== 'object' || pen === null) return false;
@@ -95,10 +103,7 @@ export class ViewSettings {
     if (this.refusal(command, all)) return false;
     if (command.type === 'toggleSmartGuides') this.smartGuides = !this.smartGuides;
     // A copy the host cannot change after it passed `validPen`.
-    else if (command.type === 'setTableBorderPen')
-      this.tableBorderPen = Object.freeze(
-        JSON.parse(JSON.stringify(command.pen)) as TableBorderPen
-      );
+    else if (command.type === 'setTableBorderPen') this.tableBorderPen = frozenPen(command.pen);
     else if (command.type === 'setPresentationView') this.presentationView = command.view;
     else {
       const ids = new Set(this.collapsedSections);

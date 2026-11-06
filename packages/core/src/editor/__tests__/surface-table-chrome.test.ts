@@ -253,6 +253,12 @@ describe('the table chrome', () => {
     expect(rects(block)).toBe(3);
     // One edge around the whole range, not one on each cell.
     expect(edges(block).length).toBe(1);
+    // Column 0, where the merged cell starts: the edge is one column wide, as the command's.
+    const first = { ...column, anchor: { row: 0, column: 0 }, focus: { row: 2, column: 0 } };
+    const t = tableItem(layout(e), nodeId)!.table;
+    const edge = edges(first)[0];
+    expect(Number(edge.getAttribute('width'))).toBeCloseTo(t.columnX[1] - t.columnX[0]);
+    expect(Number(edge.getAttribute('height'))).toBeCloseTo(t.rowY[3] - t.rowY[0]);
   });
 
   test('a selected column under a merged cell inserts, deletes, and fills its own line', async () => {

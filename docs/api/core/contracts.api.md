@@ -1386,7 +1386,7 @@ export type TableCommand =
 /**
 * Fill cells with plain text from the top-left cell of the selection (a paste of copied
 * cells): one array for each row, one string for each cell. Each written cell keeps the format
-* of its first run. Text past the table's edge adds rows at the bottom and columns at the right
+* of its first run. Text past the table's edge adds rows at the bottom and columns at the end of the grid (the right, or the left in a right-to-left table)
 * (new columns share the table's width), up to the table limits; a position inside a merged
 * cell is skipped.
 */

@@ -263,7 +263,6 @@ export function cellRangeRects(
 ): globalThis.Element[] {
   const g = doc.createElementNS(SVG_NS, 'g');
   g.setAttribute('transform', `matrix(${frame.matrix.join(' ')})`);
-  const box = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
   for (const c of frame.table.cells) {
     const cr1 = c.cell.row + c.cell.rowSpan - 1;
     const cc1 = c.cell.col + c.cell.gridSpan - 1;
@@ -282,19 +281,22 @@ export function cellRangeRects(
     r.setAttribute('width', String(c.width));
     r.setAttribute('height', String(c.height));
     g.append(r);
-    box.x0 = Math.min(box.x0, c.x);
-    box.y0 = Math.min(box.y0, c.y);
-    box.x1 = Math.max(box.x1, c.x + c.width);
-    box.y1 = Math.max(box.y1, c.y + c.height);
   }
-  // One edge around the whole range, so the cells' own borders stay visible inside it.
-  if (box.x1 > box.x0) {
+  // One edge around the range's own grid lines, so the cells' borders stay visible inside it
+  // and a merged cell that crosses a selected band stays outside the edge.
+  const { columnX, rowY, rtl } = frame.table;
+  const n = columnX.length - 1;
+  const [x0, x1] = rtl
+    ? [columnX[n - range.c1 - 1], columnX[n - range.c0]]
+    : [columnX[range.c0], columnX[range.c1 + 1]];
+  const [y0, y1] = [rowY[range.r0], rowY[range.r1 + 1]];
+  if ([x0, x1, y0, y1].every(Number.isFinite) && x1 > x0 && y1 > y0) {
     const edge = doc.createElementNS(SVG_NS, 'rect');
     edge.setAttribute('class', `${className}-edge`);
-    edge.setAttribute('x', String(box.x0));
-    edge.setAttribute('y', String(box.y0));
-    edge.setAttribute('width', String(box.x1 - box.x0));
-    edge.setAttribute('height', String(box.y1 - box.y0));
+    edge.setAttribute('x', String(x0));
+    edge.setAttribute('y', String(y0));
+    edge.setAttribute('width', String(x1 - x0));
+    edge.setAttribute('height', String(y1 - y0));
     g.append(edge);
   }
   return [g];
