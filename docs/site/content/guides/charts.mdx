@@ -1,0 +1,32 @@
+---
+title: 'Charts'
+description: 'Draw charts from the values cached in their chart parts, in the editor and in the PDF export.'
+category: 'Guides'
+---
+
+A PPTX chart is a graphic frame that names a chart part (`c:chartSpace`, ECMA-376 Part 1, 21.2). The chart part caches the values of every series. The free engine shows a labeled placeholder for a chart. The drawing module of `@pptx-editor.dev/pro` draws the chart from those cached values. It needs the EigenPal Pro License.
+
+## Enable chart rendering
+
+```ts
+import { createPptxEditor } from '@pptx-editor.dev/core/editor';
+import { drawingModule } from '@pptx-editor.dev/pro/drawing';
+
+const editor = createPptxEditor({ document: bytes, modules: [drawingModule({ licenseKey })] });
+```
+
+In the React or Vue adapter, pass the same module in the `modules` prop of `PptxEditor`. For headless layout, call `installDrawing({ licenseKey })` once. The module serves every editor in the process, so install it before the first deck opens. `@pptx-editor.dev/pptx-to-pdf` always installs it.
+
+## What draws
+
+- Bar and column charts: clustered, stacked, and percent stacked.
+- Line, area, scatter, pie, doughnut, and radar charts.
+- Titles, legends, axes, gridlines, data labels, and number formats.
+
+3-D, of-pie, stock, bubble, and surface charts, and charts with trendlines or error bars, show the placeholder. The PDF export reports them with the `frame.chart` diagnostic code.
+
+## How it works
+
+The module turns a chart into shapes and labels in the chart's frame. The engine lays them out with the same geometry and text measurement as every other shape. The editor and the PDF export draw that one layout, so the two agree.
+
+A chart is not editable. It selects, moves, and deletes as one object, and its chart part saves unchanged. The engine never reads an embedded workbook or an external data source.
