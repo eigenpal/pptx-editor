@@ -304,7 +304,8 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
       id: 'tableDelete',
       labelKey: 'table.delete',
       paths: ICON_PATHS['delete_sweep'] ?? null,
-      items: (['rows', 'columns', 'table'] as const).map((v): ChromeMenuItemEntry => ({
+      // The toolbar's order: Delete Columns, Delete Rows, Delete Table.
+      items: (['columns', 'rows', 'table'] as const).map((v): ChromeMenuItemEntry => ({
         kind: 'item',
         slot: 'table.delete',
         value: v,
@@ -316,7 +317,8 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
       id: 'tableSelect',
       labelKey: 'table.select',
       paths: ICON_PATHS['select_all'] ?? null,
-      items: (['table', 'row', 'column'] as const).map((v): ChromeMenuItemEntry => ({
+      // The toolbar's order: Select Table, Select Column, Select Row.
+      items: (['table', 'column', 'row'] as const).map((v): ChromeMenuItemEntry => ({
         kind: 'item',
         slot: 'table.select',
         value: v,

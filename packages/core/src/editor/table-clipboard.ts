@@ -16,6 +16,9 @@ const MAX_LINES = 75;
 /** The most characters a pasted cell keeps. */
 const MAX_CELL_CHARS = 32_768;
 
+/** The most clipboard characters a paste reads, before it parses them. */
+const MAX_RAW_CHARS = 4_000_000;
+
 /** The plain text of each cell of a cell range, row by row; a covered position is ''. */
 export function cellRangeTexts(
   layout: SlideLayout | undefined,
@@ -55,7 +58,8 @@ export function toTabSeparated(rows: readonly (readonly string[])[]): string {
  * Tab-separated text as rows of cell texts: quoted cells keep their tabs, line breaks, and
  * doubled quotes; one trailing line break is not a row. At most 75 rows of 75 cells.
  */
-export function parseTabSeparated(text: string): string[][] {
+export function parseTabSeparated(raw: string): string[][] {
+  const text = raw.slice(0, MAX_RAW_CHARS);
   const rows: string[][] = [[]];
   let cell = '';
   let quoted = false;
@@ -80,6 +84,8 @@ export function parseTabSeparated(text: string): string[][] {
       i += 1;
     } else if (ch === '\n' || ch === '\r') {
       push();
+      // Rows past the limit are never read.
+      if (rows.length > MAX_LINES) break;
       rows.push([]);
       i += ch === '\r' && text[i + 1] === '\n' ? 2 : 1;
     } else {
@@ -96,7 +102,7 @@ export function parseTabSeparated(text: string): string[][] {
 
 /** Rows of cell texts from this editor's cells format, or null when it is not valid. */
 export function parseCellsJson(raw: string): string[][] | null {
-  if (raw.length > MAX_LINES * MAX_LINES * MAX_CELL_CHARS) return null;
+  if (raw.length > MAX_RAW_CHARS) return null;
   let value: unknown;
   try {
     value = JSON.parse(raw);

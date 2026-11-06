@@ -15,6 +15,7 @@ import {
   elementKindLabelKey,
   elementRotates,
   TABLE_OPTION_ROWS,
+  panelHistoryKey,
   platformShortcuts,
   radioGroupStep,
 } from '@pptx-editor.dev/core/editor';
@@ -57,12 +58,15 @@ const PanelNumberField = defineComponent({
             aria-label={props.label}
             value={draft.value ?? props.value}
             disabled={props.disabled}
+            // Uncommitted typing keeps Ctrl/Cmd+Z for the field's own undo (`panelHistoryKey`).
+            data-draft={draft.value !== null}
             onInput={(e: Event) => {
               draft.value = (e.target as HTMLInputElement).value;
             }}
             onBlur={commit}
             onKeydown={(e: KeyboardEvent) => {
-              if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+              // Enter commits and keeps the focus here, so the next key still reaches the panel.
+              if (e.key === 'Enter') commit();
               if (e.key === 'Escape') draft.value = null;
             }}
           />
@@ -267,6 +271,7 @@ export const PptxEditorSidePanel = defineComponent({
   props: sidePanelProps,
   setup(props, { attrs }) {
     const { t } = useTranslation();
+    const editor = usePptxEditor();
     const tab = ref<'format' | 'comments'>('format');
     return () => {
       const { class: hostClass, style: hostStyle, ...rest } = attrs;
@@ -319,7 +324,11 @@ export const PptxEditorSidePanel = defineComponent({
               <ToolButton label={t('panel.close')} icon="close" onClick={() => props.onClose?.()} />
             ) : null}
           </div>
-          <div class="pptx-panel__body" role="tabpanel">
+          <div
+            class="pptx-panel__body"
+            role="tabpanel"
+            onKeydown={(e: KeyboardEvent) => panelHistoryKey(e, editor.value)}
+          >
             {tab.value === 'format' ? <FormatTab /> : null}
             {tab.value === 'comments' ? (
               <div class="pptx-empty">

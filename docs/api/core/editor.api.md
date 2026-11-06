@@ -805,7 +805,7 @@ export interface CommandEffect {
 export function commandForSlot(slot: ChromeSlotId): EditorCommand | null;
 
 // @public
-export function commandForSlotValue(slot: ChromeSlotId, value: unknown, editor?: object | null): EditorCommand | null;
+export function commandForSlotValue(slot: ChromeSlotId, value: unknown, editor?: Editor | null): EditorCommand | null;
 
 // @public
 export class CommandRefusal extends Error {
@@ -3403,6 +3403,12 @@ export interface PaneKeyEvent {
 }
 
 // @internal
+export function panelHistoryKey(e: ModifierKeys & {
+    readonly target: unknown;
+    preventDefault(): void;
+}, editor: Pick<PptxEditorInstance, 'exec'> | null | undefined): boolean;
+
+// @internal
 export function panelItems(panel: HTMLElement): HTMLElement[];
 
 // @internal
@@ -4803,7 +4809,7 @@ export interface TableBorderPen {
 }
 
 // @public
-export function tableBorderPen(editor: object | null | undefined): TableBorderPen;
+export function tableBorderPen(editor: Editor | null | undefined): TableBorderPen;
 
 // @public
 export interface TableBorderSpec {

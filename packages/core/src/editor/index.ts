@@ -262,6 +262,7 @@ export {
   notesFormatRange,
   notesFormatShortcut,
   notesHistoryShortcut,
+  panelHistoryKey,
   notesWordAt,
   openSectionOfCurrent,
   openSlideInNormalView,

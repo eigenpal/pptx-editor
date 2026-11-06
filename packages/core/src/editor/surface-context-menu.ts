@@ -4,10 +4,11 @@
 // edited; empty slide area clears the selection. A right-click on a table cell places the caret
 // in that cell (a cell range in the table stays, and so does a table selected as an object), so
 // the table menu acts on the cell under the pointer. The chrome then reads the selection and
-// draws its menu at the event's point, so no DOM type crosses the editor contract.
+// draws its menu at the event's point, so no DOM type crosses the editor contract. A right-click
+// on the table's select handle selects the table as an object.
 
 import type { EditorSelection } from '../contracts/index.ts';
-import { selectionScope } from '../automation/commands/placement.ts';
+import { parentGroupOf, selectionScope } from '../automation/commands/placement.ts';
 import type { SurfaceHost } from './surface.ts';
 
 type Point = { x: number; y: number };
@@ -36,6 +37,32 @@ export function contextMenuSelection(
   return { kind: 'shapes', nodeIds: [id], ...(group ? { group } : {}) };
 }
 
+const REOPENED = new WeakSet<Event>();
+
+/**
+ * Send a right-click on the handle again from the stage. The new selection repaints the overlay
+ * and takes the handle out of the document before the event bubbles on, so the adapter that
+ * opens the menu would not see it; the stage stays.
+ */
+function reopenFromStage(e: MouseEvent): void {
+  const stage = e.currentTarget as globalThis.Element | null;
+  const View = stage?.ownerDocument.defaultView?.MouseEvent;
+  if (!stage || !View) return;
+  e.stopPropagation();
+  const again = new View('contextmenu', {
+    bubbles: true,
+    cancelable: true,
+    clientX: e.clientX,
+    clientY: e.clientY,
+    screenX: e.screenX,
+    screenY: e.screenY,
+    button: e.button,
+    buttons: e.buttons,
+  });
+  REOPENED.add(again);
+  stage.dispatchEvent(again);
+}
+
 /** Handle a `contextmenu` event on the slide stage. */
 export function selectForContextMenu(
   e: MouseEvent,
@@ -45,10 +72,23 @@ export function selectForContextMenu(
   cellAt?: (id: string, p: Point) => Extract<EditorSelection, { kind: 'text' }> | undefined
 ): void {
   e.preventDefault();
+  // The event `reopenFromStage` sends again: the selection is already set.
+  if (REOPENED.has(e)) return;
   const layout = editor.layout();
   if (!layout) return;
   const p = pointOf(e);
   const selection = editor.selection();
+  // The table's select handle stands for the table: a right-click selects it as an object.
+  const target = e.target as { closest?(selector: string): Element | null } | null;
+  const handle = target?.closest?.('[data-table-handle]')?.getAttribute('data-table-handle');
+  if (handle) {
+    if (!(selection.kind === 'shapes' && selection.nodeIds.includes(handle))) {
+      const group = parentGroupOf(layout.items, handle);
+      editor.select({ kind: 'shapes', nodeIds: [handle], ...(group ? { group } : {}) });
+      reopenFromStage(e);
+    }
+    return;
+  }
   // Inside an entered group, the group's children are hit first, as a click does.
   const scope = selectionScope(layout.items, selection);
   const inScope = scope ? hit(p, scope) : undefined;

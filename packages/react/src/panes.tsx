@@ -22,6 +22,7 @@ import {
   followCurrentSlide,
   groupSlideSections,
   keepCurrentSlideInView,
+  panelHistoryKey,
   radioGroupStep,
   railDragAxis,
   railKeyDown,
@@ -588,10 +589,13 @@ function NumberField({
           aria-label={label}
           value={draft ?? value}
           disabled={disabled}
+          // Uncommitted typing keeps Ctrl/Cmd+Z for the field's own undo (`panelHistoryKey`).
+          data-draft={draft !== null}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+            // Enter commits and keeps the focus here, so the next key still reaches the panel.
+            if (e.key === 'Enter') commit();
             if (e.key === 'Escape') setDraft(null);
           }}
         />
@@ -768,6 +772,7 @@ export interface SidePanelProps {
 /** The side panel: Format · Comments. @public */
 export function SidePanel({ onClose, className, paneWidth, style }: SidePanelProps) {
   const { t } = useTranslation();
+  const editor = usePptxEditor();
   const [tab, setTab] = useState<'format' | 'comments'>('format');
   return (
     <aside
@@ -806,7 +811,11 @@ export function SidePanel({ onClose, className, paneWidth, style }: SidePanelPro
         </div>
         {onClose ? <ToolButton label={t('panel.close')} icon="close" onClick={onClose} /> : null}
       </div>
-      <div className="pptx-panel__body" role="tabpanel">
+      <div
+        className="pptx-panel__body"
+        role="tabpanel"
+        onKeyDown={(e) => panelHistoryKey(e, editor)}
+      >
         {tab === 'format' ? <FormatTab /> : null}
         {tab === 'comments' ? (
           <div className="pptx-empty">

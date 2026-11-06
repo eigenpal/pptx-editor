@@ -306,6 +306,10 @@ describe('table structure (parity-baseline 4.2)', () => {
     e.exec({ type: 'insertColumn', where: 'right' });
     expect(grid(e).map((r) => r.join(''))).toEqual(['ABC', '', 'DEF', '', 'GHI']);
     expect(model(e).nC).toBe(5);
+    // The table keeps its width of three inches; the five columns share it.
+    const widths = model(e).gridCols.map((g) => Number(attr(g, 'w')));
+    expect(widths.reduce((a, b) => a + b, 0)).toBe(3 * IN);
+    expect(Math.max(...widths) - Math.min(...widths)).toBeLessThanOrEqual(1);
     expect(e.snapshot().table).toMatchObject({
       rows: 5,
       columns: 5,

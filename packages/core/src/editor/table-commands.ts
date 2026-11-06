@@ -179,6 +179,30 @@ function insertTable(ctx: CommandContext, batch: OpBatch, rows: number, cols: nu
   return insertTableFrame(batch, slidePart(ctx), rows, cols, slideW, slideH);
 }
 
+/** The sum of the grid column widths, EMU. */
+const gridWidth = (m: TableModel): number =>
+  m.gridCols.reduce((sum, g) => sum + (intAttr(g, 'w') ?? 0), 0);
+
+/**
+ * Scale the grid columns back to `width` after an insert, so the table keeps its width and the
+ * columns keep their proportions, as slide editors insert a column.
+ */
+function keepGridWidth(batch: OpBatch, m: TableModel, width: number): void {
+  const after = readTable(batch, m.part, m.frame.id);
+  const total = gridWidth(after);
+  if (width <= 0 || total <= width) return;
+  let left = width;
+  after.gridCols.forEach((g, i) => {
+    const last = i === after.gridCols.length - 1;
+    const w = last ? left : Math.round(((intAttr(g, 'w') ?? 0) * width) / total);
+    left -= w;
+    setAttr(batch, m.part, g.id, 'w', String(Math.max(1, w)));
+  });
+}
+
+/** The most characters one cell takes from a paste, as the clipboard parser reads. */
+const MAX_PASTED_CELL_CHARS = 32_768;
+
 /**
  * The cells a region command selects. A row or column region names only its own grid lines,
  * as slide editors select a column: a merged cell that crosses into the next column does not
@@ -268,7 +292,9 @@ export function compileTable(ctx: CommandContext, batch: OpBatch, command: Table
       const { m, range } = tableTarget(ctx, batch);
       const count = lineCount(ctx.selection, range.c0, range.c1);
       const left = command.where === 'left';
+      const width = gridWidth(m);
       insertColumns(batch, m, left ? range.c0 : range.c1 + 1, count, left ? range.c0 : range.c1);
+      keepGridWidth(batch, m, width);
       structureEdited(ctx, batch, m);
       refit(ctx, batch, m);
       return {
@@ -373,20 +399,20 @@ export function compileTable(ctx: CommandContext, batch: OpBatch, command: Table
     case 'pasteCells': {
       const { m, range } = tableTarget(ctx, batch);
       const texts = command.texts;
-      if (!Array.isArray(texts) || texts.length === 0 || texts.length > m.nR * 4)
+      if (!Array.isArray(texts) || texts.length === 0)
         throw new CommandRefusal('errors.unsupported', 'texts');
       let r1 = range.r0;
       let c1 = range.c0;
-      texts.forEach((row, i) => {
+      // Text past the table's edge is left out: only the rows and columns that fit are read.
+      texts.slice(0, m.nR - range.r0).forEach((row, i) => {
         if (!Array.isArray(row)) throw new CommandRefusal('errors.unsupported', 'texts');
-        row.forEach((text, j) => {
+        row.slice(0, m.nC - range.c0).forEach((text, j) => {
           if (typeof text !== 'string') throw new CommandRefusal('errors.unsupported', 'texts');
           const r = range.r0 + i;
           const c = range.c0 + j;
-          if (r >= m.nR || c >= m.nC) return;
           const a = m.anchors[r][c];
           if (a.row !== r || a.column !== c) return;
-          setCellText(batch, m, a, text);
+          setCellText(batch, m, a, text.slice(0, MAX_PASTED_CELL_CHARS));
           r1 = Math.max(r1, r);
           c1 = Math.max(c1, c);
         });

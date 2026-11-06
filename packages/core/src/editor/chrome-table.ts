@@ -105,10 +105,10 @@ export const DEFAULT_TABLE_BORDER_PEN: TableBorderPen = {
 };
 
 // One pen per editor. The pen is chrome state: it is not in the document and never syncs.
-const PENS = new WeakMap<object, TableBorderPen>();
+const PENS = new WeakMap<Editor, TableBorderPen>();
 
 /** The border pen of `editor`, or the default pen. @public */
-export function tableBorderPen(editor: object | null | undefined): TableBorderPen {
+export function tableBorderPen(editor: Editor | null | undefined): TableBorderPen {
   return (editor && PENS.get(editor)) || DEFAULT_TABLE_BORDER_PEN;
 }
 
@@ -147,7 +147,7 @@ function nextPen(pen: TableBorderPen, slot: string, value: unknown): TableBorder
  * Remember the pen that a run of a border slot picks, as `runToolbarCommand` runs it. A pick that
  * the engine refuses (no table selected) still sets the pen, because a pen is a setting. @internal
  */
-export function rememberTableBorderPen(editor: object, slot: string, value: unknown): void {
+export function rememberTableBorderPen(editor: Editor, slot: string, value: unknown): void {
   const pen = nextPen(tableBorderPen(editor), slot, value);
   if (pen) PENS.set(editor, pen);
 }

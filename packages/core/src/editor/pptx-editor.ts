@@ -920,7 +920,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         painting: () => painter.mode !== 'off',
         // A selection made with the pointer while the painter is on takes the copied format.
         pointerUp: () => void (painter.mode !== 'off' && exec({ type: 'pasteFormat' })),
-        run: (command, options) => void exec(command, options),
+        run: (command, options) => exec(command, options),
         beginHistoryGroup: () => groups.begin(),
         refuse: (reason, detail) => void refuse(reason, detail),
         fitChanged: (value) => {

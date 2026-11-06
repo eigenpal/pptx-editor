@@ -19,6 +19,7 @@ import { apply, type SlideLayout } from '../../layout/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 import { TableChrome, type TableChromeHost } from '../surface-table-chrome.ts';
 import { tableItem } from '../table-cells.ts';
+import { cellsOverlay } from '../surface-table.ts';
 
 const IN = 914_400;
 const ROW = 370_840;
@@ -186,8 +187,8 @@ describe('the table chrome', () => {
     expect(c.press(layout(e), button.querySelector('circle')!)).toEqual({ kind: 'insert' });
     expect(commands).toEqual([{ type: 'insertRow', where: 'below' }]);
     expect(rowCount(e)).toBe(4);
-    // The caret went into row 0, so the new row is row 1.
-    expect(e.snapshot().selection).toMatchObject({ nodeId: frameId(e), cell: { row: 0 } });
+    // The new row is row 1, and the caret is in it.
+    expect(e.snapshot().selection).toMatchObject({ nodeId: frameId(e), cell: { row: 1 } });
   });
 
   test('the top edge offers a column right of the nearest line', async () => {
@@ -201,6 +202,53 @@ describe('the table chrome', () => {
     c.press(layout(e), button);
     expect(commands).toEqual([{ type: 'insertColumn', where: 'right' }]);
     expect(colCount(e)).toBe(4);
+    // The caret is in the new column, in the first row.
+    expect(e.snapshot().selection).toMatchObject({ cell: { row: 0, column: 2 } });
+  });
+
+  test('a refused insert leaves the selection as it was', async () => {
+    const e = await open();
+    const selections: EditorSelection[] = [];
+    const c = new TableChrome({
+      selection: () => e.snapshot().selection,
+      readOnly: () => false,
+      zoom: () => 1,
+      label: (key) => key,
+      select: (sel: EditorSelection) => (selections.push(sel), e.setSelection(sel)),
+      run: () => ({ ok: false }),
+    });
+    const before: EditorSelection = { kind: 'shapes', nodeIds: [frameId(e)] };
+    e.setSelection(before);
+    c.hover(layout(e), at(e, columnX(e)[2] + 5 * PX, 3 * PX), frameId(e));
+    const button = c
+      .elements(doc, layout(e))
+      .find((p) => p.getAttribute('class') === 'pptx-surface__table-insert')!;
+    expect(c.press(layout(e), button)).toEqual({ kind: 'insert' });
+    expect(selections.at(-1)).toEqual(before);
+    expect(e.snapshot().selection).toMatchObject(before);
+  });
+
+  test('a selected column paints its own cells, not the merged cell that crosses it', async () => {
+    const e = await open(deck(true));
+    const nodeId = frameId(e);
+    const rects = (sel: EditorSelection) =>
+      cellsOverlay(doc, layout(e), sel)[0].querySelectorAll('rect').length;
+    // Column 1: rows 0 and 2 have their own cell; row 1's merged cell starts in column 0.
+    const column = {
+      kind: 'cells',
+      nodeId,
+      anchor: { row: 0, column: 1 },
+      focus: { row: 2, column: 1 },
+    } as const;
+    expect(rects(column)).toBe(2);
+    // A range that is not a whole row or column widens over the merged cell.
+    const block = {
+      kind: 'cells',
+      nodeId,
+      anchor: { row: 0, column: 1 },
+      focus: { row: 1, column: 1 },
+    } as const;
+    expect(rects(block)).toBe(3);
   });
 
   test('a line inside a merged cell inserts from the cell that ends there', async () => {
@@ -213,7 +261,8 @@ describe('the table chrome', () => {
       .find((p) => p.getAttribute('class') === 'pptx-surface__table-insert')!;
     c.press(layout(e), button);
     expect(commands).toEqual([{ type: 'insertColumn', where: 'right' }]);
-    expect(e.snapshot().selection).toMatchObject({ cell: { row: 0, column: 0 } });
+    // The insert went from row 0's cell A; the caret is in the new column, in row 0.
+    expect(e.snapshot().selection).toMatchObject({ cell: { row: 0, column: 1 } });
     expect(colCount(e)).toBe(4);
   });
 

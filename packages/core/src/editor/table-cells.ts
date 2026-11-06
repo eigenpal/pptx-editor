@@ -217,15 +217,22 @@ export function cellRangeRects(
   doc: Document,
   frame: TableFrame,
   range: CellRange,
-  className: string
+  className: string,
+  byAnchor = false
 ): globalThis.Element[] {
   const g = doc.createElementNS(SVG_NS, 'g');
   g.setAttribute('transform', `matrix(${frame.matrix.join(' ')})`);
   for (const c of frame.table.cells) {
     const cr1 = c.cell.row + c.cell.rowSpan - 1;
     const cc1 = c.cell.col + c.cell.gridSpan - 1;
-    if (c.cell.row < range.r0 || cr1 > range.r1 || c.cell.col < range.c0 || cc1 > range.c1)
-      continue;
+    // `byAnchor`: every cell whose top-left grid position is in the range, merged or not.
+    const out = byAnchor
+      ? c.cell.row < range.r0 ||
+        c.cell.row > range.r1 ||
+        c.cell.col < range.c0 ||
+        c.cell.col > range.c1
+      : c.cell.row < range.r0 || cr1 > range.r1 || c.cell.col < range.c0 || cc1 > range.c1;
+    if (out) continue;
     const r = doc.createElementNS(SVG_NS, 'rect');
     r.setAttribute('class', className);
     r.setAttribute('x', String(c.x));

@@ -41,7 +41,7 @@ export interface TableChromeHost {
   /** The format painter is armed: it only selects, so the chrome hides. */
   readonly painting?: () => boolean;
   select(selection: EditorSelection): void;
-  run(command: EditorCommand): void;
+  run(command: EditorCommand): { readonly ok: boolean } | void;
 }
 
 /** An insert button: a row below grid line `index`, or a column right of it. */
@@ -315,12 +315,24 @@ export class TableChrome {
     const cell = frame ? insertCell(frame, at) : undefined;
     if (!cell) return { kind: 'insert' };
     const point = { paragraph: 0, offset: 0 };
+    const before = this.host.selection();
     this.host.select({ kind: 'text', nodeId: id, cell, anchor: point, focus: point });
-    this.host.run(
+    const result = this.host.run(
       at.axis === 'row'
         ? { type: 'insertRow', where: 'below' }
         : { type: 'insertColumn', where: 'right' }
     );
+    // A refused insert leaves the selection as it was. After an insert, the caret goes into the
+    // new row or column, in the row or column of the cell it was inserted from: the next key
+    // types there.
+    if (result && !result.ok) this.host.select(before);
+    else {
+      const added =
+        at.axis === 'row'
+          ? { row: at.index, column: cell.column }
+          : { row: cell.row, column: at.index };
+      this.host.select({ kind: 'text', nodeId: id, cell: added, anchor: point, focus: point });
+    }
     return { kind: 'insert' };
   }
 }

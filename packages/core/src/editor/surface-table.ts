@@ -261,6 +261,13 @@ export function cellsOverlay(
   if (sel.kind !== 'cells') return [];
   const frame = tableItem(layout, sel.nodeId);
   if (!frame) return [];
-  const range = expandLayoutRange(frame.table, cellRangeOf(sel));
-  return cellRangeRects(doc, frame, range, 'pptx-surface__cell-selection');
+  const own = cellRangeOf(sel);
+  const rows = frame.table.rowY.length - 1;
+  const columns = frame.table.columnX.length - 1;
+  // A whole row or column (Select Row, Select Column) names its own grid lines: a merged cell
+  // that crosses into the next line does not widen it, as Delete Rows or Columns then removes
+  // only those lines. Any other range shows the rectangle that its merged cells widen it to.
+  const band = (own.r0 === 0 && own.r1 === rows - 1) || (own.c0 === 0 && own.c1 === columns - 1);
+  const range = band ? own : expandLayoutRange(frame.table, own);
+  return cellRangeRects(doc, frame, range, 'pptx-surface__cell-selection', band);
 }

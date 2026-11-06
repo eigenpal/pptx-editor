@@ -3,6 +3,7 @@
 // `commandForSlot` and `commandForSlotValue`, so the registry stays under the line cap.
 
 import type {
+  Editor,
   EditorCommand,
   FontFormatCommand,
   ParagraphFormatCommand,
@@ -79,7 +80,7 @@ export function commandForSlot(slot: ChromeSlotId): EditorCommand | null {
 export function commandForSlotValue(
   slot: ChromeSlotId,
   value: unknown,
-  editor?: object | null
+  editor?: Editor | null
 ): EditorCommand | null {
   switch (slot) {
     case 'font.family':

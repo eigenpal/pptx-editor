@@ -114,6 +114,13 @@ describe('tab-separated text', () => {
     expect(parseCellsJson('{"rows":[]}')).toBeNull();
     expect(parseCellsJson('not json')).toBeNull();
   });
+
+  test('reads at most 75 rows of 75 cells, and no more than 4 MB of text', () => {
+    const rows = parseTabSeparated(Array.from({ length: 200 }, () => 'a\tb').join('\n'));
+    expect(rows).toHaveLength(75);
+    expect(parseTabSeparated(Array(100).fill('x').join('\t'))[0]).toHaveLength(75);
+    expect(parseCellsJson(`[["${'x'.repeat(4_000_001)}"]]`)).toBeNull();
+  });
 });
 
 describe('copy a cell range', () => {
@@ -177,6 +184,18 @@ describe('paste into cells', () => {
     const saved = await e.save();
     const again = await open(saved!);
     expect(grid(again)[1][2]).toBe('G2');
+  });
+
+  test('a paste taller or wider than the table fills what fits', async () => {
+    const e = await open();
+    caretIn(e, 1, 0);
+    const texts = Array.from({ length: 20 }, (_, i) => Array.from({ length: 9 }, () => `r${i}`));
+    expect(e.exec({ type: 'pasteCells', texts }).ok).toBe(true);
+    expect(grid(e)).toEqual([
+      ['A', 'B', 'C'],
+      ['r0', 'r0', 'r0'],
+      ['r1', 'r1', 'r1'],
+    ]);
   });
 
   test('pasteCells refuses texts that are not rows of strings', async () => {

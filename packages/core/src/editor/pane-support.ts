@@ -721,6 +721,26 @@ export function notesHistoryShortcut(e: ModifierKeys): 'undo' | 'redo' | null {
   return key === 'y' && !e.shiftKey ? 'redo' : null;
 }
 
+/**
+ * Undo or redo from a side panel (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl+Y), as on the canvas, so a
+ * check box or a committed field undoes its change from where the user made it. A field with
+ * typing it has not committed (`data-draft="true"`) keeps the key for its own undo, and so does
+ * a text area. Returns whether it ran. @internal
+ */
+export function panelHistoryKey(
+  e: ModifierKeys & { readonly target: unknown; preventDefault(): void },
+  editor: Pick<PptxEditorInstance, 'exec'> | null | undefined
+): boolean {
+  const kind = notesHistoryShortcut(e);
+  if (!kind || !editor) return false;
+  const target = e.target as { tagName?: string; getAttribute?(name: string): string | null };
+  if (target?.tagName === 'TEXTAREA') return false;
+  if (target?.getAttribute?.('data-draft') === 'true') return false;
+  e.preventDefault();
+  editor.exec({ type: kind });
+  return true;
+}
+
 /** Whether the notes field `el`, or an element inside it, has the keyboard focus. @internal */
 export function notesFieldFocused(el: HTMLElement): boolean {
   const active = el.ownerDocument.activeElement;
