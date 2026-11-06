@@ -3,6 +3,7 @@
 // `commandForSlot` and `commandForSlotValue`, so the registry stays under the line cap.
 
 import type {
+  Editor,
   EditorCommand,
   FontFormatCommand,
   ParagraphFormatCommand,
@@ -20,6 +21,8 @@ import { SLIDE_SLOT_COMMANDS } from './chrome-slide-groups.ts';
 import { TABLE_SLOT_COMMANDS, tableCommandForSlotValue } from './chrome-table.ts';
 import { isColorChoice } from '../automation/commands/style-commands.ts';
 import { imageSlotCommand } from './chrome-picture.ts';
+import { LINE_DASHES } from './line-presets.ts';
+import { tableBorderPen } from './chrome-table.ts';
 import { TEXT_CASES } from '../automation/commands/font-format.ts';
 import { BULLET_GALLERY, NUMBER_GALLERY, galleryFormat } from './bullet-format.ts';
 
@@ -34,19 +37,7 @@ export const LINE_ENDS: readonly LineEndType[] = [
   'oval',
   'diamond',
 ];
-/** @internal */
-export const LINE_DASHES: readonly LineDash[] = [
-  'solid',
-  'sysDot',
-  'sysDash',
-  'dash',
-  'dashDot',
-  'lgDash',
-  'lgDashDot',
-];
-
-/** Outline weights offered, in points. */
-export const LINE_WIDTHS = [0.75, 1, 1.5, 2.25, 3, 4.5, 6] as const;
+export { LINE_DASHES, LINE_WIDTHS } from './line-presets.ts';
 
 const SLOT_COMMANDS: Partial<Record<ChromeSlotId, EditorCommand>> = {
   'history.undo': { type: 'undo' },
@@ -83,9 +74,14 @@ export function commandForSlot(slot: ChromeSlotId): EditorCommand | null {
  * The command a value slot dispatches for a picked value, or null when the value is invalid.
  * Most slots take the value of one of their options. `font.size` takes a number of points,
  * or `{ step: 1 }` / `{ step: -1 }` for Increase and Decrease Font Size (the size
- * list). @public
+ * list). The table border slots draw with the border pen of `editor` (`tableBorderPen`), or
+ * with the default pen when no editor is given. @public
  */
-export function commandForSlotValue(slot: ChromeSlotId, value: unknown): EditorCommand | null {
+export function commandForSlotValue(
+  slot: ChromeSlotId,
+  value: unknown,
+  editor?: Editor | null
+): EditorCommand | null {
   switch (slot) {
     case 'font.family':
       return typeof value === 'string' && value ? { type: 'setFontFamily', family: value } : null;
@@ -201,7 +197,7 @@ export function commandForSlotValue(slot: ChromeSlotId, value: unknown): EditorC
       if (shaped !== undefined) return shaped;
       return (
         imageSlotCommand(slot, value) ??
-        tableCommandForSlotValue(slot, value) ??
+        tableCommandForSlotValue(slot, value, tableBorderPen(editor)) ??
         commandForSlot(slot)
       );
     }

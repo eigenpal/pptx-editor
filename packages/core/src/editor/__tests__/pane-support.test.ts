@@ -7,6 +7,7 @@ import {
   notesFormatRange,
   notesFormatShortcut,
   notesHistoryShortcut,
+  panelHistoryKey,
   notesWordAt,
   slideClickMode,
   slideDropMarker,
@@ -49,5 +50,28 @@ describe('pane support', () => {
     expect(notesHistoryShortcut({ ...keys, key: 'z', metaKey: true })).toBe('undo');
     expect(notesHistoryShortcut({ ...keys, key: 'z', metaKey: true, shiftKey: true })).toBe('redo');
     expect(notesHistoryShortcut({ ...keys, key: 'y', ctrlKey: true })).toBe('redo');
+  });
+
+  test('a side panel undoes and redoes, unless a field has typing of its own', () => {
+    const ran: string[] = [];
+    const editor = { exec: (c: { type: string }) => (ran.push(c.type), { ok: true as const }) };
+    const key = (target: unknown, shiftKey = false) => ({
+      ...keys,
+      key: 'z',
+      metaKey: true,
+      shiftKey,
+      target,
+      preventDefault: () => {},
+    });
+    const field = (draft: boolean) => ({
+      tagName: 'INPUT',
+      getAttribute: (n: string) => (n === 'data-draft' ? String(draft) : null),
+    });
+    expect(panelHistoryKey(key({ tagName: 'INPUT', getAttribute: () => null }), editor)).toBe(true);
+    expect(panelHistoryKey(key(field(false), true), editor)).toBe(true);
+    expect(panelHistoryKey(key(field(true)), editor)).toBe(false);
+    expect(panelHistoryKey(key({ tagName: 'TEXTAREA' }), editor)).toBe(false);
+    expect(panelHistoryKey({ ...key(null), key: 'b' }, editor)).toBe(false);
+    expect(ran).toEqual(['undo', 'redo']);
   });
 });

@@ -183,6 +183,21 @@ export function expandLayoutRange(table: TableLayout, range: CellRange): CellRan
   return { r0, r1, c0, c1 };
 }
 
+/**
+ * The cells a cell range selects on the canvas, as `selectedRange` reads them for commands: a
+ * whole row or column band is its own grid lines (`band`); any other range grows over its merged
+ * cells.
+ */
+export function selectedLayoutRange(
+  table: TableLayout,
+  range: CellRange
+): { readonly range: CellRange; readonly band: boolean } {
+  const band =
+    (range.r0 === 0 && range.r1 === table.rowY.length - 2) ||
+    (range.c0 === 0 && range.c1 === table.columnX.length - 2);
+  return { range: band ? range : expandLayoutRange(table, range), band };
+}
+
 /** The cell under a slide point, or undefined outside the table. */
 export function cellAtPoint(
   frame: TableFrame,
@@ -205,11 +220,37 @@ export function gridLineAt(
   const t = frame.table;
   if (local.x < -tolerance || local.x > t.width + tolerance) return undefined;
   if (local.y < -tolerance || local.y > t.height + tolerance) return undefined;
+  // A line hits only where it is drawn: not inside a merged cell that spans across it.
+  const row = lineIndexAt(t.rowY, local.y);
+  const column = lineIndexAt(t.columnX, local.x);
   for (let i = 1; i < t.columnX.length; i += 1)
-    if (Math.abs(local.x - t.columnX[i]) <= tolerance) return { axis: 'column', index: i };
+    if (Math.abs(local.x - t.columnX[i]) <= tolerance && !mergedAcross(t, 'column', i, row))
+      return { axis: 'column', index: i };
   for (let i = 1; i < t.rowY.length; i += 1)
-    if (Math.abs(local.y - t.rowY[i]) <= tolerance) return { axis: 'row', index: i };
+    if (Math.abs(local.y - t.rowY[i]) <= tolerance && !mergedAcross(t, 'row', i, column))
+      return { axis: 'row', index: i };
   return undefined;
+}
+
+/** The grid row (or column) that a local coordinate falls in, clamped to the grid. */
+function lineIndexAt(lines: readonly number[], v: number): number {
+  let i = 0;
+  while (i < lines.length - 2 && v >= lines[i + 1]) i += 1;
+  return i;
+}
+
+/**
+ * Whether a merged cell spans across grid line `index` of `axis` at row (or column) `at`: a
+ * column line inside a cell that spans two columns there, or a row line inside a cell that spans
+ * two rows.
+ */
+function mergedAcross(t: TableLayout, axis: 'column' | 'row', index: number, at: number): boolean {
+  return t.cells.some((c) => {
+    const { row, col, rowSpan, gridSpan } = c.cell;
+    return axis === 'column'
+      ? col < index && col + gridSpan > index && row <= at && row + rowSpan > at
+      : row < index && row + rowSpan > index && col <= at && col + gridSpan > at;
+  });
 }
 
 /** The highlight of a cell range: one rectangle per drawn cell, in slide space. */
@@ -217,22 +258,59 @@ export function cellRangeRects(
   doc: Document,
   frame: TableFrame,
   range: CellRange,
-  className: string
+  className: string,
+  byAnchor = false
 ): globalThis.Element[] {
   const g = doc.createElementNS(SVG_NS, 'g');
   g.setAttribute('transform', `matrix(${frame.matrix.join(' ')})`);
+  // The range's own grid lines: the edge, and the bounds that clip a band's tint.
+  const { columnX, rowY, rtl } = frame.table;
+  const n = columnX.length - 1;
+  const [x0, x1] = rtl
+    ? [columnX[n - range.c1 - 1], columnX[n - range.c0]]
+    : [columnX[range.c0], columnX[range.c1 + 1]];
+  const [y0, y1] = [rowY[range.r0], rowY[range.r1 + 1]];
+  const box = [x0, x1, y0, y1].every(Number.isFinite) && x1 > x0 && y1 > y0;
+  const tinted = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
   for (const c of frame.table.cells) {
     const cr1 = c.cell.row + c.cell.rowSpan - 1;
     const cc1 = c.cell.col + c.cell.gridSpan - 1;
-    if (c.cell.row < range.r0 || cr1 > range.r1 || c.cell.col < range.c0 || cc1 > range.c1)
-      continue;
+    // `byAnchor`: every cell whose top-left grid position is in the range, merged or not.
+    const out = byAnchor
+      ? c.cell.row < range.r0 ||
+        c.cell.row > range.r1 ||
+        c.cell.col < range.c0 ||
+        c.cell.col > range.c1
+      : c.cell.row < range.r0 || cr1 > range.r1 || c.cell.col < range.c0 || cc1 > range.c1;
+    if (out) continue;
+    // A merged cell that runs past a band is tinted inside the band only, within its edge.
+    const left = byAnchor && box ? Math.max(c.x, x0) : c.x;
+    const top = byAnchor && box ? Math.max(c.y, y0) : c.y;
+    const right = byAnchor && box ? Math.min(c.x + c.width, x1) : c.x + c.width;
+    const bottom = byAnchor && box ? Math.min(c.y + c.height, y1) : c.y + c.height;
+    if (right <= left || bottom <= top) continue;
     const r = doc.createElementNS(SVG_NS, 'rect');
     r.setAttribute('class', className);
-    r.setAttribute('x', String(c.x));
-    r.setAttribute('y', String(c.y));
-    r.setAttribute('width', String(c.width));
-    r.setAttribute('height', String(c.height));
+    r.setAttribute('x', String(left));
+    r.setAttribute('y', String(top));
+    r.setAttribute('width', String(right - left));
+    r.setAttribute('height', String(bottom - top));
     g.append(r);
+    tinted.x0 = Math.min(tinted.x0, left);
+    tinted.y0 = Math.min(tinted.y0, top);
+    tinted.x1 = Math.max(tinted.x1, right);
+    tinted.y1 = Math.max(tinted.y1, bottom);
+  }
+  // One edge around the tinted cells, the cells a command changes: the borders inside stay
+  // visible, and a merged cell anchored outside a band stays outside the edge, untinted.
+  if (tinted.x1 > tinted.x0 && tinted.y1 > tinted.y0) {
+    const edge = doc.createElementNS(SVG_NS, 'rect');
+    edge.setAttribute('class', `${className}-edge`);
+    edge.setAttribute('x', String(tinted.x0));
+    edge.setAttribute('y', String(tinted.y0));
+    edge.setAttribute('width', String(tinted.x1 - tinted.x0));
+    edge.setAttribute('height', String(tinted.y1 - tinted.y0));
+    g.append(edge);
   }
   return [g];
 }

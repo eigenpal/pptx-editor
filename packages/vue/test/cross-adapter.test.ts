@@ -137,7 +137,7 @@ test.each<[ToolbarContext]>([['none'], ['shape']])(
   }
 );
 
-test('in a table, both toolbars add Table Design and Table Layout with the same controls', async () => {
+test('in a table, both toolbars add the same short table group', async () => {
   const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
   const bytes = buildPptx({
     slides: [
@@ -195,7 +195,8 @@ test('in a table, both toolbars add Table Design and Table Layout with the same 
     const vue = buttons(vueHost);
     expect(vue.map((b) => b.slot).filter((s) => iconSlots.has(s))).toEqual(slots);
     expect(vue).toEqual(react);
-    expect(vue.find((b) => b.slot === 'table.headerRow')?.pressed).toBe('true');
+    expect(vue.some((b) => b.slot === 'table.mergeCells')).toBe(true);
+    expect(vue.some((b) => b.slot === 'table.headerRow')).toBe(false);
   } finally {
     app.unmount();
     vueHost.remove();

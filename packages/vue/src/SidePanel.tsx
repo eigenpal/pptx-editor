@@ -13,6 +13,9 @@ import {
 } from 'vue';
 import {
   elementKindLabelKey,
+  elementRotates,
+  TABLE_OPTION_ROWS,
+  panelHistoryKey,
   platformShortcuts,
   radioGroupStep,
 } from '@pptx-editor.dev/core/editor';
@@ -55,12 +58,15 @@ const PanelNumberField = defineComponent({
             aria-label={props.label}
             value={draft.value ?? props.value}
             disabled={props.disabled}
+            // Uncommitted typing keeps Ctrl/Cmd+Z for the field's own undo (`panelHistoryKey`).
+            data-draft={draft.value !== null}
             onInput={(e: Event) => {
               draft.value = (e.target as HTMLInputElement).value;
             }}
             onBlur={commit}
             onKeydown={(e: KeyboardEvent) => {
-              if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+              // Enter commits and keeps the focus here, so the next key still reaches the panel.
+              if (e.key === 'Enter') commit();
               if (e.key === 'Escape') draft.value = null;
             }}
           />
@@ -128,6 +134,48 @@ const FormatTab = defineComponent({
       };
       const inch = (v: number): number => Math.round(v * EMU_PER_INCH);
       const unit = t('panel.format.inchUnit');
+      const tableSection = () => {
+        const tb = table.value;
+        if (!tb) return null;
+        return (
+          <div class="pptx-panel__section">
+            <h3 class="pptx-panel__title">{t('panel.format.table')}</h3>
+            <div class="pptx-panel__grid">
+              <PanelNumberField
+                label={t('panel.format.rowHeight')}
+                value={inches(tb.rowHeight)}
+                unit={unit}
+                disabled={readOnly.value}
+                onCommit={(v: number) =>
+                  editor.value?.exec({ type: 'setRowHeight', height: inch(v) })
+                }
+              />
+              <PanelNumberField
+                label={t('panel.format.columnWidth')}
+                value={inches(tb.columnWidth)}
+                unit={unit}
+                disabled={readOnly.value}
+                onCommit={(v: number) =>
+                  editor.value?.exec({ type: 'setColumnWidth', width: inch(v) })
+                }
+              />
+            </div>
+            <div class="pptx-radios" role="group" aria-label={t('panel.format.styleOptions')}>
+              {TABLE_OPTION_ROWS.map(({ option, labelKey }) => (
+                <label key={option} class="pptx-radio">
+                  <input
+                    type="checkbox"
+                    checked={tb.options.includes(option)}
+                    disabled={readOnly.value}
+                    onChange={() => editor.value?.exec({ type: 'toggleTableStyleOption', option })}
+                  />
+                  {t(labelKey)}
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+      };
       const field = (key: 'x' | 'y' | 'cx' | 'cy', labelKey: TranslationKey) => (
         <PanelNumberField
           label={t(labelKey)}
@@ -156,18 +204,21 @@ const FormatTab = defineComponent({
             {field('y', 'panel.format.y')}
           </div>
         </div>,
-        <div class="pptx-panel__section">
-          <h3 class="pptx-panel__title">{t('panel.format.rotation')}</h3>
-          <div class="pptx-panel__grid">
-            <PanelNumberField
-              label={t('panel.format.angle')}
-              value={String(Math.round(g.rot * 10) / 10)}
-              unit="°"
-              disabled={readOnly.value}
-              onCommit={(v: number) => move({ rot: ((v % 360) + 360) % 360 })}
-            />
+        elementRotates(g, table.value) ? (
+          <div class="pptx-panel__section">
+            <h3 class="pptx-panel__title">{t('panel.format.rotation')}</h3>
+            <div class="pptx-panel__grid">
+              <PanelNumberField
+                label={t('panel.format.angle')}
+                value={String(Math.round(g.rot * 10) / 10)}
+                unit="°"
+                disabled={readOnly.value}
+                onCommit={(v: number) => move({ rot: ((v % 360) + 360) % 360 })}
+              />
+            </div>
           </div>
-        </div>,
+        ) : null,
+        tableSection(),
         g.textFitting ? (
           <div class="pptx-panel__section">
             <h3 class="pptx-panel__title">{t('panel.format.textFitting')}</h3>
@@ -220,6 +271,7 @@ export const PptxEditorSidePanel = defineComponent({
   props: sidePanelProps,
   setup(props, { attrs }) {
     const { t } = useTranslation();
+    const editor = usePptxEditor();
     const tab = ref<'format' | 'comments'>('format');
     return () => {
       const { class: hostClass, style: hostStyle, ...rest } = attrs;
@@ -272,7 +324,11 @@ export const PptxEditorSidePanel = defineComponent({
               <ToolButton label={t('panel.close')} icon="close" onClick={() => props.onClose?.()} />
             ) : null}
           </div>
-          <div class="pptx-panel__body" role="tabpanel">
+          <div
+            class="pptx-panel__body"
+            role="tabpanel"
+            onKeydown={(e: KeyboardEvent) => panelHistoryKey(e, editor.value)}
+          >
             {tab.value === 'format' ? <FormatTab /> : null}
             {tab.value === 'comments' ? (
               <div class="pptx-empty">

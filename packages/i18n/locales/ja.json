@@ -430,6 +430,9 @@
     "bandedColumns": "縞模様 (列)",
     "cellFill": "塗りつぶし",
     "borderTarget": "罫線",
+    "borderColor": "ペンの色",
+    "borderStyle": "ペンのスタイル",
+    "borderWidth": "ペンの太さ",
     "border": {
       "all": "格子",
       "outside": "外枠",
@@ -440,6 +443,7 @@
       "right": "右罫線",
       "none": "枠なし"
     },
+    "insertSubmenu": "挿入",
     "select": "選択",
     "region": {
       "table": "表の選択",
@@ -809,7 +813,11 @@
         "connector": "コネクタ",
         "graphicFrame": "埋め込みオブジェクト",
         "table": "表"
-      }
+      },
+      "table": "表",
+      "rowHeight": "行の高さ",
+      "columnWidth": "列の幅",
+      "styleOptions": "表スタイルのオプション"
     },
     "comments": {
       "emptyTitle": "コメントはありません",

@@ -453,6 +453,16 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
     arrange: atCell(0, 0),
     command: () => ({ type: 'setCellMargins', margins: { left: IN / 8, top: IN / 16 } }),
   },
+  pasteCells: {
+    arrange: atCell(0, 1),
+    command: () => ({
+      type: 'pasteCells',
+      texts: [
+        ['x', 'y'],
+        ['two\nlines', 'w'],
+      ],
+    }),
+  },
   setRowHeight: { arrange: atCell(1, 0), command: () => ({ type: 'setRowHeight', height: IN }) },
   setColumnWidth: {
     arrange: atCell(0, 1),
@@ -511,6 +521,12 @@ export const TEXT_INPUT_FIXTURES: Record<TextInputKind, TextInputFixture> = {
  */
 export const NO_WRITE_PROBES: Partial<Record<EditorCommandType, ConvergenceFixture>> = {
   toggleSmartGuides: { command: () => ({ type: 'toggleSmartGuides' }) },
+  setTableBorderPen: {
+    command: () => ({
+      type: 'setTableBorderPen',
+      pen: { target: 'outside', drawn: true, spec: { color: '#FF0000', width: 2 } },
+    }),
+  },
   setPresentationView: { command: () => ({ type: 'setPresentationView', view: 'slideSorter' }) },
   setSectionsCollapsed: {
     arrange: (e) => run(e, { type: 'addSection', name: 'Part two', index: 1 }),

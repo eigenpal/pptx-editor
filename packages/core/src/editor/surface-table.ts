@@ -3,7 +3,7 @@
 // extends to a range, and a drag on an inner grid line resizes the columns or rows beside it.
 // Moved out of `surface.ts` (the 1000-line cap); the surface calls these before its own hits.
 
-import type { SlideLayout } from '../layout/index.ts';
+import type { LayoutItem, Matrix, SlideLayout } from '../layout/index.ts';
 import type {
   EditorCommand,
   EditorExecOptions,
@@ -14,12 +14,13 @@ import type {
 } from '../contracts/index.ts';
 import { apply, invert } from '../layout/index.ts';
 import { pointAt } from './surface-geometry.ts';
+import { parentGroupOf } from '../automation/commands/placement.ts';
 import {
   cellAtPoint,
   cellItem,
   cellRangeOf,
   cellRangeRects,
-  expandLayoutRange,
+  selectedLayoutRange,
   gridLineAt,
   tableItem,
   type ShapeItem,
@@ -50,8 +51,15 @@ type GridDrag = {
   readonly index: number;
   readonly start: { x: number; y: number };
   readonly sizes: readonly number[];
+  /**
+   * How far, in table units, the right or bottom edge may grow: to the slide's edge, so the edge
+   * stays where the pointer can reach it again. Infinite for an inner line.
+   */
+  readonly room: number;
   /** Every step of the drag runs with it: the drag is one undo step. */
   readonly historyGroup: HistoryGroup;
+  /** The table is not the selection: the first move selects it, a plain click does not. */
+  pending: boolean;
 };
 
 /** The table gestures of one surface. */
@@ -70,15 +78,6 @@ export class TableGestures {
     return (4 * EMU_PER_PX) / this.host.zoom();
   }
 
-  /** The table's selection state: the frame id when the selection is in or on it. */
-  #selectedTable(): string | undefined {
-    const sel = this.host.selection();
-    if (sel.kind === 'text' && sel.cell) return sel.nodeId;
-    if (sel.kind === 'cells') return sel.nodeId;
-    if (sel.kind === 'shapes' && sel.nodeIds.length === 1) return sel.nodeIds[0];
-    return undefined;
-  }
-
   /**
    * A press on element `id`. Returns `text` when a caret or cell range was set (the surface
    * focuses its input), `grid` for a grid line drag, or null when the press is not for a table.
@@ -92,20 +91,37 @@ export class TableGestures {
   ): 'text' | 'grid' | null {
     const frame = tableItem(layout, id);
     if (!frame || this.host.readOnly()) return null;
-    // The format painter never drags a grid line.
-    const line =
-      !painting && this.#selectedTable() === id
-        ? gridLineAt(frame, p, this.#tolerance())
-        : undefined;
+    // The format painter never drags a grid line. Any table's lines drag, as the table chrome
+    // marks the line under the pointer (`surface-table-chrome.ts`).
+    const line = painting ? undefined : gridLineAt(frame, p, this.#tolerance());
     if (line) {
       const t = frame.table;
       const lines = line.axis === 'column' ? t.columnX : t.rowY;
       const sizes = lines.slice(1).map((v, i) => Math.round(v - lines[i]));
+      // The grid commands act on the selection's table: a drag on another table's line selects it.
+      const sel = this.host.selection();
+      const on =
+        sel.kind === 'shapes'
+          ? sel.nodeIds.length === 1 && sel.nodeIds[0] === id
+          : sel.kind !== 'none' && sel.nodeId === id;
+      const outer = line.index === lines.length - 1;
+      const end =
+        line.axis === 'column'
+          ? apply(frame.matrix, t.width, 0).x
+          : apply(frame.matrix, 0, t.height).y;
+      const slideEnd = line.axis === 'column' ? layout.slide.width : layout.slide.height;
+      // Slide units for each table unit along the axis: a table in a scaled group is not 1.
+      const origin = apply(frame.matrix, 0, 0);
+      const length = line.axis === 'column' ? t.width : t.height;
+      const scale =
+        length > 0 ? (end - (line.axis === 'column' ? origin.x : origin.y)) / length : 1;
       this.#grid = {
+        pending: !on,
         id,
         ...line,
         start: apply(invert(frame.matrix), p.x, p.y),
         sizes,
+        room: outer && scale > 0 ? Math.max(0, slideEnd - end) / scale : Infinity,
         historyGroup: this.host.beginHistoryGroup(),
       };
       return 'grid';
@@ -140,6 +156,11 @@ export class TableGestures {
     if (g) {
       const frame = tableItem(layout, g.id);
       if (!frame) return true;
+      if (g.pending) {
+        g.pending = false;
+        const group = parentGroupOf(layout.items, g.id);
+        this.host.select({ kind: 'shapes', nodeIds: [g.id], ...(group ? { group } : {}) });
+      }
       const local = apply(invert(frame.matrix), p.x, p.y);
       const delta = g.axis === 'column' ? local.x - g.start.x : local.y - g.start.y;
       const sizes = [...g.sizes];
@@ -152,7 +173,7 @@ export class TableGestures {
         const d = Math.max(lo, Math.min(hi, delta));
         sizes[i] += d;
         sizes[i + 1] -= d;
-      } else sizes[i] = Math.max(Math.min(MIN_LINE, sizes[i]), sizes[i] + delta);
+      } else sizes[i] = Math.max(Math.min(MIN_LINE, sizes[i]), sizes[i] + Math.min(delta, g.room));
       // The sizes are in visual order; the grid of a right-to-left table runs the other way.
       const columns = frame.table.rtl ? [...sizes].reverse() : sizes;
       const command: EditorCommand =
@@ -176,11 +197,13 @@ export class TableGestures {
     return true;
   }
 
-  /** The gesture ended. */
-  up(): void {
-    this.#grid?.historyGroup.end();
+  /** The gesture ended. Returns true when it was a grid line drag. */
+  up(): boolean {
+    const grid = this.#grid;
+    grid?.historyGroup.end();
     this.#text = null;
     this.#grid = null;
+    return !!grid;
   }
 
   /** The text item of the cell under a point of table `id`, for a double-click. */
@@ -211,14 +234,125 @@ export class TableGestures {
     return same && (cursor === undefined || cursor === 'text');
   }
 
-  /** The pointer over table `id`: resize on a grid line of the selected table, else text. */
+  /**
+   * The selected table when `p` is on one of its grid lines: the right and bottom edges resize
+   * the last column or row. With `outside`, only just outside its box, where a shape behind the
+   * table must not take the press; inside, shapes in front of the table keep theirs.
+   */
+  edgeAt(
+    layout: SlideLayout | undefined,
+    p: { x: number; y: number },
+    outside = false
+  ): string | undefined {
+    const sel = this.host.selection();
+    const id =
+      sel.kind === 'shapes'
+        ? sel.nodeIds.length === 1
+          ? sel.nodeIds[0]
+          : undefined
+        : sel.kind === 'none'
+          ? undefined
+          : sel.nodeId;
+    const frame = id ? tableItem(layout, id) : undefined;
+    if (!frame || !this.onLine(frame, p)) return undefined;
+    if (!outside) return id;
+    return inGrid(frame, p) ? undefined : id;
+  }
+
+  /**
+   * Whether `p` is inside the drawn grid of table item `item`: its cells, where a press places a
+   * caret and the border band of the selected table does not reach. False for other items.
+   */
+  inGrid(item: LayoutItem, p: { x: number; y: number }): boolean {
+    return (
+      item.kind === 'frame' && !!item.table && inGrid({ matrix: item.matrix, table: item.table }, p)
+    );
+  }
+
+  /**
+   * A press at `p` on table item `item` drags a grid line: true wherever the resize cursor
+   * shows. The border band of a selected table yields to it, so its outer lines resize.
+   */
+  onLine(item: LayoutItem, p: { x: number; y: number }): boolean {
+    if (item.kind !== 'frame' || !item.table || this.host.readOnly()) return false;
+    return !!gridLineAt(item as Parameters<typeof gridLineAt>[0], p, this.#tolerance());
+  }
+
+  /** The pointer over table `id`: resize on a grid line, else text in a cell. */
   cursor(layout: SlideLayout, id: string, p: { x: number; y: number }): string | undefined {
     const frame = tableItem(layout, id);
     if (!frame || this.host.readOnly()) return undefined;
-    const line = this.#selectedTable() === id ? gridLineAt(frame, p, this.#tolerance()) : undefined;
+    const line = gridLineAt(frame, p, this.#tolerance());
     if (line) return line.axis === 'column' ? 'col-resize' : 'row-resize';
     return cellAtPoint(frame, p) ? 'text' : undefined;
   }
+}
+
+/**
+ * A table frame's resize, as the pointer moves its drawn grid. The handles sit on the grid,
+ * which rows that grow to fit their text can make larger than the saved frame (`xfrm`), and the
+ * resize scales the frame: the move is turned into frame units, so the handle stays under the
+ * pointer. Each dragged edge stops at the slide's edge, as the grid edges do, so a handle never
+ * leaves the place where the pointer can grab it again. `handle` is the dragged handle's place
+ * on the box; `dx` and `dy` are in slide units. With `aspect` (Shift or a locked aspect ratio on
+ * a corner), the scale stops where the first edge meets the slide's.
+ */
+export function clampTableResize(
+  item: LayoutItem,
+  handle: readonly [number, number],
+  dx: number,
+  dy: number,
+  slide: { readonly width: number; readonly height: number },
+  aspect = false
+): { dx: number; dy: number } {
+  if (item.kind !== 'frame' || !item.table) return { dx, dy };
+  const { cx, cy } = item.element.xfrm;
+  const { width, height } = item.table;
+  const end = apply(item.matrix, width, height);
+  const start = apply(item.matrix, 0, 0);
+  // Each dragged edge has room up to the slide's edge on its side: right and bottom, or left
+  // and top. A table already past an edge cannot grow further there.
+  const roomX =
+    handle[0] === 1
+      ? Math.max(0, slide.width - end.x)
+      : handle[0] === 0
+        ? Math.max(0, start.x)
+        : Infinity;
+  const roomY =
+    handle[1] === 1
+      ? Math.max(0, slide.height - end.y)
+      : handle[1] === 0
+        ? Math.max(0, start.y)
+        : Infinity;
+  // A right or bottom edge grows with a positive move, a left or top one with a negative.
+  const side = (d: number, room: number, toward: number): number =>
+    toward === 1 ? Math.min(d, room) : toward === 0 ? Math.max(d, -room) : d;
+  let gx: number;
+  let gy: number;
+  if (aspect && handle[0] !== 0.5 && handle[1] !== 0.5 && width > 0 && height > 0) {
+    // The largest scale that keeps both dragged edges on the slide.
+    const grow = Math.min(roomX / width, roomY / height);
+    gx = side(dx, grow * width, handle[0]);
+    gy = side(dy, grow * height, handle[1]);
+  } else {
+    gx = side(dx, roomX, handle[0]);
+    gy = side(dy, roomY, handle[1]);
+  }
+  // Grid units to frame units: the resize scales the grid by the frame's change.
+  return {
+    dx: width > 0 && cx > 0 ? (gx * cx) / width : gx,
+    dy: height > 0 && cy > 0 ? (gy * cy) / height : gy,
+  };
+}
+
+/** Whether `p` is inside a table frame's drawn grid, which rows that grow can make taller. */
+function inGrid(
+  frame: { readonly matrix: Matrix; readonly table: { width: number; height: number } },
+  p: { x: number; y: number }
+): boolean {
+  const local = apply(invert(frame.matrix), p.x, p.y);
+  const { width, height } = frame.table;
+  return local.x >= 0 && local.x <= width && local.y >= 0 && local.y <= height;
 }
 
 /** The highlight of a selected cell range, editing chrome over the slide. */
@@ -230,6 +364,8 @@ export function cellsOverlay(
   if (sel.kind !== 'cells') return [];
   const frame = tableItem(layout, sel.nodeId);
   if (!frame) return [];
-  const range = expandLayoutRange(frame.table, cellRangeOf(sel));
-  return cellRangeRects(doc, frame, range, 'pptx-surface__cell-selection');
+  // The cells that commands change (`selectedLayoutRange`): a whole row or column band shows the
+  // cells of its own grid lines; any other range, the rectangle its merged cells widen it to.
+  const { range, band } = selectedLayoutRange(frame.table, cellRangeOf(sel));
+  return cellRangeRects(doc, frame, range, 'pptx-surface__cell-selection', band);
 }

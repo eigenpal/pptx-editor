@@ -12,7 +12,7 @@
 // `toolbar`, `call_to_action`, `dock_to_*`, `crop`, `brightness_6`, `palette`, `opacity`,
 // `imagesmode`, `style`, `frame_person`, `list_alt`, and `accessibility_new` from the official
 // Material Symbols; the table icons (`table`, `table_rows`, `view_column`, `border_*`, `padding`,
-// `height`, `fit_width`, `delete_sweep`) from DOCX Editor's `generated-icon-paths.ts`, also
+// `height`, `fit_width`, `delete_sweep`, `open_with`) from DOCX Editor's `generated-icon-paths.ts`, also
 // official Material Symbols
 // SVGs (google/material-design-icons, `symbols/web/<name>/materialsymbolsoutlined/<name>_24px.svg`).
 // Never hand-draw or edit a path here: every entry must be an official Material Symbol.
@@ -174,6 +174,9 @@ export const ICON_PATHS: Readonly<Record<string, readonly string[]>> = {
     'm528-546-93-93-121-121h486v120H568l-40 94ZM792-56 460-388l-80 188H249l119-280L56-792l56-56 736 736-56 56Z',
   ],
   add: ['M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z'],
+  open_with: [
+    'M480-80 310-250l57-57 73 73v-166h80v165l72-73 58 58L480-80ZM250-310 80-480l169-169 57 57-72 72h166v80H235l73 72-58 58Zm460 0-57-57 73-73H560v-80h165l-73-72 58-58 170 170-170 170ZM440-560v-166l-73 73-57-57 170-170 170 170-57 57-73-73v166h-80Z',
+  ],
   arrow_drop_down: ['M480-360 280-560h400L480-360Z'],
   check: ['M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z'],
   expand_more: ['M480-345 240-585l56-56 184 184 184-184 56 56-240 240Z'],

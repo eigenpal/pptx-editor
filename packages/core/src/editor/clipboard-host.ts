@@ -1,6 +1,7 @@
 // The editor's side of the clipboard: copy the selected shapes, fill a copy or cut event, and
-// paste from a paste event. The formats and their checks are in `clipboard.ts`; this module
-// keeps the editor state they need (the last copy, the last parsed payload) out of the facade.
+// paste from a paste event. The formats and their checks are in `clipboard.ts`, and a table's
+// cell ranges in `table-clipboard.ts`; this module keeps the editor state they need (the last
+// copy, the last parsed payload) out of the facade.
 
 import type { ClipboardPayload, EditorSelection } from '../contracts/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
@@ -13,6 +14,7 @@ import {
 } from './clipboard.ts';
 import type { DocumentSession } from './document-session.ts';
 import { selectedText } from './selection-state.ts';
+import { copyCellsTo, tablePasteFrom } from './table-clipboard.ts';
 
 /** What the clipboard reads from and asks of the editor. */
 export interface ClipboardEditor {
@@ -27,6 +29,12 @@ export interface ClipboardEditor {
   deleteText(): void;
   /** Delete the selected shapes as a cut (`RemovalNotice.cut`). */
   cutShapes(): void;
+  /** Clear the selected cells (a cut of a cell range). */
+  clearCells(): void;
+  /** Fill table cells from the selection's top-left cell (`pasteCells`). */
+  pasteCells(texts: string[][]): void;
+  /** Insert text at the caret, as typing does. */
+  insertText(text: string): void;
   refuse(reason: string): void;
   paste(payload: ClipboardPayload): void;
 }
@@ -66,6 +74,11 @@ export function createClipboardHost(editor: ClipboardEditor) {
     /** Fill a clipboard event: shapes as the editor's format plus plain text. */
     copyTo(data: DataTransfer, cut: boolean): boolean {
       const selection = editor.selection();
+      // A cell range: its text as tab-separated text and as this editor's cells format.
+      if (copyCellsTo(data, editor.layout(), selection)) {
+        if (cut && !editor.readOnly()) editor.clearCells();
+        return true;
+      }
       if (selection.kind === 'text') {
         const text = selectedText(editor.layout(), selection);
         if (!text) return false;
@@ -85,7 +98,12 @@ export function createClipboardHost(editor: ClipboardEditor) {
      * is a clipboard that holds neither this editor's format nor the text of the last copy.
      */
     pasteFrom(data: DataTransfer): boolean {
-      if (editor.selection().kind === 'text' || editor.readOnly()) return false;
+      if (editor.readOnly()) return false;
+      // Copied cells or tab-separated text fill cells; one copied cell goes in at the caret.
+      const table = tablePasteFrom(data, editor.selection());
+      if (table && 'cells' in table) return (editor.pasteCells(table.cells), true);
+      if (table) return (editor.insertText(table.text), true);
+      if (editor.selection().kind === 'text') return false;
       // A payload parsed once is cached by its text, so a paste series keeps one identity.
       const read = readClipboard(data, lastCopied, (raw) => {
         if (raw === lastParsed.raw) return lastParsed.payload;

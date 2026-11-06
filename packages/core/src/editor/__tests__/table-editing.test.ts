@@ -29,7 +29,13 @@ import {
 } from '../../store/index.ts';
 import { DEFAULT_TABLE_STYLE_ID, resolveSlide } from '../../cascade/index.ts';
 import type { EditorSelection } from '../../contracts/index.ts';
-import { createPptxEditor, toolbarCommandState, type PptxEditorInstance } from '../index.ts';
+import {
+  createPptxEditor,
+  DEFAULT_TABLE_BORDER_PEN,
+  runToolbarCommand,
+  toolbarCommandState,
+  type PptxEditorInstance,
+} from '../index.ts';
 import { OpBatch } from '../../automation/commands/op-batch.ts';
 import { applyTableKey, tableKeyAction } from '../table-keys.ts';
 import {
@@ -75,6 +81,8 @@ async function open(bytes = deck()): Promise<PptxEditorInstance> {
 }
 
 const part = (e: PptxEditorInstance) => e.session!.info.slides[0].partName;
+const xml = (e: PptxEditorInstance): string =>
+  JSON.stringify(xmlPartOf(e.session!.store.package, part(e))!.root);
 const root = (e: PptxEditorInstance): Element => xmlPartOf(e.session!.store.package, part(e))!.root;
 const frameId = (e: PptxEditorInstance): string =>
   elements(find(root(e), 'p:spTree')!).find((c) => c.local === 'graphicFrame')!.id;
@@ -301,6 +309,10 @@ describe('table structure (parity-baseline 4.2)', () => {
     e.exec({ type: 'insertColumn', where: 'right' });
     expect(grid(e).map((r) => r.join(''))).toEqual(['ABC', '', 'DEF', '', 'GHI']);
     expect(model(e).nC).toBe(5);
+    // The table keeps its width of three inches; the five columns share it.
+    const widths = model(e).gridCols.map((g) => Number(attr(g, 'w')));
+    expect(widths.reduce((a, b) => a + b, 0)).toBe(3 * IN);
+    expect(Math.max(...widths) - Math.min(...widths)).toBeLessThanOrEqual(1);
     expect(e.snapshot().table).toMatchObject({
       rows: 5,
       columns: 5,
@@ -374,6 +386,11 @@ describe('merge, split, and formatting (editor-ui-parity 4.3)', () => {
       'D',
       'E',
     ]);
+    // The caret sits after the merged text: a key adds to it, it does not prefix it.
+    expect(e.snapshot().selection).toMatchObject({
+      cell: { row: 0, column: 0 },
+      focus: { paragraph: 3, offset: 1 },
+    });
     expectValid(e);
     roundTrip(e);
     caretIn(e, 0, 0);
@@ -427,6 +444,68 @@ describe('merge, split, and formatting (editor-ui-parity 4.3)', () => {
     expect(e.can({ type: 'setTableStyle', styleId: 'x' }).ok).toBe(false);
     e.exec({ type: 'setTableBorders', scope: 'none' });
     expect(child(child(tcPr(), 'a:lnL'), 'a:noFill')).toBeTruthy();
+    roundTrip(e);
+  });
+
+  test('the border pen: a target pick draws the pen, a pen pick redraws the last target', async () => {
+    const e = await open();
+    caretIn(e, 1, 1);
+    const tcPr = () => child(model(e).tcs[1][1], 'a:tcPr')!;
+    expect(toolbarCommandState(e, 'table.borderWidth').value).toBe('1');
+    // A pen pick before any target pick arms the pen and writes nothing.
+    const before = xml(e);
+    expect(runToolbarCommand(e, 'table.borderColor', '#00FF00').ok).toBe(true);
+    expect(xml(e)).toBe(before);
+    expect(e.snapshot().canUndo).toBe(false);
+    // A target pick draws the armed pen there; then a pen pick redraws that target.
+    expect(runToolbarCommand(e, 'table.borderTarget', 'outside').ok).toBe(true);
+    expect(attr(find(child(tcPr(), 'a:lnT')!, 'a:srgbClr'), 'val')).toBe('00FF00');
+    expect(runToolbarCommand(e, 'table.borderWidth', '3').ok).toBe(true);
+    expect(attr(child(tcPr(), 'a:lnL'), 'w')).toBe('38100');
+    expect(toolbarCommandState(e, 'table.borderWidth').value).toBe('3');
+    expect(runToolbarCommand(e, 'table.borderStyle', 'dash').ok).toBe(true);
+    expect(attr(find(child(tcPr(), 'a:lnB')!, 'a:prstDash'), 'val')).toBe('dash');
+    expect(toolbarCommandState(e, 'table.borderStyle').value).toBe('dash');
+    expect(Object.isFrozen(e.snapshot().tableBorderPen!.spec)).toBe(true);
+    expect(Object.isFrozen(DEFAULT_TABLE_BORDER_PEN.spec)).toBe(true);
+    // The pen keeps its color: the outside borders stay green.
+    expect(attr(find(child(tcPr(), 'a:lnB')!, 'a:srgbClr'), 'val')).toBe('00FF00');
+    // An invalid pen value changes nothing.
+    expect(runToolbarCommand(e, 'table.borderWidth', '-1' as never).ok).toBe(false);
+    expect(toolbarCommandState(e, 'table.borderWidth').value).toBe('3');
+    // In another cell, a pen pick arms only: the pen never draws where the user did not pick.
+    caretIn(e, 0, 0);
+    const moved = xml(e);
+    expect(runToolbarCommand(e, 'table.borderColor', '#FF0000').ok).toBe(true);
+    expect(xml(e)).toBe(moved);
+    expect(runToolbarCommand(e, 'table.borderTarget', 'outside').ok).toBe(true);
+    expect(runToolbarCommand(e, 'table.borderColor', '#00FF00').ok).toBe(true);
+    // The same range, selected from the other corner, is the same cells: a pick redraws.
+    const cells = (r0: number, c0: number, r1: number, c1: number) =>
+      e.setSelection({
+        kind: 'cells',
+        nodeId: frameId(e),
+        anchor: { row: r0, column: c0 },
+        focus: { row: r1, column: c1 },
+      });
+    cells(0, 0, 1, 1);
+    expect(runToolbarCommand(e, 'table.borderTarget', 'outside').ok).toBe(true);
+    cells(1, 1, 0, 0);
+    const drawn = xml(e);
+    expect(runToolbarCommand(e, 'table.borderColor', '#0000FF').ok).toBe(true);
+    expect(xml(e)).not.toBe(drawn);
+    caretIn(e, 1, 1);
+    // After No Border, a pen pick arms again and draws nothing.
+    expect(runToolbarCommand(e, 'table.borderTarget', 'none').ok).toBe(true);
+    const cleared = xml(e);
+    expect(runToolbarCommand(e, 'table.borderColor', '#0000FF').ok).toBe(true);
+    expect(xml(e)).toBe(cleared);
+    // In view mode a pen pick is refused, as a draw would be, and the pen stays.
+    e.setMode('view');
+    expect(runToolbarCommand(e, 'table.borderWidth', '6').ok).toBe(false);
+    expect(toolbarCommandState(e, 'table.borderWidth').value).toBe('3');
+    e.setMode('edit');
+    expectValid(e);
     roundTrip(e);
   });
 
@@ -580,6 +659,26 @@ describe('structure edits through merges, and repair edge cases', () => {
     );
   const cellsOf = (e: PptxEditorInstance, r: number): Element[] =>
     children(children(find(root(e), 'a:tbl')!, 'a:tr')[r], 'a:tc');
+
+  test('Select column under a merged header selects one column; Delete Columns deletes it', async () => {
+    const e = await open(merged());
+    caretIn(e, 1, 1);
+    expect(e.exec({ type: 'selectTableRegion', region: 'column' }).ok).toBe(true);
+    expect(e.snapshot().selection).toMatchObject({
+      kind: 'cells',
+      anchor: { row: 0, column: 1 },
+      focus: { row: 2, column: 1 },
+    });
+    expect(e.exec({ type: 'deleteColumn' }).ok).toBe(true);
+    // One column goes; the merged header shrinks to the column that is left.
+    expect(grid(e)).toEqual([
+      ['AB', 'C'],
+      ['D', 'F'],
+      ['G', 'I'],
+    ]);
+    expectValid(e);
+    roundTrip(e);
+  });
 
   test('a column inserted inside a horizontal merge widens the merge', async () => {
     const e = await open(merged());
@@ -825,6 +924,28 @@ describe('round 4: repair order, a second text body, and chrome state', () => {
     });
     expect(press(e, 'ArrowLeft', true)).toBe(true);
     expect(e.snapshot().selection).toMatchObject({ kind: 'text', cell: { row: 0, column: 0 } });
+  });
+
+  test('Shift+arrow at the edge of the cell text starts a cell range', async () => {
+    const e = await open();
+    // Inside the text, Shift+arrow extends the text selection as usual.
+    caretIn(e, 1, 1, 0);
+    expect(press(e, 'ArrowRight', true)).toBe(false);
+    // At the end of the text, it selects this cell and the next one.
+    caretIn(e, 1, 1, 1);
+    expect(press(e, 'ArrowRight', true)).toBe(true);
+    expect(e.snapshot().selection).toEqual({
+      kind: 'cells',
+      nodeId: frameId(e),
+      anchor: { row: 1, column: 1 },
+      focus: { row: 1, column: 2 },
+    });
+    // The range then grows down with Shift+ArrowDown.
+    expect(press(e, 'ArrowDown', true)).toBe(true);
+    expect(e.snapshot().selection).toMatchObject({ kind: 'cells', focus: { row: 2, column: 2 } });
+    // At the table's edge, nothing to extend to: the key is left to text editing.
+    caretIn(e, 0, 2, 1);
+    expect(press(e, 'ArrowRight', true)).toBe(false);
   });
 });
 
