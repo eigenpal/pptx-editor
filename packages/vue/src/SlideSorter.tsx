@@ -27,6 +27,7 @@ import {
   openSlideInNormalView,
   refocusAfterSorterHides,
   sectionOfSlide,
+  slideItemName,
   slideMenuPoint,
   slideSorterMounted,
   sorterKeyDown,
@@ -163,9 +164,6 @@ export const PptxEditorSlideSorter = defineComponent({
           role={groups ? 'treeitem' : 'option'}
           aria-selected={selected.value.includes(s.index)}
           aria-current={s.index === current.value}
-          aria-label={t(s.hidden ? 'rail.hiddenSlideLabel' : 'rail.slideLabel', {
-            index: s.index + 1,
-          })}
           data-hidden={s.hidden ? '' : undefined}
           data-index={s.index}
           {...drag.itemProps(s.index)}
@@ -186,7 +184,10 @@ export const PptxEditorSlideSorter = defineComponent({
           }}
         >
           <Thumbnail slide={s} ratio={ratio.value} />
-          <span class="pptx-sorter__number">{s.index + 1}</span>
+          <span class="pptx-sorter__number" aria-hidden="true">
+            {s.index + 1}
+          </span>
+          <span class="pptx-sr-only">{slideItemName(t, s)}</span>
         </li>
       );
       return (

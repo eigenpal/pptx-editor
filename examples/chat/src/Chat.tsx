@@ -65,6 +65,7 @@ function DeckThumb() {
       className="card__thumb"
       data-ready={first ? true : undefined}
       style={{ aspectRatio: String(1 / ratio) }}
+      aria-hidden="true"
     />
   );
 }

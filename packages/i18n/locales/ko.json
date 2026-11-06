@@ -897,6 +897,9 @@
     "level": "{percent}%",
     "levelAriaLabel": "확대/축소: {percent}%"
   },
+  "viewport": {
+    "ariaLabel": "프레젠테이션 편집기"
+  },
   "canvas": {
     "ariaLabel": "슬라이드 {index}/{total}",
     "inputAriaLabel": "선택한 도형의 텍스트",

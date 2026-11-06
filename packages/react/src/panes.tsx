@@ -32,6 +32,7 @@ import {
   runSlideStep,
   sectionOfSlide,
   slideClickMode,
+  slideItemName,
   slideMenuPoint,
   stepCommand,
   zoomStep,
@@ -75,7 +76,10 @@ const sameIndices = (a: readonly number[], b: readonly number[]): boolean =>
 /** How a click selects slides: Shift+click a range, Ctrl/Cmd+click one more or one less. */
 export const clickMode = slideClickMode;
 
-/** A slide thumbnail, repainted only when its slide renders differently. @internal */
+/**
+ * A slide thumbnail, repainted only when its slide renders differently. It is hidden from
+ * assistive technology: the slide item that holds it gives the name ("Slide 3"). @internal
+ */
 export const Thumbnail = memo(function Thumbnail({
   slide,
   ratio,
@@ -88,7 +92,14 @@ export const Thumbnail = memo(function Thumbnail({
   useEffect(() => {
     if (editor && box.current) editor.renderThumbnail(slide.index, box.current);
   }, [editor, slide]);
-  return <div ref={box} className="pptx-rail__thumb" style={{ aspectRatio: String(1 / ratio) }} />;
+  return (
+    <div
+      ref={box}
+      className="pptx-rail__thumb"
+      style={{ aspectRatio: String(1 / ratio) }}
+      aria-hidden="true"
+    />
+  );
 });
 
 /**
@@ -305,9 +316,6 @@ export function SlideRail(props: SlideRailProps = {}) {
       role={grouped ? 'treeitem' : 'option'}
       aria-selected={selected.includes(s.index)}
       aria-current={s.index === current}
-      aria-label={t(s.hidden ? 'rail.hiddenSlideLabel' : 'rail.slideLabel', {
-        index: s.index + 1,
-      })}
       data-hidden={s.hidden ? '' : undefined}
       data-index={s.index}
       {...dragProps(s.index)}
@@ -323,7 +331,12 @@ export function SlideRail(props: SlideRailProps = {}) {
         openMenu(s.index, e.currentTarget, pointer ? { x: e.clientX, y: e.clientY } : null);
       }}
     >
-      <span className="pptx-rail__number">{s.index + 1}</span>
+      {/* The name comes from the hidden text, not `aria-label`: the visible number is part of
+          it, and the thumbnail art is hidden from assistive technology. */}
+      <span className="pptx-rail__number" aria-hidden="true">
+        {s.index + 1}
+      </span>
+      <span className="pptx-sr-only">{slideItemName(t, s)}</span>
       <Thumbnail slide={s} ratio={ratio} />
     </li>
   );

@@ -898,6 +898,9 @@
     "level": "{percent}%",
     "levelAriaLabel": "Zoom: {percent}%"
   },
+  "viewport": {
+    "ariaLabel": "Presentation editor"
+  },
   "canvas": {
     "ariaLabel": "Slide {index} of {total}",
     "inputAriaLabel": "Text of the selected shape",

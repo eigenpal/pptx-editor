@@ -34,13 +34,14 @@ import {
   type EditorModule,
   type PptxEditorInstance,
 } from '@pptx-editor.dev/core/editor';
-import type { LocaleCatalog } from '@pptx-editor.dev/i18n';
+import type { LocaleCatalog, Translate } from '@pptx-editor.dev/i18n';
 import {
   PptxEditorContext,
   SlideshowContext,
   TranslationContext,
   translatorFor,
   usePptxEditor,
+  useTranslation,
 } from './context.ts';
 import { useSlideshowHandle } from './Slideshow.tsx';
 import { useCanvasContextMenu } from './CanvasContextMenu.tsx';
@@ -255,18 +256,41 @@ export const PptxEditorRoot = forwardRef<PptxEditorRef, PptxEditorRootProps>(
 export interface PptxEditorViewportProps {
   /** Appended after the `pptx-editor` class. */
   className?: string;
+  /**
+   * The name of the editor's landmark region, or a translation key. Default: "Presentation
+   * editor" (`viewport.ariaLabel`). Give each editor its own name when a page shows more than one.
+   * `false` renders no region, for a host whose own landmarks (`header`, `main`) are inside.
+   */
+  label?: string | false;
   /** The chrome and the content of the editor. */
   children?: ReactNode;
 }
 
+/** The region role and name of the viewport, or nothing for `label={false}`. */
+function viewportLandmark(
+  t: Translate,
+  label: string | false | undefined
+): { role?: 'region'; 'aria-label'?: string } {
+  if (label === false) return {};
+  return {
+    role: 'region',
+    'aria-label': label ? translateKeyOrText(t, label) : t('viewport.ariaLabel'),
+  };
+}
+
 /**
  * The editor's scroll and styling scope: carries the `.pptx-editor` class, and `dark` with it
- * when the root's `colorMode` resolves to dark. @public
+ * when the root's `colorMode` resolves to dark. It is a named landmark region ("Presentation
+ * editor"), so a screen reader user can go to the editor from anywhere on the page. @public
  */
-export function PptxEditorViewport({ className, children }: PptxEditorViewportProps) {
+export function PptxEditorViewport({ className, label, children }: PptxEditorViewportProps) {
   const dark = useChromeDark();
+  const { t } = useTranslation();
   return (
-    <div className={['pptx-editor', dark ? 'dark' : '', className].filter(Boolean).join(' ')}>
+    <div
+      className={['pptx-editor', dark ? 'dark' : '', className].filter(Boolean).join(' ')}
+      {...viewportLandmark(t, label)}
+    >
       <ScopedByAncestorContext.Provider value>{children}</ScopedByAncestorContext.Provider>
     </div>
   );

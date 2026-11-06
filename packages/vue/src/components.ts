@@ -40,7 +40,12 @@ import {
   type PptxEditorInstance,
 } from '@pptx-editor.dev/core/editor';
 import { createTranslator, type LocaleCatalog, type Translate } from '@pptx-editor.dev/i18n';
-import { providePptxEditor, pptxTranslationKey, usePptxEditor } from './composables.ts';
+import {
+  providePptxEditor,
+  pptxTranslationKey,
+  usePptxEditor,
+  useTranslation,
+} from './composables.ts';
 import { ActiveDialog, provideDialogHost, type PptxEditorPopups } from './popups.ts';
 import { provideChromeDark, provideScopedByAncestor, useChromeDark } from './color-mode.ts';
 import { providePaneState } from './pane-state.ts';
@@ -260,6 +265,12 @@ export const PptxEditorRoot = defineComponent({
 const pptxEditorViewportProps = {
   /** A class name added to the viewport, as React's `className`. A host `class` also works. */
   className: { type: String, default: undefined },
+  /**
+   * The name of the editor's landmark region, or a translation key. Default: "Presentation
+   * editor" (`viewport.ariaLabel`). Give each editor its own name when a page shows more than one.
+   * `false` renders no region, for a host whose own landmarks (`header`, `main`) are inside.
+   */
+  label: { type: [String, Boolean] as PropType<string | false>, default: undefined },
 } as const;
 
 /** The props of `PptxEditorViewport`, the twin of React's `PptxEditorViewportProps`. @public */
@@ -267,19 +278,31 @@ export type PptxEditorViewportProps = ExtractPublicPropTypes<typeof pptxEditorVi
 
 /**
  * The editor's scroll and styling scope: carries the `.pptx-editor` class, and `dark` with it
- * when the root's `colorMode` resolves to dark. @public
+ * when the root's `colorMode` resolves to dark. It is a named landmark region ("Presentation
+ * editor"), so a screen reader user can go to the editor from anywhere on the page. @public
  */
 export const PptxEditorViewport = defineComponent({
   name: 'PptxEditorViewport',
   props: pptxEditorViewportProps,
   setup(props, { slots }) {
     const dark = useChromeDark();
+    const { t } = useTranslation();
     provideScopedByAncestor();
     // The host's `class` attribute merges onto this element through attribute fallthrough.
     return () =>
       h(
         'div',
-        { class: ['pptx-editor', dark.value ? 'dark' : null, props.className] },
+        {
+          class: ['pptx-editor', dark.value ? 'dark' : null, props.className],
+          ...(props.label === false
+            ? {}
+            : {
+                role: 'region',
+                'aria-label': props.label
+                  ? translateKeyOrText(t, props.label)
+                  : t('viewport.ariaLabel'),
+              }),
+        },
         slots.default?.()
       );
   },

@@ -6,6 +6,7 @@
 //
 // Every export is adapter glue, not a stable API: `@internal`.
 
+import type { Translate } from '@pptx-editor.dev/i18n';
 import type { NotesFormat, SlideSection } from '../contracts/index.ts';
 import type { PptxEditorInstance } from './pptx-editor.ts';
 import { runSlideStep, sectionOfSlide, stepCommand, type SlideStep } from './adapter-support.ts';
@@ -46,6 +47,18 @@ export function slideClickMode(e: {
   ctrlKey: boolean;
 }): 'range' | 'toggle' | 'replace' {
   return e.shiftKey ? 'range' : e.metaKey || e.ctrlKey ? 'toggle' : 'replace';
+}
+
+/**
+ * The accessible name of a slide item in the rail and the slide sorter: "Slide 3", or "Slide 3
+ * (hidden)". The item gets it from hidden text, not `aria-label`, so the visible number is part
+ * of the name and the thumbnail art, hidden from assistive technology, is not. @internal
+ */
+export function slideItemName(
+  t: Translate,
+  slide: { readonly index: number; readonly hidden: boolean }
+): string {
+  return t(slide.hidden ? 'rail.hiddenSlideLabel' : 'rail.slideLabel', { index: slide.index + 1 });
 }
 
 /** The zoom levels of the zoom pill's menu, after Fit. @internal */

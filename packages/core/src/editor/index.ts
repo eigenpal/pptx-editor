@@ -273,6 +273,7 @@ export {
   selectSlideSection,
   slideClickMode,
   slideDropMarker,
+  slideItemName,
   slideMenuPoint,
   slideSorterMounted,
   sorterKeyDown,

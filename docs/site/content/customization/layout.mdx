@@ -128,13 +128,31 @@ The `deck-workspace` classes are your own CSS:
 
 | Part | Requirement |
 | --- | --- |
-| `PptxEditor.Viewport` | The styling scope: a plain block element with no layout of its own. Give it a height, or a flexible parent with `min-height: 0`. |
+| `PptxEditor.Viewport` | The styling scope: a plain block element with no layout of its own. Give it a height, or a flexible parent with `min-height: 0`. It is a landmark region named **Presentation editor**, so a screen reader user can go to the editor. |
 | Each flex level | Keep `min-height: 0`, so the canvas and the rail scroll inside the window instead of growing the page. |
 | The main column | `position: relative`. The zoom pill, the find bar, and the notices use absolute positions. |
 | `PptxEditor.Toolbar`, `PptxEditor.Menu` | Inside `PptxEditor.Viewport`. Their menus render inside the viewport and take its tokens. |
 | `PptxEditor.Content` | Attaches the slide canvas. |
 
 `Root` hosts the link popup. Ctrl+K (Cmd+K on macOS), the toolbar's link control, and **Insert > Link…** work with no toolbar on the page. Keep every part, menu, and application control that uses the editor under the same root.
+
+### Name the editor landmark
+
+The viewport is a `region` landmark with the name **Presentation editor** (`viewport.ariaLabel`). The slide rail (`navigation`, **Slides**) and the speaker notes (`region`, **Speaker notes**) are landmarks inside it. When a page shows more than one editor, give each one its own name with `label`. It takes text or a translation key.
+
+When your own landmarks (`header`, `main`, `aside`) are inside the viewport, set `label={false}`. The viewport then renders no region, and your landmarks stay at the top level. Put the toolbar and the canvas in your `main`.
+
+```tsx
+<PptxEditor.Viewport label={false}>
+  <header>{/* your app bar */}</header>
+  <main>
+    <PptxEditor.Toolbar />
+    <PptxEditor.Content />
+  </main>
+</PptxEditor.Viewport>
+```
+
+In Vue, write `<PptxEditorViewport :label="false">`.
 
 ## Change one part of the packaged editor
 
@@ -208,6 +226,8 @@ A horizontal rail narrower than 420 pixels, as on a phone, keeps **New slide**, 
 | `SlideRail.Collapse` | **Hide thumbnails**. `toggle={false}` on the rail removes it. |
 | `SlideRail.Expand` | **Show thumbnails**, the one button of the folded strip. `toggle={false}` on the rail removes it. |
 | `SlideRail.Action` | Your own button: the same component as `Toolbar.Action`. |
+
+Each slide in the rail and in the slide sorter has the name **Slide 3**, or **Slide 3 (hidden)** for a hidden slide. The name comes from hidden text in the item, not from `aria-label`. The thumbnail art is hidden from assistive technology, so the slide's text is not read as the name of the item. A layout tile has the name of its layout.
 
 Each named part takes `hidden`, `icon`, `className`, and `asChild`. A hidden button keeps its command on the keyboard and in the slide menu. A hidden `SlideRail.Expand` leaves the folded strip with no button. The open rail keeps the current slide in view, also when its panel changes size. For the Vue names, see [React and Vue reference](/docs/customization/reference/layout#react-and-vue-reference).
 

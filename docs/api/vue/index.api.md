@@ -2219,8 +2219,8 @@ export const Popover: vue.DefineComponent<vue.ExtractPropTypes<{
     readonly className: string;
     readonly label: string;
     readonly anchor: HTMLElement | null;
-    readonly align: "end" | "start";
     readonly role: "menu" | "dialog";
+    readonly align: "end" | "start";
     readonly field: boolean;
     readonly id: string;
     readonly focusFirst: boolean;
@@ -2601,6 +2601,10 @@ export const PptxEditor: {
             readonly type: StringConstructor;
             readonly default: undefined;
         };
+        readonly label: {
+            readonly type: PropType<string | false>;
+            readonly default: undefined;
+        };
     }>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
         [key: string]: any;
     }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
@@ -2608,8 +2612,13 @@ export const PptxEditor: {
             readonly type: StringConstructor;
             readonly default: undefined;
         };
+        readonly label: {
+            readonly type: PropType<string | false>;
+            readonly default: undefined;
+        };
     }>> & Readonly<{}>, {
         readonly className: string;
+        readonly label: string | false;
     }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
     Content: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly className: {
@@ -6862,6 +6871,10 @@ export const PptxEditorViewport: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: StringConstructor;
         readonly default: undefined;
     };
+    readonly label: {
+        readonly type: PropType<string | false>;
+        readonly default: undefined;
+    };
 }>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
     [key: string]: any;
 }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
@@ -6869,8 +6882,13 @@ export const PptxEditorViewport: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: StringConstructor;
         readonly default: undefined;
     };
+    readonly label: {
+        readonly type: PropType<string | false>;
+        readonly default: undefined;
+    };
 }>> & Readonly<{}>, {
     readonly className: string;
+    readonly label: string | false;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 
 // @public

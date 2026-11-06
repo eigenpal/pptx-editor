@@ -160,7 +160,9 @@ function Shell({
     },
   };
   return (
-    <PptxEditor.Viewport className="demo-root">
+    // The page has its own landmarks, such as the top bar's banner, so the viewport renders no
+    // region of its own.
+    <PptxEditor.Viewport className="demo-root" label={false}>
       <header className="demo-topbar" {...fileDrop}>
         <BrandLogo name={t('app.productName')} />
         {SHOW_ADAPTER_SWITCHER ? <AdapterSwitcher current="react" /> : null}
