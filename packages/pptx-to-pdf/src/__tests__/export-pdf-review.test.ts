@@ -8,6 +8,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { unzipSync, zipSync } from 'fflate';
 import { PDFDocument } from 'pdf-lib';
 import { PNG } from 'pngjs';
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -406,6 +407,16 @@ describe('diagnostics placement', () => {
     const error = await exportPdf(deckWithHidden()).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(PdfFidelityError);
     expect((error as Error).message).toContain('slide 3: fill.pattern');
+  });
+
+  test('a diagram without its saved drawing says why it is not drawn', async () => {
+    const files = unzipSync(deck('diagrams'));
+    delete files['ppt/diagrams/drawing1.xml'];
+    const result = await exportPdf(zipSync(files), BEST);
+    const missing = result.diagnostics.filter((d) => d.code === 'frame.diagram');
+    expect(missing.map((d) => [d.slideNumber, d.message])).toEqual([
+      [1, 'A diagram is not drawn: it has no saved drawing.'],
+    ]);
   });
 
   test('diagnostic codes are fixed strings, not file text', async () => {

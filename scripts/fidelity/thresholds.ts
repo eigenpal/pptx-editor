@@ -263,6 +263,8 @@ export const FIXTURE_KNOWN_GAPS: Readonly<Record<FidelityEnvironment, KnownGapLi
   // This change adds the decks and their reference PDFs, and no renderer for either: a chart
   // and a diagram draw as a placeholder (the gate allows entries for a new fixture). `linux`
   // from the CI run of eigenpal/pptx-editor#35. `macos-reference` is not measured here.
+  // 6 November 2026, diagrams draw from their saved drawing (eigenpal/pptx-editor#38): both
+  // `diagrams` slides pass.
   linux: {
     poppler: '24.02.0',
     chromium: '156.0.8078.4',
@@ -279,8 +281,6 @@ export const FIXTURE_KNOWN_GAPS: Readonly<Record<FidelityEnvironment, KnownGapLi
       'charts/6': { pixels: 0.1578, lines: 1 },
       'charts/7': { pixels: 0.1127, lines: 1 },
       'charts/8': { pixels: 0.0146, lines: 1 },
-      'diagrams/1': { pixels: 0.103, lines: 1 },
-      'diagrams/2': { pixels: 0.0628, lines: 1 },
       'east-asian-line-breaking/1': { pixels: 0.076, 'line-breaks': 0.6538, lines: 52 },
       'east-asian-line-breaking/2': { pixels: 0.0594, lines: 52 },
       'east-asian-line-breaking/3': { pixels: 0.0242, 'line-breaks': 0.5556, lines: 27 },

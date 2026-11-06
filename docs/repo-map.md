@@ -102,6 +102,7 @@ Each directory is a lane with allowed imports (`src/__tests__/core-lane-graph.ts
 | `script-fonts.ts` | The ISO 15924 script of a run's language (`lang`, `altLang`), which picks a theme script font (`a:font`) for the `ea` and `cs` slots |
 | `paint-props.ts` | Fills, lines, effects |
 | `table.ts`, `table-styles.ts` | Tables and table styles |
+| `diagram.ts` | The data model and saved drawing parts behind a diagram frame (`dgm:relIds`, `dsp:dataModelExt`), parsed with the bounded reader. `slide.ts` resolves the drawing's shapes as slide shapes |
 | `types.ts` | The resolved types layout and paint read |
 
 ### `layout/`: DOM-free geometry and text

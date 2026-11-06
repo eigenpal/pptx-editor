@@ -123,6 +123,11 @@ export type LayoutItem = ItemPlacement &
          * table and no poster draws a labeled placeholder.
          */
         readonly poster?: Extract<LayoutItem, { kind: 'picture' }>;
+        /**
+         * The laid-out saved drawing of a diagram (`element.drawing`): read-only shapes and
+         * groups placed in the frame's box. A frame with none draws a labeled placeholder.
+         */
+        readonly drawing?: readonly LayoutItem[];
       }
   );
 
@@ -147,17 +152,52 @@ type ChildMap = SourceMap;
  */
 function placeInGroup<T extends ResolvedElement>(el: T, map: ChildMap | null): T {
   if (!map) return el;
-  const x = el.xfrm;
-  return {
-    ...el,
-    xfrm: {
-      ...x,
-      x: (x.x - map.ox) * map.sx,
-      y: (x.y - map.oy) * map.sy,
-      cx: x.cx * map.sx,
-      cy: x.cy * map.sy,
-    },
+  const place = (x: Xfrm): Xfrm => ({
+    ...x,
+    x: (x.x - map.ox) * map.sx,
+    y: (x.y - map.oy) * map.sy,
+    cx: x.cx * map.sx,
+    cy: x.cy * map.sy,
+  });
+  const textXfrm = el.kind === 'shape' ? el.textXfrm : undefined;
+  return { ...el, xfrm: place(el.xfrm), ...(textXfrm ? { textXfrm: place(textXfrm) } : {}) };
+}
+
+/** Whether a laid-out diagram item falls outside what the shape renderer draws exactly. */
+function unsupportedInDiagram(item: LayoutItem): boolean {
+  if (item.kind === 'group') return item.children.some(unsupportedInDiagram);
+  return item.kind === 'shape' && item.geometry.unknownPreset !== undefined;
+}
+
+/**
+ * Lay out a diagram's saved drawing in the frame's box. The drawing's shapes are in the frame's
+ * file space, so a frame scaled by a group scales them the same way. Null when one shape uses
+ * a preset geometry that the renderer does not know: a diagram renders whole or not at all.
+ */
+function layoutDiagram(
+  source: ResolvedGraphicFrame,
+  el: ResolvedGraphicFrame,
+  matrix: Matrix,
+  measurer: TextMeasurer,
+  diagnostics: Set<string>
+): LayoutItem[] | null {
+  if (!source.drawing) return null;
+  const map: ChildMap = {
+    ox: 0,
+    oy: 0,
+    sx: source.xfrm.cx ? el.xfrm.cx / source.xfrm.cx : 1,
+    sy: source.xfrm.cy ? el.xfrm.cy / source.xfrm.cy : 1,
   };
+  const own = new Set<string>();
+  const items: LayoutItem[] = [];
+  for (const c of source.drawing) {
+    const item = layoutElement(c, matrix, map, measurer, own);
+    if (!item) continue;
+    if (unsupportedInDiagram(item)) return null;
+    items.push(item);
+  }
+  for (const d of own) diagnostics.add(d);
+  return items;
 }
 
 /**
@@ -198,7 +238,18 @@ function layoutElement(
         diagnostics.add(`unknown preset geometry: ${geometry.unknownPreset}`);
       let text: TextLayout | undefined;
       let textMatrix: Matrix | undefined;
-      if (el.text && el.text.paragraphs.length > 0) {
+      const tx = el.text && el.text.paragraphs.length > 0 ? el.textXfrm : undefined;
+      if (el.text && tx) {
+        // A diagram shape's own text rectangle, in the parent's space. Its turn adds to the
+        // shape's turn, and it never flips. A flipped frame or group keeps the glyphs upright,
+        // as for any other shape.
+        text = layoutText(el.text, { x: 0, y: 0, width: tx.cx, height: tx.cy }, measurer);
+        for (const s of text.substitutions) diagnostics.add(`font substituted: ${s}`);
+        textMatrix = uprightTextMatrix(
+          multiply(parent, boxMatrix({ ...tx, rot: tx.rot + el.xfrm.rot }, false)),
+          text.box
+        );
+      } else if (el.text && el.text.paragraphs.length > 0) {
         const r = geometry.textRect;
         text = layoutText(
           el.text,
@@ -251,8 +302,20 @@ function layoutElement(
       const poster = el.poster && layoutElement(el.poster, parent, map, measurer, diagnostics);
       if (poster?.kind === 'picture')
         return { ...placement, kind: 'frame', element: el, matrix, poster };
+      const drawing = layoutDiagram(
+        source as ResolvedGraphicFrame,
+        el,
+        matrix,
+        measurer,
+        diagnostics
+      );
+      if (drawing) return { ...placement, kind: 'frame', element: el, matrix, drawing };
       diagnostics.add(`graphic frame rendered as placeholder: ${el.frameKind}`);
-      return { ...placement, kind: 'frame', element: el, matrix };
+      // A drawing that resolved but holds a shape layout cannot draw (an unknown preset).
+      const element: ResolvedGraphicFrame = el.drawing
+        ? { ...el, drawing: undefined, drawingFallback: 'unsupported' }
+        : el;
+      return { ...placement, kind: 'frame', element, matrix };
     }
   }
 }

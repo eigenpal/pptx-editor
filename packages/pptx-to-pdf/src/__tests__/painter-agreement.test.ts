@@ -8,6 +8,8 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // SVG paint, in a happy-dom window of their own, and with the PDF writer, and fail when the two
 // disagree: a change to the editor's rule must reach the PDF writer too.
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import { PNG } from 'pngjs';
@@ -193,6 +195,56 @@ describe('the PDF writer and the SVG paint agree', () => {
     for (const [i, bar] of svgBars.entries())
       for (const [k, v] of bar.box.entries())
         expect(pdfBars[i]!.box[k]! / 12_700).toBeCloseTo(v, 1);
+  });
+
+  test('on the shapes and text of a diagram saved drawing', async () => {
+    const bytes = new Uint8Array(
+      readFileSync(join(import.meta.dirname, '../../../../fixtures/diagrams.pptx'))
+    );
+    const svg = await svgOf(bytes);
+    // The frame draws its drawing, not the dashed placeholder.
+    expect(svg.querySelector('[stroke-dasharray]')).toBeNull();
+    const svgFills = [...svg.querySelectorAll('[data-kind="frame"] path')]
+      .map((p) => p.getAttribute('fill')!)
+      .filter((f) => f !== 'none');
+    const svgText = [...svg.querySelectorAll('[data-kind="frame"] text')]
+      .map((t) => t.textContent!.trim())
+      .filter(Boolean);
+    const result = await exportPdf(bytes, BEST);
+    expect(result.diagnostics.some((d) => d.code === 'frame.diagram')).toBe(false);
+    const pdf = await getDocument({ data: result.bytes.slice(), useSystemFonts: false }).promise;
+    const page = await pdf.getPage(1);
+    const { fnArray, argsArray } = await page.getOperatorList();
+    const pdfFills: string[] = [];
+    let color = '';
+    fnArray.forEach((fn, i) => {
+      if (fn === OPS.setFillRGBColor) color = String((argsArray[i] as unknown[])[0]);
+      if (fn === OPS.constructPath && color) pdfFills.push(color);
+    });
+    // Nine shapes, each with its fill, in the SVG paint's order. The PDF also strokes and
+    // writes text, so its fills hold the SVG's fills in order.
+    expect(svgFills).toHaveLength(9);
+    let at = 0;
+    for (const fill of svgFills) {
+      at = pdfFills.indexOf(fill.toLowerCase(), at);
+      expect(at).toBeGreaterThanOrEqual(0);
+      at += 1;
+    }
+    const pdfText = (await page.getTextContent()).items
+      .map((item) => ('str' in item ? item.str.trim() : ''))
+      .filter(Boolean);
+    expect(svgText).toEqual([
+      'Plan',
+      'Scope',
+      'Brief',
+      'Write',
+      'Draft',
+      'Art',
+      'Ship',
+      'Check',
+      'Send',
+    ]);
+    expect(pdfText.slice(1)).toEqual(svgText);
   });
 });
 
