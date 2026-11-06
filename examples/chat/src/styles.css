@@ -193,6 +193,8 @@ button {
   font-size: 14px;
 }
 .chat-head__brand {
+  margin: 0;
+  font-size: inherit;
   font-weight: 650;
   letter-spacing: -0.01em;
 }

@@ -1,0 +1,143 @@
+---
+title: 'Accessibility'
+description: 'What the host page provides, how the keyboard moves through the editor, what a screen reader hears, and the known limits.'
+category: 'Getting started'
+---
+
+The editor gives names, roles, and keyboard support to its controls. The page around the editor is yours. This page tells you what to add to the page, and what the editor does by itself today.
+
+## Prepare the host page
+
+The editor renders inside your page. It does not add page-level structure. Give the page these items:
+
+- A `lang` attribute on `<html>`.
+- A `<title>` that names the page.
+- One `<main>` landmark that contains the editor.
+- A page heading (`<h1>`). The heading can be visually hidden.
+- A label for each control of your own, such as the file input that opens a deck.
+- A `title` and `allow="fullscreen"` on an `<iframe>` that holds the editor. The slide show asks for full screen (see [Installation](/docs/installation#embed-in-a-page)).
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Quarterly review | Deck editor</title>
+  </head>
+  <body>
+    <main>
+      <h1>Quarterly review</h1>
+      <label>Open a .pptx file <input type="file" accept=".pptx" /></label>
+      <div id="editor" style="height: 80vh"></div>
+    </main>
+  </body>
+</html>
+```
+
+The [quickstart](/docs/quickstart) and the demos in `examples/` follow these rules.
+
+If you build your own controls, keep them accessible. A disabled control stays focusable with `aria-disabled` and tells the user why it is off. See [Customization](/docs/customization).
+
+## Use the keyboard
+
+The editor follows the WAI-ARIA authoring practices. Each composite part, such as the slide, the toolbar, or the slide list, is one Tab stop. The arrow keys move inside it. The chrome shows a focus ring on keyboard focus.
+
+### On the slide
+
+The slide is one Tab stop (role `group`). When the slide has focus, these keys apply:
+
+| Key | Action |
+| --- | --- |
+| Tab, Shift+Tab | Select the next or the previous shape, in z-order. With no selection, Tab selects the backmost shape and Shift+Tab the frontmost. |
+| Tab on the last shape, Shift+Tab on the first | Clear the selection and move focus out of the slide. The slide never traps focus. |
+| Enter or F2 | Start to edit the text of the selected shape. On a group, Enter selects the shapes in the group. |
+| A character key | Start to edit the text of the selected shape, and type that character (in the editing mode only). |
+| Escape | Leave text editing and select the shape. Leave a group and select the group. Otherwise, clear the selection. |
+| Arrow keys | Nudge the selected shapes by 8 px. Ctrl/Cmd+arrow nudges by 1 px. Shift multiplies the step by 10. |
+| Delete, Backspace | Delete the selected shapes. |
+| Ctrl/Cmd+D | Duplicate the selected shapes. |
+| Ctrl/Cmd+A | Select all shapes, or all text when you edit text. |
+
+Inside a group, Tab and Shift+Tab cycle through the shapes of the group.
+
+While you edit text, Tab changes the list level of a list paragraph, and inserts a tab elsewhere. Press Escape first to move with Tab again. In a table cell, Tab and Shift+Tab move to the next or the previous cell. See [Tables](/docs/guides/tables).
+
+### Toolbar, menus, and dialogs
+
+- The toolbar is one Tab stop. The Left and Right arrow keys, Home, and End move through its controls. In a right-to-left interface, Left and Right change places.
+- The ribbon tabs are a `tablist`. The arrow keys, Home, and End move between tabs.
+- The menu bar is one Tab stop. Escape closes a menu and keeps focus on its menu bar item.
+- A popover, such as a color or font picker, returns focus to its trigger on Escape.
+- A context menu returns focus to where it was on Escape. Shift+F10 and the context menu key open it from the keyboard.
+- A dialog keeps Tab inside it. Escape closes it, and focus goes back to the control that opened it.
+
+### Slide list and slide sorter
+
+The slide list in the rail is one Tab stop. The focused slide is the current slide.
+
+| Key                                         | Action                                |
+| ------------------------------------------- | ------------------------------------- |
+| Up, Down (Left, Right in a horizontal rail) | Go to the previous or the next slide. |
+| Home, End                                   | Go to the first or the last slide.    |
+| Shift+arrow, Shift+Home, Shift+End          | Extend the slide selection.           |
+| Ctrl/Cmd+arrow                              | Move the selected slides.             |
+| Enter, Ctrl+M                               | Add a slide.                          |
+| Delete, Backspace                           | Delete the selected slides.           |
+| Ctrl/Cmd+D                                  | Duplicate the selected slides.        |
+| Shift+F10, context menu key                 | Open the slide menu.                  |
+
+In the viewing mode, the keys that change the deck do nothing and the editor tells why. With sections, the list is a tree: the arrow keys also stop on each section header.
+
+The slide sorter is one Tab stop. The arrow keys move through the grid of slides. Home and End go to the start and the end of the grid.
+
+### Slide show
+
+F5 starts the show from the first slide. Shift+F5 starts it from the current slide.
+
+| Key                                     | Action                         |
+| --------------------------------------- | ------------------------------ |
+| Right, Down, Page Down, Space, N, Enter | Next slide                     |
+| Left, Up, Page Up, Backspace, P         | Previous slide                 |
+| Home, End                               | First or last slide            |
+| A number, then Enter                    | Go to that slide               |
+| B or `.`, W or `,`                      | Show a black or a white screen |
+| Escape                                  | End the show                   |
+
+Tab moves through the buttons of the slide show control bar.
+
+## Hear the editor with a screen reader
+
+The editor takes its accessible names from the locale catalog, so they change with the [language](/docs/customization/language). With the English catalog, a screen reader hears these items:
+
+| Where | What the screen reader hears |
+| --- | --- |
+| Slide | The group name "Slide 3 of 12". The name changes when the slide changes. |
+| Shape selection | A polite announcement, "Title 1 selected", with the shape name from the file. It comes when Tab or a click selects one shape. |
+| Text editing | The text input "Text of the selected shape". |
+| Table cell | A polite announcement, "Row 2, column 3", when the caret moves to a cell. |
+| Link in the text | A polite announcement, "Link: https://example.com. Press F6 for its actions." F6 moves focus to the link actions. |
+| Slide list | A list box "Slides" with items "Slide 4", or "Slide 4 (hidden)" for a hidden slide. |
+| Speaker notes | A region "Speaker notes", with a multiline text box. |
+| Status bar | A polite announcement, "Slide 3 of 12", when the slide changes. |
+| Slide show | A modal dialog "Slide show". A polite announcement gives the position, "Slide 3 of 12", at each slide. When you type a number, a status message says "Go to slide 5". |
+
+## Color modes and motion
+
+- **Color modes.** Set `colorMode` to `light`, `dark`, or `system`. `system` follows the operating system and updates when it changes. Only the chrome changes. The slide always shows the colors of the file. See [Appearance](/docs/customization/appearance).
+- **Reduced motion.** When the operating system asks for reduced motion, the editor stops the loading spinner, the tooltip animation, the press effect of buttons, the slide-in of notices, and the transition of the slide show control bar.
+- **Slide show motion.** The slide show does not play the animations and transitions of the file. They stay in the file on save.
+
+## Known limits
+
+These limits apply today:
+
+- **Picture alt text.** You can set alt text, a title, and "Mark as decorative" in the Alt Text dialog. The editor saves them in the file. The slide does not yet give the alt text to a screen reader.
+- **Slide content structure.** The slide is drawn as SVG. A screen reader gets no headings, lists, or reading order from the slide. It gets the shape name only when a shape is selected. When more than one shape is selected, it hears no announcement.
+- **Slide show content.** In the slide show, each slide is an image with no text alternative. A screen reader hears the slide position, not the slide text.
+- **Forced colors.** The chrome does not yet change for a forced colors (high contrast) mode.
+
+## Next steps
+
+- [Installation](/docs/installation): requirements, styles, and how to embed the editor.
+- [Customization](/docs/customization): build controls that keep labels and keyboard support.
+- [Language](/docs/customization/language): translate the interface and its accessible names.

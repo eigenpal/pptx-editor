@@ -29,7 +29,7 @@ npm install @pptx-editor.dev/vue @pptx-editor.dev/core
 
 ## Open and save a deck
 
-This component reads a file input, shows the deck in the editor, and downloads the result. It mounts the editor after you pick a file. The editor reloads when the identity of `document` changes. The ref's `save()` returns the saved package as bytes.
+This component reads a labeled file input, shows the deck in the editor, and downloads the result. It mounts the editor after you pick a file. The editor reloads when the identity of `document` changes. The ref's `save()` returns the saved package as bytes.
 
 <FrameworkTabs>
 <Framework value="react">
@@ -62,9 +62,11 @@ export default function App() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <main style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <div>
-        <input type="file" accept=".pptx" onChange={pick} />
+        <label>
+          Open a .pptx file <input type="file" accept=".pptx" onChange={pick} />
+        </label>
         <button onClick={download} disabled={!bytes}>
           Download
         </button>
@@ -72,7 +74,7 @@ export default function App() {
       <div style={{ flex: 1, minHeight: 0 }}>
         {bytes && <PptxEditor ref={editorRef} document={bytes} mode="edit" />}
       </div>
-    </div>
+    </main>
   );
 }
 ```
@@ -109,15 +111,15 @@ function download() {
 </script>
 
 <template>
-  <div style="display: flex; flex-direction: column; height: 100vh">
+  <main style="display: flex; flex-direction: column; height: 100vh">
     <div>
-      <input type="file" accept=".pptx" @change="pick" />
+      <label>Open a .pptx file <input type="file" accept=".pptx" @change="pick" /></label>
       <button :disabled="!bytes" @click="download">Download</button>
     </div>
     <div style="flex: 1; min-height: 0">
       <PptxEditor v-if="bytes" ref="editorRef" :document="bytes" mode="edit" />
     </div>
-  </div>
+  </main>
 </template>
 ```
 
