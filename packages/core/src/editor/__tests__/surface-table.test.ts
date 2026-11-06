@@ -22,6 +22,7 @@ import type {
 } from '../../contracts/index.ts';
 import { apply, type SlideLayout } from '../../layout/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
+import { dragStep, startDrag } from '../surface-drag.ts';
 import { clampTableResize, TableGestures, type TableGestureHost } from '../surface-table.ts';
 import { tableItem } from '../table-cells.ts';
 
@@ -345,6 +346,22 @@ describe('table gestures: grid lines', () => {
       dx: 20 * IN,
       dy: 20 * IN,
     });
+  });
+
+  test('a corner drag of the frame stops the table at the slide edge', async () => {
+    const e = await open();
+    const frame = frameOf(e);
+    const lay = layout(e);
+    const id = frame.element.nodeId;
+    const corner = {
+      x: frame.matrix[4] + frame.table.width,
+      y: frame.matrix[5] + frame.table.height,
+    };
+    const d = startDrag(lay, 'se', [id], corner, 'g')!;
+    const far = { x: corner.x + 30 * IN, y: corner.y + 30 * IN };
+    const [box] = dragStep(d, far, { shift: false, snapTo: null, aspectLocked: () => false }).items;
+    expect(box!.x + box!.cx).toBe(lay.slide.width);
+    expect(box!.y + box!.cy).toBe(lay.slide.height);
   });
 
   test('the outer edges are grid lines, so the border band of the selected table yields', async () => {
