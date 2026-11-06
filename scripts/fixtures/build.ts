@@ -14,6 +14,7 @@ import { slideStructureDeck } from './slide-structure.ts';
 import { shapeFormatFixtures } from './shape-format.ts';
 import { eastAsianThemeFontsDeck, eastAsianTypographyDeck, textScriptFixtures } from './text-scripts.ts';
 import { followUpFixtures } from './follow-ups.ts';
+import { chartsDeck, diagramsDeck } from './drawingml.ts';
 
 const OUT = 'fixtures';
 const IN = 914_400;
@@ -841,4 +842,8 @@ writeFileSync(`${OUT}/fill-fidelity.pptx`, buildPptx(fillFidelityDeck(image)));
 writeFileSync(`${OUT}/east-asian-theme-fonts.pptx`, buildPptx(eastAsianThemeFontsDeck()));
 // Custom kinsoku lists, and justified and distributed East Asian text.
 writeFileSync(`${OUT}/east-asian-typography.pptx`, buildPptx(eastAsianTypographyDeck()));
-console.log(`${Object.keys(fixtures).length + 3} fixtures written to ${OUT}/`);
+// One chart type per slide, drawn from the cached values (ECMA-376 Part 1, 21.2).
+writeFileSync(`${OUT}/charts.pptx`, buildPptx(chartsDeck()));
+// Diagrams with their saved drawings (ECMA-376 Part 1, 21.4).
+writeFileSync(`${OUT}/diagrams.pptx`, buildPptx(diagramsDeck()));
+console.log(`${Object.keys(fixtures).length + 5} fixtures written to ${OUT}/`);
