@@ -127,8 +127,11 @@ export function parseCellsJson(raw: string): string[][] | null {
 /** What a paste does in a table: fill cells, insert one cell's text at the caret, or neither. */
 export type TablePaste = { readonly cells: string[][] } | { readonly text: string } | null;
 
-/** One quoted cell, as a copy of one cell with a tab, a line break, or a quote writes it. */
-const ONE_QUOTED = /^"(?:[^"]|"")*"$/;
+/**
+ * One quoted cell, as a copy of one cell writes it: quoted only because it holds a tab, a line
+ * break, or a doubled quote. Other text in quotes ("Hello") is text, and keeps its quotes.
+ */
+const ONE_QUOTED = /^"(?:[^"]|"")*(?:[\t\r\n]|"")(?:[^"]|"")*"$/;
 
 /**
  * What a paste does in a table. A cell range takes any text as cells. A caret in a cell takes a

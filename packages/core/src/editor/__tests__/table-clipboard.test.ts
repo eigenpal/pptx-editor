@@ -262,8 +262,10 @@ describe('paste into cells', () => {
     expect(tablePaste(sel, { cells: '[["a\\tb"]]', text: '"a\tb"' })).toEqual({ text: 'a\tb' });
     expect(tablePaste(sel, { text: '"x\ny"' })).toEqual({ text: 'x\ny' });
     expect(tablePaste(sel, { text: '"5"" disk"' })).toEqual({ text: '5" disk' });
-    // Text that only starts with a quote is not a quoted cell.
+    // Text that only starts with a quote, or a quoted phrase, is text: it keeps its quotes.
     expect(tablePaste(sel, { text: '"hi" she said' })).toBeNull();
+    expect(tablePaste(sel, { text: '"Hello world"' })).toBeNull();
+    expect(tablePaste(sel, { text: '""' })).toBeNull();
   });
 
   test('pasteCells refuses texts that are not rows of strings', async () => {

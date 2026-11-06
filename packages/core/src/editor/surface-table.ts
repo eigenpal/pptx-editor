@@ -233,10 +233,15 @@ export class TableGestures {
   }
 
   /**
-   * The selected table when `p` is on its outer grid line, just outside its box, where the hit
-   * test finds no element: the right and bottom edges resize the last column or row.
+   * The selected table when `p` is on one of its grid lines: the right and bottom edges resize
+   * the last column or row. With `outside`, only just outside its box, where a shape behind the
+   * table must not take the press; inside, shapes in front of the table keep theirs.
    */
-  edgeAt(layout: SlideLayout | undefined, p: { x: number; y: number }): string | undefined {
+  edgeAt(
+    layout: SlideLayout | undefined,
+    p: { x: number; y: number },
+    outside = false
+  ): string | undefined {
     const sel = this.host.selection();
     const id =
       sel.kind === 'shapes'
@@ -247,7 +252,12 @@ export class TableGestures {
           ? undefined
           : sel.nodeId;
     const frame = id ? tableItem(layout, id) : undefined;
-    return frame && this.onLine(frame, p) ? id : undefined;
+    if (!frame || !this.onLine(frame, p)) return undefined;
+    if (!outside) return id;
+    const local = apply(invert(frame.matrix), p.x, p.y);
+    const { cx, cy } = frame.element.xfrm;
+    const inside = local.x >= 0 && local.x <= cx && local.y >= 0 && local.y <= cy;
+    return inside ? undefined : id;
   }
 
   /**

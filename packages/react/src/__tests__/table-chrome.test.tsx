@@ -19,14 +19,16 @@ const PX = 9_525;
 const t = createTranslator();
 const STYLE = '{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}';
 
-/** `behind` puts a large shape under the table, as a slide's decoration sits. */
-const deck = (behind = false): Uint8Array =>
+/** `behind` puts a large shape under the table, as a slide's decoration sits; `front`, a box over it. */
+const deck = (extra?: 'behind' | 'front'): Uint8Array =>
   buildPptx({
     slides: [
       {
         layout: 'blank',
         shapes:
-          (behind ? shape({ id: 3, x: 0, y: 0, cx: 8 * IN, cy: 5 * IN, fill: 'FF0000' }) : '') +
+          (extra === 'behind'
+            ? shape({ id: 3, x: 0, y: 0, cx: 8 * IN, cy: 5 * IN, fill: 'FF0000' })
+            : '') +
           table({
             id: 2,
             x: IN,
@@ -38,19 +40,22 @@ const deck = (behind = false): Uint8Array =>
             rows: ['ABC', 'DEF']
               .map((r) => `<a:tr h="${IN}">${[...r].map((c) => cell(c)).join('')}</a:tr>`)
               .join(''),
-          }),
+          }) +
+          (extra === 'front'
+            ? shape({ id: 4, x: 1.5 * IN, y: 1.25 * IN, cx: IN, cy: IN / 2 })
+            : ''),
       },
     ],
   });
 
-async function open(behind = false): Promise<PptxEditorInstance> {
+async function open(extra?: 'behind' | 'front'): Promise<PptxEditorInstance> {
   const editor = createPptxEditor({
     fixedMeasurer: true,
     substitutes: false,
     zoom: 1,
     translate: (key, params) => t(key as never, params),
   });
-  expect((await editor.load(deck(behind))).ok).toBe(true);
+  expect((await editor.load(deck(extra))).ok).toBe(true);
   return editor;
 }
 
@@ -291,7 +296,7 @@ describe('table surface', () => {
 
 describe('table edge over a shape', () => {
   test('a press just outside the edge resizes the selected table, not the shape behind', async () => {
-    const editor = await open(true);
+    const editor = await open('behind');
     const host = surface(editor);
     const stage = stageOf(host);
     const frame = frames(editor)[0];
@@ -317,6 +322,29 @@ describe('table edge over a shape', () => {
     const root = xmlPartOf(editor.session!.store.package, part(editor))!.root;
     const sp = find(root, 'p:sp')!;
     expect(attr(find(sp, 'a:off')!, 'x')).toBe('0');
+    editor.destroy();
+  });
+});
+
+describe('table grid line under a shape', () => {
+  test('a press on a shape in front of the table takes the shape, not the grid line', async () => {
+    const editor = await open('front');
+    const host = surface(editor);
+    const stage = stageOf(host);
+    const frame = frames(editor)[0];
+    act(() => editor.setSelection({ kind: 'shapes', nodeIds: [frame.id] }));
+    // The column line at x = 2 in runs under the box (1.5 in to 2.5 in).
+    stage.dispatchEvent(new PointerEvent('pointerdown', { ...at(2 * IN, 1.5 * IN), button: 0 }));
+    document.dispatchEvent(new PointerEvent('pointerup', at(2 * IN, 1.5 * IN)));
+    const root = xmlPartOf(editor.session!.store.package, part(editor))!.root;
+    const box = find(root, 'p:sp')!;
+    const sel = editor.snapshot().selection;
+    expect(sel.kind === 'shapes' ? sel.nodeIds : sel.kind).toEqual([box.id]);
+    // The grid stays as it was: no column drag started.
+    const widths = children(find(frames(editor)[0], 'a:tblGrid'), 'a:gridCol').map((g) =>
+      Number(attr(g, 'w'))
+    );
+    expect(widths).toEqual([IN, IN, IN]);
     editor.destroy();
   });
 });

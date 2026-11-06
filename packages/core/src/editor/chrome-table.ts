@@ -135,8 +135,12 @@ function cellsKey(editor: Editor): string {
   const sel = editor.snapshot().selection;
   if (sel.kind === 'text')
     return sel.cell ? `${sel.nodeId}:${sel.cell.row},${sel.cell.column}` : '';
-  if (sel.kind === 'cells')
-    return `${sel.nodeId}:${sel.anchor.row},${sel.anchor.column}:${sel.focus.row},${sel.focus.column}`;
+  if (sel.kind === 'cells') {
+    // The same cells from either corner are the same cells.
+    const [r0, r1] = [sel.anchor.row, sel.focus.row].sort((a, b) => a - b);
+    const [c0, c1] = [sel.anchor.column, sel.focus.column].sort((a, b) => a - b);
+    return `${sel.nodeId}:${r0},${c0}:${r1},${c1}`;
+  }
   return sel.kind === 'shapes' ? sel.nodeIds.join(',') : '';
 }
 

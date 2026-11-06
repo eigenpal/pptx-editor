@@ -469,12 +469,13 @@ export class SlideSurface {
   }
 
   /**
-   * The editable element under a slide point in a scope (`surface-hit.ts`). The selected
-   * table's grid edge comes first, so a near miss never takes a shape behind the table.
+   * The editable element under a slide point in a scope (`surface-hit.ts`). Just outside the
+   * selected table, its grid edge comes first, so a near miss never takes a shape behind it.
    */
   #hit(p: { x: number; y: number }, scope?: string): string | undefined {
     const layout = this.editor.layout();
-    return this.#table.edgeAt(layout, p) ?? hitItem(layout, p, this.editor.zoom(), scope);
+    const zoom = this.editor.zoom();
+    return this.#table.edgeAt(layout, p, true) ?? hitItem(layout, p, zoom, scope);
   }
 
   /** Start dragging the selected items (or a handle of their box). */

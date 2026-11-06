@@ -472,6 +472,20 @@ describe('merge, split, and formatting (editor-ui-parity 4.3)', () => {
     expect(xml(e)).toBe(moved);
     expect(runToolbarCommand(e, 'table.borderTarget', 'outside').ok).toBe(true);
     expect(runToolbarCommand(e, 'table.borderColor', '#00FF00').ok).toBe(true);
+    // The same range, selected from the other corner, is the same cells: a pick redraws.
+    const cells = (r0: number, c0: number, r1: number, c1: number) =>
+      e.setSelection({
+        kind: 'cells',
+        nodeId: frameId(e),
+        anchor: { row: r0, column: c0 },
+        focus: { row: r1, column: c1 },
+      });
+    cells(0, 0, 1, 1);
+    expect(runToolbarCommand(e, 'table.borderTarget', 'outside').ok).toBe(true);
+    cells(1, 1, 0, 0);
+    const drawn = xml(e);
+    expect(runToolbarCommand(e, 'table.borderColor', '#0000FF').ok).toBe(true);
+    expect(xml(e)).not.toBe(drawn);
     caretIn(e, 1, 1);
     // After No Border, a pen pick arms again and draws nothing.
     expect(runToolbarCommand(e, 'table.borderTarget', 'none').ok).toBe(true);
