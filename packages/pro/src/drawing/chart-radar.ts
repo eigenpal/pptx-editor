@@ -39,6 +39,10 @@ const MAX_SPOKES = 1_024;
  */
 const LABEL_GAP = 8.5;
 const LABEL_ROOM = LABEL_GAP - 2.6;
+/** Labels beside a spoke end sit 0.85 pt nearer to it than labels above or below it. */
+const SIDE_GAP = LABEL_GAP - 0.85;
+/** Value labels end this many sizes before the first spoke. */
+const VALUE_GAP = 1;
 const DEFAULT_GRID: ChartStroke = {
   hex: '000000',
   alpha: 1,
@@ -207,7 +211,7 @@ export function paintRadar(plots: readonly ChartPlot[], box: Box, context: Radar
       context.labels.push({
         paragraphs: [[{ text, style: valueStyle }]],
         align: 'r',
-        x: point.x - 0.91 * valueStyle.sizePt - frame,
+        x: point.x - VALUE_GAP * valueStyle.sizePt - frame,
         y: point.y - height / 2,
         width: frame,
         height,
@@ -224,7 +228,7 @@ export function paintRadar(plots: readonly ChartPlot[], box: Box, context: Radar
       const cos = Math.cos(angle);
       const end = at(index, scale.max);
       const width = measureTextWidth(text, categoryStyle);
-      const centerX = end.x + LABEL_GAP * sin + (width / 2) * sin;
+      const centerX = end.x + SIDE_GAP * sin + (width / 2) * sin;
       // Like the labels beside an axis, they sit a little above their centre line.
       const centerY =
         end.y - LABEL_GAP * cos - (categoryLine / 2) * cos - LABEL_LIFT * categoryStyle.sizePt;

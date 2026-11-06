@@ -32,6 +32,11 @@ export interface LegendEntry {
   readonly line: boolean;
   /** Bubble plots fill a circle in the square's place. */
   readonly round?: boolean;
+  /**
+   * The entry names a category of a series coloured point by point. In a row, the reference
+   * leaves 0.825 sizes after such an entry, against 0.86 after a series (the `charts` PDF).
+   */
+  readonly point?: boolean;
 }
 
 /** Legend entries in the order the legend lists them, deleted entries removed. */
@@ -54,7 +59,12 @@ export function legendEntries(
       for (let index = 0; index < count && index < MAX_ENTRIES; index += 1) {
         const text = categoryLabel(series, index, model.date1904) ?? String(index + 1);
         const point = varied || series.points.has(index) ? { index, count } : undefined;
-        plotEntries.push({ text, look: seriesLook(plot, series, context, point), line });
+        plotEntries.push({
+          text,
+          look: seriesLook(plot, series, context, point),
+          line,
+          point: true,
+        });
       }
     } else {
       for (const series of plot.series) {
@@ -97,10 +107,11 @@ function keyMetrics(
 ): { readonly key: number; readonly text: number; readonly after: number } {
   // A line entry whose line is hidden keys only its marker, as narrow as a square key.
   // Measured on the `charts` reference PDF: a line key is 1.6 sizes long, a square key 0.55
-  // sizes wide, and a row leaves 0.92 or 0.86 sizes after each entry's text.
+  // sizes wide, and a row leaves 0.92 or 0.86 sizes after each entry's text (0.825 after a
+  // point entry).
   return entry.line && entry.look.line
     ? { key: 1.6 * size, text: 1.77 * size, after: 0.92 * size }
-    : { key: 0.55 * size, text: 0.79 * size, after: 0.86 * size };
+    : { key: 0.55 * size, text: 0.79 * size, after: (entry.point ? 0.825 : 0.86) * size };
 }
 
 /** Rows of a vertical legend are 1.4 lines apart (the `charts` reference PDF). */
@@ -161,7 +172,7 @@ export function placeLegend(
         (sum, item, index) => sum + item.width + (index > 0 ? row[index - 1]!.after : 0),
         0
       );
-      let x = manual ? manual.x * width : width / 2 + 1.8 - total / 2;
+      let x = manual ? manual.x * width : width / 2 + 2.15 - total / 2;
       for (const item of row) {
         items.push({ entry: item.entry, x, baseline: top + rowIndex * pitch + baselineOffset });
         x += item.width + item.after;
