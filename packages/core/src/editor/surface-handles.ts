@@ -1,7 +1,9 @@
 // The selection handles the surface paints in its overlay: the two end points of a single line,
 // else the eight box handles and the rotation handle of one shape, or the box handles of the
 // common bounds of several. A table frame has no rotation handle: tables do not rotate, as in
-// slide editors. Moved out of `surface.ts` (the 1000-line cap).
+// slide editors. Its right and bottom edges are grid lines that resize the last column or row,
+// so it has no east or south side handle there: one edge does one thing. Moved out of
+// `surface.ts` (the 1000-line cap).
 
 import { apply, type LayoutItem, type Matrix } from '../layout/index.ts';
 import { SVG_NS } from '../output/index.ts';
@@ -75,6 +77,7 @@ export function handleElements(
   }
   for (const handle of HANDLES) {
     if (handle === 'rot' && (!single || isTable(single))) continue;
+    if ((handle === 'e' || handle === 's') && single && isTable(single)) continue;
     const [hx, hy] = HANDLE_POS[handle];
     const p = apply(m, hx * cx, hy * cy);
     const hp = handle === 'rot' && single ? rotationHandle(single, 22 * px) : p;

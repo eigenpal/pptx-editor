@@ -259,6 +259,12 @@ describe('the table chrome', () => {
     const edge = edges(first)[0];
     expect(Number(edge.getAttribute('width'))).toBeCloseTo(t.columnX[1] - t.columnX[0]);
     expect(Number(edge.getAttribute('height'))).toBeCloseTo(t.rowY[3] - t.rowY[0]);
+    // The merged cell that starts in column 0 is tinted inside the column only, within the edge.
+    const tints = [
+      ...cellsOverlay(doc, layout(e), first)[0].querySelectorAll('.pptx-surface__cell-selection'),
+    ];
+    for (const r of tints)
+      expect(Number(r.getAttribute('width'))).toBeCloseTo(t.columnX[1] - t.columnX[0]);
   });
 
   test('a selected column under a merged cell inserts, deletes, and fills its own line', async () => {

@@ -164,10 +164,12 @@ describe('table surface', () => {
       };
     };
     const before = sizes();
-    const handle = host.querySelector('[data-handle="s"]') as SVGCircleElement;
-    const hx = Number(handle.getAttribute('cx'));
-    const hy = Number(handle.getAttribute('cy'));
-    const p = (dy: number) => ({ clientX: hx / PX, clientY: (hy + dy) / PX, bubbles: true });
+    // The right and bottom edges are grid lines, so a table has no east or south side handle.
+    expect(host.querySelector('[data-handle="s"], [data-handle="e"]')).toBeNull();
+    const handle = host.querySelector('[data-handle="n"]') as SVGCircleElement;
+    const hx = Number(handle.getAttribute('x')) + 4 * PX;
+    const hy = Number(handle.getAttribute('y')) + 4 * PX;
+    const p = (dy: number) => ({ clientX: hx / PX, clientY: (hy - dy) / PX, bubbles: true });
     handle.dispatchEvent(new PointerEvent('pointerdown', { ...p(0), button: 0 }));
     for (const dy of [IN, 2 * IN, -IN / 2, -IN, IN / 2])
       document.dispatchEvent(new PointerEvent('pointermove', p(dy)));
@@ -178,13 +180,13 @@ describe('table surface', () => {
     act(() => void editor.exec({ type: 'undo' }));
     expect(sizes()).toEqual(before);
     // A side handle changes the width only: the rows stay.
-    const side = host.querySelector('[data-handle="e"]') as SVGCircleElement;
-    const sx = Number(side.getAttribute('cx'));
-    const sy = Number(side.getAttribute('cy'));
-    const q = (dx: number) => ({ clientX: (sx + dx) / PX, clientY: sy / PX, bubbles: true });
+    const side = host.querySelector('[data-handle="w"]') as SVGCircleElement;
+    const sx = Number(side.getAttribute('x')) + 4 * PX;
+    const sy = Number(side.getAttribute('y')) + 4 * PX;
+    const q = (dx: number) => ({ clientX: (sx - dx) / PX, clientY: sy / PX, bubbles: true });
     side.dispatchEvent(new PointerEvent('pointerdown', { ...q(0), button: 0 }));
-    document.dispatchEvent(new PointerEvent('pointermove', q(IN)));
-    document.dispatchEvent(new PointerEvent('pointerup', q(IN)));
+    document.dispatchEvent(new PointerEvent('pointermove', q(IN / 2)));
+    document.dispatchEvent(new PointerEvent('pointerup', q(IN / 2)));
     expect(sizes().h).toEqual(before.h);
     expect(sizes().w).not.toEqual(before.w);
     editor.destroy();
@@ -207,10 +209,10 @@ describe('table surface', () => {
       );
       for (let i = 0; i < 8; i += 1) act(() => void editor.input('paragraph'));
       act(() => editor.setSelection({ kind: 'shapes', nodeIds: [id] }));
-      const handle = host.querySelector('[data-handle="s"]') as SVGCircleElement;
-      const hx = Number(handle.getAttribute('cx'));
-      const hy = Number(handle.getAttribute('cy'));
-      const p = (dy: number) => ({ clientX: hx / PX, clientY: (hy + dy) / PX, bubbles: true });
+      const handle = host.querySelector('[data-handle="n"]') as SVGCircleElement;
+      const hx = Number(handle.getAttribute('x')) + 4 * PX;
+      const hy = Number(handle.getAttribute('y')) + 4 * PX;
+      const p = (dy: number) => ({ clientX: hx / PX, clientY: (hy - dy) / PX, bubbles: true });
       handle.dispatchEvent(new PointerEvent('pointerdown', { ...p(0), button: 0 }));
       for (const dy of path) document.dispatchEvent(new PointerEvent('pointermove', p(dy)));
       document.dispatchEvent(new PointerEvent('pointerup', p(path[path.length - 1])));
@@ -227,19 +229,19 @@ describe('table surface', () => {
     const id = frames(editor)[0].id;
     const drag = (host: HTMLElement, dx: number) => {
       act(() => editor.setSelection({ kind: 'shapes', nodeIds: [id] }));
-      const side = host.querySelector('[data-handle="e"]') as SVGCircleElement;
-      const sx = Number(side.getAttribute('cx'));
-      const sy = Number(side.getAttribute('cy'));
-      const q = (d: number) => ({ clientX: (sx + d) / PX, clientY: sy / PX, bubbles: true });
+      const side = host.querySelector('[data-handle="w"]') as SVGCircleElement;
+      const sx = Number(side.getAttribute('x')) + 4 * PX;
+      const sy = Number(side.getAttribute('y')) + 4 * PX;
+      const q = (d: number) => ({ clientX: (sx - d) / PX, clientY: sy / PX, bubbles: true });
       side.dispatchEvent(new PointerEvent('pointerdown', { ...q(0), button: 0 }));
       document.dispatchEvent(new PointerEvent('pointermove', q(dx)));
       document.dispatchEvent(new PointerEvent('pointerup', q(dx)));
     };
-    drag(surface(editor), IN);
+    drag(surface(editor), IN / 2);
     const cols = [2 * IN, IN, IN];
     expect(editor.exec({ type: 'setTableGrid', columns: cols }).ok).toBe(true);
     // A new surface numbers its gestures from 1 again.
-    drag(surface(editor), 3 * IN);
+    drag(surface(editor), IN / 2);
     const widths = children(find(frames(editor)[0], 'a:tblGrid'), 'a:gridCol').map((g) =>
       Number(attr(g, 'w'))
     );

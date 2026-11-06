@@ -263,6 +263,14 @@ export function cellRangeRects(
 ): globalThis.Element[] {
   const g = doc.createElementNS(SVG_NS, 'g');
   g.setAttribute('transform', `matrix(${frame.matrix.join(' ')})`);
+  // The range's own grid lines: the edge, and the bounds that clip a band's tint.
+  const { columnX, rowY, rtl } = frame.table;
+  const n = columnX.length - 1;
+  const [x0, x1] = rtl
+    ? [columnX[n - range.c1 - 1], columnX[n - range.c0]]
+    : [columnX[range.c0], columnX[range.c1 + 1]];
+  const [y0, y1] = [rowY[range.r0], rowY[range.r1 + 1]];
+  const box = [x0, x1, y0, y1].every(Number.isFinite) && x1 > x0 && y1 > y0;
   for (const c of frame.table.cells) {
     const cr1 = c.cell.row + c.cell.rowSpan - 1;
     const cc1 = c.cell.col + c.cell.gridSpan - 1;
@@ -274,23 +282,23 @@ export function cellRangeRects(
         c.cell.col > range.c1
       : c.cell.row < range.r0 || cr1 > range.r1 || c.cell.col < range.c0 || cc1 > range.c1;
     if (out) continue;
+    // A merged cell that runs past a band is tinted inside the band only, within its edge.
+    const left = byAnchor && box ? Math.max(c.x, x0) : c.x;
+    const top = byAnchor && box ? Math.max(c.y, y0) : c.y;
+    const right = byAnchor && box ? Math.min(c.x + c.width, x1) : c.x + c.width;
+    const bottom = byAnchor && box ? Math.min(c.y + c.height, y1) : c.y + c.height;
+    if (right <= left || bottom <= top) continue;
     const r = doc.createElementNS(SVG_NS, 'rect');
     r.setAttribute('class', className);
-    r.setAttribute('x', String(c.x));
-    r.setAttribute('y', String(c.y));
-    r.setAttribute('width', String(c.width));
-    r.setAttribute('height', String(c.height));
+    r.setAttribute('x', String(left));
+    r.setAttribute('y', String(top));
+    r.setAttribute('width', String(right - left));
+    r.setAttribute('height', String(bottom - top));
     g.append(r);
   }
   // One edge around the range's own grid lines, so the cells' borders stay visible inside it
   // and a merged cell that crosses a selected band stays outside the edge.
-  const { columnX, rowY, rtl } = frame.table;
-  const n = columnX.length - 1;
-  const [x0, x1] = rtl
-    ? [columnX[n - range.c1 - 1], columnX[n - range.c0]]
-    : [columnX[range.c0], columnX[range.c1 + 1]];
-  const [y0, y1] = [rowY[range.r0], rowY[range.r1 + 1]];
-  if ([x0, x1, y0, y1].every(Number.isFinite) && x1 > x0 && y1 > y0) {
+  if (box) {
     const edge = doc.createElementNS(SVG_NS, 'rect');
     edge.setAttribute('class', `${className}-edge`);
     edge.setAttribute('x', String(x0));
