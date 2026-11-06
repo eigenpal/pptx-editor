@@ -107,7 +107,7 @@ describe('theme script fonts (ECMA-376 Part 1, 20.1.4.1.16 font)', () => {
       'DengXian',
       'Microsoft JhengHei',
       'Malgun Gothic',
-      'Calibri',
+      'Carlito',
     ]);
   });
 

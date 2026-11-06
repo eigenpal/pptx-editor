@@ -22,11 +22,12 @@ export const corpusThresholds = () =>
   ({ ...THRESHOLDS, pageSizeTolerancePt: PAGE_SIZE_TOLERANCE_PT }) as const;
 
 /**
- * The version of the `run.json` and `results.jsonl` format. 2 (31 October 2026): baselines are
- * glyph origins from the PDF (`run.json` `baselines`), each slide has `estimatedBaselines` and
- * `skippedLines`, and `linesTotal` leaves out skipped lines.
+ * The version of the `run.json` and `results.jsonl` format. 3 (6 November 2026): the editor
+ * prints the deck to PDF, and pdf.js draws and reads both PDFs (`run.json` `method`). Line
+ * scores count the reference lines, so `linesTotal` is the count of reference lines. The size,
+ * JPEG, estimated-baseline, and skipped-line fields are gone.
  */
-export const CORPUS_SCHEMA = 2;
+export const CORPUS_SCHEMA = 3;
 
 /** One deck to score. */
 export interface CorpusJob {
@@ -141,24 +142,16 @@ export function resultLine(job: CorpusJob, r: DeckResult): string {
       page: s.page ?? null,
       hidden: s.hidden ?? false,
       status: s.status,
-      sizeMismatch: s.sizeMismatch ?? null,
-      renderSizePx: s.renderSizePx ?? null,
-      referenceSizePx: s.referenceSizePx ?? null,
-      expectedRenderSizePx: s.expectedRenderSizePx ?? null,
-      expectedReferenceSizePx: s.expectedReferenceSizePx ?? null,
       pixelMismatch: s.pixelMismatch ?? null,
       diffBoxPt: s.diffBoxPt ?? null,
-      referenceJpeg: s.referenceJpeg ?? null,
       // Family names only, as `diagnostics` give them; never line texts.
       fontsSubstituted: s.fontsSubstituted ?? null,
       lineMatch: s.lineMatch ?? null,
       linesMatched: s.linesMatched ?? null,
       linesTotal: s.linesTotal ?? null,
-      pdfLinesUnmatched: s.pdfLinesUnmatched ?? null,
+      // A count only; never line texts.
+      extraLines: s.extraLines?.length ?? null,
       baselineDeltaPt: s.baselineDelta ?? null,
-      // Schema 2: matched lines whose PDF line had no glyph origin, and lines off the slide.
-      estimatedBaselines: s.estimatedBaselines ?? null,
-      skippedLines: s.skippedLines ?? null,
       selfConsistent: s.selfConsistent ?? null,
       cause: redactPaths(s.cause),
       approximations: approximationTitles(s.diagnostics),
@@ -217,7 +210,9 @@ export interface CorpusRunIdentity {
   readonly shard: { readonly index: number; readonly count: number };
   readonly sources: string;
   readonly thresholds: unknown;
-  readonly popplerVersion: string | null;
+  readonly pdfjs: string;
+  /** Playwright's pinned Chromium revision (`pinnedChromium`). */
+  readonly chromium?: string;
   /** Whether the reference fonts are installed, and `localFontsIdentity` of the font files. */
   readonly referenceFonts: boolean;
   readonly fonts: string;
@@ -226,7 +221,7 @@ export interface CorpusRunIdentity {
 /**
  * Decide how a corpus run starts in `out`: the ids already done, or why it may not start. A run
  * without `resume` refuses an existing `results.jsonl` unless `fresh` says to replace it. A
- * resume refuses an earlier run with another list, shard, source set, thresholds, or Poppler.
+ * resume refuses an earlier run with another list, shard, source set, thresholds, pdf.js, or Chromium revision.
  */
 export function startCorpusRun(
   out: string,

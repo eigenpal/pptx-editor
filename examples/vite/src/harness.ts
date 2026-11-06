@@ -1,6 +1,6 @@
-// The fidelity harness page. Playwright loads it, hands it deck bytes, and screenshots each
-// slide. It renders through the SAME session, layout, and paint the editor uses: there is no
-// second renderer for tests.
+// The fidelity harness page. Playwright loads it, hands it deck bytes, and prints the slides to
+// PDF. It paints through the SAME session, layout, and paint the editor uses: there is no second
+// renderer for tests.
 
 import { openPresentation, type DocumentSession } from '@pptx-editor.dev/core/editor';
 import { paintSlide, registerFontFaces, type FontFaceHandle } from '@pptx-editor.dev/core/output';
@@ -16,6 +16,8 @@ installDrawing();
 interface DeckSource {
   deck: string;
   fonts: { family: string; bold: boolean; italic: boolean; url: string }[];
+  /** The fallback faces, in order (`FALLBACK_FONTS` in scripts/fidelity/local-fonts.ts). */
+  fallback?: string[];
 }
 
 /** The size and SHA-256 of a file that the page got. */
@@ -24,20 +26,16 @@ interface ReceivedFile {
   sha256: string;
 }
 
-/** One laid-out text line, in points from the slide's top-left. */
-interface HarnessLine {
-  node: string;
-  text: string;
-  baselinePt: number;
-  leftPt: number;
-  /** The line is turned 180° (a net vertical flip), so its baseline is near the top of its box. */
-  upsideDown: boolean;
-  /** The line's bullet or number, which the PDF text holds before the line's text. */
-  bullet?: string;
-  /** The bullet is a number (`a:buAutoNum`), so its text must match the PDF exactly. */
-  numbered?: boolean;
-  /** The line starts outside the slide, where `pdftotext` keeps no text. */
-  offSlide?: boolean;
+/** The pages of a PDF to draw (`rasterPdf`), each with the paths that take its pixels and PNG. */
+interface RasterRequest {
+  pdf: string;
+  width: number;
+  height: number;
+  scale: number;
+  /** pdf.js options from the harness server: the image limit and the CMap folder. */
+  maxImageSize: number;
+  cMapUrl: string;
+  pages: { rgba: string; png: string }[];
 }
 
 interface HarnessApi {
@@ -47,16 +45,31 @@ interface HarnessApi {
     error?: string;
     received: { deck: ReceivedFile; fonts: (ReceivedFile & { family: string })[] };
   }>;
-  render(
-    index: number,
-    widthPx: number
-  ): Promise<{ lines: HarnessLine[]; diagnostics: readonly string[]; fonts: string[] }>;
+  /** Paint one slide, and return its diagnostics, requested fonts, and markup (`markupOf`). */
+  render(index: number): Promise<{
+    diagnostics: readonly string[];
+    fonts: string[];
+    markup: string;
+  }>;
+  /** Paint the slides at `indexes` as print pages, one page each, at the slide size. */
+  print(indexes: number[]): Promise<void>;
+  /** Remove the print pages. */
+  endPrint(): void;
+  /** Draw each PDF page with pdf.js and send its pixels (RGBA, gzip) and PNG to the server. */
+  rasterPdf(request: RasterRequest): Promise<void>;
   reopenSaved(): Promise<{ slides: number; error?: string }>;
 }
 
 let session: DocumentSession | null = null;
 let faces: FontFaceHandle | null = null;
 let fonts: FontSource[] = [];
+/** The registered fallback faces, and the family list that replaces `sans-serif` (`paintAt`). */
+let fallbackFaces: FontFace[] = [];
+let fallbackFamilies = '';
+/** The SHA-256 of each registered face's bytes, by its face id (`markupOf`). */
+let faceDigests = new Map<string, string>();
+/** The type and SHA-256 of each image blob, by its URL (`markupOf`). */
+const blobDigests = new Map<string, Promise<string>>();
 
 /** Fetch a file that the harness server gives to this page. */
 async function fetchBytes(url: string, what: string): Promise<Uint8Array<ArrayBuffer>> {
@@ -70,49 +83,90 @@ async function fetchBytes(url: string, what: string): Promise<Uint8Array<ArrayBu
   throw new Error(`${what} did not arrive from the harness server (HTTP ${r.status})`);
 }
 
-async function received(bytes: Uint8Array<ArrayBuffer>): Promise<ReceivedFile> {
+async function sha256Of(bytes: BufferSource): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
-  const sha256 = [...digest].map((b) => b.toString(16).padStart(2, '0')).join('');
-  return { bytes: bytes.length, sha256 };
+  return [...digest].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function received(bytes: Uint8Array<ArrayBuffer>): Promise<ReceivedFile> {
+  return { bytes: bytes.length, sha256: await sha256Of(bytes) };
+}
+
+/**
+ * The painted SVG with every session-bound name replaced by the digest of the bytes behind it:
+ * each image blob URL (with its type), and each face id (`pptx-f<measurer>-<face>`, new for each session). Two
+ * paints with the same markup draw the same bytes with the same instructions, so the save check
+ * compares the markup alone.
+ */
+async function markupOf(svg: SVGSVGElement): Promise<string> {
+  const urls = new Set<string>();
+  for (const img of svg.querySelectorAll('image')) {
+    const href = img.getAttribute('href');
+    if (href?.startsWith('blob:')) urls.add(href);
+  }
+  const digests = new Map<string, string>();
+  for (const url of urls) {
+    let digest = blobDigests.get(url);
+    if (!digest) {
+      // The type with the bytes: the page decodes a blob by its type (an SVG image needs it).
+      digest = fetch(url).then(
+        async (r) => `${r.headers.get('content-type')}:${await sha256Of(await r.arrayBuffer())}`
+      );
+      blobDigests.set(url, digest);
+    }
+    digests.set(url, await digest);
+  }
+  let markup = new XMLSerializer()
+    .serializeToString(svg)
+    .replace(/pptx-f\d+-\d+/g, (id) => `face:${faceDigests.get(id) ?? id}`);
+  for (const [url, digest] of digests) markup = markup.split(url).join(`image:${digest}`);
+  return markup;
 }
 const EMU_PER_PT = 12_700;
 
+type Layout = NonNullable<ReturnType<DocumentSession['layout']>>;
+
 /**
- * Collect line texts and absolute baselines (unrotated text only). A line that starts outside the
- * slide is marked: `pdftotext` keeps no text outside the page.
+ * Paint a slide layout as an SVG at the slide size in points. Where the paint names the generic
+ * `sans-serif` family (a frame label, and the glyphs that a run's face lacks), the harness names
+ * its open fallback faces instead, so no system font takes part. A glyph that they also lack
+ * still takes a system font, and the fidelity check reports that font.
  */
-function collectLines(
-  items: readonly LayoutItem[],
-  slide: { readonly width: number; readonly height: number },
-  out: HarnessLine[]
-): void {
-  for (const it of items) {
-    if (it.kind === 'group') collectLines(it.children, slide, out);
-    if (it.kind !== 'shape' || !it.text || !it.textMatrix) continue;
-    const m = it.textMatrix;
-    if (Math.abs(m[1]) > 1e-6 || Math.abs(m[2]) > 1e-6 || it.text.rotation % 360 !== 0) continue;
-    for (const line of it.text.lines) {
-      const runs = line.runs.filter((r) => r.kind === 'text');
-      const text = runs.map((r) => r.text).join('');
-      if (!text.trim()) continue;
-      const bullet = line.runs.find((r) => r.kind === 'bullet');
-      const x = it.text.box.x + (bullet ?? runs[0])?.x[0];
-      const y = it.text.box.y + line.baseline;
-      const baseline = m[1] * x + m[3] * y + m[5];
-      const left = m[0] * x + m[2] * y + m[4];
-      const offSlide = baseline < 0 || baseline > slide.height || left < 0 || left > slide.width;
-      const numbered = it.element.text?.paragraphs[line.paragraph]?.bullet?.type === 'autonum';
-      out.push({
-        node: it.element.nodeId,
-        text,
-        baselinePt: baseline / EMU_PER_PT,
-        leftPt: left / EMU_PER_PT,
-        upsideDown: m[3] < 0,
-        ...(bullet?.text.trim() ? { bullet: bullet.text.trim(), numbered } : {}),
-        ...(offSlide ? { offSlide } : {}),
-      });
+function paintAt(layout: Layout, idPrefix: string): SVGSVGElement {
+  const svg = paintSlide(document, layout, {
+    images: session!.imageUrl,
+    imageSize: session!.imageSize,
+    idPrefix,
+  });
+  if (fallbackFamilies)
+    for (const el of svg.querySelectorAll('[font-family]')) {
+      const family = el.getAttribute('font-family') ?? '';
+      el.setAttribute(
+        'font-family',
+        family.replace(/(^|,\s*)sans-serif$/, `$1${fallbackFamilies}`)
+      );
     }
-  }
+  svg.setAttribute('width', `${layout.slide.width / EMU_PER_PT}pt`);
+  svg.setAttribute('height', `${layout.slide.height / EMU_PER_PT}pt`);
+  return svg;
+}
+
+/** Wait for the fonts and for every image of the SVGs. */
+async function loaded(svgs: readonly SVGSVGElement[]): Promise<void> {
+  await document.fonts.ready;
+  await Promise.all(
+    svgs.flatMap((svg) =>
+      [...svg.querySelectorAll('image')].map(
+        (img) =>
+          new Promise<void>((done) => {
+            const probe = new Image();
+            probe.onload = () => done();
+            probe.onerror = () => done();
+            probe.src = img.getAttribute('href') ?? '';
+          })
+      )
+    )
+  );
 }
 
 /** The families that the slide's text asks for (the requested Latin face of each text run). */
@@ -131,6 +185,11 @@ async function adopt(next: DocumentSession): Promise<void> {
   faces?.dispose();
   session = next;
   faces = registerFontFaces(document, session.faces);
+  faceDigests = new Map(
+    await Promise.all(
+      session.faces.map(async (f) => [f.id, await sha256Of(f.bytes.slice())] as const)
+    )
+  );
   await faces.ready;
 }
 
@@ -143,6 +202,20 @@ const api: HarnessApi = {
     session = null;
     faces = null;
     fonts = [];
+    faceDigests = new Map();
+    blobDigests.clear();
+    for (const face of fallbackFaces) document.fonts.delete(face);
+    fallbackFaces = [];
+    fallbackFamilies = '';
+    for (const [i, url] of (source.fallback ?? []).entries()) {
+      const face = new FontFace(
+        `pptx-harness-fallback-${i}`,
+        await fetchBytes(url, 'a fallback font')
+      );
+      document.fonts.add(await face.load());
+      fallbackFaces.push(face);
+    }
+    fallbackFamilies = fallbackFaces.map((f) => f.family).join(', ');
     const deck = await fetchBytes(source.deck, 'the deck');
     const got = { deck: await received(deck), fonts: [] as (ReceivedFile & { family: string })[] };
     for (const f of source.fonts) {
@@ -155,40 +228,103 @@ const api: HarnessApi = {
     await adopt(r.session);
     return { slides: r.session.info.slides.length, received: got };
   },
-  async render(index, widthPx) {
+  async render(index) {
     if (!session) throw new Error('no document');
     const layout = session.layout(index);
     if (!layout) throw new Error(`no slide ${index}`);
-    const svg = paintSlide(document, layout, {
-      images: session.imageUrl,
-      imageSize: session.imageSize,
-      idPrefix: `s${index}`,
-    });
-    svg.setAttribute('width', String(widthPx));
-    // `renderSizePx` in scripts/fidelity/references.ts computes this size the same way, and
-    // `rasterOptions` crops the PDF raster to it.
-    svg.setAttribute(
-      'height',
-      String(Math.round((widthPx * layout.slide.height) / layout.slide.width))
-    );
+    const svg = paintAt(layout, `s${index}`);
     document.getElementById('slide')!.replaceChildren(svg);
-    await document.fonts.ready;
-    await Promise.all(
-      [...svg.querySelectorAll('image')].map(
-        (img) =>
-          new Promise<void>((done) => {
-            const probe = new Image();
-            probe.onload = () => done();
-            probe.onerror = () => done();
-            probe.src = img.getAttribute('href') ?? '';
-          })
-      )
-    );
-    const lines: HarnessLine[] = [];
-    collectLines(layout.items, layout.slide, lines);
+    await loaded([svg]);
     const fonts = new Set<string>();
     collectFonts(layout.items, fonts);
-    return { lines, diagnostics: layout.diagnostics, fonts: [...fonts].sort() };
+    return {
+      diagnostics: layout.diagnostics,
+      fonts: [...fonts].sort(),
+      markup: await markupOf(svg),
+    };
+  },
+  async print(indexes) {
+    if (!session) throw new Error('no document');
+    api.endPrint();
+    const pages = document.createElement('div');
+    pages.id = 'print';
+    const svgs: SVGSVGElement[] = [];
+    let size = { width: 0, height: 0 };
+    for (const index of indexes) {
+      const layout = session.layout(index);
+      if (!layout) throw new Error(`no slide ${index}`);
+      size = { width: layout.slide.width / EMU_PER_PT, height: layout.slide.height / EMU_PER_PT };
+      const svg = paintAt(layout, `p${index}`);
+      const page = document.createElement('div');
+      page.style.cssText = `width:${size.width}pt;height:${size.height}pt;overflow:hidden;break-after:page`;
+      page.append(svg);
+      pages.append(page);
+      svgs.push(svg);
+    }
+    const style = document.createElement('style');
+    style.id = 'print-style';
+    // Every slide of a deck has one size, so one page size serves all pages.
+    style.textContent = `@page { size: ${size.width}pt ${size.height}pt; margin: 0 } @media print { #slide { display: none } }`;
+    document.head.append(style);
+    document.body.append(pages);
+    await loaded(svgs);
+  },
+  endPrint() {
+    document.getElementById('print')?.remove();
+    document.getElementById('print-style')?.remove();
+  },
+  async rasterPdf(r) {
+    // Loaded on first use, so the editor demo never loads pdf.js.
+    const pdfjs = await import('pdfjs-dist');
+    pdfjs.GlobalWorkerOptions.workerSrc = (
+      await import('pdfjs-dist/build/pdf.worker.mjs?url')
+    ).default;
+    const doc = await pdfjs.getDocument({
+      data: await fetchBytes(r.pdf, 'the PDF'),
+      // Glyphs as paths: no system font rasterizer takes part. A PDF with a font that is not
+      // embedded never comes here (`score-deck.ts`), so no standard font data is needed.
+      disableFontFace: true,
+      isEvalSupported: false,
+      maxImageSize: r.maxImageSize,
+      cMapUrl: r.cMapUrl,
+      cMapPacked: true,
+      verbosity: 0,
+    }).promise;
+    const send = async (url: string, body: BodyInit): Promise<void> => {
+      const res = await fetch(url, { method: 'PUT', body });
+      if (!res.ok) throw new Error(`the harness server refused the upload (HTTP ${res.status})`);
+    };
+    const canvas = document.createElement('canvas');
+    canvas.width = r.width;
+    canvas.height = r.height;
+    const context = canvas.getContext('2d', { willReadFrequently: true })!;
+    try {
+      for (const [i, target] of r.pages.entries()) {
+        const page = await doc.getPage(i + 1);
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, r.width, r.height);
+        await page.render({
+          canvas,
+          canvasContext: context,
+          viewport: page.getViewport({ scale: r.scale }),
+          background: '#ffffff',
+        }).promise;
+        const png = await new Promise<Blob>((done, fail) =>
+          canvas.toBlob((b) => (b ? done(b) : fail(new Error('no PNG'))), 'image/png')
+        );
+        // The pixels gzip to a small share of their 8 MB, and Node unpacks them faster than it
+        // decodes the PNG.
+        const pixels = new Blob([context.getImageData(0, 0, r.width, r.height).data])
+          .stream()
+          .pipeThrough(new CompressionStream('gzip'));
+        const rgba = await new Response(pixels).blob();
+        await Promise.all([send(target.png, png), send(target.rgba, rgba)]);
+        page.cleanup();
+      }
+    } finally {
+      await doc.destroy();
+    }
   },
   async reopenSaved() {
     if (!session) throw new Error('no document');

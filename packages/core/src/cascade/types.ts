@@ -191,6 +191,11 @@ export interface ResolvedShape extends ResolvedBase {
   readonly text?: ResolvedTextBody;
   /** A text box (`p:cNvSpPr/@txBox`, ECMA-376 Part 1, 19.3.1.13): a press in it edits its text. */
   readonly textBox?: true;
+  /**
+   * The text rectangle of a diagram shape (`dsp:txXfrm`), in the same space as `xfrm`. Its
+   * turn adds to the shape's turn. Text lays out in it, not in the geometry's text rectangle.
+   */
+  readonly textXfrm?: Xfrm;
 }
 
 /** `p:pic`. */
@@ -256,7 +261,10 @@ export interface ResolvedTable {
   readonly styleId?: string;
 }
 
-/** `p:graphicFrame`: tables, charts, diagrams, OLE. Tables and OLE posters render; the rest show a fallback. */
+/**
+ * `p:graphicFrame`: tables, charts, diagrams, OLE. Tables, OLE posters, and diagrams with a
+ * saved drawing render; the rest show a fallback.
+ */
 export interface ResolvedGraphicFrame extends ResolvedBase {
   readonly kind: 'graphicFrame';
   readonly uri: string;
@@ -271,9 +279,23 @@ export interface ResolvedGraphicFrame extends ResolvedBase {
    * picture is not an internal PNG, JPEG, GIF, or BMP part (the frame then shows a placeholder).
    */
   readonly poster?: ResolvedPicture;
-  /** Diagram cached drawing: its shapes, rendered with the normal renderer. */
+  /**
+   * The saved drawing of a diagram (`dsp:drawing`; ECMA-376 Part 1, 21.4): its shapes and
+   * groups, in the frame's local space, drawn by the normal shape renderer. Read-only. Absent
+   * when the diagram has no saved drawing, or when the drawing does not resolve within the
+   * limits; the frame then shows a placeholder.
+   */
   readonly drawing?: readonly ResolvedElement[];
+  /**
+   * Why a diagram frame shows its placeholder: `no-drawing` (no saved drawing, or a part that
+   * does not resolve), `unsupported` (an element outside the supported subset), or `limit` (past
+   * the shape, depth, or slide limit). Absent when `drawing` is present and for other frames.
+   */
+  readonly drawingFallback?: DiagramFallback;
 }
+
+/** Why a diagram frame shows its placeholder (`ResolvedGraphicFrame.drawingFallback`). @public */
+export type DiagramFallback = 'no-drawing' | 'unsupported' | 'limit';
 
 export type ResolvedElement =
   ResolvedShape | ResolvedPicture | ResolvedGroup | ResolvedGraphicFrame;

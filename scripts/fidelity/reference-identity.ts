@@ -8,11 +8,9 @@
 // Content hashes, not file times, decide staleness: git does not keep file times.
 
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { EMU_PER_POINT, presentationInfo, readPptx } from '../../packages/core/src/store/index.ts';
-import { POPPLER } from './references.ts';
 import { PAGE_SIZE_TOLERANCE_PT } from './thresholds.ts';
 
 export const MANIFEST = 'references.json';
@@ -23,7 +21,7 @@ export interface ReferenceIdentity {
   /** SHA-256 of the PDF bytes. */
   readonly pdf: string;
   readonly pages: number;
-  /** Page 1 size in points, as `pdfinfo` reports it. */
+  /** Page 1 size in points. */
   readonly pageSizePt: readonly [number, number];
 }
 
@@ -126,46 +124,27 @@ export function slidePages(facts: DeckFacts): (number | undefined)[] {
 export interface PdfFacts {
   /** Size of each page in points. */
   readonly pages: readonly (readonly [number, number])[];
-  /** The PDF's `Creator` and `Producer`, as `pdfinfo` reports them (empty when absent). */
+  /** The PDF's `Creator` and `Producer` (empty when absent). */
   readonly producer?: string;
 }
 
-/** Tools whose PDFs are never references (AGENTS.md, "Fidelity rules"). */
-const NOT_REFERENCE = /keynote|libreoffice|openoffice|google|pages/i;
-
-/** Parse `pdfinfo -f 1 -l <n>` output: `Page    1 size: 960 x 540 pts`. */
-export function parsePdfInfo(text: string): PdfFacts {
-  const count = Number(/^Pages:\s+(\d+)/m.exec(text)?.[1] ?? NaN);
-  const sizes = [...text.matchAll(/^Page\s+\d+\s+size:\s+([\d.]+) x ([\d.]+) pts/gm)].map(
-    (m) => [Number(m[1]), Number(m[2])] as const
-  );
-  if (!Number.isFinite(count) || sizes.length !== count)
-    throw new Error('pdfinfo reported no page sizes');
-  const field = (name: string): string =>
-    new RegExp(`^${name}:\\s+(.*)$`, 'm').exec(text)?.[1].trim() ?? '';
-  return {
-    pages: sizes,
-    producer: [field('Creator'), field('Producer')].filter(Boolean).join('; '),
-  };
-}
-
-/** Page count and page sizes of a PDF, with Poppler's `pdfinfo`. */
-export function pdfFacts(pdf: string): PdfFacts {
-  return parsePdfInfo(
-    execFileSync('pdfinfo', ['-f', '1', '-l', '100000', pdf], { ...POPPLER, encoding: 'utf8' })
-  );
-}
+/**
+ * Our own PDF tools: the harness prints with Chromium (`Skia/PDF`), and `pptx-to-pdf` writes
+ * `pptx-editor.dev`. A PDF from either one is never a reference: it would compare our output
+ * with itself.
+ */
+const OUR_TOOLS = /skia\/pdf|pptx-editor\.dev/i;
 
 /**
  * The problems that make a PDF unusable as the reference of a deck: the page count must equal
  * the visible slide count, every page must be the slide size within `PAGE_SIZE_TOLERANCE_PT`,
- * and no tool in `NOT_REFERENCE` may be its creator or producer.
+ * and none of `OUR_TOOLS` may be its creator or producer.
  */
 export function referenceProblems(deck: DeckFacts, pdf: PdfFacts): string[] {
   const visible = deck.slides - deck.hidden.length;
   const out: string[] = [];
-  if (pdf.producer && NOT_REFERENCE.test(pdf.producer))
-    out.push(`the PDF was made by ${pdf.producer}, which never makes a reference PDF`);
+  if (pdf.producer && OUR_TOOLS.test(pdf.producer))
+    out.push(`the PDF was made by ${pdf.producer}, our own output, never a reference PDF`);
   if (pdf.pages.length !== visible)
     out.push(`the PDF has ${pdf.pages.length} pages, the deck has ${visible} visible slides`);
   const wrong = pdf.pages.findIndex(

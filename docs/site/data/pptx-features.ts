@@ -643,7 +643,9 @@ export const pptxFeatures: PptxFeature[] = [
     name: 'Diagrams',
     category: 'objects',
     editing: 'none',
-    rendering: 'none',
+    rendering: 'partial',
+    notes:
+      'A diagram draws from its saved drawing. A diagram with no saved drawing shows a placeholder. Diagrams are read-only.',
     roundTrip: 'preserved',
     tier: 'community',
   },

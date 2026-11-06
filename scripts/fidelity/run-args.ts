@@ -4,26 +4,31 @@
 import { parseArgs } from 'node:util';
 
 export const RUN_USAGE = `Usage:
-  bun run fidelity [-- --deck <name>] [--print-gaps]
-      The fixture gate: every fixture in fixtures/ against its reference PDF and the known gaps.
-      --deck <name>   one fixture only, for example tables
-      --print-gaps    print the known-gap entries that this run's scores record
-  bun run fidelity:corpus [-- --deck deckN]
+  bun run fidelity [<deck>...] [--update-gaps [--accept-worse]]
+      Print each fixture in fixtures/ with the editor, and compare it with its reference PDF.
+      <deck>          only these fixtures, for example: bun run fidelity tables
+      --update-gaps   write this run's failing slides to FIXTURE_KNOWN_GAPS in thresholds.ts
+      --accept-worse  also write new entries and kinds (a new fixture, a changed deck,
+                      a new reference PDF, or new tools)
+  bun run fidelity:corpus [<deckN>...]
       The private corpus in demo-presentations/ (local only): a report, no known gaps.
   bun scripts/fidelity/run.ts --list <jobs.json|jobs.jsonl> --out <dir> [--shard i/n] [--resume | --fresh] [--images]
-      Corpus mode for eigenpal/pptx-eval (CONTRIBUTING.md, "Fidelity harness"). --resume continues
-      the run in --out; --fresh replaces its results. Without either, existing results stop the run.
+      Corpus mode for eigenpal/pptx-eval. --resume continues the run in --out; --fresh replaces
+      its results. Without either, existing results stop the run.
 
 Exit codes: 0 pass, 1 the gate or a slide fails (corpus mode: the run could not finish), 2 a
-usage error, 3 not gated (no known-gap list for this machine, outside CI).`;
+usage error.`;
 
 export type RunArgs =
   | { readonly mode: 'help' }
   | {
       readonly mode: 'set';
       readonly set: 'fixtures' | 'corpus';
-      readonly deck?: string;
-      readonly printGaps: boolean;
+      /** Only these decks; empty for all. */
+      readonly decks: readonly string[];
+      readonly updateGaps: boolean;
+      /** With `updateGaps`: write new entries and kinds too. */
+      readonly acceptWorse: boolean;
     }
   | {
       readonly mode: 'list';
@@ -37,14 +42,14 @@ export type RunArgs =
 
 /** Parse the harness's arguments. Throws an Error with the usage problem; the caller exits 2. */
 export function parseRunArgs(argv: readonly string[]): RunArgs {
-  const { values: v } = parseArgs({
+  const { values: v, positionals } = parseArgs({
     args: [...argv],
     strict: true,
-    allowPositionals: false,
+    allowPositionals: true,
     options: {
       set: { type: 'string' },
-      deck: { type: 'string' },
-      'print-gaps': { type: 'boolean' },
+      'update-gaps': { type: 'boolean' },
+      'accept-worse': { type: 'boolean' },
       list: { type: 'string' },
       out: { type: 'string' },
       shard: { type: 'string' },
@@ -56,8 +61,10 @@ export function parseRunArgs(argv: readonly string[]): RunArgs {
   });
   if (v.help) return { mode: 'help' };
   if (v.list !== undefined) {
-    const other = (['set', 'deck', 'print-gaps'] as const).find((k) => v[k] !== undefined);
-    if (other) throw new Error(`--${other} does not go with --list`);
+    if (v.set !== undefined) throw new Error('--set does not go with --list');
+    if (v['update-gaps']) throw new Error('--update-gaps does not go with --list');
+    if (v['accept-worse']) throw new Error('--accept-worse does not go with --list');
+    if (positionals.length) throw new Error('deck names do not go with --list');
     if (!v.out) throw new Error('--list needs --out <dir>');
     if (v.resume && v.fresh) throw new Error('--resume and --fresh do not go together');
     return {
@@ -77,7 +84,15 @@ export function parseRunArgs(argv: readonly string[]): RunArgs {
   const set = v.set ?? 'fixtures';
   if (set !== 'fixtures' && set !== 'corpus')
     throw new Error(`--set must be fixtures or corpus, not ${set}`);
-  if (v['print-gaps'] && set !== 'fixtures')
-    throw new Error('--print-gaps goes only with the fixtures');
-  return { mode: 'set', set, deck: v.deck, printGaps: v['print-gaps'] ?? false };
+  if (v['update-gaps'] && set !== 'fixtures')
+    throw new Error('--update-gaps goes only with the fixtures');
+  if (v['accept-worse'] && !v['update-gaps'])
+    throw new Error('--accept-worse goes only with --update-gaps');
+  return {
+    mode: 'set',
+    set,
+    decks: positionals,
+    updateGaps: v['update-gaps'] ?? false,
+    acceptWorse: v['accept-worse'] ?? false,
+  };
 }

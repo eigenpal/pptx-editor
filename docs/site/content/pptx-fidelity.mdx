@@ -163,6 +163,7 @@ Each item below is a place where the renderer does not yet follow the specificat
 - **Coincident cell borders.** Where two cells state different borders for one edge, the later cell in row order draws on top.
 - **Inconsistent cell merges.** ECMA-376 does not define a table whose merge markup disagrees with itself. A cell with `hMerge` or `vMerge` that no `gridSpan` or `rowSpan` reaches draws as a normal cell, with its own text and spans. A span past the grid ends at the grid, and a span into an earlier merged cell ends before that cell. These rules are not measured yet.
 - **Text warp.** `a:prstTxWarp` is not drawn. Warped text lays out at its nominal size.
+- **Diagram drawings.** A diagram draws the shapes of its saved drawing (`dsp:drawing`) at their saved positions, sizes, and line widths. The diagram does not lay out again from its data model, layout, and style parts, so it does not change when its frame size or data changes. A diagram with no saved drawing shows a placeholder. A drawing with more than 512 shapes or 8 group levels also shows a placeholder, and so do the diagrams of a slide past 4096 shapes and groups together.
 
 ## Approximations after editing
 
@@ -199,7 +200,7 @@ An edit lays out the slide again through the same pipeline, and applies the auto
 - **Dashes and compound lines.** Drawn as one solid line.
 - **SVG pictures.** The PNG fallback of the picture is drawn.
 - **Text.** Synthetic bold and italic are not drawn, upright vertical characters draw rotated, and a character that the font does not have is not drawn. Dotted, dashed, wavy, heavy, and word-only underlines draw as one single line, as in the editor.
-- **Not drawn.** Pattern fills, picture fills on text, arrowheads, text outlines, other picture formats, charts, diagrams, OLE objects with no picture, other graphic frames, and table frames with no grid.
+- **Not drawn.** Pattern fills, picture fills on text, arrowheads, text outlines, other picture formats, charts, diagrams with no saved drawing, OLE objects with no picture, other graphic frames, and table frames with no grid.
 
 ## See also
 

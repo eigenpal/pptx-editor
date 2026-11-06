@@ -566,6 +566,18 @@ function paintItem(
         );
         return svg(doc, 'g', { ...common, 'data-kind': 'frame' }, picture ? [picture] : []);
       }
+      // A diagram draws its saved drawing (ECMA-376 Part 1, 21.4); the frame holds the hit id,
+      // so the diagram selects as one read-only object.
+      if (item.drawing) {
+        const inner = { ...opts, hitTargets: false };
+        const scale = matrixScale(item.matrix);
+        const g = svg(doc, 'g', { ...common, 'data-kind': 'frame' });
+        for (const child of item.drawing) {
+          const painted = paintItem(doc, child, ctx, inner, scale);
+          if (painted) g.appendChild(painted);
+        }
+        return g;
+      }
       const { cx: w, cy: h } = el.xfrm;
       const label = opts.frameLabel?.(item.element.frameKind) ?? item.element.frameKind;
       // Points under a scale: browsers clamp font sizes as large as EMU values.

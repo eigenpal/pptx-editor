@@ -206,6 +206,19 @@ async function drawGeometry(
   }
 }
 
+/** Why a frame is not drawn. A diagram names why it shows its placeholder. */
+function frameMessage(
+  kind: string,
+  fallback: 'no-drawing' | 'unsupported' | 'limit' | undefined
+): string {
+  if (kind !== 'diagram' || !fallback) return `${kind} frames are not drawn yet.`;
+  if (fallback === 'limit')
+    return 'A diagram is not drawn: its saved drawing is past the shape, nesting, or slide limit.';
+  if (fallback === 'unsupported')
+    return 'A diagram is not drawn: its saved drawing holds content that is not drawn yet.';
+  return 'A diagram is not drawn: it has no saved drawing.';
+}
+
 async function drawItem(
   item: LayoutItem,
   p: PageOps,
@@ -227,9 +240,14 @@ async function drawItem(
   if (item.kind === 'frame') {
     // An OLE object shows its picture, as in the SVG paint.
     if (item.poster) return drawItem(item.poster, p, local, groupScale);
+    // A diagram draws its saved drawing, as in the SVG paint.
+    if (item.drawing) {
+      for (const child of item.drawing) await drawItem(child, p, scope, matrixScale(item.matrix));
+      return;
+    }
     if (!item.table) {
       const kind = item.element.frameKind;
-      p.diag.add(`frame.${kind}`, 'unsupported', `${kind} frames are not drawn yet.`);
+      p.diag.add(`frame.${kind}`, 'unsupported', frameMessage(kind, item.element.drawingFallback));
       return;
     }
     p.push(pushGraphicsState());

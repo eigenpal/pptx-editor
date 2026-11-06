@@ -112,7 +112,7 @@ Each diagnostic has a fixed `code`. Handle an unknown code by its `severity`. Th
 | `text.synthetic-style`, `text.upright`, `text.missing-glyph` | `approximation` | Synthetic bold and italic, upright vertical characters, and characters the face lacks. | `missing-glyph` |
 | `font.missing`, `font.not-embedded` | `unsupported` | A face has no bytes, or may not be embedded; its text is not drawn. The message names the font. | `font-embedding` |
 | `font.substitute-failed` | `approximation` | A packaged substitute face did not load, so its text measures and draws with another face. The diagnostic is document-wide: it has no slide or page. `fontResolution.substituteFailures` lists each failure as `{ family, file, diagnostic }`. | `font-origin-failed` |
-| `frame.chart`, `frame.diagram`, `frame.ole`, `frame.unknown` | `unsupported` | A chart, diagram, OLE object with no PNG, JPEG, GIF, or BMP picture, or other graphic frame is not drawn. Tables and OLE pictures draw. | `drawing` |
+| `frame.chart`, `frame.diagram`, `frame.ole`, `frame.unknown` | `unsupported` | A chart, diagram with no saved drawing, OLE object with no PNG, JPEG, GIF, or BMP picture, or other graphic frame is not drawn. Tables, OLE pictures, and diagrams with a saved drawing draw. A `frame.diagram` message says why the diagram is not drawn: it has no saved drawing, its drawing holds content that is not drawn yet, or the drawing is past a shape, nesting, or slide limit. | `drawing` |
 | `frame.table` | `unsupported` | A table frame with no grid (no `a:tbl`, or no rows or columns) is not drawn. |  |
 | `geometry.unknown-preset` | `approximation` | An unknown preset geometry is drawn as a rectangle. |  |
 | `slide.not-laid-out` | `unsupported` | The slide could not be laid out and has no page. |  |
@@ -190,7 +190,8 @@ One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`sho
 | Underline styles other than single and double | Drawn as a single line (`approximation`) |
 | Arrowheads, text outlines | Not drawn (`unsupported`) |
 | Upright East Asian vertical text, synthetic bold and italic | Drawn as normal text (`approximation`) |
-| Charts, diagrams, OLE objects with no PNG, JPEG, GIF, or BMP picture | Not drawn (`unsupported`) |
+| Diagrams with a saved drawing | Drawn from the saved drawing, read-only, as in the editor |
+| Charts, diagrams with no saved drawing, OLE objects with no PNG, JPEG, GIF, or BMP picture | Not drawn (`unsupported`) |
 | Video and audio | The poster picture is drawn; the media is not embedded or played |
 | GIF, BMP, TIFF, EMF, WMF pictures | Not drawn (`unsupported`) |
 | SVG pictures | Drawn from their PNG fallback (`information`); without a fallback, not drawn |

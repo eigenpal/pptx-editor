@@ -154,11 +154,16 @@ export function imageMime(partName: string): string | undefined {
 
 type DefaultFamily = (typeof ALL_DEFAULT_FONT_FAMILIES)[number];
 
-/** Which packaged substitute family covers a typeface the deck names. */
+/**
+ * Which packaged substitute family covers a typeface the deck names. A deck can name a packaged
+ * open face itself (Carlito, Caladea, TeX Gyre Adventor): it loads the family that ships it, so
+ * the face draws as itself and not as the Arial fallback.
+ */
 function substituteFamilyFor(typeface: string): DefaultFamily {
   const t = typeface.toLowerCase();
-  if (t.startsWith('calibri') || t.startsWith('aptos')) return 'Calibri';
-  if (t.startsWith('cambria')) return 'Cambria';
+  if (t.startsWith('calibri') || t.startsWith('aptos') || t === 'carlito') return 'Calibri';
+  if (t.startsWith('cambria') || t === 'caladea') return 'Cambria';
+  if (t.startsWith('tex gyre adventor')) return 'Century Gothic';
   if (t.startsWith('times') || t.includes('serif') || t.startsWith('georgia'))
     return 'Times New Roman';
   if (t.startsWith('courier') || t.includes('mono') || t.startsWith('consolas'))

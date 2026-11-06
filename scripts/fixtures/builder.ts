@@ -73,7 +73,7 @@ export interface FixtureOptions {
   readonly footers?: boolean;
   /** Theme colors (hex, no `#`) for every slot. Default: the built-in default palette. */
   readonly colors?: ThemeColors;
-  /** Theme major/minor Latin fonts. Default Calibri Light / Calibri. */
+  /** Theme major/minor Latin fonts. Default Carlito, an open font that ships with the engine. */
   readonly majorFont?: string;
   readonly minorFont?: string;
   /**
@@ -198,7 +198,7 @@ function master(footers = false, extraLayouts: readonly string[] = [], order?: r
     return at < 0 ? Number.MAX_SAFE_INTEGER : at;
   };
   const listed = order ? [...ids].sort((a, b) => rank(a.name) - rank(b.name)) : ids;
-  const bullet = '<a:buFont typeface="Arial" panose="020B0604020202020204"/><a:buChar char="&#8226;"/>';
+  const bullet = '<a:buFont typeface="Liberation Sans"/><a:buChar char="&#8226;"/>';
   return (
     `${XML}<p:sldMaster ${NS_DECL}><p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg>` +
     spTree(
@@ -392,9 +392,9 @@ export function buildPptx(opts: FixtureOptions): Uint8Array {
   );
   put(
     'ppt/theme/theme1.xml',
-    theme(opts.majorFont ?? 'Calibri Light', opts.minorFont ?? 'Calibri', opts.colors, opts.themeName, opts.scriptFonts)
+    theme(opts.majorFont ?? 'Carlito', opts.minorFont ?? 'Carlito', opts.colors, opts.themeName, opts.scriptFonts)
   );
-  put('ppt/theme/theme2.xml', theme('Calibri Light', 'Calibri'));
+  put('ppt/theme/theme2.xml', theme('Carlito', 'Carlito'));
   const extra = opts.layouts ?? [];
   put(
     'ppt/slideMasters/slideMaster1.xml',

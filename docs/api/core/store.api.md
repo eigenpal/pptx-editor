@@ -72,6 +72,9 @@ export const canonicalSlideId: (id: string) => string;
 // @internal
 export function cellAsSaved(tc: Element_2): Element_2;
 
+// @internal
+export function changedPartNames(prev: PptxPackage, next: PptxPackage, limit: number): string[] | null;
+
 // @public
 export function changedParts(a: PptxPackage, b: PptxPackage): string[];
 
@@ -628,6 +631,9 @@ export interface Relationship {
     // (undocumented)
     readonly type: string;
 }
+
+// @internal
+export function relationshipById(pkg: PptxPackage, source: string, id: string): Relationship | undefined;
 
 // @public
 export function relationshipsOf(pkg: PptxPackage, source: string): readonly Relationship[];
