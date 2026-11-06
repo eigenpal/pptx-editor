@@ -1,5 +1,46 @@
 # @pptx-editor.dev/pro
 
+## 0.2.0
+
+### Minor Changes
+
+- a3afcdd: Charts now draw from the values cached in their chart parts when `@pptx-editor.dev/pro/drawing` is installed (`drawingModule({ licenseKey })` or `installDrawing()`). Bar, column, line, area, scatter, pie, doughnut, and radar charts draw with titles, legends, axes, gridlines, data labels, and number formats. Other chart types, and every chart without the module, keep the placeholder. `@pptx-editor.dev/pptx-to-pdf` draws charts in its PDFs, and reports `frame.chart` only for the chart types the module leaves out. The core adds the `chart` renderer key to `installDrawingRenderers`, the resolved `chart` part of a chart frame, the laid-out `chart` items of a frame, and `drawingCapabilities().chart`.
+- c292536: Glow, inner shadow, reflection, and soft edge now paint through the new `@pptx-editor.dev/pro/drawing` entry, as in DOCX Editor. Register `drawingModule({ licenseKey })` in `modules`, or call `installDrawing()` for headless rendering. Without it, a shape or picture paints without these four effects; outer shadows still paint, and the effect commands and save keep every effect. `@pptx-editor.dev/pptx-to-pdf` always installs the module, and its PDFs now draw reflections with their fade (`effect.reflection-blur` reports the blur that is left out). `@pptx-editor.dev/core/output` no longer exports the internal `glowSpread` and `innerShadowShift`.
+
+### Patch Changes
+
+- 98b85e2: Right chart legends, top and bottom legends of one row, and radar labels keep the reference spacing at text sizes from 9 to 20 pt in frames from 5.5 to 10 inches wide, not only at 12 pt in a 10-inch frame.
+- 5a03952: Published packages no longer ship source maps, so a stack trace points into `dist/`. Every JavaScript file of `pro`, `pptx-to-pdf`, and `editor-api` starts with its license header, and these packages are minified. The preset shape geometry in `core` carries the Ecma copyright notice in a legal comment, so bundlers that keep legal comments carry the notice into your app bundle.
+- cd341f2: Each package now accepts only the same minor version of `@pptx-editor.dev/core` as a peer, for example `~0.1.0`. The links in the package READMEs now open from npm.
+- Updated dependencies [4594311]
+- Updated dependencies [0057839]
+- Updated dependencies [db9407d]
+- Updated dependencies [7d4b0be]
+- Updated dependencies [5a11387]
+- Updated dependencies [bfca3d6]
+- Updated dependencies [159eb87]
+- Updated dependencies [0653436]
+- Updated dependencies [5a03952]
+- Updated dependencies [136b3b5]
+- Updated dependencies [6bed74e]
+- Updated dependencies [0593988]
+- Updated dependencies [b906153]
+- Updated dependencies [a3afcdd]
+- Updated dependencies [c292536]
+- Updated dependencies [c292536]
+- Updated dependencies [60ed234]
+- Updated dependencies [60ed234]
+- Updated dependencies [84256e4]
+- Updated dependencies [0653436]
+- Updated dependencies [60c621b]
+- Updated dependencies [6bed74e]
+- Updated dependencies [db11b83]
+- Updated dependencies [14a9bc9]
+- Updated dependencies [1358a9d]
+- Updated dependencies [aa99dad]
+- Updated dependencies [cd341f2]
+  - @pptx-editor.dev/core@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes

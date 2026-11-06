@@ -1,5 +1,66 @@
 # @pptx-editor.dev/vue
 
+## 0.2.0
+
+### Minor Changes
+
+- c292536: Without the drawing module of `@pptx-editor.dev/pro`, the chrome no longer offers glow, inner shadow, reflection, or soft edge. Shape Effects shows only the outer shadows, and Picture Styles shows only the frame styles. The effect commands still write every effect, and save keeps it. New `drawingCapabilities()` in `@pptx-editor.dev/core/layout` says what the installed renderers paint, and `chromeOfferedControl(slot, control)` in `@pptx-editor.dev/core/editor` gives the choices a slot offers in this build. The controls and the `useEditorValueCommand` options of React and Vue refresh after an install; `drawingRenderersVersion()` and `subscribeDrawingRenderers(listener)` in `@pptx-editor.dev/core/layout` give the signal.
+- aa99dad: Lists and text are faster to edit from the keyboard.
+
+  - Enter starts a new list item at the same level, also on an empty item.
+  - Tab and Shift+Tab change the level only at the start of a list item or across paragraphs. Elsewhere, both keys type a tab.
+  - Backspace at the start of a list item removes its bullet or number and keeps its level. The text moves to where the bullet was, and the next Backspace joins the item to the paragraph above. The new `removeBullet` command does this step.
+  - Ctrl/Cmd+L, E, R, and J align paragraphs. Ctrl/Cmd+Shift+> and < step the font size. Ctrl/Cmd+] and [ step the list level. Shift+F3 steps the case.
+  - Alt/Ctrl+Up and Down move to a paragraph start. A word step forward stops at the start of the next word. Cmd+Backspace deletes the word before the caret.
+  - Enter on a selected shape selects all its text.
+  - AutoCorrect works while you type: curly quotes, symbols, fractions, en dashes, sentence capitals, and lists started by typing `1.`, `1)`, `*`, or `-` and a space. Backspace right after a new list keeps the typed text. The new `autoCorrect` option and prop turn AutoCorrect off.
+
+### Patch Changes
+
+- 0057839: The editor chrome is easier to use with assistive technology and high contrast themes. `PptxEditor.Viewport` is a landmark region named "Presentation editor"; its new `label` prop gives another name, and `label={false}` removes the region. If your own `header` or `main` is inside the viewport, set `label={false}`, so your landmarks stay at the top level. Slides in the rail and the slide sorter take their name ("Slide 3", "Slide 3 (hidden)") from hidden text, and the thumbnail art is hidden from screen readers. The items have no `aria-label` now, so a test that finds a slide by its label (`getByLabelText('Slide 3')`, `[aria-label="Slide 3"]`) must find it by role and name (`getByRole('option', { name: 'Slide 3' })`). With a forced-colors theme, selected slides, pressed and checked toggles, focus rings, disabled controls, and card edges stay visible in system colors. Color swatches are 24 by 24 pixels, and 20 by 20 pixels in a dialog that is too narrow for them.
+- bfca3d6: The Find and Replace buttons are off in the slide sorter. They turn on again in the Normal view.
+- 159eb87: Without the drawing module of `@pptx-editor.dev/pro`, Shape Effects can now remove a reflection, glow, or soft edge from the file. The menu offers No reflection, No glow, or No soft edges when the selected shapes or pictures have that effect, and No shadow also removes an inner shadow. The menu follows the selection. `chromeOfferedControl(slot, control, editor)` takes the editor to give these rows to a custom control.
+- 0653436: A keystroke in a deck of 5,000 slides now costs about the same as in a short deck. An edit records only the parts it changes and copies no list of every part. The slide summaries, the font list, and the font notice update from the changed parts only. The slide rail renders only the items whose slide changed, a thumbnail out of view takes no layout or paint, and the canvas reads its fit zoom only when the slide or canvas size changes.
+- 5a03952: Published packages no longer ship source maps, so a stack trace points into `dist/`. Every JavaScript file of `pro`, `pptx-to-pdf`, and `editor-api` starts with its license header, and these packages are minified. The preset shape geometry in `core` carries the Ecma copyright notice in a legal comment, so bundlers that keep legal comments carry the notice into your app bundle.
+- 6bed74e: Let a tall menu scroll on a short screen also after it is placed a second time. Before, its last rows could be out of reach.
+- 60ed234: A long deck with a damaged slide or notes slide is refused at once, wherever the slide is read. After edits, the deck stays open read-only with `snapshot().readOnlyReason`, a status bar message says why, its other slides go on opening, and commands, undo, save, and automation writes and exports are refused. `snapshot().isOpening` is true until the first slide shows, `load` accepts any `startSlide` number, and the slide rail mounts in steps of about 8 ms.
+- 60ed234: A long deck shows its first slide and takes input before the rest is ready: the other slides open in the background, and `snapshot().pendingSlides` counts them. `load(bytes, { startSlide })` opens another slide first. Edits, undo, Find, and save work before the deck is ready. Decks with up to about 10,000 slides now open, and the slide rail re-renders only the slides that change.
+- 84256e4: Long decks open faster: the slide rail and the Slide Sorter paint the thumbnails in view at once, and the others when they scroll into view or when the browser is idle. `renderThumbnail` still paints at once by default; pass `{ defer: true }` to paint as the rail does, and call the function it returns when the element goes. Shape drags stay smooth because the deck changes once, on release, so collaborators see a drag only when it ends. The preview shows the size and text scale that autofit gives on release, and autofit text in a scaled group now fits at the size the group draws it. Escape, a lost window focus, an undo, or a change to a dragged shape or its group cancels the drag; a change to another shape keeps it. An `Editor` implementation must now return a disposer from `renderThumbnail`.
+- 6bed74e: Keep keyboard focus on the current slide when you leave the slide sorter. Before, a layout that swaps the slide rail and the slide sorter left focus on the page body after a switch back to the Normal view.
+- db11b83: The packaged editor keeps the view switch, the zoom, and the font notice above the speaker notes. They no longer cover the notes text. The canvas leaves room under the slide for them, so they also do not cover the slide.
+- 1358a9d: Tables now show editing chrome on the canvas. A handle at the top-left corner selects and moves the table, grid lines drag, and "+" buttons insert rows and columns. Cell ranges copy and paste as tab-separated text, Shift+Arrow extends into a cell range, and the cell menu groups Insert, Delete, and Select in submenus. A table selected as an object has its own context menu kind, `tableFrame`, with the Insert submenu. The Format panel sets row height, column width, and table style options, and the Borders menu draws with a pen color, style, and weight. `insertColumn` now keeps the table width, and the columns narrow in proportion.
+- cd341f2: Each package now accepts only the same minor version of `@pptx-editor.dev/core` as a peer, for example `~0.1.0`. The links in the package READMEs now open from npm.
+- Updated dependencies [4594311]
+- Updated dependencies [0057839]
+- Updated dependencies [ba27037]
+- Updated dependencies [db9407d]
+- Updated dependencies [7d4b0be]
+- Updated dependencies [5a11387]
+- Updated dependencies [bfca3d6]
+- Updated dependencies [159eb87]
+- Updated dependencies [0653436]
+- Updated dependencies [5a03952]
+- Updated dependencies [136b3b5]
+- Updated dependencies [6bed74e]
+- Updated dependencies [0593988]
+- Updated dependencies [b906153]
+- Updated dependencies [a3afcdd]
+- Updated dependencies [c292536]
+- Updated dependencies [c292536]
+- Updated dependencies [60ed234]
+- Updated dependencies [60ed234]
+- Updated dependencies [84256e4]
+- Updated dependencies [0653436]
+- Updated dependencies [60c621b]
+- Updated dependencies [6bed74e]
+- Updated dependencies [db11b83]
+- Updated dependencies [14a9bc9]
+- Updated dependencies [1358a9d]
+- Updated dependencies [aa99dad]
+- Updated dependencies [cd341f2]
+  - @pptx-editor.dev/core@0.2.0
+  - @pptx-editor.dev/i18n@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes
