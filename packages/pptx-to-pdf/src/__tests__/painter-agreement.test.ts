@@ -132,8 +132,12 @@ describe('the PDF writer and the SVG paint agree', () => {
 
   test('on the bars of underline, double underline, and strikethrough', async () => {
     const fill = (rgb: string): string => `<a:solidFill><a:srgbClr val="${rgb}"/></a:solidFill>`;
+    const uFill = (rgb: string): string => `<a:uFill>${fill(rgb)}</a:uFill>`;
     const text = para(
-      run('Under', 'sz="2400" u="sng"', fill('FF0000')) +
+      // An underline in its own fill (a:uFill), drawn over the glyphs.
+      run('Under', 'sz="2400" u="sng"', fill('FF0000') + uFill('FF00FF')) +
+        // A run with no fill draws no bars, even with an underline fill.
+        run('Ghost', 'sz="2400" u="sng"', '<a:noFill/>' + uFill('00FFFF')) +
         run('Double', 'sz="2400" u="dbl"', fill('00FF00')) +
         // The trailing space is not struck, in either paint.
         run(' Struck ', 'sz="2400" strike="sngStrike"', fill('0000FF'))
@@ -157,10 +161,14 @@ describe('the PDF writer and the SVG paint agree', () => {
     const { fnArray, argsArray } = await (await pdf.getPage(1)).getOperatorList();
     const pdfBars: { fill: string; box: number[] }[] = [];
     let color = '';
+    let firstGlyph = -1;
+    let firstBar = -1;
     fnArray.forEach((fn, i) => {
       const args = argsArray[i] as unknown[];
       if (fn === OPS.setFillRGBColor) color = String(args[0]);
+      if (fn === OPS.showText && firstGlyph < 0) firstGlyph = i;
       if (fn !== OPS.constructPath || color === '#ffffff') return;
+      if (firstBar < 0) firstBar = i;
       // pdf.js path data: 0 moveTo x y, 1 lineTo x y, 4 closePath. One box per subpath.
       const data = Array.from((args[1] as ArrayLike<number>[])[0]!);
       let xs: number[] = [];
@@ -180,7 +188,8 @@ describe('the PDF writer and the SVG paint agree', () => {
       }
     });
     expect(pdfBars.map((b) => b.fill)).toEqual(svgBars.map((b) => b.fill));
-    expect(pdfBars.map((b) => b.fill)).toEqual(['#ff0000', '#00ff00', '#00ff00', '#0000ff']);
+    expect(pdfBars.map((b) => b.fill)).toEqual(['#ff00ff', '#00ff00', '#00ff00', '#0000ff']);
+    expect(firstBar).toBeGreaterThan(firstGlyph);
     for (const [i, bar] of svgBars.entries())
       for (const [k, v] of bar.box.entries())
         expect(pdfBars[i]!.box[k]! / 12_700).toBeCloseTo(v, 1);

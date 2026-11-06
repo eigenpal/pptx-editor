@@ -98,14 +98,21 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
       // A gradient clips to the glyphs and spans the text body's bounds, as in the SVG paint.
       const own = ownFill(run.props.fill, scope).fill;
       const gradient = own.type === 'linear' || own.type === 'path' ? own : null;
+      // As in the SVG paint: a run with no fill and no outline draws no bars either.
+      if (own.type === 'none' && !run.props.outline) continue;
       const runColor = gradient ? null : flatColor(run.props.fill, scope, p, 'text');
-      // Outlines and decorations draw even on a run with no fill (outline-only text), so
-      // they come before such a run is skipped.
-      if (run.kind === 'text')
-        drawDecorations(run, line.baseline, scope, p, () => (bounds ??= textBounds(layout)));
+      // The bars draw over the glyphs, as in the SVG paint, and also on outline-only text
+      // and on text whose font has no bytes.
+      const decorate = (): void => {
+        if (run.kind === 'text')
+          drawDecorations(run, line.baseline, scope, p, () => (bounds ??= textBounds(layout)));
+      };
       if (run.props.outline)
         p.diag.add('text.outline', 'unsupported', 'Text outlines are not drawn yet.');
-      if (!gradient && !runColor) continue;
+      if (!gradient && !runColor) {
+        decorate();
+        continue;
+      }
       if (run.face.synthBold || run.face.synthItalic)
         p.diag.add(
           'text.synthetic-style',
@@ -113,7 +120,10 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
           'Synthetic bold and italic are not drawn.'
         );
       const font = fontFor(run.face.id, run.face.family, p);
-      if (!font) continue;
+      if (!font) {
+        decorate();
+        continue;
+      }
       const key = p.fontKey(run.face.id, font);
       const size = run.sizePt * EMU_PER_PT;
       const y = line.baseline - run.rise;
@@ -155,6 +165,7 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
         gradientBox(gradient, bounds.w, bounds.h, p);
       }
       p.push(popGraphicsState());
+      decorate();
     }
   }
   p.push(popGraphicsState());

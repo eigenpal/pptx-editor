@@ -172,7 +172,7 @@ const substituteCache = new Map<DefaultFamily, Promise<SubstituteLoad>>();
 /**
  * How the substitutes are fetched. Under Node the packaged faces are `file:` URLs, which
  * Node's `fetch` rejects, so a bounded reader confined to the package's `assets/` folder
- * reads them. Browsers and Bun keep the global `fetch` (undefined here).
+ * reads them (Bun takes the same reader). Browsers keep the global `fetch` (undefined here).
  */
 let substituteFetcher: typeof fetch | undefined | null = null;
 function substituteFetch(): typeof fetch | undefined {

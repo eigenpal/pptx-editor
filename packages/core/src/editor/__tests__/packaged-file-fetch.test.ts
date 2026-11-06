@@ -15,6 +15,9 @@ writeFileSync(join(root, 'face.ttf'), new Uint8Array([1, 2, 3, 4]));
 writeFileSync(join(root, 'big.ttf'), new Uint8Array(64));
 writeFileSync(join(base, 'secret.txt'), 'outside');
 symlinkSync(join(base, 'secret.txt'), join(root, 'link.ttf'));
+mkdirSync(join(base, 'outside'));
+writeFileSync(join(base, 'outside', 'face.ttf'), new Uint8Array([9]));
+symlinkSync(join(base, 'outside'), join(root, 'dir'));
 afterAll(() => rmSync(base, { recursive: true, force: true }));
 
 const rootUrl = pathToFileURL(`${root}/`);
@@ -32,6 +35,9 @@ describe('createPackagedFileFetch', () => {
     expect((await read(`${rootUrl.href}..%2Fsecret.txt`)).status).toBe(404);
     expect((await read(pathToFileURL(join(base, 'secret.txt')).href)).status).toBe(404);
     expect((await read(at('link.ttf'))).status).toBe(404);
+    // A symbolic link in a parent folder: the real path is outside.
+    expect((await read(at('dir/face.ttf'))).status).toBe(404);
+    expect((await read(rootUrl.href)).status).toBe(404);
     expect((await read(at('missing.ttf'))).status).toBe(404);
   });
 
