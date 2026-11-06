@@ -34,7 +34,10 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     fixtures: ['text-runs', 'font-effects'],
     approximations: ['line-model', 'small-caps', 'script-size'],
   },
-  'text.character-spacing': { fixtures: ['text-runs', 'font-effects'] },
+  'text.character-spacing': {
+    fixtures: ['text-runs', 'font-effects'],
+    approximations: ['glyph-advances'],
+  },
   'text.change-case': { fixtures: ['font-effects'] },
   'text.hyperlinks': { fixtures: [], approximations: ['hyperlink-text'] },
   'text.input-method': { fixtures: ['text-runs'] },
@@ -119,9 +122,16 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['color-transforms', 'gray-transform'],
   },
   // --- Effects -----------------------------------------------------------
-  'effects.shadow-glow-reflection': {
+  'effects.outer-shadow': {
     fixtures: ['effects', 'shape-effects-presets'],
-    approximations: ['blur', 'shadow-skew', 'glow-soft-edge'],
+    approximations: ['blur', 'shadow-skew'],
+  },
+  // Painted by the drawing module of @pptx-editor.dev/pro: the harness installs it
+  // (`examples/vite/src/harness.ts`), and `packages/pro/src/drawing/__tests__/effects-paint.test.ts`
+  // proves that the free engine paints none of these effects.
+  'effects.glow-reflection': {
+    fixtures: ['effects', 'shape-effects-presets', 'picture-editing'],
+    approximations: ['blur', 'glow-soft-edge'],
   },
   'effects.fill-overlay': {
     fixtures: ['fill-fidelity'],
@@ -165,8 +175,11 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   },
   'tables.sizes': { fixtures: ['tables', 'table-editing'] },
   // --- Charts, diagrams, media & OLE -------------------------------------
-  'objects.charts': { fixtures: ['preserve-unsupported', 'slide-structure'] },
-  'objects.diagrams': { fixtures: [] },
+  'objects.charts': { fixtures: ['charts', 'preserve-unsupported', 'slide-structure'] },
+  'objects.diagrams': {
+    fixtures: ['diagrams'],
+    approximations: ['diagram-drawing', 'line-model'],
+  },
   'objects.media-ole': { fixtures: ['preserve-unsupported', 'slide-structure'] },
   'objects.equations': { fixtures: [] },
   // --- Slides, layouts & notes -------------------------------------------

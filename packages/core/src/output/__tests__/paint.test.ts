@@ -182,97 +182,42 @@ describe('table border caps', () => {
   });
 });
 
-describe('effect filter regions', () => {
-  test('a shadow and a glow keep the outline that paints past the box', () => {
-    const root = paint(
-      shape({
-        id: 2,
-        x: 1_000_000,
-        y: 1_000_000,
-        cx: 2_000_000,
-        cy: 1_000_000,
-        fill: '<a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>',
-        line: '<a:ln w="88900"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln>',
-        effects:
-          '<a:effectLst><a:glow rad="12700"><a:srgbClr val="FF0000"/></a:glow>' +
-          '<a:outerShdw blurRad="0" dist="0"><a:srgbClr val="000000"/></a:outerShdw></a:effectLst>',
-      })
-    );
-    const filters = [...root.querySelectorAll('filter')];
-    expect(filters.length).toBe(2);
-    // Half the 7 pt outline lies outside the box; neither region may cut it off.
-    for (const f of filters)
-      expect(Number(f.getAttribute('x'))).toBeLessThanOrEqual(1_000_000 - 88_900);
+describe('effects without the Pro drawing renderers', () => {
+  const all = (extra = ''): string =>
+    shape({
+      id: 2,
+      x: 1_000_000,
+      y: 1_000_000,
+      cx: 2_000_000,
+      cy: 1_000_000,
+      fill: '<a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>',
+      effects:
+        '<a:effectLst><a:glow rad="63500"><a:srgbClr val="FF0000"/></a:glow>' +
+        '<a:innerShdw blurRad="63500" dist="50800" dir="5400000"><a:srgbClr val="000000"/></a:innerShdw>' +
+        extra +
+        '<a:reflection blurRad="6350" stA="50000" endPos="55000" dist="5000" dir="5400000" sy="-100000" algn="bl" rotWithShape="0"/>' +
+        '<a:softEdge rad="12700"/></a:effectLst>',
+    });
+
+  test('paint no glow, inner shadow, reflection, or soft edge', () => {
+    const root = paint(all());
+    expect(root.querySelectorAll('filter').length).toBe(0);
+    expect(root.querySelectorAll('feMorphology, mask, linearGradient').length).toBe(0);
+    expect(root.querySelector('[data-effect="reflection"]')).toBeNull();
+    // The shape itself still paints.
+    expect(root.querySelector('[data-kind="shape"] path')).not.toBeNull();
   });
 
-  test('the region keeps a miter join and arrowheads', () => {
-    const region = (line: string, prst = 'rect'): number => {
-      const root = paint(
-        shape({
-          id: 2,
-          x: 1_000_000,
-          y: 1_000_000,
-          cx: 2_000_000,
-          cy: 1_000_000,
-          prst,
-          line,
-          effects:
-            '<a:effectLst><a:glow rad="12700"><a:srgbClr val="FF0000"/></a:glow></a:effectLst>',
-        })
-      );
-      return Number(root.querySelector('filter')!.getAttribute('x'));
-    };
-    const solid = '<a:solidFill><a:srgbClr val="000000"/></a:solidFill>';
-    // A miter limit of 8 reaches up to 4 widths past the corner.
-    expect(region(`<a:ln w="25400">${solid}<a:miter lim="800000"/></a:ln>`)).toBeLessThanOrEqual(
-      1_000_000 - 4 * 25_400
-    );
-    // An arrowhead on an open path reaches 3 widths past its end.
-    expect(
-      region(`<a:ln w="25400">${solid}<a:round/><a:tailEnd type="triangle"/></a:ln>`, 'line')
-    ).toBeLessThanOrEqual(1_000_000 - 3 * 25_400);
-  });
-
-  test('a soft edge and an inner shadow keep a callout tail outside the box', () => {
+  test('still paint an outer shadow', () => {
     const root = paint(
-      shape({
-        id: 2,
-        x: 1_000_000,
-        y: 1_000_000,
-        cx: 2_000_000,
-        cy: 1_000_000,
-        prst: 'wedgeRectCallout',
-        // The tail tip lies 1.5 box heights below the box.
-        avLst: '<a:gd name="adj1" fmla="val 0"/><a:gd name="adj2" fmla="val 200000"/>',
-        fill: '<a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>',
-        effects:
-          '<a:effectLst><a:innerShdw blurRad="63500" dist="50800" dir="5400000">' +
-          '<a:srgbClr val="000000"/></a:innerShdw><a:softEdge rad="12700"/></a:effectLst>',
-      })
+      all(
+        '<a:outerShdw blurRad="38100" dist="38100" dir="2700000"><a:srgbClr val="000000"/></a:outerShdw>'
+      )
     );
-    const f = root.querySelector('filter')!;
-    const bottom = Number(f.getAttribute('y')) + Number(f.getAttribute('height'));
-    expect(bottom).toBeGreaterThanOrEqual(1_000_000 + 2.5 * 1_000_000);
-  });
-
-  test('a turned callout keeps its tail in the region too', () => {
-    const root = paint(
-      shape({
-        id: 2,
-        x: 1_000_000,
-        y: 1_000_000,
-        cx: 2_000_000,
-        cy: 1_000_000,
-        rot: 5_400_000,
-        prst: 'wedgeRectCallout',
-        avLst: '<a:gd name="adj1" fmla="val 0"/><a:gd name="adj2" fmla="val 200000"/>',
-        fill: '<a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>',
-        effects: '<a:effectLst><a:softEdge rad="12700"/></a:effectLst>',
-      })
-    );
-    // Turned 90° about the box center (2 000 000, 1 500 000), the tail tip moves to x = 0.
-    const f = root.querySelector('filter')!;
-    expect(Number(f.getAttribute('x'))).toBeLessThanOrEqual(0);
+    expect(root.querySelectorAll('[data-effect="shadow"]').length).toBe(1);
+    // Only the shadow's filter: no glow or body filter, and no reflection.
+    expect(root.querySelectorAll('filter').length).toBe(1);
+    expect(root.querySelector('[data-effect="reflection"]')).toBeNull();
   });
 });
 

@@ -21,6 +21,13 @@ import { CONTENT_TYPE, NS, REL } from './namespaces.ts';
 import { repairPresentationRoot } from './presentation-repair.ts';
 import { markFileTimings, repairTimingRoot } from './timing.ts';
 import { sha256FontBytes } from '@eigenpal/ooxml-core';
+import {
+  deferredXmlPart,
+  holdsStandIn,
+  isDeferredPending,
+  type DeferredPartFinish,
+  type DeferredPartReject,
+} from './deferred-parts.ts';
 
 /** One part of the package. */
 export type PackagePart =
@@ -114,7 +121,12 @@ function partRole(partName: string, types: ContentTypeIndex): PartRole {
   return roleByType(partName, lookupContentType(types, partName));
 }
 
-function decodeXml(bytes: Uint8Array): string {
+/**
+ * Decode the bytes of an XML part: a UTF-16 byte order mark is honored, UTF-8 otherwise.
+ *
+ * @internal
+ */
+export function decodeXml(bytes: Uint8Array): string {
   // UTF-16 parts exist in the wild; honor a BOM. Default UTF-8.
   if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes);
   if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(bytes);
@@ -123,8 +135,44 @@ function decodeXml(bytes: Uint8Array): string {
   return text;
 }
 
+/**
+ * The archive caps of a presentation when a host configures none. A slide is at least two
+ * entries (its part and its relationships), and four with speaker notes, so the format-neutral
+ * cap of 10,000 entries refused a deck of 5,000 slides. This cap admits about 10,000 slides with
+ * notes. It stays below `ZIP_HARD_LIMITS`, and the byte and ratio caps do not change.
+ */
+export const PPTX_ZIP_LIMITS: ZipLimits = Object.freeze({
+  ...DEFAULT_ZIP_LIMITS,
+  maxEntries: 40_000,
+});
+
+/** How `readPptxDeferred` defers parts; see `deferred-parts.ts`. @internal */
+export interface DeferredReadOptions {
+  /**
+   * Whether to keep the slide or notes slide `partName` as its bytes, to parse on first read.
+   * Asked only for parts of those two content types; every other part parses as before.
+   */
+  readonly defer: (partName: string) => boolean;
+  /** Runs on a deferred part's tree once it parses. */
+  readonly finish?: DeferredPartFinish;
+  /** Hears, at once, a deferred part that does not parse, wherever it is read. */
+  readonly onReject?: DeferredPartReject;
+}
+
 /** Read a `.pptx` at the trust boundary. Never throws. */
-export function readPptx(bytes: Uint8Array, limits: ZipLimits = DEFAULT_ZIP_LIMITS): PackageResult {
+export function readPptx(bytes: Uint8Array, limits: ZipLimits = PPTX_ZIP_LIMITS): PackageResult {
+  return readPptxDeferred(bytes, limits);
+}
+
+/**
+ * `readPptx`, where the slides and notes slides that `deferred` names stay unparsed until
+ * first read (`deferred-parts.ts`), for a progressive open. @internal
+ */
+export function readPptxDeferred(
+  bytes: Uint8Array,
+  limits: ZipLimits,
+  deferred?: DeferredReadOptions
+): PackageResult {
   const zip = readZip(bytes, limits);
   if (!zip.ok) return { ok: false, error: { reason: 'zip', detail: zip.reason } };
   const ctBytes = zip.entries.get(CONTENT_TYPES_PART);
@@ -138,6 +186,22 @@ export function readPptx(bytes: Uint8Array, limits: ZipLimits = DEFAULT_ZIP_LIMI
     const role = partRole(partName, types);
     if (role === 'binary') {
       parts.set(partName, { kind: 'binary', partName, bytes: data });
+      continue;
+    }
+    const kind = deferred ? deferrableKind(partName, types) : undefined;
+    if (kind && deferred!.defer(partName)) {
+      const finish = deferred!.finish;
+      parts.set(
+        partName,
+        deferredXmlPart(partName, data, decodeXml, {
+          notes: kind === 'notes',
+          ...(deferred!.onReject ? { onReject: deferred!.onReject } : {}),
+          finish: (tree) => {
+            if (isSlideRoot(tree.root)) markFileTimings(tree.root);
+            return finish ? finish(tree) : tree;
+          },
+        })
+      );
       continue;
     }
     const tree = partName === CONTENT_TYPES_PART ? ct : parseXmlPart(partName, decodeXml(data));
@@ -154,11 +218,27 @@ export function readPptx(bytes: Uint8Array, limits: ZipLimits = DEFAULT_ZIP_LIMI
   return { ok: true, pkg };
 }
 
+const SLIDE_TYPE = asciiFold(`${PML}slide+xml`);
+const NOTES_TYPE = asciiFold(`${PML}notesSlide+xml`);
+
+/** Whether `partName` is a slide or a notes slide, the parts a progressive open may defer. */
+function deferrableKind(partName: string, types: ContentTypeIndex): 'slide' | 'notes' | undefined {
+  const type = lookupContentType(types, partName);
+  const folded = type === undefined ? undefined : asciiFold(type.trim());
+  return folded === SLIDE_TYPE ? 'slide' : folded === NOTES_TYPE ? 'notes' : undefined;
+}
+
 /**
  * Write the package back to `.pptx` bytes. XML parts re-emit normalized; binaries verbatim. The
- * bytes own an `ArrayBuffer`, so they are a valid `BlobPart` as they are.
+ * bytes own an `ArrayBuffer`, so they are a valid `BlobPart` as they are. A deferred part that
+ * has not been read parses here; one that did not parse refuses the write (it throws), so a
+ * stand-in never leaves the session.
  */
 export function writePptx(pkg: PptxPackage): Uint8Array<ArrayBuffer> {
+  for (const part of pkg.parts.values()) {
+    if (isDeferredPending(part) && part.kind === 'xml') void part.xml;
+    if (holdsStandIn(part)) throw new Error(`writePptx: ${part.partName} did not parse`);
+  }
   const encoder = new TextEncoder();
   const entries = new Map<string, Uint8Array>();
   // [Content_Types].xml first: some readers sniff the first entry.
@@ -209,6 +289,12 @@ function liveRelationshipIds(pkg: PptxPackage, main: string): Map<string, string
 const isSlideRoot = (root: Element): boolean => root.ns === NS.p && root.local === 'sld';
 
 const repaired = new WeakMap<PptxPackage, Element | undefined>();
+/**
+ * The package `repairedPresentationRoot` read last, by its presentation part. An edit that
+ * changes the repair changes that part or its relationships, so a package with another
+ * presentation part has nothing to share; two documents never share one.
+ */
+const repairedLast = new WeakMap<XmlPart, WeakRef<PptxPackage>>();
 
 /**
  * The presentation root as the writer saves it (`repairPresentationRoot`), or undefined
@@ -218,10 +304,29 @@ const repaired = new WeakMap<PptxPackage, Element | undefined>();
 export function repairedPresentationRoot(pkg: PptxPackage): Element | undefined {
   if (repaired.has(pkg)) return repaired.get(pkg);
   const main = mainPresentationPart(pkg);
-  const root = main ? xmlPartOf(pkg, main)?.root : undefined;
-  const out =
-    main && root ? repairPresentationRoot(root, liveRelationshipIds(pkg, main)) : undefined;
+  const xml = main ? xmlPartOf(pkg, main) : undefined;
+  const prev = xml ? repairedLast.get(xml)?.deref() : undefined;
+  // The repair reads the root relationships, the presentation part, its relationships, and
+  // the part names. A package that differs from the last one only in other XML parts (a text
+  // edit on a slide) has the same repaired root.
+  const changed = prev && repaired.has(prev) ? changedPartNames(prev, pkg, 32) : null;
+  const shared = changed?.every((name) => {
+    const a = prev!.parts.get(name);
+    const b = pkg.parts.get(name);
+    return (
+      a?.kind === 'xml' &&
+      b?.kind === 'xml' &&
+      name !== main &&
+      !name.toLowerCase().endsWith('.rels')
+    );
+  });
+  const out = shared
+    ? repaired.get(prev!)
+    : main && xml
+      ? repairPresentationRoot(xml.root, liveRelationshipIds(pkg, main))
+      : undefined;
   repaired.set(pkg, out);
+  if (xml) repairedLast.set(xml, new WeakRef(pkg));
   return out;
 }
 
@@ -323,10 +428,62 @@ export function relationshipsOf(pkg: PptxPackage, source: string): readonly Rela
   return out;
 }
 
+/** The relationships of one list by id; the first one wins for an id that repeats. */
+const relById = new WeakMap<readonly Relationship[], ReadonlyMap<string, Relationship>>();
+
+/**
+ * The relationship of a source part with id `id`, or undefined: the first one, as a search of
+ * `relationshipsOf` finds it. One map lookup: the presentation part names every slide by id.
+ * @internal
+ */
+export function relationshipById(
+  pkg: PptxPackage,
+  source: string,
+  id: string
+): Relationship | undefined {
+  const rels = relationshipsOf(pkg, source);
+  let byId = relById.get(rels);
+  if (!byId) {
+    const map = new Map<string, Relationship>();
+    for (const r of rels) if (!map.has(r.id)) map.set(r.id, r);
+    relById.set(rels, (byId = map));
+  }
+  return byId.get(id);
+}
+
 /** The internal target of a relationship id, or undefined. */
 export function relTarget(pkg: PptxPackage, source: string, id: string): string | undefined {
-  const rel = relationshipsOf(pkg, source).find((r) => r.id === id);
+  const rel = relationshipById(pkg, source, id);
   return rel && !rel.external ? rel.target : undefined;
+}
+
+/**
+ * The names of the parts that differ between two packages by object: added, removed, or
+ * replaced. Null when more than `limit` differ. An edit replaces only the parts it changes, so
+ * this is a short list after one edit, read in one pass over the part map. @internal
+ */
+export function changedPartNames(
+  prev: PptxPackage,
+  next: PptxPackage,
+  limit: number
+): string[] | null {
+  const out: string[] = [];
+  let added = 0;
+  for (const [name, part] of next.parts) {
+    const old = prev.parts.get(name);
+    if (old === part) continue;
+    if (old === undefined) added += 1;
+    out.push(name);
+    if (out.length > limit) return null;
+  }
+  // Same names in both, less the added ones: anything else in `prev` was removed.
+  if (prev.parts.size !== next.parts.size - added)
+    for (const name of prev.parts.keys()) {
+      if (next.parts.has(name)) continue;
+      out.push(name);
+      if (out.length > limit) return null;
+    }
+  return out;
 }
 
 /** The first internal target of a relationship type. */

@@ -150,9 +150,8 @@ export interface Editor {
     focus(): void;
     // (undocumented)
     goToSlide(index: number): void;
-    // (undocumented)
-    load(bytes: Uint8Array): Promise<CommandResult>;
-    renderThumbnail(index: number, container: HTMLElement): void;
+    load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
+    renderThumbnail(index: number, container: HTMLElement, options?: RenderThumbnailOptions): () => void;
     save(): Uint8Array<ArrayBuffer> | null;
     selectAll(): void;
     selectSlide(index: number, mode?: SlideSelectMode): void;
@@ -206,6 +205,13 @@ export type EditorCommand = {
 } | {
     readonly type: 'indent';
     readonly direction: 1 | -1;
+}
+/**
+* Backspace at the start of a list item: remove the bullet or number of every list item the
+* selection touches. The item keeps its level, and its text moves to where the bullet was.
+*/
+| {
+    readonly type: 'removeBullet';
 } | {
     readonly type: 'setLineSpacing';
     readonly multiple: number;
@@ -658,6 +664,7 @@ export interface EditorSnapshot {
     readonly geometry: SelectionGeometry | null;
     readonly image?: SelectedImageState | null;
     readonly insertions: number;
+    readonly isOpening?: boolean;
     readonly lastRejection?: EditorRejection | null;
     readonly lastRemoval?: EditorRemoval | null;
     readonly layouts?: readonly SlideLayoutSummary[];
@@ -667,7 +674,9 @@ export interface EditorSnapshot {
     readonly notes: string;
     readonly notesFormatted?: readonly NotesParagraph[];
     readonly openFailure?: DocumentOpenFailure | null;
+    readonly pendingSlides?: number;
     readonly presentationView?: PresentationView;
+    readonly readOnlyReason?: 'damaged-slide' | null;
     // (undocumented)
     readonly revision: number;
     readonly sections?: readonly SlideSection[];
@@ -902,6 +911,11 @@ export type LineEndType = 'none' | 'triangle' | 'arrow' | 'stealth' | 'oval' | '
 export type LineKind = 'line' | 'arrow' | 'elbow' | 'curved';
 
 // @public
+export interface LoadOptions {
+    readonly startSlide?: number;
+}
+
+// @public
 export type NotesFormat = 'bold' | 'italic' | 'underline' | 'strike';
 
 // @public
@@ -1051,6 +1065,11 @@ export type PresentationView = 'normal' | 'slideSorter';
 
 // @public
 export type ReflectionPreset = 'tightTouching' | 'halfTouching' | 'fullTouching' | 'tight4pt' | 'half4pt' | 'full4pt' | 'tight8pt' | 'half8pt' | 'full8pt';
+
+// @public
+export interface RenderThumbnailOptions {
+    readonly defer?: boolean;
+}
 
 // @public
 export type RotateChoice = 'right90' | 'left90' | 'flipVertical' | 'flipHorizontal';
@@ -1269,6 +1288,7 @@ export interface SlideSummary {
     readonly index: number;
     readonly key: string;
     readonly layoutId?: string;
+    readonly pending?: true;
 }
 
 // @public

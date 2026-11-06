@@ -8,6 +8,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // evaluation scripts share it, so a tool sees exactly the layout the PDF is painted from.
 
 import { openPresentation, type DocumentSession } from '@pptx-editor.dev/core/editor';
+import { installDrawing } from '@pptx-editor.dev/pro/drawing';
 import type { FontSource } from '@pptx-editor.dev/core/layout';
 import { cjkFallbackFont } from './cjk-font.ts';
 import {
@@ -69,6 +70,9 @@ export async function openExportSession(
   signal?: AbortSignal
 ): Promise<OpenPdfDocumentForExportResult> {
   if (signal?.aborted) return { ok: false, reason: 'aborted' };
+  // PDF export always draws charts and paints every effect (`@pptx-editor.dev/pro/drawing`), as DOCX Editor's
+  // `docx-to-pdf` always installs its drawing module. Installing again is silent.
+  installDrawing();
   const given: readonly FontSource[] =
     options.fonts === undefined
       ? []

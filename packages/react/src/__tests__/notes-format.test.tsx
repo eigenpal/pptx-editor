@@ -202,7 +202,9 @@ describe('the notes field', () => {
     );
     select(0);
     fireEvent.keyDown(field(), { key: 'Escape' });
-    expect(document.activeElement === screen.getByLabelText('Slide 2')).toBe(true);
+    expect(
+      document.activeElement === document.querySelector('.pptx-rail__item[data-index="1"]')
+    ).toBe(true);
   });
 
   test('Escape goes to the section header when the current slide is in a collapsed section', async () => {
@@ -220,7 +222,7 @@ describe('the notes field', () => {
         </div>
       </PptxEditorContext.Provider>
     );
-    expect(screen.queryByLabelText('Slide 2') === null).toBe(true);
+    expect(document.querySelector('.pptx-rail__item[data-index="1"]') === null).toBe(true);
     select(0);
     fireEvent.keyDown(field(), { key: 'Escape' });
     const header = screen.getByRole('treeitem', { name: /^Section Opening,/ });

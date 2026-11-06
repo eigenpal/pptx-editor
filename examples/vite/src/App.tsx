@@ -12,7 +12,8 @@ import {
   type DragEvent,
   type ReactNode,
 } from 'react';
-import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import type { EditorModule, PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import { drawingModule } from '@pptx-editor.dev/pro/drawing';
 import {
   PptxEditor,
   Icon,
@@ -58,7 +59,15 @@ import {
   type UnsavedEdits,
 } from '../../shared/demo-files.ts';
 
+// Glow, inner shadow, reflection, and soft edge (EigenPal Pro License).
+const MODULES: readonly EditorModule[] = [
+  drawingModule({ licenseKey: import.meta.env.VITE_PPTX_LICENSE }),
+];
+
 const base = import.meta.env.BASE_URL;
+/** A phone opens with the notes closed, so the slide gets the room; one tap opens them. */
+const PHONE_SCREEN =
+  typeof matchMedia === 'function' && matchMedia('(max-height: 500px), (max-width: 600px)').matches;
 /** The notes pane stays mounted in the slide sorter, so its open state and draft stay. */
 const HIDDEN: CSSProperties = { display: 'none' };
 
@@ -95,6 +104,8 @@ function Shell({
   // `?chrome=ribbon` shows the ribbon and the status bar in place of the flat toolbar.
   const ribbon = ribbonChrome(location.search);
   const canPresent = useEditorState((s) => s.status === 'ready' && s.slides.length > 0);
+  // A phone sizes the slide area to the slide's shape (shell.css).
+  const slideRatio = useEditorState((s) => (s.slideWidth ? s.slideHeight / s.slideWidth : 0.5625));
   const show = useSlideshow();
   // Closed on a narrow window, so the slide keeps a usable zoom (demo-files.ts).
   const [panel, setPanel] = useState(panelStartsOpen);
@@ -155,7 +166,9 @@ function Shell({
     },
   };
   return (
-    <PptxEditor.Viewport className="demo-root">
+    // The page has its own landmarks, such as the top bar's banner, so the viewport renders no
+    // region of its own.
+    <PptxEditor.Viewport className="demo-root" label={false}>
       <header className="demo-topbar" {...fileDrop}>
         <BrandLogo name={t('app.productName')} />
         {SHOW_ADAPTER_SWITCHER ? <AdapterSwitcher current="react" /> : null}
@@ -219,7 +232,7 @@ function Shell({
           <span className="demo-topbar__divider" />
           <button
             type="button"
-            className="demo-btn demo-btn--quiet demo-btn--sm"
+            className="demo-btn demo-btn--quiet demo-btn--sm demo-open"
             // The label can hide on a narrow bar: the name and the tooltip stay.
             aria-label={t('menu.open').replace('…', '')}
             data-pptx-tooltip={t('menu.open').replace('…', '')}
@@ -231,7 +244,7 @@ function Shell({
           </button>
           <button
             type="button"
-            className="demo-btn demo-btn--quiet demo-btn--sm"
+            className="demo-btn demo-btn--quiet demo-btn--sm demo-new"
             aria-label={t('menu.new')}
             data-pptx-tooltip={t('menu.new')}
             onMouseDown={keepFocus}
@@ -265,39 +278,55 @@ function Shell({
           }}
         />
       </header>
-      <div className="demo-dock">
-        {ribbon ? (
-          <PptxEditor.Ribbon />
-        ) : (
-          <PptxEditor.Toolbar>
-            <PptxEditor.Toolbar.ChangeCase hidden />
-            <PptxEditor.Toolbar.Link hidden />
-          </PptxEditor.Toolbar>
-        )}
-      </div>
-      <div
-        className={rail ? 'demo-workspace demo-workspace--rail' : 'demo-workspace'}
-        {...fileDrop}
-      >
-        {sorter ? null : <PptxEditor.SlideRail />}
-        {/* The slide sorter takes the canvas's place, so the status bar and the notices stay. */}
-        <div className="demo-docpane">
-          {sorter ? <PptxEditor.SlideSorter /> : null}
-          <div className="demo-canvas" hidden={sorter}>
-            <PptxEditor.Content />
-            <PptxEditor.FindBar />
-            <PptxEditor.Loading overlay />
-            <PptxEditor.FontNotice />
-            {ribbon ? null : <PptxEditor.ZoomPill />}
-          </div>
-          <PptxEditor.NotesPane {...(sorter ? { style: HIDDEN } : {})} />
-          <PptxEditor.EditNotice />
-          <PptxEditor.OpenFailure />
-          {ribbon ? <PptxEditor.StatusBar /> : null}
+      <main className="demo-main">
+        <h1 className="demo-sr-only">{t('app.productName')}</h1>
+        <div className="demo-dock">
+          {ribbon ? (
+            <PptxEditor.Ribbon />
+          ) : (
+            <PptxEditor.Toolbar>
+              <PptxEditor.Toolbar.ChangeCase hidden />
+              <PptxEditor.Toolbar.Link hidden />
+            </PptxEditor.Toolbar>
+          )}
         </div>
-        {panel ? <PptxEditor.SidePanel onClose={() => setPanel(false)} /> : null}
-        {dragging ? <div className="demo-drop">{t('app.dropHint')}</div> : null}
-      </div>
+        <div
+          className={rail ? 'demo-workspace demo-workspace--rail' : 'demo-workspace'}
+          {...fileDrop}
+        >
+          {sorter ? null : <PptxEditor.SlideRail />}
+          {/* The slide sorter takes the canvas's place, so the status bar and the notices stay. */}
+          <div className="demo-docpane">
+            {sorter ? <PptxEditor.SlideSorter /> : null}
+            <div
+              className="demo-canvas"
+              hidden={sorter}
+              style={{ '--demo-slide-ratio': slideRatio } as CSSProperties}
+            >
+              <PptxEditor.Content />
+              <PptxEditor.FindBar />
+              <PptxEditor.Loading overlay />
+              <PptxEditor.FontNotice />
+            </div>
+            {/* The view switch and the zoom stay in view in both views, under the slide. */}
+            {ribbon ? null : (
+              <div className="demo-status">
+                <PptxEditor.StatusBar.Views />
+                <PptxEditor.ZoomPill />
+              </div>
+            )}
+            <PptxEditor.NotesPane
+              defaultOpen={!PHONE_SCREEN}
+              {...(sorter ? { style: HIDDEN } : {})}
+            />
+            <PptxEditor.EditNotice />
+            <PptxEditor.OpenFailure />
+            {ribbon ? <PptxEditor.StatusBar /> : null}
+          </div>
+          {panel ? <PptxEditor.SidePanel onClose={() => setPanel(false)} /> : null}
+          {dragging ? <div className="demo-drop">{t('app.dropHint')}</div> : null}
+        </div>
+      </main>
       <PptxEditor.Slideshow />
       {children}
     </PptxEditor.Viewport>
@@ -310,7 +339,7 @@ export function App() {
   const [title, setTitle] = useState<string>(EXAMPLES[initial].title);
   const [mode, setMode] = useState<'edit' | 'view'>('edit');
   const [theme, setThemeState] = useState<'light' | 'dark'>(() => initialTheme(location.search));
-  // A theme picked here is kept; until then the demo follows the system color scheme.
+  // A theme picked here is kept; until then the demo starts light.
   const setTheme = useCallback((next: 'light' | 'dark') => {
     rememberTheme(next);
     setThemeState(next);
@@ -366,6 +395,7 @@ export function App() {
       mode={mode}
       colorMode={theme}
       popups={popups}
+      modules={MODULES}
       fonts={fonts}
       fontFamilies={CATALOG_FAMILIES}
       onReady={(instance) => {

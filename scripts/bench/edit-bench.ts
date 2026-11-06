@@ -1,5 +1,5 @@
-// Editing benchmark: one keystroke, one drag step, and one slide switch on synthetic decks of
-// text slides, run headless through the editor facade.
+// Editing benchmark: opening a deck, one keystroke, one drag step, and one slide switch on
+// synthetic decks of text slides, run headless through the editor facade.
 //
 // The editor runs in happy-dom with the production HarfBuzz measurer and the packaged
 // substitute fonts. The bench stands in for the React chrome the way the adapter drives it:
@@ -8,12 +8,19 @@
 // object changed (as the rail's memoized `Thumbnail` does). Timings include that work.
 //
 // Timings depend on the machine; the counters do not. Read the counters first: layout runs,
-// `renderThumbnail` calls, and thumbnail repaints per operation.
+// `renderThumbnail` calls, thumbnail paints, slide repaints, and the `can` probes compiled per
+// operation. A probe compiles a command on a copy of the deck; New Slide and Add Section probes
+// cost more as the deck grows, so typing and dragging compile none (`Deck probes` stays 0). The
+// `open` row is one load, from the bytes to a rail with every container asked to paint: its
+// thumbnail paints are the ones the editor made before it could be used, and its idle paints
+// the rest.
+// The `open-ready` row is the time until no slide is still opening (`pendingSlides` is 0): a
+// long deck shows its first slide first and parses the rest in the background.
 //
 // Model: DOCX Editor's `scripts/bench/edit-bench.ts` (EigenPal, same owner).
 //
 // Usage:
-//   bun scripts/bench/edit-bench.ts [--sizes 10,60,200] [--runs 40] [--warmup 5] [--json]
+//   bun scripts/bench/edit-bench.ts [--sizes 10,60,200,800] [--runs 40] [--warmup 5] [--json]
 
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { textDeck } from './text-deck.ts';
@@ -40,7 +47,7 @@ function parseArgs(argv: readonly string[]): Args {
     return i >= 0 ? argv[i + 1] : undefined;
   };
   return {
-    sizes: (value('--sizes') ?? '10,60,200').split(',').map(Number),
+    sizes: (value('--sizes') ?? '10,60,200,800').split(',').map(Number),
     runs: Number(value('--runs') ?? 40),
     warmup: Number(value('--warmup') ?? 5),
     json: argv.includes('--json'),
@@ -63,7 +70,16 @@ interface Counters {
   thumbnailPaints: number;
   /** Thumbnails repainted after the operation, when the editor was idle. */
   idleThumbnailPaints: number;
+  /** `can` answers compiled (a probe batch opened), not answered from the cache. */
+  probes: number;
+  /** Of those, New Slide and Add Section: probes that run a whole-deck command. */
+  deckProbes: number;
+  /** Times the editing surface painted the slide anew. */
+  slidePaints: number;
 }
+
+/** Commands whose probe runs a whole-deck command. */
+const DECK_COMMANDS: ReadonlySet<string> = new Set(['addSlide', 'addSection']);
 
 interface ScenarioResult {
   name: string;
@@ -91,6 +107,7 @@ class Harness {
   readonly thumbs: HTMLDivElement[] = [];
   #last: Snapshot['slides'] = [];
   #painted = new Map<HTMLElement, Element | null>();
+  #slide: Element | null = null;
   #seen = new WeakSet<SlideLayout>();
   counters: Counters = this.#zero();
   toolbarMs = 0;
@@ -110,6 +127,9 @@ class Harness {
       thumbnailCalls: 0,
       thumbnailPaints: 0,
       idleThumbnailPaints: 0,
+      probes: 0,
+      deckProbes: 0,
+      slidePaints: 0,
     };
   }
 
@@ -124,6 +144,20 @@ class Harness {
       if (r && !this.#seen.has(r)) {
         this.#seen.add(r);
         this.counters.layoutsComputed += 1;
+      }
+      return r;
+    };
+    // A compiled `can` answer opens one probe batch; a cached one opens none.
+    let batches = 0;
+    const probeBatch = session.probeBatch.bind(session);
+    session.probeBatch = (base) => ((batches += 1), probeBatch(base));
+    const can = this.editor.can.bind(this.editor);
+    this.editor.can = (command, options) => {
+      const before = batches;
+      const r = can(command, options);
+      if (batches > before) {
+        this.counters.probes += 1;
+        if (DECK_COMMANDS.has(command.type)) this.counters.deckProbes += 1;
       }
       return r;
     };
@@ -143,6 +177,16 @@ class Harness {
     t0 = performance.now();
     this.syncRail(snap.slides);
     this.railMs += performance.now() - t0;
+    this.countSlidePaints();
+  }
+
+  /** Whether the surface painted a new slide SVG since the last count. */
+  countSlidePaints(): void {
+    const svg = this.host.querySelector('.pptx-surface__slide');
+    if (svg !== this.#slide) {
+      if (this.#slide) this.counters.slidePaints += 1;
+      this.#slide = svg;
+    }
   }
 
   /** The rail: one container per slide; repaint a thumbnail when its summary changed. */
@@ -155,18 +199,18 @@ class Harness {
     slides.forEach((s, i) => {
       if (this.#last[i] === s) return;
       this.counters.thumbnailCalls += 1;
-      this.editor.renderThumbnail(i, this.thumbs[i]);
+      this.editor.renderThumbnail(i, this.thumbs[i], { defer: true });
     });
     this.#last = slides;
     this.countPaints('thumbnailPaints');
   }
 
-  /** Thumbnails whose painted SVG changed since the last count. */
+  /** Thumbnails whose painted SVG changed since the last count (a first paint counts too). */
   countPaints(field: 'thumbnailPaints' | 'idleThumbnailPaints'): void {
     for (const box of this.thumbs) {
       const svg = box.firstElementChild;
-      if (this.#painted.get(box) !== svg) {
-        if (this.#painted.has(box)) this.counters[field] += 1;
+      if ((this.#painted.get(box) ?? null) !== svg) {
+        if (svg) this.counters[field] += 1;
         this.#painted.set(box, svg);
       }
     }
@@ -210,7 +254,19 @@ async function measure(
   // Repaints the editor defers until it is idle.
   await idle(400);
   h.countPaints('idleThumbnailPaints');
-  const per = (v: number): number => Math.round((v / args.runs) * 100) / 100;
+  return result(h, name, slides, args.runs, total, toolbar, rail);
+}
+
+function result(
+  h: Harness,
+  name: string,
+  slides: number,
+  runs: number,
+  total: number[],
+  toolbar: number[],
+  rail: number[]
+): ScenarioResult {
+  const per = (v: number): number => Math.round((v / runs) * 100) / 100;
   const c = h.counters;
   return {
     name,
@@ -224,6 +280,9 @@ async function measure(
       thumbnailCalls: per(c.thumbnailCalls),
       thumbnailPaints: per(c.thumbnailPaints),
       idleThumbnailPaints: per(c.idleThumbnailPaints),
+      probes: per(c.probes),
+      deckProbes: per(c.deckProbes),
+      slidePaints: per(c.slidePaints),
     },
   };
 }
@@ -261,14 +320,33 @@ function dragDriver(h: Harness, index: number) {
 }
 
 async function benchDeck(n: number, args: Args): Promise<ScenarioResult[]> {
+  const bytes = textDeck(n);
+  Bun.gc(true);
+  // (o) Open: load, attach, and mount the rail, until the editor can be used.
+  const t0 = performance.now();
   const editor = createPptxEditor({});
-  const r = await editor.load(textDeck(n));
+  const r = await editor.load(bytes);
   if (!r.ok) throw new Error(`load failed: ${r.reason}`);
   const h = new Harness(editor);
   editor.attach(h.host);
   h.syncRail(editor.snapshot().slides);
+  const opened = performance.now() - t0;
+  // (o2) Ready: a long deck opens progressively; the rest of its slides parse in the background.
+  while ((editor.snapshot().pendingSlides ?? 0) > 0) await idle(1);
+  const ready = performance.now() - t0;
+  h.counters.thumbnailCalls = n;
+  // Thumbnails painted later, when the editor is idle (every one, at the latest after this).
+  for (let wait = 0; wait < 600 && h.thumbs.some((b) => !b.firstElementChild); wait += 1)
+    await idle(5);
+  h.countPaints('idleThumbnailPaints');
+  if (h.thumbs.some((b) => !b.firstElementChild))
+    throw new Error('a thumbnail never painted after open');
+  const out: ScenarioResult[] = [
+    result(h, 'open', n, 1, [opened], [0], [0]),
+    result(h, 'open-ready', n, 1, [ready], [0], [0]),
+  ];
+  h.reset();
   h.instrument();
-  const out: ScenarioResult[] = [];
   const middle = Math.floor(n / 2);
 
   // (a) One keystroke at the end of the body text on the middle slide.
@@ -292,10 +370,16 @@ async function benchDeck(n: number, args: Args): Promise<ScenarioResult[]> {
   out.push(await measure(h, 'keystroke-normAutofit', n, args, () => editor.input('text', 'x')));
 
   // (b) One drag step (move) of the body text box.
+  const from = shapesOf(editor, middle).body.element.xfrm;
   const move = dragDriver(h, middle);
   out.push(await measure(h, 'drag-step', n, args, move));
   document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
   if (!editor.snapshot().canUndo) throw new Error('the drag did not edit the deck');
+  // The whole drag is one undo step.
+  editor.exec({ type: 'undo' });
+  const back = shapesOf(editor, middle).body.element.xfrm;
+  if (back.x !== from.x || back.y !== from.y) throw new Error('the drag is not one undo step');
+  editor.exec({ type: 'redo' });
 
   // (c) A slide switch between two neighbors.
   const other = Math.min(n - 1, middle + 1);
@@ -313,18 +397,27 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const results: ScenarioResult[] = [];
   for (const n of args.sizes) results.push(...(await benchDeck(n, args)));
+  // An edit on one slide keeps the deck's structure: no whole-deck probe may run again.
+  const regressions = results.filter(
+    (r) => r.name !== 'slide-switch' && r.perOperation.deckProbes > 0
+  );
+  for (const r of regressions)
+    console.error(
+      `${r.name} at ${r.slides} slides compiled ${r.perOperation.deckProbes} deck probes`
+    );
+  if (regressions.length) process.exitCode = 1;
   if (args.json) {
     console.log(JSON.stringify({ schema: 1, runtime: `bun ${Bun.version}`, args, results }));
     return;
   }
   console.log(
-    '| Scenario | Slides | Total ms (median / p95) | Toolbar ms | Rail ms | Layout calls | Layouts computed | Thumbnail calls | Thumbnail paints | Idle paints |'
+    '| Scenario | Slides | Total ms (median / p95) | Toolbar ms | Rail ms | Layout calls | Layouts computed | Thumbnail calls | Thumbnail paints | Idle paints | Slide paints | Probes | Deck probes |'
   );
-  console.log('| --- | --: | --: | --: | --: | --: | --: | --: | --: | --: |');
+  console.log('| --- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |');
   for (const r of results) {
     const c = r.perOperation;
     console.log(
-      `| ${r.name} | ${r.slides} | ${fmt(r.total)} | ${fmt(r.toolbar)} | ${fmt(r.rail)} | ${c.layoutCalls} | ${c.layoutsComputed} | ${c.thumbnailCalls} | ${c.thumbnailPaints} | ${c.idleThumbnailPaints} |`
+      `| ${r.name} | ${r.slides} | ${fmt(r.total)} | ${fmt(r.toolbar)} | ${fmt(r.rail)} | ${c.layoutCalls} | ${c.layoutsComputed} | ${c.thumbnailCalls} | ${c.thumbnailPaints} | ${c.idleThumbnailPaints} | ${c.slidePaints} | ${c.probes} | ${c.deckProbes} |`
     );
   }
 }

@@ -134,6 +134,18 @@ export {
   showsLoading,
   type LoadingSheetSize,
 } from './loading.ts';
+export {
+  createProgressiveMount,
+  MOUNT_CHUNK_ITEMS,
+  MOUNT_FIRST_ITEMS,
+  MOUNT_FIRST_STEP_ITEMS,
+  MOUNT_FRAME_MS,
+  MOUNT_MIN_STEP_ITEMS,
+  mountedSections,
+  railItemPosition,
+  type MountedSections,
+  type ProgressiveMount,
+} from './progressive-mount.ts';
 export { STANDARD_COLORS, gradientCss, presetGradient, swatchName } from './palette.ts';
 export { focusEdge, handleMenuKey, panelItems } from './menu-keyboard.ts';
 export {
@@ -211,6 +223,7 @@ export {
   type ArrangedRibbonTab,
   type RibbonTabOverride,
 } from './ribbon-arrange.ts';
+export { chromeOfferedControl } from './chrome-offered.ts';
 export {
   GLOW_ACCENTS,
   SHAPE_STYLE_GALLERY,
@@ -242,6 +255,7 @@ export {
   renderNotes,
   selectNotes,
 } from './notes-dom.ts';
+export { NOTES_INSET_PROPERTY, trackNotesInset, type NotesInsetTracker } from './notes-inset.ts';
 export {
   NOTES_FORMAT_BUTTONS,
   NO_NOTES_FORMATS,
@@ -265,6 +279,7 @@ export {
   notesWordAt,
   openSectionOfCurrent,
   openSlideInNormalView,
+  refocusAfterSorterHides,
   sectionMenuPoint,
   railKeyDown,
   refocusAfterCollapse,
@@ -275,6 +290,7 @@ export {
   selectSlideSection,
   slideClickMode,
   slideDropMarker,
+  slideItemName,
   slideMenuPoint,
   slideSorterMounted,
   sorterKeyDown,

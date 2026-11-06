@@ -80,8 +80,15 @@ function Workspace({ target }: { target: number }) {
           <PptxEditor.FindBar />
           <PptxEditor.Loading overlay />
           <PptxEditor.FontNotice />
-          {stacked ? null : <PptxEditor.ZoomPill />}
         </div>
+        {/* The view switch sits next to the zoom, outside the canvas, so it stays in the Slide
+            Sorter. Stacked has no zoom: the switch shows there only as the way out of the sorter. */}
+        {stacked && !sorter ? null : (
+          <div className="deck-ws__status">
+            <PptxEditor.StatusBar.Views />
+            {stacked ? null : <PptxEditor.ZoomPill />}
+          </div>
+        )}
         {stacked && !sorter ? (
           <PptxEditor.SlideRail {...rail} orientation="horizontal" className="deck-ws__rail">
             {/* A narrow row drops the move buttons, so more slides fit. Ctrl+Left and
@@ -90,7 +97,11 @@ function Workspace({ target }: { target: number }) {
             <PptxEditor.SlideRail.MoveLater hidden={shape.narrow} />
           </PptxEditor.SlideRail>
         ) : null}
-        <PptxEditor.NotesPane className="deck-ws__notes" />
+        {/* The notes stay mounted in the Slide Sorter, so their open state and draft stay. */}
+        <PptxEditor.NotesPane
+          className="deck-ws__notes"
+          {...(sorter ? { style: { display: 'none' } } : {})}
+        />
         <PptxEditor.EditNotice />
         <PptxEditor.OpenFailure />
       </div>

@@ -471,6 +471,9 @@ export interface ChromeMenuSubmenuEntry {
 }
 
 // @public
+export function chromeOfferedControl(slot: ChromeSlotId, control: ChromeControl): ChromeControl;
+
+// @public
 export function chromeOptionChecked(value: unknown, option: string): boolean;
 
 // @internal
@@ -509,6 +512,9 @@ export interface ChromeTooltipState {
 
 // @public
 export type ChromeTranslate = (key: string, params?: TranslationParams) => string;
+
+// @internal
+export function clampSlide(index: number | undefined, count: number): number;
 
 // @internal
 export function clearNotesFindMatch(root: HTMLElement | null): void;
@@ -978,6 +984,9 @@ export function createNotesFindPainter(): {
 export function createPptxEditor(options?: PptxEditorOptions): PptxEditorInstance;
 
 // @internal
+export function createProgressiveMount(changed: () => void, now?: () => number): ProgressiveMount;
+
+// @internal
 export function createToolbarFitMemory(): ToolbarFitMemory;
 
 // @public
@@ -1169,9 +1178,15 @@ export interface DocumentSearchState {
 // @public (undocumented)
 export class DocumentSession {
     constructor(store: PptxDocumentStore, fonts: FontSet);
+    // @internal
+    addMissingSubstitutes(): Promise<boolean>;
     batch(base?: PptxPackage): OpBatch;
     // @internal
     clearHostFaces(): void;
+    // @internal
+    damage: Extract<PackageRejection, {
+        reason: 'xml';
+    }> | null;
     dispose(): void;
     get faces(): readonly RegisteredFace[];
     get fontGeneration(): number;
@@ -1189,11 +1204,23 @@ export class DocumentSession {
     get info(): PresentationInfo;
     layout(index: number): SlideLayout | undefined;
     layoutOf(pkg: PptxPackage, index: number): SlideLayout | undefined;
+    // @internal
+    markDamaged(rejection: Extract<PackageRejection, {
+        reason: 'xml';
+    }>): void;
     get measurer(): TextMeasurer;
+    // @internal
+    onDamage: ((rejection: Extract<PackageRejection, {
+        reason: 'xml';
+    }>) => void) | null;
+    // @internal
+    opening: ProgressiveOpen | null;
     // @internal
     probeBatch(base?: PptxPackage): OpBatch;
     // @internal
     setHostFaces(next: HostFaces): void;
+    // @internal
+    slidePending(index: number): boolean;
     // (undocumented)
     readonly store: PptxDocumentStore;
     substitutedFamilies(): FontSubstitution[];
@@ -1238,9 +1265,8 @@ export interface Editor {
     focus(): void;
     // (undocumented)
     goToSlide(index: number): void;
-    // (undocumented)
-    load(bytes: Uint8Array): Promise<CommandResult>;
-    renderThumbnail(index: number, container: HTMLElement): void;
+    load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
+    renderThumbnail(index: number, container: HTMLElement, options?: RenderThumbnailOptions): () => void;
     save(): Uint8Array<ArrayBuffer> | null;
     selectAll(): void;
     selectSlide(index: number, mode?: SlideSelectMode): void;
@@ -1333,6 +1359,13 @@ export type EditorCommand = {
 } | {
     readonly type: 'indent';
     readonly direction: 1 | -1;
+}
+/**
+* Backspace at the start of a list item: remove the bullet or number of every list item the
+* selection touches. The item keeps its level, and its text moves to where the bullet was.
+*/
+| {
+    readonly type: 'removeBullet';
 } | {
     readonly type: 'setLineSpacing';
     readonly multiple: number;
@@ -1778,7 +1811,7 @@ export interface EditorRefApi {
     // (undocumented)
     getEditor(): PptxEditorInstance | null;
     // (undocumented)
-    load(bytes: Uint8Array): Promise<CommandResult>;
+    load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
     // (undocumented)
     save(): Uint8Array<ArrayBuffer> | null;
     // (undocumented)
@@ -1843,6 +1876,7 @@ export interface EditorSnapshot {
     readonly geometry: SelectionGeometry | null;
     readonly image?: SelectedImageState | null;
     readonly insertions: number;
+    readonly isOpening?: boolean;
     readonly lastRejection?: EditorRejection | null;
     readonly lastRemoval?: EditorRemoval | null;
     readonly layouts?: readonly SlideLayoutSummary[];
@@ -1852,7 +1886,9 @@ export interface EditorSnapshot {
     readonly notes: string;
     readonly notesFormatted?: readonly NotesParagraph[];
     readonly openFailure?: DocumentOpenFailure | null;
+    readonly pendingSlides?: number;
     readonly presentationView?: PresentationView;
+    readonly readOnlyReason?: 'damaged-slide' | null;
     // (undocumented)
     readonly revision: number;
     readonly sections?: readonly SlideSection[];
@@ -2961,6 +2997,11 @@ export interface LoadingSheetSize {
 // @internal
 export function loadingSheetSize(snapshot: EditorSnapshot): LoadingSheetSize;
 
+// @public
+export interface LoadOptions {
+    readonly startSlide?: number;
+}
+
 // @internal
 export function loadSubstitute(family: DefaultFamily, fetcher?: typeof fetch | undefined): Promise<SubstituteLoad>;
 
@@ -3119,6 +3160,32 @@ export interface MenuSlotRowSpec {
     readonly value?: string | undefined;
 }
 
+// @internal
+export const MOUNT_CHUNK_ITEMS = 1000;
+
+// @internal
+export const MOUNT_FIRST_ITEMS = 40;
+
+// @internal
+export const MOUNT_FIRST_STEP_ITEMS = 100;
+
+// @internal
+export const MOUNT_FRAME_MS = 8;
+
+// @internal
+export const MOUNT_MIN_STEP_ITEMS = 10;
+
+// @internal
+export interface MountedSections {
+    // (undocumented)
+    readonly limit: number;
+    // (undocumented)
+    readonly sections: readonly SlideSection[];
+}
+
+// @internal
+export function mountedSections(grouped: readonly SlideSection[], limit: number): MountedSections;
+
 // @public
 export function namedFamilies(pkg: PptxPackage): string[];
 
@@ -3140,6 +3207,9 @@ NotesFormat,
 string,
 'notes.bold' | 'notes.italic' | 'notes.underline'
 ])[];
+
+// @internal
+export const NOTES_INSET_PROPERTY = "--pptx-notes-inset";
 
 // @internal
 export const NOTES_SLOTS: Partial<Record<ChromeSlotId, NotesFormat>>;
@@ -3185,6 +3255,12 @@ export function notesFormatShortcut(e: ModifierKeys): NotesFormat | null;
 
 // @internal
 export function notesHistoryShortcut(e: ModifierKeys): 'undo' | 'redo' | null;
+
+// @internal
+export interface NotesInsetTracker {
+    dispose(): void;
+    refresh(): void;
+}
 
 // @internal
 export interface NotesKeyContext {
@@ -3352,6 +3428,10 @@ export function openHyperlinkPopup(controller: HyperlinkPopupController, editor:
 export interface OpenOptions {
     readonly fixedMeasurer?: boolean;
     readonly fonts?: readonly FontSource_2[];
+    // @internal
+    readonly progressive?: {
+        readonly startSlide?: number;
+    };
     readonly substitutes?: boolean;
 }
 
@@ -3756,6 +3836,8 @@ export interface PptxEditorEvents {
 // @public
 export interface PptxEditorInstance extends Editor {
     readonly find: PptxFind;
+    // @internal
+    finishOpening(): boolean;
     fontFamilies(): readonly string[];
     readonly fonts: PptxEditorOptions['fonts'];
     input(kind: TextInputKind, data?: string): CommandResult;
@@ -3772,6 +3854,7 @@ export interface PptxEditorInstance extends Editor {
 
 // @public
 export interface PptxEditorOptions extends Omit<OpenOptions, 'fonts'> {
+    readonly autoCorrect?: boolean;
     // (undocumented)
     readonly document?: Uint8Array;
     readonly fontFamilies?: readonly string[];
@@ -3826,6 +3909,14 @@ export type PresentationView = 'normal' | 'slideSorter';
 // @internal
 export function presetGradient(base: string, light: number, dark: number): GradientFill;
 
+// @internal
+export interface ProgressiveMount {
+    // (undocumented)
+    dispose(): void;
+    follow(total: number): void;
+    limit(total: number, needed: number, opening: boolean, loading?: boolean): number;
+}
+
 // @public
 export function queryLocalFontSources(families: readonly string[]): Promise<LocalFontsOutcome>;
 
@@ -3840,6 +3931,12 @@ export function railDragAxis(orientation: SlideRailOrientation | undefined): 'x'
 
 // @internal
 export function railFoldsActions(orientation: SlideRailOrientation | undefined, width: number): boolean;
+
+// @internal
+export function railItemPosition(index: number, count: number, limit: number, grouped: readonly SlideSection[] | null): {
+    readonly setSize: number;
+    readonly posInSet: number;
+} | null;
 
 // @internal
 export function railKeyDown(e: PaneKeyEvent, ctx: SlideListKeyContext): void;
@@ -3893,6 +3990,9 @@ export type ReflectionPreset = 'tightTouching' | 'halfTouching' | 'fullTouching'
 export function refocusAfterCollapse(list: HTMLElement | null, was: HTMLElement | null): void;
 
 // @internal
+export function refocusAfterSorterHides(list: HTMLElement, editor: PptxEditorInstance | null): void;
+
+// @internal
 export function registerSectionRenamer(editor: object, take: (sectionId: string) => void): () => void;
 
 // @internal
@@ -3912,6 +4012,11 @@ export function renderImageWith(session: DocumentSession, index: number, request
 
 // @internal
 export function renderNotes(root: HTMLElement, paragraphs: readonly NotesParagraph[]): void;
+
+// @public
+export interface RenderThumbnailOptions {
+    readonly defer?: boolean;
+}
 
 // @internal
 export function repaintSurfaceOf(editor: object): boolean;
@@ -4467,6 +4572,12 @@ export interface SlideImageOptions {
     readonly width?: number;
 }
 
+// @internal
+export function slideItemName(t: Translate, slide: {
+    readonly index: number;
+    readonly hidden: boolean;
+}): string;
+
 // @public
 export type SlideLayoutKind = 'title' | 'tx' | 'twoColTx' | 'tbl' | 'txAndChart' | 'chartAndTx' | 'dgm' | 'chart' | 'txAndClipArt' | 'clipArtAndTx' | 'titleOnly' | 'blank' | 'txAndObj' | 'objAndTx' | 'objOnly' | 'obj' | 'txAndMedia' | 'mediaAndTx' | 'objOverTx' | 'txOverObj' | 'txAndTwoObj' | 'twoObjAndTx' | 'twoObjOverTx' | 'fourObj' | 'vertTx' | 'clipArtAndVertTx' | 'vertTitleAndTx' | 'vertTitleAndTxOverChart' | 'twoObj' | 'objAndTwoObj' | 'twoObjAndObj' | 'cust' | 'secHead' | 'twoTxTwoObj' | 'objTx' | 'picTx';
 
@@ -4640,6 +4751,7 @@ export interface SlideSummary {
     readonly index: number;
     readonly key: string;
     readonly layoutId?: string;
+    readonly pending?: true;
 }
 
 // @internal
@@ -5526,6 +5638,9 @@ export const TOOLTIP_SKIP_DELAY_MS = 300;
 
 // @internal
 export function tooltipAttributes(label: string, disabled?: boolean, reason?: string | null): ChromeTooltipAttributes;
+
+// @internal
+export function trackNotesInset(box: HTMLElement): NotesInsetTracker;
 
 // @public
 export interface TransformItem {

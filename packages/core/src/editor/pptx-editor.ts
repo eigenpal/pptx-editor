@@ -4,12 +4,11 @@
 // state moves, so `useSyncExternalStore` selectors only re-render when their slice changes.
 
 import { documentOpenFailure, yieldToPaint } from './loading.ts';
-import { relationshipsOf, writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
+import { relationshipById, writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
 import { registerFontFaces, type FontFaceHandle } from '../output/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
 import type {
   CanResult,
-  ClipboardPayload,
   CommandResult,
   EditorCommand,
   EditorExecOptions,
@@ -20,15 +19,10 @@ import type {
   TextPoint,
 } from '../contracts/index.ts';
 import { tableStyleList } from '../cascade/index.ts';
-import {
-  CLIPBOARD_MIME,
-  clipboardText,
-  copySelection,
-  parseClipboardText,
-  readClipboard,
-} from './clipboard.ts';
+import { createClipboardHost } from './clipboard-host.ts';
+import { createOpeningLane } from './pptx-editor-opening.ts';
 import { commandCacheKey, compile, type CommandContext } from './commands.ts';
-import { openPresentation, type DocumentSession } from './document-session.ts';
+import { clampSlide, openPresentation, type DocumentSession } from './document-session.ts';
 import { changedSlide, isHistoryMark, validSelection, type HistoryMark } from './history-marks.ts';
 import { EditorHistoryGroups } from './history-groups.ts';
 import {
@@ -43,36 +37,24 @@ import {
   createSubstitutionSource,
   createVersionSource,
 } from './snapshot-sources.ts';
-import { aspectLockedIn, createShapeListSource, elementIn } from './shape-list.ts';
-import { parentGroupOf } from '../automation/commands/placement.ts';
-import {
-  activeOf,
-  createBackgroundSource,
-  formatAt,
-  geometryOf,
-  selectedText,
-} from './selection-state.ts';
+import { createShapeListSource, elementIn } from './shape-list.ts';
+import { activeOf, createBackgroundSource } from './selection-state.ts';
+import { formatAt, geometryOf } from './selection-state.ts';
 import { FormatPainter } from './format-painter.ts';
 import { CropMode } from './crop-mode.ts';
 import { pictureStateAt, withAltText } from './picture-state.ts';
 import { isViewCommand, ViewSettings, type ViewCommand } from './view-settings.ts';
 import { PlaceholderPrompts } from './placeholder-prompts.ts';
 import { RemovalNotice } from './removal-notice.ts';
-import { CanCache } from './can-cache.ts';
+import { CanCache, createStructureKey, STRUCTURE_COMMANDS } from './can-cache.ts';
 import { itemById, SlideSurface } from './surface.ts';
+import { createShortcut, createSurfaceHost, type SurfaceHostBase } from './surface-host.ts';
 import { setSurfaceRoot } from './surface-registry.ts';
 import { refit } from '../automation/commands/autofit.ts';
-import { listKeyAction } from './list-keys.ts';
-import { formatKeyCommand } from './format-keys.ts';
-import { selectAllOf, shapeKeyAction } from './shape-keys.ts';
-import { clampZoom, zoomKeyAction } from './zoom.ts';
-import {
-  editText,
-  isCaretKey,
-  moveTextSelection,
-  snapTextSelection,
-  type TextInputKind,
-} from './text-input.ts';
+import { withAutoCorrect } from './autocorrect.ts';
+import { selectAllOf } from './shape-keys.ts';
+import { clampZoom } from './zoom.ts';
+import { snapTextSelection, type TextInputKind } from './text-input.ts';
 import { comparePoints } from '../automation/commands/text-model.ts';
 import { CaretArm, armedCaretOf, caretSelection } from './caret-arm.ts';
 import { fontFamilyOf } from '../automation/commands/font-format.ts';
@@ -80,8 +62,7 @@ import { createHostFonts, openOptionsOf } from './host-fonts.ts';
 import { selectionBody, snapCellAddress, textItemOf } from './table-cells.ts';
 import { repairTablesForSave } from '../automation/commands/table-repair.ts';
 import { withoutStaleCopies } from '../automation/commands/alternate-copies.ts';
-import { applyTableKey, firstCellCaret, tableKeyAction } from './table-keys.ts';
-import { copyCellsTo, tablePasteFrom } from './table-clipboard.ts';
+import { firstCellCaret } from './table-keys.ts';
 import { createTableStateSource } from './table-state.ts';
 import { createThemeColorSource } from './theme-palette.ts';
 import { createSlideSummaries, SlideSelection } from './slide-selection.ts';
@@ -104,7 +85,15 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   let fonts: FontFaceHandle | null = null;
   let status: EditorSnapshot['status'] = 'empty';
   let failure: ReturnType<typeof documentOpenFailure> | undefined;
-  let mode: EditorMode = options.mode ?? 'edit';
+  /** Why the open deck is read-only, after edits, because a slide of it did not parse. */
+  let readOnly: EditorSnapshot['readOnlyReason'] = null;
+  /** The mode the host asked for (`setMode`, `options.mode`). */
+  let hostMode: EditorMode = options.mode ?? 'edit';
+  /** The mode in effect: view while the deck is read-only (`readOnlyReason`). */
+  let mode: EditorMode = hostMode;
+  // The caret and the store revision just after AutoCorrect started a list.
+  let autoListed: { readonly sel: EditorSelection; readonly rev: number } | null = null;
+  const typeText = withAutoCorrect(options.autoCorrect !== false);
   let slide = 0;
   let selection: EditorSelection = { kind: 'none' };
   let zoom = typeof options.zoom === 'number' ? clampZoom(options.zoom) : 1;
@@ -115,11 +104,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   let cached: EditorSnapshot | null = null;
   // The typing burst, the drag, and the host handles that make one undo step each.
   const groups = new EditorHistoryGroups();
-  let lastCopied: ClipboardPayload | null = null;
   // Repeated pastes of one payload cascade; a payload parsed from the clipboard is cached by
   // its text so the series survives re-reading it.
   let pasteSeries: { payload: unknown; count: number } = { payload: null, count: 0 };
-  let lastParsed: { raw: string; payload: unknown } = { raw: '', payload: null };
   let lastRejection: EditorRejection | null = null;
   const removal = new RemovalNotice(); // `snapshot.lastRemoval`
   const painter = new FormatPainter();
@@ -140,6 +127,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     idPrefix,
     frameLabel: (kind) => frameLabelOf(options.translate, kind),
     layoutPreview: (owner, id) => prompts.preview(owner, id),
+    currentSlide: () => slide,
   });
 
   const effectiveZoom = (): number => (fitZoom ? fitValue : zoom);
@@ -147,18 +135,23 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
 
   // `can` compiles the command; toolbars ask for every slot on every change, so answers are
   // cached until the state a command compiles against moves: the package, the slide, the
-  // selection, or the mode. Zoom, hover, and fit changes keep them.
-  const canCache = new CanCache<CommandContext['active']>(() => [
-    session?.store.package,
-    slide,
-    slideSel.indices(session?.info.slides ?? [], slide).join(),
-    selection,
-    mode,
-    painter.state,
-    cropper.state,
-    arm.version,
-    views.presentationView,
-  ]);
+  // selection, or the mode. Zoom, hover, and fit changes keep them. New Slide and Add Section
+  // read no slide content and no selection: typing keeps their answers (`STRUCTURE_COMMANDS`).
+  const structureOf = createStructureKey();
+  const canCache = new CanCache<CommandContext['active']>(
+    () => [
+      session?.store.package,
+      slide,
+      slideSel.version,
+      selection,
+      mode,
+      painter.state,
+      cropper.state,
+      arm.version,
+      views.presentationView,
+    ],
+    () => [...structureOf(session), slide, mode, views.presentationView]
+  );
   const emit = (): void => {
     arm.sync();
     // The slide sorter shows no slide canvas: no shape or text selection there, whatever set it
@@ -189,6 +182,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       revision,
       mode,
       slides,
+      pendingSlides: opening.pending(),
+      isOpening: status === 'loading',
+      readOnlyReason: readOnly,
       currentSlide: slide,
       selectedSlides: slideSel.indices(info?.slides ?? [], slide),
       slideNumbers: pkg ? hasSlideNumber(pkg, slide) : false,
@@ -202,7 +198,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       selection,
       format: formatAt(arm.layout() ?? lay, selection, (rId) => {
         const part = info?.slides[slide]?.partName;
-        const rel = pkg && part ? relationshipsOf(pkg, part).find((r) => r.id === rId) : undefined;
+        const rel = pkg && part ? relationshipById(pkg, part, rId) : undefined;
         return rel?.external ? rel.externalTarget : undefined;
       }),
       geometry: withAltText(
@@ -288,7 +284,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         ? // Commands carrying bytes are cached by object identity, not serialized.
           `${command.type}:${partVersion(command)}`
         : commandCacheKey(command);
-    return canCache.answer(key, () => canUncached(command));
+    return canCache.answer(key, () => canUncached(command), STRUCTURE_COMMANDS.has(command.type));
   };
 
   const sectionIds = () => sectionSummaries(session?.store.package).map((x) => x.id);
@@ -387,6 +383,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     if (!session) return { ok: false, reason: 'disabled.noEditor' };
     if (command.type === 'undo' || command.type === 'redo') {
       if (mode === 'view') return refuse('disabled.viewing');
+      surface?.cancelDrag();
       const undo = command.type === 'undo';
       // An armed format is the last step, as in DOCX Editor: the first undo ends it alone.
       if (undo && arm.current()) return (arm.clear(), emit(), { ok: true });
@@ -504,10 +501,11 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     const armed = typed ? arm.current() : null;
     const batch = session.batch(armed?.pkg);
     let at: TextPoint;
+    let listed = false;
     try {
       const txBody = selectionBody(batch, part, sel);
       if (!txBody) throw new CommandRefusal('disabled.noText');
-      at = editText(batch, part, txBody.id, item, sel, kind, data);
+      ({ at, list: listed } = typeText(batch, part, slide, txBody.id, item, sel, kind, data));
       const caret = { part, nodeId: sel.nodeId, at, ...(sel.cell ? { cell: sel.cell } : {}) };
       if (carried) for (const op of arm.carry(batch.pkg, caret)) batch.push(op);
       refit(batch, slide, part, sel.nodeId, session.measurer);
@@ -517,7 +515,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     }
     // Typed text is one burst, one undo step; text typed over a range starts a new burst that
     // holds the replace, so one undo removes both. A break or a delete is a step of its own.
-    const burst = kind === 'text';
+    const burst = kind === 'text' && !listed;
     if (!burst || comparePoints(sel.anchor, sel.focus) !== 0) groups.boundary();
     const caret: EditorSelection = { ...sel, anchor: at, focus: at };
     // The entry's `selectionBefore`: an undo returns this object, so the arm finds its commands.
@@ -532,84 +530,29 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     if (armed) arm.typed(mark, armed.commands);
     if (!carried) arm.clear();
     selection = caret;
+    autoListed = listed ? { sel: caret, rev: session.store.revision } : null;
     emit();
     return { ok: true };
   };
 
-  /** Move the caret (arrow keys), optionally extending the selection. */
-  const moveCaret = (key: string, e: KeyboardEvent): void => {
-    if (!session || selection.kind !== 'text') return;
-    const item = textItemOf(layout(), selection);
-    if (!item?.text) return;
-    selection = moveTextSelection(item, selection, key, e.shiftKey, e);
-    groups.boundary();
-    emit();
-  };
-
-  const shortcut = (key: string, e: KeyboardEvent): boolean => {
-    const mod = e.metaKey || e.ctrlKey;
-    const lower = key.toLowerCase();
-    // The format and history keys (format-keys.ts); in text, Ctrl/Cmd+= is subscript.
-    const keyed = formatKeyCommand(key, e, selection.kind === 'text');
-    if (keyed) return (exec(keyed), true);
-    // Ctrl/Cmd + = and − zoom, and Ctrl/Cmd + 0 fits the slide to the window (zoom.ts).
-    const zoomed = zoomKeyAction(key, mod);
-    if (zoomed) return (zoomed === 'fit' ? instance.setZoom('fit') : surface?.zoomBy(zoomed), true);
-    // The format painter: Escape puts it away.
-    if (key === 'Escape' && (painter.cancel() || cropper.cancel())) return (emit(), true);
-    // Ctrl/Cmd+K asks the chrome for its link popover; Ctrl/Cmd+\\ clears formatting.
-    if (mod && lower === 'k') {
-      // The detail names the editor, so a toolbar answers only its own editor's request.
-      surface?.root.dispatchEvent(
-        new CustomEvent('pptx-link-request', { bubbles: true, detail: { editor: instance } })
-      );
-      return true;
-    }
-    // Tab, Shift+Tab, and arrows at a cell's edge move between table cells (table-keys.ts).
-    const cellKey = tableKeyAction(layout(), selection, key, e.shiftKey, mod || e.altKey);
-    if (cellKey) return (applyTableKey(cellKey, exec, layout, select), true);
-    if (selection.kind === 'text') {
-      if (isCaretKey(key)) {
-        moveCaret(key, e);
-        return true;
-      }
-      if (mod && lower === 'a') return (selectAll(), true);
-      if (key === 'Escape') {
-        const group = parentGroupOf(layout()?.items ?? [], selection.nodeId);
-        selection = { kind: 'shapes', nodeIds: [selection.nodeId], ...(group ? { group } : {}) };
-        emit();
-        surface?.focus();
-        return true;
-      }
-      // Enter, Tab, and Backspace with lists (list-keys.ts).
-      const list = listKeyAction(textItemOf(layout(), selection), selection, key, {
-        shift: e.shiftKey,
-        other: mod || e.altKey,
-      });
-      if (list)
-        return (
-          list.kind === 'input' ? textInput(list.input, list.data) : exec(list.command),
-          true
-        );
-      return false;
-    }
-    if (mod && lower === 'a') return (selectAll(), true);
-    if (mod && lower === 'g') return (exec({ type: e.shiftKey ? 'ungroup' : 'group' }), true);
-    if (selection.kind === 'shapes' || selection.kind === 'none') {
-      // Tab, nudge, delete, duplicate, Escape, and Enter on selected shapes (shape-keys.ts).
-      const keys = { shift: e.shiftKey, mod, alt: e.altKey };
-      const act = shapeKeyAction(key, keys, selection, layout(), mode);
-      if (act?.kind === 'leave') return (select({ kind: 'none' }), false);
-      if (act?.kind === 'exec') return (exec(act.command), true);
-      if (act?.kind === 'select') return (select(act.selection), true);
-      if (act?.kind === 'enterText') {
-        if (enterText(act.nodeId, null) && act.type) textInput('text', act.type);
-        return true;
-      }
-      if (act) return true;
-    }
-    return false;
-  };
+  const shortcut = createShortcut({
+    editor: () => instance,
+    layout: () => layout(),
+    selection: () => selection,
+    setSelection: (next) => ((selection = next), emit()),
+    mode: () => mode,
+    exec: (command) => exec(command),
+    select: (next) => select(next),
+    selectAll: () => selectAll(),
+    textInput: (kind, data) => textInput(kind, data),
+    enterText: (id) => enterText(id, null),
+    surface: () => surface,
+    fitZoom: () => instance.setZoom('fit'),
+    cancelTools: () => (painter.cancel() || cropper.cancel() ? (emit(), true) : false),
+    boundary: () => groups.boundary(),
+    // Backspace right after AutoCorrect started a list gives the typed marker back (undo).
+    autoListed: () => autoListed?.sel === selection && autoListed.rev === session?.store.revision,
+  });
 
   /** Enter text editing at the end of a shape's text. */
   const enterText = (id: string, point: TextPoint | null): boolean => {
@@ -683,71 +626,78 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     select(all);
   };
 
-  /** The selected shapes as a clipboard payload. */
-  const copy = (): ClipboardPayload | null => {
-    if (!session || selection.kind !== 'shapes') return null;
-    const ref = session.info.slides[slide];
-    if (!ref) return null;
-    const payload = copySelection(
-      session.store.package,
-      ref.partName,
-      layout()?.items ?? [],
-      selection,
-      session.id
-    );
-    if (payload) {
-      lastCopied = payload;
-      // Paste's enabled state reads `lastCopied`: tell the chrome it changed.
-      emit();
-    }
-    return payload;
-  };
-
-  /** Fill a clipboard event: shapes as the editor's format plus plain text. */
-  const copyTo = (data: DataTransfer, cut: boolean): boolean => {
-    // A cell range: its text as tab-separated text and as this editor's cells format.
-    if (copyCellsTo(data, layout(), selection))
-      return (cut && mode !== 'view' && exec({ type: 'delete' }), true);
-    if (selection.kind === 'text') {
-      const text = selectedText(layout(), selection);
-      if (!text) return false;
-      data.setData('text/plain', text);
-      if (cut) textInput('deleteBackward');
-      return true;
-    }
-    const payload = copy();
-    if (!payload) return false;
-    data.setData(CLIPBOARD_MIME, JSON.stringify(payload));
-    data.setData('text/plain', clipboardText(payload));
-    if (cut) removal.cut(() => exec({ type: 'delete' }));
-    return true;
-  };
+  const clipboard = createClipboardHost({
+    session: () => session,
+    slide: () => slide,
+    selection: () => selection,
+    layout,
+    readOnly: () => mode === 'view',
+    emit,
+    deleteText: () => void textInput('deleteBackward'),
+    cutShapes: () => removal.cut(() => exec({ type: 'delete' })),
+    clearCells: () => void exec({ type: 'delete' }),
+    pasteCells: (texts) => void exec({ type: 'pasteCells', texts }),
+    insertText: (text) => void textInput('text', text),
+    refuse: (reason) => void refuse(reason),
+    paste: (payload) => void exec({ type: 'paste', payload }),
+  });
 
   /**
-   * Paste shapes from a clipboard event. Text pastes into text editing are left alone, and so
-   * is a clipboard that holds neither this editor's format nor the text of the last copy.
+   * Put the mode in effect: the host's, or view while the deck is read-only. The host's mode is
+   * kept, so the next deck opens in it.
    */
-  const pasteFrom = (data: DataTransfer): boolean => {
-    if (mode === 'view') return false;
-    // Copied cells or tab-separated text fill cells; one copied cell goes in at the caret.
-    const paste = tablePasteFrom(data, selection);
-    if (paste && 'cells' in paste) return (exec({ type: 'pasteCells', texts: paste.cells }), true);
-    if (paste) return (textInput('text', paste.text), true);
-    if (selection.kind === 'text') return false;
-    // A payload parsed once is cached by its text, so a paste series keeps one identity.
-    const read = readClipboard(data, lastCopied, (raw) => {
-      if (raw === lastParsed.raw) return lastParsed.payload;
-      const payload = parseClipboardText(raw);
-      if (payload) lastParsed = { raw, payload };
-      return payload;
-    });
-    if (!read) return false;
-    if ('refused' in read) return (refuse('errors.clipboard'), true);
-    exec({ type: 'paste', payload: read.payload as ClipboardPayload });
-    return true;
+  const applyMode = (): void => {
+    mode = readOnly || session?.damage ? 'view' : hostMode;
+    if (mode !== 'view') return;
+    painter.reset();
+    cropper.cancel();
+    // View mode edits no text and no cells: the element stays selected.
+    if (selection.kind === 'text' || selection.kind === 'cells')
+      selection = { kind: 'shapes', nodeIds: [selection.nodeId] };
   };
+  /**
+   * Refuse a file that did not open, or the deck `drop` opened when one of its slides did not
+   * parse. A deck with no edits goes. A deck with edits stays open for viewing, as DOCX Editor's
+   * write guard keeps a document readable: its store refuses every commit, and the notice says
+   * why, so the user can still read and copy the work.
+   */
+  const refuseOpen = (code: string, drop?: DocumentSession): CommandResult => {
+    const refused: CommandResult = { ok: false, reason: 'errors.malformed', detail: code };
+    if (drop && drop !== session) return refused;
+    if (drop && drop.store.edited) {
+      // The deck opened and holds edits: it stays on screen, read-only. It is no failed open.
+      readOnly = 'damaged-slide';
+      applyMode();
+      opening.keepReading(drop);
+      emit();
+      return refused;
+    }
+    if (drop) {
+      (detachModules(), thumbnails.clear(), drop.dispose());
+      // The deck goes with its fonts, its slide, and any gesture still open on it.
+      fonts?.dispose();
+      fonts = null;
+      session = null;
+      selection = { kind: 'none' };
+      slide = 0;
+      slideSel.reset(undefined);
+      groups.closeAll();
+    }
+    // A deck that was open stays open. A load that runs keeps its own status.
+    if (!drop || status !== 'loading') status = session ? 'ready' : 'error';
+    failure = documentOpenFailure(code);
+    emit();
+    return { ok: false, reason: 'errors.malformed', detail: code };
+  };
+  const opening = createOpeningLane({
+    session: () => session,
+    emit,
+    refuse: (owner, rejection) => void refuseOpen(rejection.reason, owner),
+    facesChanged: refreshFaces,
+    requestFamilies: (families) => hostFonts.request(families),
+  });
 
-  const load = async (bytes: Uint8Array): Promise<CommandResult> => {
+  const openFile: PptxEditorInstance['load'] = async (bytes, loadOptions) => {
     if (destroyed) return { ok: false, reason: 'disabled.destroyed' };
     // A later `load` (or `destroy`) supersedes this one: its result is disposed, not shown.
     const token = ++generation;
@@ -757,21 +707,24 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       reason: destroyed ? 'disabled.destroyed' : 'errors.superseded',
     });
     status = 'loading';
+    // The open deck's background parse waits: the new file gets the thread.
+    opening.pause(session);
     emit();
     // Let the loading screen paint before the parse blocks the main thread (a large deck).
     await yieldToPaint();
     if (stale()) return superseded();
-    const r = await openPresentation(bytes, openOptionsOf(options));
+    // A collaboration room needs every part, so a deck that joins one opens whole.
+    const startSlide = clampSlide(loadOptions?.startSlide, Number.MAX_SAFE_INTEGER);
+    const progressive = modules.collaboration ? {} : { progressive: { startSlide } };
+    const r = await openPresentation(bytes, { ...openOptionsOf(options), ...progressive });
     if (r.ok && !stale()) await hostFonts.open(r.session, stale);
     if (stale()) {
       if (r.ok) r.session.dispose();
       return superseded();
     }
     if (!r.ok) {
-      status = session ? 'ready' : 'error'; // A deck that was open stays open.
-      failure = documentOpenFailure(r.error.reason);
-      emit();
-      return { ok: false, reason: 'errors.malformed', detail: r.error.reason };
+      opening.resume(session);
+      return refuseOpen(r.error.reason);
     }
     let faces: FontFaceHandle | null = null;
     if (typeof document !== 'undefined') {
@@ -812,8 +765,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     thumbnails.clear();
     status = 'ready';
     failure = undefined;
-    slide = 0;
-    slideSel.reset(session.info.slides[0]?.partName);
+    readOnly = null;
+    mode = hostMode;
+    slide = clampSlide(startSlide, session.info.slides.length);
+    slideSel.reset(session.info.slides[slide]?.partName);
     selection = { kind: 'none' };
     lastRejection = null;
     removal.clear();
@@ -821,6 +776,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     painter.reset(true);
     groups.closeAll();
     emit();
+    opening.start(opened);
     return { ok: true };
   };
 
@@ -832,12 +788,12 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       return hostFonts.current();
     },
     get lastCopied() {
-      return lastCopied;
+      return clipboard.lastCopied;
     },
     fontFamilies,
     tableStyles: () => (session ? tableStyleList(session.store.package) : []),
     setSelection: (next) => select(next),
-    copy,
+    copy: clipboard.copy,
     selectAll,
     focus: () => surface?.focus(),
     input: (kind, data) => textInput(kind, data),
@@ -856,8 +812,21 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     can,
     exec,
     beginHistoryGroup: () => groups.begin(),
-    load,
-    save: () => (session ? writePptx(repairTablesForSave(session.store.package)) : null),
+    load: async (bytes, loadOptions) => {
+      const before = session;
+      try {
+        return await openFile(bytes, loadOptions);
+      } catch (error) {
+        // The open threw before it replaced the deck: the old deck's background parse goes on.
+        if (session === before) opening.resume(before);
+        throw error;
+      }
+    },
+    // A deck still opening parses the rest first; a slide that does not parse refuses the deck.
+    save: () =>
+      session && !session.damage && opening.finish() && session && !session.damage
+        ? writePptx(repairTablesForSave(session.store.package))
+        : null,
     setZoom(value) {
       if (value === 'fit') fitZoom = true;
       else {
@@ -867,12 +836,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       emit();
     },
     setMode(next) {
-      mode = next;
-      if (next === 'view') painter.reset();
-      if (next === 'view') cropper.cancel();
-      // View mode edits no text and no cells: the element stays selected.
-      if (next === 'view' && (selection.kind === 'text' || selection.kind === 'cells'))
-        selection = { kind: 'shapes', nodeIds: [selection.nodeId] };
+      hostMode = next;
+      applyMode();
       emit();
     },
     goToSlide(index) {
@@ -895,32 +860,16 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       surface?.destroy();
       const focus = (): void => surface?.focus();
       setSurfaceRoot(instance, element, focus, () => surface?.render());
-      surface = new SlideSurface(element, {
+      const base: SurfaceHostBase = {
         idPrefix,
         layout,
-        paintLayout: (l) => prompts.paint(session, l, selection, mode === 'view') ?? l,
-        selection: () => selection,
-        readOnly: () => mode === 'view',
-        imageUrl: (p, id) => session?.imageUrl(p, id),
-        imageSize: (p, id) => session?.imageSize(p, id),
         label: (key, params) => (options.translate ? options.translate(key, params) : key),
         select,
-        presence: () => presence.painted(session?.store.package, partAt(slide)),
-        copy: copyTo,
-        paste: pasteFrom,
-        transform: (items, gesture) => {
-          if (!session) return;
-          // The package when this drag started: a table resize scales from it.
-          const base = groups.drag(surface, gesture, session.store.package).base ?? undefined;
-          gestureEdit({ type: 'setTransforms', items }, gesture, base);
-        },
+        copy: clipboard.copyTo,
+        paste: clipboard.pasteFrom,
         cropping,
-        crop: (crop, gesture) => gestureEdit({ type: 'cropImage', crop }, gesture),
         textInput,
         shortcut,
-        painting: () => painter.mode !== 'off',
-        // A selection made with the pointer while the painter is on takes the copied format.
-        pointerUp: () => void (painter.mode !== 'off' && exec({ type: 'pasteFormat' })),
         run: (command, options) => exec(command, options),
         beginHistoryGroup: () => groups.begin(),
         refuse: (reason, detail) => void refuse(reason, detail),
@@ -935,10 +884,18 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         },
         zoom: effectiveZoom,
         setZoom: (value) => instance.setZoom(value),
-        slideCount: () => session?.info.slides.length ?? 0,
-        smartGuides: () => views.smartGuides,
-        aspectLocked: (id) => aspectLockedIn(session?.store.package, partAt(slide), id),
-      });
+      };
+      surface = new SlideSurface(
+        element,
+        createSurfaceHost(base, {
+          session: () => session,
+          selection: () => selection,
+          viewing: () => mode === 'view',
+          part: () => partAt(slide),
+          surface: () => surface,
+          ...{ prompts, presence, painter, views, groups, gestureEdit },
+        })
+      );
       surface.render();
     },
     detach() {
@@ -948,10 +905,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     },
     setFonts: (next) => hostFonts.setFonts(next),
     setFontFamilies: (next) => void (familySource.set(next) && emit()),
-    renderThumbnail(index, container) {
-      thumbnails.render(index, container);
-    },
+    renderThumbnail: (index, container, opts) =>
+      thumbnails.render(index, container, opts?.defer === true),
     renderLayoutThumbnail: (layoutId, container) => thumbnails.renderLayout(layoutId, container),
+    finishOpening: () => !session || (!session.damage && opening.finish() && !session?.damage),
     reject: refuse,
     destroy() {
       // A `load` still in flight sees the flag and disposes what it opened.
@@ -995,6 +952,6 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     emit();
   }
 
-  if (options.document) void load(options.document);
+  if (options.document) void instance.load(options.document);
   return seam.withCollaborationFlag(removal.attach(instance), modules);
 }

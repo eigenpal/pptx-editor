@@ -105,14 +105,14 @@ Each diagnostic has a fixed `code`. Handle an unknown code by its `severity`. Th
 | `effect.inner-shadow` | `approximation` | An inner shadow starts at the fill, so an outline wider than 1 pt, an unfilled outline, and overlapping paths are shaded differently. |  |
 | `effect.silhouette` | `approximation` | A shadow or glow uses an opaque silhouette: picture and fill transparency do not shape it. |  |
 | `effect.soft-edge` | `approximation` | Soft edges are drawn hard. |  |
-| `effect.reflection` | `unsupported` | Reflections are not drawn. |  |
+| `effect.reflection-blur` | `approximation` | A reflection is drawn without its blur. |  |
 | `effect.not-rendered` | `unsupported` | An effect the engine does not render (`a:presetShdw`, `a:blur`, and others). |  |
 | `text.outline` | `unsupported` | Text outlines are not drawn. |  |
 | `text.underline-style` | `approximation` | A dotted, dashed, wavy, heavy, or word-only underline is drawn as a single line, as in the editor. |  |
 | `text.synthetic-style`, `text.upright`, `text.missing-glyph` | `approximation` | Synthetic bold and italic, upright vertical characters, and characters the face lacks. | `missing-glyph` |
 | `font.missing`, `font.not-embedded` | `unsupported` | A face has no bytes, or may not be embedded; its text is not drawn. The message names the font. | `font-embedding` |
 | `font.substitute-failed` | `approximation` | A packaged substitute face did not load, so its text measures and draws with another face. The diagnostic is document-wide: it has no slide or page. `fontResolution.substituteFailures` lists each failure as `{ family, file, diagnostic }`. | `font-origin-failed` |
-| `frame.chart`, `frame.diagram`, `frame.ole`, `frame.unknown` | `unsupported` | A chart, diagram, OLE object with no PNG, JPEG, GIF, or BMP picture, or other graphic frame is not drawn. Tables and OLE pictures draw. | `drawing` |
+| `frame.chart`, `frame.diagram`, `frame.ole`, `frame.unknown` | `unsupported` | A chart type outside the drawing module (3-D, of-pie, stock, bubble, surface, or a chart with trendlines or error bars), a diagram with no saved drawing, an OLE object with no PNG, JPEG, GIF, or BMP picture, or another graphic frame is not drawn. Tables, OLE pictures, other charts, and diagrams with a saved drawing draw. A `frame.diagram` message says why the diagram is not drawn: it has no saved drawing, its drawing holds content that is not drawn yet, or the drawing is past a shape, nesting, or slide limit. | `drawing` |
 | `frame.table` | `unsupported` | A table frame with no grid (no `a:tbl`, or no rows or columns) is not drawn. |  |
 | `geometry.unknown-preset` | `approximation` | An unknown preset geometry is drawn as a rectangle. |  |
 | `slide.not-laid-out` | `unsupported` | The slide could not be laid out and has no page. |  |
@@ -151,7 +151,8 @@ One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`sho
 - A blurred shadow or glow is up to 13 rings, each a transparency group, so overlapping rings never darken, with σ = `blurRad` × 0.5 from the editor. DOCX Editor draws 6 rings at fixed σ multiples (σ = `blurRad` ÷ 4) over a core at half alpha, without groups.
 - Past the paint budget, the export throws `PdfWorkLimitError` with the code `operations`, for operations and content bytes alike, next to `timeout` and `aborted`. DOCX Editor's `PdfWorkLimitError` has the one code `workLimitExceeded` for all of its budgets.
 - Each gradient's stop functions are written once per document, and at most 64 stops are drawn. DOCX Editor writes the stops of each gradient as given; a PPTX group, layout, or theme gradient can fill thousands of shapes.
-- Soft edges, reflections, and picture brightness and contrast are not drawn yet. DOCX Editor draws them with luminosity masks and the image `Decode` array (`picture-effects.ts`, `images.ts`), which is the pattern to follow.
+- A reflection is a transparency group of the shape under the reflection transform, through a luminosity soft mask of its fade; its blur is left out. Soft edges and picture brightness and contrast are not drawn yet. DOCX Editor draws them with luminosity masks and the image `Decode` array (`picture-effects.ts`, `images.ts`), which is the pattern to follow.
+- Opening an export session always installs the drawing module of `@pptx-editor.dev/pro/drawing`, so a PDF draws glow, inner shadows, reflections, and hard soft edges, as DOCX Editor's PDF export always includes its drawing module.
 - Diagnostic codes are dotted by area (`fill.*`, `picture.*`, `line.*`, `effect.*`, `text.*`, `font.*`, `frame.*`). DOCX Editor's codes are kebab-case, as its Markdown warnings are. The table above names the DOCX Editor code where the idea is the same. Handle an unknown code by its `severity`.
 - A refused open gives core's open error reason, and the package re-exports core's `OpenError` type, so a host reads one vocabulary with core's `openPresentation`. DOCX Editor re-exports its reason union `HeadlessDocumentRejection`; PPTX Core has no separate union to re-export.
 
@@ -180,15 +181,19 @@ One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`sho
 | Engine approximations and font substitutions | Reported as `information` |
 | Outer and inner shadows, glow | Drawn; the blur is layered rings (`approximation`) |
 | Soft edges | Drawn hard (`approximation`) |
+| Reflections | Drawn with their fade; the blur is left out (`approximation`) |
 | Gradient fills on text | Drawn: the glyphs clip the gradient, which spans the text body |
 | Gradient fills on lines | Drawn in the gradient's middle color (`approximation`) |
 | Tiled pictures; picture color effects (grayscale, duotone, brightness, black and white) | Drawn stretched; effects not applied (`approximation`) |
 | Dashes, compound lines | Drawn solid and single (`approximation`) |
-| Pattern fills, reflections | Not drawn (`unsupported`) |
+| Pattern fills | Not drawn (`unsupported`) |
 | Underline styles other than single and double | Drawn as a single line (`approximation`) |
 | Arrowheads, text outlines | Not drawn (`unsupported`) |
 | Upright East Asian vertical text, synthetic bold and italic | Drawn as normal text (`approximation`) |
-| Charts, diagrams, OLE objects with no PNG, JPEG, GIF, or BMP picture | Not drawn (`unsupported`) |
+| Diagrams with a saved drawing | Drawn from the saved drawing, read-only, as in the editor |
+| Charts: bar, column, line, area, scatter, pie, doughnut, and radar, from the values cached in the chart part | Drawn, from the engine's layout of the shapes and labels that `@pptx-editor.dev/pro/drawing` gives |
+| 3-D, of-pie, stock, bubble, and surface charts; charts with trendlines or error bars | Not drawn (`unsupported`) |
+| Diagrams with no saved drawing, OLE objects with no PNG, JPEG, GIF, or BMP picture | Not drawn (`unsupported`) |
 | Video and audio | The poster picture is drawn; the media is not embedded or played |
 | GIF, BMP, TIFF, EMF, WMF pictures | Not drawn (`unsupported`) |
 | SVG pictures | Drawn from their PNG fallback (`information`); without a fallback, not drawn |
@@ -211,4 +216,5 @@ The dependencies are the same as DOCX Editor's `docx-to-pdf`.
 | --- | --- | --- |
 | `pdf-lib` 1.17.1 | MIT | PDF writer |
 | `fontkit` 2.0.4 | MIT | Font parsing and subsetting for the embedder copied from DOCX Editor |
+| `@pptx-editor.dev/pro` | EigenPal Pro License | Charts, glow, inner shadow, reflection, and soft edge (`@pptx-editor.dev/pro/drawing`), which the export always installs, as DOCX Editor's `docx-to-pdf` installs `@docx-editor.dev/pro/drawing` |
 | `pdfjs-dist` 5.4.624 (dev) | Apache-2.0 | Reads the PDF back in tests |

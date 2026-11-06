@@ -76,6 +76,8 @@ Your own content inside the viewport keeps your styles. It gets only the editor'
 
 The slide show asks the browser for full screen. In an iframe, add `allow="fullscreen"`. Without full screen, the slide show fills only a transformed container around the editor.
 
+The page around the editor needs a `lang`, a `<title>`, one `<main>`, a heading, and labels for your own controls. See [Accessibility](/docs/accessibility).
+
 ## Set up your bundler
 
 The engine shapes text with HarfBuzz and loads `harfbuzz.wasm` from `new URL(..., import.meta.url)`.
@@ -97,3 +99,4 @@ Without other setup, the editor measures with the deck's embedded fonts, then wi
 
 - [Quickstart](/docs/quickstart): open and save a deck.
 - [Customization](/docs/customization): change the toolbar, menus, dialogs, and appearance.
+- [Accessibility](/docs/accessibility): prepare the host page, and check the keyboard and screen reader support.

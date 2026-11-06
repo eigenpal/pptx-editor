@@ -7,6 +7,12 @@
 // @internal
 export function adjustForPathMode(color: Rgba, mode: GeometryPath['fill']): Rgba;
 
+// @public
+export type AltTextPort = (part: string, nodeId: string) => {
+    readonly description: string;
+    readonly decorative: boolean;
+} | undefined;
+
 // @internal
 export function blurSigma(blurRad: number): number;
 
@@ -39,9 +45,6 @@ export interface FontFaceHandle {
 }
 
 // @internal
-export function glowSpread(rad: number): SpreadBlur;
-
-// @internal
 export function gradientPaintStops(stops: readonly GradientStop[]): GradientStop[];
 
 // @public
@@ -52,12 +55,6 @@ export type ImageSizePort = (sourcePart: string, rId: string) => {
 
 // @public
 export type ImageUrlPort = (sourcePart: string, rId: string) => string | undefined;
-
-// @internal
-export function innerShadowShift(dist: number, dir: number): {
-    dx: number;
-    dy: number;
-};
 
 // @internal
 export function linearGradientEnds(angle: number, scaled: boolean, w: number, h: number): {
@@ -89,6 +86,7 @@ export interface PaintContext {
 
 // @public
 export interface PaintOptions {
+    readonly altText?: AltTextPort;
     readonly frameLabel?: (kind: string) => string;
     readonly hitTargets?: boolean;
     readonly idPrefix: string;
@@ -107,12 +105,6 @@ export function registerFontFaces(doc: Document, faces: readonly RegisteredFace[
 
 // @internal
 export function serializeSvgElement(root: Element): string;
-
-// @internal
-export interface SpreadBlur {
-    readonly sigma: number;
-    readonly spread: number;
-}
 
 // @internal
 export const STORED_PIXELS_STYLE = "image-orientation: none";

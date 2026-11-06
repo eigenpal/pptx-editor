@@ -230,6 +230,19 @@ describe('rows the adapter runs', () => {
     expect(toolbarCommandState(editor, 'file.pageSetup').enabled).toBe(true);
     expect(toolbarCommandState(editor, 'view.playFromStart').enabled).toBe(true);
   });
+
+  test('Find and Replace are off in the slide sorter, and on again in the Normal view', async () => {
+    const editor = await open();
+    expect(editor.exec({ type: 'setPresentationView', view: 'slideSorter' }).ok).toBe(true);
+    for (const id of ['find.find', 'find.replace'] as const)
+      expect(toolbarCommandState(editor, id)).toMatchObject({
+        enabled: false,
+        disabledReason: 'disabled.findSorter',
+      });
+    expect(editor.exec({ type: 'setPresentationView', view: 'normal' }).ok).toBe(true);
+    expect(toolbarCommandState(editor, 'find.find').enabled).toBe(true);
+    expect(toolbarCommandState(editor, 'find.replace').enabled).toBe(true);
+  });
 });
 
 describe('clipboard rows and frames the clipboard cannot carry', () => {

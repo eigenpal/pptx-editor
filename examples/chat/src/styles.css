@@ -193,6 +193,8 @@ button {
   font-size: 14px;
 }
 .chat-head__brand {
+  margin: 0;
+  font-size: inherit;
   font-weight: 650;
   letter-spacing: -0.01em;
 }
@@ -613,9 +615,18 @@ button {
   .composer {
     padding: 0 10px 10px;
   }
-  .composer__hint,
-  .chat-head__new-label {
+  .composer__hint {
     display: none;
+  }
+  /* The label leaves the screen but stays the button's name for screen readers. */
+  .chat-head__new-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .composer__bar {
     justify-content: flex-end;
@@ -792,11 +803,9 @@ button {
     --pptx-rail-thumb-width: 88px;
   }
 }
-/* Stacked: the slide asks for the height that fits the width (an inline `flex-basis`) and
-   takes the spare height, the rail keeps its own height, and the open notes keep a reading
-   height. A short panel shrinks the slide and the notes together. */
 /* Stacked: the slide takes only its fitted height (the inline flex-basis from DeckPanel), so
-   no empty bands appear above and below it. The open notes take the spare height. */
+   no empty bands appear above and below it. The rail keeps its own height, and a short panel
+   shrinks the slide and the notes together. */
 .deck-ws[data-mode='stacked'] .deck-ws__canvas {
   flex-grow: 0;
   flex-shrink: 1;
@@ -805,9 +814,29 @@ button {
 .deck-ws__rail {
   margin: 0 12px 10px;
 }
+/* The view switch and the zoom float over the bottom right of the slide, or of the sorter. The
+   negative top margin pulls the group up over the pane above it, and the bottom margin gives
+   the next pane its place back. */
+.deck-ws__status {
+  position: relative;
+  z-index: 25;
+  display: flex;
+  align-self: flex-end;
+  gap: 8px;
+  height: 34px;
+  margin: -50px 18px 16px 0;
+}
+.deck-ws__status .pptx-zoom {
+  position: static;
+}
+/* The open notes take the height their text needs, up to half the panel, and then scroll. */
 .deck-ws[data-mode='stacked'] .deck-ws__notes[data-open='true'] {
-  flex: 1 1 0;
+  flex: 0 1 auto;
   min-height: 96px;
+  max-height: 50%;
+}
+.deck-ws[data-mode='stacked'] .deck-ws__notes[data-open='true'] .pptx-notes__text {
+  height: auto;
 }
 
 /* ============================================================================

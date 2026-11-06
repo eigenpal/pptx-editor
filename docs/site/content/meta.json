@@ -24,6 +24,7 @@
     "frameworks/vite-vue",
     "frameworks/nextjs",
     "pptx-fidelity",
+    "accessibility",
     "---React---",
     "react/index",
     "react/composition",

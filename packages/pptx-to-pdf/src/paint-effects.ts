@@ -3,10 +3,13 @@ Copyright (c) 2026 EigenPal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Outer shadows and glow as PDF paint, under the shape, and inner shadows over its geometry.
-// The placement is the editor's (`effectMatrix` and `blurSigma`, shared with
-// `packages/core/src/output/`). The blur is an APPROXIMATION: the writer has no blur filter, so a
-// blurred silhouette is drawn as a few layers, each the silhouette grown by a ring and painted as
+// Reflections, outer shadows, and glow as PDF paint, under the shape, and inner shadows over its
+// geometry. The placement is the editor's (`effectMatrix` and `blurSigma`, shared with
+// `packages/core/src/output/`; `glowSpread`, `innerShadowShift`, `reflectionFade`, and
+// `reflectionBlurSigma`, shared with `@pptx-editor.dev/pro/drawing`). Glow, inner shadow, and
+// reflection paint only while the Pro drawing renderers are installed, as in the SVG paint;
+// opening an export session always installs them. The blur is an APPROXIMATION: the writer has
+// no blur filter, so a blurred silhouette is drawn as a few layers, each the silhouette grown by a ring and painted as
 // one transparency group, at alphas that add up to the Gaussian edge (an approximation).
 //
 // The silhouette has parts: filled paths, outlines of unfilled paths, and the text's glyph
@@ -36,6 +39,7 @@ import {
 import type { Rgba } from '@pptx-editor.dev/core/cascade';
 import {
   apply,
+  drawingRenderers,
   hasCharacters,
   invert,
   multiply,
@@ -44,17 +48,19 @@ import {
   type Matrix,
   type PathCommand,
 } from '@pptx-editor.dev/core/layout';
+import { blurSigma, effectMatrix } from '@pptx-editor.dev/core/output';
 import {
-  blurSigma,
-  effectMatrix,
   glowSpread,
   innerShadowShift,
-} from '@pptx-editor.dev/core/output';
+  reflectionBlurSigma,
+  reflectionFade,
+} from '@pptx-editor.dev/pro/drawing';
 import { flatColor, ownFill, type FillScope } from './paint-fill.ts';
 import { fillTextOutlines } from './paint-text.ts';
 import {
   clipEvenOdd,
   EMU_PER_PT,
+  shadingFill,
   endPath,
   fillEvenOdd,
   fillEvenOddAndStroke,
@@ -71,6 +77,11 @@ const MIN_SIGMA = 6_350;
 
 /** A typical stem of a glyph, as a fraction of the font size: the width of a text silhouette. */
 const STEM_PER_EM = 0.1;
+
+/** Whether the Pro drawing renderers are installed, so glow, inner shadow, and reflection paint. */
+function proEffects(): boolean {
+  return drawingRenderers().effects !== undefined;
+}
 
 /** Whether the item's fill, outline, or text has any transparency. */
 function translucent(item: Drawable, scope: FillScope): boolean {
@@ -96,9 +107,10 @@ export function effectDiagnostics(item: Drawable, p: PageOps, scope: FillScope):
   const outlined = lineFill === 'solid' || lineFill === 'linear' || lineFill === 'path';
   const hasText = item.kind === 'shape' && item.text !== undefined && hasCharacters(item.text);
   const visible = filled.length > 0 || outlined || hasText;
+  const pro = proEffects();
   const { outerShadow, glow, innerShadow, softEdge, reflection } = effects;
   const shadowDrawn = visible && outerShadow !== undefined && outerShadow.color.a > 0;
-  const glowDrawn = visible && glow !== undefined && glow.radius > 0 && glow.color.a > 0;
+  const glowDrawn = pro && visible && glow !== undefined && glow.radius > 0 && glow.color.a > 0;
   if (shadowDrawn && blurSigma(outerShadow.blur) >= MIN_SIGMA)
     p.diag.add('effect.shadow-blur', 'approximation', 'Shadow blur is drawn as layered rings.');
   if (glowDrawn) p.diag.add('effect.glow', 'approximation', 'Glow is drawn as layered rings.');
@@ -109,7 +121,7 @@ export function effectDiagnostics(item: Drawable, p: PageOps, scope: FillScope):
       'Shadows and glow use an opaque silhouette: picture and fill transparency do not shape them.'
     );
   const m = item.matrix;
-  const inner = innerShadow !== undefined && innerShadow.color.a > 0;
+  const inner = pro && innerShadow !== undefined && innerShadow.color.a > 0;
   // `drawInnerShadow` shades the filled paths of a shape with an area.
   const innerDrawn = inner && filled.length > 0 && Math.abs(m[0] * m[3] - m[1] * m[2]) >= 1e-9;
   if (innerDrawn && blurSigma(innerShadow.blur) >= MIN_SIGMA)
@@ -128,10 +140,15 @@ export function effectDiagnostics(item: Drawable, p: PageOps, scope: FillScope):
       'approximation',
       'Inner shadows start at the fill: outlines and overlapping paths are shaded differently.'
     );
-  if (softEdge && softEdge.radius > 0)
+  if (pro && softEdge && softEdge.radius > 0)
     p.diag.add('effect.soft-edge', 'approximation', 'Soft edges are drawn hard.');
-  if (reflection && (reflection.startAlpha > 0 || reflection.endAlpha > 0))
-    p.diag.add('effect.reflection', 'unsupported', 'Reflections are not drawn yet.');
+  if (
+    pro &&
+    reflection &&
+    (reflection.startAlpha > 0 || reflection.endAlpha > 0) &&
+    reflectionBlurSigma(reflection.blur) >= MIN_SIGMA
+  )
+    p.diag.add('effect.reflection-blur', 'approximation', 'Reflections are drawn without blur.');
 }
 
 /** The standard normal distribution function (Abramowitz and Stegun 7.1.26 for erf). */
@@ -385,7 +402,7 @@ export async function drawEffectsBehind(
       );
   }
   const glow = effects.glow;
-  if (glow && glow.radius > 0 && glow.color.a > 0) {
+  if (glow && glow.radius > 0 && glow.color.a > 0 && proEffects()) {
     // As the SVG glow (`glowSpread`): the silhouette grown by `spread` and blurred by σ. The
     // inside level is the profile at the edge, a·Φ(spread / σ).
     const { spread, sigma } = glowSpread(glow.radius);
@@ -420,7 +437,7 @@ export async function drawInnerShadow(item: Drawable, p: PageOps, scope: FillSco
   // The SVG filter reads the shape's alpha: an unfilled shape has no inside to shade.
   const fills = item.kind === 'picture' || ownFill(item.element.fill, scope).fill.type !== 'none';
   const paths = fills ? item.geometry.paths.filter((path) => path.fill !== 'none') : [];
-  if (!inner || inner.color.a <= 0 || paths.length === 0) return;
+  if (!inner || inner.color.a <= 0 || paths.length === 0 || !proEffects()) return;
   const m = item.matrix;
   // A shape with no area has no inside.
   if (Math.abs(m[0] * m[3] - m[1] * m[2]) < 1e-9) return;
@@ -459,4 +476,62 @@ export async function drawInnerShadow(item: Drawable, p: PageOps, scope: FillSco
   p.push(clipEvenOdd(), endPath());
   await drawLayers([part], inner.color, list, p);
   p.push(popGraphicsState());
+}
+
+/**
+ * The reflection of a shape or picture, painted before its shadow and content, as the SVG
+ * renderer paints it: `drawContent` (the geometry, inner shadow, and text, in slide space) under
+ * the reflection's effect transform, as one transparency group, through a luminosity soft mask
+ * that fades from `startAlpha` at `startPos` to `endAlpha` at `endPos` along `fadeDir`. The blur
+ * is left out (`effectDiagnostics` reports it).
+ */
+export async function drawReflection(
+  item: Drawable,
+  p: PageOps,
+  drawContent: () => Promise<void>
+): Promise<void> {
+  const ref = item.element.effects?.reflection;
+  if (!ref || (ref.startAlpha <= 0 && ref.endAlpha <= 0) || !proEffects()) return;
+  const { cx: w, cy: h } = item.element.xfrm;
+  // The SVG renderer's placement and fade, so the two reflections agree.
+  const { matrix: m, line, start, end: last } = reflectionFade(ref, item.matrix, w, h);
+  // A transform with no area paints nothing.
+  if (Math.abs(m[0] * m[3] - m[1] * m[2]) < 1e-12) return;
+  const content = await p.capture(async () => {
+    p.push(pushGraphicsState(), concatTransformationMatrix(m[0], m[1], m[2], m[3], m[4], m[5]));
+    await drawContent();
+    p.push(popGraphicsState());
+  });
+  const group = p.form(content, formBox(p), { S: 'Transparency' });
+  // Equal positions are a hard step; the shading needs a line of some length.
+  const end = Math.max(start + 1e-6, last);
+  const at = (t: number): [number, number] => [
+    line.x1 + (line.x2 - line.x1) * t,
+    line.y1 + (line.y2 - line.y1) * t,
+  ];
+  const clamp = (a: number): number => Math.max(0, Math.min(1, a));
+  const ctx = p.res.doc.context;
+  const shading = ctx.obj({
+    ShadingType: 2,
+    ColorSpace: 'DeviceGray',
+    Coords: [...at(start), ...at(end)],
+    Function: {
+      FunctionType: 2,
+      Domain: [0, 1],
+      C0: [clamp(ref.startAlpha)],
+      C1: [clamp(ref.endAlpha)],
+      N: 1,
+    },
+    Extend: [true, true],
+  });
+  p.res.work.reserveContent(shading.sizeInBytes());
+  const mask = p.form([shadingFill(p.name('Shading', ctx.register(shading)))], formBox(p), {
+    S: 'Transparency',
+    CS: 'DeviceGray',
+  });
+  p.push(pushGraphicsState());
+  p.state(`smask:${mask.toString()}`, () =>
+    ctx.obj({ Type: 'ExtGState', SMask: { Type: 'Mask', S: 'Luminosity', G: mask } })
+  );
+  p.push(drawObject(p.name('XObject', group)), popGraphicsState());
 }

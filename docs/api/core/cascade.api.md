@@ -96,6 +96,9 @@ export interface CellBorders {
 }
 
 // @public
+export const CHART_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.drawingml.chart+xml";
+
+// @public
 export function collectionScriptFont(collection: FontCollection, slot: 'ea' | 'cs', lang?: string): string | undefined;
 
 // @public
@@ -125,6 +128,9 @@ export const DEFAULT_TABLE_STYLE_ID = "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}";
 
 // @public
 export function defaultTableStyleId(pkg: PptxPackage): string;
+
+// @public
+export type DiagramFallback = 'no-drawing' | 'unsupported' | 'limit';
 
 // @public
 export type EffectAlign = 'tl' | 't' | 'tr' | 'l' | 'ctr' | 'r' | 'bl' | 'b' | 'br';
@@ -186,6 +192,14 @@ export type GeometrySpec = {
 } | {
     readonly kind: 'custom';
     readonly element: Element_2;
+}
+/**
+* Paths already evaluated in the element's local box (EMU). Never read from a file: a drawing
+* renderer emits them, for example the bars and lines of a chart.
+*/
+| {
+    readonly kind: 'paths';
+    readonly paths: readonly GeometryPath[];
 };
 
 // @public
@@ -280,6 +294,9 @@ export interface RelRect {
 }
 
 // @public
+export function resolveChartPart(pkg: PptxPackage, sourcePart: string, graphicData: Element_2 | undefined, colors: ColorContext, theme: Theme): ResolvedChartPart | undefined;
+
+// @public
 export function resolveColor(el: Element_2 | undefined, ctx: ColorContext): Rgba | undefined;
 
 // @public
@@ -305,6 +322,14 @@ export type ResolvedBullet = {
     };
     readonly color?: Rgba;
 };
+
+// @public
+export interface ResolvedChartPart {
+    readonly chartSpace: Element_2;
+    readonly colors: ColorContext;
+    readonly partName: string;
+    readonly theme: Theme;
+}
 
 // @public
 export interface ResolvedEffects {
@@ -396,7 +421,9 @@ export type ResolvedFill = {
 
 // @public
 export interface ResolvedGraphicFrame extends ResolvedBase {
+    readonly chart?: ResolvedChartPart;
     readonly drawing?: readonly ResolvedElement[];
+    readonly drawingFallback?: DiagramFallback;
     // @deprecated (undocumented)
     readonly fallbackRId?: string;
     // (undocumented)
@@ -542,6 +569,7 @@ export interface ResolvedShape extends ResolvedBase {
     // (undocumented)
     readonly text?: ResolvedTextBody;
     readonly textBox?: true;
+    readonly textXfrm?: Xfrm;
 }
 
 // @public

@@ -859,6 +859,14 @@
 .pptx-statusbar__spacer {
   flex: 1 1 auto;
 }
+/* A deck that turned read-only after edits (`readOnlyReason`), beside the slide number. */
+.pptx-statusbar__read-only {
+  margin-inline-start: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--doc-warning-bg);
+  color: var(--doc-text);
+}
 .pptx-statusbar__views,
 .pptx-statusbar__zoom {
   display: inline-flex;
@@ -1053,7 +1061,9 @@
   width: 36px;
   height: 18px;
 }
-/* Color menus: titled sections of ten columns. */
+/* Color menus: titled sections of ten columns. Each swatch is a 24px target (WCAG 2.5.8), so
+ * the variant columns can touch. A container narrower than the grid, as the Format Background
+ * dialog on a phone, shrinks the swatches to 20px, so the ten columns stay inside it. */
 .pptx-swatches__section + .pptx-swatches__section {
   border-top: 1px solid var(--doc-border);
 }
@@ -1066,7 +1076,7 @@
 }
 .pptx-swatches {
   display: grid;
-  grid-template-columns: repeat(10, 20px);
+  grid-template-columns: repeat(10, minmax(20px, 24px));
   gap: 4px;
   padding: 6px 8px 8px;
 }
@@ -1081,12 +1091,17 @@
   border-radius: 0;
 }
 .pptx-swatch {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 1px solid var(--doc-border);
   border-radius: 4px;
   cursor: pointer;
+}
+.pptx-swatches > .pptx-swatch {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
 }
 .pptx-swatch:hover {
   transform: scale(1.1);
@@ -1231,6 +1246,10 @@
 }
 .pptx-rail__thumb svg {
   display: block;
+}
+/* The thumbnail of a slide still opening in a long deck (`SlideSummary.pending`). */
+.pptx-rail__thumb[data-pending] {
+  background: var(--doc-bg-hover);
 }
 /* Sections: a header per section that collapses its slides. */
 .pptx-rail__section,
@@ -2160,27 +2179,38 @@
   box-shadow: var(--doc-card-shadow-strong);
 }
 /* The views box holds the Normal or Slide Sorter workspace and, at its bottom right, the status
-   area, which stays mounted when the view changes. */
+   area, which stays mounted when the view changes. It is the size container of the font notice:
+   its width comes from the editor, never from its content. */
 .pptx-default__views {
   position: relative;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+  container: pptx-views / inline-size;
 }
 /* The view switch shows the chosen view as a pressed toggle, also inside the zoom pill. */
 .pptx-view-switch .pptx-view-switch__option[aria-checked='true'] {
   background: var(--doc-toggle-active-bg);
   color: var(--doc-toggle-active-fg);
 }
-/* The default editor's status area: the view switch and the zoom pill, bottom right. */
+/* The default editor's status area: the view switch and the zoom pill, bottom right. It floats
+   above the notes card at every notes height: `--pptx-notes-inset` (`notes-inset.ts`) is the
+   height that the card takes from the bottom of the workspace. The font notice uses it too. */
 .pptx-statusbar {
   position: absolute;
   right: 18px;
-  bottom: 16px;
+  bottom: calc(16px + var(--pptx-notes-inset, 0px));
   z-index: 25;
   display: flex;
   gap: 8px;
+}
+/* The status area stands over the bottom of the canvas, so the canvas pads its bottom: the
+   fitted slide stays clear of the controls, and a zoomed slide scrolls out from under them.
+   58px is the area's 16px offset, its 34px height, and an 8px gap; the surface's own padding
+   already gives part of it. */
+.pptx-default__views:has(> .pptx-statusbar) .pptx-default__main > .pptx-canvas {
+  padding-bottom: calc(58px - var(--doc-slide-padding, 24px));
 }
 .pptx-statusbar .pptx-zoom {
   position: static;
@@ -2253,13 +2283,14 @@
 .pptx-font-notice {
   position: absolute;
   left: 16px;
-  bottom: 16px;
+  bottom: calc(16px + var(--pptx-notes-inset, 0px));
   z-index: 25;
   display: flex;
   align-items: center;
   gap: 10px;
   width: max-content;
-  max-width: calc(100% - 200px);
+  /* It leaves room at the right for the status area: 18px, about 200px of controls, a gap. */
+  max-width: calc(100% - 256px);
   padding: 4px 4px 4px 12px;
   border: 1px solid var(--doc-warning);
   border-radius: var(--doc-radius-surface, 10px);
@@ -2294,6 +2325,21 @@
   width: 26px;
   height: 26px;
   color: var(--doc-warning-text);
+}
+/* In a narrow workspace there is no room beside the status area, so the notice takes the full
+   width above it (34px controls and a 12px gap), with its buttons on a second row. This block
+   comes after the notice's own rules, so it wins over them. */
+@container pptx-views (max-width: 799px) {
+  .pptx-font-notice {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    max-width: calc(100% - 32px);
+    padding-top: 6px;
+    bottom: calc(62px + var(--pptx-notes-inset, 0px));
+  }
+  .pptx-font-notice__text {
+    flex-basis: 100%;
+  }
 }
 .pptx-panel__list {
   display: flex;
@@ -3489,5 +3535,164 @@ legend.pptx-dialog__label {
 @media (prefers-reduced-motion: reduce) {
   .pptx-loading__spinner {
     animation: none;
+  }
+}
+
+/* ============================================================================
+ * FORCED COLORS (high contrast themes)
+ * The browser replaces the chrome colors with the user's system colors and removes box
+ * shadows. These rules draw each state with system colors: selection with an inner border,
+ * pressed and checked controls in `Highlight`, focus rings in `Highlight`, disabled controls in
+ * `GrayText`, and card edges where only a shadow drew them. Color previews keep their colors.
+ * ============================================================================ */
+
+@media (forced-colors: active) {
+  .pptx-editor :focus-visible {
+    outline-color: Highlight;
+  }
+
+  /* Cards and floating surfaces that a shadow outlined. */
+  .pptx-menu,
+  .pptx-tooltip,
+  .pptx-find,
+  .pptx-zoom,
+  .pptx-notes {
+    border: 1px solid CanvasText;
+  }
+
+  /* Pressed toggles, the checked view, selected tabs and options, the active row, and the
+   * hovered or focused menu row (a menu that the pointer opened draws no focus ring). The
+   * browser draws no text backplate here (`forced-color-adjust: none`), so the text and icons
+   * take `HighlightText` on `Highlight`, also in the hover state, and every part inside takes
+   * the same text color. A disabled control never takes `Highlight`: `GrayText` on `Highlight`
+   * can be unreadable. */
+  .pptx-toolbar__button:is([aria-pressed='true'], [data-active]):not(
+      :disabled,
+      [aria-disabled='true']
+    ),
+  .pptx-view-switch .pptx-view-switch__option[aria-checked='true'],
+  .pptx-segmented button:is([aria-checked='true'], [aria-selected='true']),
+  .pptx-tabs__tab[aria-selected='true'],
+  .pptx-font-picker__option[aria-selected='true'],
+  .pptx-menu__row[data-active]:not([aria-disabled='true']),
+  .pptx-table-grid__cell[data-active],
+  .pptx-menu__item:is(:hover, :focus-visible):not([aria-disabled='true']),
+  .pptx-layout-gallery__item:is(:hover, :focus-visible):not([aria-disabled='true']) {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+  .pptx-toolbar__button:is([aria-pressed='true'], [data-active]):not(
+      :disabled,
+      [aria-disabled='true']
+    )
+    *,
+  .pptx-view-switch .pptx-view-switch__option[aria-checked='true'] *,
+  .pptx-segmented button:is([aria-checked='true'], [aria-selected='true']) *,
+  .pptx-tabs__tab[aria-selected='true'] *,
+  .pptx-font-picker__option[aria-selected='true'] *,
+  .pptx-menu__row[data-active]:not([aria-disabled='true']) *,
+  .pptx-menu__item:is(:hover, :focus-visible):not([aria-disabled='true']) *,
+  .pptx-layout-gallery__item:is(:hover, :focus-visible):not([aria-disabled='true']) * {
+    color: inherit;
+  }
+  /* A pressed toggle that is disabled keeps its pressed state as a system-colored edge. */
+  .pptx-toolbar__button:is([aria-pressed='true'], [data-active]):is(
+      :disabled,
+      [aria-disabled='true']
+    ) {
+    outline: 1px solid GrayText;
+    outline-offset: -1px;
+  }
+  .pptx-ribbon__tab[aria-selected='true']::after {
+    background: Highlight;
+  }
+  .pptx-menubar__trigger[aria-expanded='true'],
+  .pptx-toolbar__field[aria-expanded='true'] {
+    outline: 1px solid Highlight;
+  }
+
+  /* Selected slides and the current layout: an inner border, so the focus ring stays outside. */
+  .pptx-rail__thumb,
+  .pptx-layout-gallery__thumb {
+    position: relative;
+    outline: 1px solid GrayText;
+  }
+  .pptx-rail__item:is([aria-selected='true'], [aria-current='true']) .pptx-rail__thumb::after,
+  .pptx-sorter__item:is([aria-selected='true'], [aria-current='true']) .pptx-rail__thumb::after,
+  .pptx-layout-gallery__item[data-current] .pptx-layout-gallery__thumb::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 3px solid Highlight;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  .pptx-rail__item:focus-visible .pptx-rail__thumb,
+  .pptx-sorter__item:focus-visible .pptx-rail__thumb {
+    outline: 2px solid Highlight;
+  }
+  .pptx-style-gallery__cell[aria-checked='true'],
+  .pptx-gradient__handle[aria-pressed='true'] {
+    outline: 2px solid Highlight;
+    outline-offset: 1px;
+  }
+
+  /* Disabled controls: the system's disabled text color. */
+  .pptx-toolbar__button:is(:disabled, [aria-disabled='true']),
+  .pptx-toolbar__field:is(:disabled, [aria-disabled='true']),
+  .pptx-toolbar__size[aria-disabled='true'],
+  .pptx-menu__item[aria-disabled='true'],
+  .pptx-menu__row[aria-disabled='true'],
+  .pptx-layout-gallery__item[aria-disabled='true'],
+  .pptx-zoom__level[aria-disabled='true'],
+  .pptx-button:disabled {
+    color: GrayText;
+  }
+
+  /* Color previews show the color they stand for, inside a system-colored edge. */
+  .pptx-swatch,
+  .pptx-toolbar__swatch,
+  .pptx-gradient__preview,
+  .pptx-gradient__bar,
+  .pptx-gradient__handle,
+  .pptx-style-gallery__swatch,
+  .pptx-corrections-grid__swatch {
+    forced-color-adjust: none;
+  }
+  .pptx-swatch,
+  .pptx-gradient__preview,
+  .pptx-gradient__bar {
+    border-color: CanvasText;
+  }
+  .pptx-swatch:is([aria-pressed='true'], [aria-current='true']) {
+    outline: 3px solid Highlight;
+  }
+  .pptx-swatch:focus-visible,
+  .pptx-gradient__handle:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  /* The selection marks on the slide. */
+  .pptx-surface__outline,
+  .pptx-surface__marquee,
+  .pptx-surface__handle {
+    stroke: Highlight;
+  }
+  .pptx-surface__handle {
+    fill: Canvas;
+  }
+  .pptx-surface__marquee {
+    fill: none;
+  }
+  .pptx-surface__group-outline,
+  .pptx-surface__crop-handle {
+    stroke: CanvasText;
+  }
+  .pptx-surface__text-selection,
+  .pptx-surface__cell-selection {
+    fill: Highlight;
+    fill-opacity: 0.4;
   }
 }

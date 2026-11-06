@@ -8,24 +8,7 @@
 import { apply, type LayoutItem, type Matrix } from '../layout/index.ts';
 import { SVG_NS } from '../output/index.ts';
 import { rotationHandle, unionBounds } from '../automation/commands/placement.ts';
-
-/** A handle of the selection: a box handle, the rotation handle, or a line's end point. */
-export type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'rot' | 'start' | 'end';
-type BoxHandle = Exclude<Handle, 'start' | 'end'>;
-const HANDLES: readonly BoxHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w', 'rot'];
-
-/** Where each box handle sits on the box, as fractions of its width and height. */
-export const HANDLE_POS: Record<BoxHandle, [number, number]> = {
-  nw: [0, 0],
-  n: [0.5, 0],
-  ne: [1, 0],
-  e: [1, 0.5],
-  se: [1, 1],
-  s: [0.5, 1],
-  sw: [0, 1],
-  w: [0, 0.5],
-  rot: [0.5, 0],
-};
+import { HANDLE_POS, HANDLES } from './surface-drag.ts';
 
 /** A table frame: it has a grid, and no rotation handle. */
 const isTable = (item: LayoutItem): boolean => item.kind === 'frame' && !!item.table;

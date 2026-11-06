@@ -27,7 +27,12 @@ import {
   type PathCommand,
   type SlideLayout,
 } from '@pptx-editor.dev/core/layout';
-import { drawEffectsBehind, drawInnerShadow, effectDiagnostics } from './paint-effects.ts';
+import {
+  drawEffectsBehind,
+  drawInnerShadow,
+  drawReflection,
+  effectDiagnostics,
+} from './paint-effects.ts';
 import {
   canDrawPicture,
   drawPicture,
@@ -201,6 +206,19 @@ async function drawGeometry(
   }
 }
 
+/** Why a frame is not drawn. A diagram names why it shows its placeholder. */
+function frameMessage(
+  kind: string,
+  fallback: 'no-drawing' | 'unsupported' | 'limit' | undefined
+): string {
+  if (kind !== 'diagram' || !fallback) return `${kind} frames are not drawn yet.`;
+  if (fallback === 'limit')
+    return 'A diagram is not drawn: its saved drawing is past the shape, nesting, or slide limit.';
+  if (fallback === 'unsupported')
+    return 'A diagram is not drawn: its saved drawing holds content that is not drawn yet.';
+  return 'A diagram is not drawn: it has no saved drawing.';
+}
+
 async function drawItem(
   item: LayoutItem,
   p: PageOps,
@@ -222,9 +240,19 @@ async function drawItem(
   if (item.kind === 'frame') {
     // An OLE object shows its picture, as in the SVG paint.
     if (item.poster) return drawItem(item.poster, p, local, groupScale);
+    // A diagram draws its saved drawing, as in the SVG paint.
+    if (item.drawing) {
+      for (const child of item.drawing) await drawItem(child, p, scope, matrixScale(item.matrix));
+      return;
+    }
+    // A chart drawn by an installed renderer, as in the SVG paint.
+    if (item.chart) {
+      for (const child of item.chart) await drawItem(child, p, local, groupScale);
+      return;
+    }
     if (!item.table) {
       const kind = item.element.frameKind;
-      p.diag.add(`frame.${kind}`, 'unsupported', `${kind} frames are not drawn yet.`);
+      p.diag.add(`frame.${kind}`, 'unsupported', frameMessage(kind, item.element.drawingFallback));
       return;
     }
     p.push(pushGraphicsState());
@@ -238,21 +266,25 @@ async function drawItem(
   const own = ownFill(item.element.fill, local);
   const shown = own.fill.type !== 'picture' || (await canDrawPicture(own.sourcePart, own.fill, p));
   if (shown) effectDiagnostics(item, p, local);
-  // Shadows and glow paint under the content, as in the SVG paint.
-  if (shown) await drawEffectsBehind(item, p, local);
-  p.push(pushGraphicsState());
-  p.matrix(item.matrix);
-  await drawGeometry(item, p, local, groupScale);
-  p.push(popGraphicsState());
-  // Over the geometry and under the text, in slide space.
-  if (shown) await drawInnerShadow(item, p, local);
-  // An empty body's caret line draws nothing: no operators for it.
-  if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text)) {
+  const drawContent = async (): Promise<void> => {
     p.push(pushGraphicsState());
-    p.matrix(item.textMatrix);
-    await drawText(item.text, p, local);
+    p.matrix(item.matrix);
+    await drawGeometry(item, p, local, groupScale);
     p.push(popGraphicsState());
-  }
+    // Over the geometry and under the text, in slide space.
+    if (shown) await drawInnerShadow(item, p, local);
+    // An empty body's caret line draws nothing: no operators for it.
+    if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text)) {
+      p.push(pushGraphicsState());
+      p.matrix(item.textMatrix);
+      await drawText(item.text, p, local);
+      p.push(popGraphicsState());
+    }
+  };
+  // The reflection, shadows, and glow paint under the content, as in the SVG paint.
+  if (shown) await drawReflection(item, p, drawContent);
+  if (shown) await drawEffectsBehind(item, p, local);
+  await drawContent();
 }
 
 /** Map layout's fidelity notes to PDF diagnostics, with fixed codes. */

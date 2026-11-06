@@ -266,4 +266,4 @@ await editor.setFonts(withFontOrigin(editor.fonts, { sources: localFaces }));
 - Host bytes pass the content hash, the sfnt check, `maxFontBytes`, the 64 MiB face limit, 256 faces, and 128 MiB in total.
 - Replacing the deck or destroying the editor cancels outstanding resolution and discards late answers.
 - Missing coverage can change line breaks. A font command can succeed before its bytes arrive.
-- The fidelity harness measures with the reference fonts, not with host origins.
+- The fidelity harness loads only open fonts for the fixtures, not host origins. It fails a deck when the printed PDF draws with any other font.

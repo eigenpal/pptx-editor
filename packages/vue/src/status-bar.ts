@@ -21,7 +21,7 @@ import { Icon } from './chrome.tsx';
 import { useEditorState, useTranslation } from './composables.ts';
 import { useNotesPane } from './pane-state.ts';
 import { PptxEditorZoomPill } from './panes.tsx';
-import { ViewSwitch } from './SlideSorter.tsx';
+import { ReadOnlyBadge, ViewSwitch } from './SlideSorter.tsx';
 import { ToolbarAction } from './toolbar-parts.ts';
 
 const partProps = {
@@ -204,7 +204,7 @@ export const PptxEditorStatusBar = Object.assign(
             },
             content
           );
-        if (!props.preset) return bar(children ?? []);
+        if (!props.preset) return bar([...(children ?? []), h(ReadOnlyBadge)]);
         const overrides = new Map<unknown, VNode>();
         const extras: VNode[] = [];
         for (const vnode of flatten(children))
@@ -212,6 +212,8 @@ export const PptxEditorStatusBar = Object.assign(
           else extras.push(vnode);
         return bar([
           overrides.get(StatusBarSlideNumber) ?? h(StatusBarSlideNumber),
+          // Its own part of the bar: hiding the slide number does not hide it.
+          h(ReadOnlyBadge),
           h('span', { class: 'pptx-statusbar__spacer' }),
           overrides.get(StatusBarNotes) ?? h(StatusBarNotes),
           ...extras,

@@ -119,20 +119,8 @@ jobs:
       - name: Consumer install
         if: matrix.check == 'build'
         run: bun run check:consumer-install
-      # The device rasters of the reference PDFs (`rasterizePages` in
-      # scripts/fidelity/references.ts). Each entry inside is keyed by its PDF, the Poppler
-      # version, and the `pdftoppm` options, so an older entry still serves the PDFs that did not
-      # change. A run over every fixture prunes the folder to the current PDFs.
-      - name: Restore reference rasters
-        if: matrix.check == 'fidelity'
-        id: rasters-cache
-        uses: actions/cache/restore@v6
-        with:
-          path: .cache/fidelity-rasters
-          key: fidelity-rasters-${{ hashFiles('fixtures/*.pdf', 'scripts/fidelity/references.ts') }}
-          restore-keys: fidelity-rasters-
       # The package files that apt downloads for the fidelity job: Chromium's system
-      # dependencies and fonts (`playwright install --with-deps`), Poppler, and xmllint. apt
+      # dependencies and fonts (`playwright install --with-deps`), and xmllint. apt
       # still resolves and installs the same packages; a cached file only skips its download,
       # and apt checks it against the package lists first. Keyed by the OS release, the package
       # list, and the lockfile that pins Playwright.
@@ -140,7 +128,7 @@ jobs:
         if: matrix.check == 'fidelity'
         id: apt-key
         env:
-          APT_PACKAGES: 'playwright-chromium-deps poppler-utils libxml2-utils'
+          APT_PACKAGES: 'playwright-chromium-deps libxml2-utils'
         run: |
           . /etc/os-release
           list=$(printf '%s' "$APT_PACKAGES" | sha256sum | cut -c1-16)
@@ -163,25 +151,23 @@ jobs:
             'APT::Keep-Downloaded-Packages "true";' \
             'Binary::apt::APT::Keep-Downloaded-Packages "true";' \
             'APT::Sandbox::User "root";' | sudo tee /etc/apt/apt.conf.d/99-fidelity-cache >/dev/null
-          # `--with-deps` keeps the system packages that the known-gap lists were measured with:
-          # it installs the fallback fonts that Chromium paints with. Its `apt-get update` also
-          # serves Poppler (the reference rasters) and xmllint (validate:xsd), with the same
-          # packages as before. A restored browser cache skips only the browser download.
+          # `--with-deps` installs Chromium's system packages. Its `apt-get update` also serves
+          # xmllint (validate:xsd). A restored browser cache skips only the browser download.
           bunx playwright install --with-deps chromium
-          sudo apt-get install -y poppler-utils libxml2-utils
+          sudo apt-get install -y libxml2-utils
           sudo chown -R "$(id -u):$(id -g)" ~/apt-archives
           # The installed package set, to compare runs with and without the cache.
           echo "dpkg: $(dpkg-query -W -f '${Package}=${Version}\n' | sort | sha256sum | cut -c1-16)" \
             "$(dpkg-query -W | wc -l) packages"
-          # Only the harness tests that the unit shards skip, because they have no Poppler and no
-          # Chromium (a browser that crashes or hangs in the middle of a deck). The shards run
-          # the rest of scripts/fidelity/. These run first and do not stop the gate, so a red
-          # gate still has its report and these results.
-          bun test scripts/fidelity/harness-page.test.ts scripts/fidelity/references.test.ts \
-            scripts/fidelity/score-deck.test.ts || tests=$?
-          bun run fidelity -- --print-gaps
-          bun run validate:xsd
-          exit "${tests:-0}"
+          # Only the harness tests that the unit shards skip, because they have no Chromium
+          # (printing, drawing PDFs, and a browser that crashes or hangs in the middle of a
+          # deck). The shards run the rest of scripts/fidelity/. These run first and do not stop
+          # the gate, so a red gate still has its report and these results.
+          bun test scripts/fidelity/harness-page.test.ts || tests=$?
+          # The schema check runs also when the gate fails.
+          bun run fidelity || gate=$?
+          bun run validate:xsd || xsd=$?
+          exit "$(( ${tests:-0} || ${gate:-0} || ${xsd:-0} ))"
       # Only what needs a real browser: canvas pixels and CSS layout (e2e/browser.spec.ts). The
       # demo flows and the open-every-deck check run in happy-dom in the unit shards (`bun run test`).
       - name: Browser checks of the demo
@@ -192,11 +178,12 @@ jobs:
       - name: API change has a changeset
         if: matrix.check == 'changeset' && github.event_name == 'pull_request' && !startsWith(github.head_ref, 'changeset-release/')
         run: node scripts/check-api-changeset.mjs --base origin/${{ github.base_ref }}
-      # FIXTURE_KNOWN_GAPS only shrinks: no new entry, new kind, or looser score
-      # unless the fixture's reference PDF changes too. Needs the base branch (full history).
+      # FIXTURE_KNOWN_GAPS only shrinks, and no limit loosens or goes away unseen
+      # (scripts/fidelity/check-known-gaps.ts says when a new or looser entry may stay).
+      # Needs the base branch (full history).
       - name: Known gaps only shrink
         if: matrix.check == 'changeset' && github.event_name == 'pull_request'
-        run: bun run fidelity:check-gaps -- --base origin/${{ github.base_ref }}
+        run: bun scripts/fidelity/check-known-gaps.ts --base origin/${{ github.base_ref }}
       - name: Upload fidelity report
         if: matrix.check == 'fidelity' && always()
         uses: actions/upload-artifact@v7
@@ -210,12 +197,6 @@ jobs:
         with:
           path: ~/apt-archives
           key: ${{ steps.apt-key.outputs.prefix }}${{ steps.apt-key.outputs.packages }}-${{ hashFiles('bun.lock') }}
-      - name: Save reference rasters
-        if: github.event_name == 'push' && matrix.check == 'fidelity' && !cancelled() && steps.rasters-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v6
-        with:
-          path: .cache/fidelity-rasters
-          key: fidelity-rasters-${{ hashFiles('fixtures/*.pdf', 'scripts/fidelity/references.ts') }}
       - name: Save npm cache
         if: github.event_name == 'push' && matrix.check == 'build'
         uses: actions/cache/save@v6
@@ -354,7 +335,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           # Keep the newest entry for each prefix; delete the rest.
-          for prefix in test-durations- npm-build- playwright- fidelity-rasters- apt-fidelity-; do
+          for prefix in test-durations- npm-build- playwright- apt-fidelity-; do
             gh cache list --ref refs/heads/main --key "$prefix" --sort created_at \
               --order desc --limit 100 --json id --jq '.[1:][].id' |
               while read -r id; do

@@ -19,6 +19,8 @@ Every edit the user makes is one undo step. Undo restores the slide and the sele
 
 A command that has nothing to do adds no step. When the browser cancels a pointer drag (`pointercancel`), the drag ends where it is and keeps one step.
 
+While the pointer moves, a drag that moves, resizes, or rotates shapes shows a preview and does not change the deck. The release writes the drag as one edit, so `subscribe` listeners and collaboration peers see one change. Press Escape before the release, or move the focus out of the window, to cancel the drag. The deck then does not change. An undo, a redo, or a change to a dragged shape or to its group also cancels the drag. The change can come from a command or from a collaborator. A change to another shape keeps the drag. Crop drags and table grid line drags still change the deck at each pointer move, and Escape does not cancel them. Each of these drags is still one undo step.
+
 ## Group your own commands
 
 Use a history group to make several commands one undo step. Open one with `editor.beginHistoryGroup()`, pass it to each command as `{ historyGroup }`, and call `end()` when the gesture ends:
@@ -69,6 +71,7 @@ export function FontSizeSlider() {
   return (
     <input
       type="range"
+      aria-label="Font size"
       min={8}
       max={96}
       value={size.value ?? 18}

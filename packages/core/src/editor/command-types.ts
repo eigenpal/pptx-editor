@@ -32,6 +32,7 @@ const COMMAND_TABLE = {
   toggleBullets: true,
   toggleNumbering: true,
   indent: true,
+  removeBullet: true,
   setLineSpacing: true,
   setLink: true,
   clearFormatting: true,

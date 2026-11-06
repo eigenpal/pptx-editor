@@ -5,10 +5,13 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { chromium, type Page } from '@playwright/test';
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { buildPptx } from '../fixtures/builder.ts';
 import {
   fileDigest,
   openDeck,
+  printDeck,
+  rasterPdf,
   renderSlide,
   reopenSaved,
   startHarnessServer,
@@ -71,21 +74,6 @@ async function browserPid(page: Page): Promise<number> {
   return info.processInfo.find((p) => p.type === 'browser')!.id;
 }
 
-/** Playwright's Chromium processes (pid, parent, group, state, type), for a failure. */
-function chromiumProcesses(): string {
-  const all = execFileSync('ps', ['-eo', 'pid=,ppid=,pgid=,stat=,command='], {
-    encoding: 'utf8',
-  });
-  const rows: string[] = [];
-  for (const line of all.split('\n')) {
-    const [pid, ppid, pgid, stat, binary, ...args] = line.trim().split(/\s+/);
-    if (!binary?.includes('ms-playwright')) continue;
-    const type = args.find((a) => a.startsWith('--type='))?.slice(7) ?? 'browser';
-    rows.push(`${pid} ${ppid} ${pgid} ${stat} ${type}`);
-  }
-  return rows.join('\n');
-}
-
 /** The processes of a process group, by its leader's pid. */
 function groupMembers(pgid: number): number[] {
   try {
@@ -114,7 +102,6 @@ describe.skipIf(!hasChromium)('a browser that dies in the middle of a deck', () 
       const deck = join(dir, 'deck.pptx');
       writeFileSync(deck, buildPptx({ slides: [{ shapes: '' }, { shapes: '' }] }));
       const input = { file: deck, name: 'd' };
-      let stopping = 0;
       const [crashed, next] = await withHarnessPage(async (first, control) => {
         // Kill Chromium with SIGKILL when the deck renders its first slide, as an
         // out-of-memory kill does. The deck has opened by then.
@@ -130,7 +117,6 @@ describe.skipIf(!hasChromium)('a browser that dies in the middle of a deck', () 
                 const gone = new Promise<void>((done) =>
                   browser.once('disconnected', () => done())
                 );
-                console.log(`killing browser ${pid}:\n${chromiumProcesses()}`);
                 process.kill(pid, 'SIGKILL');
                 await gone;
               }
@@ -140,15 +126,9 @@ describe.skipIf(!hasChromium)('a browser that dies in the middle of a deck', () 
         }) as Page;
         const a = await scoreSafely(dying, control, input, { redact: true });
         expect(a.fatal).toBeUndefined();
-        console.log(`after the reset (${a.result.error}):\n${chromiumProcesses()}`);
         const b = await scoreSafely(a.page, control, input, { redact: true });
-        console.log(
-          `the next deck took ${b.result.milliseconds ?? '?'} ms${b.result.error ? `, and failed:\n${chromiumProcesses()}` : ''}`
-        );
-        stopping = Date.now();
         return [a, b];
       });
-      console.log(`the harness stopped in ${Date.now() - stopping} ms`);
       expect(crashed.result.error).toStartWith(
         `${BROWSER_CRASHED} (the next deck gets a new browser): `
       );
@@ -164,7 +144,6 @@ describe.skipIf(!hasChromium)('a browser that dies in the middle of a deck', () 
   test('a browser that stops answering is replaced, and the next deck is scored', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'pptx-hang-'));
     const stopped: number[] = [];
-    let stopping = 0;
     try {
       const deck = join(dir, 'deck.pptx');
       writeFileSync(deck, buildPptx({ slides: [{ shapes: '' }] }));
@@ -176,11 +155,8 @@ describe.skipIf(!hasChromium)('a browser that dies in the middle of a deck', () 
         for (const pid of stopped) process.kill(pid, 'SIGSTOP');
         const a = await scoreSafely(first, control, input, { redact: true, timeoutMs: 1_000 });
         const b = await scoreSafely(a.page, control, input, { redact: true });
-        console.log(`the next deck took ${b.result.milliseconds ?? '?'} ms`);
-        stopping = Date.now();
         return [a, b];
       }, 3_000);
-      console.log(`the harness stopped in ${Date.now() - stopping} ms`);
       expect(hung.result.error).toBe(
         `${BROWSER_HUNG} (the next deck gets a new browser): the deck did not finish within 1 s`
       );
@@ -225,7 +201,7 @@ describe.skipIf(!hasChromium)('openDeck', () => {
         });
         for (const fontMissing of [false, true]) {
           await openDeck(page, deck, []);
-          await renderSlide(page, 0, 960);
+          await renderSlide(page, 0);
           const attempt = fontMissing
             ? openDeck(page, deck, [
                 { family: 'Missing', bold: false, italic: false, file: missing },
@@ -234,7 +210,7 @@ describe.skipIf(!hasChromium)('openDeck', () => {
           await expect(attempt).rejects.toThrow(
             `${fontMissing ? 'the font Missing' : 'the deck'} did not arrive from the harness server (HTTP 404)`
           );
-          await expect(renderSlide(page, 0, 960)).rejects.toThrow('no document');
+          await expect(renderSlide(page, 0)).rejects.toThrow('no document');
           await expect(reopenSaved(page)).rejects.toThrow('no document');
         }
         expect(responses).toEqual([404, 404]);
@@ -267,7 +243,7 @@ describe.skipIf(!hasChromium)('openDeck', () => {
         const a = await openDeck(page, deck, [...fonts, large]);
         // The next deck gets only its own fonts.
         const b = await openDeck(page, deck, []);
-        const r = await renderSlide(page, 0, 960);
+        const r = await renderSlide(page, 0);
         // After `openDeck`, its paths, and any other path, give nothing.
         const files = fetched.length;
         const urls = [...fetched, '/__harness/file/not-a-token'];
@@ -286,9 +262,9 @@ describe.skipIf(!hasChromium)('openDeck', () => {
         received: { deck: fileDigest(deck), fonts: [...fonts, large].map(digest) },
       });
       expect(second.received.fonts).toEqual([]);
-      expect(rendered.png.length).toBeGreaterThan(0);
-      // The deck and three fonts, then the deck alone.
-      expect(after.files).toBe(5);
+      expect(rendered.markup.length).toBeGreaterThan(0);
+      // The deck, three fonts, and the two fallback faces; then the deck and the fallback faces.
+      expect(after.files).toBe(9);
       expect(new Set(after.statuses)).toEqual(new Set([404]));
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -326,6 +302,103 @@ describe.skipIf(!hasChromium)('openDeck', () => {
           sha256: createHash('sha256').update(face).digest('hex'),
         },
       ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
+});
+
+describe.skipIf(!hasChromium)('renderSlide', () => {
+  test('a saved and reopened deck paints the same markup, with no session-bound names', async () => {
+    // Image blob URLs and face ids are new in each session.
+    await withHarnessPage(async (page) => {
+      for (const [name, named] of [
+        ['pictures', 'image:'],
+        ['text-runs', 'face:'],
+      ]) {
+        const { slides } = await openDeck(
+          page,
+          join(import.meta.dir, `../../fixtures/${name}.pptx`),
+          []
+        );
+        const first: string[] = [];
+        for (let i = 0; i < slides; i += 1) first.push((await renderSlide(page, i)).markup);
+        expect(first.join('')).toContain(named);
+        expect(first.join('')).not.toMatch(/blob:|pptx-f\d/);
+        expect((await reopenSaved(page)).slides).toBe(slides);
+        for (let i = 0; i < slides; i += 1)
+          expect((await renderSlide(page, i)).markup).toBe(first[i]);
+      }
+    });
+  }, 60_000);
+});
+
+describe.skipIf(!hasChromium)('printDeck and rasterPdf', () => {
+  test('our PDF has one page for each printed slide, and draws as the reference does', async () => {
+    const fixture = join(import.meta.dir, '../../fixtures/colors');
+    await withHarnessPage(async (page, control) => {
+      await openDeck(page, `${fixture}.pptx`, []);
+      const ours = await printDeck(page, [0]);
+      expect(ours.subarray(0, 5).toString()).toBe('%PDF-');
+      // The print pages are gone after the print.
+      expect(await page.evaluate(() => document.getElementById('print'))).toBeNull();
+      const size = { width: 480, height: 270 };
+      const drawer = await control.rasterPage();
+      const [a] = await rasterPdf(drawer, new Uint8Array(ours), 1, size, 0.5);
+      const [b] = await rasterPdf(
+        drawer,
+        new Uint8Array(readFileSync(`${fixture}.pdf`)),
+        1,
+        size,
+        0.5
+      );
+      expect(a.data.length).toBe(480 * 270 * 4);
+      expect(a.png.subarray(1, 4)).toEqual(new Uint8Array([0x50, 0x4e, 0x47]));
+      // The same raster page serves the next deck.
+      expect(await control.rasterPage()).toBe(drawer);
+      let differ = 0;
+      for (let i = 0; i < a.data.length; i += 4)
+        if (Math.abs(a.data[i] - b.data[i]) > 64) differ += 1;
+      expect(differ / (480 * 270)).toBeLessThan(0.01);
+    });
+  }, 60_000);
+
+  test('a crashed raster page is replaced, and a reset closes it', async () => {
+    await withHarnessPage(async (_page, control) => {
+      const drawer = await control.rasterPage();
+      const crashed = new Promise<void>((done) => drawer.once('crash', () => done()));
+      await drawer.goto('chrome://crash').catch(() => undefined);
+      await crashed;
+      // `isClosed()` stays false after a renderer crash.
+      expect(drawer.isClosed()).toBe(false);
+      const next = await control.rasterPage();
+      expect(next).not.toBe(drawer);
+      await control.reset();
+      expect(next.isClosed()).toBe(true);
+      expect(await control.rasterPage()).not.toBe(next);
+    });
+  }, 60_000);
+});
+
+describe.skipIf(!hasChromium)('the fallback faces', () => {
+  test('the paint names the open fallback faces where it names sans-serif', async () => {
+    // Slide 1 of slide-structure has a chart. As a 3-D chart, which the drawing module leaves
+    // out, it keeps its frame label, which the paint sets in sans-serif.
+    const files = unzipSync(
+      new Uint8Array(readFileSync(join(import.meta.dir, '../../fixtures/slide-structure.pptx')))
+    );
+    const chart = strFromU8(files['ppt/charts/chart1.xml']!);
+    files['ppt/charts/chart1.xml'] = strToU8(chart.replaceAll('c:barChart>', 'c:bar3DChart>'));
+    const dir = mkdtempSync(join(tmpdir(), 'pptx-fallback-'));
+    const fixture = join(dir, 'chart-3d.pptx');
+    writeFileSync(fixture, zipSync(files));
+    try {
+      await withHarnessPage(async (page) => {
+        await openDeck(page, fixture, []);
+        const { markup } = await renderSlide(page, 0);
+        expect(markup).toContain('font-family="pptx-harness-fallback-0, pptx-harness-fallback-1"');
+        expect(markup).not.toContain('sans-serif');
+      });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

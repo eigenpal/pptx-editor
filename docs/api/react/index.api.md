@@ -70,6 +70,7 @@ import { isFontResolver } from '@pptx-editor.dev/core/editor';
 import { loadFonts } from '@pptx-editor.dev/core/editor';
 import { LoadFontsRequest } from '@pptx-editor.dev/core/editor';
 import { LoadFontsResult } from '@pptx-editor.dev/core/editor';
+import { LoadOptions } from '@pptx-editor.dev/core/editor';
 import { LocaleCatalog } from '@pptx-editor.dev/i18n';
 import { MarkedFontResolver } from '@pptx-editor.dev/core/editor';
 import { MAX_RESOLVER_FAMILIES } from '@pptx-editor.dev/core/editor';
@@ -1170,6 +1171,7 @@ export interface PptxEditorPopups {
 
 // @public
 export interface PptxEditorProps {
+    readonly autoCorrect?: boolean;
     readonly children?: ReactNode;
     readonly className?: string;
     readonly colorMode?: ColorMode;
@@ -1198,7 +1200,7 @@ export interface PptxEditorRef {
     exec(command: EditorCommand, options?: EditorExecOptions): CommandResult;
     focus(): void;
     getEditor(): PptxEditorInstance | null;
-    load(bytes: Uint8Array): Promise<CommandResult>;
+    load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
     save(): Uint8Array<ArrayBuffer> | null;
     snapshot(): EditorSnapshot;
 }
@@ -1211,6 +1213,7 @@ export const PptxEditorRoot: react.ForwardRefExoticComponent<PptxEditorRootProps
 
 // @public
 export interface PptxEditorRootProps {
+    readonly autoCorrect?: boolean;
     readonly children?: ReactNode;
     readonly colorMode?: ColorMode;
     readonly document?: Uint8Array;
@@ -1244,6 +1247,7 @@ export function PptxEditorViewport(input: PptxEditorViewportProps): react.JSX.El
 export interface PptxEditorViewportProps {
     children?: ReactNode;
     className?: string;
+    label?: string | false;
 }
 
 export { PptxFontOrigin }

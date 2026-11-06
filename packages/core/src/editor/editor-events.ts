@@ -11,10 +11,18 @@ import type { DocumentOpenFailure, EditorRejection, EditorSnapshot } from '../co
 export interface PptxEditorEvents {
   /**
    * The presentation changed: an applied edit, an undo or redo, or a load that finished or
-   * failed. Selection, zoom, and view changes do not fire it.
+   * failed. Selection, zoom, and view changes do not fire it, and neither does a slide of a
+   * long deck that finishes opening in the background (`selectionChange` reports those): a
+   * host that saves on `change` does not save, and parse the whole deck, while it opens. It
+   * also fires once when the deck turns read-only (`EditorSnapshot.readOnlyReason`), so a host
+   * that saves on `change` sees `save()` return `null` and can say why.
    */
   change: (snapshot: EditorSnapshot) => void;
-  /** The shape or text selection, the current slide, or the selected slides changed. */
+  /**
+   * The shape or text selection, the current slide, or the selected slides changed; or, while a
+   * long deck opens, the count of slides still opening (`EditorSnapshot.pendingSlides`), as
+   * DOCX Editor reports pages laid out in the background.
+   */
   selectionChange: (snapshot: EditorSnapshot) => void;
   /** The editor refused an edit (`EditorSnapshot.lastRejection`). */
   rejection: (rejection: EditorRejection, snapshot: EditorSnapshot) => void;
@@ -35,16 +43,20 @@ const sameSlides = (a: readonly number[], b: readonly number[]): boolean =>
 function happened(event: keyof PptxEditorEvents, prev: EditorSnapshot, next: EditorSnapshot) {
   switch (event) {
     case 'change':
-      // A load that finishes (or fails) counts; the start of a load does not.
+      // A load that finishes (or fails) counts; the start of a load does not. A slide that
+      // finishes opening in the background is no change: the document did not change.
+      // A deck that turns read-only (`readOnlyReason`) counts once: what the host may do changed.
       return (
         prev.revision !== next.revision ||
-        (prev.status !== next.status && next.status !== 'loading')
+        (prev.status !== next.status && next.status !== 'loading') ||
+        (next.readOnlyReason ?? null) !== (prev.readOnlyReason ?? null)
       );
     case 'selectionChange':
       return (
         prev.selection !== next.selection ||
         prev.currentSlide !== next.currentSlide ||
-        !sameSlides(prev.selectedSlides, next.selectedSlides)
+        !sameSlides(prev.selectedSlides, next.selectedSlides) ||
+        (prev.pendingSlides ?? 0) !== (next.pendingSlides ?? 0)
       );
     case 'rejection':
       return !!next.lastRejection && next.lastRejection !== prev.lastRejection;

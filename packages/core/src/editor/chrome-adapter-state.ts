@@ -1,5 +1,5 @@
 // The state of the slots an adapter runs itself (the slide background dialog, the clipboard,
-// and the slide show). Split from `chrome-controls.ts`, which asks it from
+// the slide show, and the find bar). Split from `chrome-controls.ts`, which asks it from
 // `toolbarCommandState`, so the registry stays under the line cap.
 
 import type { ClipboardPayload, Editor } from '../contracts/index.ts';
@@ -29,7 +29,7 @@ interface SlideLayoutLike {
   readonly items: readonly LayoutItemLike[];
 }
 
-/** Enabled state of the slots an adapter runs itself: dialogs, the clipboard, the show. @internal */
+/** Enabled state of the slots an adapter runs: dialogs, clipboard, show, find. @internal */
 export function adapterActionState(editor: Editor, id: ChromeSlotId): ToolbarCommandState {
   const snap = editor.snapshot();
   const off = (reason: string): ToolbarCommandState => ({
@@ -75,6 +75,12 @@ export function adapterActionState(editor: Editor, id: ChromeSlotId): ToolbarCom
       const can = editor.can({ type: 'paste', payload: copied });
       return can.ok ? on : off(can.reason);
     }
+    // Find reads any open deck and shows its matches on the slide canvas, which the slide
+    // sorter does not show. Replace edits the deck, so it also needs editing mode.
+    case 'find.find':
+    case 'find.replace':
+      if (snap.presentationView === 'slideSorter') return off('disabled.findSorter');
+      return id === 'find.replace' && viewing ? off('disabled.viewing') : on;
     case 'view.playFromStart':
     case 'view.playFromCurrent':
       return snap.slides.length > 0 ? on : off('disabled.noEditor');

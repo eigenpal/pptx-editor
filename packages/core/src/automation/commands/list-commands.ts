@@ -5,8 +5,9 @@
 //
 // - Bullets off: `a:buNone` with `marL="0" indent="0"` when an inherited bullet must be
 //   suppressed; otherwise the paragraph's own bullet and hanging indent are simply removed.
-// - Bullets on: the paragraph's own `a:buNone` (and the zero margins that came with it) are
-//   removed first, so a placeholder takes its master's bullet, font, color, and margins. Only
+// - Bullets on: the paragraph's own `a:buNone` (and the zero margins that came with it, or
+//   the margin that Backspace left at the bullet's position) are removed first, so a
+//   placeholder takes its master's bullet, font, color, and margins. Only
 //   a paragraph that inherits no list gets an explicit `a:buChar` or `a:buAutoNum` with a
 //   hanging indent.
 // - List level: `lvl` moves between 0 and 8. A paragraph with its own `marL` (an explicit
@@ -123,14 +124,22 @@ export function setListKind(
 ): void {
   const all = paragraphsOf(batch.element(part, target.txBodyId));
   const pPrs = target.paragraphs.map((i) => ensureParagraphProps(batch, part, all[i].id));
+  // A margin dropped on trust in phase 1: put back unless it was the bullet's position.
+  const dropped: (string | undefined)[] = [];
   // Phase 1: drop the paragraph's own list overrides, so inheritance shows through.
   for (const pPrId of pPrs) {
     const pPr = batch.element(part, pPrId);
     const suppressed = !!child(pPr, 'a:buNone');
     removeBulletChildren(batch, part, pPrId);
-    const zeroMargins = attr(pPr, 'marL') === '0' && (attr(pPr, 'indent') ?? '0') === '0';
+    const noIndent = (attr(pPr, 'indent') ?? '0') === '0';
+    const zeroMargins = attr(pPr, 'marL') === '0' && noIndent;
     const ownHanging = attr(pPr, 'indent') === String(-HANG);
-    if ((suppressed && zeroMargins) || (kind === 'none' && ownHanging)) {
+    // A bullet that Backspace removed left the text at the bullet's position (`marL`, no
+    // indent). Bullets back on drop that margin too, so the level's hanging indent returns.
+    // Phase 2 puts back a margin that is not the inherited bullet's position: the author's.
+    const removedInPlace = suppressed && noIndent && !zeroMargins && kind !== 'none';
+    dropped.push(removedInPlace ? attr(pPr, 'marL') : undefined);
+    if ((suppressed && zeroMargins) || removedInPlace || (kind === 'none' && ownHanging)) {
       setPPrAttr(batch, part, pPrId, 'marL', null);
       setPPrAttr(batch, part, pPrId, 'indent', null);
     }
@@ -150,6 +159,12 @@ export function setListKind(
       }
       return;
     }
+    const own = dropped[k];
+    const at = inherited[index] && Math.round(inherited[index].marL + inherited[index].indent);
+    if (bullet && own !== undefined && String(at) !== own) {
+      setPPrAttr(batch, part, pPrId, 'marL', own);
+      setPPrAttr(batch, part, pPrId, 'indent', '0');
+    }
     const wanted = kind === 'bullet' ? 'char' : 'autonum';
     if (bullet?.type === wanted) return;
     insertBullet(batch, part, pPrId, kind);
@@ -160,6 +175,37 @@ export function setListKind(
       setPPrAttr(batch, part, pPrId, 'indent', String(-HANG));
     }
   });
+}
+
+/**
+ * Remove the bullet or number of each target paragraph that has one, and keep its text where
+ * the bullet was: `a:buNone`, `marL` at the bullet's position (`marL + indent`), and no
+ * hanging indent. The level stays, so the paragraph keeps its level's spacing and font. This
+ * is Backspace at the start of a list item. A probe resolves too, so `can` and `exec` agree
+ * on a paragraph with no bullet. Answers whether any paragraph had a bullet to remove.
+ */
+export function removeBulletInPlace(
+  batch: OpBatch,
+  part: string,
+  slide: number,
+  target: ListTarget
+): boolean {
+  const all = paragraphsOf(batch.element(part, target.txBodyId));
+  const resolved = resolvedParagraphs(batch, slide, target);
+  let removed = false;
+  for (const index of target.paragraphs) {
+    const r = resolved[index];
+    if (!r?.bullet) continue;
+    removed = true;
+    const pPrId = ensureParagraphProps(batch, part, all[index].id);
+    removeBulletChildren(batch, part, pPrId);
+    const at = bulletIndex(batch, part, pPrId);
+    batch.insert({ op: 'insertNode', part, parent: pPrId, index: at, spec: aSpec('buNone') });
+    const marL = Math.max(0, Math.round(r.marL + r.indent));
+    setPPrAttr(batch, part, pPrId, 'marL', String(marL));
+    setPPrAttr(batch, part, pPrId, 'indent', '0');
+  }
+  return removed;
 }
 
 /** Move the list level of one paragraph by `direction` (±1). Returns false at a limit. */

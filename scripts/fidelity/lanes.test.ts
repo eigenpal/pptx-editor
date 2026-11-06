@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { availableParallelism } from 'node:os';
+import { cpus } from 'node:os';
 import { laneCount } from './lanes.ts';
 
 describe('laneCount', () => {
@@ -10,7 +10,7 @@ describe('laneCount', () => {
   });
 
   test('without a valid PPTX_FIDELITY_JOBS, one lane for each core, at most 4', () => {
-    const want = Math.min(4, availableParallelism());
+    const want = Math.min(4, cpus().length);
     expect(laneCount(38, undefined)).toBe(want);
     expect(laneCount(38, '0')).toBe(want);
     expect(laneCount(38, 'many')).toBe(want);

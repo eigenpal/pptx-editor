@@ -8,11 +8,13 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { unzipSync, zipSync } from 'fflate';
 import { PDFDocument } from 'pdf-lib';
 import { PNG } from 'pngjs';
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { openPresentation } from '@pptx-editor.dev/core/editor';
 import type { FontSource } from '@pptx-editor.dev/core/layout';
+import { readZip, writeZip } from '@pptx-editor.dev/core/store';
 import { buildPptx, para, run, shape } from '../../../../scripts/fixtures/builder.ts';
 import { buildEot } from '../../../core/src/store/fonts/__tests__/fixtures.ts';
 import {
@@ -256,14 +258,28 @@ describe('fonts', () => {
 });
 
 describe('pictures', () => {
-  test('an OLE object draws its picture (ECMA-376 Part 1, 19.3.1.36); a chart stays undrawn', async () => {
+  test('an OLE object draws its picture (ECMA-376 Part 1, 19.3.1.36), and a chart draws', async () => {
     const result = await exportPdf(deck('slide-structure'), BEST);
     const codes = result.diagnostics.map((d) => d.code);
-    expect(codes).toContain('frame.chart');
+    expect(codes).not.toContain('frame.chart');
     expect(codes).not.toContain('frame.ole');
     const pdf = await getDocument({ data: result.bytes.slice(), useSystemFonts: false }).promise;
     const { fnArray } = await (await pdf.getPage(4)).getOperatorList();
     expect(fnArray).toContain(OPS.paintImageXObject);
+  });
+
+  test('a chart type outside the drawing module keeps the placeholder note', async () => {
+    const zip = readZip(deck('charts'));
+    if (!zip.ok) throw new Error('charts.pptx');
+    const entries = new Map(zip.entries);
+    const name = 'ppt/charts/chart1.xml';
+    const xml = new TextDecoder().decode(entries.get(name) ?? entries.get(`/${name}`));
+    const threeD = xml.replaceAll('c:barChart>', 'c:bar3DChart>');
+    expect(threeD).not.toBe(xml);
+    entries.set(entries.has(name) ? name : `/${name}`, new TextEncoder().encode(threeD));
+    const result = await exportPdf(writeZip(entries), BEST);
+    const charts = result.diagnostics.filter((d) => d.code === 'frame.chart');
+    expect(charts.map((d) => d.slideNumber)).toEqual([1]);
   });
 
   test('a cropped picture is drawn cropped, inside its box', async () => {
@@ -406,6 +422,16 @@ describe('diagnostics placement', () => {
     const error = await exportPdf(deckWithHidden()).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(PdfFidelityError);
     expect((error as Error).message).toContain('slide 3: fill.pattern');
+  });
+
+  test('a diagram without its saved drawing says why it is not drawn', async () => {
+    const files = unzipSync(deck('diagrams'));
+    delete files['ppt/diagrams/drawing1.xml'];
+    const result = await exportPdf(zipSync(files), BEST);
+    const missing = result.diagnostics.filter((d) => d.code === 'frame.diagram');
+    expect(missing.map((d) => [d.slideNumber, d.message])).toEqual([
+      [1, 'A diagram is not drawn: it has no saved drawing.'],
+    ]);
   });
 
   test('diagnostic codes are fixed strings, not file text', async () => {

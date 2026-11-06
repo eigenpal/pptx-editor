@@ -30,6 +30,7 @@ const title = computed(() => {
     type="button"
     :aria-disabled="!bold.isEnabled.value || undefined"
     :aria-pressed="bold.isActive.value"
+    :aria-label="t('toolbar.bold')"
     :title="title"
     @mousedown.prevent
     @click="bold.execute()"
@@ -166,9 +167,9 @@ const { zoom, isFit, fit, zoomIn, zoomOut, canZoomIn, canZoomOut } = useZoom();
 
 <template>
   <div role="group" aria-label="Zoom">
-    <button :disabled="!canZoomOut" @click="zoomOut">-</button>
+    <button :disabled="!canZoomOut" aria-label="Zoom out" @click="zoomOut">-</button>
     <span>{{ Math.round(zoom * 100) }}%</span>
-    <button :disabled="!canZoomIn" @click="zoomIn">+</button>
+    <button :disabled="!canZoomIn" aria-label="Zoom in" @click="zoomIn">+</button>
     <button :aria-pressed="isFit" @click="fit">Fit</button>
   </div>
 </template>
@@ -215,6 +216,7 @@ const size = useEditorValueCommand('font.size');
 <template>
   <input
     type="range"
+    aria-label="Font size"
     :ref="group.ref"
     @input="size.execute(Number(($event.target as HTMLInputElement).value), group.options())"
   />

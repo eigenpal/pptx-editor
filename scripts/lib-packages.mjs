@@ -15,7 +15,12 @@ export const PACKAGES = [
   },
   { name: '@pptx-editor.dev/react', root: 'packages/react', slug: 'react', entries: ['index'] },
   { name: '@pptx-editor.dev/vue', root: 'packages/vue', slug: 'vue', entries: ['index'] },
-  { name: '@pptx-editor.dev/pro', root: 'packages/pro', slug: 'pro', entries: ['index'] },
+  {
+    name: '@pptx-editor.dev/pro',
+    root: 'packages/pro',
+    slug: 'pro',
+    entries: ['index', 'drawing'],
+  },
   {
     name: '@pptx-editor.dev/pptx-to-pdf',
     root: 'packages/pptx-to-pdf',

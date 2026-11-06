@@ -5,7 +5,8 @@
 // nothing is uploaded.
 import { computed, h, onBeforeUnmount, onMounted, shallowRef, watch, watchEffect } from 'vue';
 import { PageSetupDialog, PptxEditorRoot, type PptxEditorPopups } from '@pptx-editor.dev/vue';
-import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import type { EditorModule, PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import { drawingModule } from '@pptx-editor.dev/pro/drawing';
 import {
   BLANK,
   EXAMPLES,
@@ -23,13 +24,18 @@ import { CATALOG_FAMILIES, useDemoFonts } from './fonts.ts';
 import DiscardDialog from './DiscardDialog.vue';
 import Shell from './Shell.vue';
 
+// Glow, inner shadow, reflection, and soft edge (EigenPal Pro License).
+const MODULES: readonly EditorModule[] = [
+  drawingModule({ licenseKey: import.meta.env.VITE_PPTX_LICENSE }),
+];
+
 const base = import.meta.env.BASE_URL;
 const initial = initialExample(location.search);
 const bytes = shallowRef<Uint8Array | undefined>();
 const title = shallowRef<string>(EXAMPLES[initial].title);
 const mode = shallowRef<'edit' | 'view'>('edit');
 const theme = shallowRef<'light' | 'dark'>(initialTheme(location.search));
-// A theme picked here is kept; until then the demo follows the system color scheme.
+// A theme picked here is kept; until then the demo starts light.
 watch(theme, rememberTheme);
 
 const editor = shallowRef<PptxEditorInstance | null>(null);
@@ -96,6 +102,7 @@ function onReady(instance: PptxEditorInstance): void {
     :mode="mode"
     :color-mode="theme"
     :popups="popups"
+    :modules="MODULES"
     :fonts="fonts"
     :font-families="CATALOG_FAMILIES"
     @ready="onReady"

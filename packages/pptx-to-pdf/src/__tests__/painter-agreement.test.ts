@@ -8,12 +8,16 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // SVG paint, in a happy-dom window of their own, and with the PDF writer, and fail when the two
 // disagree: a change to the editor's rule must reach the PDF writer too.
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import { PNG } from 'pngjs';
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { decodePDFRawStream, PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
 import { openPresentation } from '@pptx-editor.dev/core/editor';
 import { paintSlide } from '@pptx-editor.dev/core/output';
+import { installDrawing } from '@pptx-editor.dev/pro/drawing';
 import { buildPptx, para, run, shape } from '../../../../scripts/fixtures/builder.ts';
 import { exportPdf } from '../index.ts';
 
@@ -57,6 +61,32 @@ const gradientDeck = (fill: string, cx = 3 * IN, cy = IN) =>
 const stops =
   '<a:gsLst><a:gs pos="0"><a:srgbClr val="FF0000"/></a:gs>' +
   '<a:gs pos="100000"><a:srgbClr val="0000FF"/></a:gs></a:gsLst>';
+
+/** The gray `/Coords` of the PDF's shadings: the fades of reflection soft masks. */
+function grayCoordsOf(pdf: Uint8Array): number[][] {
+  const text = new TextDecoder('latin1').decode(pdf);
+  return [
+    ...text.matchAll(/\/ShadingType 2\s*\/ColorSpace \/DeviceGray\s*\/Coords \[ ([^\]]+) \]/g),
+  ].map((m) => m[1]!.trim().split(/\s+/).map(Number));
+}
+
+/** The operands of every `cm` operator in the PDF's form XObjects. */
+async function formMatrices(pdf: Uint8Array): Promise<number[][]> {
+  const doc = await PDFDocument.load(pdf);
+  const out: number[][] = [];
+  for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+    if (!(obj instanceof PDFRawStream)) continue;
+    if (obj.dict.get(PDFName.of('Subtype')) !== PDFName.of('Form')) continue;
+    const raw = obj.dict.has(PDFName.of('Filter'))
+      ? decodePDFRawStream(obj).decode()
+      : obj.contents;
+    const tokens = new TextDecoder('latin1').decode(raw).split(/\s+/);
+    tokens.forEach((t, i) => {
+      if (t === 'cm') out.push(tokens.slice(i - 6, i).map(Number));
+    });
+  }
+  return out;
+}
 
 describe('the PDF writer and the SVG paint agree', () => {
   test('on the linear gradient axis, scaled and not', async () => {
@@ -113,6 +143,56 @@ describe('the PDF writer and the SVG paint agree', () => {
       .sort();
     expect(want).toHaveLength(4);
     expect(got).toEqual(want);
+  });
+
+  test('on the place and fade of a reflection, turned with the shape and not', async () => {
+    // The SVG renderer is the Pro one; opening an export session installs the same one.
+    installDrawing();
+    for (const [rot, rotWithShape] of [
+      [0, 0],
+      [1_800_000, 1],
+      [1_800_000, 0],
+    ] as const) {
+      const effects =
+        '<a:effectLst><a:reflection blurRad="6350" stA="52000" stPos="10000" endA="300" endPos="35000" ' +
+        `dist="12700" dir="5400000" sy="-100000" algn="bl" rotWithShape="${rotWithShape}"/></a:effectLst>`;
+      const bytes = buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes: shape({
+              id: 2,
+              x: IN,
+              y: IN,
+              cx: 2 * IN,
+              cy: IN,
+              rot,
+              fill: '<a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>',
+              effects,
+            }),
+          },
+        ],
+      });
+      const svg = await svgOf(bytes);
+      const gradient = svg.querySelector('linearGradient');
+      const [x1, y1, x2, y2] = attrs(gradient, ['x1', 'y1', 'x2', 'y2']);
+      const offsets = [...gradient!.querySelectorAll('stop')].map((s) =>
+        Number(s.getAttribute('offset'))
+      );
+      const at = (t: number): number[] => [x1! + (x2! - x1!) * t, y1! + (y2! - y1!) * t];
+      const pdf = (await exportPdf(bytes, BEST)).bytes;
+      const fades = grayCoordsOf(pdf);
+      expect(fades).toHaveLength(1);
+      // The PDF fade runs between the two SVG stops, along the same line.
+      const want = [...at(offsets[0]!), ...at(offsets[1]!)];
+      fades[0]!.forEach((v, i) => expect(Math.abs(v - want[i]!)).toBeLessThan(2));
+      // The reflected copy sits under the same transform in both.
+      const use = svg.querySelector('[data-effect="reflection"] use')!.getAttribute('transform')!;
+      const m = /matrix\(([^)]+)\)/.exec(use)![1]!.split(/\s+/).map(Number);
+      const near = (c: number[]): boolean =>
+        c.every((v, i) => Math.abs(v - m[i]!) <= (i < 4 ? 1e-2 : 2));
+      expect((await formMatrices(pdf)).some(near)).toBe(true);
+    }
   });
 
   for (const [name, blip] of [
@@ -193,6 +273,56 @@ describe('the PDF writer and the SVG paint agree', () => {
     for (const [i, bar] of svgBars.entries())
       for (const [k, v] of bar.box.entries())
         expect(pdfBars[i]!.box[k]! / 12_700).toBeCloseTo(v, 1);
+  });
+
+  test('on the shapes and text of a diagram saved drawing', async () => {
+    const bytes = new Uint8Array(
+      readFileSync(join(import.meta.dirname, '../../../../fixtures/diagrams.pptx'))
+    );
+    const svg = await svgOf(bytes);
+    // The frame draws its drawing, not the dashed placeholder.
+    expect(svg.querySelector('[stroke-dasharray]')).toBeNull();
+    const svgFills = [...svg.querySelectorAll('[data-kind="frame"] path')]
+      .map((p) => p.getAttribute('fill')!)
+      .filter((f) => f !== 'none');
+    const svgText = [...svg.querySelectorAll('[data-kind="frame"] text')]
+      .map((t) => t.textContent!.trim())
+      .filter(Boolean);
+    const result = await exportPdf(bytes, BEST);
+    expect(result.diagnostics.some((d) => d.code === 'frame.diagram')).toBe(false);
+    const pdf = await getDocument({ data: result.bytes.slice(), useSystemFonts: false }).promise;
+    const page = await pdf.getPage(1);
+    const { fnArray, argsArray } = await page.getOperatorList();
+    const pdfFills: string[] = [];
+    let color = '';
+    fnArray.forEach((fn, i) => {
+      if (fn === OPS.setFillRGBColor) color = String((argsArray[i] as unknown[])[0]);
+      if (fn === OPS.constructPath && color) pdfFills.push(color);
+    });
+    // Nine shapes, each with its fill, in the SVG paint's order. The PDF also strokes and
+    // writes text, so its fills hold the SVG's fills in order.
+    expect(svgFills).toHaveLength(9);
+    let at = 0;
+    for (const fill of svgFills) {
+      at = pdfFills.indexOf(fill.toLowerCase(), at);
+      expect(at).toBeGreaterThanOrEqual(0);
+      at += 1;
+    }
+    const pdfText = (await page.getTextContent()).items
+      .map((item) => ('str' in item ? item.str.trim() : ''))
+      .filter(Boolean);
+    expect(svgText).toEqual([
+      'Plan',
+      'Scope',
+      'Brief',
+      'Write',
+      'Draft',
+      'Art',
+      'Ship',
+      'Check',
+      'Send',
+    ]);
+    expect(pdfText.slice(1)).toEqual(svgText);
   });
 });
 

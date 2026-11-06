@@ -182,9 +182,7 @@ describe('pptx-features: evidence for claims', () => {
 
   test('rendering "full" needs fixtures that pass the harness: no slide of them is a known gap', () => {
     const gapped = new Set(
-      Object.values(FIXTURE_KNOWN_GAPS).flatMap((list) =>
-        Object.keys(list.slides).map((key) => key.slice(0, key.lastIndexOf('/')))
-      )
+      Object.keys(FIXTURE_KNOWN_GAPS.slides).map((key) => key.slice(0, key.lastIndexOf('/')))
     );
     const unproven = pptxFeatures
       .filter((row) => row.rendering === 'full')

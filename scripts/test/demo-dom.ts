@@ -355,23 +355,26 @@ export async function drag(
   options: { steps?: number; target?: Element; during?: () => void | Promise<void> } = {}
 ): Promise<void> {
   const { steps = 5 } = options;
-  const target = options.target ?? stage();
+  const pressed = options.target ?? stage();
+  // A target that left the page (a handle the overlay painted again): a browser sends the
+  // events to what is under the pointer, and the stage stands in for it.
+  const target = (): Element => (pressed.isConnected ? pressed : stage());
   await run(async () => {
-    const down = pointer('pointerdown', target, from, { ...held, button: 0, buttons: 1 });
-    if (!down.defaultPrevented) mouse('mousedown', target, from, { ...held, button: 0 });
+    const down = pointer('pointerdown', pressed, from, { ...held, button: 0, buttons: 1 });
+    if (!down.defaultPrevented) mouse('mousedown', pressed, from, { ...held, button: 0 });
     for (let i = 1; i <= steps; i += 1) {
       const at = {
         x: from.x + ((to.x - from.x) * i) / steps,
         y: from.y + ((to.y - from.y) * i) / steps,
       };
-      pointer('pointermove', target, at, { ...held, button: -1, buttons: 1 });
+      pointer('pointermove', target(), at, { ...held, button: -1, buttons: 1 });
     }
   });
   await settle();
   if (options.during) await options.during();
   await run(async () => {
-    pointer('pointerup', target, to, { ...held, button: 0, buttons: 0 });
-    mouse('click', target, to, { ...held, button: 0 });
+    pointer('pointerup', target(), to, { ...held, button: 0, buttons: 0 });
+    mouse('click', target(), to, { ...held, button: 0 });
   });
   await settle();
 }

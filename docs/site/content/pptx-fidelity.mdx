@@ -111,13 +111,13 @@ The editor lists the families it substituted in `snapshot().substitutedFonts`, a
 
 Each item below is a place where the renderer does not yet follow the specification exactly, or where the specification does not state the behavior.
 
-- **Line model.** Line heights and baselines follow measured rules for Latin and Japanese text, from each font's own ascent and descent, and each baseline rounds to a whole point from the top of the text. The rules are not measured for other scripts or for vertical text. A missing font keeps its line metrics for common Latin and East Asian families. For other families, a baseline can be off by up to a few points. Text that is taller than a centered or bottom-anchored body can be 1 to 3 pt off.
-- **Glyph advances.** The text shaper's advances can differ from other renderers by a small amount per glyph. A centered or right-aligned line can start up to 0.5 pt away, and a line near the edge of its box can break at another word.
+- **Line model.** Line heights and baselines follow measured rules for Latin and Japanese text, from each font's own ascent and descent, and each baseline rounds to a whole point from the top of the text. Diagram text spaces its lines on the font's ascent plus descent, not on 1.2 times the font size. The rules are not measured for other scripts or for vertical text. A missing font keeps its line metrics for common Latin and East Asian families. For other families, a baseline can be off by up to a few points. Text that is taller than a centered or bottom-anchored body can be 1 to 3 pt off.
+- **Glyph advances.** The text shaper's advances can differ from other renderers by a small amount per glyph. A centered or right-aligned line can start up to 0.5 pt away, and a line near the edge of its box can break at another word. A font that the deck names kerns (`kern`) only when it has a `kern` table, as measured on reference PDFs. A substitute font, also one from a host substitution, keeps its own kerning pairs.
 - **Color transform spaces.** `a:tint`, `a:shade`, and `a:inv` use linear RGB, and the `a:lum*` transforms use HSL. The other transforms are not measured against a reference.
 - **Gray transform.** `a:gray` uses Rec. 709 weights on sRGB components. One measured color confirms it, so other weights are not ruled out.
 - **Blur.** The specification does not define the blur kernel. Shadows use a Gaussian blur with a standard deviation of a third of `blurRad`, as measured on reference PDFs. Reflections use half of `blurRad`, which is not measured yet.
 - **Shadow skew.** `kx` and `ky` skew after the `sx` and `sy` scale, about the `algn` point.
-- **Glow and soft edge.** A glow grows the outline by half of `rad` and blurs it by the other half. A soft edge shrinks the outline by 0.84 of `rad` and blurs it by `rad`. Reference PDFs give both rules, measured for glows of 5 to 18 pt and soft edges of 2.5 and 10 pt. How fill transparency changes them is not measured: a glow takes the fill's alpha as its strength. A soft edge removes a part of the shape that is thinner than 1.7 times `rad`. The outline grows and shrinks by a set of rectangles, not a circle: a curved edge can be up to 8 % off, and a sharp corner up to 29 %.
+- **Glow and soft edge.** These effects, the inner shadow, and the reflection need the drawing module of `@pptx-editor.dev/pro` (EigenPal Pro License). Without it, a shape paints without them. A glow grows the outline by half of `rad` and blurs it by the other half. A soft edge shrinks the outline by 0.84 of `rad` and blurs it by `rad`. Reference PDFs give both rules, measured for glows of 5 to 18 pt and soft edges of 2.5 and 10 pt. How fill transparency changes them is not measured: a glow takes the fill's alpha as its strength. A soft edge removes a part of the shape that is thinner than 1.7 times `rad`. The outline grows and shrinks by a set of rectangles, not a circle: a curved edge can be up to 8 % off, and a sharp corner up to 29 %.
 - **Effects not drawn.** `a:prstShdw`, `a:blur`, `a:effectDag`, group effects, text effects, and some fill overlays are not drawn. They stay in the file.
 - **Fill overlay.** `a:fillOverlay` blends with the shape's own fill only. Over a semi-transparent fill, the result is opaque where the overlay is.
 - **Gradient colors.** A gradient with exactly two stops, at 0 and 100 %, bends each color channel toward the larger of its two end values. A gradient with three or more stops interpolates linearly in sRGB.
@@ -163,13 +163,14 @@ Each item below is a place where the renderer does not yet follow the specificat
 - **Coincident cell borders.** Where two cells state different borders for one edge, the later cell in row order draws on top.
 - **Inconsistent cell merges.** ECMA-376 does not define a table whose merge markup disagrees with itself. A cell with `hMerge` or `vMerge` that no `gridSpan` or `rowSpan` reaches draws as a normal cell, with its own text and spans. A span past the grid ends at the grid, and a span into an earlier merged cell ends before that cell. These rules are not measured yet.
 - **Text warp.** `a:prstTxWarp` is not drawn. Warped text lays out at its nominal size.
+- **Diagram drawings.** A diagram draws the shapes of its saved drawing (`dsp:drawing`) at their saved positions, sizes, and line widths. The diagram does not lay out again from its data model, layout, and style parts, so it does not change when its frame size or data changes. A diagram with no saved drawing shows a placeholder. A drawing with more than 512 shapes or 8 group levels also shows a placeholder, and so do the diagrams of a slide past 4096 shapes and groups together.
 
 ## Approximations after editing
 
 An edit lays out the slide again through the same pipeline, and applies the autofit rules of the text body (`a:normAutofit`, `a:spAutoFit`; ECMA-376 Part 1, 21.1.2.1). These recomputations are approximations:
 
 - **Shape autofit.** Rotated text, text in more than one column, and text in a shape that is not a rectangle get an estimated size.
-- **Shrink on overflow.** Each edit fits the text again from 100 %. A title takes one step at most, a 90 % font scale, and longer text then overflows. Other text first reduces line spacing by 10 %, then lowers the font scale in steps with 10 % and then 20 % less line spacing, and the editor writes the first step at which the text fits. Steps below a 55 % font scale are estimated.
+- **Shrink on overflow.** Each edit fits the text again from 100 %. A title takes one step at most, a 90 % font scale, and longer text then overflows. Other text first reduces line spacing by 10 %, then lowers the font scale in steps with 10 % and then 20 % less line spacing, and the editor writes the first step at which the text fits. Below an 85 % font scale, each step has 20 % less line spacing only. Empty paragraphs at the end of the text do not count. Steps below a 55 % font scale are estimated.
 - **Resize several shapes.** Rotated shapes scale in the slide's axes.
 - **Ungroup a group with a non-uniform scale.** Each child keeps its center, size, and rotation.
 - **Change case.** A letter whose other case has a different length, such as `ß`, stays as it is. The language of the run is not used.
@@ -190,6 +191,7 @@ An edit lays out the slide again through the same pipeline, and applies the auto
 - **Opaque silhouettes.** Fill transparency does not lighten a shadow, and a picture's shadow takes the shape of its frame.
 - **Inner shadows.** The outer half of an outline is not shaded, and an unfilled shape gets no inner shadow.
 - **Soft edges.** Drawn hard.
+- **Reflection blur.** A reflection is drawn with its fade, without its blur.
 - **Gradient lines.** Drawn in one color.
 - **Gradient stops.** At most 64 stops are drawn.
 - **Fills outside the box.** A rectangle path gradient or a picture fill paints the shape's box only.
@@ -198,7 +200,7 @@ An edit lays out the slide again through the same pipeline, and applies the auto
 - **Dashes and compound lines.** Drawn as one solid line.
 - **SVG pictures.** The PNG fallback of the picture is drawn.
 - **Text.** Synthetic bold and italic are not drawn, upright vertical characters draw rotated, and a character that the font does not have is not drawn. Dotted, dashed, wavy, heavy, and word-only underlines draw as one single line, as in the editor.
-- **Not drawn.** Pattern fills, picture fills on text, reflections, arrowheads, text outlines, other picture formats, charts, diagrams, OLE objects with no picture, other graphic frames, and table frames with no grid.
+- **Not drawn.** Pattern fills, picture fills on text, arrowheads, text outlines, other picture formats, diagrams with no saved drawing, OLE objects with no picture, other graphic frames, and table frames with no grid. Charts draw through the Pro drawing module, which the export always installs. Chart types outside that module show a placeholder (see [Charts](/docs/guides/charts)).
 
 ## See also
 

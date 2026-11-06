@@ -30,6 +30,8 @@ import {
 } from './table-cells.ts';
 import { itemById } from './surface.ts';
 import { comparePoints } from '../automation/commands/text-model.ts';
+import { commandWordRange } from '../automation/commands/command-word.ts';
+import type { FormatKeyTarget } from './format-keys.ts';
 import { effectsStateOf, shapeStyleOf } from '../automation/commands/effect-commands.ts';
 import { aspectLocked } from '../automation/commands/arrange-commands.ts';
 import { paragraphFormatRead } from '../automation/commands/paragraph-format.ts';
@@ -75,6 +77,40 @@ export function selectedText(layout: SlideLayout | undefined, sel: EditorSelecti
     );
   });
   return out.join('\n');
+}
+
+/**
+ * The text Change Case acts on: the selected text, or at a caret the word that the command
+ * reaches (`commandWordRange`). Shift+F3 reads it to pick the next case.
+ */
+export function caseTargetText(layout: SlideLayout | undefined, sel: EditorSelection): string {
+  const text = selectedText(layout, sel);
+  if (text || sel.kind !== 'text' || !layout) return text;
+  const p = textItemOf(layout, sel)?.element.text?.paragraphs[sel.focus.paragraph];
+  const plain = p?.runs.map((r) => (r.kind === 'break' ? '\n' : r.text)).join('') ?? '';
+  const word = commandWordRange(plain, sel.focus.offset, new Set());
+  return word ? plain.slice(word.start, word.end) : '';
+}
+
+/** Whether a layout item holds text: a shape's text body, a table, or a group with either. */
+function hasText(item: ReturnType<typeof itemById>): boolean {
+  if (item?.kind === 'group') return item.children.some(hasText);
+  return (
+    (item?.kind === 'shape' && !!item.element.text) || (item?.kind === 'frame' && !!item.table)
+  );
+}
+
+/** Where the format keys act (format-keys.ts): text, selected shapes, and the case target. */
+export function formatKeyTarget(
+  layout: SlideLayout | undefined,
+  sel: EditorSelection
+): FormatKeyTarget {
+  return {
+    inText: sel.kind === 'text',
+    // Only a shape with text takes the paragraph and font keys; a picture leaves them to the browser.
+    shapes: sel.kind === 'shapes' && sel.nodeIds.some((id) => hasText(itemById(layout, id))),
+    selectedText: () => caseTargetText(layout, sel),
+  };
 }
 
 /** A text body's stored `a:normAutofit/@fontScale` (1 when the text is not shrunk). */

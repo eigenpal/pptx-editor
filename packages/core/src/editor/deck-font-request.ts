@@ -6,6 +6,7 @@
 
 import {
   attr,
+  isDeferredPending,
   NS,
   presentationInfo,
   type Element,
@@ -86,7 +87,10 @@ export function deckFontFamilies(pkg: PptxPackage): string[] {
   // names none.
   const presentationPart = presentationInfo(pkg).presentationPart;
   const parts = [...pkg.parts.values()].flatMap((part) =>
-    part.kind === 'xml' && (FAMILY_PARTS.test(part.partName) || part.partName === presentationPart)
+    // A slide still opening is asked for when the open settles (`progressive-open.ts`).
+    part.kind === 'xml' &&
+    !isDeferredPending(part) &&
+    (FAMILY_PARTS.test(part.partName) || part.partName === presentationPart)
       ? [partFonts(part.xml)]
       : []
   );

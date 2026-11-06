@@ -170,7 +170,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'partial',
     tier: 'community',
     notes:
-      'Five modes rewrite the letters and keep the formatting; at a caret, the word around it. A letter whose other case has a different length (ß) stays, and the run language is not used.',
+      'Five modes rewrite the letters and keep the formatting; at a caret, the word around it. Shift+F3 steps through Capitalize Each Word, UPPER CASE, and lower case. A letter whose other case has a different length (ß) stays, and the run language is not used.',
   },
   {
     id: 'text.hyperlinks',
@@ -267,7 +267,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'partial',
     tier: 'community',
     notes:
-      'Stored font scale and line spacing reduction render with whole-point sizes and a subtracted reduction, as measured. Refit after an edit starts from 100 %, not from the last state: a title shrinks to 90 % at most and then overflows, as measured; other text uses the measured step order down to a 55 % font scale, and estimated steps below it. The font size box shows the size the text is drawn at; the Font dialog shows and sets the size the text asks for. Increase steps up from that size, and Decrease on whole selected shapes steps down from the drawn size. The toolbar and the Format panel switch between no autofit, shrink text on overflow, and resize shape to fit text. Overflowing centered text is approximate. Resize to fit text across rotated text, several columns, or a shape that is not a rectangle is approximate.',
+      'Stored font scale and line spacing reduction render with whole-point sizes and a subtracted reduction, as measured. Refit after an edit starts from 100 %, not from the last state: a title shrinks to 90 % at most and then overflows, as measured; other text uses the measured step order down to a 55 % font scale, and estimated steps below it. Empty paragraphs at the end of the text do not count, as measured. The font size box shows the size the text is drawn at; the Font dialog shows and sets the size the text asks for. Increase steps up from that size, and Decrease on whole selected shapes steps down from the drawn size. The toolbar and the Format panel switch between no autofit, shrink text on overflow, and resize shape to fit text. Overflowing centered text is approximate. Resize to fit text across rotated text, several columns, or a shape that is not a rectangle is approximate.',
   },
   {
     id: 'paragraphs.text-direction-columns',
@@ -301,7 +301,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'partial',
     tier: 'community',
     notes:
-      'Toggle bullets and numbering. The galleries set common bullet characters and a:buAutoNum numbering schemes, and the Bullets and Numbering dialog sets the size, color, start number, and a custom character and font. Enter continues the list. Tab demotes a level, and Shift+Tab promotes one. Where a symbol font is not installed, a Wingdings or Symbol bullet draws its Unicode twin (approximate). Picture bullets do not draw and cannot be set.',
+      'Toggle bullets and numbering. The galleries set common bullet characters and a:buAutoNum numbering schemes, and the Bullets and Numbering dialog sets the size, color, start number, and a custom character and font. Enter continues the list, also on an empty item. At the start of a list item or across paragraphs, Tab demotes a level and Shift+Tab promotes one; elsewhere both keys type a tab. Backspace at the start of a list item removes its bullet and keeps its level. Typing 1., 1), *, or - and a space at the start of a paragraph starts a list (AutoCorrect). Where a symbol font is not installed, a Wingdings or Symbol bullet draws its Unicode twin (approximate). Picture bullets do not draw and cannot be set.',
   },
 
   // --- Shapes, groups & connectors -------------------------------------
@@ -438,15 +438,26 @@ export const pptxFeatures: PptxFeature[] = [
 
   // --- Effects ---------------------------------------------------------
   {
-    id: 'effects.shadow-glow-reflection',
-    name: 'Shadow, glow, soft edge, and reflection',
+    id: 'effects.outer-shadow',
+    name: 'Outer shadow',
     category: 'effects',
     editing: 'partial',
     rendering: 'partial',
     roundTrip: 'partial',
     tier: 'community',
     notes:
-      'Gallery presets set and clear each effect, glows in the six accent colors. Inherited and theme effects stay. Groups, tables, and charts are refused, and so is a theme effect style with a:effectDag. No perspective shadows, Preset, Bevel, or 3-D Rotation. Shadow, glow, and soft edge blurs are measured for small radii. The reflection blur is not measured.',
+      'Gallery presets set and clear the shadow. Inherited and theme effects stay. Groups, tables, and charts are refused, and so is a theme effect style with a:effectDag. No perspective shadows. The shadow blur is measured for small radii.',
+  },
+  {
+    id: 'effects.glow-reflection',
+    name: 'Glow, inner shadow, soft edge, and reflection',
+    category: 'effects',
+    editing: 'partial',
+    rendering: 'partial',
+    roundTrip: 'partial',
+    tier: 'premium',
+    notes:
+      'The drawing module of @pptx-editor.dev/pro paints these effects and needs the EigenPal Pro License. Without it, shapes and pictures paint without them. PDF export always paints them. With the module, the Shape Effects menu sets and clears each effect, glows in the six accent colors, and Picture Styles offers the reflection and soft edge styles. Without it, the chrome does not offer these choices, and the commands still set and clear each effect. Save keeps them in every edition. No Preset, Bevel, or 3-D Rotation. Glow, inner shadow, and soft edge blurs are measured for small radii. The reflection blur is not measured.',
   },
   {
     id: 'effects.fill-overlay',
@@ -523,7 +534,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'partial',
     tier: 'community',
     notes:
-      'Description, title, and "Mark as decorative" for one selected object. Automatic descriptions are not built.',
+      'Description, title, and "Mark as decorative" for one selected object. On the slide and in the slide show, a screen reader reads the description of a picture. It skips a decorative picture and a picture with no description. When Tab selects an object, the screen reader also hears its description. Automatic descriptions are not built.',
   },
   {
     id: 'pictures.emf-wmf',
@@ -622,17 +633,21 @@ export const pptxFeatures: PptxFeature[] = [
     name: 'Charts',
     category: 'objects',
     editing: 'none',
-    rendering: 'none',
+    rendering: 'partial',
     roundTrip: 'preserved',
-    tier: 'community',
-    notes: 'A labeled placeholder shows in place of the chart.',
+    tier: 'premium',
+    notes:
+      'The drawing module of @pptx-editor.dev/pro draws charts from the values cached in the chart part, in the editor and in the PDF export. It draws bar and column charts (clustered, stacked, and percent stacked), line, area, scatter, pie, doughnut, and radar charts, with titles, legends, axes, gridlines, data labels, and number formats. 3-D, of-pie, stock, bubble, and surface charts, and charts with trendlines or error bars, show a labeled placeholder. Without the module, every chart shows the placeholder. Charts are not editable, and the chart part saves unchanged. The module needs the EigenPal Pro License.',
+    docsLink: '/docs/guides/charts',
   },
   {
     id: 'objects.diagrams',
     name: 'Diagrams',
     category: 'objects',
     editing: 'none',
-    rendering: 'none',
+    rendering: 'partial',
+    notes:
+      'A diagram draws from its saved drawing. A diagram with no saved drawing shows a placeholder. Diagrams are read-only.',
     roundTrip: 'preserved',
     tier: 'community',
   },
@@ -858,7 +873,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'none',
     tier: 'premium',
     notes:
-      '@pptx-editor.dev/pptx-to-pdf needs the EigenPal Pro License. The PDF export draws shapes, solid and gradient fills, cropped PNG and JPEG pictures, tables, shadows, glow, and searchable text. It exports in one call or from a reusable session, and leaves hidden slides out. Approximations, each with a diagnostic code: shadow and glow blur, opaque silhouettes, inner shadows, soft edges, gradient lines, gradients with more than 64 stops, fills past the shape box, tiled pictures, picture color effects, dashes, compound lines, underline styles other than single and double, and some text styles; SVG pictures draw from their PNG fallback. The border of a picture is drawn outside the picture. With the optional @docx-editor.dev/fonts-cjk installed, East Asian text in a missing font draws with Noto Sans CJK JP. Not drawn yet: pattern fills, picture fills on text, reflections, arrowheads, text outlines, other picture formats, charts, diagrams, OLE objects with no picture, and other graphic frames, and table frames with no grid. The export fidelity is not measured yet, so rendering stays planned.',
+      '@pptx-editor.dev/pptx-to-pdf needs the EigenPal Pro License. The PDF export draws shapes, solid and gradient fills, cropped PNG and JPEG pictures, tables, shadows, glow, inner shadows, reflections, and searchable text. It exports in one call or from a reusable session, and leaves hidden slides out. Approximations, each with a diagnostic code: shadow and glow blur, opaque silhouettes, inner shadows, soft edges, reflection blur, gradient lines, gradients with more than 64 stops, fills past the shape box, tiled pictures, picture color effects, dashes, compound lines, underline styles other than single and double, and some text styles; SVG pictures draw from their PNG fallback. The border of a picture is drawn outside the picture. With the optional @docx-editor.dev/fonts-cjk installed, East Asian text in a missing font draws with Noto Sans CJK JP. Not drawn yet: pattern fills, picture fills on text, arrowheads, text outlines, other picture formats, diagrams, OLE objects with no picture, and other graphic frames, and table frames with no grid. Charts draw through the drawing module of @pptx-editor.dev/pro, which the export always installs; chart types outside that module show a placeholder with the frame.chart code. The export fidelity is not measured yet, so rendering stays planned.',
   },
 ];
 

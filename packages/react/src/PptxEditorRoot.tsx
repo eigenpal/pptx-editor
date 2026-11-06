@@ -25,6 +25,7 @@ import {
   warnModulesChanged,
   type ColorMode,
   type CommandResult,
+  type LoadOptions,
   type EditorCommand,
   type EditorExecOptions,
   type EditorSnapshot,
@@ -34,13 +35,14 @@ import {
   type EditorModule,
   type PptxEditorInstance,
 } from '@pptx-editor.dev/core/editor';
-import type { LocaleCatalog } from '@pptx-editor.dev/i18n';
+import type { LocaleCatalog, Translate } from '@pptx-editor.dev/i18n';
 import {
   PptxEditorContext,
   SlideshowContext,
   TranslationContext,
   translatorFor,
   usePptxEditor,
+  useTranslation,
 } from './context.ts';
 import { useSlideshowHandle } from './Slideshow.tsx';
 import { useCanvasContextMenu } from './CanvasContextMenu.tsx';
@@ -88,6 +90,12 @@ export interface PptxEditorRootProps {
    * effect and prints a development warning. Create the list once, outside the component.
    */
   readonly modules?: readonly EditorModule[];
+  /**
+   * AutoCorrect while typing (default `true`): curly quotes, symbols, fractions, en dashes,
+   * sentence capitals, and lists started by typing `1.`, `1)`, `*`, or `-` and a space. Read
+   * once, when the editor is created.
+   */
+  readonly autoCorrect?: boolean;
   /** Customize the dialogs the editor mounts. Set an entry to `false` to turn one off. */
   readonly popups?: PptxEditorPopups;
   /**
@@ -108,11 +116,16 @@ export interface PptxEditorRootProps {
  * returns. @public
  */
 export interface PptxEditorRef {
-  /** Open `.pptx` bytes. Resolves when the presentation is open, or with the refusal. */
-  load(bytes: Uint8Array): Promise<CommandResult>;
   /**
-   * The presentation as `.pptx` bytes, or `null` when no presentation is open. The bytes own an
-   * `ArrayBuffer`, so `new Blob([bytes])` takes them as they are.
+   * Open `.pptx` bytes. Resolves when the presentation is open, or with the refusal. A long
+   * deck resolves when `options.startSlide` (or the first slide) is ready.
+   */
+  load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
+  /**
+   * The presentation as `.pptx` bytes. The bytes own an `ArrayBuffer`, so `new Blob([bytes])`
+   * takes them as they are. `null` when no presentation is open, and when a slide of it is
+   * damaged: `snapshot().readOnlyReason` is then `'damaged-slide'` (after edits), or
+   * `snapshot().openFailure` reports the refused file.
    */
   save(): Uint8Array<ArrayBuffer> | null;
   /** The editor instance, or `null` before it mounts. */
@@ -157,6 +170,7 @@ export const PptxEditorRoot = forwardRef<PptxEditorRef, PptxEditorRootProps>(
         ...(props.fontFamilies ? { fontFamilies: props.fontFamilies } : {}),
         ...(props.fonts ? { fonts: props.fonts } : {}),
         ...(props.modules ? { modules: props.modules } : {}),
+        ...(props.autoCorrect === false ? { autoCorrect: false } : {}),
         onFontError: (error) => reportFontError(error, callbacks.current.onFontError),
         translate: (key, params) => translateKeyOrText(tRef.current, key, params),
       });
@@ -255,18 +269,41 @@ export const PptxEditorRoot = forwardRef<PptxEditorRef, PptxEditorRootProps>(
 export interface PptxEditorViewportProps {
   /** Appended after the `pptx-editor` class. */
   className?: string;
+  /**
+   * The name of the editor's landmark region, or a translation key. Default: "Presentation
+   * editor" (`viewport.ariaLabel`). Give each editor its own name when a page shows more than one.
+   * `false` renders no region, for a host whose own landmarks (`header`, `main`) are inside.
+   */
+  label?: string | false;
   /** The chrome and the content of the editor. */
   children?: ReactNode;
 }
 
+/** The region role and name of the viewport, or nothing for `label={false}`. */
+function viewportLandmark(
+  t: Translate,
+  label: string | false | undefined
+): { role?: 'region'; 'aria-label'?: string } {
+  if (label === false) return {};
+  return {
+    role: 'region',
+    'aria-label': label ? translateKeyOrText(t, label) : t('viewport.ariaLabel'),
+  };
+}
+
 /**
  * The editor's scroll and styling scope: carries the `.pptx-editor` class, and `dark` with it
- * when the root's `colorMode` resolves to dark. @public
+ * when the root's `colorMode` resolves to dark. It is a named landmark region ("Presentation
+ * editor"), so a screen reader user can go to the editor from anywhere on the page. @public
  */
-export function PptxEditorViewport({ className, children }: PptxEditorViewportProps) {
+export function PptxEditorViewport({ className, label, children }: PptxEditorViewportProps) {
   const dark = useChromeDark();
+  const { t } = useTranslation();
   return (
-    <div className={['pptx-editor', dark ? 'dark' : '', className].filter(Boolean).join(' ')}>
+    <div
+      className={['pptx-editor', dark ? 'dark' : '', className].filter(Boolean).join(' ')}
+      {...viewportLandmark(t, label)}
+    >
       <ScopedByAncestorContext.Provider value>{children}</ScopedByAncestorContext.Provider>
     </div>
   );

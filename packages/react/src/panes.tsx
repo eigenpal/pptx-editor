@@ -8,16 +8,23 @@ import {
   useEffect,
   useId,
   useLayoutEffect,
+  useMemo,
+  useReducer,
   useRef,
   useState,
   type CSSProperties,
+  type DragEvent,
   type FocusEvent,
   type KeyboardEvent,
+  type MouseEvent,
   type ReactNode,
   type RefObject,
 } from 'react';
 import {
   ZOOM_MENU_LEVELS,
+  createProgressiveMount,
+  mountedSections,
+  railItemPosition,
   tooltipAttributes,
   followCurrentSlide,
   groupSlideSections,
@@ -33,6 +40,7 @@ import {
   runSlideStep,
   sectionOfSlide,
   slideClickMode,
+  slideItemName,
   slideMenuPoint,
   stepCommand,
   zoomStep,
@@ -78,7 +86,10 @@ const sameIndices = (a: readonly number[], b: readonly number[]): boolean =>
 /** How a click selects slides: Shift+click a range, Ctrl/Cmd+click one more or one less. */
 export const clickMode = slideClickMode;
 
-/** A slide thumbnail, repainted only when its slide renders differently. @internal */
+/**
+ * A slide thumbnail, repainted only when its slide renders differently. It is hidden from
+ * assistive technology: the slide item that holds it gives the name ("Slide 3"). @internal
+ */
 export const Thumbnail = memo(function Thumbnail({
   slide,
   ratio,
@@ -88,10 +99,82 @@ export const Thumbnail = memo(function Thumbnail({
 }) {
   const editor = usePptxEditor();
   const box = useRef<HTMLDivElement>(null);
+  // A deferred paint: a long list paints the thumbnails in view first. The disposer runs on
+  // unmount and on an editor change, so the old editor forgets the container.
   useEffect(() => {
-    if (editor && box.current) editor.renderThumbnail(slide.index, box.current);
+    if (!editor || !box.current) return undefined;
+    return editor.renderThumbnail(slide.index, box.current, { defer: true });
   }, [editor, slide]);
-  return <div ref={box} className="pptx-rail__thumb" style={{ aspectRatio: String(1 / ratio) }} />;
+  return (
+    <div
+      ref={box}
+      className="pptx-rail__thumb"
+      data-pending={slide.pending ? '' : undefined}
+      style={{ aspectRatio: String(1 / ratio) }}
+      aria-hidden="true"
+    />
+  );
+});
+
+/** The rail's handlers for its items: one object for the rail's life, which reads its latest render. */
+interface RailItemHandlers {
+  click(index: number, e: MouseEvent<HTMLLIElement>): void;
+  menu(index: number, e: MouseEvent<HTMLLIElement>): void;
+  dragStart(index: number, e: DragEvent<HTMLElement>): void;
+  dragOver(index: number, e: DragEvent<HTMLElement>): void;
+  dragEnd(index: number): void;
+  drop(index: number, e: DragEvent<HTMLElement>): void;
+}
+
+/**
+ * One slide of the rail. Memoized on its props, so a keystroke that changes one slide, or a
+ * long deck whose rail grows while it opens, renders only the items that changed. @internal
+ */
+const RailItem = memo(function RailItem(props: {
+  slide: SlideSummary;
+  ratio: number;
+  selected: boolean;
+  current: boolean;
+  role: 'treeitem' | 'option';
+  /** The item's name for assistive technology (`slideItemName`). */
+  name: string;
+  drop: string | undefined;
+  draggable: boolean;
+  on: RailItemHandlers;
+  /** `aria-setsize` and `aria-posinset` while the rail mounts only part of its items. */
+  setSize?: number | undefined;
+  posInSet?: number | undefined;
+}) {
+  const { slide: s, on } = props;
+  return (
+    <li
+      className="pptx-rail__item"
+      role={props.role}
+      aria-setsize={props.setSize}
+      aria-posinset={props.posInSet}
+      aria-selected={props.selected}
+      aria-current={props.current}
+      data-hidden={s.hidden ? '' : undefined}
+      data-index={s.index}
+      data-drop={props.drop}
+      draggable={props.draggable}
+      onDragStart={(e) => on.dragStart(s.index, e)}
+      onDragOver={(e) => on.dragOver(s.index, e)}
+      onDragEnd={() => on.dragEnd(s.index)}
+      onDrop={(e) => on.drop(s.index, e)}
+      tabIndex={props.current ? 0 : -1}
+      onClick={(e) => on.click(s.index, e)}
+      onContextMenu={(e) => on.menu(s.index, e)}
+    >
+      {/* The name comes from the hidden text, not `aria-label`: the visible number is part of
+          it, and the thumbnail art is hidden from assistive technology. */}
+      <span className="pptx-rail__number" aria-hidden="true">
+        {s.index + 1}
+      </span>
+      <span className="pptx-sr-only">{props.name}</span>
+      <Thumbnail slide={s} ratio={props.ratio} />
+    </li>
+  );
 });
 
 /**
@@ -183,6 +266,24 @@ function paneStyle(width: number | undefined, style: CSSProperties | undefined) 
   return { width, ...style };
 }
 
+/**
+ * How many rail items to mount while a long deck opens: the first screen with the first slide,
+ * then more after each painted frame (core's `createProgressiveMount`).
+ */
+function useProgressiveMount(
+  total: number,
+  needed: number,
+  opening: boolean,
+  loading: boolean
+): number {
+  const [, grow] = useReducer((n: number) => n + 1, 0);
+  const [mount] = useState(() => createProgressiveMount(grow));
+  useEffect(() => () => mount.dispose(), [mount]);
+  const shown = mount.limit(total, needed, opening, loading);
+  useEffect(() => mount.follow(total));
+  return shown;
+}
+
 /** Open state of a pane: controlled by `open`, else its own. */
 function usePaneOpen(props: PaneProps) {
   const [own, setOwn] = useState(props.defaultOpen ?? true);
@@ -218,12 +319,18 @@ export function SlideRail(props: SlideRailProps = {}) {
   const readOnly = useEditorState((s) => s.mode === 'view');
   const list = useRef<HTMLOListElement>(null);
   const count = slides.length;
+  const opening = useEditorState((s) => (s.pendingSlides ?? 0) > 0);
+  // A file that loads starts the next deck's rail at the first screen again.
+  const loading = useEditorState((s) => s.isOpening === true);
+  const mounted = useProgressiveMount(count, current, opening, loading);
   const [menu, setMenu] = useState<RailMenuState | null>(null);
   const [gallery, setGallery] = useState<HTMLElement | null>(null);
   const actions = useRef<HTMLDivElement>(null);
   const sections = useSlideSections();
   // Sections group the rail when they cover every slide in order; otherwise it stays flat.
   const grouped = groupSlideSections(sections, count);
+  // A grouped rail mounts whole sections, so no header shows with no slides under it.
+  const inView = grouped ? mountedSections(grouped, mounted) : null;
   const orientation = resolveRailOrientation(props.orientation, 'PptxEditor.SlideRail');
   // A right-to-left row mirrors the move buttons, as its arrow keys do. The direction comes
   // from the mounted rail, so it is read after the rail mounts or changes.
@@ -233,12 +340,11 @@ export function SlideRail(props: SlideRailProps = {}) {
   // A narrow horizontal rail (a phone) folds its secondary actions into one menu.
   const [folded, setFolded] = useState(false);
   useEffect(() => watchRailFold(rail.current, orientation, setFolded), [orientation, open]);
-  const { itemProps: dragProps, cancel: cancelDrag } = useSlideDrag(
-    railDragAxis(orientation),
-    selected,
-    readOnly,
-    grouped
-  );
+  const {
+    itemProps: dragProps,
+    cancel: cancelDrag,
+    marker: dropMarker,
+  } = useSlideDrag(railDragAxis(orientation), selected, readOnly, grouped);
   const collapsed = useCollapsedSections();
   const [renaming, setRenaming] = useState<string | null>(null);
   useOpenCurrentSection(grouped);
@@ -300,36 +406,53 @@ export function SlideRail(props: SlideRailProps = {}) {
       openMenu: (index, item) => openMenu(index, item, null),
       focusCurrent,
     });
-  /** One slide of the rail. */
-  const item = (s: SlideSummary) => (
-    <li
-      key={s.index}
-      className="pptx-rail__item"
-      role={grouped ? 'treeitem' : 'option'}
-      aria-selected={selected.includes(s.index)}
-      aria-current={s.index === current}
-      aria-label={t(s.hidden ? 'rail.hiddenSlideLabel' : 'rail.slideLabel', {
-        index: s.index + 1,
-      })}
-      data-hidden={s.hidden ? '' : undefined}
-      data-index={s.index}
-      {...dragProps(s.index)}
-      tabIndex={s.index === current ? 0 : -1}
-      onClick={(e) => {
+  // The items' handlers read the latest render, so the object stays the same and a memoized
+  // item does not render again for a new closure.
+  const latest = useRef({ editor, dragProps, openMenu });
+  useLayoutEffect(() => {
+    latest.current = { editor, dragProps, openMenu };
+  });
+  const on = useMemo<RailItemHandlers>(
+    () => ({
+      click: (index, e) => {
         e.currentTarget.focus({ preventScroll: true });
-        editor?.selectSlide(s.index, clickMode(e));
-      }}
-      onContextMenu={(e) => {
+        latest.current.editor?.selectSlide(index, clickMode(e));
+      },
+      menu: (index, e) => {
         e.preventDefault();
         // A keyboard-opened menu reports no pointer position: open at the slide.
         const pointer = e.clientX !== 0 || e.clientY !== 0;
-        openMenu(s.index, e.currentTarget, pointer ? { x: e.clientX, y: e.clientY } : null);
-      }}
-    >
-      <span className="pptx-rail__number">{s.index + 1}</span>
-      <Thumbnail slide={s} ratio={ratio} />
-    </li>
+        const at = pointer ? { x: e.clientX, y: e.clientY } : null;
+        latest.current.openMenu(index, e.currentTarget, at);
+      },
+      dragStart: (index, e) => latest.current.dragProps(index).onDragStart(e),
+      dragOver: (index, e) => latest.current.dragProps(index).onDragOver(e),
+      dragEnd: (index) => latest.current.dragProps(index).onDragEnd(),
+      drop: (index, e) => latest.current.dragProps(index).onDrop(e),
+    }),
+    []
   );
+  /** One slide of the rail. */
+  const itemLimit = inView ? inView.limit : mounted;
+  const item = (s: SlideSummary) => {
+    const place = railItemPosition(s.index, count, itemLimit, grouped);
+    return (
+      <RailItem
+        key={s.id}
+        setSize={place?.setSize}
+        posInSet={place?.posInSet}
+        slide={s}
+        ratio={ratio}
+        selected={selected.includes(s.index)}
+        current={s.index === current}
+        role={grouped ? 'treeitem' : 'option'}
+        name={slideItemName(t, s)}
+        drop={dropMarker(s.index)}
+        draggable={!readOnly}
+        on={on}
+      />
+    );
+  };
   const railActions: RailActions = {
     t,
     editor,
@@ -400,8 +523,8 @@ export function SlideRail(props: SlideRailProps = {}) {
         onKeyDown={onKeyDown}
         onFocus={trackFocus}
       >
-        {grouped
-          ? grouped.map((sec) => {
+        {grouped && inView
+          ? inView.sections.map((sec) => {
               const shut = collapsed.includes(sec.id);
               return (
                 <SectionNode
@@ -416,11 +539,13 @@ export function SlideRail(props: SlideRailProps = {}) {
                   onRenameEnd={() => setRenaming(null)}
                   onRemoved={focusCurrent}
                 >
-                  {slides.slice(sec.firstSlide, sec.firstSlide + sec.slideCount).map(item)}
+                  {slides
+                    .slice(sec.firstSlide, Math.min(sec.firstSlide + sec.slideCount, inView.limit))
+                    .map(item)}
                 </SectionNode>
               );
             })
-          : slides.map(item)}
+          : slides.slice(0, mounted).map(item)}
       </ol>
       <RailActionsContext.Provider value={railActions}>
         <div

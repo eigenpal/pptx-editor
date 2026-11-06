@@ -26,6 +26,9 @@ Preserve legal license files and license identifiers.
 - Write document changes only through `PptxDocumentStore` operations.
 - Keep parsing, cascade, and layout free of DOM dependencies.
 - Use the same layout and rendering pipeline in the editor and fidelity checks.
+- Make the fidelity check compare two PDFs: the PDF of the editor's own paint and the reference PDF.
+- Process both PDFs with the same tools. Do not add rules for an operating system, machine, or presentation application.
+- Accept reference PDFs from any machine. Use only open fonts in fixtures.
 - Read the [OOXML references](reference/README.md) before changing parsing, cascade, or layout.
 - Measure rendering against reference PDFs. Never loosen thresholds to pass a check.
 - Treat missing references and skipped checks as gaps, never passes.

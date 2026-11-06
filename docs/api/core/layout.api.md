@@ -16,6 +16,9 @@ export function autofitSizePt(sizePt: number, fontScale: number): number;
 // @public
 export function autonumberText(scheme: string, n: number): string;
 
+// @internal
+export function baselineInLinePt(single: number, lineHeight: number, metrics: FaceMetrics): number;
+
 // @public
 export function baselineOffsetPt(sizePt: number, lineHeight: number, metrics: FaceMetrics): number;
 
@@ -49,6 +52,16 @@ export interface CellLayout {
     readonly x: number;
     // (undocumented)
     readonly y: number;
+}
+
+// @internal
+export type ChartRenderer = (input: ChartRenderInput) => readonly ResolvedElement[] | null;
+
+// @internal
+export interface ChartRenderInput {
+    readonly chart: ResolvedChartPart;
+    readonly frame: ResolvedGraphicFrame;
+    readonly measurer: TextMeasurer;
 }
 
 // @public
@@ -100,10 +113,98 @@ export function deferFonts(origin: FontOrigin): MarkedFontResolver;
 export function defineFontResolver<T extends FontResolver>(resolve: T): MarkedFontResolver<T>;
 
 // @public
+export interface DrawingCapabilities {
+    readonly chart: boolean;
+    readonly effects: boolean;
+}
+
+// @public
+export function drawingCapabilities(): DrawingCapabilities;
+
+// @internal
+export interface DrawingEffectsRenderer {
+    readonly body: (effects: ResolvedEffects, bounds: EffectBounds, ids: EffectIds) => EffectFilterPaint | null;
+    readonly glow: (effects: ResolvedEffects, bounds: EffectBounds, ids: EffectIds) => EffectFilterPaint | null;
+    readonly reflection: (effects: ResolvedEffects, source: EffectCopySource, ids: EffectIds) => EffectCopyPaint | null;
+}
+
+// @internal
+export interface DrawingRenderers {
+    readonly chart?: ChartRenderer;
+    readonly effects?: DrawingEffectsRenderer;
+}
+
+// @internal
+export function drawingRenderers(): DrawingRenderers;
+
+// @internal
+export function drawingRenderersListenerCount(): number;
+
+// @public
+export function drawingRenderersVersion(): number;
+
+// @public
 export const EAST_ASIAN_FALLBACK_FAMILIES: readonly string[];
 
 // @public
 export function eastAsianFallbackFamilies(lang?: string): readonly string[];
+
+// @internal
+export interface EffectBounds {
+    // (undocumented)
+    readonly b: number;
+    // (undocumented)
+    readonly r: number;
+    // (undocumented)
+    readonly x: number;
+    // (undocumented)
+    readonly y: number;
+}
+
+// @internal
+export interface EffectCopyPaint {
+    // (undocumented)
+    readonly defs: readonly EffectNode[];
+    // (undocumented)
+    readonly node: EffectNode;
+}
+
+// @internal
+export interface EffectCopySource {
+    readonly contentId: string;
+    readonly corners: readonly {
+        x: number;
+        y: number;
+    }[];
+    // (undocumented)
+    readonly height: number;
+    readonly matrix: Matrix;
+    // (undocumented)
+    readonly width: number;
+}
+
+// @internal
+export interface EffectFilterPaint {
+    readonly defs: readonly EffectNode[];
+    // (undocumented)
+    readonly filter: string;
+}
+
+// @internal
+export interface EffectIds {
+    // (undocumented)
+    id(kind: string): string;
+}
+
+// @internal
+export interface EffectNode {
+    // (undocumented)
+    readonly attrs: Readonly<Record<string, string>>;
+    // (undocumented)
+    readonly children?: readonly EffectNode[];
+    // (undocumented)
+    readonly tag: string;
+}
 
 // @public
 export interface EvaluatedGeometry {
@@ -322,11 +423,17 @@ export const HARFBUZZ_VERSION = "15.0.0";
 // @public
 export function hasCharacters(layout: TextLayout): boolean;
 
+// @public
+export const HOST_SUBSTITUTE_ORIGIN = "host-substitute";
+
 // @public (undocumented)
 export const IDENTITY: Matrix;
 
 // @public
 export function initializeHarfBuzz(): Promise<void>;
+
+// @internal
+export function installDrawingRenderers(renderers: Partial<DrawingRenderers>): void;
 
 // @public
 export function invert(m: Matrix): Matrix;
@@ -389,6 +496,8 @@ export type LayoutItem = ItemPlacement & ({
     readonly poster?: Extract<LayoutItem, {
         kind: 'picture';
     }>;
+    readonly drawing?: readonly LayoutItem[];
+    readonly chart?: readonly LayoutItem[];
 });
 
 // @public
@@ -404,6 +513,14 @@ export function layoutText(body: ResolvedTextBody, rect: {
     width: number;
     height: number;
 }, measurer: TextMeasurer): TextLayout;
+
+// @internal
+export function layoutTextOn(body: ResolvedTextBody, rect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}, measurer: TextMeasurer, basis: LineBasis): TextLayout;
 
 // @public
 export interface Line {
@@ -424,6 +541,16 @@ export interface Line {
     readonly start: number;
     readonly top: number;
 }
+
+// @internal
+export type LineBasis = 'size' | 'face';
+
+// @internal
+export function lineHeightInPt(singlePt: number, spacing: {
+    pct: number;
+} | {
+    pts: number;
+}, reduction: number): number;
 
 // @public
 export function lineHeightPt(sizePt: number, spacing: {
@@ -554,6 +681,9 @@ export const sha256FontBytes: (bytes: Uint8Array) => string;
 // @public
 export const SINGLE_LINE_FACTOR = 1.2;
 
+// @internal
+export function singleLinePt(sizePt: number, metrics: FaceMetrics, basis: LineBasis): number;
+
 // @public
 export interface SlideLayout {
     readonly diagnostics: readonly string[];
@@ -577,6 +707,9 @@ export interface SourceMap {
     // (undocumented)
     readonly sy: number;
 }
+
+// @public
+export function subscribeDrawingRenderers(listener: () => void): () => void;
 
 // @internal
 export function symbolBulletText(char: string, font: string | null | undefined, isFamilyAvailable?: (family: string) => boolean): string;

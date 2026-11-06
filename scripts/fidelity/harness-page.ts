@@ -3,51 +3,76 @@
 // it, and the page renders with the editor's own `openPresentation` → `layoutSlide` →
 // `paintSlide`. There is no second renderer.
 
-import { chromium, type Browser, type CDPSession, type Page } from '@playwright/test';
+import { chromium, type Browser, type Page } from '@playwright/test';
 import { createHash, randomUUID } from 'node:crypto';
-import { createReadStream, readFileSync, statSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  createReadStream,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { createServer, type Plugin } from 'vite';
-import { PNG } from 'pngjs';
-import { collectionFace, deckFontFamilies, localFonts, type LocalFont } from './local-fonts.ts';
-import { downsample, type Raster } from './supersample.ts';
-import { THRESHOLDS } from './thresholds.ts';
+import {
+  collectionFace,
+  deckFontFamilies,
+  FALLBACK_FONTS,
+  localFonts,
+  type LocalFont,
+} from './local-fonts.ts';
+import { MAX_IMAGE_PIXELS, PDFJS_DIR } from './pdf.ts';
 
-/** One laid-out text line, in points from the slide's top-left. */
-export interface HarnessLine {
-  node: string;
-  text: string;
-  baselinePt: number;
-  leftPt: number;
-  /** The line is turned 180° (a net vertical flip), so its baseline is near the top of its box. */
-  upsideDown?: boolean;
-  /** The line's bullet or number, which the PDF text holds before the line's text. */
-  bullet?: string;
-  /** The bullet is a number (`a:buAutoNum`), so its text must match the PDF exactly. */
-  numbered?: boolean;
-  /** The line starts outside the slide, where `pdftotext` keeps no text. */
-  offSlide?: boolean;
-}
-
+/** One painted slide (`renderSlide`). */
 export interface HarnessRender {
-  /** The slide's SVG as Chromium painted it, filtered down to the render width (PNG). */
-  readonly png: Buffer;
-  /** The pixels of `png`. */
-  readonly image: Raster;
-  /** The same paint at the device scale, `THRESHOLDS.rasterScale` times larger (PNG). */
-  devicePng: Buffer;
-  /** The pixels of `devicePng`. */
-  readonly device: Raster;
-  lines: HarnessLine[];
-  diagnostics: readonly string[];
+  readonly diagnostics: readonly string[];
   /** The families that the slide's text asks for. */
-  fonts: readonly string[];
+  readonly fonts: readonly string[];
+  /**
+   * The painted SVG, with image URLs and face ids replaced by the digests of their bytes, so two
+   * sessions that paint the same thing give the same markup.
+   */
+  readonly markup: string;
 }
 
 export interface HarnessServer {
   /** The server's address, for example `http://127.0.0.1:53712/`. */
   readonly url: string;
   close(): Promise<void>;
+}
+
+/**
+ * The folder of the harness servers' Vite caches, one folder for each server. One root for each
+ * user: in a shared temp folder, another user's folders cannot be removed.
+ */
+const VITE_CACHE_ROOT = join(tmpdir(), `pptx-harness-vite-${process.getuid?.() ?? 'user'}`);
+
+/**
+ * A new Vite cache folder for one harness server. Lanes that share the demo's folder write it at
+ * the same time and fail with ENOTEMPTY. Each folder starts with its process id, and the folders
+ * of processes that no longer run (a lane that was killed) are removed first.
+ */
+function viteCacheDir(): string {
+  mkdirSync(VITE_CACHE_ROOT, { recursive: true });
+  for (const entry of readdirSync(VITE_CACHE_ROOT)) {
+    const pid = Number(entry.split('-')[0]);
+    let running = false;
+    try {
+      running = Number.isInteger(pid) && pid > 0 && process.kill(pid, 0);
+    } catch (e) {
+      // EPERM: the process runs under another user.
+      running = (e as NodeJS.ErrnoException).code === 'EPERM';
+    }
+    try {
+      if (!running) rmSync(join(VITE_CACHE_ROOT, entry), { recursive: true, force: true });
+    } catch {
+      // A folder that cannot be removed only takes space.
+    }
+  }
+  return mkdtempSync(join(VITE_CACHE_ROOT, `${process.pid}-`));
 }
 
 /**
@@ -58,20 +83,32 @@ export interface HarnessServer {
  * edits during a run do not reload the page.
  */
 export async function startHarnessServer(): Promise<HarnessServer> {
+  const cacheDir = viteCacheDir();
   const server = await createServer({
     configFile: resolve('examples/vite/vite.config.ts'),
     root: resolve('examples/vite'),
     plugins: [harnessFiles()],
     server: { host: '127.0.0.1', port: 0, strictPort: true, hmr: false, watch: null },
+    // The harness page imports only ES modules, so the server discovers no dependencies. The
+    // React plugin still adds React, which the harness page never loads.
+    optimizeDeps: { noDiscovery: true, include: [] },
+    cacheDir,
     logLevel: 'error',
   });
+  const close = async (): Promise<void> => {
+    try {
+      await server.close();
+    } finally {
+      rmSync(cacheDir, { recursive: true, force: true });
+    }
+  };
   await server.listen();
   const url = server.resolvedUrls?.local[0];
   if (!url) {
-    await server.close();
+    await close();
     throw new Error('the harness server has no local address');
   }
-  return { url, close: () => server.close() };
+  return { url, close };
 }
 
 /** The path under which the harness server gives a file to its page (`openDeck`). */
@@ -92,11 +129,58 @@ function serveFile(file: string | Uint8Array): { readonly url: string; release()
   return { url: `${FILES_PATH}${token}`, release: () => servedFiles.delete(token) };
 }
 
-/** The Vite middleware for `servedFiles`. */
+/** The path under which the page sends bytes back to Node (`receive`). */
+const UPLOAD_PATH = '/__harness/upload/';
+
+/** The uploads that Node waits for, by a random token. */
+const uploads = new Map<string, (bytes: Uint8Array<ArrayBuffer>) => void>();
+
+/**
+ * A path where the page can send bytes once (HTTP PUT), and the bytes when they arrive. Large
+ * pixel arrays go this way: through `page.evaluate` they would be JSON.
+ */
+function receive(): {
+  readonly url: string;
+  readonly bytes: Promise<Uint8Array<ArrayBuffer>>;
+  release(): void;
+} {
+  const token = randomUUID();
+  const bytes = new Promise<Uint8Array<ArrayBuffer>>((resolve) => uploads.set(token, resolve));
+  return { url: `${UPLOAD_PATH}${token}`, bytes, release: () => uploads.delete(token) };
+}
+
+/**
+ * Hand bytes to the upload that waits at `url` (`receive`). False when no upload waits there.
+ * The middleware calls it for each PUT; a test without a browser calls it directly.
+ */
+export function deliverUpload(url: string, bytes: Uint8Array<ArrayBuffer>): boolean {
+  const token = url.startsWith(UPLOAD_PATH) ? url.slice(UPLOAD_PATH.length) : url;
+  const done = uploads.get(token);
+  if (!done) return false;
+  uploads.delete(token);
+  done(bytes);
+  return true;
+}
+
+/** The Vite middleware for `servedFiles` and `uploads`. */
 function harnessFiles(): Plugin {
   return {
     name: 'pptx-harness-files',
     configureServer(server) {
+      server.middlewares.use(UPLOAD_PATH, (req, res) => {
+        const token = (req.url ?? '').slice(1);
+        if (!uploads.has(token) || req.method !== 'PUT') {
+          res.statusCode = 404;
+          res.end();
+          return;
+        }
+        const chunks: Buffer[] = [];
+        req.on('data', (c: Buffer) => chunks.push(c));
+        req.on('end', () => {
+          deliverUpload(token, new Uint8Array(Buffer.concat(chunks)));
+          res.end();
+        });
+      });
       server.middlewares.use(FILES_PATH, (req, res) => {
         const file = servedFiles.get((req.url ?? '').slice(1));
         if (file instanceof Uint8Array) {
@@ -156,14 +240,19 @@ export interface HarnessControl {
    * deck. A new context for each deck paints it as a run of that deck alone does (`lane.ts`).
    */
   restart(): Promise<Page>;
+  /**
+   * A second harness page that only draws PDFs (`rasterPdf`). It stays open across decks, so
+   * pdf.js loads once for each browser; a new one opens when the browser changed or it closed.
+   */
+  rasterPage(): Promise<Page>;
 }
 
 /** A page reset that takes longer than this fails, so a hung browser cannot stop a run. */
 export const RESET_TIMEOUT_MS = 60_000;
 
 /**
- * A browser close that takes longer than this ends with a kill. A close takes about 0.1 s. On
- * Linux (CI, Chromium headless shell 1248), the close of the browser that replaced a crashed one
+ * A browser close that takes longer than this ends with a kill. A close takes about 0.1 s. In
+ * CI (Chromium headless shell 1248), the close of the browser that replaced a crashed one
  * never ended: Playwright waits for the browser's output pipes, and they stayed open. The cause
  * is not known; the kill ends the close.
  */
@@ -186,6 +275,22 @@ function within<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
       );
     }),
   ]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * The Chromium that prints our PDF, as Playwright pins it (`browsers.json` of `playwright-core`):
+ * the headless shell and its revision. The same Playwright gives the same revision everywhere;
+ * the version that the browser reports can differ between builds of one revision.
+ */
+export function pinnedChromium(): string {
+  const test = dirname(Bun.resolveSync('@playwright/test/package.json', import.meta.dir));
+  const core = dirname(Bun.resolveSync('playwright-core/package.json', test));
+  const { browsers } = JSON.parse(readFileSync(join(core, 'browsers.json'), 'utf8')) as {
+    browsers: { name: string; revision: string }[];
+  };
+  const shell = browsers.find((b) => b.name === 'chromium-headless-shell');
+  if (!shell) throw new Error('playwright-core pins no chromium-headless-shell');
+  return `${shell.name} ${shell.revision}`;
 }
 
 /** A launched Chromium and the pid of its browser process, when CDP gives it. */
@@ -269,17 +374,32 @@ export async function withHarnessPage<T>(
   try {
     current = await launch();
     const open = async (): Promise<Page> => {
-      const next = await current!.browser.newPage({
-        viewport: { width: 2000, height: 1300 },
-        // Chromium paints at the raster scale; `renderSlide` filters it down (`supersample.ts`).
-        deviceScaleFactor: THRESHOLDS.rasterScale,
-      });
+      const next = await current!.browser.newPage({ viewport: { width: 2000, height: 1300 } });
       await next.goto(`${server.url}harness.html`);
       await next.waitForSelector('body[data-ready="1"]', { state: 'attached' });
       return next;
     };
     let page = await open();
+    // The page that draws PDFs stays open across decks. A renderer crash leaves `isClosed()`
+    // false, so the `crash` event drops it, and so does every `reset`.
+    let raster: Page | undefined;
+    const dropRaster = async (): Promise<void> => {
+      const old = raster;
+      raster = undefined;
+      if (old && !old.isClosed())
+        await within(old.close(), resetTimeoutMs, 'closing the raster page').catch(() => undefined);
+    };
     return await fn(page, {
+      async rasterPage() {
+        if (!raster || raster.isClosed() || raster.context().browser() !== current!.browser) {
+          const next = await within(open(), resetTimeoutMs, 'opening the raster page');
+          next.on('crash', () => {
+            if (raster === next) raster = undefined;
+          });
+          raster = next;
+        }
+        return raster;
+      },
       async restart() {
         // `browser.newPage` gives each page its own context, and closing the page closes it.
         await within(page.close(), resetTimeoutMs, 'closing the page');
@@ -291,6 +411,7 @@ export async function withHarnessPage<T>(
         // call fails, so the cause is read here, after a new page did not open: the
         // `disconnected` event, or Playwright's "has been closed" when the event comes late.
         let newBrowser: 'exited' | 'hung' | undefined = 'exited';
+        await dropRaster();
         if (!current!.exited) {
           await within(page.close(), resetTimeoutMs, 'closing the page').catch(() => undefined);
           try {
@@ -373,6 +494,7 @@ export async function openDeck(
     sources.push(source);
   }
   const served = [serveFile(file), ...sources.map(serveFile)];
+  const fallback = FALLBACK_FONTS.map((f) => serveFile(f));
   try {
     const source = {
       deck: served[0].url,
@@ -382,10 +504,11 @@ export async function openDeck(
         italic: f.italic,
         url: served[i + 1].url,
       })),
+      fallback: fallback.map((f) => f.url),
     };
     return await page.evaluate((s) => (window as any).__pptxHarness.open(s), source);
   } finally {
-    for (const s of served) s.release();
+    for (const s of [...served, ...fallback]) s.release();
   }
 }
 
@@ -394,117 +517,75 @@ export async function reopenSaved(page: Page): Promise<{ slides: number; error?:
   return page.evaluate(() => (window as any).__pptxHarness.reopenSaved());
 }
 
-/** One DevTools session for each page, for `capture`. */
-const sessions = new WeakMap<Page, Promise<CDPSession>>();
+/** Paint one slide (0-based) of the open deck, and return its diagnostics and markup. */
+export async function renderSlide(page: Page, index: number): Promise<HarnessRender> {
+  return page.evaluate((n) => (window as any).__pptxHarness.render(n), index);
+}
 
-/**
- * A PNG of the slide's SVG at the page's device scale, taken as Playwright's element screenshot
- * takes it (playwright-core 1.64): it waits for `document.fonts.ready`, and it captures beyond
- * the viewport only when the box does not fit in it (an A4 slide is taller than it), because
- * that capture lays the page out again. It adds `optimizeForSpeed`, a faster PNG encoder that
- * keeps the pixels.
- */
-async function capture(page: Page): Promise<Buffer> {
-  const svg = page.locator('#slide svg');
-  await page.evaluate(() => document.fonts.ready.then(() => undefined));
-  const box = await svg.boundingBox();
-  const viewport = page.viewportSize();
-  if (!box || !viewport) return svg.screenshot();
-  const fits =
-    box.x >= 0 &&
-    box.y >= 0 &&
-    box.x + box.width <= viewport.width &&
-    box.y + box.height <= viewport.height;
-  let session = sessions.get(page);
-  if (!session) {
-    session = page.context().newCDPSession(page);
-    sessions.set(page, session);
-  }
-  const shot = await (
-    await session
-  ).send('Page.captureScreenshot', {
-    format: 'png',
-    clip: { ...box, scale: THRESHOLDS.rasterScale },
-    captureBeyondViewport: !fits,
-    optimizeForSpeed: true,
-  });
-  return Buffer.from(shot.data, 'base64');
+/** A PDF page drawn by the harness page (`rasterPdf`): its pixels (RGBA) and their PNG. */
+export interface PageRaster {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8Array;
+  readonly png: Uint8Array;
 }
 
 /**
- * Render one slide (0-based) of the open deck at `widthPx` wide and screenshot it. The PNG is
- * decoded and filtered only when a caller reads `png`, `image`, or `device`.
+ * Draw the first `pages` pages of PDF bytes with pdf.js in the harness page, at `scale` pixels
+ * per point, each onto a white canvas of `size`. Both PDFs of a comparison are drawn this way.
+ * Glyphs are drawn as paths (`disableFontFace`), so no system font rasterizer takes part.
  */
-export async function renderSlide(
+export async function rasterPdf(
   page: Page,
-  index: number,
-  widthPx: number
-): Promise<HarnessRender> {
-  const r = await page.evaluate(
-    ([n, w]) => (window as any).__pptxHarness.render(n, w),
-    [index, widthPx]
-  );
-  const shot = await capture(page);
-  const scale: number = THRESHOLDS.rasterScale;
-  let device: PNG | undefined;
-  let image: PNG | undefined;
-  let png: Buffer | undefined;
-  const decoded = (): PNG => (device ??= PNG.sync.read(shot));
-  const filtered = (): PNG => (image ??= downsample(decoded(), scale));
-  return {
-    devicePng: shot,
-    get device() {
-      return decoded();
-    },
-    get image() {
-      return filtered();
-    },
-    get png() {
-      return (png ??= scale === 1 ? shot : PNG.sync.write(filtered()));
-    },
-    lines: r.lines,
-    diagnostics: r.diagnostics,
-    fonts: r.fonts ?? [],
-  };
+  pdf: Uint8Array,
+  pages: number,
+  size: { readonly width: number; readonly height: number },
+  scale: number
+): Promise<PageRaster[]> {
+  const served = serveFile(pdf);
+  const targets = Array.from({ length: pages }, () => ({ rgba: receive(), png: receive() }));
+  try {
+    await page.evaluate((a) => (window as any).__pptxHarness.rasterPdf(a), {
+      pdf: served.url,
+      ...size,
+      scale,
+      maxImageSize: MAX_IMAGE_PIXELS,
+      // The page fetches the CMaps from the harness server (Vite serves the package files).
+      cMapUrl: `/@fs${join(PDFJS_DIR, 'cmaps')}/`,
+      pages: targets.map((t) => ({ rgba: t.rgba.url, png: t.png.url })),
+    });
+    return await Promise.all(
+      targets.map(async (t) => {
+        const data = Bun.gunzipSync(await t.rgba.bytes);
+        if (data.length !== size.width * size.height * 4)
+          throw new Error(
+            `a page raster has ${data.length} bytes, not ${size.width} × ${size.height} pixels`
+          );
+        return { ...size, data, png: await t.png.bytes };
+      })
+    );
+  } finally {
+    served.release();
+    for (const t of targets) {
+      t.rgba.release();
+      t.png.release();
+    }
+  }
 }
 
 /**
- * Decode an image file (JPEG, PNG) with Chromium's own decoder, at its natural size, without
- * resampling or color conversion, and return the pixels.
+ * Print the slides at `indexes` (0-based) of the open deck to PDF with the editor's own paint:
+ * one page for each slide, at the slide size.
  */
-export async function decodeImage(page: Page, bytes: Uint8Array, mime: string): Promise<PNG> {
-  const dataUrl = `data:${mime};base64,${Buffer.from(bytes).toString('base64')}`;
-  const png = await page.evaluate(async (src) => {
-    const img = new Image();
-    img.src = src;
-    await img.decode();
-    const canvas = document.createElement('canvas');
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    canvas.getContext('2d')!.drawImage(img, 0, 0);
-    return canvas.toDataURL('image/png');
-  }, dataUrl);
-  return PNG.sync.read(Buffer.from(png.slice(png.indexOf(',') + 1), 'base64'));
-}
-
-/**
- * Encode pixels as JPEG with Chromium's encoder at `quality` (1–100) and decode them again. Used
- * to estimate how much a JPEG round trip alone changes an image.
- */
-export async function jpegRoundTrip(page: Page, image: PNG, quality: number): Promise<PNG> {
-  const pngUrl = `data:image/png;base64,${PNG.sync.write(image).toString('base64')}`;
-  const jpeg = await page.evaluate(
-    async ([src, q]) => {
-      const img = new Image();
-      img.src = src;
-      await img.decode();
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      canvas.getContext('2d')!.drawImage(img, 0, 0);
-      return canvas.toDataURL('image/jpeg', q / 100);
-    },
-    [pngUrl, quality] as const
-  );
-  return decodeImage(page, Buffer.from(jpeg.slice(jpeg.indexOf(',') + 1), 'base64'), 'image/jpeg');
+export async function printDeck(page: Page, indexes: readonly number[]): Promise<Buffer> {
+  await page.evaluate((list) => (window as any).__pptxHarness.print(list), [...indexes]);
+  try {
+    return await page.pdf({
+      preferCSSPageSize: true,
+      printBackground: true,
+      margin: { top: '0', right: '0', bottom: '0', left: '0' },
+    });
+  } finally {
+    await page.evaluate(() => (window as any).__pptxHarness.endPrint());
+  }
 }

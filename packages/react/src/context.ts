@@ -4,6 +4,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from 'react';
 import { createTranslator, type LocaleCatalog, type Translate } from '@pptx-editor.dev/i18n';
+import { drawingRenderersVersion, subscribeDrawingRenderers } from '@pptx-editor.dev/core/layout';
 import { NOTES_SLOTS, useNotesTarget } from './notes-target.ts';
 import {
   canRenameSectionInPlace,
@@ -235,6 +236,8 @@ export interface UseEditorValueCommandReturn<V, S = V> {
   /**
    * The slot's fixed choices, from the registry (the Rotate, Align, line width, or Shape Effects
    * rows); none for a slot with a free value (`font.size`, `shape.fill`, `shape.styles`).
+   * Without the `@pptx-editor.dev/pro/drawing` module, they leave out the effects it paints
+   * (`chromeOfferedControl`), so `value` can be an effect from the file that is not in the list.
    */
   readonly options: readonly V[];
   /** Whether the command can run now. */
@@ -252,15 +255,22 @@ export function useEditorValueCommand<K extends keyof ToolbarValueMap>(
 ): UseEditorValueCommandReturn<ToolbarValueMap[K], ToolbarShownValue<K>> {
   const editor = usePptxEditor();
   const cmd = useEditorCommand(slot);
+  // The options follow the installed drawing renderers: an install offers the Pro choices.
+  const renderers = useSyncExternalStore(
+    subscribeDrawingRenderers,
+    drawingRenderersVersion,
+    drawingRenderersVersion
+  );
   return useMemo(
     () => ({
       execute: (value: ToolbarValueMap[K], options?: EditorExecOptions): CommandResult =>
         runToolbarCommand(editor, slot, value as ToolbarSlotValue<K>, options),
       value: valueSlotShown(slot, cmd.value),
-      options: valueSlotOptions(slot),
+      // `renderers` changes after an install, so the options run again.
+      options: (void renderers, valueSlotOptions(slot)),
       isEnabled: cmd.isEnabled,
       disabledReason: cmd.disabledReason,
     }),
-    [editor, slot, cmd]
+    [editor, slot, cmd, renderers]
   );
 }

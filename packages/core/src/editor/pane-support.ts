@@ -6,6 +6,7 @@
 //
 // Every export is adapter glue, not a stable API: `@internal`.
 
+import type { Translate } from '@pptx-editor.dev/i18n';
 import type { NotesFormat, SlideSection } from '../contracts/index.ts';
 import type { PptxEditorInstance } from './pptx-editor.ts';
 import { runSlideStep, sectionOfSlide, stepCommand, type SlideStep } from './adapter-support.ts';
@@ -46,6 +47,18 @@ export function slideClickMode(e: {
   ctrlKey: boolean;
 }): 'range' | 'toggle' | 'replace' {
   return e.shiftKey ? 'range' : e.metaKey || e.ctrlKey ? 'toggle' : 'replace';
+}
+
+/**
+ * The accessible name of a slide item in the rail and the slide sorter: "Slide 3", or "Slide 3
+ * (hidden)". The item gets it from hidden text, not `aria-label`, so the visible number is part
+ * of the name and the thumbnail art, hidden from assistive technology, is not. @internal
+ */
+export function slideItemName(
+  t: Translate,
+  slide: { readonly index: number; readonly hidden: boolean }
+): string {
+  return t(slide.hidden ? 'rail.hiddenSlideLabel' : 'rail.slideLabel', { index: slide.index + 1 });
 }
 
 /** The zoom levels of the zoom pill's menu, after Fit. @internal */
@@ -634,14 +647,35 @@ export function openSlideInNormalView(
   const scope = from?.closest<HTMLElement>('.pptx-editor') ?? null;
   editor?.goToSlide(index);
   editor?.exec({ type: 'setPresentationView', view: 'normal' });
+  focusNormalViewAfterRender(scope, editor);
+}
+
+/**
+ * The slide sorter `list` is about to leave the page (View > Normal, the Normal view button).
+ * When one of its slides has focus, focus goes to the current slide in the rail, or to the
+ * slide, once the Normal view rendered, so it never stays on the page body. Focus that a host
+ * put elsewhere stays. Call it before the sorter leaves the page. @internal
+ */
+export function refocusAfterSorterHides(
+  list: HTMLElement,
+  editor: PptxEditorInstance | null
+): void {
+  if (!list.contains(list.ownerDocument.activeElement)) return;
+  focusNormalViewAfterRender(list.closest<HTMLElement>('.pptx-editor'), editor);
+}
+
+/** After the adapter rendered the Normal view (the rail mounts with it), focus its current slide when focus is lost. */
+function focusNormalViewAfterRender(
+  scope: HTMLElement | null,
+  editor: PptxEditorInstance | null
+): void {
   const view = scope?.ownerDocument.defaultView;
   if (!editor || !scope || !view) return;
   const go = (): void => {
     const active = scope.ownerDocument.activeElement;
     if (active && active !== scope.ownerDocument.body && active.isConnected) return;
-    focusCurrentSlideOrCanvas(scope, editor);
+    if (scope.isConnected) focusCurrentSlideOrCanvas(scope, editor);
   };
-  // After the adapter rendered the Normal view: the rail mounts with it.
   if (typeof view.requestAnimationFrame === 'function') view.requestAnimationFrame(go);
   else setTimeout(go, 0);
 }

@@ -4,6 +4,7 @@ import { uprightPieces } from '../../output/paint-text.ts';
 import { createPptxEditor, namedFamilies, openPresentation, withFontOrigin } from '../index.ts';
 // `face` makes a Liberation Sans face under another name: it stands in for a licensed face.
 import { face, fixture } from './font-test-helpers.ts';
+import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 
 const substituted = (editor: ReturnType<typeof createPptxEditor>): string[] =>
   editor.snapshot().substitutedFonts.map((f) => f.family);
@@ -28,6 +29,33 @@ describe('font coverage', () => {
       substitute: 'Carlito',
       metricCompatible: true,
     });
+  });
+
+  test('a deck that names a packaged open face draws with that face, not a substitute', async () => {
+    const families = [
+      'Carlito',
+      'Caladea',
+      'TeX Gyre Adventor',
+      'Liberation Sans',
+      'Liberation Serif',
+      'Liberation Mono',
+    ];
+    const text = families
+      .map((f) => para(run(`${f} text`, '', `<a:latin typeface="${f}"/>`)))
+      .join('');
+    const deck = buildPptx({
+      slides: [{ shapes: shape({ id: 2, x: 0, y: 0, cx: 9_000_000, cy: 5_000_000, text }) }],
+    });
+    const r = await openPresentation(deck);
+    if (!r.ok) throw new Error('open');
+    const loaded = new Set(r.session.faces.map((f) => f.family));
+    for (const f of families) expect(loaded).toContain(f);
+    expect(r.session.substitutedFamilies().map((s) => s.family)).not.toEqual(
+      expect.arrayContaining(families)
+    );
+    expect(
+      r.session.layout(0)?.diagnostics.filter((d) => d.startsWith('font substituted'))
+    ).toEqual([]);
   });
 
   test('the fonts resolver is asked for the deck families and its faces win', async () => {

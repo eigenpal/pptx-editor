@@ -32,8 +32,9 @@ const TEXT_INPUT: Readonly<Record<string, TextInputKind>> = {
   deleteContentForward: 'deleteForward',
   deleteWordBackward: 'deleteWordBackward',
   deleteWordForward: 'deleteWordForward',
-  deleteSoftLineBackward: 'deleteLineBackward',
-  deleteHardLineBackward: 'deleteLineBackward',
+  // Cmd+Backspace on macOS: the word before the caret, as Alt+Backspace.
+  deleteSoftLineBackward: 'deleteWordBackward',
+  deleteHardLineBackward: 'deleteWordBackward',
   deleteSoftLineForward: 'deleteLineForward',
   deleteHardLineForward: 'deleteLineForward',
   insertParagraph: 'paragraph',

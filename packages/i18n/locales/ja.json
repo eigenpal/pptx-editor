@@ -905,11 +905,16 @@
     "level": "{percent}%",
     "levelAriaLabel": "ズーム: {percent}%"
   },
+  "viewport": {
+    "ariaLabel": "プレゼンテーション エディター"
+  },
   "canvas": {
     "ariaLabel": "スライド {index}/{total}",
     "inputAriaLabel": "選択した図形のテキスト",
     "tableCell": "{row} 行、{column} 列",
-    "shapeSelected": "{name} を選択しました",
+    "shapeSelected": "{kind} {name} を選択しました",
+    "shapeSelectedWithAltText": "{kind} {name}、{description} を選択しました",
+    "dragCanceled": "ドラッグを取り消しました",
     "placeholderObject": "{kind} (このバージョンでは表示されません)",
     "kinds": {
       "chart": "グラフ",
@@ -1290,6 +1295,7 @@
   "statusBar": {
     "ariaLabel": "ステータス バー",
     "slide": "スライド {current}/{total}",
+    "readOnlyDamaged": "スライドが破損しています。このプレゼンテーションは表示できますが、変更は保存できません。",
     "notes": "ノート"
   }
 }

@@ -17,6 +17,7 @@ import {
 import {
   colorMenuSelection,
   arrangeToolbarGroups,
+  chromeOfferedControl,
   createToolbarFitMemory,
   observeToolbarFit,
   requestDialogSection,
@@ -119,6 +120,7 @@ function DropdownControl({ slot, control }: SlotPartProps) {
   const anchor = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const current = control.options?.find((o) => o.value === cmd.value);
+  const offered = chromeOfferedControl(slot, control);
   // A dropdown with no icon is the arrow half of a split button (Bullets and Numbering).
   const icon = current?.paths ?? control.paths;
   const trigger = useTriggerAttributes(
@@ -147,7 +149,8 @@ function DropdownControl({ slot, control }: SlotPartProps) {
       {off.note}
       {open ? (
         <Popover anchor={anchor.current} onClose={() => setOpen(false)}>
-          {control.options?.map((o) => {
+          {/* The choices this build offers: a choice whose result does not paint stays out. */}
+          {offered.options?.map((o) => {
             // A dialog row ("Line spacing options…") opens its registry dialog; core's rule says
             // which rows are checked or off, with the reason.
             const row = toolbarDropdownRow(editor, host, slot, control, o, cmd.value);
@@ -184,7 +187,7 @@ function DropdownControl({ slot, control }: SlotPartProps) {
                 >
                   {o.paths ? (
                     <Icon paths={o.paths} />
-                  ) : o.glyph || control.options?.some((x) => x.glyph) ? (
+                  ) : o.glyph || offered.options?.some((x) => x.glyph) ? (
                     // A row with no preview keeps the column, so the labels line up.
                     <span className="pptx-menu__glyph" aria-hidden="true">
                       {o.glyph}

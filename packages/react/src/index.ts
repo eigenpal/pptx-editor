@@ -768,6 +768,8 @@ export interface PptxEditorProps {
   readonly fontFamilies?: readonly string[];
   /** Capability modules (`@pptx-editor.dev/pro`), as on `PptxEditor.Root`. Read at mount. */
   readonly modules?: readonly EditorModule[];
+  /** AutoCorrect while typing, as on `PptxEditor.Root`. Read at mount. */
+  readonly autoCorrect?: boolean;
   /**
    * The notice for a file that does not open (`PptxEditor.OpenFailure`). An object is
    * `PptxEditorOpenFailureProps`, passed straight through. `false` removes the notice, for a host that
@@ -875,6 +877,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
     onFontError,
     fontFamilies,
     modules,
+    autoCorrect,
     openFailure = true,
     renderOpenFailureActions,
     toolbar = true,
@@ -921,6 +924,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
       ...(onFontError ? { onFontError } : {}),
       ...(fontFamilies ? { fontFamilies } : {}),
       ...(modules ? { modules } : {}),
+      ...(autoCorrect === false ? { autoCorrect } : {}),
     },
     createElement(
       PptxEditorViewport,

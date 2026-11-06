@@ -18,6 +18,7 @@ import {
 } from 'vue';
 import {
   colorMenuSelection,
+  chromeOfferedControl,
   chromeSlotIsToggle,
   requestDialogSection,
   dispatchFindRequest,
@@ -132,7 +133,8 @@ const DropdownControl = defineComponent({
       const paths = icon();
       const base = `pptx-toolbar__button ${paths ? 'pptx-toolbar__button--wide' : 'pptx-toolbar__button--caret'}`;
       const attrs = trigger();
-      const options = props.control.options ?? [];
+      // The choices this build offers: a choice whose result does not paint stays out.
+      const options = chromeOfferedControl(props.slot, props.control).options ?? [];
       const glyphs = options.some((x) => x.glyph);
       return [
         <button
@@ -308,14 +310,18 @@ const PanelControl = defineComponent({
     const host = inject(chromeActionHostKey, null);
     return () => {
       // A `popups.find` of `false`, the slide sorter, or no find bar turns the button off.
+      // Read the command state before `off`: a render that stops at `off` would not track it,
+      // and the control would stay off after the reason goes away.
+      const enabled = cmd.isEnabled.value;
+      const why = reason.value;
       const off = host?.unavailable?.(props.slot) ?? null;
       return (
         <ToolButton
           slot={props.slot}
           label={label.value}
           paths={props.control.paths}
-          disabled={!!off || !cmd.isEnabled.value}
-          disabledReason={off ? translateKeyOrText(t, off) : reason.value}
+          disabled={!!off || !enabled}
+          disabledReason={off ? translateKeyOrText(t, off) : why}
           onClick={() => dispatchFindRequest(editor.value, props.slot === 'find.replace')}
         />
       );
@@ -360,6 +366,10 @@ const ActionControl = defineComponent({
     return () => {
       // A `popups` entry of `false` turns the button off. A slot that also takes a value
       // (`image.altText`) keeps its command enabled, so the button asks the host here.
+      // Read the command state before `off`: a render that stops at `off` would not track it,
+      // and the control would stay off after the reason goes away.
+      const enabled = cmd.isEnabled.value;
+      const why = reason.value;
       const off = host?.unavailable?.(props.slot) ?? null;
       return (
         <span ref={wrap} class="pptx-toolbar__group">
@@ -368,8 +378,8 @@ const ActionControl = defineComponent({
             slot={props.slot}
             label={label.value}
             paths={props.control.paths}
-            disabled={!!off || !cmd.isEnabled.value}
-            disabledReason={off ? translateKeyOrText(t, off) : reason.value}
+            disabled={!!off || !enabled}
+            disabledReason={off ? translateKeyOrText(t, off) : why}
             onClick={run}
           />
         </span>

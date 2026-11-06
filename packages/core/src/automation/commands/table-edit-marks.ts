@@ -18,6 +18,7 @@
 import {
   child,
   elements,
+  isDeferredPending,
   isStructureEdited,
   NS,
   structureMarksOf as marksOf,
@@ -25,6 +26,7 @@ import {
   type Element,
   type NodeSpec,
   type PptxPackage,
+  type XmlPart,
 } from '../../store/index.ts';
 import { OpBatch } from './op-batch.ts';
 
@@ -107,10 +109,28 @@ export function withoutEditorMarks(pkg: PptxPackage): PptxPackage {
       unmarkStructureEdit(batch, part, el.id);
     if (depth < 256) for (const c of elements(el)) walk(part, c, depth + 1);
   };
+  // A deferred part not parsed yet drops its marks when it parses (`partWithoutEditorMarks`).
   for (const part of pkg.parts.values())
-    if (part.kind === 'xml' && part.xml.root.ns !== '' && /\/slide/i.test(part.partName))
+    if (
+      part.kind === 'xml' &&
+      !isDeferredPending(part) &&
+      part.xml.root.ns !== '' &&
+      /\/slide/i.test(part.partName)
+    )
       walk(part.partName, part.xml.root, 0);
   return batch.ops.length ? batch.pkg : pkg;
+}
+
+/**
+ * One slide part's tree without structure marks: what `withoutEditorMarks` makes of it. A
+ * progressive open runs it on each deferred part as it parses.
+ */
+export function partWithoutEditorMarks(xml: XmlPart): XmlPart {
+  const one: PptxPackage = {
+    parts: new Map([[xml.partName, { kind: 'xml', partName: xml.partName, xml }]]),
+  };
+  const out = withoutEditorMarks(one).parts.get(xml.partName);
+  return out?.kind === 'xml' ? out.xml : xml;
 }
 
 /**

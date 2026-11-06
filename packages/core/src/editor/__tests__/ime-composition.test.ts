@@ -188,6 +188,13 @@ describe('IME composition in the editor', () => {
     elements(find(root(e), 'p:spTree')!).find((c) => attr(find(c, 'p:cNvPr'), 'name') === 'T')!.id;
   const text = (e: PptxEditorInstance): string => textOf(find(root(e), 'p:txBody'));
 
+  test('the hidden input has a form field name and turns off autocomplete', async () => {
+    const { e, input } = await attached();
+    expect(input.name).toBe('pptx-slide-text');
+    expect(input.getAttribute('autocomplete')).toBe('off');
+    e.destroy();
+  });
+
   test('the composed text goes in at the caret once, as one undo step', async () => {
     const { e, input } = await attached();
     const nodeId = id(e);

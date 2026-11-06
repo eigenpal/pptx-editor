@@ -3,18 +3,20 @@
 // relationships, never file-name conventions.
 
 import {
+  changedPartNames,
   equivalentPartName,
   mainPresentationPart,
-  relationshipsOf,
+  relationshipById,
   relTarget,
   relTargetByType,
   repairedPresentationRoot,
   xmlPartOf,
   type PptxPackage,
 } from './package.ts';
+import { peekDeferredRootAttribute } from './deferred-parts.ts';
 import { attr, child, children, intAttr, path } from './query.ts';
 import { NS, REL } from './namespaces.ts';
-import type { Element } from './tree.ts';
+import type { Element, XmlPart } from './tree.ts';
 
 /** EMUs per inch, point, and CSS pixel (96 dpi). */
 export const EMU_PER_INCH = 914_400;
@@ -66,10 +68,62 @@ const DEFAULT_SIZE = { cx: 9_144_000, cy: 6_858_000 };
 const MIN_SLIDE = 914_400;
 const MAX_SLIDE = 51_206_400;
 
+/**
+ * The package read last, by its presentation part. The info reads that part, so a package
+ * with another one has nothing to share; two documents never share one.
+ */
+const lastByPresentation = new WeakMap<XmlPart, WeakRef<PptxPackage>>();
+/** With more changed parts than this, the structure is read again. */
+const REUSE_LIMIT = 32;
+
+/** The presentation part of a package, as `presentationInfo` reads it. */
+const presentationXml = (pkg: PptxPackage): XmlPart | undefined =>
+  xmlPartOf(pkg, mainPresentationPart(pkg) ?? '/ppt/presentation.xml');
+
+/**
+ * The info of the last package with the same presentation part, when `pkg` shares it, or
+ * undefined. The info reads the root relationships, the presentation part, its relationships,
+ * the part names, and of each slide its relationship chain and `p:sld/@show`. When two
+ * packages differ only in other XML parts, or in a slide's content but not its `show`, they
+ * have the same info. A text edit then costs no walk over the slide list.
+ */
+function sharedInfo(pkg: PptxPackage): PresentationInfo | undefined {
+  const xml = presentationXml(pkg);
+  const prev = xml ? lastByPresentation.get(xml)?.deref() : undefined;
+  const info = prev && cache.get(prev);
+  if (!prev || !info) return undefined;
+  const changed = changedPartNames(prev, pkg, REUSE_LIMIT);
+  return changed?.every((name) => keepsInfo(prev, pkg, name, info)) ? info : undefined;
+}
+
+/** Whether a part that differs between two packages leaves the info of `prev` as it is. */
+function keepsInfo(
+  prev: PptxPackage,
+  pkg: PptxPackage,
+  name: string,
+  info: PresentationInfo
+): boolean {
+  const a = prev.parts.get(name);
+  const b = pkg.parts.get(name);
+  // An added or removed part changes the names; a binary part may have been an XML one.
+  if (a?.kind !== 'xml' || b?.kind !== 'xml') return false;
+  if (name === info.presentationPart || name.toLowerCase().endsWith('.rels')) return false;
+  return attr(a.xml.root, 'show') === attr(b.xml.root, 'show');
+}
+
+function remember(pkg: PptxPackage, info: PresentationInfo): PresentationInfo {
+  cache.set(pkg, info);
+  const xml = presentationXml(pkg);
+  if (xml) lastByPresentation.set(xml, new WeakRef(pkg));
+  return info;
+}
+
 /** Read the presentation structure. Memoized per package identity. */
 export function presentationInfo(pkg: PptxPackage): PresentationInfo {
   const hit = cache.get(pkg);
   if (hit) return hit;
+  const shared = sharedInfo(pkg);
+  if (shared) return remember(pkg, shared);
   const presentationPart = mainPresentationPart(pkg) ?? '/ppt/presentation.xml';
   const root = xmlPartOf(pkg, presentationPart)?.root;
   const sz = child(root, 'p:sldSz');
@@ -88,12 +142,12 @@ export function presentationInfo(pkg: PptxPackage): PresentationInfo {
     // OPC part names fold ASCII case (ECMA-376 Part 2, 6.2.2.3), as the writer's repair does
     // (`liveRelationshipIds`): a target that differs only in case names the part.
     const partName = target ? equivalentPartName(pkg, target) : undefined;
-    if (!rId || !partName || !xmlPartOf(pkg, partName)) continue;
+    if (!rId || !partName || pkg.parts.get(partName)?.kind !== 'xml') continue;
     const layoutPart = relTargetByType(pkg, partName, REL.slideLayout);
     const masterPart = layoutPart ? relTargetByType(pkg, layoutPart, REL.slideMaster) : undefined;
     const themePart = masterPart ? relTargetByType(pkg, masterPart, REL.theme) : undefined;
     const notesPart = relTargetByType(pkg, partName, REL.notesSlide);
-    const sld = xmlPartOf(pkg, partName)?.root;
+    const show = slideShow(pkg, partName);
     slides.push({
       sldId: attr(el, 'id') ?? '',
       rId,
@@ -102,7 +156,7 @@ export function presentationInfo(pkg: PptxPackage): PresentationInfo {
       ...(masterPart ? { masterPart } : {}),
       ...(themePart ? { themePart } : {}),
       ...(notesPart ? { notesPart } : {}),
-      hidden: attr(sld, 'show') === '0' || attr(sld, 'show') === 'false',
+      hidden: show === '0' || show === 'false',
       nodeId: el.id,
     });
   }
@@ -130,8 +184,19 @@ export function presentationInfo(pkg: PptxPackage): PresentationInfo {
     embeddedFonts,
     ...(notesMasterPart ? { notesMasterPart } : {}),
   };
-  cache.set(pkg, info);
-  return info;
+  return remember(pkg, info);
+}
+
+/**
+ * `p:sld/@show` of slide `partName`. A deferred slide not parsed yet answers from its start
+ * tag, so the slide list does not parse every slide (`deferred-parts.ts`).
+ */
+function slideShow(pkg: PptxPackage, partName: string): string | undefined {
+  const part = pkg.parts.get(partName);
+  if (!part) return undefined;
+  const peeked = peekDeferredRootAttribute(part, 'show');
+  if (peeked !== null) return peeked;
+  return attr(xmlPartOf(pkg, partName)?.root, 'show');
 }
 
 /** The `p:cSld/p:spTree` of a slide, layout, or master part. */
@@ -141,7 +206,7 @@ export function shapeTreeOf(pkg: PptxPackage, partName: string | undefined): Ele
 
 /** Whether a relationship target is an image the engine may decode (never external). */
 export function imagePartFor(pkg: PptxPackage, source: string, rId: string): string | undefined {
-  const rel = relationshipsOf(pkg, source).find((r) => r.id === rId);
+  const rel = relationshipById(pkg, source, rId);
   if (!rel || rel.external) return undefined;
   return rel.target;
 }

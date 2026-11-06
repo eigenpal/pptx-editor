@@ -21,6 +21,7 @@ import {
   type PptxPackage,
 } from '../store/index.ts';
 import { contentElements } from './alternate-content.ts';
+import { resolveChartPart } from './chart-part.ts';
 import { colorChild, resolveColor, type ColorContext } from './color.ts';
 import {
   effectContainer,
@@ -33,6 +34,12 @@ import {
   type ResolvedFill,
 } from './paint-props.ts';
 import { resolveFrameTable } from './table.ts';
+import {
+  diagramParts,
+  MAX_DIAGRAM_GROUP_DEPTH,
+  MAX_DIAGRAM_SHAPES,
+  MAX_SLIDE_DIAGRAM_SHAPES,
+} from './diagram.ts';
 import { DEFAULT_COLOR_MAP, parseTheme, readColorMap, type Theme } from './theme.ts';
 import {
   fontRefEntry,
@@ -44,6 +51,7 @@ import {
 import type {
   Autofit,
   BodyProps,
+  DiagramFallback,
   GeometrySpec,
   KinsokuRules,
   Layer,
@@ -75,6 +83,8 @@ interface SlideScope {
   readonly kinsoku?: KinsokuRules;
   readonly layoutPlaceholders: readonly PlaceholderEntry[];
   readonly masterPlaceholders: readonly PlaceholderEntry[];
+  /** Shapes and groups resolved from diagram drawings on this slide so far. */
+  readonly diagramShapes: { count: number };
 }
 
 const MAX_GROUP_DEPTH = 32;
@@ -177,9 +187,20 @@ function readGeometry(spPr: Element | undefined): GeometrySpec | undefined {
   return undefined;
 }
 
+/** The namespace of a shape's own children: `p:` on a slide, `dsp:` in a diagram drawing. */
+function ownNs(el: Element | undefined): string {
+  return el?.ns === NS.dsp ? NS.dsp : NS.p;
+}
+
+/** A child in the element's own namespace (`p:spPr`, or `dsp:spPr` in a diagram drawing). */
+function ownChild(el: Element | undefined, local: string): Element | undefined {
+  return child(el, { ns: ownNs(el), local });
+}
+
 function nonVisualProps(el: Element): Element | undefined {
-  const nv = elements(el).find((c) => c.ns === NS.p && c.local.startsWith('nv'));
-  return child(nv, 'p:cNvPr');
+  const ns = ownNs(el);
+  const nv = elements(el).find((c) => c.ns === ns && c.local.startsWith('nv'));
+  return child(nv, { ns, local: 'cNvPr' });
 }
 
 function readBodyProps(chain: readonly Element[]): BodyProps {
@@ -252,12 +273,12 @@ function resolveText(
   inherited: readonly Element[],
   fontRef: FontRef | undefined
 ): ResolvedTextBody | undefined {
-  const txBody = child(el, 'p:txBody');
+  const txBody = ownChild(el, 'txBody');
   if (!txBody) return undefined;
   const bodyChain: Element[] = [];
   const lstChain: Element[] = [];
   for (const source of inherited) {
-    const tb = child(source, 'p:txBody');
+    const tb = ownChild(source, 'txBody');
     const bp = child(tb, 'a:bodyPr');
     if (bp) bodyChain.push(bp);
     const ls = child(tb, 'a:lstStyle');
@@ -323,7 +344,7 @@ function resolveShapeLike(
     const masterPh = findMasterPlaceholder(ph.type, scope.masterPlaceholders);
     if (masterPh) inherited.push(masterPh);
   }
-  const spPrOf = (e: Element): Element | undefined => child(e, 'p:spPr');
+  const spPrOf = (e: Element): Element | undefined => ownChild(e, 'spPr');
   const chain = [...inherited, el];
   let xfrm: Xfrm | undefined;
   let geometry: GeometrySpec | undefined;
@@ -338,7 +359,7 @@ function resolveShapeLike(
     fillEl ??= fillElementOf(spPr);
     lnEl ??= child(spPr, 'a:ln');
     effects ??= effectContainer(spPr);
-    style ??= child(chain[i], 'p:style');
+    style ??= ownChild(chain[i], 'style');
   }
   const ctx = scope.ctx;
   let fill: ResolvedFill = { type: 'none' };
@@ -394,7 +415,16 @@ function resolveShapeLike(
       : undefined;
   // ECMA-376 Part 1, 19.3.1.13 cNvSpPr: txBox marks a text box.
   const textBox = kind === 'shape' && boolAttr(path(el, 'p:nvSpPr', 'p:cNvSpPr'), 'txBox') === true;
-  return { ...base, kind, fill, ...(text ? { text } : {}), ...(textBox ? { textBox } : {}) };
+  // A diagram shape names its own text rectangle (`dsp:txXfrm`).
+  const textXfrm = el.ns === NS.dsp ? readXfrm(child(el, 'dsp:txXfrm')) : undefined;
+  return {
+    ...base,
+    kind,
+    fill,
+    ...(text ? { text } : {}),
+    ...(textBox ? { textBox } : {}),
+    ...(text && textXfrm ? { textXfrm } : {}),
+  };
 }
 
 function frameKind(uri: string): 'chart' | 'diagram' | 'table' | 'ole' | 'unknown' {
@@ -443,6 +473,165 @@ function resolveOlePoster(
   if (resolved.kind !== 'picture' || resolved.fill.type !== 'picture') return undefined;
   if (!drawableImage(scope.pkg, partName, resolved.fill.rId)) return undefined;
   return { ...resolved, nodeId: frame.id, xfrm, hidden: false };
+}
+
+/** A shape of a diagram drawing that fails the supported subset: the whole diagram falls back. */
+const UNSUPPORTED = Symbol('unsupported');
+
+/** The shapes one diagram drawing has resolved, and whether a limit stopped it. */
+interface DiagramBudget {
+  shapes: number;
+  overLimit: boolean;
+}
+
+/** Stop a diagram at a shape, depth, or slide limit, and remember why. */
+function overLimit(budget: DiagramBudget): typeof UNSUPPORTED {
+  budget.overLimit = true;
+  return UNSUPPORTED;
+}
+
+/**
+ * One element of a diagram drawing's shape tree (`dsp:spTree`), in its parent's space. Shapes
+ * resolve as slide shapes do. Undefined for the tree's own properties; {@link UNSUPPORTED} for
+ * a shape with no box, a group past the depth limit, an element past the frame's or the
+ * slide's shape budget, or any other element.
+ */
+function resolveDiagramElement(
+  el: Element,
+  layer: Layer,
+  drawingPart: string,
+  scope: SlideScope,
+  depth: number,
+  budget: DiagramBudget
+): ResolvedElement | undefined | typeof UNSUPPORTED {
+  if (el.ns !== NS.dsp) return UNSUPPORTED;
+  switch (el.local) {
+    case 'nvGrpSpPr':
+    case 'grpSpPr':
+    case 'extLst':
+      return undefined;
+    case 'sp': {
+      budget.shapes += 1;
+      scope.diagramShapes.count += 1;
+      if (budget.shapes > MAX_DIAGRAM_SHAPES) return overLimit(budget);
+      if (scope.diagramShapes.count > MAX_SLIDE_DIAGRAM_SHAPES) return overLimit(budget);
+      if (!path(el, 'dsp:spPr', 'a:xfrm')) return UNSUPPORTED;
+      return resolveShapeLike(el, 'shape', layer, drawingPart, scope);
+    }
+    case 'grpSp': {
+      scope.diagramShapes.count += 1;
+      if (depth >= MAX_DIAGRAM_GROUP_DEPTH) return overLimit(budget);
+      if (scope.diagramShapes.count > MAX_SLIDE_DIAGRAM_SHAPES) return overLimit(budget);
+      const kids = resolveDiagramTree(el, layer, drawingPart, scope, depth + 1, budget);
+      if (!kids) return UNSUPPORTED;
+      return diagramGroup(el, kids, layer, drawingPart, scope);
+    }
+  }
+  return UNSUPPORTED;
+}
+
+function resolveDiagramTree(
+  tree: Element,
+  layer: Layer,
+  drawingPart: string,
+  scope: SlideScope,
+  depth: number,
+  budget: DiagramBudget
+): ResolvedElement[] | undefined {
+  const out: ResolvedElement[] = [];
+  for (const c of elements(tree)) {
+    const r = resolveDiagramElement(c, layer, drawingPart, scope, depth, budget);
+    if (r === UNSUPPORTED) return undefined;
+    if (r) out.push(r);
+  }
+  return out;
+}
+
+/** A `dsp:grpSp`, or the `dsp:spTree` root when its `dsp:grpSpPr` places its children. */
+function diagramGroup(
+  el: Element,
+  children: readonly ResolvedElement[],
+  layer: Layer,
+  drawingPart: string,
+  scope: SlideScope
+): ResolvedElement {
+  const grpSpPr = child(el, 'dsp:grpSpPr');
+  const x = child(grpSpPr, 'a:xfrm');
+  const xfrm = readXfrm(x) ?? ZERO_XFRM;
+  const chOff = child(x, 'a:chOff');
+  const chExt = child(x, 'a:chExt');
+  const cNvPr = nonVisualProps(el);
+  return {
+    kind: 'group',
+    nodeId: el.id,
+    partName: drawingPart,
+    layer,
+    name: attr(cNvPr, 'name') ?? '',
+    xfrm,
+    hidden: boolAttr(cNvPr, 'hidden') ?? false,
+    childOffset: { x: intAttr(chOff, 'x') ?? xfrm.x, y: intAttr(chOff, 'y') ?? xfrm.y },
+    childExtent: { cx: intAttr(chExt, 'cx') ?? xfrm.cx, cy: intAttr(chExt, 'cy') ?? xfrm.cy },
+    children,
+    fill: resolveFillElement(fillElementOf(grpSpPr), scope.ctx) ?? { type: 'none' },
+  };
+}
+
+/**
+ * The diagram background (`dgm:bg`) and outline (`dgm:whole/a:ln`) of the data model, as one
+ * rectangle over the frame's box. Undefined when the data model sets neither.
+ */
+function diagramBackground(
+  frame: Element,
+  dataModel: Element,
+  xfrm: Xfrm,
+  layer: Layer,
+  dataPart: string,
+  scope: SlideScope
+): ResolvedElement | undefined {
+  const fill = resolveFillElement(fillElementOf(child(dataModel, 'dgm:bg')), scope.ctx);
+  const line = resolveLine(path(dataModel, 'dgm:whole', 'a:ln'), undefined, scope.ctx, scope.ctx);
+  const drawn = line && line.fill.type !== 'none' ? line : undefined;
+  if ((!fill || fill.type === 'none') && !drawn) return undefined;
+  return {
+    kind: 'shape',
+    nodeId: `${frame.id}#background`,
+    partName: dataPart,
+    layer,
+    name: '',
+    xfrm: { ...ZERO_XFRM, cx: xfrm.cx, cy: xfrm.cy },
+    hidden: false,
+    geometry: { kind: 'preset', preset: 'rect', adjust: new Map() },
+    fill: fill ?? { type: 'none' },
+    ...(drawn ? { line: drawn } : {}),
+  };
+}
+
+/**
+ * The saved drawing of a diagram frame (ECMA-376 Part 1, 21.4; see `diagram.ts`): its shapes in
+ * the frame's local space, behind the data model's background. Otherwise the reason it shows
+ * its placeholder: no saved drawing (or a part that does not resolve), an element outside the
+ * supported subset, or a shape, depth, or slide limit. A diagram renders whole or not at all.
+ */
+function resolveDiagram(
+  frame: Element,
+  graphicData: Element | undefined,
+  xfrm: Xfrm,
+  layer: Layer,
+  partName: string,
+  scope: SlideScope
+): { drawing: readonly ResolvedElement[] } | { drawingFallback: DiagramFallback } {
+  const parts = diagramParts(scope.pkg, partName, graphicData);
+  const tree = child(parts?.drawing, 'dsp:spTree');
+  if (!parts || !tree) return { drawingFallback: 'no-drawing' };
+  const budget: DiagramBudget = { shapes: 0, overLimit: false };
+  const shapes = resolveDiagramTree(tree, layer, parts.drawingPart, scope, 0, budget);
+  if (!shapes) return { drawingFallback: budget.overLimit ? 'limit' : 'unsupported' };
+  if (shapes.length === 0) return { drawingFallback: 'no-drawing' };
+  const root = child(child(tree, 'dsp:grpSpPr'), 'a:xfrm')
+    ? [diagramGroup(tree, shapes, layer, parts.drawingPart, scope)]
+    : shapes;
+  const background = diagramBackground(frame, parts.dataModel, xfrm, layer, parts.dataPart, scope);
+  return { drawing: background ? [background, ...root] : root };
 }
 
 function resolveElement(
@@ -500,6 +689,14 @@ function resolveElement(
         kind === 'ole'
           ? resolveOlePoster(el, graphicData, xfrm, layer, partName, scope)
           : undefined;
+      const diagram =
+        kind === 'diagram'
+          ? resolveDiagram(el, graphicData, xfrm, layer, partName, scope)
+          : undefined;
+      const chart =
+        kind === 'chart'
+          ? resolveChartPart(scope.pkg, partName, graphicData, scope.ctx, scope.theme)
+          : undefined;
       return {
         kind: 'graphicFrame',
         nodeId: el.id,
@@ -512,6 +709,8 @@ function resolveElement(
         frameKind: kind,
         ...(table ? { table } : {}),
         ...(poster ? { poster } : {}),
+        ...diagram,
+        ...(chart ? { chart } : {}),
       };
     }
   }
@@ -603,6 +802,7 @@ export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | u
     ...(kinsoku ? { kinsoku } : {}),
     layoutPlaceholders: collectPlaceholders(pkg, ref.layoutPart),
     masterPlaceholders: collectPlaceholders(pkg, ref.masterPart),
+    diagramShapes: { count: 0 },
   };
   const bg = resolveBackground([slide, layout, master], scope);
   const backgroundPart = [ref.partName, ref.layoutPart, ref.masterPart][bg.index] ?? ref.partName;

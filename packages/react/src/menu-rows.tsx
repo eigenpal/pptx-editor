@@ -11,6 +11,7 @@ import { createContext, useContext, type ReactNode } from 'react';
 import {
   SHAPE_GALLERY,
   chromeControlForSlot,
+  chromeOfferedControl,
   chromeRowState,
   menuEntryKey,
   menuRowCheck,
@@ -142,13 +143,15 @@ export function SlotMenuRow({
           <MenuTableGrid slot={entry.slot} label={label} autoFocus onInserted={close} />
         </MenuSubmenu>
       );
+    // The choices this build offers: a choice whose result does not paint stays out.
+    const offered = chromeOfferedControl(entry.slot, control);
     // Shape Effects: one submenu for each effect kind, as its toolbar menu has.
-    if (control.optionGroups?.length && control.options?.length)
+    if (offered.optionGroups?.length && offered.options?.length)
       return (
         <MenuSubmenu {...common}>
-          {control.optionGroups.map((group) => (
+          {offered.optionGroups.map((group) => (
             <MenuSubmenu key={group.id} label={t(group.labelKey)}>
-              {control
+              {offered
                 .options!.filter((o) => o.group === group.id)
                 .map((o) => (
                   <SlotMenuRow
@@ -160,10 +163,10 @@ export function SlotMenuRow({
           ))}
         </MenuSubmenu>
       );
-    if (control.options?.length)
+    if (offered.options?.length)
       return (
         <MenuSubmenu {...common}>
-          {control.options.map((o) => (
+          {offered.options.map((o) => (
             <SlotMenuRow key={o.value} entry={{ kind: 'item', slot: entry.slot, value: o.value }} />
           ))}
         </MenuSubmenu>

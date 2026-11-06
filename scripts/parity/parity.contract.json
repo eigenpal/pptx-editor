@@ -68,6 +68,7 @@
       "reactProps": "PptxEditorProps",
       "topLevel": true,
       "paired": [
+        "autoCorrect",
         "colorMode",
         "contextMenu",
         "document",
@@ -102,6 +103,7 @@
     "PptxEditorRoot": {
       "reactProps": "PptxEditorRootProps",
       "paired": [
+        "autoCorrect",
         "colorMode",
         "document",
         "fontFamilies",
@@ -532,7 +534,7 @@
     },
     "PptxEditorViewport": {
       "reactProps": "PptxEditorViewportProps",
-      "paired": ["className"],
+      "paired": ["className", "label"],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {},
       "reactRenderPropsAsVueSlots": {

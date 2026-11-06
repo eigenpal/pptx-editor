@@ -55,7 +55,7 @@ A row that opens a dialog or popup reads the `popups` registry on `PptxEditor.Ro
 | `paragraph.columns` (value `dialog`) | **Format > Columns…** opens the `columns` dialog. |
 | `paragraph.dialog` | **Format > Paragraph…** and **Paragraph…** in the text context menu open the `paragraph` dialog. |
 | `text.link` | **Insert > Link…** opens the `hyperlink` popup. The `text.link` slot is also the **Insert link…** row of the text context menu. |
-| `find.find`, `find.replace` | **Edit > Find > Find…** and **Edit > Find > Replace…** open the `find` bar. Without a mounted `PptxEditor.FindBar`, the rows are disabled with a reason. |
+| `find.find`, `find.replace` | **Edit > Find > Find…** and **Edit > Find > Replace…** open the `find` bar. Without a mounted `PptxEditor.FindBar`, or in the slide sorter, the rows are disabled with a reason. |
 
 A row with the value `dialog` is a menu row that opens a dialog. `dialog` is not a value of the slot's command, so `runToolbarCommand` and `useEditorValueCommand` refuse it. To open these dialogs from your own code, call `useEditorDialog('bulletsAndNumbering')` or `useEditorDialog('columns')`.
 

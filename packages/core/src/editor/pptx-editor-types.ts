@@ -24,6 +24,12 @@ export interface PptxEditorOptions extends Omit<OpenOptions, 'fonts'> {
   /** Whether drags snap to smart guides; on by default. `toggleSmartGuides` switches it. */
   readonly smartGuides?: boolean;
   /**
+   * AutoCorrect while typing (default true): curly quotes, the ©, ®, and ™ signs, ellipses,
+   * fractions, en dashes, sentence capitals, and lists started by typing `1.`, `1)`, `*`, or
+   * `-` and a space.
+   */
+  readonly autoCorrect?: boolean;
+  /**
    * Translates engine-generated labels (placeholder frames, the canvas name). Adapters pass
    * their i18n translator; English keys show when omitted.
    */
@@ -96,6 +102,11 @@ export interface PptxEditorInstance extends Editor {
    * prompts, into a container: the Layout and New Slide galleries.
    */
   renderLayoutThumbnail(layoutId: string, container: HTMLElement): void;
+  /**
+   * Open the rest of a deck that is still opening, now, for a reader of the whole deck (the
+   * automation host's export). False when a slide did not parse. @internal
+   */
+  finishOpening(): boolean;
   /**
    * Publish a refusal as `lastRejection`, for chrome that refuses an action itself (Change
    * Picture after the selection changed while the file loaded). @internal

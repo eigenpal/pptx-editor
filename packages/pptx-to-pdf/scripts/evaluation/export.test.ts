@@ -72,7 +72,7 @@ describe('evaluation export', () => {
     const { report } = await exportForEvaluation(deck('effects'));
     const severity = (code: string) => report.diagnostics.find((d) => d.code === code)?.severity;
     expect(severity('effect.shadow-blur')).toBe('approximation');
-    expect(severity('effect.reflection')).toBe('unsupported');
+    expect(severity('effect.reflection-blur')).toBe('approximation');
   });
 });
 

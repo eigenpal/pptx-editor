@@ -905,11 +905,16 @@
     "level": "{percent}%",
     "levelAriaLabel": "缩放：{percent}%"
   },
+  "viewport": {
+    "ariaLabel": "演示文稿编辑器"
+  },
   "canvas": {
     "ariaLabel": "第 {index} 张幻灯片，共 {total} 张",
     "inputAriaLabel": "所选形状的文本",
     "tableCell": "第 {row} 行，第 {column} 列",
-    "shapeSelected": "已选择 {name}",
+    "shapeSelected": "已选择 {kind} {name}",
+    "shapeSelectedWithAltText": "已选择 {kind} {name}，{description}",
+    "dragCanceled": "已取消拖动",
     "placeholderObject": "{kind}(此版本中不呈现)",
     "kinds": {
       "chart": "图表",
@@ -1290,6 +1295,7 @@
   "statusBar": {
     "ariaLabel": "状态栏",
     "slide": "幻灯片第 {current} 张，共 {total} 张",
+    "readOnlyDamaged": "有一张幻灯片已损坏。您可以查看此演示文稿，但无法保存更改。",
     "notes": "备注"
   }
 }

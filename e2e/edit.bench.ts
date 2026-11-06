@@ -1,5 +1,9 @@
-// Browser editing bench: main-thread time per keystroke, per drag step, and per slide switch in
-// the demo (React chrome, real rail), on the synthetic decks of `scripts/bench/edit-bench.ts`.
+// Browser editing bench: the time to open a deck, and main-thread time per keystroke, per drag
+// step, and per slide switch in the demo (React chrome, real rail), on the synthetic decks of
+// `scripts/bench/edit-bench.ts`. The open row is the wall time from the file input to the first
+// frame with every rail item in place (the page polls once a frame, so a busy main thread
+// delays it), and the thumbnails painted by then. The editing rows start after every thumbnail
+// has painted, so the thumbnails the editor paints when idle do not count in them.
 //
 // Main-thread time is Chrome's `TaskDuration` metric (DevTools protocol), less the same span of
 // idle time. It includes event dispatch, the engine, React, style, layout, and paint, and the
@@ -71,7 +75,9 @@ async function mainThread(
 async function instrument(page: Page): Promise<void> {
   await page.evaluate(() => {
     const w = window as unknown as {
-      __pptxEditor: { renderThumbnail: (i: number, c: HTMLElement) => void };
+      __pptxEditor: {
+        renderThumbnail: (i: number, c: HTMLElement, o?: { defer?: boolean }) => () => void;
+      };
       __thumbCalls: number;
       __thumbPaints: number;
     };
@@ -79,9 +85,9 @@ async function instrument(page: Page): Promise<void> {
     w.__thumbCalls = 0;
     w.__thumbPaints = 0;
     const orig = ed.renderThumbnail.bind(ed);
-    ed.renderThumbnail = (i, c) => {
+    ed.renderThumbnail = (i, c, o) => {
       w.__thumbCalls += 1;
-      orig(i, c);
+      return orig(i, c, o);
     };
     new MutationObserver((records) => {
       for (const r of records)
@@ -100,9 +106,14 @@ const counters = (page: Page) =>
     return out;
   });
 
-async function open(page: Page, n: number): Promise<void> {
+/** Open a deck; the wall time until the rail is in place, and the thumbnails painted by then. */
+async function open(
+  page: Page,
+  n: number
+): Promise<{ ms: number; painted: number; allMs: number }> {
   await page.goto('/');
   await page.waitForSelector('.pptx-surface__slide', { timeout: 30_000 });
+  const t0 = Date.now();
   await page.locator('input[type=file][accept*=".pptx"]').setInputFiles({
     name: `bench-${n}.pptx`,
     mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -111,9 +122,20 @@ async function open(page: Page, n: number): Promise<void> {
   await page.waitForFunction(
     (count) => document.querySelectorAll('.pptx-rail__item').length === count,
     n,
+    { timeout: 120_000, polling: 'raf' }
+  );
+  const ms = Date.now() - t0;
+  const painted = await page.evaluate(
+    () => document.querySelectorAll('.pptx-rail__thumb > svg').length
+  );
+  await page.waitForFunction(
+    (count) => document.querySelectorAll('.pptx-rail__thumb > svg').length === count,
+    n,
     { timeout: 120_000 }
   );
+  const allMs = Date.now() - t0;
   await page.waitForTimeout(1_500);
+  return { ms, painted, allMs };
 }
 
 /** The middle slide's body box: its node id and its top border in page coordinates. */
@@ -142,8 +164,10 @@ test('edit bench', async ({ page }) => {
   const rows: Row[] = [];
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Performance.enable');
+  const opens: string[] = [];
   for (const n of SIZES) {
-    await open(page, n);
+    const o = await open(page, n);
+    opens.push(`| open | ${n} | ${o.ms} | ${o.painted} | ${o.allMs} |`);
     await instrument(page);
     const middle = Math.floor(n / 2);
     await page.evaluate((i) => {
@@ -244,4 +268,11 @@ test('edit bench', async ({ page }) => {
     ),
   ];
   console.log(lines.join('\n'));
+  console.log(
+    [
+      '| Scenario | Slides | Wall ms | Thumbnails painted | Wall ms to every thumbnail |',
+      '| --- | --: | --: | --: | --: |',
+      ...opens,
+    ].join('\n')
+  );
 });

@@ -10,6 +10,7 @@ import {
 } from '../cascade/index.ts';
 import {
   apply as applyMatrix,
+  drawingRenderers,
   hasCharacters,
   multiply as multiplyMatrix,
   type GeometryPath,
@@ -17,13 +18,7 @@ import {
   type Matrix,
   type SlideLayout,
 } from '../layout/index.ts';
-import {
-  bodyFilter,
-  glowFilter,
-  reflectionCopy,
-  shadowCopy,
-  type EffectSource,
-} from './paint-effects.ts';
+import { effectDefs, effectElement, shadowCopy, type EffectSource } from './paint-effects.ts';
 import { boundsOf, cornersUnder, grow, PX } from './effect-transforms.ts';
 import {
   fillPaint,
@@ -56,6 +51,31 @@ export interface PaintOptions {
   readonly frameLabel?: (kind: string) => string;
   /** Include `data-node-id` hooks for hit testing. Default true. */
   readonly hitTargets?: boolean;
+  /**
+   * The alt text of an element. With it, each picture is exposed to assistive technology: a
+   * picture with a description is an image named by it, and a decorative picture or one with
+   * no description is hidden. Without it, the paint has no ARIA (thumbnails and exports).
+   */
+  readonly altText?: AltTextPort;
+}
+
+/** Resolves an element (`p:cNvPr/@descr` and the `adec:decorative` extension) to its alt text. */
+export type AltTextPort = (
+  part: string,
+  nodeId: string
+) => { readonly description: string; readonly decorative: boolean } | undefined;
+
+/**
+ * The ARIA of a picture (WAI-ARIA `img` role, after the WAI images tutorial): its description as
+ * the name, or hidden when decorative or without a description. Pixels do not change.
+ */
+function pictureAria(
+  el: { readonly partName: string; readonly nodeId: string },
+  altText: AltTextPort
+): Record<string, string> {
+  const alt = altText(el.partName, el.nodeId);
+  const name = alt && !alt.decorative ? alt.description.trim() : '';
+  return name ? { role: 'img', 'aria-label': name } : { 'aria-hidden': 'true' };
 }
 
 /**
@@ -546,6 +566,28 @@ function paintItem(
         );
         return svg(doc, 'g', { ...common, 'data-kind': 'frame' }, picture ? [picture] : []);
       }
+      // A diagram draws its saved drawing (ECMA-376 Part 1, 21.4); the frame holds the hit id,
+      // so the diagram selects as one read-only object.
+      if (item.drawing) {
+        const inner = { ...opts, hitTargets: false };
+        const scale = matrixScale(item.matrix);
+        const g = svg(doc, 'g', { ...common, 'data-kind': 'frame' });
+        for (const child of item.drawing) {
+          const painted = paintItem(doc, child, ctx, inner, scale);
+          if (painted) g.appendChild(painted);
+        }
+        return g;
+      }
+      // A chart drawn by an installed renderer: its shapes and labels, under the frame's hit id.
+      if (item.chart) {
+        const inner = { ...opts, hitTargets: false };
+        const parts: SVGElement[] = [];
+        for (const child of item.chart) {
+          const painted = paintItem(doc, child, local, inner, parentScale);
+          if (painted) parts.push(painted);
+        }
+        return svg(doc, 'g', { ...common, 'data-kind': 'chart' }, parts);
+      }
       const { cx: w, cy: h } = el.xfrm;
       const label = opts.frameLabel?.(item.element.frameKind) ?? item.element.frameKind;
       // Points under a scale: browsers clamp font sizes as large as EMU values.
@@ -579,16 +621,22 @@ function paintItem(
     }
     case 'shape':
     case 'picture': {
-      const outer = svg(doc, 'g', { ...common, 'data-kind': item.kind });
+      const aria = item.kind === 'picture' && opts.altText ? pictureAria(el, opts.altText) : {};
+      const outer = svg(doc, 'g', { ...common, 'data-kind': item.kind, ...aria });
       const effects = item.element.effects;
+      // Glow, inner shadow, reflection, and soft edge paint only through the installed effects
+      // renderer (`@pptx-editor.dev/pro/drawing`); the outer shadow is the engine's.
+      const pro = effects ? drawingRenderers().effects : undefined;
+      const ids = ctx.defs;
       const body = svg(doc, 'g', { transform: matrixAttr(item.matrix) });
       for (const node of paintGeometry(doc, item, local, parentScale)) body.appendChild(node);
       const bodyFx =
-        effects && (effects.softEdge || effects.innerShadow)
-          ? bodyFilter(ctx.defs, effects, boundsOf(boxCorners(item)))
-          : undefined;
+        pro && effects && (effects.softEdge || effects.innerShadow)
+          ? pro.body(effects, boundsOf(boxCorners(item)), ids)
+          : null;
+      if (bodyFx) effectDefs(ctx.defs, bodyFx.defs);
       const content = svg(doc, 'g', {}, [
-        bodyFx ? svg(doc, 'g', { filter: bodyFx }, [body]) : body,
+        bodyFx ? svg(doc, 'g', { filter: `url(#${bodyFx.filter})` }, [body]) : body,
       ]);
       // An empty body's caret line draws nothing: no group for it.
       if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text))
@@ -597,7 +645,8 @@ function paintItem(
             paintText(doc, item.text, local),
           ])
         );
-      if (!effects || !(effects.outerShadow || effects.reflection || effects.glow)) {
+      const copies = effects?.outerShadow || (pro && (effects?.reflection || effects?.glow));
+      if (!effects || !copies) {
         outer.appendChild(content);
         return outer;
       }
@@ -611,12 +660,18 @@ function paintItem(
         height: el.xfrm.cy,
         corners: contentCorners(item),
       };
-      const reflection = reflectionCopy(ctx.defs, effects, source);
-      if (reflection) outer.appendChild(reflection);
+      const reflection = pro && effects.reflection ? pro.reflection(effects, source, ids) : null;
+      if (reflection) {
+        effectDefs(ctx.defs, reflection.defs);
+        outer.appendChild(effectElement(doc, reflection.node));
+      }
       const shadow = shadowCopy(ctx.defs, effects, source);
       if (shadow) outer.appendChild(shadow);
-      const glow = glowFilter(ctx.defs, effects, boundsOf(source.corners));
-      outer.appendChild(glow ? svg(doc, 'g', { filter: glow }, [content]) : content);
+      const glow = pro && effects.glow ? pro.glow(effects, boundsOf(source.corners), ids) : null;
+      if (glow) effectDefs(ctx.defs, glow.defs);
+      outer.appendChild(
+        glow ? svg(doc, 'g', { filter: `url(#${glow.filter})` }, [content]) : content
+      );
       return outer;
     }
   }

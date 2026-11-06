@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { unzipSync } from 'fflate';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { textDeck } from '../scripts/bench/text-deck.ts';
 
 /** Open the demo on the basic deck and wait until the slide is painted. */
 async function ready(page: Page): Promise<void> {
@@ -423,4 +424,270 @@ test('embedding: Ctrl/Cmd+F with the focus outside the editor stays with the bro
   });
   expect(prevented).toBe(false);
   await expect(page.getByRole('search', { name: 'Find and replace' })).toBeHidden();
+});
+
+/** Hold `requestIdleCallback` until `window.releaseIdle()`, so no idle paint runs before. */
+const HOLD_IDLE = (): void => {
+  const w = window as unknown as {
+    requestIdleCallback: (cb: IdleRequestCallback, o?: IdleRequestOptions) => number;
+    cancelIdleCallback: (id: number) => void;
+    releaseIdle: () => void;
+  };
+  const real = {
+    request: w.requestIdleCallback.bind(window),
+    cancel: w.cancelIdleCallback.bind(window),
+  };
+  const held = new Map<number, IdleRequestCallback>();
+  let next = 1;
+  w.requestIdleCallback = (cb) => {
+    const id = next++;
+    held.set(id, cb);
+    return id;
+  };
+  w.cancelIdleCallback = (id) => void held.delete(id);
+  w.releaseIdle = () => {
+    w.requestIdleCallback = real.request;
+    w.cancelIdleCallback = real.cancel;
+    for (const cb of held.values()) real.request(cb);
+    held.clear();
+  };
+};
+
+/** Which rail items have a painted thumbnail, by slide index, and which are in the list's view. */
+async function railState(page: Page) {
+  return page.evaluate(() => {
+    const list = document.querySelector('.pptx-rail__list')!;
+    const view = list.getBoundingClientRect();
+    const painted: number[] = [];
+    const inView: number[] = [];
+    for (const item of document.querySelectorAll<HTMLElement>('.pptx-rail__item')) {
+      const index = Number(item.dataset.index);
+      if (item.querySelector('.pptx-rail__thumb > svg')) painted.push(index);
+      const r = item.getBoundingClientRect();
+      if (r.bottom > view.top && r.top < view.bottom && r.height > 0) inView.push(index);
+    }
+    return { painted, inView, mounted: document.querySelectorAll('.pptx-rail__item').length };
+  });
+}
+
+test('long deck: the rail paints the thumbnails in view first, then the rest', async ({ page }) => {
+  // Visibility from CSS layout and the browser's IntersectionObserver: happy-dom has neither.
+  // With idle time held, only the first-paint burst, the items in view (or near it), and the
+  // ones that scroll into view can paint: the observer path, alone.
+  const SLIDES = 1000;
+  await page.addInitScript(HOLD_IDLE);
+  await ready(page);
+  const base64 = Buffer.from(textDeck(SLIDES)).toString('base64');
+  await page.evaluate(async (data) => {
+    const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+    const editor = (
+      window as unknown as {
+        __pptxEditor: { load(b: Uint8Array, o: { startSlide: number }): Promise<unknown> };
+      }
+    ).__pptxEditor;
+    await editor.load(bytes, { startSlide: 600 });
+  }, base64);
+  // The current slide's item is mounted and scrolled into view, and the items in view paint.
+  await expect
+    .poll(async () => {
+      const { painted, inView } = await railState(page);
+      return inView.length > 0 && inView.includes(600) && inView.every((i) => painted.includes(i));
+    })
+    .toBe(true);
+  // Far from the view, past the overscan and the burst at the top: nothing paints yet.
+  const band = (painted: number[]) => painted.filter((i) => i >= 100 && i <= 500);
+  expect(band((await railState(page)).painted)).toEqual([]);
+  // Every item mounts, the end scrolls into view, and the last item paints while the band waits.
+  await expect.poll(async () => (await railState(page)).mounted, { timeout: 30_000 }).toBe(SLIDES);
+  await page.locator('.pptx-rail__list').evaluate((el) => (el.scrollTop = el.scrollHeight));
+  const last = page.locator('.pptx-rail__item').last().locator('.pptx-rail__thumb > svg');
+  await expect(last).toHaveCount(1);
+  expect(band((await railState(page)).painted)).toEqual([]);
+  // In idle time, every thumbnail paints.
+  await page.evaluate(() => (window as unknown as { releaseIdle(): void }).releaseIdle());
+  await expect
+    .poll(async () => (await railState(page)).painted.length, { timeout: 30_000 })
+    .toBe(SLIDES);
+});
+
+test('long deck: the first slide takes input while the rest opens, and every slide is there after', async ({
+  page,
+}) => {
+  // Frames and tasks of a real browser: the rail mounts over frames, and the slides parse in
+  // tasks between them.
+  await ready(page);
+  const n = 3000;
+  await page.locator('input[type=file][accept*=".pptx"]').setInputFiles({
+    name: 'long.pptx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    buffer: Buffer.from(textDeck(n)),
+  });
+  await page.waitForFunction(
+    () => document.querySelector('.pptx-surface__slide')?.textContent?.includes('Slide 1 title'),
+    undefined,
+    { timeout: 60_000 }
+  );
+  type Ed = {
+    snapshot(): { pendingSlides?: number; slides: { pending?: true }[] };
+    session: { layout(i: number): { items: { element: { name?: string; nodeId: string } }[] } };
+    setSelection(s: unknown): void;
+    focus(): void;
+  };
+  // Type into the first slide at once.
+  await page.evaluate(() => {
+    const ed = (window as unknown as { __pptxEditor: Ed }).__pptxEditor;
+    const body = ed.session.layout(0).items.find((x) => x.element.name === 'Body')!;
+    const at = { paragraph: 0, offset: 0 };
+    ed.setSelection({ kind: 'text', nodeId: body.element.nodeId, anchor: at, focus: at });
+    ed.focus();
+  });
+  await page.keyboard.type('Hello ');
+  await expect(page.locator('.pptx-surface__slide')).toContainText('Hello');
+  // The rest opens: every rail item mounts, and no slide is pending.
+  await expect(page.locator('.pptx-rail__item')).toHaveCount(n, { timeout: 60_000 });
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __pptxEditor: Ed }).__pptxEditor.snapshot().pendingSlides ?? 0
+        ),
+      { timeout: 60_000 }
+    )
+    .toBe(0);
+  // The thumbnails in view paint.
+  await expect(
+    page.locator('.pptx-rail__item').first().locator('.pptx-rail__thumb > svg')
+  ).toHaveCount(1);
+});
+
+test('shape drag: the preview puts the shape where the release does', async ({ page }) => {
+  // Boxes of the painted SVG: happy-dom lays nothing out.
+  await ready(page);
+  await page.locator('.pptx-rail__item').nth(1).click();
+  const shape = page.locator('.pptx-surface__slide [data-kind="shape"]').first();
+  const box = (await shape.boundingBox())!;
+  const id = await shape.getAttribute('data-node-id');
+  // During a drag, the shape is hidden and its preview painted after it.
+  const at = () =>
+    page.locator(
+      `.pptx-surface__slide :is([data-preview-of="${id}"], [data-node-id="${id}"]:not([display="none"]))`
+    );
+  // Press on the shape's border band (its top edge) and drag it.
+  const x = box.x + box.width / 2;
+  const y = box.y + 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 20, y + 10);
+  await page.mouse.move(x + 60, y + 30, { steps: 4 });
+  const during = (await at().boundingBox())!;
+  expect(during.x).toBeGreaterThan(box.x + 30);
+  await page.mouse.up();
+  const after = (await at().boundingBox())!;
+  for (const k of ['x', 'y', 'width', 'height'] as const)
+    expect(Math.abs(after[k] - during[k])).toBeLessThan(1.5);
+  // Escape during a drag puts the shape back.
+  await page.mouse.move(after.x + after.width / 2, after.y + 2);
+  await page.mouse.down();
+  await page.mouse.move(after.x + after.width / 2 + 80, after.y + 40, { steps: 4 });
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  const back = (await at().boundingBox())!;
+  expect(Math.abs(back.x - after.x)).toBeLessThan(1.5);
+});
+
+test('shape resize: the preview matches the release, and Escape on a handle cancels', async ({
+  page,
+}) => {
+  // Boxes of the painted SVG: happy-dom lays nothing out.
+  await ready(page);
+  await page.locator('.pptx-rail__item').nth(1).click();
+  const shape = page.locator('.pptx-surface__slide [data-kind="shape"]').first();
+  const id = await shape.getAttribute('data-node-id');
+  const at = () =>
+    page.locator(
+      `.pptx-surface__slide :is([data-preview-of="${id}"], [data-node-id="${id}"]:not([display="none"]))`
+    );
+  const box = (await shape.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + 2);
+  const handle = (await page.locator('[data-handle="se"]').boundingBox())!;
+  const hx = handle.x + handle.width / 2;
+  const hy = handle.y + handle.height / 2;
+  await page.mouse.move(hx, hy);
+  await page.mouse.down();
+  await page.mouse.move(hx - 60, hy + 40, { steps: 5 });
+  const during = (await at().boundingBox())!;
+  const text = await at().textContent();
+  await page.mouse.up();
+  const after = (await at().boundingBox())!;
+  for (const k of ['x', 'y', 'width', 'height'] as const)
+    expect(Math.abs(after[k] - during[k])).toBeLessThan(1.5);
+  expect(await at().textContent()).toBe(text);
+  // Escape during a resize puts the shape back, and the release writes nothing.
+  const corner = (await page.locator('[data-handle="se"]').boundingBox())!;
+  await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(corner.x + 120, corner.y + 90, { steps: 5 });
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  const back = (await at().boundingBox())!;
+  for (const k of ['x', 'y', 'width', 'height'] as const)
+    expect(Math.abs(back[k] - after[k])).toBeLessThan(1.5);
+});
+
+test('long deck: slide edits leave no thumbnail in view empty', async ({ page }) => {
+  // Layout boxes and the browser's IntersectionObserver: happy-dom has neither.
+  await ready(page);
+  await page.locator('input[type=file][accept*=".pptx"]').setInputFiles({
+    name: 'long.pptx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    buffer: Buffer.from(textDeck(200)),
+  });
+  await expect(page.locator('.pptx-rail__item')).toHaveCount(200, { timeout: 60_000 });
+  const run = (command: unknown) =>
+    page.evaluate((c) => {
+      const ed = (window as unknown as Record<string, unknown>).__pptxEditor as {
+        exec(c: unknown): { ok: boolean };
+      };
+      return ed.exec(c).ok;
+    }, command);
+  const goTo = (index: number) =>
+    page.evaluate((i) => {
+      const ed = (window as unknown as Record<string, unknown>).__pptxEditor as {
+        goToSlide(i: number): void;
+      };
+      ed.goToSlide(i);
+    }, index);
+  const painted = () => page.locator('.pptx-rail__thumb > svg').count();
+  const scrolled = () => page.locator('.pptx-rail__list').evaluate((el) => el.scrollTop);
+  // On slide 101, delete slide 3, then go back to slide 101: the rail follows it down.
+  await goTo(100);
+  expect(await run({ type: 'deleteSlides', indices: [2] })).toBe(true);
+  await goTo(100);
+  await expect.poll(painted, { timeout: 30_000 }).toBe(199);
+  await page.waitForTimeout(300);
+  // Watch for a thumbnail in the rail's box that is empty at a frame.
+  await page.evaluate(() => {
+    const w = window as unknown as { __emptyInView: number };
+    w.__emptyInView = 0;
+    const list = document.querySelector('.pptx-rail__list')!;
+    const check = (): void => {
+      const r = list.getBoundingClientRect();
+      for (const t of document.querySelectorAll('.pptx-rail__thumb')) {
+        const b = t.getBoundingClientRect();
+        if (b.bottom > r.top && b.top < r.bottom && !t.firstElementChild) w.__emptyInView += 1;
+      }
+      requestAnimationFrame(check);
+    };
+    requestAnimationFrame(check);
+  });
+  // Undo puts slide 3 back above the view, with slide 101 still current.
+  const top = await scrolled();
+  expect(top).toBeGreaterThan(5000);
+  expect(await run({ type: 'undo' })).toBe(true);
+  await expect.poll(painted, { timeout: 30_000 }).toBe(200);
+  expect(Math.abs((await scrolled()) - top)).toBeLessThan(400);
+  expect(
+    await page.evaluate(() => (window as unknown as { __emptyInView: number }).__emptyInView)
+  ).toBe(0);
 });
