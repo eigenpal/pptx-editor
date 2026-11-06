@@ -1,6 +1,6 @@
 /*
-Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Legacy PresentationML comments (ECMA-376 Part 1, 19.4): `ppt/commentAuthors.xml` holds

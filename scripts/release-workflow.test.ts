@@ -377,3 +377,20 @@ for (const project of ['', '12']) {
     }
   });
 }
+
+test('every publishing job builds, writes the notices, and checks the artifacts in that order', () => {
+  for (const name of ['build', 'canary']) {
+    const steps = workflow.jobs[name].steps;
+    const index = (run: string) => steps.findIndex((step) => step.run === run);
+    const build = index('bun run build:packages');
+    const notices = index('bun run notices:generate');
+    const artifacts = index('bun run check:package-artifacts');
+    expect(build).toBeGreaterThanOrEqual(0);
+    expect(notices).toBeGreaterThan(build);
+    expect(artifacts).toBeGreaterThan(notices);
+    for (const step of steps.slice(build, artifacts + 1)) {
+      expect(step['continue-on-error']).toBeUndefined();
+      expect(step.if).toBeUndefined();
+    }
+  }
+});

@@ -6,7 +6,7 @@
 // This is PPTX Editor's module (from `packages/core/src/cascade/color.ts`), not a copy of a
 // DOCX Editor file. DOCX Editor resolves the same colors in
 // docx-editor/packages/core/src/store/package/drawing-shape-color.ts at 5993bd223, with other
-// math. Fixes for the DOCX Editor team (archive PRs eigenpal/pptx-editor-miro#120 and eigenpal/pptx-editor-miro#129). The color
+// math. The fixes below also apply to DOCX Editor. The color
 // values are measured on the reference PDF of the `colors` fixture of PPTX Editor:
 // - `a:shade` uses the sRGB transfer curve and rounds once at the end. A 2.3 gamma with a floor
 //   draws accent2 ED7D31 + `shade 50000` as AF5C24; the reference PDF draws AE5A21.

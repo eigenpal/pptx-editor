@@ -220,7 +220,7 @@ You must sign the [Contributor License Agreement](CLA.md).
 
 ## License
 
-Contributions to `core`, `react`, `vue`, `i18n`, and `ooxml-core` use [Apache 2.0](LICENSE). Contributions to `pro`, `pptx-to-pdf`, and `editor-api` use the EigenPal Pro License, as will the future `telemetry` package. Third-party material keeps its own terms.
+Contributions to `core`, `react`, `vue`, `i18n`, and `ooxml-core` use [Apache 2.0](LICENSE). Contributions to `pro`, `pptx-to-pdf`, and `editor-api` use the EigenPal Pro License. Third-party material keeps its own terms.
 
 ## Report bugs
 

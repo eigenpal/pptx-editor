@@ -76,7 +76,7 @@
     "notices:check": "bun scripts/generate-third-party-notices.mjs --check",
     "changeset": "changeset",
     "version-packages": "changeset version && bun install --lockfile-only",
-    "release": "bun run build:packages && bun run notices:generate && changeset publish",
+    "release": "bun run build:packages && bun run notices:generate && bun run check:package-artifacts && changeset publish",
     "prepare": "husky"
   },
   "dependencies": {
@@ -111,7 +111,7 @@
     "typescript": "^5.9.3",
     "vite": "^8.0.10"
   },
-  "author": "EigenPal",
+  "author": "Eigenpal, Inc.",
   "license": "Apache-2.0",
   "homepage": "https://pptx-editor.dev/",
   "repository": {

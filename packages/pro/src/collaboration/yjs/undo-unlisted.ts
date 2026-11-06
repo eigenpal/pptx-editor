@@ -1,6 +1,6 @@
 /*
-Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // What a peer wrote into a node that an undo takes out of the document, after DOCX Editor's

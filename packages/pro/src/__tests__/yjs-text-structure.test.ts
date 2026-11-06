@@ -1,6 +1,6 @@
 /*
-Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Concurrent text structure edits (openspec change `collaboration-text-lineage`, "Character
@@ -264,7 +264,7 @@ describe('an edit at a run a peer splits at the same time (#17)', () => {
   }
 });
 
-describe('two Enters in one paragraph at once (deleted archive issue 98)', () => {
+describe('two Enters in one paragraph at once', () => {
   for (const swap of [false, true]) {
     test(`each paragraph shows its text once, not ["A", "BCDE", "CDE"] (${order(swap)})`, async () => {
       const { a, b, sync } = await replicas(oneRun('ABCDE'), swap);
@@ -417,7 +417,7 @@ describe('two Enters in one paragraph at once (deleted archive issue 98)', () =>
       });
 });
 
-describe('a delete of a run a peer types into (deleted archive issue 100)', () => {
+describe('a delete of a run a peer types into', () => {
   for (const swap of [false, true]) {
     test(`a range delete keeps the typed character, not "ABGH" (${order(swap)})`, async () => {
       const { a, b, sync } = await replicas(boldMiddle(), swap);

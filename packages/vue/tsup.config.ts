@@ -9,7 +9,7 @@ export default defineConfig({
   dts: true,
   clean: true,
   metafile: true,
-  sourcemap: true,
+  sourcemap: false,
   external: ['vue', /^@pptx-editor\.dev\//],
   esbuildOptions(options) {
     options.jsx = 'automatic';

@@ -1,9 +1,9 @@
 /*
-Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Deleting an animated shape on one replica while another edits it (deleted archive issue 93). The delete
+// Deleting an animated shape on one replica while another edits it. The delete
 // removes the shape's `p:timing` entries and the connector ends glued to it in the same
 // transaction; both replicas must hold the same slide, and the saved deck must name no removed
 // shape. A `p:timing` that no one changed saves as the file wrote it, on each replica.

@@ -501,8 +501,7 @@ function fontDigest(source: string | Uint8Array): string | undefined {
  * Open a deck in the harness page with the local reference fonts that the deck names (or `fonts`).
  * The page fetches the deck and the fonts from the harness server as raw bytes. They never go
  * through `page.evaluate`: Chromium ends the DevTools connection on one message of about
- * 100 MiB, and a deck whose theme names large East Asian fonts needs more than that
- * (deleted archive issue 82).
+ * 100 MiB, and a deck whose theme names large East Asian fonts needs more than that.
  */
 export async function openDeck(
   page: Page,

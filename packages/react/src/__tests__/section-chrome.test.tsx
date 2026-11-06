@@ -1,4 +1,4 @@
-// The section and sorter chrome after review (PR eigenpal/pptx-editor-miro#39): the `railContextMenu` and
+// The section and sorter chrome after review: the `railContextMenu` and
 // `sectionContextMenu` popup entries in the rail and the sorter, rename registration, focus
 // after a collapse and a removal, a collapsed section that keeps shut when selected by name,
 // sorter keys, the Slide Sorter warning, and controls that stay focusable while off.

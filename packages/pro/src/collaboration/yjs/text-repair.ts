@@ -1,6 +1,6 @@
 /*
-Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // The text a peer's split moved while this replica edited it (openspec change
@@ -370,7 +370,7 @@ function followEnter({ room, me, incoming, all, placed, share, step }: Repair): 
  * Follow: this replica's live characters whose left neighbor when typed was a character that
  * the copy moved (or such a character of its own) go right after the shown copy of that
  * character that keeps it. A character the copy's writer had seen (`seen`) stays: it was live
- * here and not moved there, so the writer saw it deleted (eigenpal/pptx-editor-miro#144). Without
+ * here and not moved there, so the writer saw it deleted. Without
  * the mark, every such character follows. A character this replica's undo or redo put back
  * keeps its identity: it goes with its restore mark, and when a shown copy holds its root, it
  * goes and is not written again ("Once"): an undo puts a character back right after the one

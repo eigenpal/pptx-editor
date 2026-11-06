@@ -2,7 +2,7 @@
 
 Drive a `.pptx` from code with an object model in the shape of the Office.js presentation API: `Presentation`, `Slide`, `Shape`, `TextFrame`, `TextRange`, `Table`, and their collections. The package runs on the PPTX Editor engine. It works on a server from PPTX bytes, or in a page against an editor that a reader already has open.
 
-The package is not Office.js and does not run in an add-in host. It implements a documented subset of that API, and every type in it is authored here. Its license is the EigenPal Pro License (`LICENSE.md`): you may evaluate it freely, and production use requires a commercial agreement.
+The package is not Office.js and does not run in an add-in host. It implements a documented subset of that API, and every type in it is authored here. It uses the EigenPal Pro License (`LICENSE.md`). Evaluation is permitted. Production use requires a commercial agreement.
 
 For task guides and API details, see the [developer documentation](https://pptx-editor.dev/docs/editor-api).
 

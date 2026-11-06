@@ -83,8 +83,8 @@
       ]
     },
     "diagrams": {
-      "deck": "a7e4cacd7ebce79be5d7648b51d147d8886d801e47d8ce3dd730d64c8a8fef41",
-      "pdf": "12d7b5e8096aa48a75a76c563bc008c16cf861ab0b5e8aaf268c066472b807ca",
+      "deck": "64e92741841c58a9d935d5c1fcd79ebec70f1b0724911b21b3d96b123c786346",
+      "pdf": "223730a36db86b1afe216d94b344b356c66b193aa299123336a13a6cbc76a70b",
       "pages": 2,
       "pageSizePt": [
         960,
@@ -163,15 +163,6 @@
         540
       ]
     },
-    "open-font-families": {
-      "deck": "e92f2624a44f2f6e4d3cfe3d0b6a98bf575c133f5f7d4b63145a13fea8f94265",
-      "pdf": "47c6de86c8b0907fddc1e22e6be87f66a6add54d60a3cd889c7b4e936fe74caa",
-      "pages": 1,
-      "pageSizePt": [
-        960.009448818898,
-        540
-      ]
-    },
     "gradients": {
       "deck": "002f16981fb950baaa6794d7c3d8004c2bff14719e5601fa9fede0ed4a3cecf0",
       "pdf": "7f429efedfc6ad2bbc6093c15f62d0e7e8cc3f1f52a7b682f31955c734af5b91",
@@ -214,6 +205,15 @@
       "pages": 2,
       "pageSizePt": [
         960,
+        540
+      ]
+    },
+    "open-font-families": {
+      "deck": "e92f2624a44f2f6e4d3cfe3d0b6a98bf575c133f5f7d4b63145a13fea8f94265",
+      "pdf": "47c6de86c8b0907fddc1e22e6be87f66a6add54d60a3cd889c7b4e936fe74caa",
+      "pages": 1,
+      "pageSizePt": [
+        960.009448818898,
         540
       ]
     },

@@ -28,7 +28,8 @@
     "dist",
     "en.json",
     "README.md",
-    "THIRD_PARTY_NOTICES.md"
+    "THIRD_PARTY_NOTICES.md",
+    "!dist/metafile-*.json"
   ],
   "scripts": {
     "build": "tsup",

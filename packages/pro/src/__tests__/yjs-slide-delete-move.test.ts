@@ -1,9 +1,9 @@
 /*
-Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// A slide that one peer deletes while another moves it (deleted archive issue 102). The move inserts the slide
+// A slide that one peer deletes while another moves it. The move inserts the slide
 // entry again, but the delete wins, as a deletion wins over a concurrent move in DOCX Editor:
 // every replica that sees an entry whose relationship is gone removes it. Before, the
 // repair gave the slide part back under the `xml` Default, with no relationships, and the file

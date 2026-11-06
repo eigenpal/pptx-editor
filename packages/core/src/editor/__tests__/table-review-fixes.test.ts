@@ -1,4 +1,4 @@
-// Table editing: fixes from the PR eigenpal/pptx-editor-miro#35 review (links in new cells, frame resize, inherited
+// Table editing: review fixes (links in new cells, frame resize, inherited
 // bullets, group scope, context menu, replace, view mode, the default style).
 
 import { describe, expect, test } from 'bun:test';

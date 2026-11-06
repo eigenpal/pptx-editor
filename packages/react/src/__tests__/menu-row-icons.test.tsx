@@ -15,7 +15,7 @@ import { PptxEditor } from '../index.ts';
 
 // Customization ladder step 2 on menus: the `icon` of `Menu.Item` and `ContextMenu.Slot` shows
 // on every row kind, as DOCX Editor's `Menu.Item icon` does (docs/site/content/customization/
-// menus.mdx). Deleted archive issue 97: the Insert > Shape gallery row dropped it.
+// menus.mdx). The Insert > Shape gallery row once dropped it.
 
 const IN = 914_400;
 const PX = 9_525;
@@ -33,7 +33,7 @@ const ROWS: readonly (readonly [ChromeSlotId, string?, boolean?])[] = [
   ['table.insert'], // table size grid
   ['slide.layout'], // layout gallery
   ['slide.add', undefined, false], // layout gallery, from a row that runs at once by default
-  ['insert.shape'], // shape gallery (deleted archive issue 97)
+  ['insert.shape'], // shape gallery
   ['text.color'], // a picker with no menu form: a disabled row
 ];
 
@@ -140,7 +140,7 @@ describe('Menu.Item icon on every row kind', () => {
     for (const cell of iconCells(panel)) expect(cell.childElementCount).toBe(0);
   });
 
-  test('Deleted archive issue 97: the Insert > Shape gallery row keeps its icon and still opens the gallery', async () => {
+  test('The Insert > Shape gallery row keeps its icon and still opens the gallery', async () => {
     const editor = await open();
     render(
       <PptxEditorContext.Provider value={editor}>

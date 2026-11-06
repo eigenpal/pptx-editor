@@ -1,10 +1,10 @@
 /*
-Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Two peers press Backspace at the start of two neighboring paragraphs at the same time
-// (eigenpal/pptx-editor-miro#138). One join moves the runs of the last paragraph into the middle
+// Two peers press Backspace at the start of two neighboring paragraphs at the same time.
+// One join moves the runs of the last paragraph into the middle
 // one; the other join moves the runs of the middle paragraph into the first one and removes
 // the middle paragraph without having seen the runs that came in. The move rescue (openspec
 // change `collaboration-text-lineage`, "Follow a join") sends those runs after the runs that

@@ -32,9 +32,16 @@ for (const pkg of PACKAGES) {
   }
   if (pkg.name === '@pptx-editor.dev/core') validateHarfBuzzNotices();
   const inlined = new Set();
-  for (const f of readdirSync(dist).filter(
+  const metafiles = readdirSync(dist).filter(
     (n) => n.startsWith('metafile-') && n.endsWith('.json')
-  )) {
+  );
+  // Without a metafile the inlined packages are unknown: fail, never claim "bundles no third-party code".
+  if (metafiles.length === 0) {
+    console.error(`${pkg.name}: no metafile in dist. Set \`metafile: true\` in tsup.config.ts.`);
+    failed = true;
+    continue;
+  }
+  for (const f of metafiles) {
     const meta = JSON.parse(readFileSync(join(dist, f), 'utf8'));
     for (const input of Object.keys(meta.inputs)) {
       const m = /node_modules\/(?:\.bun\/[^/]+\/node_modules\/)?((?:@[^/]+\/)?[^/]+)\//.exec(input);

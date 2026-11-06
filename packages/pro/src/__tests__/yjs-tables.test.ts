@@ -489,7 +489,7 @@ describe('concurrent table structure edits', () => {
     sync.flush();
     expect(fingerprint(a.editor)).toBe(fingerprint(b.editor));
     // The cell of "D" keeps vMerge, and no span reaches it any more: both replicas draw it with
-    // its text before any table command, and find reads it (deleted archive issue 92).
+    // its text before any table command, and find reads it.
     for (const e of [a.editor, b.editor]) {
       const frameItem = e.session!.layout(0)!.items.find((i) => i.kind === 'frame');
       const cells = frameItem?.kind === 'frame' ? (frameItem.table?.cells ?? []) : [];
@@ -711,7 +711,7 @@ describe('concurrent table formatting', () => {
   });
 });
 
-// The text format commands of eigenpal/pptx-editor-miro#43 act on table cells too: each runs on a cell while the other
+// The text format commands act on table cells too: each runs on a cell while the other
 // participant changes the table's structure or formats the next cell.
 describe('text formats in table cells', () => {
   const xml = (e: PptxEditorInstance) => JSON.stringify(frame(e));

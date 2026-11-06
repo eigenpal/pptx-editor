@@ -1,10 +1,10 @@
 /*
-Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Concurrent table structure edits that leave rows with too few or too many cells
-// (eigenpal/pptx-editor-miro#143; AGENTS.md, "Collaboration verification"). Three editors on linked
+// (AGENTS.md, "Collaboration verification"). Three editors on linked
 // Y.Docs open a 3 x 3 table and, with the link paused, change its structure at the same time: a
 // row insert and a column insert leave the new row one cell short, two splits in one row leave
 // the rows uneven, and a column delete beside a split leaves a row one cell long. The save
@@ -153,7 +153,7 @@ const ORDERS = [
   { name: 'B before A', ids: [3_003, 2_002, 1_001] },
 ] as const;
 
-/** One history of eigenpal/pptx-editor-miro#143: two concurrent structure edits, on peers A and B. */
+/** One history: two concurrent structure edits, on peers A and B. */
 interface History {
   readonly name: string;
   readonly a: { row: number; column: number; command: Structure };
@@ -198,7 +198,7 @@ async function run(h: History, ids: readonly number[]) {
   return { a, b, editors, sync };
 }
 
-describe('the canvas draws the grid that the save writes after concurrent structure edits (eigenpal/pptx-editor-miro#143)', () => {
+describe('the canvas draws the grid that the save writes after concurrent structure edits', () => {
   for (const h of HISTORIES)
     for (const order of ORDERS) {
       test(`${h.name} (${order.name})`, async () => {

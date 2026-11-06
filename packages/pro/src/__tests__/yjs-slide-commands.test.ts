@@ -215,7 +215,7 @@ describe('section commands on two replicas', () => {
     a.exec({ type: 'addSlide' });
     expectConverged(a, b);
     expect(b.snapshot().slides.length).toBe(count + 1);
-    // Every saved slide entry has its own r:id (this holds with deleted archive issue 102 too).
+    // Every saved slide entry has its own r:id.
     for (const e of [a, b]) {
       const pkg = reopen(e);
       const root = xmlPartOf(pkg, presentationInfo(pkg).presentationPart)!.root;
@@ -227,7 +227,7 @@ describe('section commands on two replicas', () => {
     }
   });
 
-  // Deleted archive issue 102 (fixed by eigenpal/pptx-editor-miro#103): since eigenpal/pptx-editor-miro#57, a concurrent delete and move brought back the deleted
+  // A concurrent delete and move used to bring back the deleted
   // slide's part and its presentation relationship without its content type or its rels, so the
   // dead `p:sldId` named a part and the writer repair kept it (7 entries, 6 slides). Now the
   // delete wins and the entry goes. Only the entry count is in this test; the r:id check is in

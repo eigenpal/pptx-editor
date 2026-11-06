@@ -65,4 +65,4 @@ setHarfBuzzWasmUrl('/static/harfbuzz.wasm');
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](LICENSE). The bundled ECMA-376 preset shape geometry is used under the Ecma copyright notice, not Apache-2.0. Other third-party material keeps its own terms. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

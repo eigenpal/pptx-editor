@@ -7,6 +7,6 @@ export default defineConfig({
   dts: true,
   clean: true,
   metafile: true,
-  sourcemap: true,
+  sourcemap: false,
   external: ['react', 'react-dom', /^@pptx-editor\.dev\//],
 });
