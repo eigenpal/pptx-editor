@@ -19,8 +19,11 @@ import {
   PptxEditorFindBar,
   PptxEditorNotesPane,
   PptxEditorOpenFailure,
+  PptxEditorRoot,
   PptxEditorSlideRail,
   PptxEditorSlideSorter,
+  PptxEditorToolbar,
+  PptxEditorViewport,
   requestFindBar,
 } from '../src/index.ts';
 import { providePptxEditor } from '../src/composables.ts';
@@ -261,6 +264,33 @@ describe('slide sorter', () => {
     await tick();
     expect(notice()).toBe('Open the Normal view to find text in the slides');
     expect(document.querySelector<HTMLElement>('.pptx-find')!.hidden).toBe(true);
+  });
+
+  test('the Find button turns off in the slide sorter and on again in the Normal view', async () => {
+    let editor: PptxEditorInstance | null = null;
+    host = document.createElement('div');
+    document.body.append(host);
+    app = createApp(
+      defineComponent({
+        setup: () => () =>
+          h(PptxEditorRoot, { onReady: (e: PptxEditorInstance) => (editor = e) }, () =>
+            h(PptxEditorViewport, null, () => [h(PptxEditorToolbar), h(PptxEditorFindBar)])
+          ),
+      }) as Component
+    );
+    app.mount(host);
+    await tick();
+    expect((await editor!.load(flatDeck())).ok).toBe(true);
+    await tick();
+    const off = (): string | null =>
+      document.querySelector('button[data-slot="find.find"]')!.getAttribute('aria-disabled');
+    expect(off()).toBe(null);
+    editor!.exec({ type: 'setPresentationView', view: 'slideSorter' });
+    await tick();
+    expect(off()).toBe('true');
+    editor!.exec({ type: 'setPresentationView', view: 'normal' });
+    await tick();
+    expect(off()).toBe(null);
   });
 });
 

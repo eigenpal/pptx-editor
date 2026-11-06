@@ -867,16 +867,7 @@ export function toolbarCommandState(editor: Editor | null, id: ChromeSlotId): To
   const unprobed = kind === 'dialog' && PROBES[id] === undefined;
   if (unprobed || kind === 'clipboard' || kind === 'slideshow')
     return adapterActionState(editor, id);
-  if (id === 'find.find' || id === 'find.replace') {
-    // Find reads any open deck; replace edits it, so it needs editing mode.
-    const reason =
-      snap.status !== 'ready'
-        ? 'disabled.noEditor'
-        : id === 'find.replace' && snap.mode === 'view'
-          ? 'disabled.viewing'
-          : null;
-    return { id, enabled: !reason, disabledReason: reason, active: false };
-  }
+  if (id === 'find.find' || id === 'find.replace') return adapterActionState(editor, id);
   const table = tableSlotState(editor, id);
   if (table) return table;
   const command =
