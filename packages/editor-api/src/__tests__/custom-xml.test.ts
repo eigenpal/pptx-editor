@@ -1,6 +1,6 @@
 /*
 Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/editor-api/LICENSE.md.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/editor-api/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Custom XML parts end to end on a server runtime, on every owner kind, with a save and reopen.

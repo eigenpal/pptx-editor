@@ -1,4 +1,4 @@
-// Tables whose merge markup disagrees with itself (deleted archive issue 92). Coverage comes from
+// Tables whose merge markup disagrees with itself. Coverage comes from
 // spans only (`store/package/table-grid.ts`): a cell with an orphan `hMerge` or `vMerge` (no
 // span reaches it) is drawn with its own text and spans, a span past the grid ends at the grid,
 // and a span into an earlier block ends before it. The cascade, hit testing, the table commands,

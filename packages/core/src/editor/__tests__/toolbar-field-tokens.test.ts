@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 // The toolbar's picker fields (the font family field and the font size box) use the surface,
 // border, and hover tokens, as DOCX Editor's font pickers do. The toggle tokens
 // (`--doc-toggle-active-*`) are for pressed toggles only: the field keeps its text color, so a
-// toggle slab under it (near-black in light mode) makes the label unreadable (deleted archive issue 76).
+// toggle slab under it (near-black in light mode) makes the label unreadable.
 // The React and Vue adapter stylesheets only import this file, so both adapters get these rules.
 //
 // The checks read declarations, not raw text, so a reformatted stylesheet still passes.

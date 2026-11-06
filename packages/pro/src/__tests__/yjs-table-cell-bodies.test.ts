@@ -1,9 +1,9 @@
 /*
 Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Concurrent typing into a table cell with no text body (eigenpal/pptx-editor-miro#163; AGENTS.md,
+// Concurrent typing into a table cell with no text body (AGENTS.md,
 // "Collaboration verification"). A cell may have no `a:txBody` (ECMA-376 Part 1, 21.1.3.16 tc),
 // and each peer that types into it gives it one. Both bodies stay in the room and in every
 // store; the canvas and the save join them into one body (`cellAsSaved` in core). Every history
@@ -146,7 +146,7 @@ const byClient = (ids: readonly number[], texts: readonly string[]): string[] =>
     .sort(([a], [b]) => a - b)
     .map(([, t]) => t);
 
-describe('concurrent typing into a table cell with no text body keeps every peer text (eigenpal/pptx-editor-miro#163)', () => {
+describe('concurrent typing into a table cell with no text body keeps every peer text', () => {
   for (const ids of orders([1_001, 2_002])) {
     const name = `client ids ${ids.join(', ')}`;
 

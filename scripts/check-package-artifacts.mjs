@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Published exports and declarations must be self-contained
 // (docx-editor/scripts/check-package-artifacts.mjs).
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 
@@ -109,9 +110,72 @@ for (const packageDir of packageDirs) {
   }
 }
 
+// What npm would publish. npm skips a missing `files` entry without an error, so a lost license
+// or notice file would publish silently: read the tarball list and require them.
+for (const packageDir of packageDirs) {
+  const packageRoot = path.join(root, 'packages', packageDir);
+  const packageJson = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
+  const name = packageJson.name;
+  const [packed] = JSON.parse(
+    execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
+      cwd: packageRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      // npm is `npm.cmd` on Windows, which only a shell resolves.
+      shell: process.platform === 'win32',
+    })
+  );
+  const files = new Set(packed.files.map((file) => file.path));
+  const proprietary = String(packageJson.license).startsWith('LicenseRef-');
+  const required = ['README.md', 'THIRD_PARTY_NOTICES.md', proprietary ? 'LICENSE.md' : 'LICENSE'];
+  // The component notices of the bundled HarfBuzz binary.
+  if (existsSync(path.join(packageRoot, 'licenses'))) {
+    for (const file of readdirSync(path.join(packageRoot, 'licenses')))
+      required.push(`licenses/${file}`);
+  }
+  for (const file of required) {
+    if (!files.has(file)) errors.push(`${name} would publish without ${file}`);
+  }
+  for (const file of files) {
+    if (/\.map$|(?:^|\/)metafile-[^/]*\.json$/.test(file))
+      errors.push(`${name} would publish ${file}, which holds source or build paths`);
+  }
+
+  const scripts = [...files].filter((file) => /^dist\/.*\.[cm]?js$/.test(file));
+  const declarations = [...files].filter((file) => /^dist\/.*\.d\.[cm]?ts$/.test(file));
+  // A home directory or CI workspace path is a build machine path, wherever it was checked out.
+  const machinePath = /(?:^|[\s'"`(])\/(?:Users|home|runner|private\/var|tmp)\/[\w.-]+\//;
+  for (const file of [...scripts, ...declarations]) {
+    const content = readFileSync(path.join(packageRoot, file), 'utf8');
+    if (content.includes(root) || machinePath.test(content))
+      errors.push(`${name} ${file} contains a build machine path`);
+  }
+  for (const file of [...scripts, ...declarations]) {
+    const content = readFileSync(path.join(packageRoot, file), 'utf8');
+    // Every file of a proprietary package opens with its license header (license-header.txt).
+    if (proprietary && !/^\/\*!\s*Copyright \(c\) \d{4} EigenPal, Inc\./.test(content))
+      errors.push(`${name} ${file} does not start with the license header`);
+  }
+  // The Ecma notice travels with the bundled preset geometry, inside the code itself.
+  if (name === '@pptx-editor.dev/core') {
+    const geometry = scripts.filter((file) =>
+      readFileSync(path.join(packageRoot, file), 'utf8').includes('PRESET_SHAPES')
+    );
+    for (const file of geometry) {
+      const content = readFileSync(path.join(packageRoot, file), 'utf8');
+      // The whole notice inside one legal comment: the match may not cross a `*/`.
+      if (!/\/\*!(?:(?!\*\/)[^])*?© Ecma International(?:(?!\*\/)[^])*?\*\//.test(content))
+        errors.push(`${name} ${file} bundles the preset geometry without the Ecma notice`);
+    }
+    if (geometry.length === 0) errors.push(`${name} dist has no preset geometry table`);
+  }
+}
+
 if (errors.length > 0) {
   console.error(errors.join('\n'));
   process.exit(1);
 }
 
-console.log('Published package exports and declarations are self-contained.');
+console.log(
+  'Published package exports and declarations are self-contained, and every tarball carries its license and notices.'
+);

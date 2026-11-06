@@ -27,7 +27,7 @@ Commercial capabilities for PPTX Editor, delivered as `EditorModule`s, in the sa
   - **Presence:** with a Yjs `awareness` (`y-protocols/awareness`), the editor publishes its selection, and the canvas shows each peer's selected shapes and text caret, with the peer's name and color. Your caret stays on its character while peers type before it.
 - `drawingModule()` from `@pptx-editor.dev/pro/drawing`: paints the shape and picture effects glow, inner shadow, reflection, and soft edge (ECMA-376 Part 1, 20.1.8). The free engine paints outer shadows. Without the module, a shape or picture paints without these four effects, and the editor chrome does not offer them: Shape Effects shows only the outer shadows, and Picture Styles shows only the frame styles. Removing an effect needs no module: when the selection has a reflection, glow, or soft edge, Shape Effects offers its No row, and No shadow also removes an inner shadow. The effect commands still write every effect, and save keeps it. PDF export (`@pptx-editor.dev/pptx-to-pdf`) always includes the module. It also draws charts from the values cached in their chart parts (ECMA-376 Part 1, 21.2); see [Charts](#charts).
 
-This package uses the EigenPal Pro License (`LICENSE.md`): you may evaluate it freely, and production use requires a commercial agreement.
+This package uses the EigenPal Pro License (`LICENSE.md`). Evaluation is permitted. Production use requires a commercial agreement.
 
 For task guides and API details, see the [developer documentation](https://pptx-editor.dev/docs/pro).
 

@@ -1,9 +1,9 @@
 /*
 Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Seeded fuzz of concurrent table edits (the class of eigenpal/pptx-editor-miro#133). Three editors
+// Seeded fuzz of concurrent table edits. Three editors
 // on three Y.Docs insert and delete rows and columns, merge and split cells, type in cells,
 // delete text, undo, and redo in one 3 x 3 table. The relay holds every update back and
 // delivers parts of it at random; a round ends with a flush, or keeps the held updates for the
@@ -65,7 +65,7 @@ const DECK_ROWS = ['ABC', 'DEF', 'GHI'];
 /**
  * The deck of one fuzz mode: a 3 x 3 table with a letter in each cell. The cells of `bodiless`
  * have no text body (`a:txBody` is optional, ECMA-376 Part 1, 21.1.3.16 tc), so peers that type
- * into one at once each give it a body (eigenpal/pptx-editor-miro#163).
+ * into one at once each give it a body.
  */
 interface FuzzDeck {
   readonly bodiless: string;
@@ -744,7 +744,7 @@ fuzzSuite<TableAction>({
   summary: () => `table fuzz checks: ${JSON.stringify(STATS)}`,
 });
 
-// The same fuzz on a table whose center cell has no text body (eigenpal/pptx-editor-miro#163). It has its own seeds and
+// The same fuzz on a table whose center cell has no text body. It has its own seeds and
 // pins, so the pins of the mode above stay valid. Its knobs have the prefix `TABLE_BODILESS`.
 const BODILESS_KNOBS = fuzzKnobs('TABLE_BODILESS', 16);
 

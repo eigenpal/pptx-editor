@@ -1,10 +1,10 @@
 // Chart and diagram fixtures (ECMA-376 Part 1, 21.2 DrawingML Charts and 21.4 DrawingML
 // Diagrams). Each chart slide holds one chart part with cached values and no workbook, so a
-// reader draws it from the cache. The diagram parts in `diagrams/` are the anonymous diagram
-// parts of DOCX Editor's default sample (docx-editor/scripts/demo-doc/diagrams, EigenPal):
-// data, layout, quick style, colors, and the saved drawing. `drawing1.xml` is the drawing that
-// the presentation app saves for this frame: a reader that lays the diagram out again gets the
-// same text sizes and insets as a reader of the saved drawing.
+// reader draws it from the cache. The layout, quick style, and colors definitions in
+// `diagrams/` are written for these fixtures, with `urn:pptx-editor.dev/diagram/` ids. The
+// data and drawing parts are what the presentation app saves after it lays the diagram out
+// with those definitions: a reader that lays the diagram out again gets the same text sizes
+// and insets as a reader of the saved drawing.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -350,8 +350,9 @@ const diagramPart = (file: string): string =>
   readFileSync(join(import.meta.dirname, 'diagrams', file), 'utf8');
 
 /**
- * Two diagrams, each with its saved drawing: a nested target (`target2`) and a grouped
- * process list (`lProcess2`). Each frame keeps the extent the drawing was laid out in.
+ * Two diagrams, each with its saved drawing: grouped columns and grouped rows. Each group
+ * holds a header box and one box per sub-item. Each frame keeps the extent the drawing was
+ * laid out in.
  */
 export function diagramsDeck(): FixtureOptions {
   const extents: readonly (readonly [number, number])[] = [
@@ -365,7 +366,7 @@ export function diagramsDeck(): FixtureOptions {
     return {
       layout: 'blank',
       shapes:
-        title(n === 1 ? 'Nested target diagram' : 'Grouped process list') +
+        title(n === 1 ? 'Grouped columns' : 'Grouped rows') +
         frame(
           3,
           `Diagram ${n}`,

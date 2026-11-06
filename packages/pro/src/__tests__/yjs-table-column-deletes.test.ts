@@ -1,10 +1,10 @@
 /*
 Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Concurrent deletes of the last columns of a table after a row insert (eigenpal/pptx-editor-miro#139;
-// AGENTS.md, "Collaboration verification"). Three editors on linked Y.Docs open a 3 x 3 table;
+// Concurrent deletes of the last columns of a table after a row insert
+// (AGENTS.md, "Collaboration verification"). Three editors on linked Y.Docs open a 3 x 3 table;
 // peer C deletes column 2, then, with the link paused, peer A inserts a row and deletes one of
 // the two columns left while peer C deletes the other (or the same) one. The inserted row keeps
 // its cell of the column that peer C deleted, because peer C never saw it. When no column is
@@ -142,7 +142,7 @@ const ORDERS = [
 ] as const;
 
 /**
- * The history of eigenpal/pptx-editor-miro#139: C deletes column 2 and all updates arrive; then, with the link paused,
+ * One history: C deletes column 2 and all updates arrive; then, with the link paused,
  * A inserts a row above row 3 and deletes column 2 of the two left, and C deletes column
  * `cColumn` (1-based, of the two left). The link then flushes.
  */
@@ -159,7 +159,7 @@ async function history(ids: readonly number[], cColumn: 1 | 2) {
   return { a, b, c, editors, sync };
 }
 
-describe('concurrent deletes of the last columns after a row insert (eigenpal/pptx-editor-miro#139)', () => {
+describe('concurrent deletes of the last columns after a row insert', () => {
   for (const order of ORDERS)
     test(`different columns: the table goes on save and on the canvas (${order.name})`, async () => {
       const { a, b, c, editors } = await history(order.ids, 1);
@@ -207,8 +207,7 @@ describe('concurrent deletes of the last columns after a row insert (eigenpal/pp
       const { c, editors, sync } = await history(order.ids, 2);
       expect(await savedEqual(editors)).toEqual(['A', 'D', '', 'G']);
       // An undo of either delete brings the column back in the rows that its peer knew, and
-      // leaves the inserted row one cell short. The save adds the cell, and the canvas draws it
-      // (eigenpal/pptx-editor-miro#143).
+      // leaves the inserted row one cell short. The save adds the cell, and the canvas draws it.
       expect(c.exec({ type: 'undo' }).ok).toBe(true);
       sync.flush();
       expect(await savedEqual(editors)).toEqual(['A|C', 'D|F', '|', 'G|I']);

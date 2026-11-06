@@ -1,6 +1,6 @@
 /*
 Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pptx-to-pdf/LICENSE.md.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // `openDocumentForExport` and `exportPdfFrom`: one layout, many exports (DOCX Editor's
@@ -143,7 +143,7 @@ describe('openDocumentForExport and exportPdfFrom', () => {
 
   test('the reference PDF leaves hidden slides out, and so does the export', async () => {
     // `reference/hidden-slides.pdf`: the reference PDF of `reference/hidden-slides.pptx`,
-    // a deck built as `withHidden()` (slides 2 and 4 hidden).
+    // a deck that `scripts/build-reference-decks.ts` builds (slides 2 and 4 hidden).
     const reference = join(import.meta.dir, 'reference');
     const bytes = new Uint8Array(readFileSync(join(reference, 'hidden-slides.pptx')));
     const session = await open(bytes);

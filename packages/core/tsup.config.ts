@@ -1,5 +1,5 @@
 import { copyFile, readFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Options } from 'tsup';
 
@@ -34,7 +34,12 @@ const harfBuzzWasmUrlEscapeHatch: NonNullable<Options['esbuildPlugins']>[number]
         );
       }
       applied += 1;
-      const resolver = JSON.stringify(resolve(here, 'src/layout/harfbuzz-wasm-binary.ts'));
+      // A path relative to the glue, so no build machine path reaches the output.
+      const target = relative(
+        dirname(args.path),
+        resolve(here, 'src/layout/harfbuzz-wasm-binary.ts')
+      );
+      const resolver = JSON.stringify(`./${target.split(sep).join('/')}`);
       const contents =
         `import{resolveHarfBuzzWasmBinaryUrl as __pptxResolveHarfBuzzWasmBinaryUrl}from${resolver};` +
         // A replacement function, not a string: `$&` and friends are patterns in a string.
@@ -79,7 +84,7 @@ export default defineConfig({
   dts: { resolve: ['@eigenpal/ooxml-core'] },
   clean: true,
   metafile: true,
-  sourcemap: true,
+  sourcemap: false,
   splitting: true,
   noExternal: ['harfbuzzjs', '@eigenpal/ooxml-core'],
   esbuildPlugins: [harfBuzzWasmUrlEscapeHatch],

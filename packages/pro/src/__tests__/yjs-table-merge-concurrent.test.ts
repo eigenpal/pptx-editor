@@ -1,12 +1,12 @@
 /*
 Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // A cell merge while peers change the same table's structure or type in it (AGENTS.md,
 // "Collaboration verification"): editors on linked Y.Docs, the links paused, each client
 // order, undo and redo. The histories are the shrunk failures of the seeded table fuzzer
-// (eigenpal/pptx-editor#1, eigenpal/pptx-editor-miro#141, #2). Merged text shows in the drawn cell that covers the
+// (eigenpal/pptx-editor#1, #2). Merged text shows in the drawn cell that covers the
 // cell it sits in (`merged-cells.ts`), and a merge leaves no hidden copy of it. Every case
 // checks that each character shows once on the canvas, that no character a peer did not
 // remove is lost, that the replicas hold the same package, and that the saved deck passes the
@@ -209,7 +209,7 @@ describe('a merge and a concurrent delete of its first cell keep the merged text
     });
 });
 
-describe('a merge and a concurrent structure change inside it show merged text once (eigenpal/pptx-editor-miro#141)', () => {
+describe('a merge and a concurrent structure change inside it show merged text once', () => {
   for (const ids of THREE)
     test(`a merge of a column and a row insert inside it (client order ${named(ids)})`, async () => {
       const { editors, sync } = await peers(deck(), ids);

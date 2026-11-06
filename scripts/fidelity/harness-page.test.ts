@@ -233,7 +233,7 @@ describe.skipIf(!hasChromium)('openDeck', () => {
         return { family, bold: false, italic: false, file };
       };
       const fonts = [font('A', randomBytes(3 * 1024 * 1024)), font('B', randomBytes(1025))];
-      // More than one DevTools message can carry (about 100 MiB): deleted archive issue 82.
+      // More than one DevTools message can carry (about 100 MiB).
       const large = font('Large', Buffer.alloc(110 * 1024 * 1024, 7));
       const [first, second, rendered, after] = await withHarnessPage(async (page) => {
         const fetched: string[] = [];

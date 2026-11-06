@@ -52,6 +52,26 @@ test('the source-note scanner tells EigenPal notes from third-party notes', () =
   expect(leadingComment('// a\n/* b\n * c */\nconst x = 1; // copied from y')).toBe('a b c');
 });
 
+// The preset geometry is used under the Ecma notice, which must travel with every copy:
+// in core's notices, and in a legal comment beside the data, which bundlers keep.
+test('the Ecma notice stays with the preset geometry', () => {
+  const notice = readFileSync(join(root, 'reference/ecma-376/NOTICE'), 'utf8');
+  const terms = notice.slice(notice.indexOf('COPYRIGHT NOTICE')).trim();
+  expect(VENDORED['@pptx-editor.dev/core']?.join('\n')).toContain(terms);
+  const generated = readFileSync(
+    join(root, 'packages/ooxml-core/src/drawingml-preset-geometry.generated.ts'),
+    'utf8'
+  );
+  const legal = /\/\*!([^]*?)\*\/\s*\/\*\*[^]*?\*\/\s*export const PRESET_SHAPES/.exec(generated);
+  expect(legal).not.toBeNull();
+  const words = (text: string) =>
+    text
+      .replace(/^\s*\*/gm, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+  expect(words(legal![1]).join(' ')).toContain(words(terms).join(' '));
+});
+
 for (const pkg of PACKAGES) {
   const listed = VENDORED[pkg.name]?.join('\n') ?? '';
   test(`${pkg.name}: every third-party source note is in the notices`, () => {

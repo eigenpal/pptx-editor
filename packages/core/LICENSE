@@ -1,3 +1,14 @@
+LICENSE SCOPE NOTICE
+
+Except where a file expressly states different license terms, this package is
+licensed under the Apache License, Version 2.0, reproduced below.
+
+The preset shape geometry table that this package bundles is derived from
+ECMA-376 Part 1, 5th edition (2016), published by Ecma International. It is
+used under the Ecma copyright notice, not under the Apache License. The notice
+is in THIRD_PARTY_NOTICES.md and in a legal comment in the dist/ file that
+holds the table.
+
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -186,7 +197,7 @@
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
-   Copyright 2026 EigenPal Inc.
+   Copyright 2026 EigenPal, Inc.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.

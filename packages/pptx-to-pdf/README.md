@@ -18,7 +18,7 @@
 
 Convert a `.pptx` to PDF on Node.js, with searchable text and embedded fonts. The package runs the PPTX Editor engine headlessly: `openPresentation` lays out each slide exactly as the editor does, and this package paints that layout into PDF pages. It is not a second renderer.
 
-The package is a foundation for Node.js. Its license is the EigenPal Pro License (`LICENSE.md`): you may evaluate it freely, and production use requires a commercial agreement.
+The package is a foundation for Node.js. It uses the EigenPal Pro License (`LICENSE.md`). Evaluation is permitted. Production use requires a commercial agreement.
 
 For task guides and API details, see the [developer documentation](https://pptx-editor.dev/docs/export/pdf).
 

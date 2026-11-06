@@ -2,7 +2,7 @@
 // as AGENTS.md "Collaboration verification" asks: concurrent edits with the link paused, undo
 // while a peer edits, and a deletion while a peer edits the same shape. The replicas converge,
 // before and after save and reopen. Concurrent inserts of the same child, or of two ordered
-// children, keep one child in schema order through the mirror's companion records (eigenpal/pptx-editor-miro#57), in both
+// children, keep one child in schema order through the mirror's companion records, in both
 // client orders.
 
 import { describe, expect, test } from 'bun:test';
@@ -196,7 +196,7 @@ describe('setParagraphFormat under collaboration', () => {
   });
 
   // Children that a paragraph holds once: two peers who add one at once keep one, in schema
-  // order (companion records, eigenpal/pptx-editor-miro#57).
+  // order (companion records).
   const gapsDeck = (): Uint8Array =>
     buildPptx({
       slides: [

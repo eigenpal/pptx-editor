@@ -12,7 +12,7 @@
 // copy of a DOCX Editor file. DOCX Editor evaluates the same definitions in
 // docx-editor/packages/core/src/store/package/drawing-geometry-engine.ts and
 // drawing-geometry-formula.ts at 5993bd223, and flattens every curve to a polyline. Fixes for
-// the DOCX Editor team (archive PR eigenpal/pptx-editor-miro#119 and this module):
+// the DOCX Editor team (this module):
 // - Only `a:moveTo` sets the current point. A path that starts with `a:lnTo`, `a:arcTo`,
 //   `a:quadBezTo`, or `a:cubicBezTo` has no current point, so that command draws nothing, and
 //   neither the fill nor the outline shows it (ECMA-376 Part 1, 20.1.9, `CT_Path2D`). The

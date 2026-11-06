@@ -1,6 +1,6 @@
 // Removing a shape removes the animation entries that name it (ECMA-376 Part 1, §19.5
 // `p:timing`) and the connector ends glued to it, so a saved slide names no missing shape and
-// its `p:timing` stays valid against `CT_SlideTiming` (deleted archive issue 93). A slide the session did not
+// its `p:timing` stays valid against `CT_SlideTiming`. A slide the session did not
 // change saves as the file wrote it.
 
 import { describe, expect, test } from 'bun:test';

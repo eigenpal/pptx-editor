@@ -402,7 +402,7 @@ describe('Vue bar groups', () => {
   });
 });
 
-// Deleted archive issue 78: a plain `class` on `ToolbarSlot` goes on the control, as React's `className` on
+// A plain `class` on `ToolbarSlot` goes on the control, as React's `className` on
 // `Toolbar.Slot` does, in the preset bar and in a hand-built bar.
 describe('ToolbarSlot class (Vue)', () => {
   const warnings = (warn: { mock: { calls: unknown[][] } }): string =>

@@ -1,6 +1,6 @@
 /*
 Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // What an undo must not take from a peer. A `Y.UndoManager` undo deletes this author's
@@ -15,7 +15,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 //   but lost in the undo, and gives back the relationship, its target part, and the content
 //   type entry the part needs, from the package before the undo.
 // - A slide entry whose slide a peer deleted while this replica moved it: the delete wins, and
-//   `withSlideListsRepaired` removes the entry and its section entry (deleted archive issue 102).
+//   `withSlideListsRepaired` removes the entry and its section entry.
 // - A relationship to a slide that a peer deleted (a copy of a slide jump): the delete wins, and
 //   the hyperlinks that use it go, so no slide part comes back without its content type.
 
@@ -366,7 +366,7 @@ export function lostReferences(before: PptxPackage, after: PptxPackage): Package
       before.parts.get(rels) === after.parts.get(rels)
     )
       continue;
-    // A relationship to a slide that is gone: the delete wins (deleted archive issue 102). The hyperlinks that
+    // A relationship to a slide that is gone: the delete wins. The hyperlinks that
     // use it go with it, so no slide part comes back without its relationships and content
     // type. A relationship that no element uses goes too, as `deleteSlide` in core does. One
     // that another kind of element uses stays. Returns whether the relationship went.

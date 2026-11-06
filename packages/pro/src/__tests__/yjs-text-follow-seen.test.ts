@@ -1,12 +1,12 @@
 /*
 Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // The "Follow" repair (openspec change `collaboration-text-lineage`, "Character identity") moves
 // only text that the split's writer had not seen. A character that the writer saw deleted stays
-// deleted after its Enter, also when the delete reaches a replica after the Enter does
-// (eigenpal/pptx-editor-miro#144). A character that the writer had not seen follows the Enter; when
+// deleted after its Enter, also when the delete reaches a replica after the Enter does.
+// A character that the writer had not seen follows the Enter; when
 // a peer had deleted it, that peer's "Delete" repair reaches the moved character.
 
 import { describe, expect, test } from 'bun:test';

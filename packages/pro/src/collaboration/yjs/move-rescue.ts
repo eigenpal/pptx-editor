@@ -1,13 +1,13 @@
 /*
 Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // The move rescue of the text lineage (openspec change `collaboration-text-lineage`): a node
 // that a peer moved into a subtree another peer removed without having seen it goes back to its
 // old place, or to an earlier one when that place is gone too. When every old place is gone, it
 // follows the children that moved out of the removed node (a join of a paragraph whose own
-// join is in flight, eigenpal/pptx-editor-miro#138). Adapted from DOCX Editor
+// join is in flight). Adapted from DOCX Editor
 // `packages/pro/src/collaboration/document/materialize-orphans.ts` at 5ffe9674. The fields it
 // reads are written by `markLineage` in `text-lineage.ts`. Everything read here comes from the
 // room and is untrusted.
@@ -197,7 +197,7 @@ export function rescueMoved(
   // node), the orphan goes with them: right after the last one shown, or
   // after the last orphan placed so that left the removed node, in the order it left its own
   // parent. A peer joined that paragraph into the one before it while this node's join moved
-  // it in (eigenpal/pptx-editor-miro#138); with more joins at once, the orphans form a chain. Each
+  // it in; with more joins at once, the orphans form a chain. Each
   // round places the orphans whose anchor is known, so an anchor is placed before its
   // followers. At most one round per orphan.
   const placedOutOf = new Map<string, { key: string; into: string }>();

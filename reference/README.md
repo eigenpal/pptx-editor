@@ -37,7 +37,7 @@ When a quick reference and the schema disagree, the schema wins. Fix the quick r
 
 ## Terms
 
-Ecma International holds the copyright. Ecma's text copyright policy permits copies of a standard, in whole or in part, and derivative works that implement the standard in a conformant product, if the copies carry the Ecma copyright notice and its Copyright License and Disclaimer, and if the content is not modified. The notice is in [`ecma-376/NOTICE`](ecma-376/NOTICE). The published `core` package carries the same notice in its `THIRD_PARTY_NOTICES.md`, and the generated geometry file names it in its header.
+Ecma International holds the copyright. Ecma's text copyright policy permits copies of a standard, in whole or in part, and derivative works that implement the standard in a conformant product, if the copies carry the Ecma copyright notice and its Copyright License and Disclaimer, and if the content is not modified. The notice is in [`ecma-376/NOTICE`](ecma-376/NOTICE). The published `core` package carries the same notice in its `THIRD_PARTY_NOTICES.md`, and its `LICENSE` says that the Ecma terms, not Apache-2.0, apply to the geometry data. The generated geometry file holds the full notice in a legal comment (`/*!`). Common bundlers keep legal comments or move them to a license file, so the notice also reaches the bundles of apps that use `core`.
 
 Never edit a file in `ecma-376/`. To use a different version, replace the file with an unmodified Ecma copy and record its source in the table above.
 

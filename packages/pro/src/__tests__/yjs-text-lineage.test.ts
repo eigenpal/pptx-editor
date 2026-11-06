@@ -1,6 +1,6 @@
 /*
 Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Text that concurrent structure edits duplicated or lost (openspec change
@@ -98,7 +98,7 @@ describe('one peer alone: a split never drops text', () => {
     });
 });
 
-describe('two peers that format one run at once (deleted archive issue 74)', () => {
+describe('two peers that format one run at once', () => {
   for (const swap of [false, true])
     test(`the same word: the text shows once, not "worldworld" (client order ${swap ? 'B, A' : 'A, B'})`, async () => {
       const { a, b, sync } = await replicas(oneRun('Hello world'), swap);
@@ -380,7 +380,7 @@ describe('two peers that format one run at once (deleted archive issue 74)', () 
       });
 
   for (const swap of [false, true])
-    test(`a format while a peer joins the paragraphs keeps the formatted word (deleted archive issue 94, client order ${swap ? 'B, A' : 'A, B'})`, async () => {
+    test(`a format while a peer joins the paragraphs keeps the formatted word (client order ${swap ? 'B, A' : 'A, B'})`, async () => {
       const { a, b, sync } = await replicas(twoParagraphs(), swap);
       selectIn(a, 1, 6, 11);
       sync.pause();
@@ -397,7 +397,7 @@ describe('two peers that format one run at once (deleted archive issue 74)', () 
     });
 
   for (const swap of [false, true])
-    test(`undo and redo of the join and of the format keep the word (deleted archive issue 94, client order ${swap ? 'B, A' : 'A, B'})`, async () => {
+    test(`undo and redo of the join and of the format keep the word (client order ${swap ? 'B, A' : 'A, B'})`, async () => {
       const { a, b, sync } = await replicas(twoParagraphs(), swap);
       selectIn(a, 1, 6, 11);
       sync.pause();
@@ -610,7 +610,7 @@ describe('two peers that format one run at once (deleted archive issue 74)', () 
   });
 });
 
-describe('a merge while a peer deletes the row of the merged cell (eigenpal/pptx-editor-miro#35)', () => {
+describe('a merge while a peer deletes the row of the merged cell', () => {
   for (const swap of [false, true])
     test(`the moved text goes back to the cell it came from (client order ${swap ? 'B, A' : 'A, B'})`, async () => {
       const { a, b, sync } = await replicas(tableDeck(), swap);
@@ -630,9 +630,7 @@ describe('a merge while a peer deletes the row of the merged cell (eigenpal/pptx
 
   // The rescued cell keeps `vMerge="1"` with no cell above it. Its reference PDF draws it and
   // its text; the editor's cascade hides such a cell (older code).
-  test.todo(
-    'the rescued text in a cell that keeps vMerge="1" is in the layout (deleted archive issue 92)'
-  );
+  test.todo('the rescued text in a cell that keeps vMerge="1" is in the layout');
 
   test('a delete that saw the merge removes the merged text with the row', async () => {
     const { a, b } = await replicas(tableDeck());

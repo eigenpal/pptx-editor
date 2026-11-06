@@ -1,9 +1,9 @@
 /*
 Copyright (c) 2026 EigenPal, Inc. All rights reserved.
-Licensed under the EigenPal Pro Evaluation License 1.0 — see packages/pro/LICENSE.md.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Ids that two peers mint at the same time (deleted archive issues 55 and 67): two editors on two linked
+// Ids that two peers mint at the same time: two editors on two linked
 // Y.Docs, the link paused, the same kind of insert on both, then a flush and a save. Each new
 // relationship, part, slide, and shape keeps its own id, so the saved file has no duplicate and
 // no peer's slide, image, or link is lost.
@@ -151,7 +151,7 @@ const slidePart = (pkg: PptxPackage, i = 0) => {
 };
 
 describe('ids that two peers mint at once', () => {
-  test('two peers add a slide: both slides, distinct slide ids, relationships, and parts (deleted archive issue 55)', async () => {
+  test('two peers add a slide: both slides, distinct slide ids, relationships, and parts', async () => {
     const { a, b, sync } = await replicas();
     sync.pause();
     expect(a.exec({ type: 'addSlide' }).ok).toBe(true);
@@ -169,7 +169,7 @@ describe('ids that two peers mint at once', () => {
     for (const p of parts) expect(xmlPartOf(pkg, p)).toBeDefined();
   });
 
-  test('two peers insert different pictures: two media parts, each picture its own (deleted archive issue 67)', async () => {
+  test('two peers insert different pictures: two media parts, each picture its own', async () => {
     const { a, b, sync } = await replicas();
     sync.pause();
     const pic = { type: 'insertImage', mime: 'image/png', width: 10, height: 10 } as const;
@@ -213,7 +213,7 @@ describe('ids that two peers mint at once', () => {
     }
   });
 
-  test('two peers link two shapes: each link keeps its own address (deleted archive issue 67)', async () => {
+  test('two peers link two shapes: each link keeps its own address', async () => {
     const { a, b, sync } = await replicas();
     const select = (e: PptxEditorInstance, name: string) =>
       e.setSelection({ kind: 'shapes', nodeIds: [byName(e, name)] });
@@ -319,8 +319,8 @@ describe('ids that two peers mint at once', () => {
     expect(unique([0, 1, 2].map((i) => slidePart(pkg, i)))).toBe(true);
   });
 
-  // A reload or a remount keeps the mirror's node keys apart from the ones the room holds
-  // (eigenpal/pptx-editor-miro#57, deleted archive issue 77), so a peer's undo and a late joiner see the same deck.
+  // A reload or a remount keeps the mirror's node keys apart from the ones the room holds,
+  // so a peer's undo and a late joiner see the same deck.
   for (const who of [0, 1] as const)
     for (const mode of ['reload', 'remount'] as const)
       test(`a ${mode} by peer ${who}: the other peer undo brings the slide back, and a third replica matches`, async () => {
@@ -363,7 +363,7 @@ describe('ids that two peers mint at once', () => {
         );
       });
 
-  test('two peers insert a shape: distinct shape ids on the slide (deleted archive issue 67)', async () => {
+  test('two peers insert a shape: distinct shape ids on the slide', async () => {
     const { a, b, sync } = await replicas();
     sync.pause();
     expect(a.exec({ type: 'insertShape', preset: 'rect' }).ok).toBe(true);
