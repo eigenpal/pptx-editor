@@ -22,6 +22,7 @@ import {
   PptxEditorToolbar,
   PptxEditorViewport,
   PptxEditorZoomPill,
+  StatusBarViews,
   keepFocus,
   useEditorState,
   usePptxEditor,
@@ -262,7 +263,11 @@ function onDrop(e: DragEvent): void {
           <PptxEditorFindBar />
           <PptxEditorLoading overlay />
           <PptxEditorFontNotice />
-          <PptxEditorZoomPill v-if="!ribbon" />
+        </div>
+        <!-- The view switch and the zoom stay in view in both views, under the slide. -->
+        <div v-if="!ribbon" class="demo-status">
+          <StatusBarViews />
+          <PptxEditorZoomPill />
         </div>
         <!-- The notes pane stays mounted in the slide sorter, so its open state and draft stay. -->
         <PptxEditorNotesPane :style="sorter ? { display: 'none' } : undefined" />

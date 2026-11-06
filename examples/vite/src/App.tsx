@@ -288,8 +288,14 @@ function Shell({
             <PptxEditor.FindBar />
             <PptxEditor.Loading overlay />
             <PptxEditor.FontNotice />
-            {ribbon ? null : <PptxEditor.ZoomPill />}
           </div>
+          {/* The view switch and the zoom stay in view in both views, under the slide. */}
+          {ribbon ? null : (
+            <div className="demo-status">
+              <PptxEditor.StatusBar.Views />
+              <PptxEditor.ZoomPill />
+            </div>
+          )}
           <PptxEditor.NotesPane {...(sorter ? { style: HIDDEN } : {})} />
           <PptxEditor.EditNotice />
           <PptxEditor.OpenFailure />

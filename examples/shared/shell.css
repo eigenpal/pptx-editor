@@ -404,9 +404,37 @@
 .demo-root .pptx-zoom {
   box-shadow: var(--demo-shadow-2);
 }
-/* The zoom pill sits in a strip under the slide, so it never covers the slide's corner. */
-.demo-canvas:has(> .pptx-zoom) {
-  padding-bottom: 46px;
+/* The view switch and the zoom pill sit in a strip under the slide, so they never cover the
+   slide's corner. The group stays outside the canvas, so it also shows in the Slide Sorter.
+   Its negative top margin pulls it up into the strip, and its bottom margin gives the next pane
+   back its usual gap. */
+.demo-docpane {
+  --demo-status-h: 34px;
+  --demo-status-inset: 16px;
+  --demo-status-strip: 46px;
+}
+.demo-docpane:has(> .demo-status) > .demo-canvas {
+  padding-bottom: var(--demo-status-strip);
+}
+/* In the Slide Sorter, the group floats over the sorter's bottom edge. The extra room lets the
+   last row scroll clear of it, also when a keyboard move scrolls a slide into view. */
+.demo-docpane:has(> .demo-status) > .pptx-sorter {
+  padding-bottom: calc(var(--demo-status-h) + var(--demo-status-inset) * 2);
+  scroll-padding-bottom: calc(var(--demo-status-h) + var(--demo-status-inset));
+}
+.demo-status {
+  position: relative;
+  z-index: 25;
+  display: flex;
+  align-self: flex-end;
+  gap: 8px;
+  height: var(--demo-status-h);
+  /* 12px is the docpane's gap between panes. */
+  margin: calc(-12px - var(--demo-status-inset) - var(--demo-status-h)) 18px
+    var(--demo-status-inset) 0;
+}
+.demo-status .pptx-zoom {
+  position: static;
 }
 /* The slide thumbnails toggle shows only on a narrow window, where the rail leaves the row. */
 .demo-rail-toggle {
