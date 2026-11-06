@@ -423,7 +423,8 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'partial',
     tier: 'community',
-    notes: 'Compound line bands and arrowhead joins are not measured.',
+    notes:
+      'Dashes and line ends draw at measured sizes, at every line width. Compound line bands are not measured.',
   },
   {
     id: 'fills-lines.theme-colors',
@@ -873,7 +874,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'none',
     tier: 'premium',
     notes:
-      '@pptx-editor.dev/pptx-to-pdf needs the EigenPal Pro License. The PDF export draws shapes, solid and gradient fills, cropped PNG and JPEG pictures, tables, shadows, glow, inner shadows, reflections, and searchable text. It exports in one call or from a reusable session, and leaves hidden slides out. Approximations, each with a diagnostic code: shadow and glow blur, opaque silhouettes, inner shadows, soft edges, reflection blur, gradient lines, gradients with more than 64 stops, fills past the shape box, tiled pictures, picture color effects, dashes, compound lines, underline styles other than single and double, and some text styles; SVG pictures draw from their PNG fallback. The border of a picture is drawn outside the picture. With the optional @docx-editor.dev/fonts-cjk installed, East Asian text in a missing font draws with Noto Sans CJK JP. Not drawn yet: pattern fills, picture fills on text, arrowheads, text outlines, other picture formats, diagrams, OLE objects with no picture, and other graphic frames, and table frames with no grid. Charts draw through the drawing module of @pptx-editor.dev/pro, which the export always installs; chart types outside that module show a placeholder with the frame.chart code. The export fidelity is not measured yet, so rendering stays planned.',
+      '@pptx-editor.dev/pptx-to-pdf needs the EigenPal Pro License. The PDF export draws shapes, solid and gradient fills, cropped PNG and JPEG pictures, tables, shadows, glow, inner shadows, reflections, and searchable text. It exports in one call or from a reusable session, and leaves hidden slides out. It draws dashes and line ends with the same geometry as the editor. Approximations, each with a diagnostic code: shadow and glow blur, opaque silhouettes, inner shadows, soft edges, reflection blur, gradient lines, gradients with more than 64 stops, fills past the shape box, tiled pictures, picture color effects, compound lines, underline styles other than single and double, and some text styles; SVG pictures draw from their PNG fallback. The border of a picture is drawn outside the picture. With the optional @docx-editor.dev/fonts-cjk installed, East Asian text in a missing font draws with Noto Sans CJK JP. Not drawn yet: pattern fills, picture fills on text, text outlines, other picture formats, diagrams, OLE objects with no picture, and other graphic frames, and table frames with no grid. Charts draw through the drawing module of @pptx-editor.dev/pro, which the export always installs; chart types outside that module show a placeholder with the frame.chart code. The export fidelity is not measured yet, so rendering stays planned.',
   },
 ];
 

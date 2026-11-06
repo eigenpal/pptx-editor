@@ -14,6 +14,7 @@ import { slideStructureDeck } from './slide-structure.ts';
 import { shapeFormatFixtures } from './shape-format.ts';
 import { eastAsianThemeFontsDeck, eastAsianTypographyDeck, textScriptFixtures } from './text-scripts.ts';
 import { followUpFixtures } from './follow-ups.ts';
+import { lineEndsDashesFixtures } from './line-ends-dashes.ts';
 import { chartsDeck, diagramsDeck } from './drawingml.ts';
 
 const OUT = 'fixtures';
@@ -96,6 +97,7 @@ const fixtures: Record<string, FixtureSlide[]> = {
   ...shapeFormatFixtures,
   ...textScriptFixtures,
   ...followUpFixtures,
+  ...lineEndsDashesFixtures,
   'tables': [
     {
       // The default style, referenced but not written in tableStyles.xml.

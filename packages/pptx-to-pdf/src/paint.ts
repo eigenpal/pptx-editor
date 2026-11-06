@@ -14,18 +14,32 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import {
   closePath,
   concatTransformationMatrix,
+  fill,
   lineTo,
   moveTo,
   popGraphicsState,
   pushGraphicsState,
+  setDashPattern,
+  setFillingRgbColor,
+  setLineCap,
+  setLineJoin,
   setLineWidth,
   stroke,
+  LineJoinStyle,
+  PDFNumber,
+  PDFOperator,
+  PDFOperatorNames,
 } from 'pdf-lib';
+import type { Rgba } from '@pptx-editor.dev/core/cascade';
 import {
+  ARROW_MITER_LIMIT,
   hasCharacters,
+  planStroke,
+  strokeWidth,
   type LayoutItem,
   type PathCommand,
   type SlideLayout,
+  type StrokePlan,
 } from '@pptx-editor.dev/core/layout';
 import {
   drawEffectsBehind,
@@ -36,6 +50,7 @@ import {
 import {
   canDrawPicture,
   drawPicture,
+  lineCapStyle,
   ownFill,
   paintFill,
   strokeStyle,
@@ -51,6 +66,7 @@ import {
   EMU_PER_PT,
   endPath,
   PageOps,
+  rgb,
   tracePath,
   traceRect,
   type PaintResources,
@@ -95,9 +111,35 @@ function pastBox(commands: readonly PathCommand[], w: number, h: number): boolea
   return false;
 }
 
-/** A path with no `close`: the only kind that gets line ends (as the SVG paint's `isOpenPath`). */
-function isOpenPath(commands: readonly PathCommand[]): boolean {
-  return commands.length >= 2 && !commands.some((c) => c.op === 'Z');
+/**
+ * The line ends and square dash caps of a stroke, as the SVG paint draws them (`output/paint.ts`,
+ * `strokeExtras`): filled heads, open arrows stroked as wide as the line with round caps and a
+ * mitered tip, and solid caps with butt ends. The stroke color and alpha are already set.
+ */
+function drawStrokeExtras(plan: StrokePlan, color: Rgba, width: number, p: PageOps): void {
+  if (!plan.ends.length && !plan.caps.length) return;
+  p.push(setDashPattern([], 0));
+  for (const end of plan.ends) {
+    if (end.kind === 'fill') {
+      p.alpha(color.a, color.a);
+      p.push(setFillingRgbColor(...rgb(color)));
+      tracePath(end.commands, p);
+      p.push(fill());
+      continue;
+    }
+    p.push(
+      setLineWidth(end.width),
+      setLineCap(lineCapStyle('round')),
+      setLineJoin(LineJoinStyle.Miter),
+      PDFOperator.of(PDFOperatorNames.SetLineMiterLimit, [PDFNumber.of(ARROW_MITER_LIMIT)])
+    );
+    tracePath(end.commands, p);
+    p.push(stroke());
+  }
+  if (!plan.caps.length) return;
+  p.push(setLineWidth(width), setLineCap(lineCapStyle('butt')));
+  for (const cap of plan.caps) tracePath(cap, p);
+  p.push(stroke());
 }
 
 type Drawable = Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>;
@@ -184,23 +226,19 @@ async function drawGeometry(
     // A picture's outline follows all of its geometry, as in the SVG paint.
     if (!el.line || (!path.stroke && item.kind !== 'picture')) continue;
     p.push(pushGraphicsState());
-    const color = strokeStyle(el.line, p, scope, groupScale);
+    const picture = item.kind === 'picture';
+    const color = strokeStyle(el.line, p, scope, groupScale, picture);
     if (color) {
-      // Line ends show on open paths only, as in the SVG paint.
-      if (item.kind === 'shape' && (el.line.head || el.line.tail) && isOpenPath(path.commands))
-        p.diag.add('line.ends', 'unsupported', 'Arrowheads are not drawn yet.');
       p.alpha(1, color.a);
+      const width = strokeWidth(el.line, groupScale);
       // A picture's border lies outside the picture.
-      if (item.kind === 'picture')
-        outsideOf(
-          path.commands,
-          (el.line.width > 0 ? el.line.width : 9525) / (groupScale || 1),
-          w,
-          h,
-          p
-        );
-      tracePath(path.commands, p);
+      if (picture) outsideOf(path.commands, width, w, h, p);
+      // An open path stops short under its line ends, and a dashed one can get square caps, as
+      // in the SVG paint (`core/layout`, `planStroke`).
+      const plan = picture ? undefined : planStroke(path.commands, el.line, groupScale);
+      tracePath(plan ? plan.commands : path.commands, p);
       p.push(stroke());
+      if (plan) drawStrokeExtras(plan, color, width, p);
     }
     p.push(popGraphicsState());
   }

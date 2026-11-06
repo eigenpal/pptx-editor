@@ -187,21 +187,50 @@ describe('gradient text', () => {
   });
 });
 
-describe('line ends', () => {
-  test('are reported only on open paths, the only paths that show them', async () => {
-    const line =
-      '<a:ln w="12700"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:tailEnd type="triangle"/></a:ln>';
-    const deckWith = (prst: string) =>
-      buildPptx({
-        slides: [
-          {
-            layout: 'blank',
-            shapes: shape({ id: 2, x: IN, y: IN, cx: 2 * IN, cy: IN, prst, line }),
-          },
-        ],
-      });
-    expect(codes(await exportPdf(deckWith('rect'), BEST))).not.toContain('line.ends');
-    expect(codes(await exportPdf(deckWith('line'), BEST))).toContain('line.ends');
+describe('line ends and dashes', () => {
+  const deckWith = (prst: string, line: string) =>
+    buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          shapes: shape({ id: 2, x: IN, y: IN, cx: 2 * IN, cy: IN, prst, line }),
+        },
+      ],
+    });
+  const black = '<a:solidFill><a:srgbClr val="000000"/></a:solidFill>';
+
+  test('a triangle draws on an open path only, and nothing is reported', async () => {
+    const line = `<a:ln w="12700">${black}<a:tailEnd type="triangle"/></a:ln>`;
+    const open = await exportPdf(deckWith('line', line), BEST);
+    const closed = await exportPdf(deckWith('rect', line), BEST);
+    expect(codes(open)).toEqual([]);
+    expect(codes(closed)).toEqual([]);
+    // The same page and stroke, and on the line one more fill: the head.
+    const fills = async (r: PdfExportResult) => count((await pages(r))[0]!.ops, OPS.fill);
+    expect((await fills(open)) - (await fills(closed))).toBe(1);
+  });
+
+  test('an open arrow draws as a stroke with round caps', async () => {
+    const result = await exportPdf(
+      deckWith('line', `<a:ln w="12700">${black}<a:headEnd type="arrow"/></a:ln>`),
+      BEST
+    );
+    const [page] = await pages(result);
+    expect(count(page!.ops, OPS.stroke)).toBe(2);
+    expect(count(page!.ops, OPS.setLineCap)).toBeGreaterThan(1);
+  });
+
+  test('a dashed line sets its dash pattern in line widths, and is not reported', async () => {
+    const result = await exportPdf(
+      deckWith('line', `<a:ln w="12700" cap="rnd">${black}<a:prstDash val="dash"/></a:ln>`),
+      BEST
+    );
+    expect(codes(result)).toEqual([]);
+    const pdf = await getDocument({ data: result.bytes.slice(), useSystemFonts: false }).promise;
+    const { fnArray, argsArray } = await (await pdf.getPage(1)).getOperatorList();
+    const dash = argsArray[fnArray.indexOf(OPS.setDash)] as [number[], number];
+    // `dash` is 4 widths on and 3 off; a round cap takes one width from each dash.
+    expect(dash).toEqual([[3 * 12_700, 4 * 12_700], 0]);
   });
 });
 

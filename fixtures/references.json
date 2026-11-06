@@ -181,6 +181,15 @@
         540
       ]
     },
+    "line-ends-dashes": {
+      "deck": "00bc1d248ff0c943aac2d7f0733918ac15f85b18866fa104bc9425e6190f2f90",
+      "pdf": "37c53a21dc703a10785958400a788ddc02b55e4b4a17b681dce126d52dab8954",
+      "pages": 7,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
     "line-model": {
       "deck": "412575d65667e7523e81b35b63dbfb296622afe91d4962d679d80dffe9b19047",
       "pdf": "3c49fdbfd474f5168ceae317de45d201a67f2c06d93fb33cccb30957a57c360c",

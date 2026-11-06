@@ -39,34 +39,33 @@ const outlined = (prst: string): string =>
       '<a:headEnd type="oval"/><a:tailEnd type="triangle"/></a:ln>',
   });
 
-/** Paths that carry a line-end marker, and whether each is closed. */
-function markedPaths(root: SVGSVGElement): { closed: boolean; start: boolean; end: boolean }[] {
-  return [...root.querySelectorAll('path')]
-    .filter((p) => p.getAttribute('marker-start') || p.getAttribute('marker-end'))
-    .map((p) => ({
-      closed: /Z/i.test(p.getAttribute('d') ?? ''),
-      start: p.hasAttribute('marker-start'),
-      end: p.hasAttribute('marker-end'),
-    }));
+/** The drawn line ends of a slide: the path data of each. */
+function lineEnds(root: SVGSVGElement): string[] {
+  return [...root.querySelectorAll('[data-line-end]')].map((p) => p.getAttribute('d') ?? '');
 }
 
 describe('line ends only on open paths (R3)', () => {
-  test('a rectangle with a tail end draws no arrowhead and defines no marker', () => {
-    const root = paint(outlined('rect'));
-    expect(markedPaths(root)).toEqual([]);
-    expect(root.querySelectorAll('marker').length).toBe(0);
+  test('a rectangle with a tail end draws no arrowhead', () => {
+    expect(lineEnds(paint(outlined('rect')))).toEqual([]);
   });
 
   test('a callout puts line ends on its leader line, never on its box', () => {
-    const marked = markedPaths(paint(outlined('borderCallout1')));
-    expect(marked.length).toBe(1);
-    expect(marked[0]).toEqual({ closed: false, start: true, end: true });
+    // An oval head (four curves) and a triangle tail (three corners).
+    const ends = lineEnds(paint(outlined('borderCallout1')));
+    expect(ends.length).toBe(2);
+    expect(ends[0].match(/C/g)?.length).toBe(4);
+    expect(ends[1].match(/L/g)?.length).toBe(2);
   });
 
-  test('an open line keeps both ends', () => {
-    expect(markedPaths(paint(outlined('line')))).toEqual([
-      { closed: false, start: true, end: true },
-    ]);
+  test('an open line keeps both ends, and its stroke stops inside the triangle', () => {
+    const root = paint(outlined('line'));
+    expect(lineEnds(root).length).toBe(2);
+    // A 1.5 pt line takes the heads of a 2 pt line: the med triangle is 3 × 25 400 EMU long,
+    // and the line stops half a unit inside its base, 63 500 EMU before the end point.
+    const stroke = [...root.querySelectorAll('path')].find((p) => p.getAttribute('stroke-width'));
+    const [x0, y0, x1, y1] = (stroke?.getAttribute('d') ?? '').match(/[\d.]+/g)!.map(Number);
+    expect([x0, y0]).toEqual([0, 0]);
+    expect(Math.hypot(2_000_000 - x1, 1_000_000 - y1)).toBeCloseTo(63_500, 0);
   });
 });
 

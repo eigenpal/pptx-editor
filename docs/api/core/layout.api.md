@@ -11,6 +11,9 @@ export function apply(m: Matrix, x: number, y: number): {
 };
 
 // @internal
+export const ARROW_MITER_LIMIT = 10;
+
+// @internal
 export function autofitSizePt(sizePt: number, fontScale: number): number;
 
 // @public
@@ -99,6 +102,9 @@ export function createFixedMeasurer(): TextMeasurer;
 export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeasurer & {
     readonly faces: readonly RegisteredFace[];
 };
+
+// @internal
+export function dashArray(line: ResolvedLine, width: number): number[] | undefined;
 
 // @public
 export const DEFAULT_FALLBACK_FAMILY = "Liberation Sans";
@@ -454,6 +460,9 @@ export function isIdeographic(cp: number): boolean;
 export function isMetricCompatible(family: string, substitute: string): boolean;
 
 // @internal
+export function isOpenPath(commands: readonly PathCommand[]): boolean;
+
+// @internal
 export function isSymbolFont(family: string): boolean;
 
 // @public
@@ -546,6 +555,19 @@ export interface Line {
 export type LineBasis = 'size' | 'face';
 
 // @internal
+export function lineEndReach(line: ResolvedLine, scale?: number): number;
+
+// @internal
+export type LineEndShape = {
+    readonly kind: 'fill';
+    readonly commands: readonly PathCommand[];
+} | {
+    readonly kind: 'stroke';
+    readonly commands: readonly PathCommand[];
+    readonly width: number;
+};
+
+// @internal
 export function lineHeightInPt(singlePt: number, spacing: {
     pct: number;
 } | {
@@ -576,6 +598,9 @@ export function multiply(m: Matrix, n: Matrix): Matrix;
 
 // @public
 export function normalizeFontResolverResult(result: FontConfigurationBase | null | undefined): FontConfigurationBase | undefined;
+
+// @internal
+export function outsideDashArray(line: ResolvedLine, width: number): number[] | undefined;
 
 // @public
 export function paragraphSpacingPt(spacing: {
@@ -609,6 +634,9 @@ export type PathCommand = {
 
 // @internal
 export function placeBaseline(emu: number): number;
+
+// @internal
+export function planStroke(commands: readonly PathCommand[], line: ResolvedLine, scale?: number): StrokePlan;
 
 // @public
 export interface PresetAdjustment {
@@ -707,6 +735,19 @@ export interface SourceMap {
     // (undocumented)
     readonly sy: number;
 }
+
+// @internal
+export function strokeCap(line: ResolvedLine): 'butt' | 'round' | 'square';
+
+// @internal
+export interface StrokePlan {
+    readonly caps: readonly (readonly PathCommand[])[];
+    readonly commands: readonly PathCommand[];
+    readonly ends: readonly LineEndShape[];
+}
+
+// @internal
+export function strokeWidth(line: ResolvedLine, scale?: number): number;
 
 // @public
 export function subscribeDrawingRenderers(listener: () => void): () => void;
