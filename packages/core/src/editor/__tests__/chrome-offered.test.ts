@@ -374,6 +374,87 @@ describe('removing an effect without the renderer', () => {
     expect(slideXml(editor)).toContain(`<a:effectLst>${UNKNOWN}</a:effectLst>`);
   });
 
+  test('text editing in a shape, a picture, and view mode follow the command', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const { editor, ids } = await effectsDeck();
+    // A caret in the shape's text: the rows follow that shape.
+    editor.setSelection({
+      kind: 'text',
+      nodeId: ids[0]!,
+      anchor: { paragraph: 0, offset: 0 },
+      focus: { paragraph: 0, offset: 0 },
+    });
+    expect(proRows(editor)).toEqual(['glow.none', 'softEdge.none']);
+    // View mode removes nothing, so it offers no Pro row.
+    editor.setSelection({ kind: 'shapes', nodeIds: [ids[0]!] });
+    editor.setMode('view');
+    expect(proRows(editor)).toEqual([]);
+    editor.setMode('edit');
+    expect(proRows(editor)).toEqual(['glow.none', 'softEdge.none']);
+    // A picture with a soft edge.
+    const PNG = Uint8Array.from(
+      atob(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+      ),
+      (c) => c.charCodeAt(0)
+    );
+    const pictures = await open(
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            rels: [
+              [
+                'rIdImg',
+                'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+                '../media/image1.png',
+              ],
+            ],
+            shapes:
+              '<p:pic><p:nvPicPr><p:cNvPr id="2" name="Picture 1"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>' +
+              '<p:blipFill><a:blip r:embed="rIdImg"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>' +
+              `<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${IN}" cy="${IN}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${list(SOFT)}</p:spPr></p:pic>`,
+          },
+        ],
+        media: [{ name: 'image1.png', bytes: PNG, contentType: 'image/png' }],
+      })
+    );
+    pictures.setSelection({ kind: 'shapes', nodeIds: [nodeIds(pictures)[0]!] });
+    expect(proRows(pictures)).toEqual(['softEdge.none']);
+    expect(run(pictures, 'softEdge.none')).toBe(true);
+    expect(slideXml(pictures)).not.toContain('<a:softEdge');
+    expect(proRows(pictures)).toEqual([]);
+  });
+
+  test('an effect inherited from the layout placeholder offers its No row', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const ph = (spPr: string): string =>
+      '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Body"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>' +
+      `<p:spPr>${spPr}</p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Hi</a:t></a:r></a:p></p:txBody></p:sp>`;
+    const editor = await open(
+      buildPptx({
+        layouts: [
+          {
+            name: 'Glowing',
+            shapes: ph(
+              `<a:xfrm><a:off x="0" y="0"/><a:ext cx="${IN}" cy="${IN}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${list(GLOW)}`
+            ),
+          },
+        ],
+        slides: [{ layoutName: 'Glowing', shapes: ph('') }],
+      })
+    );
+    editor.setSelection({ kind: 'shapes', nodeIds: [nodeIds(editor)[0]!] });
+    expect(proRows(editor)).toEqual(['glow.none']);
+    expect(run(editor, 'glow.none')).toBe(true);
+    // The slide shape gets its own empty list over the layout's glow; the layout keeps it.
+    expect(slideXml(editor)).toContain(EMPTY);
+    expect(strFromU8(unzipSync(editor.save()!)['ppt/slideLayouts/slideLayout3.xml']!)).toContain(
+      GLOW
+    );
+    expect(proRows(editor)).toEqual([]);
+  });
+
   test('with the renderer, every row shows for any selection', async () => {
     const { editor, ids } = await effectsDeck();
     editor.setSelection({ kind: 'shapes', nodeIds: [ids[1]!] });

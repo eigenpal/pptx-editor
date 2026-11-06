@@ -5633,7 +5633,7 @@ export function validateBackgroundDraft(fields: BackgroundDraftFields, initial: 
 export function validatePicturePropertiesDraft(f: PicturePropertiesDraftFields, initial?: PicturePropertiesDraftFields): DialogErrors<PicturePropertiesDraftFields>;
 
 // @internal
-export function valueSlotOptions<K extends keyof ToolbarValueMap>(slot: K, editor?: Pick<PptxEditorInstance, 'can'> | null): readonly ToolbarValueMap[K][];
+export function valueSlotOptions<K extends keyof ToolbarValueMap>(slot: K, editor?: Pick<Editor, 'can'> | null): readonly ToolbarValueMap[K][];
 
 // @internal
 export function valueSlotShown<K extends keyof ToolbarValueMap>(slot: K, raw: unknown): ToolbarShownValue<K> | null;

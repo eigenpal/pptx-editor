@@ -457,7 +457,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'partial',
     tier: 'premium',
     notes:
-      'The drawing module of @pptx-editor.dev/pro paints these effects and needs the EigenPal Pro License. Without it, shapes and pictures paint without them. PDF export always paints them. With the module, the Shape Effects menu sets and clears each effect, glows in the six accent colors, and Picture Styles offers the reflection and soft edge styles. Without it, the chrome does not offer these choices, and the commands still set and clear each effect. Save keeps them in every edition. No Preset, Bevel, or 3-D Rotation. Glow, inner shadow, and soft edge blurs are measured for small radii. The reflection blur is not measured.',
+      'The drawing module of @pptx-editor.dev/pro paints these effects and needs the EigenPal Pro License. Without it, shapes and pictures paint without them. PDF export always paints them. With the module, the Shape Effects menu sets and clears each effect, glows in the six accent colors, and Picture Styles offers the reflection and soft edge styles. Without it, the chrome does not offer the choices that add these effects. It still offers No reflection, No glow, and No soft edges when the selection has that effect, and No shadow also removes an inner shadow. The commands still set and clear each effect. Save keeps them in every edition. No Preset, Bevel, or 3-D Rotation. Glow, inner shadow, and soft edge blurs are measured for small radii. The reflection blur is not measured.',
   },
   {
     id: 'effects.fill-overlay',

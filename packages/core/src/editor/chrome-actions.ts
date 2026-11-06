@@ -15,6 +15,7 @@ import {
 } from './chrome-controls.ts';
 import { chromeCommandState, type ChromeCommandState } from './adapter-support.ts';
 import { chromeOfferedControl } from './chrome-offered.ts';
+import type { Editor } from '../contracts/index.ts';
 import type { PptxEditorInstance } from './pptx-editor-types.ts';
 import { focusSurfaceOf, surfaceInputOf, surfaceRootOf } from './surface-registry.ts';
 import { warnNoAltTextPopup, warnNoLinkPopup } from './dev-warnings.ts';
@@ -166,7 +167,7 @@ function typedSlotValue(slot: string, raw: unknown): unknown {
  */
 export function valueSlotOptions<K extends keyof ToolbarValueMap>(
   slot: K,
-  editor?: Pick<PptxEditorInstance, 'can'> | null
+  editor?: Pick<Editor, 'can'> | null
 ): readonly ToolbarValueMap[K][] {
   const control = chromeControlForSlot(slot);
   // A dialog row ("Line spacing options…") opens a dialog: it is not a value.
