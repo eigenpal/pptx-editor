@@ -105,15 +105,16 @@ export interface LegendLayout {
  * The key's width, the offset from the key to its text, and the room a row leaves after the
  * text, for one entry of `size` points. Measured on the `charts` and `chart-sizes` reference
  * PDFs at 9 to 20 pt:
- * - A square key is 0.55 sizes wide. Its text starts 0.275 sizes less 0.4 pt past the key. The
- *   key, its gap to the text, and the room after the text take 1.65 sizes together (1.615 for
- *   a point entry).
+ * - A square key is 0.55 sizes wide. Its text starts 0.275 sizes less 0.4 pt past the key (at
+ *   the key's end for text under 1.45 pt). The key, its gap to the text, and the room after
+ *   the text take 1.65 sizes together (1.615 for a point entry).
  * - A line key is 19.2 pt long at every size, with its text 2.03 pt past it. A row leaves
  *   6.43 pt and 0.386 sizes after the text.
  * - A row of entries centres 0.18 sizes right of the chart's centre (1.76 pt for line keys).
- *   Every row of a legend takes the `shift` of the legend's first entry.
  * - A right legend keeps `gap` between the plot and its keys: 13.25 pt and half a square key,
  *   or 15.66 pt for line keys. A left legend keeps `LEFT_GAP` after its text.
+ * The reference PDFs have no legend that mixes square and line keys. Such a legend takes the
+ * `shift` of its first entry for every row, and the larger `gap`: both are unmeasured.
  * A line entry whose line is hidden keys only its marker, as narrow as a square key.
  */
 export function keyMetrics(
@@ -246,7 +247,7 @@ export function placeLegend(
     : legend.position === 'l'
       ? 10.7
       : width - 10 - textWidth - keyText;
-  const center = (box.t + height - 11) / 2;
+  const center = (box.t + height - CHART_MARGIN) / 2;
   const top = manual
     ? manual.y * height + Math.max(0, (room - blockHeight) / 2)
     : legend.position === 'tr'

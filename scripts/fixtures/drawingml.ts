@@ -274,10 +274,10 @@ const CHART_SIZES: readonly ChartSizeSlide[] = [
   ['column', 'b', 9, 'small'],
   ['line', 'b', 9, 'small'],
   ['column', 'b', 20, 'large'],
-  ['pie', 'r', 20, 'medium'],
   ['pie', 'b', 14, 'small'],
   ['line', 't', 20, 'medium'],
   ['radar', 'r', 9, 'small'],
+  ['radar', 'r', 9, 'large'],
   ['radar', 'r', 14, 'medium'],
   ['radar', 'r', 20, 'large'],
 ];

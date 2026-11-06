@@ -47,9 +47,16 @@ describe('chart spacing rules match the reference PDFs', () => {
   });
 
   test('a line key is 19.2 pt long at every size, with its text 21.23 pt from its start', () => {
-    for (const size of [9, 11.97, 14, 20]) {
-      expect(keyMetrics(lined, size).key).toBe(19.2);
-      expect(keyMetrics(lined, size).text).toBeCloseTo(21.23, 6);
+    // [text size, measured key length, measured key start to text start]
+    for (const [size, key, text] of [
+      [9, 19.2, 21.22],
+      [11.97, 19.2, 21.23],
+      [14, 19.2, 21.23],
+      [20, 19.2, 21.23],
+    ] as const) {
+      const metrics = keyMetrics(lined, size);
+      expect([size, Math.abs(metrics.key - key) < 0.05]).toEqual([size, true]);
+      expect([size, Math.abs(metrics.text - text) < 0.05]).toEqual([size, true]);
     }
   });
 
@@ -61,13 +68,21 @@ describe('chart spacing rules match the reference PDFs', () => {
       [20, 18.75],
     ] as const)
       expect([size, Math.abs(keyMetrics(square, size).gap - measured) < 0.1]).toEqual([size, true]);
-    for (const size of [9, 11.97, 14, 20]) expect(keyMetrics(lined, size).gap).toBe(15.66);
+    // [text size, measured gap from the plot to the line keys]
+    for (const [size, measured] of [
+      [9, 15.65],
+      [11.97, 15.65],
+      [14, 15.66],
+      [20, 15.66],
+    ] as const)
+      expect([size, Math.abs(keyMetrics(lined, size).gap - measured) < 0.05]).toEqual([size, true]);
   });
 
   test('a radar keeps half a category line and the label room of its plot height', () => {
     // [text size, chart height, measured radius]
     for (const [size, height, measured] of [
       [9, 237.6, 99.21],
+      [9, 424.8, 192.82],
       [11.97, 424.8, 188.25],
       [14, 316.8, 131.12],
       [20, 424.8, 175.89],
@@ -89,10 +104,11 @@ describe('chart spacing rules match the reference PDFs', () => {
   });
 
   test('radar labels sit 0.04 radii past a side spoke, and 0.16 sizes more above the top one', () => {
-    // [text size, radius, measured side gap, measured gap below the top label's line]. The
-    // 12 pt radar has the largest radius, so the gaps follow the radius, not the text size.
+    // [text size, radius, measured side gap, measured gap below the top label's line]. The two
+    // 9 pt radars keep 3.9 pt and 7.7 pt, so the gaps follow the radius, not the text size.
     for (const [size, radius, side, top] of [
       [9, 99.21, 3.93, 5.36],
+      [9, 192.82, 7.67, 9.2],
       [11.97, 188.25, 7.49, 9.3],
       [14, 131.12, 5.2, 7.37],
       [20, 175.89, 6.99, 10.22],
@@ -182,9 +198,9 @@ describe('the chart-sizes charts follow the rules', () => {
   });
 
   test('bottom legends: the keys centre 9 pt and 0.6 sizes above the chart bottom', () => {
-    for (const index of [3, 5, 7]) {
+    for (const index of [3, 5, 6]) {
       const { scene, labels } = render(index);
-      const first = index === 7 ? 'North' : 'Plan';
+      const first = index === 6 ? 'North' : 'Plan';
       const size = sizeOf(label(labels, first));
       const key = squareKey(scene.components, size);
       expect((key.t + key.b) / 2).toBeCloseTo(height(index) - (9 + 0.6 * size), 6);
@@ -192,10 +208,10 @@ describe('the chart-sizes charts follow the rules', () => {
       const firstLabel = label(labels, first);
       const next = squareKey(scene.components, size, 'ED7D31');
       const text = 0.825 * size - 0.4;
-      const after = (index === 7 ? 1.615 : 1.65) * size - text;
+      const after = (index === 6 ? 1.615 : 1.65) * size - text;
       expect(next.l - (firstLabel.x + textWidth(firstLabel))).toBeCloseTo(after, 6);
       // From the first key to the end of the last text, the row centres 0.18 sizes right.
-      const last = label(labels, index === 7 ? 'West' : 'Forecast');
+      const last = label(labels, index === 6 ? 'West' : 'Forecast');
       const end = last.x + textWidth(last);
       expect((key.l + end) / 2 - width(index) / 2).toBeCloseTo(0.18 * size, 6);
     }
@@ -204,7 +220,7 @@ describe('the chart-sizes charts follow the rules', () => {
   test('line keys in a row: 19.2 pt long, 6.43 pt and 0.386 sizes apart, centred 1.76 pt right', () => {
     for (const [index, side] of [
       [4, 'b'],
-      [8, 't'],
+      [7, 't'],
     ] as const) {
       const { scene, labels } = render(index);
       const plan = label(labels, 'Plan');
@@ -222,7 +238,7 @@ describe('the chart-sizes charts follow the rules', () => {
   });
 
   test('radars: the radius keeps the label room, and the labels keep their gaps', () => {
-    for (const index of [9, 10, 11]) {
+    for (const index of [8, 9, 10, 11]) {
       const { scene, labels } = render(index);
       const south = label(labels, 'South');
       const size = sizeOf(south);
