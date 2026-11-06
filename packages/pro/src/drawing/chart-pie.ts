@@ -80,8 +80,9 @@ const LEADER_REACH = 0.75;
 /**
  * The room an automatic plot area keeps round a pie whose labels may sit outside it, in points,
  * across both sides: a share of the plot area's shorter side plus a fixed margin. The pie and
- * the doughnut of the `charts` reference PDF fit this within 0.2 pt, and the room does not change
- * with the label size.
+ * the doughnut of the `charts` reference PDF fit this within 0.2 pt. Reference renderings of
+ * that pie in frames 1.5, 3, 4.5, 5.9, and 6.8 inches tall, with and without its title and
+ * legend, fit it within 0.6 pt. The room does not change with the label size.
  */
 export function outsideLabelRoom(side: number): number {
   return side * OUTSIDE_ROOM_SHARE + OUTSIDE_ROOM_PT;

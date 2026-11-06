@@ -14,7 +14,15 @@ import { readChartModel } from '../chart-model.ts';
 import { renderChart } from '../chart-render.ts';
 import { withChartText } from '../chart-text.ts';
 import { createFixedMeasurer, type TextMeasurer } from '@pptx-editor.dev/core/layout';
-import { chartSpace, fixtureCharts, numericSeries, renderFixture } from './chart-support.ts';
+import { parseXmlPart } from '@pptx-editor.dev/core/store';
+import { strFromU8, unzipSync } from 'fflate';
+import {
+  chartSpace,
+  chartsDeck,
+  fixtureCharts,
+  numericSeries,
+  renderFixture,
+} from './chart-support.ts';
 
 interface Box {
   l: number;
@@ -174,6 +182,37 @@ describe('chart geometry', () => {
     // Their plot areas are 371 and 376 pt tall and keep 49 and 50 pt.
     expect(outsideLabelRoom(371)).toBeCloseTo(49, 0);
     expect(outsideLabelRoom(376.4)).toBeCloseTo(49.8, 0);
+  });
+
+  test('pie: the room for outside labels fits frames from 1.5 to 6.8 inches tall', () => {
+    // The pie of `charts.pptx` with no title and no legend, in a 12-inch-wide frame. Reference
+    // renderings of it draw these colored diameters (pt): its slices also have a 1.5 pt white
+    // outline, so the outline paths are 1.5 pt wider.
+    const xml = strFromU8(unzipSync(chartsDeck())['ppt/charts/chart6.xml']!)
+      .replace(/<c:title>.*?<\/c:title>/, '')
+      .replace('<c:autoTitleDeleted val="0"/>', '<c:autoTitleDeleted val="1"/>')
+      .replace(/<c:legend>.*?<\/c:legend>/, '');
+    const parsed = parseXmlPart('/ppt/charts/chart6.xml', xml);
+    if (!parsed.ok) throw new Error(parsed.reason);
+    const model = readChartModel(parsed.part.root)!;
+    const reference: readonly (readonly [number, number])[] = [
+      [1.5, 70.8],
+      [3, 165.2],
+      [4.5, 259.8],
+      [5.9, 348],
+      [6.8, 404.5],
+    ];
+    for (const [inches, colored] of reference) {
+      const { chart } = fixtureCharts()[5]!;
+      const rendered = withChartText({ measurer: createFixedMeasurer(), theme: chart.theme }, () =>
+        renderChart(model, 12 * 72, inches * 72, chart.colors)
+      )!;
+      const slices = rendered.scene.components.filter(
+        (c) => c.closed && c.fill && c.subpaths[0]!.length > 10
+      );
+      const box = boxOf(slices.flatMap((c) => c.subpaths[0]!));
+      expect([inches, Math.abs(box.b - box.t - (colored + 1.5)) < 1]).toEqual([inches, true]);
+    }
   });
 
   test('radar: one polygon per series with a vertex on each category spoke', () => {
