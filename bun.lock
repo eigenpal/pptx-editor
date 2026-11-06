@@ -4,6 +4,9 @@
   "workspaces": {
     "": {
       "name": "pptx-editor-monorepo",
+      "dependencies": {
+        "@pptx-editor.dev/pptx-to-pdf": "workspace:*",
+      },
       "devDependencies": {
         "@changesets/cli": "^3.0.0",
         "@changesets/get-release-plan": "5.0.2",

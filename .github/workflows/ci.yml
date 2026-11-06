@@ -103,6 +103,10 @@ jobs:
           bun run --filter './examples/vite' build
           bun run build:preview
           bun run --filter './examples/nextjs' build
+      # The demo's PDF export function imports the built converter.
+      - name: PDF export function
+        if: matrix.check == 'build'
+        run: node --test api/convert.node.test.mjs
       - name: Upload package size report
         if: matrix.check == 'build'
         uses: actions/upload-artifact@v7

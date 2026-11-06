@@ -17,7 +17,6 @@ import {
 import {
   colorMenuSelection,
   arrangeToolbarGroups,
-  chromeOfferedControl,
   createToolbarFitMemory,
   observeToolbarFit,
   requestDialogSection,
@@ -56,7 +55,7 @@ import {
   keepFocus,
   useAriaDisabled,
 } from './chrome.tsx';
-import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
+import { useEditorState, useOfferedControl, usePptxEditor, useTranslation } from './context.ts';
 import { useSlot, type SlotPartProps } from './slot.ts';
 import { ColorSwatches } from './ColorSwatches.tsx';
 import { FillControl, LineMenuControl, ShapeGalleryControl } from './ShapeControls.tsx';
@@ -120,7 +119,8 @@ function DropdownControl({ slot, control }: SlotPartProps) {
   const anchor = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const current = control.options?.find((o) => o.value === cmd.value);
-  const offered = chromeOfferedControl(slot, control);
+  // The choices of this build and selection: they follow each change while the menu is open.
+  const offered = useOfferedControl(slot, control) ?? control;
   // A dropdown with no icon is the arrow half of a split button (Bullets and Numbering).
   const icon = current?.paths ?? control.paths;
   const trigger = useTriggerAttributes(

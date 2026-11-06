@@ -46,6 +46,15 @@
         540
       ]
     },
+    "chart-sizes": {
+      "deck": "8d047dafad73968a13da37c88413db21221458e4a0e0c25ccb0a80fa87c6f357",
+      "pdf": "ab02b33e0ae734489e5127ec833e9faf625a70a21e7ccf872b97a1d7592dbf55",
+      "pages": 12,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
     "charts": {
       "deck": "9069c345ccb969ab50a00b4c251ab9e77342d925ca3b8490c0f2f635eefeb471",
       "pdf": "41a95904b6833f96c9e08ac42dcf41afbf407c5152786ddac1e2b4ec82b9b6a0",

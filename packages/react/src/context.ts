@@ -8,6 +8,8 @@ import { drawingRenderersVersion, subscribeDrawingRenderers } from '@pptx-editor
 import { NOTES_SLOTS, useNotesTarget } from './notes-target.ts';
 import {
   canRenameSectionInPlace,
+  chromeControlForSlot,
+  chromeOfferedControl,
   subscribeSectionRenamers,
   EMPTY_EDITOR_SNAPSHOT,
   editorCommandFor,
@@ -17,6 +19,7 @@ import {
   valueSlotOptions,
   valueSlotShown,
   type ChromeActionHost,
+  type ChromeControl,
   type ChromeSlotId,
   type CommandResult,
   type EditorExecOptions,
@@ -238,12 +241,37 @@ export interface UseEditorValueCommandReturn<V, S = V> {
    * rows); none for a slot with a free value (`font.size`, `shape.fill`, `shape.styles`).
    * Without the `@pptx-editor.dev/pro/drawing` module, they leave out the effects it paints
    * (`chromeOfferedControl`), so `value` can be an effect from the file that is not in the list.
+   * They keep the rows that remove an effect the selection has (`reflection.none`).
    */
   readonly options: readonly V[];
   /** Whether the command can run now. */
   readonly isEnabled: boolean;
   /** Why the command cannot run: a catalog key, or the engine's own text. */
   readonly disabledReason: string | null;
+}
+
+/**
+ * The control a slot shows in this build (`chromeOfferedControl`), read again on each editor
+ * change and after each drawing renderer install. Without the drawing module, a selection
+ * change adds or drops the rows that remove an effect the selection has. @internal
+ */
+export function useOfferedControl(
+  slot: ChromeSlotId,
+  control: ChromeControl | null | undefined
+): ChromeControl | undefined {
+  const editor = usePptxEditor();
+  const renderers = useSyncExternalStore(
+    subscribeDrawingRenderers,
+    drawingRenderersVersion,
+    drawingRenderersVersion
+  );
+  // A new selector after an install, so the slice is read again with an unchanged snapshot.
+  const select = useCallback(
+    () => (void renderers, control ? chromeOfferedControl(slot, control, editor) : undefined),
+    [slot, control, editor, renderers]
+  );
+  // The same choices give the same object, so the default `Object.is` keeps the slice.
+  return useEditorState(select as unknown as (s: EditorSnapshot) => ChromeControl | undefined);
 }
 
 /**
@@ -255,22 +283,18 @@ export function useEditorValueCommand<K extends keyof ToolbarValueMap>(
 ): UseEditorValueCommandReturn<ToolbarValueMap[K], ToolbarShownValue<K>> {
   const editor = usePptxEditor();
   const cmd = useEditorCommand(slot);
-  // The options follow the installed drawing renderers: an install offers the Pro choices.
-  const renderers = useSyncExternalStore(
-    subscribeDrawingRenderers,
-    drawingRenderersVersion,
-    drawingRenderersVersion
-  );
+  // The options follow the installed drawing renderers and, without them, the effects of the
+  // selection: `offered` changes with either, so the options run again.
+  const offered = useOfferedControl(slot, chromeControlForSlot(slot));
   return useMemo(
     () => ({
       execute: (value: ToolbarValueMap[K], options?: EditorExecOptions): CommandResult =>
         runToolbarCommand(editor, slot, value as ToolbarSlotValue<K>, options),
       value: valueSlotShown(slot, cmd.value),
-      // `renderers` changes after an install, so the options run again.
-      options: (void renderers, valueSlotOptions(slot)),
+      options: (void offered, valueSlotOptions(slot, editor)),
       isEnabled: cmd.isEnabled,
       disabledReason: cmd.disabledReason,
     }),
-    [editor, slot, cmd, renderers]
+    [editor, slot, cmd, offered]
   );
 }

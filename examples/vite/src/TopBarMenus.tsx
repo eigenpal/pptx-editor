@@ -4,9 +4,9 @@
 // focus into the menu on a click too, and Escape returns it to the trigger. A row's name is its
 // label; its hint is its description.
 
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Icon, MenuItem, Popover, keepFocus, useTranslation } from '@pptx-editor.dev/react';
-import { PICTURE_WIDTH, type PictureExport } from '../../shared/demo-files.ts';
+import { PICTURE_WIDTH, watchPdfExport, type SlideExport } from '../../shared/demo-files.ts';
 
 export function ModePill({
   mode,
@@ -67,7 +67,8 @@ export function ModePill({
   );
 }
 
-const PICTURES = [
+const SLIDE_EXPORTS = [
+  ['pdf', 'PDF', 'menu.exportPdf', 'menu.exportPdfHint'],
   ['png', 'PNG', 'menu.exportSlidePng', 'menu.exportSlidePngHint'],
   ['zip', 'ZIP', 'menu.exportSlidesPng', 'menu.exportSlidesPngHint'],
   ['svg', 'SVG', 'menu.exportSlideSvg', 'menu.exportSlideSvgHint'],
@@ -75,15 +76,19 @@ const PICTURES = [
 
 export function ExportMenu({
   onExport,
-  onExportPicture,
+  onExportSlides,
 }: {
   onExport: () => void;
-  onExportPicture: (kind: PictureExport) => void;
+  onExportSlides: (kind: SlideExport) => void;
 }) {
   const { t } = useTranslation();
   const anchor = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  // While the server makes the PDF, the button says so and the PDF row waits.
+  const [pdfBusy, setPdfBusy] = useState(false);
+  useEffect(() => watchPdfExport(setPdfBusy), []);
   const id = useId();
+  const label = pdfBusy ? t('menu.exportPdfBusy') : t('menu.export');
   return (
     <div className="demo-menu">
       <button
@@ -93,14 +98,15 @@ export function ExportMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        aria-label={t('menu.export')}
-        data-pptx-tooltip={t('menu.export')}
+        aria-label={label}
+        aria-busy={pdfBusy || undefined}
+        data-pptx-tooltip={label}
         onMouseDown={keepFocus}
         onClick={() => setOpen((o) => !o)}
       >
         <Icon name="file_download" className="" />
         <span className="demo-btn__label" aria-hidden="true">
-          {t('menu.export')}
+          {label}
         </span>
         <Icon name="expand_more" className="demo-btn__chev" />
       </button>
@@ -126,11 +132,13 @@ export function ExportMenu({
               </span>
             </span>
           </MenuItem>
-          {PICTURES.map(([kind, type, label, hint]) => (
+          {SLIDE_EXPORTS.map(([kind, type, label, hint]) => (
             <MenuItem
               key={kind}
+              disabled={kind === 'pdf' && pdfBusy}
+              reason={t('menu.exportPdfBusy')}
               description={t(hint, { width: PICTURE_WIDTH })}
-              onSelect={() => (onExportPicture(kind), setOpen(false))}
+              onSelect={() => (onExportSlides(kind), setOpen(false))}
             >
               <span className="demo-filetype" aria-hidden="true">
                 {type}

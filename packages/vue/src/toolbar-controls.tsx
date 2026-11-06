@@ -18,7 +18,6 @@ import {
 } from 'vue';
 import {
   colorMenuSelection,
-  chromeOfferedControl,
   chromeSlotIsToggle,
   requestDialogSection,
   dispatchFindRequest,
@@ -48,6 +47,7 @@ import { ColorSwatches } from './ColorSwatches.tsx';
 import {
   chromeActionHostKey,
   useEditorState,
+  useOfferedControl,
   usePptxEditor,
   useTranslation,
 } from './composables.ts';
@@ -111,6 +111,11 @@ const DropdownControl = defineComponent({
     const host = inject(chromeActionHostKey, null);
     const anchor = ref<HTMLButtonElement | null>(null);
     const open = ref(false);
+    // The choices of this build and selection: they follow each change while the menu is open.
+    const offered = useOfferedControl(
+      () => props.slot,
+      () => props.control
+    );
     // A dropdown with no icon is the arrow half of a split button (Bullets and Numbering).
     const icon = (): readonly string[] | null | undefined =>
       props.control.options?.find((o) => o.value === cmd.value.value)?.paths ?? props.control.paths;
@@ -134,7 +139,7 @@ const DropdownControl = defineComponent({
       const base = `pptx-toolbar__button ${paths ? 'pptx-toolbar__button--wide' : 'pptx-toolbar__button--caret'}`;
       const attrs = trigger();
       // The choices this build offers: a choice whose result does not paint stays out.
-      const options = chromeOfferedControl(props.slot, props.control).options ?? [];
+      const options = (offered.value ?? props.control).options ?? [];
       const glyphs = options.some((x) => x.glyph);
       return [
         <button

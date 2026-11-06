@@ -397,7 +397,11 @@ const rows = (): string[] =>
   );
 
 describe('Pro effect controls', () => {
-  afterEach(() => installDrawingRenderers({ effects: EFFECTS }));
+  // Unmount first: an install with the parts mounted draws them again outside `act`.
+  afterEach(() => {
+    cleanup();
+    installDrawingRenderers({ effects: EFFECTS });
+  });
 
   test('without the drawing module, Shape effects offers only the outer shadows', async () => {
     installDrawingRenderers({ effects: undefined });
@@ -421,7 +425,7 @@ describe('Pro effect controls', () => {
     expect(editor.snapshot().geometry?.effects?.shadow).toBe('outerTop');
 
     // A module installed later shows its effects the next time the menu opens.
-    installDrawingRenderers({ effects: EFFECTS });
+    act(() => installDrawingRenderers({ effects: EFFECTS }));
     act(() => void fireEvent.click(button));
     for (const name of ['Shadow', 'Reflection', 'Glow', 'Soft edges'])
       expect(screen.getByRole('menuitem', { name })).toBeTruthy();
@@ -537,5 +541,122 @@ describe('Pro effect controls', () => {
     );
     expect(html).toContain('<output>');
     expect(drawingRenderersListenerCount()).toBe(before);
+  });
+});
+
+// Removing an effect needs no drawing module: without it, the No row of an effect stays while
+// the selection has that effect, so a community build can remove an effect from the file.
+
+const GLOW = '<a:glow rad="63500"><a:srgbClr val="FF0000"/></a:glow>';
+const REFLECTION =
+  '<a:reflection blurRad="6350" stA="50000" endPos="55000" dist="5000" dir="5400000" sy="-100000" algn="bl" rotWithShape="0"/>';
+
+/** A shape with a glow, a plain shape, and a shape with a reflection. */
+async function openEffects(): Promise<{ editor: PptxEditorInstance; ids: string[] }> {
+  const box = (id: number, x: number, effects = ''): string =>
+    shape({
+      id,
+      x,
+      y: IN,
+      cx: IN,
+      cy: IN,
+      fill: solid('4472C4'),
+      ...(effects ? { effects: `<a:effectLst>${effects}</a:effectLst>` } : {}),
+    });
+  const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  const bytes = buildPptx({
+    slides: [
+      { layout: 'blank', shapes: box(2, IN, GLOW) + box(3, 3 * IN) + box(4, 5 * IN, REFLECTION) },
+    ],
+  });
+  expect((await editor.load(bytes)).ok).toBe(true);
+  return { editor, ids: editor.session!.layout(0)!.items.map((i) => i.element.nodeId) };
+}
+
+const kinds = (): string[] =>
+  ['Shadow', 'Reflection', 'Glow', 'Soft edges'].filter(
+    (name) => screen.queryByRole('menuitem', { name }) !== null
+  );
+
+describe('Removing an effect without the drawing module', () => {
+  // Unmount first: an install with the parts mounted draws them again outside `act`.
+  afterEach(() => {
+    cleanup();
+    installDrawingRenderers({ effects: EFFECTS });
+  });
+
+  test('Shape effects offers No glow for a shape with a glow, and it removes the glow', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const { editor, ids } = await openEffects();
+    const [glow, plain] = ids;
+    render(
+      <PptxEditorContext.Provider value={editor}>
+        <PptxEditor.Toolbar preset={false}>
+          <Toolbar.Slot slotId="shape.effects" />
+        </PptxEditor.Toolbar>
+      </PptxEditorContext.Provider>
+    );
+    act(() => editor.setSelection({ kind: 'shapes', nodeIds: [plain!] }));
+    const button = screen.getByRole('button', { name: 'Shape effects' });
+    act(() => void fireEvent.click(button));
+    expect(kinds()).toEqual(['Shadow']);
+    // The open menu follows the selection.
+    act(() => editor.setSelection({ kind: 'shapes', nodeIds: [glow!] }));
+    expect(kinds()).toEqual(['Shadow', 'Glow']);
+    act(() => void fireEvent.click(screen.getByRole('menuitem', { name: 'Glow' })));
+    // Only the row that removes: no glow preset and no Glow Variations grid.
+    expect(screen.getByRole('menuitemradio', { name: 'No glow' })).toBeTruthy();
+    expect(document.querySelector('.pptx-glow-grid')).toBeNull();
+    act(() => void fireEvent.click(screen.getByRole('menuitemradio', { name: 'No glow' })));
+    expect(editor.snapshot().geometry?.effects?.glow).toBe(0);
+    act(() => void fireEvent.click(button));
+    expect(kinds()).toEqual(['Shadow']);
+    act(() => void fireEvent.click(button));
+    // Undo brings the glow and its row back.
+    act(() => void editor.exec({ type: 'undo' }));
+    act(() => void fireEvent.click(button));
+    expect(kinds()).toEqual(['Shadow', 'Glow']);
+  });
+
+  test('a menu row offers the No row of each effect that a selected shape has', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const { editor, ids } = await openEffects();
+    act(() => editor.setSelection({ kind: 'shapes', nodeIds: [ids[0]!, ids[2]!] }));
+    render(
+      <PptxEditorContext.Provider value={editor}>
+        <PptxEditor.Menu>
+          <PptxEditor.Menu.Entry id="acme" label="Acme">
+            <PptxEditor.Menu.Item slotId="shape.effects" />
+          </PptxEditor.Menu.Entry>
+        </PptxEditor.Menu>
+      </PptxEditorContext.Provider>
+    );
+    act(() => void fireEvent.click(screen.getByRole('menuitem', { name: 'Acme' })));
+    act(() => void fireEvent.click(screen.getByRole('menuitem', { name: 'Shape effects' })));
+    expect(kinds()).toEqual(['Shadow', 'Reflection', 'Glow']);
+    act(() => void fireEvent.click(screen.getByRole('menuitem', { name: 'Reflection' })));
+    expect(rows()).toContain('No reflection');
+    expect(rows().some((r) => r.startsWith('Tight reflection'))).toBe(false);
+  });
+
+  test('useEditorValueCommand options follow the selection', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const { editor, ids } = await openEffects();
+    let options: readonly string[] = [];
+    function Probe() {
+      options = useEditorValueCommand('shape.effects').options;
+      return <output>{options.length}</output>;
+    }
+    render(
+      <PptxEditorContext.Provider value={editor}>
+        <Probe />
+      </PptxEditorContext.Provider>
+    );
+    act(() => editor.setSelection({ kind: 'shapes', nodeIds: [ids[1]!] }));
+    expect(options).not.toContain('glow.none');
+    act(() => editor.setSelection({ kind: 'shapes', nodeIds: [ids[0]!, ids[1]!] }));
+    expect(options).toContain('glow.none');
+    expect(options).not.toContain('reflection.none');
+    expect(options.some((v) => /^glow\.\d/.test(v))).toBe(false);
   });
 });

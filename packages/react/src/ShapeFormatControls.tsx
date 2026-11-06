@@ -8,7 +8,6 @@ import { Fragment, useCallback, useRef, useState, type ReactNode } from 'react';
 import {
   GLOW_ACCENTS,
   SHAPE_STYLE_GALLERY,
-  chromeOfferedControl,
   chromeOptionChecked,
   effectSeparatorBefore,
   glowGridRows,
@@ -21,7 +20,7 @@ import {
 } from '@pptx-editor.dev/core/editor';
 import { Icon, Popover, keepFocus, useAriaDisabled } from './chrome.tsx';
 import { MenuRow, MenuSeparator, MenuSubmenu } from './ContextMenu.tsx';
-import { useEditorState, useTranslation } from './context.ts';
+import { useEditorState, useOfferedControl, useTranslation } from './context.ts';
 import { useSlot } from './slot.ts';
 import { useTriggerAttributes } from './slot-override.ts';
 
@@ -283,7 +282,8 @@ export function EffectMenuControl({
     disabled: !cmd.isEnabled,
   });
   const close = useCallback(() => setOpen(false), []);
-  const offered = chromeOfferedControl(slot, control);
+  // The choices of this build and selection: they follow each change while the menu is open.
+  const offered = useOfferedControl(slot, control) ?? control;
   return (
     <>
       <button
@@ -325,7 +325,10 @@ export function EffectMenuControl({
                 {group.id === 'glow' && first ? (
                   <>
                     {row(first)}
-                    <GlowGrid slot={slot} options={rest} value={cmd.value} onPick={pick} />
+                    {/* Without the drawing module, No Glow can be the only row. */}
+                    {rest.length ? (
+                      <GlowGrid slot={slot} options={rest} value={cmd.value} onPick={pick} />
+                    ) : null}
                   </>
                 ) : (
                   // Shadows: a line between the outer and the inner presets (the Outer and
