@@ -110,7 +110,8 @@ export interface LegendLayout {
  *   the text take 1.65 sizes together (1.615 for a point entry).
  * - A line key is 19.2 pt long at every size, with its text 2.03 pt past it. A row leaves
  *   6.43 pt and 0.386 sizes after the text.
- * - A row of entries centres 0.18 sizes right of the chart's centre (1.76 pt for line keys).
+ * - A row of entries centres 0.55 pt and 0.138 sizes right of the chart's centre (1.76 pt for
+ *   line keys).
  * - A right legend keeps `gap` between the plot and its keys: 13.25 pt and half a square key,
  *   or 15.66 pt for line keys. A left legend keeps `LEFT_GAP` after its text.
  * The reference PDFs have no legend that mixes square and line keys. Such a legend takes the
@@ -134,7 +135,7 @@ export function keyMetrics(
   const key = 0.55 * size;
   const text = key + Math.max(0, 0.275 * size - 0.4);
   const after = (entry.point ? 1.615 : 1.65) * size - text;
-  return { key, text, after, shift: 0.18 * size, gap: 13.25 + key / 2 };
+  return { key, text, after, shift: 0.55 + 0.138 * size, gap: 13.25 + key / 2 };
 }
 
 /** A line key's length in points, the same at every text size. */
@@ -145,12 +146,18 @@ const ROW_GAP = 5.85;
 /** A key's centre sits this many sizes above its entry's baseline (`paintLegend`). */
 const KEY_RISE = 0.27;
 /**
- * A row legend centres its keys 9 pt and 0.6 sizes inside the chart edge (below the title for a
- * top legend), and the plot ends 14.2 pt and 0.6 sizes past that centre line.
+ * How far inside the chart edge a row legend centres its keys: 9 pt and 0.6045 sizes (below the
+ * title for a top legend). Measured on the `charts` and `chart-sizes` reference PDFs at 9 to
+ * 20 pt.
  */
-const ROW_EDGE = 9;
-const ROW_HALF = 0.6;
-const ROW_PLOT_GAP = 14.2;
+export function rowKeyInset(size: number): number {
+  return 9 + 0.6045 * size;
+}
+
+/** How far past a row legend's key centre line the plot ends: 14.2 pt and 0.59 sizes. */
+export function rowPlotGap(size: number): number {
+  return 14.2 + 0.59 * size;
+}
 /** The margin of an automatic chart layout on each side, in points (`chart-render.ts`). */
 export const CHART_MARGIN = 11;
 /**
@@ -201,7 +208,7 @@ export function placeLegend(
       rows[rows.length - 1]!.push({ entry, width: entryWidth, after: metrics.after });
     }
     const pitch = 1.84 * size;
-    const edge = ROW_EDGE + ROW_HALF * size;
+    const edge = rowKeyInset(size);
     // The key centre line of the first row. A top legend measures from `CHART_MARGIN` above
     // `box.t`: the top of the chart, or 1.5 pt below the title's lines (`chart-render.ts`).
     const firstCenter =
@@ -227,7 +234,7 @@ export function placeLegend(
       }
     }
     if (!legend.overlay && !manual) {
-      const reach = ROW_HALF * size + ROW_PLOT_GAP;
+      const reach = rowPlotGap(size);
       if (legend.position === 'b') plot.b = Math.min(plot.b, firstCenter - reach);
       else plot.t = Math.max(plot.t, lastCenter + reach);
     }

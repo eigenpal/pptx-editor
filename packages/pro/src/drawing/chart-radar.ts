@@ -34,8 +34,10 @@ import {
 
 const MAX_SPOKES = 1_024;
 /**
- * The room that a radar keeps for its category labels, past half a category line, at each
- * side of its box. Measured on the `charts` and `chart-sizes` reference PDFs at 9 to 20 pt.
+ * The room that a radar keeps for its category labels: past half a category line at the top
+ * and bottom of its box, and past the widest label at the left and right. Measured on the
+ * `charts` and `chart-sizes` reference PDFs at 9 to 20 pt, where the height limits the radius;
+ * no reference has a radar whose width limits it.
  */
 export function labelRoom(sizePt: number): number {
   return Math.max(0, 0.9275 * sizePt - 5.25);

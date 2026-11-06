@@ -9,7 +9,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // painted charts follow the rules at every size.
 
 import { describe, expect, test } from 'bun:test';
-import { keyMetrics, type LegendEntry } from '../chart-legend.ts';
+import { keyMetrics, rowKeyInset, rowPlotGap, type LegendEntry } from '../chart-legend.ts';
 import { labelRoom } from '../chart-radar.ts';
 import type { ChartComponent, Point } from '../chart-scene.ts';
 import type { ChartLabel } from '../chart-text.ts';
@@ -89,6 +89,46 @@ describe('chart spacing rules match the reference PDFs', () => {
     ] as const) {
       const radius = (height - 22) / 2 - ((CARLITO_LINE * size) / 2 + labelRoom(size));
       expect([size, Math.abs(radius - measured) < 0.1]).toEqual([size, true]);
+    }
+  });
+
+  test('a row legend centres its keys 9 pt and 0.6045 sizes inside the chart edge', () => {
+    // [text size, measured key centre from the bottom or top edge]
+    for (const [size, measured] of [
+      [9, 14.44],
+      [11.97, 16.23],
+      [14, 17.46],
+      [20, 21.08],
+    ] as const)
+      expect([size, Math.abs(rowKeyInset(size) - measured) < 0.05]).toEqual([size, true]);
+  });
+
+  test('the plot ends 14.2 pt and 0.59 sizes past the key centre line of a bottom legend', () => {
+    // [text size, measured gap], from the category labels above the legend.
+    for (const [size, measured] of [
+      [9, 19.51],
+      [11.97, 21.16],
+      [20, 26.0],
+    ] as const)
+      expect([size, Math.abs(rowPlotGap(size) - measured) < 0.15]).toEqual([size, true]);
+  });
+
+  test('row entries leave the measured room after their text, and centre the row', () => {
+    const point: LegendEntry = { ...square, point: true };
+    // [entry, text size, measured room from the text end to the next key, measured row shift]
+    for (const [name, entry, size, after, shift] of [
+      ['square', square, 9, 7.84, 1.79],
+      ['square', square, 11.97, 10.3, 2.2],
+      ['square', square, 20, 16.94, 3.31],
+      ['point', point, 11.97, 9.87, 2.2],
+      ['point', point, 14, 11.48, 2.48],
+      ['line', lined, 9, 9.87, 1.76],
+      ['line', lined, 11.97, 11.03, 1.77],
+      ['line', lined, 20, 14.15, 1.77],
+    ] as const) {
+      const metrics = keyMetrics(entry, size);
+      expect([name, size, Math.abs(metrics.after - after) < 0.05]).toEqual([name, size, true]);
+      expect([name, size, Math.abs(metrics.shift - shift) < 0.05]).toEqual([name, size, true]);
     }
   });
 
@@ -197,23 +237,21 @@ describe('the chart-sizes charts follow the rules', () => {
     }
   });
 
-  test('bottom legends: the keys centre 9 pt and 0.6 sizes above the chart bottom', () => {
+  test('bottom legends: keys at rowKeyInset, room after each text, and the row shift', () => {
     for (const index of [3, 5, 6]) {
       const { scene, labels } = render(index);
       const first = index === 6 ? 'North' : 'Plan';
       const size = sizeOf(label(labels, first));
       const key = squareKey(scene.components, size);
-      expect((key.t + key.b) / 2).toBeCloseTo(height(index) - (9 + 0.6 * size), 6);
-      // After the text, square keys leave 1.65 sizes less the text offset (1.615 for points).
+      expect((key.t + key.b) / 2).toBeCloseTo(height(index) - rowKeyInset(size), 6);
+      const metrics = keyMetrics(index === 6 ? { ...square, point: true } : square, size);
       const firstLabel = label(labels, first);
       const next = squareKey(scene.components, size, 'ED7D31');
-      const text = 0.825 * size - 0.4;
-      const after = (index === 6 ? 1.615 : 1.65) * size - text;
-      expect(next.l - (firstLabel.x + textWidth(firstLabel))).toBeCloseTo(after, 6);
-      // From the first key to the end of the last text, the row centres 0.18 sizes right.
+      expect(next.l - (firstLabel.x + textWidth(firstLabel))).toBeCloseTo(metrics.after, 6);
+      // From the first key to the end of the last text, the row centres `shift` right.
       const last = label(labels, index === 6 ? 'West' : 'Forecast');
       const end = last.x + textWidth(last);
-      expect((key.l + end) / 2 - width(index) / 2).toBeCloseTo(0.18 * size, 6);
+      expect((key.l + end) / 2 - width(index) / 2).toBeCloseTo(metrics.shift, 6);
     }
   });
 
@@ -226,7 +264,7 @@ describe('the chart-sizes charts follow the rules', () => {
       const plan = label(labels, 'Plan');
       const size = sizeOf(plan);
       const key = lineKey(scene.components);
-      const center = side === 'b' ? height(index) - (9 + 0.6 * size) : 9 + 0.6 * size;
+      const center = side === 'b' ? height(index) - rowKeyInset(size) : rowKeyInset(size);
       expect(key.t).toBeCloseTo(center, 6);
       expect(plan.x - key.l).toBeCloseTo(21.23, 6);
       const actual = label(labels, 'Actual');
