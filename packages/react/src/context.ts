@@ -197,6 +197,7 @@ export function useEditorCommand(slot: ChromeSlotId): UseEditorCommandReturn {
       ...state,
     };
     // `renamable` changes the answer of `editorCommandFor` for the section slots.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, slot, host, renamable]);
   const engine = useEditorState(
     select as unknown as (s: EditorSnapshot) => UseEditorCommandReturn,
@@ -235,6 +236,8 @@ export interface UseEditorValueCommandReturn<V, S = V> {
   /**
    * The slot's fixed choices, from the registry (the Rotate, Align, line width, or Shape Effects
    * rows); none for a slot with a free value (`font.size`, `shape.fill`, `shape.styles`).
+   * Without the `@pptx-editor.dev/pro/drawing` module, they leave out the effects it paints
+   * (`chromeOfferedControl`), so `value` can be an effect from the file that is not in the list.
    */
   readonly options: readonly V[];
   /** Whether the command can run now. */

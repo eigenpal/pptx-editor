@@ -44,9 +44,9 @@ const offered = new WeakMap<ChromeControl, ChromeControl>();
  * The control a slot shows in this build: its registry entry without the options whose result
  * does not paint, and without an option group that has no option left. With the
  * `@pptx-editor.dev/pro/drawing` module installed, or for a slot with no such option, it is the
- * control itself. The adapters read it each time they draw a slot's choices, and draw again after
- * `installDrawingRenderers` (`subscribeDrawingRenderers`), so the controls refresh after an
- * install. @public
+ * control itself. The adapters read it each time they draw a slot's choices: a menu opened after
+ * an install shows the new choices, and `useEditorValueCommand` draws again on each install
+ * (`subscribeDrawingRenderers`). A custom control does the same. @public
  */
 export function chromeOfferedControl(slot: ChromeSlotId, control: ChromeControl): ChromeControl {
   if (!control.options || drawingCapabilities().effects) return control;
