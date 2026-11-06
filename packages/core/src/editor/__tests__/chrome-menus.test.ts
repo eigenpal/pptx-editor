@@ -3,6 +3,7 @@ import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/bui
 import { buildSlideStructureDeck } from '../../../../../scripts/fixtures/slide-structure.ts';
 import {
   CANVAS_CONTEXT_MENUS,
+  canvasMenuKind,
   CHROME_MENUS,
   chromeCommandState,
   chromeControlForSlot,
@@ -173,6 +174,27 @@ describe('rows the adapter runs', () => {
     const h = host();
     runChromeRow(editor, h, 'paragraph.columns', 'dialog');
     expect(h.calls).toEqual(['dialog:columns']);
+  });
+
+  test('a table selected as an object has the shape rows and the table submenus', () => {
+    const shapes = { kind: 'shapes', nodeIds: ['7'] } as const;
+    expect(canvasMenuKind({ selection: shapes, image: null })).toBe('shapes');
+    const table = {} as NonNullable<Parameters<typeof canvasMenuKind>[0]['table']>;
+    expect(canvasMenuKind({ selection: shapes, image: null, table })).toBe('tableFrame');
+    const ids = CANVAS_CONTEXT_MENUS.tableFrame.map((e) =>
+      e.kind === 'item' ? e.slot : e.kind === 'submenu' ? e.id : ''
+    );
+    expect(ids.slice(0, 7)).toEqual([
+      'edit.cut',
+      'edit.copy',
+      'edit.paste',
+      'more.duplicate',
+      'more.delete',
+      '',
+      'tableInsert',
+    ]);
+    expect(ids).toContain('tableDelete');
+    expect(ids).not.toContain('tableSelect');
   });
 
   test('clipboard rows: copy and paste shapes through the editor clipboard', async () => {

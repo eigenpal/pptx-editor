@@ -9,7 +9,7 @@ import { caretAt, linkedAt, linkedAtPoint, pointAt, textFrameMatrix } from './su
 
 export { caretAt, pointAt, textFrameMatrix };
 import { selectionRects } from './surface-text-selection.ts';
-import { cellsOverlay, TableGestures } from './surface-table.ts';
+import { cellsOverlay, clampTableResize, TableGestures } from './surface-table.ts';
 import { TableChrome } from './surface-table-chrome.ts';
 import { textItemOf } from './table-cells.ts';
 import { paragraphUnits, wordSelectionAt } from '../automation/commands/text-units.ts';
@@ -789,6 +789,7 @@ export class SlideSurface {
       this.editor.transform([toFile(item, { ...x, rot })], d.gesture);
       return;
     }
+    ({ dx, dy } = clampTableResize(item, [hx, hy], dx, dy, layout.slide));
     const s0 = toParent(item, d.start.x, d.start.y);
     const s1 = toParent(item, d.start.x + dx, d.start.y + dy);
     const locked = !!this.editor.aspectLocked?.(item.element.nodeId);

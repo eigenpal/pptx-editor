@@ -73,7 +73,7 @@ export function canvasMenuLabelKey(
   | 'contextMenu.shapeLabel'
   | 'contextMenu.pictureLabel'
   | 'contextMenu.canvasLabel' {
-  if (kind === 'table') return 'contextMenu.tableLabel';
+  if (kind === 'table' || kind === 'tableFrame') return 'contextMenu.tableLabel';
   return kind === 'text'
     ? 'contextMenu.textLabel'
     : kind === 'shapes'

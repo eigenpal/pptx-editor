@@ -152,8 +152,9 @@
   --doc-review-change-bar-simple-width: 2px;
 
   /* Selected table cells: drawn, because a native selection cannot express a rectangle
-    * of cells. Kept close to the browser's own selection tint. */
-  --doc-cell-selection: rgba(26, 115, 232, 0.22);
+    * of cells. A light tint with an edge, so the cells' own fill stays readable. */
+  --doc-cell-selection: rgba(26, 115, 232, 0.14);
+  --doc-cell-selection-edge: rgba(26, 115, 232, 0.9);
 
   /* Shadows & overlays */
   --doc-shadow: rgba(0, 0, 0, 0.15);
@@ -1623,9 +1624,13 @@
   fill: var(--doc-selection);
 }
 
-/* A selected range of table cells (surface-table.ts). */
+/* A selected range of table cells (surface-table.ts): a light tint and a 1px edge on each
+   cell, so a cell fill shows through and a new fill is visible at once. */
 .pptx-surface__cell-selection {
-  fill: var(--doc-selection);
+  fill: var(--doc-cell-selection);
+  stroke: var(--doc-cell-selection-edge);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
 }
 /* The table chrome (surface-table-chrome.ts), after DOCX Editor's: the select handle at the
    table's top-left corner, the grid line under the pointer, and the insert buttons. */

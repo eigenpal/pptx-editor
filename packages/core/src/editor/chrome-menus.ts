@@ -226,7 +226,7 @@ export const CHROME_MENUS: readonly ChromeMenu[] = [
  * What a canvas context menu opened on: shapes, pictures only, text being edited, a table cell
  * (a caret in a cell, or a cell range), or empty slide area. @public
  */
-export type CanvasMenuKind = 'shapes' | 'picture' | 'text' | 'table' | 'slide';
+export type CanvasMenuKind = 'shapes' | 'picture' | 'text' | 'table' | 'tableFrame' | 'slide';
 
 /**
  * The context menu kind for a snapshot: a table cell (a caret in a cell, or a cell range), text
@@ -234,14 +234,44 @@ export type CanvasMenuKind = 'shapes' | 'picture' | 'text' | 'table' | 'slide';
  * slide. @internal
  */
 export function canvasMenuKind(
-  snapshot: Pick<EditorSnapshot, 'selection' | 'image'>
+  snapshot: Pick<EditorSnapshot, 'selection' | 'image'> & Partial<Pick<EditorSnapshot, 'table'>>
 ): CanvasMenuKind {
   const sel = snapshot.selection;
   if (sel.kind === 'cells' || (sel.kind === 'text' && sel.cell)) return 'table';
   if (sel.kind === 'text') return 'text';
+  if (sel.kind === 'shapes' && snapshot.table) return 'tableFrame';
   if (sel.kind === 'shapes') return snapshot.image ? 'picture' : 'shapes';
   return 'slide';
 }
+
+/** The table Insert submenu: rows above and below, columns left and right. */
+const TABLE_INSERT: ChromeMenuEntry = {
+  kind: 'submenu',
+  id: 'tableInsert',
+  labelKey: 'table.insertSubmenu',
+  paths: ICON_PATHS['add'] ?? null,
+  items: [
+    item('table.insertRowAbove'),
+    item('table.insertRowBelow'),
+    item('table.insertColumnLeft'),
+    item('table.insertColumnRight'),
+  ],
+};
+
+/** The table Delete submenu, in the toolbar's order. */
+const TABLE_DELETE: ChromeMenuEntry = {
+  kind: 'submenu',
+  id: 'tableDelete',
+  labelKey: 'table.delete',
+  paths: ICON_PATHS['delete_sweep'] ?? null,
+  // The toolbar's order: Delete Columns, Delete Rows, Delete Table.
+  items: (['columns', 'rows', 'table'] as const).map((v): ChromeMenuItemEntry => ({
+    kind: 'item',
+    slot: 'table.delete',
+    value: v,
+    labelKey: `table.deleteRegion.${v}`,
+  })),
+};
 
 /**
  * The canvas context menus, one per kind of target, in a fixed order. Rows the selection
@@ -281,37 +311,14 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
   // The table cell menu, on the cell (or the cell range): the clipboard rows, then the row and
   // column commands of the Table Layout tab in three short submenus (Insert, Delete, Select),
   // then Merge and Split, then the text dialogs. A table selected as an object takes the
-  // shapes menu.
+  // table frame menu.
   table: [
     item('edit.cut', 'contextMenu.cut', 'contextMenu.shortcuts.cut'),
     item('edit.copy', 'contextMenu.copy', 'contextMenu.shortcuts.copy'),
     item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
     SEPARATOR,
-    {
-      kind: 'submenu',
-      id: 'tableInsert',
-      labelKey: 'table.insertSubmenu',
-      paths: ICON_PATHS['add'] ?? null,
-      items: [
-        item('table.insertRowAbove'),
-        item('table.insertRowBelow'),
-        item('table.insertColumnLeft'),
-        item('table.insertColumnRight'),
-      ],
-    },
-    {
-      kind: 'submenu',
-      id: 'tableDelete',
-      labelKey: 'table.delete',
-      paths: ICON_PATHS['delete_sweep'] ?? null,
-      // The toolbar's order: Delete Columns, Delete Rows, Delete Table.
-      items: (['columns', 'rows', 'table'] as const).map((v): ChromeMenuItemEntry => ({
-        kind: 'item',
-        slot: 'table.delete',
-        value: v,
-        labelKey: `table.deleteRegion.${v}`,
-      })),
-    },
+    TABLE_INSERT,
+    TABLE_DELETE,
     {
       kind: 'submenu',
       id: 'tableSelect',
@@ -344,6 +351,25 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     SEPARATOR,
     item('text.dialog', 'contextMenu.font'),
     item('paragraph.dialog', 'contextMenu.paragraph'),
+  ],
+  // A table selected as an object (from the select handle): the shape rows, with the table's
+  // Insert and Delete submenus after the clipboard rows. Tables do not group-format or crop.
+  tableFrame: [
+    item('edit.cut', 'contextMenu.cut', 'contextMenu.shortcuts.cut'),
+    item('edit.copy', 'contextMenu.copy', 'contextMenu.shortcuts.copy'),
+    item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
+    item('more.duplicate', 'contextMenu.duplicate', 'contextMenu.shortcuts.duplicate'),
+    item('more.delete', 'contextMenu.delete', 'contextMenu.shortcuts.delete'),
+    SEPARATOR,
+    TABLE_INSERT,
+    TABLE_DELETE,
+    SEPARATOR,
+    ...ORDER_ROWS,
+    SEPARATOR,
+    item('arrange.group', 'contextMenu.group', 'contextMenu.shortcuts.group'),
+    item('arrange.ungroup', 'contextMenu.ungroup', 'contextMenu.shortcuts.ungroup'),
+    SEPARATOR,
+    item('image.altText', 'contextMenu.altText'),
   ],
   // The picture menu: the shape rows, with Change Picture after Paste and Format Picture at the
   // end. This order is not checked yet.

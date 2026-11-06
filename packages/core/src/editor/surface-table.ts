@@ -269,6 +269,25 @@ export class TableGestures {
   }
 }
 
+/**
+ * A table frame's resize: its right and bottom edges stop at the slide's edge, as its grid
+ * edges do, so a handle never leaves the place where the pointer can grab it again. `handle` is
+ * the dragged handle's place on the box; `dx` and `dy` are in slide units.
+ */
+export function clampTableResize(
+  item: LayoutItem,
+  handle: readonly [number, number],
+  dx: number,
+  dy: number,
+  slide: { readonly width: number; readonly height: number }
+): { dx: number; dy: number } {
+  if (item.kind !== 'frame' || !item.table) return { dx, dy };
+  const end = apply(item.matrix, item.element.xfrm.cx, item.element.xfrm.cy);
+  return {
+    dx: handle[0] === 1 ? Math.min(dx, Math.max(0, slide.width - end.x)) : dx,
+    dy: handle[1] === 1 ? Math.min(dy, Math.max(0, slide.height - end.y)) : dy,
+  };
+}
 /** The highlight of a selected cell range, editing chrome over the slide. */
 export function cellsOverlay(
   doc: Document,

@@ -243,10 +243,10 @@ export type CanResult = {
 export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly ChromeMenuEntry[]>>;
 
 // @public
-export type CanvasMenuKind = 'shapes' | 'picture' | 'text' | 'table' | 'slide';
+export type CanvasMenuKind = 'shapes' | 'picture' | 'text' | 'table' | 'tableFrame' | 'slide';
 
 // @internal
-export function canvasMenuKind(snapshot: Pick<EditorSnapshot, 'selection' | 'image'>): CanvasMenuKind;
+export function canvasMenuKind(snapshot: Pick<EditorSnapshot, 'selection' | 'image'> & Partial<Pick<EditorSnapshot, 'table'>>): CanvasMenuKind;
 
 // @internal
 export function canvasMenuLabelKey(kind: CanvasMenuKind): 'contextMenu.textLabel' | 'contextMenu.tableLabel' | 'contextMenu.shapeLabel' | 'contextMenu.pictureLabel' | 'contextMenu.canvasLabel';

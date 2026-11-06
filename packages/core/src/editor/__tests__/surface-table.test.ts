@@ -22,7 +22,7 @@ import type {
 } from '../../contracts/index.ts';
 import { apply, type SlideLayout } from '../../layout/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
-import { TableGestures, type TableGestureHost } from '../surface-table.ts';
+import { clampTableResize, TableGestures, type TableGestureHost } from '../surface-table.ts';
 import { tableItem } from '../table-cells.ts';
 
 const IN = 914_400;
@@ -294,6 +294,31 @@ describe('table gestures: grid lines', () => {
     const slide = layout(e).slide.width;
     expect(IN + widths(e).reduce((a, b) => a + b, 0)).toBe(slide);
     g.up();
+  });
+
+  test('a frame resize handle stops at the slide edge too; other shapes and handles do not', async () => {
+    const e = await open();
+    const frame = frameOf(e);
+    const slide = layout(e).slide;
+    const right = frame.matrix[4] + frame.element.xfrm.cx;
+    const bottom = frame.matrix[5] + frame.element.xfrm.cy;
+    // The east and south-east handles grow the table to the slide's edge only.
+    expect(clampTableResize(frame, [1, 0.5], 20 * IN, 0, slide)).toEqual({
+      dx: slide.width - right,
+      dy: 0,
+    });
+    expect(clampTableResize(frame, [1, 1], 20 * IN, 20 * IN, slide)).toEqual({
+      dx: slide.width - right,
+      dy: slide.height - bottom,
+    });
+    // A shrink, the west handle, and a shape that is not a table keep the pointer's move.
+    expect(clampTableResize(frame, [1, 0.5], -IN, 0, slide)).toEqual({ dx: -IN, dy: 0 });
+    expect(clampTableResize(frame, [0, 0.5], -20 * IN, 0, slide)).toEqual({ dx: -20 * IN, dy: 0 });
+    const box = layout(e).items.find((i) => i.element.nodeId === boxId(e))!;
+    expect(clampTableResize(box, [1, 1], 20 * IN, 20 * IN, slide)).toEqual({
+      dx: 20 * IN,
+      dy: 20 * IN,
+    });
   });
 
   test('the outer edges are grid lines, so the border band of the selected table yields', async () => {
