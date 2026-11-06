@@ -9,7 +9,7 @@ import type {
   EditorCommand,
   EditorSnapshot,
   TableBorderEdgeTarget,
-  TableBorderSpec,
+  TableBorderPen,
   TableBorderTarget,
   TableContext,
   TableStyleOption,
@@ -20,6 +20,7 @@ import type { ChromeGroup, ChromeSlotId, ToolbarCommandState } from './chrome-co
 import { ICON_PATHS } from './icon-paths.ts';
 import { isColorChoice } from '../automation/commands/style-commands.ts';
 import { LINE_DASHES, LINE_WIDTHS } from './line-presets.ts';
+import { DEFAULT_TABLE_BORDER_PEN } from './view-settings.ts';
 
 const icon = (name: string): readonly string[] => ICON_PATHS[name] ?? [];
 
@@ -86,38 +87,20 @@ const OPTION_ICONS: Record<keyof typeof OPTIONS, string> = {
   bandedColumns: 'view_column',
 };
 
-/**
- * The border pen, as DOCX Editor's table chrome draft: the last border target and the line the
- * Borders menu draws. Picking a target draws the pen there and makes it the active target;
- * picking a pen color, style, or weight redraws the active target with the new pen. @public
- */
-export interface TableBorderPen {
-  /** The target the pen last drew (All Borders until the first pick). */
-  readonly target: TableBorderEdgeTarget;
-  /** The line the pen draws. */
-  readonly spec: TableBorderSpec;
-}
+export { DEFAULT_TABLE_BORDER_PEN } from './view-settings.ts';
 
-/** The pen before any pick: all borders, 1 pt solid in the theme's Text 1. @public */
-export const DEFAULT_TABLE_BORDER_PEN: TableBorderPen = {
-  target: 'all',
-  spec: { color: { theme: 'tx1' }, width: 1 },
-};
-
-// One pen per editor. The pen is chrome state: it is not in the document and never syncs.
-const PENS = new WeakMap<Editor, TableBorderPen>();
-
-/** The border pen of `editor`, or the default pen. @public */
+/** The border pen of `editor` (`snapshot.tableBorderPen`), or the default pen. @public */
 export function tableBorderPen(editor: Editor | null | undefined): TableBorderPen {
-  return (editor && PENS.get(editor)) || DEFAULT_TABLE_BORDER_PEN;
+  return editor?.snapshot().tableBorderPen ?? DEFAULT_TABLE_BORDER_PEN;
 }
 
 /** The pen after a pick of a border slot, or null when `slot` is not one or `value` is invalid. */
 function nextPen(pen: TableBorderPen, slot: string, value: unknown): TableBorderPen | null {
   switch (slot) {
     case 'table.borderTarget':
-      return BORDERS.includes(value as TableBorderTarget) && value !== 'none'
-        ? { ...pen, target: value as TableBorderEdgeTarget }
+      if (value === 'none') return { ...pen, drawn: false };
+      return BORDERS.includes(value as TableBorderTarget)
+        ? { ...pen, target: value as TableBorderEdgeTarget, drawn: true }
         : null;
     case 'table.borderColor':
       // The reset row is the automatic color: the theme's Text 1.
@@ -144,12 +127,30 @@ function nextPen(pen: TableBorderPen, slot: string, value: unknown): TableBorder
 }
 
 /**
+ * Arm the pen with a pen color, style, or weight pick while it has drawn no target: the pen
+ * changes, the document does not. Returns the run's result, or null when the pick draws (the
+ * pen has drawn a target) or is not a pen pick. @internal
+ */
+export function armTableBorderPen(
+  editor: Editor,
+  slot: string,
+  value: unknown
+): { readonly ok: true } | null {
+  if (slot === 'table.borderTarget') return null;
+  const pen = tableBorderPen(editor);
+  const next = nextPen(pen, slot, value);
+  if (!next || pen.drawn) return null;
+  const result = editor.exec({ type: 'setTableBorderPen', pen: next });
+  return result.ok ? { ok: true } : null;
+}
+
+/**
  * Remember the pen that a run of a border slot picks, as `runToolbarCommand` runs it. A pick that
  * the engine refuses (no table selected) still sets the pen, because a pen is a setting. @internal
  */
 export function rememberTableBorderPen(editor: Editor, slot: string, value: unknown): void {
   const pen = nextPen(tableBorderPen(editor), slot, value);
-  if (pen) PENS.set(editor, pen);
+  if (pen) editor.exec({ type: 'setTableBorderPen', pen });
 }
 
 /**

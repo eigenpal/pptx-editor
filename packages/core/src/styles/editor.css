@@ -1722,8 +1722,10 @@
   text-decoration: underline;
   box-shadow: 0 0 0 1px var(--doc-surface);
 }
+/* The slide takes the stage's cursor (surface.ts `#updateCursor`): resize on a table's grid
+   lines, text over text, move on shapes; never the browser's own cursor over SVG text. */
 .pptx-surface__stage [data-layer='slide'] {
-  cursor: default;
+  cursor: inherit;
 }
 /* While the format painter is on, the whole slide shows its brush (surface.ts). */
 .pptx-surface--painting .pptx-surface__stage,

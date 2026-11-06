@@ -38,6 +38,7 @@ import {
   selectedRange,
   insertColumns,
   insertRows,
+  MAX_ROWS,
   MAX_TABLE_SIZE,
   mergeRange,
   readTable,
@@ -199,6 +200,36 @@ function keepGridWidth(batch: OpBatch, m: TableModel, width: number): void {
     left -= w;
     setAttr(batch, m.part, g.id, 'w', String(Math.max(1, w)));
   });
+}
+
+/**
+ * The table after a paste grows it: rows and columns are added at the bottom and right for the
+ * text past its edge, as many as the table limits allow. New columns share the table's width.
+ */
+function grownForPaste(
+  ctx: CommandContext,
+  batch: OpBatch,
+  m: TableModel,
+  range: CellRange,
+  texts: readonly unknown[]
+): TableModel {
+  const widest = texts.reduce<number>(
+    (n, row) => (Array.isArray(row) ? Math.max(n, row.length) : n),
+    0
+  );
+  const rows = Math.min(range.r0 + texts.length - m.nR, MAX_ROWS - m.nR);
+  const columns = Math.min(range.c0 + widest - m.nC, MAX_TABLE_SIZE - m.nC);
+  if (rows <= 0 && columns <= 0) return m;
+  if (rows > 0) insertRows(batch, m, m.nR, rows, m.nR - 1);
+  let grown = readTable(batch, m.part, m.frame.id);
+  if (columns > 0) {
+    const width = gridWidth(grown);
+    insertColumns(batch, grown, grown.nC, columns, grown.nC - 1);
+    keepGridWidth(batch, grown, width);
+    grown = readTable(batch, m.part, m.frame.id);
+  }
+  structureEdited(ctx, batch, grown);
+  return grown;
 }
 
 /** The most characters one cell takes from a paste, as the clipboard parser reads. */
@@ -401,13 +432,15 @@ export function compileTable(ctx: CommandContext, batch: OpBatch, command: Table
       return { batch, effect: { label: 'columnWidth' } };
     }
     case 'pasteCells': {
-      const { m, range } = tableTarget(ctx, batch);
+      const target = tableTarget(ctx, batch);
+      const range = target.range;
       const texts = command.texts;
       if (!Array.isArray(texts) || texts.length === 0)
         throw new CommandRefusal('errors.unsupported', 'texts');
+      const m = grownForPaste(ctx, batch, target.m, range, texts);
       let r1 = range.r0;
       let c1 = range.c0;
-      // Text past the table's edge is left out: only the rows and columns that fit are read.
+      // Text past the largest table is left out: only the rows and columns that fit are read.
       texts.slice(0, m.nR - range.r0).forEach((row, i) => {
         if (!Array.isArray(row)) throw new CommandRefusal('errors.unsupported', 'texts');
         row.slice(0, m.nC - range.c0).forEach((text, j) => {

@@ -82,7 +82,7 @@ editor.exec({
 });
 ```
 
-A paste fills as many cells as the table has, and adds no rows or columns. A covered position of a merged cell takes no text. A line break in a value makes a new paragraph in its cell. A paste reads at most 75 rows, 75 columns, and 32,768 characters in each cell. After the paste, the filled cells are selected.
+A paste larger than the table adds rows at the bottom and columns at the right, in the same undo step. New columns share the table's width. A covered position of a merged cell takes no text. A line break in a value makes a new paragraph in its cell. A paste reads at most 75 rows, 75 columns, and 32,768 characters in each cell. After the paste, the filled cells are selected.
 
 ## Edit on the canvas
 
@@ -136,14 +136,19 @@ editor.exec({ type: 'splitCell', rows: 2, cols: 1 });
 
 ### Draw borders with the pen
 
-The Borders menu (`table.borderTarget`) draws with the border pen: Pen color (`table.borderColor`), Pen style (`table.borderStyle`, a `LineDash`), and Pen weight (`table.borderWidth`, in points). Pick a border target to draw the pen there. Pick a pen color, style, or weight to redraw the last target with the new pen. Until the first pick, the pen draws all borders, 1 pt solid, in the theme's Text 1.
+The Borders menu (`table.borderTarget`) draws with the border pen: Pen color (`table.borderColor`), Pen style (`table.borderStyle`, a `LineDash`), and Pen weight (`table.borderWidth`, in points). The pen starts as 1 pt solid in the theme's Text 1.
+
+- A pen color, style, or weight pick sets the pen and changes nothing in the document.
+- A border target pick (All, Outside, Inside, or one side) draws the pen there.
+- After a border target pick, a pen pick redraws that target with the new pen. No Border clears the borders and stops the redraw.
 
 The pen is a setting of each editor, not part of the document. `tableBorderPen(editor)` returns it, and `runToolbarCommand` keeps it current:
 
 ```ts
-runToolbarCommand(editor, 'table.borderTarget', 'outside');
-runToolbarCommand(editor, 'table.borderColor', '#1F4E79'); // redraws the outside borders
-tableBorderPen(editor); // { target: 'outside', spec: { color: '#1F4E79', width: 1 } }
+runToolbarCommand(editor, 'table.borderColor', '#1F4E79'); // sets the pen only
+runToolbarCommand(editor, 'table.borderTarget', 'outside'); // draws the outside borders
+runToolbarCommand(editor, 'table.borderWidth', '3'); // redraws them 3 pt wide
+tableBorderPen(editor); // { target: 'outside', drawn: true, spec: { color: '#1F4E79', width: 3 } }
 ```
 
 ## Customize the table chrome

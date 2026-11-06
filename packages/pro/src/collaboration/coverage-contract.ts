@@ -40,6 +40,7 @@ export const COLLABORATION_UNCOVERED: ReadonlyMap<EditorCommandType, string> = n
   string
 >([
   ['toggleSmartGuides', VIEW_SETTING],
+  ['setTableBorderPen', VIEW_SETTING],
   ['setPresentationView', VIEW_SETTING],
   ['setSectionsCollapsed', VIEW_SETTING],
   [

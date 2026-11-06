@@ -80,6 +80,8 @@ async function open(bytes = deck()): Promise<PptxEditorInstance> {
 }
 
 const part = (e: PptxEditorInstance) => e.session!.info.slides[0].partName;
+const xml = (e: PptxEditorInstance): string =>
+  JSON.stringify(xmlPartOf(e.session!.store.package, part(e))!.root);
 const root = (e: PptxEditorInstance): Element => xmlPartOf(e.session!.store.package, part(e))!.root;
 const frameId = (e: PptxEditorInstance): string =>
   elements(find(root(e), 'p:spTree')!).find((c) => c.local === 'graphicFrame')!.id;
@@ -444,10 +446,14 @@ describe('merge, split, and formatting (editor-ui-parity 4.3)', () => {
     caretIn(e, 1, 1);
     const tcPr = () => child(model(e).tcs[1][1], 'a:tcPr')!;
     expect(toolbarCommandState(e, 'table.borderWidth').value).toBe('1');
-    // A pen pick before any target pick draws all borders.
+    // A pen pick before any target pick arms the pen and writes nothing.
+    const before = xml(e);
     expect(runToolbarCommand(e, 'table.borderColor', '#00FF00').ok).toBe(true);
-    expect(attr(find(child(tcPr(), 'a:lnT')!, 'a:srgbClr'), 'val')).toBe('00FF00');
+    expect(xml(e)).toBe(before);
+    expect(e.snapshot().canUndo).toBe(false);
+    // A target pick draws the armed pen there; then a pen pick redraws that target.
     expect(runToolbarCommand(e, 'table.borderTarget', 'outside').ok).toBe(true);
+    expect(attr(find(child(tcPr(), 'a:lnT')!, 'a:srgbClr'), 'val')).toBe('00FF00');
     expect(runToolbarCommand(e, 'table.borderWidth', '3').ok).toBe(true);
     expect(attr(child(tcPr(), 'a:lnL'), 'w')).toBe('38100');
     expect(toolbarCommandState(e, 'table.borderWidth').value).toBe('3');
@@ -459,6 +465,11 @@ describe('merge, split, and formatting (editor-ui-parity 4.3)', () => {
     // An invalid pen value changes nothing.
     expect(runToolbarCommand(e, 'table.borderWidth', '-1' as never).ok).toBe(false);
     expect(toolbarCommandState(e, 'table.borderWidth').value).toBe('3');
+    // After No Border, a pen pick arms again and draws nothing.
+    expect(runToolbarCommand(e, 'table.borderTarget', 'none').ok).toBe(true);
+    const cleared = xml(e);
+    expect(runToolbarCommand(e, 'table.borderColor', '#0000FF').ok).toBe(true);
+    expect(xml(e)).toBe(cleared);
     expectValid(e);
     roundTrip(e);
   });

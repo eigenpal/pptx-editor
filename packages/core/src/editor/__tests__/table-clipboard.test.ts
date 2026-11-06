@@ -10,7 +10,7 @@ import {
   shape,
   table,
 } from '../../../../../scripts/fixtures/builder.ts';
-import { child, elements, find, textOf, xmlPartOf, type Element } from '../../store/index.ts';
+import { attr, child, elements, find, textOf, xmlPartOf, type Element } from '../../store/index.ts';
 import { DEFAULT_TABLE_STYLE_ID } from '../../cascade/index.ts';
 import { createPptxEditor, toolbarCommandState, type PptxEditorInstance } from '../index.ts';
 import { OpBatch } from '../../automation/commands/op-batch.ts';
@@ -69,6 +69,8 @@ const part = (e: PptxEditorInstance) => e.session!.info.slides[0].partName;
 const root = (e: PptxEditorInstance): Element => xmlPartOf(e.session!.store.package, part(e))!.root;
 const frameId = (e: PptxEditorInstance): string =>
   elements(find(root(e), 'p:spTree')!).find((c) => c.local === 'graphicFrame')!.id;
+const model = (e: PptxEditorInstance) =>
+  readTable(new OpBatch(e.session!.store.package), part(e), frameId(e));
 const grid = (e: PptxEditorInstance): string[][] =>
   readTable(new OpBatch(e.session!.store.package), part(e), frameId(e)).tcs.map((row) =>
     row.map((tc) => textOf(child(tc, 'a:txBody')))
@@ -142,30 +144,34 @@ describe('copy a cell range', () => {
 });
 
 describe('paste into cells', () => {
-  test('pasteCells fills cells from the caret, leaves out text past the edge, and undoes once', async () => {
+  test('pasteCells fills cells from the caret, grows the table past its edge, and undoes once', async () => {
     const e = await open();
     caretIn(e, 1, 1);
     const r = e.exec({
       type: 'pasteCells',
       texts: [
-        ['x', 'y', 'past the edge'],
+        ['x', 'y', 'new column'],
         ['z', 'w'],
       ],
     });
     expect(r.ok).toBe(true);
     expect(grid(e)).toEqual([
-      ['A', 'B', 'C'],
-      ['D', 'x', 'y'],
-      ['G', 'z', 'w'],
+      ['A', 'B', 'C', ''],
+      ['D', 'x', 'y', 'new column'],
+      ['G', 'z', 'w', ''],
     ]);
     // The filled cells are the selection.
     expect(e.snapshot().selection).toMatchObject({
       kind: 'cells',
       anchor: { row: 1, column: 1 },
-      focus: { row: 2, column: 2 },
+      focus: { row: 2, column: 3 },
     });
     e.exec({ type: 'undo' });
-    expect(grid(e)[1]).toEqual(['D', 'E', 'F']);
+    expect(grid(e)).toEqual([
+      ['A', 'B', 'C'],
+      ['D', 'E', 'F'],
+      ['G', 'H', 'I'],
+    ]);
   });
 
   test('a cell keeps the format of its first run; lines become paragraphs', async () => {
@@ -186,16 +192,18 @@ describe('paste into cells', () => {
     expect(grid(again)[1][2]).toBe('G2');
   });
 
-  test('a paste taller or wider than the table fills what fits', async () => {
+  test('a paste taller or wider than the table adds rows and columns; the width stays', async () => {
     const e = await open();
-    caretIn(e, 1, 0);
-    const texts = Array.from({ length: 20 }, (_, i) => Array.from({ length: 9 }, () => `r${i}`));
+    caretIn(e, 2, 0);
+    const width = () => model(e).gridCols.reduce((n, g) => n + Number(attr(g, 'w')), 0);
+    const before = width();
+    const texts = Array.from({ length: 4 }, (_, i) => Array.from({ length: 5 }, () => `r${i}`));
     expect(e.exec({ type: 'pasteCells', texts }).ok).toBe(true);
-    expect(grid(e)).toEqual([
-      ['A', 'B', 'C'],
-      ['r0', 'r0', 'r0'],
-      ['r1', 'r1', 'r1'],
-    ]);
+    expect(grid(e).length).toBe(6);
+    expect(grid(e)[5]).toEqual(['r3', 'r3', 'r3', 'r3', 'r3']);
+    expect(width()).toBe(before);
+    // Every row holds one cell for each grid column.
+    expect(model(e).tcs.every((row) => row.length === model(e).nC)).toBe(true);
   });
 
   test('pasteCells refuses texts that are not rows of strings', async () => {

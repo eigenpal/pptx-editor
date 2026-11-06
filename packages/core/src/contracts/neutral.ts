@@ -51,12 +51,13 @@ export type {
   ParagraphFormatRead,
 } from './text-format.ts';
 
-import type { TableCellAddress, TableContext, TableCommand } from './table.ts';
+import type { TableBorderPen, TableCellAddress, TableContext, TableCommand } from './table.ts';
 
 export type {
   TableCellAddress,
   TableBorderTarget,
   TableBorderEdgeTarget,
+  TableBorderPen,
   TableBorderSpec,
   TableStyleOption,
   TableStyleChoice,
@@ -258,6 +259,11 @@ export type EditorCommand =
     }
   /** View > Smart guides: drags snap to and show alignment guides. A view setting, not an edit. */
   | { readonly type: 'toggleSmartGuides' }
+  /**
+   * Set the table border pen (`snapshot.tableBorderPen`) that the Borders menu draws with. A
+   * setting of this editor, not an edit: no undo step, never saved.
+   */
+  | { readonly type: 'setTableBorderPen'; readonly pen: TableBorderPen }
   /** View > Normal or Slide Sorter. A view setting, not an edit: no undo step, never saved. */
   | { readonly type: 'setPresentationView'; readonly view: PresentationView }
   /**
@@ -906,6 +912,11 @@ export interface EditorSnapshot {
    * the implementation has no format painter.
    */
   readonly formatPainter?: FormatPainterMode;
+  /**
+   * The table border pen: the line the Borders menu draws and the target it last drew
+   * (`setTableBorderPen`). Optional: absent means the implementation has no border pen.
+   */
+  readonly tableBorderPen?: TableBorderPen;
   /**
    * The selected pictures, while every selected element is a picture; the picture controls
    * show then. Optional: absent means the implementation does not report pictures.

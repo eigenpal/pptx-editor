@@ -105,6 +105,7 @@ const COMMAND_TABLE = {
   replaceAll: true,
   // View settings
   toggleSmartGuides: true,
+  setTableBorderPen: true,
   setPresentationView: true,
   setSectionsCollapsed: true,
   // Pictures

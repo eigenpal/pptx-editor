@@ -31,7 +31,6 @@ export {
   TABLE_CHROME_SLOT_IDS,
   tableBorderPen,
   tableChromeVisible,
-  type TableBorderPen,
   type TableChromeSlotId,
   type TableSlotId,
 } from './chrome-table.ts';

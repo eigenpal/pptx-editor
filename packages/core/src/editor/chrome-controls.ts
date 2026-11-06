@@ -40,6 +40,7 @@ import {
   type TableSlotId,
   TABLE_GROUPS,
   TABLE_PROBES,
+  armTableBorderPen,
   rememberTableBorderPen,
   tableBorderPen,
   tableSlotState,
@@ -978,6 +979,9 @@ export function runToolbarCommand<K extends ChromeSlotId>(
     warnInvalidSlotValue(id, value);
     return { ok: false as const, reason: 'disabled.invalidValue' };
   }
+  // A pen pick before any border target pick arms the pen and writes nothing.
+  const armed = armTableBorderPen(editor, id, value);
+  if (armed) return armed;
   rememberTableBorderPen(editor, id, value);
   return editor.exec(command, options);
 }

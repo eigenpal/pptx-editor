@@ -514,6 +514,12 @@ export const TEXT_INPUT_FIXTURES: Record<TextInputKind, TextInputFixture> = {
  */
 export const NO_WRITE_PROBES: Partial<Record<EditorCommandType, ConvergenceFixture>> = {
   toggleSmartGuides: { command: () => ({ type: 'toggleSmartGuides' }) },
+  setTableBorderPen: {
+    command: () => ({
+      type: 'setTableBorderPen',
+      pen: { target: 'outside', drawn: true, spec: { color: '#FF0000', width: 2 } },
+    }),
+  },
   setPresentationView: { command: () => ({ type: 'setPresentationView', view: 'slideSorter' }) },
   setSectionsCollapsed: {
     arrange: (e) => run(e, { type: 'addSection', name: 'Part two', index: 1 }),
