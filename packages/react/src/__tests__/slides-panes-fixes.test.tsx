@@ -219,25 +219,22 @@ describe('slide sorter', () => {
   });
 
   test('the Find button turns off in the slide sorter and on again in the Normal view', async () => {
-    const editor = await open(flatDeck());
+    let editor: PptxEditorInstance | null = null;
     const { container } = render(
-      <PptxEditorRoot>
-        <PptxEditorContext.Provider value={editor}>
-          <div className="pptx-editor">
-            <Toolbar preset={false}>
-              <Toolbar.Find />
-            </Toolbar>
-            <PptxEditor.FindBar />
-          </div>
-        </PptxEditorContext.Provider>
+      <PptxEditorRoot onReady={(e) => (editor = e)}>
+        <Toolbar preset={false}>
+          <Toolbar.Find />
+        </Toolbar>
+        <PptxEditor.FindBar />
       </PptxEditorRoot>
     );
+    await act(async () => void (await editor!.load(flatDeck())));
     const off = () =>
       container.querySelector('[data-slot="find.find"]')!.getAttribute('aria-disabled');
     expect(off()).toBe(null);
-    act(() => void editor.exec({ type: 'setPresentationView', view: 'slideSorter' }));
+    act(() => void editor!.exec({ type: 'setPresentationView', view: 'slideSorter' }));
     expect(off()).toBe('true');
-    act(() => void editor.exec({ type: 'setPresentationView', view: 'normal' }));
+    act(() => void editor!.exec({ type: 'setPresentationView', view: 'normal' }));
     expect(off()).toBe(null);
   });
 });
