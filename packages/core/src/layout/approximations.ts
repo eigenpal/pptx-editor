@@ -80,7 +80,7 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'coincident-borders', title: 'Coincident cell borders', perSlide: true },
   { id: 'inconsistent-merges', title: 'Inconsistent cell merges', perSlide: false },
   { id: 'text-warp', title: 'Text warp', perSlide: false },
-  { id: 'diagram-drawing', title: 'Diagram drawings', perSlide: false },
+  { id: 'diagram-drawing', title: 'Diagram drawings', perSlide: true },
 ] satisfies Approximation[]);
 
 const CONTENT_PLACEHOLDERS = new Set(['pic', 'tbl', 'chart', 'clipArt', 'dgm', 'media']);
@@ -227,6 +227,7 @@ class Collector {
       }
       case 'frame': {
         if (item.poster) this.item(item.poster);
+        if (item.drawing) this.add('diagram-drawing');
         for (const c of item.drawing ?? []) this.item(c);
         const table = item.table;
         if (!table) return;

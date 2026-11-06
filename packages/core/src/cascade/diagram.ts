@@ -30,6 +30,12 @@ const DIAGRAM_DATA =
 
 /** The most shapes one diagram drawing may hold. A larger drawing shows its placeholder. */
 export const MAX_DIAGRAM_SHAPES = 512;
+/**
+ * The most shapes and groups that the diagram drawings of one slide may hold together. Many
+ * frames can name one large drawing, so each frame's own limit does not bound a slide. A frame
+ * past this budget shows its placeholder.
+ */
+export const MAX_SLIDE_DIAGRAM_SHAPES = 4096;
 /** The deepest group nesting in one diagram drawing. */
 export const MAX_DIAGRAM_GROUP_DEPTH = 8;
 

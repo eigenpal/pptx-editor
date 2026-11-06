@@ -51,6 +51,12 @@ interface SpOptions {
   readonly text?: string;
   readonly txXfrm?: [number, number, number, number];
   readonly hidden?: boolean;
+  readonly flipH?: boolean;
+  /** The `dsp:spPr` paint; the default sets a solid fill and a 2 pt white line. */
+  readonly paint?: string;
+  /** The `dsp:style` references; the default names fill 1, line 2, and the minor font. */
+  readonly style?: string;
+  readonly rPr?: string;
 }
 
 const sp = (o: SpOptions = {}): string => {
@@ -59,15 +65,19 @@ const sp = (o: SpOptions = {}): string => {
   const tx = o.txXfrm;
   return (
     `<dsp:sp modelId="{1}"><dsp:nvSpPr><dsp:cNvPr id="0" name=""${o.hidden ? ' hidden="1"' : ''}/><dsp:cNvSpPr/></dsp:nvSpPr>` +
-    `<dsp:spPr><a:xfrm${o.rot ? ` rot="${o.rot}"` : ''}><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm>` +
+    `<dsp:spPr><a:xfrm${o.rot ? ` rot="${o.rot}"` : ''}${o.flipH ? ' flipH="1"' : ''}><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm>` +
     `<a:prstGeom prst="${o.preset ?? 'roundRect'}"><a:avLst/></a:prstGeom>` +
-    '<a:solidFill><a:srgbClr val="9BBB59"><a:hueOff val="0"/></a:srgbClr></a:solidFill>' +
-    '<a:ln w="25400"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:ln></dsp:spPr>' +
-    '<dsp:style><a:lnRef idx="2"><a:scrgbClr r="0" g="0" b="0"/></a:lnRef><a:fillRef idx="1"><a:scrgbClr r="0" g="0" b="0"/></a:fillRef>' +
-    '<a:effectRef idx="0"><a:scrgbClr r="0" g="0" b="0"/></a:effectRef><a:fontRef idx="minor"><a:srgbClr val="FFFFFF"/></a:fontRef></dsp:style>' +
+    (o.paint ??
+      '<a:solidFill><a:srgbClr val="9BBB59"><a:hueOff val="0"/></a:srgbClr></a:solidFill>' +
+        '<a:ln w="25400"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:ln>') +
+    '</dsp:spPr><dsp:style>' +
+    (o.style ??
+      '<a:lnRef idx="2"><a:scrgbClr r="0" g="0" b="0"/></a:lnRef><a:fillRef idx="1"><a:scrgbClr r="0" g="0" b="0"/></a:fillRef>' +
+        '<a:effectRef idx="0"><a:scrgbClr r="0" g="0" b="0"/></a:effectRef><a:fontRef idx="minor"><a:srgbClr val="FFFFFF"/></a:fontRef>') +
+    '</dsp:style>' +
     (o.text
       ? '<dsp:txBody><a:bodyPr lIns="0" tIns="0" rIns="0" bIns="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/>' +
-        `<a:p><a:r><a:rPr lang="en-US" sz="1800"/><a:t>${o.text}</a:t></a:r></a:p></dsp:txBody>`
+        `<a:p><a:r>${o.rPr ?? '<a:rPr lang="en-US" sz="1800"/>'}<a:t>${o.text}</a:t></a:r></a:p></dsp:txBody>`
       : '') +
     (tx
       ? `<dsp:txXfrm><a:off x="${tx[0]}" y="${tx[1]}"/><a:ext cx="${tx[2]}" cy="${tx[3]}"/></dsp:txXfrm>`
@@ -82,6 +92,8 @@ const drawing = (shapes: string, root = ''): string =>
   `${shapes}</dsp:spTree></dsp:drawing>`;
 
 interface DeckOptions {
+  /** How many frames on the slide name the one diagram. */
+  readonly frames?: number;
   readonly data?: string;
   readonly drawingXml?: string;
   readonly drawingRel?:
@@ -97,7 +109,7 @@ function deck(shapes: string, o: DeckOptions = {}): Uint8Array {
     slides: [
       {
         layout: 'blank',
-        shapes: frame,
+        shapes: frame.repeat(o.frames ?? 1),
         rels: [
           ['rIdData', `${R}/diagramData`, '../diagrams/data1.xml'],
           ...(drawingRel ? [drawingRel] : []),
@@ -137,6 +149,7 @@ describe('diagram saved drawing: shapes', () => {
     const { layout } = open(deck(sp()));
     const f = frameOf(layout);
     expect(layout.diagnostics).not.toContain(PLACEHOLDER);
+    expect(layout.diagnostics).toContain('approximation: diagram-drawing');
     expect(f.drawing).toHaveLength(1);
     const shape = f.drawing![0]!;
     if (shape.kind !== 'shape') throw new Error('not a shape');
@@ -188,6 +201,69 @@ describe('diagram saved drawing: shapes', () => {
       x: FRAME.x + FRAME.cx,
       y: FRAME.y + FRAME.cy,
     });
+  });
+});
+
+describe('diagram saved drawing: style references', () => {
+  test('a shape with no own paint takes its fill, line, and text color from the theme', () => {
+    const style =
+      '<a:lnRef idx="2"><a:srgbClr val="00FF00"/></a:lnRef><a:fillRef idx="1"><a:srgbClr val="0000FF"/></a:fillRef>' +
+      '<a:effectRef idx="0"><a:scrgbClr r="0" g="0" b="0"/></a:effectRef><a:fontRef idx="minor"><a:srgbClr val="FF0000"/></a:fontRef>';
+    const shape = sp({ paint: '', style, text: 'Plan' });
+    const item = frameOf(open(deck(shape)).layout).drawing![0]!;
+    if (item.kind !== 'shape') throw new Error('not a shape');
+    const el = item.element;
+    // Fill 1 and line 2 of the theme, painted in the reference colors (`phClr`).
+    expect(el.fill).toEqual({ type: 'solid', color: { r: 0, g: 0, b: 0xff, a: 1 } });
+    expect(el.line?.width).toBe(12_700);
+    expect(el.line?.fill).toEqual({ type: 'solid', color: { r: 0, g: 0xff, b: 0, a: 1 } });
+    const run = el.text!.paragraphs[0]!.runs[0]!;
+    expect(run.props.fill).toEqual({ type: 'solid', color: { r: 0xff, g: 0, b: 0, a: 1 } });
+  });
+
+  test('a line with no width takes the width of the theme line it references', () => {
+    const paint = '<a:ln><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:ln>';
+    const item = frameOf(open(deck(sp({ paint }))).layout).drawing![0]!;
+    if (item.kind !== 'shape') throw new Error('not a shape');
+    expect(item.element.line?.width).toBe(12_700);
+    expect(item.element.line?.fill).toEqual({
+      type: 'solid',
+      color: { r: 255, g: 255, b: 255, a: 1 },
+    });
+  });
+});
+
+describe('diagram saved drawing: turns and flips', () => {
+  test('a turned, flipped shape turns and mirrors about its own center', () => {
+    const shape = sp({ off: [0, 0], ext: [1_000_000, 500_000], rot: 5_400_000, flipH: true });
+    const item = frameOf(open(deck(shape)).layout).drawing![0]!;
+    // The center stays where the file puts it.
+    const c = apply(item.matrix, 500_000, 250_000);
+    expect(c.x).toBeCloseTo(FRAME.x + 500_000, 3);
+    expect(c.y).toBeCloseTo(FRAME.y + 250_000, 3);
+    // A quarter turn and a mirror: the local x axis points down, the y axis points left.
+    const [a, b, cc, d] = item.matrix;
+    expect([a, b, cc, d].map((v) => Math.round(v) + 0)).toEqual([0, -1, -1, 0]);
+  });
+
+  test('text in a flipped group stays readable', () => {
+    const group =
+      '<dsp:grpSp><dsp:nvGrpSpPr><dsp:cNvPr id="0" name=""/><dsp:cNvGrpSpPr/></dsp:nvGrpSpPr>' +
+      '<dsp:grpSpPr><a:xfrm flipH="1"><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/>' +
+      '<a:chOff x="0" y="0"/><a:chExt cx="2000000" cy="1000000"/></a:xfrm></dsp:grpSpPr>' +
+      `${sp({ off: [0, 0], ext: [1_000_000, 500_000], text: 'Plan', txXfrm: [0, 0, 1_000_000, 500_000] })}</dsp:grpSp>`;
+    const g = frameOf(open(deck(group)).layout).drawing![0]!;
+    if (g.kind !== 'group') throw new Error('not a group');
+    const item = g.children[0]!;
+    if (item.kind !== 'shape' || !item.textMatrix || !item.text) throw new Error('no text');
+    const m = item.textMatrix;
+    // Not mirrored: the matrix keeps its orientation.
+    expect(m[0] * m[3] - m[1] * m[2]).toBeGreaterThan(0);
+    // The flipped group moves the text rectangle to its mirrored place on the right.
+    const left = apply(m, item.text.box.x, 0).x;
+    const right = apply(m, item.text.box.x + item.text.box.width, 0).x;
+    expect(Math.min(left, right)).toBeCloseTo(FRAME.x + 1_000_000, 3);
+    expect(Math.max(left, right)).toBeCloseTo(FRAME.x + 2_000_000, 3);
   });
 });
 
@@ -272,14 +348,28 @@ describe('diagram saved drawing: missing and hostile parts', () => {
     expectPlaceholder(deck(sp(), { drawingXml: `<dgm:dataModel xmlns:dgm="${DGM}"/>` }));
   });
 
-  test('a drawing with an entity declaration is refused by the bounded reader', () => {
-    const xml = `<!DOCTYPE d [<!ENTITY e "x">]>${drawing(sp({ text: '&e;' }))}`;
-    expectPlaceholder(deck(sp(), { drawingXml: xml }));
+  test('a drawing with a document type declaration is refused by the bounded reader', () => {
+    // The same drawing draws without the declaration, so the declaration alone refuses it.
+    expect(frameOf(open(deck(sp())).layout).drawing).toHaveLength(1);
+    expectPlaceholder(deck(sp(), { drawingXml: `<!DOCTYPE d [<!ENTITY e "x">]>${drawing(sp())}` }));
   });
 
   test('a drawing past the shape limit gives the placeholder', () => {
     expectPlaceholder(deck(sp().repeat(513)));
     expect(frameOf(open(deck(sp().repeat(512))).layout).drawing).toHaveLength(512);
+  });
+
+  test('frames past the slide budget give the placeholder, however many name one drawing', () => {
+    // Eight frames of 512 shapes fill the slide budget of 4096; the ninth frame does not draw.
+    const { layout } = open(deck(sp().repeat(512), { frames: 9 }));
+    const frames = layout.items.filter((i) => i.kind === 'frame');
+    expect(frames).toHaveLength(9);
+    expect(frames.slice(0, 8).every((f) => f.kind === 'frame' && f.drawing?.length === 512)).toBe(
+      true
+    );
+    const last = frames[8]!;
+    expect(last.kind === 'frame' && last.drawing).toBeFalsy();
+    expect(layout.diagnostics).toContain(PLACEHOLDER);
   });
 
   test('groups nested past the depth limit give the placeholder', () => {

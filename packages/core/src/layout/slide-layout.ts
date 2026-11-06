@@ -241,10 +241,14 @@ function layoutElement(
       const tx = el.text && el.text.paragraphs.length > 0 ? el.textXfrm : undefined;
       if (el.text && tx) {
         // A diagram shape's own text rectangle, in the parent's space. Its turn adds to the
-        // shape's turn, and it never flips.
+        // shape's turn, and it never flips. A flipped frame or group keeps the glyphs upright,
+        // as for any other shape.
         text = layoutText(el.text, { x: 0, y: 0, width: tx.cx, height: tx.cy }, measurer);
         for (const s of text.substitutions) diagnostics.add(`font substituted: ${s}`);
-        textMatrix = multiply(parent, boxMatrix({ ...tx, rot: tx.rot + el.xfrm.rot }, false));
+        textMatrix = uprightTextMatrix(
+          multiply(parent, boxMatrix({ ...tx, rot: tx.rot + el.xfrm.rot }, false)),
+          text.box
+        );
       } else if (el.text && el.text.paragraphs.length > 0) {
         const r = geometry.textRect;
         text = layoutText(

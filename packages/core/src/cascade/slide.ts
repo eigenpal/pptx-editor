@@ -33,7 +33,12 @@ import {
   type ResolvedFill,
 } from './paint-props.ts';
 import { resolveFrameTable } from './table.ts';
-import { diagramParts, MAX_DIAGRAM_GROUP_DEPTH, MAX_DIAGRAM_SHAPES } from './diagram.ts';
+import {
+  diagramParts,
+  MAX_DIAGRAM_GROUP_DEPTH,
+  MAX_DIAGRAM_SHAPES,
+  MAX_SLIDE_DIAGRAM_SHAPES,
+} from './diagram.ts';
 import { DEFAULT_COLOR_MAP, parseTheme, readColorMap, type Theme } from './theme.ts';
 import {
   fontRefEntry,
@@ -76,6 +81,8 @@ interface SlideScope {
   readonly kinsoku?: KinsokuRules;
   readonly layoutPlaceholders: readonly PlaceholderEntry[];
   readonly masterPlaceholders: readonly PlaceholderEntry[];
+  /** Shapes and groups resolved from diagram drawings on this slide so far. */
+  readonly diagramShapes: { count: number };
 }
 
 const MAX_GROUP_DEPTH = 32;
@@ -472,8 +479,8 @@ const UNSUPPORTED = Symbol('unsupported');
 /**
  * One element of a diagram drawing's shape tree (`dsp:spTree`), in its parent's space. Shapes
  * resolve as slide shapes do. Undefined for the tree's own properties; {@link UNSUPPORTED} for
- * a shape with no box, a group past the depth limit, past the shape budget, or any other
- * element.
+ * a shape with no box, a group past the depth limit, an element past the frame's or the
+ * slide's shape budget, or any other element.
  */
 function resolveDiagramElement(
   el: Element,
@@ -491,12 +498,16 @@ function resolveDiagramElement(
       return undefined;
     case 'sp': {
       budget.shapes += 1;
+      scope.diagramShapes.count += 1;
       if (budget.shapes > MAX_DIAGRAM_SHAPES) return UNSUPPORTED;
+      if (scope.diagramShapes.count > MAX_SLIDE_DIAGRAM_SHAPES) return UNSUPPORTED;
       if (!path(el, 'dsp:spPr', 'a:xfrm')) return UNSUPPORTED;
       return resolveShapeLike(el, 'shape', layer, drawingPart, scope);
     }
     case 'grpSp': {
+      scope.diagramShapes.count += 1;
       if (depth >= MAX_DIAGRAM_GROUP_DEPTH) return UNSUPPORTED;
+      if (scope.diagramShapes.count > MAX_SLIDE_DIAGRAM_SHAPES) return UNSUPPORTED;
       const kids = resolveDiagramTree(el, layer, drawingPart, scope, depth + 1, budget);
       if (!kids) return UNSUPPORTED;
       return diagramGroup(el, kids, layer, drawingPart, scope);
@@ -771,6 +782,7 @@ export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | u
     ...(kinsoku ? { kinsoku } : {}),
     layoutPlaceholders: collectPlaceholders(pkg, ref.layoutPart),
     masterPlaceholders: collectPlaceholders(pkg, ref.masterPart),
+    diagramShapes: { count: 0 },
   };
   const bg = resolveBackground([slide, layout, master], scope);
   const backgroundPart = [ref.partName, ref.layoutPart, ref.masterPart][bg.index] ?? ref.partName;
