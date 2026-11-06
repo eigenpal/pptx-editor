@@ -3,7 +3,9 @@ import { strFromU8, unzipSync } from 'fflate';
 import { buildPptx, shape, solid } from '../../../../../scripts/fixtures/builder.ts';
 import {
   drawingCapabilities,
+  drawingRenderersVersion,
   installDrawingRenderers,
+  subscribeDrawingRenderers,
   type DrawingEffectsRenderer,
 } from '../../layout/index.ts';
 import { chromeOptionNeedsEffects } from '../chrome-offered.ts';
@@ -49,6 +51,22 @@ describe('drawingCapabilities', () => {
     expect(drawingCapabilities()).toEqual({ effects: false });
   });
 
+  test('an install raises the version and calls each subscriber', () => {
+    const calls: number[] = [];
+    const before = drawingRenderersVersion();
+    const stop = subscribeDrawingRenderers(() => calls.push(drawingRenderersVersion()));
+    const failing = subscribeDrawingRenderers(() => {
+      throw new Error('boom');
+    });
+    installDrawingRenderers({ effects: STUB });
+    installDrawingRenderers({ effects: undefined });
+    expect(calls).toEqual([before + 1, before + 2]);
+    stop();
+    failing();
+    installDrawingRenderers({ effects: STUB });
+    expect(calls).toHaveLength(2);
+  });
+
   test('a query is not a use: an install after it logs no warning', () => {
     // A fresh process, because the warning fires once per process after the first paint.
     const url = new URL('../../layout/drawing-renderers.ts', import.meta.url).href;
@@ -57,6 +75,8 @@ describe('drawingCapabilities', () => {
       let warned = 0;
       console.warn = () => { warned += 1; };
       m.drawingCapabilities();
+      m.drawingRenderersVersion();
+      m.subscribeDrawingRenderers(() => {});
       m.installDrawingRenderers({ effects: { body: () => null, glow: () => null, reflection: () => null } });
       const quiet = warned;
       m.drawingRenderers();

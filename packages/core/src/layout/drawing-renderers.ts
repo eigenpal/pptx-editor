@@ -159,6 +159,38 @@ export function installDrawingRenderers(renderers: Partial<DrawingRenderers>): v
     );
   }
   installed = Object.freeze({ ...installed, ...guardedRenderers(renderers) });
+  version += 1;
+  for (const listener of [...listeners]) {
+    try {
+      listener();
+    } catch {
+      // One failing listener does not stop the others or the install.
+    }
+  }
+}
+
+let version = 0;
+const listeners = new Set<() => void>();
+
+/**
+ * A number that each `installDrawingRenderers` call increases. An adapter reads it with
+ * {@link subscribeDrawingRenderers} (for example through `useSyncExternalStore`), so the
+ * choices it shows refresh after an install. @public
+ */
+export function drawingRenderersVersion(): number {
+  return version;
+}
+
+/**
+ * Call `listener` after each `installDrawingRenderers` call. Returns the function that stops the
+ * calls. Like {@link drawingCapabilities}, a subscription does not count as a use, so it logs no
+ * warning. @public
+ */
+export function subscribeDrawingRenderers(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 /**

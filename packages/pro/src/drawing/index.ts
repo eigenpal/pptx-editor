@@ -16,7 +16,8 @@ Production use requires a commercial agreement: licensing@eigenpal.com
  * (`@pptx-editor.dev/pptx-to-pdf`) always includes this module.
  *
  * The renderers serve every editor and export in the process. Install them before any document
- * opens; a later install logs a console warning once.
+ * opens; a later install logs a console warning once. The chrome controls refresh after an
+ * install.
  *
  * @example Enable advanced drawing rendering in an editor
  * ```ts

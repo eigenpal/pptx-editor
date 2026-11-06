@@ -470,4 +470,26 @@ describe('Pro effect controls', () => {
       'Soft edge oval',
     ]);
   });
+
+  test('useEditorValueCommand options refresh after a late install', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const editor = await open();
+    let options: readonly string[] = [];
+    function Probe() {
+      options = useEditorValueCommand('shape.effects').options;
+      return <output>{options.length}</output>;
+    }
+    render(
+      <PptxEditorContext.Provider value={editor}>
+        <Probe />
+      </PptxEditorContext.Provider>
+    );
+    expect(options.some((v) => v.startsWith('glow.'))).toBe(false);
+    expect(options.some((v) => v.startsWith('shadow.inner'))).toBe(false);
+    act(() => installDrawingRenderers({ effects: EFFECTS }));
+    expect(options).toContain('glow.8.accent2');
+    expect(options).toContain('shadow.innerTop');
+    expect(options).toContain('reflection.none');
+    expect(options).toContain('softEdge.none');
+  });
 });

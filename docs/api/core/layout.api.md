@@ -123,6 +123,9 @@ export interface DrawingRenderers {
 export function drawingRenderers(): DrawingRenderers;
 
 // @public
+export function drawingRenderersVersion(): number;
+
+// @public
 export const EAST_ASIAN_FALLBACK_FAMILIES: readonly string[];
 
 // @public
@@ -660,6 +663,9 @@ export interface SourceMap {
     // (undocumented)
     readonly sy: number;
 }
+
+// @public
+export function subscribeDrawingRenderers(listener: () => void): () => void;
 
 // @internal
 export function symbolBulletText(char: string, font: string | null | undefined, isFamilyAvailable?: (family: string) => boolean): string;

@@ -114,7 +114,7 @@ Each directory is a lane with allowed imports (`src/__tests__/core-lane-graph.ts
 | `text/measurer.ts`, `harfbuzz-measurer.ts`, `advance-cache.ts`, `line-metrics.ts`, `face-line-metrics.ts` | The injected `TextMeasurer`, HarfBuzz shaping, the measured line rules, the line metrics of missing faces |
 | `harfbuzz-wasm-binary.ts`, `node-module-shim.ts` | How the bundled HarfBuzz finds its WASM (`setHarfBuzzWasmUrl`) |
 | `table-layout.ts` | Table rows and cells |
-| `drawing-renderers.ts` | `installDrawingRenderers` and `drawingRenderers`: the renderers a capability package installs (the Pro `effects` renderer). `drawingCapabilities` says what they paint, for the chrome. DOM-free: a renderer returns SVG as plain data |
+| `drawing-renderers.ts` | `installDrawingRenderers` and `drawingRenderers`: the renderers a capability package installs (the Pro `effects` renderer). `drawingCapabilities` says what they paint, for the chrome, and `subscribeDrawingRenderers` tells the adapters when an install changes it. DOM-free: a renderer returns SVG as plain data |
 | `approximations.ts` | The catalog of known approximations (kept equal to the known approximations of `docs/site/content/pptx-fidelity.mdx` by a test; matrix rows name its ids) |
 | `font-resource.ts`, `font-composition.ts`, `font-resolver.ts`, `font-deferred.ts`, `defer-fonts.ts`, `supported-font-families.ts` | Font configuration copied from DOCX Editor: admission limits and the sfnt check, `composeFontConfiguration`, `composeFontOrigins` and the resolver mark, and late faces |
 

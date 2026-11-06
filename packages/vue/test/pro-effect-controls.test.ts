@@ -9,7 +9,12 @@ import { createPptxEditor, type PptxEditorInstance } from '@pptx-editor.dev/core
 import { installDrawingRenderers, type DrawingEffectsRenderer } from '@pptx-editor.dev/core/layout';
 import { buildPptx, shape, solid } from '../../../scripts/fixtures/builder.ts';
 import { providePptxEditor } from '../src/composables.ts';
-import { PptxEditorMenu, PptxEditorToolbar, ToolbarSlot } from '../src/index.ts';
+import {
+  PptxEditorMenu,
+  PptxEditorToolbar,
+  ToolbarSlot,
+  useEditorValueCommand,
+} from '../src/index.ts';
 
 const IN = 914_400;
 const IMAGE_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
@@ -175,5 +180,43 @@ describe('Pro effect controls (Vue)', () => {
       'Simple frame, black',
       'Soft edge oval',
     ]);
+  });
+
+  test('useEditorValueCommand options refresh after a late install', async () => {
+    const editor = await openShape();
+    let options: { value: readonly string[] } | null = null;
+    const Probe = defineComponent({
+      setup() {
+        const cmd = useEditorValueCommand('shape.effects');
+        options = cmd.options;
+        return () => h('output', String(cmd.options.value.length));
+      },
+    });
+    await mount(editor, () => h(Probe));
+    expect(options!.value.some((v) => v.startsWith('glow.'))).toBe(false);
+    expect(options!.value.some((v) => v.startsWith('shadow.inner'))).toBe(false);
+    const shown = document.querySelector('output')!.textContent;
+    installDrawingRenderers({ effects: EFFECTS });
+    await nextTick();
+    expect(options!.value).toContain('glow.8.accent2');
+    expect(options!.value).toContain('shadow.innerTop');
+    expect(options!.value).toContain('reflection.none');
+    expect(options!.value).toContain('softEdge.none');
+    // The component that reads the options draws again.
+    expect(document.querySelector('output')!.textContent).not.toBe(shown);
+  });
+
+  test('an open toolbar shows the Pro picture styles after a late install', async () => {
+    const editor = await openPicture();
+    await mount(editor, () =>
+      h(PptxEditorToolbar, { preset: false }, () => [h(ToolbarSlot, { slotId: 'image.styles' })])
+    );
+    await click(button('Picture styles'));
+    expect(rows()).toEqual(['Simple frame, white', 'Simple frame, black']);
+    await click(button('Picture styles'));
+    installDrawingRenderers({ effects: EFFECTS });
+    await click(button('Picture styles'));
+    for (const name of ['Reflected rounded rectangle', 'Soft edge rectangle', 'Soft edge oval'])
+      expect(rows()).toContain(name);
   });
 });

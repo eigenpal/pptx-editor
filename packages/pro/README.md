@@ -53,7 +53,7 @@ const editor = createPptxEditor({
 });
 ```
 
-The drawing renderers serve every editor and export in the process. Create the module before the first document opens; a later install logs a console warning once, and the chrome offers the effects the next time a menu opens. For headless rendering without an editor, call `installDrawing()` from the same entry.
+The drawing renderers serve every editor and export in the process. Create the module before the first document opens; a later install logs a console warning once, and slides painted before it keep their paint until they paint again. The chrome controls refresh after an install: in React and Vue, menus and `useEditorValueCommand` options then offer the effects. For headless rendering without an editor, call `installDrawing()` from the same entry.
 
 In the React or Vue adapter, pass the same list in the `modules` prop of `PptxEditor` or its root. The editor reads it once, when it is created. Keep the list stable, for example in `useMemo` or a `const` in `setup`:
 

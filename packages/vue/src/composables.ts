@@ -23,6 +23,7 @@ import {
   type ShallowRef,
 } from 'vue';
 import { createTranslator, type Translate } from '@pptx-editor.dev/i18n';
+import { drawingRenderersVersion, subscribeDrawingRenderers } from '@pptx-editor.dev/core/layout';
 import {
   EMPTY_EDITOR_SNAPSHOT,
   chromeCommandState,
@@ -418,11 +419,16 @@ export function useEditorValueCommand<K extends keyof ToolbarValueMap>(
 ): UseEditorValueCommandReturn<ToolbarValueMap[K], ToolbarShownValue<K>> {
   const editorRef = usePptxEditor();
   const cmd = useEditorCommand(slot);
+  // The options follow the installed drawing renderers, as in React: an install offers the Pro
+  // choices.
+  const renderers = shallowRef(drawingRenderersVersion());
+  const stop = subscribeDrawingRenderers(() => (renderers.value = drawingRenderersVersion()));
+  if (getCurrentScope()) onScopeDispose(stop);
   return {
     execute: (value: ToolbarValueMap[K], options?: EditorExecOptions): CommandResult =>
       runToolbarCommand(editorRef.value, toValue(slot), value as ToolbarSlotValue<K>, options),
     value: computed(() => valueSlotShown(toValue(slot), cmd.value.value)),
-    options: computed(() => valueSlotOptions(toValue(slot))),
+    options: computed(() => (void renderers.value, valueSlotOptions(toValue(slot)))),
     isEnabled: cmd.isEnabled,
     disabledReason: cmd.disabledReason,
   };
