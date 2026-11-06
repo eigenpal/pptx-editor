@@ -93,6 +93,16 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'The shape already has that name, so nothing changes.',
   ],
   [
+    'disabled.noAdjustChange',
+    'edit.no-change',
+    'The shape already has those adjust values, so nothing changes.',
+  ],
+  [
+    'disabled.noAdjustHandles',
+    'edit.unsupported-element',
+    'Only a preset shape with adjust handles has adjust values. Select such a shape.',
+  ],
+  [
     'disabled.noSizeChange',
     'edit.no-change',
     'The slides already have that size, so nothing changes.',

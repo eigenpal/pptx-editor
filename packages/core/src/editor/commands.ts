@@ -77,6 +77,7 @@ import { setSlideNumbers } from '../automation/commands/slide-numbers.ts';
 import { notesShown, setNotes } from '../automation/commands/notes-commands.ts';
 import { compilePictureCommand, isPictureCommand } from './picture-commands.ts';
 import { compileSlideCommand, isSlideCommand } from './slide-command-table.ts';
+import { compileShapeCommand, isShapeCommand } from './shape-command-table.ts';
 import { compileTextFormatCommand, isTextFormatCommand } from './text-format-commands.ts';
 import {
   forParagraphs,
@@ -111,7 +112,6 @@ import {
   moveSlide,
   setSlideBackground,
 } from '../automation/commands/slide-commands.ts';
-import { setSlideSize } from '../automation/commands/slide-size.ts';
 import {
   aSpec,
   paragraphsOf,
@@ -379,6 +379,7 @@ export function compile(
   const batch = ctx.probe ? ctx.session.probeBatch(ctx.base) : ctx.session.batch(ctx.base);
   if (PRESENTATION_EDITS.has(command.type)) normalizePresentation(batch);
   if (isSlideCommand(command)) return { batch, effect: compileSlideCommand(ctx, batch, command) };
+  if (isShapeCommand(command)) return { batch, effect: compileShapeCommand(ctx, batch, command) };
   if (isPictureCommand(command))
     return { batch, effect: compilePictureCommand(ctx, batch, slidePart(ctx), command) };
   if (isTextFormatCommand(command))
@@ -779,14 +780,6 @@ export function compile(
       const slides = command.allSlides ? info.slides.map((_, i) => i) : [ctx.slide];
       for (const i of slides) setSlideBackground(batch, i, command.background);
       return { batch, effect: { label: 'slideBackground' } };
-    }
-    case 'setSlideSize': {
-      const content = command.content ?? 'scale';
-      if (content !== 'scale' && content !== 'keep')
-        throw new CommandRefusal('errors.unsupported', 'content');
-      if (!setSlideSize(batch, command.width, command.height, content))
-        throw new CommandRefusal('disabled.noSizeChange');
-      return { batch, effect: { label: 'slideSize' } };
     }
     case 'insertLine': {
       const id = insertLine(batch, slidePart(ctx), command.kind, slideW, slideH);

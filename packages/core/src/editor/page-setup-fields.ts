@@ -107,33 +107,44 @@ export function withSlideDimension(
   return { ...next, size: 'custom', orientation };
 }
 
-/** The size the fields ask for, in EMU: a preset's exact size, or the typed inches. */
-function emuOf(d: SlideSizeFields): { readonly width: number; readonly height: number } {
+/** A slide size in EMU. @internal */
+export interface SlideSizeEmu {
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * The size the fields ask for, in EMU: a preset's exact size, or the typed inches. A side whose
+ * text is still the opening text of either side keeps that side's exact size, so picking
+ * Custom, or swapping the orientation, never rounds a size to two decimals.
+ */
+function emuOf(seed: SlideSizeFields, d: SlideSizeFields, current: SlideSizeEmu): SlideSizeEmu {
   if (d.size !== 'custom') {
     const p = SLIDE_SIZE_PRESETS[d.size];
     return d.orientation === 'portrait'
       ? { width: p.height, height: p.width }
       : { width: p.width, height: p.height };
   }
-  return {
-    width: Math.round(parseAmount(d.width) * EMU_PER_INCH),
-    height: Math.round(parseAmount(d.height) * EMU_PER_INCH),
-  };
+  const side = (text: string): number =>
+    text === seed.width
+      ? current.width
+      : text === seed.height
+        ? current.height
+        : Math.round(parseAmount(text) * EMU_PER_INCH);
+  return { width: side(d.width), height: side(d.height) };
 }
-
-const unchanged = (seed: SlideSizeFields, d: SlideSizeFields): boolean =>
-  d.width === seed.width && d.height === seed.height && d.size === seed.size;
 
 /**
  * The field that blocks OK, with the translation key of its message, or null. The range is
- * `ST_SlideSizeCoordinate`, 1 to 56 inches. @internal
+ * `ST_SlideSizeCoordinate`, 1 to 56 inches. `current` is the deck's size, the one the fields
+ * opened on. @internal
  */
 export function slideSizeFieldError(
   seed: SlideSizeFields,
-  d: SlideSizeFields
+  d: SlideSizeFields,
+  current: SlideSizeEmu
 ): { readonly field: 'width' | 'height'; readonly key: 'errors.slideSizeRange' } | null {
-  if (unchanged(seed, d)) return null;
-  const { width, height } = emuOf(d);
+  const { width, height } = emuOf(seed, d, current);
   const bad = (v: number): boolean =>
     !Number.isFinite(v) || v < MIN_SLIDE_SIZE || v > MAX_SLIDE_SIZE;
   if (bad(width)) return { field: 'width', key: 'errors.slideSizeRange' };
@@ -142,15 +153,15 @@ export function slideSizeFieldError(
 }
 
 /**
- * The command OK sends, or null when the size did not change. A size typed back to the opening
- * text sends nothing, so the rounding of the inches never moves a slide. @internal
+ * The command OK sends, or null when the fields ask for the deck's size `current`. @internal
  */
 export function slideSizeCommandOf(
   seed: SlideSizeFields,
-  d: SlideSizeFields
+  d: SlideSizeFields,
+  current: SlideSizeEmu
 ): EditorCommand | null {
-  if (unchanged(seed, d)) return null;
-  const { width, height } = emuOf(d);
+  const { width, height } = emuOf(seed, d, current);
+  if (width === current.width && height === current.height) return null;
   return {
     type: 'setSlideSize',
     width,

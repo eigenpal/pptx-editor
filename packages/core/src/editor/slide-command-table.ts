@@ -1,5 +1,6 @@
-// Slide commands of the Home and Slide Show tabs (change layout, reset, hide) and speaker notes
-// formatting. `commands.ts` sends them here; each compiles to one transaction, so one undo step.
+// Slide commands of the Home and Slide Show tabs (change layout, reset, hide), speaker notes
+// formatting, sections, and the slide size. `commands.ts` sends them here; each compiles to one
+// transaction, so one undo step.
 
 import { createTranslator } from '@pptx-editor.dev/i18n';
 import { presentationInfo, xmlPartOf } from '../store/index.ts';
@@ -10,6 +11,7 @@ import { CommandRefusal, type OpBatch } from '../automation/commands/op-batch.ts
 import { formatNotes } from '../automation/commands/notes-commands.ts';
 import { applyLayout, deckLayout } from '../automation/commands/slide-layouts.ts';
 import { slideIndices } from '../automation/commands/slide-multi.ts';
+import { setSlideSize } from '../automation/commands/slide-size.ts';
 import {
   addSection,
   moveSection,
@@ -32,7 +34,8 @@ export type SlideCommand = Extract<
       | 'renameSection'
       | 'removeSection'
       | 'removeAllSections'
-      | 'moveSection';
+      | 'moveSection'
+      | 'setSlideSize';
   }
 >;
 
@@ -46,6 +49,7 @@ const TYPES: ReadonlySet<string> = new Set([
   'removeSection',
   'removeAllSections',
   'moveSection',
+  'setSlideSize',
 ]);
 
 const english = createTranslator();
@@ -85,6 +89,14 @@ export function compileSlideCommand(
   command: SlideCommand
 ): CommandEffect {
   switch (command.type) {
+    case 'setSlideSize': {
+      const content = command.content ?? 'scale';
+      if (content !== 'scale' && content !== 'keep')
+        throw new CommandRefusal('errors.unsupported', 'content');
+      if (!setSlideSize(batch, command.width, command.height, content))
+        throw new CommandRefusal('disabled.noSizeChange');
+      return { label: 'slideSize' };
+    }
     case 'addSection': {
       const index = command.index ?? ctx.slide;
       const name = command.name ?? textOf(ctx, 'sections.untitled');

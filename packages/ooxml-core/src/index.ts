@@ -18,3 +18,4 @@ export * from './word-segment.ts';
 export * from './caret-word.ts';
 export * from './drawingml-color.ts';
 export * from './drawingml-geometry.ts';
+export * from './drawingml-handles.ts';

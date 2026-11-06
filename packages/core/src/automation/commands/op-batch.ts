@@ -37,6 +37,7 @@ const NOTHING_TO_DO: ReadonlySet<string> = new Set([
   'disabled.noArrangeChange',
   'disabled.noNameChange',
   'disabled.noSizeChange',
+  'disabled.noAdjustChange',
 ]);
 
 /** Whether a refusal reason means the command had nothing to do. */

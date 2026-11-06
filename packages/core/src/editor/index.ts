@@ -447,6 +447,7 @@ export {
   withSlideOrientation,
   withSlideSizePreset,
   type SlideOrientation,
+  type SlideSizeEmu,
   type SlideSizeFields,
   type SlideSizePreset,
 } from './page-setup-fields.ts';

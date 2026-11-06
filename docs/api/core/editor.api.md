@@ -1652,15 +1652,17 @@ export type EditorCommand = {
     readonly background: SlideBackground | null;
     readonly allSlides?: boolean;
 }
-/**
-* The slide size in EMU, 1 to 56 inches a side. `content: 'scale'` (the default) scales boxes
-* and text by the smaller ratio and centers them; `'keep'` changes only the size.
-*/
+/** Slide size in EMU, 1 to 56 in a side; `content: 'scale'` (default) fits the content. */
 | {
     readonly type: 'setSlideSize';
     readonly width: number;
     readonly height: number;
     readonly content?: 'scale' | 'keep';
+}
+/** Adjust values of one preset shape by guide name, in guide units (see `a:gd`). */
+| {
+    readonly type: 'setAdjustments';
+    readonly values: Readonly<Record<string, number>>;
 }
 /** Insert a line, an arrow, or an elbow or curved connector. */
 | {
@@ -4745,10 +4747,18 @@ export interface SlideshowState {
 }
 
 // @internal
-export function slideSizeCommandOf(seed: SlideSizeFields, d: SlideSizeFields): EditorCommand | null;
+export function slideSizeCommandOf(seed: SlideSizeFields, d: SlideSizeFields, current: SlideSizeEmu): EditorCommand | null;
 
 // @internal
-export function slideSizeFieldError(seed: SlideSizeFields, d: SlideSizeFields): {
+export interface SlideSizeEmu {
+    // (undocumented)
+    readonly height: number;
+    // (undocumented)
+    readonly width: number;
+}
+
+// @internal
+export function slideSizeFieldError(seed: SlideSizeFields, d: SlideSizeFields, current: SlideSizeEmu): {
     readonly field: 'width' | 'height';
     readonly key: 'errors.slideSizeRange';
 } | null;

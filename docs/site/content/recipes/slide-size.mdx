@@ -29,17 +29,22 @@ Each side must be from 914400 to 51206400 EMU (1 to 56 inches). A size out of th
 
 By default, `content` is `'scale'`. The editor then scales the content by the smaller of the width and height ratios and centers it on the new slide:
 
-- Boxes of shapes, pictures, groups, tables, and charts on the slides, layouts, and masters.
+- Boxes of shapes, pictures, groups, tables, charts, and diagrams on the slides, layouts, and masters.
 - Table column widths and row heights.
-- Text sizes, character spacing, spacing in points, indents, tab stops, and text and cell insets, including the text styles of the masters and the presentation.
+- Text sizes, character spacing, spacing in points, indents, tab stops, and text and cell insets that the file sets, including the text styles of the masters and the presentation, and the text of charts.
 
-Line widths and effect distances keep their values.
+These values keep their size:
+
+- Line widths and effect distances.
+- Values that the file leaves to their defaults, such as the default text insets.
+- Diagram text. Diagram shapes scale, and their text keeps its size, as a diagram does when it is laid out again from its data.
+- The slide images of notes pages, and drawing guides.
 
 Set `content: 'keep'` to change only the size. Every box then stays where it is, so content can extend past a smaller slide.
 
 ## Let users pick a size
 
-The default editor shows the slide size in **File** > **Page setup**. Users pick a preset (Widescreen, Standard, A4, or Letter) or type a custom size, choose the orientation, and choose whether the content scales. For the dialog's fields, see [Dialogs reference](/docs/customization/reference/dialogs).
+The default editor shows the slide size in **File** > **Page setup**. Users pick a preset (**Widescreen (16:9)**, **Standard (4:3)**, **A4 paper**, or **Letter paper**) or type a custom size, choose the orientation, and choose whether the content scales. In viewing mode, the dialog shows the size as text. For the dialog's fields, see [Dialogs reference](/docs/customization/reference/dialogs).
 
 ## See also
 

@@ -35,4 +35,16 @@ export interface PresetShapeDefinition {
     string | null,
     string | null,
   ])[];
+  /**
+   * Adjust handle places (`a:ahXY` and `a:ahPolar` with their `a:pos`), in `a:ahLst` order:
+   * the kind, the position as guide names or literals, and the guides the handle moves (x and
+   * y, or radius and angle), each null when the handle does not move it.
+   */
+  readonly hp?: readonly (readonly [
+    'xy' | 'polar',
+    string,
+    string,
+    string | null,
+    string | null,
+  ])[];
 }

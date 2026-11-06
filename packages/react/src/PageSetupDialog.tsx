@@ -134,15 +134,19 @@ function PageSetupDialogOpen({
   // while the dialog is open is not reverted by an untouched OK.
   const [opening] = useState(theme);
   // The slide size the dialog opened on: OK sends a size only when the fields moved from it.
+  const [opened] = useState(() => ({ width, height }));
   const [seed] = useState(() => seedSlideSizeFields(width, height));
   const draft = useDialogDraft<PageSetupDialogFields>(() => ({
     initial: { theme: opening, slideSize: seed },
     validate: (values) => {
-      const problem = slideSizeFieldError(seed, values.slideSize);
+      const problem = slideSizeFieldError(seed, values.slideSize, opened);
       return problem ? { slideSize: problem.key } : {};
     },
     commit: (values) => {
-      const resized = commitDialogCommand(editor, slideSizeCommandOf(seed, values.slideSize));
+      const resized = commitDialogCommand(
+        editor,
+        slideSizeCommandOf(seed, values.slideSize, opened)
+      );
       if (!resized.ok) return resized;
       if (values.theme !== opening) onThemeChange?.(values.theme);
       return { ok: true };
@@ -190,7 +194,16 @@ function PageSetupDialogOpen({
                 className="pptx-dialog__section"
               >
                 <h3 className="pptx-dialog__label">{t('pageSetup.slideSize')}</h3>
-                <div className="pptx-dialog__rows">
+                {editable ? null : (
+                  // Viewing mode: the size as text, as the fields cannot change it.
+                  <p className="pptx-dialog__value">
+                    {t(`pageSetup.slideSizeName.${seed.size}`)}
+                    <span className="pptx-dialog__muted">
+                      {t('pageSetup.slideSizeValue', { width: seed.width, height: seed.height })}
+                    </span>
+                  </p>
+                )}
+                <div className="pptx-dialog__rows" hidden={!editable}>
                   <SelectField
                     name="size"
                     label={t('pageSetup.size')}

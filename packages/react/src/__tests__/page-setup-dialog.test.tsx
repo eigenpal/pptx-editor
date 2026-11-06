@@ -84,6 +84,26 @@ describe('Page setup slide size', () => {
     expect(editor.snapshot().slideHeight).toBe(6_858_000);
   });
 
+  test('Custom with the same numbers, or orientation there and back, sends no command', async () => {
+    const editor = await open();
+    withEditor(editor, <PageSetupDialog open onClose={() => {}} />);
+    act(() => void fireEvent.change(field('size'), { target: { value: 'custom' } }));
+    act(() => void fireEvent.click(screen.getByRole('radio', { name: 'Portrait' })));
+    act(() => void fireEvent.click(screen.getByRole('radio', { name: 'Landscape' })));
+    act(() => void fireEvent.click(ok()));
+    expect(editor.snapshot().canUndo).toBe(false);
+    expect(editor.snapshot().slideWidth).toBe(12_192_000);
+  });
+
+  test('viewing mode shows the size as text', async () => {
+    const editor = await open();
+    act(() => editor.setMode('view'));
+    withEditor(editor, <PageSetupDialog open onClose={() => {}} />);
+    const section = document.querySelector('[data-pptx-field="slideSize"]')!;
+    expect(section.textContent).toContain('Widescreen (16:9)');
+    expect(section.textContent).toContain('13.33 × 7.5 in');
+  });
+
   test('OK with untouched fields sends no command', async () => {
     const editor = await open();
     withEditor(editor, <PageSetupDialog open onClose={() => {}} />);

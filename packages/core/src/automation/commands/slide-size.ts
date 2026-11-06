@@ -5,22 +5,26 @@
 // height ratios, and is centered on the new slide. So nothing leaves the slide and nothing
 // distorts. A group scales its own box only: its children keep their child coordinates, so they
 // follow the group. A table also scales its column widths and row heights, because its grid sets
-// the drawn size. Text scales with its box: font and bullet sizes, character spacing, spacing
-// in points, indents, tab stops, and text and cell insets, on the slides, layouts, masters
-// (with their text styles), and the presentation's default text style. Line widths and effect
-// distances keep their values. With `content: 'keep'`, nothing but the size changes.
+// the drawn size. Text scales with its box: the font and bullet sizes, character spacing,
+// spacing in points, indents, tab stops, and text and cell insets that the file sets, on the
+// slides, layouts, masters (with their text styles), the presentation's default text style,
+// and charts. Diagram shapes scale, and their text keeps its size. A value that the file leaves to its default keeps the default.
+// Line widths and effect distances keep their values. With `content: 'keep'`, nothing but the size changes.
 
 import {
   attr,
   child,
+  contentTypeOf,
   elements,
   find,
   NS,
+  parseXmlPart,
   presentationInfo,
+  serializeXmlPart,
   xmlPartOf,
   type Element,
 } from '../../store/index.ts';
-import { CommandRefusal, type OpBatch } from './op-batch.ts';
+import { CommandRefusal, OpBatch } from './op-batch.ts';
 import { coordinate, positiveCoordinate } from './package-edits.ts';
 
 /** `ST_SlideSizeCoordinate`: 1 to 56 inches, in EMU (ECMA-376 Part 1, 19.7.17). @internal */
@@ -117,16 +121,70 @@ export function setSlideSize(
   if (content === 'keep') return true;
   const s = Math.min(cx / info.width, cy / info.height);
   const scale: Scale = { s, dx: (cx - info.width * s) / 2, dy: (cy - info.height * s) / 2 };
-  for (const [name, p] of batch.pkg.parts) {
-    const root = p.kind === 'xml' ? p.xml.root : undefined;
-    if (!root || root.ns !== NS.p || !CANVAS_ROOTS.has(root.local)) continue;
-    const tree = find(root, 'p:spTree');
-    if (tree) scaleShapes(batch, name, tree, scale, 0);
-    scaleText(batch, name, root, s, 0);
+  for (const [name, p] of [...batch.pkg.parts]) {
+    if (p.kind === 'xml') {
+      const root = p.xml.root;
+      if (root.ns !== NS.p || !CANVAS_ROOTS.has(root.local)) continue;
+      const tree = find(root, 'p:spTree');
+      if (tree) scaleShapes(batch, name, tree, scale, 0);
+      scaleText(batch, name, root, s, 0);
+    } else if (DRAWING_TYPES.has(contentTypeOf(batch.pkg, name) ?? '')) {
+      scaleDrawingPart(batch, name, p.bytes, s);
+    }
   }
   const defaults = child(xmlPartOf(batch.pkg, part)?.root, 'p:defaultTextStyle');
   if (defaults) scaleText(batch, part, defaults, s, 0);
   return true;
+}
+
+/** The parts read on demand, as bytes, whose content scales: diagram drawings and charts. */
+const DRAWING_TYPES: ReadonlySet<string> = new Set([
+  'application/vnd.ms-office.drawingml.diagramDrawing+xml',
+  'application/vnd.openxmlformats-officedocument.drawingml.chart+xml',
+]);
+
+/**
+ * Scale a diagram drawing or a chart that the package holds as bytes (the cascade reads it on
+ * demand). The part is read, scaled in a scratch batch, and written back whole, in this
+ * transaction. A chart keeps its layout, which is in fractions of its frame; its text scales.
+ * A diagram's shapes scale, and its text keeps its size and insets: the reference application
+ * lays a diagram out again from its data at the new size, with the text size of its layout.
+ */
+function scaleDrawingPart(batch: OpBatch, name: string, bytes: Uint8Array, s: number): void {
+  const r = parseXmlPart(name, new TextDecoder().decode(bytes));
+  if (!r.ok) return;
+  const root = r.part.root;
+  const scratch = new OpBatch({
+    parts: new Map([[name, { kind: 'xml', partName: name, xml: r.part }]]),
+  });
+  if (root.ns === NS.dsp && root.local === 'drawing') scaleDiagram(scratch, name, root, s);
+  else if (root.ns === NS.c && root.local === 'chartSpace') scaleText(scratch, name, root, s, 0);
+  else return;
+  const scaled = xmlPartOf(scratch.pkg, name);
+  if (scratch.ops.length === 0 || !scaled) return;
+  batch.push({ op: 'removePart', part: name });
+  batch.push({ op: 'addPart', part: name, xml: serializeXmlPart(scaled) });
+}
+
+/**
+ * Scale the saved drawing of a diagram (`dsp:drawing`). Its shapes are in the local space of
+ * the diagram's frame, so they scale with no offset: the root group's box when it maps a child
+ * space, else the box and text box of each top-level shape.
+ */
+function scaleDiagram(batch: OpBatch, part: string, root: Element, s: number): void {
+  const tree = child(root, 'dsp:spTree');
+  if (!tree) return;
+  const k: Scale = { s, dx: 0, dy: 0 };
+  const rootXfrm = child(child(tree, 'dsp:grpSpPr'), 'a:xfrm');
+  if (rootXfrm && child(rootXfrm, 'a:chExt')) return scaleTransform(batch, part, rootXfrm, k);
+  for (const el of elements(tree)) {
+    if (el.ns !== NS.dsp) continue;
+    const props = el.local === 'grpSp' ? 'dsp:grpSpPr' : el.local === 'sp' ? 'dsp:spPr' : '';
+    const xfrm = props ? child(child(el, props), 'a:xfrm') : undefined;
+    if (xfrm) scaleTransform(batch, part, xfrm, k);
+    const text = el.local === 'sp' ? child(el, 'dsp:txXfrm') : undefined;
+    if (text) scaleTransform(batch, part, text, k);
+  }
 }
 
 /** Scale the text attributes of every DrawingML element under `el` (`TEXT_ATTRIBUTES`). */

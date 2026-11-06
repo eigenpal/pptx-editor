@@ -81,6 +81,7 @@ const COMMAND_TABLE = {
   setLineEnds: true,
   setShapeEffect: true,
   setShapeStyle: true,
+  setAdjustments: true,
   // Slides, notes, and sections
   addSlide: true,
   duplicateSlide: true,

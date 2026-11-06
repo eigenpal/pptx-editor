@@ -141,11 +141,12 @@ const PageSetupDialogOpen = defineComponent({
     const substituted = useEditorState((s) => s.substitutedFonts);
     const opening = props.theme;
     // The slide size the dialog opened on: OK sends a size only when the fields moved from it.
-    const seed = seedSlideSizeFields(width.value, height.value);
+    const opened = { width: width.value, height: height.value };
+    const seed = seedSlideSizeFields(opened.width, opened.height);
     const draft = useDialogDraft<PageSetupDialogFields>({
       initial: { theme: opening, slideSize: seed },
       validate: (values) => {
-        const problem = slideSizeFieldError(seed, values.slideSize);
+        const problem = slideSizeFieldError(seed, values.slideSize, opened);
         return problem ? { slideSize: problem.key } : {};
       },
       // As the React twin: the slide size first, then a change from the opening choice,
@@ -153,7 +154,7 @@ const PageSetupDialogOpen = defineComponent({
       commit: (values) => {
         const resized = commitDialogCommand(
           editor.value,
-          slideSizeCommandOf(seed, values.slideSize)
+          slideSizeCommandOf(seed, values.slideSize, opened)
         );
         if (!resized.ok) return resized;
         if (values.theme !== opening) props.onThemeChange?.(values.theme);
@@ -189,7 +190,18 @@ const PageSetupDialogOpen = defineComponent({
         ]),
         h('div', { 'data-pptx-part': 'body', class: 'pptx-dialog__body' }, [
           section('slideSize', t('pageSetup.slideSize'), [
-            h('div', { class: 'pptx-dialog__rows' }, [
+            // Viewing mode: the size as text, as the fields cannot change it.
+            editable.value
+              ? null
+              : h('p', { class: 'pptx-dialog__value' }, [
+                  t(`pageSetup.slideSizeName.${seed.size}`),
+                  h(
+                    'span',
+                    { class: 'pptx-dialog__muted' },
+                    t('pageSetup.slideSizeValue', { width: seed.width, height: seed.height })
+                  ),
+                ]),
+            h('div', { class: 'pptx-dialog__rows', hidden: !editable.value }, [
               h(SelectField, {
                 name: 'size',
                 label: t('pageSetup.size'),

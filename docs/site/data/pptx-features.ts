@@ -734,12 +734,12 @@ export const pptxFeatures: PptxFeature[] = [
     id: 'slides.size',
     name: 'Slide size',
     category: 'slides',
-    editing: 'full',
+    editing: 'partial',
     rendering: 'partial',
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Pick Widescreen, Standard, A4, Letter, or a custom size from 1 to 56 inches, in either orientation, in **Page setup** (`setSlideSize`). The content scales to fit by default: boxes, text sizes, spacing, and insets scale by one factor and stay centered, while line widths and effect distances keep their values. Rendering is measured on 16:9, ISO A4 (842 × 595.5 pt), and 400.25 × 300.5 pt slides, which export to PDF pages rounded to whole points. Rendering is partial: portrait and very wide slides are not measured, and the strip past a rounded-down page is not compared.',
+      'Pick Widescreen, Standard, A4, Letter, or a custom size from 1 to 56 inches, in either orientation, in **Page setup** (`setSlideSize`). The content scales to fit by default: boxes, tables, chart text, and the text sizes, spacing, and insets that the file sets scale by one factor and stay centered. Editing is partial: line widths, effect distances, and values left to their defaults keep their values, diagram text keeps its size, and the notes pages and drawing guides keep their old layout. Rendering is measured on 16:9, ISO A4 (842 × 595.5 pt), and 400.25 × 300.5 pt slides, which export to PDF pages rounded to whole points. Rendering is partial: portrait and very wide slides are not measured, and the strip past a rounded-down page is not compared.',
   },
   {
     id: 'slides.sections',

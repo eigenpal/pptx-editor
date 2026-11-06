@@ -293,6 +293,12 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
     style: { row: 'intenseEffect', color: 'accent2' },
   })),
 
+  // A new rounded rectangle (selected after the insert): its corner handle moves.
+  setAdjustments: {
+    arrange: (e) => void e.exec({ type: 'insertShape', preset: 'roundRect' }),
+    command: () => ({ type: 'setAdjustments', values: { adj: 40_000 } }),
+  },
+
   // Slides, notes, and sections.
   addSlide: { command: () => ({ type: 'addSlide' }) },
   duplicateSlide: { command: () => ({ type: 'duplicateSlide', index: 1 }) },

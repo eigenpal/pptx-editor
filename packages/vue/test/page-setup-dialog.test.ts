@@ -94,6 +94,19 @@ describe('Vue Page setup slide size', () => {
     expect(boxWidth(editor)).toBe(2_438_400);
   });
 
+  test('Custom with the same numbers, or orientation there and back, sends no command', async () => {
+    const editor = await open();
+    await type('size', 'custom');
+    button('Portrait').click();
+    await nextTick();
+    button('Landscape').click();
+    await nextTick();
+    button('OK').click();
+    await nextTick();
+    expect(editor.snapshot().canUndo).toBe(false);
+    expect(editor.snapshot().slideWidth).toBe(12_192_000);
+  });
+
   test('a size out of 1 to 56 inches keeps the dialog open with its reason', async () => {
     let closed = 0;
     const editor = await open(() => (closed += 1));

@@ -5,6 +5,12 @@
 ```ts
 
 // @public
+export function adjustForHandle(preset: string, w: number, h: number, adjust: ReadonlyMap<string, number>, index: number, point: {
+    readonly x: number;
+    readonly y: number;
+}): Map<string, number> | undefined;
+
+// @public
 export function apply(m: Matrix, x: number, y: number): {
     x: number;
     y: number;
@@ -653,6 +659,20 @@ export interface PresetAdjustment {
 export function presetAdjustments(preset: string, w: number, h: number, adjust: ReadonlyMap<string, number>): PresetAdjustment[] | undefined;
 
 // @public
+export interface PresetHandle {
+    readonly guides: readonly string[];
+    // (undocumented)
+    readonly kind: 'xy' | 'polar';
+    // (undocumented)
+    readonly x: number;
+    // (undocumented)
+    readonly y: number;
+}
+
+// @public
+export function presetHandles(preset: string, w: number, h: number, adjust: ReadonlyMap<string, number>): PresetHandle[];
+
+// @public
 export function presetNames(): string[];
 
 // @public
@@ -667,6 +687,13 @@ export interface PresetShapeDefinition {
     readonly av: readonly (readonly [string, string])[];
     // (undocumented)
     readonly gd: readonly (readonly [string, string])[];
+    readonly hp?: readonly (readonly [
+    'xy' | 'polar',
+    string,
+    string,
+    string | null,
+    string | null
+    ])[];
     // (undocumented)
     readonly paths: readonly PresetPath[];
     readonly rect?: readonly [string, string, string, string];

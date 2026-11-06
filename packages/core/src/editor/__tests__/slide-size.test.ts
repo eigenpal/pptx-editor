@@ -12,6 +12,7 @@ import {
   find,
   presentationInfo,
   readPptx,
+  serializeXmlPart,
   shapeTreeOf,
   xmlPartOf,
   type Element,
@@ -28,6 +29,14 @@ async function open(name: string): Promise<PptxEditorInstance> {
 }
 
 const pkgOf = (e: PptxEditorInstance): PptxPackage => e.session!.store.package;
+const pkg = pkgOf;
+
+/** The XML text of a part, whether the package holds it parsed or as bytes. */
+function partText(p: PptxPackage, name: string): string {
+  const part = p.parts.get(name);
+  if (!part) throw new Error(`no part ${name}`);
+  return part.kind === 'xml' ? serializeXmlPart(part.xml) : new TextDecoder().decode(part.bytes);
+}
 
 function reopen(e: PptxEditorInstance): PptxPackage {
   const r = readPptx(e.save()!);
@@ -148,6 +157,29 @@ describe('setSlideSize', () => {
     expect(sizes(reopen(e))).toEqual(was.map((v) => Math.max(100, Math.round(v * 0.75))));
     expect(e.exec({ type: 'undo' }).ok).toBe(true);
     expect(sizes(pkgOf(e))).toEqual(was);
+  });
+
+  test('diagram drawings scale in their frame, and chart text scales', async () => {
+    const drawing = (p: PptxPackage): string => partText(p, '/ppt/diagrams/drawing1.xml');
+    const e = await open('diagrams');
+    const was = drawing(pkg(e));
+    expect(e.exec({ type: 'setSlideSize', width: 9_144_000, height: 6_858_000 }).ok).toBe(true);
+    const now = drawing(reopen(e));
+    // The first shape: off (390, 208259) and ext (1582031, 786760), scaled by 0.75 from the
+    // frame's origin.
+    expect(was).toContain('x="390" y="208259"');
+    expect(now).toContain('x="293" y="156194"');
+    expect(now).toContain('cx="1186523" cy="590070"');
+    // Diagram text keeps its size and insets.
+    const sizes0 = [...was.matchAll(/ sz="(\d+)"| lIns="(\d+)"/g)].map((m) => m[0]);
+    expect([...now.matchAll(/ sz="(\d+)"| lIns="(\d+)"/g)].map((m) => m[0])).toEqual(sizes0);
+    const c = await open('charts');
+    const sizes = (p: PptxPackage): string[] =>
+      [...partText(p, '/ppt/charts/chart1.xml').matchAll(/ sz="(\d+)"/g)].map((m) => m[1]!);
+    const before = sizes(pkg(c));
+    expect(before).toContain('1862');
+    expect(c.exec({ type: 'setSlideSize', width: 9_144_000, height: 6_858_000 }).ok).toBe(true);
+    expect(sizes(reopen(c))).toEqual(before.map((v) => String(Math.round(Number(v) * 0.75))));
   });
 
   test('keep leaves every box where it is', async () => {

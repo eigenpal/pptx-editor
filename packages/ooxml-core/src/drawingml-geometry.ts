@@ -688,3 +688,30 @@ export function presetAdjustments(
     };
   });
 }
+
+/**
+ * The guide values of a preset at a size, with its definition, for the adjust handles
+ * (`drawingml-handles.ts`). `mirrored`: the preset draws its base preset upside down.
+ * Undefined for a preset that the engine does not know. @internal
+ */
+export function presetGuides(
+  preset: string,
+  w: number,
+  h: number,
+  adjust: ReadonlyMap<string, number>
+):
+  | {
+      readonly def: PresetShapeDefinition;
+      readonly vars: Map<string, number>;
+      readonly mirrored: boolean;
+    }
+  | undefined {
+  const mirrored = Object.prototype.hasOwnProperty.call(MIRRORED_PRESETS, preset);
+  const name = mirrored ? MIRRORED_PRESETS[preset]! : preset;
+  if (!Object.prototype.hasOwnProperty.call(PRESET_SHAPES, name)) return undefined;
+  const def = PRESET_SHAPES[name]!;
+  const vars = builtins(w, h);
+  defineGuides(vars, def.av, adjust);
+  defineGuides(vars, def.gd);
+  return { def, vars, mirrored };
+}

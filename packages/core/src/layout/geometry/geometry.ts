@@ -16,11 +16,14 @@ import { attr, elements, type Element } from '../../store/index.ts';
 import type { GeometrySpec } from '../../cascade/index.ts';
 
 export {
+  adjustForHandle,
   evaluateFormula,
   presetAdjustments,
+  presetHandles,
   presetNames,
   type EvaluatedGeometry,
   type PresetAdjustment,
+  type PresetHandle,
   type GeometryPath,
   type PathCommand,
 } from '@eigenpal/ooxml-core';
