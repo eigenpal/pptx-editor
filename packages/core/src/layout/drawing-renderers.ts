@@ -193,6 +193,11 @@ export function subscribeDrawingRenderers(listener: () => void): () => void {
   };
 }
 
+/** The live {@link subscribeDrawingRenderers} subscriptions. Tests check cleanup with it. @internal */
+export function drawingRenderersListenerCount(): number {
+  return listeners.size;
+}
+
 /**
  * What the installed drawing renderers paint in this process.
  *

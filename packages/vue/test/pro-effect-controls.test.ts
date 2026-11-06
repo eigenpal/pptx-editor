@@ -4,9 +4,24 @@
 // them the next time the menu opens.
 
 import { afterAll, afterEach, beforeAll, describe, expect, spyOn, test } from 'bun:test';
-import { createApp, defineComponent, h, nextTick, shallowRef, type App, type Component } from 'vue';
+import {
+  createApp,
+  createSSRApp,
+  defineComponent,
+  effectScope,
+  h,
+  nextTick,
+  shallowRef,
+  type App,
+  type Component,
+} from 'vue';
+import { renderToString } from 'vue/server-renderer';
 import { createPptxEditor, type PptxEditorInstance } from '@pptx-editor.dev/core/editor';
-import { installDrawingRenderers, type DrawingEffectsRenderer } from '@pptx-editor.dev/core/layout';
+import {
+  drawingRenderersListenerCount,
+  installDrawingRenderers,
+  type DrawingEffectsRenderer,
+} from '@pptx-editor.dev/core/layout';
 import { buildPptx, shape, solid } from '../../../scripts/fixtures/builder.ts';
 import { providePptxEditor } from '../src/composables.ts';
 import {
@@ -204,6 +219,55 @@ describe('Pro effect controls (Vue)', () => {
     expect(options!.value).toContain('softEdge.none');
     // The component that reads the options draws again.
     expect(document.querySelector('output')!.textContent).not.toBe(shown);
+  });
+
+  test('useEditorValueCommand subscribes on mount and stops on unmount', async () => {
+    const editor = await openShape();
+    const before = drawingRenderersListenerCount();
+    const Probe = defineComponent({
+      setup() {
+        const cmd = useEditorValueCommand('shape.effects');
+        return () => h('output', String(cmd.options.value.length));
+      },
+    });
+    await mount(editor, () => h(Probe));
+    expect(drawingRenderersListenerCount()).toBe(before + 1);
+    unmount();
+    expect(drawingRenderersListenerCount()).toBe(before);
+  });
+
+  test('a server render of useEditorValueCommand leaves no renderer subscription', async () => {
+    const editor = await openShape();
+    const before = drawingRenderersListenerCount();
+    const html = await renderToString(
+      createSSRApp(
+        defineComponent({
+          setup() {
+            providePptxEditor(shallowRef(editor));
+            const cmd = useEditorValueCommand('shape.effects');
+            return () => h('output', String(cmd.options.value.length));
+          },
+        })
+      )
+    );
+    expect(html).toContain('<output>');
+    expect(drawingRenderersListenerCount()).toBe(before);
+  });
+
+  test('useEditorValueCommand in an effect scope stops with the scope', async () => {
+    const before = drawingRenderersListenerCount();
+    // An app context gives `inject` its providers outside a component, as a host store does.
+    const context = createApp({ render: () => null });
+    const scope = effectScope();
+    const options = context.runWithContext(() =>
+      scope.run(() => useEditorValueCommand('shape.effects').options)!
+    );
+    expect(drawingRenderersListenerCount()).toBe(before + 1);
+    expect(options.value.some((v) => v.startsWith('glow.'))).toBe(false);
+    installDrawingRenderers({ effects: EFFECTS });
+    expect(options.value).toContain('glow.8.accent2');
+    scope.stop();
+    expect(drawingRenderersListenerCount()).toBe(before);
   });
 
   test('an open toolbar shows the Pro picture styles after a late install', async () => {

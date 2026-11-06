@@ -10,8 +10,10 @@
 
 import {
   computed,
+  getCurrentInstance,
   getCurrentScope,
   inject,
+  onMounted,
   onScopeDispose,
   provide,
   shallowRef,
@@ -402,12 +404,39 @@ export interface UseEditorValueCommandReturn<V, S = V> {
   /**
    * The slot's fixed choices, from the registry (the Rotate, Align, line width, or Shape Effects
    * rows); none for a slot with a free value (`font.size`, `shape.fill`, `shape.styles`).
+   * Without the `@pptx-editor.dev/pro/drawing` module, they leave out the effects it paints
+   * (`chromeOfferedControl`), so `value` can be an effect from the file that is not in the list.
    */
   readonly options: ComputedRef<readonly V[]>;
   /** Whether the command can run now. */
   readonly isEnabled: ComputedRef<boolean>;
   /** Why the command cannot run: a catalog key, or the engine's own text. */
   readonly disabledReason: ComputedRef<string | null>;
+}
+
+/**
+ * `drawingRenderersVersion()`, updated after each install. A component subscribes when it
+ * mounts, as React's `useSyncExternalStore` does: a server render mounts nothing and runs no
+ * scope cleanup, so a subscription in `setup` would stay in the process for good. A bare
+ * effect scope subscribes at once and stops with the scope. Without a scope, the value stays.
+ */
+function useDrawingRenderersVersion(): Readonly<ShallowRef<number>> {
+  const version = shallowRef(drawingRenderersVersion());
+  if (!getCurrentScope()) return version;
+  let stop: (() => void) | null = null;
+  const start = (): void => {
+    stop?.();
+    stop = subscribeDrawingRenderers(() => (version.value = drawingRenderersVersion()));
+    // An install between `setup` and the mount counts too.
+    version.value = drawingRenderersVersion();
+  };
+  if (getCurrentInstance()) onMounted(start);
+  else start();
+  onScopeDispose(() => {
+    stop?.();
+    stop = null;
+  });
+  return version;
 }
 
 /**
@@ -421,9 +450,7 @@ export function useEditorValueCommand<K extends keyof ToolbarValueMap>(
   const cmd = useEditorCommand(slot);
   // The options follow the installed drawing renderers, as in React: an install offers the Pro
   // choices.
-  const renderers = shallowRef(drawingRenderersVersion());
-  const stop = subscribeDrawingRenderers(() => (renderers.value = drawingRenderersVersion()));
-  if (getCurrentScope()) onScopeDispose(stop);
+  const renderers = useDrawingRenderersVersion();
   return {
     execute: (value: ToolbarValueMap[K], options?: EditorExecOptions): CommandResult =>
       runToolbarCommand(editorRef.value, toValue(slot), value as ToolbarSlotValue<K>, options),

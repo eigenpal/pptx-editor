@@ -122,6 +122,9 @@ export interface DrawingRenderers {
 // @internal
 export function drawingRenderers(): DrawingRenderers;
 
+// @internal
+export function drawingRenderersListenerCount(): number;
+
 // @public
 export function drawingRenderersVersion(): number;
 

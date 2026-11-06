@@ -5,7 +5,13 @@ import {
   panelItems,
   type PptxEditorInstance,
 } from '@pptx-editor.dev/core/editor';
-import { installDrawingRenderers, type DrawingEffectsRenderer } from '@pptx-editor.dev/core/layout';
+import { StrictMode } from 'react';
+import { renderToString } from 'react-dom/server';
+import {
+  drawingRenderersListenerCount,
+  installDrawingRenderers,
+  type DrawingEffectsRenderer,
+} from '@pptx-editor.dev/core/layout';
 import { buildPptx, shape, solid } from '../../../../scripts/fixtures/builder.ts';
 import { PptxEditorContext } from '../context.ts';
 import { PptxEditor, Toolbar, useEditorValueCommand } from '../index.ts';
@@ -491,5 +497,45 @@ describe('Pro effect controls', () => {
     expect(options).toContain('shadow.innerTop');
     expect(options).toContain('reflection.none');
     expect(options).toContain('softEdge.none');
+  });
+
+  test('useEditorValueCommand holds one renderer subscription under StrictMode and none after', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const editor = await open();
+    const before = drawingRenderersListenerCount();
+    let options: readonly string[] = [];
+    function Probe() {
+      options = useEditorValueCommand('shape.effects').options;
+      return <output>{options.length}</output>;
+    }
+    const view = render(
+      <StrictMode>
+        <PptxEditorContext.Provider value={editor}>
+          <Probe />
+        </PptxEditorContext.Provider>
+      </StrictMode>
+    );
+    // StrictMode subscribes, unsubscribes, and subscribes again: one subscription stays.
+    expect(drawingRenderersListenerCount()).toBe(before + 1);
+    act(() => installDrawingRenderers({ effects: EFFECTS }));
+    expect(options).toContain('glow.8.accent2');
+    view.unmount();
+    expect(drawingRenderersListenerCount()).toBe(before);
+  });
+
+  test('a server render of useEditorValueCommand leaves no renderer subscription', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const editor = await open();
+    const before = drawingRenderersListenerCount();
+    function Probe() {
+      return <output>{useEditorValueCommand('shape.effects').options.length}</output>;
+    }
+    const html = renderToString(
+      <PptxEditorContext.Provider value={editor}>
+        <Probe />
+      </PptxEditorContext.Provider>
+    );
+    expect(html).toContain('<output>');
+    expect(drawingRenderersListenerCount()).toBe(before);
   });
 });
