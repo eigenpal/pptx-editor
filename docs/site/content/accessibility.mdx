@@ -8,7 +8,7 @@ The editor gives names, roles, and keyboard support to its controls. The page ar
 
 ## Prepare the host page
 
-The editor renders inside your page. It does not add page-level structure. Give the page these items:
+The editor renders inside your page. It adds one landmark, the region "Presentation editor" around its viewport. It adds no other page-level structure. Give the page these items:
 
 - A `lang` attribute on `<html>`.
 - A `<title>` that names the page.
@@ -33,6 +33,8 @@ The editor renders inside your page. It does not add page-level structure. Give 
   </body>
 </html>
 ```
+
+If your own `<header>` or `<main>` is inside the viewport, set `label={false}` on `PptxEditor.Viewport` (`:label="false"` in Vue). The viewport then adds no region, and your landmarks stay at the top level. To change the region name, give `label` a text or a translation key.
 
 The demos in `examples/` follow these rules. The [quickstart](/docs/quickstart) shows the `<main>` landmark and the file input label.
 
@@ -111,30 +113,30 @@ The editor takes its accessible names from the locale catalog, so they change wi
 
 | Where | What the screen reader hears |
 | --- | --- |
-| Slide | The group name "Slide 3 of 12". The name changes when the slide changes. |
-| Shape selection | A polite announcement, "Title 1 selected", with the shape name from the file. It comes when Tab or a click selects one shape. |
+| Editor | A region "Presentation editor" that holds the chrome and the slide. |
+| Slide | The group name "Slide 3 of 12". The name changes when the slide changes. Inside it, the slide text and an image for each picture that has alt text. The image name is the alt text. A decorative picture, or a picture with no alt text, is hidden. |
+| Shape selection | A polite announcement with the kind and the name of the shape, for example "Shape Title 1, selected". For a picture with alt text, the alt text comes after the name: "Picture Logo, A green leaf, selected". It comes when Tab or a click selects one shape. |
 | Text editing | The text input "Text of the selected shape". |
 | Table cell | A polite announcement, "Row 2, column 3", when the caret moves to a cell. |
 | Link in the text | A polite announcement, "Link: https://example.com. Press F6 for its actions." F6 moves focus to the link actions. |
 | Slide list | A navigation region "Slides" with a list box "Slides". With sections, the list is a tree. Items are "Slide 4", or "Slide 4 (hidden)" for a hidden slide. |
 | Speaker notes | A region "Speaker notes", with a multiline text box. |
 | Status bar | A polite announcement, "Slide 3 of 12", when the slide changes. |
-| Slide show | A modal dialog "Slide show". A polite announcement gives the position, "Slide 3 of 12", at each slide. When you type a number, a status message says "Go to slide 5". |
+| Slide show | A modal dialog "Slide show" with the slide text and the picture alt text of the current slide. A polite announcement gives the position, "Slide 3 of 12", at each slide. When you type a number, a status message says "Go to slide 5". |
 
 ## Color modes and motion
 
 - **Color modes.** Set `colorMode` to `light`, `dark`, or `system`. `system` follows the operating system and updates when it changes. Only the chrome changes. The slide always shows the colors of the file. See [Appearance](/docs/customization/appearance).
 - **Reduced motion.** When the operating system asks for reduced motion, the editor stops the loading spinner, the tooltip animation, the press effect of buttons, the slide-in of notices, and the transition of the slide show control bar.
+- **Forced colors.** In a forced colors (high contrast) mode, the chrome uses the system colors. Selection, pressed and checked controls, focus rings, and disabled controls stay visible. The slide keeps the colors of the file. See [Appearance](/docs/customization/appearance).
 - **Slide show motion.** The slide show does not play the animations and transitions of the file. They stay in the file on save.
 
 ## Known limits
 
 These limits apply today:
 
-- **Picture alt text.** You can set alt text, a title, and "Mark as decorative" in the Alt text dialog. The editor saves them in the file. The slide does not yet give the alt text to a screen reader.
+- **Alt text of other objects.** Only pictures give their alt text to a screen reader on the slide. Charts, groups, and shapes do not yet. A picture with a title but no alt text is hidden.
 - **Slide content structure.** The slide is drawn as SVG. A screen reader gets the slide text only as flat text, in z-order. It gets no headings, lists, or reading order. It gets the shape name only when a shape is selected. When more than one shape is selected, it hears no announcement.
-- **Slide show content.** In the slide show, each slide is an image with no text alternative. A screen reader hears the slide position, not the slide text.
-- **Forced colors.** The chrome does not yet change for a forced colors (high contrast) mode.
 
 ## Next steps
 
