@@ -32,6 +32,7 @@ import {
 import { snapContext, snapMove, snapResize, type SnapContext } from './surface-guides.ts';
 import type { SnapGuide } from './snapping.ts';
 import { resizeOne, scaleMany } from './surface-resize.ts';
+import { clampTableResize } from './surface-table.ts';
 
 export type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'rot' | 'start' | 'end';
 export type BoxHandle = Exclude<Handle, 'start' | 'end'>;
@@ -141,9 +142,12 @@ export function dragStep(
     const rot = rotationAfterDrag(item, x, d.start, p, input.shift);
     return { items: [toFile(item, { ...x, rot })], guides };
   }
+  const keep = { shift: input.shift, locked: input.aspectLocked(item.element.nodeId) };
+  // A table resizes from its drawn grid, and each dragged edge stops at the slide's edge.
+  const aspect = keep.shift || keep.locked;
+  ({ dx, dy } = clampTableResize(item, [hx, hy], dx, dy, d.snap.slide, aspect));
   const s0 = toParent(item, d.start.x, d.start.y);
   const s1 = toParent(item, d.start.x + dx, d.start.y + dy);
-  const keep = { shift: input.shift, locked: input.aspectLocked(item.element.nodeId) };
   return { items: [resizeOne(item, x, [hx, hy], s1.x - s0.x, s1.y - s0.y, keep)], guides };
 }
 

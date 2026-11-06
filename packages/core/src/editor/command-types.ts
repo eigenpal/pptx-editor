@@ -106,6 +106,7 @@ const COMMAND_TABLE = {
   replaceAll: true,
   // View settings
   toggleSmartGuides: true,
+  setTableBorderPen: true,
   setPresentationView: true,
   setSectionsCollapsed: true,
   // Pictures
@@ -137,6 +138,7 @@ const COMMAND_TABLE = {
   setColumnWidth: true,
   distributeRows: true,
   distributeColumns: true,
+  pasteCells: true,
   setTableGrid: true,
 } as const satisfies Record<EditorCommandType, true>;
 

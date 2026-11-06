@@ -285,6 +285,8 @@ const SLOT_PART_NAMES = [
   'Rotate',
   'TableStyle',
   'TableBorderTarget',
+  'TableBorderStyle',
+  'TableBorderWidth',
   'TableSelect',
   'TableDelete',
   'TableSplitCell',
@@ -298,6 +300,7 @@ const COLOR_SPLIT_NAMES = [
   'ShapeFill',
   'LineColor',
   'TableCellFill',
+  'TableBorderColor',
 ] as const;
 
 type SlotPartName = (typeof SLOT_PART_NAMES)[number];

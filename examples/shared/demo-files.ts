@@ -55,19 +55,13 @@ function storedTheme(): Theme | null {
   }
 }
 
-/** The system color scheme: dark when the system asks for it. */
-function systemTheme(): Theme {
-  const media = globalThis.matchMedia?.('(prefers-color-scheme: dark)');
-  return media?.matches ? 'dark' : 'light';
-}
-
 /**
  * The theme the demo starts in: the URL's (`?theme=dark` or `?theme=light`), else the theme
- * picked before, else the system color scheme (`prefers-color-scheme`).
+ * picked before, else light. Dark is only ever picked by hand.
  */
 export function initialTheme(search: string): Theme {
   const asked = new URLSearchParams(search).get('theme');
-  return isTheme(asked) ? asked : (storedTheme() ?? systemTheme());
+  return isTheme(asked) ? asked : (storedTheme() ?? 'light');
 }
 
 /** Keep the theme picked in File > Page setup for the next visit. */
@@ -75,7 +69,7 @@ export function rememberTheme(theme: Theme): void {
   try {
     globalThis.localStorage?.setItem(THEME_KEY, theme);
   } catch {
-    // Storage is off: the next visit follows the system again.
+    // Storage is off: the next visit starts light again.
   }
 }
 

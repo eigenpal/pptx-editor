@@ -38,6 +38,21 @@ export interface TableBorderSpec {
 }
 
 /**
+ * The border pen: the line the Borders menu draws, and the target it last drew. A pen color,
+ * style, or weight pick arms the pen and writes nothing. A border target pick draws the pen
+ * there; after it, a pen pick redraws that target with the new pen, as DOCX Editor's table
+ * chrome draft does, until No Border. @public
+ */
+export interface TableBorderPen {
+  /** The target the pen last drew (All Borders until the first pick). */
+  readonly target: TableBorderEdgeTarget;
+  /** Whether a pen pick redraws `target`: true after a border target pick, until No Border. */
+  readonly drawn: boolean;
+  /** The line the pen draws. */
+  readonly spec: TableBorderSpec;
+}
+
+/**
  * Table style options, the `a:tblPr` flags: Header Row, Total Row, Banded Rows, First Column,
  * Last Column, Banded Columns. @public
  */
@@ -152,6 +167,14 @@ export type TableCommand =
   | { readonly type: 'setRowHeight'; readonly height: number }
   /** The width of the selected columns in EMU (`a:gridCol/@w`). */
   | { readonly type: 'setColumnWidth'; readonly width: number }
+  /**
+   * Fill cells with plain text from the top-left cell of the selection (a paste of copied
+   * cells): one array for each row, one string for each cell. Each written cell keeps the format
+   * of its first run. Text past the table's edge adds rows at the bottom and columns at the end of the grid (the right, or the left in a right-to-left table)
+   * (new columns share the table's width), up to the table limits; a position inside a merged
+   * cell is skipped.
+   */
+  | { readonly type: 'pasteCells'; readonly texts: readonly (readonly string[])[] }
   /** Give the selected rows (or every row) the same height. */
   | { readonly type: 'distributeRows' }
   /** Give the selected columns (or every column) the same width. */

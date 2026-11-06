@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createPptxEditor, type PptxEditorInstance } from '@pptx-editor.dev/core/editor';
 import { attr, children, find, xmlPartOf, type Element } from '@pptx-editor.dev/core/store';
 import { createTranslator } from '@pptx-editor.dev/i18n';
-import { buildPptx, cell, table } from '../../../../scripts/fixtures/builder.ts';
+import { buildPptx, cell, shape, table } from '../../../../scripts/fixtures/builder.ts';
 import { PptxEditorContext, useEditorCommand } from '../context.ts';
 import { Toolbar, ToolbarGroup, ToolbarSlot } from '../Toolbar.tsx';
 import { MenuTableGrid } from '../TableControls.tsx';
@@ -19,35 +19,43 @@ const PX = 9_525;
 const t = createTranslator();
 const STYLE = '{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}';
 
-const deck = (): Uint8Array =>
+/** `behind` puts a large shape under the table, as a slide's decoration sits; `front`, a box over it. */
+const deck = (extra?: 'behind' | 'front'): Uint8Array =>
   buildPptx({
     slides: [
       {
         layout: 'blank',
-        shapes: table({
-          id: 2,
-          x: IN,
-          y: IN,
-          cx: 3 * IN,
-          cy: 2 * IN,
-          columns: [IN, IN, IN],
-          tblPr: `<a:tblPr firstRow="1" bandRow="1"><a:tableStyleId>${STYLE}</a:tableStyleId></a:tblPr>`,
-          rows: ['ABC', 'DEF']
-            .map((r) => `<a:tr h="${IN}">${[...r].map((c) => cell(c)).join('')}</a:tr>`)
-            .join(''),
-        }),
+        shapes:
+          (extra === 'behind'
+            ? shape({ id: 3, x: 0, y: 0, cx: 8 * IN, cy: 5 * IN, fill: 'FF0000' })
+            : '') +
+          table({
+            id: 2,
+            x: IN,
+            y: IN,
+            cx: 3 * IN,
+            cy: 2 * IN,
+            columns: [IN, IN, IN],
+            tblPr: `<a:tblPr firstRow="1" bandRow="1"><a:tableStyleId>${STYLE}</a:tableStyleId></a:tblPr>`,
+            rows: ['ABC', 'DEF']
+              .map((r) => `<a:tr h="${IN}">${[...r].map((c) => cell(c)).join('')}</a:tr>`)
+              .join(''),
+          }) +
+          (extra === 'front'
+            ? shape({ id: 4, x: 1.5 * IN, y: 1.25 * IN, cx: IN, cy: IN / 2 })
+            : ''),
       },
     ],
   });
 
-async function open(): Promise<PptxEditorInstance> {
+async function open(extra?: 'behind' | 'front'): Promise<PptxEditorInstance> {
   const editor = createPptxEditor({
     fixedMeasurer: true,
     substitutes: false,
     zoom: 1,
     translate: (key, params) => t(key as never, params),
   });
-  expect((await editor.load(deck())).ok).toBe(true);
+  expect((await editor.load(deck(extra))).ok).toBe(true);
   return editor;
 }
 
@@ -156,10 +164,12 @@ describe('table surface', () => {
       };
     };
     const before = sizes();
-    const handle = host.querySelector('[data-handle="s"]') as SVGCircleElement;
-    const hx = Number(handle.getAttribute('cx'));
-    const hy = Number(handle.getAttribute('cy'));
-    const p = (dy: number) => ({ clientX: hx / PX, clientY: (hy + dy) / PX, bubbles: true });
+    // The right and bottom edges are grid lines, so a table has no east or south side handle.
+    expect(host.querySelector('[data-handle="s"], [data-handle="e"]')).toBeNull();
+    const handle = host.querySelector('[data-handle="n"]') as SVGCircleElement;
+    const hx = Number(handle.getAttribute('x')) + 4 * PX;
+    const hy = Number(handle.getAttribute('y')) + 4 * PX;
+    const p = (dy: number) => ({ clientX: hx / PX, clientY: (hy - dy) / PX, bubbles: true });
     handle.dispatchEvent(new PointerEvent('pointerdown', { ...p(0), button: 0 }));
     for (const dy of [IN, 2 * IN, -IN / 2, -IN, IN / 2])
       document.dispatchEvent(new PointerEvent('pointermove', p(dy)));
@@ -170,13 +180,13 @@ describe('table surface', () => {
     act(() => void editor.exec({ type: 'undo' }));
     expect(sizes()).toEqual(before);
     // A side handle changes the width only: the rows stay.
-    const side = host.querySelector('[data-handle="e"]') as SVGCircleElement;
-    const sx = Number(side.getAttribute('cx'));
-    const sy = Number(side.getAttribute('cy'));
-    const q = (dx: number) => ({ clientX: (sx + dx) / PX, clientY: sy / PX, bubbles: true });
+    const side = host.querySelector('[data-handle="w"]') as SVGCircleElement;
+    const sx = Number(side.getAttribute('x')) + 4 * PX;
+    const sy = Number(side.getAttribute('y')) + 4 * PX;
+    const q = (dx: number) => ({ clientX: (sx - dx) / PX, clientY: sy / PX, bubbles: true });
     side.dispatchEvent(new PointerEvent('pointerdown', { ...q(0), button: 0 }));
-    document.dispatchEvent(new PointerEvent('pointermove', q(IN)));
-    document.dispatchEvent(new PointerEvent('pointerup', q(IN)));
+    document.dispatchEvent(new PointerEvent('pointermove', q(IN / 2)));
+    document.dispatchEvent(new PointerEvent('pointerup', q(IN / 2)));
     expect(sizes().h).toEqual(before.h);
     expect(sizes().w).not.toEqual(before.w);
     editor.destroy();
@@ -199,10 +209,10 @@ describe('table surface', () => {
       );
       for (let i = 0; i < 8; i += 1) act(() => void editor.input('paragraph'));
       act(() => editor.setSelection({ kind: 'shapes', nodeIds: [id] }));
-      const handle = host.querySelector('[data-handle="s"]') as SVGCircleElement;
-      const hx = Number(handle.getAttribute('cx'));
-      const hy = Number(handle.getAttribute('cy'));
-      const p = (dy: number) => ({ clientX: hx / PX, clientY: (hy + dy) / PX, bubbles: true });
+      const handle = host.querySelector('[data-handle="n"]') as SVGCircleElement;
+      const hx = Number(handle.getAttribute('x')) + 4 * PX;
+      const hy = Number(handle.getAttribute('y')) + 4 * PX;
+      const p = (dy: number) => ({ clientX: hx / PX, clientY: (hy - dy) / PX, bubbles: true });
       handle.dispatchEvent(new PointerEvent('pointerdown', { ...p(0), button: 0 }));
       for (const dy of path) document.dispatchEvent(new PointerEvent('pointermove', p(dy)));
       document.dispatchEvent(new PointerEvent('pointerup', p(path[path.length - 1])));
@@ -219,19 +229,19 @@ describe('table surface', () => {
     const id = frames(editor)[0].id;
     const drag = (host: HTMLElement, dx: number) => {
       act(() => editor.setSelection({ kind: 'shapes', nodeIds: [id] }));
-      const side = host.querySelector('[data-handle="e"]') as SVGCircleElement;
-      const sx = Number(side.getAttribute('cx'));
-      const sy = Number(side.getAttribute('cy'));
-      const q = (d: number) => ({ clientX: (sx + d) / PX, clientY: sy / PX, bubbles: true });
+      const side = host.querySelector('[data-handle="w"]') as SVGCircleElement;
+      const sx = Number(side.getAttribute('x')) + 4 * PX;
+      const sy = Number(side.getAttribute('y')) + 4 * PX;
+      const q = (d: number) => ({ clientX: (sx - d) / PX, clientY: sy / PX, bubbles: true });
       side.dispatchEvent(new PointerEvent('pointerdown', { ...q(0), button: 0 }));
       document.dispatchEvent(new PointerEvent('pointermove', q(dx)));
       document.dispatchEvent(new PointerEvent('pointerup', q(dx)));
     };
-    drag(surface(editor), IN);
+    drag(surface(editor), IN / 2);
     const cols = [2 * IN, IN, IN];
     expect(editor.exec({ type: 'setTableGrid', columns: cols }).ok).toBe(true);
     // A new surface numbers its gestures from 1 again.
-    drag(surface(editor), 3 * IN);
+    drag(surface(editor), IN / 2);
     const widths = children(find(frames(editor)[0], 'a:tblGrid'), 'a:gridCol').map((g) =>
       Number(attr(g, 'w'))
     );
@@ -282,6 +292,101 @@ describe('table surface', () => {
     expect(widths()).toEqual([IN + 20 * PX, IN - 20 * PX, IN]);
     act(() => void editor.exec({ type: 'undo' }));
     expect(widths()).toEqual([IN, IN, IN]);
+    editor.destroy();
+  });
+});
+
+describe('focus after a grid drag', () => {
+  test('a caret that stays in the table takes the keys again after a line drag', async () => {
+    const editor = await open();
+    const host = surface(editor);
+    const stage = stageOf(host);
+    const frame = frames(editor)[0];
+    const at0 = { paragraph: 0, offset: 1 };
+    const cell = { row: 0, column: 0 };
+    act(() =>
+      editor.setSelection({ kind: 'text', nodeId: frame.id, cell, anchor: at0, focus: at0 })
+    );
+    stage.dispatchEvent(new PointerEvent('pointerdown', { ...at(2 * IN, 1.5 * IN), button: 0 }));
+    document.dispatchEvent(new PointerEvent('pointermove', at(2 * IN + 20 * PX, 1.5 * IN)));
+    document.dispatchEvent(new PointerEvent('pointerup', at(2 * IN + 20 * PX, 1.5 * IN)));
+    expect(editor.snapshot().selection.kind).toBe('text');
+    expect(document.activeElement?.className).toBe('pptx-surface__input');
+    editor.destroy();
+  });
+});
+
+describe('the border band of a selected table', () => {
+  test('a press just inside the bottom edge places a caret; it never moves the table', async () => {
+    const editor = await open();
+    const host = surface(editor);
+    const stage = stageOf(host);
+    const frame = frames(editor)[0];
+    act(() => editor.setSelection({ kind: 'shapes', nodeIds: [frame.id] }));
+    // The bottom edge is at y = 3 in; the press is 6 px above it, in the second row's cell.
+    const y = 3 * IN - 6 * PX;
+    stage.dispatchEvent(new PointerEvent('pointerdown', { ...at(1.5 * IN, y), button: 0 }));
+    document.dispatchEvent(new PointerEvent('pointermove', at(1.5 * IN, y + 25 * PX)));
+    document.dispatchEvent(new PointerEvent('pointerup', at(1.5 * IN, y + 25 * PX)));
+    const sel = editor.snapshot().selection;
+    expect(sel.kind === 'text' || sel.kind === 'cells').toBe(true);
+    const off = find(frames(editor)[0], 'p:xfrm')!;
+    expect(attr(find(off, 'a:off')!, 'y')).toBe(String(IN));
+    editor.destroy();
+  });
+});
+
+describe('table edge over a shape', () => {
+  test('a press just outside the edge resizes the selected table, not the shape behind', async () => {
+    const editor = await open('behind');
+    const host = surface(editor);
+    const stage = stageOf(host);
+    const frame = frames(editor)[0];
+    const at0 = { paragraph: 0, offset: 0 };
+    act(() =>
+      editor.setSelection({
+        kind: 'text',
+        nodeId: frame.id,
+        cell: { row: 0, column: 0 },
+        anchor: at0,
+        focus: at0,
+      })
+    );
+    // The right edge is at x = 4 in; the press is 2 px outside it, over the shape.
+    const x = 4 * IN + 2 * PX;
+    stage.dispatchEvent(new PointerEvent('pointerdown', { ...at(x, 1.5 * IN), button: 0 }));
+    document.dispatchEvent(new PointerEvent('pointermove', at(x + 20 * PX, 1.5 * IN)));
+    document.dispatchEvent(new PointerEvent('pointerup', at(x + 20 * PX, 1.5 * IN)));
+    const widths = children(find(frames(editor)[0], 'a:tblGrid'), 'a:gridCol').map((g) =>
+      Number(attr(g, 'w'))
+    );
+    expect(widths).toEqual([IN, IN, IN + 20 * PX]);
+    const root = xmlPartOf(editor.session!.store.package, part(editor))!.root;
+    const sp = find(root, 'p:sp')!;
+    expect(attr(find(sp, 'a:off')!, 'x')).toBe('0');
+    editor.destroy();
+  });
+});
+
+describe('table grid line under a shape', () => {
+  test('a press on a shape in front of the table takes the shape, not the grid line', async () => {
+    const editor = await open('front');
+    const host = surface(editor);
+    const stage = stageOf(host);
+    const frame = frames(editor)[0];
+    act(() => editor.setSelection({ kind: 'shapes', nodeIds: [frame.id] }));
+    // The column line at x = 2 in runs under the box (1.5 in to 2.5 in).
+    stage.dispatchEvent(new PointerEvent('pointerdown', { ...at(2 * IN, 1.5 * IN), button: 0 }));
+    document.dispatchEvent(new PointerEvent('pointerup', at(2 * IN, 1.5 * IN)));
+    const root = xmlPartOf(editor.session!.store.package, part(editor))!.root;
+    const box = find(root, 'p:sp')!;
+    const sel = editor.snapshot().selection;
+    expect(sel.kind === 'shapes' ? sel.nodeIds : sel.kind).toEqual([box.id]);
+    // The grid stays as it was: no column drag started.
+    const widths = children(find(frames(editor)[0], 'a:tblGrid'), 'a:gridCol').map((g) =>
+      Number(attr(g, 'w'))
+    );
+    expect(widths).toEqual([IN, IN, IN]);
     editor.destroy();
   });
 });
@@ -418,10 +523,9 @@ describe('table toolbar', () => {
       })
     );
     expect(groups(container).at(-1)).toBe('table');
-    const header = container.querySelector<HTMLButtonElement>('[data-slot="table.headerRow"]')!;
-    expect(header.getAttribute('aria-pressed')).toBe('true');
-    act(() => void fireEvent.click(header));
-    expect(header.getAttribute('aria-pressed')).toBe('false');
+    // The bar's short table group: the style options stay on the ribbon and in Toolbar.Slot.
+    expect(container.querySelector('[data-slot="table.headerRow"]')).toBeNull();
+    expect(container.querySelector('[data-slot="table.style"]')).not.toBeNull();
     act(() => void fireEvent.click(container.querySelector('[data-slot="table.insertRowBelow"]')!));
     expect(rowsOf(frames(editor)[0])).toHaveLength(3);
     // One cell: Merge Cells is disabled with the engine's reason.

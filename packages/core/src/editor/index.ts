@@ -26,10 +26,13 @@ export {
   type ToolbarCommandState,
 } from './chrome-controls.ts';
 export {
+  DEFAULT_TABLE_BORDER_PEN,
   isTableChromeSlot,
   TABLE_CHROME_SLOT_IDS,
+  tableBorderPen,
   tableChromeVisible,
   type TableChromeSlotId,
+  type TableSlotId,
 } from './chrome-table.ts';
 export {
   collaborationPort,
@@ -272,6 +275,7 @@ export {
   notesFormatRange,
   notesFormatShortcut,
   notesHistoryShortcut,
+  panelHistoryKey,
   notesWordAt,
   openSectionOfCurrent,
   openSlideInNormalView,
@@ -663,7 +667,14 @@ export {
   startSlideshowController,
   type SlideshowScreenSize,
 } from './slideshow-screen.ts';
-export { editNoticeTone, elementKindLabelKey, type ElementKindLabelKey } from './canvas-support.ts';
+export {
+  editNoticeTone,
+  elementKindLabelKey,
+  elementRotates,
+  TABLE_OPTION_ROWS,
+  type ElementKindLabelKey,
+  type TableOptionRow,
+} from './canvas-support.ts';
 export {
   applyLocalFonts,
   dispatchFindRequest,

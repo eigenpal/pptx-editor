@@ -635,6 +635,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     emit,
     deleteText: () => void textInput('deleteBackward'),
     cutShapes: () => removal.cut(() => exec({ type: 'delete' })),
+    clearCells: () => void exec({ type: 'delete' }),
+    pasteCells: (texts) => void exec({ type: 'pasteCells', texts }),
+    insertText: (text) => void textInput('text', text),
     refuse: (reason) => void refuse(reason),
     paste: (payload) => void exec({ type: 'paste', payload }),
   });
@@ -867,7 +870,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         cropping,
         textInput,
         shortcut,
-        run: (command, options) => void exec(command, options),
+        run: (command, options) => exec(command, options),
         beginHistoryGroup: () => groups.begin(),
         refuse: (reason, detail) => void refuse(reason, detail),
         fitChanged: (value) => {

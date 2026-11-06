@@ -60,3 +60,22 @@ export function surfacePadding(root: HTMLElement): { x: number; y: number } {
     y: side(own?.paddingTop) + side(own?.paddingBottom),
   };
 }
+
+/**
+ * The zoom that fits slide `size` (EMU) in `host`, inside the host's own padding (an open find
+ * bar reserves its top) and the surface padding of `root` (`--doc-slide-padding`, 24px a side).
+ * @internal
+ */
+export function fitZoom(
+  host: HTMLElement,
+  root: HTMLElement,
+  size: { readonly width: number; readonly height: number }
+): number {
+  const pad = host.ownerDocument.defaultView?.getComputedStyle(host);
+  const sum = (a?: string, b?: string): number =>
+    (parseFloat(a ?? '') || 0) + (parseFloat(b ?? '') || 0);
+  const own = surfacePadding(root);
+  const w = Math.max(100, host.clientWidth - sum(pad?.paddingLeft, pad?.paddingRight) - own.x);
+  const h = Math.max(100, host.clientHeight - sum(pad?.paddingTop, pad?.paddingBottom) - own.y);
+  return Math.max(0.1, Math.min(w / (size.width / 9_525), h / (size.height / 9_525)));
+}

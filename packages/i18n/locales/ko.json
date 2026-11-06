@@ -430,6 +430,9 @@
     "bandedColumns": "줄무늬 열",
     "cellFill": "음영",
     "borderTarget": "테두리",
+    "borderColor": "펜 색",
+    "borderStyle": "펜 스타일",
+    "borderWidth": "펜 두께",
     "border": {
       "all": "모든 테두리",
       "outside": "바깥쪽 테두리",
@@ -440,6 +443,7 @@
       "right": "오른쪽 테두리",
       "none": "테두리 없음"
     },
+    "insertSubmenu": "삽입",
     "select": "선택",
     "region": {
       "table": "표 선택",
@@ -809,7 +813,11 @@
         "connector": "연결선",
         "graphicFrame": "포함된 개체",
         "table": "표"
-      }
+      },
+      "table": "표",
+      "rowHeight": "행 높이",
+      "columnWidth": "열 너비",
+      "styleOptions": "표 스타일 옵션"
     },
     "comments": {
       "emptyTitle": "메모 없음",

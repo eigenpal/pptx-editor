@@ -73,7 +73,7 @@ export function canvasMenuLabelKey(
   | 'contextMenu.shapeLabel'
   | 'contextMenu.pictureLabel'
   | 'contextMenu.canvasLabel' {
-  if (kind === 'table') return 'contextMenu.tableLabel';
+  if (kind === 'table' || kind === 'tableFrame') return 'contextMenu.tableLabel';
   return kind === 'text'
     ? 'contextMenu.textLabel'
     : kind === 'shapes'
@@ -147,6 +147,9 @@ export const CONTEXT_MENU_NAMED_PARTS = {
   DeleteTableRow: row('table.delete', 'rows'),
   DeleteTableColumn: row('table.delete', 'columns'),
   DeleteTable: row('table.delete', 'table'),
+  SelectTable: row('table.select', 'table'),
+  SelectTableRow: row('table.select', 'row'),
+  SelectTableColumn: row('table.select', 'column'),
 } as const satisfies Record<string, MenuNamedRow>;
 
 /**

@@ -153,15 +153,40 @@ export const TOOLBAR_BAR_GROUPS: readonly ChromeGroup[] = formattingBarChromeGro
 export const TOOLBAR_PICTURE_GROUPS: readonly ChromeGroup[] = PICTURE_BAR_GROUPS;
 
 /**
+ * The table controls of the preset bar, as DOCX Editor's short table group: the style, cell
+ * fill, borders, and the pen color and weight, then select, delete, insert, merge, and split.
+ * The whole group would never fit beside the text controls; the style options, pen style,
+ * distribute, and cell margins stay on the ribbon's Table Design and Table Layout tabs and in
+ * `Toolbar.Slot`.
+ */
+const BAR_TABLE_CONTROLS: ReadonlySet<string> = new Set([
+  'style',
+  'cellFill',
+  'borderTarget',
+  'borderColor',
+  'borderWidth',
+  'select',
+  'delete',
+  'insertRowAbove',
+  'insertRowBelow',
+  'insertColumnLeft',
+  'insertColumnRight',
+  'mergeCells',
+  'splitCell',
+]);
+
+/**
  * The groups the preset toolbar adds for the selection: the `table` group while it is in or
- * on a table (`tableChromeVisible`), with every table slot but Insert > Table, as DOCX Editor's
- * table chrome. @internal
+ * on a table (`tableChromeVisible`), with the table slots of `BAR_TABLE_CONTROLS`, as DOCX
+ * Editor's table chrome. @internal
  */
 export const TOOLBAR_CONTEXT_GROUPS: readonly ChromeGroup[] = CHROME_GROUPS.filter(
   (g) => g.id === 'table'
 ).map((g) => ({
   ...g,
-  controls: g.controls.filter((c) => isTableChromeSlot(`table.${c.id}` as ChromeSlotId)),
+  controls: g.controls.filter(
+    (c) => isTableChromeSlot(`table.${c.id}` as ChromeSlotId) && BAR_TABLE_CONTROLS.has(c.id)
+  ),
 }));
 
 /**

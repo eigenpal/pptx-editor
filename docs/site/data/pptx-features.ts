@@ -267,7 +267,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'partial',
     tier: 'community',
     notes:
-      'Stored font scale and line spacing reduction render with whole-point sizes and a subtracted reduction, as measured. Refit after an edit starts from 100 %, not from the last state: a title shrinks to 90 % at most and then overflows, as measured; other text uses the measured step order down to a 55 % font scale, and estimated steps below it. The font size box shows the size the text is drawn at; the Font dialog shows and sets the size the text asks for. Increase steps up from that size, and Decrease on whole selected shapes steps down from the drawn size. The toolbar and the Format panel switch between no autofit, shrink text on overflow, and resize shape to fit text. Overflowing centered text is approximate. Resize to fit text across rotated text, several columns, or a shape that is not a rectangle is approximate.',
+      'Stored font scale and line spacing reduction render with whole-point sizes and a subtracted reduction, as measured. Refit after an edit starts from 100 %, not from the last state: a title shrinks to 90 % at most and then overflows, as measured; other text uses the measured step order down to a 55 % font scale, and estimated steps below it. Empty paragraphs at the end of the text do not count, as measured. The font size box shows the size the text is drawn at; the Font dialog shows and sets the size the text asks for. Increase steps up from that size, and Decrease on whole selected shapes steps down from the drawn size. The toolbar and the Format panel switch between no autofit, shrink text on overflow, and resize shape to fit text. Overflowing centered text is approximate. Resize to fit text across rotated text, several columns, or a shape that is not a rectangle is approximate.',
   },
   {
     id: 'paragraphs.text-direction-columns',
@@ -568,7 +568,7 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'partial',
     tier: 'community',
-    notes: `Click in a cell and type. Text commands work in a cell, a cell range, or the whole table. Tab and Shift+Tab move between cells. Tab in the last cell adds a row. ${TABLE_SAVE}`,
+    notes: `Click in a cell and type. Text commands work in a cell, a cell range, or the whole table. Tab and Shift+Tab move between cells. Tab in the last cell adds a row. Shift+Arrow at a cell's edge selects a cell range. Copy, cut, and paste a cell range as tab-separated text; a paste larger than the table adds rows and columns. ${TABLE_SAVE}`,
     docsLink: '/docs/guides/tables',
   },
   {
@@ -612,7 +612,7 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'partial',
     tier: 'community',
-    notes: `Shading takes a color or No Fill. Borders use one pen: 1 pt, Text 1. Diagonal borders and cell effects are not editable. ${TABLE_SAVE}`,
+    notes: `Shading takes a color or No Fill. Borders draw with a pen of a color, a preset dash, and a weight. Diagonal borders and cell effects are not editable. ${TABLE_SAVE}`,
     docsLink: '/docs/guides/tables',
   },
   {
@@ -623,7 +623,7 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'partial',
     tier: 'community',
-    notes: `Drag an inner grid line, distribute rows and columns, or resize the frame by its handles (the columns and rows scale; how the change is shared among them is approximate). Row heights stay minimums, so rows grow to fit text. ${TABLE_SAVE}`,
+    notes: `Drag a grid line (the line under the pointer is marked), distribute rows and columns, type a row height or column width in the Format panel, or resize the frame by its handles (the columns and rows scale; how the change is shared among them is approximate). Row heights stay minimums, so rows grow to fit text. ${TABLE_SAVE}`,
     docsLink: '/docs/guides/tables',
   },
 
