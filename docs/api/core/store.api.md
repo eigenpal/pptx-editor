@@ -791,6 +791,9 @@ export interface SlideRef {
 // @public
 export function specOf(el: Element_2): NodeSpec;
 
+// @internal
+export function standInReads(): number;
+
 // @public
 export interface StoreChange {
     // (undocumented)

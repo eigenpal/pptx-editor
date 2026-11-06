@@ -30,9 +30,11 @@ export interface ProgressiveMount {
   /**
    * How many of `total` items to mount now. `needed` (the current slide) is always within the
    * limit. `opening` says whether the deck is still opening: an open that starts goes back to
-   * the first screen, and a deck that opened whole mounts every item.
+   * the first screen, and a deck that opened whole mounts every item. `loading` says another
+   * file is loading (`EditorSnapshot.isOpening`): the next deck starts at the first screen
+   * again, whatever the deck before it had mounted.
    */
-  limit(total: number, needed: number, opening: boolean): number;
+  limit(total: number, needed: number, opening: boolean, loading?: boolean): number;
   /**
    * Call after each render of the rail. Grows the limit after the next painted frame, if
    * items are still left out; the render that the last growth caused sizes the next one.
@@ -119,16 +121,30 @@ export function createProgressiveMount(
   /** The last timed step, and the cost of one more item. */
   let timed: { items: number; spent: number } | null = null;
   let each = 0;
+  /** A file loads: the next deck starts again at the first screen. */
+  let held = false;
+  const restart = (): void => {
+    cancel?.();
+    cancel = null;
+    grew = null;
+    timed = null;
+    step = MOUNT_FIRST_STEP_ITEMS;
+    limit = MOUNT_FIRST_ITEMS;
+  };
   return {
-    limit(total, needed, opening) {
-      if (opening && !wasOpening) {
-        cancel?.();
-        cancel = null;
-        grew = null;
-        timed = null;
-        step = MOUNT_FIRST_STEP_ITEMS;
-        limit = MOUNT_FIRST_ITEMS;
+    limit(total, needed, opening, loading = false) {
+      if (loading) {
+        if (!held) restart();
+        held = true;
+        wasOpening = false;
+        return Math.min(total, limit);
       }
+      if (held) {
+        held = false;
+        // The new deck opened whole: every item at once, as for any deck that opens whole.
+        if (!opening) limit = Number.POSITIVE_INFINITY;
+      }
+      if (opening && !wasOpening) restart();
       wasOpening = opening;
       if (needed >= limit) limit = needed + 1;
       return Math.min(total, limit);

@@ -112,4 +112,22 @@ describe('the rail mount limit', () => {
     expect(shown.limit).toBe(MOUNT_FIRST_ITEMS);
     expect(shown.sections.map((s) => s.id)).toEqual(['a', 'b']);
   });
+
+  test('a new deck starts at the first screen, whatever the deck before it mounted', async () => {
+    const mount = createProgressiveMount(() => {});
+    // Deck A opens progressively and its rail grows to 3,000 items.
+    mount.limit(3000, 0, true);
+    for (let i = 0; i < 200 && mount.limit(3000, 0, true) < 3000; i += 1) {
+      mount.follow(3000);
+      await tick();
+    }
+    expect(mount.limit(3000, 0, true)).toBe(3000);
+    // Deck B loads while A still opens: the rail does not mount A's count of B in one task.
+    expect(mount.limit(3000, 0, true, true)).toBe(MOUNT_FIRST_ITEMS);
+    expect(mount.limit(5000, 0, true)).toBe(MOUNT_FIRST_ITEMS);
+    // A small deck C that opens whole mounts every item at once.
+    mount.limit(5000, 0, false, true);
+    expect(mount.limit(500, 0, false)).toBe(500);
+    mount.dispose();
+  });
 });

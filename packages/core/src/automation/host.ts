@@ -9,7 +9,7 @@
 // names the failing operation and marks every other one `skipped`.
 
 import type { TextMeasurer } from '../layout/index.ts';
-import type { PptxOp, PptxPackage } from '../store/index.ts';
+import { standInReads, type PptxOp, type PptxPackage } from '../store/index.ts';
 import { toBase64 } from './commands/base64.ts';
 import { CommandRefusal, type OpBatch } from './commands/op-batch.ts';
 import { createHandleTable } from './handles.ts';
@@ -259,13 +259,34 @@ export function createAutomationHost(composition: AutomationHostComposition): Au
           ),
           revision
         );
+      // An operation that read a slide or a notes slide that did not parse saw an empty
+      // stand-in, not the slide: it is refused, as the export is, also when it found the damage.
+      const reads = standInReads();
+      const damaged = (): AutomationBatchResponse | null =>
+        standInReads() === reads
+          ? null
+          : refuse(
+              count,
+              index,
+              automationError(
+                'document-unavailable',
+                'a slide of this presentation did not open',
+                'damaged'
+              ),
+              revision
+            );
       try {
         if (!name) throw new AutomationFailure('unknown-operation', 'not an operation');
         const before = ctx.batch.pkg;
-        results.push(planOperation(ctx, operation!));
+        const value = planOperation(ctx, operation!);
+        const refused = damaged();
+        if (refused) return refused;
+        results.push(value);
         if (ctx.batch.pkg !== before && ctx.bindings.size > 0)
           sweepBindings(ctx.bindings, ctx.batch.pkg);
       } catch (e) {
+        const refused = damaged();
+        if (refused) return refused;
         if (e instanceof NullReference) {
           if (command || name === 'exportSlides' || name === 'prepareImage')
             return refuse(

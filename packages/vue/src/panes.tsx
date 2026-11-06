@@ -349,6 +349,8 @@ const SlideRailRoot = defineComponent({
     // While a long deck opens: the first screen with the first slide, then more after each
     // painted frame (core's `createProgressiveMount`).
     const opening = useEditorState((s) => (s.pendingSlides ?? 0) > 0);
+    // A file that loads starts the next deck's rail at the first screen again.
+    const loading = useEditorState((s) => s.isOpening === true);
     const grown = ref(0);
     const mount = createProgressiveMount(() => (grown.value += 1));
     onMounted(() => mount.follow(count()));
@@ -556,7 +558,7 @@ const SlideRailRoot = defineComponent({
       const groups = grouped.value;
       const currentSection = groups ? sectionOfSlide(groups, current.value)?.id : undefined;
       void grown.value;
-      const mounted = mount.limit(count(), current.value, opening.value);
+      const mounted = mount.limit(count(), current.value, opening.value, loading.value);
       // A grouped rail mounts whole sections, so no header shows with no slides under it.
       const inView = groups ? mountedSections(groups, mounted) : null;
       itemLimit = inView ? inView.limit : mounted;

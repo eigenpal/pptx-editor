@@ -267,11 +267,16 @@ function paneStyle(width: number | undefined, style: CSSProperties | undefined) 
  * How many rail items to mount while a long deck opens: the first screen with the first slide,
  * then more after each painted frame (core's `createProgressiveMount`).
  */
-function useProgressiveMount(total: number, needed: number, opening: boolean): number {
+function useProgressiveMount(
+  total: number,
+  needed: number,
+  opening: boolean,
+  loading: boolean
+): number {
   const [, grow] = useReducer((n: number) => n + 1, 0);
   const [mount] = useState(() => createProgressiveMount(grow));
   useEffect(() => () => mount.dispose(), [mount]);
-  const shown = mount.limit(total, needed, opening);
+  const shown = mount.limit(total, needed, opening, loading);
   useEffect(() => mount.follow(total));
   return shown;
 }
@@ -312,7 +317,9 @@ export function SlideRail(props: SlideRailProps = {}) {
   const list = useRef<HTMLOListElement>(null);
   const count = slides.length;
   const opening = useEditorState((s) => (s.pendingSlides ?? 0) > 0);
-  const mounted = useProgressiveMount(count, current, opening);
+  // A file that loads starts the next deck's rail at the first screen again.
+  const loading = useEditorState((s) => s.isOpening === true);
+  const mounted = useProgressiveMount(count, current, opening, loading);
   const [menu, setMenu] = useState<RailMenuState | null>(null);
   const [gallery, setGallery] = useState<HTMLElement | null>(null);
   const actions = useRef<HTMLDivElement>(null);

@@ -112,8 +112,10 @@ export interface PptxEditorRef {
    */
   load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
   /**
-   * The presentation as `.pptx` bytes, or `null` when no presentation is open. The bytes own an
-   * `ArrayBuffer`, so `new Blob([bytes])` takes them as they are.
+   * The presentation as `.pptx` bytes. The bytes own an `ArrayBuffer`, so `new Blob([bytes])`
+   * takes them as they are. `null` when no presentation is open, and when a slide of it is
+   * damaged: `snapshot().readOnlyReason` is then `'damaged-slide'` (after edits), or
+   * `snapshot().openFailure` reports the refused file.
    */
   save(): Uint8Array<ArrayBuffer> | null;
   /** The editor instance, or `null` before it mounts. */

@@ -41,6 +41,7 @@ const states = new WeakMap<PackagePart, DeferredState>();
 const standIns = new WeakSet<object>();
 let parsedCount = 0;
 let rejectionCount = 0;
+let standInReadCount = 0;
 
 /**
  * The stand-in tree of a deferred part that did not parse: the root of a slide or a notes slide
@@ -84,7 +85,10 @@ export function deferredXmlPart(
     kind: 'xml' as const,
     partName,
     get xml(): XmlPart {
-      if (state.xml) return state.xml;
+      if (state.xml) {
+        if (state.rejection) standInReadCount += 1;
+        return state.xml;
+      }
       const source = state.bytes!;
       state.bytes = null;
       parsedCount += 1;
@@ -94,6 +98,7 @@ export function deferredXmlPart(
         state.rejection = { reason: 'xml', partName, detail: tree.reason };
         rejectionCount += 1;
         state.xml = standIn(partName, options.notes);
+        standInReadCount += 1;
         options.onReject?.(state.rejection);
       }
       return state.xml;
@@ -101,6 +106,15 @@ export function deferredXmlPart(
   };
   states.set(part, state);
   return part;
+}
+
+/**
+ * How many times, in this page, a reader got the stand-in of a part that did not parse: a
+ * reader that compares it before and after its work knows whether it read an empty stand-in
+ * in place of a slide or a notes slide. @internal
+ */
+export function standInReads(): number {
+  return standInReadCount;
 }
 
 /** Whether `part` is a deferred part whose bytes have not been parsed yet. @internal */

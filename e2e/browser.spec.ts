@@ -426,46 +426,88 @@ test('embedding: Ctrl/Cmd+F with the focus outside the editor stays with the bro
   await expect(page.getByRole('search', { name: 'Find and replace' })).toBeHidden();
 });
 
+/** Hold `requestIdleCallback` until `window.releaseIdle()`, so no idle paint runs before. */
+const HOLD_IDLE = (): void => {
+  const w = window as unknown as {
+    requestIdleCallback: (cb: IdleRequestCallback, o?: IdleRequestOptions) => number;
+    cancelIdleCallback: (id: number) => void;
+    releaseIdle: () => void;
+  };
+  const real = {
+    request: w.requestIdleCallback.bind(window),
+    cancel: w.cancelIdleCallback.bind(window),
+  };
+  const held = new Map<number, IdleRequestCallback>();
+  let next = 1;
+  w.requestIdleCallback = (cb) => {
+    const id = next++;
+    held.set(id, cb);
+    return id;
+  };
+  w.cancelIdleCallback = (id) => void held.delete(id);
+  w.releaseIdle = () => {
+    w.requestIdleCallback = real.request;
+    w.cancelIdleCallback = real.cancel;
+    for (const cb of held.values()) real.request(cb);
+    held.clear();
+  };
+};
+
+/** Which rail items have a painted thumbnail, by slide index, and which are in the list's view. */
+async function railState(page: Page) {
+  return page.evaluate(() => {
+    const list = document.querySelector('.pptx-rail__list')!;
+    const view = list.getBoundingClientRect();
+    const painted: number[] = [];
+    const inView: number[] = [];
+    for (const item of document.querySelectorAll<HTMLElement>('.pptx-rail__item')) {
+      const index = Number(item.dataset.index);
+      if (item.querySelector('.pptx-rail__thumb > svg')) painted.push(index);
+      const r = item.getBoundingClientRect();
+      if (r.bottom > view.top && r.top < view.bottom && r.height > 0) inView.push(index);
+    }
+    return { painted, inView, mounted: document.querySelectorAll('.pptx-rail__item').length };
+  });
+}
+
 test('long deck: the rail paints the thumbnails in view first, then the rest', async ({ page }) => {
   // Visibility from CSS layout and the browser's IntersectionObserver: happy-dom has neither.
+  // With idle time held, only the first-paint burst, the items in view (or near it), and the
+  // ones that scroll into view can paint: the observer path, alone.
   const SLIDES = 1000;
+  await page.addInitScript(HOLD_IDLE);
   await ready(page);
-  // The order thumbnails paint in, read from the page as each one gets its slide picture. The
-  // order, not a count at one moment: the idle paints can finish before a check reads them.
-  await page.evaluate(() => {
-    const order: number[] = [];
-    (window as unknown as { paintOrder: number[] }).paintOrder = order;
-    new MutationObserver((records) => {
-      for (const r of records)
-        for (const node of r.addedNodes) {
-          if (!(node instanceof SVGElement)) continue;
-          const thumb = node.parentElement;
-          if (!thumb?.classList.contains('pptx-rail__thumb')) continue;
-          const item = thumb.closest<HTMLElement>('.pptx-rail__item');
-          if (item) order.push(Number(item.dataset.index));
-        }
-    }).observe(document.body, { childList: true, subtree: true });
-  });
-  await page.locator('input[type=file][accept*=".pptx"]').setInputFiles({
-    name: 'long.pptx',
-    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    buffer: Buffer.from(textDeck(SLIDES)),
-  });
-  await expect(page.locator('.pptx-rail__item')).toHaveCount(SLIDES, { timeout: 60_000 });
-  const painted = () => page.locator('.pptx-rail__thumb > svg').count();
-  // In idle time, every thumbnail paints.
-  await expect.poll(painted, { timeout: 30_000 }).toBe(SLIDES);
-  const order = await page.evaluate(
-    () => (window as unknown as { paintOrder: number[] }).paintOrder
-  );
-  // The first thumbnails to paint are the ones on the first screen of the rail.
-  const first = order.slice(0, 10);
-  expect(first.length).toBe(10);
-  expect(Math.max(...first)).toBeLessThan(40);
-  // Scrolled to the end, the last thumbnails are there to see.
+  const base64 = Buffer.from(textDeck(SLIDES)).toString('base64');
+  await page.evaluate(async (data) => {
+    const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+    const editor = (
+      window as unknown as {
+        __pptxEditor: { load(b: Uint8Array, o: { startSlide: number }): Promise<unknown> };
+      }
+    ).__pptxEditor;
+    await editor.load(bytes, { startSlide: 600 });
+  }, base64);
+  // The current slide's item is mounted and scrolled into view, and the items in view paint.
+  await expect
+    .poll(async () => {
+      const { painted, inView } = await railState(page);
+      return inView.length > 0 && inView.includes(600) && inView.every((i) => painted.includes(i));
+    })
+    .toBe(true);
+  // Far from the view, past the overscan and the burst at the top: nothing paints yet.
+  const band = (painted: number[]) => painted.filter((i) => i >= 100 && i <= 500);
+  expect(band((await railState(page)).painted)).toEqual([]);
+  // Every item mounts, the end scrolls into view, and the last item paints while the band waits.
+  await expect.poll(async () => (await railState(page)).mounted, { timeout: 30_000 }).toBe(SLIDES);
   await page.locator('.pptx-rail__list').evaluate((el) => (el.scrollTop = el.scrollHeight));
   const last = page.locator('.pptx-rail__item').last().locator('.pptx-rail__thumb > svg');
   await expect(last).toHaveCount(1);
+  expect(band((await railState(page)).painted)).toEqual([]);
+  // In idle time, every thumbnail paints.
+  await page.evaluate(() => (window as unknown as { releaseIdle(): void }).releaseIdle());
+  await expect
+    .poll(async () => (await railState(page)).painted.length, { timeout: 30_000 })
+    .toBe(SLIDES);
 });
 
 test('long deck: the first slide takes input while the rest opens, and every slide is there after', async ({

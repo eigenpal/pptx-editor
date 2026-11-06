@@ -39,7 +39,7 @@ import {
 } from './snapshot-sources.ts';
 import { createShapeListSource, elementIn } from './shape-list.ts';
 import { activeOf, createBackgroundSource } from './selection-state.ts';
-import { formatAt, geometryOf, selectedText } from './selection-state.ts';
+import { formatAt, geometryOf } from './selection-state.ts';
 import { FormatPainter } from './format-painter.ts';
 import { CropMode } from './crop-mode.ts';
 import { pictureStateAt, withAltText } from './picture-state.ts';
@@ -640,12 +640,6 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   });
 
   /**
-   * Refuse a file that did not open, or the deck `drop` opened when one of its slides did not
-   * parse. A deck with no edits goes. A deck with edits stays open for viewing, as DOCX Editor's
-   * write guard keeps a document readable: its store refuses every commit, and the notice says
-   * why, so the user can still read and copy the work.
-   */
-  /**
    * Put the mode in effect: the host's, or view while the deck is read-only. The host's mode is
    * kept, so the next deck opens in it.
    */
@@ -658,6 +652,12 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     if (selection.kind === 'text' || selection.kind === 'cells')
       selection = { kind: 'shapes', nodeIds: [selection.nodeId] };
   };
+  /**
+   * Refuse a file that did not open, or the deck `drop` opened when one of its slides did not
+   * parse. A deck with no edits goes. A deck with edits stays open for viewing, as DOCX Editor's
+   * write guard keeps a document readable: its store refuses every commit, and the notice says
+   * why, so the user can still read and copy the work.
+   */
   const refuseOpen = (code: string, drop?: DocumentSession): CommandResult => {
     const refused: CommandResult = { ok: false, reason: 'errors.malformed', detail: code };
     if (drop && drop !== session) return refused;
@@ -671,8 +671,14 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     }
     if (drop) {
       (detachModules(), thumbnails.clear(), drop.dispose());
+      // The deck goes with its fonts, its slide, and any gesture still open on it.
+      fonts?.dispose();
+      fonts = null;
       session = null;
       selection = { kind: 'none' };
+      slide = 0;
+      slideSel.reset(undefined);
+      groups.closeAll();
     }
     // A deck that was open stays open. A load that runs keeps its own status.
     if (!drop || status !== 'loading') status = session ? 'ready' : 'error';

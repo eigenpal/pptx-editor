@@ -3890,7 +3890,7 @@ export interface ProgressiveMount {
     // (undocumented)
     dispose(): void;
     follow(total: number): void;
-    limit(total: number, needed: number, opening: boolean): number;
+    limit(total: number, needed: number, opening: boolean, loading?: boolean): number;
 }
 
 // @public

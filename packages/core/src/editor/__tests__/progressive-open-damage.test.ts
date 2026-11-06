@@ -236,6 +236,54 @@ describe('a damaged part in a progressive open', () => {
     fresh.destroy();
   });
 
+  test('every automation read of a damaged slide is refused, also the one that finds the damage', async () => {
+    const reads: { op: string; extra?: Record<string, unknown> }[] = [
+      { op: 'readBackground' },
+      { op: 'listShapes' },
+      { op: 'listHyperlinks' },
+    ];
+    for (const { op, extra } of reads) {
+      const editor = editorFor();
+      const bytes = withPart(BYTES, slidePart(BYTES, SLIDES - 1), BROKEN);
+      expect((await editor.load(bytes)).ok).toBe(true);
+      // The slide has not parsed yet: this batch is the first to read it.
+      expect(editor.session!.slidePending(SLIDES - 1)).toBe(true);
+      const key = op === 'listShapes' ? 'container' : op === 'listHyperlinks' ? 'slide' : 'owner';
+      const response = createBrowserAutomationHost(editor).execute({
+        operations: [
+          { op: 'getSlide', key: { index: SLIDES - 1 } },
+          { op, [key]: { result: 0 }, ...extra } as never,
+        ],
+      });
+      expect(response.ok).toBe(false);
+      expect(response.results[1]).toMatchObject({
+        status: 'error',
+        error: { code: 'document-unavailable', detail: 'damaged' },
+      });
+      editor.destroy();
+    }
+  });
+
+  test('a find, or a notes read, that reaches a damaged slide turns an edited deck read-only', async () => {
+    for (const reader of ['find', 'notes'] as const) {
+      const editor = editorFor();
+      expect((await editor.load(withPart(BYTES, slidePart(BYTES, SLIDES - 1), BROKEN))).ok).toBe(
+        true
+      );
+      typeHere(editor, 'x');
+      if (reader === 'find') editor.find.matches('Slide 300 title');
+      else {
+        editor.goToSlide(SLIDES - 1);
+        void editor.snapshot().notes;
+        editor.session!.layout(SLIDES - 1);
+      }
+      await Promise.resolve();
+      expect(editor.snapshot().readOnlyReason).toBe('damaged-slide');
+      expect(editor.save()).toBeNull();
+      editor.destroy();
+    }
+  });
+
   test('a slide that finishes opening fires no change, so a host that saves on change does not', async () => {
     const editor = editorFor();
     let changes = 0;
