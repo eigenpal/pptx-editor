@@ -601,6 +601,44 @@
   }
 }
 
+/* A phone: the bar keeps one row, the slide area takes the slide's own shape, and the notes
+   take the height left under it. */
+@media (max-width: 600px) {
+  .demo-topbar .demo-theme-toggle,
+  .demo-topbar .demo-new {
+    display: none;
+  }
+  .demo-file {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .demo-file__name {
+    max-width: none;
+    min-width: 48px;
+  }
+  .demo-root {
+    --doc-slide-padding: 12px;
+  }
+  /* The slide's width (the pane less the workspace and surface padding) times its ratio, plus
+     the surface padding and the strip under the slide. */
+  .demo-canvas {
+    flex: 0 0 auto;
+    height: calc((100vw - 48px) * var(--demo-slide-ratio, 0.5625) + 24px + 46px);
+  }
+  .demo-root .pptx-notes[data-open='true'] {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}
+
+/* A short window (a phone held sideways): the notes field keeps two lines, so the slide gets
+   the height and is never cut off. */
+@media (max-height: 500px) {
+  .demo-root .pptx-notes__text {
+    height: 40px;
+  }
+}
+
 /* The light/dark toggle (examples/vite/src/ThemeToggle.tsx, examples/vue/src/ThemeToggle.vue):
    a segmented sun/moon control with the shape of the DOCX Editor demos' toggle. */
 .demo-theme-toggle {

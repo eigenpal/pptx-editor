@@ -66,6 +66,8 @@ const sorter = useEditorState((s) => s.presentationView === 'slideSorter');
 // `?chrome=ribbon` shows the ribbon and the status bar in place of the flat toolbar.
 const ribbon = ribbonChrome(location.search);
 const canPresent = useEditorState((s) => s.status === 'ready' && s.slides.length > 0);
+// A phone sizes the slide area to the slide's shape (shell.css).
+const slideRatio = useEditorState((s) => (s.slideWidth ? s.slideHeight / s.slideWidth : 0.5625));
 const show = useSlideshow();
 // Closed on a narrow window, so the slide keeps a usable zoom (demo-files.ts).
 const panel = shallowRef(panelStartsOpen());
@@ -219,7 +221,7 @@ function onDrop(e: DragEvent): void {
         </button>
         <button
           type="button"
-          class="demo-btn demo-btn--quiet demo-btn--sm"
+          class="demo-btn demo-btn--quiet demo-btn--sm demo-new"
           :aria-label="t('menu.new')"
           :data-pptx-tooltip="t('menu.new')"
           @mousedown="keepFocus"
@@ -258,7 +260,7 @@ function onDrop(e: DragEvent): void {
       <!-- The slide sorter takes the canvas's place, so the status bar and the notices stay. -->
       <div class="demo-docpane">
         <PptxEditorSlideSorter v-if="sorter" />
-        <div class="demo-canvas" :hidden="sorter">
+        <div class="demo-canvas" :hidden="sorter" :style="{ '--demo-slide-ratio': slideRatio }">
           <PptxEditorContent />
           <PptxEditorFindBar />
           <PptxEditorLoading overlay />

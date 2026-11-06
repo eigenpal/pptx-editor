@@ -95,6 +95,8 @@ function Shell({
   // `?chrome=ribbon` shows the ribbon and the status bar in place of the flat toolbar.
   const ribbon = ribbonChrome(location.search);
   const canPresent = useEditorState((s) => s.status === 'ready' && s.slides.length > 0);
+  // A phone sizes the slide area to the slide's shape (shell.css).
+  const slideRatio = useEditorState((s) => (s.slideWidth ? s.slideHeight / s.slideWidth : 0.5625));
   const show = useSlideshow();
   // Closed on a narrow window, so the slide keeps a usable zoom (demo-files.ts).
   const [panel, setPanel] = useState(panelStartsOpen);
@@ -231,7 +233,7 @@ function Shell({
           </button>
           <button
             type="button"
-            className="demo-btn demo-btn--quiet demo-btn--sm"
+            className="demo-btn demo-btn--quiet demo-btn--sm demo-new"
             aria-label={t('menu.new')}
             data-pptx-tooltip={t('menu.new')}
             onMouseDown={keepFocus}
@@ -283,7 +285,11 @@ function Shell({
         {/* The slide sorter takes the canvas's place, so the status bar and the notices stay. */}
         <div className="demo-docpane">
           {sorter ? <PptxEditor.SlideSorter /> : null}
-          <div className="demo-canvas" hidden={sorter}>
+          <div
+            className="demo-canvas"
+            hidden={sorter}
+            style={{ '--demo-slide-ratio': slideRatio } as CSSProperties}
+          >
             <PptxEditor.Content />
             <PptxEditor.FindBar />
             <PptxEditor.Loading overlay />
