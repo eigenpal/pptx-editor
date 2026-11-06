@@ -11,7 +11,9 @@ import type { DocumentOpenFailure, EditorRejection, EditorSnapshot } from '../co
 export interface PptxEditorEvents {
   /**
    * The presentation changed: an applied edit, an undo or redo, or a load that finished or
-   * failed. Selection, zoom, and view changes do not fire it.
+   * failed. Selection, zoom, and view changes do not fire it, and neither does a slide of a
+   * long deck that finishes opening in the background (`selectionChange` reports those): a
+   * host that saves on `change` does not save, and parse the whole deck, while it opens.
    */
   change: (snapshot: EditorSnapshot) => void;
   /**
@@ -39,11 +41,11 @@ const sameSlides = (a: readonly number[], b: readonly number[]): boolean =>
 function happened(event: keyof PptxEditorEvents, prev: EditorSnapshot, next: EditorSnapshot) {
   switch (event) {
     case 'change':
-      // A load that finishes (or fails) counts; the start of a load does not. A slide summary
-      // that changes with no revision (a slide that finishes opening) counts too.
+      // A load that finishes (or fails) counts; the start of a load does not. A slide that
+      // finishes opening in the background is no change: the document did not change.
       return (
         prev.revision !== next.revision ||
-        (next.status !== 'loading' && (prev.status !== next.status || prev.slides !== next.slides))
+        (prev.status !== next.status && next.status !== 'loading')
       );
     case 'selectionChange':
       return (

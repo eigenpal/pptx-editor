@@ -13,6 +13,7 @@ import {
   isDeferredPending,
   presentationInfo,
   readPptx,
+  readPptxDeferred,
   PPTX_ZIP_LIMITS,
 } from '../../store/index.ts';
 import { createPptxEditor, onEditorEvent, type PptxEditorInstance } from '../index.ts';
@@ -125,7 +126,7 @@ describe('a progressive open', () => {
   });
 
   test('each background slice keeps to its budget and ends early for input', () => {
-    const r = readPptx(BYTES, PPTX_ZIP_LIMITS, { defer: () => true });
+    const r = readPptxDeferred(BYTES, PPTX_ZIP_LIMITS, { defer: () => true });
     if (!r.ok) throw new Error('read');
     const info = presentationInfo(r.pkg);
     const run = new ProgressiveOpen(r.pkg, openingOrder(info, 0));

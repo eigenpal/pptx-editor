@@ -858,6 +858,14 @@
 .pptx-statusbar__spacer {
   flex: 1 1 auto;
 }
+/* A deck that turned read-only after edits (`readOnlyReason`), beside the slide number. */
+.pptx-statusbar__read-only {
+  margin-inline-start: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--doc-warning-bg);
+  color: var(--doc-text);
+}
 .pptx-statusbar__views,
 .pptx-statusbar__zoom {
   display: inline-flex;

@@ -29,6 +29,8 @@ interface DeferredState {
   bytes: Uint8Array | null;
   xml: XmlPart | null;
   rejection: Extract<PackageRejection, { reason: 'xml' }> | null;
+  /** Root attributes read from the start tag, so a second read does not scan again. */
+  peeked?: Map<string, string | undefined | null>;
 }
 
 const states = new WeakMap<PackagePart, DeferredState>();
@@ -98,7 +100,7 @@ export function deferredXmlPart(
   return part;
 }
 
-/** Whether `part` is a deferred part whose bytes have not been parsed yet. */
+/** Whether `part` is a deferred part whose bytes have not been parsed yet. @internal */
 export function isDeferredPending(part: PackagePart | undefined): boolean {
   if (!part) return false;
   const state = states.get(part);
@@ -137,7 +139,7 @@ export function parseDeferredParts(pkg: PptxPackage): void {
     if (isDeferredPending(part) && part.kind === 'xml') void part.xml;
 }
 
-/** The refusal of a deferred part of `pkg` that did not parse, or undefined. */
+/** The refusal of a deferred part of `pkg` that did not parse, or undefined. @internal */
 export function deferredRejection(
   pkg: PptxPackage
 ): Extract<PackageRejection, { reason: 'xml' }> | undefined {
@@ -168,8 +170,12 @@ export function peekDeferredRootAttribute(
 ): string | undefined | null {
   const state = states.get(part);
   if (!state || state.xml || !state.bytes) return null;
+  const known = state.peeked?.get(name);
+  if (known !== undefined || state.peeked?.has(name)) return known;
   const tag = rootStartTag(state.bytes);
-  return tag === null ? null : rootAttribute(tag, name);
+  const value = tag === null ? null : rootAttribute(tag, name);
+  (state.peeked ??= new Map()).set(name, value);
+  return value;
 }
 
 /** How many bytes the root start tag is looked for in. */

@@ -16,6 +16,7 @@ import {
   peekDeferredRootAttribute,
   presentationInfo,
   readPptx,
+  readPptxDeferred,
   serializeXmlPart,
   writePptx,
   PPTX_ZIP_LIMITS,
@@ -40,7 +41,7 @@ const deck = (n: number): Uint8Array =>
   });
 
 const deferAll = (bytes: Uint8Array) => {
-  const r = readPptx(bytes, PPTX_ZIP_LIMITS, { defer: () => true });
+  const r = readPptxDeferred(bytes, PPTX_ZIP_LIMITS, { defer: () => true });
   if (!r.ok) throw new Error(JSON.stringify(r.error));
   return r.pkg;
 };
@@ -164,6 +165,27 @@ describe('deferred parts', () => {
     const edited = store.package.parts.get(name)!;
     expect(edited).not.toBe(part);
     expect(() => writePptx(store.package)).toThrow(/did not parse/);
+  });
+});
+
+describe('the archive entry limit of a presentation', () => {
+  /** A one-slide deck padded with empty entries to `total` entries. */
+  function padded(total: number): Uint8Array {
+    const zip = readZip(deck(1));
+    if (!zip.ok) throw new Error('zip');
+    const entries = new Map(zip.entries);
+    const empty = new Uint8Array(0);
+    for (let i = 0; entries.size < total; i += 1) entries.set(`/pad/e${i}.bin`, empty);
+    return writeZip(entries);
+  }
+
+  test('a deck of 40,000 entries opens, and one of 40,001 is refused', () => {
+    expect(PPTX_ZIP_LIMITS.maxEntries).toBe(40_000);
+    expect(readPptx(padded(40_000)).ok).toBe(true);
+    expect(readPptx(padded(40_001))).toMatchObject({
+      ok: false,
+      error: { reason: 'zip', detail: 'too-many-entries' },
+    });
   });
 });
 

@@ -141,7 +141,7 @@ export const PPTX_ZIP_LIMITS: ZipLimits = Object.freeze({
   maxEntries: 40_000,
 });
 
-/** How `readPptx` defers parts; see `deferred-parts.ts`. */
+/** How `readPptxDeferred` defers parts; see `deferred-parts.ts`. @internal */
 export interface DeferredReadOptions {
   /**
    * Whether to keep the slide or notes slide `partName` as its bytes, to parse on first read.
@@ -154,13 +154,18 @@ export interface DeferredReadOptions {
   readonly onReject?: DeferredPartReject;
 }
 
+/** Read a `.pptx` at the trust boundary. Never throws. */
+export function readPptx(bytes: Uint8Array, limits: ZipLimits = PPTX_ZIP_LIMITS): PackageResult {
+  return readPptxDeferred(bytes, limits);
+}
+
 /**
- * Read a `.pptx` at the trust boundary. Never throws. With `deferred`, the slides and notes
- * slides it names stay unparsed until first read (`deferred-parts.ts`).
+ * `readPptx`, where the slides and notes slides that `deferred` names stay unparsed until
+ * first read (`deferred-parts.ts`), for a progressive open. @internal
  */
-export function readPptx(
+export function readPptxDeferred(
   bytes: Uint8Array,
-  limits: ZipLimits = PPTX_ZIP_LIMITS,
+  limits: ZipLimits,
   deferred?: DeferredReadOptions
 ): PackageResult {
   const zip = readZip(bytes, limits);

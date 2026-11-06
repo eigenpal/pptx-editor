@@ -24,6 +24,7 @@ import {
   ZOOM_MENU_LEVELS,
   createProgressiveMount,
   mountedSections,
+  railItemPosition,
   tooltipAttributes,
   followCurrentSlide,
   groupSlideSections,
@@ -137,12 +138,17 @@ const RailItem = memo(function RailItem(props: {
   drop: string | undefined;
   draggable: boolean;
   on: RailItemHandlers;
+  /** `aria-setsize` and `aria-posinset` while the rail mounts only part of its items. */
+  setSize?: number | undefined;
+  posInSet?: number | undefined;
 }) {
   const { slide: s, on } = props;
   return (
     <li
       className="pptx-rail__item"
       role={props.role}
+      aria-setsize={props.setSize}
+      aria-posinset={props.posInSet}
       aria-selected={props.selected}
       aria-current={props.current}
       data-hidden={s.hidden ? '' : undefined}
@@ -417,20 +423,26 @@ export function SlideRail(props: SlideRailProps = {}) {
     []
   );
   /** One slide of the rail. */
-  const item = (s: SlideSummary) => (
-    <RailItem
-      key={s.id}
-      slide={s}
-      ratio={ratio}
-      selected={selected.includes(s.index)}
-      current={s.index === current}
-      role={grouped ? 'treeitem' : 'option'}
-      name={slideItemName(t, s)}
-      drop={dropMarker(s.index)}
-      draggable={!readOnly}
-      on={on}
-    />
-  );
+  const itemLimit = inView ? inView.limit : mounted;
+  const item = (s: SlideSummary) => {
+    const place = railItemPosition(s.index, count, itemLimit, grouped);
+    return (
+      <RailItem
+        key={s.id}
+        setSize={place?.setSize}
+        posInSet={place?.posInSet}
+        slide={s}
+        ratio={ratio}
+        selected={selected.includes(s.index)}
+        current={s.index === current}
+        role={grouped ? 'treeitem' : 'option'}
+        name={slideItemName(t, s)}
+        drop={dropMarker(s.index)}
+        draggable={!readOnly}
+        on={on}
+      />
+    );
+  };
   const railActions: RailActions = {
     t,
     editor,

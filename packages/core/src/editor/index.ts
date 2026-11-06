@@ -135,7 +135,11 @@ export {
   createProgressiveMount,
   MOUNT_CHUNK_ITEMS,
   MOUNT_FIRST_ITEMS,
+  MOUNT_FIRST_STEP_ITEMS,
+  MOUNT_FRAME_MS,
+  MOUNT_MIN_STEP_ITEMS,
   mountedSections,
+  railItemPosition,
   type MountedSections,
   type ProgressiveMount,
 } from './progressive-mount.ts';

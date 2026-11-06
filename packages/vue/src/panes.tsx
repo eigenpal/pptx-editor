@@ -28,6 +28,7 @@ import {
   ZOOM_MENU_LEVELS,
   createProgressiveMount,
   mountedSections,
+  railItemPosition,
   tooltipAttributes,
   followCurrentSlide,
   groupSlideSections,
@@ -161,6 +162,9 @@ const RailItem = defineComponent({
     drop: { type: String as PropType<'before' | 'after'>, default: undefined },
     draggable: { type: Boolean, required: true },
     on: { type: Object as PropType<RailItemHandlers>, required: true },
+    /** `aria-setsize` and `aria-posinset` while the rail mounts only part of its items. */
+    setSize: { type: Number, default: undefined },
+    posInSet: { type: Number, default: undefined },
   },
   setup(props) {
     return () => {
@@ -169,6 +173,8 @@ const RailItem = defineComponent({
         <li
           class="pptx-rail__item"
           role={props.role}
+          aria-setsize={props.setSize}
+          aria-posinset={props.posInSet}
           aria-selected={props.selected}
           aria-current={props.current}
           data-hidden={s.hidden ? '' : undefined}
@@ -498,20 +504,27 @@ const SlideRailRoot = defineComponent({
       drop: (index, e) => drag.itemProps(index).onDrop(e),
     };
     /** One slide of the rail. */
-    const item = (s: SlideSummary) => (
-      <RailItem
-        key={s.id}
-        slide={s}
-        ratio={ratio.value}
-        selected={selected.value.includes(s.index)}
-        current={s.index === current.value}
-        role={grouped.value ? 'treeitem' : 'option'}
-        name={slideItemName(t, s)}
-        drop={drag.marker(s.index)}
-        draggable={!readOnly.value}
-        on={on}
-      />
-    );
+    /** The item limit of the render in progress, for `railItemPosition`. */
+    let itemLimit = Number.POSITIVE_INFINITY;
+    const item = (s: SlideSummary) => {
+      const place = railItemPosition(s.index, count(), itemLimit, grouped.value);
+      return (
+        <RailItem
+          key={s.id}
+          setSize={place?.setSize}
+          posInSet={place?.posInSet}
+          slide={s}
+          ratio={ratio.value}
+          selected={selected.value.includes(s.index)}
+          current={s.index === current.value}
+          role={grouped.value ? 'treeitem' : 'option'}
+          name={slideItemName(t, s)}
+          drop={drag.marker(s.index)}
+          draggable={!readOnly.value}
+          on={on}
+        />
+      );
+    };
     return () => {
       const toggle = props.toggle !== false;
       const open = pane.open.value;
@@ -546,6 +559,7 @@ const SlideRailRoot = defineComponent({
       const mounted = mount.limit(count(), current.value, opening.value);
       // A grouped rail mounts whole sections, so no header shows with no slides under it.
       const inView = groups ? mountedSections(groups, mounted) : null;
+      itemLimit = inView ? inView.limit : mounted;
       return (
         <nav
           {...restAttrs(attrs)}

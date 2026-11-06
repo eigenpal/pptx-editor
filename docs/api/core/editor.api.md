@@ -514,6 +514,9 @@ export interface ChromeTooltipState {
 export type ChromeTranslate = (key: string, params?: TranslationParams) => string;
 
 // @internal
+export function clampSlide(index: number | undefined, count: number): number;
+
+// @internal
 export function clearNotesFindMatch(root: HTMLElement | null): void;
 
 // @public
@@ -978,6 +981,9 @@ export function createNotesFindPainter(): {
 export function createPptxEditor(options?: PptxEditorOptions): PptxEditorInstance;
 
 // @internal
+export function createProgressiveMount(changed: () => void, now?: () => number): ProgressiveMount;
+
+// @internal
 export function createToolbarFitMemory(): ToolbarFitMemory;
 
 // @public
@@ -1166,9 +1172,15 @@ export interface DocumentSearchState {
 // @public (undocumented)
 export class DocumentSession {
     constructor(store: PptxDocumentStore, fonts: FontSet);
+    // @internal
+    addMissingSubstitutes(): Promise<boolean>;
     batch(base?: PptxPackage): OpBatch;
     // @internal
     clearHostFaces(): void;
+    // @internal
+    damage: Extract<PackageRejection, {
+        reason: 'xml';
+    }> | null;
     dispose(): void;
     get faces(): readonly RegisteredFace[];
     get fontGeneration(): number;
@@ -1186,11 +1198,23 @@ export class DocumentSession {
     get info(): PresentationInfo;
     layout(index: number): SlideLayout | undefined;
     layoutOf(pkg: PptxPackage, index: number): SlideLayout | undefined;
+    // @internal
+    markDamaged(rejection: Extract<PackageRejection, {
+        reason: 'xml';
+    }>): void;
     get measurer(): TextMeasurer;
+    // @internal
+    onDamage: ((rejection: Extract<PackageRejection, {
+        reason: 'xml';
+    }>) => void) | null;
+    // @internal
+    opening: ProgressiveOpen | null;
     // @internal
     probeBatch(base?: PptxPackage): OpBatch;
     // @internal
     setHostFaces(next: HostFaces): void;
+    // @internal
+    slidePending(index: number): boolean;
     // (undocumented)
     readonly store: PptxDocumentStore;
     substitutedFamilies(): FontSubstitution[];
@@ -1235,8 +1259,7 @@ export interface Editor {
     focus(): void;
     // (undocumented)
     goToSlide(index: number): void;
-    // (undocumented)
-    load(bytes: Uint8Array): Promise<CommandResult>;
+    load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
     renderThumbnail(index: number, container: HTMLElement, options?: RenderThumbnailOptions): () => void;
     save(): Uint8Array<ArrayBuffer> | null;
     selectAll(): void;
@@ -1839,6 +1862,7 @@ export interface EditorSnapshot {
     readonly geometry: SelectionGeometry | null;
     readonly image?: SelectedImageState | null;
     readonly insertions: number;
+    readonly isOpening?: boolean;
     readonly lastRejection?: EditorRejection | null;
     readonly lastRemoval?: EditorRemoval | null;
     readonly layouts?: readonly SlideLayoutSummary[];
@@ -1848,7 +1872,9 @@ export interface EditorSnapshot {
     readonly notes: string;
     readonly notesFormatted?: readonly NotesParagraph[];
     readonly openFailure?: DocumentOpenFailure | null;
+    readonly pendingSlides?: number;
     readonly presentationView?: PresentationView;
+    readonly readOnlyReason?: 'damaged-slide' | null;
     // (undocumented)
     readonly revision: number;
     readonly sections?: readonly SlideSection[];
@@ -2953,6 +2979,11 @@ export interface LoadingSheetSize {
 // @internal
 export function loadingSheetSize(snapshot: EditorSnapshot): LoadingSheetSize;
 
+// @public
+export interface LoadOptions {
+    readonly startSlide?: number;
+}
+
 // @internal
 export function loadSubstitute(family: DefaultFamily, fetcher?: typeof fetch | undefined): Promise<SubstituteLoad>;
 
@@ -3110,6 +3141,32 @@ export interface MenuSlotRowSpec {
     // (undocumented)
     readonly value?: string | undefined;
 }
+
+// @internal
+export const MOUNT_CHUNK_ITEMS = 1000;
+
+// @internal
+export const MOUNT_FIRST_ITEMS = 40;
+
+// @internal
+export const MOUNT_FIRST_STEP_ITEMS = 100;
+
+// @internal
+export const MOUNT_FRAME_MS = 8;
+
+// @internal
+export const MOUNT_MIN_STEP_ITEMS = 10;
+
+// @internal
+export interface MountedSections {
+    // (undocumented)
+    readonly limit: number;
+    // (undocumented)
+    readonly sections: readonly SlideSection[];
+}
+
+// @internal
+export function mountedSections(grouped: readonly SlideSection[], limit: number): MountedSections;
 
 // @public
 export function namedFamilies(pkg: PptxPackage): string[];
@@ -3353,6 +3410,10 @@ export function openHyperlinkPopup(controller: HyperlinkPopupController, editor:
 export interface OpenOptions {
     readonly fixedMeasurer?: boolean;
     readonly fonts?: readonly FontSource_2[];
+    // @internal
+    readonly progressive?: {
+        readonly startSlide?: number;
+    };
     readonly substitutes?: boolean;
 }
 
@@ -3751,6 +3812,8 @@ export interface PptxEditorEvents {
 // @public
 export interface PptxEditorInstance extends Editor {
     readonly find: PptxFind;
+    // @internal
+    finishOpening(): boolean;
     fontFamilies(): readonly string[];
     readonly fonts: PptxEditorOptions['fonts'];
     input(kind: TextInputKind, data?: string): CommandResult;
@@ -3822,6 +3885,14 @@ export type PresentationView = 'normal' | 'slideSorter';
 // @internal
 export function presetGradient(base: string, light: number, dark: number): GradientFill;
 
+// @internal
+export interface ProgressiveMount {
+    // (undocumented)
+    dispose(): void;
+    follow(total: number): void;
+    limit(total: number, needed: number, opening: boolean): number;
+}
+
 // @public
 export function queryLocalFontSources(families: readonly string[]): Promise<LocalFontsOutcome>;
 
@@ -3836,6 +3907,12 @@ export function railDragAxis(orientation: SlideRailOrientation | undefined): 'x'
 
 // @internal
 export function railFoldsActions(orientation: SlideRailOrientation | undefined, width: number): boolean;
+
+// @internal
+export function railItemPosition(index: number, count: number, limit: number, grouped: readonly SlideSection[] | null): {
+    readonly setSize: number;
+    readonly posInSet: number;
+} | null;
 
 // @internal
 export function railKeyDown(e: PaneKeyEvent, ctx: SlideListKeyContext): void;
@@ -4650,6 +4727,7 @@ export interface SlideSummary {
     readonly index: number;
     readonly key: string;
     readonly layoutId?: string;
+    readonly pending?: true;
 }
 
 // @internal

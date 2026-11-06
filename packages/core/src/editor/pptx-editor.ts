@@ -85,6 +85,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   let fonts: FontFaceHandle | null = null;
   let status: EditorSnapshot['status'] = 'empty';
   let failure: ReturnType<typeof documentOpenFailure> | undefined;
+  /** Why the open deck is read-only, after edits, because a slide of it did not parse. */
+  let readOnly: EditorSnapshot['readOnlyReason'] = null;
   let mode: EditorMode = options.mode ?? 'edit';
   // The caret and the store revision just after AutoCorrect started a list.
   let autoListed: { readonly sel: EditorSelection; readonly rev: number } | null = null;
@@ -179,6 +181,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       slides,
       pendingSlides: opening.pending(),
       isOpening: status === 'loading',
+      readOnlyReason: readOnly,
       currentSlide: slide,
       selectedSlides: slideSel.indices(info?.slides ?? [], slide),
       slideNumbers: pkg ? hasSlideNumber(pkg, slide) : false,
@@ -640,16 +643,23 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
    * why, so the user can still read and copy the work.
    */
   const refuseOpen = (code: string, drop?: DocumentSession): CommandResult => {
-    if (drop && drop !== session) return { ok: false, reason: 'errors.malformed', detail: code };
+    const refused: CommandResult = { ok: false, reason: 'errors.malformed', detail: code };
+    if (drop && drop !== session) return refused;
     if (drop && drop.store.edited) {
-      drop.opening = null;
+      // The deck opened and holds edits: it stays on screen, read-only. It is no failed open.
+      readOnly = 'damaged-slide';
       instance.setMode('view');
-    } else if (drop) {
+      opening.keepReading(drop);
+      emit();
+      return refused;
+    }
+    if (drop) {
       (detachModules(), thumbnails.clear(), drop.dispose());
       session = null;
       selection = { kind: 'none' };
     }
-    status = session ? 'ready' : 'error'; // A deck that was open stays open.
+    // A deck that was open stays open. A load that runs keeps its own status.
+    if (!drop || status !== 'loading') status = session ? 'ready' : 'error';
     failure = documentOpenFailure(code);
     emit();
     return { ok: false, reason: 'errors.malformed', detail: code };
@@ -672,6 +682,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       reason: destroyed ? 'disabled.destroyed' : 'errors.superseded',
     });
     status = 'loading';
+    // The open deck's background parse waits: the new file gets the thread.
+    opening.pause(session);
     emit();
     // Let the loading screen paint before the parse blocks the main thread (a large deck).
     await yieldToPaint();
@@ -685,7 +697,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       if (r.ok) r.session.dispose();
       return superseded();
     }
-    if (!r.ok) return refuseOpen(r.error.reason);
+    if (!r.ok) {
+      opening.resume(session);
+      return refuseOpen(r.error.reason);
+    }
     let faces: FontFaceHandle | null = null;
     if (typeof document !== 'undefined') {
       faces = registerFontFaces(document, r.session.faces);
@@ -725,6 +740,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     thumbnails.clear();
     status = 'ready';
     failure = undefined;
+    readOnly = null;
     slide = clampSlide(startSlide, session.info.slides.length);
     slideSel.reset(session.info.slides[slide]?.partName);
     selection = { kind: 'none' };

@@ -338,6 +338,7 @@ export function DefaultWorkspace({
       {overlay}
       {status === undefined ? (
         <div className="pptx-statusbar">
+          <ReadOnlyBadge />
           <ViewSwitch />
           <ZoomPill />
         </div>
@@ -345,6 +346,21 @@ export function DefaultWorkspace({
         status
       )}
     </div>
+  );
+}
+
+/**
+ * Says that the open deck is read-only (`EditorSnapshot.readOnlyReason`): a slide of a long
+ * deck did not parse after edits. Nothing when the deck can be edited. @internal
+ */
+export function ReadOnlyBadge(): ReactNode {
+  const { t } = useTranslation();
+  const damaged = useEditorState((s) => s.readOnlyReason === 'damaged-slide');
+  if (!damaged) return null;
+  return (
+    <span className="pptx-statusbar__read-only" role="status" data-reason="damaged-slide">
+      {t('statusBar.readOnlyDamaged')}
+    </span>
   );
 }
 

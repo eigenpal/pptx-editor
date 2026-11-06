@@ -428,21 +428,23 @@ test('embedding: Ctrl/Cmd+F with the focus outside the editor stays with the bro
 
 test('long deck: the rail paints the thumbnails in view first, then the rest', async ({ page }) => {
   // Visibility from CSS layout and the browser's IntersectionObserver: happy-dom has neither.
+  // Enough slides that the idle paints cannot catch up with the rail while it mounts in steps.
+  const SLIDES = 1000;
   await ready(page);
   await page.locator('input[type=file][accept*=".pptx"]').setInputFiles({
     name: 'long.pptx',
     mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    buffer: Buffer.from(textDeck(300)),
+    buffer: Buffer.from(textDeck(SLIDES)),
   });
-  await expect(page.locator('.pptx-rail__item')).toHaveCount(300, { timeout: 60_000 });
+  await expect(page.locator('.pptx-rail__item')).toHaveCount(SLIDES, { timeout: 60_000 });
   const painted = () => page.locator('.pptx-rail__thumb > svg').count();
-  expect(await painted()).toBeLessThan(300);
+  expect(await painted()).toBeLessThan(SLIDES);
   // Scrolled to the end, the last thumbnails paint before the idle time reaches them.
   await page.locator('.pptx-rail__list').evaluate((el) => (el.scrollTop = el.scrollHeight));
   const last = page.locator('.pptx-rail__item').last().locator('.pptx-rail__thumb > svg');
   await expect(last).toHaveCount(1);
   // In idle time, every thumbnail paints.
-  await expect.poll(painted, { timeout: 30_000 }).toBe(300);
+  await expect.poll(painted, { timeout: 30_000 }).toBe(SLIDES);
 });
 
 test('long deck: the first slide takes input while the rest opens, and every slide is there after', async ({

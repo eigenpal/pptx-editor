@@ -29,6 +29,7 @@ import {
   type PptxPackage,
 } from '../package/package.ts';
 import { carryFileTimings } from '../package/timing.ts';
+import { isDeferredPending } from '../package/deferred-parts.ts';
 import { applyOps, type OpRejection, type PptxOp } from './ops.ts';
 import type { HistoryGroup, TransactOrigin } from './history-group.ts';
 import { introducedViolation } from './part-checks.ts';
@@ -242,6 +243,9 @@ export class PptxDocumentStore {
       return { ok: false, rejection: { code: 'unsupported', detail: this.#blocked } };
     const r = this.#stage(ops);
     if (!r.ok) return r;
+    // Staging reads parts, and a read can find a damaged one and block the store.
+    if (this.#blocked !== null)
+      return { ok: false, rejection: { code: 'unsupported', detail: this.#blocked } };
     const before = this.#pkg;
     const parts = r.parts;
     if (origin === 'remote') {
@@ -315,6 +319,9 @@ export class PptxDocumentStore {
         return { ok: false, rejection: { code: 'unsafe-part-name', part: name } };
       next.delete(name);
     }
+    // Reading a prior part can find a damaged one and block the store.
+    if (this.#blocked !== null)
+      return { ok: false, rejection: { code: 'unsupported', detail: this.#blocked } };
     const before = this.#pkg;
     const after: PptxPackage = { parts: next };
     const changed = changedParts(before, after);
@@ -414,7 +421,7 @@ export class PptxDocumentStore {
     let out: Map<string, PackagePart> | null = null;
     for (const name of parts) {
       const part = pkg.parts.get(name);
-      if (!part || part.kind !== 'xml') continue;
+      if (!part || part.kind !== 'xml' || isDeferredPending(part)) continue;
       const floor = this.#highWater.get(name) ?? 0;
       if (part.xml.nextId >= floor) continue;
       out ??= new Map(pkg.parts);
@@ -426,6 +433,8 @@ export class PptxDocumentStore {
   #recordIds(pkg: PptxPackage, parts: readonly string[]): void {
     for (const name of parts) {
       const part = pkg.parts.get(name);
+      // A part still unparsed minted no id; reading it here would parse a removed slide.
+      if (isDeferredPending(part)) continue;
       if (part?.kind === 'xml' && part.xml.nextId > (this.#highWater.get(name) ?? 0))
         this.#highWater.set(name, part.xml.nextId);
     }

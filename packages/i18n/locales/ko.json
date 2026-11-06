@@ -1287,6 +1287,7 @@
   "statusBar": {
     "ariaLabel": "상태 표시줄",
     "slide": "슬라이드 {current}/{total}",
+    "readOnlyDamaged": "슬라이드가 손상되었습니다. 이 프레젠테이션을 볼 수는 있지만 변경 내용을 저장할 수는 없습니다.",
     "notes": "슬라이드 노트"
   }
 }

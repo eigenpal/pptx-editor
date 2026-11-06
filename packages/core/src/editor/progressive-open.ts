@@ -65,6 +65,14 @@ export class ProgressiveOpen {
   #settled = false;
   #rejection: XmlRejection | null = null;
   #rejections: number;
+  /** Set once the damage is reported and the deck stays open read-only: parse on, past it. */
+  #tolerant = false;
+  /**
+   * Whether a queued part is still in the document. A slide the user deleted is skipped: it
+   * parses, and a damaged one refuses the deck, only when an undo brings it back and a reader
+   * reads it. The editor sets it; without it every queued part counts.
+   */
+  live: (part: PackagePart) => boolean = () => true;
   #pendingMemo: { pkg: PptxPackage | null; parsed: number; count: number } = {
     pkg: null,
     parsed: -1,
@@ -117,6 +125,16 @@ export class ProgressiveOpen {
     return count;
   }
 
+  /**
+   * Go on past a part that did not parse: the deck stays open read-only (after edits), and its
+   * other slides still open in the background, so their placeholders fill in one by one and no
+   * reader parses them all in one task. A later damaged part is skipped.
+   */
+  tolerate(): void {
+    this.#tolerant = true;
+    this.#rejection = null;
+  }
+
   /** Parse the deferred part `partName` before the others (a thumbnail in view asked for it). */
   want(partName: string): void {
     const part = this.#byName.get(partName);
@@ -128,7 +146,7 @@ export class ProgressiveOpen {
    * have parsed parts, so the pending count and a failed parse are seen.
    */
   noteReads(): XmlRejection | null {
-    if (deferredRejectionCount() === this.#rejections) return null;
+    if (this.#tolerant || deferredRejectionCount() === this.#rejections) return null;
     this.#rejections = deferredRejectionCount();
     for (const part of this.#queue) {
       const rejection = deferredPartRejection(part);
@@ -159,10 +177,10 @@ export class ProgressiveOpen {
         this.#settled = true;
         break;
       }
-      if (!isDeferredPending(part) || part.kind !== 'xml') continue;
+      if (!isDeferredPending(part) || part.kind !== 'xml' || !this.live(part)) continue;
       void part.xml;
       if (fromWanted) wanted = true;
-      const rejection = deferredPartRejection(part);
+      const rejection = this.#tolerant ? undefined : deferredPartRejection(part);
       if (rejection) this.#rejection = rejection;
     }
     if (this.#rejection) return { done: true, wanted };

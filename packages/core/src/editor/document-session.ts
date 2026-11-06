@@ -20,6 +20,7 @@ import {
   attr,
   NS,
   readPptx,
+  readPptxDeferred,
   relTarget,
   isDeferredPending,
   parseDeferredPart,
@@ -594,7 +595,8 @@ export class DocumentSession {
   markDamaged(rejection: Extract<PackageRejection, { reason: 'xml' }>): void {
     if (this.damage) return;
     this.damage = rejection;
-    this.store.block(`${rejection.partName} did not parse`);
+    // A stable code: the part name comes from the file.
+    this.store.block('damaged-slide');
     this.onDamage?.(rejection);
   }
 
@@ -604,7 +606,6 @@ export class DocumentSession {
    * @internal
    */
   slidePending(index: number): boolean {
-    if (!this.opening) return false;
     const part = this.info.slides[index]?.partName;
     return !!part && isDeferredPending(this.store.package.parts.get(part));
   }
@@ -697,7 +698,7 @@ export async function openPresentation(
     else early ??= rejection;
   };
   const read = options.progressive
-    ? readPptx(bytes, PPTX_ZIP_LIMITS, {
+    ? readPptxDeferred(bytes, PPTX_ZIP_LIMITS, {
         defer: () => true,
         finish: partWithoutEditorMarks,
         onReject,

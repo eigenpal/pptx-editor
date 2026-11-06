@@ -104,7 +104,7 @@ export function createFontFamilySource(
       const revision = session?.store.revision ?? -1;
       const fonts = session?.fontGeneration ?? -1;
       // A slide that finishes opening can name new families, but changes no revision.
-      const parsed = session?.opening ? deferredParseCount() : -1;
+      const parsed = deferredParseCount();
       if (
         cache?.session === session &&
         cache.revision === revision &&

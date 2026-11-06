@@ -21,7 +21,7 @@ import { Icon } from './chrome.tsx';
 import { useEditorState, useTranslation } from './composables.ts';
 import { useNotesPane } from './pane-state.ts';
 import { PptxEditorZoomPill } from './panes.tsx';
-import { ViewSwitch } from './SlideSorter.tsx';
+import { ReadOnlyBadge, ViewSwitch } from './SlideSorter.tsx';
 import { ToolbarAction } from './toolbar-parts.ts';
 
 const partProps = {
@@ -58,7 +58,7 @@ export const StatusBarSlideNumber = defineComponent({
               'data-part': 'slideNumber',
               'aria-live': 'polite',
             },
-            status.value ? t('statusBar.slide', status.value) : ''
+            [status.value ? t('statusBar.slide', status.value) : '', h(ReadOnlyBadge)]
           );
   },
 });

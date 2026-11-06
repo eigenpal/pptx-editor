@@ -10,7 +10,7 @@
 import type { PackageRejection } from '../store/index.ts';
 import { deckFontFamilies } from './deck-font-request.ts';
 import type { DocumentSession } from './document-session.ts';
-import { continueOpening } from './progressive-open.ts';
+import { continueOpening, type ProgressiveOpen } from './progressive-open.ts';
 
 type XmlRejection = Extract<PackageRejection, { reason: 'xml' }>;
 
@@ -56,6 +56,24 @@ export function createOpeningLane(editor: OpeningEditor) {
   /** Refuse `owner`'s deck once, after the read that found the damage has returned. */
   const refuse = (owner: DocumentSession, rejection: XmlRejection): void =>
     queueMicrotask(() => refuseNow(owner, rejection));
+  /** Sessions whose background parse waits: a later load runs. */
+  const paused = new WeakSet<DocumentSession>();
+  /** The latest run of each session: a run that a later one replaced stops. */
+  const runs = new WeakMap<DocumentSession, number>();
+  const run = (owner: DocumentSession, open: ProgressiveOpen): void => {
+    const token = (runs.get(owner) ?? 0) + 1;
+    runs.set(owner, token);
+    continueOpening(open, {
+      current: () =>
+        editor.session() === owner &&
+        owner.opening === open &&
+        !paused.has(owner) &&
+        runs.get(owner) === token,
+      publish: () => editor.emit(),
+      settled: () => (settle(owner), editor.emit()),
+      failed: (rejection) => refuseNow(owner, rejection),
+    });
+  };
   return {
     /** Parse the rest of `owner`'s deck in background tasks, if any is left. */
     start(owner: DocumentSession): void {
@@ -64,15 +82,31 @@ export function createOpeningLane(editor: OpeningEditor) {
       if (owner.damage) refuse(owner, owner.damage);
       const open = owner.opening;
       if (!open) return;
+      open.live = (part) => owner.store.package.parts.get(part.partName) === part;
       // What the open asked for: the parts parsed so far, as `hostFonts.open` read them.
       const families = deckFontFamilies(owner.store.package).map((f) => f.toLowerCase());
       asked.set(owner, new Set(families));
-      continueOpening(open, {
-        current: () => editor.session() === owner && owner.opening === open,
-        publish: () => editor.emit(),
-        settled: () => (settle(owner), editor.emit()),
-        failed: (rejection) => refuseNow(owner, rejection),
-      });
+      run(owner, open);
+    },
+    /**
+     * `owner` stays open read-only after its damage was reported: its other slides go on
+     * opening in the background, past the damaged part.
+     */
+    keepReading(owner: DocumentSession): void {
+      const open = owner.opening;
+      if (!open || open.settled) return;
+      open.tolerate();
+      run(owner, open);
+    },
+    /** Hold the background parse while another file loads: the load's task gets the thread. */
+    pause(owner: DocumentSession | null): void {
+      if (owner?.opening) paused.add(owner);
+    },
+    /** The load did not replace `owner`: its background parse goes on. */
+    resume(owner: DocumentSession | null): void {
+      if (!owner || !paused.has(owner)) return;
+      paused.delete(owner);
+      if (owner.opening && !owner.opening.settled) run(owner, owner.opening);
     },
     /**
      * Finish the open now, for a reader of the whole deck. False when the deck was refused

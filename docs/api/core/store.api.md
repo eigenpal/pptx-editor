@@ -130,14 +130,14 @@ export function deferredPartRejection(part: PackagePart): Extract<PackageRejecti
     reason: 'xml';
 }> | undefined;
 
-// @public
+// @internal
 export interface DeferredReadOptions {
     readonly defer: (partName: string) => boolean;
     readonly finish?: DeferredPartFinish;
     readonly onReject?: DeferredPartReject;
 }
 
-// @public
+// @internal
 export function deferredRejection(pkg: PptxPackage): Extract<PackageRejection, {
     reason: 'xml';
 }> | undefined;
@@ -299,7 +299,7 @@ export function is(el: Element_2 | undefined, name: string | QName): el is Eleme
 // @internal
 export function isDeferredPart(part: PackagePart | undefined): boolean;
 
-// @public
+// @internal
 export function isDeferredPending(part: PackagePart | undefined): boolean;
 
 // @internal
@@ -667,7 +667,10 @@ export interface QName {
 }
 
 // @public
-export function readPptx(bytes: Uint8Array, limits?: ZipLimits, deferred?: DeferredReadOptions): PackageResult;
+export function readPptx(bytes: Uint8Array, limits?: ZipLimits): PackageResult;
+
+// @internal
+export function readPptxDeferred(bytes: Uint8Array, limits: ZipLimits, deferred?: DeferredReadOptions): PackageResult;
 
 // @public
 export function readZip(bytes: Uint8Array, limits?: ZipLimits): ZipReadResult;

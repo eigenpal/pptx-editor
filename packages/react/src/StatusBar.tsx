@@ -14,7 +14,7 @@ import { ToolbarAction } from './toolbar-action.tsx';
 import { useEditorState, useTranslation } from './context.ts';
 import { useNotesPane } from './pane-state.ts';
 import { ZoomPill } from './panes.tsx';
-import { ViewSwitch } from './SlideSorter.tsx';
+import { ReadOnlyBadge, ViewSwitch } from './SlideSorter.tsx';
 
 /** Props of every status bar part. @public */
 export interface StatusBarPartProps {
@@ -39,6 +39,7 @@ export function StatusBarSlideNumber({ className, hidden }: StatusBarPartProps):
       aria-live="polite"
     >
       {status ? t('statusBar.slide', status) : null}
+      <ReadOnlyBadge />
     </span>
   );
 }

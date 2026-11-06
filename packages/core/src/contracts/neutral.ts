@@ -853,6 +853,14 @@ export interface EditorSnapshot {
    * starts to open.
    */
   readonly openFailure?: DocumentOpenFailure | null;
+  /**
+   * Why the open presentation is read-only, or `null`. `'damaged-slide'`: a long deck that
+   * opened and holds edits had a slide or a notes slide that did not parse. It stays on screen
+   * in view mode with its edits, and its other slides go on opening; commands, undo, `save()`,
+   * and automation writes are refused. `openFailure` stays `null`: the file did open. It clears
+   * when the next file opens. Optional and additive: absent reads as `null`.
+   */
+  readonly readOnlyReason?: 'damaged-slide' | null;
   readonly revision: number;
   readonly mode: EditorMode;
   readonly slides: readonly SlideSummary[];

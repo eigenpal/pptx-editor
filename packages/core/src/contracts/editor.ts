@@ -62,8 +62,12 @@ export interface Editor {
    */
   load(bytes: Uint8Array, options?: LoadOptions): Promise<CommandResult>;
   /**
-   * The presentation as `.pptx` bytes, or `null` when no presentation is open. The bytes own an
-   * `ArrayBuffer`, so `new Blob([bytes])` takes them as they are.
+   * The presentation as `.pptx` bytes. The bytes own an `ArrayBuffer`, so `new Blob([bytes])`
+   * takes them as they are. A long deck still opening opens the rest first.
+   *
+   * Returns `null` when no presentation is open, and when a slide of the presentation is
+   * damaged: `EditorSnapshot.readOnlyReason` is then `'damaged-slide'` (after edits), or
+   * `EditorSnapshot.openFailure` reports the refused file (with no edits).
    */
   save(): Uint8Array<ArrayBuffer> | null;
   setZoom(zoom: number | 'fit'): void;
