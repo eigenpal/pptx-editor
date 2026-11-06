@@ -18,6 +18,7 @@ import {
   valueSlotOptions,
   type ChromeControl,
   type ChromeSlotId,
+  type PptxEditorInstance,
 } from '../index.ts';
 
 // Without the `effects` drawing renderer (`@pptx-editor.dev/pro/drawing`), the chrome does not
@@ -197,5 +198,186 @@ describe('effects without the renderer', () => {
     const slide = strFromU8(unzipSync(editor.save()!)['ppt/slides/slide1.xml']!);
     expect(slide).toContain('<a:outerShdw');
     expect(slide).toContain(effects);
+  });
+});
+
+// Removing an effect needs no renderer. Without it, the `none` row of an effect stays while the
+// selection has that effect, so a community build can remove an effect from the file.
+
+const IN = 914_400;
+const GLOW = '<a:glow rad="63500"><a:srgbClr val="FF0000"/></a:glow>';
+const INNER =
+  '<a:innerShdw blurRad="63500" dist="50800" dir="5400000"><a:srgbClr val="000000"/></a:innerShdw>';
+const REFLECTION =
+  '<a:reflection blurRad="6350" stA="50000" endPos="55000" dist="5000" dir="5400000" sy="-100000" algn="bl" rotWithShape="0"/>';
+const SOFT = '<a:softEdge rad="12700"/>';
+/** An unknown extension inside the effect list: save keeps it as it is. */
+const UNKNOWN = '<a:extLst><a:ext uri="{00000000-0000-0000-0000-000000000001}"/></a:extLst>';
+const list = (effects: string): string => `<a:effectLst>${effects}</a:effectLst>`;
+/** An own empty list stays: it says "no effects" over an inherited one. */
+const EMPTY = '<a:effectLst/>';
+
+const box = (id: number, x: number, effects?: string): string =>
+  shape({
+    id,
+    x,
+    y: 0,
+    cx: IN / 2,
+    cy: IN / 2,
+    fill: solid('4472C4'),
+    ...(effects ? { effects: `<a:effectLst>${effects}</a:effectLst>` } : {}),
+  });
+
+async function open(bytes: Uint8Array): Promise<PptxEditorInstance> {
+  const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  expect((await editor.load(bytes)).ok).toBe(true);
+  return editor;
+}
+
+const nodeIds = (editor: PptxEditorInstance): string[] =>
+  editor.session!.layout(0)!.items.map((i) => i.element.nodeId);
+
+/** Shapes: glow and soft edge, plain, reflection, inner shadow, and a group with a glow inside. */
+async function effectsDeck(): Promise<{ editor: PptxEditorInstance; ids: string[] }> {
+  const group =
+    '<p:grpSp><p:nvGrpSpPr><p:cNvPr id="10" name="G"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>' +
+    '<p:grpSpPr><a:xfrm><a:off x="0" y="2743200"/><a:ext cx="914400" cy="457200"/><a:chOff x="0" y="2743200"/><a:chExt cx="914400" cy="457200"/></a:xfrm></p:grpSpPr>' +
+    box(11, 0, GLOW) +
+    '</p:grpSp>';
+  const editor = await open(
+    buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          shapes:
+            box(2, 0, GLOW + SOFT) +
+            box(3, IN) +
+            box(4, 2 * IN, REFLECTION) +
+            box(5, 3 * IN, INNER) +
+            group,
+        },
+      ],
+    })
+  );
+  return { editor, ids: nodeIds(editor) };
+}
+
+const slideXml = (editor: PptxEditorInstance): string =>
+  strFromU8(unzipSync(editor.save()!)['ppt/slides/slide1.xml']!);
+
+const offeredEffects = (editor: PptxEditorInstance | null): ChromeControl =>
+  chromeOfferedControl('shape.effects', control('shape.effects'), editor);
+
+/** The Pro rows the menu offers: the options that a build without the renderer hides. */
+const proRows = (editor: PptxEditorInstance): string[] =>
+  values(offeredEffects(editor)).filter((v) => chromeOptionNeedsEffects('shape.effects', v));
+
+const run = (editor: PptxEditorInstance, value: string): boolean =>
+  editor.exec(commandForSlotValue('shape.effects', value)!).ok;
+
+describe('removing an effect without the renderer', () => {
+  test('a selection offers the No row of each effect it has, and no preset', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const { editor, ids } = await effectsDeck();
+    const [glowSoft, plain, reflected] = ids;
+    editor.setSelection({ kind: 'shapes', nodeIds: [plain!] });
+    expect(proRows(editor)).toEqual([]);
+    expect(offeredEffects(editor)).toBe(offeredEffects(null));
+    editor.setSelection({ kind: 'shapes', nodeIds: [glowSoft!] });
+    expect(proRows(editor)).toEqual(['glow.none', 'softEdge.none']);
+    const shown = offeredEffects(editor);
+    expect(shown.optionGroups?.map((g) => g.id)).toEqual(['shadow', 'glow', 'softEdge']);
+    // The same choices give the same object, so a memoized adapter part keeps its rows.
+    expect(offeredEffects(editor)).toBe(shown);
+    editor.setSelection({ kind: 'shapes', nodeIds: [reflected!] });
+    expect(proRows(editor)).toEqual(['reflection.none']);
+    // Picture Styles only adds effects: it offers no Pro style for any selection.
+    expect(values(chromeOfferedControl('image.styles', control('image.styles'), editor))).toEqual([
+      'simpleFrameWhite',
+      'simpleFrameBlack',
+    ]);
+  });
+
+  test('a mixed multi-selection offers the No row of each effect that a shape has', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const { editor, ids } = await effectsDeck();
+    const [glowSoft, plain, reflected] = ids;
+    editor.setSelection({ kind: 'shapes', nodeIds: [plain!, reflected!] });
+    expect(proRows(editor)).toEqual(['reflection.none']);
+    editor.setSelection({ kind: 'shapes', nodeIds: [glowSoft!, reflected!] });
+    expect(proRows(editor)).toEqual(['reflection.none', 'glow.none', 'softEdge.none']);
+    expect(valueSlotOptions('shape.effects', editor)).toContain('reflection.none');
+    expect(valueSlotOptions('shape.effects')).not.toContain('reflection.none');
+    // No Reflection removes the reflection, and nothing else.
+    const before = slideXml(editor);
+    expect(run(editor, 'reflection.none')).toBe(true);
+    expect(slideXml(editor)).toBe(before.replace(list(REFLECTION), EMPTY));
+    expect(proRows(editor)).toEqual(['glow.none', 'softEdge.none']);
+  });
+
+  test('a group carries no effect: it offers no Pro row, and its children keep theirs', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const { editor, ids } = await effectsDeck();
+    const [, , reflected, , group] = ids;
+    editor.setSelection({ kind: 'shapes', nodeIds: [group!] });
+    expect(proRows(editor)).toEqual([]);
+    // A group with a shape: the rows follow the shape, and the group's child keeps its glow.
+    editor.setSelection({ kind: 'shapes', nodeIds: [group!, reflected!] });
+    expect(proRows(editor)).toEqual(['reflection.none']);
+    expect(run(editor, 'reflection.none')).toBe(true);
+    expect(slideXml(editor)).toContain(GLOW);
+  });
+
+  test('No Shadow is always offered, and it removes an inner shadow', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const { editor, ids } = await effectsDeck();
+    editor.setSelection({ kind: 'shapes', nodeIds: [ids[3]!] });
+    expect(editor.snapshot().geometry?.effects?.shadow).not.toBe('none');
+    const shown = values(offeredEffects(editor));
+    expect(shown).toContain('shadow.none');
+    expect(shown.some((v) => v.startsWith('shadow.inner'))).toBe(false);
+    const before = slideXml(editor);
+    expect(run(editor, 'shadow.none')).toBe(true);
+    expect(slideXml(editor)).toBe(before.replace(list(INNER), EMPTY));
+    expect(editor.snapshot().geometry?.effects?.shadow).toBe('none');
+  });
+
+  test('No Glow saves without the glow, keeps the rest byte for byte, and undoes', async () => {
+    installDrawingRenderers({ effects: undefined });
+    const editor = await open(
+      buildPptx({
+        slides: [{ layout: 'blank', shapes: box(2, 0, GLOW + SOFT + UNKNOWN) + box(3, IN) }],
+      })
+    );
+    editor.setSelection({ kind: 'shapes', nodeIds: [nodeIds(editor)[0]!] });
+    const original = slideXml(editor);
+    expect(proRows(editor)).toEqual(['glow.none', 'softEdge.none']);
+    expect(run(editor, 'glow.none')).toBe(true);
+    const removed = slideXml(editor);
+    expect(removed).toBe(original.replace(GLOW, ''));
+    expect(removed).toContain(`<a:effectLst>${SOFT}${UNKNOWN}</a:effectLst>`);
+    // The menu follows the edit: No Glow goes, and No Soft Edges stays.
+    expect(proRows(editor)).toEqual(['softEdge.none']);
+    // The saved deck reopens with the same slide.
+    const reopened = await open(editor.save()!);
+    expect(slideXml(reopened)).toBe(removed);
+    // Undo brings the glow and its row back; redo removes them again.
+    expect(editor.exec({ type: 'undo' }).ok).toBe(true);
+    expect(slideXml(editor)).toBe(original);
+    expect(proRows(editor)).toEqual(['glow.none', 'softEdge.none']);
+    expect(editor.exec({ type: 'redo' }).ok).toBe(true);
+    expect(slideXml(editor)).toBe(removed);
+    expect(proRows(editor)).toEqual(['softEdge.none']);
+    // With the soft edge removed too, the shape offers no Pro row.
+    expect(run(editor, 'softEdge.none')).toBe(true);
+    expect(proRows(editor)).toEqual([]);
+    expect(slideXml(editor)).toContain(`<a:effectLst>${UNKNOWN}</a:effectLst>`);
+  });
+
+  test('with the renderer, every row shows for any selection', async () => {
+    const { editor, ids } = await effectsDeck();
+    editor.setSelection({ kind: 'shapes', nodeIds: [ids[1]!] });
+    installDrawingRenderers({ effects: STUB });
+    expect(offeredEffects(editor)).toBe(control('shape.effects'));
   });
 });

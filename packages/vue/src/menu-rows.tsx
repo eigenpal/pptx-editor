@@ -17,7 +17,6 @@ import {
 import {
   SHAPE_GALLERY,
   chromeControlForSlot,
-  chromeOfferedControl,
   chromeRowState,
   editorCommandFor,
   menuEntryKey,
@@ -40,6 +39,7 @@ import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import {
   chromeActionHostKey,
   useEditorState,
+  useOfferedControl,
   usePptxEditor,
   useTranslation,
 } from './composables.ts';
@@ -97,6 +97,12 @@ export const SlotMenuRow = defineComponent({
     // The host knows which `popups` entries are off: their rows show disabled with the reason.
     const host = inject(chromeActionHostKey, null);
     const close = useMenuClose();
+    // The choices this build offers for the selection: a choice whose result does not paint
+    // stays out, and a row that removes an effect the selection has stays in.
+    const offeredControl = useOfferedControl(
+      () => props.entry.slot,
+      () => chromeControlForSlot(props.entry.slot)
+    );
     const state = useEditorState(
       () => chromeRowState(editor.value, props.entry.slot, props.entry.value, host ?? undefined),
       sameChromeCommandState
@@ -155,8 +161,7 @@ export const SlotMenuRow = defineComponent({
               }}
             </MenuSubmenu>
           );
-        // The choices this build offers: a choice whose result does not paint stays out.
-        const offered = chromeOfferedControl(entry.slot, control);
+        const offered = offeredControl.value ?? control;
         // Shape Effects: one submenu for each effect kind, as its toolbar menu has.
         if (offered.optionGroups?.length && offered.options?.length)
           return (

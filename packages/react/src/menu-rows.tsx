@@ -11,7 +11,6 @@ import { createContext, useContext, type ReactNode } from 'react';
 import {
   SHAPE_GALLERY,
   chromeControlForSlot,
-  chromeOfferedControl,
   chromeRowState,
   menuEntryKey,
   menuRowCheck,
@@ -30,7 +29,7 @@ import {
 } from '@pptx-editor.dev/core/editor';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { MenuCloseContext, MenuRow, MenuSeparator, MenuSubmenu } from './ContextMenu.tsx';
-import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
+import { useEditorState, useOfferedControl, usePptxEditor, useTranslation } from './context.ts';
 import { useChromeActionHost } from './chrome-actions.tsx';
 import { LineGlyph, ShapeGrid, ShapeIcon } from './ShapeControls.tsx';
 import { LayoutGallery } from './SlideControls.tsx';
@@ -112,6 +111,9 @@ export function SlotMenuRow({
   const state = useRowState(entry.slot, entry.value);
   const row = resolveChromeMenuRow(entry);
   const control = chromeControlForSlot(entry.slot);
+  // The choices this build offers for the selection: a choice whose result does not paint
+  // stays out, and a row that removes an effect the selection has stays in.
+  const offeredControl = useOfferedControl(entry.slot, control);
   if (!row || !control) {
     warnMenuPart('Menu.Item', 'unknownSlot', entry.slot);
     return null;
@@ -143,8 +145,7 @@ export function SlotMenuRow({
           <MenuTableGrid slot={entry.slot} label={label} autoFocus onInserted={close} />
         </MenuSubmenu>
       );
-    // The choices this build offers: a choice whose result does not paint stays out.
-    const offered = chromeOfferedControl(entry.slot, control);
+    const offered = offeredControl ?? control;
     // Shape Effects: one submenu for each effect kind, as its toolbar menu has.
     if (offered.optionGroups?.length && offered.options?.length)
       return (

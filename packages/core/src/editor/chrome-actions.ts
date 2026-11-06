@@ -161,16 +161,18 @@ function typedSlotValue(slot: string, raw: unknown): unknown {
 /**
  * The choices of a typed value slot, from the options it offers in this build
  * (`chromeOfferedControl`), for `useEditorValueCommand`'s `options` (DOCX Editor's shape), as the
- * slot's type. A slot with free values (`font.size`, `shape.fill`) has none. @internal
+ * slot's type. A slot with free values (`font.size`, `shape.fill`) has none. With `editor`, they
+ * keep the rows that remove an effect the selection has. @internal
  */
 export function valueSlotOptions<K extends keyof ToolbarValueMap>(
-  slot: K
+  slot: K,
+  editor?: Pick<PptxEditorInstance, 'can'> | null
 ): readonly ToolbarValueMap[K][] {
   const control = chromeControlForSlot(slot);
   // A dialog row ("Line spacing options…") opens a dialog: it is not a value.
-  const options = (control ? (chromeOfferedControl(slot, control).options ?? []) : []).filter(
-    (o) => !o.dialog
-  );
+  const options = (
+    control ? (chromeOfferedControl(slot, control, editor).options ?? []) : []
+  ).filter((o) => !o.dialog);
   return options.map((option) => typedSlotValue(slot, option.value) as ToolbarValueMap[K]);
 }
 
