@@ -53,6 +53,9 @@ function fontResolution(document: DocumentSession): PdfFontResolution {
     faces: Object.freeze(report.faces.map((f) => Object.freeze({ ...f }))),
     substitutions: Object.freeze(document.substitutedFamilies().map((s) => Object.freeze(s))),
     refusedEmbedded: Object.freeze([...report.refusedEmbedded]),
+    substituteFailures: Object.freeze(
+      report.substituteFailures.map((f) => Object.freeze({ ...f }))
+    ),
   });
 }
 

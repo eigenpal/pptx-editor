@@ -6,7 +6,11 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // The public types, named as in DOCX Editor's `docx-to-pdf` (`packages/docx-to-pdf/src/types.ts`)
 // where the concept is the same.
 
-import type { FontSubstitution, OpenError } from '@pptx-editor.dev/core/editor';
+import type {
+  FontSubstitution,
+  OpenError,
+  SubstituteFontFailure,
+} from '@pptx-editor.dev/core/editor';
 import type { FontSource } from '@pptx-editor.dev/core/layout';
 
 /** A bounded explanation of content the PDF cannot reproduce. @public */
@@ -19,7 +23,7 @@ export interface PdfDiagnostic {
   readonly pageIndex?: number;
   /** One-based PDF page number for display. */
   readonly pageNumber?: number;
-  /** Zero-based slide index in the deck, hidden slides included. */
+  /** Zero-based slide index in the deck, hidden slides included. Omitted for document-wide diagnostics. */
   readonly slideIndex?: number;
   /** One-based slide number in the deck, hidden slides included. */
   readonly slideNumber?: number;
@@ -73,6 +77,8 @@ export interface PdfFontResolution {
   readonly substitutions: readonly FontSubstitution[];
   /** Embedded faces the deck carries that may not be used, with the reason. */
   readonly refusedEmbedded: readonly string[];
+  /** Packaged substitute faces that failed to load, each with its family, file, and reason. */
+  readonly substituteFailures: readonly SubstituteFontFailure[];
 }
 
 /** Result owns its bytes. @public */

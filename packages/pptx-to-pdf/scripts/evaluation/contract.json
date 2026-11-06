@@ -179,7 +179,7 @@
     },
     "font-resolution": {
       "type": "object",
-      "required": ["faces", "substitutions", "refusedEmbedded"],
+      "required": ["faces", "substitutions", "refusedEmbedded", "substituteFailures"],
       "properties": {
         "faces": {
           "type": "array",
@@ -201,7 +201,19 @@
             }
           }
         },
-        "refusedEmbedded": { "type": "array", "items": { "type": "string" } }
+        "refusedEmbedded": { "type": "array", "items": { "type": "string" } },
+        "substituteFailures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["family", "file", "diagnostic"],
+            "properties": {
+              "family": { "type": "string" },
+              "file": { "type": "string" },
+              "diagnostic": { "type": "string" }
+            }
+          }
+        }
       }
     },
     "font-plan-identity": {

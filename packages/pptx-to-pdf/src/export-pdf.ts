@@ -17,7 +17,7 @@ import {
   type SessionState,
 } from './open-session.ts';
 import { validateOptions, withPdfWork, type Work } from './options.ts';
-import { SlideDiagnostics, type PaintResources } from './page-ops.ts';
+import { clip, SlideDiagnostics, type PaintResources } from './page-ops.ts';
 import { paintSlide } from './paint.ts';
 import { PROJECTION_KEYS, SESSION_KEYS } from './pdf-session.ts';
 import {
@@ -152,6 +152,15 @@ async function renderSession(
       for (const d of diag.list) diagnostics.push(d);
     }
   }
+  // A packaged substitute that failed to load changes how text measures on every page: one
+  // document-wide diagnostic per face, with no slide or page, as DOCX Editor reports
+  // font source failures.
+  for (const f of state.fontResolution.substituteFailures)
+    diagnostics.push({
+      code: 'font.substitute-failed',
+      severity: 'approximation',
+      message: `The ${clip(f.family)} substitute${f.file ? ` (${clip(f.file)})` : ''} did not load: ${clip(f.diagnostic, 200)}.`,
+    });
   const layoutMs = phase() - openMs;
 
   const doc = await PDFDocument.create({ updateMetadata: false });

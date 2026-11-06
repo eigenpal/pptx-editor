@@ -370,6 +370,38 @@ describe('diagnostics placement', () => {
     expect(fill).toMatchObject({ slideIndex: 2, slideNumber: 3, pageIndex: 1, pageNumber: 2 });
   });
 
+  test('single and double underline and strikethrough pass strict; other underline styles are approximate', async () => {
+    const deckOf = (runs: string): Uint8Array =>
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes: shape({ id: 2, x: IN, y: IN, cx: 6 * IN, cy: IN, text: para(runs) }),
+          },
+        ],
+      });
+    const exact = await exportPdf(
+      deckOf(
+        run('One', 'u="sng"') +
+          run('Two', 'u="dbl"') +
+          run('Gone', 'strike="sngStrike"') +
+          run('Twice', 'strike="dblStrike"')
+      )
+    );
+    expect(exact.diagnostics.filter((d) => d.severity !== 'information')).toEqual([]);
+    const wavy = await exportPdf(deckOf(run('Wavy', 'u="wavy"')), BEST);
+    expect(wavy.diagnostics.map((d) => [d.code, d.severity])).toContainEqual([
+      'text.underline-style',
+      'approximation',
+    ]);
+  });
+
+  test('the font resolution lists no substitute failures when the packaged faces load', async () => {
+    const result = await exportPdf(deck('font-substitution'), BEST);
+    expect(result.fontResolution.substituteFailures).toEqual([]);
+    expect(result.diagnostics.map((d) => d.code)).not.toContain('font.substitute-failed');
+  });
+
   test('the strict error names the slide and the feature', async () => {
     const error = await exportPdf(deckWithHidden()).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(PdfFidelityError);

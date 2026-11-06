@@ -1,0 +1,170 @@
+import { afterAll, describe, expect, test } from 'bun:test';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { FONT_ASSET_ROOT } from '@docx-editor.dev/fonts';
+import { createPackagedFileFetch } from '../packaged-file-fetch.ts';
+import { loadSubstitute, openPresentation } from '../document-session.ts';
+import { buildPptx } from '../../../../../scripts/fixtures/builder.ts';
+
+const base = mkdtempSync(join(tmpdir(), 'pptx-packaged-fetch-'));
+const root = join(base, 'assets');
+mkdirSync(root);
+writeFileSync(join(root, 'face.ttf'), new Uint8Array([1, 2, 3, 4]));
+writeFileSync(join(root, 'big.ttf'), new Uint8Array(64));
+writeFileSync(join(base, 'secret.txt'), 'outside');
+symlinkSync(join(base, 'secret.txt'), join(root, 'link.ttf'));
+mkdirSync(join(base, 'outside'));
+writeFileSync(join(base, 'outside', 'face.ttf'), new Uint8Array([9]));
+symlinkSync(join(base, 'outside'), join(root, 'dir'));
+afterAll(() => rmSync(base, { recursive: true, force: true }));
+
+const rootUrl = pathToFileURL(`${root}/`);
+const read = createPackagedFileFetch({ trustedRoot: rootUrl, maxBytes: 16 })!;
+const at = (name: string): string => new URL(name, rootUrl).href;
+
+describe('createPackagedFileFetch', () => {
+  test('reads a file inside the trusted folder', async () => {
+    const response = await read(at('face.ttf'));
+    expect(response.status).toBe(200);
+    expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([1, 2, 3, 4]);
+  });
+
+  test('refuses files outside the folder, through `..` or a symbolic link', async () => {
+    expect((await read(`${rootUrl.href}..%2Fsecret.txt`)).status).toBe(404);
+    expect((await read(pathToFileURL(join(base, 'secret.txt')).href)).status).toBe(404);
+    expect((await read(at('link.ttf'))).status).toBe(404);
+    // A symbolic link in a parent folder: the real path is outside.
+    expect((await read(at('dir/face.ttf'))).status).toBe(404);
+    expect((await read(rootUrl.href)).status).toBe(404);
+    expect((await read(at('missing.ttf'))).status).toBe(404);
+  });
+
+  // Root reads a file with no permissions, so the read error needs a normal user.
+  test.skipIf(process.getuid?.() === 0)(
+    'a read error keeps its code but not the local path',
+    async () => {
+      writeFileSync(join(root, 'locked.ttf'), new Uint8Array([1]));
+      chmodSync(join(root, 'locked.ttf'), 0o000);
+      const error = await read(at('locked.ttf')).then(
+        () => undefined,
+        (e: unknown) => e as Error
+      );
+      expect(error?.message).toMatch(/could not be read \(E[A-Z]+\)/);
+      expect(error?.message).not.toContain(base);
+    }
+  );
+
+  test('refuses a folder and a FIFO without blocking', async () => {
+    mkdirSync(join(root, 'folder.ttf'));
+    expect((await read(at('folder.ttf'))).status).toBe(404);
+    // Opening a FIFO for reading blocks until a writer comes, unless the reader passes O_NONBLOCK.
+    if (process.platform !== 'win32' && spawnSync('mkfifo', [join(root, 'pipe.ttf')]).status === 0)
+      expect((await read(at('pipe.ttf'))).status).toBe(404);
+  });
+
+  test("stops on an aborted Request's own signal", async () => {
+    const controller = new AbortController();
+    controller.abort(new Error('stop'));
+    const request = { url: at('face.ttf'), signal: controller.signal } as unknown as Request;
+    await expect(read(request)).rejects.toThrow('stop');
+  });
+
+  test('refuses a file over maxBytes before it reads it', async () => {
+    expect((await read(at('big.ttf'))).status).toBe(413);
+  });
+
+  test('refuses a file: URL on another host, and accepts localhost', async () => {
+    expect((await read(at('face.ttf').replace('file://', 'file://elsewhere'))).status).toBe(404);
+    expect((await read(at('face.ttf').replace('file://', 'file://localhost'))).status).toBe(200);
+  });
+
+  test('is undefined for a filesystem root, which confines nothing', () => {
+    expect(
+      createPackagedFileFetch({ trustedRoot: pathToFileURL('/'), maxBytes: 1 })
+    ).toBeUndefined();
+  });
+
+  test('is undefined for a root this platform cannot name, instead of throwing', () => {
+    // A host other than localhost has no path on POSIX; Windows reads it as a network share.
+    if (process.platform === 'win32') return;
+    expect(
+      createPackagedFileFetch({ trustedRoot: new URL('file://share/fonts/'), maxBytes: 1 })
+    ).toBeUndefined();
+  });
+
+  test('leaves a non-file folder to the global fetch', () => {
+    expect(
+      createPackagedFileFetch({ trustedRoot: new URL('https://example.test/'), maxBytes: 1 })
+    ).toBeUndefined();
+  });
+
+  test('is undefined off Node, where the global fetch serves the faces', () => {
+    const runtime = globalThis.process as { getBuiltinModule?: unknown };
+    const saved = runtime.getBuiltinModule;
+    runtime.getBuiltinModule = undefined;
+    try {
+      expect(createPackagedFileFetch({ trustedRoot: rootUrl, maxBytes: 1 })).toBeUndefined();
+    } finally {
+      runtime.getBuiltinModule = saved;
+    }
+  });
+});
+
+describe('packaged substitutes', () => {
+  test('load from disk with a fetch that refuses file: URLs, as Node does', async () => {
+    expect(FONT_ASSET_ROOT.protocol).toBe('file:');
+    const saved = globalThis.fetch;
+    // Node's fetch rejects every file: URL ("fetch failed"). Bun's reads them, which hid the
+    // fault from every test that ran under Bun.
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const href = typeof input === 'string' ? input : 'href' in input ? input.href : input.url;
+      if (href.startsWith('file:')) throw new TypeError('fetch failed');
+      return saved(input);
+    }) as typeof fetch;
+    try {
+      // `loadSubstitute` skips the per-page cache, which another test file in this worker
+      // may have filled already through Bun's `fetch`.
+      const load = await loadSubstitute('Calibri');
+      expect(load.failures).toEqual([]);
+      expect(load.sources.map((s) => [s.bold, s.italic]).sort()).toEqual([
+        [false, false],
+        [false, true],
+        [true, false],
+        [true, true],
+      ]);
+      const opened = await openPresentation(
+        buildPptx({ slides: [{ layout: 'blank', shapes: '' }] })
+      );
+      if (!opened.ok) throw new Error('deck');
+      const report = opened.session.fontReport;
+      expect(report.substituteFailures).toEqual([]);
+      expect(report.faces.some((f) => f.origin === 'substitute')).toBe(true);
+      opened.session.dispose();
+    } finally {
+      globalThis.fetch = saved;
+    }
+  });
+});
+
+describe('substitute failures', () => {
+  test('name the family, the file, and the reason of each face that fails', async () => {
+    const refuse = (async () => new Response(null, { status: 404 })) as unknown as typeof fetch;
+    const load = await loadSubstitute('Arial', refuse);
+    expect(load.sources).toEqual([]);
+    expect(load.failures.map((f) => f.file)).toEqual([
+      'LiberationSans-Regular.ttf',
+      'LiberationSans-Bold.ttf',
+      'LiberationSans-Italic.ttf',
+      'LiberationSans-BoldItalic.ttf',
+    ]);
+    for (const f of load.failures) {
+      expect(f.family).toBe('Arial');
+      // A missing file tells the developer what to ship, not only the status.
+      expect(f.diagnostic).toStartWith('HTTP 404: the file is not in the assets folder');
+      expect(f.diagnostic).toContain('DOCX_EDITOR_FONT_ASSET_ROOT');
+    }
+  });
+});

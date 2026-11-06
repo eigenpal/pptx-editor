@@ -7,6 +7,7 @@
 import { FontSource } from '@pptx-editor.dev/core/layout';
 import { FontSubstitution } from '@pptx-editor.dev/core/editor';
 import { OpenError } from '@pptx-editor.dev/core/editor';
+import { SubstituteFontFailure } from '@pptx-editor.dev/core/editor';
 
 // @public
 export function exportPdf(source: Uint8Array, options?: PdfExportOptions): Promise<PdfExportResult>;
@@ -119,6 +120,7 @@ export interface PdfFontResolution {
         readonly origin: string;
     }[];
     readonly refusedEmbedded: readonly string[];
+    readonly substituteFailures: readonly SubstituteFontFailure[];
     readonly substitutions: readonly FontSubstitution[];
 }
 
@@ -149,6 +151,8 @@ export class PdfWorkLimitError extends Error {
     constructor(code: 'timeout' | 'aborted' | 'operations', options?: ErrorOptions);
     readonly code: 'timeout' | 'aborted' | 'operations';
 }
+
+export { SubstituteFontFailure }
 
 // (No @packageDocumentation comment for this package)
 

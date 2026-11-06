@@ -45,4 +45,8 @@ export type {
   PdfProjectionOptions,
 } from './types.ts';
 export type { FontSource } from '@pptx-editor.dev/core/layout';
-export type { FontSubstitution, OpenError } from '@pptx-editor.dev/core/editor';
+export type {
+  FontSubstitution,
+  OpenError,
+  SubstituteFontFailure,
+} from '@pptx-editor.dev/core/editor';

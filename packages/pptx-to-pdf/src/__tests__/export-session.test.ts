@@ -319,3 +319,33 @@ describe('openDocumentForExport and exportPdfFrom', () => {
     expect(await pending).toEqual({ ok: false, reason: 'aborted' });
   });
 });
+
+describe('substitute font failures', () => {
+  test('give one document-wide diagnostic per face, which strict refuses', async () => {
+    const opened = await openDocumentForExport(deck('font-substitution'), {});
+    if (!opened.ok) throw new Error('deck');
+    // Stand in for a fonts package with a missing file: the session resolves its fonts once.
+    const state = sessionState(opened.session)!;
+    const failure = { family: 'Calibri', file: 'Carlito-Bold.ttf', diagnostic: 'HTTP 404' };
+    (state as { fontResolution: unknown }).fontResolution = {
+      ...state.fontResolution,
+      substituteFailures: [failure],
+    };
+    try {
+      const result = await exportPdfFrom(opened.session, BEST);
+      expect(result.diagnostics.filter((d) => d.code === 'font.substitute-failed')).toEqual([
+        {
+          code: 'font.substitute-failed',
+          severity: 'approximation',
+          message: 'The Calibri substitute (Carlito-Bold.ttf) did not load: HTTP 404.',
+        },
+      ]);
+      expect(result.fontResolution.substituteFailures).toEqual([failure]);
+      const error = await exportPdfFrom(opened.session, {}).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(PdfFidelityError);
+      expect((error as Error).message).toContain('document: font.substitute-failed');
+    } finally {
+      opened.session.dispose();
+    }
+  });
+});
