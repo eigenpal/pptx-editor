@@ -40,6 +40,7 @@ The demo builds against workspace source, so it needs no package build.
    `bun run test` runs one `bun test` process per test file over a pool of workers, slowest file first, as DOCX Editor does (`scripts/test/run-parallel.mjs`). Only the React and Vue adapter tests preload happy-dom. The engine tests run with no global DOM. Other test commands:
    - `bun run test:changed` runs only the test files that your change can affect. Add `--list` to print them.
    - `bun run test:serial` runs the suite in two `bun test` processes. Use it to find a test that depends on file order.
+   - `bun run test:dom` runs the React and Vue adapter tests in one process, so they share one set of DOM classes. A test that patches a DOM prototype must restore the saved property descriptor, or delete an own property that was not there. An assignment such as `HTMLElement.prototype.getBoundingClientRect = saved` adds a copy that hides later patches of `Element.prototype`. The preload fails a test that leaves such a copy, and fails the run when a prototype differs at the end.
    - `bun run test --shard 1/3 --balance` runs one CI shard. `--only FILE`, `--exclude PREFIX`, `--jobs N`, `--fail-fast`, and `--retry-failed` are also available. Arguments after `--` go to each `bun test`.
 5. Add a changeset for code changes with `bun changeset`. Documentation, test, and CI-only changes do not need one.
 6. Submit a pull request against `main` with a conventional-commit title.
