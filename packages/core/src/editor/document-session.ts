@@ -3,7 +3,11 @@
 // harness measures and paints exactly what the editor shows.
 
 import { withoutEditorMarks } from '../automation/commands/table-edit-marks.ts';
-import { loadDefaultFonts, ALL_DEFAULT_FONT_FAMILIES } from '@docx-editor.dev/fonts';
+import {
+  loadDefaultFonts,
+  ALL_DEFAULT_FONT_FAMILIES,
+  FONT_ASSET_ROOT,
+} from '@docx-editor.dev/fonts';
 import {
   binaryPartOf,
   decodeEmbeddedFont,
@@ -25,6 +29,7 @@ import {
 import { partNameKey } from '@eigenpal/ooxml-core';
 import { resolveSlide } from '../cascade/index.ts';
 import {
+  HARD_MAX_FONT_BYTES,
   createFixedMeasurer,
   createHarfBuzzMeasurer,
   initializeHarfBuzz,
@@ -36,6 +41,7 @@ import {
   type TextMeasurer,
 } from '../layout/index.ts';
 import { OpBatch } from '../automation/commands/op-batch.ts';
+import { createPackagedFileFetch } from './packaged-file-fetch.ts';
 import { replicaBindingOf } from './replica-ids.ts';
 import { sameDependencies, slideDependencies } from './slide-dependencies.ts';
 
@@ -67,6 +73,11 @@ export type OpenError = PackageRejection | { readonly reason: 'empty' };
 export interface FontReport {
   readonly embeddedFaces: number;
   readonly refusedEmbedded: readonly string[];
+  /**
+   * Packaged substitute faces that failed to load, each as `family (file): reason`. Text in
+   * those families measures and paints with another face, or with none.
+   */
+  readonly substituteFailures: readonly string[];
   readonly faces: readonly { readonly family: string; readonly origin: string }[];
 }
 
@@ -150,30 +161,71 @@ export function substituteFamiliesFor(pkg: PptxPackage): DefaultFamily[] {
   return [...families];
 }
 
-const substituteCache = new Map<DefaultFamily, Promise<FontSource[]>>();
+/** The packaged substitutes of one family, and the faces that failed to load. */
+interface SubstituteLoad {
+  readonly sources: readonly FontSource[];
+  readonly failures: readonly string[];
+}
 
-/** The packaged substitutes for some families, each family loaded once per page. */
-function substituteFonts(families: readonly DefaultFamily[]): Promise<FontSource[]> {
+const substituteCache = new Map<DefaultFamily, Promise<SubstituteLoad>>();
+
+/**
+ * How the substitutes are fetched. Under Node the packaged faces are `file:` URLs, which
+ * Node's `fetch` rejects, so a bounded reader confined to the package's `assets/` folder
+ * reads them. Browsers and Bun keep the global `fetch` (undefined here).
+ */
+let substituteFetcher: typeof fetch | undefined | null = null;
+function substituteFetch(): typeof fetch | undefined {
+  if (substituteFetcher === null)
+    substituteFetcher = createPackagedFileFetch({
+      trustedRoot: FONT_ASSET_ROOT,
+      maxBytes: HARD_MAX_FONT_BYTES,
+    });
+  return substituteFetcher;
+}
+
+function loadSubstitute(family: DefaultFamily): Promise<SubstituteLoad> {
+  const fetcher = substituteFetch();
+  return loadDefaultFonts({ families: [family], ...(fetcher ? { fetcher } : {}) }).then(
+    (fragment) => ({
+      sources: fragment.sources.map((s) => ({
+        family: s.request.family,
+        bold: s.request.weight >= 600,
+        italic: s.request.style === 'italic',
+        bytes: s.bytes,
+        origin: 'substitute',
+      })),
+      failures: fragment.failures.map((f) => `${f.family} (${f.file}): ${f.diagnostic}`),
+    }),
+    (error: unknown) => ({
+      sources: [],
+      failures: [`${family}: ${error instanceof Error ? error.message : String(error)}`],
+    })
+  );
+}
+
+/**
+ * The packaged substitutes for some families, each family loaded once per page. A family
+ * with a failed face loads again at the next open, so a passing fault does not stick.
+ */
+function substituteFonts(families: readonly DefaultFamily[]): Promise<SubstituteLoad> {
   return Promise.all(
     families.map((family) => {
       let hit = substituteCache.get(family);
       if (!hit) {
-        hit = loadDefaultFonts({ families: [family] })
-          .then((fragment) =>
-            fragment.sources.map((s) => ({
-              family: s.request.family,
-              bold: s.request.weight >= 600,
-              italic: s.request.style === 'italic',
-              bytes: s.bytes,
-              origin: 'substitute',
-            }))
-          )
-          .catch(() => []);
+        hit = loadSubstitute(family);
         substituteCache.set(family, hit);
+        void hit.then((load) => {
+          if (load.failures.length > 0 && substituteCache.get(family) === hit)
+            substituteCache.delete(family);
+        });
       }
       return hit;
     })
-  ).then((lists) => lists.flat());
+  ).then((loads) => ({
+    sources: loads.flatMap((l) => l.sources),
+    failures: loads.flatMap((l) => l.failures),
+  }));
 }
 
 /** Decode the presentation's embedded fonts in memory, honoring embedding permissions. */
@@ -239,6 +291,7 @@ interface FontSet {
   readonly configured: HostFaces;
   readonly substitutes: readonly FontSource[];
   readonly refused: readonly string[];
+  readonly substituteFailures: readonly string[];
   readonly fixed: boolean;
 }
 
@@ -358,6 +411,7 @@ export class DocumentSession {
     return {
       embeddedFaces: this.#fonts.embedded.length,
       refusedEmbedded: this.#fonts.refused,
+      substituteFailures: this.#fonts.substituteFailures,
       faces: this.#faces.map((f) => ({ family: f.family, origin: f.origin })),
     };
   }
@@ -527,13 +581,21 @@ export async function openPresentation(
     embedded,
     refused,
     configured: NO_HOST_FACES,
-    substitutes: [] as FontSource[],
+    substitutes: [] as readonly FontSource[],
+    substituteFailures: [] as readonly string[],
   };
   if (options.fixedMeasurer)
     return { ok: true, session: new DocumentSession(store, { ...base, fixed: true }) };
   await initializeHarfBuzz();
-  const substitutes =
-    options.substitutes === false ? [] : await substituteFonts(substituteFamiliesFor(read.pkg));
-  const fonts: FontSet = { ...base, substitutes, fixed: false };
+  const loaded =
+    options.substitutes === false
+      ? { sources: [], failures: [] }
+      : await substituteFonts(substituteFamiliesFor(read.pkg));
+  const fonts: FontSet = {
+    ...base,
+    substitutes: loaded.sources,
+    substituteFailures: loaded.failures,
+    fixed: false,
+  };
   return { ok: true, session: new DocumentSession(store, fonts) };
 }

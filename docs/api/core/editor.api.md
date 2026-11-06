@@ -2324,6 +2324,7 @@ export interface FontReport {
     }[];
     // (undocumented)
     readonly refusedEmbedded: readonly string[];
+    readonly substituteFailures: readonly string[];
 }
 
 // @public

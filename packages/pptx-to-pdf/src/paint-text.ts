@@ -9,8 +9,10 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import {
   appendBezierCurve,
   beginText,
+  clip as clipPath,
   closePath,
   concatTransformationMatrix,
+  endPath,
   endText,
   fill,
   fillAndStroke,
@@ -26,18 +28,24 @@ import {
   PDFHexString,
   TextRenderingMode,
 } from 'pdf-lib';
-import { hasCharacters, type TextLayout } from '@pptx-editor.dev/core/layout';
+import type { ResolvedFill } from '@pptx-editor.dev/core/cascade';
+import { hasCharacters, type GlyphRun, type TextLayout } from '@pptx-editor.dev/core/layout';
 import { EmbeddedFace } from './fonts.ts';
 import { flatColor, gradientBox, ownFill, type FillScope } from './paint-fill.ts';
 import { clip, EMU_PER_PT, rgb, type PageOps } from './page-ops.ts';
 
 /** The embedded face for a layout face id, or null with a diagnostic. */
-function fontFor(faceId: string, p: PageOps): EmbeddedFace | null {
+function fontFor(faceId: string, family: string, p: PageOps): EmbeddedFace | null {
   const cached = p.res.fonts.get(faceId);
   if (cached !== undefined) return cached;
   const face = p.res.faces.get(faceId);
   let font: EmbeddedFace | null = null;
-  if (!face) p.diag.add('font.missing', 'unsupported', 'A text face has no font bytes.');
+  if (!face)
+    p.diag.add(
+      'font.missing',
+      'unsupported',
+      `The ${clip(family)} font has no font bytes. Its text is not drawn.`
+    );
   else {
     try {
       // DOCX Editor's embedder: OS/2 fsType and collection checks, then a subset per face.
@@ -92,13 +100,9 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
       const gradient = own.type === 'linear' || own.type === 'path' ? own : null;
       const runColor = gradient ? null : flatColor(run.props.fill, scope, p, 'text');
       // Outlines and decorations draw even on a run with no fill (outline-only text), so
-      // they are reported before such a run is skipped.
-      if (run.props.underline !== 'none' || run.props.strike !== 'noStrike')
-        p.diag.add(
-          'text.decoration',
-          'unsupported',
-          'Underline and strikethrough are not drawn yet.'
-        );
+      // they come before such a run is skipped.
+      if (run.kind === 'text')
+        drawDecorations(run, line.baseline, scope, p, () => (bounds ??= textBounds(layout)));
       if (run.props.outline)
         p.diag.add('text.outline', 'unsupported', 'Text outlines are not drawn yet.');
       if (!gradient && !runColor) continue;
@@ -108,7 +112,7 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
           'approximation',
           'Synthetic bold and italic are not drawn.'
         );
-      const font = fontFor(run.face.id, p);
+      const font = fontFor(run.face.id, run.face.family, p);
       if (!font) continue;
       const key = p.fontKey(run.face.id, font);
       const size = run.sizePt * EMU_PER_PT;
@@ -156,6 +160,85 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
   p.push(popGraphicsState());
 }
 
+/** Underline styles the bars draw exactly; the SVG paint draws every other style the same way. */
+const EXACT_UNDERLINES = new Set(['none', 'sng', 'dbl']);
+
+/**
+ * Underline and strikethrough as filled bars, with the geometry of the SVG paint
+ * (`core/src/output/paint-text.ts`, `decorationRects`): face metrics, trailing spaces trimmed,
+ * the underline in its own fill (`a:uFill`) when the run has one, the strikethrough in the
+ * run's fill. A gradient fill spans the text body's bounds, as the glyphs' does.
+ */
+function drawDecorations(
+  run: GlyphRun,
+  baseline: number,
+  scope: FillScope,
+  p: PageOps,
+  bounds: () => { x: number; y: number; w: number; h: number }
+): void {
+  const { underline, strike } = run.props;
+  if (underline === 'none' && strike === 'noStrike') return;
+  if (!EXACT_UNDERLINES.has(underline))
+    p.diag.add(
+      'text.underline-style',
+      'approximation',
+      'Dotted, dashed, wavy, heavy, and word-only underlines are drawn as single lines.'
+    );
+  let end = run.text.length;
+  while (end > 0 && run.text[end - 1] === ' ') end -= 1;
+  const x0 = run.x[0];
+  const x1 = run.x[end] ?? run.x[run.x.length - 1];
+  if (!(x1 > x0)) return;
+  const size = run.sizePt * EMU_PER_PT;
+  const m = run.face.metrics;
+  const thickness = Math.max(m.underlineThickness * size, size / 20);
+  const y = baseline - run.rise;
+  const bars = (fillValue: ResolvedFill, tops: readonly number[]): void => {
+    const own = ownFill(fillValue, scope).fill;
+    const trace = (): void => {
+      for (const top of tops)
+        p.push(
+          moveTo(x0, top),
+          lineTo(x1, top),
+          lineTo(x1, top + thickness),
+          lineTo(x0, top + thickness),
+          closePath()
+        );
+    };
+    if (own.type === 'solid') {
+      p.push(pushGraphicsState());
+      p.alpha(own.color.a, 1);
+      p.push(setFillingRgbColor(...rgb(own.color)));
+      trace();
+      p.push(fill(), popGraphicsState());
+    } else if ((own.type === 'linear' || own.type === 'path') && own.stops.length > 0) {
+      const box = bounds();
+      p.push(pushGraphicsState());
+      trace();
+      p.push(clipPath(), endPath(), concatTransformationMatrix(1, 0, 0, 1, box.x, box.y));
+      gradientBox(own, box.w, box.h, p);
+      p.push(popGraphicsState());
+    } else if (own.type !== 'none') {
+      // A picture or pattern fill is not drawn on text yet: this reports it once.
+      flatColor(fillValue, scope, p, 'text');
+    }
+  };
+  if (underline !== 'none') {
+    const top = y - m.underlinePosition * size;
+    bars(
+      run.props.underlineFill ?? run.props.fill,
+      underline === 'dbl' ? [top, top + thickness * 2] : [top]
+    );
+  }
+  if (strike !== 'noStrike') {
+    const mid = y - size * 0.3;
+    bars(
+      run.props.fill,
+      strike === 'dblStrike' ? [mid - thickness / 2, mid - thickness * 2] : [mid - thickness / 2]
+    );
+  }
+}
+
 /** The laid-out bounds of a text body in its frame, as the SVG paint's gradient text spans. */
 function textBounds(layout: TextLayout): { x: number; y: number; w: number; h: number } {
   let [x, y, r, b] = [Infinity, Infinity, -Infinity, -Infinity];
@@ -190,7 +273,7 @@ export function fillTextOutlines(
     for (const run of line.runs) {
       if (run.text.length === 0) continue;
       if (ownFill(run.props.fill, scope).fill.type === 'none') continue;
-      const face = p.res.fonts.get(run.face.id) ?? fontFor(run.face.id, p);
+      const face = p.res.fonts.get(run.face.id) ?? fontFor(run.face.id, run.face.family, p);
       if (!face) continue;
       const k = (run.sizePt * EMU_PER_PT) / face.font.unitsPerEm;
       const y = line.baseline - run.rise;

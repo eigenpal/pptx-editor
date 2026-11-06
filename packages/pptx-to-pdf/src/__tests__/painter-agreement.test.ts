@@ -14,7 +14,7 @@ import { PNG } from 'pngjs';
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { openPresentation } from '@pptx-editor.dev/core/editor';
 import { paintSlide } from '@pptx-editor.dev/core/output';
-import { buildPptx, shape } from '../../../../scripts/fixtures/builder.ts';
+import { buildPptx, para, run, shape } from '../../../../scripts/fixtures/builder.ts';
 import { exportPdf } from '../index.ts';
 
 const IN = 914_400;
@@ -129,6 +129,62 @@ describe('the PDF writer and the SVG paint agree', () => {
     test(`on the place of ${name}`, async () => {
       await pictureAgrees(blip);
     });
+
+  test('on the bars of underline, double underline, and strikethrough', async () => {
+    const fill = (rgb: string): string => `<a:solidFill><a:srgbClr val="${rgb}"/></a:solidFill>`;
+    const text = para(
+      run('Under', 'sz="2400" u="sng"', fill('FF0000')) +
+        run('Double', 'sz="2400" u="dbl"', fill('00FF00')) +
+        // The trailing space is not struck, in either paint.
+        run(' Struck ', 'sz="2400" strike="sngStrike"', fill('0000FF'))
+    );
+    const bytes = buildPptx({
+      slides: [
+        { layout: 'blank', shapes: shape({ id: 2, x: IN, y: IN, cx: 6 * IN, cy: IN, text }) },
+      ],
+    });
+    // The SVG bars are in points inside the frame; the PDF bars are in EMU inside the frame.
+    const svgBars = [...(await svgOf(bytes)).querySelectorAll('rect')]
+      .filter((r) => r.getAttribute('data-kind') !== 'background')
+      .map((r) => ({
+        fill: r.getAttribute('fill')!,
+        box: attrs(r, ['x', 'y', 'width', 'height']),
+      }));
+    const pdf = await getDocument({
+      data: (await exportPdf(bytes, BEST)).bytes.slice(),
+      useSystemFonts: false,
+    }).promise;
+    const { fnArray, argsArray } = await (await pdf.getPage(1)).getOperatorList();
+    const pdfBars: { fill: string; box: number[] }[] = [];
+    let color = '';
+    fnArray.forEach((fn, i) => {
+      const args = argsArray[i] as unknown[];
+      if (fn === OPS.setFillRGBColor) color = String(args[0]);
+      if (fn !== OPS.constructPath || color === '#ffffff') return;
+      // pdf.js path data: 0 moveTo x y, 1 lineTo x y, 4 closePath. One box per subpath.
+      const data = Array.from((args[1] as ArrayLike<number>[])[0]!);
+      let xs: number[] = [];
+      let ys: number[] = [];
+      for (let k = 0; k < data.length;) {
+        const op = data[k]!;
+        if (op === 4) {
+          const [x, y] = [Math.min(...xs), Math.min(...ys)];
+          pdfBars.push({ fill: color, box: [x, y, Math.max(...xs) - x, Math.max(...ys) - y] });
+          [xs, ys] = [[], []];
+          k += 1;
+        } else {
+          xs.push(data[k + 1]!);
+          ys.push(data[k + 2]!);
+          k += 3;
+        }
+      }
+    });
+    expect(pdfBars.map((b) => b.fill)).toEqual(svgBars.map((b) => b.fill));
+    expect(pdfBars.map((b) => b.fill)).toEqual(['#ff0000', '#00ff00', '#00ff00', '#0000ff']);
+    for (const [i, bar] of svgBars.entries())
+      for (const [k, v] of bar.box.entries())
+        expect(pdfBars[i]!.box[k]! / 12_700).toBeCloseTo(v, 1);
+  });
 });
 
 async function pictureAgrees(blip: string): Promise<void> {

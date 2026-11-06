@@ -17,7 +17,7 @@ import {
   type SessionState,
 } from './open-session.ts';
 import { validateOptions, withPdfWork, type Work } from './options.ts';
-import { SlideDiagnostics, type PaintResources } from './page-ops.ts';
+import { clip, SlideDiagnostics, type PaintResources } from './page-ops.ts';
 import { paintSlide } from './paint.ts';
 import { PROJECTION_KEYS, SESSION_KEYS } from './pdf-session.ts';
 import {
@@ -178,6 +178,15 @@ async function renderSession(
   for (const [pageIndex, { index, layout }] of layouts.entries()) {
     step();
     const diag = new SlideDiagnostics(index, pageIndex);
+    // A packaged substitute that failed to load changes how text measures on every page, so
+    // the first page names each failure once.
+    if (pageIndex === 0)
+      for (const failure of state.fontResolution.substituteFailures)
+        diag.add(
+          'font.substitute-failed',
+          'approximation',
+          `A packaged substitute font failed to load: ${clip(failure, 200)}.`
+        );
     // Let the timer and the caller's signal run between slides, as DOCX Editor does.
     await work.yield();
     await paintSlide(layout, res, diag);

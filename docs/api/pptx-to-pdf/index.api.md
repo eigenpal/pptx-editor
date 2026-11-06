@@ -119,6 +119,7 @@ export interface PdfFontResolution {
         readonly origin: string;
     }[];
     readonly refusedEmbedded: readonly string[];
+    readonly substituteFailures: readonly string[];
     readonly substitutions: readonly FontSubstitution[];
 }
 

@@ -55,7 +55,12 @@ Run every command from the root of the checkout, after `bun install`. The Bun co
   "slideCount": 3,
   "hiddenSlides": [2],
   "diagnostics": [{ "code": "frame.chart", "severity": "unsupported", "message": "…" }],
-  "fontResolution": { "faces": [], "substitutions": [], "refusedEmbedded": [] },
+  "fontResolution": {
+    "faces": [],
+    "substitutions": [],
+    "refusedEmbedded": [],
+    "substituteFailures": []
+  },
   "fontPlan": null,
   "timings": { "openMs": 18, "layoutMs": 4, "paintMs": 9, "saveMs": 2 }
 }

@@ -73,6 +73,8 @@ export interface PdfFontResolution {
   readonly substitutions: readonly FontSubstitution[];
   /** Embedded faces the deck carries that may not be used, with the reason. */
   readonly refusedEmbedded: readonly string[];
+  /** Packaged substitute faces that failed to load, each as `family (file): reason`. */
+  readonly substituteFailures: readonly string[];
 }
 
 /** Result owns its bytes. @public */

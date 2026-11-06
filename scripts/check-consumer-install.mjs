@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 //
 // Installs the packages the way a consumer does: from tarballs, into an empty project, with
-// npm resolving what it finds inside them. Then it builds a React app with Vite and with
-// Bun's bundler, and opens the Vite build in Chromium to check that a slide renders
-// (docx-editor/scripts/check-consumer-install.mjs, sized for PPTX Editor).
+// npm resolving what it finds inside them. Then it exports a PDF under Node, builds a React
+// app with Vite and with Bun's bundler, and opens the Vite build in Chromium to check that a
+// slide renders (docx-editor/scripts/check-consumer-install.mjs, sized for PPTX Editor).
 //
 // This is the only check that reads a published manifest instead of a workspace one, so it
 // is the only place where a `workspace:` range, a missing `exports` subpath, a `files` list
@@ -114,10 +114,38 @@ cpSync(
   path.join(ROOT, 'examples/vite/public/sample.pptx'),
   path.join(appDir, 'public/sample.pptx')
 );
+cpSync(path.join(ROOT, 'examples/vite/public/showcase.pptx'), path.join(appDir, 'showcase.pptx'));
+// PDF export under Node, as the pptx-to-pdf README tells users to write it. Every unit test
+// runs under Bun, whose `fetch` reads `file:` URLs; Node's does not, so only this run proves
+// that the packaged substitute fonts load and the PDF carries its text.
+writeFileSync(
+  path.join(appDir, 'export-pdf.mjs'),
+  `import { readFile } from 'node:fs/promises';
+import { exportPdf } from '@pptx-editor.dev/pptx-to-pdf';
+
+if (process.versions.bun) throw new Error('run this under Node, not Bun');
+const result = await exportPdf(await readFile('showcase.pptx'), { fidelityPolicy: 'best-effort' });
+const pdf = Buffer.from(result.bytes).toString('latin1');
+console.log(
+  JSON.stringify({
+    pages: result.pageCount,
+    embeddedFonts: (pdf.match(/\\/FontFile2? /g) ?? []).length,
+    substituteFaces: result.fontResolution.faces.filter((f) => f.origin === 'substitute').length,
+    substituteFailures: result.fontResolution.substituteFailures,
+    fontDiagnostics: result.diagnostics
+      .filter((d) => d.code === 'font.missing' || d.code === 'font.substitute-failed')
+      .map((d) => d.message),
+  })
+);
+`
+);
 
 const failures = [];
 try {
   run('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error'], appDir);
+
+  // Node: the PDF must embed the packaged substitute fonts and draw the deck's text.
+  checkNodePdf(JSON.parse(run('node', ['export-pdf.mjs'], appDir)), failures);
 
   // Vite: the build must emit HarfBuzz's WASM, and the app must render a slide.
   run('npx', ['vite', 'build', '--logLevel', 'warn'], appDir);
@@ -140,6 +168,15 @@ try {
 } finally {
   if (keep) console.log(`Kept ${tempRoot}`);
   else rmSync(tempRoot, { recursive: true, force: true });
+}
+
+function checkNodePdf(report, out) {
+  if (report.pages < 1) out.push('node pdf: the export has no pages');
+  if (report.embeddedFonts < 1) out.push('node pdf: the PDF embeds no font, so it has no text');
+  if (report.substituteFaces < 1) out.push('node pdf: no packaged substitute font loaded');
+  for (const failure of report.substituteFailures)
+    out.push(`node pdf: a substitute font failed to load: ${failure}`);
+  for (const message of report.fontDiagnostics) out.push(`node pdf: ${message}`);
 }
 
 async function checkRender(out) {
@@ -194,4 +231,6 @@ if (failures.length > 0) {
   console.error(failures.join('\n'));
   process.exit(1);
 }
-console.log('Consumer install: the Vite app builds and renders, and the Bun bundle builds.');
+console.log(
+  'Consumer install: the Node PDF export embeds its fonts, the Vite app builds and renders, and the Bun bundle builds.'
+);

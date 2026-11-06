@@ -107,9 +107,11 @@ Each diagnostic has a fixed `code`. Handle an unknown code by its `severity`. Th
 | `effect.soft-edge` | `approximation` | Soft edges are drawn hard. |  |
 | `effect.reflection` | `unsupported` | Reflections are not drawn. |  |
 | `effect.not-rendered` | `unsupported` | An effect the engine does not render (`a:presetShdw`, `a:blur`, and others). |  |
-| `text.decoration`, `text.outline` | `unsupported` | Underline, strikethrough, and text outlines are not drawn. |  |
+| `text.outline` | `unsupported` | Text outlines are not drawn. |  |
+| `text.underline-style` | `approximation` | A dotted, dashed, wavy, heavy, or word-only underline is drawn as a single line, as in the editor. |  |
 | `text.synthetic-style`, `text.upright`, `text.missing-glyph` | `approximation` | Synthetic bold and italic, upright vertical characters, and characters the face lacks. | `missing-glyph` |
-| `font.missing`, `font.not-embedded` | `unsupported` | A face has no bytes, or may not be embedded; its text is not drawn. | `font-embedding` |
+| `font.missing`, `font.not-embedded` | `unsupported` | A face has no bytes, or may not be embedded; its text is not drawn. The message names the font. | `font-embedding` |
+| `font.substitute-failed` | `approximation` | A packaged substitute face did not load, so its text measures and draws with another face. The message names the family and the file; `fontResolution.substituteFailures` lists every failure. |  |
 | `frame.chart`, `frame.diagram`, `frame.ole`, `frame.unknown` | `unsupported` | A chart, diagram, OLE object with no PNG, JPEG, GIF, or BMP picture, or other graphic frame is not drawn. Tables and OLE pictures draw. | `drawing` |
 | `frame.table` | `unsupported` | A table frame with no grid (no `a:tbl`, or no rows or columns) is not drawn. |  |
 | `geometry.unknown-preset` | `approximation` | An unknown preset geometry is drawn as a rectangle. |  |
