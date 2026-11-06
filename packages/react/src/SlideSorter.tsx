@@ -17,8 +17,10 @@ import {
   slideMenuPoint,
   slideSorterMounted,
   sorterKeyDown,
+  trackNotesInset,
   translateKeyOrText,
   warnSlideSorterUnmounted,
+  type NotesInsetTracker,
   type SlideSummary,
 } from '@pptx-editor.dev/core/editor';
 import { useEditorDialog } from './popups.tsx';
@@ -287,6 +289,21 @@ export function DefaultWorkspace({
     if (active && active !== active.ownerDocument.body && active.isConnected) return;
     focusCurrentSlideOrCanvas(box.current, editor);
   }, [view, editor]);
+  // The status area and the font notice float above the notes card, at every notes height.
+  const inset = useRef<NotesInsetTracker | null>(null);
+  useEffect(() => {
+    if (!box.current) return;
+    const tracker = trackNotesInset(box.current);
+    inset.current = tracker;
+    return () => {
+      tracker.dispose();
+      inset.current = null;
+    };
+  }, []);
+  // A view change or another `normal` part can add or remove the notes card.
+  useEffect(() => {
+    inset.current?.refresh();
+  });
   return (
     <div ref={box} className="pptx-default__views">
       {view === 'slideSorter' ? (

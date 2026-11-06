@@ -3124,6 +3124,9 @@ string,
 ])[];
 
 // @internal
+export const NOTES_INSET_PROPERTY = "--pptx-notes-inset";
+
+// @internal
 export const NOTES_SLOTS: Partial<Record<ChromeSlotId, NotesFormat>>;
 
 // @internal
@@ -3167,6 +3170,12 @@ export function notesFormatShortcut(e: ModifierKeys): NotesFormat | null;
 
 // @internal
 export function notesHistoryShortcut(e: ModifierKeys): 'undo' | 'redo' | null;
+
+// @internal
+export interface NotesInsetTracker {
+    dispose(): void;
+    refresh(): void;
+}
 
 // @internal
 export interface NotesKeyContext {
@@ -5464,6 +5473,9 @@ export const TOOLTIP_SKIP_DELAY_MS = 300;
 
 // @internal
 export function tooltipAttributes(label: string, disabled?: boolean, reason?: string | null): ChromeTooltipAttributes;
+
+// @internal
+export function trackNotesInset(box: HTMLElement): NotesInsetTracker;
 
 // @public
 export interface TransformItem {

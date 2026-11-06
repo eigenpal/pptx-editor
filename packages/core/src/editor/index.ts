@@ -239,6 +239,7 @@ export {
   renderNotes,
   selectNotes,
 } from './notes-dom.ts';
+export { NOTES_INSET_PROPERTY, trackNotesInset, type NotesInsetTracker } from './notes-inset.ts';
 export {
   NOTES_FORMAT_BUTTONS,
   NO_NOTES_FORMATS,
