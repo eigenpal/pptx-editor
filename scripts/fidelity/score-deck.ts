@@ -1,49 +1,29 @@
-// Score one deck in the harness page: render every slide with the editor's own pipeline, compare
-// it with the deck's reference PDF (pixels, line breaks, baselines), and check save → reopen →
-// re-render consistency. The reference PDF leaves hidden slides out, so PDF pages map to the
-// visible slides in order. A missing or stale reference is a gap, never a pass. `run.ts` drives
-// it for the fixture gate, the corpus report, and corpus mode.
+// Score one deck: print it to PDF with the editor's own paint, and compare our PDF with the
+// reference PDF page by page (pixels, line breaks, baselines). pdf.js draws and reads both PDFs
+// (`pdf.ts`). Then save, reopen, and paint again: every slide must paint the same markup. The
+// reference PDF leaves hidden slides out, and so does our PDF. A missing or stale reference is a
+// gap, never a pass. `run.ts` drives it.
 
 import type { Page } from '@playwright/test';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { THRESHOLDS } from './thresholds.ts';
 import {
-  captureSlide,
   openDeck,
+  printDeck,
+  rasterPdf,
   renderSlide,
-  slideMarkup,
   reopenSaved,
   ResetFailed,
   type HarnessControl,
+  type HarnessRender,
 } from './harness-page.ts';
-import {
-  comparePixels,
-  compareLines,
-  missingFonts,
-  sizeMismatchCause,
-  sizeMismatchDetail,
-  slidePasses,
-} from './compare.ts';
+import { comparePixels, compareLines, slidePasses } from './compare.ts';
 import { redactPaths } from './corpus-list.ts';
-import {
-  expectedRasterSizePx,
-  glyphOrigins,
-  jpegPages,
-  pdfLines,
-  pdfPageFonts,
-  POPPLER,
-  rasterizePages,
-  rasterLimitMs,
-  renderSizePx,
-  timedOut,
-  withBaselines,
-  type PdfLine,
-  type ReferencePage,
-} from './references.ts';
-import { deckFacts, pdfFacts, referenceProblems, slidePages } from './reference-identity.ts';
-import { measuredLineCauses, probableCause, type DeckResult, type SlideResult } from './report.ts';
+import { localFonts, type FontSet } from './local-fonts.ts';
+import { openPdf, openPdfFile, rasterSizePx, type Pdf } from './pdf.ts';
+import { deckFacts, referenceProblems, slidePages } from './reference-identity.ts';
+import { probableCause, type DeckResult, type SlideResult } from './report.ts';
 
 /** One deck to score, with the PDF to compare it with, or the reason it has none. */
 export interface DeckInput {
@@ -53,23 +33,26 @@ export interface DeckInput {
   readonly pdf?: string;
   /** Why the deck has no usable reference (missing, or the stale reasons). */
   readonly gap?: { readonly status: 'no-reference' | 'stale'; readonly reasons: readonly string[] };
-  /** The time limit to rasterize the PDF (default: `rasterLimitMs` of its page count). */
-  readonly rasterLimitMs?: number;
-  /** A folder that keeps the PDF's rasters between runs (`rasterizePages`). */
-  readonly rasterCache?: string;
+  /**
+   * The fonts the page gets besides the engine's own: the repository's (`fixtures`), or this
+   * machine's reference fonts that the deck names (`corpus`, the default).
+   */
+  readonly fontSet?: FontSet;
 }
 
 /** A deck that takes longer than this is stopped and reported as an error. */
 export const DECK_TIMEOUT_MS = 10 * 60_000;
 
 /**
- * Render and score one deck. With `imagesDir`, the renders, the PDF rasters, and the diff
- * overlays are written there; without it, nothing stays on disk. Throws when the page fails.
+ * Print and score one deck. With `imagesDir`, both PDFs and each slide's two pages and diff are
+ * written there; without it, nothing stays on disk. Throws when the page fails.
  */
 export async function scoreDeck(
   page: Page,
   input: DeckInput,
-  imagesDir?: string
+  imagesDir?: string,
+  /** The page that draws both PDFs (`HarnessControl.rasterPage`); `page` when absent. */
+  rasterPage?: () => Promise<Page>
 ): Promise<DeckResult> {
   const started = Date.now();
   let facts;
@@ -78,7 +61,11 @@ export async function scoreDeck(
   } catch (e) {
     return { name: input.name, error: (e as Error).message, slides: [] };
   }
-  const opened = await openDeck(page, input.file);
+  const opened = await openDeck(
+    page,
+    input.file,
+    input.fontSet === 'fixtures' ? localFonts(undefined, 'fixtures') : undefined
+  );
   if (opened.error)
     return { name: input.name, error: `the deck does not open: ${opened.error}`, slides: [] };
   if (opened.slides !== facts.slides)
@@ -88,203 +75,124 @@ export async function scoreDeck(
       slides: [],
     };
 
+  // Paint every slide, print the visible ones, then save, reopen, and paint again.
+  const pages = slidePages(facts);
+  const visible = pages.flatMap((p, i) => (p === undefined ? [] : [i]));
+  const renders: HarnessRender[] = [];
+  for (let i = 0; i < opened.slides; i += 1) renders.push(await renderSlide(page, i));
+  const oursBytes = visible.length ? await printDeck(page, visible) : undefined;
+  const reopened = await reopenSaved(page);
+  const consistent: boolean[] = [];
+  for (let i = 0; i < opened.slides; i += 1)
+    consistent.push(
+      !reopened.error &&
+        reopened.slides === opened.slides &&
+        (await renderSlide(page, i)).markup === renders[i].markup
+    );
+
   let gap = input.gap;
   if (!gap && !input.pdf) gap = { status: 'no-reference', reasons: ['no reference PDF'] };
-  const work = imagesDir ?? mkdtempSync(join(tmpdir(), 'pptx-fidelity-'));
-  const slides: SlideResult[] = [];
-  let referenceCached: boolean | undefined;
+  let reference: Pdf | undefined;
+  let ours: Pdf | undefined;
+  const result: DeckResult = { name: input.name, slides: [] };
   try {
-    mkdirSync(work, { recursive: true });
-    let referencePages: ReferencePage[] = [];
-    let referenceLines: PdfLine[][] = [];
-    let jpeg = new Set<number>();
-    let pdfPages: readonly (readonly [number, number])[] = [];
     if (!gap && input.pdf) {
-      // Fixed reasons, never a tool's message: it names the PDF's path.
-      let step = 'the PDF does not open (pdfinfo failed)';
-      let limitMs: number = POPPLER.timeout;
       try {
-        const info = pdfFacts(input.pdf);
-        pdfPages = info.pages;
-        const issues = referenceProblems(facts, info);
+        reference = await openPdfFile(input.pdf);
+        const issues = referenceProblems(facts, reference);
         if (issues.length) gap = { status: 'stale', reasons: issues };
-        else {
-          step = 'the PDF does not rasterize (pdftoppm failed)';
-          limitMs = input.rasterLimitMs ?? rasterLimitMs(info.pages.length);
-          referencePages = rasterizePages(
-            input.pdf,
-            join(work, 'reference'),
-            facts,
-            THRESHOLDS.renderWidthPx,
-            limitMs,
-            THRESHOLDS.rasterScale,
-            input.rasterCache
-          );
-          referenceCached = referencePages.length > 0 && referencePages.every((p) => p.cached);
-          limitMs = POPPLER.timeout;
-          step = 'the PDF text does not extract (pdftotext failed)';
-          // Baselines are glyph origins from the content stream. When pdf.js cannot read the
-          // PDF, they fall back to estimates from the line boxes, and the report counts them.
-          const origins = await glyphOrigins(input.pdf).catch(() => {
-            console.warn(`${input.name}: pdf.js cannot read the PDF; baselines are estimates.`);
-            return [];
-          });
-          referenceLines = withBaselines(pdfLines(input.pdf, work), origins);
-          step = 'the PDF images do not list (pdfimages failed)';
-          jpeg = jpegPages(input.pdf);
-        }
-      } catch (e) {
-        // A time-out says nothing about the reference: the deck is not scored, and is no gap.
-        if (timedOut(e))
-          throw new Error(
-            `Poppler did not finish within ${limitMs / 1000} s, so the deck is not scored. The machine may be busy: run the deck again`
-          );
-        gap = { status: 'stale', reasons: [step] };
+      } catch {
+        // A fixed reason, never the tool's message: it can name the PDF's path.
+        gap = { status: 'stale', reasons: ['pdf.js cannot read the PDF'] };
       }
     }
-    const pages = slidePages(facts);
-    const firstRenders: Buffer[] = [];
-    const firstMarkup: string[] = [];
+    if (!gap && oursBytes) {
+      ours = await openPdf(oursBytes);
+      if (ours.pages.length !== visible.length)
+        throw new Error(`our PDF has ${ours.pages.length} pages for ${visible.length} slides`);
+    }
+    if (imagesDir) {
+      mkdirSync(imagesDir, { recursive: true });
+      if (oursBytes) writeFileSync((result.oursPdf = join(imagesDir, 'ours.pdf')), oursBytes);
+      if (input.pdf && reference)
+        copyFileSync(input.pdf, (result.referencePdf = join(imagesDir, 'reference.pdf')));
+    }
+    const size = rasterSizePx(facts, THRESHOLDS.renderWidthPx);
+    const scale = THRESHOLDS.renderWidthPx / facts.widthPt;
+    // Both PDFs are drawn by the same pdf.js in the harness page.
+    const drawer = rasterPage ? await rasterPage() : page;
+    const [oursPages, referencePages] =
+      !gap && ours && reference && oursBytes && input.pdf
+        ? [
+            await rasterPdf(drawer, oursBytes, visible.length, size, scale),
+            await rasterPdf(
+              drawer,
+              new Uint8Array(readFileSync(input.pdf)),
+              visible.length,
+              size,
+              scale
+            ),
+          ]
+        : [[], []];
     for (let i = 0; i < opened.slides; i += 1) {
-      const r = await renderSlide(page, i, THRESHOLDS.renderWidthPx);
-      firstRenders.push(r.devicePng);
-      firstMarkup.push(r.markup);
-      const render = imagesDir ? join(imagesDir, `slide${i + 1}.png`) : undefined;
-      if (render) writeFileSync(render, r.png);
       const pageIndex = pages[i];
-      const result: SlideResult = {
+      const r = renders[i];
+      const s: SlideResult = {
         index: i + 1,
         hidden: pageIndex === undefined,
         page: pageIndex === undefined ? undefined : pageIndex + 1,
-        render,
-        diagnostics: r.diagnostics,
         status: gap?.status ?? 'no-reference',
         cause: gap ? gap.reasons.join('; ') : '',
+        selfConsistent: consistent[i],
+        diagnostics: r.diagnostics,
+        fontsSubstituted: r.diagnostics
+          .filter((d) => d.startsWith('font substituted: '))
+          .map((d) => d.slice('font substituted: '.length)),
       };
+      result.slides.push(s);
       if (pageIndex === undefined) {
-        result.status = 'no-reference';
-        result.cause = 'hidden slide: the reference PDF leaves it out';
-      } else if (!gap && !referencePages[pageIndex]) {
-        result.cause = `the PDF raster has no page ${pageIndex + 1}`;
-      } else if (!gap) {
-        const reference = referencePages[pageIndex];
-        const px = comparePixels(r.image, reference.image, {
-          diff: Boolean(imagesDir),
-          // Anti-aliasing is judged on the unfiltered images (`supersample.ts`).
-          device:
-            THRESHOLDS.rasterScale > 1 && THRESHOLDS.antialiasing === 'device'
-              ? {
-                  render: r.device,
-                  reference: reference.device(),
-                  scale: THRESHOLDS.rasterScale,
-                }
-              : undefined,
-          expected: {
-            render: renderSizePx(facts, THRESHOLDS.renderWidthPx),
-            reference: expectedRasterSizePx(facts, pdfPages[pageIndex], THRESHOLDS.renderWidthPx),
-          },
-        });
-        const lines = compareLines(r.lines, referenceLines[pageIndex] ?? []);
-        if (imagesDir && px.diff) {
-          result.diff = join(imagesDir, `slide${i + 1}-diff.png`);
-          writeFileSync(result.diff, px.diff);
-        }
-        result.referenceImage = imagesDir ? referencePages[pageIndex].path : undefined;
-        result.referenceJpeg = jpeg.has(pageIndex + 1);
-        // A size mismatch compares no pixels: no score, never a 100 % mismatch.
-        result.pixelMismatch = px.sizeMismatch ? undefined : px.mismatch;
-        // No checked line, no line score: `undefined`, never a perfect 1 or 0 pt.
-        result.lineMatch = lines.total ? lines.matched / lines.total : undefined;
-        result.linesMatched = lines.matched;
-        result.linesTotal = lines.total;
-        result.pdfLinesUnmatched = lines.pdfUnmatched;
-        result.baselineDelta = lines.matched ? lines.worstBaseline : undefined;
-        result.estimatedBaselines = lines.estimated;
-        result.skippedLines = lines.skipped;
-        result.unmatchedLines = lines.unmatched.length;
-        result.unmatchedTexts = lines.unmatched;
-        result.pdfUnmatchedTexts = lines.pdfUnmatchedTexts;
-        result.lineSplitOnly = lines.splitOnly;
-        result.lineMarkersOnly = lines.markersOnly;
-        result.lineSameText = lines.sameText;
-        result.sizeMismatch = px.sizeMismatch;
-        result.renderSizePx = [px.sizes.render.width, px.sizes.render.height];
-        result.referenceSizePx = [px.sizes.reference.width, px.sizes.reference.height];
-        const want = px.sizes.expected;
-        if (want) {
-          result.expectedRenderSizePx = [want.render.width, want.render.height];
-          result.expectedReferenceSizePx = [want.reference.width, want.reference.height];
-        }
-        if (px.sizeMismatch) result.sizeDetail = sizeMismatchDetail(px.sizes);
-        if (px.diffBox) {
-          // Pixels to points: the render is `renderWidthPx` wide for the slide's width.
-          const pt = facts.widthPt / THRESHOLDS.renderWidthPx;
-          result.diffBoxPt = px.diffBox.map((v) => Math.round(v * pt * 10) / 10) as [
-            number,
-            number,
-            number,
-            number,
-          ];
-        }
-        // Fonts: what the reference PDF drew with (the PDF page) against what the slide asks for,
-        // and what the editor substituted. Either side's substitution is reported apart from
-        // layout.
-        let pdfFonts: string[] = [];
-        try {
-          pdfFonts = pdfPageFonts(input.pdf!, pageIndex + 1);
-        } catch {
-          // pdffonts failed: the fonts are unknown, not substituted.
-        }
-        result.fontsReference = pdfFonts;
-        result.fontsSubstituted = {
-          reference: pdfFonts.length ? missingFonts(r.fonts, pdfFonts) : [],
-          editor: r.diagnostics
-            .filter((d) => d.startsWith('font substituted: '))
-            .map((d) => d.slice('font substituted: '.length)),
-        };
-        const pass = slidePasses(px, lines);
-        result.status = pass ? 'pass' : 'fail';
-        result.cause = pass
-          ? ''
-          : px.sizeMismatch
-            ? // A size failure still measures lines: add only their measured causes, never the
-              // diagnostics, which cannot explain a size.
-              [sizeMismatchCause(px.sizes), ...measuredLineCauses(result)].join('; ')
-            : probableCause(result, r.diagnostics);
+        s.status = 'no-reference';
+        s.cause = 'hidden slide: the reference PDF leaves it out';
+        continue;
       }
-      slides.push(result);
-    }
-    // Save → reopen → re-render: must be pixel-identical to the first render, at the device
-    // scale, before the filter can hide a change (`supersample.ts`). The same markup paints the
-    // same pixels, so only a slide whose markup changed is captured and compared.
-    const reopened = await reopenSaved(page);
-    if (reopened.error || reopened.slides !== opened.slides) {
-      for (const s of slides) s.selfConsistent = false;
-    } else {
-      for (let i = 0; i < opened.slides; i += 1) {
-        const markup = await slideMarkup(page, i, THRESHOLDS.renderWidthPx);
-        if (typeof markup === 'string' && markup === firstMarkup[i]) {
-          slides[i].selfConsistent = true;
-          continue;
-        }
-        const again = await captureSlide(page);
-        // The same PNG bytes are the same pixels: no decode is needed.
-        slides[i].selfConsistent =
-          firstRenders[i].equals(again) ||
-          comparePixels(firstRenders[i], again).mismatch <= THRESHOLDS.maxSelfConsistencyMismatch;
+      if (gap || !ours || !reference) continue;
+      const [a, b] = [oursPages[pageIndex], referencePages[pageIndex]];
+      const px = comparePixels(a, b, Boolean(imagesDir));
+      const lines = compareLines(await ours.lines(pageIndex), await reference.lines(pageIndex));
+      if (imagesDir) {
+        writeFileSync((s.ours = join(imagesDir, `slide${i + 1}-ours.png`)), a.png);
+        writeFileSync((s.reference = join(imagesDir, `slide${i + 1}-reference.png`)), b.png);
+        if (px.diff) writeFileSync((s.diff = join(imagesDir, `slide${i + 1}-diff.png`)), px.diff);
       }
+      s.pixelMismatch = px.mismatch;
+      if (px.diffBox) {
+        const pt = 1 / scale;
+        s.diffBoxPt = px.diffBox.map((v) => Math.round(v * pt * 10) / 10) as [
+          number,
+          number,
+          number,
+          number,
+        ];
+      }
+      // No reference line, no line score: `undefined`, never a perfect 1 or 0 pt.
+      s.lineMatch = lines.total ? lines.matched / lines.total : undefined;
+      s.linesMatched = lines.matched;
+      s.linesTotal = lines.total;
+      s.baselineDelta = lines.matched ? lines.worstBaseline : undefined;
+      s.missingLines = lines.missing;
+      s.extraLines = lines.extra;
+      const pass = slidePasses(px, lines);
+      s.status = pass ? 'pass' : 'fail';
+      s.cause = pass ? '' : probableCause(s, r.diagnostics);
     }
   } finally {
-    if (!imagesDir) rmSync(work, { recursive: true, force: true });
+    await ours?.close();
+    await reference?.close();
   }
-  return {
-    name: input.name,
-    slides,
-    reference: gap ? (gap.status === 'stale' ? 'stale' : 'none') : 'pdf',
-    referenceIssues: gap?.reasons ?? [],
-    milliseconds: Date.now() - started,
-    ...(referenceCached === undefined ? {} : { referenceCached }),
-  };
+  result.reference = gap ? (gap.status === 'stale' ? 'stale' : 'none') : 'pdf';
+  result.referenceIssues = gap?.reasons ?? [];
+  result.milliseconds = Date.now() - started;
+  return result;
 }
 
 /** The result of `scoreSafely`. */
@@ -311,7 +219,7 @@ export const BROWSER_HUNG = 'the browser stopped answering while rendering the d
  */
 export async function scoreSafely(
   page: Page,
-  control: Pick<HarnessControl, 'reset'>,
+  control: Pick<HarnessControl, 'reset'> & Partial<Pick<HarnessControl, 'rasterPage'>>,
   input: DeckInput,
   options: {
     readonly imagesDir?: string;
@@ -329,7 +237,10 @@ export async function scoreSafely(
     );
   });
   try {
-    const result = await Promise.race([scoreDeck(page, input, options.imagesDir), timeout]);
+    const result = await Promise.race([
+      scoreDeck(page, input, options.imagesDir, control.rasterPage),
+      timeout,
+    ]);
     return {
       result:
         options.redact && result.error ? { ...result, error: redactPaths(result.error) } : result,

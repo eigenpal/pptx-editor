@@ -9,9 +9,10 @@ import { buildPptx } from '../fixtures/builder.ts';
 import {
   fileDigest,
   openDeck,
+  printDeck,
+  rasterPdf,
   renderSlide,
   reopenSaved,
-  slideMarkup,
   startHarnessServer,
   withHarnessPage,
 } from './harness-page.ts';
@@ -226,7 +227,7 @@ describe.skipIf(!hasChromium)('openDeck', () => {
         });
         for (const fontMissing of [false, true]) {
           await openDeck(page, deck, []);
-          await renderSlide(page, 0, 960);
+          await renderSlide(page, 0);
           const attempt = fontMissing
             ? openDeck(page, deck, [
                 { family: 'Missing', bold: false, italic: false, file: missing },
@@ -235,7 +236,7 @@ describe.skipIf(!hasChromium)('openDeck', () => {
           await expect(attempt).rejects.toThrow(
             `${fontMissing ? 'the font Missing' : 'the deck'} did not arrive from the harness server (HTTP 404)`
           );
-          await expect(renderSlide(page, 0, 960)).rejects.toThrow('no document');
+          await expect(renderSlide(page, 0)).rejects.toThrow('no document');
           await expect(reopenSaved(page)).rejects.toThrow('no document');
         }
         expect(responses).toEqual([404, 404]);
@@ -268,7 +269,7 @@ describe.skipIf(!hasChromium)('openDeck', () => {
         const a = await openDeck(page, deck, [...fonts, large]);
         // The next deck gets only its own fonts.
         const b = await openDeck(page, deck, []);
-        const r = await renderSlide(page, 0, 960);
+        const r = await renderSlide(page, 0);
         // After `openDeck`, its paths, and any other path, give nothing.
         const files = fetched.length;
         const urls = [...fetched, '/__harness/file/not-a-token'];
@@ -287,7 +288,7 @@ describe.skipIf(!hasChromium)('openDeck', () => {
         received: { deck: fileDigest(deck), fonts: [...fonts, large].map(digest) },
       });
       expect(second.received.fonts).toEqual([]);
-      expect(rendered.png.length).toBeGreaterThan(0);
+      expect(rendered.markup.length).toBeGreaterThan(0);
       // The deck and three fonts, then the deck alone.
       expect(after.files).toBe(5);
       expect(new Set(after.statuses)).toEqual(new Set([404]));
@@ -333,7 +334,7 @@ describe.skipIf(!hasChromium)('openDeck', () => {
   }, 60_000);
 });
 
-describe.skipIf(!hasChromium)('slideMarkup', () => {
+describe.skipIf(!hasChromium)('renderSlide', () => {
   test('a saved and reopened deck paints the same markup, with no session-bound names', async () => {
     // Image blob URLs and face ids are new in each session.
     await withHarnessPage(async (page) => {
@@ -347,12 +348,44 @@ describe.skipIf(!hasChromium)('slideMarkup', () => {
           []
         );
         const first: string[] = [];
-        for (let i = 0; i < slides; i += 1) first.push(await slideMarkup(page, i, 960));
+        for (let i = 0; i < slides; i += 1) first.push((await renderSlide(page, i)).markup);
         expect(first.join('')).toContain(named);
         expect(first.join('')).not.toMatch(/blob:|pptx-f\d/);
         expect((await reopenSaved(page)).slides).toBe(slides);
-        for (let i = 0; i < slides; i += 1) expect(await slideMarkup(page, i, 960)).toBe(first[i]);
+        for (let i = 0; i < slides; i += 1)
+          expect((await renderSlide(page, i)).markup).toBe(first[i]);
       }
+    });
+  }, 60_000);
+});
+
+describe.skipIf(!hasChromium)('printDeck and rasterPdf', () => {
+  test('our PDF has one page for each printed slide, and draws as the reference does', async () => {
+    const fixture = join(import.meta.dir, '../../fixtures/colors');
+    await withHarnessPage(async (page, control) => {
+      await openDeck(page, `${fixture}.pptx`, []);
+      const ours = await printDeck(page, [0]);
+      expect(ours.subarray(0, 5).toString()).toBe('%PDF-');
+      // The print pages are gone after the print.
+      expect(await page.evaluate(() => document.getElementById('print'))).toBeNull();
+      const size = { width: 480, height: 270 };
+      const drawer = await control.rasterPage();
+      const [a] = await rasterPdf(drawer, new Uint8Array(ours), 1, size, 0.5);
+      const [b] = await rasterPdf(
+        drawer,
+        new Uint8Array(readFileSync(`${fixture}.pdf`)),
+        1,
+        size,
+        0.5
+      );
+      expect(a.data.length).toBe(480 * 270 * 4);
+      expect(a.png.subarray(1, 4)).toEqual(new Uint8Array([0x50, 0x4e, 0x47]));
+      // The same raster page serves the next deck.
+      expect(await control.rasterPage()).toBe(drawer);
+      let differ = 0;
+      for (let i = 0; i < a.data.length; i += 4)
+        if (Math.abs(a.data[i] - b.data[i]) > 64) differ += 1;
+      expect(differ / (480 * 270)).toBeLessThan(0.01);
     });
   }, 60_000);
 });

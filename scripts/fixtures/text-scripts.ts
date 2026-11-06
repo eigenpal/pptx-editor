@@ -37,17 +37,18 @@ function box(id: number, x: number, y: number, cx: number, cy: number, text: str
 
 // --- rtl-text ----------------------------------------------------------------
 
-const ARIAL = '<a:latin typeface="Arial"/><a:cs typeface="Arial"/>';
-const TAHOMA = '<a:latin typeface="Tahoma"/><a:cs typeface="Tahoma"/>';
-const DAVID = '<a:latin typeface="Arial"/><a:cs typeface="David"/>';
-const ar = (text: string, fonts = ARIAL, attrs?: string): string => r(text, 'ar-SA', fonts, attrs);
-const he = (text: string, fonts = ARIAL, attrs?: string): string => r(text, 'he-IL', fonts, attrs);
-const en = (text: string, fonts = ARIAL, attrs?: string): string => r(text, 'en-US', fonts, attrs);
+const LATIN = '<a:latin typeface="Liberation Sans"/><a:cs typeface="Liberation Sans"/>';
+/** Arabic: Liberation Sans has no Arabic glyphs, so the Arabic face is Noto Sans Arabic. */
+const ARABIC = '<a:latin typeface="Liberation Sans"/><a:cs typeface="Noto Sans Arabic"/>';
+const HEBREW_SERIF = '<a:latin typeface="Liberation Serif"/><a:cs typeface="Liberation Serif"/>';
+const ar = (text: string, fonts = ARABIC, attrs?: string): string => r(text, 'ar-SA', fonts, attrs);
+const he = (text: string, fonts = LATIN, attrs?: string): string => r(text, 'he-IL', fonts, attrs);
+const en = (text: string, fonts = LATIN, attrs?: string): string => r(text, 'en-US', fonts, attrs);
 const RTL_R = '<a:pPr algn="r" rtl="1"/>';
 
 const rtlText: FixtureSlide[] = [
   {
-    // Right-to-left paragraphs in Arabic and Hebrew, right aligned, in three faces.
+    // Right-to-left paragraphs in Arabic and Hebrew, right aligned; the last Hebrew paragraph in a serif face.
     shapes:
       box(
         2,
@@ -57,7 +58,7 @@ const rtlText: FixtureSlide[] = [
         3,
         p(ar('هذا نص عربي يبدأ من اليمين إلى اليسار.'), RTL_R) +
           p(ar('تتدفق الفقرة من اليمين، وتلتف الأسطر داخل المربع حسب عرضه دون أن تتغير الكلمات.'), RTL_R) +
-          p(ar('خط آخر للنص نفسه في فقرة ثالثة.', TAHOMA), RTL_R)
+          p(ar('خط آخر للنص نفسه في فقرة ثالثة.', ARABIC), RTL_R)
       ) +
       box(
         3,
@@ -67,7 +68,7 @@ const rtlText: FixtureSlide[] = [
         3,
         p(he('זהו טקסט בעברית שנכתב מימין לשמאל.'), RTL_R) +
           p(he('השורות נשברות בתוך התיבה לפי הרוחב שלה, והמילים נשארות שלמות.'), RTL_R) +
-          p(he('גופן אחר לאותו טקסט בפסקה שלישית.', DAVID), RTL_R)
+          p(he('גופן אחר לאותו טקסט בפסקה שלישית.', HEBREW_SERIF), RTL_R)
       ) +
       box(
         4,
@@ -75,8 +76,8 @@ const rtlText: FixtureSlide[] = [
         3.9,
         12.3,
         3,
-        p(ar('عنوان كبير بخط عريض', ARIAL, 'sz="3600" b="1"'), RTL_R) +
-          p(he('כותרת משנה בגופן נטוי', ARIAL, 'sz="2800" i="1"'), RTL_R) +
+        p(ar('عنوان كبير بخط عريض', ARABIC, 'sz="3600" b="1"'), RTL_R) +
+          p(he('כותרת משנה בגופן נטוי', LATIN, 'sz="2800" i="1"'), RTL_R) +
           p(ar('فقرة من اليمين إلى اليسار بمحاذاة إلى اليسار.'), '<a:pPr algn="l" rtl="1"/>') +
           p(en('A left-to-right paragraph in the same box, aligned left.'), '<a:pPr algn="l" rtl="0"/>')
       ),
@@ -127,10 +128,10 @@ const rtlText: FixtureSlide[] = [
         3.4,
         ['البند الأول من القائمة', 'البند الثاني أطول قليلا ويلتف إلى سطر جديد', 'البند الثالث']
           .map((t) =>
-            p(ar(t), '<a:pPr marL="342900" indent="-342900" algn="r" rtl="1"><a:buFont typeface="Arial"/><a:buChar char="•"/></a:pPr>')
+            p(ar(t), '<a:pPr marL="342900" indent="-342900" algn="r" rtl="1"><a:buFont typeface="Liberation Sans"/><a:buChar char="•"/></a:pPr>')
           )
           .join('') +
-          p(ar('بند فرعي في المستوى الثاني'), '<a:pPr marL="800100" lvl="1" indent="-342900" algn="r" rtl="1"><a:buFont typeface="Arial"/><a:buChar char="–"/></a:pPr>')
+          p(ar('بند فرعي في المستوى الثاني'), '<a:pPr marL="800100" lvl="1" indent="-342900" algn="r" rtl="1"><a:buFont typeface="Liberation Sans"/><a:buChar char="–"/></a:pPr>')
       ) +
       box(
         3,
@@ -164,7 +165,7 @@ const rtlText: FixtureSlide[] = [
         2.8,
         ['פריט עם תבליט', 'פריט נוסף']
           .map((t) =>
-            p(he(t), '<a:pPr marL="342900" indent="-342900" algn="r" rtl="1"><a:buFont typeface="Arial"/><a:buChar char="•"/></a:pPr>')
+            p(he(t), '<a:pPr marL="342900" indent="-342900" algn="r" rtl="1"><a:buFont typeface="Liberation Sans"/><a:buChar char="•"/></a:pPr>')
           )
           .join('') +
           p(ar('أ. بند مرقم بالحروف'), '<a:pPr marL="457200" indent="-457200" algn="r" rtl="1"><a:buFont typeface="+mj-lt"/><a:buAutoNum type="arabic1Minus"/></a:pPr>') +
@@ -209,7 +210,9 @@ const rtlText: FixtureSlide[] = [
 
 // --- east-asian-line-breaking ------------------------------------------------
 
-const YU_GOTHIC = '<a:latin typeface="Yu Gothic"/><a:ea typeface="Yu Gothic"/>';
+const YU_GOTHIC = '<a:latin typeface="Noto Sans CJK JP"/><a:ea typeface="Noto Sans CJK JP"/>';
+/** The slide that names fonts on purpose keeps Yu Gothic: it checks which face each name gets. */
+const NAMED_YU_GOTHIC = '<a:latin typeface="Yu Gothic"/><a:ea typeface="Yu Gothic"/>';
 const ja = (text: string, fonts = YU_GOTHIC, attrs?: string): string => r(text, 'ja-JP', fonts, attrs);
 const brk = (ea: 0 | 1, latin: 0 | 1, hang: 0 | 1): string =>
   `<a:pPr eaLnBrk="${ea}" latinLnBrk="${latin}" hangingPunct="${hang}"/>`;
@@ -248,7 +251,7 @@ const eastAsian: FixtureSlide[] = [
         [0, 'Internationalization and localization in a narrow box, with latinLnBrk off.'],
       ]
         .map(([latin, text], i) =>
-          box(6 + i, 0.4 + i * 6.3, 3.8, 2.4, 3.2, p(r(String(text), 'en-US', '<a:latin typeface="Arial"/>', 'sz="2400"'), brk(1, latin as 0 | 1, 1)))
+          box(6 + i, 0.4 + i * 6.3, 3.8, 2.4, 3.2, p(r(String(text), 'en-US', '<a:latin typeface="Liberation Sans"/>', 'sz="2400"'), brk(1, latin as 0 | 1, 1)))
         )
         .join(''),
   },
@@ -287,10 +290,10 @@ const eastAsian: FixtureSlide[] = [
               r('', 'en-US', '<a:latin typeface="Arial"/><a:sym typeface="Symbol"/>')
           ) +
           p(
-            ja('混在：', YU_GOTHIC) +
+            ja('混在：', NAMED_YU_GOTHIC) +
               r('Arial ', 'en-US', '<a:latin typeface="Arial"/>') +
               r('عربي', 'ar-SA', '<a:latin typeface="Arial"/><a:cs typeface="Tahoma"/>') +
-              ja(' 日本語', YU_GOTHIC)
+              ja(' 日本語', NAMED_YU_GOTHIC)
           )
       ),
   },
@@ -421,8 +424,8 @@ export function eastAsianTypographyDeck(): FixtureOptions {
             0.2,
             3.2,
             5.4,
-            p(r('한국어 문단을 양쪽 맞춤으로 정렬하면 단어 사이와 글자 사이의 간격이 넓어집니다.', 'ko-KR', '<a:latin typeface="Arial"/><a:ea typeface="Malgun Gothic"/>'), '<a:pPr algn="just"/>') +
-              p(r('균등 분할 정렬은 마지막 줄도 채웁니다.', 'ko-KR', '<a:latin typeface="Arial"/><a:ea typeface="Malgun Gothic"/>'), '<a:pPr algn="dist"/>')
+            p(r('한국어 문단을 양쪽 맞춤으로 정렬하면 단어 사이와 글자 사이의 간격이 넓어집니다.', 'ko-KR', '<a:latin typeface="Liberation Sans"/><a:ea typeface="Noto Sans CJK JP"/>'), '<a:pPr algn="just"/>') +
+              p(r('균등 분할 정렬은 마지막 줄도 채웁니다.', 'ko-KR', '<a:latin typeface="Liberation Sans"/><a:ea typeface="Noto Sans CJK JP"/>'), '<a:pPr algn="dist"/>')
           ),
       },
     ],

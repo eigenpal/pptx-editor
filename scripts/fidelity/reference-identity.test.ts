@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { buildPptx } from '../fixtures/builder.ts';
 import {
   deckFacts,
-  parsePdfInfo,
   readManifest,
   referenceProblems,
   referenceState,
@@ -15,6 +14,7 @@ import {
   type DeckFacts,
   type ReferenceIdentity,
 } from './reference-identity.ts';
+import { openPdfFile } from './pdf.ts';
 
 const FIXTURE = join(import.meta.dir, '../../fixtures/slide-structure.pptx');
 
@@ -141,23 +141,15 @@ describe('deck and PDF facts', () => {
     ]);
   });
 
-  test('parsePdfInfo reads every page size', () => {
-    const text = [
-      'Producer:        macOS Version 27.0.1 (Build 26A434) Quartz PDFContext',
-      'Pages:           2',
-      'Page    1 size: 960 x 540 pts',
-      'Page    1 rot:  0',
-      'Page    2 size: 960 x 540.5 pts',
-      'Page    2 rot:  0',
-    ].join('\n');
-    expect(parsePdfInfo(text).pages).toEqual([
-      [960, 540],
-      [960, 540.5],
-    ]);
-    expect(parsePdfInfo(text).producer).toBe(
-      'macOS Version 27.0.1 (Build 26A434) Quartz PDFContext'
-    );
-    expect(() => parsePdfInfo('Pages: 2\nPage 1 size: 960 x 540 pts')).toThrow();
+  test('openPdf reads every page size and the producer of a reference PDF', async () => {
+    const pdf = await openPdfFile(join(import.meta.dir, '../../fixtures/slide-structure.pdf'));
+    try {
+      expect(pdf.pages.length).toBe(4);
+      expect(pdf.pages[0]).toEqual([960, 540]);
+      expect(referenceProblems(deckFacts(new Uint8Array(readFileSync(FIXTURE))), pdf)).toEqual([]);
+    } finally {
+      await pdf.close();
+    }
   });
 
   test('referenceProblems refuses a PDF that another presentation tool made', () => {

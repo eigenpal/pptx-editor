@@ -3,7 +3,7 @@
 //
 //   bun scripts/fixtures/build.ts
 //
-// Each fixture also needs a reference PDF next to it (`bun run fidelity:missing`).
+// Each fixture also needs a reference PDF next to it (`CONTRIBUTING.md`, "Fidelity harness").
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
@@ -268,7 +268,7 @@ const fixtures: Record<string, FixtureSlide[]> = {
             para(run('Numbered one'), '<a:pPr marL="342900" indent="-342900"><a:buFont typeface="+mj-lt"/><a:buAutoNum type="arabicPeriod"/></a:pPr>') +
             para(run('Numbered two'), '<a:pPr marL="342900" indent="-342900"><a:buFont typeface="+mj-lt"/><a:buAutoNum type="arabicPeriod"/></a:pPr>') +
             para(run('Roman with color'), '<a:pPr marL="342900" indent="-342900"><a:buClr><a:srgbClr val="2E7D32"/></a:buClr><a:buAutoNum type="romanUcParenR"/></a:pPr>') +
-            para(run('Custom character, 150%'), '<a:pPr marL="342900" indent="-342900"><a:buSzPct val="150000"/><a:buFont typeface="Arial"/><a:buChar char="–"/></a:pPr>') +
+            para(run('Custom character, 150%'), '<a:pPr marL="342900" indent="-342900"><a:buSzPct val="150000"/><a:buFont typeface="Liberation Sans"/><a:buChar char="–"/></a:pPr>') +
             para(run('No bullet'), '<a:pPr marL="0" indent="0"><a:buNone/></a:pPr>'),
         }).replace('<a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm><a:prstGeom prst="rect"><a:avLst></a:avLst></a:prstGeom>', ''),
     },
@@ -293,7 +293,7 @@ const fixtures: Record<string, FixtureSlide[]> = {
         ['l', 'ctr', 'r']
           .map((algn, i) =>
             box(3 + i, 6.6 * IN, (0.4 + i * 1.1) * IN, 5 * IN, 0.9 * IN,
-              para(run(`Bullet with algn="${algn}"`, 'sz="1800"'), `<a:pPr algn="${algn}" marL="342900" indent="-342900"><a:buFont typeface="Arial"/><a:buChar char="•"/></a:pPr>`), { fill: solid('DEEBF7') }))
+              para(run(`Bullet with algn="${algn}"`, 'sz="1800"'), `<a:pPr algn="${algn}" marL="342900" indent="-342900"><a:buFont typeface="Liberation Sans"/><a:buChar char="•"/></a:pPr>`), { fill: solid('DEEBF7') }))
           .join('') +
         box(6, 6.6 * IN, 3.8 * IN, 5 * IN, 2.6 * IN,
           '<a:p><a:r><a:rPr lang="en-US" sz="2400" dirty="0"/><a:t>Trailing break</a:t></a:r><a:br><a:rPr lang="en-US" sz="2400" dirty="0"/></a:br><a:endParaRPr lang="en-US" sz="2400" dirty="0"/></a:p>',
@@ -324,14 +324,14 @@ const fixtures: Record<string, FixtureSlide[]> = {
       shapes:
         box(2, 0.4 * IN, 0.4 * IN, 6 * IN, 6.6 * IN,
           [
-            ['Filled round', '<a:buFont typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/><a:buChar char="•"/>'],
-            ['Hollow round', '<a:buFont typeface="Courier New" panose="02070309020205020404" pitchFamily="49" charset="0"/><a:buChar char="o"/>'],
+            ['Filled round', '<a:buFont typeface="Liberation Sans"/><a:buChar char="•"/>'],
+            ['Hollow round', '<a:buFont typeface="Liberation Mono"/><a:buChar char="o"/>'],
             ['Filled square', '<a:buFont typeface="Wingdings" panose="05000000000000000000" pitchFamily="2" charset="2"/><a:buChar char="§"/>'],
             ['Hollow square', '<a:buFont typeface="Wingdings" panose="05000000000000000000" pitchFamily="2" charset="2"/><a:buChar char="q"/>'],
             ['Star', '<a:buFont typeface="Wingdings" panose="05000000000000000000" pitchFamily="2" charset="2"/><a:buChar char="v"/>'],
             ['Arrow', '<a:buFont typeface="Wingdings" panose="05000000000000000000" pitchFamily="2" charset="2"/><a:buChar char="Ø"/>'],
             ['Checkmark', '<a:buFont typeface="Wingdings" panose="05000000000000000000" pitchFamily="2" charset="2"/><a:buChar char="ü"/>'],
-            ['Size 150 %, accent color', '<a:buClr><a:schemeClr val="accent2"/></a:buClr><a:buSzPct val="150000"/><a:buFont typeface="Arial" panose="020B0604020202020204" pitchFamily="34" charset="0"/><a:buChar char="•"/>'],
+            ['Size 150 %, accent color', '<a:buClr><a:schemeClr val="accent2"/></a:buClr><a:buSzPct val="150000"/><a:buFont typeface="Liberation Sans"/><a:buChar char="•"/>'],
             ['Custom en dash, text font', '<a:buChar char="–"/>'],
           ]
             .map(([text, bullet]) => para(run(text, 'sz="2000"'), `<a:pPr marL="342900" indent="-342900">${bullet}</a:pPr>`))
@@ -462,9 +462,9 @@ const fixtures: Record<string, FixtureSlide[]> = {
     {
       shapes:
         box(2, 0.3 * IN, 0.3 * IN, 3 * IN, 6.9 * IN,
-          para(run(LOREM, 'sz="1400"', '<a:latin typeface="Arial"/>'), '<a:pPr><a:lnSpc><a:spcPts val="1560"/></a:lnSpc></a:pPr>') +
-          para(run(LOREM.slice(0, 60), 'sz="1800"', '<a:latin typeface="Arial"/>'), '<a:pPr><a:lnSpc><a:spcPts val="2100"/></a:lnSpc></a:pPr>') +
-          para(run(LOREM.slice(0, 60), 'sz="1300"', '<a:latin typeface="Arial"/>'), '<a:pPr><a:lnSpc><a:spcPts val="1680"/></a:lnSpc></a:pPr>') +
+          para(run(LOREM, 'sz="1400"', '<a:latin typeface="Liberation Sans"/>'), '<a:pPr><a:lnSpc><a:spcPts val="1560"/></a:lnSpc></a:pPr>') +
+          para(run(LOREM.slice(0, 60), 'sz="1800"', '<a:latin typeface="Liberation Sans"/>'), '<a:pPr><a:lnSpc><a:spcPts val="2100"/></a:lnSpc></a:pPr>') +
+          para(run(LOREM.slice(0, 60), 'sz="1300"', '<a:latin typeface="Liberation Sans"/>'), '<a:pPr><a:lnSpc><a:spcPts val="1680"/></a:lnSpc></a:pPr>') +
           para(run(LOREM.slice(0, 60), 'sz="1600"'), '<a:pPr><a:lnSpc><a:spcPts val="1200"/></a:lnSpc></a:pPr>')) +
         box(3, 3.5 * IN, 0.3 * IN, 3 * IN, 6.9 * IN,
           ['80000', '115000', '150000', '200000']
@@ -478,7 +478,7 @@ const fixtures: Record<string, FixtureSlide[]> = {
           { bodyPr: '<a:bodyPr wrap="square" spcFirstLastPara="1"><a:noAutofit/></a:bodyPr>' }) +
         box(5, 9.9 * IN, 0.3 * IN, 3.1 * IN, 6.9 * IN,
           para(run('Mixed ', 'sz="1200"') + run('sizes', 'sz="2800"') + run(' on one line, then a second line', 'sz="1200"')) +
-          para(run(LOREM.slice(0, 50), 'sz="2400"', '<a:latin typeface="Times New Roman"/>'), '<a:pPr><a:lnSpc><a:spcPct val="120000"/></a:lnSpc></a:pPr>')),
+          para(run(LOREM.slice(0, 50), 'sz="2400"', '<a:latin typeface="Liberation Serif"/>'), '<a:pPr><a:lnSpc><a:spcPct val="120000"/></a:lnSpc></a:pPr>')),
     },
     {
       shapes:
@@ -767,7 +767,7 @@ const fixtures: Record<string, FixtureSlide[]> = {
       shapes:
         shape({ id: 2, x: 0.6 * IN, y: 0.5 * IN, cx: 1.4 * IN, cy: 6 * IN, fill: solid('FDF2E9'),
           bodyPr: '<a:bodyPr vert="eaVert" wrap="square"><a:noAutofit/></a:bodyPr>',
-          text: para(run('縦書きのテキストです。ABC 123', 'sz="2800"', '<a:ea typeface="Yu Gothic"/>')) }) +
+          text: para(run('縦書きのテキストです。ABC 123', 'sz="2800"', '<a:ea typeface="Noto Sans CJK JP"/>')) }) +
         shape({ id: 3, x: 2.4 * IN, y: 0.5 * IN, cx: 1.4 * IN, cy: 6 * IN, fill: solid('E3F2FD'),
           bodyPr: '<a:bodyPr vert="vert" wrap="square"><a:noAutofit/></a:bodyPr>',
           text: para(run('横に回転 vert', 'sz="2800"')) }) +

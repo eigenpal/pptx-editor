@@ -3,7 +3,7 @@
 // `scoreSafely`, as a sequential run does. The lanes take decks from one queue, and the results
 // come back in the order of the input, so the report does not depend on which lane was faster.
 
-import { availableParallelism } from 'node:os';
+import { cpus } from 'node:os';
 import { join } from 'node:path';
 import type { DeckResult } from './report.ts';
 import type { DeckInput } from './score-deck.ts';
@@ -30,10 +30,12 @@ export const LANE_MESSAGE = '\u0000fidelity-lane ';
  * compared markup and the raster cache kept the filtered pages. Never more lanes than
  * decks.
  */
+// Not `availableParallelism`: under Bun it reads `navigator`, which the pdf.js legacy build
+// replaces, and then it gives undefined.
 export function laneCount(decks: number, env = process.env.PPTX_FIDELITY_JOBS): number {
   const asked = env ? Number(env) : NaN;
   const lanes =
-    Number.isInteger(asked) && asked > 0 ? asked : Math.min(4, Math.max(1, availableParallelism()));
+    Number.isInteger(asked) && asked > 0 ? asked : Math.min(4, Math.max(1, cpus().length));
   return Math.max(1, Math.min(lanes, decks));
 }
 

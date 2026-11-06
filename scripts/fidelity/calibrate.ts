@@ -15,7 +15,7 @@ import { openPresentation } from '../../packages/core/src/editor/index.ts';
 import { WHOLE_POINT_BASELINES, type LayoutItem } from '../../packages/core/src/layout/index.ts';
 import { deckFontFamilies, localFonts, referenceFontsInstalled } from './local-fonts.ts';
 import { deckFacts, slidePages } from './reference-identity.ts';
-import { glyphOrigins, normalize, type GlyphOrigin } from './references.ts';
+import { glyphOrigins, normalize, type GlyphOrigin } from './pdf.ts';
 
 const bare = (s: string): string => s.replace(/\s+/g, '');
 

@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'bun:test';
+import { join } from 'node:path';
 import {
+  FIXTURE_FONTS_DIR,
   MAX_COLLECTION_FACES,
   collectionFace,
   faceOffsets,
+  localFonts,
   localFontsIdentity,
   referenceFontsInstalled,
 } from './local-fonts.ts';
@@ -52,6 +55,28 @@ describe('local fonts', () => {
     expect(a).toMatch(/^[0-9a-f]{64}$/);
     expect(localFontsIdentity()).toBe(a);
     expect(typeof referenceFontsInstalled()).toBe('boolean');
+  });
+
+  test('the fixture set is fixtures/fonts and the packaged CJK face, without the system Arial', () => {
+    const all = localFonts(undefined, 'fixtures');
+    expect(all.filter((f) => f.family === 'Noto Sans CJK JP')).toHaveLength(1);
+    const faces = all
+      .filter((f) => f.family !== 'Noto Sans CJK JP')
+      .sort((a, b) => a.file.localeCompare(b.file));
+    expect(faces).toEqual([
+      {
+        family: 'Noto Sans Arabic',
+        bold: true,
+        italic: false,
+        file: join(FIXTURE_FONTS_DIR, 'NotoSansArabic-Bold.ttf'),
+      },
+      {
+        family: 'Noto Sans Arabic',
+        bold: false,
+        italic: false,
+        file: join(FIXTURE_FONTS_DIR, 'NotoSansArabic-Regular.ttf'),
+      },
+    ]);
   });
 
   test('a collection gives each face as a single font with its own tables', () => {

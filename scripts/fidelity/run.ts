@@ -1,34 +1,22 @@
 // The fidelity harness.
 //
-//   bun run fidelity          # synthetic fixtures (CI gate)
-//   bun run fidelity:corpus   # the private corpus in demo-presentations/ (local only)
-//   bun scripts/fidelity/run.ts --list jobs.jsonl --out <dir> [--shard i/n] [--resume] [--images]
-//                             # corpus mode for eigenpal/pptx-eval (CONTRIBUTING.md, "Fidelity harness")
-//   bun scripts/fidelity/run.ts --help
+//   bun run fidelity                  # every fixture: the gate
+//   bun run fidelity tables           # one fixture
+//   bun run fidelity --update-gaps    # record this run's failing slides in thresholds.ts
+//   bun run fidelity:corpus           # the private corpus in demo-presentations/ (local only)
+//   bun scripts/fidelity/run.ts --list jobs.jsonl --out <dir> ...   # corpus mode for pptx-eval
 //
-// Renders every slide with the editor's own pipeline in Playwright Chromium and compares it with
-// the reference PDF (`score-deck.ts`).
-//
-// Fixture and corpus sets write an HTML report to fidelity-report/<set>/. The fixture set exits 1
-// when the fixture gate fails (`known-gaps.ts`: a failure that is not a known gap, a known gap
-// that got worse or is gone, a missing or stale reference, a deck the harness cannot score, or
-// a save-consistency failure). The corpus set exits 1 when any slide with a current reference
-// fails or is not save-consistent. Corpus mode writes JSON only and exits 0 when every deck was
-// scored: the caller owns the policy. Every mode exits 2 on a usage error.
+// The editor prints each deck to PDF with its own paint, and `score-deck.ts` compares that PDF
+// with the reference PDF. Fixture and corpus sets write an HTML report, both PDFs, and the page
+// images to fidelity-report/<set>/. The fixture set exits 1 when the gate fails (`known-gaps.ts`).
+// Corpus mode writes JSON only and exits 0 when every deck was scored: the caller owns the
+// policy. Every mode exits 2 on a usage error.
 
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, relative, resolve } from 'node:path';
-import { FIXTURE_KNOWN_GAPS } from './thresholds.ts';
-import {
-  checkFixtureGate,
-  fidelityEnvironment,
-  gateExitCode,
-  listToolChanges,
-  recordedGaps,
-  slideKey,
-  slideVerdict,
-} from './known-gaps.ts';
+import { FIXTURE_KNOWN_GAPS, type KnownGapList } from './thresholds.ts';
+import { checkFixtureGate, recordedList, slideKey, slideVerdict, writeGaps } from './known-gaps.ts';
 import { withHarnessPage } from './harness-page.ts';
 import { laneCount, scoreInLanes, type LaneJob } from './lanes.ts';
 import {
@@ -44,41 +32,42 @@ import {
   writeJsonAtomic,
   type CorpusJob,
 } from './corpus-list.ts';
-import { localFontsIdentity, referenceFontsInstalled } from './local-fonts.ts';
-import { popplerVersion, pruneRasterCache } from './references.ts';
+import {
+  fixtureFontsIdentity,
+  localFontsIdentity,
+  referenceFontsInstalled,
+} from './local-fonts.ts';
+import { PDFJS_VERSION } from './pdf.ts';
 import { deckFacts, readManifest, referenceState, sha256 } from './reference-identity.ts';
 import { writeReport, type DeckResult } from './report.ts';
 import { parseRunArgs, RUN_USAGE, type RunArgs } from './run-args.ts';
 import { scoreSafely, type DeckInput } from './score-deck.ts';
 
-const counts = (r: DeckResult): Record<string, number> =>
-  r.slides.reduce(
-    (m, s) => ({ ...m, [s.status]: (m[s.status] ?? 0) + 1 }),
-    {} as Record<string, number>
-  );
+const THRESHOLDS_FILE = resolve(import.meta.dir, 'thresholds.ts');
 
-/**
- * The fixture rasters kept between runs: by PDF, Poppler version, and `pdftoppm` options
- * (`rasterCacheKey`). CI restores and saves this folder.
- */
-const RASTER_CACHE = process.env.PPTX_FIDELITY_RASTER_CACHE || '.cache/fidelity-rasters';
+const pct = (v: number): string => `${(v * 100).toFixed(2)} %`;
 
-const POPPLER_MISSING =
-  'Poppler is not installed (pdftoppm, pdftotext, pdfinfo), so no slide can be compared. Install it: brew install poppler, or apt-get install poppler-utils.';
+/** One console line for a scored deck: slides that pass, the worst pixel score, and the time. */
+function deckLine(r: DeckResult): string {
+  if (r.error) return `${r.name}: not scored: ${r.error}`;
+  const compared = r.slides.filter((s) => s.status === 'pass' || s.status === 'fail');
+  const passing = compared.filter((s) => s.status === 'pass').length;
+  const worst = Math.max(0, ...compared.map((s) => s.pixelMismatch ?? 0));
+  const gap =
+    r.reference === 'pdf' ? '' : ` (${r.reference === 'stale' ? 'stale' : 'no'} reference)`;
+  const saved = r.slides.some((s) => s.selfConsistent === false) ? ', save/reopen DIFFERS' : '';
+  const time = `${((r.milliseconds ?? 0) / 1000).toFixed(1)} s`;
+  return `${r.name}: ${passing}/${r.slides.length} pass, worst pixels ${pct(worst)}${gap}${saved}, ${time}`;
+}
 
 /** `bun run fidelity` and `bun run fidelity:corpus`: decks in a folder, an HTML report. */
 async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> {
-  const { set, deck: only } = args;
+  const { set, decks: only } = args;
   const dir = set === 'corpus' ? 'demo-presentations' : 'fixtures';
   const out = resolve('fidelity-report', set);
   if (!existsSync(dir)) {
     console.log(`No decks in ${dir}/.`);
     return set === 'fixtures' ? 1 : 0;
-  }
-  const poppler = popplerVersion();
-  if (!poppler && set === 'fixtures') {
-    console.error(`GATE: ${POPPLER_MISSING}`);
-    return 1;
   }
   const manifest = readManifest(dir);
   const files = readdirSync(dir)
@@ -87,24 +76,21 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
   const inputs: DeckInput[] = files.map((f, i) => {
     const file = join(dir, f);
     const name = set === 'corpus' ? `deck${i + 1}` : f.replace(/\.pptx$/, '');
-    if (!poppler)
-      return { file, name, gap: { status: 'no-reference', reasons: ['Poppler is not installed'] } };
     const state = referenceState(file, manifest);
     if (state.status === 'current') return { file, name, pdf: state.pdf };
     if (state.status === 'stale')
       return { file, name, gap: { status: 'stale', reasons: state.reasons } };
     return { file, name, gap: { status: 'no-reference', reasons: ['no reference PDF'] } };
   });
-  const targets = only ? inputs.filter((d) => d.name === only) : inputs;
-  if (only && targets.length === 0) {
+  const unknown = only.filter((n) => !inputs.some((d) => d.name === n));
+  if (unknown.length) {
     console.error(
-      `fidelity: no ${set === 'corpus' ? 'corpus deck' : 'fixture'} is named ${only}. Names: ${inputs.map((d) => d.name).join(', ')}.`
+      `fidelity: no deck is named ${unknown.join(', ')}. Names: ${inputs.map((d) => d.name).join(', ')}.`
     );
     return 2;
   }
-  // The fixture rasters are kept between runs (`rasterizePages`); corpus rasters never are.
-  const rasterCache = set === 'fixtures' ? resolve(RASTER_CACHE) : undefined;
-  const started = Date.now();
+  const targets = only.length ? inputs.filter((d) => only.includes(d.name)) : inputs;
+  if (!only.length) rmSync(out, { recursive: true, force: true });
   // The decks with the most slides start first, so no lane is left with a long deck at the end.
   const slideCount = (d: DeckInput): number => {
     try {
@@ -117,89 +103,72 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
     .map((d) => ({ d, n: slideCount(d) }))
     .sort((a, b) => b.n - a.n)
     .map(({ d }) => ({
-      input: rasterCache ? { ...d, rasterCache } : d,
+      input: set === 'fixtures' ? { ...d, fontSet: 'fixtures' as const } : d,
       imagesDir: join(out, d.name),
       redact: false,
     }));
-  const lanes = laneCount(jobs.length);
-  console.log(`Scoring ${jobs.length} decks in ${lanes} lane(s).`);
-  const scored = await scoreInLanes(jobs, lanes, (job, r) => {
-    const consistent = r.slides.every((s) => s.selfConsistent);
-    console.log(
-      `${job.input.name}: ${r.error ?? JSON.stringify(counts(r))} save-consistent=${consistent}`
-    );
-  });
-  // In the order of the decks, whatever lane finished first.
+  const started = Date.now();
+  const scored = await scoreInLanes(jobs, laneCount(jobs.length), (_, r) =>
+    console.log(deckLine(r))
+  );
   const byName = new Map(scored.results.map((r, i) => [jobs[i].input.name, r]));
   const results = targets.map((d) => byName.get(d.name)!);
-  const chromium = scored.chromium;
-  if (rasterCache && !only) pruneRasterCache(rasterCache, started);
-  const rasterized = results.filter((r) => r.referenceCached !== undefined);
-  if (rasterCache && rasterized.length)
-    console.log(
-      `Reference rasters: ${rasterized.filter((r) => r.referenceCached).length} of ${rasterized.length} PDFs from the cache in ${relative(process.cwd(), rasterCache) || '.'}.`
-    );
+  const all = results.flatMap((r) => r.slides);
+  const passing = all.filter((s) => s.status === 'pass').length;
+  const seconds = ((Date.now() - started) / 1000).toFixed(1);
+  const tools = {
+    pdfjs: PDFJS_VERSION,
+    chromium: scored.chromium ?? 'unknown',
+    fonts: set === 'fixtures' ? fixtureFontsIdentity() : localFontsIdentity(),
+  };
+  const toolsText = `pdf.js ${tools.pdfjs}, Chromium ${tools.chromium}, fonts ${tools.fonts}`;
+  const report = join(relative(process.cwd(), out) || '.', 'index.html');
+
   if (set !== 'fixtures') {
-    for (const r of results) for (const s of r.slides) s.verdict = slideVerdict(s, undefined);
-    writeReport(out, set, results, { poppler, chromium });
+    writeReport(out, set, results, { tools: toolsText });
+    console.log(`${passing} of ${all.length} slides pass in ${seconds} s. Report: ${report}`);
     const failed = results.some(
       (r) => r.error || r.slides.some((s) => s.status === 'fail' || s.selfConsistent === false)
     );
-    console.log(`Report: ${join(out, 'index.html')}`);
     return failed ? 1 : 0;
   }
-  // The fixture gate: known gaps per environment, a ratchet.
-  const referenceFonts = referenceFontsInstalled();
-  const environment = fidelityEnvironment(process.platform, referenceFonts);
-  const recorded = environment ? FIXTURE_KNOWN_GAPS[environment] : undefined;
-  const gaps = recorded?.slides;
-  const list = environment ? `FIXTURE_KNOWN_GAPS.${environment}` : undefined;
-  const toolChanges = listToolChanges(recorded, poppler, chromium);
-  const gate = checkFixtureGate(results, gaps, { complete: !only, list, toolChanges });
-  const where = `${process.platform} ${referenceFonts ? 'with' : 'without'} reference fonts`;
-  const problems = [...gate.problems];
-  const notes = [...gate.notes];
-  if (!environment && process.env.CI)
-    problems.push(
-      `no known-gap list for ${where} in CI. Add the environment to FIDELITY_ENVIRONMENTS and FIXTURE_KNOWN_GAPS in scripts/fidelity/thresholds.ts`
+
+  let list: KnownGapList = FIXTURE_KNOWN_GAPS;
+  if (args.updateGaps) {
+    // A partial run replaces only the entries of the decks that ran.
+    const ran = new Set(results.map((r) => r.name));
+    const kept = Object.fromEntries(
+      Object.entries(list.slides).filter(([key]) => !ran.has(key.slice(0, key.lastIndexOf('/'))))
     );
+    const recorded = recordedList(results, tools);
+    list = { ...recorded, slides: { ...kept, ...recorded.slides } };
+    await writeGaps(THRESHOLDS_FILE, list);
+  }
+  const gate = checkFixtureGate(results, list, tools, !only.length);
   for (const r of results)
     for (const s of r.slides) {
       const key = slideKey(r.name, s.index);
       s.knownGap = gate.knownGaps.has(key);
-      s.verdict = slideVerdict(s, gaps && Object.hasOwn(gaps, key) ? gaps[key] : undefined);
+      s.verdict = slideVerdict(s, Object.hasOwn(list.slides, key) ? list.slides[key] : undefined);
     }
-  const entries = recordedGaps(results);
-  writeReport(out, set, results, {
-    poppler,
-    chromium,
-    gate: { where, list, problems, notes, entries },
-  });
-  const all = results.flatMap((r) => r.slides);
+  const fixes = gate.problems.filter((p) => p.kind === 'fix');
+  const next = args.updateGaps
+    ? `FIXTURE_KNOWN_GAPS in scripts/fidelity/thresholds.ts now records this run. Review its diff: a worse value is a regression to fix, not to record.`
+    : fixes.length
+      ? `Fix the problems above; see ${report}. A new fixture, a changed deck, or a new reference PDF may take new entries with: bun run fidelity --update-gaps`
+      : gate.problems.length
+        ? 'The scores are better than the known gaps record. Record them with: bun run fidelity --update-gaps'
+        : 'Nothing to do.';
+  const problems = gate.problems.map((p) => p.text);
+  writeReport(out, set, results, { tools: toolsText, gate: { problems, next } });
   console.log(
-    `${all.filter((s) => s.status === 'pass').length} of ${all.length} slides pass; ${gate.knownGaps.size} fail as known gaps.`
+    `\n${passing} of ${all.length} slides pass; ${gate.knownGaps.size} fail as known gaps. ${seconds} s. Report: ${report}`
   );
-  if (list) console.log(`Known gaps: ${list}.`);
-  for (const n of notes) console.log(`NOTE: ${n}`);
-  for (const p of problems) console.log(`GATE: ${p}`);
-  if (args.printGaps) {
-    console.log(`The known-gap entries that this run's scores record (${where}):`);
-    for (const e of entries) console.log(`    ${e}`);
-  }
-  console.log(`Report: ${join(out, 'index.html')}; each slide's scores are in summary.json.`);
-  const code = gateExitCode(problems.length, Boolean(list));
-  if (code === 1) console.log(`Gate: fails with ${problems.length} problem(s).`);
-  else if (code === 3)
-    // A distinct code, so a script cannot read a run that gated no slide score as a pass.
-    console.log(
-      `Gate: NOT GATED. There is no known-gap list for ${where}, so slide failures are reported, not gated; only references, open errors, and save consistency are gated. Run the gate in CI or on the Mac that exports the references (exit 3).`
-    );
-  else console.log(`Gate: passes${only ? ` (one fixture only: ${only})` : ''}.`);
-  if (code === 1 && !list)
-    console.log(
-      `Slide scores were not gated here either: there is no known-gap list for ${where}.`
-    );
-  return code;
+  for (const p of gate.problems) console.log(`${p.kind === 'fix' ? 'FIX' : 'RECORD'}: ${p.text}`);
+  console.log(
+    `Gate: ${gate.problems.length ? 'fails' : 'passes'}${only.length ? ` (only ${only.join(', ')})` : ''}. ${next}`
+  );
+  return gate.problems.length ? 1 : 0;
 }
 
 function gitState(): { commit: string | null; dirty: boolean | null } {
@@ -229,11 +198,6 @@ async function runList(args: Extract<RunArgs, { mode: 'list' }>): Promise<number
     console.error(`fidelity: ${redactPaths((e as Error).message)}\n\n${RUN_USAGE}`);
     return 2;
   }
-  const poppler = popplerVersion();
-  if (!poppler) {
-    console.error(`fidelity: ${POPPLER_MISSING}`);
-    return 1;
-  }
   const out = resolve(args.out);
   mkdirSync(out, { recursive: true });
   const resultsFile = join(out, 'results.jsonl');
@@ -243,7 +207,7 @@ async function runList(args: Extract<RunArgs, { mode: 'list' }>): Promise<number
     shard,
     sources: sourcesHash(resolve('.')),
     thresholds: corpusThresholds(),
-    popplerVersion: poppler,
+    pdfjs: PDFJS_VERSION,
     referenceFonts: referenceFontsInstalled(),
     fonts: localFontsIdentity(),
   };
@@ -258,9 +222,8 @@ async function runList(args: Extract<RunArgs, { mode: 'list' }>): Promise<number
     ...identity,
     harness: 'pptx-editor scripts/fidelity/run.ts',
     ...gitState(),
-    poppler: true,
-    /** PDF baselines are glyph origins from the content stream (pdf.js), else box estimates. */
-    baselines: 'glyph-origin',
+    /** Our PDF, printed with the editor's paint, against the reference PDF; pdf.js reads both. */
+    method: 'pdf-vs-pdf',
     chromium: null as string | null,
     startedAt: new Date().toISOString(),
     finishedAt: null as string | null,
@@ -297,7 +260,7 @@ async function runList(args: Extract<RunArgs, { mode: 'list' }>): Promise<number
       runInfo.decks.scored += 1;
       if (r.error) runInfo.decks.errors += 1;
       writeRun();
-      console.log(`${job.id}: ${r.error ?? JSON.stringify(counts(r))}`);
+      console.log(deckLine({ ...r, name: job.id }));
       if (fatal) throw fatal;
     }
   });
