@@ -762,6 +762,7 @@ export class SlideSurface {
     // A press that ended out of sight (a lost pointerup) ends a handle drag: a hover edits nothing.
     if ((this.#adjustDrag || this.#cropDrag) && (e.buttons & 1) === 0) {
       this.#adjustDrag = this.#cropDrag = null;
+      this.#pressed = false;
       return;
     }
     const a = this.#adjustDrag;
