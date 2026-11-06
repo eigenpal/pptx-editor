@@ -21,9 +21,10 @@ Production use requires a commercial agreement: licensing@eigenpal.com
  * cancels its conversion. A request that closes while it waits keeps its turn until the
  * conversion before it ends, and then gives it up. Neither the upload nor the PDF is kept.
  *
- * The time budget: 15 s of upload, 40 s of waiting, and 40 s of conversion make 95 s. The
- * conversion checks its deadline between slides, so `maxDuration` keeps 25 s more for a slow
- * slide. The browser waits 130 s, longer than the function can run.
+ * The time budget: 15 s of upload, at most 40 s of waiting, and 40 s of conversion make 95 s. A
+ * request that waits longer gets 503, whatever the conversion before it does. The conversion
+ * checks its deadline between slides, so `maxDuration` keeps 25 s more for a slow slide. The
+ * browser waits 130 s, longer than the function can run.
  *
  * The request must carry an `Origin` that matches the host: a browser sends `Origin` on every
  * `POST`, so a request without one is not the demo page. This keeps other pages from using the
@@ -37,6 +38,7 @@ const MAX_UPLOAD = 4 * 1024 * 1024;
 const MAX_OUTPUT = 4 * 1024 * 1024;
 const UPLOAD_MS = 15_000;
 const DEADLINE_MS = 40_000;
+const WAIT_MS = 40_000;
 /** The conversion that runs and the one that waits. */
 const MAX_IN_FLIGHT = 2;
 const TOO_LARGE = { ok: false, error: 'UploadTooLarge', message: 'The upload limit is 4 MiB.' };
@@ -51,7 +53,7 @@ let inFlight = 0;
 
 /**
  * Run `work` after the conversions before it, so one instance never lays out two decks at once.
- * `'busy'` when `MAX_IN_FLIGHT` requests already convert or wait.
+ * `'busy'` when `MAX_IN_FLIGHT` requests already convert or wait, or after `WAIT_MS` of waiting.
  */
 async function inTurn<T>(work: () => Promise<T>): Promise<T | 'busy'> {
   if (inFlight >= MAX_IN_FLIGHT) return 'busy';
@@ -59,8 +61,19 @@ async function inTurn<T>(work: () => Promise<T>): Promise<T | 'busy'> {
   const before = line;
   let done!: () => void;
   line = new Promise<void>((resolve) => (done = resolve));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const turn = await Promise.race([
+    before.then(() => true),
+    new Promise<false>((resolve) => (timer = setTimeout(() => resolve(false), WAIT_MS))),
+  ]);
+  clearTimeout(timer);
+  if (!turn) {
+    // Give up the wait. The line stays in order: the next request starts after the one before.
+    inFlight--;
+    void before.then(done);
+    return 'busy';
+  }
   try {
-    await before;
     return await work();
   } finally {
     inFlight--;
@@ -68,24 +81,21 @@ async function inTurn<T>(work: () => Promise<T>): Promise<T | 'busy'> {
   }
 }
 
-function json(
-  res: ServerResponse,
-  status: number,
-  value: Record<string, unknown>,
-  headers: Record<string, string> = {}
-): void {
+function json(res: ServerResponse, status: number, value: Record<string, unknown>): void {
   if (res.destroyed || res.writableEnded) return;
-  res.writeHead(status, {
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-store',
-    ...headers,
-  });
+  res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(value));
 }
 
+/** How long, and how much more, a refused upload is read before its connection closes. */
+const DISCARD_MS = 5_000;
+const DISCARD_BYTES = 2 * MAX_UPLOAD;
+
 /**
- * Refuse an upload that may still arrive. The reply goes out first, and then the connection
- * closes, so the client reads the reason before the server stops the upload.
+ * Refuse an upload that may still arrive. The reply goes out first, and the rest of the upload
+ * is read and thrown away, so the client can finish its upload and read the reply. A socket that
+ * closes with unread data resets the connection, and the client can then lose the reply. After
+ * `DISCARD_MS` or `DISCARD_BYTES` the connection closes anyway.
  */
 function refuseUpload(
   req: IncomingMessage,
@@ -93,36 +103,59 @@ function refuseUpload(
   status: number,
   value: Record<string, unknown>
 ): void {
-  json(res, status, value, { Connection: 'close' });
-  if (typeof res.once === 'function') res.once('finish', () => req.destroy?.());
-  else req.destroy?.();
+  json(res, status, value);
+  let discarded = 0;
+  const stop = (): void => {
+    clearTimeout(timer);
+    req.destroy?.();
+  };
+  const timer = setTimeout(stop, DISCARD_MS);
+  timer.unref?.();
+  req.on('data', (chunk: Buffer) => {
+    discarded += chunk.length;
+    if (discarded > DISCARD_BYTES) stop();
+  });
+  req.once('end', () => clearTimeout(timer));
+  req.resume();
 }
 
 /**
  * The body; `'large'` past `MAX_UPLOAD`; `'slow'` when it takes more than `UPLOAD_MS`; or
- * `'aborted'` when the client stops the upload.
+ * `'aborted'` when the client stops the upload. It pauses the request and does not destroy it,
+ * so the refusal can still reach the client (`refuseUpload`).
  */
-async function readBody(req: IncomingMessage): Promise<Uint8Array | 'large' | 'slow' | 'aborted'> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const slow = new Promise<'slow'>((resolve) => {
-    timer = setTimeout(() => resolve('slow'), UPLOAD_MS);
-  });
-  const read = (async () => {
+function readBody(req: IncomingMessage): Promise<Uint8Array | 'large' | 'slow' | 'aborted'> {
+  return new Promise((resolve) => {
     const chunks: Buffer[] = [];
     let length = 0;
-    for await (const chunk of req) {
-      const bytes = chunk as Buffer;
-      length += bytes.length;
-      if (length > MAX_UPLOAD) return 'large' as const;
-      chunks.push(bytes);
-    }
-    return new Uint8Array(Buffer.concat(chunks));
-  })().catch(() => 'aborted' as const);
-  try {
-    return await Promise.race([read, slow]);
-  } finally {
-    clearTimeout(timer);
-  }
+    let settled = false;
+    const finish = (value: Uint8Array | 'large' | 'slow' | 'aborted'): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      req.off('data', onData);
+      req.off('end', onEnd);
+      req.off('error', onAbort);
+      req.off('close', onClose);
+      if (typeof value === 'string') req.pause();
+      resolve(value);
+    };
+    const onData = (chunk: Buffer): void => {
+      length += chunk.length;
+      if (length > MAX_UPLOAD) finish('large');
+      else chunks.push(chunk);
+    };
+    const onEnd = (): void => finish(new Uint8Array(Buffer.concat(chunks)));
+    const onAbort = (): void => finish('aborted');
+    // A request that closes before its end lost its client.
+    const onClose = (): void =>
+      finish(req.readableEnded ? new Uint8Array(Buffer.concat(chunks)) : 'aborted');
+    const timer = setTimeout(() => finish('slow'), UPLOAD_MS);
+    req.on('data', onData);
+    req.on('end', onEnd);
+    req.on('error', onAbort);
+    req.on('close', onClose);
+  });
 }
 
 /** Fixed public failure responses. Never return raw exception messages. */

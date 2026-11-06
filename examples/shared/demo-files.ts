@@ -128,11 +128,16 @@ export class PdfExportFailure extends Error {
   }
 }
 
-/** The notice for an HTTP status of the PDF function. */
-function failureFor(status: number): PdfExportFailure {
+/**
+ * The notice for a failure of the PDF function: its HTTP status and the `error` name of its JSON
+ * body. Only the name is read, never the server's message.
+ */
+function failureFor(status: number, error: unknown): PdfExportFailure {
   if (status === 413) return new PdfExportFailure('app.pdfTooLarge');
-  // Too many slides, too much paint, or a PDF past its size limit.
-  if (status === 507) return new PdfExportFailure('app.pdfTooComplex');
+  // Too many slides, too much paint, a PDF past its size limit, or past the conversion deadline:
+  // a retry fails the same way.
+  if (status === 507 || (status === 408 && error === 'PdfWorkLimitError'))
+    return new PdfExportFailure('app.pdfTooComplex');
   if (status === 503) return new PdfExportFailure('app.pdfBusy');
   return new PdfExportFailure('app.pdfExportFailed');
 }
@@ -158,7 +163,10 @@ export async function convertToPdf(deck: Uint8Array): Promise<Blob> {
   }
   const type = response.headers.get('content-type') ?? '';
   if (response.ok && type.startsWith('application/pdf')) return response.blob();
-  throw failureFor(response.status);
+  const body: unknown = type.includes('application/json')
+    ? await response.json().catch(() => null)
+    : null;
+  throw failureFor(response.status, (body as { error?: unknown } | null)?.error);
 }
 
 /** Whether a PDF export is running. A second pick does nothing until it ends. */

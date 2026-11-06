@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { createServer, request as httpRequest } from 'node:http';
 import { Readable } from 'node:stream';
 
 const built = existsSync(new URL('../packages/pptx-to-pdf/dist/index.js', import.meta.url));
@@ -189,4 +190,49 @@ test("failures answer with fixed text, never with the file's own details", { ski
   const unknown = pdfFailureResponse(new Error('secret slide title'));
   assert.equal(unknown.status, 500);
   assert.equal(unknown.body.message, 'The conversion failed.');
+});
+
+test('a real client gets the 413 reply for a chunked upload past the limit', { skip }, async () => {
+  // A socket, not a stand-in: the reply must go out before the server stops the upload.
+  const { default: handler } = await import('./convert.ts');
+  const server = createServer((req, res) => void handler(req, res));
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  try {
+    const reply = await new Promise((resolve, reject) => {
+      const req = httpRequest(
+        {
+          host: '127.0.0.1',
+          port,
+          method: 'POST',
+          path: '/api/convert',
+          // No `Content-Length`: the body is chunked, so only the count while reading stops it.
+          headers: { origin: `http://127.0.0.1:${port}`, 'transfer-encoding': 'chunked' },
+        },
+        (res) => {
+          const chunks = [];
+          res.on('data', (chunk) => chunks.push(chunk));
+          res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks) }));
+        }
+      );
+      // A lost reply fails the test; it does not hang it.
+      setTimeout(() => reject(new Error('no reply within 10 s')), 10_000).unref();
+      req.on('error', reject);
+      const piece = Buffer.alloc(256 * 1024);
+      let sent = 0;
+      const more = () => {
+        while (sent < 5 * 1024 * 1024) {
+          sent += piece.length;
+          if (!req.write(piece)) return void req.once('drain', more);
+        }
+        req.end();
+      };
+      more();
+    });
+    assert.equal(reply.status, 413);
+    assert.equal(JSON.parse(reply.body.toString('utf8')).error, 'UploadTooLarge');
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
 });

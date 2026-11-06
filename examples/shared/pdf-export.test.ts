@@ -40,6 +40,11 @@ describe('convertToPdf', () => {
   test('maps each failure status to a notice key', async () => {
     answer(413, 'text/plain', 'Request Entity Too Large');
     expect(await failure()).toBe('app.pdfTooLarge');
+    // Past the conversion deadline a retry fails the same way; a slow upload can succeed later.
+    answer(408, 'application/json', '{"error":"PdfWorkLimitError"}');
+    expect(await failure()).toBe('app.pdfTooComplex');
+    answer(408, 'application/json', '{"error":"UploadTimeout"}');
+    expect(await failure()).toBe('app.pdfExportFailed');
     answer(507, 'application/json', '{"message":"The presentation is larger"}');
     expect(await failure()).toBe('app.pdfTooComplex');
     answer(503, 'application/json', '{"message":"A conversion is already running"}');
