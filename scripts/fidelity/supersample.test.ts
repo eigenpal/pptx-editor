@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'bun:test';
+import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import { comparePixels } from './compare.ts';
-import { downsample, downsampledSize } from './supersample.ts';
+import { deviceAntialiased, downsample, downsampledSize } from './supersample.ts';
+import { THRESHOLDS } from './thresholds.ts';
 
 const image = (w: number, h: number, px: (x: number, y: number) => number[]): PNG => {
   const p = new PNG({ width: w, height: h });
@@ -95,5 +97,115 @@ describe('anti-aliasing judged at the device scale', () => {
   test('an anti-aliased edge that snaps by one device pixel does not count', () => {
     expect(score(stroke(22, true), stroke(23, true))).toBe(0);
     expect(score(stroke(22), stroke(22))).toBe(0);
+  });
+});
+
+describe('device anti-aliasing by tiles', () => {
+  // The whole-image method that `deviceAntialiased` replaces: one pixelmatch call over every
+  // device pixel, with the blocks under red pixels unmasked.
+  const wholeImage = (diff: PNG, a: PNG, b: PNG, scale: number): { n: number; diff: Buffer } => {
+    const out = new Uint8Array(a.width * a.height * 4);
+    const ignore = new Uint8Array(a.width * a.height).fill(1);
+    const red: number[] = [];
+    for (let y = 0; y < diff.height; y += 1)
+      for (let x = 0; x < diff.width; x += 1) {
+        const i = (y * diff.width + x) * 4;
+        if (diff.data[i] === 255 && diff.data[i + 1] === 0 && diff.data[i + 2] === 0) {
+          red.push(x, y);
+          for (let yy = y * scale; yy < (y + 1) * scale; yy += 1)
+            ignore.fill(0, yy * a.width + x * scale, yy * a.width + (x + 1) * scale);
+        }
+      }
+    pixelmatch(a.data, b.data, out, a.width, a.height, {
+      threshold: THRESHOLDS.pixelThreshold,
+      includeAA: false,
+      alpha: 0,
+      diffColor: [255, 0, 0],
+      diffColorAlt: [255, 0, 0],
+      aaColor: [255, 255, 0],
+      ignoreMask: ignore,
+    });
+    const copy = PNG.sync.write(diff);
+    const marked = PNG.sync.read(copy);
+    let n = 0;
+    for (let k = 0; k < red.length; k += 2) {
+      let real = 0;
+      let aa = 0;
+      for (let yy = red[k + 1] * scale; yy < (red[k + 1] + 1) * scale; yy += 1)
+        for (let xx = red[k] * scale; xx < (red[k] + 1) * scale; xx += 1) {
+          const j = (yy * a.width + xx) * 4;
+          if (out[j] === 255 && out[j + 1] === 0 && out[j + 2] === 0) real += 1;
+          else if (out[j] === 255 && out[j + 1] === 255 && out[j + 2] === 0) aa += 1;
+        }
+      if (real > aa) n += 1;
+      else marked.data.set([255, 255, 0], (red[k + 1] * diff.width + red[k]) * 4);
+    }
+    return { n, diff: PNG.sync.write(marked) };
+  };
+
+  /** The top-left `w` × `h` px of an image. */
+  const crop = (p: PNG, w: number, h: number): PNG =>
+    image(w, h, (x, y) => [...p.data.subarray((y * p.width + x) * 4, (y * p.width + x) * 4 + 4)]);
+
+  // Seeded noise: the same images on every run.
+  let seed = 7;
+  const random = (): number => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+
+  test('every block gets the same class as in a whole-image comparison, across tile edges', () => {
+    const scale = 4;
+    // 300 × 260 device px: tiles of 128 device px, with partial tiles at the right and bottom.
+    const w = 300;
+    const h = 260;
+    let counted = 0;
+    let excused = 0;
+    for (let round = 0; round < 6; round += 1) {
+      // Anti-aliased strokes, some of them across tile edges, moved by 0 to 3 device pixels.
+      const strokes = Array.from({ length: 12 }, () => ({
+        x: Math.floor(random() * w),
+        y: Math.floor(random() * h),
+        len: 10 + Math.floor(random() * 120),
+        across: random() < 0.5,
+        shift: Math.floor(random() * 4),
+      }));
+      // In odd rounds the render is larger than the reference by a few device pixels, as a
+      // size within `maxSizeDeltaPx` may be: only the overlap is compared.
+      const [dw, dh] = round % 2 ? [6, 5] : [0, 0];
+      const draw = (moved: boolean): PNG =>
+        image(w + (moved ? dw : 0), h + (moved ? dh : 0), (x, y) => {
+          for (const s of strokes) {
+            const top = s.y + (moved ? s.shift : 0);
+            const [u, v, start] = s.across ? [x, y, s.x] : [y, x, s.x];
+            if (u >= start && u < start + s.len) {
+              if (v >= top && v < top + 6) return [0, 0, 0, 255];
+              if (v === top - 1 || v === top + 6) return [128, 128, 128, 255];
+            }
+          }
+          return [255, 255, 255, 255];
+        });
+      const a = draw(false);
+      const b = draw(true);
+      const fa = downsample(a, scale);
+      const fb = crop(downsample(b, scale), fa.width, fa.height);
+      const diff = new PNG({ width: fa.width, height: fa.height });
+      pixelmatch(fa.data, fb.data, diff.data, fa.width, fa.height, {
+        threshold: THRESHOLDS.pixelThreshold,
+        includeAA: true,
+      });
+      const want = wholeImage(diff, a, crop(b, w, h), scale);
+      const red = (p: PNG): number => {
+        let r = 0;
+        for (let i = 0; i < p.data.length; i += 4)
+          if (p.data[i] === 255 && p.data[i + 1] === 0 && p.data[i + 2] === 0) r += 1;
+        return r;
+      };
+      counted += want.n;
+      excused += red(diff) - want.n;
+      const tiled = PNG.sync.read(PNG.sync.write(diff));
+      expect(deviceAntialiased(tiled, a, b, scale)).toBe(want.n);
+      expect(PNG.sync.write(tiled).equals(want.diff)).toBe(true);
+    }
+    // The images exercise both classes: blocks that count and blocks that are anti-aliasing.
+    expect(counted).toBeGreaterThan(0);
+    expect(excused).toBeGreaterThan(0);
   });
 });

@@ -34,6 +34,13 @@ export interface Raster {
   readonly data: Uint8Array;
 }
 
+/**
+ * Encode pixels as PNG for the report. By default pngjs tries all five row filters on each row:
+ * on fixture slides that takes 60 ms an image, and the Up filter alone takes 10 ms. The files are
+ * about 40 % larger, and only the report reads them.
+ */
+export const encodePng = (image: PNG): Buffer => PNG.sync.write(image, { filterType: 2 });
+
 /** The pixels of a PNG file's bytes, or the raster itself. */
 export const pixels = (image: Buffer | Raster): Raster =>
   Buffer.isBuffer(image) ? PNG.sync.read(image) : image;
@@ -107,7 +114,7 @@ export function downsample(image: Raster, scale: number): PNG {
 /** `downsample` on a PNG file's bytes, returning PNG bytes. */
 export function downsamplePng(png: Buffer, scale: number): Buffer {
   if (scale === 1) return png;
-  return PNG.sync.write(downsample(PNG.sync.read(png), scale));
+  return encodePng(downsample(PNG.sync.read(png), scale));
 }
 
 /** Pixelmatch's output colors, set apart so the classes can be read back. */
@@ -116,12 +123,29 @@ const AA: readonly [number, number, number] = [255, 255, 0];
 const is = (d: Uint8Array, i: number, c: readonly number[]): boolean =>
   d[i] === c[0] && d[i + 1] === c[1] && d[i + 2] === c[2];
 
-/** The overlap of an image with `w` × `h` px, as RGBA bytes. */
-function cropped(p: Raster, w: number, h: number): Uint8Array {
-  if (p.width === w && p.height === h) return p.data;
-  const out = new Uint8Array(w * h * 4);
-  for (let y = 0; y < h; y += 1)
-    out.set(p.data.subarray(y * p.width * 4, y * p.width * 4 + w * 4), y * w * 4);
+/**
+ * The comparison pixels in each side of a tile that `deviceAntialiased` compares at once. Small
+ * tiles read fewer device pixels around a few scattered differences; large tiles make fewer
+ * pixelmatch calls on a slide that differs everywhere.
+ */
+const TILE = 32;
+
+/**
+ * The device pixels around a tile that its comparison also reads. Pixelmatch's anti-aliasing
+ * test reads the 8 neighbors of a pixel and the 8 neighbors of those (radius 2), and treats the
+ * edge of its image as an edge. With 3 pixels more on each side, every pixel of the tile sees
+ * the same neighbors as in a comparison of the whole image.
+ */
+const PAD = 3;
+
+/** The rectangle `[x0, x1) × [y0, y1)` of an image that is `w` px wide, as RGBA bytes. */
+function region(p: Raster, x0: number, y0: number, x1: number, y1: number): Uint8Array {
+  const w = x1 - x0;
+  const out = new Uint8Array(w * (y1 - y0) * 4);
+  for (let y = y0; y < y1; y += 1) {
+    const from = (y * p.width + x0) * 4;
+    out.set(p.data.subarray(from, from + w * 4), (y - y0) * w * 4);
+  }
   return out;
 }
 
@@ -134,9 +158,10 @@ function cropped(p: Raster, w: number, h: number): Uint8Array {
  * counts. A block with no device difference at all is the sum of differences below the threshold,
  * and does not count. Returns the number of pixels that count.
  *
- * Only the blocks under red pixels are read, so pixelmatch skips every other device pixel
- * (`ignoreMask`). Its anti-aliasing test reads the neighbors from the images, not the mask, so
- * each block gets the same classes as from a full comparison.
+ * Only the tiles that hold red pixels are compared (`TILE`), each with `PAD` device pixels of
+ * context, and within a tile only the blocks under red pixels (`ignoreMask`). So each block gets
+ * the same classes as from a comparison of the whole image, and a slide with a few differences
+ * reads a few tiles, not every device pixel.
  */
 export function deviceAntialiased(
   diff: PNG,
@@ -148,41 +173,66 @@ export function deviceAntialiased(
   const b = pixels(reference);
   const w = Math.min(a.width, b.width);
   const h = Math.min(a.height, b.height);
-  const red: number[] = [];
+  // The red pixels of each tile, by tile index.
+  const tilesX = Math.ceil(diff.width / TILE);
+  const tiles = new Map<number, number[]>();
   for (let y = 0, i = 0; y < diff.height; y += 1)
-    for (let x = 0; x < diff.width; x += 1, i += 4) if (is(diff.data, i, REAL)) red.push(x, y);
-  const ignore = new Uint8Array(w * h).fill(1);
-  for (let k = 0; k < red.length; k += 2) {
-    const x0 = red[k] * scale;
-    const x1 = Math.min(w, x0 + scale);
-    if (x0 >= x1) continue;
-    for (let yy = red[k + 1] * scale; yy < Math.min(h, (red[k + 1] + 1) * scale); yy += 1)
-      ignore.fill(0, yy * w + x0, yy * w + x1);
-  }
-  const out = new Uint8Array(w * h * 4);
-  pixelmatch(cropped(a, w, h), cropped(b, w, h), out, w, h, {
+    for (let x = 0; x < diff.width; x += 1, i += 4)
+      if (is(diff.data, i, REAL)) {
+        const t = Math.floor(y / TILE) * tilesX + Math.floor(x / TILE);
+        let red = tiles.get(t);
+        if (!red) tiles.set(t, (red = []));
+        red.push(x, y);
+      }
+  const options = {
     threshold: THRESHOLDS.pixelThreshold,
     includeAA: false,
     alpha: 0,
     diffColor: [...REAL] as [number, number, number],
     diffColorAlt: [...REAL] as [number, number, number],
     aaColor: [...AA] as [number, number, number],
-    ignoreMask: ignore,
-  });
+  };
   let n = 0;
-  for (let k = 0; k < red.length; k += 2) {
-    const x = red[k];
-    const y = red[k + 1];
-    let real = 0;
-    let aa = 0;
-    for (let yy = y * scale; yy < Math.min(h, (y + 1) * scale); yy += 1)
-      for (let xx = x * scale; xx < Math.min(w, (x + 1) * scale); xx += 1) {
-        const j = (yy * w + xx) * 4;
-        if (is(out, j, REAL)) real += 1;
-        else if (is(out, j, AA)) aa += 1;
-      }
-    if (real > aa) n += 1;
-    else diff.data.set(AA, (y * diff.width + x) * 4);
+  for (const [t, red] of tiles) {
+    const tx = (t % tilesX) * TILE * scale;
+    const ty = Math.floor(t / tilesX) * TILE * scale;
+    const x0 = Math.max(0, tx - PAD);
+    const y0 = Math.max(0, ty - PAD);
+    const x1 = Math.min(w, tx + TILE * scale + PAD);
+    const y1 = Math.min(h, ty + TILE * scale + PAD);
+    if (x0 >= x1 || y0 >= y1) continue;
+    const ww = x1 - x0;
+    const wh = y1 - y0;
+    const ignore = new Uint8Array(ww * wh).fill(1);
+    for (let k = 0; k < red.length; k += 2) {
+      const bx0 = Math.max(x0, red[k] * scale);
+      const bx1 = Math.min(x1, (red[k] + 1) * scale);
+      for (
+        let yy = Math.max(y0, red[k + 1] * scale);
+        yy < Math.min(y1, (red[k + 1] + 1) * scale);
+        yy += 1
+      )
+        if (bx0 < bx1) ignore.fill(0, (yy - y0) * ww + bx0 - x0, (yy - y0) * ww + bx1 - x0);
+    }
+    const out = new Uint8Array(ww * wh * 4);
+    pixelmatch(region(a, x0, y0, x1, y1), region(b, x0, y0, x1, y1), out, ww, wh, {
+      ...options,
+      ignoreMask: ignore,
+    });
+    for (let k = 0; k < red.length; k += 2) {
+      const x = red[k];
+      const y = red[k + 1];
+      let real = 0;
+      let aa = 0;
+      for (let yy = Math.max(y0, y * scale); yy < Math.min(y1, (y + 1) * scale); yy += 1)
+        for (let xx = Math.max(x0, x * scale); xx < Math.min(x1, (x + 1) * scale); xx += 1) {
+          const j = ((yy - y0) * ww + xx - x0) * 4;
+          if (is(out, j, REAL)) real += 1;
+          else if (is(out, j, AA)) aa += 1;
+        }
+      if (real > aa) n += 1;
+      else diff.data.set(AA, (y * diff.width + x) * 4);
+    }
   }
   return n;
 }

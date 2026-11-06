@@ -167,7 +167,7 @@ Thresholds and tolerances live in one file, `scripts/fidelity/thresholds.ts`. Fo
 | Pixels | At most 0.5 % of the pixels differ, with anti-aliasing tolerance judged at the device scale. |
 | Line breaks | Every laid-out line appears as a PDF line with the same characters. Whitespace is ignored, and a bullet or number may lead. |
 | Baselines | Each baseline is within 0.5 pt of the glyph origin in the PDF. |
-| Save consistency | Save, reopen, and render again give identical pixels, compared at the device scale (see Supersampled rasters, below). |
+| Save consistency | Save, reopen, and render again give the same SVG markup, or identical pixels at the device scale (see Supersampled rasters, below). |
 
 A reference is current while the deck and the PDF are the bytes that `fixtures/references.json` records. A stale or missing reference is a gap, never a pass. Hidden slides are not in the reference PDFs, so PDF pages map to the visible slides in order.
 
@@ -182,9 +182,13 @@ So the harness works at `THRESHOLDS.rasterScale` (4) device pixels for each comp
 1. Chromium paints the slide at device scale 4, and `pdftoppm` rasterizes the page at 4 times the resolution.
 2. `scripts/fidelity/supersample.ts` box-filters each image down to 1920 px wide with the same filter. The snapping now moves a glyph by at most 0.25 px.
 3. The pixel check finds the pixels that differ on the filtered images. It decides which differences are anti-aliasing on the device-scale images (`deviceAntialiased`): a differing pixel counts when its 4 × 4 block of device pixels has more real differences than anti-aliased ones. The filter turns every edge into a ramp, so pixelmatch's anti-aliasing test on the filtered images would excuse a stroke moved by 1 px.
-4. The save-consistency check compares the two device-scale renders, before the filter.
+4. The save-consistency check compares the two device-scale renders, before the filter, when their markup differs.
 
-`pdftoppm` writes PPM, which holds the same pixels as its PNG without the encoding. The fixture set keeps each device raster in `.cache/fidelity-rasters/`, compressed, under a key of the PDF's SHA-256, the Poppler version, and the `pdftoppm` options, so a later run reads it and does not run `pdftoppm`. A run over every fixture removes the entries that it did not use. CI restores this folder, and pushes to `main` save it. The save-consistency check compares the PNG bytes first: the same bytes are the same pixels.
+`pdftoppm` writes PPM, which holds the same pixels as its PNG without the encoding. The fixture set keeps each page in `.cache/fidelity-rasters/` under a key of the PDF's SHA-256, the Poppler version, the `pdftoppm` options, the raster scale, and the SHA-256 of `supersample.ts`: the device raster and the filtered page, compressed, and the filtered page's PNG. A later run reads them and does not run `pdftoppm`, filter, or encode again. A run over every fixture removes the entries that it did not use. CI restores this folder, and pushes to `main` save it.
+
+The save-consistency check compares markup first. The harness page replaces each image URL and each font face id with the SHA-256 of its bytes, because both are new in each session. The same markup in the same page paints the same pixels, so the check takes a second screenshot only for a slide whose markup changed. It then compares the PNG bytes, and decodes them only when the bytes differ.
+
+The anti-aliasing test at the device scale reads only the 32 × 32 px tiles of the comparison image that have differences, each with 3 device pixels of context. Pixelmatch's anti-aliasing test reads 2 pixels around each pixel, so each tile gets the same classes as a comparison of the whole image. A diff overlay is written only for a slide with differing pixels.
 
 The thresholds are the same as at scale 1. These measurements on every fixture slide (macOS, reference fonts) support the method:
 

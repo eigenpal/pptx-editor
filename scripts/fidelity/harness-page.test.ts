@@ -11,6 +11,7 @@ import {
   openDeck,
   renderSlide,
   reopenSaved,
+  slideMarkup,
   startHarnessServer,
   withHarnessPage,
 } from './harness-page.ts';
@@ -329,5 +330,29 @@ describe.skipIf(!hasChromium)('openDeck', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  }, 60_000);
+});
+
+describe.skipIf(!hasChromium)('slideMarkup', () => {
+  test('a saved and reopened deck paints the same markup, with no session-bound names', async () => {
+    // Image blob URLs and face ids are new in each session.
+    await withHarnessPage(async (page) => {
+      for (const [name, named] of [
+        ['pictures', 'image:'],
+        ['text-runs', 'face:'],
+      ]) {
+        const { slides } = await openDeck(
+          page,
+          join(import.meta.dir, `../../fixtures/${name}.pptx`),
+          []
+        );
+        const first: string[] = [];
+        for (let i = 0; i < slides; i += 1) first.push(await slideMarkup(page, i, 960));
+        expect(first.join('')).toContain(named);
+        expect(first.join('')).not.toMatch(/blob:|pptx-f\d/);
+        expect((await reopenSaved(page)).slides).toBe(slides);
+        for (let i = 0; i < slides; i += 1) expect(await slideMarkup(page, i, 960)).toBe(first[i]);
+      }
+    });
   }, 60_000);
 });

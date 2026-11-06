@@ -45,13 +45,22 @@ interface HarnessApi {
   render(
     index: number,
     widthPx: number
-  ): Promise<{ lines: HarnessLine[]; diagnostics: readonly string[]; fonts: string[] }>;
+  ): Promise<{
+    lines: HarnessLine[];
+    diagnostics: readonly string[];
+    fonts: string[];
+    markup: string;
+  }>;
   reopenSaved(): Promise<{ slides: number; error?: string }>;
 }
 
 let session: DocumentSession | null = null;
 let faces: FontFaceHandle | null = null;
 let fonts: FontSource[] = [];
+/** The SHA-256 of each registered face's bytes, by its face id (`markupOf`). */
+let faceDigests = new Map<string, string>();
+/** The type and SHA-256 of each image blob, by its URL (`markupOf`). */
+const blobDigests = new Map<string, Promise<string>>();
 
 /** Fetch a file that the harness server gives to this page. */
 async function fetchBytes(url: string, what: string): Promise<Uint8Array<ArrayBuffer>> {
@@ -65,10 +74,44 @@ async function fetchBytes(url: string, what: string): Promise<Uint8Array<ArrayBu
   throw new Error(`${what} did not arrive from the harness server (HTTP ${r.status})`);
 }
 
-async function received(bytes: Uint8Array<ArrayBuffer>): Promise<ReceivedFile> {
+async function sha256Of(bytes: BufferSource): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
-  const sha256 = [...digest].map((b) => b.toString(16).padStart(2, '0')).join('');
-  return { bytes: bytes.length, sha256 };
+  return [...digest].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function received(bytes: Uint8Array<ArrayBuffer>): Promise<ReceivedFile> {
+  return { bytes: bytes.length, sha256: await sha256Of(bytes) };
+}
+
+/**
+ * The painted SVG with every session-bound name replaced by the digest of the bytes behind it:
+ * each image blob URL (with its type), and each face id (`pptx-f<measurer>-<face>`, new for each session). Two
+ * paints with the same markup draw the same bytes with the same instructions, so the save check
+ * compares markup first and screenshots only when it differs.
+ */
+async function markupOf(svg: SVGSVGElement): Promise<string> {
+  const urls = new Set<string>();
+  for (const img of svg.querySelectorAll('image')) {
+    const href = img.getAttribute('href');
+    if (href?.startsWith('blob:')) urls.add(href);
+  }
+  const digests = new Map<string, string>();
+  for (const url of urls) {
+    let digest = blobDigests.get(url);
+    if (!digest) {
+      // The type with the bytes: the page decodes a blob by its type (an SVG image needs it).
+      digest = fetch(url).then(
+        async (r) => `${r.headers.get('content-type')}:${await sha256Of(await r.arrayBuffer())}`
+      );
+      blobDigests.set(url, digest);
+    }
+    digests.set(url, await digest);
+  }
+  let markup = new XMLSerializer()
+    .serializeToString(svg)
+    .replace(/pptx-f\d+-\d+/g, (id) => `face:${faceDigests.get(id) ?? id}`);
+  for (const [url, digest] of digests) markup = markup.split(url).join(`image:${digest}`);
+  return markup;
 }
 const EMU_PER_PT = 12_700;
 
@@ -126,6 +169,11 @@ async function adopt(next: DocumentSession): Promise<void> {
   faces?.dispose();
   session = next;
   faces = registerFontFaces(document, session.faces);
+  faceDigests = new Map(
+    await Promise.all(
+      session.faces.map(async (f) => [f.id, await sha256Of(f.bytes.slice())] as const)
+    )
+  );
   await faces.ready;
 }
 
@@ -138,6 +186,8 @@ const api: HarnessApi = {
     session = null;
     faces = null;
     fonts = [];
+    faceDigests = new Map();
+    blobDigests.clear();
     const deck = await fetchBytes(source.deck, 'the deck');
     const got = { deck: await received(deck), fonts: [] as (ReceivedFile & { family: string })[] };
     for (const f of source.fonts) {
@@ -183,7 +233,12 @@ const api: HarnessApi = {
     collectLines(layout.items, layout.slide, lines);
     const fonts = new Set<string>();
     collectFonts(layout.items, fonts);
-    return { lines, diagnostics: layout.diagnostics, fonts: [...fonts].sort() };
+    return {
+      lines,
+      diagnostics: layout.diagnostics,
+      fonts: [...fonts].sort(),
+      markup: await markupOf(svg),
+    };
   },
   async reopenSaved() {
     if (!session) throw new Error('no document');

@@ -18,7 +18,7 @@
 
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { FIXTURE_KNOWN_GAPS } from './thresholds.ts';
 import {
   checkFixtureGate,
@@ -134,6 +134,11 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
   const results = targets.map((d) => byName.get(d.name)!);
   const chromium = scored.chromium;
   if (rasterCache && !only) pruneRasterCache(rasterCache, started);
+  const rasterized = results.filter((r) => r.referenceCached !== undefined);
+  if (rasterCache && rasterized.length)
+    console.log(
+      `Reference rasters: ${rasterized.filter((r) => r.referenceCached).length} of ${rasterized.length} PDFs from the cache in ${relative(process.cwd(), rasterCache) || '.'}.`
+    );
   if (set !== 'fixtures') {
     for (const r of results) for (const s of r.slides) s.verdict = slideVerdict(s, undefined);
     writeReport(out, set, results, { poppler, chromium });

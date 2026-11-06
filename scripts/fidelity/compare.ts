@@ -4,7 +4,7 @@
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import { estimatedBaseline, normalize, type PdfLine, type SizePx } from './references.ts';
-import { deviceAntialiased, pixels, type Raster } from './supersample.ts';
+import { deviceAntialiased, encodePng, pixels, type Raster } from './supersample.ts';
 import { THRESHOLDS } from './thresholds.ts';
 import type { HarnessLine } from './harness-page.ts';
 
@@ -21,7 +21,7 @@ export interface PixelScore {
     readonly reference: SizePx;
     readonly expected?: ExpectedSizes;
   };
-  /** The diff overlay, when asked for. */
+  /** The diff overlay, when asked for and some pixels differ. */
   readonly diff?: Buffer;
   /** The box around every differing pixel, `[x0, y0, x1, y1]` in pixels, or undefined. */
   readonly diffBox?: readonly [number, number, number, number];
@@ -91,14 +91,26 @@ export function comparePixels(
     // images every differing pixel is found here and the device scale decides which count.
     includeAA: device !== undefined,
   });
+  const differs = n > 0 || marked(diff);
   if (device && n) n = deviceAntialiased(diff, device.render, device.reference, device.scale);
   return {
     mismatch: n / (w * h),
     sizeMismatch: false,
     sizes,
-    diff: options.diff ? PNG.sync.write(diff) : undefined,
+    // An overlay shows counted (red) and excused (yellow) pixels. With neither, it is all gray.
+    diff: options.diff && differs ? encodePng(diff) : undefined,
     diffBox: n ? differingBox(diff) : undefined,
   };
+}
+
+/**
+ * Whether pixelmatch marked any pixel of its overlay: red for a difference, yellow for
+ * anti-aliasing. It paints every other pixel gray, with equal channels.
+ */
+function marked(diff: PNG): boolean {
+  const d = diff.data;
+  for (let i = 0; i < d.length; i += 4) if (d[i] === 255 && d[i + 2] === 0) return true;
+  return false;
 }
 
 /** Whether a size equals another. */

@@ -26,7 +26,8 @@ export const LANE_MESSAGE = '\u0000fidelity-lane ';
 /**
  * The number of lanes: `PPTX_FIDELITY_JOBS` when set, else one for each core, at most 4. A lane
  * waits on its browser for much of a deck, so it does not fill a core. On a 14-core laptop the
- * fixtures took 83 s with 2 lanes, 35 s with 4, and 38 s with 6 or 10. Never more lanes than
+ * fixtures took 83 s with 2 lanes, 35 s with 4, and 38 s with 6 or 10, before the save check
+ * compared markup and the raster cache kept the filtered pages. Never more lanes than
  * decks.
  */
 export function laneCount(decks: number, env = process.env.PPTX_FIDELITY_JOBS): number {

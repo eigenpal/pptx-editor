@@ -119,10 +119,10 @@ jobs:
       - name: Consumer install
         if: matrix.check == 'build'
         run: bun run check:consumer-install
-      # The device rasters of the reference PDFs (`rasterizePages` in
-      # scripts/fidelity/references.ts). Each entry inside is keyed by its PDF, the Poppler
-      # version, and the `pdftoppm` options, so an older entry still serves the PDFs that did not
-      # change. A run over every fixture prunes the folder to the current PDFs.
+      # The rasters of the reference PDFs (`rasterizePages` in scripts/fidelity/references.ts):
+      # each page at the device scale and filtered. Each entry inside is keyed by its PDF, the
+      # Poppler version, the `pdftoppm` options, the raster scale, and the filter source, so an older entry still
+      # serves the PDFs that did not change. A run over every fixture prunes the folder to the current PDFs.
       - name: Restore reference rasters
         if: matrix.check == 'fidelity'
         id: rasters-cache

@@ -10,8 +10,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { THRESHOLDS } from './thresholds.ts';
 import {
+  captureSlide,
   openDeck,
   renderSlide,
+  slideMarkup,
   reopenSaved,
   ResetFailed,
   type HarnessControl,
@@ -90,6 +92,7 @@ export async function scoreDeck(
   if (!gap && !input.pdf) gap = { status: 'no-reference', reasons: ['no reference PDF'] };
   const work = imagesDir ?? mkdtempSync(join(tmpdir(), 'pptx-fidelity-'));
   const slides: SlideResult[] = [];
+  let referenceCached: boolean | undefined;
   try {
     mkdirSync(work, { recursive: true });
     let referencePages: ReferencePage[] = [];
@@ -117,6 +120,7 @@ export async function scoreDeck(
             THRESHOLDS.rasterScale,
             input.rasterCache
           );
+          referenceCached = referencePages.length > 0 && referencePages.every((p) => p.cached);
           limitMs = POPPLER.timeout;
           step = 'the PDF text does not extract (pdftotext failed)';
           // Baselines are glyph origins from the content stream. When pdf.js cannot read the
@@ -140,9 +144,11 @@ export async function scoreDeck(
     }
     const pages = slidePages(facts);
     const firstRenders: Buffer[] = [];
+    const firstMarkup: string[] = [];
     for (let i = 0; i < opened.slides; i += 1) {
       const r = await renderSlide(page, i, THRESHOLDS.renderWidthPx);
       firstRenders.push(r.devicePng);
+      firstMarkup.push(r.markup);
       const render = imagesDir ? join(imagesDir, `slide${i + 1}.png`) : undefined;
       if (render) writeFileSync(render, r.png);
       const pageIndex = pages[i];
@@ -249,13 +255,19 @@ export async function scoreDeck(
       slides.push(result);
     }
     // Save → reopen → re-render: must be pixel-identical to the first render, at the device
-    // scale, before the filter can hide a change (`supersample.ts`).
+    // scale, before the filter can hide a change (`supersample.ts`). The same markup paints the
+    // same pixels, so only a slide whose markup changed is captured and compared.
     const reopened = await reopenSaved(page);
     if (reopened.error || reopened.slides !== opened.slides) {
       for (const s of slides) s.selfConsistent = false;
     } else {
       for (let i = 0; i < opened.slides; i += 1) {
-        const again = (await renderSlide(page, i, THRESHOLDS.renderWidthPx)).devicePng;
+        const markup = await slideMarkup(page, i, THRESHOLDS.renderWidthPx);
+        if (typeof markup === 'string' && markup === firstMarkup[i]) {
+          slides[i].selfConsistent = true;
+          continue;
+        }
+        const again = await captureSlide(page);
         // The same PNG bytes are the same pixels: no decode is needed.
         slides[i].selfConsistent =
           firstRenders[i].equals(again) ||
@@ -271,6 +283,7 @@ export async function scoreDeck(
     reference: gap ? (gap.status === 'stale' ? 'stale' : 'none') : 'pdf',
     referenceIssues: gap?.reasons ?? [],
     milliseconds: Date.now() - started,
+    ...(referenceCached === undefined ? {} : { referenceCached }),
   };
 }
 
