@@ -70,7 +70,7 @@ export async function openExportSession(
   signal?: AbortSignal
 ): Promise<OpenPdfDocumentForExportResult> {
   if (signal?.aborted) return { ok: false, reason: 'aborted' };
-  // PDF export always paints every effect (`@pptx-editor.dev/pro/drawing`), as DOCX Editor's
+  // PDF export always draws charts and paints every effect (`@pptx-editor.dev/pro/drawing`), as DOCX Editor's
   // `docx-to-pdf` always installs its drawing module. Installing again is silent.
   installDrawing();
   const given: readonly FontSource[] =

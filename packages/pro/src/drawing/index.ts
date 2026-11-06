@@ -7,12 +7,21 @@ Production use requires a commercial agreement: licensing@eigenpal.com
  * `@pptx-editor.dev/pro/drawing`: advanced drawing rendering.
  *
  * The free engine paints pictures, shapes with fills, gradients, patterns, lines and outer
- * shadows, text, tables, and groups. This module adds the shape and picture effects glow, inner
- * shadow, reflection, and soft edge (ECMA-376 Part 1, 20.1.8).
+ * shadows, text, tables, and groups. This module adds:
  *
- * Without it, a shape or picture paints without those effects, and the editor chrome does not
- * offer them (Shape Effects shows only the outer shadows, Picture Styles only the frame styles).
- * The effect commands still write them to the file, and save keeps them. PDF export
+ * - the shape and picture effects glow, inner shadow, reflection, and soft edge (ECMA-376
+ *   Part 1, 20.1.8);
+ * - charts, drawn from the values cached in their chart parts (ECMA-376 Part 1, 21.2): bar and
+ *   column charts (clustered, stacked, and percent stacked), line, area, scatter, pie, doughnut,
+ *   and radar charts, with titles, legends, axes, gridlines, data labels, and number formats.
+ *   3-D, of-pie, stock, bubble, and surface charts, and charts with trendlines or error bars,
+ *   keep the placeholder. A chart becomes shapes and labels that the engine lays out like any
+ *   other shape, so the editor and the PDF export draw one layout. Its part saves unchanged.
+ *
+ * Without it, a chart shows a labeled placeholder, and a shape or picture paints without those
+ * effects, and the editor chrome does not offer them (Shape Effects shows only the outer
+ * shadows, Picture Styles only the frame styles). The effect commands still write them to the
+ * file, and save keeps them. PDF export
  * (`@pptx-editor.dev/pptx-to-pdf`) always includes this module.
  *
  * The renderers serve every editor and export in the process. Install them before any document
@@ -36,19 +45,20 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import { installDrawingRenderers } from '@pptx-editor.dev/core/layout';
 import type { EditorModule } from '@pptx-editor.dev/core/editor';
 import { rememberLicenseKey, type ProLicenseOptions } from '../license.ts';
+import { renderChartFrame } from './chart-projection.ts';
 import { drawingEffectsRenderer } from './effects-renderer.ts';
 
 /**
- * Install the drawing renderers (glow, inner shadow, reflection, and soft edge) for every editor
- * and export in this process, without an editor module: for headless rendering. Installing
- * again is harmless. A host without the EigenPal Pro License leaves this call out; its shapes
- * and pictures then paint without those effects.
+ * Install the drawing renderers (charts, glow, inner shadow, reflection, and soft edge) for
+ * every editor and export in this process, without an editor module: for headless rendering.
+ * Installing again is harmless. A host without the EigenPal Pro License leaves this call out;
+ * its charts then show placeholders, and its shapes and pictures paint without those effects.
  *
  * @public
  */
 export function installDrawing(options: ProLicenseOptions = {}): void {
   rememberLicenseKey(options.licenseKey);
-  installDrawingRenderers({ effects: drawingEffectsRenderer });
+  installDrawingRenderers({ effects: drawingEffectsRenderer, chart: renderChartFrame });
 }
 
 /**

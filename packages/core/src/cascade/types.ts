@@ -2,7 +2,9 @@
 // inheritance, theme references, color maps, and style matrices are already applied — so
 // layout and paint never consult the tree for a property again.
 
+import type { GeometryPath } from '@eigenpal/ooxml-core';
 import type { Element } from '../store/index.ts';
+import type { ResolvedChartPart } from './chart-part.ts';
 import type { Rgba } from './color.ts';
 import type { ResolvedEffects, ResolvedFill, ResolvedLine } from './paint-props.ts';
 
@@ -27,7 +29,12 @@ export type GeometrySpec =
       readonly preset: string;
       readonly adjust: ReadonlyMap<string, number>;
     }
-  | { readonly kind: 'custom'; readonly element: Element };
+  | { readonly kind: 'custom'; readonly element: Element }
+  /**
+   * Paths already evaluated in the element's local box (EMU). Never read from a file: a drawing
+   * renderer emits them, for example the bars and lines of a chart.
+   */
+  | { readonly kind: 'paths'; readonly paths: readonly GeometryPath[] };
 
 /** Bullet of a paragraph. Sizes: `pct` of the first run's size, or `pts` in hundredths. */
 export type ResolvedBullet =
@@ -263,7 +270,8 @@ export interface ResolvedTable {
 
 /**
  * `p:graphicFrame`: tables, charts, diagrams, OLE. Tables, OLE posters, and diagrams with a
- * saved drawing render; the rest show a fallback.
+ * saved drawing render, and charts render through an installed chart renderer; the rest show a
+ * fallback.
  */
 export interface ResolvedGraphicFrame extends ResolvedBase {
   readonly kind: 'graphicFrame';
@@ -279,6 +287,12 @@ export interface ResolvedGraphicFrame extends ResolvedBase {
    * picture is not an internal PNG, JPEG, GIF, or BMP part (the frame then shows a placeholder).
    */
   readonly poster?: ResolvedPicture;
+  /**
+   * The chart part, for `frameKind: 'chart'` (ECMA-376 Part 1, 21.2). Absent when the part is
+   * missing or is not a chart. The engine draws a chart only through an installed chart
+   * renderer (`installDrawingRenderers`); without one the frame shows a placeholder.
+   */
+  readonly chart?: ResolvedChartPart;
   /**
    * The saved drawing of a diagram (`dsp:drawing`; ECMA-376 Part 1, 21.4): its shapes and
    * groups, in the frame's local space, drawn by the normal shape renderer. Read-only. Absent

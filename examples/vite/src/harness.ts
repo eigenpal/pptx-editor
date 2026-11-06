@@ -8,7 +8,7 @@ import { writePptx } from '@pptx-editor.dev/core/store';
 import type { FontSource, LayoutItem } from '@pptx-editor.dev/core/layout';
 import { installDrawing } from '@pptx-editor.dev/pro/drawing';
 
-// The harness renders as the demos do: with the Pro drawing renderers (glow, inner shadow,
+// The harness renders as the demos do: with the Pro drawing renderers (charts, glow, inner shadow,
 // reflection, and soft edge), installed before any deck opens.
 installDrawing();
 

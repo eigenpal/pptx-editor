@@ -111,6 +111,9 @@ export type DecodeEmbeddedFontResult = {
     info: EmbeddedFontInfo;
 } | FontRejection;
 
+// @internal
+export function decodeXml(bytes: Uint8Array): string;
+
 // @public
 export const DEFAULT_ZIP_LIMITS: ZipLimits;
 

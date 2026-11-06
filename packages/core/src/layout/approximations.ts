@@ -229,6 +229,8 @@ class Collector {
         if (item.poster) this.item(item.poster);
         if (item.drawing) this.add('diagram-drawing');
         for (const c of item.drawing ?? []) this.item(c);
+        // A chart's labels set text like any shape, so their approximations count.
+        if (item.chart) for (const c of item.chart) this.item(c);
         const table = item.table;
         if (!table) return;
         this.fill(item.element.table?.background, false);

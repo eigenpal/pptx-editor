@@ -11,11 +11,13 @@ import type {
   Xfrm,
 } from '../cascade/index.ts';
 import { fitShape } from './autofit.ts';
+import { drawingRenderers } from './drawing-renderers.ts';
 import { evaluateGeometry } from './geometry/geometry.ts';
 import { boxMatrix, multiply, type Matrix } from './matrix.ts';
 import type { ItemPlacement, LayoutItem, SourceMap } from './slide-layout.ts';
 import { layoutTable } from './table-layout.ts';
-import { layoutText, layoutTextOn, type TextLayout } from './text/text-layout.ts';
+import { layoutTextOn, type TextLayout } from './text/text-layout.ts';
+import type { LineBasis } from './text/line-metrics.ts';
 import type { TextMeasurer } from './text/measurer.ts';
 
 /** Maps a group's child coordinates (`chOff`/`chExt`) into the group's local box. */
@@ -97,10 +99,13 @@ export function layoutElement(
   parent: Matrix,
   map: ChildMap | null,
   measurer: TextMeasurer,
-  diagnostics: Set<string>
+  diagnostics: Set<string>,
+  /** The single line that text in a shape's own geometry is spaced on (`LineBasis`). */
+  basis: LineBasis = 'size'
 ): LayoutItem | null {
   if (source.hidden) return null;
-  return layoutPlaced(placeInGroup(source, map), source, parent, map, measurer, diagnostics);
+  const el = placeInGroup(source, map);
+  return layoutPlaced(el, source, parent, map, measurer, diagnostics, basis);
 }
 
 /**
@@ -157,7 +162,8 @@ function layoutPlaced(
   parent: Matrix,
   map: ChildMap | null,
   measurer: TextMeasurer,
-  diagnostics: Set<string>
+  diagnostics: Set<string>,
+  basis: LineBasis = 'size'
 ): LayoutItem | null {
   const matrix = multiply(parent, boxMatrix(el.xfrm));
   const placement: ItemPlacement = { parentMatrix: parent, toSource: map };
@@ -187,10 +193,11 @@ function layoutPlaced(
         );
       } else if (el.text && el.text.paragraphs.length > 0) {
         const r = geometry.textRect;
-        text = layoutText(
+        text = layoutTextOn(
           el.text,
           { x: r.l, y: r.t, width: r.r - r.l, height: r.b - r.t },
-          measurer
+          measurer,
+          basis
         );
         for (const s of text.substitutions) diagnostics.add(`font substituted: ${s}`);
         textMatrix = uprightTextMatrix(matrix, text.box);
@@ -246,6 +253,8 @@ function layoutPlaced(
         diagnostics
       );
       if (drawing) return { ...placement, kind: 'frame', element: el, matrix, drawing };
+      const chart = el.chart && layoutChart(el, matrix, measurer, diagnostics);
+      if (chart) return { ...placement, kind: 'frame', element: el, matrix, chart };
       diagnostics.add(`graphic frame rendered as placeholder: ${el.frameKind}`);
       // A drawing that resolved but holds a shape layout cannot draw (an unknown preset).
       const element: ResolvedGraphicFrame = el.drawing
@@ -254,4 +263,30 @@ function layoutPlaced(
       return { ...placement, kind: 'frame', element, matrix };
     }
   }
+}
+
+/**
+ * Lay out a chart frame through the installed chart renderer, or null when none is installed or
+ * it does not draw this chart. The renderer's elements sit in the frame's local box.
+ */
+function layoutChart(
+  frame: ResolvedGraphicFrame,
+  matrix: Matrix,
+  measurer: TextMeasurer,
+  diagnostics: Set<string>
+): LayoutItem[] | null {
+  const chart = frame.chart;
+  if (!chart) return null;
+  const render = drawingRenderers().chart;
+  const elements = render?.({ frame, chart, measurer });
+  if (!elements) return null;
+  const items: LayoutItem[] = [];
+  // Chart labels space their lines on the face's line, as diagram text does: each label line is
+  // as tall as its face's ascent plus descent, with the baseline at the ascent (the chart
+  // labels of the `charts` and `slide-structure` reference PDFs).
+  for (const el of elements) {
+    const item = layoutElement(el, matrix, null, measurer, diagnostics, 'face');
+    if (item) items.push(item);
+  }
+  return items;
 }

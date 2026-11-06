@@ -39,6 +39,7 @@ const customCache = new WeakMap<Element, PresetShapeDefinition>();
 
 /** Evaluate a geometry spec at a size (EMU). */
 export function evaluateGeometry(spec: GeometrySpec, w: number, h: number): EvaluatedGeometry {
+  if (spec.kind === 'paths') return { paths: spec.paths, textRect: { l: 0, t: 0, r: w, b: h } };
   if (spec.kind === 'custom') {
     let def = customCache.get(spec.element);
     if (!def) {

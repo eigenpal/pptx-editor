@@ -20,6 +20,7 @@ import {
   type NodeSpec,
   isValidXmlText,
   type PptxPackage,
+  decodeXml,
 } from '../store/index.ts';
 import { partNameKey } from '@eigenpal/ooxml-core';
 import type { OpBatch } from './commands/op-batch.ts';
@@ -75,14 +76,6 @@ const CORE_FIELDS = {
 const APP_FIELDS = { company: 'Company', manager: 'Manager' } as const;
 
 const parsed = new WeakMap<Uint8Array, Element | null>();
-
-/** The text of an XML part kept as bytes, honoring a UTF-8 or UTF-16 byte order mark. */
-function decodeXml(bytes: Uint8Array): string {
-  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes);
-  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(bytes);
-  const text = new TextDecoder().decode(bytes);
-  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
-}
 
 /**
  * The root of an XML part. The reader keeps the property and tags parts as bytes (it does not

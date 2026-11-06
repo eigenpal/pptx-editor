@@ -54,6 +54,16 @@ export interface CellLayout {
     readonly y: number;
 }
 
+// @internal
+export type ChartRenderer = (input: ChartRenderInput) => readonly ResolvedElement[] | null;
+
+// @internal
+export interface ChartRenderInput {
+    readonly chart: ResolvedChartPart;
+    readonly frame: ResolvedGraphicFrame;
+    readonly measurer: TextMeasurer;
+}
+
 // @public
 export function composeFontConfiguration(base: FontConfigurationBase, ...fragments: readonly FontConfigurationFragment[]): FontConfiguration;
 
@@ -104,6 +114,7 @@ export function defineFontResolver<T extends FontResolver>(resolve: T): MarkedFo
 
 // @public
 export interface DrawingCapabilities {
+    readonly chart: boolean;
     readonly effects: boolean;
 }
 
@@ -119,6 +130,7 @@ export interface DrawingEffectsRenderer {
 
 // @internal
 export interface DrawingRenderers {
+    readonly chart?: ChartRenderer;
     readonly effects?: DrawingEffectsRenderer;
 }
 
@@ -485,6 +497,7 @@ export type LayoutItem = ItemPlacement & ({
         kind: 'picture';
     }>;
     readonly drawing?: readonly LayoutItem[];
+    readonly chart?: readonly LayoutItem[];
 });
 
 // @public

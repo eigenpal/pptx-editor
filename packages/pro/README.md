@@ -25,7 +25,7 @@ Commercial capabilities for PPTX Editor, delivered as `EditorModule`s, in the sa
   - **Status:** `statusSnapshot()` and `subscribeStatus()` report the state and a typed `CollaborationFailureCode`, as in DOCX Editor. Call `setConnected()` from your provider's status event.
   - **Concurrent edits:** two peers that add or replace an element that a slide, shape, or paragraph holds once end with one element, and the other peer's copy stays hidden in the room until the winner undoes. Property elements merge. Concurrent splits of one run keep its text once, and a node moved into content that a peer removes at once goes back. The `collaboration.realtime` row in `docs/site/data/pptx-features.ts` states what is supported and its limits. A room from a pre-release build (room format 1) refuses to attach.
   - **Presence:** with a Yjs `awareness` (`y-protocols/awareness`), the editor publishes its selection, and the canvas shows each peer's selected shapes and text caret, with the peer's name and color. Your caret stays on its character while peers type before it.
-- `drawingModule()` from `@pptx-editor.dev/pro/drawing`: paints the shape and picture effects glow, inner shadow, reflection, and soft edge (ECMA-376 Part 1, 20.1.8). The free engine paints outer shadows. Without the module, a shape or picture paints without these four effects, and the editor chrome does not offer them: Shape Effects shows only the outer shadows, and Picture Styles shows only the frame styles. The effect commands still write them, and save keeps them. PDF export (`@pptx-editor.dev/pptx-to-pdf`) always includes the module.
+- `drawingModule()` from `@pptx-editor.dev/pro/drawing`: paints the shape and picture effects glow, inner shadow, reflection, and soft edge (ECMA-376 Part 1, 20.1.8). The free engine paints outer shadows. Without the module, a shape or picture paints without these four effects, and the editor chrome does not offer them: Shape Effects shows only the outer shadows, and Picture Styles shows only the frame styles. The effect commands still write them, and save keeps them. PDF export (`@pptx-editor.dev/pptx-to-pdf`) always includes the module. It also draws charts from the values cached in their chart parts (ECMA-376 Part 1, 21.2); see [Charts](#charts).
 
 This package uses the EigenPal Pro License (`LICENSE.md`): you may evaluate it freely, and production use requires a commercial agreement.
 
@@ -115,6 +115,21 @@ The first replica in an empty room seeds it from its deck. Later replicas adopt 
 Your host must authenticate participants and authorize access to each document before connecting its provider. A `documentId` identifies a document; it does not grant access. Enforce read and write permissions in your provider or server, including update and awareness messages. Disconnect participants when their access ends. Use an encrypted connection for network transport.
 
 Registering a module is the whole enablement story. Without modules, the free engine works the same: decks round-trip, comments and effects are kept, and no replica attaches.
+
+## Charts
+
+`@pptx-editor.dev/pro/drawing` draws bar and column charts (clustered, stacked, and percent stacked), line, area, scatter, pie, doughnut, and radar charts, with titles, legends, axes, gridlines, data labels, and number formats. 3-D, of-pie, stock, bubble, and surface charts, and charts with trendlines or error bars, keep the placeholder. A chart is not editable, and its part saves unchanged.
+
+```ts
+import { createPptxEditor } from '@pptx-editor.dev/core/editor';
+import { drawingModule } from '@pptx-editor.dev/pro/drawing';
+
+const editor = createPptxEditor({ document: bytes, modules: [drawingModule({ licenseKey })] });
+```
+
+For headless layout, call `installDrawing({ licenseKey })` once. The renderers serve every editor and export in the process, so install them before the first deck opens. `@pptx-editor.dev/pptx-to-pdf` always installs them.
+
+A chart becomes shapes and labels that the engine lays out like any other shape, with the same text measurer. The editor and the PDF export draw that one layout.
 
 ## How it connects to the engine
 

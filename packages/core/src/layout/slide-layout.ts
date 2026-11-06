@@ -76,6 +76,12 @@ export type LayoutItem = ItemPlacement &
          * groups placed in the frame's box. A frame with none draws a labeled placeholder.
          */
         readonly drawing?: readonly LayoutItem[];
+        /**
+         * The laid-out chart, for a chart frame that an installed chart renderer draws: shapes
+         * and labels in the frame's box, in paint order. They carry ids under the frame's id
+         * and are never hit targets: the frame is the object.
+         */
+        readonly chart?: readonly LayoutItem[];
       }
   );
 

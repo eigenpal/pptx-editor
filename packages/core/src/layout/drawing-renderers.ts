@@ -4,15 +4,25 @@
 // The engine paints shapes, pictures, fills, lines, text, and outer shadows on its own. A shape
 // or picture paints without the effects that no renderer paints: glow, inner shadow,
 // reflection, and soft edge come from the `effects` renderer (`@pptx-editor.dev/pro/drawing`).
-// Other capability packages add their own keys to `DrawingRenderers`.
+// A chart keeps its labeled placeholder until a `chart` renderer is installed. Other capability
+// packages add their own keys to `DrawingRenderers`.
 //
-// The boundary is DOM-free: a renderer returns SVG as plain data (`EffectNode`), and the SVG
-// paint (`output/paint.ts`) builds the elements. Installation is process-wide, because every
-// editor and export in the process paints with the same engine; install renderers before any
-// document opens. Looking up a renderer is one property read.
+// The boundary is DOM-free: an effects renderer returns SVG as plain data (`EffectNode`), and
+// the SVG paint (`output/paint.ts`) builds the elements. A chart renderer returns resolved
+// shapes in the frame's box; `layoutSlide` lays them out with the same geometry and text
+// pipeline as every other shape, and the SVG paint and the PDF writer draw those records.
+// Installation is process-wide, because every editor and export in the process paints with the
+// same engine; install renderers before any document opens. Looking up a renderer is one
+// property read.
 
-import type { ResolvedEffects } from '../cascade/index.ts';
+import type {
+  ResolvedChartPart,
+  ResolvedEffects,
+  ResolvedElement,
+  ResolvedGraphicFrame,
+} from '../cascade/index.ts';
 import type { Matrix } from './slide-layout.ts';
+import type { TextMeasurer } from './text/measurer.ts';
 
 /**
  * One SVG element as plain data: the SVG paint creates it with `createElementNS` and
@@ -91,6 +101,25 @@ export interface DrawingEffectsRenderer {
   ) => EffectCopyPaint | null;
 }
 
+/** What a chart renderer reads for one chart frame. @internal */
+export interface ChartRenderInput {
+  /** The graphic frame, at its laid-out size (`xfrm.cx`, `xfrm.cy`). */
+  readonly frame: ResolvedGraphicFrame;
+  /** The chart part, with the colors and theme its values resolve against. */
+  readonly chart: ResolvedChartPart;
+  /** The measurer that lays out every label, so sizes match the drawn text. */
+  readonly measurer: TextMeasurer;
+}
+
+/**
+ * A chart renderer: the shapes and labels of a chart as resolved elements in the frame's local
+ * box (EMU, origin at the frame's top-left corner), in paint order. Null when the chart is
+ * outside what the renderer draws; the frame then keeps its placeholder.
+ *
+ * @internal
+ */
+export type ChartRenderer = (input: ChartRenderInput) => readonly ResolvedElement[] | null;
+
 /**
  * Renderers a capability package installs.
  *
@@ -99,6 +128,8 @@ export interface DrawingEffectsRenderer {
 export interface DrawingRenderers {
   /** Glow, inner shadow, reflection, and soft edge. */
   readonly effects?: DrawingEffectsRenderer;
+  /** Charts drawn from the values cached in their chart parts (ECMA-376 Part 1, 21.2). */
+  readonly chart?: ChartRenderer;
 }
 
 let installed: DrawingRenderers = Object.freeze({});
@@ -119,7 +150,7 @@ function guard<A extends unknown[], R>(render: (...args: A) => R, fallback: R): 
 }
 
 function guardedRenderers(renderers: Partial<DrawingRenderers>): Partial<DrawingRenderers> {
-  const { effects } = renderers;
+  const { effects, chart } = renderers;
   // Spread first, so a key named with `undefined` clears the installed renderer.
   return {
     ...renderers,
@@ -132,6 +163,8 @@ function guardedRenderers(renderers: Partial<DrawingRenderers>): Partial<Drawing
           }),
         }
       : {}),
+    // A chart whose renderer fails keeps its placeholder.
+    ...(chart ? { chart: guard(chart, null) } : {}),
   };
 }
 
@@ -206,10 +239,17 @@ export function drawingRenderersListenerCount(): number {
 export interface DrawingCapabilities {
   /** Glow, inner shadow, reflection, and soft edge paint (`@pptx-editor.dev/pro/drawing`). */
   readonly effects: boolean;
+  /**
+   * Charts draw from their cached values (`@pptx-editor.dev/pro/drawing`). Without it, a chart
+   * frame keeps its labeled placeholder.
+   */
+  readonly chart: boolean;
 }
 
-const WITHOUT_EFFECTS: DrawingCapabilities = Object.freeze({ effects: false });
-const WITH_EFFECTS: DrawingCapabilities = Object.freeze({ effects: true });
+/** One frozen answer for each combination, so a caller can compare answers by identity. */
+const CAPABILITIES: readonly DrawingCapabilities[] = [0, 1, 2, 3].map((bits) =>
+  Object.freeze({ effects: (bits & 1) !== 0, chart: (bits & 2) !== 0 })
+);
 
 /**
  * What the installed drawing renderers paint, read at the time of the call. The chrome reads it
@@ -219,7 +259,7 @@ const WITH_EFFECTS: DrawingCapabilities = Object.freeze({ effects: true });
  * @public
  */
 export function drawingCapabilities(): DrawingCapabilities {
-  return installed.effects ? WITH_EFFECTS : WITHOUT_EFFECTS;
+  return CAPABILITIES[(installed.effects ? 1 : 0) | (installed.chart ? 2 : 0)]!;
 }
 
 /** The installed renderers. @internal */
