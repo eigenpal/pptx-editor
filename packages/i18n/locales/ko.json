@@ -755,7 +755,11 @@
     "noRoot": "이 컨트롤을 사용하려면 편집기 루트(PptxEditor.Root 또는 PptxEditorRoot) 안에 넣으세요",
     "dialogSlot": "이 컨트롤은 대화 상자를 엽니다",
     "selectWord": "단어 안을 클릭하거나 텍스트를 선택하세요",
-    "mixedSize": "선택한 텍스트에 크기가 둘 이상 있습니다"
+    "mixedSize": "선택한 텍스트에 크기가 둘 이상 있습니다",
+    "animationsReadOnly": "이 슬라이드의 효과는 편집기가 변경하지 않는 마크업을 사용합니다",
+    "noAnimation": "이 슬라이드에 해당 효과가 없습니다",
+    "noAnimationChange": "효과 또는 전환에 이미 이 설정이 있습니다",
+    "instantAnimation": "이 효과는 즉시 실행되므로 재생 시간이 없습니다"
   },
   "rail": {
     "ariaLabel": "슬라이드",
@@ -803,6 +807,7 @@
     "tabs": {
       "format": "서식",
       "selection": "선택",
+      "animations": "애니메이션",
       "comments": "메모"
     },
     "format": {
@@ -843,6 +848,69 @@
     "comments": {
       "emptyTitle": "메모 없음",
       "emptyBody": "메모는 저장할 때 유지됩니다. 이 버전에서는 메모를 검토할 수 없습니다."
+    },
+    "animations": {
+      "transition": "슬라이드 전환",
+      "transitionKind": "전환",
+      "kinds": {
+        "none": "없음",
+        "fade": "페이드",
+        "push": "밀어내기",
+        "wipe": "닦아내기",
+        "split": "나누기",
+        "cut": "자르기",
+        "other": "기타"
+      },
+      "duration": "재생 시간",
+      "secondsUnit": "초",
+      "advanceOnClick": "마우스를 클릭할 때",
+      "advanceAfter": "다음 시간 후",
+      "applyToAll": "모든 슬라이드에 적용",
+      "effects": "효과",
+      "addEffect": "효과 추가",
+      "add": "추가",
+      "classes": {
+        "entrance": "나타내기",
+        "emphasis": "강조",
+        "exit": "끝내기",
+        "motionPath": "이동 경로",
+        "other": "기타 효과"
+      },
+      "presets": {
+        "appear": "나타내기",
+        "fade": "페이드",
+        "flyIn": "날아오기",
+        "wipe": "닦아내기",
+        "zoom": "확대/축소",
+        "pulse": "펄스",
+        "spin": "회전",
+        "growShrink": "크게/작게",
+        "disappear": "사라지기",
+        "fadeOut": "페이드 아웃",
+        "flyOut": "날아가기",
+        "wipeOut": "닦아내며 사라지기",
+        "zoomOut": "축소하며 사라지기"
+      },
+      "listLabel": "이 슬라이드의 효과",
+      "emptyTitle": "효과 없음",
+      "emptyBody": "슬라이드에서 도형을 선택한 다음 효과를 추가하세요.",
+      "readOnly": "편집기는 이 효과를 표시하지만 변경하지 않습니다.",
+      "noPlayback": "편집기는 효과나 전환을 재생하지 않습니다.",
+      "start": "시작",
+      "triggers": {
+        "onClick": "클릭할 때",
+        "withPrevious": "이전 효과와 함께",
+        "afterPrevious": "이전 효과 다음에"
+      },
+      "delay": "지연",
+      "moveEarlier": "앞으로 이동",
+      "moveLater": "뒤로 이동",
+      "remove": "효과 제거",
+      "onShapeClick": "{shape} 클릭할 때",
+      "paragraphs": "단락 {start}~{end}",
+      "unnamed": "없는 도형",
+      "step": "클릭 {step}",
+      "withSlide": "슬라이드와 함께"
     }
   },
   "pageSetup": {

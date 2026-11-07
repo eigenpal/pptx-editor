@@ -755,7 +755,11 @@
     "noRoot": "このコントロールを使用するには、エディターのルート (PptxEditor.Root または PptxEditorRoot) 内に配置してください",
     "dialogSlot": "このコントロールはダイアログを開きます",
     "selectWord": "単語内をクリックするか、テキストを選択してください",
-    "mixedSize": "選択したテキストには複数のサイズが含まれています"
+    "mixedSize": "選択したテキストには複数のサイズが含まれています",
+    "animationsReadOnly": "このスライドの効果は、エディターが変更しないマークアップを使っています",
+    "noAnimation": "このスライドにその効果はありません",
+    "noAnimationChange": "効果または画面切り替えはすでにこの設定です",
+    "instantAnimation": "この効果は瞬時に行われるため、継続時間はありません"
   },
   "rail": {
     "ariaLabel": "スライド",
@@ -803,6 +807,7 @@
     "tabs": {
       "format": "書式",
       "selection": "選択",
+      "animations": "アニメーション",
       "comments": "コメント"
     },
     "format": {
@@ -843,6 +848,69 @@
     "comments": {
       "emptyTitle": "コメントはありません",
       "emptyBody": "コメントは保存時に保持されます。このバージョンでは、コメントの確認はできません。"
+    },
+    "animations": {
+      "transition": "スライドの切り替え",
+      "transitionKind": "画面切り替え",
+      "kinds": {
+        "none": "なし",
+        "fade": "フェード",
+        "push": "プッシュ",
+        "wipe": "ワイプ",
+        "split": "スプリット",
+        "cut": "カット",
+        "other": "その他"
+      },
+      "duration": "継続時間",
+      "secondsUnit": "秒",
+      "advanceOnClick": "クリック時",
+      "advanceAfter": "自動的に切り替え",
+      "applyToAll": "すべてのスライドに適用",
+      "effects": "効果",
+      "addEffect": "効果の追加",
+      "add": "追加",
+      "classes": {
+        "entrance": "開始",
+        "emphasis": "強調",
+        "exit": "終了",
+        "motionPath": "アニメーションの軌跡",
+        "other": "その他の効果"
+      },
+      "presets": {
+        "appear": "アピール",
+        "fade": "フェード",
+        "flyIn": "スライドイン",
+        "wipe": "ワイプ",
+        "zoom": "ズーム",
+        "pulse": "パルス",
+        "spin": "スピン",
+        "growShrink": "拡大/収縮",
+        "disappear": "クリア",
+        "fadeOut": "フェードアウト",
+        "flyOut": "スライドアウト",
+        "wipeOut": "ワイプアウト",
+        "zoomOut": "ズームアウト"
+      },
+      "listLabel": "このスライドの効果",
+      "emptyTitle": "効果はありません",
+      "emptyBody": "スライドの図形を選択して、効果を追加してください。",
+      "readOnly": "エディターはこれらの効果を表示しますが、変更しません。",
+      "noPlayback": "エディターは効果や画面切り替えを再生しません。",
+      "start": "開始",
+      "triggers": {
+        "onClick": "クリック時",
+        "withPrevious": "直前の動作と同時",
+        "afterPrevious": "直前の動作の後"
+      },
+      "delay": "遅延",
+      "moveEarlier": "前に移動",
+      "moveLater": "後に移動",
+      "remove": "効果の削除",
+      "onShapeClick": "{shape} のクリック時",
+      "paragraphs": "段落 {start} から {end}",
+      "unnamed": "見つからない図形",
+      "step": "クリック {step}",
+      "withSlide": "スライドと同時"
     }
   },
   "pageSetup": {

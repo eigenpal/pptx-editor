@@ -68,7 +68,8 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
  * change its fingerprint, only after you open its copy with no prompt. `feature-edits.test.ts`
  * fails when a recipe or an engine change gives a copy with another fingerprint: then open the new
  * copy, and record its fingerprint. Last checked on 7 November 2026: all 66 copies, written by
- * the recipes and fixtures as they are now, no prompt; and the `text.clipboard` copy, no prompt.
+ * the recipes and fixtures as they are now, no prompt; the `text.clipboard` copy, no prompt;
+ * and again `presenting.animations-transitions`, with its new effects and transition, no prompt.
  */
 export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'collaboration.automation-api':
@@ -109,7 +110,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'pictures.styles-border':
     'sha256:043e5036d5b63116d9ff5d107948c943d23bb309adca4f8a9eaee82137daf636',
   'presenting.animations-transitions':
-    'sha256:18faeb28c7810413c87f81817bda47e140f789eadc4563833062ce0981c1cd27',
+    'sha256:011639372529ef9a4c39d0162e3e74d3534fba3b57cacd7a2067c52092680a03',
   'review.comments': 'sha256:f67938b2e1691f8c4005435cbaaaa5d30685c21acf3d82dd96d8418fa651bae1',
   'shapes.arrange': 'sha256:4701cd3ccd6930d3b7f250b7bb632460e869c08904ce4f132c7272c5764ad5f3',
   'shapes.connectors': 'sha256:e734d6ef3ed3218480c862dff622121acdee1f26ca896d8f5c6b4a8895dfbe23',
@@ -166,7 +167,8 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
  * `scripts/fidelity/kept-content-edits.ts`) whose copy opens with no repair prompt, with the
  * fingerprint of that copy (`editFingerprint`). `bun scripts/fidelity/kept-content-edits.ts --out
  * <dir>` writes one copy per recipe. The rules of `SAVE_VERIFIED_FEATURE_EDITS` apply. Last
- * checked on 7 November 2026: all 37 copies, no prompt.
+ * checked on 7 November 2026: all 37 copies, no prompt. The animation row now proves a full
+ * round trip in `SAVE_VERIFIED_FEATURE_EDITS`, so its duplicate-slide copy is no longer listed.
  */
 export const SAVE_VERIFIED_KEPT_CONTENT_EDITS: Readonly<Record<string, string>> = {
   'paragraphs.text-warp: duplicate slide':
@@ -237,8 +239,6 @@ export const SAVE_VERIFIED_KEPT_CONTENT_EDITS: Readonly<Record<string, string>> 
     'sha256:fe28abbe16211ae3cd2448e3b86bbe1f4b26bd45e99f927aa20cccc48c2f9d29',
   'objects.equations: paste into another deck':
     'sha256:fe28abbe16211ae3cd2448e3b86bbe1f4b26bd45e99f927aa20cccc48c2f9d29',
-  'presenting.animations-transitions: duplicate slide':
-    'sha256:c94c33372ad368532f3e7b50ee56133ff4b414094edfcd7772adfafb31bb2bae',
   'review.comments: duplicate slide':
     'sha256:af6f398bd04ec75e51b13c7f7b768e0c99923f040141e8829b4c0dc76be560cf',
   'themes.placeholder-inheritance: duplicate slide':

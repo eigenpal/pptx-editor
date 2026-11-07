@@ -755,7 +755,11 @@
     "noRoot": "请将此控件放在编辑器根元素(PptxEditor.Root 或 PptxEditorRoot)内以使用它",
     "dialogSlot": "此控件会打开对话框",
     "selectWord": "请在某个词中单击或选择文本",
-    "mixedSize": "所选文本包含多种字号"
+    "mixedSize": "所选文本包含多种字号",
+    "animationsReadOnly": "此幻灯片的效果使用了编辑器不会更改的标记",
+    "noAnimation": "此幻灯片没有该效果",
+    "noAnimationChange": "效果或切换已经是这些设置",
+    "instantAnimation": "此效果是瞬时的，因此没有持续时间"
   },
   "rail": {
     "ariaLabel": "幻灯片",
@@ -803,6 +807,7 @@
     "tabs": {
       "format": "格式",
       "selection": "选择",
+      "animations": "动画",
       "comments": "批注"
     },
     "format": {
@@ -843,6 +848,69 @@
     "comments": {
       "emptyTitle": "没有批注",
       "emptyBody": "保存时会保留批注。此版本不支持审阅批注。"
+    },
+    "animations": {
+      "transition": "幻灯片切换",
+      "transitionKind": "切换",
+      "kinds": {
+        "none": "无",
+        "fade": "淡入/淡出",
+        "push": "推入",
+        "wipe": "擦除",
+        "split": "分割",
+        "cut": "切出",
+        "other": "其他"
+      },
+      "duration": "持续时间",
+      "secondsUnit": "秒",
+      "advanceOnClick": "单击鼠标时",
+      "advanceAfter": "设置自动换片时间",
+      "applyToAll": "应用到全部幻灯片",
+      "effects": "效果",
+      "addEffect": "添加效果",
+      "add": "添加",
+      "classes": {
+        "entrance": "进入",
+        "emphasis": "强调",
+        "exit": "退出",
+        "motionPath": "动作路径",
+        "other": "其他效果"
+      },
+      "presets": {
+        "appear": "出现",
+        "fade": "淡化",
+        "flyIn": "飞入",
+        "wipe": "擦除",
+        "zoom": "缩放",
+        "pulse": "脉冲",
+        "spin": "陀螺旋",
+        "growShrink": "放大/缩小",
+        "disappear": "消失",
+        "fadeOut": "淡出",
+        "flyOut": "飞出",
+        "wipeOut": "擦除退出",
+        "zoomOut": "缩放退出"
+      },
+      "listLabel": "此幻灯片的效果",
+      "emptyTitle": "没有效果",
+      "emptyBody": "在幻灯片上选择一个形状，然后添加效果。",
+      "readOnly": "编辑器显示这些效果，但不会更改它们。",
+      "noPlayback": "编辑器不播放效果或切换。",
+      "start": "开始",
+      "triggers": {
+        "onClick": "单击时",
+        "withPrevious": "与上一动画同时",
+        "afterPrevious": "上一动画之后"
+      },
+      "delay": "延迟",
+      "moveEarlier": "向前移动",
+      "moveLater": "向后移动",
+      "remove": "删除效果",
+      "onShapeClick": "单击 {shape} 时",
+      "paragraphs": "段落 {start} 至 {end}",
+      "unnamed": "缺少的形状",
+      "step": "单击 {step}",
+      "withSlide": "与幻灯片同时"
     }
   },
   "pageSetup": {

@@ -22,6 +22,8 @@ import type { FindMatch, FindOptions } from './find.ts';
 export type { FindMatch, FindOptions } from './find.ts';
 import type { ConnectorRoute } from './connectors.ts';
 export type { ConnectionTarget, ConnectorRoute } from './connectors.ts';
+import type { AnimationCommand, SlideAnimations } from './animation.ts';
+export type * from './animation.ts';
 
 import type {
   ObjectAxis,
@@ -424,6 +426,7 @@ export type EditorCommand =
   | TextFormatCommand
   | PictureCommand
   | FillCommand
+  | AnimationCommand
   /**
    * Shape Effects: set or remove one effect of the selected shapes, connectors, and pictures.
    * A shape whose effects come from its theme style (`a:effectRef`) gets that style's effects
@@ -995,4 +998,14 @@ export interface EditorSnapshot {
    * or null. Optional: absent means the implementation does not edit tables.
    */
   readonly table?: TableContext | null;
+  /**
+   * The current slide's effects and transition. Optional: absent means the implementation does
+   * not edit animations.
+   */
+  readonly animations?: SlideAnimations;
+  /**
+   * Whether the canvas shows the order number of each effect on its shape
+   * (`showAnimationOrder`). A view setting, never saved. Absent reads as false.
+   */
+  readonly animationOrder?: boolean;
 }

@@ -20,6 +20,7 @@ import { attr, children, elements } from './query.ts';
 import { NS, REL } from './namespaces.ts';
 import { repairPresentationRoot } from './presentation-repair.ts';
 import { markFileTimings, repairTimingRoot } from './timing.ts';
+import { repairTransitionRoot } from './transition-repair.ts';
 import { sha256FontBytes } from '@eigenpal/ooxml-core';
 import { DerivedParts } from './parts-map.ts';
 import {
@@ -404,7 +405,8 @@ export function writePptx(pkg: PptxPackage): Uint8Array<ArrayBuffer> {
   );
   // The presentation part leaves with one extension list, one section list, and one slide id
   // for each slide that has a relationship and a part. A slide whose `p:timing` the session
-  // changed leaves with no empty time node list or build list in it (`repairTimingRoot`).
+  // changed leaves with no empty time node list or build list in it (`repairTimingRoot`), and
+  // a slide leaves with one transition, before its timing (`repairTransitionRoot`).
   const main = mainPresentationPart(pkg);
   for (const part of ordered)
     entries.set(
@@ -415,7 +417,7 @@ export function writePptx(pkg: PptxPackage): Uint8Array<ArrayBuffer> {
               part.partName === main
                 ? { ...part.xml, root: repairedPresentationRoot(pkg) ?? part.xml.root }
                 : isSlideRoot(part.xml.root)
-                  ? { ...part.xml, root: repairTimingRoot(part.xml.root) }
+                  ? { ...part.xml, root: repairTransitionRoot(repairTimingRoot(part.xml.root)) }
                   : part.xml
             )
           )

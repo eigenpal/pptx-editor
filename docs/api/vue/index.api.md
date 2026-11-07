@@ -3472,14 +3472,14 @@ export const PptxEditor: {
             readonly default: undefined;
         };
     }>> & Readonly<{
-        onTabChange?: ((_tab: "format" | "comments" | "selection") => any) | undefined;
-        "onUpdate:tab"?: ((_tab: "format" | "comments" | "selection") => any) | undefined;
+        onTabChange?: ((_tab: "format" | "comments" | "animations" | "selection") => any) | undefined;
+        "onUpdate:tab"?: ((_tab: "format" | "comments" | "animations" | "selection") => any) | undefined;
     }>, {
         readonly className: string;
         readonly style: vue.CSSProperties;
         readonly paneWidth: number;
         readonly onClose: () => void;
-        readonly tab: "format" | "comments" | "selection";
+        readonly tab: "format" | "comments" | "animations" | "selection";
     }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
     SelectionPane: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly className: {
@@ -6203,14 +6203,14 @@ export const PptxEditorSidePanel: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly default: undefined;
     };
 }>> & Readonly<{
-    onTabChange?: ((_tab: "format" | "comments" | "selection") => any) | undefined;
-    "onUpdate:tab"?: ((_tab: "format" | "comments" | "selection") => any) | undefined;
+    onTabChange?: ((_tab: "format" | "comments" | "animations" | "selection") => any) | undefined;
+    "onUpdate:tab"?: ((_tab: "format" | "comments" | "animations" | "selection") => any) | undefined;
 }>, {
     readonly className: string;
     readonly style: CSSProperties;
     readonly paneWidth: number;
     readonly onClose: () => void;
-    readonly tab: "format" | "comments" | "selection";
+    readonly tab: "format" | "comments" | "animations" | "selection";
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 
 // @public

@@ -98,6 +98,26 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'The shape already has those adjust values, so nothing changes.',
   ],
   [
+    'disabled.noAnimationChange',
+    'edit.no-change',
+    'The effect or the transition already has those settings, so nothing changes.',
+  ],
+  [
+    'disabled.animationsReadOnly',
+    'edit.animations-read-only',
+    'The slide keeps its effects in markup that the editor does not change. Edit them in the file.',
+  ],
+  [
+    'disabled.noAnimation',
+    'edit.no-animation',
+    'The slide has no main sequence effect with that id. Read the effect ids of the slide first.',
+  ],
+  [
+    'disabled.instantAnimation',
+    'edit.instant-animation',
+    'The effect is instant, so it has no duration. Change its delay instead.',
+  ],
+  [
     'disabled.noAdjustHandles',
     'edit.unsupported-element',
     'Only a preset shape with adjust handles has adjust values. Select such a shape.',

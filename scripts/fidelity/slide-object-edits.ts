@@ -530,25 +530,50 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
   'presenting.animations-transitions': {
     fixture: 'preserved-content',
     edit: (t) => {
-      t.selectText('Animated text', 0, 4);
-      t.run({ type: 'toggleBold' });
-      t.selectText('Animated text', 0, 0);
-      t.type('Typed. ');
+      // An effect of each class, one on a shape in markup-compatibility content, a reorder, new
+      // timing, the removal of an effect of the file, and a new transition.
+      t.select('Title');
+      t.run({ type: 'addAnimation', preset: 'flyIn' });
+      t.select('Warped text');
+      t.run({ type: 'addAnimation', preset: 'pulse', trigger: 'afterPrevious' });
+      t.select('EMF picture');
+      t.run({ type: 'addAnimation', preset: 'fadeOut' });
+      t.select('Equation');
+      t.run({ type: 'addAnimation', preset: 'zoom', trigger: 'withPrevious' });
+      const effects = () => t.editor.snapshot().animations!.effects;
+      const of = (name: string) => effects().find((e) => e.shapeName === name)!.id;
+      t.run({ type: 'moveAnimation', effectId: of('EMF picture'), to: 0 });
+      t.run({ type: 'setAnimationTiming', effectId: of('Title'), delayMs: 250, durationMs: 1000 });
+      t.run({ type: 'removeAnimation', effectId: of('3-D shape') });
+      t.run({ type: 'setTransition', kind: 'push', durationMs: 1200, advanceAfterMs: 5000 });
     },
     check: (d) => {
-      // The shape keeps its id, which the animation names, and its unknown extension.
-      const nonVisual = (xml: string) => /<p:cNvPr .*?<\/p:cNvPr>/.exec(xml)?.[0];
+      const animations = d.editor.snapshot().animations!;
+      const list = animations.effects.map((e) =>
+        [e.shapeName, e.preset, e.trigger, e.step, e.delayMs, e.durationMs].join(' ')
+      );
+      const want = [
+        'EMF picture fadeOut onClick 1 0 500',
+        'Animated text appear onClick 2 0 ',
+        'Title flyIn onClick 3 250 1000',
+        'Warped text pulse afterPrevious 3 0 500',
+        'Equation zoom withPrevious 3 0 500',
+      ];
+      const xml = d.slideXml(0);
+      const ids = [...xml.matchAll(/<p:cTn id="(\d+)"/g)].map((m) => m[1]);
+      const transition = animations.transition;
       return all(
-        textOf(find(shapeElement(d.pkg, 0, 'Animated text'), 'p:txBody')).startsWith('Typed. ')
+        list.join('\n') === want.join('\n') ? undefined : `effects ${list.join('; ')}`,
+        transition.kind === 'push' &&
+          transition.durationMs === 1200 &&
+          transition.advanceOnClick &&
+          transition.advanceAfterMs === 5000
           ? undefined
-          : 'no text',
-        keptChild(d, 0, 'p:transition'),
-        keptChild(d, 0, 'p:timing'),
-        keptChild(d, 0, 'p:extLst'),
-        nonVisual(d.shapeXml(0, 'Animated text')) ===
-          nonVisual(shapeXmlOf(d.original, 0, 'Animated text'))
-          ? undefined
-          : 'the id or the extension of the animated shape changed'
+          : `transition ${JSON.stringify(transition)}`,
+        new Set(ids).size === ids.length ? undefined : 'two time nodes share an id',
+        lacks(xml, '<p:spTgt spid="4"/>', '<p:bldP spid="4"'),
+        has(xml, '<p:bldP spid="3" grpId="0" animBg="1"/>', '<p:bldP spid="5" grpId="0"'),
+        keptChild(d, 0, 'p:extLst')
       );
     },
   },

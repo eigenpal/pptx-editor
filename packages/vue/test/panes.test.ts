@@ -235,7 +235,7 @@ describe('Vue panes match React', () => {
     ]) {
       const el = await mount();
       const tabs = () => [...el.querySelectorAll<HTMLElement>('[role="tab"]')];
-      expect(tabs().map((t) => t.tabIndex)).toEqual([0, -1, -1]);
+      expect(tabs().map((t) => t.tabIndex)).toEqual([0, -1, -1, -1]);
       tabs()[0]!.focus();
       key(tabs()[0]!, 'ArrowRight');
       await nextTick();
@@ -244,8 +244,9 @@ describe('Vue panes match React', () => {
         'false',
         'true',
         'false',
+        'false',
       ]);
-      expect(tabs().map((t) => t.tabIndex)).toEqual([-1, 0, -1]);
+      expect(tabs().map((t) => t.tabIndex)).toEqual([-1, 0, -1, -1]);
       expect(document.activeElement).toBe(tabs()[1]!);
       cleanup();
     }

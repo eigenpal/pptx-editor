@@ -14,6 +14,96 @@ export interface AltText {
 }
 
 // @public
+export type AnimationClass = 'entrance' | 'emphasis' | 'exit' | 'motionPath' | 'other';
+
+// @public
+export type AnimationCommand =
+/**
+* Add an effect to each selected shape, at the end of the main sequence. A shape in a group
+* animates as its whole group. `trigger` defaults to `onClick`.
+*/
+    {
+    readonly type: 'addAnimation';
+    readonly preset: AnimationPreset;
+    readonly trigger?: AnimationTrigger;
+}
+/** Remove the effect `effectId` (`AnimationEffect.id`) of the current slide. */
+| {
+    readonly type: 'removeAnimation';
+    readonly effectId: string;
+}
+/** Move the effect `effectId` to position `to` of the main sequence (0-based). */
+| {
+    readonly type: 'moveAnimation';
+    readonly effectId: string;
+    readonly to: number;
+}
+/**
+* Change when the effect `effectId` starts and how long it plays. Absent fields stay. Delay is
+* 0 to 3,600,000 ms; duration is 10 to 59,000 ms and is refused for an instant effect.
+*/
+| {
+    readonly type: 'setAnimationTiming';
+    readonly effectId: string;
+    readonly trigger?: AnimationTrigger;
+    readonly delayMs?: number;
+    readonly durationMs?: number;
+}
+/**
+* Set the transition of the current slide, or of the slides `indices`. Absent fields keep
+* their values. `kind: 'none'` removes the effect. Duration is 10 to 59,000 ms;
+* `advanceAfterMs` is 0 to 3,600,000 ms, or null to clear it.
+*/
+| {
+    readonly type: 'setTransition';
+    readonly kind?: TransitionKind | 'none';
+    readonly durationMs?: number;
+    readonly advanceOnClick?: boolean;
+    readonly advanceAfterMs?: number | null;
+    readonly indices?: readonly number[];
+}
+/**
+* Show the order number of each effect on its shape on the canvas. A view setting, not an
+* edit: no undo step, never saved.
+*/
+| {
+    readonly type: 'showAnimationOrder';
+    readonly show: boolean;
+};
+
+// @public
+interface AnimationEffect_2 {
+    readonly delayMs: number;
+    readonly durationMs: number | null;
+    readonly editable: boolean;
+    // (undocumented)
+    readonly effectClass: AnimationClass;
+    readonly id: string;
+    readonly nodeId: string | null;
+    readonly paragraphs?: {
+        readonly start: number;
+        readonly end: number;
+    };
+    readonly preset: AnimationPreset | null;
+    readonly presetId: number | null;
+    readonly sequence: 'main' | 'interactive';
+    readonly shapeId: string;
+    readonly shapeName: string;
+    readonly step: number | null;
+    // (undocumented)
+    readonly trigger: AnimationTrigger;
+    readonly triggerShapeId?: string;
+    readonly triggerShapeName?: string;
+}
+export { AnimationEffect_2 as AnimationEffect }
+
+// @public
+export type AnimationPreset = 'appear' | 'fade' | 'flyIn' | 'wipe' | 'zoom' | 'pulse' | 'spin' | 'growShrink' | 'disappear' | 'fadeOut' | 'flyOut' | 'wipeOut' | 'zoomOut';
+
+// @public
+export type AnimationTrigger = 'onClick' | 'withPrevious' | 'afterPrevious';
+
+// @public
 export type AutonumberScheme = `${'arabic' | 'romanUc' | 'romanLc' | 'alphaUc' | 'alphaLc'}${'Period' | 'ParenR' | 'ParenBoth'}` | 'arabicPlain';
 
 // @public
@@ -616,7 +706,7 @@ export type EditorCommand = {
 /** Apply the copied formatting to the selection as one undo step (Ctrl/Cmd+Shift+V). */
 | {
     readonly type: 'pasteFormat';
-} | TextFormatCommand | PictureCommand | FillCommand
+} | TextFormatCommand | PictureCommand | FillCommand | AnimationCommand
 /**
 * Shape Effects: set or remove one effect of the selected shapes, connectors, and pictures.
 * A shape whose effects come from its theme style (`a:effectRef`) gets that style's effects
@@ -729,6 +819,8 @@ export type EditorSelection = {
 
 // @public (undocumented)
 export interface EditorSnapshot {
+    readonly animationOrder?: boolean;
+    readonly animations?: SlideAnimations;
     // (undocumented)
     readonly canRedo: boolean;
     // (undocumented)
@@ -1356,6 +1448,14 @@ export interface ShapeSummary {
 }
 
 // @public
+export interface SlideAnimations {
+    readonly editable: boolean;
+    readonly effects: readonly AnimationEffect_2[];
+    // (undocumented)
+    readonly transition: SlideTransitionState;
+}
+
+// @public
 export type SlideBackground = {
     readonly kind: 'solid';
     readonly color: ColorChoice;
@@ -1420,6 +1520,14 @@ export interface SlideSummary {
     readonly key: string;
     readonly layoutId?: string;
     readonly pending?: true;
+}
+
+// @public
+export interface SlideTransitionState {
+    readonly advanceAfterMs: number | null;
+    readonly advanceOnClick: boolean;
+    readonly durationMs: number;
+    readonly kind: TransitionKind | 'none' | 'other';
 }
 
 // @public
@@ -1734,6 +1842,9 @@ export interface TransformItem {
     // (undocumented)
     readonly y: number;
 }
+
+// @public
+export type TransitionKind = 'fade' | 'push' | 'wipe' | 'split' | 'cut';
 
 // @public
 export type UnderlineStyle = 'none' | 'words' | 'single' | 'double' | 'heavy' | 'dotted' | 'dottedHeavy' | 'dash' | 'dashHeavy' | 'dashLong' | 'dashLongHeavy' | 'dotDash' | 'dotDashHeavy' | 'dotDotDash' | 'dotDotDashHeavy' | 'wavy' | 'wavyHeavy' | 'wavyDouble';

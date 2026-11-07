@@ -1,0 +1,135 @@
+---
+title: 'Animations and transitions'
+description: 'List, add, reorder, time, and remove the effects of a slide, and set its transition.'
+category: 'Guides'
+---
+
+You edit the effects of a slide and its transition with editor commands: run `editor.exec(command)`, or check first with `editor.can(command)`. Each command is one undo step. The effects are the main sequence of the slide's `p:timing` (ECMA-376 Part 1, §19.5), and the transition is its `p:transition` (§19.3.1.50). For the feature status, see <FeatureBadge id="presenting.animations-transitions" />.
+
+The side panel has an **Animations** tab with the same edits: a **Transition** menu with its duration and advance settings, an **Add effect** menu, and the list of effects in play order. While the tab shows, the canvas tags each animated shape with the click steps that play its effects.
+
+The editor does not play effects or transitions, in the canvas or in the slide show. Another presentation application plays the saved file.
+
+## Read the effects of a slide
+
+`editor.snapshot().animations` holds the effects and the transition of the current slide.
+
+```ts
+const { effects, editable, transition } = editor.snapshot().animations!;
+for (const effect of effects) {
+  // For example: "1 flyIn Title onClick 0 500"
+  console.log(
+    effect.step,
+    effect.preset ?? effect.effectClass,
+    effect.shapeName,
+    effect.trigger,
+    effect.delayMs,
+    effect.durationMs
+  );
+}
+console.log(transition.kind, transition.durationMs, transition.advanceAfterMs);
+```
+
+Each effect has these values:
+
+- `id`: the handle that the effect commands take.
+- `effectClass`: `entrance`, `emphasis`, `exit`, `motionPath`, or `other`.
+- `preset`: the preset that `addAnimation` writes, or `null` for another effect.
+- `trigger`: `onClick`, `withPrevious`, or `afterPrevious`.
+- `step`: the click that starts the effect. Step `0` plays when the slide starts.
+- `delayMs` and `durationMs`: the timing in milliseconds. `durationMs` is `null` for an instant effect, such as Appear.
+- `paragraphs`: the paragraph range (`p:pRg`) of an effect that animates text by paragraph.
+
+The commands edit only the effects of the main sequence. An effect that a click on another shape starts (an interactive sequence) has `sequence: 'interactive'` and `editable: false`. A motion path is listed, and you can reorder, time, or remove it, but you cannot add one.
+
+## Add an effect
+
+`addAnimation` adds an effect to each selected shape, at the end of the main sequence. A shape inside a group animates as its whole group.
+
+```ts
+editor.setSelection({ kind: 'shapes', nodeIds: [titleNodeId] });
+editor.exec({ type: 'addAnimation', preset: 'flyIn' });
+editor.exec({ type: 'addAnimation', preset: 'pulse', trigger: 'afterPrevious' });
+```
+
+These presets are available:
+
+| Class | Presets |
+| --- | --- |
+| Entrance | `appear`, `fade`, `flyIn`, `wipe`, `zoom` |
+| Emphasis | `pulse`, `spin`, `growShrink` |
+| Exit | `disappear`, `fadeOut`, `flyOut`, `wipeOut`, `zoomOut` |
+
+`trigger` defaults to `onClick`. When you select more than one shape, the first effect takes `trigger` and the others play with it. A shape with text also gets a build entry (`p:bldP`), so the text animates with the shape.
+
+## Change the order and the timing
+
+`moveAnimation` moves an effect to a position of the main sequence. `setAnimationTiming` changes its trigger, its delay, or its duration. Absent fields keep their values.
+
+```ts
+const [first, second] = editor.snapshot().animations!.effects;
+editor.exec({ type: 'moveAnimation', effectId: second.id, to: 0 });
+editor.exec({
+  type: 'setAnimationTiming',
+  effectId: first.id,
+  trigger: 'withPrevious',
+  delayMs: 250,
+  durationMs: 1000,
+});
+```
+
+The editor keeps the click steps of the main sequence in agreement with the triggers. An effect with an `afterPrevious` trigger starts when the effects before it in the same step end. Delay is 0 to 3,600,000 ms. Duration is 10 to 59,000 ms. A duration for an instant effect is refused with `disabled.instantAnimation`.
+
+## Remove an effect
+
+`removeAnimation` removes one effect. When no other effect of the same shape and group is left, its build entry goes too. When the last effect goes, the slide's timing goes.
+
+```ts
+editor.exec({ type: 'removeAnimation', effectId: effect.id });
+```
+
+Deleting a shape also removes its effects. An effect that animates paragraphs follows its paragraphs when you edit the text.
+
+## Set the transition
+
+`setTransition` sets the transition of the current slide, or of the slides in `indices`. Absent fields keep their values.
+
+```ts
+// Push, for 1.2 seconds, and advance after 5 seconds or on a click.
+editor.exec({
+  type: 'setTransition',
+  kind: 'push',
+  durationMs: 1200,
+  advanceOnClick: true,
+  advanceAfterMs: 5000,
+});
+
+// The same kind on every slide.
+const count = editor.snapshot().slides.length;
+editor.exec({
+  type: 'setTransition',
+  kind: 'push',
+  indices: Array.from({ length: count }, (_, i) => i),
+});
+
+// No transition, and no automatic advance.
+editor.exec({ type: 'setTransition', kind: 'none', advanceAfterMs: null });
+```
+
+`kind` is `fade`, `push`, `wipe`, `split`, `cut`, or `none`. A transition of another kind reads as `other`. A change of the duration or the advance settings keeps that kind and its extension markup. A change of the kind replaces it. Duration is 10 to 59,000 ms, and `advanceAfterMs` is 0 to 3,600,000 ms or `null`.
+
+## Show the order on the canvas
+
+`showAnimationOrder` turns the order tags on the canvas on or off. It is a view setting: it takes no undo step and is not saved. The **Animations** tab turns it on while it shows.
+
+```ts
+editor.exec({ type: 'showAnimationOrder', show: true });
+```
+
+## Limits
+
+- The editor does not play effects or transitions.
+- A slide whose timing is in markup-compatibility content (`mc:AlternateContent`) is read-only, and `editable` is `false`. The effect commands refuse with `disabled.animationsReadOnly`.
+- A main sequence with a structure that the commands do not write is read-only for the same reason.
+- When two collaborators add the first effect of a slide at the same time, the merge can keep only one of the two effects.
+- When one collaborator removes an effect while another adds, moves, or times an effect on the same slide, the merge can keep the removed effect.

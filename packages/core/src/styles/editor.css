@@ -1834,6 +1834,16 @@
   font-family: system-ui, sans-serif;
   font-weight: 600;
 }
+.pptx-surface__animation-mark rect {
+  /* The selection blue with a light halo: it shows on a dark slide and on a light one. */
+  fill: var(--doc-primary);
+  stroke: var(--doc-selection-halo);
+}
+.pptx-surface__animation-mark text {
+  fill: var(--doc-on-primary);
+  font-family: system-ui, sans-serif;
+  font-weight: 600;
+}
 .pptx-surface__input {
   position: absolute;
   width: 1px;
@@ -2211,6 +2221,96 @@
   min-height: 0;
   padding: 6px 16px 24px;
   overflow-y: auto;
+}
+/* Animations tab: the transition, the Add effect menu, and the effects in play order. A row
+   is a button that selects its effect; the step number leads it. */
+.pptx-animations__select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--doc-border);
+  border-radius: var(--doc-radius-control, 8px);
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 13px;
+}
+.pptx-animations__add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+.pptx-animations__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pptx-animations__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+.pptx-animations__row:hover {
+  background: var(--doc-bg-hover);
+}
+.pptx-animations__row[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--doc-primary) 16%, transparent);
+}
+.pptx-animations__row:focus-visible {
+  outline: 2px solid var(--doc-primary);
+  outline-offset: -2px;
+}
+.pptx-animations__step {
+  display: grid;
+  flex: none;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--doc-accent);
+  color: var(--doc-on-primary);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pptx-animations__name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pptx-animations__detail {
+  overflow: hidden;
+  color: var(--doc-text-muted);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pptx-animations__actions {
+  display: flex;
+  gap: 2px;
+}
+.pptx-animations__note {
+  margin: 0 0 12px;
+  color: var(--doc-text-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
 }
 /* Selection pane: Show all, Hide all, and the order buttons over a tree of the slide's
    elements, top first. A hidden element is muted and shows a closed eye. */

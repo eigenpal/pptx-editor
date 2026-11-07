@@ -27,6 +27,22 @@ import { createPptxEditor } from '../packages/core/src/editor/index.ts';
 
 const SCHEMAS = 'reference/ecma-376/part4/transitional-schemas';
 
+const ANIMATION_PRESET_NAMES = [
+  'fade',
+  'pulse',
+  'flyOut',
+  'zoom',
+  'spin',
+  'wipeOut',
+  'growShrink',
+  'appear',
+  'disappear',
+  'wipe',
+  'fadeOut',
+  'flyIn',
+  'zoomOut',
+] as const;
+
 function preprocess(el: Element, ignorable: Set<string>): Element {
   const children: Element['children'][number][] = [];
   for (const c of el.children) {
@@ -249,6 +265,21 @@ async function edited(bytes: Uint8Array): Promise<PptxPackage | null> {
   }
   editor.exec({ type: 'toggleBold' });
   editor.exec({ type: 'insertShape', preset: 'roundRect' });
+  // Animations: every preset, a reorder, timing, a removal, and a transition.
+  for (const preset of ANIMATION_PRESET_NAMES) editor.exec({ type: 'addAnimation', preset });
+  const effects = editor.snapshot().animations?.effects ?? [];
+  if (effects.length > 3) {
+    editor.exec({ type: 'moveAnimation', effectId: effects[1].id, to: 0 });
+    editor.exec({
+      type: 'setAnimationTiming',
+      effectId: effects[2].id,
+      trigger: 'afterPrevious',
+      delayMs: 250,
+      durationMs: 1500,
+    });
+    editor.exec({ type: 'removeAnimation', effectId: effects[3].id });
+  }
+  editor.exec({ type: 'setTransition', kind: 'split', durationMs: 1250, advanceAfterMs: 4000 });
   editor.exec({ type: 'nudge', dx: 9525, dy: 9525 });
   editor.exec({ type: 'duplicateSlide', index: 0 });
   editor.exec({ type: 'setNotes', index: 0, text: 'Edited notes' });
