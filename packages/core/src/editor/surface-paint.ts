@@ -83,3 +83,21 @@ export function setStyle(
 ): void {
   if (el.style[name] !== value) el.style[name] = value;
 }
+
+/** Put the slide's picture `svg` first in `stage`, in place of an earlier one. */
+export function placeSlide(stage: Element, svg: Element): void {
+  setAttr(svg, 'class', 'pptx-surface__slide');
+  const old = stage.querySelector('.pptx-surface__slide');
+  if (old === svg) return;
+  if (old) old.replaceWith(svg);
+  else stage.prepend(svg);
+}
+
+/** Set the width and height of each of `svgs` in pixels. */
+export function sizeAll(svgs: readonly (Element | null)[], w: number, h: number): void {
+  for (const svg of svgs) {
+    if (!svg) continue;
+    setAttr(svg, 'width', String(w));
+    setAttr(svg, 'height', String(h));
+  }
+}

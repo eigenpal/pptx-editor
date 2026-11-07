@@ -10,11 +10,10 @@
 //   editable. Other faces (preview-and-print deck fonts, host and local fonts) are referenced
 //   by family name, so a viewer with the font installed shows it.
 
-import { binaryPartOf, fontEmbeddingPermission, relTarget, writeZip } from '../store/index.ts';
+import { fontEmbeddingPermission, relTarget, writeZip } from '../store/index.ts';
 import { elementsWithAttribute, paintSlide } from '../output/index.ts';
 import type { RegisteredFace, SlideLayout } from '../layout/index.ts';
-import { imageMime, type DocumentSession } from './document-session.ts';
-import { drawableImageMime } from './drawable-image.ts';
+import type { DocumentSession } from './document-session.ts';
 import { toBase64 } from '../automation/commands/base64.ts';
 import { CommandRefusal } from '../automation/commands/op-batch.ts';
 import { uniquePrefix } from './paint-ids.ts';
@@ -26,6 +25,11 @@ export interface SlideImageOptions {
   readonly width?: number;
   /** The label of an element the editor draws as a placeholder (chart, diagram), as on the canvas. */
   readonly frameLabel?: (kind: string) => string;
+  /**
+   * PNG and ZIP export only: how long to wait for each slide's EMF and WMF pictures, in
+   * milliseconds. Default 30000; `Infinity` waits until each one converted or failed.
+   */
+  readonly picturesTimeoutMs?: number;
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -126,11 +130,10 @@ export function paintLayout(
       const target = relTarget(pkg, source, rId);
       if (!target) return undefined;
       if (!pictures.has(target)) {
-        // The same check as the editor's paint: a damaged or oversized picture exports as
-        // the placeholder.
-        const bytes = binaryPartOf(pkg, target);
-        const mime = bytes ? drawableImageMime(bytes, imageMime(target)) : undefined;
-        pictures.set(target, mime && bytes ? `data:${mime};base64,${toBase64(bytes)}` : undefined);
+        // The same pictures as the editor's paint: a damaged or oversized picture, and a
+        // metafile that has not converted, export as the placeholder.
+        const pic = session.picture(target);
+        pictures.set(target, pic ? `data:${pic.mime};base64,${toBase64(pic.bytes)}` : undefined);
       }
       return pictures.get(target);
     },
@@ -161,7 +164,11 @@ export function paintLayout(
   return svg;
 }
 
-/** Slide `index` as a standalone SVG document. See the file comment for the fonts it holds. @public */
+/**
+ * Slide `index` as a standalone SVG document. See the file comment for the fonts it holds. An
+ * EMF or WMF picture exports as the placeholder until it has converted: await
+ * `session.picturesReady(index)` first. @public
+ */
 export function exportSlideSvg(
   session: DocumentSession,
   index: number,
@@ -191,14 +198,18 @@ async function decodeSvg(text: string): Promise<HTMLImageElement> {
 
 /**
  * Slide `index` as a PNG of `options.width` pixels (default 1920), drawn from the editor's own
- * paint. Rejects with a `CommandRefusal` (`errors.exportSize`, `errors.exportFailed`). @public
+ * paint. It waits for the slide's EMF and WMF pictures (`session.picturesReady`); one that is
+ * not ready after `options.picturesTimeoutMs` (default 30 seconds) draws as the placeholder.
+ * To know whether every picture draws, await `picturesReady` first.
+ * Rejects with a `CommandRefusal` (`errors.exportSize`, `errors.exportFailed`). @public
  */
 export async function exportSlidePng(
   session: DocumentSession,
   index: number,
   options: SlideImageOptions = {}
 ): Promise<Blob> {
-  await document.fonts?.ready;
+  const timeoutMs = options.picturesTimeoutMs;
+  await Promise.all([document.fonts?.ready, session.picturesReady(index, { timeoutMs })]);
   const { svg, width, height } = paintAlone(session, index, options, () => true);
   return drawPng(svg, width, height);
 }

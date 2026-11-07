@@ -5,7 +5,9 @@
 // reader. The editor draws and edits one copy, the branch of `alternateBranch`. When that copy is
 // in a `mc:Choice`, a reader that selects another branch would show the object as it was before
 // the edit. So the transaction of the edit also removes each copy in another branch that the edit
-// did not change too. Copies match by kind and `p:cNvPr/@id`. Hide, rename, and the aspect lock
+// did not change too. Copies match by kind and `p:cNvPr/@id`. In nested `mc:AlternateContent`, the
+// rule holds at each level: the copies in the other branches of every enclosing one go too, also
+// those inside a nested `mc:AlternateContent` of such a branch. Hide, rename, and the aspect lock
 // change every copy (`arrange-commands.ts`), so those copies stay. When the edit deletes the
 // drawn copy, every other copy goes too, whichever branch the editor draws, and a wrapper that
 // keeps no content goes with them.
@@ -42,7 +44,10 @@ const MAX_DEPTH = 256;
 const isBranch = (el: Element): boolean =>
   el.ns === NS.mc && (el.local === 'Choice' || el.local === 'Fallback');
 
-/** A copy that an edit touched: the copy, its branch, and their `mc:AlternateContent`. */
+/**
+ * A copy that an edit touched: the copy, its branch, and their `mc:AlternateContent`. In an
+ * enclosing `mc:AlternateContent`, the copy is still the shape in the innermost branch.
+ */
 interface Touched {
   readonly copy: Element;
   readonly branch: Element;
@@ -87,6 +92,8 @@ function touchedCopies(base: PptxPackage, ops: readonly PptxOp[]): Map<string, T
       // created it touched one of its ancestors.
       let at = index.get(id);
       let below: Element | undefined;
+      // The shape that the last branch on the way up holds.
+      let copy: Element | undefined;
       for (let depth = 0; at && depth < MAX_DEPTH; depth += 1) {
         const node = at.node;
         if (node.type !== 'element') {
@@ -96,14 +103,36 @@ function touchedCopies(base: PptxPackage, ops: readonly PptxOp[]): Map<string, T
         const up = at.parent ? index.get(at.parent) : undefined;
         const wrapper = up?.node;
         if (below && isBranch(node) && wrapper?.type === 'element' && isAlternateContent(wrapper)) {
+          // A nested `mc:AlternateContent` is not a copy: the shape in it is.
+          copy = copy && isAlternateContent(below) ? copy : below;
           const list = out.get(op.part) ?? [];
-          list.push({ copy: below, branch: node, wrapper });
+          list.push({ copy, branch: node, wrapper });
           out.set(op.part, list);
         }
         below = node;
         at = up;
       }
     }
+  return out;
+}
+
+/** Whether `branch` draws nothing: no content, or only nested wrappers that draw nothing. */
+function drawsNothing(branch: Element, depth = 0): boolean {
+  return elements(branch).every(
+    (el) =>
+      isAlternateContent(el) &&
+      depth < MAX_DEPTH &&
+      elements(el).every((b) => !isBranch(b) || drawsNothing(b, depth + 1))
+  );
+}
+
+/** The elements of `branch`, with the content of every branch of a nested `mc:AlternateContent`. */
+function branchContent(branch: Element, depth = 0, out: Element[] = []): Element[] {
+  for (const el of elements(branch)) {
+    if (!isAlternateContent(el)) out.push(el);
+    else if (depth < MAX_DEPTH)
+      for (const inner of elements(el)) if (isBranch(inner)) branchContent(inner, depth + 1, out);
+  }
   return out;
 }
 
@@ -134,7 +163,7 @@ export function withoutStaleCopies(base: PptxPackage, ops: readonly PptxOp[]): r
       if (id === undefined) continue;
       for (const other of elements(wrapper)) {
         if (other === branch || !isBranch(other)) continue;
-        for (const twin of elements(other))
+        for (const twin of branchContent(other))
           if (
             twin.ns === copy.ns &&
             twin.local === copy.local &&
@@ -152,7 +181,7 @@ export function withoutStaleCopies(base: PptxPackage, ops: readonly PptxOp[]): r
       const now = xmlPartOf(batch.pkg, part);
       const at = now ? nodeIndex(now).get(wrapper.id)?.node : undefined;
       if (at?.type !== 'element') continue;
-      if (elements(at).every((b) => !isBranch(b) || elements(b).length === 0))
+      if (elements(at).every((b) => !isBranch(b) || drawsNothing(b)))
         batch.push({ op: 'removeNode', part, node: wrapper.id });
     }
   }

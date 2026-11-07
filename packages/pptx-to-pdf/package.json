@@ -29,10 +29,14 @@
   },
   "peerDependencies": {
     "@docx-editor.dev/fonts-cjk": "^2.34.0",
+    "@napi-rs/canvas": "^1.0.9",
     "@pptx-editor.dev/core": "~0.2.0"
   },
   "peerDependenciesMeta": {
     "@docx-editor.dev/fonts-cjk": {
+      "optional": true
+    },
+    "@napi-rs/canvas": {
       "optional": true
     }
   },

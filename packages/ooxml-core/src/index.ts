@@ -13,6 +13,7 @@ export * from './xml-reader.ts';
 export * from './xml-fast-read.ts';
 export * from './sha256.ts';
 export * from './image-size.ts';
+export * from './metafile.ts';
 export * from './grapheme.ts';
 export * from './word-segment.ts';
 export * from './caret-word.ts';

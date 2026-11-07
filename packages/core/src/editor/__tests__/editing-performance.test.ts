@@ -66,7 +66,7 @@ describe('P1: layouts and thumbnails are keyed by the parts a slide reads', () =
     const editor = await open(textDeck(3));
     const session = editor.session!;
     const pkg = session.store.package;
-    const keys = [0, 1, 2].map((i) => renderKey(pkg, i, session.fontGeneration));
+    const keys = [0, 1, 2].map((i) => renderKey(pkg, i, session.paintGeneration));
     const layouts = [0, 1, 2].map((i) => session.layout(i));
     const master = presentationInfo(pkg).slides[0]!.masterPart!;
     const off = find(xmlPartOf(pkg, master)!.root, 'a:off')!;
@@ -76,7 +76,7 @@ describe('P1: layouts and thumbnails are keyed by the parts a slide reads', () =
     expect(r.ok).toBe(true);
     const next = session.store.package;
     for (const i of [0, 1, 2]) {
-      expect(renderKey(next, i, session.fontGeneration)).not.toBe(keys[i]!);
+      expect(renderKey(next, i, session.paintGeneration)).not.toBe(keys[i]!);
       expect(session.layout(i)).not.toBe(layouts[i]!);
     }
     editor.destroy();

@@ -7,5 +7,6 @@ root = "."
 # Supply-chain defense, as in DOCX Editor: install only package versions that are at least
 # 7 days old. Compromised releases are almost always yanked within hours.
 minimumReleaseAge = 604800
-# EigenPal's own packages are released and consumed in lockstep.
-minimumReleaseAgeExcludes = ["@docx-editor.dev/fonts", "@docx-editor.dev/fonts-cjk"]
+# EigenPal's own packages are released and consumed in lockstep. emf-converter is pinned to
+# an exact version that DOCX Editor ships.
+minimumReleaseAgeExcludes = ["@docx-editor.dev/fonts", "@docx-editor.dev/fonts-cjk", "emf-converter"]

@@ -809,6 +809,7 @@ export {
   exportSlidesPngZip,
   type SlideImageOptions,
 } from './export-image.ts';
+export type { PicturesWait, PictureStatus } from './metafile-pictures.ts';
 export {
   renderImageWith,
   type ImageRasterFont,

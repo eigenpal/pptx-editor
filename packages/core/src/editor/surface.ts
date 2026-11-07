@@ -51,6 +51,7 @@ import {
   type AdjustDrag,
 } from './surface-adjust.ts';
 import type { Relayout } from './drag-preview.ts';
+import * as paint from './surface-paint.ts';
 import { CursorLayer, NextFrame, PAINT_BUDGET, setAttr, setStyle } from './surface-paint.ts';
 
 const EMU_PER_PX = 9_525;
@@ -65,6 +66,8 @@ export interface SurfaceHost extends SurfaceInputHost {
   readonly selection: () => EditorSelection;
   readonly readOnly: () => boolean;
   readonly imageUrl: (part: string, rId: string) => string | undefined;
+  /** Changes when the slide paints differently with no edit (`DocumentSession.paintKey`). */
+  readonly paintKey?: () => string | undefined;
   readonly imageSize?: (part: string, rId: string) => { cx: number; cy: number } | undefined;
   readonly label: (key: string, params?: Record<string, string | number>) => string;
   /** The alt text of an element: pictures are named by it, and the live region says it. */
@@ -133,6 +136,7 @@ export class SlideSurface {
   #zoomAnchor: { x: number; y: number } | null = null;
   #renderedZoom: number | null = null;
   #paintKey: unknown = null;
+  #slidePaintKey: string | undefined;
   /** Paints the slide, reusing the nodes of unchanged items (`SlidePainter`). */
   #painter: SlidePainter | null = null;
   /**
@@ -309,6 +313,10 @@ export class SlideSurface {
       this.host.scrollTop += st.top + keep.fy * st.height - keep.client.y;
     }
     const painted = this.editor.paintLayout?.(layout) ?? layout;
+    const paintKey = this.editor.paintKey?.();
+    // Converted pictures, or new faces: paint every item again.
+    if (paintKey !== this.#slidePaintKey)
+      [this.#slidePaintKey, this.#paintKey, this.#painter] = [paintKey, null, null];
     if (this.#paintKey !== painted) {
       this.#paintKey = painted;
       const opts = {
@@ -327,20 +335,11 @@ export class SlideSurface {
           this.#paintKey = null;
           this.render();
         });
-      svg.setAttribute('class', 'pptx-surface__slide');
-      const old = this.#stage.querySelector('.pptx-surface__slide');
-      if (old !== svg) {
-        if (old) old.replaceWith(svg);
-        else this.#stage.prepend(svg);
-      }
+      paint.placeSlide(this.#stage, svg);
       // A repaint during a drag (a peer's edit to another shape) keeps the preview.
       this.#drag.repainted(layout);
     }
-    for (const svg of [this.#stage.querySelector('.pptx-surface__slide'), this.#overlay]) {
-      if (!svg) continue;
-      setAttr(svg, 'width', String(w));
-      setAttr(svg, 'height', String(h));
-    }
+    paint.sizeAll([this.#stage.querySelector('.pptx-surface__slide'), this.#overlay], w, h);
     setAttr(this.#overlay, 'viewBox', `0 0 ${layout.slide.width} ${layout.slide.height}`);
     this.#renderOverlay(this.#drag.overlayLayout(layout), zoom);
     if (this.#fitSlide !== `${layout.slide.width}x${layout.slide.height}`) this.#reportFit();

@@ -24,7 +24,8 @@
 //   canvas draws a marked table with the same counts (`tableAsDrawn`), so the cells the save
 //   adds show before the save, and every table with the joined bodies (`cellAsSaved`). A table
 //   without a mark draws its file's cell counts: a short row shows no cell where the save adds
-//   a blank one;
+//   a blank one. Its grid gets no column: cells with text past the grid save as the file holds
+//   them, and the canvas draws them neither before nor after the save;
 // - a table that a structure command changed in a collaboration room (a structure mark,
 //   `table-edit-marks.ts`) and whose merge markup fails the grid (`tableMergeFaults`) also gets
 //   the merge markers the next table command would write. A merge and a concurrent delete of
@@ -85,13 +86,17 @@ function trimSpans(batch: OpBatch, part: string, tblId: string): void {
  * `markers` also rewrites the merge markers from the spans (a table command does; a save
  * leaves them, so a plain save never changes how a table from elsewhere looks). A frame that
  * is not a table, a table without a grid or rows, and a table larger than the editor makes
- * (a file decides the work a repair does) are left as they are.
+ * (a file decides the work a repair does) are left as they are. `widen` adds grid columns for a
+ * row with more cells than the grid (a table command and the save of a marked table do). Without
+ * it, the cells with text past the grid stay as the file holds them, and the grid keeps its
+ * columns: the canvas draws a table without a mark by its grid, so its save draws the same.
  */
 export function repairTable(
   batch: OpBatch,
   part: string,
   frameId: string,
-  markers = true
+  markers = true,
+  widen = true
 ): boolean {
   const before = batch.ops.length;
   const tbl = tblOf(batch.element(part, frameId));
@@ -100,6 +105,7 @@ export function repairTable(
   const counts = tableCellCounts(tbl);
   if (!tbl || !grid || !counts) return false;
   const gridCols = children(grid, 'a:gridCol');
+  const columns = widen ? counts.columns : gridCols.length;
   // Blank cells past the grid go first: two peers that repair one short row at the same time
   // each add its missing cell, and the row then has one too many.
   children(tbl, 'a:tr').forEach((tr, r) => {
@@ -107,7 +113,7 @@ export function repairTable(
       batch.push({ op: 'removeNode', part, node: tc.id });
   });
   dedupe(batch, part, batch.element(part, tbl.id));
-  for (let c = gridCols.length; c < counts.columns; c += 1)
+  for (let c = gridCols.length; c < columns; c += 1)
     batch.insert({
       op: 'insertNode',
       part,
@@ -117,9 +123,9 @@ export function repairTable(
     });
   for (const tr of children(batch.element(part, tbl.id), 'a:tr')) {
     const tcs = children(tr, 'a:tc');
-    if (tcs.length >= counts.columns) continue;
+    if (tcs.length >= columns) continue;
     const at = afterLastCell(tr);
-    for (let c = tcs.length; c < counts.columns; c += 1)
+    for (let c = tcs.length; c < columns; c += 1)
       batch.insert({
         op: 'insertNode',
         part,
@@ -297,7 +303,7 @@ function writeAsSaved(batch: OpBatch, part: string, frameId: string): void {
   }
   const edited = isStructureEdited(frame);
   try {
-    repairTable(batch, part, frameId, false);
+    repairTable(batch, part, frameId, false, edited);
     if (edited && mergeFaulty(batch, part, frameId)) repairTable(batch, part, frameId);
   } catch (e) {
     // A table the repair cannot read is saved as it is.

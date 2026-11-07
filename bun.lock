@@ -105,7 +105,8 @@
       "version": "0.2.0",
       "dependencies": {
         "@docx-editor.dev/fonts": "^2.34.0",
-        "@pptx-editor.dev/i18n": "^0.1.0",
+        "@pptx-editor.dev/i18n": "^0.2.0",
+        "emf-converter": "4.28.0",
         "fast-xml-parser": "^5.10.1",
         "fflate": "^0.8.2",
       },
@@ -113,6 +114,12 @@
         "@eigenpal/ooxml-core": "workspace:*",
         "harfbuzzjs": "1.6.4",
       },
+      "peerDependencies": {
+        "@napi-rs/canvas": "^1.0.9",
+      },
+      "optionalPeers": [
+        "@napi-rs/canvas",
+      ],
     },
     "packages/editor-api": {
       "name": "@pptx-editor.dev/editor-api",
@@ -121,7 +128,7 @@
         "@pptx-editor.dev/core": "workspace:*",
       },
       "peerDependencies": {
-        "@pptx-editor.dev/core": "~0.1.0",
+        "@pptx-editor.dev/core": "~0.2.0",
       },
     },
     "packages/i18n": {
@@ -140,7 +147,7 @@
       "name": "@pptx-editor.dev/pptx-to-pdf",
       "version": "0.2.0",
       "dependencies": {
-        "@pptx-editor.dev/pro": "~0.1.0",
+        "@pptx-editor.dev/pro": "~0.2.0",
         "fontkit": "2.0.4",
         "pdf-lib": "1.17.1",
       },
@@ -152,10 +159,12 @@
       },
       "peerDependencies": {
         "@docx-editor.dev/fonts-cjk": "^2.34.0",
-        "@pptx-editor.dev/core": "~0.1.0",
+        "@napi-rs/canvas": "^1.0.9",
+        "@pptx-editor.dev/core": "~0.2.0",
       },
       "optionalPeers": [
         "@docx-editor.dev/fonts-cjk",
+        "@napi-rs/canvas",
       ],
     },
     "packages/pro": {
@@ -169,20 +178,20 @@
         "@pptx-editor.dev/core": "workspace:*",
       },
       "peerDependencies": {
-        "@pptx-editor.dev/core": "~0.1.0",
+        "@pptx-editor.dev/core": "~0.2.0",
       },
     },
     "packages/react": {
       "name": "@pptx-editor.dev/react",
       "version": "0.2.0",
       "dependencies": {
-        "@pptx-editor.dev/i18n": "^0.1.0",
+        "@pptx-editor.dev/i18n": "^0.2.0",
       },
       "devDependencies": {
         "@pptx-editor.dev/core": "workspace:*",
       },
       "peerDependencies": {
-        "@pptx-editor.dev/core": "~0.1.0",
+        "@pptx-editor.dev/core": "~0.2.0",
         "react": "^18.0.0 || ^19.0.0",
         "react-dom": "^18.0.0 || ^19.0.0",
       },
@@ -191,15 +200,15 @@
       "name": "@pptx-editor.dev/vue",
       "version": "0.2.0",
       "dependencies": {
-        "@pptx-editor.dev/i18n": "^0.1.0",
+        "@pptx-editor.dev/i18n": "^0.2.0",
       },
       "devDependencies": {
         "@pptx-editor.dev/core": "workspace:*",
         "vue": "3.5.44",
       },
       "peerDependencies": {
-        "@pptx-editor.dev/core": "~0.1.0",
-        "vue": "^3.3.0",
+        "@pptx-editor.dev/core": "~0.2.0",
+        "vue": "^3.5.0",
       },
     },
   },
@@ -711,6 +720,8 @@
     "diff": ["diff@8.0.4", "", {}, "sha512-DPi0FmjiSU5EvQV0++GFDOJ9ASQUVFh5kD+OzOnYdi7n3Wpm9hWWGfB/O2blfHcMVTL5WkQXSnRiK9makhrcnw=="],
 
     "dom-accessibility-api": ["dom-accessibility-api@0.5.16", "", {}, "sha512-X7BJ2yElsnOJ30pZF4uIIDfBEVgF4XEBxL9Bxhy6dnrm5hkzqmsWHGTiHqRiITNhMyFLyAiWndIJP7Z1NTteDg=="],
+
+    "emf-converter": ["emf-converter@4.28.0", "", { "peerDependencies": { "@napi-rs/canvas": "^1.0.9" }, "optionalPeers": ["@napi-rs/canvas"], "bin": { "emf-converter": "dist/cli.mjs" } }, "sha512-Y2EApPpPirdaA5JVUAVxFZx8XWG5zJpBJgQFOd76Ty+LYufp7yOZofmz8Lg3KCuOgDTcO6PA6PubPBNf3dEFog=="],
 
     "entities": ["entities@7.0.1", "", {}, "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA=="],
 

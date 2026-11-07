@@ -4,6 +4,7 @@
 import { expect, test } from 'bun:test';
 import { GlobalWindow } from 'happy-dom';
 import { buildPptx } from '../../../../../scripts/fixtures/builder.ts';
+import { webpHeader } from '../../../../../scripts/fixtures/picture-bytes.ts';
 import { drawableImageMime } from '../drawable-image.ts';
 import { paintLayout } from '../export-image.ts';
 import { createPptxEditor } from '../index.ts';
@@ -24,7 +25,7 @@ const text = (s: string) => new TextEncoder().encode(s);
 test('the signature decides the type, not the part name', () => {
   expect(drawableImageMime(png(10, 10), 'image/png')).toBe('image/png');
   expect(drawableImageMime(png(10, 10), undefined)).toBe('image/png');
-  expect(drawableImageMime(text('RIFF\0\0\0\0WEBPVP8 '), 'image/png')).toBe('image/webp');
+  expect(drawableImageMime(webpHeader('VP8L', 10, 10), 'image/png')).toBe('image/webp');
 });
 
 test('empty, unknown, and markup bytes in a raster part draw nothing', () => {
@@ -45,6 +46,13 @@ test('a header beyond the size limits draws nothing', () => {
   expect(drawableImageMime(png(0, 10), 'image/png')).toBeUndefined();
   expect(drawableImageMime(png(60_000, 60_000), 'image/png')).toBeUndefined();
   expect(drawableImageMime(png(20_000, 20_000), 'image/png')).toBeUndefined();
+});
+
+test('a WebP passes the same size checks', () => {
+  expect(drawableImageMime(webpHeader('VP8 ', 640, 480), 'image/webp')).toBe('image/webp');
+  expect(drawableImageMime(webpHeader('VP8X', 20_000, 20_000), 'image/webp')).toBeUndefined();
+  expect(drawableImageMime(webpHeader('VP8X', 40_000, 10), 'image/webp')).toBeUndefined();
+  expect(drawableImageMime(text('RIFF\0\0\0\0WEBPVP8 '), 'image/webp')).toBeUndefined();
 });
 
 test('an export paints a damaged picture as the placeholder', async () => {

@@ -120,9 +120,9 @@ export function createSlideSummaries(): (
   pkg: PptxPackage | undefined
 ) => EditorSnapshot['slides'] {
   let cachedSlides: EditorSnapshot['slides'] = [];
-  let slidesOf: { pkg: PptxPackage | undefined; fonts: number; parsed: number } = {
+  let slidesOf: { pkg: PptxPackage | undefined; fonts: string; parsed: number } = {
     pkg: undefined,
-    fonts: -1,
+    fonts: '',
     parsed: -1,
   };
   /** The parts each slide's key read, by slide index, for `slidesOf.pkg`. */
@@ -149,7 +149,6 @@ export function createSlideSummaries(): (
     session: DocumentSession,
     pkg: PptxPackage,
     index: number,
-    fonts: number,
     old: SlideSummary | undefined,
     parts: string[]
   ): SlideSummary => {
@@ -166,7 +165,7 @@ export function createSlideSummaries(): (
             pending: true as const,
             ...(s.layoutPart ? { layoutId: s.layoutPart } : {}),
           };
-    const key = renderKey(pkg, index, fonts, parts) ?? '';
+    const key = renderKey(pkg, index, session.paintKey(s.partName), parts) ?? '';
     // Part names are never reused in a session, so the part name is the slide's identity.
     return old &&
       old.key === key &&
@@ -184,7 +183,7 @@ export function createSlideSummaries(): (
   };
 
   return (session, pkg) => {
-    const fonts = session?.fontGeneration ?? -1;
+    const fonts = session?.paintGeneration ?? '';
     // A slide that finished opening changes its summary, but not the package.
     const parsed = deferredParseCount();
     if (slidesOf.pkg === pkg && slidesOf.fonts === fonts && slidesOf.parsed === parsed)
@@ -212,7 +211,7 @@ export function createSlideSummaries(): (
       let next: SlideSummary[] | null = null;
       for (const index of affected) {
         const names: string[] = [];
-        const summary = summarize(session, pkg, index, fonts, prev[index], names);
+        const summary = summarize(session, pkg, index, prev[index], names);
         for (const name of readParts[index] ?? []) readers.get(name)?.delete(index);
         readParts[index] = names;
         for (const name of [slides[index].partName, ...names]) {
@@ -243,7 +242,7 @@ export function createSlideSummaries(): (
         return old;
       }
       const names: string[] = [];
-      const summary = summarize(session, pkg, index, fonts, old, names);
+      const summary = summarize(session, pkg, index, old, names);
       parts.push(names);
       return summary;
     });

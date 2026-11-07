@@ -208,6 +208,67 @@ describe('an edit of a drawn mc:Choice copy', () => {
   });
 });
 
+describe('an edit of a copy in nested mc:AlternateContent', () => {
+  /** Box 3 drawn from the inner `mc:Choice`, with a copy in the inner and the outer `mc:Fallback`. */
+  const nested = (): Uint8Array =>
+    deck(
+      wrap(
+        choice(
+          'p14',
+          `xmlns:p14="${P14}"`,
+          wrap(
+            choice('p14', `xmlns:p14="${P14}"`, box(3, 'C00000', 'drawn')) +
+              fallback(box(3, '70AD47', 'inner fallback'))
+          )
+        ) + fallback(box(3, '70AD47', 'outer fallback') + box(4, '00B050', 'outer other', 5 * IN))
+      )
+    );
+
+  test('a fill change removes the copy in every enclosing mc:Fallback', async () => {
+    const e = await open(nested());
+    e.setSelection({ kind: 'shapes', nodeIds: [drawnId(e, 'Box 3')] });
+    expect(e.exec({ type: 'setShapeFill', color: '0000FF' }).ok).toBe(true);
+    const xml = slideXml(e);
+    expect(xml).toContain('drawn');
+    expect(xml).not.toContain('inner fallback');
+    expect(xml).not.toContain('outer fallback');
+    expect(xml).toContain('outer other');
+    expect(e.exec({ type: 'undo' }).ok).toBe(true);
+    expect(slideXml(e)).toContain('outer fallback');
+  });
+
+  test('a rename changes the copy in every branch', async () => {
+    const e = await open(nested());
+    expect(e.exec({ type: 'renameShape', nodeId: drawnId(e, 'Box 3'), name: 'Kept' }).ok).toBe(
+      true
+    );
+    expect(slideXml(e).match(/name="Kept"/g)).toHaveLength(3);
+  });
+
+  test('a delete removes every copy and both emptied wrappers', async () => {
+    const e = await open(nested());
+    e.setSelection({ kind: 'shapes', nodeIds: [drawnId(e, 'Box 3')] });
+    expect(e.exec({ type: 'delete' }).ok).toBe(true);
+    const root = saved(e);
+    expect(fallbackReaderText(root)).toEqual(['outer other']);
+    expect(e.snapshot().shapes!.map((s) => s.name)).toEqual([]);
+  });
+
+  test('a delete removes a wrapper whose branches hold only emptied wrappers', async () => {
+    const inner = (where: string): string =>
+      wrap(
+        choice('p14', `xmlns:p14="${P14}"`, box(3, 'C00000', `${where} choice`)) +
+          fallback(box(3, '70AD47', `${where} fallback`))
+      );
+    const e = await open(
+      deck(wrap(choice('p14', `xmlns:p14="${P14}"`, inner('drawn')) + fallback(inner('copy'))))
+    );
+    e.setSelection({ kind: 'shapes', nodeIds: [drawnId(e, 'Box 3')] });
+    expect(e.exec({ type: 'delete' }).ok).toBe(true);
+    expect(slideXml(e)).not.toContain('AlternateContent');
+  });
+});
+
 describe('an edit of a drawn mc:Fallback copy', () => {
   const vmlDeck = () =>
     deck(

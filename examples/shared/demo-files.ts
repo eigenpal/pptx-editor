@@ -231,11 +231,14 @@ export async function exportSlides(
       download(await exportSlidePng(session, slide, options), `${name} ${slide + 1}.png`);
     else if (kind === 'zip')
       download(await exportSlidesPngZip(session, options), `${name}.zip`, 'application/zip');
-    else
+    else {
+      // EMF and WMF pictures convert in the background: wait for those of the slide.
+      await session.picturesReady(slide);
       download(
         new Blob([exportSlideSvg(session, slide, options)], { type: 'image/svg+xml' }),
         `${name} ${slide + 1}.svg`
       );
+    }
   } catch (e) {
     console.error(e);
     if (kind === 'pdf')

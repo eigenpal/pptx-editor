@@ -583,6 +583,31 @@ describe('placeholders that keep their place', () => {
     expect(now.xfrm).toEqual(was);
   });
 
+  test('a slide placeholder in nested mc:AlternateContent holds its place, with no second copy', async () => {
+    const body = (text: string): string => ph(3, 'Content Placeholder 2', '<p:ph idx="1"/>', text);
+    const e = await load(
+      buildPptx({
+        layouts: LAYOUTS,
+        slides: [
+          {
+            layout: 'title',
+            shapes:
+              ph(2, 'Title 1', '<p:ph type="title"/>', 'Agenda') +
+              wrap(wrap(body('Inner'), body('Inner fallback')), body('Fallback')),
+          },
+        ],
+      })
+    );
+    const was = resolveSlide(pkgOf(e), 0)!.elements.find((el) => el.placeholder?.idx === '1')!.xfrm;
+    e.exec({ type: 'applyLayout', indices: [0], layoutId: layoutId(e, 'Two Content') });
+    const pkg = reopen(e);
+    // Every copy keeps its p:ph; only the second content place gets a new placeholder.
+    expect(allPh(pkg)).toEqual(['title:', 'obj:1', 'obj:1', 'obj:1', 'obj:2']);
+    const drawn = resolveSlide(pkg, 0)!.elements.filter((el) => el.placeholder?.idx === '1');
+    expect(drawn).toHaveLength(1);
+    expect(drawn[0]!.xfrm).toEqual(was);
+  });
+
   test('a layout place in mc:AlternateContent is a place, read from its fallback', async () => {
     const place = (id: number): string =>
       `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Body"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="13"/></p:nvPr></p:nvSpPr>` +

@@ -28,13 +28,13 @@ export function drawableImageMime(
   named: string | undefined
 ): string | undefined {
   if (bytes.length === 0 || bytes.length > LIMITS.maxEncodedBytes) return undefined;
-  if (startsWith(bytes, 'RIFF') && startsWith(bytes, 'WEBP', 8)) return 'image/webp';
   if (named === 'image/svg+xml') return startsAsMarkup(bytes) ? named : undefined;
   const size = imageSize(bytes);
   if (!size || size.width <= 0 || size.height <= 0) return undefined;
   if (size.width > LIMITS.maxDimension || size.height > LIMITS.maxDimension) return undefined;
   if (size.width * size.height > LIMITS.maxPixels) return undefined;
   const b = bytes;
+  if (startsWith(b, 'RIFF')) return 'image/webp';
   if (b[0] === 0x89) return 'image/png';
   if (b[0] === 0xff) return 'image/jpeg';
   if (b[0] === 0x47) return 'image/gif';

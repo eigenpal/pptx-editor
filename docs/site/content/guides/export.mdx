@@ -54,13 +54,32 @@ export async function slideAssets(editor: PptxEditorInstance) {
   if (!editor.save()) throw new Error('Export is unavailable.');
   const session = editor.session;
   if (!session) throw new Error('No presentation is open.');
-  const svg = exportSlideSvg(session, editor.snapshot().currentSlide);
+  const slide = editor.snapshot().currentSlide;
+  // EMF and WMF pictures convert in the background. Wait for this slide's.
+  if (!(await session.picturesReady(slide))) {
+    // A picture that did not convert exports as a placeholder.
+    const missing = session.pictureStatus(slide).filter((p) => p.state !== 'ready');
+    console.warn('Pictures that export as placeholders:', missing);
+  }
+  const svg = exportSlideSvg(session, slide);
   const zip = await exportSlidesPngZip(session, { width: 1280 });
   return { svg, zip };
 }
 ```
 
 SVG export returns a string. ZIP export returns bytes with numbered files such as `slide-01.png`.
+
+### EMF and WMF pictures
+
+The editor converts EMF and WMF pictures to PNG in the background. A picture shows a placeholder until its PNG is ready.
+
+- `exportSlideSvg()` is synchronous. Await `session.picturesReady(index)` before you call it.
+- PNG and ZIP export wait for the pictures of each slide for up to 30 seconds. Set `picturesTimeoutMs` to change that limit for each slide.
+- `session.picturesReady(index?, { timeoutMs, retry })` resolves `true` when every picture draws. Omit `index` to wait for every slide.
+- It resolves `false` when a picture cannot convert, when the slide does not exist, or after `timeoutMs` (default 30000). Pass `Infinity` to wait until each picture converted or failed. A picture is `timed-out` after two tries of 10 seconds each. Pass `retry: true` to convert it again.
+- `session.pictureStatus(index?)` lists the pictures with their states: `ready`, `pending`, `failed`, or `timed-out`. Use it to learn which picture exports as the placeholder. A picture of a slide that nothing painted or waited for stays `pending`: `picturesReady` starts its conversion.
+
+The editor repaints when pictures convert, and `editor.subscribe()` listeners hear a new snapshot. A picture that is not ready exports as the placeholder. After a font change, it exports as its last converted version until the new one is ready.
 
 Catch export errors in your UI. Use PNG when you need a fixed raster image. SVG font embedding follows font permissions; another viewer can substitute unavailable fonts.
 

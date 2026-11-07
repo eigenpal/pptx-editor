@@ -21,6 +21,10 @@ import type { DocumentSession } from './document-session.ts';
 import { renderKey } from './slide-dependencies.ts';
 import { idleCallback, ThumbnailQueue, type Ask, type IdleDeadline } from './thumbnail-queue.ts';
 
+/** The render key of slide `index`: its parts, its faces, and its converted pictures. */
+const keyOf = (session: DocumentSession, index: number): string | undefined =>
+  renderKey(session.store.package, index, session.paintKey(session.info.slides[index]?.partName));
+
 /** The label of a frame the engine does not draw ("Chart (not rendered in this version)"). */
 export function frameLabelOf(
   translate: ((key: string, params?: Record<string, string | number>) => string) | undefined,
@@ -68,7 +72,9 @@ const MAX_WAIT_MS = 1000;
 export class ThumbnailPainter {
   readonly #host: ThumbnailHost;
   #painted = new WeakMap<HTMLElement, Painted>();
-  #layouts = new WeakMap<HTMLElement, { pkg: PptxPackage; id: string; fonts: number }>();
+  #layouts = new WeakMap<HTMLElement, { pkg: PptxPackage; id: string; key: string }>();
+  /** The layout of each gallery container, to repaint it when its pictures convert. */
+  #layoutBoxes = new Map<HTMLElement, string>();
   /** Containers waiting for an idle repaint, with the slide index asked for last. */
   #pending = new Map<HTMLElement, number>();
   /** How many times each container was asked for: a disposer acts for the last ask only. */
@@ -117,7 +123,7 @@ export class ThumbnailPainter {
     // A slide still opening waits as a placeholder in a deferred list. A caller that paints at
     // once (no `defer`) gets the slide now: its layout parses it.
     if (defer && session.slidePending(index)) return this.#placeholder(session, index, container);
-    const key = renderKey(session.store.package, index, session.fontGeneration);
+    const key = keyOf(session, index);
     const part = session.info.slides[index]?.partName;
     if (!key || !part) return;
     const was = this.#painted.get(container);
@@ -156,9 +162,11 @@ export class ThumbnailPainter {
     const session = this.#host.session();
     const pkg = session?.store.package;
     if (!session || !pkg) return;
+    for (const box of this.#layoutBoxes.keys()) if (!box.isConnected) this.#layoutBoxes.delete(box);
+    this.#layoutBoxes.set(container, layoutId);
     const was = this.#layouts.get(container);
-    if (was && was.pkg === pkg && was.id === layoutId && was.fonts === session.fontGeneration)
-      return;
+    const key = session.paintKey(layoutId);
+    if (was && was.pkg === pkg && was.id === layoutId && was.key === key) return;
     const lay = this.#host.layoutPreview(session, layoutId);
     if (!lay) return container.replaceChildren();
     this.#count += 1;
@@ -172,7 +180,18 @@ export class ThumbnailPainter {
     svg.setAttribute('width', '100%');
     svg.setAttribute('height', '100%');
     container.replaceChildren(svg);
-    this.#layouts.set(container, { pkg, id: layoutId, fonts: session.fontGeneration });
+    this.#layouts.set(container, { pkg, id: layoutId, key });
+  }
+
+  /**
+   * EMF or WMF pictures converted: repaint the layout previews that show them. A slide
+   * thumbnail repaints when its summary changes; a layout no slide uses has no summary.
+   */
+  picturesChanged(): void {
+    for (const [container, id] of [...this.#layoutBoxes]) {
+      if (container.isConnected) this.renderLayout(id, container);
+      else this.#layoutBoxes.delete(container);
+    }
   }
 
   /** Paint every waiting thumbnail now. */
@@ -200,6 +219,7 @@ export class ThumbnailPainter {
   clear(): void {
     this.#cancel();
     this.#pending.clear();
+    this.#layoutBoxes.clear();
     this.#queue.clear();
   }
 
@@ -240,7 +260,7 @@ export class ThumbnailPainter {
       return;
     }
     if (session.slidePending(index)) return void session.opening?.want(ask.part);
-    const key = renderKey(session.store.package, index, session.fontGeneration);
+    const key = keyOf(session, index);
     const was = this.#painted.get(container);
     if (was?.session === session && was.key === key) return;
     this.#paint(session, index, container);
@@ -256,7 +276,7 @@ export class ThumbnailPainter {
     container: HTMLElement,
     budget = Infinity
   ): boolean {
-    const key = renderKey(session.store.package, index, session.fontGeneration);
+    const key = keyOf(session, index);
     const part = session.info.slides[index]?.partName;
     const lay = session.layout(index);
     if (!key || !part || !lay) return true;
@@ -313,7 +333,7 @@ export class ThumbnailPainter {
       this.#pending.delete(container);
       if (!session) continue;
       const was = this.#painted.get(container);
-      const key = renderKey(session.store.package, index, session.fontGeneration);
+      const key = keyOf(session, index);
       if (was?.session === session && was.key === key) continue;
       if (!this.#paint(session, index, container, all ? Infinity : IDLE_PAINT_BUDGET))
         this.#pending.set(container, index);

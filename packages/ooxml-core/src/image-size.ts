@@ -1,6 +1,7 @@
-// Read an image's pixel size and resolution from its header: PNG (`IHDR`, `pHYs`), JPEG (`SOFn`,
-// JFIF density), GIF, and BMP. Every read is bounds-checked and the scan is capped, because the
-// bytes come from the file (AGENTS.md "Security"). Nothing is decoded.
+// Read an image's pixel size and resolution from its header: PNG (`IHDR`, `pHYs`), JPEG
+// (`SOFn`, JFIF density), GIF, BMP, and WebP (`VP8 `, `VP8L`, `VP8X`). Every read is
+// bounds-checked and the scan is capped, because the bytes come from the file (AGENTS.md
+// "Security"). Nothing is decoded.
 
 /** Pixel size and resolution. `dpiX`/`dpiY` are undefined when the file states none. */
 export interface ImageSize {
@@ -112,7 +113,34 @@ function bmp(b: Uint8Array): ImageSize | null {
   return { width, height, ...(x ? { dpiX: x } : {}), ...(y ? { dpiY: y } : {}) };
 }
 
-/** The size of a PNG, JPEG, GIF, or BMP image, or null for anything else. */
+const u24le = (b: Uint8Array, i: number): number => b[i] | (b[i + 1] << 8) | (b[i + 2] << 16);
+const ascii = (b: Uint8Array, i: number, text: string): boolean =>
+  [...text].every((c, k) => b[i + k] === c.charCodeAt(0));
+
+/** A WebP: the first chunk after the RIFF header gives the size. WebP states no resolution. */
+function webp(b: Uint8Array): ImageSize | null {
+  if (b.length < 30) return null;
+  let width = 0;
+  let height = 0;
+  if (ascii(b, 12, 'VP8 ')) {
+    // A key frame: a 3-byte frame tag, the start code 9D 01 2A, then 14-bit sizes.
+    if (b[23] !== 0x9d || b[24] !== 0x01 || b[25] !== 0x2a) return null;
+    width = u16le(b, 26) & 0x3fff;
+    height = u16le(b, 28) & 0x3fff;
+  } else if (ascii(b, 12, 'VP8L')) {
+    // The signature 2F, then the width and height less one in 14 bits each.
+    if (b[20] !== 0x2f) return null;
+    width = 1 + (b[21] | ((b[22] & 0x3f) << 8));
+    height = 1 + ((b[22] >> 6) | (b[23] << 2) | ((b[24] & 0x0f) << 10));
+  } else if (ascii(b, 12, 'VP8X')) {
+    // The canvas width and height less one in 24 bits each.
+    width = 1 + u24le(b, 24);
+    height = 1 + u24le(b, 27);
+  } else return null;
+  return valid(width, height) ? { width, height } : null;
+}
+
+/** The size of a PNG, JPEG, GIF, BMP, or WebP image, or null for anything else. */
 export function imageSize(bytes: Uint8Array): ImageSize | null {
   const b = bytes;
   if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47)
@@ -120,6 +148,7 @@ export function imageSize(bytes: Uint8Array): ImageSize | null {
   if (b.length >= 4 && b[0] === 0xff && b[1] === 0xd8) return jpeg(b);
   if (b.length >= 6 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return gif(b);
   if (b.length >= 2 && b[0] === 0x42 && b[1] === 0x4d) return bmp(b);
+  if (b.length >= 12 && ascii(b, 0, 'RIFF') && ascii(b, 8, 'WEBP')) return webp(b);
   return null;
 }
 
