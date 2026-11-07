@@ -41,7 +41,7 @@ import type { CropDrag, CropHandle } from './surface-crop.ts';
 import { withHalos } from './surface-halo.ts';
 import { hitItem, inText, onBorder } from './surface-hit.ts';
 import { diagramPress } from './surface-diagram.ts';
-import { fitZoom, outsideVeil, scrollBoxIntoView } from './surface-view.ts';
+import { CaretScroll, fitZoom, outsideVeil } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
 import { selectionAnnouncement } from './surface-announce.ts';
 import { ShapeDrag, type Handle } from './surface-drag.ts';
@@ -158,8 +158,8 @@ export class SlideSurface {
   #fitSlide = '';
   #gestures = 0;
   #pressed = false;
-  /** The caret the view last followed (`#keepCaretInView`). */
-  #caretKey = '';
+  /** Scrolls the caret into view when a key moves it (`CaretScroll`). */
+  readonly #caretScroll: CaretScroll;
   /** The presses of a multi-click: their count, time, and place. */
   #presses = new PressCounter();
 
@@ -196,6 +196,7 @@ export class SlideSurface {
     // The input sits in the stage, on the caret, so an IME candidate window opens there.
     this.#cursor = new CursorLayer(doc);
     this.#paintRest = new NextFrame(doc.defaultView as Window | null);
+    this.#caretScroll = new CaretScroll(host, this.#stage, this.root);
     this.#stage.append(this.#cursor.element, this.#overlay, this.#input);
     this.root.append(this.#stage, this.#live);
     host.append(this.root);
@@ -448,7 +449,12 @@ export class SlideSurface {
             item.kind === 'shape' ? ghostBullet(doc, item, sel, textFrameMatrix(item)) : null;
           if (ghost) parts.push(ghost);
           this.#placeInput(caret, zoom / EMU_PER_PX);
-          this.#keepCaretInView(sel, caret, zoom / EMU_PER_PX);
+          this.#caretScroll.follow(
+            JSON.stringify([sel.nodeId, sel.cell, sel.focus]),
+            caret,
+            zoom / EMU_PER_PX,
+            this.#pressed
+          );
         }
       }
     }
@@ -468,49 +474,6 @@ export class SlideSurface {
     style.height = `${height}px`;
     style.fontSize = style.lineHeight = `${height}px`;
   }
-
-  /**
-   * Scroll the caret (the focus end of a range) into view when it moves by a key: typing at a
-   * high zoom, or an arrow key. A pointer press does not scroll: the caret is under it.
-   */
-  #keepCaretInView(
-    sel: Extract<EditorSelection, { kind: 'text' }>,
-    caret: { x1: number; y1: number; x2: number; y2: number },
-    scale: number
-  ): void {
-    const key = JSON.stringify([sel.nodeId, sel.cell, sel.focus]);
-    if (key === this.#caretKey) return;
-    this.#caretKey = key;
-    if (this.#pressed) return;
-    // Read the stage position at the next frame, where the browser lays out the page anyway. A
-    // read here would force a layout of the whole slide on every keystroke.
-    const pending = !this.#caretScroll;
-    this.#caretScroll = { caret, scale };
-    const view = this.host.ownerDocument.defaultView;
-    if (!pending) return;
-    const scroll = () => {
-      const next = this.#caretScroll;
-      this.#caretScroll = null;
-      if (!next || !this.root.isConnected) return;
-      const c = next.caret;
-      const st = this.#stage.getBoundingClientRect();
-      const box = {
-        left: st.left + Math.min(c.x1, c.x2) * next.scale,
-        right: st.left + Math.max(c.x1, c.x2) * next.scale,
-        top: st.top + Math.min(c.y1, c.y2) * next.scale,
-        bottom: st.top + Math.max(c.y1, c.y2) * next.scale,
-      };
-      scrollBoxIntoView(this.host, box, 32);
-    };
-    if (view?.requestAnimationFrame) view.requestAnimationFrame(scroll);
-    else scroll();
-  }
-
-  /** The caret scroll that waits for the next frame (`#keepCaretInView`). */
-  #caretScroll: {
-    caret: { x1: number; y1: number; x2: number; y2: number };
-    scale: number;
-  } | null = null;
 
   /** A caret in the table cell under `p`, for a right-click; none in view mode. */
   #cellCaret(id: string, p: { x: number; y: number }) {

@@ -312,7 +312,7 @@ export type BulletFormat = {
 
 // @public
 export interface BulletFormatMixed {
-    readonly kinds: readonly ('bullet' | 'number' | 'none')[];
+    readonly kinds: readonly ('bullet' | 'number' | 'picture' | 'none')[];
     readonly sizePercent: number | null;
     readonly startAt?: number | null;
 }

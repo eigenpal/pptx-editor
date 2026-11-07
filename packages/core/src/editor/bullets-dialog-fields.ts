@@ -68,7 +68,9 @@ export function seedBulletFields(
   mixed?: BulletFormatMixed
 ): BulletsDialogFields {
   if (read === undefined) {
-    const lists = mixed?.kinds.filter((k) => k !== 'none') ?? [];
+    // A picture bullet shows on the Bulleted tab.
+    const tabs = (mixed?.kinds ?? []).map((k) => (k === 'picture' ? 'bullet' : k));
+    const lists = [...new Set(tabs)].filter((k) => k !== 'none');
     const start = mixed && mixed.startAt === undefined ? 1 : mixed?.startAt;
     return {
       kind: lists.length === 1 ? lists[0]! : (tab ?? lists[0] ?? 'bullet'),
