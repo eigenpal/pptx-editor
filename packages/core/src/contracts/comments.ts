@@ -19,6 +19,13 @@ export type CommentAnchor =
 export interface SlideComment {
   /** Stable while the comment exists. Pass it to the comment commands. */
   readonly id: string;
+  /**
+   * A token that names the comment while the deck is open. An edit or a resolve of any comment,
+   * and a delete of another one, never change it, even where `id` changes because a file repeats
+   * the comment's GUID. One exception: when the file repeats the GUID, author, and creation time
+   * of a comment, its text is part of the token. Key UI state by it; pass `id` to the commands.
+   */
+  readonly identity: string;
   /** The author's display name. Empty when the file names no author for the comment. */
   readonly author: string;
   /** The author's initials. Empty when the file has none. */

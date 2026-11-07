@@ -168,6 +168,41 @@ describe('comment ids from a file', () => {
     expect(texts(e)).toEqual(['B again']);
   });
 
+  test('identity survives edits, resolves, and deletes of others; twins never swap it', async () => {
+    const at = (thread: string, text: string, minute?: string) => {
+      const t = thread.replace('>A<', `>${text}<`);
+      return minute
+        ? t.replace(/ created="[^"]*"/, ` created="2026-11-07T10:${minute}:00.000"`)
+        : t;
+    };
+    // A and B are twins (one GUID, author, and date); C is later.
+    const e = await open(await oneThread((t) => at(t, 'A') + at(t, 'B') + at(t, 'C', '30')));
+    const [a, b, c] = e.snapshot().comments!;
+    expect(new Set([a!.identity, b!.identity, c!.identity]).size).toBe(3);
+    expect(e.exec({ type: 'editComment', commentId: c!.id, text: 'C edited' }).ok).toBe(true);
+    expect(e.exec({ type: 'resolveComment', commentId: c!.id }).ok).toBe(true);
+    expect(e.snapshot().comments!.map((t) => t.identity)).toEqual([
+      a!.identity,
+      b!.identity,
+      c!.identity,
+    ]);
+    // B takes A's id when A goes, but never A's identity.
+    expect(e.exec({ type: 'deleteComment', commentId: a!.id }).ok).toBe(true);
+    const [b2, c2] = e.snapshot().comments!;
+    expect(b2!.id).toBe(a!.id);
+    expect(b2!.identity).not.toBe(a!.identity);
+    expect(c2!.identity).toBe(c!.identity);
+    // C is the last copy of the GUID once B goes: its id loses the mark, its identity stays, and
+    // the marked id still resolves.
+    expect(e.exec({ type: 'deleteComment', commentId: b2!.id }).ok).toBe(true);
+    const [c3] = e.snapshot().comments!;
+    expect(c3!.id).not.toBe(c!.id);
+    expect(c3!.id).not.toContain('~');
+    expect(c3!.identity).toBe(c!.identity);
+    expect(e.exec({ type: 'editComment', commentId: c!.id, text: 'By the old id' }).ok).toBe(true);
+    expect(texts(e)).toEqual(['By the old id']);
+  });
+
   test('a file id that holds # stays reachable', async () => {
     const e = await open(await oneThread((t, g) => t.replace(g, 'X#Y')));
     const [thread] = e.snapshot().comments!;

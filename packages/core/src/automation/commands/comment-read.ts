@@ -217,7 +217,11 @@ export const legacyId = (slidePart: string, authorId: string, idx: string): stri
  * (FNV-1a). A delete or an edit of another comment never changes it.
  */
 export function modernMark(el: Element): string {
-  const text = `${(attr(el, 'authorId') ?? '').toUpperCase()}\u0000${attr(el, 'created') ?? ''}`;
+  return fnv(`${(attr(el, 'authorId') ?? '').toUpperCase()}\u0000${attr(el, 'created') ?? ''}`);
+}
+
+/** FNV-1a of `text`, as 8 upper-case hex digits. */
+function fnv(text: string): string {
   let hash = 0x811c9dc5;
   for (let i = 0; i < text.length; i += 1)
     hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193) >>> 0;
@@ -380,6 +384,8 @@ const optionalDate = (date: string | undefined) => (date !== undefined ? { date 
  */
 interface GuidCount {
   readonly uses: Map<string, number>;
+  /** How many comments use each GUID and mark. */
+  readonly twins: Map<string, number>;
   readonly seen: Map<string, number>;
 }
 
@@ -404,20 +410,23 @@ function modernComment(
 ): SlideComment {
   const author = authors.get(attr(el, 'authorId')?.toUpperCase() ?? '');
   const guid = (attr(el, 'id') ?? '').toUpperCase();
-  let marked: { mark: string; ordinal: number } | undefined;
-  if ((count.uses.get(guid) ?? 0) > 1 || guid.includes('~')) {
-    const mark = modernMark(el);
-    const key = `${guid}\u0000${mark}`;
-    const ordinal = (count.seen.get(key) ?? 0) + 1;
-    count.seen.set(key, ordinal);
-    marked = { mark, ordinal };
-  }
+  const mark = modernMark(el);
+  const key = `${guid}\u0000${mark}`;
+  const ordinal = (count.seen.get(key) ?? 0) + 1;
+  count.seen.set(key, ordinal);
+  const repeated = (count.uses.get(guid) ?? 0) > 1 || guid.includes('~');
+  const text = bodyText(child(el, { ns: COMMENTS.p188, local: 'txBody' }));
+  // The GUID and the mark, which edits, resolves, and deletes of other comments keep. Twins (one
+  // GUID, author, and date) also take their place and text: nothing else tells them apart.
+  const twins = (count.twins.get(key) ?? 0) > 1;
+  const identity = `${slidePart}#${guid}~${mark}${twins ? `~${ordinal}~${fnv(text)}` : ''}`;
   return {
-    id: modernId(slidePart, guid, marked),
+    id: modernId(slidePart, guid, repeated ? { mark, ordinal } : undefined),
+    identity,
     author: author?.name ?? '',
     initials: author?.initials ?? '',
     ...optionalDate(attr(el, 'created')),
-    text: bodyText(child(el, { ns: COMMENTS.p188, local: 'txBody' })),
+    text,
     textEditable: modernTextEditable(el),
   };
 }
@@ -472,6 +481,7 @@ function legacyThreads(pkg: PptxPackage, slidePart: string, listPart: string): C
     const author = authors.get(authorId);
     const comment: SlideComment = {
       id: legacyId(slidePart, authorId, idx),
+      identity: legacyId(slidePart, authorId, idx),
       author: author?.name ?? '',
       initials: author?.initials ?? '',
       ...optionalDate(attr(cm, 'dt')),
@@ -525,11 +535,13 @@ export function readSlideComments(pkg: PptxPackage, slidePart: string): CommentT
   const { legacy, modern } = slideCommentParts(pkg, slidePart);
   if (legacy.length === 0 && modern.length === 0) return [];
   const keys = shapeKeys(xmlPartOf(pkg, slidePart)?.root);
-  const count: GuidCount = { uses: new Map(), seen: new Map() };
+  const count: GuidCount = { uses: new Map(), twins: new Map(), seen: new Map() };
   for (const part of modern)
     eachModern(commentTree(pkg, part)?.root, (el) => {
       const guid = (attr(el, 'id') ?? '').toUpperCase();
+      const key = `${guid}\u0000${modernMark(el)}`;
       count.uses.set(guid, (count.uses.get(guid) ?? 0) + 1);
+      count.twins.set(key, (count.twins.get(key) ?? 0) + 1);
     });
   return [
     ...legacy.flatMap((part) => legacyThreads(pkg, slidePart, part)),

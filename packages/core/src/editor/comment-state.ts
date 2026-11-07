@@ -20,6 +20,8 @@ const NONE: readonly CommentThread[] = Object.freeze([]);
 export class CommentState {
   #author: string | undefined;
   #active: string | null = null;
+  /** The `identity` of the picked thread, once a snapshot has read it. */
+  #activeIdentity: string | null = null;
   #key: readonly unknown[] = [];
   #threads: readonly CommentThread[] = NONE;
 
@@ -48,6 +50,7 @@ export class CommentState {
     const next = typeof id === 'string' ? id : null;
     if (next === this.#active) return false;
     this.#active = next;
+    this.#activeIdentity = null;
     return true;
   }
 
@@ -106,12 +109,24 @@ export class CommentState {
     const commentAuthor = this.author ?? null;
     if (!this.modules.review) return { comments: null, activeComment: null, commentAuthor };
     const comments = this.threads(pkg, slidePart);
-    const active = this.#active;
-    return {
-      comments,
-      activeComment: active && comments.some((t) => t.id === active) ? active : null,
-      commentAuthor,
-    };
+    return { comments, activeComment: this.#pickedIn(comments), commentAuthor };
+  }
+
+  /**
+   * The id of the picked thread in `comments`, or null. The pick follows the thread's
+   * `identity`, so it stays when a delete of another repeat changes the thread's id, and it ends
+   * when another thread takes the id.
+   */
+  #pickedIn(comments: readonly CommentThread[]): string | null {
+    if (this.#active === null) return null;
+    const known = this.#activeIdentity;
+    const hit = known
+      ? comments.find((t) => t.identity === known)
+      : comments.find((t) => t.id === this.#active);
+    if (!hit) return null;
+    this.#active = hit.id;
+    this.#activeIdentity = hit.identity;
+    return hit.id;
   }
 
   /**

@@ -1732,6 +1732,7 @@ export interface SlideComment {
     readonly author: string;
     readonly date?: string;
     readonly id: string;
+    readonly identity: string;
     readonly initials: string;
     readonly text: string;
     readonly textEditable: boolean;
