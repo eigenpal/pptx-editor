@@ -64,6 +64,7 @@
     "stress:hang": "bun scripts/stress/hang-check.ts",
     "bench:edit:browser": "playwright test --config e2e/bench.config.ts e2e/edit.bench.ts",
     "bench:open:browser": "playwright test --config e2e/bench.config.ts e2e/open.bench.ts",
+    "bench:hang:browser": "playwright test --config e2e/bench.config.ts e2e/hang.bench.ts",
     "fidelity": "bun scripts/fidelity/run.ts",
     "fidelity:corpus": "bun scripts/fidelity/run.ts --set corpus",
     "fidelity:census": "bun scripts/fidelity/census.ts",
