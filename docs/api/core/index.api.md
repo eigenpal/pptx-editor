@@ -1243,10 +1243,12 @@ export class DocumentSession {
     // @internal
     opening: ProgressiveOpen | null;
     // @internal
+    get paintGeneration(): string;
+    // @internal
     parsedAt: number;
     // @internal
     picture(target: string): DrawablePicture | undefined;
-    picturesReady(): Promise<void>;
+    picturesReady(index?: number): Promise<void>;
     // @internal
     probeBatch(base?: PptxPackage): OpBatch;
     // @internal

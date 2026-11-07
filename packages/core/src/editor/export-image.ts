@@ -162,7 +162,7 @@ export function paintLayout(
 /**
  * Slide `index` as a standalone SVG document. See the file comment for the fonts it holds. An
  * EMF or WMF picture exports as the placeholder until it has converted: await
- * `session.picturesReady()` first. @public
+ * `session.picturesReady(index)` first. @public
  */
 export function exportSlideSvg(
   session: DocumentSession,
@@ -200,7 +200,7 @@ export async function exportSlidePng(
   index: number,
   options: SlideImageOptions = {}
 ): Promise<Blob> {
-  await Promise.all([document.fonts?.ready, session.picturesReady()]);
+  await Promise.all([document.fonts?.ready, session.picturesReady(index)]);
   const { svg, width, height } = paintAlone(session, index, options, () => true);
   return drawPng(svg, width, height);
 }

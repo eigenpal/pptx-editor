@@ -409,18 +409,17 @@ async function imageFor(target: string, p: PageOps): Promise<PDFImage | null> {
   let image: PDFImage | null = null;
   let bytes = binaryPartOf(p.res.pkg, target);
   // An EMF or WMF picture draws as its PNG, converted as in the editor.
-  if (bytes && metafileFormat(bytes)) {
-    const fonts = [...p.res.faces.values()].map((f) => f.bytes);
-    bytes = (await metafilePng(bytes, fonts)) ?? bytes;
+  const metafile = bytes !== undefined && metafileFormat(bytes) !== undefined;
+  if (bytes && metafile) {
+    const fonts = (p.res.metafileFonts ??= [...p.res.faces.values()].map((f) => f.bytes));
+    bytes = (await metafilePng(bytes, fonts, p.res.work.signal)) ?? undefined;
   }
   const png = bytes ? isPng(bytes) : false;
-  if (!bytes) p.diag.add('picture.missing', 'unsupported', 'A picture part is missing.');
+  if (!bytes && metafile)
+    p.diag.add('picture.metafile', 'unsupported', 'An EMF or WMF picture does not convert.');
+  else if (!bytes) p.diag.add('picture.missing', 'unsupported', 'A picture part is missing.');
   else if (!png && !isJpeg(bytes))
-    p.diag.add(
-      'picture.format',
-      'unsupported',
-      'Only PNG, JPEG, EMF, and WMF pictures are drawn yet.'
-    );
+    p.diag.add('picture.format', 'unsupported', 'A picture is not PNG, JPEG, EMF, or WMF.');
   else {
     const size = imageSize(bytes);
     if (!size || size.width <= 0 || size.height <= 0)

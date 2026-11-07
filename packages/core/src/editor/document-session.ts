@@ -60,7 +60,7 @@ import { replicaBindingOf } from './replica-ids.ts';
 import { sameDependencies, slideDependencies } from './slide-dependencies.ts';
 import { carryFits } from '../automation/commands/table-fit.ts';
 import { refitEditedText } from './late-fit.ts';
-import { MetafilePictures, type DrawablePicture } from './metafile-pictures.ts';
+import { MetafilePictures, metafilesOf, type DrawablePicture } from './metafile-pictures.ts';
 import { within } from './within.ts';
 import {
   openingOrder,
@@ -499,11 +499,11 @@ export class DocumentSession {
   /** The last layout of each slide part, with what it was made from (`slideDependencies`). */
   #bySlide = new Map<string, { readonly deps: readonly unknown[]; readonly layout: SlideLayout }>();
   #substitutions: { key: string; list: FontSubstitution[] } | null = null;
-  #urls = new Map<string, string>();
+  #pictureGeneration = 0;
   /** EMF and WMF parts draw as PNG once converted, then `onPictures` repaints. */
   #pictures = new MetafilePictures(
     () => this.#faces.map((f) => f.bytes),
-    () => (this.#repaint(), this.onPictures?.())
+    () => (this.#pictureGeneration++, this.onPictures?.())
   );
   /** Hears that converted pictures are ready to paint. The editor sets it. @internal */
   onPictures: (() => void) | null = null;
@@ -603,9 +603,14 @@ export class DocumentSession {
     return this.#faces;
   }
 
-  /** Bumped every time the face set changes or converted pictures are ready to paint. */
+  /** Bumped every time the face set changes. */
   get fontGeneration(): number {
     return this.#generation;
+  }
+
+  /** Changes when the same slides paint differently: new faces, or converted pictures. @internal */
+  get paintGeneration(): string {
+    return `${this.#generation}.${this.#pictureGeneration}`;
   }
 
   get fontReport(): FontReport {
@@ -692,15 +697,11 @@ export class DocumentSession {
     if (this.#fonts.fixed) carryFits(this.#measurer, built.measurer);
     this.#measurer = built.measurer;
     this.#faces = built.faces;
-    this.#substitutions = null;
-    this.#repaint();
-  }
-
-  /** New layouts and a new `fontGeneration`, so every view paints again. */
-  #repaint(): void {
     this.#layouts = new WeakMap();
     this.#bySlide.clear();
+    this.#substitutions = null;
     this.#generation += 1;
+    this.#pictures.fontsChanged(); // Metafile text draws with the faces.
   }
 
   /**
@@ -812,15 +813,7 @@ export class DocumentSession {
     const target = relTarget(pkg, sourcePart, rId);
     if (!target) return undefined;
     const picture = this.picture(target);
-    if (!picture) return undefined;
-    const key = `${target}\u0000${picture.bytes.length}`;
-    const hit = this.#urls.get(key);
-    if (hit) return hit;
-    if (typeof URL === 'undefined' || typeof Blob === 'undefined') return undefined;
-    const blob = new Blob([picture.bytes.slice().buffer], { type: picture.mime });
-    const url = URL.createObjectURL(blob);
-    this.#urls.set(key, url);
-    return url;
+    return picture ? this.#pictures.url(picture) : undefined;
   };
 
   /**
@@ -833,10 +826,15 @@ export class DocumentSession {
     return bytes ? this.#pictures.drawable(bytes, imageMime(target)) : undefined;
   }
 
-  /** Resolves when every EMF and WMF part converted or failed, so an export draws them. */
-  picturesReady(): Promise<void> {
-    const pkg = this.store.package;
-    return this.#pictures.convertAll([...pkg.parts.keys()].map((n) => binaryPartOf(pkg, n)));
+  /**
+   * Resolves when the EMF and WMF pictures of slide `index` (of every slide when you omit it)
+   * have converted, so an export draws them. It waits 30 seconds at most: a picture that is not
+   * ready by then draws as the placeholder.
+   */
+  picturesReady(index?: number): Promise<void> {
+    const slides = this.info.slides.map((s) => s.partName);
+    const shown = index === undefined ? slides : slides.slice(index, index + 1);
+    return this.#pictures.ready(metafilesOf(this.store.package, shown));
   }
 
   /**
@@ -870,8 +868,6 @@ export class DocumentSession {
   dispose(): void {
     this.#disposed = true;
     this.#pictures.dispose();
-    for (const url of this.#urls.values()) URL.revokeObjectURL(url);
-    this.#urls.clear();
   }
 }
 

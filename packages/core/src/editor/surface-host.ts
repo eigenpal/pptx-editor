@@ -77,6 +77,7 @@ export function createSurfaceHost(base: SurfaceHostBase, s: SurfaceHostState): S
     selection: () => s.selection(),
     readOnly: () => s.viewing(),
     imageUrl: (p, id) => s.session()?.imageUrl(p, id),
+    paintGeneration: () => s.session()?.paintGeneration,
     fillableType: (id) => {
       const pkg = s.session()?.store.package;
       const part = s.part();

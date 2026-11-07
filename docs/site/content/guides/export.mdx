@@ -54,9 +54,10 @@ export async function slideAssets(editor: PptxEditorInstance) {
   if (!editor.save()) throw new Error('Export is unavailable.');
   const session = editor.session;
   if (!session) throw new Error('No presentation is open.');
-  // EMF and WMF pictures convert in the background. Wait for them.
-  await session.picturesReady();
-  const svg = exportSlideSvg(session, editor.snapshot().currentSlide);
+  const slide = editor.snapshot().currentSlide;
+  // EMF and WMF pictures convert in the background. Wait for this slide's.
+  await session.picturesReady(slide);
+  const svg = exportSlideSvg(session, slide);
   const zip = await exportSlidesPngZip(session, { width: 1280 });
   return { svg, zip };
 }
@@ -64,7 +65,7 @@ export async function slideAssets(editor: PptxEditorInstance) {
 
 SVG export returns a string. ZIP export returns bytes with numbered files such as `slide-01.png`.
 
-The editor converts EMF and WMF pictures to PNG in the background, and shows a placeholder until each one is ready. PNG and ZIP export wait for the conversions. `exportSlideSvg()` is synchronous, so call `session.picturesReady()` before it.
+The editor converts EMF and WMF pictures to PNG in the background, and shows a placeholder until each one is ready. PNG and ZIP export wait for the conversions. `exportSlideSvg()` is synchronous, so call `session.picturesReady(index)` before it. Omit `index` to wait for the pictures of every slide. The wait lasts 30 seconds at most. A picture that is not ready by then exports as the placeholder.
 
 Catch export errors in your UI. Use PNG when you need a fixed raster image. SVG font embedding follows font permissions; another viewer can substitute unavailable fonts.
 

@@ -157,7 +157,8 @@ function typeIn(types: ContentTypeIndex, partName: string, set: ReadonlySet<stri
  * Notes are not needed to show the slides. A part is notes when a notes relationship reaches it,
  * when its content type is a notes type (so another relationship that names it, such as a
  * hostile slide relationship, does not make a damaged notes part refuse the deck), or when it is
- * the theme of a notes master or a handout master. Keys are folded part names (`partNameKey`),
+ * the theme of a notes master or a handout master. A slide or slide master of the main part
+ * stays part of the deck, whatever its content type. Keys are folded part names (`partNameKey`),
  * as OPC part names compare. A part that several relationships reach keeps the strongest role:
  * the main part first, notes last.
  */
@@ -167,10 +168,19 @@ function structuralTargets(
 ): Map<string, StructuralRole> {
   const pkg: PptxPackage = { parts: rels };
   const out = new Map<string, StructuralRole>();
+  // The slides and slide masters of the main part: a content type never makes them notes.
+  const shown = new Set<string>();
+  for (const main of relationshipsOf(pkg, '/'))
+    if (main.type === REL.officeDocument && main.target !== undefined)
+      for (const rel of relationshipsOf(pkg, main.target))
+        if ((rel.type === REL.slide || rel.type === REL.slideMaster) && rel.target !== undefined)
+          shown.add(partNameKey(rel.target));
+  const notesTyped = (part: string, set: ReadonlySet<string>): boolean =>
+    !shown.has(partNameKey(part)) && typeIn(types, part, set);
   for (const name of rels.keys()) {
     const source = relsSource(name);
     if (source === undefined) continue;
-    const notesMaster = source !== '/' && typeIn(types, source, NOTES_MASTER_TYPES);
+    const notesMaster = source !== '/' && notesTyped(source, NOTES_MASTER_TYPES);
     for (const rel of relationshipsOf(pkg, source)) {
       if (rel.target === undefined || !STRUCTURAL_RELS.has(rel.type)) continue;
       const key = partNameKey(rel.target);
@@ -180,7 +190,7 @@ function structuralTargets(
           : rel.type === REL.notesSlide ||
               rel.type === REL.notesMaster ||
               (rel.type === REL.theme && notesMaster) ||
-              typeIn(types, rel.target, NOTES_TYPES)
+              notesTyped(rel.target, NOTES_TYPES)
             ? 'notes'
             : 'deck';
       const was = out.get(key);

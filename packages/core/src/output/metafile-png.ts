@@ -19,11 +19,13 @@ const PNG_PREFIX = 'data:image/png;base64,';
  * The PNG of an EMF or WMF picture, at most `MAX_METAFILE_RASTER_EDGE` pixels on a side, or
  * null when `bytes` are not a metafile or do not convert within the limits. Text in the
  * metafile draws with `fonts` (TrueType or OpenType files): pass the faces that the deck's
- * text uses, so every host draws the same glyphs. Never throws. @internal
+ * text uses, so every host draws the same glyphs. Pass the same array again to reuse the fonts
+ * the converter has read. `signal` stops the conversion. Never throws. @internal
  */
 export async function metafilePng(
   bytes: Uint8Array,
-  fonts: readonly Uint8Array[] = []
+  fonts: readonly Uint8Array[] = [],
+  signal?: AbortSignal
 ): Promise<Uint8Array | null> {
   if (!metafileFormat(bytes) || bytes.length > DEFAULT_IMAGE_RESOURCE_LIMITS.maxEncodedBytes)
     return null;
@@ -35,7 +37,9 @@ export async function metafilePng(
       maxCanvasDimension: MAX_METAFILE_RASTER_EDGE,
       dpiScale: DPI_SCALE,
       timeoutMs: MAX_METAFILE_MS,
-      ...(fonts.length ? { fonts: [...fonts] } : {}),
+      // Gray smoothing: no colored fringes that depend on a screen's subpixel order.
+      ...(fonts.length ? { fonts: fonts as Uint8Array[], fontSmoothing: 'gray' as const } : {}),
+      ...(signal ? { signal } : {}),
     });
     if (!url?.startsWith(PNG_PREFIX)) return null;
     const binary = atob(url.slice(PNG_PREFIX.length));

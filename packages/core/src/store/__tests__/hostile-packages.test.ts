@@ -268,4 +268,21 @@ describe('damaged notes parts and notes themes', () => {
     });
     expect(readPptx(bytes).ok).toBe(false);
   });
+
+  test.each([
+    ['slide', '/ppt/slides/slide1.xml', 'notesSlide'],
+    ['slide master', '/ppt/slideMasters/slideMaster1.xml', 'notesMaster'],
+  ])('a damaged %s with a notes content type still refuses the deck', (_, part, notesType) => {
+    const bytes = notesDeck((entries) => {
+      entries.set(part, new TextEncoder().encode('<p:sld><broken'));
+      const types = new TextDecoder().decode(entries.get(CT));
+      const retyped = types.replace(
+        new RegExp(`(PartName="${part}" ContentType="${PML}).*?\\+xml"`),
+        `$1${notesType}+xml"`
+      );
+      expect(retyped).not.toBe(types);
+      entries.set(CT, new TextEncoder().encode(retyped));
+    });
+    expect(readPptx(bytes).ok).toBe(false);
+  });
 });

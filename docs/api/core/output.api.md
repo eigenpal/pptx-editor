@@ -74,7 +74,7 @@ export function lumTransfer(bright: number, contrast: number): {
 export const MAX_METAFILE_RASTER_EDGE = 4096;
 
 // @internal
-export function metafilePng(bytes: Uint8Array, fonts?: readonly Uint8Array[]): Promise<Uint8Array | null>;
+export function metafilePng(bytes: Uint8Array, fonts?: readonly Uint8Array[], signal?: AbortSignal): Promise<Uint8Array | null>;
 
 // @public
 export interface PaintContext {

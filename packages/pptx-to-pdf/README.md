@@ -97,7 +97,8 @@ Each diagnostic has a fixed `code`. Handle an unknown code by its `severity`. Th
 | `line.gradient` | `approximation` | A gradient on a line is drawn in its middle color. |  |
 | `fill.outside-box` | `approximation` | A shape's picture fill or rectangular path gradient paints only the shape's box; geometry more than 0.75 pt past it is empty. |  |
 | `fill.gradient-stops` | `approximation` | A gradient with more than 64 stops is drawn with 64. |  |
-| `picture.missing`, `picture.format`, `picture.unreadable`, `picture.too-large` | `unsupported` | A picture part is missing or external, in a format other than PNG or JPEG, unreadable, or over the pixel limit. |  |
+| `picture.missing`, `picture.format`, `picture.unreadable`, `picture.too-large` | `unsupported` | A picture part is missing or external, in a format other than PNG, JPEG, EMF, or WMF, unreadable, or over the pixel limit. |  |
+| `picture.metafile` | `unsupported` | An EMF or WMF picture does not convert to a PNG within the limits. |  |
 | `picture.svg-fallback` | `information` | An SVG picture is drawn from its PNG fallback, the raster copy that the file stores beside it. |  |
 | `picture.tile` | `approximation` | A tiled picture is drawn stretched. |  |
 | `picture.color-effects` | `approximation` | Picture color effects are not applied. | `image-effects` |
@@ -176,6 +177,7 @@ One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`sho
 | Preset and custom geometry, groups, rotation, flips | Drawn, from the engine's evaluated paths |
 | Solid fills and lines, with transparency; caps and joins | Drawn |
 | PNG and JPEG pictures, identified by their signature: cropped by `srcRect`, placed by `fillRect`, clipped to the geometry, with transparency | Drawn |
+| EMF and WMF pictures | Drawn as a PNG at twice their pixel size, at most 4096 pixels on a side; text in them uses the deck's fonts |
 | Linear and path gradients on shapes, backgrounds, and table cells; picture fills; group fills; lighten and darken path fills | Drawn, as PDF shadings and clipped pictures |
 | Tables: background, cell fills, borders, and cell text | Drawn, from the engine's table layout |
 | Text: every run at the position layout measured; bold, italic, size, color, caps, spacing, superscript and subscript, highlight | Drawn, searchable; subset fonts embedded |

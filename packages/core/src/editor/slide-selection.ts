@@ -120,9 +120,9 @@ export function createSlideSummaries(): (
   pkg: PptxPackage | undefined
 ) => EditorSnapshot['slides'] {
   let cachedSlides: EditorSnapshot['slides'] = [];
-  let slidesOf: { pkg: PptxPackage | undefined; fonts: number; parsed: number } = {
+  let slidesOf: { pkg: PptxPackage | undefined; fonts: string; parsed: number } = {
     pkg: undefined,
-    fonts: -1,
+    fonts: '',
     parsed: -1,
   };
   /** The parts each slide's key read, by slide index, for `slidesOf.pkg`. */
@@ -149,7 +149,7 @@ export function createSlideSummaries(): (
     session: DocumentSession,
     pkg: PptxPackage,
     index: number,
-    fonts: number,
+    fonts: string,
     old: SlideSummary | undefined,
     parts: string[]
   ): SlideSummary => {
@@ -184,7 +184,7 @@ export function createSlideSummaries(): (
   };
 
   return (session, pkg) => {
-    const fonts = session?.fontGeneration ?? -1;
+    const fonts = session?.paintGeneration ?? '';
     // A slide that finished opening changes its summary, but not the package.
     const parsed = deferredParseCount();
     if (slidesOf.pkg === pkg && slidesOf.fonts === fonts && slidesOf.parsed === parsed)

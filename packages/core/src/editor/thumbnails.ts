@@ -58,7 +58,7 @@ const MAX_WAIT_MS = 1000;
 export class ThumbnailPainter {
   readonly #host: ThumbnailHost;
   #painted = new WeakMap<HTMLElement, Painted>();
-  #layouts = new WeakMap<HTMLElement, { pkg: PptxPackage; id: string; fonts: number }>();
+  #layouts = new WeakMap<HTMLElement, { pkg: PptxPackage; id: string; fonts: string }>();
   /** Containers waiting for an idle repaint, with the slide index asked for last. */
   #pending = new Map<HTMLElement, number>();
   /** How many times each container was asked for: a disposer acts for the last ask only. */
@@ -101,7 +101,7 @@ export class ThumbnailPainter {
     // A slide still opening waits as a placeholder in a deferred list. A caller that paints at
     // once (no `defer`) gets the slide now: its layout parses it.
     if (defer && session.slidePending(index)) return this.#placeholder(session, index, container);
-    const key = renderKey(session.store.package, index, session.fontGeneration);
+    const key = renderKey(session.store.package, index, session.paintGeneration);
     const part = session.info.slides[index]?.partName;
     if (!key || !part) return;
     const was = this.#painted.get(container);
@@ -132,7 +132,7 @@ export class ThumbnailPainter {
     const pkg = session?.store.package;
     if (!session || !pkg) return;
     const was = this.#layouts.get(container);
-    if (was && was.pkg === pkg && was.id === layoutId && was.fonts === session.fontGeneration)
+    if (was && was.pkg === pkg && was.id === layoutId && was.fonts === session.paintGeneration)
       return;
     const lay = this.#host.layoutPreview(session, layoutId);
     if (!lay) return container.replaceChildren();
@@ -147,7 +147,7 @@ export class ThumbnailPainter {
     svg.setAttribute('width', '100%');
     svg.setAttribute('height', '100%');
     container.replaceChildren(svg);
-    this.#layouts.set(container, { pkg, id: layoutId, fonts: session.fontGeneration });
+    this.#layouts.set(container, { pkg, id: layoutId, fonts: session.paintGeneration });
   }
 
   /** Paint every waiting thumbnail now. */
@@ -215,14 +215,14 @@ export class ThumbnailPainter {
       return;
     }
     if (session.slidePending(index)) return void session.opening?.want(ask.part);
-    const key = renderKey(session.store.package, index, session.fontGeneration);
+    const key = renderKey(session.store.package, index, session.paintGeneration);
     const was = this.#painted.get(container);
     if (was?.session === session && was.key === key) return;
     this.#paint(session, index, container);
   }
 
   #paint(session: DocumentSession, index: number, container: HTMLElement): void {
-    const key = renderKey(session.store.package, index, session.fontGeneration);
+    const key = renderKey(session.store.package, index, session.paintGeneration);
     const part = session.info.slides[index]?.partName;
     const lay = session.layout(index);
     if (!key || !part || !lay) return;
@@ -266,7 +266,7 @@ export class ThumbnailPainter {
       this.#pending.delete(container);
       if (!session) continue;
       const was = this.#painted.get(container);
-      const key = renderKey(session.store.package, index, session.fontGeneration);
+      const key = renderKey(session.store.package, index, session.paintGeneration);
       if (was?.session === session && was.key === key) continue;
       this.#paint(session, index, container);
       painted += 1;
