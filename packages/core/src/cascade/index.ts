@@ -10,6 +10,7 @@ export { inheritedPlaceholders, layoutPlaceholderOf, resolveSlide, XFRM_BOUND } 
 export { CHART_CONTENT_TYPE, resolveChartPart, type ResolvedChartPart } from './chart-part.ts';
 export { alternateBranch, contentElements, isAlternateContent } from './alternate-content.ts';
 export { resolveTable, type TableScope } from './table.ts';
+export type { PictureBulletSource } from './picture-bullet.ts';
 export {
   DEFAULT_TABLE_STYLE_ID,
   defaultTableStyleId,

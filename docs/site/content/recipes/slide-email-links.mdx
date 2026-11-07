@@ -1,10 +1,10 @@
 ---
-title: 'Link to a slide or an email address'
-description: 'Link selected text to a slide of the presentation, a relative slide, or an email address.'
+title: 'Link to a slide, a custom show, a file, or an email address'
+description: 'Link selected text to a slide, a relative slide, a custom show, another file, or an email address.'
 category: 'Task recipes'
 ---
 
-Use the `setLink` command to link the selected text to a slide or an email address. The command takes one `url` string for every kind of link, and each link is one undo step.
+Use the `setLink` command to link the selected text to a slide, a custom show, another file, or an email address. The command takes one `url` string for every kind of link, and each link is one undo step.
 
 ## Link to a slide
 
@@ -32,6 +32,34 @@ To jump relative to the slide that shows, use one of these forms:
 | `#next-slide`     | The slide after the one that shows  |
 | `#previous-slide` | The slide before the one that shows |
 
+## Link to a custom show
+
+A custom show is a named list of the deck's slides. `editor.snapshot().customShows` lists the shows of the open deck, each with its `id` and `name`. Link to a show with `#custom-show-<id>`. Add `?return=true` to come back to the linking slide after the show's last slide:
+
+```ts
+const show = editor.snapshot().customShows?.find((s) => s.name === 'Short');
+if (show) editor.exec({ type: 'setLink', url: `#custom-show-${show.id}?return=true` });
+```
+
+The file stores the link with no relationship and the action `ppaction://customshow?id=<id>&return=true`. `setLink` refuses an id that the deck does not have with `errors.customShowNotFound`.
+
+## Link to another file
+
+Link to a file next to the presentation with a relative path that starts with `./` or `../`:
+
+```ts
+editor.exec({ type: 'setLink', url: './docs/Q3 report.pdf' });
+```
+
+The file stores the path, percent-encoded, as an external hyperlink target: `docs/Q3%20report.pdf`. A presentation application opens the file relative to the deck. The editor never opens or fetches it: a browser cannot reach a file next to the deck.
+
+`setLink` checks the path strictly and refuses it with `errors.unsafeFileLink` in these cases:
+
+- It has no `./` or `../` prefix. A bare name such as `report.pdf` is a web address.
+- It has more than two leading `../` steps, or a `.` or `..` step after the first name.
+- It names a scheme, a drive, or an absolute path, or holds a backslash or a control character.
+- It names a program or a script, such as `.exe`, `.sh`, `.js`, or `.ps1`.
+
 ## Link to an email address
 
 Use a `mailto:` URL. Percent-encode the subject, so that its text cannot add other fields:
@@ -43,18 +71,20 @@ editor.exec({ type: 'setLink', url: `mailto:ana@example.com?subject=${subject}` 
 
 ## Read a link
 
-With a caret inside linked text, `editor.snapshot().format?.link` returns the same URL forms: `#slide-3`, `#next-slide`, or the `mailto:` address.
+With a caret inside linked text, `editor.snapshot().format?.link` returns the same URL forms: `#slide-3`, `#next-slide`, `#custom-show-2?return=true`, `./docs/Q3 report.pdf`, or the `mailto:` address.
 
 ## What users see
 
-In the default editor, the link popup has a **Link to** choice: **Web address**, **Email**, or **Slide**. **Email** shows the address and subject fields. **Slide** lists the four relative jumps and each slide by number.
+In the default editor, the link popup has a **Link to** choice: **Web address**, **Email**, **Slide**, **Custom show**, or **Other file**. **Custom show** shows only when the deck has a custom show, or when the link already goes to one. It lists the deck's shows by name, with **Return to this slide after the show**. **Other file** takes a relative path.
 
-A click into a slide link shows the slide it goes to as a button, such as **Slide 3**. The button's accessible name is "Go to Slide 3", and it shows that slide in the editor. **Copy** is hidden for slide links. In the slide show, a click on a slide link moves the show to that slide. A click on any other link opens it in a new tab.
+A click into a slide link shows the slide it goes to as a button, such as **Slide 3**. The button's accessible name is "Go to Slide 3", and it shows that slide in the editor. A custom show link shows its show, such as "Custom show: Short". A file link shows its path. **Copy** is hidden for these links. In the slide show, a click on a slide link moves the show to that slide. A click on a web or email link opens it in a new tab. Custom show and file links do nothing in the slide show.
 
 ## Limits
 
 - `setLink` refuses a slide number past the end, `#slide-0`, and any other `#` form with `errors.slideNotFound`.
-- A link that starts a custom show or a program keeps its action on save. The popup shows only an external target of such a link, and **Edit** replaces the action.
+- The slide show does not run custom shows.
+- Copy and paste drops a link to another file from the pasted text.
+- Links to programs (`ppaction://program`) keep their action and target on save, and the editor never runs them. `setLink` never writes such a link: this is a deliberate security limit. **Edit** replaces the link.
 - `mailto:` fields other than the subject, such as `cc` and `body`, stay in the link when you edit the address or the subject.
 
 ## See also

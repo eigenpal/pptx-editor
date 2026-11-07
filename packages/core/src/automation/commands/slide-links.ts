@@ -6,18 +6,40 @@
 // `#last-slide`. The file keeps the relationship, so a link follows its slide when slides move.
 
 import { NS, presentationInfo, REL, sanitizeHref, type NodeSpec } from '../../store/index.ts';
+import {
+  customShowLinkSpec,
+  fileLinkTarget,
+  isFileLink,
+  parseCustomShowLink,
+} from './custom-show-links.ts';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
 import { addExternalRelationship, addRelationship } from './package-edits.ts';
 
 /**
- * The `a:hlinkClick` of a link from `part` to `url`, with its relationship: a slide in its `#`
- * form, or an address that passes `sanitizeHref`. A bare host ("example.com") is a web address.
- * Anything else is refused with `errors.unsafeLink`, and a `#` form that names no slide with
- * `errors.slideNotFound`.
+ * The `a:hlinkClick` of a link from `part` to `url`, with its relationship: a slide or a custom
+ * show in its `#` form, a file in its `./` form (`custom-show-links.ts`), or an address that
+ * passes `sanitizeHref`. A bare host ("example.com") is a web address. Anything else is refused
+ * with `errors.unsafeLink`, a `#` form that names no slide with `errors.slideNotFound`, one that
+ * names no custom show with `errors.customShowNotFound`, and a file path that is not safe with
+ * `errors.unsafeFileLink`.
  */
 export function linkSpec(batch: OpBatch, part: string, url: string): NodeSpec {
   const raw = url.trim();
   if (!raw || raw.length > 2048) throw new CommandRefusal('errors.unsafeLink');
+  if (raw.startsWith('#custom-show-')) {
+    const show = parseCustomShowLink(raw);
+    if (!show) throw new CommandRefusal('errors.customShowNotFound');
+    return customShowLinkSpec(batch.pkg, show);
+  }
+  if (isFileLink(raw)) {
+    // A relative path, written as the file's own hyperlink: no action, never fetched.
+    const rId = addExternalRelationship(batch, part, REL.hyperlink, fileLinkTarget(raw));
+    return {
+      ns: NS.a,
+      local: 'hlinkClick',
+      attrs: [{ ns: NS.r, local: 'id', prefix: 'r', value: rId }],
+    };
+  }
   if (raw.startsWith('#')) {
     const target = parseSlideLink(raw);
     if (!target) throw new CommandRefusal('errors.slideNotFound');

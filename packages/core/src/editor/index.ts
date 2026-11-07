@@ -588,10 +588,14 @@ export {
   type ColumnsFieldError,
 } from './columns-dialog-fields.ts';
 export {
+  BULLET_PICTURE_ACCEPT,
   BULLET_TEXT_FONT,
   CURRENT_STYLE,
+  PICTURE_STYLE,
+  bulletColorEnabled,
   bulletCommandOf,
   bulletFieldsEnabled,
+  chooseBulletPicture,
   bulletFontChoices,
   bulletFontMixed,
   bulletsFieldError,
@@ -600,6 +604,7 @@ export {
   customBulletPreview,
   editBulletGlyph,
   pickBulletStyle,
+  readBulletPicture,
   seedBulletFields,
   type BulletsDialogFields,
   type BulletsDialogTab,
@@ -796,7 +801,12 @@ export {
 } from './link-popup.ts';
 export {
   LINK_KINDS,
+  customShowDraft,
+  customShowDraftUrl,
+  customShowLinkLabel,
+  linkKindDraft,
   linkKindOf,
+  linkKindsFor,
   mailtoParts,
   mailtoUrl,
   slideLinkChoices,

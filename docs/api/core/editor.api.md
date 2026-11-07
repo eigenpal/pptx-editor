@@ -245,7 +245,13 @@ export function builtInGroupPriority(groupId: string, groups: readonly Pick<Chro
 export const BULLET_GALLERY: readonly ListGalleryItem<BulletGalleryKey>[];
 
 // @internal
+export const BULLET_PICTURE_ACCEPT = "image/png,image/jpeg,image/gif";
+
+// @internal
 export const BULLET_TEXT_FONT = "\u0001text";
+
+// @internal
+export function bulletColorEnabled(d: BulletsDialogFields): boolean;
 
 // @internal
 export function bulletCommandOf(seed: BulletsDialogFields, d: BulletsDialogFields): BulletFormat | null | undefined;
@@ -276,6 +282,10 @@ export type BulletFormat = {
     readonly sizePercent?: number | null;
     readonly color?: ColorChoice | null;
 } | {
+    readonly kind: 'picture';
+    readonly picture: Uint8Array;
+    readonly sizePercent?: number | null;
+} | {
     readonly kind?: undefined;
     readonly sizePercent?: number | null;
     readonly color?: ColorChoice | null;
@@ -301,6 +311,9 @@ export type BulletFormatRead = {
     readonly startAt: number;
     readonly sizePercent: number;
     readonly color?: string;
+} | {
+    readonly kind: 'picture';
+    readonly sizePercent: number;
 };
 
 // @public
@@ -317,6 +330,7 @@ export interface BulletsDialogFields {
     readonly font: string;
     readonly kind: BulletsDialogTab;
     readonly number: string;
+    readonly picture: Uint8Array | null;
     readonly sizePercent: string;
     readonly startAt: string;
 }
@@ -380,6 +394,9 @@ export type CapsStyle = 'none' | 'small' | 'all';
 
 // @public
 export type CheckState = boolean | 'mixed';
+
+// @internal
+export function chooseBulletPicture(d: BulletsDialogFields, picture: Uint8Array): BulletsDialogFields;
 
 // @public
 export const CHROME_GROUPS: readonly ChromeGroup[];
@@ -1175,6 +1192,24 @@ export function customHexDraft(text: string): string;
 
 // @internal
 export function customHexSeed(selected: ColorChoice | null | undefined): string;
+
+// @internal
+export function customShowDraft(url: string): {
+    readonly id: number;
+    readonly returns: boolean;
+} | null;
+
+// @internal
+export function customShowDraftUrl(id: number, returns: boolean): string;
+
+// @internal
+export function customShowLinkLabel(t: Translate, url: string, shows: readonly CustomShowSummary[]): string;
+
+// @public
+export interface CustomShowSummary {
+    readonly id: number;
+    readonly name: string;
+}
 
 // @public
 export interface DateTimeState {
@@ -2098,6 +2133,7 @@ export interface EditorSnapshot {
     readonly collapsedSections?: readonly string[];
     // (undocumented)
     readonly currentSlide: number;
+    readonly customShows?: readonly CustomShowSummary[];
     readonly dateTime?: DateTimeState | null;
     // (undocumented)
     readonly embeddedFontFaces: number;
@@ -3193,16 +3229,22 @@ export const LINK_KINDS: readonly LinkKind[];
 export function linkCaretAnchor(editor: object): HTMLElement | null;
 
 // @internal
-export type LinkKind = 'web' | 'email' | 'slide';
+export type LinkKind = 'web' | 'email' | 'slide' | 'customShow' | 'file';
+
+// @internal
+export function linkKindDraft(kind: LinkKind, shows: readonly CustomShowSummary[]): string;
 
 // @public
 export function linkKindOf(url: string): LinkKind;
 
 // @internal
+export function linkKindsFor(shows: readonly CustomShowSummary[], draft: string): readonly LinkKind[];
+
+// @internal
 export function linkPopupAnchor(request: LinkRequest, editor: object): HTMLElement | null;
 
 // @internal
-export function linkPopupAnnouncement(state: HyperlinkPopupState, t: Translate): string;
+export function linkPopupAnnouncement(state: HyperlinkPopupState, t: Translate, shows?: readonly CustomShowSummary[]): string;
 
 // @internal
 export function linkPopupReturnsFocus(editor?: object): boolean;
@@ -3978,6 +4020,9 @@ export function pickPictureFill(editor: PptxEditorInstance, from?: Element | nul
 // @internal
 export const PICTURE_FILL_TYPES = "image/png,image/jpeg,image/gif";
 
+// @internal
+export const PICTURE_STYLE = "picture";
+
 // @public
 export type PictureCommand =
 /**
@@ -4373,6 +4418,9 @@ export function railRightToLeft(el: Element | null): boolean;
 
 // @internal
 export function railStepOfKey(key: string, orientation: SlideRailOrientation | undefined, list: HTMLElement | null): -1 | 0 | 1;
+
+// @internal
+export function readBulletPicture(file: Blob | undefined | null): Promise<Uint8Array | null>;
 
 // @public
 export type ReflectionPreset = 'tightTouching' | 'halfTouching' | 'fullTouching' | 'tight4pt' | 'half4pt' | 'full4pt' | 'tight8pt' | 'half8pt' | 'full8pt';

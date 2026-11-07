@@ -48,6 +48,14 @@ export function boxMatrix(x: Xfrm, withFlip?: boolean, extraRotation?: number): 
 export function breakOpportunities(text: string, eaLineBreak?: boolean, latinLineBreak?: boolean, kinsoku?: KinsokuLists): Uint8Array;
 
 // @public
+export interface BulletPicture {
+    readonly height: number;
+    readonly part: string;
+    readonly rId: string;
+    readonly svgRId?: string;
+}
+
+// @public
 export interface CellLayout {
     // (undocumented)
     readonly cell: ResolvedTableCell;
@@ -423,6 +431,7 @@ export interface GlyphRun {
     readonly face: ResolvedFace;
     // (undocumented)
     readonly kind: 'text' | 'bullet';
+    readonly picture?: BulletPicture;
     // (undocumented)
     readonly props: RunProps;
     readonly rise: number;
@@ -650,6 +659,9 @@ export type PathCommand = {
 } | {
     readonly op: 'Z';
 };
+
+// @public
+export const PICTURE_BULLET_SCALE = 0.7;
 
 // @internal
 export function placeBaseline(emu: number): number;

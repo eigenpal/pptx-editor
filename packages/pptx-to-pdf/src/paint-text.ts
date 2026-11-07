@@ -31,7 +31,7 @@ import {
 import type { ResolvedFill } from '@pptx-editor.dev/core/cascade';
 import { hasCharacters, type GlyphRun, type TextLayout } from '@pptx-editor.dev/core/layout';
 import { EmbeddedFace } from './fonts.ts';
-import { flatColor, gradientBox, ownFill, type FillScope } from './paint-fill.ts';
+import { drawPicture, flatColor, gradientBox, ownFill, type FillScope } from './paint-fill.ts';
 import { clip, EMU_PER_PT, rgb, type PageOps } from './page-ops.ts';
 
 /** The embedded face for a layout face id, or null with a diagnostic. */
@@ -87,6 +87,10 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
     p.diag.add('text.upright', 'approximation', 'Upright vertical characters are drawn rotated.');
   for (const line of layout.lines) {
     for (const run of line.runs) {
+      if (run.picture) {
+        await drawBulletPicture(run, line.baseline, p);
+        continue;
+      }
       if (run.text.length === 0) continue;
       if (run.props.highlight && run.kind === 'text') {
         const x0 = run.x[0];
@@ -248,6 +252,32 @@ function drawDecorations(
       strike === 'dblStrike' ? [mid - thickness / 2, mid - thickness * 2] : [mid - thickness / 2]
     );
   }
+}
+
+/**
+ * The picture of a picture bullet, standing on the baseline, stretched over its box as the SVG
+ * paint draws it. A picture that cannot be read draws nothing.
+ */
+async function drawBulletPicture(run: GlyphRun, baseline: number, p: PageOps): Promise<void> {
+  const pic = run.picture;
+  if (!pic) return;
+  const x = run.x[0];
+  const w = run.x[run.x.length - 1] - x;
+  if (!(w > 0) || !(pic.height > 0)) return;
+  const none = { l: 0, t: 0, r: 0, b: 0 };
+  const fill: Extract<ResolvedFill, { type: 'picture' }> = {
+    type: 'picture',
+    rId: pic.rId,
+    ...(pic.svgRId ? { svgRId: pic.svgRId } : {}),
+    srcRect: none,
+    mode: 'stretch',
+    fillRect: none,
+    effects: [],
+    rotWithShape: true,
+  };
+  p.push(pushGraphicsState(), concatTransformationMatrix(1, 0, 0, 1, x, baseline - pic.height));
+  await drawPicture(pic.part, fill, w, pic.height, p);
+  p.push(popGraphicsState());
 }
 
 /** The laid-out bounds of a text body in its frame, as the SVG paint's gradient text spans. */

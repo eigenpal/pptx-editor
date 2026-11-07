@@ -362,7 +362,7 @@ export const BulletsAndNumberingDialog: {
 };
 
 // @public
-export type BulletsAndNumberingDialogFieldName = 'bullet' | 'number' | 'style' | 'char' | 'font' | 'sizePercent' | 'color' | 'numberStyle' | 'numberSizePercent' | 'numberColor' | 'startAt';
+export type BulletsAndNumberingDialogFieldName = 'bullet' | 'number' | 'style' | 'char' | 'font' | 'picture' | 'sizePercent' | 'color' | 'numberStyle' | 'numberSizePercent' | 'numberColor' | 'startAt';
 
 // @public
 export type BulletsAndNumberingDialogProps = ExtractPublicPropTypes<typeof bulletsAndNumberingDialogProps>;

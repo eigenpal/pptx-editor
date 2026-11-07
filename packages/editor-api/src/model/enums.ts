@@ -466,7 +466,12 @@ export interface EnumMap<O extends string> {
 
 function enumMap<O extends string>(
   pairs: readonly (readonly [O, string])[],
-  options: { readonly writeOnly?: readonly (readonly [O, string])[]; readonly fallback?: O } = {}
+  options: {
+    readonly writeOnly?: readonly (readonly [O, string])[];
+    /** File values that read as an Office.js value but that the value never writes. */
+    readonly readOnly?: readonly (readonly [O, string])[];
+    readonly fallback?: O;
+  } = {}
 ): EnumMap<O> {
   const toFile: Record<string, string> = Object.create(null);
   const fromFile: Record<string, O> = Object.create(null);
@@ -475,6 +480,7 @@ function enumMap<O extends string>(
     fromFile[f] ??= o;
   }
   for (const [o, f] of options.writeOnly ?? []) toFile[o] = f;
+  for (const [o, f] of options.readOnly ?? []) fromFile[f] ??= o;
   return {
     toFile(value, target) {
       if (typeof value !== 'string' || !(value in toFile))
@@ -711,7 +717,8 @@ export const BULLET_TYPE = enumMap<`${BulletType}`>(
     ['Numbered', 'autonum'],
     ['Unnumbered', 'char'],
   ],
-  { fallback: 'Unsupported' }
+  // A picture bullet (`a:buBlip`) reads as unnumbered; `Unnumbered` writes a character bullet.
+  { readOnly: [['Unnumbered', 'picture']], fallback: 'Unsupported' }
 );
 
 /** The shape type of a protocol read (`geometricShape`) as the Office.js value. */

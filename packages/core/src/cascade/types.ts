@@ -52,6 +52,18 @@ export type ResolvedBullet =
       readonly font?: string;
       readonly size: { readonly pct: number } | { readonly pts: number };
       readonly color?: Rgba;
+    }
+  | {
+      /** A picture bullet (`a:buBlip`, ECMA-376 Part 1, 21.1.2.4.2). */
+      readonly type: 'picture';
+      /** The part whose relationships resolve `rId` and `svgRId`. */
+      readonly part: string;
+      readonly rId: string;
+      /** An `asvg:svgBlip` alternative, when present. */
+      readonly svgRId?: string;
+      /** The picture's width over its height. */
+      readonly aspect: number;
+      readonly size: { readonly pct: number } | { readonly pts: number };
     };
 
 /** Line spacing: a percentage of single spacing, or an exact size in hundredths of a point. */

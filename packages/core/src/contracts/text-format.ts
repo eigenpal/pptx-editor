@@ -55,6 +55,17 @@ export type BulletFormat =
       readonly color?: ColorChoice | null;
     }
   | {
+      /**
+       * A picture bullet (`a:buBlip`, ECMA-376 Part 1, 21.1.2.4.2): the picture stands on the
+       * baseline, 0.7 times the bullet size high, and keeps its aspect.
+       */
+      readonly kind: 'picture';
+      /** PNG, JPEG, or GIF bytes, at most 50 MB. The command adds them as one media part. */
+      readonly picture: Uint8Array;
+      /** Percent of the text size, 25 to 400 (`a:buSzPct`). */
+      readonly sizePercent?: number | null;
+    }
+  | {
       readonly kind?: undefined;
       /** Percent of the text size, 25 to 400 (`a:buSzPct`). */
       readonly sizePercent?: number | null;
@@ -83,6 +94,12 @@ export type BulletFormatRead =
       /** Percent of the text size. */
       readonly sizePercent: number;
       readonly color?: string;
+    }
+  | {
+      /** A picture bullet (`a:buBlip`). */
+      readonly kind: 'picture';
+      /** Percent of the text size. */
+      readonly sizePercent: number;
     };
 
 /**

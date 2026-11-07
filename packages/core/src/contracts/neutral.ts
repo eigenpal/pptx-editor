@@ -24,6 +24,8 @@ import type { ConnectorRoute } from './connectors.ts';
 export type { ConnectionTarget, ConnectorRoute } from './connectors.ts';
 import type { AnimationCommand, SlideAnimations } from './animation.ts';
 export type * from './animation.ts';
+import type { CustomShowSummary, NotesFormat, NotesParagraph, SlideSection } from './deck.ts';
+export type * from './deck.ts';
 
 import type {
   ObjectAxis,
@@ -712,16 +714,6 @@ export interface SlideSummary {
  */
 export type PresentationView = 'normal' | 'slideSorter';
 
-/** One section of the slide list (`p14:section`). @public */
-export interface SlideSection {
-  /** The section's identity: its GUID in the file. */
-  readonly id: string;
-  readonly name: string;
-  /** The index of its first slide; for an empty section, the index its slides would take. */
-  readonly firstSlide: number;
-  readonly slideCount: number;
-}
-
 /**
  * What a person can do about a file that did not open, after DOCX Editor's reason groups:
  * `damaged` (the archive or its XML is broken, or the file is not a ZIP package at all),
@@ -751,29 +743,6 @@ export interface DocumentOpenFailure {
   readonly code: string;
   /** The group of `code` that picks the message. */
   readonly reason: DocumentOpenFailureReason;
-}
-
-/** Character formats the speaker notes pane sets. @public */
-export type NotesFormat = 'bold' | 'italic' | 'underline' | 'strike';
-
-/** A run of the speaker notes with its character formatting. @public */
-export interface NotesRun {
-  /** The run's text. A line break inside a paragraph is `\n`. */
-  readonly text: string;
-  /** Bold, from the run or the notes text style it inherits. */
-  readonly bold: boolean;
-  /** Italic, from the run or the notes text style it inherits. */
-  readonly italic: boolean;
-  /** Underlined (any underline style). */
-  readonly underline: boolean;
-  /** Struck through (single or double). */
-  readonly strike: boolean;
-}
-
-/** One paragraph of the speaker notes. @public */
-export interface NotesParagraph {
-  /** The paragraph's runs; neighbors with the same formatting are joined. */
-  readonly runs: readonly NotesRun[];
 }
 
 /**
@@ -993,6 +962,12 @@ export interface EditorSnapshot {
    * change. Optional: absent means the implementation does not report sections.
    */
   readonly sections?: readonly SlideSection[];
+  /**
+   * The deck's custom shows, in file order; empty when it has none. A link can go to one
+   * (`#custom-show-<id>`). Reference-stable while they do not change. Optional: absent means
+   * the implementation does not report custom shows.
+   */
+  readonly customShows?: readonly CustomShowSummary[];
   /**
    * The table of the selection (a caret in a cell, a cell range, or the selected table frame),
    * or null. Optional: absent means the implementation does not edit tables.

@@ -49,7 +49,30 @@ export interface GlyphRun {
   readonly runIndex: number;
   /** Source offset of `text[0]` within the paragraph. */
   readonly start: number;
+  /**
+   * The picture of a picture bullet (`a:buBlip`). Such a run has no text, and `x` holds its
+   * left and right edge. The picture stands on the baseline.
+   */
+  readonly picture?: BulletPicture;
 }
+
+/** The picture of a picture bullet, as paint draws it. */
+export interface BulletPicture {
+  /** The part whose relationships resolve `rId` and `svgRId`. */
+  readonly part: string;
+  /** The relationship of the raster picture (`a:blip/@r:embed`). */
+  readonly rId: string;
+  /** The relationship of an `asvg:svgBlip` alternative, when present. */
+  readonly svgRId?: string;
+  /** The picture's height, EMU. */
+  readonly height: number;
+}
+
+/**
+ * The height of a picture bullet over its bullet size: measured on reference PDFs, where the
+ * picture is 0.7 times the bullet size high, whatever the text's face, and keeps its aspect.
+ */
+export const PICTURE_BULLET_SCALE = 0.7;
 
 /** One laid-out line. */
 export interface Line {
@@ -423,7 +446,27 @@ export function layoutTextOn(
     // caret is there (`Line.pendingBullet`). Empty paragraphs consume no number.
     let marker: GlyphRun | null = null;
     const number = sourceLength > 0 ? numbering.next(p) : numbering.peek(p);
-    if (p.bullet) {
+    if (p.bullet?.type === 'picture') {
+      const sizePt =
+        'pct' in p.bullet.size
+          ? firstSize * p.bullet.size.pct
+          : autofitSizePt(p.bullet.size.pts / 100, fontScale);
+      const height = sizePt * PICTURE_BULLET_SCALE * EMU_PER_PT;
+      const x0 = p.marL + p.indent;
+      const { part, rId, svgRId, aspect } = p.bullet;
+      marker = {
+        kind: 'bullet',
+        text: '',
+        x: [x0, x0 + height * aspect],
+        face: faceFor(firstProps, measurer),
+        sizePt,
+        rise: 0,
+        props: firstProps,
+        runIndex: -1,
+        start: 0,
+        picture: { part, rId, ...(svgRId ? { svgRId } : {}), height },
+      };
+    } else if (p.bullet) {
       const raw =
         p.bullet.type === 'char' ? p.bullet.char : autonumberText(p.bullet.scheme, number ?? 1);
       const sizePt =

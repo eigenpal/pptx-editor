@@ -164,6 +164,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'lines-arrows': 0,
     'open-font-families': 8,
     'paragraph-format': 27,
+    'picture-bullets': 24,
     'picture-editing': 0,
     pictures: 0,
     'placeholders-background': 3,

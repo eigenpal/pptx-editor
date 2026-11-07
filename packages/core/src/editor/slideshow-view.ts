@@ -87,8 +87,9 @@ export function paintSlideshowSlide(
 /**
  * The hyperlink under a slide point (EMU), as a URL safe to open, or null. Only text links
  * (`a:hlinkClick` on a run) count. An external target passes `sanitizeHref`, which withholds
- * any scheme other than http(s), mailto, tel, and ftp. A link to a slide of the deck comes back
- * in its `#` form (`#slide-3`, `#next-slide`), for `followSlideshowLink`. @public
+ * any scheme other than http(s), mailto, tel, and ftp; a relative path (a link to another file)
+ * and a program link give null. A custom show link gives null: the show does not run it. A link
+ * to a slide of the deck comes back in its `#` form (`#slide-3`, `#next-slide`), for `followSlideshowLink`. @public
  */
 export function slideshowLinkAt(
   session: DocumentSession,
@@ -109,8 +110,11 @@ export function slideshowLinkAt(
     if (slide) return slide;
   }
   if (!rel?.external || !rel.externalTarget) return null;
+  // A program link never runs, and a relative path (another file) names nothing the page can
+  // open: only an address with a scheme opens.
+  if (rId.action?.startsWith('ppaction://program')) return null;
   const safe = sanitizeHref(rel.externalTarget);
-  return safe.ok && safe.href ? safe.href : null;
+  return safe.ok && /^[a-z][a-z0-9+.-]*:/i.test(safe.href) ? safe.href : null;
 }
 
 function linkIn(

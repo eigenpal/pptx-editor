@@ -729,6 +729,7 @@ export interface Relationship {
     readonly externalTarget?: string;
     // (undocumented)
     readonly id: string;
+    readonly relativeTarget?: string;
     readonly target?: string;
     // (undocumented)
     readonly type: string;

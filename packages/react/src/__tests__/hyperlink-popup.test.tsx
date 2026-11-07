@@ -14,7 +14,10 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-async function loaded(ui: (onReady: (e: PptxEditorInstance) => void) => ReactElement) {
+async function loaded(
+  ui: (onReady: (e: PptxEditorInstance) => void) => ReactElement,
+  presentationLists?: string
+) {
   let editor: PptxEditorInstance | null = null;
   render(ui((e) => (editor = e)));
   await act(
@@ -34,6 +37,7 @@ async function loaded(ui: (onReady: (e: PptxEditorInstance) => void) => ReactEle
               }),
             },
           ],
+          ...(presentationLists ? { presentationLists } : {}),
         })
       ))
   );
@@ -533,5 +537,48 @@ describe('PptxEditor.HyperLink link kinds', () => {
     act(() => void fireEvent.click(go));
     expect(panel()).toBe(null);
     expect(editor.snapshot().currentSlide).toBe(0);
+  });
+});
+
+describe('PptxEditor.HyperLink custom show and file links', () => {
+  test('Link to writes a custom show link and a file link, and reads them back', async () => {
+    const editor = await loaded(
+      (onReady) => (
+        <PptxEditorRoot onReady={onReady}>
+          <PptxEditorContent />
+        </PptxEditorRoot>
+      ),
+      '<p:custShowLst><p:custShow name="Short" id="3"><p:sldLst><p:sld r:id="rId101"/></p:sldLst></p:custShow></p:custShowLst>'
+    );
+    linkAndCaret(editor);
+    await clickSlide(editor);
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Edit link' })));
+    const kind = () => screen.getByRole('combobox', { name: 'Link to' }) as HTMLSelectElement;
+    expect([...kind().options].map((o) => o.value)).toEqual([
+      'web',
+      'email',
+      'slide',
+      'customShow',
+      'file',
+    ]);
+    act(() => void fireEvent.change(kind(), { target: { value: 'customShow' } }));
+    const show = screen.getByRole('combobox', { name: 'Custom show in this presentation' });
+    expect([...(show as HTMLSelectElement).options].map((o) => o.text)).toEqual(['Short']);
+    const back = screen.getByRole('checkbox', { name: 'Return to this slide after the show' });
+    expect((back as HTMLInputElement).checked).toBe(true);
+    act(() => void fireEvent.click(back));
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Apply' })));
+    expect(editor.snapshot().format?.link).toBe('#custom-show-3');
+    // Reading mode names the show, with no Copy.
+    await clickSlide(editor);
+    expect(document.querySelector('.pptx-link__url')?.textContent).toBe('Custom show: Short');
+    expect(screen.queryByRole('button', { name: 'Copy link' })).toBe(null);
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Edit link' })));
+    expect(kind().value).toBe('customShow');
+    act(() => void fireEvent.change(kind(), { target: { value: 'file' } }));
+    const path = screen.getByRole('textbox', { name: 'File path' });
+    act(() => void fireEvent.change(path, { target: { value: './docs/report.pdf' } }));
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Apply' })));
+    expect(editor.snapshot().format?.link).toBe('./docs/report.pdf');
   });
 });

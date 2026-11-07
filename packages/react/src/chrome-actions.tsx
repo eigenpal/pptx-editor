@@ -224,7 +224,7 @@ function LinkPopupHost({ store, views }: { store: HyperlinkPopupStore; views: nu
     <>
       {content}
       <span className="pptx-sr-only" role="status" aria-live="polite">
-        {linkPopupAnnouncement(state, t)}
+        {linkPopupAnnouncement(state, t, editor?.snapshot().customShows)}
       </span>
     </>
   );

@@ -5,7 +5,7 @@
 
 import { toCss, type ResolvedFill } from '../cascade/index.ts';
 import { isIdeographic, type GlyphRun, type TextLayout } from '../layout/index.ts';
-import { fillPaint, type PaintContext } from './paint-fill.ts';
+import { fillPaint, STORED_PIXELS_STYLE, type PaintContext } from './paint-fill.ts';
 import { num, svg } from './svg.ts';
 
 const EMU_PER_PT = 12_700;
@@ -127,6 +127,36 @@ export function uprightPieces(
   return out;
 }
 
+/**
+ * The picture of a picture bullet, standing on the baseline, in points; null when the picture
+ * has no image to show (the bullet then shows nothing).
+ */
+function bulletPicture(
+  doc: Document,
+  run: GlyphRun,
+  baseline: number,
+  ctx: PaintContext
+): SVGElement | null {
+  const pic = run.picture;
+  if (!pic) return null;
+  const url =
+    ctx.images(pic.part, pic.svgRId ?? pic.rId) ??
+    (pic.svgRId ? ctx.images(pic.part, pic.rId) : undefined);
+  const x = run.x[0];
+  const width = run.x[run.x.length - 1] - x;
+  if (!url || !(width > 0) || !(pic.height > 0)) return null;
+  return svg(doc, 'image', {
+    href: url,
+    x: num(x / EMU_PER_PT),
+    y: num((baseline - pic.height) / EMU_PER_PT),
+    width: num(width / EMU_PER_PT),
+    height: num(pic.height / EMU_PER_PT),
+    preserveAspectRatio: 'none',
+    style: STORED_PIXELS_STYLE,
+    'data-run': 'bullet',
+  });
+}
+
 /** Paint a text layout into a group in the text frame's coordinates. */
 export function paintText(doc: Document, layout: TextLayout, ctx: PaintContext): SVGElement {
   const box = layout.box;
@@ -144,6 +174,11 @@ export function paintText(doc: Document, layout: TextLayout, ctx: PaintContext):
   const bounds = textBounds(layout);
   for (const line of layout.lines) {
     for (const run of line.runs) {
+      if (run.picture) {
+        const image = bulletPicture(doc, run, line.baseline, ctx);
+        if (image) group.appendChild(image);
+        continue;
+      }
       if (run.text.length === 0) continue;
       const fill = textFill(run.props.fill, bounds, ctx);
       if (run.props.highlight && run.kind === 'text') {
