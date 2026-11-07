@@ -18,6 +18,7 @@ import {
   textOf,
   xmlPartOf,
   type Element,
+  type NodeSpec,
   type PptxPackage,
 } from '../../store/index.ts';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
@@ -149,6 +150,16 @@ function paragraphXml(text: string, what: string, field: string | undefined): st
 
 const TEXT_CONTENT = new Set(['r', 'fld', 'br']);
 
+/** A format copied to new text, without the links that the end of a paragraph can carry. */
+function withoutLinks(spec: NodeSpec): NodeSpec {
+  return {
+    ...spec,
+    children: spec.children?.filter(
+      (c) => !('local' in c) || (c.local !== 'hlinkClick' && c.local !== 'hlinkMouseOver')
+    ),
+  };
+}
+
 /**
  * Show `text` in an existing placeholder. The first paragraph and its first run or field stay,
  * so the placeholder keeps its paragraph and character format; other text is removed. A date
@@ -229,7 +240,7 @@ function replaceText(
         part,
         parent: created,
         index: 0,
-        spec: { ...specOf(endPr), local: 'rPr' },
+        spec: withoutLinks({ ...specOf(endPr), local: 'rPr' }),
       });
   }
   for (const c of content) if (c !== run || !t) batch.push({ op: 'removeNode', part, node: c.id });
@@ -318,6 +329,8 @@ function applyKind(
         let edited = false;
         for (const shape of existing) {
           const own = shownBy(shape);
+          // An empty footer with no text anywhere in the deck: nothing to show.
+          if (!own && !deck) throw new CommandRefusal('disabled.noFooterText');
           if (!own && deck) {
             const field = showing.toFixed ? undefined : deck.fieldType;
             replaceText(batch, slide.partName, shape, what, deck.text, field);

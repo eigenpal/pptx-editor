@@ -348,6 +348,20 @@ describe('edge cases', () => {
     );
   });
 
+  test('only empty footers and no text: refused, and new text carries no link', async () => {
+    const e = await open(withSlide2(placeholder(9, 'ftr', 11, emptyFooter)));
+    e.exec({ type: 'setFooter', show: false, indices: [0] });
+    const r = e.exec({ type: 'setFooter', show: true });
+    expect(r.ok ? undefined : r.reason).toBe('disabled.noFooterText');
+    const linked =
+      '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="en-US">' +
+      '<a:hlinkClick xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id=""/>' +
+      '</a:endParaRPr></a:p></p:txBody>';
+    const f = await open(withSlide2(placeholder(9, 'ftr', 11, linked)));
+    expect(f.exec({ type: 'setFooter', show: true, text: 'Plain' }).ok).toBe(true);
+    expect(slideXml(f, 1)).toContain('<a:r><a:rPr lang="en-US"/><a:t>Plain</a:t></a:r>');
+  });
+
   test('hiding ignores the text', async () => {
     const e = await open(buildPptx(headerFooterDeck()));
     expect(e.exec({ type: 'setFooter', show: false, text: '' }).ok).toBe(true);
