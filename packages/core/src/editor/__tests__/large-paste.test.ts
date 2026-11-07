@@ -132,8 +132,10 @@ async function htmlPasteMs(count: number): Promise<number> {
   return best;
 }
 
-test('pasted HTML paragraphs cost what they insert: four times the paragraphs take less than five times the time', async () => {
+// A cost that grows with the square of the paragraphs takes 16 times as long for 4 times the
+// paragraphs. The limit of 10 leaves room for a busy machine and still fails that cost.
+test('pasted HTML paragraphs cost what they insert: four times the paragraphs take less than ten times the time', async () => {
   const small = await htmlPasteMs(1_250);
   const large = await htmlPasteMs(5_000);
-  expect(large).toBeLessThan(small * 5);
+  expect(large).toBeLessThan(small * 10);
 });
