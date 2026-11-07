@@ -34,7 +34,8 @@ import { DerivedParts } from '../package/parts-map.ts';
 import { applyOps, type OpRejection, type PptxOp } from './ops.ts';
 import type { HistoryGroup, TransactOrigin } from './history-group.ts';
 import { introducedViolation } from './part-checks.ts';
-import { paragraphRangeFixes } from './paragraph-ranges.ts';
+import { paragraphRangeFixes, type TextEditAt } from './paragraph-ranges.ts';
+export type { TextEditAt } from './paragraph-ranges.ts';
 
 /** What a committed transaction changed. */
 export interface StoreChange {
@@ -88,6 +89,11 @@ export interface TransactOptions {
    * clears it.
    */
   readonly recordsHistory?: boolean;
+  /**
+   * Where a text edit started, before it. Animation ranges that name paragraphs use it to tell
+   * identical paragraphs apart. Omitted: the text alone decides.
+   */
+  readonly textAt?: TextEditAt;
 }
 
 interface HistoryEntry {
@@ -212,13 +218,13 @@ export class PptxDocumentStore {
   }
 
   /** The ops that keep the paragraph ranges of the changed slides on their paragraphs. */
-  #rangeFixes(next: PptxPackage, parts: readonly string[]): PptxOp[] {
+  #rangeFixes(next: PptxPackage, parts: readonly string[], at?: TextEditAt): PptxOp[] {
     const out: PptxOp[] = [];
     for (const name of parts) {
       const before = this.#pkg.parts.get(name);
       const after = next.parts.get(name);
       if (before?.kind !== 'xml' || after?.kind !== 'xml') continue;
-      for (const op of paragraphRangeFixes(name, before.xml.root, after.xml.root)) out.push(op);
+      for (const op of paragraphRangeFixes(name, before.xml.root, after.xml.root, at)) out.push(op);
     }
     return out;
   }
@@ -260,7 +266,7 @@ export class PptxDocumentStore {
     // A local edit of paragraphs moves the animation ranges that name them (`paragraph-ranges.ts`).
     // A remote transaction holds the fixes that its peer made.
     if (origin !== 'remote') {
-      const fixes = this.#rangeFixes(r.pkg, r.parts);
+      const fixes = this.#rangeFixes(r.pkg, r.parts, options.textAt);
       if (fixes.length > 0) {
         ops = [...ops, ...fixes];
         r = this.#stage(ops);

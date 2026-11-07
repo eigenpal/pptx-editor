@@ -4,6 +4,7 @@
 // selection there, or select nothing when its shapes are gone.
 
 import type { SlideLayout } from '../layout/index.ts';
+import type { TextEditAt } from '../store/index.ts';
 import type { EditorCommand, EditorSelection } from '../contracts/index.ts';
 import { findItem } from '../automation/commands/placement.ts';
 import { cellLayoutAt, snapCellAddress, tableItem, textItemOf } from './table-cells.ts';
@@ -24,6 +25,32 @@ export function changedSlide(command: EditorCommand, current: number): number {
   )
     return command.index;
   return command.type === 'moveSlide' ? command.from : current;
+}
+
+/** Where a text edit in a shape starts: the start of the text selection of `mark`. */
+export function textEditAt(mark: HistoryMark): TextEditAt | undefined {
+  const sel = mark.selection;
+  if (sel.kind !== 'text' || sel.cell || mark.part === undefined) return undefined;
+  const { anchor: a, focus: f } = sel;
+  const start =
+    a.paragraph < f.paragraph || (a.paragraph === f.paragraph && a.offset <= f.offset) ? a : f;
+  return { part: mark.part, node: sel.nodeId, paragraph: start.paragraph, offset: start.offset };
+}
+
+/**
+ * The transaction options of an edit with history marks `before` and `after`: the marks, and
+ * where a text edit starts.
+ */
+export function markOptions(
+  before: HistoryMark,
+  after?: HistoryMark
+): { selectionBefore: HistoryMark; selectionAfter?: HistoryMark; textAt?: TextEditAt } {
+  const at = textEditAt(before);
+  return {
+    selectionBefore: before,
+    ...(after ? { selectionAfter: after } : {}),
+    ...(at ? { textAt: at } : {}),
+  };
 }
 
 /** A history entry's selection state, as the facade stores it. */

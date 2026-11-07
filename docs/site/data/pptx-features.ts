@@ -840,7 +840,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'preserved',
     tier: 'community',
     notes:
-      'Kept on save and not played. Deleting, cutting, or ungrouping shapes, deleting a table, and turning slide numbers off remove the animations of the removed shapes. A paragraph animation range (`p:pRg`) follows its paragraphs when you add, delete, split, or join paragraphs. An effect whose paragraphs are all deleted goes too. When neighboring paragraphs have the same text, an effect can stay with the wrong one of them. An edit with very many changes in one shape can remove the effects of the paragraphs it changed.',
+      'Kept on save and not played. Deleting, cutting, or ungrouping shapes, deleting a table, and turning slide numbers off remove the animations of the removed shapes. A paragraph animation range (`p:pRg`) follows its paragraphs when you add, delete, split, or join paragraphs. An effect whose paragraphs are all deleted goes too. Between paragraphs with the same text, an edit in the editor keeps each effect with its own paragraph. An automation edit that names no selection decides by the text, so an effect can stay with the wrong one of two identical paragraphs.',
   },
 
   // --- Comments & review -----------------------------------------------

@@ -6,21 +6,44 @@
 // that changes the number of paragraphs of an animated shape is checked here. A paragraph
 // follows its text: the changed regions between the old and the new text of the shape
 // (`diffHunks`, paragraphs joined by line feeds) tell where each unchanged character went, and
-// a paragraph goes to the paragraph that holds its first unchanged character. An empty
-// paragraph follows its line feed. A range takes the new indexes of its paragraphs. A range
-// whose paragraphs all went takes its effect with it (`paragraphTargetRemovals`).
+// a paragraph goes to the paragraphs that hold its unchanged characters. An empty paragraph
+// follows its line feed. A range takes the new indexes of its paragraphs. A range whose
+// paragraphs all went takes its effect with it (`paragraphTargetRemovals`).
+//
+// Text alone cannot tell identical neighbors apart: deleting the first of two equal paragraphs
+// and deleting the second give the same text. The editor names where the edit started
+// (`TextEditAt`), and a deletion or insertion that fits in more than one place goes to the place
+// nearest it. An edit with too many changes for a character diff is compared by whole
+// paragraphs first, and only the changed paragraphs by characters.
 //
 // The fixes are ops of the same transaction, so undo restores the ranges with the text, and
 // collaborators receive them with the edit.
 
 import { NS } from '../package/namespaces.ts';
 import { attr, child, elements, textOf } from '../package/query.ts';
-import { diffHunks, type TextHunk } from '../package/text-diff.ts';
+import { diffHunks, diffResult, type TextHunk } from '../package/text-diff.ts';
 import { paragraphTargetRemovals } from '../package/timing.ts';
 import type { Element } from '../package/tree.ts';
 import type { PptxOp } from './ops.ts';
 
 const MAX_DEPTH = 64;
+
+/**
+ * Where a text edit started, before the edit: the slide part, the shape node (`p:sp`), and the
+ * paragraph and offset of the start of the selection.
+ */
+export interface TextEditAt {
+  readonly part: string;
+  readonly node: string;
+  readonly paragraph: number;
+  readonly offset: number;
+}
+
+/** One copy of a shape: its node id and its paragraph texts. */
+interface Copy {
+  readonly node: string;
+  readonly texts: string[];
+}
 
 /** A paragraph target: `p:spTgt` with `p:txEl/p:pRg`. */
 interface Target {
@@ -53,20 +76,21 @@ function targetsOf(root: Element): Target[] {
  * The paragraph texts of each copy of each shape that `spids` names, by `p:cNvPr/@id`, in
  * document order. A shape in `mc:AlternateContent` has a copy in each branch.
  */
-function paragraphsOf(root: Element, spids: ReadonlySet<string>): Map<string, string[][]> {
-  const out = new Map<string, string[][]>();
+function paragraphsOf(root: Element, spids: ReadonlySet<string>): Map<string, Copy[]> {
+  const out = new Map<string, Copy[]>();
   const walk = (el: Element, depth: number): void => {
     if (depth > MAX_DEPTH) return;
     if (isP(el, 'sp')) {
       const id = attr(child(child(el, 'p:nvSpPr'), 'p:cNvPr'), 'id');
       if (id !== undefined && spids.has(id)) {
         const copies = out.get(id) ?? [];
-        copies.push(
-          elements(child(el, 'p:txBody'))
+        copies.push({
+          node: el.id,
+          texts: elements(child(el, 'p:txBody'))
             .filter((p) => p.ns === NS.a && p.local === 'p')
             // A line feed separates paragraphs; one inside a paragraph's text counts as a space.
-            .map((p) => textOf(p).replace(/\n/g, ' '))
-        );
+            .map((p) => textOf(p).replace(/\n/g, ' ')),
+        });
         out.set(id, copies);
       }
       return;
@@ -91,12 +115,95 @@ interface Moved {
 }
 
 /**
+ * Each hunk that only deletes or only inserts, moved to the place nearest `hint` (an offset in
+ * `a`) among the places that give the same text. Other hunks stay.
+ */
+function slid(
+  a: string,
+  b: string,
+  hunks: readonly TextHunk[],
+  hint: number | undefined
+): TextHunk[] {
+  if (hint === undefined) return [...hunks];
+  return hunks.map((h, i) => {
+    const deletes = h.bStart === h.bEnd;
+    if (deletes === (h.aStart === h.aEnd)) return h;
+    const lo = i > 0 ? hunks[i - 1]!.aEnd : 0;
+    const hi = i < hunks.length - 1 ? hunks[i + 1]!.aStart : a.length;
+    const s = deletes ? a : b;
+    const start = deletes ? h.aStart : h.bStart;
+    const end = deletes ? h.aEnd : h.bEnd;
+    let t = 0;
+    while (h.aStart + t > hint && h.aStart + t > lo && s[start + t - 1] === s[end + t - 1]) t -= 1;
+    while (h.aStart + t < hint && h.aEnd + t < hi && s[start + t] === s[end + t]) t += 1;
+    if (t === 0) return h;
+    return { aStart: h.aStart + t, aEnd: h.aEnd + t, bStart: h.bStart + t, bEnd: h.bEnd + t };
+  });
+}
+
+/** Where an edit point is in the old texts joined by line feeds. */
+function charAt(was: readonly string[], at: { paragraph: number; offset: number }): number {
+  let c = 0;
+  for (let i = 0; i < at.paragraph && i < was.length; i += 1) c += was[i]!.length + 1;
+  return c + Math.max(0, Math.min(at.offset, was[at.paragraph]?.length ?? 0));
+}
+
+/**
  * Where each old paragraph went, or undefined for a paragraph that the edit replaced: fewer
  * than half of its characters are unchanged. A paragraph that the edit split goes to every
- * part. `was` and `is` are the paragraph texts before and after the edit.
+ * part. `was` and `is` are the paragraph texts before and after the edit, and `at` is where the
+ * edit started, when the editor knows it.
  */
-function paragraphMap(was: readonly string[], is: readonly string[]): (Moved | undefined)[] {
-  const hunks = diffHunks(was.join('\n'), is.join('\n'));
+function paragraphMap(
+  was: readonly string[],
+  is: readonly string[],
+  at?: { paragraph: number; offset: number }
+): (Moved | undefined)[] {
+  const a = was.join('\n');
+  const b = is.join('\n');
+  const r = diffResult(a, b);
+  if (r.exact) return charMap(was, is, slid(a, b, r.hunks, at && charAt(was, at)));
+  // Too many changes for a character diff: compare whole paragraphs, one character each, and
+  // then the characters of each changed block of paragraphs.
+  const ids = new Map<string, number>();
+  const token = (t: string): string => {
+    let id = ids.get(t);
+    if (id === undefined) ids.set(t, (id = ids.size));
+    return String.fromCharCode(id);
+  };
+  const pa = was.map(token).join('');
+  const pb = is.map(token).join('');
+  if (ids.size > 0xffff) return charMap(was, is, r.hunks);
+  // An edit that starts in the second half of a paragraph keeps that paragraph.
+  const len = at === undefined ? 0 : (was[at.paragraph]?.length ?? 0);
+  const first =
+    at === undefined ? undefined : at.paragraph + (at.offset > 0 && at.offset * 2 >= len ? 1 : 0);
+  const blocks = slid(pa, pb, diffHunks(pa, pb), first);
+  const out: (Moved | undefined)[] = [];
+  let i = 0;
+  let delta = 0;
+  const end = { aStart: was.length, aEnd: was.length, bStart: is.length, bEnd: is.length };
+  for (const k of [...blocks, end]) {
+    for (; i < k.aStart; i += 1) out.push({ low: i + delta, high: i + delta });
+    if (k === end) break;
+    if (k.bStart < k.bEnd && k.aStart < k.aEnd) {
+      const olds = was.slice(k.aStart, k.aEnd);
+      const news = is.slice(k.bStart, k.bEnd);
+      for (const m of charMap(olds, news, diffHunks(olds.join('\n'), news.join('\n'))))
+        out.push(m && { low: m.low + k.bStart, high: m.high + k.bStart });
+    } else for (let j = k.aStart; j < k.aEnd; j += 1) out.push(undefined);
+    i = k.aEnd;
+    delta = k.bEnd - k.aEnd;
+  }
+  return out;
+}
+
+/** Where each old paragraph went, by the changed regions `hunks` of the joined texts. */
+function charMap(
+  was: readonly string[],
+  is: readonly string[],
+  hunks: readonly TextHunk[]
+): (Moved | undefined)[] {
   // The start offset of each new paragraph in the new text.
   const starts: number[] = [];
   let at = 0;
@@ -171,9 +278,15 @@ function mappedBack(p: number, hunks: readonly TextHunk[]): number | undefined {
 
 /**
  * The ops that keep the paragraph ranges of slide `part` on their paragraphs after an edit
- * changed its root from `before` to `after`. Empty when nothing needs to change.
+ * changed its root from `before` to `after`. `at` is where a text edit started. Empty when
+ * nothing needs to change.
  */
-export function paragraphRangeFixes(part: string, before: Element, after: Element): PptxOp[] {
+export function paragraphRangeFixes(
+  part: string,
+  before: Element,
+  after: Element,
+  at?: TextEditAt
+): PptxOp[] {
   if (!isP(after, 'sld')) return [];
   const targets = targetsOf(after);
   if (targets.length === 0) return [];
@@ -199,12 +312,14 @@ export function paragraphRangeFixes(part: string, before: Element, after: Elemen
     // The copy whose paragraphs changed: the one that the editor draws.
     const olds = old.get(t.spid) ?? [];
     const news = now.get(t.spid) ?? [];
-    const k = news.findIndex((is, i) => olds[i] !== undefined && olds[i]!.length !== is.length);
+    const k = news.findIndex(
+      (is, i) => olds[i] !== undefined && olds[i]!.texts.length !== is.texts.length
+    );
     // A shape that the edit added or removed follows its own rules (`timingRemovals`). An edit
     // that keeps the number of paragraphs keeps their indexes.
     if (k < 0 || olds.length !== news.length) continue;
-    const was = olds[k]!;
-    const is = news[k]!;
+    const was = olds[k]!.texts;
+    const is = news[k]!.texts;
     // A range that the same transaction added names the new paragraphs already.
     const range = oldRanges.get(t.pRg.id);
     if (!range) continue;
@@ -214,7 +329,8 @@ export function paragraphRangeFixes(part: string, before: Element, after: Elemen
     if (st === undefined || end === undefined || st > end || end >= was.length) continue;
     const key = `${t.spid} ${k}`;
     let map = maps.get(key);
-    if (!map) maps.set(key, (map = paragraphMap(was, is)));
+    const hint = at?.part === part && at.node === news[k]!.node ? at : undefined;
+    if (!map) maps.set(key, (map = paragraphMap(was, is, hint)));
     let low = Infinity;
     let high = -Infinity;
     for (let i = st; i <= end; i += 1) {

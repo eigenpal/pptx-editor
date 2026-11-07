@@ -928,6 +928,18 @@ export interface TableSpanTrim {
 export function tableSpanTrims<T extends TableGridCell>(cells: readonly (readonly (T | undefined)[])[], hasText: (tc: T) => boolean): TableSpanTrim[];
 
 // @public
+export interface TextEditAt {
+    // (undocumented)
+    readonly node: string;
+    // (undocumented)
+    readonly offset: number;
+    // (undocumented)
+    readonly paragraph: number;
+    // (undocumented)
+    readonly part: string;
+}
+
+// @public
 export interface TextNode {
     // (undocumented)
     readonly id: NodeId;
@@ -951,6 +963,7 @@ export interface TransactOptions {
     readonly recordsHistory?: boolean;
     readonly selectionAfter?: unknown;
     readonly selectionBefore?: unknown;
+    readonly textAt?: TextEditAt;
 }
 
 // @public
