@@ -107,7 +107,22 @@ async function threadedDeck(): Promise<Uint8Array> {
       // A second thread with the GUID of "Repeated".
       const repeated =
         /<p188:cm [^>]*>(?:(?!<p188:cm ).)*?<a:t>Repeated<\/a:t>.*?<\/p188:cm>/s.exec(out)![0];
-      return out.replace('</p188:cmLst>', `${repeated.replace('Repeated', 'Copy')}</p188:cmLst>`);
+      const head = /^<p188:cm [^>]*>/.exec(repeated)![0];
+      const guid = / id="([^"]+)"/.exec(head)![1]!;
+      const attrOf = (name: string) => new RegExp(` ${name}="[^"]*"`).exec(head)![0];
+      // A thread without an id, which the reader skips with its reply, whose GUID repeats.
+      const reply =
+        `<p188:replyLst><p188:reply${attrOf('authorId')}${attrOf('created')} id="${guid}">` +
+        '<p188:txBody><a:bodyPr/><a:p><a:r><a:t>Hidden</a:t></a:r></a:p></p188:txBody>' +
+        '</p188:reply></p188:replyLst>';
+      const idless = repeated
+        .replace(head, head.replace(` id="${guid}"`, ''))
+        .replace('<p188:txBody>', `${reply}<p188:txBody>`)
+        .replace('Repeated', 'No id');
+      // A file id that reads like the second use of the GUID: `<guid>~2`.
+      const tilde = repeated.replace(guid, `${guid}~2`).replace('Repeated', 'Tilde');
+      const copy = repeated.replace('Repeated', 'Copy');
+      return out.replace('</p188:cmLst>', `${idless}${copy}${tilde}</p188:cmLst>`);
     }
   );
 }
@@ -126,12 +141,19 @@ describe('review items', () => {
       expect(new Set(items.map((i) => i.id)).size).toBe(items.length);
       expect(by('Copy').id).toBe(`${by('Repeated').id}~2`);
       expect(by('Copy').editable).toBe(true);
+      expect(by('Tilde').id).toBe(`${by('Repeated').id}~2~1`);
+      expect(items.some((i) => i.text === 'Hidden' || i.text === 'No id')).toBe(false);
       expect(
         e.exec({ type: 'editComment', commentId: by('Copy').id, text: 'Copy edited' }).ok
       ).toBe(true);
       const texts = e.snapshot().comments!.map((t) => t.text);
       expect(texts).toContain('Repeated');
       expect(texts).toContain('Copy edited');
+      const tildeEdit = e.exec({ type: 'editComment', commentId: by('Tilde').id, text: 'Tilde 2' });
+      expect(tildeEdit.ok).toBe(true);
+      expect(e.snapshot().comments!.map((t) => t.text)).toEqual(
+        expect.arrayContaining(['Repeated', 'Copy edited', 'Tilde 2'])
+      );
       e.setMode('view');
       expect(agreement(e).every((i) => !i.editable && !i.resolvable)).toBe(true);
     } finally {

@@ -214,10 +214,20 @@ export const legacyId = (slidePart: string, authorId: string, idx: string): stri
 
 /**
  * The comment id of a threaded comment or reply: its GUID. A GUID that the slide already used
- * (a file can repeat one) takes its ordinal, `~2` for the second, so each id stays unique.
+ * (a file can repeat one) takes its ordinal, `~2` for the second, so each id stays unique. A
+ * file id that holds `~` (no GUID does) always takes its ordinal, `X~2~1`, so it never reads as
+ * the second use of `X`. `modernKeyParts` reads the key back.
  */
-export const modernId = (slidePart: string, guid: string, ordinal = 1): string =>
-  `${slidePart}#${guid.toUpperCase()}${ordinal > 1 ? `~${ordinal}` : ''}`;
+export const modernId = (slidePart: string, guid: string, ordinal = 1): string => {
+  const upper = guid.toUpperCase();
+  return `${slidePart}#${upper}${ordinal > 1 || upper.includes('~') ? `~${ordinal}` : ''}`;
+};
+
+/** The GUID and the ordinal of a threaded comment id key (`modernId`). */
+export function modernKeyParts(key: string): { readonly guid: string; readonly ordinal: number } {
+  const m = /^(.*)~(\d{1,6})$/.exec(key.toUpperCase());
+  return m ? { guid: m[1]!, ordinal: Number(m[2]) } : { guid: key.toUpperCase(), ordinal: 1 };
+}
 
 /** The first descendant with this namespace and local name, at most `depth` levels down. */
 export function descendant(

@@ -31,6 +31,7 @@ import {
   COMMENTS,
   commentTree,
   findCommentAuthor,
+  modernKeyParts,
   modernTextEditable,
   presentationTarget,
   slideCommentParts,
@@ -267,7 +268,8 @@ function modernHits(root: Element | undefined, wanted: string): ModernHit[] {
   if (!is(root, 'cmLst')) return [];
   const out: ModernHit[] = [];
   for (const cm of elements(root)) {
-    if (!is(cm, 'cm')) continue;
+    // The reader skips a thread without an id, with its replies: so do the ordinals.
+    if (!is(cm, 'cm') || !attr(cm, 'id')) continue;
     if (attr(cm, 'id')?.toUpperCase() === wanted) out.push({ thread: cm });
     for (const list of elements(cm))
       if (is(list, 'replyLst'))
@@ -302,9 +304,8 @@ export function findModern(
     }
     return undefined;
   };
-  const wanted = key.toUpperCase();
-  const m = /^(.*)~([1-9]\d{0,5})$/.exec(wanted);
-  const found = at(wanted, 1) ?? (m ? at(m[1]!, Number(m[2])) : undefined);
+  const { guid, ordinal } = modernKeyParts(key);
+  const found = ordinal > 0 ? at(guid, ordinal) : undefined;
   if (!found) throw new CommandRefusal('errors.noComment');
   return found;
 }
