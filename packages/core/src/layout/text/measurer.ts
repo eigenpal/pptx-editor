@@ -71,7 +71,8 @@ export interface TextMeasurer {
   /**
    * The outline of the glyph that the face's character map gives a character, in em with y up
    * and the origin on the baseline at the glyph's start. Undefined when the face lacks the
-   * character or its outline. Optional: without it, warped text (`a:prstTxWarp`) draws flat.
+   * character or its outline, and when the outline has more than 2,000 commands. Optional:
+   * without it, warped text (`a:prstTxWarp`) draws flat.
    */
   glyphOutline?(face: ResolvedFace, codePoint: number): readonly PathCommand[] | undefined;
 }

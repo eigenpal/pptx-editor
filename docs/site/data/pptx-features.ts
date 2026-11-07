@@ -307,7 +307,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Text effects > Transform sets or removes a preset warp. Adjust values are set by command only. Glyphs bend into the warp. The caret and the selection use flat text. Lines in some multi-band warps sit lower. Vertical and rotated text draws flat.',
+      'Text effects > Transform sets or removes a preset warp. Adjust values are set by command only. Glyphs bend into the warp. The caret and the selection use flat text. Lines in some multi-band warps sit lower. Warped glyphs are not shaped, so ligatures and complex scripts lose their forms. Vertical, rotated, and diagram text draws flat.',
   },
 
   // --- Bullets & numbering ---------------------------------------------

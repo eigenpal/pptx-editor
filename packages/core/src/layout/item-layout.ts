@@ -188,6 +188,7 @@ function layoutPlaced(
         const box = { x: 0, y: 0, width: tx.cx, height: tx.cy };
         text = layoutTextOn(el.text, box, measurer, 'face');
         for (const s of text.substitutions) diagnostics.add(`font substituted: ${s}`);
+        if (el.text.body.warp) diagnostics.add('text warp drawn flat: diagram text');
         textMatrix = uprightTextMatrix(
           multiply(parent, boxMatrix({ ...tx, rot: tx.rot + el.xfrm.rot }, false)),
           text.box

@@ -289,6 +289,18 @@ describe('diagram saved drawing: text rectangle', () => {
     expect(origin.y).toBeCloseTo(FRAME.y + 250_000, 3);
   });
 
+  test('a text warp in the text rectangle draws flat and says so', () => {
+    const shape = sp({ text: 'Plan', txXfrm: [0, 0, 400_000, 300_000] }).replace(
+      '<a:noAutofit/>',
+      '<a:prstTxWarp prst="textWave1"><a:avLst/></a:prstTxWarp><a:noAutofit/>'
+    );
+    const { layout } = open(deck(shape));
+    const item = frameOf(layout).drawing![0]!;
+    if (item.kind !== 'shape' || !item.text) throw new Error('no text');
+    expect(item.text.warped).toBeUndefined();
+    expect(layout.diagnostics).toContain('text warp drawn flat: diagram text');
+  });
+
   test("the text rectangle's turn adds to the shape's turn", () => {
     const shape = sp({ rot: 5_400_000, text: 'Plan', txXfrm: [0, 0, 400_000, 200_000] });
     const item = frameOf(open(deck(shape)).layout).drawing![0]!;

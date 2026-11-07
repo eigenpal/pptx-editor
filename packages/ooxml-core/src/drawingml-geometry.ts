@@ -295,6 +295,18 @@ interface PathSink {
   readonly sy: number;
   /** Commands still allowed for the whole geometry. */
   budget: { left: number };
+  /** Draw an arc with one zero radius as a line (`EvaluateOptions.flatArcs`). */
+  readonly flatArcs: boolean;
+}
+
+/** Options of `evaluateGeometry`. */
+export interface EvaluateOptions {
+  /**
+   * Draw an `a:arcTo` with one zero radius as a line to the end of the flat ellipse: the limit
+   * of the arc as that radius shrinks. By default such an arc draws nothing and keeps the
+   * current point. Text warps use the line, so a warp path keeps its length.
+   */
+  readonly flatArcs?: boolean;
 }
 
 function emit(sink: PathSink, cmd: PathCommand): boolean {
@@ -319,20 +331,18 @@ function arcToBeziers(
   swAng: number,
   sink: PathSink
 ): { x: number; y: number } {
-  if (wR === 0 || hR === 0) return { x: x0, y: y0 };
-  const sw = boundedSweep(swAng);
-  const param = (a: number): number => Math.atan2(wR * Math.sin(a), hR * Math.cos(a));
-  const st = stAng * DEG;
-  const t0 = param(st);
-  // Sweep in parametric space follows the visual sweep's direction and turn count.
-  const endVisual = st + sw * DEG;
-  let t1 = param(endVisual);
-  const turns = Math.trunc(sw / 360);
-  t1 += turns * 2 * Math.PI;
-  let sweep = t1 - t0;
-  if (sw > 0 && sweep <= 0) sweep += 2 * Math.PI;
-  if (sw < 0 && sweep >= 0) sweep -= 2 * Math.PI;
-  if (sw === 0) sweep = 0;
+  if (wR === 0 && hR === 0) return { x: x0, y: y0 };
+  if (wR === 0 || hR === 0) {
+    if (!sink.flatArcs || !Number.isFinite(wR) || !Number.isFinite(hR)) return { x: x0, y: y0 };
+    // The arc's angles as the zero radius shrinks toward zero: the end of the flat ellipse.
+    const e = Math.abs(wR || hR) * 1e-9;
+    const flat = arcParams(wR || e, hR || e, stAng, swAng);
+    const x = x0 + wR * (Math.cos(flat.t0 + flat.sweep) - Math.cos(flat.t0));
+    const y = y0 + hR * (Math.sin(flat.t0 + flat.sweep) - Math.sin(flat.t0));
+    emit(sink, { op: 'L', x: x * sink.sx, y: y * sink.sy });
+    return { x, y };
+  }
+  const { t0, sweep } = arcParams(wR, hR, stAng, swAng);
   const cx = x0 - wR * Math.cos(t0);
   const cy = y0 - hR * Math.sin(t0);
   const segments = Math.min(16, Math.max(1, Math.ceil(Math.abs(sweep) / (Math.PI / 2))));
@@ -363,18 +373,43 @@ function arcToBeziers(
   return { x: px, y: py };
 }
 
+/** The parametric start angle and sweep of an arc whose angles are visual, in degrees. */
+function arcParams(
+  wR: number,
+  hR: number,
+  stAng: number,
+  swAng: number
+): { t0: number; sweep: number } {
+  const sw = boundedSweep(swAng);
+  const param = (a: number): number => Math.atan2(wR * Math.sin(a), hR * Math.cos(a));
+  const st = stAng * DEG;
+  const t0 = param(st);
+  // Sweep in parametric space follows the visual sweep's direction and turn count.
+  const endVisual = st + sw * DEG;
+  let t1 = param(endVisual);
+  const turns = Math.trunc(sw / 360);
+  t1 += turns * 2 * Math.PI;
+  let sweep = t1 - t0;
+  if (sw > 0 && sweep <= 0) sweep += 2 * Math.PI;
+  if (sw < 0 && sweep >= 0) sweep -= 2 * Math.PI;
+  if (sw === 0) sweep = 0;
+  return { t0, sweep };
+}
+
 function evaluatePath(
   path: PresetPath,
   vars: ReadonlyMap<string, number>,
   w: number,
   h: number,
-  budget: { left: number }
+  budget: { left: number },
+  flatArcs: boolean
 ): GeometryPath {
   const sink: PathSink = {
     out: [],
     sx: path.w ? w / path.w : 1,
     sy: path.h ? h / path.h : 1,
     budget,
+    flatArcs,
   };
   const { sx, sy } = sink;
   const v = (token: string): number => operand(token, vars);
@@ -460,13 +495,15 @@ export function evaluateGeometry(
   def: PresetShapeDefinition,
   w: number,
   h: number,
-  adjust?: ReadonlyMap<string, number>
+  adjust?: ReadonlyMap<string, number>,
+  options?: EvaluateOptions
 ): EvaluatedGeometry {
   const vars = builtins(w, h);
   defineGuides(vars, def.av, adjust);
   defineGuides(vars, def.gd);
   const budget = { left: MAX_GEOMETRY_COMMANDS };
-  const paths = def.paths.map((p) => evaluatePath(p, vars, w, h, budget));
+  const flatArcs = options?.flatArcs === true;
+  const paths = def.paths.map((p) => evaluatePath(p, vars, w, h, budget, flatArcs));
   const rv = (t: string, d: number): number =>
     vars.get(t) ?? (Number.isFinite(Number(t)) ? Number(t) : d);
   const textRect = def.rect

@@ -858,6 +858,11 @@ export interface WarpedRun {
     readonly glyphs: readonly PathCommand[];
     readonly highlight: readonly PathCommand[];
     readonly line: number;
+    readonly picture?: {
+        readonly origin: readonly [number, number];
+        readonly across: readonly [number, number];
+        readonly down: readonly [number, number];
+    };
     // (undocumented)
     readonly run: number;
     readonly underline: readonly PathCommand[];
