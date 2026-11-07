@@ -53,12 +53,14 @@ editor.exec({ type: 'setLink', url: './docs/Q3 report.pdf' });
 
 The file stores the path, percent-encoded, as an external hyperlink target: `docs/Q3%20report.pdf`. A presentation application opens the file relative to the deck. The editor never opens or fetches it: a browser cannot reach a file next to the deck.
 
-`setLink` checks the path strictly and refuses it with `errors.unsafeFileLink` in these cases:
+Only a URL that starts with `./` or `../` is a file link. `setLink` reads a bare name such as `report.pdf` as a web address (`https://report.pdf`). In the default editor, **Other file** adds `./` to a path that has no prefix.
 
-- It has no `./` or `../` prefix. A bare name such as `report.pdf` is a web address.
+`setLink` checks a file path strictly and refuses it with `errors.unsafeFileLink` in these cases:
+
 - It has more than two leading `../` steps, or a `.` or `..` step after the first name.
-- It names a scheme, a drive, or an absolute path, or holds a backslash or a control character.
-- It names a program or a script, such as `.exe`, `.sh`, `.js`, or `.ps1`.
+- It names a scheme, a drive, or an absolute path, or holds a backslash, a colon, or a control character.
+- A name in it ends with a dot or a space, or is a device name such as `CON` or `nul.txt`.
+- The file is not a document, picture, sound, or video file. The file name must end with an extension such as `.pdf`, `.docx`, `.xlsx`, `.pptx`, `.txt`, `.csv`, `.png`, `.jpg`, `.mp3`, or `.mp4`. A program, a script, a web page, a document with macros, or a disk image is refused.
 
 ## Link to an email address
 
@@ -83,7 +85,7 @@ A click into a slide link shows the slide it goes to as a button, such as **Slid
 
 - `setLink` refuses a slide number past the end, `#slide-0`, and any other `#` form with `errors.slideNotFound`.
 - The slide show does not run custom shows.
-- Copy and paste drops a link to another file from the pasted text.
+- Copy and paste keeps a link to another file only when its path passes the checks of `setLink`.
 - Links to programs (`ppaction://program`) keep their action and target on save, and the editor never runs them. `setLink` never writes such a link: this is a deliberate security limit. **Edit** replaces the link.
 - `mailto:` fields other than the subject, such as `cc` and `body`, stay in the link when you edit the address or the subject.
 

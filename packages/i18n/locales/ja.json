@@ -1139,7 +1139,7 @@
     "sectionNotFound": "プレゼンテーションにそのセクションはありません。",
     "slideNotFound": "プレゼンテーションにそのスライドはありません。",
     "customShowNotFound": "この目的別スライド ショーはプレゼンテーションにありません。",
-    "unsafeFileLink": "./ または ../ で始まる相対パスを入力してください (例: ./report.pdf)。プログラムやスクリプトのファイルにはリンクできません。",
+    "unsafeFileLink": "./ または ../ で始まる相対パスを入力してください (例: ./report.pdf)。リンクできるのは文書、画像、サウンド、ビデオのファイルだけです。",
     "sectionName": "セクション名は 1 から 255 文字で指定してください。",
     "view": "エディターにその表示はありません。",
     "chartData": {
@@ -1443,6 +1443,9 @@
     "picture": "図",
     "choosePicture": "図を選択…",
     "pictureChosen": "図を選択しました",
+    "pictureType": "PNG、JPEG、または GIF の画像を選んでください。",
+    "pictureTooLarge": "画像が大きすぎます。50 MB 以下、2,500 万ピクセル以下の画像を選んでください。",
+    "pictureUnreadable": "画像を読み込めません。別のファイルを選んでください。",
     "errors": {
       "percent": "{field} は {min} から {max} % の数値で指定してください。",
       "whole": "{field} は {min} から {max} の整数で指定してください。",

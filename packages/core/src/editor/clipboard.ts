@@ -39,6 +39,11 @@ import {
 import type { ClipboardNode, ClipboardPayload, ClipboardRelationship } from '../contracts/index.ts';
 import { fromBase64, toBase64 } from '../automation/commands/base64.ts';
 import { CommandRefusal, OpBatch } from '../automation/commands/op-batch.ts';
+import {
+  fileLinkTarget,
+  fileLinkUrl,
+  isFileLink,
+} from '../automation/commands/custom-show-links.ts';
 import { scopeItems } from '../automation/commands/placement.ts';
 import type { LayoutItem } from '../layout/index.ts';
 import {
@@ -232,6 +237,9 @@ class Carrier {
     if (rel.type === REL.hyperlink) {
       const safe = rel.external && rel.externalTarget ? sanitizeHref(rel.externalTarget) : null;
       if (safe?.ok) return { ...plain, part: '', target: safe.href };
+      // A link to another file travels in its `./` form; the paste checks it again.
+      const file = rel.external ? fileLinkUrl(rel.relativeTarget) : undefined;
+      if (file) return { ...plain, part: '', target: file };
       return nested ? null : undefined;
     }
     if (rel.external || !rel.target) return nested ? null : undefined;
@@ -496,6 +504,16 @@ type CleanRelationship =
 
 type GraphRelationship = Extract<CleanRelationship, { kind: 'graph' }>;
 
+/** The relationship target of a pasted file link (`./a.pdf`), or undefined when it is unsafe. */
+function pastedFileTarget(url: string): string | undefined {
+  try {
+    return fileLinkTarget(url);
+  } catch (err) {
+    if (err instanceof CommandRefusal) return undefined;
+    throw err;
+  }
+}
+
 /**
  * Validate one untrusted relationship. Null refuses the payload; undefined drops the
  * relationship and the attributes that name it. A relationship of a carried part (`nested`)
@@ -515,6 +533,11 @@ function cleanRelationship(
   if (nested && !NAME.test(id)) return null;
   const skip = nested ? null : undefined;
   if (type === REL.hyperlink) {
+    // A link to another file passes the same path checks as `setLink`.
+    if (typeof target === 'string' && isFileLink(target)) {
+      const href = pastedFileTarget(target);
+      return href ? { kind: 'link', id, type, href } : skip;
+    }
     const safe = typeof target === 'string' ? sanitizeHref(target) : null;
     return safe?.ok ? { kind: 'link', id, type, href: safe.href } : skip;
   }

@@ -26,6 +26,7 @@ import {
 import {
   customShowDraft,
   customShowDraftUrl,
+  fileDraftUrl,
   customShowLinkLabel,
   linkKindDraft,
   linkKindOf,
@@ -399,7 +400,7 @@ const HyperLinkFields = part(
                 placeholder={t('link.filePlaceholder')}
                 value={s.draft}
                 {...invalid}
-                onInput={(e: Event) => setUrl(value(e))}
+                onInput={(e: Event) => setUrl(fileDraftUrl(value(e)))}
                 onKeydown={onEnter}
               />
             ) : (

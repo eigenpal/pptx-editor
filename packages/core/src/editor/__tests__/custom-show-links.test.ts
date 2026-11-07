@@ -24,8 +24,11 @@ import {
   linkKindsFor,
 } from '../link-fields.ts';
 import { slideshowLinkAt } from '../slideshow-view.ts';
+import type { ClipboardPayload } from '../../contracts/index.ts';
+import { createServerAutomationHost } from '../../automation/index.ts';
 import {
   customShowLinkOf,
+  fileDraftUrl,
   fileLinkTarget,
   fileLinkUrl,
 } from '../../automation/commands/custom-show-links.ts';
@@ -213,5 +216,152 @@ describe('links to other files', () => {
     for (const x of [IN / 4, 2 * IN])
       expect(slideshowLinkAt(e.session!, 0, x, 0.4 * IN)).toBeNull();
     popup.dispose();
+  });
+});
+
+describe('file link checks', () => {
+  const refused = (path: string): boolean => {
+    try {
+      fileLinkTarget(path);
+      return false;
+    } catch {
+      return true;
+    }
+  };
+
+  test('a trailing dot or space cannot hide a program', () => {
+    for (const path of ['./a.exe.', './a.exe..', './a.exe. .', './a.pdf.', './dir./a.pdf'])
+      expect(refused(path)).toBe(true);
+  });
+
+  test('only a document, picture, sound, or video file can be linked', () => {
+    for (const path of [
+      './a.py',
+      './a.pyw',
+      './x.scpt',
+      './a.chm',
+      './a.iso',
+      './a.html',
+      './a.svg',
+      './a.pptm',
+      './a.docm',
+      './a.xlam',
+      './a.msix',
+      './a.appref-ms',
+      './a.settingcontent-ms',
+      './ａ.exe',
+      './a．exe',
+      './a.exе',
+      './.pdf',
+      './README',
+      './~',
+      './a.exe::$DATA',
+    ])
+      expect(refused(path)).toBe(true);
+    for (const path of ['./a.pdf', './b.DOCX', './c.png', './d.mp4', '../e.xlsx'])
+      expect(refused(path)).toBe(false);
+  });
+
+  test('a device name is refused in any case and with any extension', () => {
+    for (const path of ['./CON.pdf', './nul.txt', './Aux.png', './com1.pdf', './LPT9.txt'])
+      expect(refused(path)).toBe(true);
+    expect(refused('./CON/a.pdf')).toBe(true);
+    expect(refused('./console.pdf')).toBe(false);
+  });
+
+  test('names with combining marks are taken, in NFC', () => {
+    const nfd = './café.pdf';
+    expect(fileLinkTarget(nfd)).toBe(encodeURIComponent('café.pdf'));
+    expect(refused('./नमस्ते.pdf')).toBe(false);
+    expect(refused('./สวัสดี.pdf')).toBe(false);
+  });
+
+  test('a decoded target that hides a character or steps up too far shows as written', () => {
+    for (const raw of [
+      '%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd',
+      'javascript%3Aalert(1).pdf',
+      'report%E2%80%AEfdp.exe',
+      'a%0Ab.pdf',
+      '%5C%5Chost%5Cshare.pdf',
+    ])
+      expect(fileLinkUrl(raw)).toBe(`./${raw}`);
+    expect(fileLinkUrl('docs/Q3%20report.pdf')).toBe('./docs/Q3 report.pdf');
+  });
+
+  test('the file path field adds ./ to a bare name', () => {
+    expect(fileDraftUrl('report.pdf')).toBe('./report.pdf');
+    expect(fileDraftUrl('../a.pdf')).toBe('../a.pdf');
+    expect(fileDraftUrl('./a.pdf')).toBe('./a.pdf');
+    for (const text of ['', '.', '..']) expect(fileDraftUrl(text)).toBe(text);
+  });
+});
+
+describe('custom show list', () => {
+  test('a repeated id lists once, and a name loses its format characters', async () => {
+    const shows =
+      '<p:custShowLst><p:custShow name="A‮b​" id="4"><p:sldLst/></p:custShow>' +
+      '<p:custShow name="Dup" id="4"><p:sldLst/></p:custShow></p:custShowLst>';
+    const e = await open(shows);
+    expect(e.snapshot().customShows).toEqual([{ id: 4, name: 'Ab' }]);
+    e.destroy();
+  });
+});
+
+describe('file links through copy, paste, and automation', () => {
+  const linked = (): Promise<PptxEditorInstance> =>
+    open(SHOWS, {
+      shapes: shape({
+        id: 2,
+        name: 'T',
+        x: IN,
+        y: IN,
+        cx: 6 * IN,
+        cy: 2 * IN,
+        text:
+          '<a:p><a:r><a:rPr lang="en-US"><a:hlinkClick r:id="rIdFile"/></a:rPr><a:t>File</a:t>' +
+          '</a:r><a:r><a:rPr lang="en-US"><a:hlinkClick r:id="rIdTool"/></a:rPr><a:t>Tool</a:t>' +
+          '</a:r></a:p>',
+      }),
+      rels: [
+        ['rIdFile', `${R}/hyperlink`, 'docs/a%20b.pdf', 'External'],
+        ['rIdTool', `${R}/hyperlink`, 'tool.exe', 'External'],
+      ],
+    });
+
+  test('a pasted shape keeps a safe file link and drops an unsafe one', async () => {
+    const e = await linked();
+    e.setSelection({ kind: 'shapes', nodeIds: [shapeId(e)] });
+    const payload = JSON.parse(JSON.stringify(e.copy())) as ClipboardPayload;
+    expect(payload.relationships.map((r) => r.target)).toEqual(['./docs/a b.pdf', './tool.exe']);
+    expect(e.exec({ type: 'paste', payload }).ok).toBe(true);
+    const targets = rels(e).map((r) => r.relativeTarget);
+    expect(targets.filter((t) => t === 'docs/a%20b.pdf')).toHaveLength(2);
+    expect(targets.filter((t) => t === 'tool.exe')).toHaveLength(1);
+    // A changed payload passes the same checks: a trailing dot is refused.
+    const bad = {
+      ...payload,
+      relationships: payload.relationships.map((r) => ({ ...r, target: './a.exe.' })),
+    };
+    expect(e.exec({ type: 'paste', payload: bad }).ok).toBe(true);
+    expect(rels(e).some((r) => r.relativeTarget?.startsWith('a.exe'))).toBe(false);
+    e.destroy();
+  });
+
+  test('automation reads the address of a file link', async () => {
+    const e = await linked();
+    const opened = createServerAutomationHost(e.save()!);
+    if (!opened.ok) throw new Error('not opened');
+    const response = opened.host.execute({
+      operations: [
+        { op: 'getSlide', key: { index: 0 } },
+        { op: 'listHyperlinks', slide: { result: 0 } },
+      ],
+    });
+    expect(response.ok).toBe(true);
+    const value = response.results[1];
+    expect(value?.status === 'ok' ? value.value : null).toMatchObject({
+      hyperlinks: [{ address: 'docs/a%20b.pdf' }, { address: 'tool.exe' }],
+    });
+    e.destroy();
   });
 });

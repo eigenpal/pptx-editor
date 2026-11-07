@@ -14,6 +14,8 @@ import {
 } from '../automation/commands/custom-show-links.ts';
 import { parseSlideLink } from '../automation/commands/slide-links.ts';
 
+export { fileDraftUrl } from '../automation/commands/custom-show-links.ts';
+
 /** What a link goes to. @internal */
 export type LinkKind = 'web' | 'email' | 'slide' | 'customShow' | 'file';
 

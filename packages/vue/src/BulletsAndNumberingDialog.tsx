@@ -54,6 +54,7 @@ import {
   type FormDialogParts,
 } from './dialog-form.tsx';
 import { useFormDraft } from './form-draft.ts';
+import type { TranslationKey } from '@pptx-editor.dev/i18n';
 
 /**
  * The field names of the Bullets and Numbering dialog, for `BulletsAndNumberingDialog.Field`:
@@ -139,6 +140,8 @@ const BulletsAndNumberingDialogOpen = defineComponent({
     const state = formDialogState({ draft, isEnabled: editable, onClose: () => props.onClose() });
     const set = draft.setValue;
     const file = ref<HTMLInputElement | null>(null);
+    // Why the Picture field refused the last file the user picked.
+    const pictureProblem = ref<TranslationKey | null>(null);
     const fields = (kind: BulletsDialogTab, d: BulletsDialogFields, mixed: string): VNode => {
       // While a tab's style is None, its size, color, and start are dimmed.
       const off = !bulletFieldsEnabled({ ...d, kind });
@@ -201,7 +204,11 @@ const BulletsAndNumberingDialogOpen = defineComponent({
                       {t('bulletsAndNumberingDialog.choosePicture')}
                     </button>
                     <span role="status" class="pptx-dialog__muted">
-                      {d.picture ? t('bulletsAndNumberingDialog.pictureChosen') : ''}
+                      {pictureProblem.value
+                        ? t(pictureProblem.value)
+                        : d.picture
+                          ? t('bulletsAndNumberingDialog.pictureChosen')
+                          : ''}
                     </span>
                   </span>
                   <input
@@ -213,8 +220,10 @@ const BulletsAndNumberingDialogOpen = defineComponent({
                       const input = e.target as HTMLInputElement;
                       const picked = input.files?.[0];
                       input.value = '';
-                      void readBulletPicture(picked).then((bytes) => {
-                        if (bytes) draft.update((cur) => chooseBulletPicture(cur, bytes));
+                      void readBulletPicture(picked).then((read) => {
+                        if (!read) return;
+                        pictureProblem.value = read.ok ? null : read.reason;
+                        if (read.ok) draft.update((cur) => chooseBulletPicture(cur, read.picture));
                       });
                     }}
                   />

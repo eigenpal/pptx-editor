@@ -426,7 +426,8 @@ describe('PptxEditorHyperLink custom show and file links', () => {
     const path = document.querySelector<HTMLInputElement>(
       '.pptx-link input[aria-label="File path"]'
     )!;
-    path.value = './docs/report.pdf';
+    // A bare name stays a file link: the field adds ./.
+    path.value = 'docs/report.pdf';
     path.dispatchEvent(new Event('input'));
     await nextTick();
     await apply();

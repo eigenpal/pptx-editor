@@ -34,6 +34,7 @@ import {
 import {
   customShowDraft,
   customShowDraftUrl,
+  fileDraftUrl,
   customShowLinkLabel,
   linkKindDraft,
   linkKindOf,
@@ -534,7 +535,7 @@ function HyperLinkFields({ className, hidden }: HyperLinkPartProps) {
           placeholder={t('link.filePlaceholder')}
           value={state.draft}
           {...invalid}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={(e) => setUrl(fileDraftUrl(e.target.value))}
           onKeyDown={onEnter}
         />
       ) : (

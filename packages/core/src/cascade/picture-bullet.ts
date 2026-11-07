@@ -36,7 +36,7 @@ export interface PictureBulletImage {
 }
 
 /** The most pixels a bullet picture may have; the PDF writer's picture limit. */
-const MAX_PIXELS = 25_000_000;
+export const MAX_BULLET_PICTURE_PIXELS = 25_000_000;
 
 /**
  * The picture of an `a:buBlip` in `entry`, or undefined when its part is unknown, or its
@@ -55,7 +55,12 @@ export function pictureBulletImage(
   if (!rId) return undefined;
   const bytes = binaryPartOf(source.pkg, relTarget(source.pkg, part, rId));
   const size = bytes ? imageSize(bytes) : null;
-  if (!size || size.width <= 0 || size.height <= 0 || size.width * size.height > MAX_PIXELS)
+  if (
+    !size ||
+    size.width <= 0 ||
+    size.height <= 0 ||
+    size.width * size.height > MAX_BULLET_PICTURE_PIXELS
+  )
     return undefined;
   const emu = imageSizeEmu(size);
   const aspect = emu.cx / emu.cy;

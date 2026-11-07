@@ -577,7 +577,8 @@ describe('PptxEditor.HyperLink custom show and file links', () => {
     expect(kind().value).toBe('customShow');
     act(() => void fireEvent.change(kind(), { target: { value: 'file' } }));
     const path = screen.getByRole('textbox', { name: 'File path' });
-    act(() => void fireEvent.change(path, { target: { value: './docs/report.pdf' } }));
+    // A bare name stays a file link: the field adds ./.
+    act(() => void fireEvent.change(path, { target: { value: 'docs/report.pdf' } }));
     act(() => void fireEvent.click(screen.getByRole('button', { name: 'Apply' })));
     expect(editor.snapshot().format?.link).toBe('./docs/report.pdf');
   });

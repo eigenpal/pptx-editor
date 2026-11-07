@@ -767,6 +767,7 @@ export interface TableScope {
     readonly partName?: string;
     // (undocumented)
     readonly pkg: PptxPackage;
+    readonly presentationPart?: string;
     // (undocumented)
     readonly slideNumber: number;
     // (undocumented)

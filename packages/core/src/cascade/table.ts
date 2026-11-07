@@ -50,6 +50,8 @@ export interface TableScope {
   readonly kinsoku?: KinsokuRules;
   /** The part of the table, whose relationships the picture bullets of its cells name. */
   readonly partName?: string;
+  /** The presentation part, whose relationships the picture bullets of `defaultTextStyle` name. */
+  readonly presentationPart?: string;
 }
 
 const MAX_LENGTH = 51_206_400;
@@ -211,10 +213,17 @@ function cellText(
     ...(entry ? [entry] : []),
     ...levelEntries(lstStyle, level),
   ];
-  // A cell's own list style and paragraphs are in the table's part.
+  // A cell's own list style and paragraphs are in the table's part; the deck's default text
+  // style is in the presentation part. The table style's text entry holds no bullet.
   const pictures = {
     pkg: scope.pkg,
-    partOf: entryParts([[lstStyle, scope.partName]], scope.partName),
+    partOf: entryParts(
+      [
+        [scope.defaultTextStyle, scope.presentationPart],
+        [lstStyle, scope.partName],
+      ],
+      scope.partName
+    ),
   };
   const paragraphs = elements(txBody)
     .filter((p) => p.kind === 'paragraph')

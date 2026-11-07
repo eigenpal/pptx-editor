@@ -5,7 +5,16 @@
 import { describe, expect, test } from 'bun:test';
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { PNG } from 'pngjs';
-import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
+import {
+  buildPptx,
+  cell,
+  para,
+  run,
+  shape,
+  table,
+} from '../../../../../scripts/fixtures/builder.ts';
+import { bulletPictureProblem } from '../bullet-format.ts';
+import { readBulletPicture } from '../bullets-dialog-fields.ts';
 import { attr, child, elements, find, readPptx, writePptx, xmlPartOf } from '../../store/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 import type { GlyphRun } from '../../layout/index.ts';
@@ -216,6 +225,93 @@ describe('setBulletFormat with a picture', () => {
     expect(e.snapshot().format?.bullets).toBe(true);
     expect(e.exec({ type: 'toggleBullets' }).ok).toBe(true);
     expect(bulletOf(e)).toBeUndefined();
+    e.destroy();
+  });
+});
+
+/** A PNG with only its signature and header: a size, and no pixels to decode. */
+function pngHeader(w: number, h: number): Uint8Array<ArrayBuffer> {
+  const out = new Uint8Array(33);
+  out.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+  const view = new DataView(out.buffer);
+  view.setUint32(16, w);
+  view.setUint32(20, h);
+  out.set([8, 6, 0, 0, 0], 24);
+  return out;
+}
+
+/** Every glyph run with a picture in a slide layout, at any depth (tables hold cell layouts). */
+function picturesIn(value: unknown, out: GlyphRun[] = [], depth = 0): GlyphRun[] {
+  if (!value || typeof value !== 'object' || depth > 12) return out;
+  const v = value as Partial<GlyphRun>;
+  if (v.kind === 'bullet' && v.picture) out.push(v as GlyphRun);
+  for (const child of Object.values(value)) picturesIn(child, out, depth + 1);
+  return out;
+}
+
+describe('picture bullet limits', () => {
+  test('a picture over 25 million pixels is refused, since it would never draw', async () => {
+    const e = await open(deck(''));
+    select(e);
+    const huge = { kind: 'picture', picture: pngHeader(6000, 6000) } as const;
+    expect(e.exec({ type: 'setBulletFormat', format: huge }).ok).toBe(false);
+    expect(bulletPictureProblem(pngHeader(6000, 6000))).toBe('size');
+    expect(bulletPictureProblem(png(4, 4))).toBeNull();
+    e.destroy();
+  });
+
+  test('the Picture field gives a reason for a file it refuses', async () => {
+    const file = (bytes: Uint8Array<ArrayBuffer>, type: string) => new Blob([bytes], { type });
+    expect(await readBulletPicture(null)).toBeNull();
+    expect(await readBulletPicture(file(png(4, 4), 'image/svg+xml'))).toEqual({
+      ok: false,
+      reason: 'bulletsAndNumberingDialog.pictureType',
+    });
+    expect(await readBulletPicture(file(new Uint8Array(0), 'image/png'))).toEqual({
+      ok: false,
+      reason: 'bulletsAndNumberingDialog.pictureType',
+    });
+    expect(await readBulletPicture(file(pngHeader(6000, 6000), 'image/png'))).toEqual({
+      ok: false,
+      reason: 'bulletsAndNumberingDialog.pictureTooLarge',
+    });
+    // A browser may give no type: the bytes decide.
+    expect((await readBulletPicture(file(png(4, 4), '')))?.ok).toBe(true);
+  });
+
+  test('a table cell takes a picture bullet from the default text style', async () => {
+    const files = unzipSync(
+      buildPptx({
+        slides: [
+          {
+            shapes: table({
+              id: 2,
+              x: IN,
+              y: IN,
+              cx: 4 * IN,
+              cy: IN,
+              columns: [4 * IN],
+              tblPr: '<a:tblPr/>',
+              rows: `<a:tr h="${IN}">${cell('cell')}</a:tr>`,
+            }),
+          },
+        ],
+        presentationRels: [['rIdPresBu', R_IMAGE, 'media/bullet.png']],
+        media: [{ name: 'bullet.png', bytes: png(10, 10), contentType: 'image/png' }],
+      })
+    );
+    const name = 'ppt/presentation.xml';
+    const xml = strFromU8(files[name]!);
+    const style = xml.indexOf('<p:defaultTextStyle>');
+    const lvl1 = /<a:lvl1pPr[^>]*>/.exec(xml.slice(style))![0];
+    files[name] = strToU8(
+      xml.slice(0, style) +
+        xml.slice(style).replace(lvl1, `${lvl1}<a:buBlip><a:blip r:embed="rIdPresBu"/></a:buBlip>`)
+    );
+    const e = await open(zipSync(files));
+    const [bullet] = picturesIn(e.session!.layout(0));
+    expect(bullet?.picture?.part).toBe('/ppt/presentation.xml');
+    expect(bullet?.picture?.rId).toBe('rIdPresBu');
     e.destroy();
   });
 });
