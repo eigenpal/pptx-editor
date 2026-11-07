@@ -1188,6 +1188,7 @@
     "commentAuthor": "作成者名が長すぎます",
     "commentDate": "コメントの日付が無効です",
     "noComment": "このコメントはもう存在しません",
+    "commentChanged": "開いた後にこのコメントが変更されました",
     "chartData": {
       "noChart": "グラフを 1 つ選択してください。",
       "noData": "このグラフにはデータ系列がありません。",
@@ -1647,6 +1648,7 @@
     "cancel": "キャンセル",
     "keyHint": "Enter で投稿、Shift+Enter で改行、Esc でキャンセルします。",
     "noAuthor": "コメントするには作成者を設定してください。",
+    "changed": "このコメントは変更されました。テキストを残すにはコピーしてください。",
     "pointsAt": "対象: {name}",
     "on": "対象: {name}",
     "resolved": "解決済み",

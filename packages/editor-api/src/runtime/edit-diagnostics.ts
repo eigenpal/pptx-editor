@@ -310,6 +310,11 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'The slide has no comment with this id. Read the comments of the slide again.',
   ],
   [
+    'errors.commentChanged',
+    'edit.comment-changed',
+    'The comment at this id no longer matches expect. Read the comments of the slide again.',
+  ],
+  [
     'errors.altTextLength',
     'edit.alt-text-length',
     'Alternative text can have up to 4000 characters. Shorten it.',

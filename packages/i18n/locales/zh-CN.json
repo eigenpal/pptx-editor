@@ -1188,6 +1188,7 @@
     "commentAuthor": "作者名称过长",
     "commentDate": "批注日期无效",
     "noComment": "此批注已不存在",
+    "commentChanged": "打开后此批注已被更改",
     "chartData": {
       "noChart": "请选择一个图表。",
       "noData": "此图表没有数据系列。",
@@ -1647,6 +1648,7 @@
     "cancel": "取消",
     "keyHint": "按 Enter 发布，按 Shift+Enter 换行，按 Esc 取消。",
     "noAuthor": "请先设置作者再添加批注。",
+    "changed": "此批注已更改。若要保留文本，请复制它。",
     "pointsAt": "指向 {name}",
     "on": "指向 {name}",
     "resolved": "已解决",

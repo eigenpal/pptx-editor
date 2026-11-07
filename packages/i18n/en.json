@@ -1188,6 +1188,7 @@
     "commentAuthor": "The author name is too long",
     "commentDate": "The comment date is not valid",
     "noComment": "This comment no longer exists",
+    "commentChanged": "This comment changed after you opened it",
     "chartData": {
       "noChart": "Select one chart.",
       "noData": "The chart has no data series.",
@@ -1647,6 +1648,7 @@
     "cancel": "Cancel",
     "keyHint": "Enter posts. Shift+Enter starts a new line. Escape cancels.",
     "noAuthor": "Set an author to comment.",
+    "changed": "This comment changed. Copy your text to keep it.",
     "pointsAt": "Points at {name}",
     "on": "On {name}",
     "resolved": "Resolved",

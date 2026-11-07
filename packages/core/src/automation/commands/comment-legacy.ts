@@ -218,25 +218,41 @@ const keyOf = (cm: Element): string =>
   `${canonicalAuthor(attr(cm, 'authorId'))}:${canonicalIdx(attr(cm, 'idx'))}`;
 
 /**
- * A legacy comment of a slide by its id key (`cm-<author>-<idx>`, each field encoded): its list, the comment, and
- * the thread it is in (itself for a thread).
+ * A legacy comment of a slide by its id key (`cm-<author>-<idx>`, each field encoded, and
+ * `-<n>` for the n-th repeat of an author and index): its list, the comment, and the thread it
+ * is in (itself for a thread). A key without a place names a comment only while the slide holds
+ * its author and index once.
  */
 export function findLegacy(
   batch: OpBatch,
   slidePart: string,
   key: string
-): { part: string; cm: Element; thread: Element } {
+): { part: string; cm: Element; thread: Element; repeated: boolean } {
   const fields = legacyKeyFields(key);
   if (!fields) throw new CommandRefusal('errors.noComment');
   const wanted = `${fields.authorId}:${fields.idx}`;
-  for (const part of slideCommentParts(batch.pkg, slidePart).legacy) {
-    const probe = elements(commentTree(batch.pkg, part)?.root);
-    if (!probe.some((cm) => isP(cm, 'cm') && keyOf(cm) === wanted)) continue;
-    const all = elements(editable(batch, part)?.root).filter((cm) => isP(cm, 'cm'));
-    const cm = all.find((c) => keyOf(c) === wanted)!;
+  const matches = (root: Element | undefined): Element[] =>
+    isP(root, 'cmLst') ? elements(root).filter((cm) => isP(cm, 'cm') && keyOf(cm) === wanted) : [];
+  // Read first, so a list without the comment is not rewritten as an XML part.
+  const lists = slideCommentParts(batch.pkg, slidePart).legacy.map((part) => ({
+    part,
+    hits: matches(commentTree(batch.pkg, part)?.root).length,
+  }));
+  const total = lists.reduce((n, l) => n + l.hits, 0);
+  if (fields.ordinal === undefined && total !== 1) throw new CommandRefusal('errors.noComment');
+  let left = fields.ordinal ?? 1;
+  for (const { part, hits } of lists) {
+    if (left > hits) {
+      left -= hits;
+      continue;
+    }
+    const root = editable(batch, part)?.root;
+    const cm = matches(root)[left - 1];
+    if (!cm) break;
+    const all = elements(root).filter((c) => isP(c, 'cm'));
     const parent = parentKey(cm);
     const thread = (parent && all.find((c) => keyOf(c) === parent && !parentKey(c))) || cm;
-    return { part, cm, thread };
+    return { part, cm, thread, repeated: total > 1 };
   }
   throw new CommandRefusal('errors.noComment');
 }

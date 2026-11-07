@@ -18,22 +18,23 @@ export type CommentAnchor =
 /** One comment or reply. Its text and author come from the file: show them as text. @public */
 export interface SlideComment {
   /**
-   * The id that the comment commands take. When the slide repeats the comment's GUID, a delete
-   * of another comment can change it, and a twin (see `identity`) can take the id of a deleted
-   * one.
+   * The id that the comment commands take. When the slide repeats the comment's GUID, or a legacy
+   * comment's author and index, a delete of another comment can change it, and a twin (see
+   * `identity`) can take the id of a deleted one. Send `expect` with a command, so the editor
+   * refuses it when the comment at the id is not the one you showed.
    */
   readonly id: string;
   /**
-   * A token that names the comment in the snapshot while its slide is current. Key UI state,
-   * such as an open field, by it; pass `id` to the commands.
+   * A token that names the comment in this editor's snapshots. Key UI state, such as an open
+   * field, by it; pass `id` to the commands. Once shown, an identity never names another
+   * comment, also after the slide changes and comes back.
    *
-   * - A comment whose GUID, author, and creation time no other comment of the slide shares keeps
-   *   its identity through every change except its own delete.
-   * - Twins, which share all three, keep their identities through their own edits and the delete
-   *   of a twin with another text. When a twin goes and another twin has the same text, the
-   *   editor cannot tell which went: every twin of that group takes a new identity, so state
-   *   keyed by the old ones ends.
-   * - An identity that is gone never names another comment.
+   * - A comment that never had a twin keeps its identity until it is deleted. A twin shares the
+   *   GUID, author, and creation time of another comment of the slide.
+   * - Twins keep their identities when one change explains their group: an edit or a resolve
+   *   that changes at most one text, or one twin more or less at one place. Otherwise every
+   *   twin of the group takes a new identity, so state keyed by the old ones ends.
+   * - A comment that a slide shows after its first read takes a new identity.
    *
    * `readCommentThreads` reads the identities from the file alone, without this carry.
    */
@@ -78,7 +79,25 @@ export interface CommentAuthorInput {
 }
 
 /**
+ * What a host showed of a comment, for a command that acts on it: pass the comment's `author`,
+ * `date`, and `text` as the snapshot gave them. The editor refuses the command
+ * (`errors.commentChanged`) when the comment at `commentId` has another author or date. It
+ * compares the text only for a twin: a comment whose GUID, author, and date another comment of
+ * the slide shares. So a collaborator's edit of a comment without a twin never refuses yours.
+ * @public
+ */
+export interface CommentExpect {
+  /** The author's display name, as `SlideComment.author` gave it. */
+  readonly author: string;
+  /** The date, as `SlideComment.date` gave it; absent when the comment has none. */
+  readonly date?: string;
+  /** The text, as `SlideComment.text` gave it. */
+  readonly text: string;
+}
+
+/**
  * The comment commands. Text is 1 to 10,000 characters; a line feed starts a new paragraph.
+ * The commands on an existing comment take `expect`, what the host showed of that comment.
  * A new comment uses the threaded format, unless the deck has only legacy comments. @public
  */
 export type CommentCommand =
@@ -96,15 +115,25 @@ export type CommentCommand =
       readonly type: 'replyToComment';
       readonly commentId: string;
       readonly text: string;
+      readonly expect?: CommentExpect;
     } & CommentAuthorInput)
   /** Replace the text of a comment or a reply. */
-  | { readonly type: 'editComment'; readonly commentId: string; readonly text: string }
+  | {
+      readonly type: 'editComment';
+      readonly commentId: string;
+      readonly text: string;
+      readonly expect?: CommentExpect;
+    }
   /** Delete a reply, or a whole thread when `commentId` is a thread. */
-  | { readonly type: 'deleteComment'; readonly commentId: string }
+  | { readonly type: 'deleteComment'; readonly commentId: string; readonly expect?: CommentExpect }
   /** Mark a thread resolved. Refused for the legacy format (`disabled.commentNoStatus`). */
-  | { readonly type: 'resolveComment'; readonly commentId: string }
+  | { readonly type: 'resolveComment'; readonly commentId: string; readonly expect?: CommentExpect }
   /** Mark a resolved thread active again. */
-  | { readonly type: 'reopenComment'; readonly commentId: string };
+  | {
+      readonly type: 'reopenComment';
+      readonly commentId: string;
+      readonly expect?: CommentExpect;
+    };
 
 /**
  * How a comment marker on the slide looks. `icon`: the comment icon. `initials`: a badge with

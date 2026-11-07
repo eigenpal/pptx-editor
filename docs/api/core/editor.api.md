@@ -1149,28 +1149,40 @@ export type CommentCommand =
     readonly type: 'replyToComment';
     readonly commentId: string;
     readonly text: string;
+    readonly expect?: CommentExpect;
 } & CommentAuthorInput)
 /** Replace the text of a comment or a reply. */
 | {
     readonly type: 'editComment';
     readonly commentId: string;
     readonly text: string;
+    readonly expect?: CommentExpect;
 }
 /** Delete a reply, or a whole thread when `commentId` is a thread. */
 | {
     readonly type: 'deleteComment';
     readonly commentId: string;
+    readonly expect?: CommentExpect;
 }
 /** Mark a thread resolved. Refused for the legacy format (`disabled.commentNoStatus`). */
 | {
     readonly type: 'resolveComment';
     readonly commentId: string;
+    readonly expect?: CommentExpect;
 }
 /** Mark a resolved thread active again. */
 | {
     readonly type: 'reopenComment';
     readonly commentId: string;
+    readonly expect?: CommentExpect;
 };
+
+// @public
+export interface CommentExpect {
+    readonly author: string;
+    readonly date?: string;
+    readonly text: string;
+}
 
 // @public
 export type CommentFormat = 'modern' | 'legacy';

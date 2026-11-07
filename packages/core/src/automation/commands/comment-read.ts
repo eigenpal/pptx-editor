@@ -194,26 +194,49 @@ const idField = (raw: string): string => encodeURIComponent(raw).replace(/-/g, '
 /** A field of a comment identity: encoded, so it holds no `~` and no `#`. */
 const identityField = (raw: string): string => encodeURIComponent(raw).replace(/~/g, '%7E');
 
-/** The key of a legacy comment id (`cm-<author>-<idx>`), with each field encoded. */
-export const legacyKey = (authorId: string, idx: string): string =>
-  `cm-${idField(authorId)}-${idField(idx)}`;
+/**
+ * The key of a legacy comment id (`cm-<author>-<idx>`), with each field encoded. A comment whose
+ * author and index the slide repeats also takes its place among the repeats
+ * (`cm-<author>-<idx>-<n>`).
+ */
+export const legacyKey = (authorId: string, idx: string, ordinal?: number): string =>
+  `cm-${idField(authorId)}-${idField(idx)}${ordinal !== undefined ? `-${ordinal}` : ''}`;
 
-/** The author and index of a legacy id key, or undefined when the key is not one. */
+/** The author, index, and place of a legacy id key, or undefined when the key is not one. */
 export function legacyKeyFields(
   key: string
-): { readonly authorId: string; readonly idx: string } | undefined {
-  const m = /^cm-([^-]*)-([^-]*)$/.exec(key);
+): { readonly authorId: string; readonly idx: string; readonly ordinal?: number } | undefined {
+  const m = /^cm-([^-]*)-([^-]*)(?:-([1-9]\d{0,5}))?$/.exec(key);
   if (!m) return undefined;
   try {
-    return { authorId: decodeURIComponent(m[1]!), idx: decodeURIComponent(m[2]!) };
+    const fields = { authorId: decodeURIComponent(m[1]!), idx: decodeURIComponent(m[2]!) };
+    return m[3] ? { ...fields, ordinal: Number(m[3]) } : fields;
   } catch {
     return undefined;
   }
 }
 
-/** The comment id of a legacy comment: its author and index. */
-export const legacyId = (slidePart: string, authorId: string, idx: string): string =>
-  `${slidePart}#${legacyKey(authorId, idx)}`;
+/** The comment id of a legacy comment: its author and index, and its place among repeats. */
+export const legacyId = (
+  slidePart: string,
+  authorId: string,
+  idx: string,
+  ordinal?: number
+): string => `${slidePart}#${legacyKey(authorId, idx, ordinal)}`;
+
+/**
+ * The list part and node of each comment that `readSlideComments` returns. `CommentState` checks
+ * them before it carries the identity of a twin: a node that a delete or an undo moves is
+ * another comment.
+ */
+export const commentNodes = new WeakMap<SlideComment, string>();
+
+/** `to`, with the node of `from`. */
+function sameNode<T extends SlideComment>(from: SlideComment, to: T): T {
+  const node = commentNodes.get(from);
+  if (node !== undefined) commentNodes.set(to, node);
+  return to;
+}
 
 /**
  * The mark of a threaded comment or reply: its author id and creation time, as 8 hex digits
@@ -420,6 +443,7 @@ function eachModern(root: Element | undefined, visit: (el: Element) => void): vo
 
 function modernComment(
   slidePart: string,
+  listPart: string,
   el: Element,
   authors: Map<string, CommentAuthor>,
   count: GuidCount
@@ -434,14 +458,14 @@ function modernComment(
   // The GUID and the mark, which edits, resolves, and deletes of other comments keep. Twins (one
   // GUID, author, and date) also take a hash of their text, and twins with one text their place
   // among each other: nothing else in the file tells them apart. `CommentState` carries the
-  // identity of a twin across its own edits and the deletes of other twins.
+  // identity of a twin when one change explains the new list.
   const hash = fnv(text);
   const same = `${key}\u0000${hash}`;
   const place = bump(count.seenText, same);
   const twins = (count.twins.get(key) ?? 0) > 1;
   const suffix = twins ? `~${hash}${(count.texts.get(same) ?? 0) > 1 ? `~${place}` : ''}` : '';
   const identity = `${slidePart}#m~${identityField(guid)}~${mark}${suffix}`;
-  return {
+  const comment: SlideComment = {
     id: modernId(slidePart, guid, repeated ? { mark, ordinal } : undefined),
     identity,
     author: author?.name ?? '',
@@ -449,6 +473,42 @@ function modernComment(
     ...optionalDate(attr(el, 'created')),
     text,
     textEditable: modernTextEditable(el),
+  };
+  commentNodes.set(comment, `${listPart}\u0000${el.id}`);
+  return comment;
+}
+
+/** Whether another threaded comment of `slidePart` has the GUID and mark of `el`. */
+export function modernHasTwin(pkg: PptxPackage, slidePart: string, el: Element): boolean {
+  const guid = (attr(el, 'id') ?? '').toUpperCase();
+  const mark = modernMark(el);
+  let n = 0;
+  for (const part of slideCommentParts(pkg, slidePart).modern)
+    eachModern(commentTree(pkg, part)?.root, (c) => {
+      if ((attr(c, 'id') ?? '').toUpperCase() === guid && modernMark(c) === mark) n += 1;
+    });
+  return n > 1;
+}
+
+/** What the reader shows of a threaded comment or reply: author, date, and text. */
+export function modernFacts(
+  pkg: PptxPackage,
+  el: Element
+): { readonly author: string; readonly date?: string; readonly text: string } {
+  const author = modernAuthors(pkg).get(attr(el, 'authorId')?.toUpperCase() ?? '');
+  return { author: author?.name ?? '', ...optionalDate(attr(el, 'created')), text: modernText(el) };
+}
+
+/** What the reader shows of a legacy comment: author, date, and text. */
+export function legacyFacts(
+  pkg: PptxPackage,
+  cm: Element
+): { readonly author: string; readonly date?: string; readonly text: string } {
+  const author = legacyAuthors(pkg).get(canonicalAuthor(attr(cm, 'authorId')));
+  return {
+    author: author?.name ?? '',
+    ...optionalDate(attr(cm, 'dt')),
+    text: textOfPlain(child(cm, 'p:text')),
   };
 }
 
@@ -483,22 +543,24 @@ function modernThreads(
   for (const cm of elements(root)) {
     if (cm.ns !== COMMENTS.p188 || cm.local !== 'cm' || !attr(cm, 'id')) continue;
     // The thread before its replies: `findModern` counts repeats in this order.
-    const head = modernComment(slidePart, cm, authors, count);
+    const head = modernComment(slidePart, listPart, cm, authors, count);
     // Every reply list: two collaborators who give a thread its first reply at once give it two
     // until a save joins them.
     const replies = elements(cm)
       .filter((l) => l.ns === COMMENTS.p188 && l.local === 'replyLst')
       .flatMap((l) => elements(l))
       .filter((r) => r.ns === COMMENTS.p188 && r.local === 'reply' && attr(r, 'id'))
-      .map((r) => modernComment(slidePart, r, authors, count));
+      .map((r) => modernComment(slidePart, listPart, r, authors, count));
     const status = attr(cm, 'status');
-    out.push({
-      ...head,
-      format: 'modern',
-      resolved: status === 'resolved' || status === 'closed',
-      anchor: modernAnchor(cm, keys),
-      replies,
-    });
+    out.push(
+      sameNode(head, {
+        ...head,
+        format: 'modern',
+        resolved: status === 'resolved' || status === 'closed',
+        anchor: modernAnchor(cm, keys),
+        replies,
+      })
+    );
   }
   return out;
 }
@@ -525,15 +587,17 @@ function legacyThreads(
     const key = `${authorId}\u0000${idx}`;
     const place = bump(count.seenLegacy, key);
     const base = `${slidePart}#l~${identityField(authorId)}~${identityField(idx)}`;
+    const repeated = (count.legacy.get(key) ?? 0) > 1;
     const comment: SlideComment = {
-      id: legacyId(slidePart, authorId, idx),
-      identity: (count.legacy.get(key) ?? 0) > 1 ? `${base}~${place}` : base,
+      id: legacyId(slidePart, authorId, idx, repeated ? place : undefined),
+      identity: repeated ? `${base}~${place}` : base,
       author: author?.name ?? '',
       initials: author?.initials ?? '',
       ...optionalDate(attr(cm, 'dt')),
       text: textOfPlain(child(cm, 'p:text')),
       textEditable: !!child(cm, 'p:text'),
     };
+    commentNodes.set(comment, `${listPart}\u0000${cm.id}`);
     const parent = descendant(child(cm, 'p:extLst'), NS.p15, 'parentCm', 4);
     if (parent) {
       const key = `${canonicalAuthor(attr(parent, 'authorId'))}:${canonicalIdx(attr(parent, 'idx'))}`;
@@ -541,13 +605,13 @@ function legacyThreads(
       continue;
     }
     const replies: SlideComment[] = [];
-    const thread: CommentThread = {
+    const thread: CommentThread = sameNode(comment, {
       ...comment,
       format: 'legacy',
       resolved: false,
       anchor: pointOf(child(cm, 'p:pos'), LEGACY_POS_EMU),
       replies,
-    };
+    });
     threads.push({ thread, replies });
     if (!byKey.has(`${authorId}:${idx}`)) byKey.set(`${authorId}:${idx}`, { replies });
   }
@@ -557,13 +621,13 @@ function legacyThreads(
     if (owner) owner.replies.push(reply);
     else
       threads.push({
-        thread: {
+        thread: sameNode(reply, {
           ...reply,
           format: 'legacy',
           resolved: false,
           anchor: { kind: 'slide' },
           replies: [],
-        },
+        }),
         replies: [],
       });
   }

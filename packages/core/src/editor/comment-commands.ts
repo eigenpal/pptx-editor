@@ -7,7 +7,12 @@ import { presentationInfo, xmlPartOf, child, elements } from '../store/index.ts'
 import type { CommentCommand, EditorCommand } from '../contracts/index.ts';
 import type { CommandContext, CommandEffect } from './commands.ts';
 import { CommandRefusal, type OpBatch } from '../automation/commands/op-batch.ts';
-import { deckUses } from '../automation/commands/comment-read.ts';
+import {
+  deckUses,
+  legacyFacts,
+  modernFacts,
+  modernHasTwin,
+} from '../automation/commands/comment-read.ts';
 import {
   commentAuthor,
   commentDate,
@@ -63,6 +68,30 @@ function targetOf(ctx: CommandContext, batch: OpBatch, slidePart: string, nodeId
   return undefined;
 }
 
+/**
+ * Refuse a command whose `expect` does not match the comment it reached (`errors.commentChanged`):
+ * another author or date, or for a twin, other text. Before any write, so nothing changes.
+ */
+function checkExpect(
+  expect: unknown,
+  facts: () => { readonly author: string; readonly date?: string; readonly text: string },
+  twin: () => boolean
+): void {
+  if (expect === undefined) return;
+  const e = expect as { author?: unknown; date?: unknown; text?: unknown } | null;
+  if (
+    typeof e !== 'object' ||
+    e === null ||
+    typeof e.author !== 'string' ||
+    typeof e.text !== 'string' ||
+    (e.date !== undefined && typeof e.date !== 'string')
+  )
+    throw new CommandRefusal('errors.commentChanged');
+  const now = facts();
+  if (now.author !== e.author || now.date !== e.date || (now.text !== e.text && twin()))
+    throw new CommandRefusal('errors.commentChanged');
+}
+
 /** A thread id key: `cm-…` is a legacy comment, a GUID a threaded one. */
 const isLegacyKey = (key: string): boolean => key.startsWith('cm-');
 
@@ -89,6 +118,11 @@ export function compileCommentCommand(
     if (command.type === 'resolveComment' || command.type === 'reopenComment')
       throw new CommandRefusal('disabled.commentNoStatus');
     const found = findLegacy(batch, slidePart, key);
+    checkExpect(
+      command.expect,
+      () => legacyFacts(batch.pkg, found.cm),
+      () => found.repeated
+    );
     switch (command.type) {
       case 'replyToComment': {
         const text = commentText(command.text);
@@ -106,6 +140,12 @@ export function compileCommentCommand(
     return { label };
   }
   const found = findModern(batch, slidePart, key);
+  const el = found.reply ?? found.thread;
+  checkExpect(
+    command.expect,
+    () => modernFacts(batch.pkg, el),
+    () => modernHasTwin(batch.pkg, slidePart, el)
+  );
   switch (command.type) {
     case 'replyToComment': {
       const text = commentText(command.text);
