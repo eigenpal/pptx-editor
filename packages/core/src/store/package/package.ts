@@ -137,6 +137,8 @@ const ROLE_RANK: Readonly<Record<StructuralRole, number>> = { notes: 1, deck: 2,
 
 /** Content types of the notes parts: neither shows a slide. */
 const NOTES_TYPES = new Set([`${PML}notesSlide+xml`, `${PML}notesMaster+xml`].map(asciiFold));
+const HANDOUT_MASTER =
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/handoutMaster';
 /** Content types of the masters whose theme shows no slide. */
 const NOTES_MASTER_TYPES = new Set(
   [`${PML}notesMaster+xml`, `${PML}handoutMaster+xml`].map(asciiFold)
@@ -186,16 +188,24 @@ function structuralTargets(
       target = type === undefined ? undefined : relTargetByType(pkg, target, type);
     }
   };
+  // The notes master and the handout master, by the relationships that name them.
+  const masters = new Set<string>();
   for (const main of relationshipsOf(pkg, '/'))
     if (main.type === REL.officeDocument && main.target !== undefined)
-      for (const rel of relationshipsOf(pkg, main.target))
+      for (const rel of relationshipsOf(pkg, main.target)) {
         if (rel.type === REL.slide || rel.type === REL.slideMaster) show(rel.target, rel.type);
+        if ((rel.type === REL.notesMaster || rel.type === HANDOUT_MASTER) && rel.target)
+          masters.add(partNameKey(rel.target));
+      }
   const notesTyped = (part: string, set: ReadonlySet<string>): boolean =>
     !shown.has(partNameKey(part)) && typeIn(types, part, set);
   for (const name of rels.keys()) {
     const source = relsSource(name);
     if (source === undefined) continue;
-    const notesMaster = source !== '/' && notesTyped(source, NOTES_MASTER_TYPES);
+    const notesMaster =
+      source !== '/' &&
+      !shown.has(partNameKey(source)) &&
+      (masters.has(partNameKey(source)) || notesTyped(source, NOTES_MASTER_TYPES));
     for (const rel of relationshipsOf(pkg, source)) {
       if (rel.target === undefined || !STRUCTURAL_RELS.has(rel.type)) continue;
       const key = partNameKey(rel.target);

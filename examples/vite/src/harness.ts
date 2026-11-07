@@ -251,9 +251,9 @@ async function adopt(next: DocumentSession): Promise<void> {
   session = next;
   faceFamilies = await registerFaces(session.faces);
   // EMF and WMF pictures paint as their PNG, as in the editor once they have converted. A
-  // picture that is not ready in time would print as the placeholder: a gap, never a pass.
-  if (!(await session.picturesReady()))
-    throw new Error('EMF and WMF pictures did not convert in time');
+  // picture that does not convert, or not in time, would print as the placeholder: a gap,
+  // never a pass.
+  if (!(await session.picturesReady())) throw new Error('an EMF or WMF picture did not convert');
 }
 
 const api: HarnessApi = {

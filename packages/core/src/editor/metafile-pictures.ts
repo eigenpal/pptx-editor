@@ -133,14 +133,16 @@ export class MetafilePictures {
   }
 
   /**
-   * Convert `metafiles`. Resolves `true` when each converted or failed, or `false` after
-   * `waitMs`: a picture that is not ready by then keeps converting, and draws as the
-   * placeholder (or its PNG from before a font change) until it is.
+   * Convert `metafiles`. Resolves `true` when each one converted, so all draw. Resolves `false`
+   * when one did not convert, and after `waitMs`: a picture that is not ready by then keeps
+   * converting, and draws as the placeholder (or its PNG from before a font change) until it is.
    */
   async ready(metafiles: readonly Uint8Array[], waitMs = PICTURES_WAIT_MS): Promise<boolean> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<boolean>((resolve) => (timer = setTimeout(resolve, waitMs, false)));
-    const all = Promise.all(metafiles.map((b) => this.convert(b))).then(() => true);
+    const all = Promise.all(metafiles.map((b) => this.convert(b))).then(() =>
+      metafiles.every((b) => !!this.#done.get(b))
+    );
     try {
       // A cache disposed meanwhile converted nothing more: its pictures are not ready.
       return (await Promise.race([all, late])) && !this.#disposed;

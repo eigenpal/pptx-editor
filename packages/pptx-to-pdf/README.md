@@ -197,9 +197,9 @@ One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`sho
 | Diagrams with a saved drawing | Drawn from the saved drawing, read-only, as in the editor |
 | Charts: bar, column, line, area, scatter, pie, doughnut, and radar, from the values cached in the chart part | Drawn, from the engine's layout of the shapes and labels that `@pptx-editor.dev/pro/drawing` gives |
 | 3-D, of-pie, stock, bubble, and surface charts; charts with trendlines or error bars | Not drawn (`unsupported`) |
-| Diagrams with no saved drawing, OLE objects with no PNG, JPEG, GIF, or BMP picture | Not drawn (`unsupported`) |
+| Diagrams with no saved drawing, OLE objects with no PNG, JPEG, GIF, BMP, EMF, or WMF picture | Not drawn (`unsupported`) |
 | Video and audio | The poster picture is drawn; the media is not embedded or played |
-| GIF, BMP, TIFF, EMF, WMF pictures | Not drawn (`unsupported`) |
+| GIF, BMP, and TIFF pictures | Not drawn (`unsupported`) |
 | SVG pictures | Drawn from their PNG fallback (`information`); without a fallback, not drawn |
 | Hyperlinks, speaker notes, PDF outline | Not written |
 

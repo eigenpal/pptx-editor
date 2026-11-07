@@ -829,9 +829,9 @@ export class DocumentSession {
 
   /**
    * Waits until the EMF and WMF pictures of slide `index`, or of every slide when you omit it,
-   * have converted, so an export draws them. Resolves `true` when all are ready. Resolves
-   * `false` for a slide that does not exist, and after 30 seconds: a picture that is not ready
-   * then draws as the placeholder.
+   * have converted, so an export draws them. Resolves `true` when all draw. Resolves `false`
+   * when one cannot convert, for a slide that does not exist, and after 30 seconds: a picture
+   * that is not ready then draws as the placeholder.
    */
   picturesReady(index?: number): Promise<boolean> {
     const slides = this.info.slides.map((s) => s.partName);

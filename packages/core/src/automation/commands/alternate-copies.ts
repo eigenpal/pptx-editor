@@ -116,6 +116,16 @@ function touchedCopies(base: PptxPackage, ops: readonly PptxOp[]): Map<string, T
   return out;
 }
 
+/** Whether `branch` draws nothing: no content, or only nested wrappers that draw nothing. */
+function drawsNothing(branch: Element, depth = 0): boolean {
+  return elements(branch).every(
+    (el) =>
+      isAlternateContent(el) &&
+      depth < MAX_DEPTH &&
+      elements(el).every((b) => !isBranch(b) || drawsNothing(b, depth + 1))
+  );
+}
+
 /** The elements of `branch`, with the content of every branch of a nested `mc:AlternateContent`. */
 function branchContent(branch: Element, depth = 0, out: Element[] = []): Element[] {
   for (const el of elements(branch)) {
@@ -171,7 +181,7 @@ export function withoutStaleCopies(base: PptxPackage, ops: readonly PptxOp[]): r
       const now = xmlPartOf(batch.pkg, part);
       const at = now ? nodeIndex(now).get(wrapper.id)?.node : undefined;
       if (at?.type !== 'element') continue;
-      if (elements(at).every((b) => !isBranch(b) || elements(b).length === 0))
+      if (elements(at).every((b) => !isBranch(b) || drawsNothing(b)))
         batch.push({ op: 'removeNode', part, node: wrapper.id });
     }
   }

@@ -262,6 +262,17 @@ describe('damaged notes parts and notes themes', () => {
     expect(slides(bytes)).toBe(1);
   });
 
+  test('a damaged theme of a notes master with a generic content type drops nothing', () => {
+    const bytes = notesDeck((entries) => {
+      entries.set('/ppt/theme/theme2.xml', new TextEncoder().encode('<a:theme><broken'));
+      const types = new TextDecoder().decode(entries.get(CT));
+      const generic = types.replace(`${PML}notesMaster+xml`, 'application/xml');
+      expect(generic).not.toBe(types);
+      entries.set(CT, new TextEncoder().encode(generic));
+    });
+    expect(slides(bytes)).toBe(1);
+  });
+
   test('a damaged theme of the slide master still refuses the deck', () => {
     const bytes = notesDeck((entries) => {
       entries.set('/ppt/theme/theme1.xml', new TextEncoder().encode('<a:theme><broken'));

@@ -18,11 +18,11 @@ import { paintSlide } from '../output/index.ts';
 import type { PptxPackage } from '../store/index.ts';
 import type { DocumentSession } from './document-session.ts';
 import { renderKey } from './slide-dependencies.ts';
+import { idleCallback, ThumbnailQueue, type Ask, type IdleDeadline } from './thumbnail-queue.ts';
 
 /** The render key of slide `index`: its parts, its faces, and its converted pictures. */
 const keyOf = (session: DocumentSession, index: number): string | undefined =>
   renderKey(session.store.package, index, session.paintKey(session.info.slides[index]?.partName));
-import { idleCallback, ThumbnailQueue, type Ask, type IdleDeadline } from './thumbnail-queue.ts';
 
 /** The label of a frame the engine does not draw ("Chart (not rendered in this version)"). */
 export function frameLabelOf(

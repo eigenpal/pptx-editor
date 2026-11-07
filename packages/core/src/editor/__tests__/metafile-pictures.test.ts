@@ -236,4 +236,38 @@ test('a metafile that does not convert keeps the placeholder and repaints nothin
   expect(changed).toBe(0);
   expect(pictures.drawable(empty, 'image/x-emf')).toBeUndefined();
   expect(pictures.busy).toBe(false);
+  // The picture does not draw, so the wait for it says so.
+  expect(await pictures.ready([empty])).toBe(false);
+});
+
+test('an OLE object with an EMF preview draws the preview, not the labeled placeholder', async () => {
+  const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const xfrm = `<p:xfrm><a:off x="${IN}" y="${IN}"/><a:ext cx="${IN}" cy="${IN}"/></p:xfrm>`;
+  const ole =
+    '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="5" name="Object"/><p:cNvGraphicFramePr/>' +
+    `<p:nvPr/></p:nvGraphicFramePr>${xfrm}<a:graphic>` +
+    '<a:graphicData uri="http://schemas.openxmlformats.org/presentationml/2006/ole">' +
+    `<p:oleObj name="Object" r:id="rIdOle" imgW="${IN}" imgH="${IN}" progId="Package">` +
+    `<p:embed/>${pic(0, 'rIdEmf')}</p:oleObj></a:graphicData></a:graphic></p:graphicFrame>`;
+  const bytes = buildPptx({
+    slides: [
+      {
+        layout: 'blank',
+        rels: [
+          ['rIdEmf', R_IMAGE, '../media/image1.emf'],
+          ['rIdOle', `${R}/package`, '../embeddings/object1.bin'],
+        ],
+        shapes: ole,
+      },
+    ],
+    media: [{ name: 'image1.emf', bytes: emfRectangle(), contentType: 'image/x-emf' }],
+  });
+  const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  expect((await editor.load(bytes)).ok).toBe(true);
+  const session = editor.session!;
+  const [frame] = session.layout(0)!.items;
+  expect(frame?.kind === 'frame' && frame.poster !== undefined).toBe(true);
+  expect(await session.picturesReady(0)).toBe(true);
+  expect(session.imageUrl(SLIDE, 'rIdEmf')).toStartWith('blob:');
+  editor.destroy();
 });
