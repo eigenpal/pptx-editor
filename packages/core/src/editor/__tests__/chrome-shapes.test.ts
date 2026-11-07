@@ -121,10 +121,17 @@ describe('Shape Format slots', () => {
       'shadow.none reflection.none glow.8.accent1 softEdge.none'
     );
     expect(toolbarCommandState(editor, 'arrange.rotate').enabled).toBe(true);
+    // Off while no side panel or host listens for pane requests; on while one does.
+    expect(toolbarCommandState(editor, 'arrange.selectionPane')).toMatchObject({
+      enabled: false,
+      disabledReason: 'disabled.noSidePanel',
+    });
+    const stop = listenPaneRequests(editor, () => {});
     expect(toolbarCommandState(editor, 'arrange.selectionPane')).toMatchObject({
       enabled: true,
       disabledReason: null,
     });
+    stop();
     expect(editor.exec(commandForSlotValue('arrange.rotate', 'right90')!).ok).toBe(true);
     expect(editor.snapshot().geometry?.rot).toBe(90);
   });
@@ -162,6 +169,16 @@ describe('Shape Format slot values', () => {
       stop();
       expect(requestPane(editor, 'format')).toBe(false);
       expect(asked).toEqual(['selection', 'format']);
+      // A listener that throws does not stop the others.
+      const heard: string[] = [];
+      const offA = listenPaneRequests(editor, () => {
+        throw new Error('host');
+      });
+      const offB = listenPaneRequests(editor, (pane) => heard.push(pane));
+      expect(() => requestPane(editor, 'selection')).toThrow('host');
+      expect(heard).toEqual(['selection']);
+      offA();
+      offB();
       // @ts-expect-error A typo in a typed slot value does not compile.
       runToolbarCommand(null, 'shape.effects', 'shadow.typo');
       // A host that bypasses the value type still gets a refusal and one warning.

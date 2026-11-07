@@ -458,6 +458,8 @@ export {
   ZoomPill,
   SidePanel,
   SelectionPane,
+  listenPaneRequests,
+  requestPane,
   type NotesPaneProps,
   type PaneProps,
   type SelectionPaneProps,
@@ -646,8 +648,7 @@ export type {
   FontSource,
   FontSourceSubstitution,
 } from '@pptx-editor.dev/core/contracts';
-// The font-composition surface, re-exported as DOCX Editor's adapters do, so the common path
-// (a fonts package and an adapter) never needs a core import.
+// The font-composition surface, re-exported so a fonts package and an adapter need no core import.
 export {
   MAX_RESOLVER_FAMILIES,
   DEFAULT_FONT,
@@ -671,9 +672,8 @@ export {
   type LoadFontsRequest,
   type LoadFontsResult,
 } from '@pptx-editor.dev/core/editor';
-// The core types that the adapter's own props, hooks, and parts use, re-exported as DOCX
-// Editor's adapters re-export `Editor`, `EditorCommand`, and `EditorSnapshot`, so a host types
-// its handlers with an import from this package only. The format hooks' value types are here too.
+// The core types of the adapter's props, hooks, and parts, re-exported as DOCX Editor's adapters
+// do, so a host types its handlers with an import from this package only.
 export type {
   BulletFormat,
   BulletFormatRead,

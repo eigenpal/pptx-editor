@@ -271,15 +271,28 @@ export function SidePanel({
     setOwn(next);
     onTabChange?.(next);
   };
-  // The toolbar's Selection pane and Format pane slots ask for a tab (`requestPane`).
+  // The toolbar's Selection pane and Format shape slots ask for a tab (`requestPane`). The
+  // focus goes to that tab, so a keyboard user lands in the panel.
   const latest = useRef(setTab);
   latest.current = setTab;
+  const root = useRef<HTMLElement>(null);
+  const [asked, setAsked] = useState<{ pane: SidePanelTab } | null>(null);
   useEffect(
-    () => (editor ? listenPaneRequests(editor, (pane) => latest.current(pane)) : undefined),
+    () =>
+      editor
+        ? listenPaneRequests(editor, (pane) => {
+            latest.current(pane);
+            setAsked({ pane });
+          })
+        : undefined,
     [editor]
   );
+  useEffect(() => {
+    if (asked) root.current?.querySelector<HTMLElement>(`[data-tab="${asked.pane}"]`)?.focus();
+  }, [asked]);
   return (
     <aside
+      ref={root}
       className={['pptx-panel', className].filter(Boolean).join(' ')}
       aria-label={t('panel.ariaLabel')}
       style={paneStyle(paneWidth, style)}

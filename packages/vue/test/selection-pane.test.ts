@@ -7,6 +7,8 @@ import {
 } from '@pptx-editor.dev/core/editor';
 import { buildPptx, shape } from '../../../scripts/fixtures/builder.ts';
 import {
+  listenPaneRequests,
+  useEditorCommand,
   PptxEditorContent,
   PptxEditorRoot,
   PptxEditorSelectionPane,
@@ -146,7 +148,9 @@ describe('PptxEditorSelectionPane', () => {
     const editor = await mount(() => h(PptxEditorSelectionPane));
     const hidden = () => editor.snapshot().shapes!.find((s) => s.name === 'Two')!.hidden;
     expect(row('Two').getAttribute('aria-keyshortcuts')).toBe('H F2');
-    expect(document.querySelector('[role="tree"]')!.getAttribute('aria-describedby')).toBeTruthy();
+    // The row's description names the key hint.
+    const hint = document.getElementById(row('Two').getAttribute('aria-describedby')!);
+    expect(hint?.textContent).toContain('Press H');
     await key(row('Two'), 'h', { ctrlKey: true });
     expect(hidden()).toBeFalsy();
     await key(row('Two'), 'h');
@@ -155,16 +159,24 @@ describe('PptxEditorSelectionPane', () => {
     expect(hidden()).toBeFalsy();
   });
 
-  test('Hide all reaches a group child; a new slide closes the rename field', async () => {
+  test('Show all reaches a group child; a new slide closes the rename field', async () => {
     const editor = await mount(() => h(PptxEditorSelectionPane));
     const button = (name: string) =>
       [...document.querySelectorAll<HTMLButtonElement>('button')].find(
         (b) => b.textContent === name
       )!;
+    const cards = () => editor.snapshot().shapes!.find((s) => s.name === 'Cards')!;
+    const kid = cards().children![0]!.nodeId;
+    editor.exec({ type: 'setShapesVisible', nodeIds: [kid], visible: false });
+    await nextTick();
+    button('Show all').click();
+    await nextTick();
+    expect(cards().children![0]!.hidden).toBeFalsy();
+    // Hide all hides the top level only: showing the group again shows its children.
     button('Hide all').click();
     await nextTick();
-    const cards = editor.snapshot().shapes!.find((s) => s.name === 'Cards')!;
-    expect(cards.children![0]!.hidden).toBe(true);
+    expect(cards().hidden).toBe(true);
+    expect(cards().children![0]!.hidden).toBeFalsy();
     await key(row('One'), 'F2');
     const field = document.querySelector<HTMLInputElement>('input[aria-label="Name"]')!;
     expect(field.value).toBe('One');
@@ -178,13 +190,20 @@ describe('PptxEditorSelectionPane', () => {
   });
 
   test('the toolbar Selection pane slot turns the side panel to its tab', async () => {
-    const editor = await mount(() => h(PptxEditorSidePanel));
+    const emitted: SidePanelTab[] = [];
+    const editor = await mount(() =>
+      h(PptxEditorSidePanel, { 'onUpdate:tab': (t: SidePanelTab) => emitted.push(t) })
+    );
     const selected = () =>
       document.querySelector('[role="tab"][aria-selected="true"]')?.textContent ?? null;
     expect(selected()).toBe('Format');
     expect(runToolbarCommand(editor, 'arrange.selectionPane')).toEqual({ ok: true });
     await nextTick();
+    await nextTick();
     expect(selected()).toBe('Selection');
+    // The focus goes to the tab, so a keyboard user lands in the panel.
+    expect(document.activeElement?.textContent).toBe('Selection');
+    expect(emitted).toEqual(['selection']);
     app!.unmount();
     app = null;
     // With no side panel, the slot says so.
@@ -192,5 +211,23 @@ describe('PptxEditorSelectionPane', () => {
       ok: false,
       reason: 'disabled.noSidePanel',
     });
+  });
+  test('without a side panel, the slot is off and a host listener turns it on', async () => {
+    const Probe = defineComponent({
+      setup() {
+        const cmd = useEditorCommand('arrange.selectionPane');
+        return () =>
+          h('output', { id: 'probe' }, `${cmd.isEnabled.value} ${cmd.disabledReason.value}`);
+      },
+    });
+    const editor = await mount(() => h(Probe));
+    const probe = () => document.getElementById('probe')!.textContent;
+    expect(probe()).toBe('false disabled.noSidePanel');
+    const stop = listenPaneRequests(editor, () => {});
+    await nextTick();
+    expect(probe()).toBe('true null');
+    stop();
+    await nextTick();
+    expect(probe()).toBe('false disabled.noSidePanel');
   });
 });

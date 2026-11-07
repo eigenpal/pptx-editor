@@ -74,6 +74,8 @@ import { paneStyle } from './pane-state.ts';
 
 export { SelectionPane, type SelectionPaneProps } from './SelectionPane.tsx';
 export { SidePanel, type SidePanelProps } from './SidePanel.tsx';
+// The toolbar's pane slots ask for a side panel tab; a host listens to show a closed panel.
+export { listenPaneRequests, requestPane } from '@pptx-editor.dev/core/editor';
 
 const sameSlides = (a: readonly SlideSummary[], b: readonly SlideSummary[]): boolean =>
   a.length === b.length && a.every((s, i) => s === b[i]);

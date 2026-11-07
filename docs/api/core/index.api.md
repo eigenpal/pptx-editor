@@ -2600,6 +2600,9 @@ export function groupSlideSections(sections: readonly SlideSection[], slideCount
 // @internal
 export function handleMenuKey(panel: HTMLElement, key: string): boolean;
 
+// @internal
+export function hasPaneListener(editor: object | null | undefined): boolean;
+
 // @public
 export interface HistoryGroup {
     // (undocumented)
@@ -3571,6 +3574,9 @@ export function panelHistoryKey(e: ModifierKeys & {
     readonly target: unknown;
     preventDefault(): void;
 }, editor: Pick<PptxEditorInstance, 'exec'> | null | undefined): boolean;
+
+// @internal
+export function paneListenersVersion(): number;
 
 // @internal
 export function panelItems(panel: HTMLElement): HTMLElement[];
@@ -5072,6 +5078,9 @@ export function submenuPanelKey(panel: HTMLElement | null, event: ChromeKeyEvent
 
 // @internal
 export function subscribeNotesTargets(listen: () => void): () => void;
+
+// @internal
+export function subscribePaneListeners(watch: () => void): () => void;
 
 // @internal
 export function subscribeSectionRenamers(listen: () => void): () => void;

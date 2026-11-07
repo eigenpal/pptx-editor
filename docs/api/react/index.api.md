@@ -67,6 +67,7 @@ import { HyperlinkPopupLink } from '@pptx-editor.dev/core/editor';
 import { HyperlinkPopupMode } from '@pptx-editor.dev/core/editor';
 import { HyperlinkPopupState } from '@pptx-editor.dev/core/editor';
 import { isFontResolver } from '@pptx-editor.dev/core/editor';
+import { listenPaneRequests } from '@pptx-editor.dev/core/editor';
 import { loadFonts } from '@pptx-editor.dev/core/editor';
 import { LoadFontsRequest } from '@pptx-editor.dev/core/editor';
 import { LoadFontsResult } from '@pptx-editor.dev/core/editor';
@@ -93,6 +94,7 @@ import { PptxSource } from '@pptx-editor.dev/core/editor';
 import * as react from 'react';
 import { ReactElement } from 'react';
 import { ReactNode } from 'react';
+import { requestPane } from '@pptx-editor.dev/core/editor';
 import { ResolvedColorMode } from '@pptx-editor.dev/core/editor';
 import { RibbonTabId } from '@pptx-editor.dev/core/editor';
 import { ShapeStyleChoice } from '@pptx-editor.dev/core/editor';
@@ -656,6 +658,8 @@ export interface LineMenuControlProps {
     control: ChromeControl;
     slot: ChromeSlotId;
 }
+
+export { listenPaneRequests }
 
 export { loadFonts }
 
@@ -1304,6 +1308,8 @@ export function rejectionMessage(t: Translate, rejection: EditorRejection): stri
 
 // @public
 export function requestFindBar(editor: PptxEditorInstance | null, replace?: boolean): void;
+
+export { requestPane }
 
 // @public
 export function requestSectionRename(editor: PptxEditorInstance | null, sectionId: string): void;

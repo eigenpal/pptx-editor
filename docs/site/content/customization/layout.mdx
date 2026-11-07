@@ -334,9 +334,89 @@ const tab = shallowRef<SidePanelTab>('format');
 </Framework>
 </FrameworkTabs>
 
-Render these components inside the editor root. The toolbar's **Selection Pane** and **Format Pane** controls call `requestPane(editor, pane)`, and a mounted side panel turns to that tab. Without a side panel, the control reports `disabled.noSidePanel`. To answer the request in your own layout, for example to show a closed side panel, call `listenPaneRequests(editor, (pane) => { /* show the panel, set the tab */ })`. It returns a function that stops the listener.
+Render these components inside the editor root.
 
-In the pane, a row keeps the keyboard focus. Up and Down move, Right and Left open and close a group, H shows or hides the object, and F2 renames it.
+In the pane, a row keeps the keyboard focus. Up and Down move, Right and Left open and close a group, H shows or hides the object, and F2 renames it. **Show all** also shows the hidden objects inside groups. **Hide all** hides the top-level objects.
+
+### Open the side panel from the toolbar
+
+The toolbar's **Selection pane** and **Format shape** controls call `requestPane(editor, pane)`. A mounted side panel turns to that tab and moves the focus to it. While no side panel is mounted and your host does not listen, the controls are disabled with the `disabled.noSidePanel` reason.
+
+When your layout can hide the side panel, listen for the requests and show the panel. `listenPaneRequests` returns a function that stops the listener:
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { useEffect, useState } from 'react';
+import {
+  PptxEditor,
+  listenPaneRequests,
+  usePptxEditor,
+  type SidePanelTab,
+} from '@pptx-editor.dev/react';
+
+// Render inside the editor root.
+export function Panel() {
+  const editor = usePptxEditor();
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<SidePanelTab>('format');
+  useEffect(() => {
+    if (!editor) return;
+    return listenPaneRequests(editor, (pane) => {
+      setTab(pane);
+      setOpen(true);
+    });
+  }, [editor]);
+  return open ? (
+    <PptxEditor.SidePanel tab={tab} onTabChange={setTab} onClose={() => setOpen(false)} />
+  ) : null;
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { shallowRef, watch } from 'vue';
+import {
+  PptxEditorSidePanel,
+  listenPaneRequests,
+  usePptxEditor,
+  type SidePanelTab,
+} from '@pptx-editor.dev/vue';
+
+// Render inside the editor root.
+const editor = usePptxEditor();
+const open = shallowRef(false);
+const tab = shallowRef<SidePanelTab>('format');
+watch(
+  editor,
+  (e, _old, onCleanup) => {
+    if (!e) return;
+    onCleanup(
+      listenPaneRequests(e, (pane) => {
+        tab.value = pane;
+        open.value = true;
+      })
+    );
+  },
+  { immediate: true }
+);
+</script>
+
+<template>
+  <PptxEditorSidePanel v-if="open" v-model:tab="tab" :on-close="() => (open = false)" />
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+`requestPane` returns `false` when nothing listens. Every listener hears each request, and your host decides what an answer does.
+
+### Show the pane elsewhere
 
 To show the pane outside the side panel, render `PptxEditor.SelectionPane` (`PptxEditorSelectionPane` in Vue) anywhere inside the root. The pane writes through the `setShapesVisible`, `renameShape`, and `order` commands, so each change is one undo step. In view mode, the pane selects but does not change objects.
 

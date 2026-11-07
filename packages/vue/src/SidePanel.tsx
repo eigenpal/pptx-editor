@@ -6,6 +6,7 @@
 import {
   computed,
   defineComponent,
+  nextTick,
   ref,
   watch,
   type CSSProperties,
@@ -308,11 +309,21 @@ export const PptxEditorSidePanel = defineComponent({
       emit('tabChange', next);
       emit('update:tab', next);
     };
-    // The toolbar's Selection pane and Format pane slots ask for a tab (`requestPane`).
+    // The toolbar's Selection pane and Format shape slots ask for a tab (`requestPane`). The
+    // focus goes to that tab, so a keyboard user lands in the panel.
+    const root = ref<HTMLElement | null>(null);
     watch(
       editor,
       (e, _old, onCleanup) => {
-        if (e) onCleanup(listenPaneRequests(e, setTab));
+        if (!e) return;
+        onCleanup(
+          listenPaneRequests(e, (pane) => {
+            setTab(pane);
+            void nextTick(() =>
+              root.value?.querySelector<HTMLElement>(`[data-tab="${pane}"]`)?.focus()
+            );
+          })
+        );
       },
       { immediate: true }
     );
@@ -321,6 +332,7 @@ export const PptxEditorSidePanel = defineComponent({
       const style = [hostStyle as StyleValue, props.style];
       return (
         <aside
+          ref={root}
           aria-label={t('panel.ariaLabel')}
           {...rest}
           class={['pptx-panel', hostClass, props.className]}

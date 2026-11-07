@@ -59,6 +59,8 @@ import {
   type SlideLayoutSummary,
   type PptxEditorInstance,
   warnOutsideRoot,
+  paneListenersVersion,
+  subscribePaneListeners,
 } from '@pptx-editor.dev/core/editor';
 import { NOTES_SLOTS, useNotesTarget } from './notes-target.ts';
 
@@ -258,8 +260,11 @@ export function useEditorCommand(slot: MaybeRefOrGetter<ChromeSlotId>): UseEdito
     editorCommandFor(editorRef.value, toValue(slot), host, 'disabled.noRoot').state;
   // The deps read the slot and the root's `popups` (through the host), so a host that changes
   // `popups` at runtime turns the control on or off at once, not at the next editor change.
+  // The pane slots are on while a side panel or the host listens for pane requests.
+  const panes = useExternalVersion(subscribePaneListeners, paneListenersVersion);
   const state = useSlice<ChromeCommandState>(read, sameChromeCommandState, () => [
     toValue(slot),
+    panes.value,
     read(),
   ]);
   // While a speaker notes field has focus, bold, italic, underline, and strikethrough format
@@ -425,14 +430,22 @@ export interface UseEditorValueCommandReturn<V, S = V> {
  * effect scope subscribes at once and stops with the scope. Without a scope, the value stays.
  */
 function useDrawingRenderersVersion(): Readonly<ShallowRef<number>> {
-  const version = shallowRef(drawingRenderersVersion());
+  return useExternalVersion(subscribeDrawingRenderers, drawingRenderersVersion);
+}
+
+/** The value of `read`, updated on each `subscribe` call back; it subscribes as above. */
+function useExternalVersion(
+  subscribe: (listen: () => void) => () => void,
+  read: () => number
+): Readonly<ShallowRef<number>> {
+  const version = shallowRef(read());
   if (!getCurrentScope()) return version;
   let stop: (() => void) | null = null;
   const start = (): void => {
     stop?.();
-    stop = subscribeDrawingRenderers(() => (version.value = drawingRenderersVersion()));
-    // An install between `setup` and the mount counts too.
-    version.value = drawingRenderersVersion();
+    stop = subscribe(() => (version.value = read()));
+    // A change between `setup` and the mount counts too.
+    version.value = read();
   };
   if (getCurrentInstance()) onMounted(start);
   else start();

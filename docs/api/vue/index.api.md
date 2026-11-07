@@ -75,6 +75,7 @@ import { HyperlinkPopupState } from '@pptx-editor.dev/core/editor';
 import { InjectionKey } from 'vue';
 import { isFontResolver } from '@pptx-editor.dev/core/editor';
 import { JSX } from 'vue/jsx-runtime';
+import { listenPaneRequests } from '@pptx-editor.dev/core/editor';
 import { loadFonts } from '@pptx-editor.dev/core/editor';
 import { LoadFontsRequest } from '@pptx-editor.dev/core/editor';
 import { LoadFontsResult } from '@pptx-editor.dev/core/editor';
@@ -101,6 +102,7 @@ import { PptxFontsSource } from '@pptx-editor.dev/core/editor';
 import { PptxSource } from '@pptx-editor.dev/core/editor';
 import { PropType } from 'vue';
 import { Ref } from 'vue';
+import { requestPane } from '@pptx-editor.dev/core/editor';
 import { ResolvedColorMode } from '@pptx-editor.dev/core/editor';
 import { RibbonTabId } from '@pptx-editor.dev/core/editor';
 import { ShallowRef } from 'vue';
@@ -1402,6 +1404,8 @@ export const LineMenuControl: vue.DefineComponent<vue.ExtractPropTypes<{
 
 // @public
 export type LineMenuControlProps = ExtractPublicPropTypes<typeof slotPartProps$1>;
+
+export { listenPaneRequests }
 
 export { loadFonts }
 
@@ -7135,6 +7139,8 @@ export function rejectionMessage(t: Translate, rejection: EditorRejection): stri
 
 // @public
 export function requestFindBar(editor: PptxEditorInstance | null, replace?: boolean): void;
+
+export { requestPane }
 
 // @public
 export function requestSectionRename(editor: PptxEditorInstance | null, sectionId: string): void;

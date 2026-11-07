@@ -32,7 +32,7 @@
   },
   "peerDependencies": {
     "@pptx-editor.dev/core": "~0.2.0",
-    "vue": "^3.3.0"
+    "vue": "^3.5.0"
   },
   "devDependencies": {
     "@pptx-editor.dev/core": "workspace:*",

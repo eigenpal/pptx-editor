@@ -5,7 +5,7 @@
 // it renders and dispatches, never whether it is enabled. Enabled state has exactly one source,
 // `toolbarCommandState`, which asks `Editor.can`.
 
-import { requestPane } from './pane-requests.ts';
+import { hasPaneListener, requestPane } from './pane-requests.ts';
 import type {
   Editor,
   EditorCommand,
@@ -848,9 +848,12 @@ export function toolbarCommandState(editor: Editor | null, id: ChromeSlotId): To
     return { id, enabled: probe.ok, disabledReason: probe.ok ? null : probe.reason, active: false };
   }
   const kind = chromeControlForSlot(id)?.state.kind;
-  if (kind === 'pane')
-    // The slot asks the side panel (or the host) to show its tab (`requestPane`).
-    return { id, enabled: true, disabledReason: null, active: false };
+  if (kind === 'pane') {
+    // The slot asks the side panel (or the host) to show its tab (`requestPane`): it is on
+    // while one of them listens.
+    const on = hasPaneListener(editor);
+    return { id, enabled: on, disabledReason: on ? null : 'disabled.noSidePanel', active: false };
+  }
   // A dialog with a probe (`paragraph.dialog`) is enabled when the engine takes its command.
   const unprobed = kind === 'dialog' && PROBES[id] === undefined;
   if (unprobed || kind === 'clipboard' || kind === 'slideshow')

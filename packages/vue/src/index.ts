@@ -350,6 +350,8 @@ export {
 } from './panes.tsx';
 export { PptxEditorNotesPane, type NotesPaneProps } from './NotesPane.tsx';
 export { PptxEditorSelectionPane, type SelectionPaneProps } from './SelectionPane.tsx';
+// The toolbar's pane slots ask for a side panel tab; a host listens to show a closed panel.
+export { listenPaneRequests, requestPane } from '@pptx-editor.dev/core/editor';
 export { PptxEditorSlideSorter, type SlideSorterProps } from './SlideSorter.tsx';
 export { requestSectionRename } from './RailSections.tsx';
 export {

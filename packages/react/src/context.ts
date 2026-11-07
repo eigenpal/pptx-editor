@@ -11,6 +11,8 @@ import {
   chromeControlForSlot,
   chromeOfferedControl,
   subscribeSectionRenamers,
+  subscribePaneListeners,
+  paneListenersVersion,
   EMPTY_EDITOR_SNAPSHOT,
   editorCommandFor,
   platformShortcuts,
@@ -193,7 +195,14 @@ export function useEditorCommand(slot: ChromeSlotId): UseEditorCommandReturn {
     () => section && canRenameSectionInPlace(editor),
     () => false
   );
+  // The pane slots are on while a side panel or the host listens for pane requests.
+  const panes = useSyncExternalStore(
+    subscribePaneListeners,
+    paneListenersVersion,
+    paneListenersVersion
+  );
   const select = useCallback((): UseEditorCommandReturn => {
+    void panes;
     const { state, execute } = editorCommandFor(editor, slot, host, 'disabled.noRoot');
     return {
       execute: (value?: unknown) => execute(value),
@@ -201,7 +210,7 @@ export function useEditorCommand(slot: ChromeSlotId): UseEditorCommandReturn {
     };
     // `renamable` changes the answer of `editorCommandFor` for the section slots.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor, slot, host, renamable]);
+  }, [editor, slot, host, renamable, panes]);
   const engine = useEditorState(
     select as unknown as (s: EditorSnapshot) => UseEditorCommandReturn,
     shallow as (a: UseEditorCommandReturn, b: UseEditorCommandReturn) => boolean

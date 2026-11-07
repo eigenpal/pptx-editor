@@ -708,7 +708,13 @@ export {
   type SelectionPaneRow,
   type SidePanelTab,
 } from './selection-pane.ts';
-export { listenPaneRequests, requestPane } from './pane-requests.ts';
+export {
+  hasPaneListener,
+  listenPaneRequests,
+  paneListenersVersion,
+  requestPane,
+  subscribePaneListeners,
+} from './pane-requests.ts';
 export {
   applyLocalFonts,
   dispatchFindRequest,

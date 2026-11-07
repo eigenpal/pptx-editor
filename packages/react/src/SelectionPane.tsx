@@ -98,11 +98,11 @@ function SlidePane({ className }: SelectionPaneProps) {
     }
     if (e.ctrlKey || e.metaKey) return;
     const step = selectionPaneKey(rows, row.nodeId, e.key);
-    if (!step) return;
+    // In view mode, F2 and H are not the pane's: they pass on.
+    if (!step || (!editable && ('rename' in step || 'toggle' in step))) return;
     e.preventDefault();
     if ('focus' in step) focusRow(step.focus);
     else if ('expand' in step) toggle(step.expand, step.open);
-    else if (!editable) return;
     else if ('rename' in step) setRenaming(step.rename);
     else setVisible([row.nodeId], row.hidden);
   };
@@ -122,6 +122,8 @@ function SlidePane({ className }: SelectionPaneProps) {
           type="button"
           className="pptx-button"
           disabled={!editable}
+          // Show all reaches the children of groups; Hide all hides the top level only, so
+          // showing a group again shows its children.
           onClick={() => setVisible(selectionPaneAllIds(shapes), true)}
         >
           {t('selectionPane.showAll')}
@@ -130,7 +132,12 @@ function SlidePane({ className }: SelectionPaneProps) {
           type="button"
           className="pptx-button"
           disabled={!editable}
-          onClick={() => setVisible(selectionPaneAllIds(shapes), false)}
+          onClick={() =>
+            setVisible(
+              (shapes ?? []).map((s) => s.nodeId),
+              false
+            )
+          }
         >
           {t('selectionPane.hideAll')}
         </button>
@@ -160,7 +167,6 @@ function SlidePane({ className }: SelectionPaneProps) {
         ref={tree}
         role="tree"
         aria-label={t('selectionPane.label')}
-        aria-describedby={editable ? hintId : undefined}
         aria-multiselectable="true"
         className="pptx-selection-pane__tree"
       >
@@ -171,6 +177,7 @@ function SlidePane({ className }: SelectionPaneProps) {
             selected={selected.has(row.nodeId)}
             tabStop={row.nodeId === stop}
             editable={editable}
+            hint={editable ? hintId : undefined}
             renaming={renaming === row.nodeId}
             onFocus={() => setFocused(row.nodeId)}
             onKeyDown={(e) => onKeyDown(e, row)}
@@ -202,6 +209,8 @@ interface PaneRowProps {
   readonly selected: boolean;
   readonly tabStop: boolean;
   readonly editable: boolean;
+  /** The id of the key hint, which the row's description names. */
+  readonly hint?: string;
   readonly renaming: boolean;
   readonly onFocus: () => void;
   readonly onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => void;
@@ -231,6 +240,7 @@ function PaneRow(props: PaneRowProps) {
       aria-label={row.hidden ? t('selectionPane.hiddenName', { name: row.name }) : row.name}
       aria-description={kind}
       aria-keyshortcuts={props.editable ? 'H F2' : undefined}
+      aria-describedby={props.hint}
       tabIndex={props.tabStop ? 0 : -1}
       style={{ paddingInlineStart: `${(row.level - 1) * 16 + 4}px` }}
       onFocus={props.onFocus}

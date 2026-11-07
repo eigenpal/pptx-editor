@@ -1216,6 +1216,8 @@
       "HyperlinkPopupState",
       "rejectionMessage",
       "requestFindBar",
+      "listenPaneRequests",
+      "requestPane",
       "useSlideshow",
       "PptxEditorContentProps",
       "PptxEditorViewportProps",

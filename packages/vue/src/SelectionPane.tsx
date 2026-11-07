@@ -142,11 +142,11 @@ const SlidePane = defineComponent({
       }
       if (e.ctrlKey || e.metaKey) return;
       const step = selectionPaneKey(rows.value, row.nodeId, e.key);
-      if (!step) return;
+      // In view mode, F2 and H are not the pane's: they pass on.
+      if (!step || (!editable.value && ('rename' in step || 'toggle' in step))) return;
       e.preventDefault();
       if ('focus' in step) focusRow(step.focus);
       else if ('expand' in step) toggle(step.expand, step.open);
-      else if (!editable.value) return;
       else if ('rename' in step) renaming.value = step.rename;
       else setVisible([row.nodeId], row.hidden);
     };
@@ -188,6 +188,8 @@ const SlidePane = defineComponent({
               type="button"
               class="pptx-button"
               disabled={!canEdit}
+              // Show all reaches the children of groups; Hide all hides the top level only,
+              // so showing a group again shows its children.
               onClick={() => setVisible(selectionPaneAllIds(shapes.value), true)}
             >
               {t('selectionPane.showAll')}
@@ -196,7 +198,12 @@ const SlidePane = defineComponent({
               type="button"
               class="pptx-button"
               disabled={!canEdit}
-              onClick={() => setVisible(selectionPaneAllIds(shapes.value), false)}
+              onClick={() =>
+                setVisible(
+                  (shapes.value ?? []).map((s) => s.nodeId),
+                  false
+                )
+              }
             >
               {t('selectionPane.hideAll')}
             </button>
@@ -226,7 +233,6 @@ const SlidePane = defineComponent({
             ref={tree}
             role="tree"
             aria-label={t('selectionPane.label')}
-            aria-describedby={canEdit ? hintId : undefined}
             aria-multiselectable="true"
             class="pptx-selection-pane__tree"
           >
@@ -251,6 +257,7 @@ const SlidePane = defineComponent({
                   }
                   aria-description={t(`panel.format.elementKind.${row.kind}`)}
                   aria-keyshortcuts={canEdit ? 'H F2' : undefined}
+                  aria-describedby={canEdit ? hintId : undefined}
                   tabindex={row.nodeId === stop ? 0 : -1}
                   style={{ paddingInlineStart: `${(row.level - 1) * 16 + 4}px` }}
                   onFocus={() => (focused.value = row.nodeId)}
