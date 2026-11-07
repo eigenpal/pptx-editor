@@ -16,6 +16,7 @@ import {
   type PptxPackage,
 } from '../../store/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
+import { readSlidesClipboard, slidesClipboard } from '../slide-clipboard.ts';
 
 const IN = 914_400;
 const P14 = 'http://schemas.microsoft.com/office/powerpoint/2010/main';
@@ -58,7 +59,8 @@ const pkgOf = (e: PptxEditorInstance): PptxPackage => e.session!.store.package;
 const slides = (e: PptxEditorInstance): string[] => {
   const pkg = pkgOf(e);
   return presentationInfo(pkg).slides.map((s) => {
-    const own = textOf(find(xmlPartOf(pkg, s.partName)!.root, 'p:txBody'));
+    // A pasted slide can also hold empty placeholders of its layout: all text of the tree.
+    const own = textOf(find(xmlPartOf(pkg, s.partName)!.root, 'p:spTree'));
     const notes = s.notesPart ? textOf(find(xmlPartOf(pkg, s.notesPart)!.root, 'p:txBody')) : '';
     return `${own}|${notes}`;
   });
@@ -146,6 +148,24 @@ test('Duplicate of several slides puts the copies, with notes, after the last on
   expect(sections(again)).toEqual(sections(e));
 });
 
+test('a slide copy writes only the copied slides, and pastes them in their order', async () => {
+  const e = await open(deck(40, true));
+  const raw = slidesClipboard(e.session!, [7, 2])!;
+  const read = readSlidesClipboard(raw)!;
+  expect(read.slides).toEqual([1, 0]);
+  const file = await open(read.file);
+  expect(slides(file)).toEqual(['S2|Notes of S2', 'S7|Notes of S7']);
+  expectConsistent(file);
+  const into = await open(deck(2));
+  expect(into.exec({ type: 'pasteSlides', ...read }).ok).toBe(true);
+  expect(slides(into)).toEqual([
+    'S0|Notes of S0',
+    'S7|Notes of S7',
+    'S2|Notes of S2',
+    'S1|Notes of S1',
+  ]);
+});
+
 /** The fastest of three runs of `command` on a deck of `n` slides, in milliseconds. */
 async function fastest(
   n: number,
@@ -165,22 +185,24 @@ async function fastest(
 
 const all = (from: number, n: number) => Array.from({ length: n - from }, (_, i) => from + i);
 
-test('Delete of every slide but one: four times the slides take less than eight times the time', async () => {
-  const small = await fastest(150, (n) => ({ type: 'deleteSlides', indices: all(1, n) }));
-  const large = await fastest(600, (n) => ({ type: 'deleteSlides', indices: all(1, n) }));
-  expect(large).toBeLessThan(small * 8);
+// One slide at a time, these took 3 s (Delete), 11 s (Duplicate), and 0.8 s (Hide Slide) on 600
+// slides: each slide read the whole deck again.
+test('Delete of every slide but one of 600 takes less than 0.8 s', async () => {
+  expect(await fastest(600, (n) => ({ type: 'deleteSlides', indices: all(1, n) }))).toBeLessThan(
+    800
+  );
 });
 
-test('Duplicate of every slide: four times the slides take less than eight times the time', async () => {
-  const small = await fastest(150, (n) => ({ type: 'duplicateSlides', indices: all(0, n) }));
-  const large = await fastest(600, (n) => ({ type: 'duplicateSlides', indices: all(0, n) }));
-  expect(large).toBeLessThan(small * 8);
+test('Duplicate of every slide of 600 takes less than 2.5 s', async () => {
+  expect(await fastest(600, (n) => ({ type: 'duplicateSlides', indices: all(0, n) }))).toBeLessThan(
+    2_500
+  );
 });
 
-test('Hide Slide on every slide: four times the slides take less than eight times the time', async () => {
-  const small = await fastest(150, (n) => ({ type: 'setSlidesHidden', indices: all(0, n) }));
-  const large = await fastest(600, (n) => ({ type: 'setSlidesHidden', indices: all(0, n) }));
-  expect(large).toBeLessThan(small * 8);
+test('Hide Slide on every slide of 1,200 takes less than 0.8 s, and the toggle shows them again', async () => {
+  expect(
+    await fastest(1_200, (n) => ({ type: 'setSlidesHidden', indices: all(0, n) }))
+  ).toBeLessThan(800);
   const e = await open(deck(4));
   expect(e.exec({ type: 'setSlidesHidden', indices: [0, 2] }).ok).toBe(true);
   const hidden = () => presentationInfo(pkgOf(e)).slides.map((s) => s.hidden);
