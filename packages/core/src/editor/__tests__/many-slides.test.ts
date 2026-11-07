@@ -201,24 +201,33 @@ async function fastest(
 
 const all = (from: number, n: number) => Array.from({ length: n - from }, (_, i) => from + i);
 
-// One slide at a time, these took 3 s (Delete), 11 s (Duplicate), and 0.8 s (Hide Slide) on 600
-// slides: each slide read the whole deck again.
-test('Delete of every slide but one of 600 takes less than 0.8 s', async () => {
-  expect(await fastest(600, (n) => ({ type: 'deleteSlides', indices: all(1, n) }))).toBeLessThan(
-    800
+/** How many times as long `command` takes on four times the slides (`n` and `4 n`). */
+async function growth(
+  n: number,
+  command: (n: number) => Parameters<PptxEditorInstance['exec']>[0]
+): Promise<number> {
+  const small = await fastest(n, command);
+  const large = await fastest(4 * n, command);
+  return large / Math.max(small, 1);
+}
+
+// One slide at a time, these read the whole deck again for each slide: four times the slides
+// took 16 times as long (3 s for Delete, 11 s for Duplicate, and 0.8 s for Hide Slide on 600
+// slides). A limit of 10 times leaves room for a busy machine and still fails that cost.
+test('Delete of every slide but one costs less than 10 times as much on 4 times the slides', async () => {
+  expect(await growth(300, (n) => ({ type: 'deleteSlides', indices: all(1, n) }))).toBeLessThan(10);
+});
+
+test('Duplicate of every slide costs less than 10 times as much on 4 times the slides', async () => {
+  expect(await growth(150, (n) => ({ type: 'duplicateSlides', indices: all(0, n) }))).toBeLessThan(
+    10
   );
 });
 
-test('Duplicate of every slide of 600 takes less than 2.5 s', async () => {
-  expect(await fastest(600, (n) => ({ type: 'duplicateSlides', indices: all(0, n) }))).toBeLessThan(
-    2_500
+test('Hide Slide on every slide costs less than 10 times as much on 4 times the slides, and the toggle shows them again', async () => {
+  expect(await growth(600, (n) => ({ type: 'setSlidesHidden', indices: all(0, n) }))).toBeLessThan(
+    10
   );
-});
-
-test('Hide Slide on every slide of 1,200 takes less than 0.8 s, and the toggle shows them again', async () => {
-  expect(
-    await fastest(1_200, (n) => ({ type: 'setSlidesHidden', indices: all(0, n) }))
-  ).toBeLessThan(800);
   const e = await open(deck(4));
   expect(e.exec({ type: 'setSlidesHidden', indices: [0, 2] }).ok).toBe(true);
   const hidden = () => presentationInfo(pkgOf(e)).slides.map((s) => s.hidden);
