@@ -328,7 +328,7 @@ function summaryDiff(before: Summary, after: Summary, top = 15): string[] {
 // Verdicts.
 
 interface Budget {
-  /** The heap growth per iteration that counts as a leak, in KB. */
+  /** The growth per iteration of the JS heap and its array buffers that counts as a leak, in KB. */
   heapKB: number;
   /** DOM nodes per iteration. */
   nodes?: number;
@@ -365,7 +365,7 @@ interface Result {
 }
 
 const HEADER =
-  'scenario         | unit    | iter | heap MB base -> end (KB/iter) | nodes base -> end (/iter) | ' +
+  'scenario         | unit    | iter | heap MB base -> end (KB/iter with buffers) | nodes base -> end (/iter) | ' +
   'listeners base -> end | blobs | fonts | observers | verdict';
 
 function row(r: Result): string {
@@ -380,18 +380,28 @@ function row(r: Result): string {
   );
 }
 
-/** Growth checks over the second half of the readings (`perStep` iterations per reading). */
+/**
+ * Growth checks over the second half of the readings (`perStep` iterations per reading). A
+ * metric grows when its slope there passes the budget and its last reading is above the first
+ * one of the half by at least half of what that budget allows: one high reading in the middle
+ * (a collection that had not finished) is not growth.
+ */
 function verdict(readings: Reading[], perStep: number, budget: Budget): string[] {
   const late = readings.slice(Math.floor(readings.length / 2));
+  const span = (late.length - 1) * perStep;
   const per = (f: (r: Reading) => number): number => slope(late.map(f)) / perStep;
+  const grows = (f: (r: Reading) => number, limit: number): number | null => {
+    const rate = per(f);
+    const rise = f(late.at(-1)!) - f(late[0]!);
+    return rate > limit && rise > (limit * span) / 2 ? rate : null;
+  };
   const leaks: string[] = [];
-  const heap = per((r) => r.heapMB) * 1024;
-  if (heap > budget.heapKB) leaks.push(`heap +${heap.toFixed(0)} KB/iteration`);
-  const nodes = per((r) => r.nodes);
-  if (nodes > (budget.nodes ?? 5)) leaks.push(`DOM nodes +${nodes.toFixed(1)}/iteration`);
-  const listeners = per((r) => r.listeners);
-  if (listeners > (budget.listeners ?? 1))
-    leaks.push(`listeners +${listeners.toFixed(1)}/iteration`);
+  const heap = grows((r) => (r.heapMB + r.buffersMB) * 1024, budget.heapKB);
+  if (heap !== null) leaks.push(`heap +${heap.toFixed(0)} KB/iteration`);
+  const nodes = grows((r) => r.nodes, budget.nodes ?? 5);
+  if (nodes !== null) leaks.push(`DOM nodes +${nodes.toFixed(1)}/iteration`);
+  const listeners = grows((r) => r.listeners, budget.listeners ?? 1);
+  if (listeners !== null) leaks.push(`listeners +${listeners.toFixed(1)}/iteration`);
   // Resources the editor must release: any steady growth is a leak.
   const base = readings[0]!;
   const end = readings.at(-1)!;
@@ -459,7 +469,7 @@ async function scenario(
     iterations: o.iterations,
     base,
     end,
-    heapKBPerIteration: (slope(late.map((r) => r.heapMB)) * 1024) / perStep,
+    heapKBPerIteration: (slope(late.map((r) => r.heapMB + r.buffersMB)) * 1024) / perStep,
     nodesPerIteration: slope(late.map((r) => r.nodes)) / perStep,
     listenersPerIteration: slope(late.map((r) => r.listeners)) / perStep,
     leaks,
@@ -600,7 +610,7 @@ test('open-same: open the sample deck 20 times', async ({ page }) => {
   expectNoLeak(r);
 });
 
-test('open-mixed: open four different decks in turn, 20 opens', async ({ page }) => {
+test('open-mixed: open four different decks in turn, 40 opens', async ({ page }) => {
   const cdp = await start(page);
   const decks: [string, Uint8Array][] = [
     ['text-300', textDeck(300)],
@@ -615,7 +625,7 @@ test('open-mixed: open four different decks in turn, 20 opens', async ({ page })
     name: 'open-mixed',
     unit: 'round',
     warmup: 1,
-    iterations: n(5),
+    iterations: n(10),
     budget: { heapKB: 400 },
     step: round,
   });
