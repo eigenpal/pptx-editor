@@ -4,10 +4,10 @@
 // state moves, so `useSyncExternalStore` selectors only re-render when their slice changes.
 
 import { pickImageInto } from './chrome-actions.ts';
-import { slideLinkOf } from '../automation/commands/slide-links.ts';
+import { runLinkOf } from './link-read.ts';
 import { documentOpenFailure, OPEN_FAILED, openRejectionCode } from './loading.ts';
 import { prepareDeck } from './open-steps.ts';
-import { relationshipById, writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
+import { writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
 import { registerFontFaces, type FontFaceHandle } from '../output/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
 import type {
@@ -71,6 +71,7 @@ import { createThemeColorSource } from './theme-palette.ts';
 import { createSlideSummaries, SlideSelection } from './slide-selection.ts';
 import { createLayoutSummaries } from '../automation/commands/slide-layouts.ts';
 import { createSectionSummaries } from '../automation/commands/slide-sections.ts';
+import { createCustomShowSummaries } from '../automation/commands/custom-show-links.ts';
 import { hasSlideNumber } from '../automation/commands/slide-numbers.ts';
 import { dateShown, footerText } from '../automation/commands/header-footer.ts';
 import { createAnimationsSource } from './animation-command-table.ts';
@@ -202,19 +203,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       insertions,
       ...views.snapshot(sectionSummaries(pkg).map((x) => x.id)),
       selection,
-      format: formatAt(arm.layout() ?? lay, selection, (rId, action) => {
-        const part = info?.slides[slide]?.partName;
-        const rel = pkg && part && rId ? relationshipById(pkg, part, rId) : undefined;
-        const slideLink = action
-          ? slideLinkOf(
-              action,
-              rel && !rel.external ? rel.target : undefined,
-              info?.slides.map((s) => s.partName) ?? []
-            )
-          : undefined;
-        // Any other action with an external target (a file link) shows that target.
-        return slideLink ?? (rel?.external ? rel.externalTarget : undefined);
-      }),
+      format: formatAt(arm.layout() ?? lay, selection, (rId, action) =>
+        runLinkOf(pkg, partAt(slide), info?.slides.map((s) => s.partName) ?? [], rId, action)
+      ),
       geometry: withAltText(
         geometryOf(lay, selection, (id) => elementIn(pkg, partAt(slide), id)),
         pkg,
@@ -236,6 +227,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       image: pictureStateAt(pkg, partAt(slide), selection, cropping(), lay),
       layouts: layoutSummaries(pkg),
       sections: sectionSummaries(pkg),
+      customShows: customShowSummaries(pkg),
       table: tableState(pkg, partAt(slide), lay, selection),
       shapes: shapeList(pkg, partAt(slide)),
       animations: animationsOf(pkg, partAt(slide)),
@@ -245,6 +237,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   const [slideSummaries, shapeList] = [createSlideSummaries(), createShapeListSource()];
   const animationsOf = createAnimationsSource();
   const [layoutSummaries, sectionSummaries] = [createLayoutSummaries(), createSectionSummaries()];
+  const customShowSummaries = createCustomShowSummaries();
   const slideSel = new SlideSelection();
   const notesSource = createNotesSource();
   const notesFormatted = createNotesFormattedSource();

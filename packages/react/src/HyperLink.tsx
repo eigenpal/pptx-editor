@@ -32,8 +32,12 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  LINK_KINDS,
+  customShowDraft,
+  customShowDraftUrl,
+  customShowLinkLabel,
+  linkKindDraft,
   linkKindOf,
+  linkKindsFor,
   linkSelectionRect,
   mailtoParts,
   mailtoUrl,
@@ -47,6 +51,7 @@ import {
   type HyperlinkPopupController,
   type HyperlinkPopupState,
 } from '@pptx-editor.dev/core/editor';
+import type { CustomShowSummary } from '@pptx-editor.dev/core/contracts';
 import { Icon, Popover } from './chrome.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
 import { renderAsChild, type HostElementProps } from './slot-override.ts';
@@ -87,6 +92,9 @@ export interface HyperlinkPopupContextValue {
 
 /** @internal */
 export const HyperlinkPopupContext = createContext<HyperlinkPopupContextValue | null>(null);
+
+/** No custom shows: one array, so the selector result stays the same. */
+const NO_SHOWS: readonly CustomShowSummary[] = [];
 
 const CLOSED_STATE: HyperlinkPopupState = {
   mode: 'closed',
@@ -281,7 +289,14 @@ function HyperLinkPreset({ children }: { children?: ReactNode }) {
 function HyperLinkUrl({ className, asChild, hidden, children }: HyperLinkPartProps) {
   const { state, openTarget } = useHyperlinkPopup();
   const { t } = useTranslation();
+  const shows = useEditorState((s) => s.customShows ?? NO_SHOWS);
   if (hidden || !state.url) return null;
+  // A custom show link names its show; it opens in a slide show, not here.
+  const show = customShowLinkLabel(t, state.url, shows);
+  if (show) {
+    const props = { className: join('pptx-link__url', className), 'data-inert': '' };
+    return render(asChild, children, props, () => <span {...props}>{children ?? show}</span>);
+  }
   const slide = slideLinkLabel(t, state.url);
   if (slide) {
     const props: HostElementProps = {
@@ -377,19 +392,25 @@ const KIND_LABEL = {
   web: 'link.kindWeb',
   email: 'link.kindEmail',
   slide: 'link.kindSlide',
+  customShow: 'link.kindCustomShow',
+  file: 'link.kindFile',
 } as const;
 
 /**
- * The link's target: **Link to** (a web address, an email address, or a slide of this
- * presentation) and its fields. Each kind writes the one draft that Apply sends. Enter applies.
- * @public
+ * The link's target: **Link to** (a web address, an email address, a slide or a custom show of
+ * this presentation, or another file by its relative path) and its fields. Each kind writes the
+ * one draft that Apply sends. Enter applies. @public
  */
 function HyperLinkFields({ className, hidden }: HyperLinkPartProps) {
   const ctx = useContext(HyperlinkPopupContext);
   const { state, setUrl, commitEdit } = useHyperlinkPopup();
   const { t } = useTranslation();
   const slides = useEditorState((s) => s.slides.length);
+  const shows = useEditorState((s) => s.customShows ?? NO_SHOWS);
   const [kind, setKind] = useState<LinkKind>(() => linkKindOf(state.draft));
+  // The kinds stay as they opened: Custom show only for a deck with one, or a link to one.
+  const [kinds] = useState(() => linkKindsFor(shows, state.draft));
+  const show = customShowDraft(state.draft);
   const [mail, setMail] = useState(() => mailtoParts(state.draft));
   const field = useRef<HTMLInputElement & HTMLSelectElement>(null);
   // After the popover is placed: a browser does not focus into a hidden panel. A change of kind
@@ -423,10 +444,10 @@ function HyperLinkFields({ className, hidden }: HyperLinkPartProps) {
             const next = e.target.value as LinkKind;
             setKind(next);
             setMail({ address: '', subject: '', rest: '' });
-            setUrl(next === 'slide' ? '#next-slide' : '');
+            setUrl(linkKindDraft(next, shows));
           }}
         >
-          {LINK_KINDS.map((k) => (
+          {kinds.map((k) => (
             <option key={k} value={k}>
               {t(KIND_LABEL[k])}
             </option>
@@ -470,6 +491,52 @@ function HyperLinkFields({ className, hidden }: HyperLinkPartProps) {
             onKeyDown={onEnter}
           />
         </>
+      ) : kind === 'customShow' ? (
+        <>
+          <select
+            ref={field}
+            className="pptx-link__field"
+            aria-label={t('link.customShow')}
+            value={show ? String(show.id) : ''}
+            {...invalid}
+            onChange={(e) =>
+              setUrl(customShowDraftUrl(Number(e.target.value), show?.returns ?? true))
+            }
+            onKeyDown={onEnter}
+          >
+            {/* A link to a show the deck no longer has keeps its id as a choice. */}
+            {show && !shows.some((s) => s.id === show.id) ? (
+              <option value={String(show.id)}>{customShowLinkLabel(t, state.draft, shows)}</option>
+            ) : null}
+            {shows.map((s) => (
+              <option key={s.id} value={String(s.id)}>
+                {s.name || String(s.id)}
+              </option>
+            ))}
+          </select>
+          <label className="pptx-radio pptx-link__return">
+            <input
+              type="checkbox"
+              checked={show?.returns ?? true}
+              disabled={!show}
+              onChange={(e) => show && setUrl(customShowDraftUrl(show.id, e.target.checked))}
+            />
+            {t('link.returnAfterShow')}
+          </label>
+        </>
+      ) : kind === 'file' ? (
+        <input
+          ref={field}
+          className="pptx-font-picker__search pptx-link__field"
+          type="text"
+          dir="ltr"
+          aria-label={t('link.filePath')}
+          placeholder={t('link.filePlaceholder')}
+          value={state.draft}
+          {...invalid}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={onEnter}
+        />
       ) : (
         <select
           ref={field}

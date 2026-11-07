@@ -134,6 +134,11 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       t.run({ type: 'setLink', url: '#slide-2' });
       t.selectText('Links', 0, 16, 7);
       t.run({ type: 'setLink', url: null });
+      // "plain" links to the custom show "Short", and "to" to a file next to the deck.
+      t.selectText('Links', 25, 30);
+      t.run({ type: 'setLink', url: '#custom-show-0' });
+      t.selectText('Links', 11, 13);
+      t.run({ type: 'setLink', url: './docs/Q3 report.pdf' });
     },
     check: (d) => {
       const xml = d.shapeXml(0, 'Links');
@@ -156,6 +161,14 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
           ? undefined
           : `the email link targets ${target('text')}`,
         has(slideJump, 'action="ppaction://hlinksldjump"'),
+        has(
+          runsOf(xml).find((r) => r.text === 'plain')?.rPr ?? '',
+          '<a:hlinkClick r:id="" action="ppaction://customshow?id=0"/>'
+        ),
+        target('to') === 'docs/Q3%20report.pdf'
+          ? undefined
+          : `the file link targets ${target('to')}`,
+        has(rels, 'Target="docs/Q3%20report.pdf" TargetMode="External"'),
         target('More') === 'slide2.xml' ? undefined : `the slide link targets ${target('More')}`,
         lacks(after[7] ?? '', 'hlinkClick'),
         has(after[7] ?? '', '<a:t>A link to remove</a:t>'),
@@ -349,8 +362,35 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
     edit: (t) => {
       t.selectText('Shape 2', 0, 1);
       t.run({ type: 'toggleNumbering' });
+      // A picture bullet on "Second level": one media part, related to the slide.
+      t.selectText('Shape 3', 0, 6, 1);
+      t.run({
+        type: 'setBulletFormat',
+        format: { kind: 'picture', picture: t.png, sizePercent: 120 },
+      });
     },
-    check: (d) => has(d.shapeXml(0, 'Shape 2'), '<a:buAutoNum'),
+    check: (d) => {
+      const second = paragraphOf(d.shapeXml(0, 'Shape 3'), 1);
+      const rId = /<a:buBlip><a:blip r:embed="([^"]+)"\/><\/a:buBlip>/.exec(second)?.[1];
+      const rels = d.partXml('/ppt/slides/_rels/slide1.xml.rels');
+      const rel = rId && new RegExp(`<Relationship [^>]*Id="${rId}"[^>]*>`).exec(rels)?.[0];
+      const media = rel ? /Target="\.\.\/media\/([^"]+)"/.exec(rel)?.[1] : undefined;
+      return all(
+        has(d.shapeXml(0, 'Shape 2'), '<a:buAutoNum'),
+        has(second, '<a:buSzPct val="120000"/>', '<a:buBlip>'),
+        media && d.pkg.parts.get(`/ppt/media/${media}`)?.kind === 'binary'
+          ? undefined
+          : 'the picture bullet names no media part',
+        d.editor
+          .session!.layout(0)!
+          .items.some(
+            (i) => i.kind === 'shape' && !!i.text?.lines.some((l) => l.runs.some((r) => r.picture))
+          )
+          ? undefined
+          : 'the reopened copy draws no picture bullet'
+      );
+    },
+    parts: MEDIA,
   },
   'shapes.preset-geometry': {
     fixture: 'preset-shapes',

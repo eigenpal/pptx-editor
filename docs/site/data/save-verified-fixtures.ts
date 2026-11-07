@@ -8,7 +8,8 @@
  * (CONTRIBUTING.md, "Fidelity harness"). Last checked on 6 November 2026: all 44 fixtures,
  * 88 copies written at commit 79a5d22, no prompt. On 7 November 2026: `header-footer`,
  * `hyperlinks`, `preserved-content`, and `svg-tab-stops`, 8 copies, no prompt; and again
- * `header-footer`, with its date and footer placeholders, 2 copies, no prompt.
+ * `header-footer`, with its date and footer placeholders, 2 copies, no prompt; and
+ * `picture-bullets`, 2 copies, no prompt.
  */
 export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'alignment-anchor',
@@ -38,6 +39,7 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'lines-arrows',
   'open-font-families',
   'paragraph-format',
+  'picture-bullets',
   'picture-editing',
   'pictures',
   'placeholders-background',
@@ -68,8 +70,10 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
  * change its fingerprint, only after you open its copy with no prompt. `feature-edits.test.ts`
  * fails when a recipe or an engine change gives a copy with another fingerprint: then open the new
  * copy, and record its fingerprint. Last checked on 7 November 2026: all 66 copies, written by
- * the recipes and fixtures as they are now, no prompt; the `text.clipboard` copy, no prompt;
- * and again `presenting.animations-transitions`, with its new effects and transition, no prompt.
+ * the recipes and fixtures as they are now, no prompt; the `text.clipboard` copy, no prompt; and again
+ * `presenting.animations-transitions`, with its new effects and transition, and
+ * `lists.bullets-numbering` and `text.hyperlinks`, with picture bullets and custom show and file
+ * links, no prompt.
  */
 export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'collaboration.automation-api':
@@ -89,7 +93,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'fills-lines.theme-colors':
     'sha256:937f0feb9baa7944af5c51556bd358d06ad1bf770773841306d7a516c5c3b909',
   'lists.bullets-numbering':
-    'sha256:69286419928fadc77b9942ac7b3e57b8cdd782c0c09437ef7b55565ac5d944f3',
+    'sha256:37e710090974cae1ffd0a0fb047f4ee7ffeffd845c72ffd4acd6bdd4b49be27f',
   'objects.charts': 'sha256:42f18731591c3a7d930e44bfbcc6ec53ac87e470e4733f21ccdfbc0df1bdfca1',
   'objects.diagrams': 'sha256:aeb9619902390e6835fb90efb2d8f3d942add7d2ef02639a7e1bfc133351f751',
   'objects.equations': 'sha256:24251ac84a6747362dda9cdf121e956733aaef472fa71667b7fe384ea1efa122',
@@ -153,7 +157,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'text.font-family-size':
     'sha256:4a5c2bc26a3b131d3f39dbb42b4f282c87ad97ebb1b97f7733c509d72ee49acf',
   'text.format-painter': 'sha256:bfc0643f53ce620501692fa93a67daeadae2e18bb2b623651f571329dc85eaf9',
-  'text.hyperlinks': 'sha256:dea8f85db1ad583f8388d3d8b6d65008fa5050334226c20f2f77ce36ee18b062',
+  'text.hyperlinks': 'sha256:3a55fd374282395cdefeb2b5f3f0b58f41fcedf64fc53657d000b5112663702c',
   'text.input-method': 'sha256:e2dccdc16125bdba88d31c8633ed7bef4f81273109149e0efa8fd728ec01c359',
   'themes.backgrounds': 'sha256:111b73c89fba4487451c7ede83e331f4c7409dab545f65e32c2feabe8230016f',
   'themes.change-layout-theme':

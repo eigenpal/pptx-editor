@@ -36,6 +36,7 @@ import {
   themeFill,
   type ResolvedFill,
 } from './paint-props.ts';
+import { entryParts } from './picture-bullet.ts';
 import { layerKey, partContent, relsKey, sameKey } from './resolve-keys.ts';
 import { resolveFrameTable } from './table.ts';
 import {
@@ -93,6 +94,10 @@ interface SlideScope {
   readonly diagramShapes: { count: number };
   /** The color map, the slide number, and the kinsoku rules as text: part of `textKey`. */
   readonly textContext: string;
+  /** The presentation, master, and layout parts, whose relationships picture bullets name. */
+  readonly presentationPart: string;
+  readonly masterPart?: string;
+  readonly layoutPart?: string;
 }
 
 /**
@@ -344,27 +349,43 @@ function txStyleFor(type: string | undefined, txStyles: Element | undefined): El
 
 function resolveText(
   el: Element,
+  partName: string,
   scope: SlideScope,
   ph: PlaceholderKey | undefined,
-  inherited: readonly Element[],
+  inherited: readonly (readonly [Element, string | undefined])[],
   fontRef: FontRef | undefined
 ): ResolvedTextBody | undefined {
   const txBody = ownChild(el, 'txBody');
   if (!txBody) return undefined;
   const bodyChain: Element[] = [];
   const lstChain: Element[] = [];
-  for (const source of inherited) {
+  // Each list style with its part, for the relationships of picture bullets.
+  const lists: (readonly [Element | undefined, string | undefined])[] = [];
+  for (const [source, part] of inherited) {
     const tb = ownChild(source, 'txBody');
     const bp = child(tb, 'a:bodyPr');
     if (bp) bodyChain.push(bp);
     const ls = child(tb, 'a:lstStyle');
     if (ls) lstChain.push(ls);
+    lists.push([ls, part]);
   }
   const ownBody = child(txBody, 'a:bodyPr');
   if (ownBody) bodyChain.push(ownBody);
   const ownList = child(txBody, 'a:lstStyle');
   if (ownList) lstChain.push(ownList);
   const masterStyle = txStyleFor(ph?.type, scope.txStyles);
+  const pictures = {
+    pkg: scope.pkg,
+    partOf: entryParts(
+      [
+        [scope.defaultTextStyle, scope.presentationPart],
+        [masterStyle, scope.masterPart],
+        ...lists,
+        [ownList, partName],
+      ],
+      partName
+    ),
+  };
   const refEntry = fontRefEntry(fontRef);
   const chainFor = (level: number): Element[] => [
     ...levelEntries(scope.defaultTextStyle, level),
@@ -404,6 +425,7 @@ function resolveText(
             ...(fontRef ? { fontRef } : {}),
             slideNumber: scope.slideNumber,
             ...(scope.kinsoku ? { kinsoku: scope.kinsoku } : {}),
+            pictures,
           })
         )
     );
@@ -430,18 +452,21 @@ function resolveShapeLike(
 ): ResolvedElement {
   const ph = placeholderOf(el);
   const inherited: Element[] = [];
+  // The inherited placeholders with their parts, for picture bullets.
+  const sources: (readonly [Element, string | undefined])[] = [];
   if (ph && layer === 'slide') {
     const layoutPh = findLayoutPlaceholder(ph, scope.layoutPlaceholders);
     const masterPh = findMasterPlaceholder(
       layoutPh ? (placeholderOf(layoutPh)?.type ?? ph.type) : ph.type,
       scope.masterPlaceholders
     );
-    if (masterPh) inherited.push(masterPh);
-    if (layoutPh) inherited.push(layoutPh);
+    if (masterPh) sources.push([masterPh, scope.masterPart]);
+    if (layoutPh) sources.push([layoutPh, scope.layoutPart]);
   } else if (ph && layer === 'layout') {
     const masterPh = findMasterPlaceholder(ph.type, scope.masterPlaceholders);
-    if (masterPh) inherited.push(masterPh);
+    if (masterPh) sources.push([masterPh, scope.masterPart]);
   }
+  for (const [source] of sources) inherited.push(source);
   const spPrOf = (e: Element): Element | undefined => ownChild(e, 'spPr');
   const chain = [...inherited, el];
   let xfrm: Xfrm | undefined;
@@ -511,7 +536,7 @@ function resolveShapeLike(
   }
   const text =
     kind === 'shape'
-      ? resolveText(el, scope, ph, inherited, styleFontRef(style, scope))
+      ? resolveText(el, partName, scope, ph, sources, styleFontRef(style, scope))
       : undefined;
   // ECMA-376 Part 1, 19.3.1.13 cNvSpPr: txBox marks a text box.
   const textBox = kind === 'shape' && boolAttr(path(el, 'p:nvSpPr', 'p:cNvSpPr'), 'txBox') === true;
@@ -802,7 +827,7 @@ function resolveElement(
       // A table that concurrent deletes left with no column or row is not drawn: the save
       // leaves it out (`isEmptiedTable`).
       if (kind === 'table' && isEmptiedTable(el)) return undefined;
-      const table = kind === 'table' ? resolveFrameTable(el, scope) : undefined;
+      const table = kind === 'table' ? resolveFrameTable(el, { ...scope, partName }) : undefined;
       const cNvPr = nonVisualProps(el);
       const xfrm = readXfrm(child(el, 'p:xfrm')) ?? ZERO_XFRM;
       const poster =
@@ -937,6 +962,9 @@ export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | u
     masterPlaceholders: collectPlaceholders(pkg, ref.masterPart),
     diagramShapes: { count: 0 },
     textContext: JSON.stringify([[...colorMap], index + 1, kinsoku ?? null]),
+    presentationPart: info.presentationPart,
+    ...(ref.masterPart ? { masterPart: ref.masterPart } : {}),
+    ...(ref.layoutPart ? { layoutPart: ref.layoutPart } : {}),
   };
   const bg = resolveBackground([slide, layout, master], scope);
   const backgroundPart = [ref.partName, ref.layoutPart, ref.masterPart][bg.index] ?? ref.partName;

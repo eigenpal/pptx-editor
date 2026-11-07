@@ -550,7 +550,26 @@ export interface Relationship {
   readonly target?: string;
   /** External: the raw URI, retained verbatim and NEVER fetched. */
   readonly externalTarget?: string;
+  /**
+   * External: a relative path to another file (`report.pdf`, `../docs/a%20b.pdf`), retained
+   * verbatim. It is NEVER fetched or opened: a page cannot reach the file.
+   */
+  readonly relativeTarget?: string;
   readonly external: boolean;
+}
+
+/**
+ * Whether an external target is a plain relative path: no scheme, no absolute or network path,
+ * no backslash, query, or fragment, no control character, and no `.` or `..` step past two
+ * leading `..` steps.
+ */
+function isRelativeFileTarget(target: string): boolean {
+  if (target.length === 0 || target.length > 2048) return false;
+  if (/[\\?#:\p{Cc}]/u.test(target) || target.startsWith('/')) return false;
+  const steps = target.split('/');
+  let i = 0;
+  while (i < 2 && steps[i] === '..') i += 1;
+  return steps.slice(i).every((s) => s !== '' && s !== '.' && s !== '..');
 }
 
 /** The `.rels` part name for a source part (`/` for the package). */
@@ -577,7 +596,13 @@ export function relationshipsOf(pkg: PptxPackage, source: string): readonly Rela
     if (!id || !type || target === undefined) continue;
     if (attr(el, 'TargetMode') === 'External') {
       const ok = validateExternalTarget(target);
-      out.push({ id, type, external: true, ...(ok.ok ? { externalTarget: target } : {}) });
+      const relative = !ok.ok && isRelativeFileTarget(target);
+      out.push({
+        id,
+        type,
+        external: true,
+        ...(ok.ok ? { externalTarget: target } : relative ? { relativeTarget: target } : {}),
+      });
       continue;
     }
     const resolved = resolveInternalTarget(owner, target);

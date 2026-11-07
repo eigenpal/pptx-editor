@@ -17,6 +17,7 @@ import { followUpFixtures } from './follow-ups.ts';
 import { lineEndsDashesFixtures } from './line-ends-dashes.ts';
 import { chartSizesDeck, chartsDeck, diagramsDeck } from './drawingml.ts';
 import { buildRoundTripDecks } from './round-trip.ts';
+import { pictureBulletsDeck } from './picture-bullets.ts';
 
 const OUT = 'fixtures';
 const IN = 914_400;
@@ -841,6 +842,8 @@ writeFileSync(`${OUT}/slide-structure.pptx`, buildPptx(slideStructureDeck(image,
 writeFileSync(`${OUT}/slide-layouts.pptx`, buildPptx(slideLayoutsDeck()));
 // One slide per fill rule.
 writeFileSync(`${OUT}/fill-fidelity.pptx`, buildPptx(fillFidelityDeck(image)));
+// Picture bullets at several sizes, levels, and alignments.
+writeFileSync(`${OUT}/picture-bullets.pptx`, buildPptx(pictureBulletsDeck()));
 // East Asian faces from the theme script fonts, by each run's language.
 writeFileSync(`${OUT}/east-asian-theme-fonts.pptx`, buildPptx(eastAsianThemeFontsDeck()));
 // Custom kinsoku lists, and justified and distributed East Asian text.
@@ -854,4 +857,4 @@ writeFileSync(`${OUT}/diagrams.pptx`, buildPptx(diagramsDeck()));
 // Links, kept content, an SVG picture, and tab stops: the round-trip checks of the feature edits.
 const roundTrip = buildRoundTripDecks(image);
 for (const [name, bytes] of Object.entries(roundTrip)) writeFileSync(`${OUT}/${name}.pptx`, bytes);
-console.log(`${Object.keys(fixtures).length + 6 + Object.keys(roundTrip).length} fixtures written to ${OUT}/`);
+console.log(`${Object.keys(fixtures).length + 7 + Object.keys(roundTrip).length} fixtures written to ${OUT}/`);

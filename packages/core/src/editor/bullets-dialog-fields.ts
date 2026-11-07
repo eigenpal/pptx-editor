@@ -27,6 +27,9 @@ export type BulletsDialogTab = 'bullet' | 'number';
 /** The style row's value for the paragraphs' own bullet or scheme, when no gallery item matches. @internal */
 export const CURRENT_STYLE = 'current';
 
+/** The style row's value for a picture bullet (`a:buBlip`). @internal */
+export const PICTURE_STYLE = 'picture';
+
 /** The first gallery bullet, which the Bulleted tab shows for paragraphs with none. */
 const FIRST_BULLET = { char: '•', font: 'Arial' };
 
@@ -48,6 +51,8 @@ export interface BulletsDialogFields {
   readonly color: ColorPick;
   /** The first number, 1 to 32767, as typed. */
   readonly startAt: string;
+  /** A picture the user chose for a picture bullet (PNG, JPEG, or GIF bytes), or null. */
+  readonly picture: Uint8Array | null;
 }
 
 /**
@@ -73,6 +78,7 @@ export function seedBulletFields(
       sizePercent: mixed?.sizePercent == null ? '' : String(mixed.sizePercent),
       color: 'keep',
       startAt: start == null ? '' : String(start),
+      picture: null,
     };
   }
   if (read === null)
@@ -84,6 +90,18 @@ export function seedBulletFields(
       sizePercent: '100',
       color: 'auto',
       startAt: '1',
+      picture: null,
+    };
+  if (read.kind === 'picture')
+    return {
+      kind: tab ?? 'bullet',
+      bullet: PICTURE_STYLE,
+      ...FIRST_BULLET,
+      number: 'none',
+      sizePercent: String(read.sizePercent),
+      color: 'auto',
+      startAt: '1',
+      picture: null,
     };
   const key = (gallery: readonly ListGalleryItem[]) => galleryKeyOf(gallery, read) ?? CURRENT_STYLE;
   return {
@@ -94,7 +112,44 @@ export function seedBulletFields(
     sizePercent: String(read.sizePercent),
     color: read.color ? 'keep' : 'auto',
     startAt: String(read.kind === 'number' ? read.startAt : 1),
+    picture: null,
   };
+}
+
+/**
+ * A picture the user chose: the Bulleted tab shows the Picture style, and OK sets a picture
+ * bullet. @internal
+ */
+export function chooseBulletPicture(
+  d: BulletsDialogFields,
+  picture: Uint8Array
+): BulletsDialogFields {
+  return { ...d, kind: 'bullet', bullet: PICTURE_STYLE, picture };
+}
+
+/** The picture types the Picture field's file picker takes. @internal */
+export const BULLET_PICTURE_ACCEPT = 'image/png,image/jpeg,image/gif';
+
+/** The largest picture file the Picture field reads, as the command's media limit. */
+const MAX_PICTURE_FILE = 50 * 1024 * 1024;
+
+/**
+ * The bytes of a picture file the user picked, or null for no file, another type, a file over
+ * 50 MB, or one that cannot be read. The command checks the bytes again. @internal
+ */
+export async function readBulletPicture(file: Blob | undefined | null): Promise<Uint8Array | null> {
+  if (!file || !BULLET_PICTURE_ACCEPT.split(',').includes(file.type)) return null;
+  if (file.size === 0 || file.size > MAX_PICTURE_FILE) return null;
+  try {
+    return new Uint8Array(await file.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+/** Whether the bullet color field applies: a picture bullet has no color. @internal */
+export function bulletColorEnabled(d: BulletsDialogFields): boolean {
+  return bulletFieldsEnabled(d) && !(d.kind === 'bullet' && d.bullet === PICTURE_STYLE);
 }
 
 /**
@@ -102,6 +157,7 @@ export function seedBulletFields(
  * font's Unicode twin), or the first three numbers of the scheme ("I) II) III)"). @internal
  */
 export function currentStylePreview(read: BulletFormatRead): string {
+  if (read.kind === 'picture') return '';
   if (read.kind === 'bullet') return symbolBulletText(read.char, read.font);
   return [1, 2, 3].map((n) => autonumberText(read.scheme, n)).join(' ');
 }
@@ -253,16 +309,22 @@ export function bulletCommandOf(
   const moved = key !== (d.kind === 'bullet' ? seed.bullet : seed.number);
   if (key === 'none') return moved ? null : undefined;
   const font = d.font.trim();
-  const picked: BulletFormat | null | undefined = customBullet(seed, d)
-    ? { kind: 'bullet', char: d.char, ...(font ? { font } : {}) }
-    : moved
-      ? galleryFormat(d.kind === 'bullet' ? BULLET_GALLERY : NUMBER_GALLERY, key)
-      : undefined;
+  // A chosen picture is the bullet; with none, the Picture style keeps the paragraphs' picture.
+  const picture = d.kind === 'bullet' && key === PICTURE_STYLE ? d.picture : null;
+  const picked: BulletFormat | null | undefined = picture
+    ? { kind: 'picture', picture }
+    : key === PICTURE_STYLE
+      ? undefined
+      : customBullet(seed, d)
+        ? { kind: 'bullet', char: d.char, ...(font ? { font } : {}) }
+        : moved
+          ? galleryFormat(d.kind === 'bullet' ? BULLET_GALLERY : NUMBER_GALLERY, key)
+          : undefined;
   const sizePercent =
     d.sizePercent !== seed.sizePercent && d.sizePercent !== ''
       ? parseAmount(d.sizePercent)
       : undefined;
-  const color = colorChange(seed.color, d.color);
+  const color = key === PICTURE_STYLE ? undefined : colorChange(seed.color, d.color);
   const startAt =
     d.kind === 'number' && d.startAt !== seed.startAt && d.startAt !== ''
       ? parseAmount(d.startAt)
@@ -271,6 +333,8 @@ export function bulletCommandOf(
     ...(sizePercent !== undefined ? { sizePercent } : {}),
     ...(color !== undefined ? { color } : {}),
   };
+  if (picked?.kind === 'picture')
+    return { ...picked, ...(sizePercent !== undefined ? { sizePercent } : {}) };
   if (picked)
     return {
       ...picked,

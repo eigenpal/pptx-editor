@@ -33,6 +33,7 @@
     "recipes/shape-adjustments",
     "recipes/pattern-picture-fills",
     "recipes/slide-email-links",
+    "recipes/picture-bullets",
     "---React---",
     "react/index",
     "react/composition",

@@ -16,6 +16,7 @@ import { BULLET_GALLERY, NUMBER_GALLERY } from './bullet-format.ts';
 import {
   BULLET_TEXT_FONT,
   CURRENT_STYLE,
+  PICTURE_STYLE,
   bulletFontChoices,
   currentStylePreview,
   customBullet,
@@ -119,6 +120,12 @@ export function bulletStyleOptions(
       CURRENT_STYLE,
       t('bulletsAndNumberingDialog.custom', { char: currentStylePreview(opened) }),
     ]);
+  // A picture bullet: the paragraphs' own, or a picture the user chose.
+  if (
+    kind === 'bullet' &&
+    (seed?.bullet === PICTURE_STYLE || draft?.bullet === PICTURE_STYLE || !!draft?.picture)
+  )
+    options.push([PICTURE_STYLE, t('bulletsAndNumberingDialog.pictureStyle')]);
   return options;
 }
 

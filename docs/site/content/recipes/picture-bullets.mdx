@@ -1,0 +1,52 @@
+---
+title: 'Set a picture bullet'
+description: 'Use a PNG, JPEG, or GIF picture as the bullet of the selected paragraphs.'
+category: 'Task recipes'
+---
+
+Use the `setBulletFormat` command with `kind: 'picture'` to make a picture the bullet of the selected paragraphs. The command adds the picture to the presentation once, and the change is one undo step.
+
+## Set a picture bullet
+
+This helper accepts an open `PptxEditorInstance` with text selected, and a picture file that the user picked:
+
+```ts
+import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+export async function setPictureBullet(editor: PptxEditorInstance, file: File) {
+  const picture = new Uint8Array(await file.arrayBuffer());
+  const result = editor.exec({
+    type: 'setBulletFormat',
+    format: { kind: 'picture', picture, sizePercent: 120 },
+  });
+  if (!result.ok) throw new Error(result.reason);
+}
+```
+
+`picture` takes PNG, JPEG, or GIF bytes of up to 50 MB. `sizePercent` is optional: it sets the bullet size in percent of the text, from 25 to 400. A paragraph with no list first gets the margins of a bulleted list.
+
+## Size and place
+
+The picture is 0.7 times the bullet size high and keeps its own aspect. The bullet size is the size of the first text of the paragraph times the percent (`a:buSzPct`), or a size in points (`a:buSzPts`). The picture stands on the baseline at the bullet position. A picture wider than the hanging indent pushes the text to its right edge. A picture bullet does not make its line taller.
+
+## Read the bullet
+
+With the paragraphs selected, `editor.snapshot().format?.bulletFormat` returns `{ kind: 'picture', sizePercent }` for a picture bullet. The Bullets button shows as on, and a press on it removes the bullet. To change only the size, send a format with no `kind`:
+
+```ts
+editor.exec({ type: 'setBulletFormat', format: { sizePercent: 150 } });
+```
+
+## What users see
+
+In the Bullets and Numbering dialog, **Choose picture…** on the Bulleted tab opens a file picker for PNG, JPEG, and GIF files. The style then shows **Picture**, and OK sets the picture bullet. The color field is off for a picture bullet.
+
+## Limits
+
+- A picture bullet from a file draws when its picture is a PNG, JPEG, GIF, or BMP image in the package. A missing or unreadable picture draws no bullet, and the file keeps its markup.
+- A changed picture leaves the old picture in the package, as **Change Picture** does.
+
+## See also
+
+- [Dialogs](/docs/customization/dialogs): the fields of the Bullets and Numbering dialog.
+- [Undo history](/docs/guides/undo-history)

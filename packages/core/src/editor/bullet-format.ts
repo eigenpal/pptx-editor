@@ -16,7 +16,7 @@ import { toHex, type ResolvedParagraph } from '../cascade/index.ts';
 import type { BulletFormat, BulletFormatMixed, BulletFormatRead } from '../contracts/index.ts';
 import type { BulletGalleryKey, NumberGalleryKey } from './toolbar-values.ts';
 import { isSymbolFont } from '../layout/index.ts';
-import { attr, type Element, type NodeSpec } from '../store/index.ts';
+import { attr, NS, type Element, type NodeSpec } from '../store/index.ts';
 import { FONT_NAME } from '../automation/commands/font-format.ts';
 import {
   paragraphLookup,
@@ -24,7 +24,12 @@ import {
   type ListTarget,
 } from '../automation/commands/list-commands.ts';
 import { CommandRefusal, type OpBatch } from '../automation/commands/op-batch.ts';
-import { specFromXml } from '../automation/commands/shape-commands.ts';
+import { pictureType } from '../automation/commands/fill-commands.ts';
+import {
+  addImagePart,
+  MAX_IMAGE_BYTES,
+  specFromXml,
+} from '../automation/commands/shape-commands.ts';
 import { colorXml, isColorChoice } from '../automation/commands/style-commands.ts';
 import { aSpec, ensureParagraphProps, paragraphsOf } from '../automation/commands/text-model.ts';
 
@@ -113,7 +118,10 @@ export function isBulletChar(char: unknown): boolean {
 const FIELDS: Readonly<Record<string, readonly string[]>> = Object.assign(Object.create(null), {
   bullet: ['kind', 'char', 'font', 'sizePercent', 'color'],
   number: ['kind', 'scheme', 'startAt', 'sizePercent', 'color'],
+  picture: ['kind', 'picture', 'sizePercent'],
 });
+/** The picture types a picture bullet takes. */
+const BULLET_PICTURE_TYPES: readonly string[] = ['image/png', 'image/jpeg', 'image/gif'];
 /** A format with no kind takes the size and the color only. */
 const KINDLESS_FIELDS: readonly string[] = ['kind', 'sizePercent', 'color'];
 
@@ -149,6 +157,17 @@ export function checkBulletFormat(style: BulletFormat | null): void {
       )
     )
       bad('font');
+  } else if (style.kind === 'picture') {
+    if (!(style.picture instanceof Uint8Array) || style.picture.length > MAX_IMAGE_BYTES)
+      bad('picture');
+    // The bytes must be a PNG, JPEG, or GIF image with a size (`pictureType` reads the header).
+    let type = '';
+    try {
+      type = pictureType(style.picture);
+    } catch {
+      bad('picture');
+    }
+    if (!BULLET_PICTURE_TYPES.includes(type)) bad('picture');
   } else if (style.kind === 'number') {
     if (
       style.scheme !== undefined &&
@@ -161,7 +180,8 @@ export function checkBulletFormat(style: BulletFormat | null): void {
     )
       bad('startAt');
   }
-  const { sizePercent: size, color } = style;
+  const { sizePercent: size } = style;
+  const color = 'color' in style ? style.color : undefined;
   if (size != null && !(typeof size === 'number' && size >= 25 && size <= 400)) bad('sizePercent');
   if (color != null && !isColorChoice(color)) bad('color');
 }
@@ -241,7 +261,8 @@ export function setBulletFormats(
   slide: number,
   targets: readonly ListTarget[],
   style: BulletFormat | null,
-  resolve = true
+  resolve = true,
+  pictures: PictureMemo = {}
 ): { listed: boolean; changed: ListTarget[] } {
   checkBulletFormat(style);
   // No kind: only the size and color, of the paragraphs that show a list. Which ones do is
@@ -250,7 +271,8 @@ export function setBulletFormats(
   const read = resolve || !kind;
   const lookup = read ? paragraphLookup(batch, slide) : () => [];
   // A paragraph that already shows a list keeps its margins: only its bullet changes. One
-  // without a list, and None, go through Home > Bullets (`setListKinds`).
+  // without a list, and None, go through Home > Bullets (`setListKinds`). A picture
+  // bullet starts as a bulleted list.
   const plans = targets.map((target) => {
     const before = lookup(target);
     const fresh =
@@ -262,7 +284,14 @@ export function setBulletFormats(
   for (const x of kind ? plans : [])
     if (x.fresh.length) targetOf.set({ ...x.target, paragraphs: x.fresh }, x.target);
   const lists = [...targetOf.keys()];
-  const wrote = setListKinds(batch, part, slide, lists, kind || 'none', resolve);
+  const wrote = setListKinds(
+    batch,
+    part,
+    slide,
+    lists,
+    kind === 'picture' ? 'bullet' : kind || 'none',
+    resolve
+  );
   const changed = new Set(wrote.map((l) => targetOf.get(l)!));
   if (!style) return { listed: true, changed: [...changed] };
   // What a paragraph with no list shows once it has one: the scheme its placeholder inherits.
@@ -274,7 +303,7 @@ export function setBulletFormats(
     listed = true;
     const at = batch.ops.length;
     const after = later && fresh.length ? later(target) : before;
-    writeBulletStyle(batch, part, target, style, kind, before, after, fresh);
+    writeBulletStyle(batch, part, target, style, kind, before, after, fresh, pictures);
     if (batch.ops.length !== at) changed.add(target);
   }
   return { listed, changed: [...changed] };
@@ -289,7 +318,8 @@ function writeBulletStyle(
   kind: BulletFormat['kind'] | 'none',
   before: readonly ResolvedParagraph[],
   after: readonly ResolvedParagraph[],
-  fresh: readonly number[]
+  fresh: readonly number[],
+  pictures: PictureMemo
 ): void {
   const all = paragraphsOf(batch.element(part, target.txBodyId));
   const isFresh = new Set(fresh);
@@ -299,6 +329,14 @@ function writeBulletStyle(
     const sameKind = !!shown && (shown.type === 'char') === (style.kind === 'bullet');
     const set = (slot: readonly string[], spec: NodeSpec | null, replace = false) =>
       setSlot(batch, part, pPrId, slot, spec, replace);
+    if (style.kind === 'picture') {
+      // One media part for the command, related to the slide. A replaced picture and its
+      // relationship stay, as Change Picture keeps them: a peer may still name them.
+      pictures.rId ??= addImagePart(batch, part, style.picture, pictureType(style.picture));
+      if (style.sizePercent !== undefined) setSize(set, style.sizePercent);
+      set(['buNone', 'buAutoNum', 'buChar', 'buBlip'], buBlipSpec(pictures.rId), true);
+      continue;
+    }
     if (style.color !== undefined)
       set(
         ['buClrTx', 'buClr'],
@@ -308,13 +346,7 @@ function writeBulletStyle(
         // A color and its luminance are one pick: a new `a:buClr`, never a merge of two.
         true
       );
-    if (style.sizePercent !== undefined)
-      set(
-        ['buSzTx', 'buSzPct', 'buSzPts'],
-        style.sizePercent === null
-          ? aSpec('buSzTx')
-          : aSpec('buSzPct', { val: String(Math.round(style.sizePercent * 1000)) })
-      );
+    if (style.sizePercent !== undefined) setSize(set, style.sizePercent);
     if (style.kind === 'bullet') {
       // An absent character keeps the paragraph's own bullet, or takes the first gallery one.
       const char = style.char ?? (sameKind || isFresh.has(i) ? undefined : FIRST_BULLET.char);
@@ -378,6 +410,35 @@ function writeBulletStyle(
   }
 }
 
+/** The picture a command adds once, for every text target it changes. */
+export interface PictureMemo {
+  rId?: string;
+}
+
+/** Write the bullet size: a percent of the text, or null to follow the text. */
+function setSize(
+  set: (slot: readonly string[], spec: NodeSpec | null) => void,
+  sizePercent: number | null
+): void {
+  set(
+    ['buSzTx', 'buSzPct', 'buSzPts'],
+    sizePercent === null
+      ? aSpec('buSzTx')
+      : aSpec('buSzPct', { val: String(Math.round(sizePercent * 1000)) })
+  );
+}
+
+/** `a:buBlip` with the `a:blip` of a picture relationship. */
+function buBlipSpec(rId: string): NodeSpec {
+  return {
+    ns: NS.a,
+    local: 'buBlip',
+    children: [
+      { ns: NS.a, local: 'blip', attrs: [{ ns: NS.r, local: 'embed', prefix: 'r', value: rId }] },
+    ],
+  };
+}
+
 /** The bullet format of a resolved paragraph, as the gallery and dialog show it. */
 export function bulletFormatOf(p: ResolvedParagraph): BulletFormatRead | null {
   const b = p.bullet;
@@ -387,6 +448,7 @@ export function bulletFormatOf(p: ResolvedParagraph): BulletFormatRead | null {
   const sizePercent = Math.round(
     'pct' in b.size ? b.size.pct * 100 : text > 0 ? (b.size.pts / text) * 100 : 100
   );
+  if (b.type === 'picture') return { kind: 'picture', sizePercent };
   const color = b.color ? { color: toHex(b.color).toUpperCase() } : {};
   if (b.type === 'char')
     return {
@@ -429,7 +491,7 @@ export function galleryKeyOf(
     if (!s || s.kind !== state.kind) return false;
     return s.kind === 'bullet'
       ? state.kind === 'bullet' && s.char === state.char && (s.font ?? '') === (state.font ?? '')
-      : state.kind === 'number' && s.scheme === state.scheme;
+      : s.kind === 'number' && state.kind === 'number' && s.scheme === state.scheme;
   })?.key;
 }
 

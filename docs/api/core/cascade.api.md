@@ -264,6 +264,7 @@ export interface ParagraphInputs {
     readonly kinsoku?: KinsokuRules;
     // (undocumented)
     readonly paragraph: Element_2;
+    readonly pictures?: PictureBulletSource;
     readonly slideNumber: number;
     // (undocumented)
     readonly theme: Theme;
@@ -274,6 +275,13 @@ export function parseHex(hex: string | undefined): Rgba | undefined;
 
 // @public
 export function parseTheme(part: XmlPart | undefined): Theme;
+
+// @public
+export interface PictureBulletSource {
+    readonly partOf: (entry: Element_2) => string | undefined;
+    // (undocumented)
+    readonly pkg: PptxPackage;
+}
 
 // @public
 export const PRESET_COLORS: Readonly<Record<string, string>>;
@@ -327,6 +335,17 @@ export type ResolvedBullet = {
         readonly pts: number;
     };
     readonly color?: Rgba;
+} | {
+    readonly type: 'picture';
+    readonly part: string;
+    readonly rId: string;
+    readonly svgRId?: string;
+    readonly aspect: number;
+    readonly size: {
+        readonly pct: number;
+    } | {
+        readonly pts: number;
+    };
 };
 
 // @public
@@ -744,6 +763,7 @@ export interface TableScope {
     // (undocumented)
     readonly defaultTextStyle?: Element_2;
     readonly kinsoku?: KinsokuRules;
+    readonly partName?: string;
     // (undocumented)
     readonly pkg: PptxPackage;
     // (undocumented)

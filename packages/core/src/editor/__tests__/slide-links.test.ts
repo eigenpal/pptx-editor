@@ -229,7 +229,7 @@ describe('copy and paste', () => {
 });
 
 describe('links with other actions', () => {
-  test('an action with an external target shows that target; a custom show keeps its action', async () => {
+  test('an action with an external target shows that target; a custom show reads in its # form', async () => {
     const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink';
     const text =
       '<a:p><a:r><a:rPr lang="en-US"><a:hlinkClick r:id="rId9" action="ppaction://hlinkfile"/>' +
@@ -252,7 +252,7 @@ describe('links with other actions', () => {
       anchor: { paragraph: 0, offset: 6 },
       focus: { paragraph: 0, offset: 6 },
     });
-    expect(e.snapshot().format?.link).toBeUndefined();
+    expect(e.snapshot().format?.link).toBe('#custom-show-0');
     // Save keeps the custom show action.
     const show = elements(find(root(e), 'a:p')!).filter((r) => r.local === 'r')[1]!;
     expect(attr(linkEl(show), 'action')).toBe('ppaction://customshow?id=0');

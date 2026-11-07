@@ -320,6 +320,11 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'The text has no characters that a slide can hold, such as control characters only. Remove them.',
   ],
   [
+    'errors.customShowNotFound',
+    'edit.custom-show-not-found',
+    'The presentation has no custom show with this id. Read the custom shows of the deck again.',
+  ],
+  [
     'errors.layoutNotFound',
     'edit.layout-not-found',
     'The presentation has no such slide layout. Read the layouts of the master again.',
@@ -353,6 +358,11 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'errors.unsafeLink',
     'argument.not-accepted',
     'Use an http, https, mailto, tel, or ftp address of up to 2048 characters.',
+  ],
+  [
+    'errors.unsafeFileLink',
+    'argument.not-accepted',
+    'Use a relative path that starts with ./ or ../, with at most two ../ steps and no program or script file.',
   ],
   [
     'errors.unsupported',
