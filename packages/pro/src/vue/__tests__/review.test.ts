@@ -6,7 +6,11 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // The twin of `../../react/__tests__/review.test.tsx`.
 import { afterEach, describe, expect, test } from 'bun:test';
 import { createApp, defineComponent, h, nextTick, type App, type Component, type VNode } from 'vue';
-import type { EditorModule, PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import {
+  listenSlideshowStartKeys,
+  type EditorModule,
+  type PptxEditorInstance,
+} from '@pptx-editor.dev/core/editor';
 import {
   PptxEditorContent,
   PptxEditorRoot,
@@ -129,6 +133,29 @@ describe('PptxEditorReview (Vue)', () => {
     expect(editor.snapshot().comments).toEqual([]);
     await key(el, { key: 'Escape' });
     expect(field('Add a comment…')).toBeNull();
+  });
+
+  test('Ctrl+Enter in a comment field posts and does not start the slide show', async () => {
+    const editor = await mount([reviewModule()]);
+    let started = 0;
+    const stop = listenSlideshowStartKeys(
+      () => document.querySelector('.pptx-editor'),
+      () => false,
+      () => void started++
+    );
+    try {
+      await click(button('New comment'));
+      const el = field('Add a comment…')!;
+      await type(el, 'Note');
+      await key(el, { key: 'Enter', ctrlKey: true });
+      expect(started).toBe(0);
+      expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['Note']);
+      // The same key outside a comment field starts the show.
+      await key(document.body, { key: 'Enter', ctrlKey: true });
+      expect(started).toBe(1);
+    } finally {
+      stop();
+    }
   });
 
   test('parts: hidden removes a part, a card class reaches each card, filter picks threads', async () => {

@@ -111,18 +111,24 @@ describe('PptxEditorReview', () => {
     expect(editor.snapshot().comments).toEqual([]);
   });
 
-  test('Enter in a comment field posts and does not start the slide show', async () => {
+  test('Ctrl+Enter in a comment field posts and does not start the slide show', async () => {
     const editor = await mount([reviewModule()]);
     let started = 0;
     const stop = listenSlideshowStartKeys(
-      () => document.querySelector('.pptx-review'),
+      () => document.querySelector('.pptx-editor'),
       () => false,
       () => void started++
     );
     try {
-      post('Note');
+      act(() => void fireEvent.click(screen.getByRole('button', { name: 'New comment' })));
+      const field = screen.getByRole('textbox', { name: 'Add a comment…' });
+      act(() => void fireEvent.change(field, { target: { value: 'Note' } }));
+      act(() => void fireEvent.keyDown(field, { key: 'Enter', ctrlKey: true }));
       expect(started).toBe(0);
       expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['Note']);
+      // The same key outside a comment field starts the show.
+      act(() => void fireEvent.keyDown(document.body, { key: 'Enter', ctrlKey: true }));
+      expect(started).toBe(1);
     } finally {
       stop();
     }

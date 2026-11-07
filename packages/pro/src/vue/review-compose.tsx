@@ -50,6 +50,7 @@ const CommentField = defineComponent({
         ref={field}
         id={props.id}
         class="pptx-review__input"
+        data-comment-field=""
         rows={1}
         value={props.value}
         maxlength={COMMENT_TEXT_MAX}

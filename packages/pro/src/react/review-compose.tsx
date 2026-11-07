@@ -52,6 +52,7 @@ function CommentField(props: {
       ref={field}
       id={props.id}
       className="pptx-review__input"
+      data-comment-field=""
       rows={1}
       value={props.value}
       maxLength={COMMENT_TEXT_MAX}
