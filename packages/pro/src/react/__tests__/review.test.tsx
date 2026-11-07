@@ -146,10 +146,10 @@ describe('PptxEditorReview', () => {
     act(() => void fireEvent.click(edit));
     const box = screen.getByRole('textbox', { name: 'Edit comment' });
     act(() => void fireEvent.change(box, { target: { value: 'A edited' } }));
-    // A peer deletes A: B, a repeat with A's author and date, takes A's id but not its card.
+    // A peer deletes A: B, a repeat with A's author and date, keeps its own card.
     act(() => void editor.exec({ type: 'deleteComment', commentId: a!.id }));
     expect(editor.snapshot().comments!.map((t) => [t.id === a!.id, t.text])).toEqual([
-      [true, 'B'],
+      [false, 'B'],
       [false, 'C'],
     ]);
     expect(screen.queryByRole('textbox', { name: 'Edit comment' })).toBeNull();
@@ -218,9 +218,47 @@ describe('PptxEditorReview', () => {
     act(() => void fireEvent.keyDown(field, { key: 'Enter' }));
     expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['Peer', 'B', 'C']);
     expect(field.value).toBe('Mine');
-    expect(document.querySelector('.pptx-review__refused[role="status"]')!.textContent).toBe(
-      'This comment changed. Copy your text to keep it.'
+    const notice = document.querySelector('.pptx-review__notice')!;
+    expect(notice.getAttribute('role')).toBe('status');
+    expect(notice.textContent).toBe('This comment changed. Copy your text to keep it.');
+    expect(field.getAttribute('aria-describedby')).toContain(notice.id);
+    // A second, deliberate save replaces the comment as it shows now.
+    act(() => void fireEvent.keyDown(field, { key: 'Enter' }));
+    expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['Mine', 'B', 'C']);
+    expect(screen.queryByRole('textbox', { name: 'Edit comment' })).toBeNull();
+  });
+
+  test('a refusal for another reason says that reason, and the notice clears on typing', async () => {
+    const editor = await mount([reviewModule()]);
+    post('First');
+    act(
+      () =>
+        void fireEvent.click(screen.getByRole('button', { name: 'Edit comment by Ada Lovelace' }))
     );
+    const box = screen.getByRole('textbox', { name: 'Edit comment' }) as HTMLTextAreaElement;
+    act(() => void fireEvent.change(box, { target: { value: '\u0001' } }));
+    act(() => void fireEvent.keyDown(box, { key: 'Enter' }));
+    const notice = document.querySelector('.pptx-review__notice')!;
+    expect(notice.textContent).toBe('Comment text must have 1 to 10,000 characters');
+    expect(editor.snapshot().comments![0]!.text).toBe('First');
+    act(() => void fireEvent.change(box, { target: { value: 'Second' } }));
+    expect(notice.textContent).toBe('');
+    expect(notice.isConnected).toBe(true);
+  });
+
+  test('without an author, Enter in the reply line posts nothing and says nothing new', async () => {
+    const editor = await mount([reviewModule()]);
+    post('First');
+    act(() => editor.setAuthor(undefined));
+    const [thread] = editor.snapshot().comments!;
+    act(() => editor.selectComment(thread!.id));
+    const reply = screen.getByRole('textbox', { name: 'Reply to Ada Lovelace' });
+    act(() => void fireEvent.change(reply, { target: { value: 'Hello' } }));
+    act(() => void fireEvent.keyDown(reply, { key: 'Enter' }));
+    expect(editor.snapshot().comments![0]!.replies).toEqual([]);
+    expect((reply as HTMLTextAreaElement).value).toBe('Hello');
+    expect(document.querySelector('.pptx-review__notice')!.textContent).toBe('');
+    expect(screen.getByText('Set an author to comment.')).toBeDefined();
   });
 
   test('when one of three copies goes, an edit of a copy closes and saves nothing', async () => {

@@ -104,6 +104,32 @@ export interface CommentSeen {
   readonly text: string;
 }
 
+/**
+ * Run `act`, a comment action. Null when the editor applied it; else the reason that the editor
+ * published for the refusal (`lastRejection`), or an empty string when it published none.
+ */
+export function refusalOf(editor: PptxEditorInstance | null, act: () => boolean): string | null {
+  const before = editor?.snapshot().lastRejection ?? null;
+  if (act()) return null;
+  const after = editor?.snapshot().lastRejection ?? null;
+  return after && after !== before ? after.reason : '';
+}
+
+/**
+ * What a comment field says after a refusal, with a serial so that a repeated refusal reads
+ * again in the live region.
+ */
+export interface FieldNotice {
+  readonly key: string;
+  readonly serial: number;
+}
+
+/** The notice of `reason`: the comment changed, or the editor's own text of the reason. */
+export function fieldNotice(reason: string, serial: number): FieldNotice | null {
+  if (!reason) return null;
+  return { key: reason === 'errors.commentChanged' ? 'comments.changed' : reason, serial };
+}
+
 /** What `item` shows of its comment. */
 export const seenOf = (item: CommentSeen): CommentSeen => ({
   author: item.author,

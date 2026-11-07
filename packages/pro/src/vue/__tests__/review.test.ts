@@ -169,11 +169,11 @@ describe('PptxEditorReview (Vue)', () => {
     await type(field('Reply to Ada Lovelace')!, 'For A');
     await click(button('Edit comment by Ada Lovelace'));
     await type(field('Edit comment')!, 'A edited');
-    // A peer deletes A: B, a repeat with A's author and date, takes A's id but not its card.
+    // A peer deletes A: B, a repeat with A's author and date, keeps its own card.
     editor.exec({ type: 'deleteComment', commentId: a!.id });
     await settle();
     expect(editor.snapshot().comments!.map((t) => [t.id === a!.id, t.text])).toEqual([
-      [true, 'B'],
+      [false, 'B'],
       [false, 'C'],
     ]);
     expect(field('Edit comment')).toBeNull();
@@ -234,9 +234,43 @@ describe('PptxEditorReview (Vue)', () => {
     await key(field('Edit comment')!, { key: 'Enter' });
     expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['Peer', 'B', 'C']);
     expect(field('Edit comment')!.value).toBe('Mine');
-    expect(document.querySelector('.pptx-review__refused[role="status"]')!.textContent).toBe(
-      'This comment changed. Copy your text to keep it.'
-    );
+    const notice = document.querySelector('.pptx-review__notice')!;
+    expect(notice.getAttribute('role')).toBe('status');
+    expect(notice.textContent).toBe('This comment changed. Copy your text to keep it.');
+    expect(field('Edit comment')!.getAttribute('aria-describedby')).toContain(notice.id);
+    // A second, deliberate save replaces the comment as it shows now.
+    await key(field('Edit comment')!, { key: 'Enter' });
+    expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['Mine', 'B', 'C']);
+    expect(field('Edit comment')).toBeNull();
+  });
+
+  test('a refusal for another reason says that reason, and the notice clears on typing', async () => {
+    const editor = await mount([reviewModule()]);
+    await post('First');
+    await click(button('Edit comment by Ada Lovelace'));
+    await type(field('Edit comment')!, '\u0001');
+    await key(field('Edit comment')!, { key: 'Enter' });
+    const notice = document.querySelector('.pptx-review__notice')!;
+    expect(notice.textContent).toBe('Comment text must have 1 to 10,000 characters');
+    expect(editor.snapshot().comments![0]!.text).toBe('First');
+    await type(field('Edit comment')!, 'Second');
+    expect(notice.textContent).toBe('');
+    expect(notice.isConnected).toBe(true);
+  });
+
+  test('without an author, Enter in the reply line posts nothing and says nothing new', async () => {
+    const editor = await mount([reviewModule()]);
+    await post('First');
+    editor.setAuthor(undefined);
+    const [thread] = editor.snapshot().comments!;
+    editor.selectComment(thread!.id);
+    await settle();
+    await type(field('Reply to Ada Lovelace')!, 'Hello');
+    await key(field('Reply to Ada Lovelace')!, { key: 'Enter' });
+    expect(editor.snapshot().comments![0]!.replies).toEqual([]);
+    expect(field('Reply to Ada Lovelace')!.value).toBe('Hello');
+    expect(document.querySelector('.pptx-review__notice')!.textContent).toBe('');
+    expect(document.body.textContent).toContain('Set an author to comment.');
   });
 
   test('when one of three copies goes, an edit of a copy closes and saves nothing', async () => {
