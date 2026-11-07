@@ -17,13 +17,25 @@ export type CommentAnchor =
 
 /** One comment or reply. Its text and author come from the file: show them as text. @public */
 export interface SlideComment {
-  /** Stable while the comment exists. Pass it to the comment commands. */
+  /**
+   * The id that the comment commands take. When the slide repeats the comment's GUID, a delete
+   * of another comment can change it, and a twin (see `identity`) can take the id of a deleted
+   * one.
+   */
   readonly id: string;
   /**
-   * A token that names the comment while the deck is open. An edit or a resolve of any comment,
-   * and a delete of another one, never change it, even where `id` changes because a file repeats
-   * the comment's GUID. One exception: when the file repeats the GUID, author, and creation time
-   * of a comment, its text is part of the token. Key UI state by it; pass `id` to the commands.
+   * A token that names the comment in the snapshot while its slide is current. Key UI state,
+   * such as an open field, by it; pass `id` to the commands.
+   *
+   * - A comment whose GUID, author, and creation time no other comment of the slide shares keeps
+   *   its identity through every change except its own delete.
+   * - Twins, which share all three, keep their identities through their own edits and the delete
+   *   of a twin with another text. When a twin goes and another twin has the same text, the
+   *   editor cannot tell which went: every twin of that group takes a new identity, so state
+   *   keyed by the old ones ends.
+   * - An identity that is gone never names another comment.
+   *
+   * `readCommentThreads` reads the identities from the file alone, without this carry.
    */
   readonly identity: string;
   /** The author's display name. Empty when the file names no author for the comment. */

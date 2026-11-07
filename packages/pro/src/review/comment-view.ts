@@ -34,13 +34,13 @@ export const COMMENT_TEXT_MAX = 10_000;
  * @public
  */
 export interface ReviewItemView {
-  /** The key the actions take. Stable while the comment exists. */
+  /** The key the actions take: the comment id. */
   readonly key: string;
   /** The comment id, as the comment commands take it. Equal to `key`. */
   readonly id: string;
   /**
-   * The comment's `identity`: edits, resolves, and deletes of other comments keep it, even where
-   * `id` changes. The pane keys its cards and open fields by it.
+   * The comment's `identity` (`SlideComment.identity` says what keeps it), which can stay where
+   * `id` changes. The pane keys its cards, its open fields, and the selected thread by it.
    */
   readonly identity: string;
   /** Always `comment`: PresentationML has no tracked-change markup. */
