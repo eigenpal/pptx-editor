@@ -143,13 +143,12 @@ describe('an undo of either join after the merge', () => {
       selectIn(c, 0, 12);
       expect(c.input('text', 'x').ok).toBe(true);
       savedAlike([a, b, c], relay, ['ABCDEFGHIJKLx']);
-      // B's undo lists "IJKL" in the middle paragraph again, and a node listed twice shows at
-      // its first listing: no text is lost, but it shows in the first paragraph
-      // (eigenpal/pptx-editor#8, the todo below).
+      // A write never lists a node where the move rescue shows it, so B's undo shows "IJKL"
+      // with the middle paragraph again.
       expect(b.exec({ type: 'undo' }).ok).toBe(true);
-      savedAlike([a, b, c], relay, ['ABIJKLx', 'CDEFGH']);
+      savedAlike([a, b, c], relay, ['AB', 'CDEFGHIJKLx']);
       expect(a.exec({ type: 'undo' }).ok).toBe(true);
-      savedAlike([a, b, c], relay, ['ABIJKLx', 'CDEFGH', '']);
+      savedAlike([a, b, c], relay, ['AB', 'CDEFGH', 'IJKLx']);
     });
 
     test(`both joiners undo at once, then both redo (${order(ids)})`, async () => {
@@ -164,9 +163,18 @@ describe('an undo of either join after the merge', () => {
     });
   }
 
-  // eigenpal/pptx-editor#8
-  test.todo(
-    'after a third peer writes the joined paragraph, an undo of the earlier join shows the ' +
-      'later join\'s runs in the middle paragraph again ("AB", "CDEFGHIJKLx")'
-  );
+  for (const ids of CLIENT_ORDERS)
+    test(`a third peer presses Enter in the rescued text, then the earlier join is undone (${order(ids)})`, async () => {
+      const { a, b, c, relay } = await concurrentJoins(ids);
+      relay.flush();
+      selectIn(c, 0, 10);
+      expect(c.input('paragraph').ok).toBe(true);
+      savedAlike([a, b, c], relay, ['ABCDEFGHIJ', 'KL']);
+      // The undo lists the middle paragraph again at its old place, which the new paragraph
+      // took: every character shows once, and "IJ" goes back with "CDEFGH".
+      expect(b.exec({ type: 'undo' }).ok).toBe(true);
+      savedAlike([a, b, c], relay, ['AB', 'KL', 'CDEFGHIJ']);
+      expect(b.exec({ type: 'redo' }).ok).toBe(true);
+      savedAlike([a, b, c], relay, ['ABCDEFGHIJ', 'KL']);
+    });
 });

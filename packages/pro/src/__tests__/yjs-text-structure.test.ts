@@ -498,11 +498,11 @@ describe('a delete of a run a peer types into', () => {
 // A run that came back for a peer's text is listed again by two writes at once: a peer types
 // into it, and another peer's Enter moves it to a new paragraph. The read shows it in the
 // paragraph it left, though its move mark names that paragraph. A later delete of its text
-// while a peer types into it again must keep the typed text there; it does not yet (design,
-// "Known gaps").
+// while a peer types into it again keeps the typed text there: a move mark counts only while
+// another record lists the run (`movedAway` in `text-identity.ts`).
 describe("a run kept for a peer's text, then listed by two peers at once", () => {
   for (const swap of [false, true])
-    test.todo(`a delete of its text keeps the next typed character (${order(swap)})`, async () => {
+    test(`a delete of its text keeps the next typed character (${order(swap)})`, async () => {
       const deck = textBox(
         para(run('ABCD') + run('EF', 'b="1"') + run('GH') + '<a:endParaRPr lang="en-US"/>')
       );
