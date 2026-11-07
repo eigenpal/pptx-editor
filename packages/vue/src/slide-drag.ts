@@ -7,6 +7,8 @@ import { shallowRef, toValue, type MaybeRefOrGetter } from 'vue';
 import {
   dragOverSlide,
   dropSlideDrag,
+  setSlideDragImage,
+  slideDragCount,
   slideDropMarker,
   startSlideDrag,
   type SlideDrag,
@@ -51,6 +53,11 @@ export function useSlideDrag(
     draggable: !toValue(readOnly),
     onDragstart: (e) => {
       if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+      // The image first: making the slide current can move the list. A node check, not
+      // `instanceof`: an editor in a frame has its own `Element`.
+      const item = e.currentTarget as Element | null;
+      if (item?.nodeType === 1)
+        setSlideDragImage(e, item, slideDragCount(toValue(selected), index));
       drag.value = startSlideDrag(editor.value, toValue(selected), index);
     },
     onDragover: (e) => {

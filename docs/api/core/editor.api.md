@@ -4559,6 +4559,13 @@ export function separatorCost(bar: HTMLElement, style: CSSStyleDeclaration): num
 // @internal
 export function setNotesTarget(editor: object, target: NotesTarget | null): void;
 
+// @internal
+export function setSlideDragImage(e: {
+    readonly dataTransfer: DataTransfer | null;
+    clientX: number;
+    clientY: number;
+}, item: Element, count: number): void;
+
 // @public
 export type ShadowPreset = 'outerBottomRight' | 'outerBottom' | 'outerBottomLeft' | 'outerRight' | 'outerCenter' | 'outerLeft' | 'outerTopRight' | 'outerTop' | 'outerTopLeft' | 'innerTopLeft' | 'innerTop' | 'innerTopRight' | 'innerLeft' | 'innerCenter' | 'innerRight' | 'innerBottomLeft' | 'innerBottom' | 'innerBottomRight';
 
@@ -4699,6 +4706,12 @@ export function sizeErrorPlace(box: HTMLElement | null): {
 };
 
 // @internal
+export const SLIDE_DRAG_IMAGE_CLASS = "pptx-slide-drag-image";
+
+// @internal
+export const SLIDE_DRAG_TYPE = "application/x-pptx-editor-slides";
+
+// @internal
 export const SLIDE_SIZE_CHOICES: readonly SlideSizePreset[];
 
 // @internal
@@ -4753,6 +4766,9 @@ export interface SlideDrag {
     // (undocumented)
     readonly side: 'before' | 'after';
 }
+
+// @internal
+export function slideDragCount(selected: readonly number[], index: number): number;
 
 // @internal
 export function slideDropMarker(drag: SlideDrag | null, index: number): SlideDrag['side'] | undefined;
