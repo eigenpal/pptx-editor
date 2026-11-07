@@ -118,6 +118,8 @@ export class SlideSurface {
   readonly #cursor: CursorLayer;
   /** The frame that paints the items a paint budget left out (`PAINT_BUDGET`). */
   readonly #paintRest: NextFrame;
+  /** The view for the window, and the repaint when the window grows (surface-paint.ts). */
+  readonly #reach: paint.WindowReach;
   readonly #input: HTMLTextAreaElement;
   readonly #live: HTMLDivElement;
   readonly #resize: ResizeObserver;
@@ -187,6 +189,8 @@ export class SlideSurface {
     // The input sits in the stage, on the caret, so an IME candidate window opens there.
     this.#cursor = new CursorLayer(doc);
     this.#paintRest = new NextFrame(doc.defaultView as Window | null);
+    const shown = () => ((l) => l && { slide: l.slide, zoom: editor.zoom() })(editor.layout());
+    this.#reach = new paint.WindowReach(doc.defaultView, EMU_PER_PX, shown, () => this.render());
     this.#stage.append(this.#cursor.element, this.#overlay, this.#input);
     this.root.append(this.#stage, this.#live);
     host.append(this.root);
@@ -236,6 +240,7 @@ export class SlideSurface {
     this.host.removeEventListener('wheel', this.#onWheel);
     this.#unbindInput();
     this.#paintRest.stop();
+    this.#reach.destroy();
     this.root.remove();
   }
 
@@ -868,11 +873,7 @@ export class SlideSurface {
   }
 
   /** What the surface can show at this zoom (`surfaceView`). */
-  #view(layout: SlideLayout) {
-    const win = this.host.ownerDocument.defaultView;
-    const px = Math.max(win?.innerWidth ?? 0, win?.innerHeight ?? 0);
-    return paint.surfaceView(layout.slide, px, this.editor.zoom(), EMU_PER_PX);
-  }
+  #view = (layout: SlideLayout) => this.#reach.view(layout.slide, this.editor.zoom());
 
   /**
    * End a drag (an undo or a redo). A shape drag ends with no edit, and says so when it moved. A

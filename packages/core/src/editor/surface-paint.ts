@@ -5,6 +5,8 @@
 
 import type { ViewRect } from '../output/index.ts';
 
+type SlideSize = { readonly width: number; readonly height: number };
+
 /**
  * The part of slide space the editing surface can show (`PaintOptions.view`): the slide, and
  * past each edge as far as a window of `windowPx` CSS pixels (its larger side) reaches at
@@ -15,7 +17,7 @@ import type { ViewRect } from '../output/index.ts';
  * @internal
  */
 export function surfaceView(
-  slide: { readonly width: number; readonly height: number },
+  slide: SlideSize,
   windowPx: number,
   zoom: number,
   emuPerPx: number
@@ -30,6 +32,55 @@ export function surfaceView(
     width: slideWidth + 2 * margin,
     height: slideHeight + 2 * margin,
   };
+}
+
+/**
+ * The surface's view (`surfaceView`) for the window it is in. A window resize at a fixed zoom
+ * renders nothing else, so a window that grows past the next power of two repaints here: the
+ * overflowing text that it can now show paints on the next frame. @internal
+ */
+export class WindowReach {
+  readonly #frame: NextFrame;
+  /** The window size and zoom of the last view, or null before one. */
+  #last: { readonly px: number; readonly zoom: number } | null = null;
+
+  constructor(
+    private readonly win: Window | null,
+    private readonly emuPerPx: number,
+    /** The slide on the surface and its zoom, or undefined for none. */
+    private readonly shown: () => { readonly slide: SlideSize; readonly zoom: number } | undefined,
+    private readonly repaint: () => void
+  ) {
+    this.#frame = new NextFrame(win);
+    win?.addEventListener('resize', this.#onResize);
+  }
+
+  #px(): number {
+    return Math.max(this.win?.innerWidth ?? 0, this.win?.innerHeight ?? 0);
+  }
+
+  /** The view of `slide` at `zoom` in this window, which the next resize compares with. */
+  view(slide: SlideSize, zoom: number): ViewRect {
+    const px = this.#px();
+    this.#last = { px, zoom };
+    return surfaceView(slide, px, zoom, this.emuPerPx);
+  }
+
+  #onResize = (): void => {
+    const shown = this.shown();
+    const last = this.#last;
+    if (!shown || !last) return;
+    const before = surfaceView(shown.slide, last.px, last.zoom, this.emuPerPx);
+    const now = surfaceView(shown.slide, this.#px(), shown.zoom, this.emuPerPx);
+    // A smaller view can wait for the next render: what is painted past it never shows.
+    if (now.width > before.width) this.#frame.request(this.repaint);
+  };
+
+  /** Stop listening to the window. */
+  destroy(): void {
+    this.win?.removeEventListener('resize', this.#onResize);
+    this.#frame.stop();
+  }
 }
 
 /**

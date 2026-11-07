@@ -168,3 +168,58 @@ test('the surface view reaches as far as the window at the zoom, by powers of tw
   // No window (a server, a test) reaches one slide width.
   expect(surfaceView(slide, 0, 1, px).x).toBe(-slide.width);
 });
+
+test('a window that grows at a fixed zoom paints the overflowing lines that it can now show', async () => {
+  const g = globalThis as { ResizeObserver?: unknown };
+  g.ResizeObserver ??= (win as unknown as { ResizeObserver: unknown }).ResizeObserver;
+  win.happyDOM.setWindowSize({ width: 1024, height: 768 });
+  const added: unknown[] = [];
+  const dropped: unknown[] = [];
+  const listen = win.addEventListener.bind(win);
+  const unlisten = win.removeEventListener.bind(win);
+  win.addEventListener = ((type: string, fn: never) => {
+    if (type === 'resize') added.push(fn);
+    listen(type, fn);
+  }) as typeof win.addEventListener;
+  win.removeEventListener = ((type: string, fn: never) => {
+    if (type === 'resize') dropped.push(fn);
+    unlisten(type, fn);
+  }) as typeof win.removeEventListener;
+  try {
+    const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false, zoom: 1 });
+    const text = Array.from({ length: 3000 }, (_, i) => para(run(`line ${i}`))).join('');
+    const bytes = buildPptx({
+      slides: [
+        {
+          shapes: shape({
+            id: 2,
+            x: IN,
+            y: IN,
+            cx: 4 * IN,
+            cy: IN,
+            bodyPr: '<a:bodyPr wrap="square"><a:noAutofit/></a:bodyPr>',
+            text,
+          }),
+        },
+      ],
+    });
+    expect((await editor.load(bytes)).ok).toBe(true);
+    const host = doc.createElement('div') as unknown as HTMLElement;
+    doc.body.append(host as unknown as Node);
+    editor.attach(host);
+    const painted = () => host.querySelectorAll('.pptx-surface__slide text').length;
+    const near = painted();
+    expect(near).toBeGreaterThan(20);
+    expect(added).toHaveLength(1);
+    // A window eight times as large reaches further below the slide, at the same zoom.
+    win.happyDOM.setWindowSize({ width: 8192, height: 6144 });
+    for (let i = 0; i < 20 && painted() === near; i += 1) await wait(20);
+    expect(painted()).toBeGreaterThan(near);
+    editor.destroy();
+    expect(dropped).toEqual(added);
+  } finally {
+    win.addEventListener = listen;
+    win.removeEventListener = unlisten;
+    win.happyDOM.setWindowSize({ width: 1024, height: 768 });
+  }
+});
