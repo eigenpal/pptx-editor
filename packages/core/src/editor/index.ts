@@ -753,9 +753,11 @@ export {
   TRANSITION_KINDS,
   animationEffectLabelKey,
   animationListParts,
+  animationStartLabel,
   parseSeconds,
   secondsText,
   transitionKindLabelKey,
+  type AnimationStartLabel,
 } from './animation-pane.ts';
 export {
   hasPaneListener,

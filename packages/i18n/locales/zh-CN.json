@@ -917,6 +917,7 @@
       "secondsUnit": "秒",
       "advanceOnClick": "单击鼠标时",
       "advanceAfter": "设置自动换片时间",
+      "advanceAutomatically": "自动换片",
       "applyToAll": "应用到全部幻灯片",
       "effects": "效果",
       "addEffect": "添加效果",
@@ -948,6 +949,7 @@
       "emptyBody": "在幻灯片上选择一个形状，然后添加效果。",
       "readOnly": "编辑器显示这些效果，但不会更改它们。",
       "noPlayback": "编辑器不播放效果或切换。",
+      "invalidTime": "请输入允许范围内的秒数。",
       "start": "开始",
       "triggers": {
         "onClick": "单击时",

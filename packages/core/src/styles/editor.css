@@ -2312,6 +2312,11 @@
   font-size: 11.5px;
   line-height: 1.5;
 }
+.pptx-animations__error {
+  color: var(--doc-danger);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
 /* Selection pane: Show all, Hide all, and the order buttons over a tree of the slide's
    elements, top first. A hidden element is muted and shows a closed eye. */
 .pptx-selection-pane {

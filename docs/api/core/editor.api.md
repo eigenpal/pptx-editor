@@ -152,6 +152,22 @@ export function animationListParts(effects: readonly AnimationEffect_2[]): {
 export type AnimationPreset = 'appear' | 'fade' | 'flyIn' | 'wipe' | 'zoom' | 'pulse' | 'spin' | 'growShrink' | 'disappear' | 'fadeOut' | 'flyOut' | 'wipeOut' | 'zoomOut';
 
 // @public
+export type AnimationStartLabel = {
+    readonly key: 'panel.animations.withSlide';
+} | {
+    readonly key: 'panel.animations.step';
+    readonly step: number;
+} | {
+    readonly key: 'panel.animations.onShapeClick';
+    readonly shapeName: string;
+} | {
+    readonly key: `panel.animations.triggers.${AnimationTrigger}`;
+};
+
+// @public
+export function animationStartLabel(effect: Pick<AnimationEffect_2, 'sequence' | 'step' | 'trigger' | 'triggerShapeName'>): AnimationStartLabel;
+
+// @public
 export type AnimationTrigger = 'onClick' | 'withPrevious' | 'afterPrevious';
 
 // @internal

@@ -89,7 +89,8 @@ const PART_NUMBER = /(\d{1,10})\.[^./]*$/;
 /**
  * Adds to `minted` every number in the actor's stripe that `pkg` holds: shape ids
  * (`p:cNvPr/@id`), slide ids (`p:sldId/@id`), relationship ids (`rIdN`), part-name numbers,
- * slide creation ids (`p14:creationId/@val`), and time node ids (`p:cTn/@id`), each read as
+ * slide creation ids (`p14:creationId/@val`), time node ids (`p:cTn/@id`), and build group ids
+ * (`p:cTn/@grpId`, `p:bldP/@grpId`), each read as
  * `xsd:unsignedInt` (`unsignedIntId`). Comment indexes need no seed: a new index starts after the author's
  * `p:cmAuthor/@lastIdx`, which never goes down when a comment is deleted.
  *
@@ -122,6 +123,10 @@ export function seedMintedIds(minted: MintedIds, pkg: PptxPackage, actor: string
           break;
         case 'cTn':
           add('timeNodeId', unsignedIntId(attr(el, 'id')));
+          add('buildGroupId', unsignedIntId(attr(el, 'grpId')));
+          break;
+        case 'bldP':
+          add('buildGroupId', unsignedIntId(attr(el, 'grpId')));
           break;
         case 'creationId':
           add('creationId', unsignedIntId(attr(el, 'val')));

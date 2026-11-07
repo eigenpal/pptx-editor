@@ -117,7 +117,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'pictures.styles-border':
     'sha256:043e5036d5b63116d9ff5d107948c943d23bb309adca4f8a9eaee82137daf636',
   'presenting.animations-transitions':
-    'sha256:011639372529ef9a4c39d0162e3e74d3534fba3b57cacd7a2067c52092680a03',
+    'sha256:11fee431d75edb3255ee2e5fe61cfae95b23496c194e581df535033fe80c243d',
   'review.comments': 'sha256:f67938b2e1691f8c4005435cbaaaa5d30685c21acf3d82dd96d8418fa651bae1',
   'shapes.arrange': 'sha256:4701cd3ccd6930d3b7f250b7bb632460e869c08904ce4f132c7272c5764ad5f3',
   'shapes.connectors': 'sha256:e734d6ef3ed3218480c862dff622121acdee1f26ca896d8f5c6b4a8895dfbe23',

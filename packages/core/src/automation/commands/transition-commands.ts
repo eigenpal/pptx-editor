@@ -8,13 +8,15 @@
 // the duration from the `p14` branch and the kind from the first branch whose kind it knows.
 //
 // A change of the advance settings or the duration writes into every copy of the transition,
-// so a kind that the editor does not write (and its extension markup) stays. A change of the
+// so a kind that the editor does not write (and its extension markup) stays. A plain
+// `p:transition` holds only a speed: a duration that is no speed wraps it in a new
+// `mc:AlternateContent` whose `p14` choice holds the duration. A change of the
 // kind replaces the whole transition markup with a new `mc:AlternateContent`, and `none`
 // removes it. The new markup goes where `CT_Slide` puts the transition: after `p:clrMapOvr`
 // and before `p:timing` and `p:extLst`.
 
 import type { SlideTransitionState, TransitionKind } from '../../contracts/neutral.ts';
-import { attr, elements, NS, xmlPartOf, type Element } from '../../store/index.ts';
+import { attr, elements, NS, specOf, xmlPartOf, type Element } from '../../store/index.ts';
 import { timeOf } from './animation-model.ts';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
 import { specFromXml } from './shape-commands.ts';
@@ -28,17 +30,24 @@ export const MIN_TRANSITION_MS = 10;
 export const MAX_TRANSITION_MS = 59_000;
 export const MAX_ADVANCE_MS = 3_600_000;
 
+// The tables are `Map`s: their keys come from the file and from commands, and an object would
+// also answer for the keys of its prototype (`toString`, `constructor`, `__proto__`).
+
 /** The duration of each speed (`ST_TransitionSpeed`), in ms. */
-const SPEEDS: Readonly<Record<string, number>> = { fast: 500, med: 750, slow: 1000 };
+const SPEEDS: ReadonlyMap<string, number> = new Map([
+  ['fast', 500],
+  ['med', 750],
+  ['slow', 1000],
+]);
 
 /** The kinds the editor writes, with their element. */
-const KINDS: Readonly<Record<TransitionKind, string>> = {
-  fade: '<p:fade/>',
-  push: '<p:push dir="u"/>',
-  wipe: '<p:wipe/>',
-  split: '<p:split orient="vert"/>',
-  cut: '<p:cut/>',
-};
+const KINDS: ReadonlyMap<string, string> = new Map<TransitionKind, string>([
+  ['fade', '<p:fade/>'],
+  ['push', '<p:push dir="u"/>'],
+  ['wipe', '<p:wipe/>'],
+  ['split', '<p:split orient="vert"/>'],
+  ['cut', '<p:cut/>'],
+]);
 
 const NO_TRANSITION: SlideTransitionState = Object.freeze({
   kind: 'none',
@@ -89,7 +98,7 @@ function transitionOf(root: Element | undefined): { holders: Element[]; copies: 
 function kindOf(el: Element): SlideTransitionState['kind'] {
   const first = elements(el).find((c) => !(isP(c, 'sndAc') || isP(c, 'extLst')));
   if (!first) return 'none';
-  if (first.ns === NS.p && first.local in KINDS) return first.local as TransitionKind;
+  if (first.ns === NS.p && KINDS.has(first.local)) return first.local as TransitionKind;
   return 'other';
 }
 
@@ -99,7 +108,7 @@ export function readTransition(root: Element | undefined): SlideTransitionState 
   if (copies.length === 0) return NO_TRANSITION;
   const main = copies.find((c) => c.p14) ?? copies[0];
   const p14dur = timeOf(attr(main.el, { ns: NS.p14, local: 'dur' }));
-  const speed = SPEEDS[attr(main.el, 'spd') ?? 'fast'] ?? 500;
+  const speed = SPEEDS.get(attr(main.el, 'spd') ?? 'fast') ?? 500;
   const advTm = timeOf(attr(main.el, 'advTm'));
   const advClick = attr(main.el, 'advClick');
   return {
@@ -137,7 +146,8 @@ function newTransitionXml(state: SlideTransitionState): string | null {
   const advance = advanceAttrs(state.advanceOnClick, state.advanceAfterMs);
   if (state.kind === 'none' || state.kind === 'other')
     return advance ? `<p:transition${advance}/>` : null;
-  const body = KINDS[state.kind];
+  const body = KINDS.get(state.kind);
+  if (body === undefined) return null;
   const spd = speedOf(state.durationMs);
   return (
     `<mc:AlternateContent xmlns:mc="${NS.mc}"><mc:Choice xmlns:p14="${NS.p14}" Requires="p14">` +
@@ -161,7 +171,7 @@ function setAttr(
 export function setTransition(batch: OpBatch, part: string, change: TransitionChange): void {
   const root = xmlPartOf(batch.pkg, part)?.root;
   if (!root) throw new CommandRefusal('errors.malformed');
-  if (change.kind !== undefined && change.kind !== 'none' && !(change.kind in KINDS))
+  if (change.kind !== undefined && change.kind !== 'none' && !KINDS.has(change.kind))
     throw new CommandRefusal('errors.unsupported', 'kind');
   const current = readTransition(root);
   const next: SlideTransitionState = {
@@ -181,7 +191,15 @@ export function setTransition(batch: OpBatch, part: string, change: TransitionCh
   if (typeof next.advanceOnClick !== 'boolean') throw new CommandRefusal('errors.unsupported');
   const { holders, copies } = transitionOf(root);
   const before = batch.ops.length;
-  if (next.kind === current.kind && copies.length > 0) {
+  const sameKind = next.kind === current.kind && copies.length > 0;
+  const plainKeepsDuration =
+    sameKind &&
+    change.durationMs !== undefined &&
+    next.kind !== 'none' &&
+    holders.length === 1 &&
+    isP(holders[0], 'transition') &&
+    SPEEDS.get(speedOf(next.durationMs)) !== next.durationMs;
+  if (sameKind && !plainKeepsDuration) {
     // The same kind: write the settings into every copy, and keep the rest of the markup.
     for (const copy of copies) {
       setAttr(
@@ -204,6 +222,11 @@ export function setTransition(batch: OpBatch, part: string, change: TransitionCh
       if (copy.p14 || attr(copy.el, dur) !== undefined)
         setAttr(batch, part, copy.el, dur, String(next.durationMs));
     }
+  } else if (plainKeepsDuration) {
+    // A plain `p:transition` holds a speed only: a duration that is no speed gets the `p14`
+    // copy. The plain element moves into the fallback with its markup, and the choice is a
+    // copy of it with the duration.
+    wrapPlain(batch, part, root, copies[0].el, next);
   } else {
     for (const h of holders) batch.push({ op: 'removeNode', part, node: h.id });
     const xml = newTransitionXml(next);
@@ -225,4 +248,50 @@ export function setTransition(batch: OpBatch, part: string, change: TransitionCh
     }
   }
   if (batch.ops.length === before) throw new CommandRefusal('disabled.noAnimationChange');
+}
+
+/**
+ * Wrap the plain transition `el` in `mc:AlternateContent`: a `p14` choice with the duration and
+ * the advance settings, and the fallback with the speed. Both copies keep the element's other
+ * attributes and children.
+ */
+function wrapPlain(
+  batch: OpBatch,
+  part: string,
+  root: Element,
+  el: Element,
+  next: SlideTransitionState
+): void {
+  const index = root.children.indexOf(el);
+  const spd = speedOf(next.durationMs);
+  const advance = { advClick: next.advanceOnClick ? null : '0', advTm: next.advanceAfterMs };
+  const node = batch.insert({
+    op: 'insertNode',
+    part,
+    parent: root.id,
+    index,
+    spec: specFromXml(
+      `<mc:AlternateContent xmlns:mc="${NS.mc}"><mc:Choice xmlns:p14="${NS.p14}" Requires="p14"/>` +
+        '<mc:Fallback/></mc:AlternateContent>'
+    ),
+  });
+  const ac = batch.element(part, node);
+  const [choice, fallback] = elements(ac);
+  batch.push({
+    op: 'insertNode',
+    part,
+    parent: choice.id,
+    index: 0,
+    spec: specOf(el),
+  });
+  batch.push({ op: 'moveNode', part, node: el.id, parent: fallback.id, index: 0 });
+  const copy = elements(batch.element(part, choice.id))[0];
+  for (const target of [copy, el]) {
+    setAttr(batch, part, target, { ns: '', local: 'spd' }, spd);
+    setAttr(batch, part, target, { ns: '', local: 'advClick' }, advance.advClick);
+    const tm = advance.advTm === null ? null : String(advance.advTm);
+    setAttr(batch, part, target, { ns: '', local: 'advTm' }, tm);
+  }
+  const dur = { ns: NS.p14, local: 'dur', prefix: 'p14' };
+  setAttr(batch, part, copy, dur, String(next.durationMs));
 }

@@ -12,6 +12,7 @@ import {
   TRANSITION_KINDS,
   animationEffectLabelKey,
   animationListParts,
+  animationStartLabel,
   parseSeconds,
   secondsText,
   transitionKindLabelKey,
@@ -23,7 +24,10 @@ import {
 import { ToolButton } from './chrome.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
 
-/** A seconds field that commits on Enter or blur and shows the document value otherwise. */
+/**
+ * A seconds field that commits on Enter or blur and shows the document value otherwise. A value
+ * that is not a number of seconds, or that the editor refuses, stays in the field with an error.
+ */
 function SecondsField({
   label,
   ms,
@@ -33,15 +37,22 @@ function SecondsField({
   label: string;
   ms: number;
   disabled: boolean;
-  onCommit: (ms: number) => void;
+  onCommit: (ms: number) => boolean;
 }) {
   const { t } = useTranslation();
+  const errorId = useId();
   const [draft, setDraft] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState(false);
   const shown = secondsText(ms);
-  const commit = (): void => {
-    const value = draft === null ? null : parseSeconds(draft);
-    if (value !== null && draft !== shown) onCommit(value);
+  const reset = (): void => {
     setDraft(null);
+    setInvalid(false);
+  };
+  const commit = (): void => {
+    if (draft === null) return;
+    const value = draft === shown ? null : parseSeconds(draft);
+    if (draft === shown || (value !== null && onCommit(value))) reset();
+    else setInvalid(true);
   };
   return (
     <label className="pptx-field">
@@ -50,6 +61,8 @@ function SecondsField({
         <input
           inputMode="decimal"
           aria-label={label}
+          aria-invalid={invalid}
+          aria-describedby={invalid ? errorId : undefined}
           value={draft ?? shown}
           disabled={disabled}
           data-draft={draft !== null}
@@ -57,11 +70,16 @@ function SecondsField({
           onBlur={commit}
           onKeyDown={(e) => {
             if (e.key === 'Enter') commit();
-            if (e.key === 'Escape') setDraft(null);
+            if (e.key === 'Escape') reset();
           }}
         />
         <span className="pptx-field__unit">{t('panel.animations.secondsUnit')}</span>
       </span>
+      {invalid ? (
+        <span id={errorId} className="pptx-animations__error" role="alert">
+          {t('panel.animations.invalidTime')}
+        </span>
+      ) : null}
     </label>
   );
 }
@@ -79,7 +97,7 @@ function TransitionSection({ disabled }: { disabled: boolean }) {
     durationMs?: number;
     advanceOnClick?: boolean;
     advanceAfterMs?: number | null;
-  }) => editor?.exec({ type: 'setTransition', ...change });
+  }) => editor?.exec({ type: 'setTransition', ...change }).ok === true;
   return (
     <div className="pptx-panel__section">
       <h3 className="pptx-panel__title">{t('panel.animations.transition')}</h3>
@@ -109,7 +127,7 @@ function TransitionSection({ disabled }: { disabled: boolean }) {
           label={t('panel.animations.duration')}
           ms={transition.durationMs}
           disabled={disabled || transition.kind === 'none'}
-          onCommit={(ms) => set({ durationMs: Math.max(10, ms) })}
+          onCommit={(ms) => set({ durationMs: ms })}
         />
         <SecondsField
           label={t('panel.animations.advanceAfter')}
@@ -135,7 +153,7 @@ function TransitionSection({ disabled }: { disabled: boolean }) {
             disabled={disabled}
             onChange={(e) => set({ advanceAfterMs: e.currentTarget.checked ? 0 : null })}
           />
-          {t('panel.animations.advanceAfter')}
+          {t('panel.animations.advanceAutomatically')}
         </label>
       </div>
       <button
@@ -170,14 +188,13 @@ function EffectRow({
   onSelect: () => void;
 }) {
   const { t } = useTranslation();
+  const label = animationStartLabel(effect);
   const start =
-    effect.step === null
-      ? t('panel.animations.onShapeClick', {
-          shape: effect.triggerShapeName || t('panel.animations.unnamed'),
-        })
-      : effect.step === 0
-        ? t('panel.animations.withSlide')
-        : t('panel.animations.step', { step: effect.step });
+    'step' in label
+      ? t(label.key, { step: label.step })
+      : 'shapeName' in label
+        ? t(label.key, { shape: label.shapeName || t('panel.animations.unnamed') })
+        : t(label.key);
   return (
     <li className="pptx-animations__item">
       <button
@@ -223,7 +240,7 @@ function EffectFields({
   const startId = useId();
   const off = disabled || !effect.editable;
   const timing = (change: { trigger?: AnimationTrigger; delayMs?: number; durationMs?: number }) =>
-    editor?.exec({ type: 'setAnimationTiming', effectId: effect.id, ...change });
+    editor?.exec({ type: 'setAnimationTiming', effectId: effect.id, ...change }).ok === true;
   return (
     <div className="pptx-panel__section pptx-animations__fields">
       <label className="pptx-field" htmlFor={startId}>
@@ -253,7 +270,7 @@ function EffectFields({
           label={t('panel.animations.duration')}
           ms={effect.durationMs ?? 0}
           disabled={off || effect.durationMs === null}
-          onCommit={(ms) => timing({ durationMs: Math.max(10, ms) })}
+          onCommit={(ms) => timing({ durationMs: ms })}
         />
       </div>
       <div className="pptx-animations__actions">
@@ -292,7 +309,9 @@ export function AnimationsPane() {
   const readOnly = useEditorState((s) => s.status !== 'ready' || s.mode === 'view');
   const hasSelection = useEditorState((s) => s.selection.kind !== 'none');
   const [preset, setPreset] = useState<AnimationPreset>('fade');
-  const [chosen, setChosen] = useState<string | null>(null);
+  const slide = useEditorState((s) => s.currentSlide);
+  // The chosen effect, on its slide: effect ids are unique on one slide only.
+  const [chosen, setChosen] = useState<{ slide: number; id: string } | null>(null);
   const presetId = useId();
   const listId = useId();
   // The canvas shows the order of the effects while the tab shows.
@@ -303,16 +322,17 @@ export function AnimationsPane() {
   }, [editor]);
   const effects = animations?.effects ?? [];
   const { main, other } = animationListParts(effects);
-  const current = effects.find((e) => e.id === chosen) ?? null;
+  const current =
+    chosen?.slide === slide ? (effects.find((e) => e.id === chosen.id) ?? null) : null;
   const select = (effect: AnimationEffect): void => {
-    setChosen(effect.id);
+    setChosen({ slide, id: effect.id });
     if (effect.nodeId) editor?.setSelection({ kind: 'shapes', nodeIds: [effect.nodeId] });
   };
   const add = (): void => {
     const before = new Set(effects.map((e) => e.id));
     if (!editor?.exec({ type: 'addAnimation', preset }).ok) return;
     const added = editor.snapshot().animations?.effects.find((e) => !before.has(e.id));
-    if (added) setChosen(added.id);
+    if (added) setChosen({ slide, id: added.id });
   };
   const editable = !readOnly && animations?.editable !== false;
   return (

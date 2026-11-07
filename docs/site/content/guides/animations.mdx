@@ -54,11 +54,11 @@ editor.exec({ type: 'addAnimation', preset: 'pulse', trigger: 'afterPrevious' })
 
 These presets are available:
 
-| Class | Presets |
-| --- | --- |
-| Entrance | `appear`, `fade`, `flyIn`, `wipe`, `zoom` |
-| Emphasis | `pulse`, `spin`, `growShrink` |
-| Exit | `disappear`, `fadeOut`, `flyOut`, `wipeOut`, `zoomOut` |
+| Class    | Presets                                                |
+| -------- | ------------------------------------------------------ |
+| Entrance | `appear`, `fade`, `flyIn`, `wipe`, `zoom`              |
+| Emphasis | `pulse`, `spin`, `growShrink`                          |
+| Exit     | `disappear`, `fadeOut`, `flyOut`, `wipeOut`, `zoomOut` |
 
 `trigger` defaults to `onClick`. When you select more than one shape, the first effect takes `trigger` and the others play with it. A shape with text also gets a build entry (`p:bldP`), so the text animates with the shape.
 
@@ -82,7 +82,7 @@ The editor keeps the click steps of the main sequence in agreement with the trig
 
 ## Remove an effect
 
-`removeAnimation` removes one effect. When no other effect of the same shape and group is left, its build entry goes too. When the last effect goes, the slide's timing goes.
+`removeAnimation` removes one effect. The other effects keep their click steps and play at the same time: when the removed effect started a step or a group, the next effect takes its trigger. When no other effect of the same shape and group is left, its build entry goes too. When the last effect goes, the slide's timing goes.
 
 ```ts
 editor.exec({ type: 'removeAnimation', effectId: effect.id });
@@ -116,7 +116,7 @@ editor.exec({
 editor.exec({ type: 'setTransition', kind: 'none', advanceAfterMs: null });
 ```
 
-`kind` is `fade`, `push`, `wipe`, `split`, `cut`, or `none`. A transition of another kind reads as `other`. A change of the duration or the advance settings keeps that kind and its extension markup. A change of the kind replaces it. Duration is 10 to 59,000 ms, and `advanceAfterMs` is 0 to 3,600,000 ms or `null`.
+`kind` is `fade`, `push`, `wipe`, `split`, `cut`, or `none`. A transition of another kind reads as `other`. A change of the duration or the advance settings keeps that kind and its extension markup. A transition without extension markup holds only a speed (fast, medium, or slow): a duration between the speeds adds the extension markup that holds it. A change of the kind replaces the markup. Duration is 10 to 59,000 ms, and `advanceAfterMs` is 0 to 3,600,000 ms or `null`.
 
 ## Show the order on the canvas
 
@@ -132,4 +132,4 @@ editor.exec({ type: 'showAnimationOrder', show: true });
 - A slide whose timing is in markup-compatibility content (`mc:AlternateContent`) is read-only, and `editable` is `false`. The effect commands refuse with `disabled.animationsReadOnly`.
 - A main sequence with a structure that the commands do not write is read-only for the same reason.
 - When two collaborators add the first effect of a slide at the same time, the merge can keep only one of the two effects.
-- When one collaborator removes an effect while another adds, moves, or times an effect on the same slide, the merge can keep the removed effect.
+- When one collaborator removes an effect while another moves that effect to another click step or group (with a new start, or a new order inside a step), the merge can keep the removed effect.

@@ -917,6 +917,7 @@
       "secondsUnit": "초",
       "advanceOnClick": "마우스를 클릭할 때",
       "advanceAfter": "다음 시간 후",
+      "advanceAutomatically": "자동으로 넘기기",
       "applyToAll": "모든 슬라이드에 적용",
       "effects": "효과",
       "addEffect": "효과 추가",
@@ -948,6 +949,7 @@
       "emptyBody": "슬라이드에서 도형을 선택한 다음 효과를 추가하세요.",
       "readOnly": "편집기는 이 효과를 표시하지만 변경하지 않습니다.",
       "noPlayback": "편집기는 효과나 전환을 재생하지 않습니다.",
+      "invalidTime": "허용된 범위의 초를 입력하세요.",
       "start": "시작",
       "triggers": {
         "onClick": "클릭할 때",
