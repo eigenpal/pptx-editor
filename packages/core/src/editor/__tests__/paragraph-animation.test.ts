@@ -228,6 +228,46 @@ describe('paragraph ranges of effects', () => {
     expect(ids(rootOf(e))).toEqual(['10']);
   });
 
+  /** Put the caret at `[p, o]` and press `key`. */
+  function press(
+    e: PptxEditorInstance,
+    p: number,
+    o: number,
+    key: 'deleteForward' | 'deleteBackward'
+  ) {
+    e.setSelection({
+      kind: 'text',
+      nodeId: shapeNode(e),
+      anchor: { paragraph: p, offset: o },
+      focus: { paragraph: p, offset: o },
+    });
+    expect(e.input(key).ok).toBe(true);
+  }
+
+  test('Delete at the end of a paragraph removes the effect of the empty one after it', async () => {
+    const e = await open(effect(10, 0, 0) + effect(20, 1, 1), ['X', '', 'Y']);
+    press(e, 0, 1, 'deleteForward');
+    expect(ids(rootOf(e))).toEqual(['10']);
+  });
+
+  test('Delete in the first of two empty paragraphs removes the effect of the second', async () => {
+    const e = await open(effect(10, 1, 1) + effect(20, 2, 2), ['X', '', '', 'Y']);
+    press(e, 1, 0, 'deleteForward');
+    expect(ids(rootOf(e))).toEqual(['10']);
+  });
+
+  test('Backspace in the second of two empty paragraphs removes its effect', async () => {
+    const e = await open(effect(10, 1, 1) + effect(20, 2, 2), ['X', '', '', 'Y']);
+    press(e, 2, 0, 'deleteBackward');
+    expect(ids(rootOf(e))).toEqual(['10']);
+  });
+
+  test('Backspace in an empty paragraph after an empty one removes its effect', async () => {
+    const e = await open(effect(10, 0, 0) + effect(20, 1, 1), ['', '', '']);
+    press(e, 1, 0, 'deleteBackward');
+    expect(ids(rootOf(e))).toEqual(['10']);
+  });
+
   test('Enter between identical paragraphs moves only the ranges after the caret', async () => {
     const e = await open(effect(10, 0, 0) + effect(20, 1, 1), ['', '', 'Gamma']);
     e.setSelection({
@@ -267,6 +307,27 @@ describe('paragraph ranges of effects', () => {
       ['1', '1'],
       ['2', '2'],
     ]);
+  });
+
+  test('Enter in the drawn choice of mc:AlternateContent moves the ranges', async () => {
+    const e = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    const text = para(run('Alpha')) + para(run('Beta')) + para(run('Gamma'));
+    const sp = shape({ id: 2, name: 'List', x: IN, y: IN, cx: 6 * IN, cy: 3 * IN, text });
+    const mc = 'http://schemas.openxmlformats.org/markup-compatibility/2006';
+    const p14 = 'http://schemas.microsoft.com/office/powerpoint/2010/main';
+    const shapes =
+      `<mc:AlternateContent xmlns:mc="${mc}"><mc:Choice xmlns:p14="${p14}" Requires="p14">` +
+      `${sp}</mc:Choice><mc:Fallback>${sp}</mc:Fallback></mc:AlternateContent>`;
+    const deck = buildPptx({ slides: [{ shapes, ext: timing(effect(10, 1, 1)) }] });
+    expect((await e.load(deck)).ok).toBe(true);
+    e.setSelection({
+      kind: 'text',
+      nodeId: find(find(rootOf(e), 'mc:Choice')!, 'p:sp')!.id,
+      anchor: { paragraph: 0, offset: 0 },
+      focus: { paragraph: 0, offset: 0 },
+    });
+    expect(e.input('paragraph').ok).toBe(true);
+    expect(ranges(rootOf(e))).toEqual([['2', '2']]);
   });
 
   test('typing in an animated paragraph keeps every range', async () => {
