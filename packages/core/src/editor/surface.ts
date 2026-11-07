@@ -255,6 +255,7 @@ export class SlideSurface {
     const zoom = this.editor.zoom();
     // A dragged shape that changed under the drag (a peer's edit) ends the drag.
     this.#drag.check(layout);
+    this.#syncRotating();
     if (!layout) {
       this.#stage.querySelector('.pptx-surface__slide')?.remove();
       this.#paintKey = null;
@@ -505,6 +506,12 @@ export class SlideSurface {
     start: { x: number; y: number }
   ): void {
     this.#drag.start(handle, ids, start, `g${++this.#gestures}`);
+    this.#syncRotating();
+  }
+
+  /** A rotation drag keeps the rotate pointer, off the handle too (`pptx-surface--rotating`). */
+  #syncRotating(): void {
+    this.root.classList.toggle('pptx-surface--rotating', this.#drag.rotating);
   }
 
   #onPointerDown = (e: PointerEvent): void => {
@@ -859,6 +866,7 @@ export class SlideSurface {
     if (this.#table.up()) this.focus();
     // A shape drag writes its last boxes as one edit.
     this.#drag.release();
+    this.#syncRotating();
     const m = this.#marquee;
     if (!m) return;
     this.#marquee = null;
