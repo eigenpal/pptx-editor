@@ -182,32 +182,38 @@ test('copies of different slides keep one saved file per revision, and a repeat 
   expect(savedSlideCopy(pkg)).toBe('0');
 });
 
-/** The fastest of three runs of `command` on a deck of `n` slides, in milliseconds. */
-async function fastest(
+/** One run of `command` on a deck of `bytes` with `n` slides, in milliseconds. */
+async function once(
+  bytes: Uint8Array,
   n: number,
   command: (n: number) => Parameters<PptxEditorInstance['exec']>[0]
-) {
-  const bytes = deck(n);
-  let best = Infinity;
-  for (let k = 0; k < 3; k += 1) {
-    const e = await open(bytes);
-    const t0 = performance.now();
-    expect(e.exec(command(n)).ok).toBe(true);
-    best = Math.min(best, performance.now() - t0);
-    e.destroy();
-  }
-  return best;
+): Promise<number> {
+  const e = await open(bytes);
+  const t0 = performance.now();
+  expect(e.exec(command(n)).ok).toBe(true);
+  const ms = performance.now() - t0;
+  e.destroy();
+  return ms;
 }
 
 const all = (from: number, n: number) => Array.from({ length: n - from }, (_, i) => from + i);
 
-/** How many times as long `command` takes on four times the slides (`n` and `4 n`). */
+/**
+ * How many times as long `command` takes on four times the slides (`n` and `4 n`): the fastest
+ * of four runs of each, in turns, so a busy machine slows both sizes alike.
+ */
 async function growth(
   n: number,
   command: (n: number) => Parameters<PptxEditorInstance['exec']>[0]
 ): Promise<number> {
-  const small = await fastest(n, command);
-  const large = await fastest(4 * n, command);
+  const smallDeck = deck(n);
+  const largeDeck = deck(4 * n);
+  let small = Infinity;
+  let large = Infinity;
+  for (let k = 0; k < 4; k += 1) {
+    small = Math.min(small, await once(smallDeck, n, command));
+    large = Math.min(large, await once(largeDeck, 4 * n, command));
+  }
   return large / Math.max(small, 1);
 }
 

@@ -1,7 +1,7 @@
 // Synthetic decks with adversarial payloads: pictures that decode to huge bitmaps, SVG and
 // metafile pictures that expand or loop, effects whose paint cost grows with a radius, charts
 // with huge data, and package parts that try to exhaust the reader. `HANG_DECKS` includes them,
-// so `hang-check.ts` and `e2e/hang.bench.ts` open each one with a time budget.
+// so `hang-check.ts` and `e2e/hang.stress.ts` open each one with a time budget.
 
 import { buildPptx, para, run, shape, solid } from '../fixtures/builder.ts';
 import { IN, LOREM, R_NS, box, one, patched, range, SLIDE, type HangDeck } from './deck-parts.ts';
