@@ -844,11 +844,23 @@ export class SlidePainter {
     };
     let left = budget;
     this.#pending = false;
+    // The earlier nodes of the shapes that a budget leaves out, by node id: each stays on
+    // screen in its place until its shape paints again (a font load or a theme edit makes
+    // every item new).
+    let earlier: Map<string, [LayoutItem, PaintedItem]> | null = null;
+    let current: Set<LayoutItem> | null = null;
     for (const item of layout.items) {
       let painted: PaintedItem;
       const kept = next.has(item) ? undefined : this.#items.get(item);
       if (!kept && left <= 0) {
         this.#pending = true;
+        earlier ??= new Map([...this.#items].map(([i, p]) => [i.element.nodeId, [i, p]] as const));
+        current ??= new Set(layout.items);
+        const stand = earlier.get(item.element.nodeId);
+        if (stand && !next.has(stand[0]) && !current.has(stand[0])) {
+          next.set(stand[0], stand[1]);
+          if (stand[1].node) nodes.push(stand[1].node);
+        }
         continue;
       }
       if (next.has(item)) {

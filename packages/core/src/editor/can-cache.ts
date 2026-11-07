@@ -41,11 +41,15 @@ export const STRUCTURE_COMMANDS: ReadonlySet<EditorCommand['type']> = new Set([
 export const LARGE_SELECTION = 250;
 
 /**
- * The number of XML nodes from which the selected shapes are large, as more than
- * {@link LARGE_SELECTION} shapes are: one text box of 50,000 runs holds 150,000 nodes, and a
- * check of Duplicate copies them all.
+ * The number of XML nodes from which the selected shapes are large for the commands that copy
+ * them ({@link COPYING_COMMANDS}): one text box of 50,000 runs holds 150,000 nodes, and a check
+ * of Duplicate copies them all. Other commands check such a selection in full: a check of
+ * Group on one shape still says that Group needs two.
  */
 export const LARGE_SELECTION_NODES = 20_000;
+
+/** Commands whose check copies every node of the selected shapes. */
+const COPYING_COMMANDS: ReadonlySet<EditorCommand['type']> = new Set(['duplicate']);
 
 /**
  * Commands that edit every placeholder of a slide, whatever the selection: a check of one on a
@@ -59,7 +63,8 @@ const SLIDE_WIDE_COMMANDS: ReadonlySet<EditorCommand['type']> = new Set([
 /**
  * The quick `can` answer for a large shape selection (`LARGE_SELECTION`,
  * `LARGE_SELECTION_NODES`) on slide `slide` of `session`, or for a slide-wide command on a large
- * slide; null to check the command in full. @internal
+ * slide; null to check the command in full. A {@link STRUCTURE_COMMANDS} answer is cached
+ * without the selection, so it never takes the quick answer. @internal
  */
 export function largeSelectionAnswer(
   selection: { readonly kind: string; readonly nodeIds?: readonly string[] },
@@ -68,6 +73,7 @@ export function largeSelectionAnswer(
   slide = 0,
   command?: EditorCommand
 ): CanResult | null {
+  if (command && STRUCTURE_COMMANDS.has(command.type)) return null;
   const pkg = session?.store.package;
   const part = session?.info.slides[slide]?.partName;
   const quick: CanResult = readOnly ? { ok: false, reason: 'disabled.viewing' } : { ok: true };
@@ -77,15 +83,13 @@ export function largeSelectionAnswer(
   }
   if (selection.kind !== 'shapes') return null;
   const ids = selection.nodeIds ?? [];
-  if (ids.length <= LARGE_SELECTION && !holdsManyNodes(pkg, part, ids)) return null;
-  return quick;
+  if (ids.length > LARGE_SELECTION) return quick;
+  const copies = !command || COPYING_COMMANDS.has(command.type);
+  return copies && holdsManyNodes(pkg, part, ids) ? quick : null;
 }
 
-/** The last answer of `holdsManyNodes` per package: the toolbar asks it once per command. */
-const lastCounts = new WeakMap<
-  PptxPackage,
-  { part: string; ids: readonly string[]; many: boolean }
->();
+/** The answers of `holdsManyNodes` per package, by part and ids: asked once per command. */
+const counts = new WeakMap<PptxPackage, Map<string, boolean>>();
 
 /** Whether the shapes `ids` of `part` hold more than {@link LARGE_SELECTION_NODES} nodes. */
 function holdsManyNodes(
@@ -94,8 +98,12 @@ function holdsManyNodes(
   ids: readonly string[]
 ): boolean {
   if (!pkg || !part) return false;
-  const last = lastCounts.get(pkg);
-  if (last?.part === part && last.ids === ids) return last.many;
+  // At most `LARGE_SELECTION` ids: the key costs little next to the walk it saves.
+  const key = `${part}\u0000${ids.join('\u0000')}`;
+  let known = counts.get(pkg);
+  if (!known) counts.set(pkg, (known = new Map()));
+  const was = known.get(key);
+  if (was !== undefined) return was;
   const xml = xmlPartOf(pkg, part);
   const index = xml ? nodeIndex(xml) : undefined;
   let left = LARGE_SELECTION_NODES;
@@ -111,7 +119,7 @@ function holdsManyNodes(
     if (node.type === 'element') for (const kid of node.children) stack.push(kid);
   }
   const many = left <= 0;
-  lastCounts.set(pkg, { part, ids, many });
+  known.set(key, many);
   return many;
 }
 
@@ -121,7 +129,8 @@ export const TYPING_SETTLE_MS = 300;
 /**
  * Formatting commands whose `can` answer depends on the text box and the mode, not on the text
  * typed into it: a typing burst keeps their answers (`CanCache.typed`). A link reads the caret
- * position, so Insert Link is not one of them. @internal
+ * position, so Insert Link is not one of them. Typing can start a list ("1. "), so the list
+ * commands are not either. @internal
  */
 export const TYPING_STABLE_COMMANDS: ReadonlySet<EditorCommand['type']> = new Set([
   'toggleBold',
@@ -136,10 +145,6 @@ export const TYPING_STABLE_COMMANDS: ReadonlySet<EditorCommand['type']> = new Se
   'toggleFormatPainter',
   'setAlign',
   'setLineSpacing',
-  'toggleBullets',
-  'toggleNumbering',
-  'setBulletFormat',
-  'indent',
 ]);
 
 /**

@@ -208,3 +208,105 @@ test('ops on the runs of one long paragraph copy its child list once', () => {
   expect(work.indexWrites).toBe(3 + (ops.length - 1));
   expect(performance.now() - start).toBeLessThan(2000);
 });
+
+test('a held element keeps its subtree when a later edit copies a path through it', () => {
+  const r = parseXmlPart(
+    PART,
+    `<p:sld xmlns:p="${NS.p}"><p:t><p:p><p:r/></p:p><p:p><p:r/></p:p></p:t></p:sld>`
+  );
+  if (!r.ok) throw new Error('fixture');
+  const t = r.part.root.children[0] as Element;
+  const [p1, p2] = t.children as Element[];
+  const pkg: PptxPackage = {
+    parts: new Map([[PART, { kind: 'xml', partName: PART, xml: r.part }]]),
+  };
+  const tx = openTransaction(pkg);
+  const attr = (node: string, value: string) =>
+    tx.apply({ op: 'setAttribute', part: PART, node, name: { ns: '', local: 'v' }, value });
+  const show = (el: Element) => serializeXmlPart({ partName: PART, root: el, nextId: 0 });
+  // The tree owns copies of the second paragraph and its path after this edit.
+  expect(attr(p2!.children[0]!.id, '1')).toBeNull();
+  const held = tx.element(PART, t.id)!;
+  const before = show(held);
+  // A copy of the held text body shares the owned second paragraph with it.
+  expect(attr(p1!.children[0]!.id, '2')).toBeNull();
+  const spec = { ns: NS.p, local: 'r', prefix: 'p', attrs: [] };
+  expect(tx.apply({ op: 'insertNode', part: PART, parent: p2!.id, index: 0, spec })).toBeNull();
+  expect(show(held)).toBe(before);
+});
+
+/** A three-level tree: 3 `p:a`, each with 4 `p:b`, each with 3 `p:c` that hold text. */
+function deepPkg(): PptxPackage {
+  const c = '<p:c>t</p:c>'.repeat(3);
+  const a = `<p:a>${`<p:b>${c}</p:b>`.repeat(4)}</p:a>`;
+  const r = parseXmlPart(PART, `<p:root xmlns:p="${NS.p}">${a.repeat(3)}</p:root>`);
+  if (!r.ok) throw new Error('fixture');
+  return { parts: new Map([[PART, { kind: 'xml', partName: PART, xml: r.part }]]) };
+}
+
+const allElements = (el: Element, out: Element[] = []): Element[] => {
+  out.push(el);
+  for (const k of el.children) if (k.type === 'element') allElements(k, out);
+  return out;
+};
+
+test('elements held between random ops, revisions, and the base never change', () => {
+  const show = (el: Element) => serializeXmlPart({ partName: PART, root: el, nextId: 0 });
+  for (let seed = 1; seed < 300; seed += 1) {
+    const r = random(seed);
+    const pkg = deepPkg();
+    const base = show(xmlPartOf(pkg, PART)!.root);
+    const tx = openTransaction(pkg);
+    let step = pkg;
+    const held: { el: Element; xml: string }[] = [];
+    for (let i = 0; i < 60; i += 1) {
+      const els = allElements(xmlPartOf(step, PART)!.root);
+      const el = els[r(els.length)]!;
+      const other = els[r(els.length)]!;
+      const pick = r(6);
+      const op: PptxOp =
+        pick === 0
+          ? {
+              op: 'insertNode',
+              part: PART,
+              parent: el.id,
+              index: r(el.children.length + 1),
+              spec: { ns: NS.p, local: 'n', prefix: 'p', attrs: [] },
+            }
+          : pick === 1
+            ? { op: 'removeNode', part: PART, node: el.id }
+            : pick === 2
+              ? {
+                  op: 'moveNode',
+                  part: PART,
+                  node: el.id,
+                  parent: other.id,
+                  index: r(other.children.length + 1),
+                }
+              : pick === 3
+                ? { op: 'setText', part: PART, node: el.id, text: `x${i}` }
+                : {
+                    op: 'setAttribute',
+                    part: PART,
+                    node: el.id,
+                    name: { ns: '', local: 'v' },
+                    value: String(i),
+                  };
+      const applied = applyOps(step, [op]);
+      if (!applied.ok) continue;
+      step = applied.pkg;
+      expect(tx.apply(op)).toBeNull();
+      if (r(2)) {
+        const ids = allElements(xmlPartOf(step, PART)!.root);
+        const h = tx.element(PART, ids[r(ids.length)]!.id);
+        if (h) held.push({ el: h, xml: show(h) });
+      }
+    }
+    const done = tx.finish();
+    expect(show(xmlPartOf(pkg, PART)!.root)).toBe(base);
+    for (const { el, xml } of held) expect(show(el)).toBe(xml);
+    const part = xmlPartOf(done, PART)!;
+    expect(show(part.root)).toBe(show(xmlPartOf(step, PART)!.root));
+    expect(stale(part)).toEqual([]);
+  }
+});

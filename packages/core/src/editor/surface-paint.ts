@@ -5,8 +5,8 @@
 
 /**
  * The new items that one frame paints. A slide with more goes on screen over several frames
- * (`SlidePainter.paint`), so opening a slide of 24,000 shapes never blocks for seconds. Items
- * painted before stay on screen through an edit. @internal
+ * (`SlidePainter.paint`), so opening a slide of 24,000 shapes never blocks for seconds. Until a
+ * shape paints again, its earlier node stays on screen. @internal
  */
 export const PAINT_BUDGET = 2_000;
 

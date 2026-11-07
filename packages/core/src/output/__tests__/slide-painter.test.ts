@@ -139,3 +139,36 @@ test('a budget paints a slide over several calls, in paint order, as one paint w
   expect(normalized(svg)).toBe(normalized(paintSlide(doc, next, opts)));
   editor.destroy();
 });
+
+test('while a budget repaints new items, each earlier node stays in its place', async () => {
+  const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  expect((await editor.load(deck())).ok).toBe(true);
+  const opts: PaintOptions = { images: () => undefined, idPrefix: 'x' };
+  const painter = new SlidePainter(doc, opts);
+  const layout = editor.session!.layout(0)!;
+  const ids = layout.items.map((i) => i.element.nodeId);
+  const shown = (svg: Element) =>
+    [...svg.querySelectorAll('[data-kind="content"] > [data-node-id]')].map((n) =>
+      n.getAttribute('data-node-id')
+    );
+  const svg = painter.paint(layout);
+  const before = new Map(ids.map((id) => [id, svg.querySelector(`[data-node-id="${id}"]`)]));
+  // Every item new, as after a font load: the same shapes, new objects.
+  const fresh = { ...layout, items: layout.items.map((i) => ({ ...i })) };
+  painter.paint(fresh, 5);
+  expect(painter.pending).toBe(true);
+  expect(shown(svg)).toEqual(ids);
+  ids.forEach((id, i) => {
+    const node = svg.querySelector(`[data-node-id="${id}"]`);
+    if (i < 5) expect(node).not.toBe(before.get(id)!);
+    else expect(node).toBe(before.get(id)!);
+  });
+  painter.paint(fresh, 5);
+  painter.paint(fresh, 5);
+  expect(painter.pending).toBe(false);
+  expect(shown(svg)).toEqual(ids);
+  for (const id of ids)
+    expect(svg.querySelector(`[data-node-id="${id}"]`)).not.toBe(before.get(id)!);
+  expect(normalized(svg)).toBe(normalized(paintSlide(doc, fresh, opts)));
+  editor.destroy();
+});

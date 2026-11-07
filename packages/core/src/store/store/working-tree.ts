@@ -182,14 +182,22 @@ export class WorkingTree {
    */
   #writable(id: NodeId): boolean {
     const loc = this.#loc(id);
-    if (!loc || !this.#owned.has(loc.node)) return false;
-    for (
-      let at: Location | undefined = loc;
-      at;
-      at = at.parent === null ? undefined : this.#loc(at.parent)
-    )
-      if (this.#held.has(at.node)) return false;
-    return true;
+    return !!loc && this.#owned.has(loc.node) && !this.#underHeld(id);
+  }
+
+  /** Whether a caller holds the node `id` or one of its ancestors. */
+  #underHeld(id: NodeId): boolean {
+    for (let at = this.#loc(id); at; at = at.parent === null ? undefined : this.#loc(at.parent))
+      if (this.#held.has(at.node)) return true;
+    return false;
+  }
+
+  /**
+   * A copy of `el`, which a caller can reach (`#underHeld`), shares the other children of `el`:
+   * the caller reaches them too, so they are held, and an edit below one copies it.
+   */
+  #holdShared(kids: readonly Node[], except: Node): void {
+    for (const kid of kids) if (kid !== except) this.#held.add(kid);
   }
 
   /** The id counter for new nodes. */
@@ -262,6 +270,7 @@ export class WorkingTree {
     const el = this.#element(parentId)!;
     const writable = this.#writable(parentId);
     const kids = writable ? (el.children as Node[]) : el.children.slice();
+    if (!writable && this.#underHeld(parentId)) this.#holdShared(kids, node);
     kids.splice(index, 0, node);
     // From the insert place: the sibling stored there moved too.
     if (index + 1 < kids.length) this.#shifted(parentId, index);
@@ -278,6 +287,7 @@ export class WorkingTree {
     this.#held.add(loc.node);
     const writable = this.#writable(parentId);
     const kids = writable ? (el.children as Node[]) : el.children.slice();
+    if (!writable && this.#underHeld(parentId)) this.#holdShared(kids, loc.node);
     kids.splice(loc.index, 1);
     this.#forget(loc.node);
     if (loc.index < kids.length) this.#shifted(parentId, loc.index);
@@ -329,6 +339,8 @@ export class WorkingTree {
       }
       const kids = parent.children.slice();
       kids[loc.index] = current;
+      // At or below the highest held node, the copy shares its other children with it.
+      if (i <= held) this.#holdShared(kids, current);
       current = this.#own({ ...parent, children: kids });
       this.#index.set(parent.id, {
         node: current,

@@ -76,7 +76,7 @@ export function addSlide(editor: Editor) {
 }
 ```
 
-Check the final result even after `can()`. Commands can be refused when their target is unavailable. For a large target, `can()` checks only the editing mode, so it answers within a frame. A large target is a selection of more than 250 shapes or 20,000 XML nodes. The `applyLayout` and `resetSlides` commands also count a slide of more than 20,000 XML nodes as large. `exec()` makes the full check and returns the refusal reason.
+Check the final result even after `can()`. Commands can be refused when their target is unavailable. For a large target, `can()` checks only the editing mode, so it answers within a frame. A large target is a selection of more than 250 shapes. The `duplicate` command also counts a selection of more than 20,000 XML nodes as large, and the `applyLayout` and `resetSlides` commands a slide of more than 20,000 XML nodes. `exec()` makes the full check and returns the refusal reason.
 
 | Member                         | Purpose                                                 |
 | ------------------------------ | ------------------------------------------------------- |
