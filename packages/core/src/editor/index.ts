@@ -247,6 +247,7 @@ export {
   shapeStylePreview,
   type ShapeStylePreview,
 } from './chrome-shapes.ts';
+export { TEXT_WARP_GALLERY, textEffectsCommand, textWarpPreview } from './chrome-text-effects.ts';
 export type {
   BulletGalleryKey,
   NumberGalleryKey,

@@ -56,6 +56,7 @@ export const TOOLBAR_NAMED_PARTS = {
   LineDash: 'shape.lineDash',
   ShapeStyles: 'shape.styles',
   ShapeEffects: 'shape.effects',
+  TextEffects: 'shape.textEffects',
   FormatShape: 'shape.properties',
   FormatPainter: 'format.painter',
   Order: 'arrange.order',

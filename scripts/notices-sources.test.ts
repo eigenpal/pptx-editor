@@ -58,18 +58,22 @@ test('the Ecma notice stays with the preset geometry', () => {
   const notice = readFileSync(join(root, 'reference/ecma-376/NOTICE'), 'utf8');
   const terms = notice.slice(notice.indexOf('COPYRIGHT NOTICE')).trim();
   expect(VENDORED['@pptx-editor.dev/core']?.join('\n')).toContain(terms);
-  const generated = readFileSync(
-    join(root, 'packages/ooxml-core/src/drawingml-preset-geometry.generated.ts'),
-    'utf8'
-  );
-  const legal = /\/\*!([^]*?)\*\/\s*\/\*\*[^]*?\*\/\s*export const PRESET_SHAPES/.exec(generated);
-  expect(legal).not.toBeNull();
   const words = (text: string) =>
     text
       .replace(/^\s*\*/gm, ' ')
       .split(/\s+/)
       .filter(Boolean);
-  expect(words(legal![1]).join(' ')).toContain(words(terms).join(' '));
+  for (const [file, name] of [
+    ['drawingml-preset-geometry.generated.ts', 'PRESET_SHAPES'],
+    ['drawingml-preset-text-warp.generated.ts', 'PRESET_TEXT_WARPS'],
+  ]) {
+    const generated = readFileSync(join(root, 'packages/ooxml-core/src', file), 'utf8');
+    const legal = new RegExp(
+      String.raw`/\*!([^]*?)\*/\s*/\*\*[^]*?\*/\s*export const ${name}`
+    ).exec(generated);
+    expect(legal).not.toBeNull();
+    expect(words(legal![1]).join(' ')).toContain(words(terms).join(' '));
+  }
 });
 
 for (const pkg of PACKAGES) {

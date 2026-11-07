@@ -5,6 +5,7 @@
 // The WASM module loads through a dynamic import so importing layout never adds top-level
 // await to a host's import graph. Call `initializeHarfBuzz()` once before measuring.
 
+import type { PathCommand } from '@eigenpal/ooxml-core';
 import { AdvanceCache } from './advance-cache.ts';
 import { os2LineExtents, withFaceLineMetrics } from './face-line-metrics.ts';
 import { isIdeographic } from './line-break.ts';
@@ -125,6 +126,8 @@ interface LoadedFace {
 const MAX_TEXT = 100_000;
 /** Advance arrays kept per measurer; the least recently used go first (`AdvanceCache`). */
 const CACHE_LIMIT = 20_000;
+/** Outline commands kept for one glyph: a real glyph has a few hundred at most. */
+const MAX_OUTLINE_COMMANDS = 10_000;
 
 /**
  * An sfnt table of face 0, read from the font bytes in JavaScript. `Face.referenceTable` makes
@@ -368,5 +371,46 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     return found ?? undefined;
   };
 
-  return { resolve, advances, fallbackFace, faces };
+  // Glyph outlines in em, y up, by face id and code point; bounded like the advance cache.
+  const outlines = new Map<string, readonly PathCommand[] | null>();
+  let draw: InstanceType<HarfBuzzModule['DrawFuncs']> | null = null;
+  let sink: PathCommand[] = [];
+  let k = 1;
+  const glyphOutline = (face: ResolvedFace, cp: number): readonly PathCommand[] | undefined => {
+    const key = `${face.id}|${cp}`;
+    const hit = outlines.get(key);
+    if (hit !== undefined) return hit ?? undefined;
+    const entry = faces.find((f) => f.id === face.id);
+    const lf = entry ? load(entry) : null;
+    const glyph = lf?.font.nominalGlyph(cp);
+    let out: PathCommand[] | null = null;
+    if (lf && glyph) {
+      k = 1 / lf.upem;
+      // Drawing is synchronous, so one set of callbacks writes into the current sink.
+      if (!draw) {
+        draw = new module.DrawFuncs();
+        const add = (c: PathCommand): void => {
+          if (sink.length < MAX_OUTLINE_COMMANDS) sink.push(c);
+        };
+        draw.setMoveToFunc((x, y) => add({ op: 'M', x: x * k, y: y * k }));
+        draw.setLineToFunc((x, y) => add({ op: 'L', x: x * k, y: y * k }));
+        draw.setQuadraticToFunc((x1, y1, x, y) =>
+          add({ op: 'Q', x1: x1 * k, y1: y1 * k, x: x * k, y: y * k })
+        );
+        draw.setCubicToFunc((x1, y1, x2, y2, x, y) =>
+          add({ op: 'C', x1: x1 * k, y1: y1 * k, x2: x2 * k, y2: y2 * k, x: x * k, y: y * k })
+        );
+        draw.setClosePathFunc(() => add({ op: 'Z' }));
+      }
+      sink = [];
+      lf.font.drawGlyph(glyph, draw);
+      out = sink;
+      sink = [];
+    }
+    if (outlines.size >= CACHE_LIMIT) outlines.clear();
+    outlines.set(key, out);
+    return out ?? undefined;
+  };
+
+  return { resolve, advances, fallbackFace, glyphOutline, faces };
 }

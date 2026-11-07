@@ -39,6 +39,7 @@ import {
 import { entryParts } from './picture-bullet.ts';
 import { layerKey, partContent, relsKey, sameKey } from './resolve-keys.ts';
 import { resolveFrameTable } from './table.ts';
+import { readAdjustValues, readTextWarp } from './text-warp.ts';
 import {
   diagramParts,
   MAX_DIAGRAM_GROUP_DEPTH,
@@ -254,13 +255,7 @@ const ZERO_XFRM: Xfrm = { x: 0, y: 0, cx: 0, cy: 0, rot: 0, flipH: false, flipV:
 function readGeometry(spPr: Element | undefined): GeometrySpec | undefined {
   const prst = child(spPr, 'a:prstGeom');
   if (prst) {
-    const adjust = new Map<string, number>();
-    for (const gd of elements(child(prst, 'a:avLst'))) {
-      const name = attr(gd, 'name');
-      const fmla = attr(gd, 'fmla') ?? '';
-      const m = /^val\s+(-?\d+)$/.exec(fmla.trim());
-      if (name && m) adjust.set(name, Number(m[1]));
-    }
+    const adjust = readAdjustValues(child(prst, 'a:avLst'));
     return { kind: 'preset', preset: attr(prst, 'prst') ?? 'rect', adjust };
   }
   const cust = child(spPr, 'a:custGeom');
@@ -319,6 +314,7 @@ function readBodyProps(chain: readonly Element[]): BodyProps {
     if (child(chain[i], 'a:noAutofit')) break;
   }
   const anchor = pick('anchor');
+  const warp = readTextWarp(chain);
   return {
     lIns: num('lIns', 91_440),
     tIns: num('tIns', 45_720),
@@ -336,6 +332,7 @@ function readBodyProps(chain: readonly Element[]): BodyProps {
     spcCol: Math.max(0, num('spcCol', 0)),
     autofit,
     spcFirstLastPara: pick('spcFirstLastPara') === '1',
+    ...(warp ? { warp } : {}),
   };
 }
 

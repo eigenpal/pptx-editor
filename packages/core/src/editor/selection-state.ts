@@ -16,6 +16,7 @@ import type {
   PatternFill,
   PatternPreset,
   TextFitting,
+  TextWarpPreset,
   VerticalAlign,
 } from '../contracts/index.ts';
 import { selectedIds, type CommandContext } from './commands.ts';
@@ -560,6 +561,9 @@ export function geometryOf(
         }
       : {}),
     ...(textFitting ? { textFitting } : {}),
+    ...(e.kind === 'shape' && e.text
+      ? { textWarp: (e.text.body.warp?.preset ?? 'textNoShape') as TextWarpPreset }
+      : {}),
     flipH: e.xfrm.flipH,
     flipV: e.xfrm.flipV,
     lockAspectRatio: aspectLocked(el),

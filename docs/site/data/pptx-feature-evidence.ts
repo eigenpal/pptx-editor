@@ -71,7 +71,10 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     fixtures: ['vertical-columns', 'vertical-east-asian', 'text-direction'],
     approximations: ['line-model', 'script-fonts', 'ea-vert', 'word-art-vert', 'other-vert'],
   },
-  'paragraphs.text-warp': { fixtures: ['preserved-content'], approximations: ['text-warp'] },
+  'paragraphs.text-warp': {
+    fixtures: ['text-warp', 'preserved-content'],
+    approximations: ['line-model', 'text-warp'],
+  },
   // --- Bullets & numbering -----------------------------------------------
   'lists.bullets-numbering': {
     fixtures: ['bullets-numbering', 'bullets-gallery', 'picture-bullets', 'rtl-text'],

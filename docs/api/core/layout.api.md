@@ -839,6 +839,7 @@ export interface TextLayout {
     readonly rotation: number;
     readonly substitutions: readonly string[];
     readonly upright: 'none' | 'eastAsian' | 'all';
+    readonly warped?: readonly WarpedRun[];
 }
 
 // @public
@@ -847,8 +848,19 @@ export interface TextMeasurer {
         readonly kerning?: boolean;
     }): Float64Array;
     fallbackFace?(face: ResolvedFace, codePoint: number, lang?: string): ResolvedFace | undefined;
+    glyphOutline?(face: ResolvedFace, codePoint: number): readonly PathCommand[] | undefined;
     // (undocumented)
     resolve(request: FontRequest): ResolvedFace;
+}
+
+// @public
+export interface WarpedRun {
+    readonly glyphs: readonly PathCommand[];
+    readonly highlight: readonly PathCommand[];
+    readonly line: number;
+    // (undocumented)
+    readonly run: number;
+    readonly underline: readonly PathCommand[];
 }
 
 // @internal

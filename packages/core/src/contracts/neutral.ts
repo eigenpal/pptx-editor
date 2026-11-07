@@ -33,6 +33,7 @@ import type {
   ShapeStyleChoice,
   ShapeEffectsState,
   ShapeSummary,
+  TextWarpPreset,
 } from './shape-format.ts';
 
 import type {
@@ -88,6 +89,8 @@ export type {
   ShapeStyleColor,
   ShapeStyleValue,
   ShapeEffectsValue,
+  TextEffectsValue,
+  TextWarpPreset,
   RotateChoice,
   ShapeStyleChoice,
   ShapeEffectsState,
@@ -407,6 +410,12 @@ export type EditorCommand =
   | { readonly type: 'insertLine'; readonly kind: LineKind }
   /** Text fitting: none, shrink text on overflow, or resize the shape to fit its text. */
   | { readonly type: 'setAutofit'; readonly mode: TextFitting }
+  /** The selected shapes' text warp, with adjust values by guide name; null removes it. */
+  | {
+      readonly type: 'setTextWarp';
+      readonly preset: TextWarpPreset | null;
+      readonly adjust?: Readonly<Record<string, number>>;
+    }
   | {
       /** Several transforms in one transaction. Values are in each element's file coordinates. */
       readonly type: 'setTransforms';
@@ -671,6 +680,8 @@ export interface SelectionGeometry {
   readonly lineTail?: LineEndType;
   /** Text fitting, for shapes with a text body. */
   readonly textFitting?: TextFitting;
+  /** The text warp (`a:prstTxWarp`), `textNoShape` for none. Shapes with a text body only. */
+  readonly textWarp?: TextWarpPreset;
   /** The element's alt text. */
   readonly altText?: AltText;
   /** Flips of the element's transform. */

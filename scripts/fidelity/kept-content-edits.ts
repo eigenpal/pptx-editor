@@ -48,11 +48,6 @@ interface Kept {
 }
 
 const KEPT: Readonly<Record<string, Kept>> = {
-  'paragraphs.text-warp': {
-    fixture: 'preserved-content',
-    names: ['Warped text'],
-    partner: 'Title',
-  },
   'shapes.custom-geometry': { fixture: 'custom-geometry', names: ['Freeform'] },
   'effects.fill-overlay': { fixture: 'fill-fidelity', slide: 2, names: ['Shape 5', 'Shape 6'] },
   'effects.3d-and-other': { fixture: 'preserved-content', names: ['3-D shape'], partner: 'Title' },

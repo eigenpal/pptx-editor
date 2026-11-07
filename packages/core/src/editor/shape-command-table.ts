@@ -1,6 +1,6 @@
 // Shape commands that `commands.ts` sends here: the adjust values of a preset shape, which its
-// adjust handles drag (`surface-adjust.ts`), and the pattern and picture fills. Each compiles to
-// one transaction, so one undo step.
+// adjust handles drag (`surface-adjust.ts`), the pattern and picture fills, and the text warp.
+// Each compiles to one transaction, so one undo step.
 
 import type { EditorCommand } from '../contracts/index.ts';
 import { child, type Element } from '../store/index.ts';
@@ -8,6 +8,7 @@ import { presetAdjustments } from '../layout/index.ts';
 import { findItem } from '../automation/commands/placement.ts';
 import { writeAdjustments } from '../automation/commands/adjust-commands.ts';
 import { setShapePattern, setShapePicture } from '../automation/commands/style-commands.ts';
+import { setTextWarp } from '../automation/commands/text-warp.ts';
 import { CommandRefusal, type OpBatch } from '../automation/commands/op-batch.ts';
 import type { CommandContext, CommandEffect } from './commands.ts';
 import { selectedIds } from './commands.ts';
@@ -16,13 +17,14 @@ import { slidePart } from './text-targets.ts';
 /** The commands this table compiles. */
 export type ShapeCommand = Extract<
   EditorCommand,
-  { readonly type: 'setAdjustments' | 'setShapePattern' | 'setShapePicture' }
+  { readonly type: 'setAdjustments' | 'setShapePattern' | 'setShapePicture' | 'setTextWarp' }
 >;
 
 const TYPES: ReadonlySet<string> = new Set([
   'setAdjustments',
   'setShapePattern',
   'setShapePicture',
+  'setTextWarp',
 ]);
 
 export function isShapeCommand(command: EditorCommand): command is ShapeCommand {
@@ -42,6 +44,13 @@ export function compileShapeCommand(
     const ids = selectedIds(ctx.selection);
     setShapePicture(batch, slidePart(ctx), ids, command.bytes, command.tile === true);
     return { label: 'shapeFill' };
+  }
+  if (command.type === 'setTextWarp') {
+    const items = ctx.session.layout(ctx.slide)?.items ?? [];
+    const sizeOf = (id: string) => findItem(items, id)?.element.xfrm;
+    const ids = selectedIds(ctx.selection);
+    setTextWarp(batch, slidePart(ctx), ids, command.preset, command.adjust, sizeOf);
+    return { label: 'textWarp' };
   }
   const ids = selectedIds(ctx.selection);
   if (ids.length !== 1) throw new CommandRefusal('disabled.selectOne');

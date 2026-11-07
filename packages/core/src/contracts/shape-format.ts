@@ -88,6 +88,59 @@ export type ShapeEffectsValue =
   | `glow.${number}.${Exclude<ShapeStyleColor, 'dk1'>}`
   | `softEdge.${number | 'none'}`;
 
+/**
+ * A preset text warp (`a:prstTxWarp/@prst`, `ST_TextShapeType`, ECMA-376 Part 1, 20.1.10.76).
+ * `textNoShape` draws the text flat. @public
+ */
+export type TextWarpPreset =
+  | 'textNoShape'
+  | 'textPlain'
+  | 'textStop'
+  | 'textTriangle'
+  | 'textTriangleInverted'
+  | 'textChevron'
+  | 'textChevronInverted'
+  | 'textRingInside'
+  | 'textRingOutside'
+  | 'textArchUp'
+  | 'textArchDown'
+  | 'textCircle'
+  | 'textButton'
+  | 'textArchUpPour'
+  | 'textArchDownPour'
+  | 'textCirclePour'
+  | 'textButtonPour'
+  | 'textCurveUp'
+  | 'textCurveDown'
+  | 'textCanUp'
+  | 'textCanDown'
+  | 'textWave1'
+  | 'textWave2'
+  | 'textDoubleWave1'
+  | 'textWave4'
+  | 'textInflate'
+  | 'textDeflate'
+  | 'textInflateBottom'
+  | 'textDeflateBottom'
+  | 'textInflateTop'
+  | 'textDeflateTop'
+  | 'textDeflateInflate'
+  | 'textDeflateInflateDeflate'
+  | 'textFadeRight'
+  | 'textFadeLeft'
+  | 'textFadeUp'
+  | 'textFadeDown'
+  | 'textSlantUp'
+  | 'textSlantDown'
+  | 'textCascadeUp'
+  | 'textCascadeDown';
+
+/**
+ * A `shape.textEffects` option value: `transform.` and a text warp, or `transform.none` to
+ * remove the warp. @public
+ */
+export type TextEffectsValue = `transform.${Exclude<TextWarpPreset, 'textNoShape'> | 'none'}`;
+
 /** An `arrange.rotate` value: the 90° turns, then the flips. @public */
 export type RotateChoice = 'right90' | 'left90' | 'flipVertical' | 'flipHorizontal';
 

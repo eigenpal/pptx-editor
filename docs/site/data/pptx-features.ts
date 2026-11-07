@@ -302,11 +302,12 @@ export const pptxFeatures: PptxFeature[] = [
     id: 'paragraphs.text-warp',
     name: 'Text warp',
     category: 'paragraphs',
-    editing: 'none',
-    rendering: 'none',
-    roundTrip: 'preserved',
+    editing: 'partial',
+    rendering: 'partial',
+    roundTrip: 'full',
     tier: 'community',
-    notes: 'Warped text draws flat.',
+    notes:
+      'Text effects > Transform sets or removes a preset warp. Adjust values are set by command only. Glyphs bend into the warp. The caret and the selection use flat text. Lines in some multi-band warps sit lower. Vertical and rotated text draws flat.',
   },
 
   // --- Bullets & numbering ---------------------------------------------

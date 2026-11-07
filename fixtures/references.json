@@ -424,6 +424,15 @@
         540
       ]
     },
+    "text-warp": {
+      "deck": "12813f6a60a425d8625765860e85c34ea36b9d65de4fa9be8d753dc75e314827",
+      "pdf": "f75fdf444a9b75dfc0ba8b3f5c8717b2ac04566a1148b7a7588a56bb050c1c66",
+      "pages": 3,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
     "vertical-columns": {
       "deck": "f48309b299b98c460cd9d561202210b3d0be381af3a0202fc3b8cc8527d212a1",
       "pdf": "e9c0a52a33934934922fdc97297244f05cabfc6f2c6bac5180c6f79717554fe9",

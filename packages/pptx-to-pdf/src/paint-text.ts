@@ -29,10 +29,16 @@ import {
   TextRenderingMode,
 } from 'pdf-lib';
 import type { ResolvedFill } from '@pptx-editor.dev/core/cascade';
-import { hasCharacters, type GlyphRun, type TextLayout } from '@pptx-editor.dev/core/layout';
+import {
+  hasCharacters,
+  type GlyphRun,
+  type PathCommand,
+  type TextLayout,
+  type WarpedRun,
+} from '@pptx-editor.dev/core/layout';
 import { EmbeddedFace } from './fonts.ts';
 import { drawPicture, flatColor, gradientBox, ownFill, type FillScope } from './paint-fill.ts';
-import { clip, EMU_PER_PT, rgb, type PageOps } from './page-ops.ts';
+import { clip, clipNonZero, EMU_PER_PT, rgb, tracePath, type PageOps } from './page-ops.ts';
 
 /** The embedded face for a layout face id, or null with a diagnostic. */
 function fontFor(faceId: string, family: string, p: PageOps): EmbeddedFace | null {
@@ -82,6 +88,11 @@ function enterFrame(layout: TextLayout, p: PageOps): void {
 /** Draw a text layout in its frame's space. `scope` resolves group fills. */
 export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope): Promise<void> {
   enterFrame(layout, p);
+  if (layout.warped) {
+    drawWarped(layout, layout.warped, p, scope);
+    p.push(popGraphicsState());
+    return;
+  }
   let bounds: ReturnType<typeof textBounds> | undefined;
   if (layout.upright !== 'none' && hasCharacters(layout))
     p.diag.add('text.upright', 'approximation', 'Upright vertical characters are drawn rotated.');
@@ -173,6 +184,55 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
     }
   }
   p.push(popGraphicsState());
+}
+
+/**
+ * Warped text (`a:prstTxWarp`) as the paths layout mapped into the warp, as in the SVG paint
+ * (`core/src/output/paint-text.ts`, `paintWarped`): the highlight, then the glyphs in the run's
+ * fill (nonzero, as glyph outlines fill), then the underline. Paths, not text, so the warped
+ * words are not in the PDF text layer.
+ */
+function drawWarped(
+  layout: TextLayout,
+  warped: readonly WarpedRun[],
+  p: PageOps,
+  scope: FillScope
+): void {
+  let bounds: ReturnType<typeof textBounds> | undefined;
+  const paint = (fillValue: ResolvedFill, commands: readonly PathCommand[]): void => {
+    if (commands.length === 0) return;
+    const own = ownFill(fillValue, scope).fill;
+    if (own.type === 'linear' || own.type === 'path') {
+      if (own.stops.length === 0) return;
+      bounds ??= textBounds(layout);
+      p.push(pushGraphicsState());
+      tracePath(commands, p);
+      p.push(clipNonZero(), endPath(), concatTransformationMatrix(1, 0, 0, 1, bounds.x, bounds.y));
+      gradientBox(own, bounds.w, bounds.h, p);
+      p.push(popGraphicsState());
+      return;
+    }
+    const color = flatColor(fillValue, scope, p, 'text');
+    if (!color) return;
+    p.push(pushGraphicsState());
+    p.alpha(color.a, 1);
+    p.push(setFillingRgbColor(...rgb(color)));
+    tracePath(commands, p);
+    p.push(fill(), popGraphicsState());
+  };
+  for (const w of warped) {
+    const run = layout.lines[w.line]?.runs[w.run];
+    if (!run) continue;
+    if (run.props.highlight && w.highlight.length) {
+      p.push(pushGraphicsState(), setFillingRgbColor(...rgb(run.props.highlight)));
+      tracePath(w.highlight, p);
+      p.push(fill(), popGraphicsState());
+    }
+    if (run.props.outline)
+      p.diag.add('text.outline', 'unsupported', 'Text outlines are not drawn yet.');
+    paint(run.props.fill, w.glyphs);
+    paint(run.props.underlineFill ?? run.props.fill, w.underline);
+  }
 }
 
 /** Underline styles the bars draw exactly; the SVG paint draws every other style the same way. */
@@ -310,7 +370,15 @@ export function fillTextOutlines(
   strokeToo = false
 ): void {
   enterFrame(layout, p);
-  for (const line of layout.lines) {
+  // Warped text casts the warped glyphs.
+  for (const w of layout.warped ?? []) {
+    const run = layout.lines[w.line]?.runs[w.run];
+    if (!run || w.glyphs.length === 0) continue;
+    if (ownFill(run.props.fill, scope).fill.type === 'none') continue;
+    tracePath(w.glyphs, p);
+    p.push(strokeToo ? fillAndStroke() : fill());
+  }
+  for (const line of layout.warped ? [] : layout.lines) {
     for (const run of line.runs) {
       if (run.text.length === 0) continue;
       if (ownFill(run.props.fill, scope).fill.type === 'none') continue;

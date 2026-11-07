@@ -39,7 +39,7 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 | `paragraph` | `paragraph.align`, `paragraph.textDirection`, `paragraph.valign`, `paragraph.columns`\*, `paragraph.dialog` (contextual) |
 | `list` | `list.bullet`, `list.bulletStyle`, `list.numbered`, `list.numberStyle`, `list.outdent`, `list.indent`, `list.lineSpacing` |
 | `insert` | `insert.textBox`, `insert.line`, `insert.shape`, `insert.image` |
-| `shape` | `shape.styles`\*, `shape.fill`, `shape.lineColor`, `shape.lineWidth`, `shape.lineStart`, `shape.lineEnd`, `shape.lineDash`, `shape.effects`\*, `shape.properties`\* |
+| `shape` | `shape.styles`\*, `shape.fill`, `shape.lineColor`, `shape.lineWidth`, `shape.lineStart`, `shape.lineEnd`, `shape.lineDash`, `shape.effects`\*, `shape.textEffects`\*, `shape.properties`\* |
 | `format` | `format.painter`, `format.clear` |
 | `arrange` | `arrange.order`, `arrange.align`, `arrange.rotate`\*, `arrange.group`, `arrange.ungroup`, `arrange.selectionPane`\* |
 | `more` | `more.duplicate`, `more.delete` |
@@ -97,6 +97,7 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 | `Toolbar.LineDash`               | `shape.lineDash`          |
 | `Toolbar.ShapeStyles`            | `shape.styles`            |
 | `Toolbar.ShapeEffects`           | `shape.effects`           |
+| `Toolbar.TextEffects`            | `shape.textEffects`       |
 | `Toolbar.FormatShape`            | `shape.properties`        |
 | `Toolbar.FormatPainter`          | `format.painter`          |
 | `Toolbar.Order`                  | `arrange.order`           |
@@ -167,7 +168,7 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 
 ### Pickers
 
-Pickers take `className` and `hidden`: `Toolbar.FontFamily`, `Toolbar.FontSize`, `Toolbar.CharacterSpacing`, `Toolbar.ChangeCase`, `Toolbar.Alignment`, `Toolbar.TextDirection`, `Toolbar.VerticalAlignment`, `Toolbar.BulletStyle`, `Toolbar.NumberStyle`, `Toolbar.LineSpacing`, `Toolbar.Columns`, `Toolbar.Line`, `Toolbar.Shapes`, `Toolbar.LineWidth`, `Toolbar.LineStart`, `Toolbar.LineEnd`, `Toolbar.LineDash`, `Toolbar.ShapeStyles`, `Toolbar.ShapeEffects`, `Toolbar.Order`, `Toolbar.AlignObjects`, and `Toolbar.Rotate`. The color split controls (`Toolbar.FontColor`, `Toolbar.Highlight`, `Toolbar.ShapeFill`, `Toolbar.LineColor`) also take `icon`, the glyph over the color bar. A picker has no single element, so `asChild` on a picker slot prints a development warning and does nothing.
+Pickers take `className` and `hidden`: `Toolbar.FontFamily`, `Toolbar.FontSize`, `Toolbar.CharacterSpacing`, `Toolbar.ChangeCase`, `Toolbar.Alignment`, `Toolbar.TextDirection`, `Toolbar.VerticalAlignment`, `Toolbar.BulletStyle`, `Toolbar.NumberStyle`, `Toolbar.LineSpacing`, `Toolbar.Columns`, `Toolbar.Line`, `Toolbar.Shapes`, `Toolbar.LineWidth`, `Toolbar.LineStart`, `Toolbar.LineEnd`, `Toolbar.LineDash`, `Toolbar.ShapeStyles`, `Toolbar.ShapeEffects`, `Toolbar.TextEffects`, `Toolbar.Order`, `Toolbar.AlignObjects`, and `Toolbar.Rotate`. The color split controls (`Toolbar.FontColor`, `Toolbar.Highlight`, `Toolbar.ShapeFill`, `Toolbar.LineColor`) also take `icon`, the glyph over the color bar. A picker has no single element, so `asChild` on a picker slot prints a development warning and does nothing.
 
 ### Parts the bar does not show
 

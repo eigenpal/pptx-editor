@@ -615,7 +615,7 @@ export function chromeOptionChecked(value: unknown, option: string): boolean;
 export function chromeRowState(editor: PptxEditorInstance | null, slot: ChromeSlotId, value?: string, host?: Pick<ChromeActionHost, 'unavailable'>): ChromeCommandState;
 
 // @public
-export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | TableSlotId | ImageSlotId;
+export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.textEffects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | TableSlotId | ImageSlotId;
 
 // @public
 export function chromeSlotIds(): ChromeSlotId[];
@@ -1938,6 +1938,12 @@ export type EditorCommand = {
 | {
     readonly type: 'setAutofit';
     readonly mode: TextFitting;
+}
+/** The selected shapes' text warp, with adjust values by guide name; null removes it. */
+| {
+    readonly type: 'setTextWarp';
+    readonly preset: TextWarpPreset | null;
+    readonly adjust?: Readonly<Record<string, number>>;
 } | {
     readonly type: 'setTransforms';
     readonly items: readonly TransformItem[];
@@ -4838,6 +4844,7 @@ export interface SelectionGeometry {
     readonly rot: number;
     readonly shapeStyle?: ShapeStyleChoice;
     readonly textFitting?: TextFitting;
+    readonly textWarp?: TextWarpPreset;
     // (undocumented)
     readonly x: number;
     // (undocumented)
@@ -5759,6 +5766,13 @@ export function takeDialogSection(editor: object | null, dialog: string): string
 // @internal
 export function takePaneRequest(editor: object | null | undefined): SidePanelTab | null;
 
+// @internal
+export const TEXT_WARP_GALLERY: readonly {
+    readonly section: 'followPath' | 'warp';
+    readonly labelKey: TranslationKey;
+    readonly warps: readonly Exclude<TextWarpPreset, 'textNoShape'>[];
+}[];
+
 // @public
 export type TextAlign = 'l' | 'ctr' | 'r' | 'just';
 
@@ -5776,6 +5790,12 @@ export interface TextColumns {
     readonly count: number;
     readonly gapEmu: number;
 }
+
+// @internal
+export function textEffectsCommand(value: unknown): EditorCommand | null;
+
+// @public
+export type TextEffectsValue = `transform.${Exclude<TextWarpPreset, 'textNoShape'> | 'none'}`;
 
 // @public
 export type TextFitting = 'none' | 'shrink' | 'shape';
@@ -5863,6 +5883,12 @@ export interface TextPoint {
     // (undocumented)
     readonly paragraph: number;
 }
+
+// @public
+export type TextWarpPreset = 'textNoShape' | 'textPlain' | 'textStop' | 'textTriangle' | 'textTriangleInverted' | 'textChevron' | 'textChevronInverted' | 'textRingInside' | 'textRingOutside' | 'textArchUp' | 'textArchDown' | 'textCircle' | 'textButton' | 'textArchUpPour' | 'textArchDownPour' | 'textCirclePour' | 'textButtonPour' | 'textCurveUp' | 'textCurveDown' | 'textCanUp' | 'textCanDown' | 'textWave1' | 'textWave2' | 'textDoubleWave1' | 'textWave4' | 'textInflate' | 'textDeflate' | 'textInflateBottom' | 'textDeflateBottom' | 'textInflateTop' | 'textDeflateTop' | 'textDeflateInflate' | 'textDeflateInflateDeflate' | 'textFadeRight' | 'textFadeLeft' | 'textFadeUp' | 'textFadeDown' | 'textSlantUp' | 'textSlantDown' | 'textCascadeUp' | 'textCascadeDown';
+
+// @internal
+export function textWarpPreview(preset: string): readonly string[];
 
 // @internal
 export function themeBaseSwatches(t: Translate, first: readonly ThemeSwatch[] | undefined): readonly {
@@ -5954,6 +5980,7 @@ export const TOOLBAR_NAMED_PARTS: {
     readonly LineDash: "shape.lineDash";
     readonly ShapeStyles: "shape.styles";
     readonly ShapeEffects: "shape.effects";
+    readonly TextEffects: "shape.textEffects";
     readonly FormatShape: "shape.properties";
     readonly FormatPainter: "format.painter";
     readonly Order: "arrange.order";
@@ -6247,6 +6274,8 @@ export interface ToolbarValueMap {
     'shape.lineWidth': number;
     // (undocumented)
     'shape.styles': ShapeStyleValue | ShapeStyleChoice;
+    // (undocumented)
+    'shape.textEffects': TextEffectsValue;
     'slide.add': string;
     'slide.layout': string;
     'text.changeCase': TextCase;

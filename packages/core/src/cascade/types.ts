@@ -182,6 +182,17 @@ export interface BodyProps {
   readonly spcCol: number;
   readonly autofit: Autofit;
   readonly spcFirstLastPara: boolean;
+  /**
+   * The preset text warp (`a:prstTxWarp`, ECMA-376 Part 1, 20.1.9.19), when it draws one:
+   * absent for `textNoShape` and for a name that `ST_TextShapeType` does not hold.
+   */
+  readonly warp?: TextWarp;
+}
+
+/** A preset text warp: its `ST_TextShapeType` name and its adjust values (`a:avLst`). */
+export interface TextWarp {
+  readonly preset: string;
+  readonly adjust: ReadonlyMap<string, number>;
 }
 
 /** A resolved text body. */

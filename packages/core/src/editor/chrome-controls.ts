@@ -744,6 +744,7 @@ export type ChromeSlotId =
   | 'shape.lineDash'
   | 'shape.styles'
   | 'shape.effects'
+  | 'shape.textEffects'
   | 'shape.properties'
   | 'format.painter'
   | 'format.clear'

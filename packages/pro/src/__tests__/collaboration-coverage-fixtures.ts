@@ -160,6 +160,7 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
   },
   setVerticalAlign: onA(() => ({ type: 'setVerticalAlign', anchor: 'b' })),
   setAutofit: onA(() => ({ type: 'setAutofit', mode: 'shrink' })),
+  setTextWarp: onA(() => ({ type: 'setTextWarp', preset: 'textArchUp', adjust: {} })),
   setParagraphFormat: onA(() => ({
     type: 'setParagraphFormat',
     spaceBeforePt: 12,

@@ -17,7 +17,7 @@ All files come from the free downloads at [ECMA-376 on the Ecma International si
 | Files | Used by |
 | --- | --- |
 | `presetShapeDefinitions.xml` | `scripts/geometry/build-presets.ts` generates `packages/ooxml-core/src/drawingml-preset-geometry.generated.ts` from it. The generated file carries the guide formulas as data. |
-| `presetTextWarpDefinitions.xml` | Lookup only. Text warps are not drawn yet. |
+| `presetTextWarpDefinitions.xml` | `scripts/geometry/build-presets.ts` generates `packages/ooxml-core/src/drawingml-preset-text-warp.generated.ts` from it. Text layout maps glyph outlines between the warp paths. |
 | `part4/transitional-schemas/*.xsd` | `scripts/validate-xsd.ts` (`bun run validate:xsd`), a test gate. Never bundled. |
 | `part1/schemas/*.xsd` | Lookup only. No gate or build step reads them. |
 
