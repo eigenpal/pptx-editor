@@ -64,7 +64,7 @@
     "stress:hang": "bun scripts/stress/hang-check.ts",
     "bench:edit:browser": "playwright test --config e2e/bench.config.ts e2e/edit.bench.ts",
     "bench:open:browser": "playwright test --config e2e/bench.config.ts e2e/open.bench.ts",
-    "bench:hang:browser": "playwright test --config e2e/bench.config.ts e2e/hang.bench.ts",
+    "bench:hang:browser": "playwright test --config e2e/hang.config.ts e2e/hang.stress.ts",
     "bench:network:browser": "playwright test --config e2e/bench.config.ts e2e/network.bench.ts",
     "bench:memory:browser": "playwright test --config e2e/memory.config.ts",
     "bench:interaction:browser": "playwright test --config e2e/bench.config.ts e2e/interaction-hang.bench.ts",

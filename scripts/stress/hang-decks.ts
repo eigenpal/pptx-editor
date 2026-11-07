@@ -740,7 +740,7 @@ export const HANG_DECKS: readonly HangDeck[] = [
   },
   // Sizes that the editor UI reads on every change: the toolbar state, the slide panel, the
   // layout menu, the selection, and the live region. Each one must open and edit in the
-  // browser without a long freeze (`e2e/hang.bench.ts`).
+  // browser without a long freeze (`e2e/hang.stress.ts`).
   ...uiScaleDecks(),
   // Adversarial payloads: pictures, SVG, metafiles, effects, charts, text, and package parts.
   ...payloadDecks(),

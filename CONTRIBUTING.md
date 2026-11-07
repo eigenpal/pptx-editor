@@ -66,7 +66,7 @@ bun run test:stress:interactions
 bun run test:fixtures:browser
 ```
 
-The hang corpus covers large presentations, extreme text, geometry, tables, and font waits. It records open time and event-loop delays, then checks recovery with another presentation. The interaction suite runs the same navigation, editing, paste, and replacement sequences in React and Vue. The fixture suite opens each synthetic fixture, navigates its slides, and saves and reopens it. These checks test responsiveness. They do not replace PDF fidelity comparisons.
+The hang corpus covers large presentations, extreme text, geometry, tables, pictures, and font waits. Each presentation opens through the demo's file input in a fresh browser context. The check records open time, main-thread gaps, and frame gaps, then checks recovery with another presentation. A crash, an uncaught error, a request outside the demo, an open over 20 seconds, or a main-thread gap over 5 seconds fails it. Set `HANG_STRICT=1` to also fail on a gap over 1 second. `bun run bench:hang:browser` runs only the hang corpus, and adds heap and DOM size in Chromium. Rows go to `test-results/hang-<browser>/rows.jsonl`. The interaction suite runs the same navigation, editing, paste, and replacement sequences in React and Vue. The fixture suite opens each synthetic fixture, navigates its slides, and saves and reopens it. These checks test responsiveness. They do not replace PDF fidelity comparisons.
 
 Set `HANG_BROWSER=firefox` or `HANG_BROWSER=webkit` to use another browser engine. Install the engines first with `bunx playwright install chromium firefox webkit`. Set `HANG_ONLY=slides-3000,tabs-many-stops` to select hang corpus cases. Each suite starts its own servers and refuses occupied ports.
 
