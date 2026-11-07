@@ -123,6 +123,17 @@ const ANGLE = 60_000; // units per degree
 const DEG = Math.PI / 180;
 
 function builtins(w: number, h: number): Map<string, number> {
+  // A slide of thousands of shapes of one size asks for the same values each time: a copy of
+  // the last set costs less than building it again.
+  if (!lastBuiltins || !Object.is(lastBuiltins.w, w) || !Object.is(lastBuiltins.h, h))
+    lastBuiltins = { w, h, values: builtinValues(w, h) };
+  return new Map(lastBuiltins.values);
+}
+
+/** The built-in values of the last size `builtins` was asked for. Never handed out. */
+let lastBuiltins: { w: number; h: number; values: ReadonlyMap<string, number> } | null = null;
+
+function builtinValues(w: number, h: number): Map<string, number> {
   const ss = Math.min(w, h);
   const ls = Math.max(w, h);
   const m = new Map<string, number>([

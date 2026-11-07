@@ -97,10 +97,14 @@ export interface PaintOptions {
     readonly idPrefix: string;
     readonly images: ImageUrlPort;
     readonly imageSize?: ImageSizePort;
+    readonly view?: ViewRect;
 }
 
 // @public
 export function paintSlide(doc: Document, layout: SlideLayout, opts: PaintOptions): SVGSVGElement;
+
+// @internal
+export function paintWeight(item: LayoutItem): number;
 
 // @public
 export function pathData(path: GeometryPath): string;
@@ -125,6 +129,7 @@ export class SlidePainter {
     paint(layout: SlideLayout, budget?: number): SVGSVGElement;
     paints(opts: PaintOptions): boolean;
     get pending(): boolean;
+    view(view: ViewRect | undefined): boolean;
 }
 
 // @internal
@@ -132,6 +137,14 @@ export const STORED_PIXELS_STYLE = "image-orientation: none";
 
 // @public (undocumented)
 export const SVG_NS = "http://www.w3.org/2000/svg";
+
+// @public
+export interface ViewRect {
+    readonly height: number;
+    readonly width: number;
+    readonly x: number;
+    readonly y: number;
+}
 
 // (No @packageDocumentation comment for this package)
 

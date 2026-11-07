@@ -215,6 +215,18 @@ export function queueTask(run: () => void): void {
 }
 
 /**
+ * The time one step of an open (the package read, the first slide's parse, its layout) may
+ * take before the next step waits for a new task, in ms. A deck that reads, parses, and lays
+ * out its first slide quickly opens in one task.
+ */
+export const OPEN_STEP_MS = 50;
+
+/** Resolves in a new task (`queueTask`). */
+export function nextTask(): Promise<void> {
+  return new Promise((resolve) => queueTask(resolve));
+}
+
+/**
  * Whether the browser holds input the page has not handled yet (Chromium's
  * `navigator.scheduling.isInputPending`). Every other engine answers false: the slice then
  * ends on its time budget alone.
@@ -245,6 +257,12 @@ export function continueOpening(open: ProgressiveOpen, hooks: OpeningHooks): voi
     queueTask(slice);
   };
   queueTask(slice);
+}
+
+/** A slide index: a finite number truncated and clamped to `count` slides, else 0. @internal */
+export function clampSlide(index: number | undefined, count: number): number {
+  const asked = typeof index === 'number' && Number.isFinite(index) ? Math.trunc(index) : 0;
+  return Math.max(0, Math.min(asked, count - 1));
 }
 
 /**

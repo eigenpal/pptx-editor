@@ -61,6 +61,36 @@ export function nodeIndex(part: XmlPart): ReadonlyMap<NodeId, Location> {
   return map;
 }
 
+/** The index of `part` when one is built or adopted already, else undefined. Never builds. */
+export function cachedNodeIndex(part: XmlPart): ReadonlyMap<NodeId, Location> | undefined {
+  return indexCache.get(part.root);
+}
+
+/**
+ * Find node `id` in `part` breadth first, visiting at most `cap` nodes, without building the
+ * index: the slide tree (`p:spTree`) of a slide of 24,000 shapes is found in a few steps. Answers
+ * the location, `null` when the walk saw the whole tree and the node is not in it, or
+ * `undefined` when the cap ended the walk first.
+ */
+export function findNodeNear(part: XmlPart, id: NodeId, cap: number): Location | null | undefined {
+  const queue: Location[] = [{ node: part.root, parent: null, index: 0 }];
+  let cut = false;
+  for (let head = 0; head < queue.length; head += 1) {
+    const item = queue[head]!;
+    if (item.node.id === id) return item;
+    if (item.node.type !== 'element') continue;
+    const kids = item.node.children;
+    for (let i = 0; i < kids.length; i += 1) {
+      if (queue.length >= cap) {
+        cut = true;
+        break;
+      }
+      queue.push({ node: kids[i], parent: item.node.id, index: i });
+    }
+  }
+  return cut ? undefined : null;
+}
+
 /** How many layers an index may stack before a commit flattens it into one map. */
 const MAX_LAYERS = 8;
 

@@ -157,11 +157,11 @@ function holdsManyNodes(
   const was = known.get(key);
   if (was !== undefined) return was;
   const xml = xmlPartOf(pkg, part);
-  const index = xml ? nodeIndex(xml) : undefined;
   let left = LARGE_SELECTION_NODES;
   const stack: Node[] = [];
   for (const id of ids) {
-    const node = index?.get(id)?.node;
+    // The root (a slide-wide command) needs no index: building one walks the whole slide.
+    const node = xml?.root.id === id ? xml.root : xml ? nodeIndex(xml).get(id)?.node : undefined;
     if (node) stack.push(node);
   }
   // The walk stops at the limit, so it costs at most that many visits.

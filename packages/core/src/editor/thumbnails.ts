@@ -15,7 +15,13 @@
 // wrong slide: one that waits is empty.
 
 import type { SlideLayout } from '../layout/index.ts';
-import { paintSlide, SlidePainter, type PaintOptions } from '../output/index.ts';
+import {
+  paintSlide,
+  paintWeight,
+  SlidePainter,
+  type PaintOptions,
+  type ViewRect,
+} from '../output/index.ts';
 import type { PptxPackage } from '../store/index.ts';
 import type { DocumentSession } from './document-session.ts';
 import { renderKey } from './slide-dependencies.ts';
@@ -24,6 +30,14 @@ import { idleCallback, ThumbnailQueue, type Ask, type IdleDeadline } from './thu
 /** The render key of slide `index`: its parts, its faces, and its converted pictures. */
 const keyOf = (session: DocumentSession, index: number): string | undefined =>
   renderKey(session.store.package, index, session.paintKey(session.info.slides[index]?.partName));
+
+/** The slide's own rectangle: a thumbnail clips to it (`PaintOptions.view`). */
+const slideView = (lay: SlideLayout): ViewRect => ({
+  x: 0,
+  y: 0,
+  width: lay.slide.width,
+  height: lay.slide.height,
+});
 
 /** The label of a frame the engine does not draw ("Chart (not rendered in this version)"). */
 export function frameLabelOf(
@@ -55,8 +69,18 @@ interface Painted {
   readonly key: string;
 }
 
-/** The number of items from which a current slide's first thumbnail waits for idle time. */
+/**
+ * The number of items (`paintWeight`: a group counts its shapes) from which a current slide's
+ * first thumbnail waits for idle time.
+ */
 const LARGE_SLIDE_ITEMS = 2_000;
+
+/** The number of items slide layout `lay` paints, with the shapes in its groups. */
+function slideWeight(lay: SlideLayout | undefined): number {
+  let weight = 0;
+  for (const item of lay?.items ?? []) weight += paintWeight(item);
+  return weight;
+}
 
 /**
  * The new items an idle repaint paints into one thumbnail. A large slide fills its thumbnail
@@ -139,7 +163,7 @@ export class ThumbnailPainter {
       const current = !defer || index === this.#host.currentSlide?.();
       // A large current slide paints its thumbnail when idle, not in the frame that paints the
       // slide itself. Until then, the container is empty.
-      if (defer && current && (session.layout(index)?.items.length ?? 0) > LARGE_SLIDE_ITEMS) {
+      if (defer && current && slideWeight(session.layout(index)) > LARGE_SLIDE_ITEMS) {
         this.#queue.drop(container);
         if (this.#painted.delete(container) || container.firstChild) container.replaceChildren();
         this.#pending.set(container, index);
@@ -182,6 +206,7 @@ export class ThumbnailPainter {
       images: session.imageUrl,
       imageSize: session.imageSize,
       idPrefix: `${this.#host.idPrefix}l${this.#count}`,
+      view: slideView(lay),
       hitTargets: false,
       frameLabel: (kind) => this.#host.frameLabel(kind),
     });
@@ -303,8 +328,10 @@ export class ThumbnailPainter {
       });
       this.#painters.set(container, painter);
     }
-    // Converted pictures, or new faces: every item paints again.
+    // Converted pictures, or new faces: every item paints again. A thumbnail clips to its
+    // slide: text out of it does not paint.
     painter.invalidate(session.paintKey(part));
+    painter.view(slideView(lay));
     const svg = painter.paint(lay, budget);
     if (svg.getAttribute('width') !== '100%') {
       svg.setAttribute('width', '100%');

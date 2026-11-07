@@ -64,6 +64,9 @@ import { MetafilePictures, type DrawablePicture } from './metafile-pictures.ts';
 import type { PicturesWait, PictureStatus } from './metafile-pictures.ts';
 import { within } from './within.ts';
 import {
+  clampSlide,
+  nextTask,
+  OPEN_STEP_MS,
   openingOrder,
   ProgressiveOpen,
   PROGRESSIVE_OPEN_CONTENT_BYTES,
@@ -889,6 +892,7 @@ export async function openPresentation(
     if (made) made.markDamaged(rejection);
     else early ??= rejection;
   };
+  const readAt = performance.now();
   const read = options.progressive
     ? readPptxDeferred(bytes, PPTX_ZIP_LIMITS, {
         defer: () => true,
@@ -897,6 +901,8 @@ export async function openPresentation(
       })
     : readPptx(bytes);
   if (!read.ok) return { ok: false, error: read.error };
+  // A long read ends its task: the first slide parses in the next one (`OPEN_STEP_MS`).
+  if (options.progressive && performance.now() - readAt > OPEN_STEP_MS) await nextTask();
   const opened = options.progressive ? firstSlideOnly(read.pkg, options.progressive) : null;
   if (opened && !opened.ok) return { ok: false, error: opened.error };
   const { sources: embedded, refused } = embeddedFontSources(read.pkg);
@@ -968,12 +974,6 @@ export async function openPresentation(
         );
       });
   return { ok: true, session };
-}
-
-/** A slide index: a finite number truncated and clamped to `count` slides, else 0. @internal */
-export function clampSlide(index: number | undefined, count: number): number {
-  const asked = typeof index === 'number' && Number.isFinite(index) ? Math.trunc(index) : 0;
-  return Math.max(0, Math.min(asked, count - 1));
 }
 
 /**

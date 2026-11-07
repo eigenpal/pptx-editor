@@ -3,11 +3,13 @@
 
 export {
   paintSlide,
+  paintWeight,
   pathData,
-  SlidePainter,
   type AltTextPort,
   type PaintOptions,
+  type ViewRect,
 } from './paint.ts';
+export { SlidePainter } from './slide-painter.ts';
 export type { ImageSizePort, ImageUrlPort, PaintContext } from './paint-fill.ts';
 export { STORED_PIXELS_STYLE } from './paint-fill.ts';
 export { metafilePng, MAX_METAFILE_RASTER_EDGE } from './metafile-png.ts';

@@ -43,7 +43,7 @@ import {
 } from './paint-fill.ts';
 import { compoundStroke } from './compound-lines.ts';
 import { paintTable } from './paint-table.ts';
-import { paintText } from './paint-text.ts';
+import { paintText, type Shows } from './paint-text.ts';
 import { MAX_SHAPE_BANDS } from './paint-gradient.ts';
 import { Defs, matrixAttr, num, svg, SVG_NS } from './svg.ts';
 
@@ -65,6 +65,48 @@ export interface PaintOptions {
    * no description is hidden. Without it, the paint has no ARIA (thumbnails and exports).
    */
   readonly altText?: AltTextPort;
+  /**
+   * The part of slide space that can show, in EMU. A text line or a table cell wholly outside
+   * it does not paint, unless its shape casts copies of itself (a shadow, a reflection, a
+   * glow). Without it, everything paints. A thumbnail shows the slide; the editing surface
+   * shows what its view can reach.
+   */
+  readonly view?: ViewRect;
+}
+
+/** A rectangle of slide space, in EMU. */
+export interface ViewRect {
+  /** The left edge, from the slide's left edge. */
+  readonly x: number;
+  /** The top edge, from the slide's top edge. */
+  readonly y: number;
+  /** The width. */
+  readonly width: number;
+  /** The height. */
+  readonly height: number;
+}
+
+/**
+ * Whether a box can show in `view`: its corners map to the slide by `m`. A box whose corners
+ * do not map to finite points always shows.
+ */
+function showsIn(view: ViewRect | undefined, m: Matrix | undefined): Shows | undefined {
+  if (!view || !m) return undefined;
+  return (corners) => {
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const c of corners) {
+      const p = applyMatrix(m, c.x, c.y);
+      if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return true;
+      x0 = Math.min(x0, p.x);
+      y0 = Math.min(y0, p.y);
+      x1 = Math.max(x1, p.x);
+      y1 = Math.max(y1, p.y);
+    }
+    return x1 >= view.x && x0 <= view.x + view.width && y1 >= view.y && y0 <= view.y + view.height;
+  };
 }
 
 /** Resolves an element (`p:cNvPr/@descr` and the `adec:decorative` extension) to its alt text. */
@@ -510,7 +552,8 @@ function strokeExtras(
   return out;
 }
 
-function paintItem(
+/** Paint one layout item. @internal */
+export function paintItem(
   doc: Document,
   item: LayoutItem,
   ctx: PaintContext,
@@ -527,19 +570,8 @@ function paintItem(
   const local: PaintContext = { ...ctx, sourcePart: el.partName };
   switch (item.kind) {
     case 'group': {
-      const g = svg(doc, 'g', { ...common, 'data-kind': 'group' });
-      const scale = matrixScale(item.matrix);
-      // A group with `a:grpFill` passes its own group's fill on (ECMA-376 Part 1, 20.1.8.35).
-      const inherits = item.element.fill.type === 'group';
-      const groupCtx: PaintContext = {
-        ...local,
-        groupFill: inherits ? ctx.groupFill : item.element.fill,
-        groupSourcePart: inherits ? ctx.groupSourcePart : el.partName,
-      };
-      for (const child of item.children) {
-        const painted = paintItem(doc, child, groupCtx, opts, scale);
-        if (painted) g.appendChild(painted);
-      }
+      const g = groupNode(doc, item, opts);
+      paintChildren(doc, item, g, ctx, opts, 0, Infinity);
       return g;
     }
     case 'frame': {
@@ -548,7 +580,13 @@ function paintItem(
           doc,
           'g',
           { ...common, 'data-kind': 'table', transform: matrixAttr(item.matrix) },
-          paintTable(doc, item.table, item.element.table?.background ?? { type: 'none' }, local)
+          paintTable(
+            doc,
+            item.table,
+            item.element.table?.background ?? { type: 'none' },
+            local,
+            showsIn(opts.view, item.matrix)
+          )
         );
       // An OLE object shows its picture (ECMA-376 Part 1, 19.3.1.36); the frame holds the hit id.
       if (item.poster) {
@@ -630,21 +668,23 @@ function paintItem(
           ? pro.body(effects, boundsOf(boxCorners(item)), ids)
           : null;
       if (bodyFx) effectDefs(ctx.defs, bodyFx.defs);
-      const content = svg(doc, 'g', {}, [
-        bodyFx ? svg(doc, 'g', { filter: `url(#${bodyFx.filter})` }, [body]) : body,
-      ]);
-      // An empty body's caret line draws nothing: no group for it.
-      if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text))
-        content.appendChild(
-          svg(doc, 'g', { transform: matrixAttr(item.textMatrix) }, [
-            paintText(doc, item.text, local),
-          ])
-        );
       const copies = effects?.outerShadow || (pro && (effects?.reflection || effects?.glow));
-      if (!effects || !copies) {
-        outer.appendChild(content);
-        return outer;
+      // The body and the text paint in a group of their own only for the copies to refer to.
+      const content = copies ? svg(doc, 'g') : outer;
+      content.appendChild(
+        bodyFx ? svg(doc, 'g', { filter: `url(#${bodyFx.filter})` }, [body]) : body
+      );
+      // An empty body's caret line draws nothing: no group for it. A copy of the content (a
+      // shadow, a reflection, a glow) can carry a line from out of view into it: every line
+      // of such a shape paints.
+      if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text)) {
+        const shows =
+          effects?.outerShadow || effects?.reflection || effects?.glow
+            ? undefined
+            : showsIn(opts.view, item.textMatrix);
+        content.appendChild(paintText(doc, item.text, local, shows, matrixAttr(item.textMatrix)));
       }
+      if (!effects || !copies) return outer;
       // Shadow, reflection, and glow use the content, text included (design D1 of `effects-fidelity`).
       const contentId = ctx.defs.id('content');
       content.setAttribute('id', contentId);
@@ -670,6 +710,81 @@ function paintItem(
       return outer;
     }
   }
+}
+
+/**
+ * The number of items `item` paints: one, or for a group, a diagram, or a chart, the items in
+ * it, and for a table, its cells. A paint budget (`SlidePainter.paint`) counts these, so a group
+ * of thousands of shapes paints over several frames as thousands of shapes do. @internal
+ */
+export function paintWeight(item: LayoutItem): number {
+  const known = weights.get(item);
+  if (known !== undefined) return known;
+  const children =
+    item.kind === 'group'
+      ? item.children
+      : item.kind === 'frame'
+        ? (item.drawing ?? item.chart)
+        : undefined;
+  let weight = 1 + (item.kind === 'frame' ? (item.table?.cells.length ?? 0) : 0);
+  if (children) for (const child of children) weight += paintWeight(child);
+  weights.set(item, weight);
+  return weight;
+}
+
+const weights = new WeakMap<LayoutItem, number>();
+
+/** The node of a group, without its children. */
+export function groupNode(
+  doc: Document,
+  group: Extract<LayoutItem, { kind: 'group' }>,
+  opts: PaintOptions
+): SVGElement {
+  const el = group.element;
+  const hit = opts.hitTargets !== false;
+  return svg(doc, 'g', {
+    'data-node-id': hit ? el.nodeId : undefined,
+    'data-part': hit ? el.partName : undefined,
+    'data-layer': hit ? el.layer : undefined,
+    'data-kind': 'group',
+  });
+}
+
+/**
+ * Paint the children of `group` into its node `g`, from child `from` on, while their weight
+ * (`paintWeight`) fits in `budget`; at least one child. Answers the index of the first child
+ * left out (`children.length` when none is) and the weight painted.
+ */
+export function paintChildren(
+  doc: Document,
+  group: Extract<LayoutItem, { kind: 'group' }>,
+  g: SVGElement,
+  ctx: PaintContext,
+  opts: PaintOptions,
+  from: number,
+  budget: number
+): { readonly next: number; readonly spent: number } {
+  const el = group.element;
+  const scale = matrixScale(group.matrix);
+  // A group with `a:grpFill` passes its own group's fill on (ECMA-376 Part 1, 20.1.8.35).
+  const inherits = el.fill.type === 'group';
+  const groupCtx: PaintContext = {
+    ...ctx,
+    sourcePart: el.partName,
+    groupFill: inherits ? ctx.groupFill : el.fill,
+    groupSourcePart: inherits ? ctx.groupSourcePart : el.partName,
+  };
+  let spent = 0;
+  let i = from;
+  for (; i < group.children.length; i += 1) {
+    const child = group.children[i]!;
+    const weight = paintWeight(child);
+    if (i > from && spent + weight > budget) break;
+    const painted = paintItem(doc, child, groupCtx, opts, scale);
+    if (painted) g.appendChild(painted);
+    spent += weight;
+  }
+  return { next: i, spent };
 }
 
 /**
@@ -729,205 +844,6 @@ function contentCorners(
   }
   return out;
 }
-
-/** The painted node of one item and the definitions it added. */
-interface PaintedItem {
-  readonly node: SVGElement | null;
-  readonly defs: readonly SVGElement[];
-}
-
-/**
- * Paints the slides of one view again and again, and reuses the nodes of the items it painted
- * before. A layout item is an immutable value, and the layout keeps an item's object while its
- * shape is unchanged (`layoutSlide`), so the same item paints the same nodes: an edit paints the
- * items it changed, not the whole slide. `paintSlide` paints from nothing, for exports,
- * thumbnails, and the fidelity check; both paint each item with `paintItem`.
- *
- * Nothing else may change the nodes it returns, except for a while: a drag preview hides nodes
- * and must put them back (`PaintedPreview.clear`) before the next `paint`. @internal
- */
-export class SlidePainter {
-  readonly #doc: Document;
-  readonly #opts: PaintOptions;
-  readonly #defs: Defs;
-  #root: SVGSVGElement | null = null;
-  #content: SVGElement | null = null;
-  #background: PaintedItem | null = null;
-  #items = new Map<LayoutItem, PaintedItem>();
-  /** Items that a layout held twice: their second paint is never reused. */
-  #twice: PaintedItem[] = [];
-  #slide = '';
-
-  constructor(doc: Document, opts: PaintOptions) {
-    this.#doc = doc;
-    this.#opts = opts;
-    this.#defs = new Defs(doc, opts.idPrefix);
-  }
-
-  /** The prefix of the ids this painter writes. */
-  get idPrefix(): string {
-    return this.#opts.idPrefix;
-  }
-
-  #key: unknown = undefined;
-  /** Items painted before the last change of `invalidate`'s key: each paints again. */
-  #stale: Set<LayoutItem> | null = null;
-
-  /**
-   * Note `key`: what the picture depends on besides the layout, such as converted pictures or
-   * loaded faces. When it changed, every item paints again, and until it does, its earlier node
-   * stays on screen in its place. Answers whether the key changed.
-   */
-  invalidate(key: unknown): boolean {
-    if (key === this.#key) return false;
-    this.#key = key;
-    this.#stale = new Set(this.#items.keys());
-    return true;
-  }
-
-  /** Whether this painter paints with `opts`: the same ports and id prefix. */
-  paints(opts: PaintOptions): boolean {
-    const a = this.#opts;
-    return (
-      a.images === opts.images &&
-      a.imageSize === opts.imageSize &&
-      a.idPrefix === opts.idPrefix &&
-      a.frameLabel === opts.frameLabel &&
-      a.hitTargets === opts.hitTargets &&
-      a.altText === opts.altText
-    );
-  }
-
-  /**
-   * Whether the last `paint` left items out because they passed its budget: a later `paint` of
-   * the same layout adds them.
-   */
-  get pending(): boolean {
-    return this.#pending;
-  }
-
-  #pending = false;
-
-  /**
-   * Paint `layout`, reusing the nodes of items painted before. Returns the same `<svg>`. With a
-   * `budget`, it paints at most that many new items, in paint order, and keeps every item it
-   * painted before (`pending` tells when some are left): a slide of 24,000 shapes then goes on
-   * screen over several frames, and no frame blocks for seconds.
-   */
-  paint(layout: SlideLayout, budget = Infinity): SVGSVGElement {
-    const doc = this.#doc;
-    const { width, height } = layout.slide;
-    const slide = `${layout.slide.partName} ${width}x${height}`;
-    if (!this.#root || !this.#content || this.#slide !== slide) {
-      this.#root = doc.createElementNS(SVG_NS, 'svg') as SVGSVGElement;
-      this.#root.setAttribute('viewBox', `0 0 ${width} ${height}`);
-      this.#root.setAttribute('preserveAspectRatio', 'none');
-      this.#root.setAttribute('data-slide-part', layout.slide.partName);
-      this.#defs.element.replaceChildren();
-      this.#root.appendChild(this.#defs.element);
-      this.#content = svg(doc, 'g', { 'data-kind': 'content' });
-      this.#root.appendChild(this.#content);
-      this.#background = null;
-      this.#items.clear();
-      this.#stale = null;
-      this.#twice = [];
-      this.#slide = slide;
-    }
-    const root = this.#root;
-    const content = this.#content;
-    const ctx: PaintContext = {
-      defs: this.#defs,
-      images: this.#opts.images,
-      ...(this.#opts.imageSize ? { imageSize: this.#opts.imageSize } : {}),
-      sourcePart: layout.slide.backgroundPart,
-    };
-    // The background is one rectangle: it paints each time.
-    const drop = (painted: PaintedItem): void => {
-      painted.node?.remove();
-      for (const d of painted.defs) d.remove();
-    };
-    if (this.#background) drop(this.#background);
-    for (const painted of this.#twice.splice(0)) drop(painted);
-    const background = this.#defs.capture(() => {
-      const bg = fillPaint(layout.slide.background, width, height, ctx);
-      return svg(doc, 'rect', {
-        width,
-        height,
-        fill: bg.paint === 'none' ? '#ffffff' : bg.paint,
-        'fill-opacity': bg.opacity < 1 ? num(bg.opacity) : undefined,
-        'data-kind': 'background',
-      });
-    });
-    this.#background = { node: background.value, defs: background.defs };
-    root.insertBefore(background.value, content);
-    const next = new Map<LayoutItem, PaintedItem>();
-    const nodes: SVGElement[] = [];
-    const paintFresh = (item: LayoutItem): PaintedItem => {
-      const fresh = this.#defs.capture(() => paintItem(doc, item, ctx, this.#opts, 1));
-      return { node: fresh.value, defs: fresh.defs };
-    };
-    let left = budget;
-    this.#pending = false;
-    // The earlier nodes of the shapes that a budget leaves out (`itemKey`): each stays on
-    // screen in its place until its shape paints again (a font load or a theme edit makes
-    // every item new).
-    let earlier: Map<string, [LayoutItem, PaintedItem]> | null = null;
-    let current: Set<LayoutItem> | null = null;
-    for (const item of layout.items) {
-      let painted: PaintedItem;
-      const stale = this.#stale?.has(item) === true;
-      const kept = next.has(item) || stale ? undefined : this.#items.get(item);
-      if (!kept && left <= 0) {
-        this.#pending = true;
-        earlier ??= new Map([...this.#items].map(([i, p]) => [itemKey(i), [i, p]] as const));
-        current ??= new Set(layout.items);
-        const stand = earlier.get(itemKey(item));
-        // An item of the layout stands in only for itself, when it waits to paint again.
-        const own = stand?.[0] === item && stale;
-        if (stand && !next.has(stand[0]) && (own || !current.has(stand[0]))) {
-          next.set(stand[0], stand[1]);
-          if (stand[1].node) nodes.push(stand[1].node);
-        }
-        continue;
-      }
-      if (next.has(item)) {
-        // An item twice in one layout paints twice: one node cannot stand in two places.
-        painted = paintFresh(item);
-        this.#twice.push(painted);
-        left -= 1;
-      } else {
-        painted = kept ?? paintFresh(item);
-        if (!kept) left -= 1;
-        next.set(item, painted);
-        if (stale) {
-          // Painted again: its earlier node and definitions go.
-          this.#stale!.delete(item);
-          const old = this.#items.get(item);
-          if (old) drop(old);
-        }
-      }
-      if (painted.node) nodes.push(painted.node);
-    }
-    for (const [item, painted] of this.#items) if (!next.has(item)) drop(painted);
-    this.#items = next;
-    // An item an edit replaced before it painted again waits no more.
-    if (this.#stale) for (const item of this.#stale) if (!next.has(item)) this.#stale.delete(item);
-    // Put the nodes in paint order, moving only the ones out of place.
-    nodes.forEach((node, i) => {
-      const at = content.childNodes[i] ?? null;
-      if (at !== node) content.insertBefore(node, at);
-    });
-    while (content.childNodes.length > nodes.length) content.lastChild?.remove();
-    return root;
-  }
-}
-
-/**
- * An item's place in the document: its part, its layer, and its node id. Node ids are numbered
- * per part, so a master shape and a slide shape can share one.
- */
-const itemKey = (item: LayoutItem): string =>
-  `${item.element.partName}\u0000${item.element.layer}\u0000${item.element.nodeId}`;
 
 /** Paint a slide into a new `<svg>` sized by viewBox in EMU. The caller sets CSS size. */
 export function paintSlide(doc: Document, layout: SlideLayout, opts: PaintOptions): SVGSVGElement {
