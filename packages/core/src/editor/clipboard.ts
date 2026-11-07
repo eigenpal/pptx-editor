@@ -170,6 +170,11 @@ const GRAPHS: ReadonlyMap<string, GraphRule> = new Map<string, GraphRule>([
   [`${R}oleObject`, { stem: '/ppt/embeddings/oleObject', types: EMBEDDED }],
   [`${R}package`, { stem: '/ppt/embeddings/package', types: EMBEDDED }],
 ]);
+/** The extensions of an embedded object or package part. */
+const EMBEDDED_EXTENSIONS = new Set(['bin', 'xlsx', 'docx', 'pptx', 'xls', 'doc', 'ppt']);
+/** The link actions that a paste keeps: slide and show jumps, custom shows, and media play. */
+const SAFE_ACTIONS =
+  /^ppaction:\/\/(?:hlinksldjump|hlinkshowjump\?jump=[a-z]+|customshow\?[\w=&]*|noaction|media)$/;
 /** The most parts that one copy carries. */
 const MAX_PARTS = 256;
 /**
@@ -524,7 +529,14 @@ function cleanRelationship(
     : /^[a-z]+\/[A-Za-z0-9.+-]+$/.test(contentType);
   const extension = /\.([A-Za-z0-9]{1,8})$/.exec(part)?.[1]?.toLowerCase();
   const norm = normalizePartName(part);
-  if (!valid || !extension || !norm.ok) return graph ? null : skip;
+  // The extension names the new part, and a `Default` content type can follow it: a part that
+  // is not XML never takes `.xml` or `.rels`, and an embedded object takes a document extension.
+  const named = graph?.root
+    ? extension === 'xml'
+    : graph
+      ? EMBEDDED_EXTENSIONS.has(extension ?? '')
+      : extension !== undefined && extension !== 'xml' && extension !== 'rels';
+  if (!valid || !named || !extension || !norm.ok) return graph ? null : skip;
   const bytes = fromBase64(base64);
   if (!bytes || depth > MAX_DEPTH) return null;
   budget.bytes += bytes.length;
@@ -581,9 +593,13 @@ function validAlternate(spec: NodeSpec): boolean {
     if (b.ns !== NS.mc) return false;
     if (b.local === 'Fallback' && i !== branches.length - 1) return false;
     if (b.local !== 'Fallback' && b.local !== 'Choice') return false;
-    const shapes = (b.children ?? []).every((c) =>
-      'text' in c ? c.text.trim() === '' : c.ns === NS.p && SHAPES.has(c.local)
-    );
+    // A branch holds at least one shape: an empty wrapper draws nothing and cannot be selected.
+    const kids = b.children ?? [];
+    const shapes =
+      kids.some((c) => !('text' in c)) &&
+      kids.every((c) =>
+        'text' in c ? c.text.trim() === '' : c.ns === NS.p && SHAPES.has(c.local)
+      );
     if (!shapes || b.local === 'Fallback') return shapes;
     const own = new Set((b.nsDecls ?? []).map((d) => d.prefix));
     const requires = b.attrs?.find((a) => a.ns === '' && a.local === 'Requires')?.value ?? '';
@@ -650,23 +666,33 @@ function partFor(batch: OpBatch, rel: CarriedPart): string {
  * relationship of its saved drawing. A drawing that did not come along leaves the id empty, so
  * the diagram never shows the drawing of another diagram.
  */
-function withDrawingId(bytes: Uint8Array, slideIds: ReadonlyMap<string, string>): Uint8Array {
-  // One character per byte (`latin1` decodes as windows-1252, one code point per byte), so the
-  // match gives byte offsets, and every byte outside the edit stays as it was in any 8-bit
-  // encoding. A UTF-16 part has no match and stays as it is.
-  const text = new TextDecoder('latin1').decode(bytes);
-  const ext = /(<(?:[A-Za-z_][\w.-]*:)?dataModelExt\b[^>]*?\brelId=)("[^"]*"|'[^']*')/.exec(text);
+function withDrawingId(
+  name: string,
+  bytes: Uint8Array,
+  slideIds: ReadonlyMap<string, string>
+): Uint8Array {
+  // The bounded reader finds the element, in linear time and never in a comment; paste checked
+  // that the part parses (`cleanRelationship`).
+  const tree = parseXmlPart(name, decodeXml(bytes));
+  if (!tree.ok) return bytes;
+  const ext = descendant(tree.part.root, DSP, 'dataModelExt');
   if (!ext) return bytes;
-  // A relationship id is ASCII (`rIdN`), so it takes one byte per character.
-  const id = xmlAttr(slideIds.get(ext[2]!.slice(1, -1)) ?? '', 'relationship');
-  const at = ext.index + ext[1]!.length;
-  const out = new Uint8Array(bytes.length - ext[2]!.length + id.length + 2);
-  out.set(bytes.subarray(0, at), 0);
-  out[at] = 0x22;
-  for (let i = 0; i < id.length; i += 1) out[at + 1 + i] = id.charCodeAt(i);
-  out[at + 1 + id.length] = 0x22;
-  out.set(bytes.subarray(at + ext[2]!.length), at + id.length + 2);
-  return out;
+  const id = slideIds.get(attr(ext, 'relId') ?? '') ?? '';
+  const swap = (el: Element, depth: number): Element => {
+    if (el === ext)
+      return {
+        ...el,
+        attrs: el.attrs.map((a) => (a.ns === '' && a.local === 'relId' ? { ...a, value: id } : a)),
+      };
+    if (depth > MAX_DEPTH) return el;
+    return {
+      ...el,
+      children: el.children.map((c) => (c.type === 'element' ? swap(c, depth + 1) : c)),
+    };
+  };
+  return new TextEncoder().encode(
+    serializeXmlPart({ ...tree.part, root: swap(tree.part.root, 0) })
+  );
 }
 
 /**
@@ -679,7 +705,8 @@ function addGraph(
   slideIds: ReadonlyMap<string, string>
 ): string {
   const name = freePartName(batch, rel.stem, `.${rel.extension}`);
-  const bytes = rel.type === `${R}diagramData` ? withDrawingId(rel.bytes, slideIds) : rel.bytes;
+  const bytes =
+    rel.type === `${R}diagramData` ? withDrawingId(name, rel.bytes, slideIds) : rel.bytes;
   batch.push({ op: 'addPart', part: name, base64: toBase64(bytes) });
   addOverride(batch, name, rel.contentType);
   if (rel.relationships.length === 0) return name;
@@ -748,6 +775,15 @@ export function pasteShapes(
     if (spec.local === 'extLst' && isOnlyStructureMarks(spec)) return null;
     attrs = attrs
       .filter((a) => a.ns !== NS.r || a.value === '' || map.has(a.value))
+      // A pasted link keeps only an action that moves the slide show: never a program, a macro,
+      // a file, or an embedded object's verb.
+      .filter(
+        (a) =>
+          !HYPERLINKS.has(spec.local) ||
+          a.ns !== '' ||
+          a.local !== 'action' ||
+          SAFE_ACTIONS.test(a.value)
+      )
       .map((a) => (a.ns === NS.r && a.value !== '' ? { ...a, value: map.get(a.value)! } : a));
     const kids: (NodeSpec | { text: string })[] = [];
     for (const c of spec.children ?? []) {

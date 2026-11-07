@@ -16,6 +16,7 @@ import { parseArgs } from 'node:util';
 import { createPptxEditor } from '../../packages/core/src/editor/index.ts';
 import {
   NS,
+  parseXmlPart,
   relationshipsOf,
   serializeXmlPart,
   xmlPartOf,
@@ -91,9 +92,12 @@ function contentOf(pkg: PptxPackage, part: string | undefined): string | undefin
   const p = part ? pkg.parts.get(part) : undefined;
   if (!p) return undefined;
   if (p.kind === 'xml') return normalized(serializeXmlPart(p.xml));
-  // A part that the reader keeps as bytes (a chart, a diagram, comments) may still be XML.
-  const text = new TextDecoder().decode(p.bytes);
-  return /^\s*</.test(text) ? normalized(text) : Buffer.from(p.bytes).toString('base64');
+  // A part that the reader keeps as bytes (a chart, a diagram, comments) may still be XML: it
+  // compares as the writer serializes its tree, so a paste that writes it again compares equal.
+  const tree = parseXmlPart(p.partName, new TextDecoder().decode(p.bytes));
+  return tree.ok
+    ? normalized(serializeXmlPart(tree.part))
+    : Buffer.from(p.bytes).toString('base64');
 }
 
 /** The targets that the `r:*` attributes of `el` name, in document order, as their content. */

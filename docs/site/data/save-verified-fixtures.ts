@@ -218,9 +218,9 @@ export const SAVE_VERIFIED_KEPT_CONTENT_EDITS: Readonly<Record<string, string>> 
   'objects.diagrams: duplicate slide':
     'sha256:ebba58655e8431d3d979e488f181abfcc76b90be01c40fe7a74089899fc064fd',
   'objects.diagrams: paste on a new slide':
-    'sha256:21602a13e18c1edfe7ee858e42ccfa3c3f30077b30f7b6e8a95559d8cf69e4ff',
+    'sha256:6bef0632f1f598ad61b46412c4c3644734ffcd9b2882baa70ee41c47c9142adb',
   'objects.diagrams: paste into another deck':
-    'sha256:21602a13e18c1edfe7ee858e42ccfa3c3f30077b30f7b6e8a95559d8cf69e4ff',
+    'sha256:6bef0632f1f598ad61b46412c4c3644734ffcd9b2882baa70ee41c47c9142adb',
   'objects.diagrams: group':
     'sha256:24b86ac67a2769552684b1f291df64d9ad956706c76d9d6f0d0790b05d92deae',
   'objects.media-ole: duplicate slide':
