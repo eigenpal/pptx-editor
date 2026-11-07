@@ -5,4 +5,4 @@
 '@pptx-editor.dev/i18n': minor
 ---
 
-Add the selection pane: the side panel's new **Selection** tab, and the `SelectionPane` component, list the objects of the current slide as a tree to select, show or hide, rename, and reorder them. `SidePanel` takes `tab` and `onTabChange` to open a tab from your own control.
+Add the selection pane: the side panel's new **Selection** tab, and the `SelectionPane` component, list the objects of the current slide as a tree to select, show or hide, rename, and reorder them. `SidePanel` takes `tab` and `onTabChange` (`v-model:tab` in Vue) to open a tab from your own control. The toolbar's Selection Pane and Format Pane controls call the new `requestPane`, and the side panel and your host answer through `listenPaneRequests`.

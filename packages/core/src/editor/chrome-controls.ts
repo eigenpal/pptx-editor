@@ -5,6 +5,7 @@
 // it renders and dispatches, never whether it is enabled. Enabled state has exactly one source,
 // `toolbarCommandState`, which asks `Editor.can`.
 
+import { requestPane } from './pane-requests.ts';
 import type {
   Editor,
   EditorCommand,
@@ -96,7 +97,10 @@ export type ChromeControlState =
    * event with `{ editor, replace }`, and the panel answers it.
    */
   | { readonly kind: 'panel' }
-  /** Opens a task pane: the Format pane or the selection pane. Neither is built yet. */
+  /**
+   * Shows a tab of the side panel: Format or Selection. The slot sends `requestPane`, which a
+   * mounted side panel and the host answer.
+   */
   | { readonly kind: 'pane'; readonly pane: 'format' | 'selection' }
   /**
    * Opens a dialog of the `popups` registry by its key. With a probe command, the slot is on when
@@ -845,8 +849,8 @@ export function toolbarCommandState(editor: Editor | null, id: ChromeSlotId): To
   }
   const kind = chromeControlForSlot(id)?.state.kind;
   if (kind === 'pane')
-    // The Format pane and the selection pane are not built yet: the slot says so.
-    return { id, enabled: false, disabledReason: 'disabled.paneNotBuilt', active: false };
+    // The slot asks the side panel (or the host) to show its tab (`requestPane`).
+    return { id, enabled: true, disabledReason: null, active: false };
   // A dialog with a probe (`paragraph.dialog`) is enabled when the engine takes its command.
   const unprobed = kind === 'dialog' && PROBES[id] === undefined;
   if (unprobed || kind === 'clipboard' || kind === 'slideshow')
@@ -959,7 +963,10 @@ export function runToolbarCommand<K extends ChromeSlotId>(
   const command = value === undefined ? commandForSlot(id) : commandForSlotValue(id, value, editor);
   if (!command) {
     const state = chromeControlForSlot(id)?.state;
-    if (state?.kind === 'pane') return { ok: false as const, reason: 'disabled.paneNotBuilt' };
+    if (state?.kind === 'pane')
+      return requestPane(editor, state.pane)
+        ? { ok: true as const }
+        : { ok: false as const, reason: 'disabled.noSidePanel' };
     const reason = CHROME_SLOT_REASONS[id];
     // A raw hook that runs such a slot must not fail in silence.
     if (reason) {

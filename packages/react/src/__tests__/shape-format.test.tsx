@@ -232,7 +232,7 @@ describe('Align menu', () => {
 });
 
 describe('task pane slots', () => {
-  test('Format shape and Selection pane are composable and say the pane is not built', async () => {
+  test('Format shape and Selection pane are composable and turn the side panel tab', async () => {
     const editor = await open();
     render(
       <PptxEditorContext.Provider value={editor}>
@@ -240,14 +240,19 @@ describe('task pane slots', () => {
           <Toolbar.Slot slotId="shape.properties" />
           <Toolbar.Slot slotId="arrange.selectionPane" />
         </Toolbar>
+        <PptxEditor.SidePanel />
       </PptxEditorContext.Provider>
     );
-    for (const name of ['Format shape', 'Selection pane']) {
+    const selected = () => screen.getByRole('tab', { selected: true }).textContent;
+    expect(selected()).toBe('Format');
+    for (const [name, tab] of [
+      ['Selection pane', 'Selection'],
+      ['Format shape', 'Format'],
+    ] as const) {
       const button = screen.getByRole('button', { name });
-      // aria-disabled, not disabled: the control stays reachable and gives its reason.
-      expect(button.getAttribute('aria-disabled')).toBe('true');
-      const reason = document.getElementById(button.getAttribute('aria-describedby')!);
-      expect(reason?.textContent).toBe('This pane is not available in this version');
+      expect(button.getAttribute('aria-disabled')).toBe(null);
+      act(() => void fireEvent.click(button));
+      expect(selected()).toBe(tab);
     }
   });
 

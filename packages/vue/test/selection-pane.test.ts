@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { createApp, defineComponent, h, nextTick, shallowRef, type App, type Component } from 'vue';
-import type { PptxEditorInstance, SidePanelTab } from '@pptx-editor.dev/core/editor';
+import {
+  runToolbarCommand,
+  type PptxEditorInstance,
+  type SidePanelTab,
+} from '@pptx-editor.dev/core/editor';
 import { buildPptx, shape } from '../../../scripts/fixtures/builder.ts';
 import {
   PptxEditorContent,
@@ -50,6 +54,7 @@ async function mount(inner: () => unknown): Promise<PptxEditorInstance> {
           shape({ id: 3, name: 'Two', x: 2 * IN, y: IN, cx: IN, cy: IN }) +
           group,
       },
+      { shapes: shape({ id: 2, name: 'Other', x: IN, y: IN, cx: IN, cy: IN }) },
     ],
   });
   const editor = ready as PptxEditorInstance | null;
@@ -60,8 +65,10 @@ async function mount(inner: () => unknown): Promise<PptxEditorInstance> {
 
 const rows = () => [...document.querySelectorAll<HTMLElement>('[role="treeitem"]')];
 const row = (name: string) => rows().find((r) => r.getAttribute('aria-label')?.startsWith(name))!;
-const key = async (el: Element, k: string): Promise<void> => {
-  el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+const key = async (el: Element, k: string, init: KeyboardEventInit = {}): Promise<void> => {
+  el.dispatchEvent(
+    new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...init })
+  );
   await nextTick();
   await nextTick();
 };
@@ -121,7 +128,7 @@ describe('PptxEditorSelectionPane', () => {
     await mount(() =>
       h(PptxEditorSidePanel, {
         tab: tab.value,
-        onTabChange: (t: SidePanelTab) => (picked.push(t), (tab.value = t)),
+        'onUpdate:tab': (t: SidePanelTab) => (picked.push(t), (tab.value = t)),
       })
     );
     const tabOf = (name: string) =>
@@ -134,5 +141,56 @@ describe('PptxEditorSelectionPane', () => {
     await nextTick();
     expect(picked).toEqual(['format']);
     expect(document.querySelector('[role="tree"]')).toBe(null);
+  });
+  test('H shows or hides the focused row; Ctrl and Cmd keys pass by', async () => {
+    const editor = await mount(() => h(PptxEditorSelectionPane));
+    const hidden = () => editor.snapshot().shapes!.find((s) => s.name === 'Two')!.hidden;
+    expect(row('Two').getAttribute('aria-keyshortcuts')).toBe('H F2');
+    expect(document.querySelector('[role="tree"]')!.getAttribute('aria-describedby')).toBeTruthy();
+    await key(row('Two'), 'h', { ctrlKey: true });
+    expect(hidden()).toBeFalsy();
+    await key(row('Two'), 'h');
+    expect(hidden()).toBe(true);
+    await key(row('Two'), 'H');
+    expect(hidden()).toBeFalsy();
+  });
+
+  test('Hide all reaches a group child; a new slide closes the rename field', async () => {
+    const editor = await mount(() => h(PptxEditorSelectionPane));
+    const button = (name: string) =>
+      [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+        (b) => b.textContent === name
+      )!;
+    button('Hide all').click();
+    await nextTick();
+    const cards = editor.snapshot().shapes!.find((s) => s.name === 'Cards')!;
+    expect(cards.children![0]!.hidden).toBe(true);
+    await key(row('One'), 'F2');
+    const field = document.querySelector<HTMLInputElement>('input[aria-label="Name"]')!;
+    expect(field.value).toBe('One');
+    // Node ids repeat across slides: the field must not rename an element of the next slide.
+    editor.goToSlide(1);
+    await nextTick();
+    await nextTick();
+    expect(document.querySelector('input[aria-label="Name"]')).toBe(null);
+    expect(rows().map((r) => r.getAttribute('aria-label'))).toEqual(['Other']);
+    expect(editor.snapshot().shapes![0]!.name).toBe('Other');
+  });
+
+  test('the toolbar Selection pane slot turns the side panel to its tab', async () => {
+    const editor = await mount(() => h(PptxEditorSidePanel));
+    const selected = () =>
+      document.querySelector('[role="tab"][aria-selected="true"]')?.textContent ?? null;
+    expect(selected()).toBe('Format');
+    expect(runToolbarCommand(editor, 'arrange.selectionPane')).toEqual({ ok: true });
+    await nextTick();
+    expect(selected()).toBe('Selection');
+    app!.unmount();
+    app = null;
+    // With no side panel, the slot says so.
+    expect(runToolbarCommand(editor, 'arrange.selectionPane')).toEqual({
+      ok: false,
+      reason: 'disabled.noSidePanel',
+    });
   });
 });

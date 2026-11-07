@@ -3413,11 +3413,10 @@ export const PptxEditor: {
             readonly type: PropType<_pptx_editor_dev_core_editor.SidePanelTab>;
             readonly default: undefined;
         };
-        readonly onTabChange: {
-            readonly type: PropType<(tab: _pptx_editor_dev_core_editor.SidePanelTab) => void>;
-            readonly default: undefined;
-        };
-    }>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    }>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
+        tabChange: (_tab: _pptx_editor_dev_core_editor.SidePanelTab) => true;
+        'update:tab': (_tab: _pptx_editor_dev_core_editor.SidePanelTab) => true;
+    }, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
         readonly paneWidth: {
             readonly type: NumberConstructor;
             readonly default: undefined;
@@ -3438,24 +3437,24 @@ export const PptxEditor: {
             readonly type: PropType<_pptx_editor_dev_core_editor.SidePanelTab>;
             readonly default: undefined;
         };
-        readonly onTabChange: {
-            readonly type: PropType<(tab: _pptx_editor_dev_core_editor.SidePanelTab) => void>;
-            readonly default: undefined;
-        };
-    }>> & Readonly<{}>, {
+    }>> & Readonly<{
+        onTabChange?: ((_tab: "format" | "comments" | "selection") => any) | undefined;
+        "onUpdate:tab"?: ((_tab: "format" | "comments" | "selection") => any) | undefined;
+    }>, {
         readonly className: string;
         readonly style: vue.CSSProperties;
         readonly paneWidth: number;
         readonly onClose: () => void;
         readonly tab: "format" | "comments" | "selection";
-        readonly onTabChange: (tab: _pptx_editor_dev_core_editor.SidePanelTab) => void;
     }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
     SelectionPane: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly className: {
             readonly type: StringConstructor;
             readonly default: undefined;
         };
-    }>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    }>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
         readonly className: {
             readonly type: StringConstructor;
             readonly default: undefined;
@@ -4619,8 +4618,8 @@ export const PptxEditor: {
                 readonly default: undefined;
             };
         }>> & Readonly<{
-            "onUpdate:tab"?: ((_tab: string) => any) | undefined;
             onTabChange?: ((_tab: string) => any) | undefined;
+            "onUpdate:tab"?: ((_tab: string) => any) | undefined;
         }>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
             [key: string]: any;
         }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
@@ -4661,8 +4660,8 @@ export const PptxEditor: {
                 readonly default: undefined;
             };
         }>> & Readonly<{
-            "onUpdate:tab"?: ((_tab: string) => any) | undefined;
             onTabChange?: ((_tab: string) => any) | undefined;
+            "onUpdate:tab"?: ((_tab: string) => any) | undefined;
         }>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
             [key: string]: any;
         }>, {}, {}, {}, {
@@ -4697,8 +4696,8 @@ export const PptxEditor: {
             readonly default: undefined;
         };
     }>> & Readonly<{
-        "onUpdate:tab"?: ((_tab: string) => any) | undefined;
         onTabChange?: ((_tab: string) => any) | undefined;
+        "onUpdate:tab"?: ((_tab: string) => any) | undefined;
     }>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
         [key: string]: any;
     }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
@@ -5826,8 +5825,8 @@ export const PptxEditorRibbon: {
             readonly default: undefined;
         };
     }>> & Readonly<{
-        "onUpdate:tab"?: ((_tab: string) => any) | undefined;
         onTabChange?: ((_tab: string) => any) | undefined;
+        "onUpdate:tab"?: ((_tab: string) => any) | undefined;
     }>, () => VNode<vue.RendererNode, vue.RendererElement, {
         [key: string]: any;
     }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
@@ -5868,8 +5867,8 @@ export const PptxEditorRibbon: {
             readonly default: undefined;
         };
     }>> & Readonly<{
-        "onUpdate:tab"?: ((_tab: string) => any) | undefined;
         onTabChange?: ((_tab: string) => any) | undefined;
+        "onUpdate:tab"?: ((_tab: string) => any) | undefined;
     }>, () => VNode<vue.RendererNode, vue.RendererElement, {
         [key: string]: any;
     }>, {}, {}, {}, {
@@ -5904,8 +5903,8 @@ export const PptxEditorRibbon: {
         readonly default: undefined;
     };
 }>> & Readonly<{
-    "onUpdate:tab"?: ((_tab: string) => any) | undefined;
     onTabChange?: ((_tab: string) => any) | undefined;
+    "onUpdate:tab"?: ((_tab: string) => any) | undefined;
 }>, () => VNode<vue.RendererNode, vue.RendererElement, {
     [key: string]: any;
 }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
@@ -6085,7 +6084,9 @@ export const PptxEditorSelectionPane: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: StringConstructor;
         readonly default: undefined;
     };
-}>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+}>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
+    [key: string]: any;
+}>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
     readonly className: {
         readonly type: StringConstructor;
         readonly default: undefined;
@@ -6116,11 +6117,10 @@ export const PptxEditorSidePanel: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: PropType<SidePanelTab>;
         readonly default: undefined;
     };
-    readonly onTabChange: {
-        readonly type: PropType<(tab: SidePanelTab) => void>;
-        readonly default: undefined;
-    };
-}>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+}>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
+    tabChange: (_tab: SidePanelTab) => true;
+    'update:tab': (_tab: SidePanelTab) => true;
+}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
     readonly paneWidth: {
         readonly type: NumberConstructor;
         readonly default: undefined;
@@ -6141,17 +6141,15 @@ export const PptxEditorSidePanel: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: PropType<SidePanelTab>;
         readonly default: undefined;
     };
-    readonly onTabChange: {
-        readonly type: PropType<(tab: SidePanelTab) => void>;
-        readonly default: undefined;
-    };
-}>> & Readonly<{}>, {
+}>> & Readonly<{
+    onTabChange?: ((_tab: "format" | "comments" | "selection") => any) | undefined;
+    "onUpdate:tab"?: ((_tab: "format" | "comments" | "selection") => any) | undefined;
+}>, {
     readonly className: string;
     readonly style: CSSProperties;
     readonly paneWidth: number;
     readonly onClose: () => void;
     readonly tab: "format" | "comments" | "selection";
-    readonly onTabChange: (tab: SidePanelTab) => void;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 
 // @public

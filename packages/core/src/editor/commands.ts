@@ -335,12 +335,15 @@ function linkedRunsAt(
     const l = linkOf(el);
     return !!l && !attr(l, 'r:id') && attr(l, 'action') === action;
   };
-  const at = slots.findIndex((sl) => sl.el === here!.el);
+  // The stretch stays in the caret's paragraph: a jump link at the end of one paragraph and
+  // another at the start of the next are two links.
+  const own = slotsOf(para!, n);
+  const at = own.findIndex((sl) => sl.el === here!.el);
   let from = at;
   let to = at;
-  while (from > 0 && same(slots[from - 1]!.el)) from -= 1;
-  while (to < slots.length - 1 && same(slots[to + 1]!.el)) to += 1;
-  return slots.slice(from, to + 1).map((sl) => sl.el);
+  while (from > 0 && same(own[from - 1]!.el)) from -= 1;
+  while (to < own.length - 1 && same(own[to + 1]!.el)) to += 1;
+  return own.slice(from, to + 1).map((sl) => sl.el);
 }
 
 /** What clear formatting keeps on a run: its language and proofing state, and its link. */

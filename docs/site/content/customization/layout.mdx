@@ -292,7 +292,7 @@ Render one notes pane in each root. For the pane props and the notes height, see
 
 The selection pane lists the objects of the current slide, top first, with groups as a tree. A click selects an object, even a hidden one. The eye button shows or hides it, and a double-click or F2 renames it. **Show all**, **Hide all**, and the order buttons act on the slide.
 
-The side panel shows the pane on its **Selection** tab. To open that tab from your own control, set `tab` and `onTabChange`:
+The side panel shows the pane on its **Selection** tab. To open that tab from your own control, set `tab` and `onTabChange` (`v-model:tab` in Vue):
 
 <FrameworkTabs>
 <Framework value="react">
@@ -327,14 +327,18 @@ const tab = shallowRef<SidePanelTab>('format');
 
 <template>
   <button type="button" @click="tab = 'selection'">Selection pane</button>
-  <PptxEditorSidePanel :tab="tab" :on-tab-change="(next: SidePanelTab) => (tab = next)" />
+  <PptxEditorSidePanel v-model:tab="tab" />
 </template>
 ```
 
 </Framework>
 </FrameworkTabs>
 
-Render these components inside the editor root. To show the pane outside the side panel, render `PptxEditor.SelectionPane` (`PptxEditorSelectionPane` in Vue) anywhere inside the root. The pane writes through the `setShapesVisible`, `renameShape`, and `order` commands, so each change is one undo step. In view mode, the pane selects but does not change objects.
+Render these components inside the editor root. The toolbar's **Selection Pane** and **Format Pane** controls call `requestPane(editor, pane)`, and a mounted side panel turns to that tab. Without a side panel, the control reports `disabled.noSidePanel`. To answer the request in your own layout, for example to show a closed side panel, call `listenPaneRequests(editor, (pane) => { /* show the panel, set the tab */ })`. It returns a function that stops the listener.
+
+In the pane, a row keeps the keyboard focus. Up and Down move, Right and Left open and close a group, H shows or hides the object, and F2 renames it.
+
+To show the pane outside the side panel, render `PptxEditor.SelectionPane` (`PptxEditorSelectionPane` in Vue) anywhere inside the root. The pane writes through the `setShapesVisible`, `renameShape`, and `order` commands, so each change is one undo step. In view mode, the pane selects but does not change objects.
 
 ## Open failure
 

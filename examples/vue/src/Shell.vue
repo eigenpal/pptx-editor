@@ -45,6 +45,7 @@ import {
   ribbonChrome,
   type SlideExport,
 } from '../../shared/demo-files.ts';
+import { listenPaneRequests } from '@pptx-editor.dev/core/editor';
 import AdapterSwitcher from './AdapterSwitcher.vue';
 import BrandLogo from './BrandLogo.vue';
 import ExportMenu from './ExportMenu.vue';
@@ -78,6 +79,20 @@ const panel = shallowRef(panelStartsOpen());
 const panelTab = shallowRef<SidePanelTab>('format');
 const stopPanelWidth = followPanelWidth((open) => (panel.value = open));
 onBeforeUnmount(stopPanelWidth);
+// The toolbar's Selection Pane and Format Pane controls open the panel on their tab.
+watch(
+  editor,
+  (e, _old, onCleanup) => {
+    if (!e) return;
+    onCleanup(
+      listenPaneRequests(e, (pane) => {
+        panelTab.value = pane;
+        panel.value = true;
+      })
+    );
+  },
+  { immediate: true }
+);
 const dragging = shallowRef(false);
 // The slide thumbnails over the slide, on a narrow window only.
 const rail = shallowRef(false);
@@ -297,8 +312,7 @@ function onDrop(e: DragEvent): void {
         </div>
         <PptxEditorSidePanel
           v-if="panel"
-          :tab="panelTab"
-          :on-tab-change="(next: SidePanelTab) => (panelTab = next)"
+          v-model:tab="panelTab"
           :on-close="() => (panel = false)"
         />
         <div v-if="dragging" class="demo-drop">{{ t('app.dropHint') }}</div>

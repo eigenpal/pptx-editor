@@ -9,7 +9,9 @@ import {
   onMounted,
   ref,
   shallowRef,
+  useId,
   watch,
+  h,
   type ExtractPublicPropTypes,
   type PropType,
 } from 'vue';
@@ -20,7 +22,7 @@ import {
   selectionPaneKey,
   selectionPaneRows,
   selectionPaneSelected,
-  selectionPaneTopIds,
+  selectionPaneAllIds,
   type SelectionPaneRow,
 } from '@pptx-editor.dev/core/editor';
 import { Icon, ToolButton, keepFocus } from './chrome.tsx';
@@ -40,51 +42,51 @@ const RenameField = defineComponent({
   props: {
     name: { type: String, required: true },
     label: { type: String, required: true },
-    onDone: { type: Function as PropType<(name: string | null) => void>, required: true },
+    onDone: {
+      type: Function as PropType<(name: string | null, refocus: boolean) => void>,
+      required: true,
+    },
   },
   setup(props) {
     const field = ref<HTMLInputElement | null>(null);
     let done = false;
     onMounted(() => {
-      field.value?.focus();
-      field.value?.select();
+      if (!field.value) return;
+      field.value.value = props.name;
+      field.value.focus();
+      field.value.select();
     });
-    const finish = (name: string | null): void => {
+    const finish = (name: string | null, refocus: boolean): void => {
       if (done) return;
       done = true;
-      props.onDone(name);
+      props.onDone(name, refocus);
     };
     return () => (
       <input
         ref={field}
         class="pptx-selection-pane__field"
         aria-label={props.label}
-        value={props.name}
         maxlength={SELECTION_PANE_NAME_MAX}
         onKeydown={(e: KeyboardEvent) => {
           e.stopPropagation();
           const value = (e.currentTarget as HTMLInputElement).value;
           if (e.key === 'Enter') {
             e.preventDefault();
-            finish(value);
+            finish(value, true);
           } else if (e.key === 'Escape') {
             e.preventDefault();
-            finish(null);
+            finish(null, true);
           }
         }}
-        onBlur={(e: FocusEvent) => finish((e.currentTarget as HTMLInputElement).value)}
+        onBlur={(e: FocusEvent) => finish((e.currentTarget as HTMLInputElement).value, false)}
       />
     );
   },
 });
 
-/**
- * The selection pane: select, show or hide, rename, and reorder the elements of the current
- * slide, the twin of React's `PptxEditor.SelectionPane`. Render it inside the editor root, or
- * open the side panel's **Selection** tab. @public
- */
-export const PptxEditorSelectionPane = defineComponent({
-  name: 'PptxEditorSelectionPane',
+/** The selection pane of one slide. */
+const SlidePane = defineComponent({
+  name: 'PptxSelectionPaneSlide',
   props: selectionPaneProps,
   setup(props) {
     const editor = usePptxEditor();
@@ -96,6 +98,7 @@ export const PptxEditorSelectionPane = defineComponent({
     const focused = ref<string | null>(null);
     const renaming = ref<string | null>(null);
     const tree = ref<HTMLDivElement | null>(null);
+    const hintId = useId();
     const selected = computed(() => selectionPaneSelected(selection.value));
     // A selected child of a group shows: its groups open when the selection reaches it. A group
     // the user closes stays closed until the selection moves again.
@@ -131,25 +134,31 @@ export const PptxEditorSelectionPane = defineComponent({
       if (editor.value) selectFromPane(editor.value, row, e.shiftKey || e.ctrlKey || e.metaKey);
     };
     const onKeydown = (e: KeyboardEvent, row: SelectionPaneRow): void => {
-      if (e.target !== e.currentTarget) return;
+      if (e.target !== e.currentTarget || e.altKey) return;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         select(row, e);
         return;
       }
+      if (e.ctrlKey || e.metaKey) return;
       const step = selectionPaneKey(rows.value, row.nodeId, e.key);
       if (!step) return;
       e.preventDefault();
       if ('focus' in step) focusRow(step.focus);
       else if ('expand' in step) toggle(step.expand, step.open);
-      else if (editable.value) renaming.value = step.rename;
+      else if (!editable.value) return;
+      else if ('rename' in step) renaming.value = step.rename;
+      else setVisible([row.nodeId], row.hidden);
     };
-    const renamed = (row: SelectionPaneRow, name: string | null): void => {
+    const renamed = (row: SelectionPaneRow, name: string | null, refocus: boolean): void => {
       renaming.value = null;
       const next = name?.trim();
-      if (next && next !== row.name)
+      // The element must still be on the slide: a peer can delete it while you type.
+      const here = selectionPaneAllIds(editor.value?.snapshot().shapes).includes(row.nodeId);
+      if (here && next && next !== row.name)
         editor.value?.exec({ type: 'renameShape', nodeId: row.nodeId, name: next });
-      focusRow(row.nodeId);
+      // Enter and Escape give the row its focus back; a click elsewhere keeps its own.
+      if (refocus && here) focusRow(row.nodeId);
     };
     const order = (move: 'forward' | 'backward') => editor.value?.exec({ type: 'order', move });
 
@@ -179,7 +188,7 @@ export const PptxEditorSelectionPane = defineComponent({
               type="button"
               class="pptx-button"
               disabled={!canEdit}
-              onClick={() => setVisible(selectionPaneTopIds(shapes.value), true)}
+              onClick={() => setVisible(selectionPaneAllIds(shapes.value), true)}
             >
               {t('selectionPane.showAll')}
             </button>
@@ -187,7 +196,7 @@ export const PptxEditorSelectionPane = defineComponent({
               type="button"
               class="pptx-button"
               disabled={!canEdit}
-              onClick={() => setVisible(selectionPaneTopIds(shapes.value), false)}
+              onClick={() => setVisible(selectionPaneAllIds(shapes.value), false)}
             >
               {t('selectionPane.hideAll')}
             </button>
@@ -208,10 +217,16 @@ export const PptxEditorSelectionPane = defineComponent({
               />
             </span>
           </div>
+          {canEdit ? (
+            <p id={hintId} class="pptx-selection-pane__hint">
+              {t('selectionPane.keyHint')}
+            </p>
+          ) : null}
           <div
             ref={tree}
             role="tree"
             aria-label={t('selectionPane.label')}
+            aria-describedby={canEdit ? hintId : undefined}
             aria-multiselectable="true"
             class="pptx-selection-pane__tree"
           >
@@ -235,6 +250,7 @@ export const PptxEditorSelectionPane = defineComponent({
                     row.hidden ? t('selectionPane.hiddenName', { name: row.name }) : row.name
                   }
                   aria-description={t(`panel.format.elementKind.${row.kind}`)}
+                  aria-keyshortcuts={canEdit ? 'H F2' : undefined}
                   tabindex={row.nodeId === stop ? 0 : -1}
                   style={{ paddingInlineStart: `${(row.level - 1) * 16 + 4}px` }}
                   onFocus={() => (focused.value = row.nodeId)}
@@ -270,7 +286,9 @@ export const PptxEditorSelectionPane = defineComponent({
                     <RenameField
                       name={row.name}
                       label={t('selectionPane.rename')}
-                      onDone={(name: string | null) => renamed(row, name)}
+                      onDone={(name: string | null, refocus: boolean) =>
+                        renamed(row, name, refocus)
+                      }
                     />
                   ) : (
                     <span class="pptx-selection-pane__name">{row.name}</span>
@@ -294,5 +312,21 @@ export const PptxEditorSelectionPane = defineComponent({
         </div>
       );
     };
+  },
+});
+
+/**
+ * The selection pane: select, show or hide, rename, and reorder the elements of the current
+ * slide, the twin of React's `PptxEditor.SelectionPane`. Render it inside the editor root, or
+ * open the side panel's **Selection** tab. @public
+ */
+export const PptxEditorSelectionPane = defineComponent({
+  name: 'PptxEditorSelectionPane',
+  props: selectionPaneProps,
+  setup(props) {
+    // Node ids repeat across slides: a new slide starts a new pane, so no rename, focus, or
+    // open group carries over to an element of another slide.
+    const slideId = useEditorState((s) => s.slides[s.currentSlide]?.id ?? '');
+    return () => h(SlidePane, { key: slideId.value, className: props.className });
   },
 });

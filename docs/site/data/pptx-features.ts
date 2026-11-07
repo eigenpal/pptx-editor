@@ -382,7 +382,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'The side panel has a Selection tab that lists the objects of the slide as a tree. It selects objects, hidden ones too, shows or hides them, renames them, and moves them forward or backward. The commands also work inside mc:AlternateContent. There, other edits of a drawn choice remove the out-of-date copies in the other branches: an approximation. The toolbar Selection pane button is not built: the host opens the side panel tab.',
+      'The side panel has a Selection tab that lists the objects of the slide as a tree. It selects objects, hidden ones too, shows or hides them with the eye button or the H key, renames them, and moves them forward or backward. The toolbar Selection pane button opens the tab. The commands also work inside mc:AlternateContent. There, other edits of a drawn choice remove the out-of-date copies in the other branches: an approximation.',
     docsLink: '/docs/customization/layout#open-the-selection-pane',
   },
   {

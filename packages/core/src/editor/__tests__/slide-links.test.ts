@@ -163,6 +163,33 @@ describe('editing a link at a caret', () => {
     expect(runs(e).filter((r) => r.includes('|'))).toEqual(['Go|nextslide']);
   });
 
+  test('a jump link stays in its paragraph', async () => {
+    const e = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    const text = para(run('Go')) + para(run('there'));
+    const deck = buildPptx({
+      slides: [{ shapes: shape({ id: 2, name: 'T', x: IN, y: IN, cx: 6 * IN, cy: 2 * IN, text }) }],
+    });
+    expect((await e.load(deck)).ok).toBe(true);
+    const at = (paragraph: number, from: number, to: number) =>
+      e.setSelection({
+        kind: 'text',
+        nodeId: shapeId(e),
+        anchor: { paragraph, offset: from },
+        focus: { paragraph, offset: to },
+      });
+    // Both paragraphs link to the next slide; the runs touch across the paragraph break.
+    at(0, 0, 2);
+    expect(e.exec({ type: 'setLink', url: '#next-slide' }).ok).toBe(true);
+    at(1, 0, 5);
+    expect(e.exec({ type: 'setLink', url: '#next-slide' }).ok).toBe(true);
+    // Remove at a caret in "Go" leaves the link of the next paragraph.
+    at(0, 1, 1);
+    expect(e.exec({ type: 'setLink', url: null }).ok).toBe(true);
+    const paras = elements(find(root(e), 'p:txBody')!).filter((c) => c.local === 'p');
+    const linked = paras.map((p) => elements(p).some((r) => r.local === 'r' && !!linkEl(r)));
+    expect(linked).toEqual([false, true]);
+  });
+
   test('relinking and removing leave no unused relationships', async () => {
     const e = await open();
     for (const url of ['#slide-2', '#slide-2', '#slide-3', 'mailto:a@b.c', 'https://a.test/']) {

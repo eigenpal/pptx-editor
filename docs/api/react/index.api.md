@@ -1363,7 +1363,7 @@ export interface SectionMenuState {
 }
 
 // @public
-export function SelectionPane(input?: SelectionPaneProps): react.JSX.Element;
+export function SelectionPane(props?: SelectionPaneProps): react.JSX.Element;
 
 // @public
 export interface SelectionPaneProps {

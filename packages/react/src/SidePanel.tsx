@@ -3,13 +3,14 @@
 // the selected element's position, size, rotation, and text fitting through engine commands.
 // The Vue twin is `packages/vue/src/SidePanel.tsx`.
 
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   SIDE_PANEL_TABS,
   TABLE_OPTION_ROWS,
   elementKindLabelKey,
   elementRotates,
   formatPanelSize,
+  listenPaneRequests,
   panelHistoryKey,
   platformShortcuts,
   radioGroupStep,
@@ -270,6 +271,13 @@ export function SidePanel({
     setOwn(next);
     onTabChange?.(next);
   };
+  // The toolbar's Selection pane and Format pane slots ask for a tab (`requestPane`).
+  const latest = useRef(setTab);
+  latest.current = setTab;
+  useEffect(
+    () => (editor ? listenPaneRequests(editor, (pane) => latest.current(pane)) : undefined),
+    [editor]
+  );
   return (
     <aside
       className={['pptx-panel', className].filter(Boolean).join(' ')}

@@ -7,6 +7,7 @@ import {
   computed,
   defineComponent,
   ref,
+  watch,
   type CSSProperties,
   type ExtractPublicPropTypes,
   type PropType,
@@ -16,6 +17,7 @@ import {
   elementKindLabelKey,
   elementRotates,
   formatPanelSize,
+  listenPaneRequests,
   TABLE_OPTION_ROWS,
   SIDE_PANEL_TABS,
   type SidePanelTab,
@@ -273,10 +275,8 @@ const sidePanelProps = {
   className: { type: String, default: undefined },
   /** Inline styles for the panel, as React's `style`; a `width` here wins over `paneWidth`. */
   style: { type: Object as PropType<CSSProperties>, default: undefined },
-  /** The tab that shows. Set it with `onTabChange` to control the tab; omit it to start on Format. */
+  /** The tab that shows, controlled. Use `v-model:tab`, or listen to `tabChange`. */
   tab: { type: String as PropType<SidePanelTab>, default: undefined },
-  /** Called with the tab the user picks, as React's `onTabChange`. */
-  onTabChange: { type: Function as PropType<(tab: SidePanelTab) => void>, default: undefined },
 } as const;
 
 /**
@@ -294,15 +294,28 @@ export const PptxEditorSidePanel = defineComponent({
   name: 'PptxEditorSidePanel',
   inheritAttrs: false,
   props: sidePanelProps,
-  setup(props, { attrs }) {
+  emits: {
+    tabChange: (_tab: SidePanelTab) => true,
+    'update:tab': (_tab: SidePanelTab) => true,
+  },
+  setup(props, { attrs, emit }) {
     const { t } = useTranslation();
     const editor = usePptxEditor();
     const own = ref<SidePanelTab>(props.tab ?? 'format');
     const tab = computed<SidePanelTab>(() => props.tab ?? own.value);
     const setTab = (next: SidePanelTab): void => {
       own.value = next;
-      props.onTabChange?.(next);
+      emit('tabChange', next);
+      emit('update:tab', next);
     };
+    // The toolbar's Selection pane and Format pane slots ask for a tab (`requestPane`).
+    watch(
+      editor,
+      (e, _old, onCleanup) => {
+        if (e) onCleanup(listenPaneRequests(e, setTab));
+      },
+      { immediate: true }
+    );
     return () => {
       const { class: hostClass, style: hostStyle, ...rest } = attrs;
       const style = [hostStyle as StyleValue, props.style];

@@ -75,8 +75,6 @@ import { paneStyle } from './pane-state.ts';
 export { SelectionPane, type SelectionPaneProps } from './SelectionPane.tsx';
 export { SidePanel, type SidePanelProps } from './SidePanel.tsx';
 
-/** The side panel's tabs, in order. */
-
 const sameSlides = (a: readonly SlideSummary[], b: readonly SlideSummary[]): boolean =>
   a.length === b.length && a.every((s, i) => s === b[i]);
 const sameIndices = (a: readonly number[], b: readonly number[]): boolean =>

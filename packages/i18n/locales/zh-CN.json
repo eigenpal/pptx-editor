@@ -726,7 +726,7 @@
     "noShapeStyle": "请选择要应用样式的形状",
     "distributeNeedsThree": "请选择三个或更多对象以进行分布",
     "noVisibilityChange": "这些对象已处于此可见性状态",
-    "paneNotBuilt": "此版本中无法使用此窗格",
+    "noSidePanel": "请打开侧面板以使用此窗格",
     "noEffectChange": "这些对象没有此效果",
     "noLockChange": "纵横比已是此设置",
     "noArrangeChange": "这些对象已在此位置",
@@ -1403,6 +1403,7 @@
     "hiddenName": "{name} (已隐藏)",
     "rename": "名称",
     "selectFirst": "请先选择一个对象",
+    "keyHint": "按 H 显示或隐藏有焦点的对象，按 F2 重命名。",
     "emptyTitle": "没有对象",
     "emptyBody": "此幻灯片上的形状、图片和文本框显示在此处。"
   }

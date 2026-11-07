@@ -87,7 +87,8 @@ export function selectionPaneSelected(selection: EditorSelection): ReadonlySet<s
 /**
  * What a key does on the focused row of the pane (the tree pattern of WAI-ARIA): Up and Down
  * move, Home and End go to the ends, Right opens a group or moves into it, Left closes a group
- * or moves to its parent. F2 renames. Null for any other key. @internal
+ * or moves to its parent. F2 renames, and H shows or hides the element. Null for any other key.
+ * Send keys with Ctrl, Cmd, or Alt elsewhere: they are not the pane's. @internal
  */
 export function selectionPaneKey(
   rows: readonly SelectionPaneRow[],
@@ -97,6 +98,7 @@ export function selectionPaneKey(
   | { readonly focus: string }
   | { readonly expand: string; readonly open: boolean }
   | { readonly rename: string }
+  | { readonly toggle: string }
   | null {
   if (rows.length === 0) return null;
   const at = Math.max(
@@ -121,6 +123,9 @@ export function selectionPaneKey(
       return row.parent ? { focus: row.parent } : null;
     case 'F2':
       return { rename: row.nodeId };
+    case 'h':
+    case 'H':
+      return { toggle: row.nodeId };
     default:
       return null;
   }
@@ -153,16 +158,23 @@ export function selectFromPane(
   );
 }
 
-/** The top-level elements of the slide: Show all and Hide all change these. @internal */
-export function selectionPaneTopIds(shapes: readonly ShapeSummary[] | undefined): string[] {
-  return (shapes ?? []).map((s) => s.nodeId);
+/**
+ * Every element of the slide, the children of groups too: Show all and Hide all change these,
+ * so a hidden child of a group shows again. @internal
+ */
+export function selectionPaneAllIds(shapes: readonly ShapeSummary[] | undefined): string[] {
+  const out: string[] = [];
+  const walk = (list: readonly ShapeSummary[]): void => {
+    for (const s of list) {
+      out.push(s.nodeId);
+      if (s.children?.length) walk(s.children);
+    }
+  };
+  walk(shapes ?? []);
+  return out;
 }
 
 /** The longest name the pane writes, as `renameShape` takes it. @internal */
 export const SELECTION_PANE_NAME_MAX = SHAPE_NAME_MAX;
 
-/** The tabs of the side panel, in order. @internal */
-export const SIDE_PANEL_TABS = ['format', 'selection', 'comments'] as const;
-
-/** A tab of the side panel: Format, Selection (the selection pane), or Comments. @public */
-export type SidePanelTab = (typeof SIDE_PANEL_TABS)[number];
+export { SIDE_PANEL_TABS, type SidePanelTab } from './pane-requests.ts';

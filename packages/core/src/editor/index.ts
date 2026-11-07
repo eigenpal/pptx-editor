@@ -704,10 +704,11 @@ export {
   selectionPaneKey,
   selectionPaneRows,
   selectionPaneSelected,
-  selectionPaneTopIds,
+  selectionPaneAllIds,
   type SelectionPaneRow,
   type SidePanelTab,
 } from './selection-pane.ts';
+export { listenPaneRequests, requestPane } from './pane-requests.ts';
 export {
   applyLocalFonts,
   dispatchFindRequest,

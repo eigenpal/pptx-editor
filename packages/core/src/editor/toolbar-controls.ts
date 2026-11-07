@@ -29,7 +29,7 @@ export function toolbarPartKind(control: ChromeControl): ToolbarPartKind {
   if (kind === 'load' || kind === 'replace') return 'load';
   if (kind === 'panel') return 'panel';
   if (kind === 'dialog' || kind === 'clipboard' || kind === 'slideshow') return 'action';
-  // A task pane slot (Format shape, Selection pane) shows its state: not built yet.
+  // A task pane slot (Format shape, Selection pane) asks for its side panel tab.
   return control.shape ?? 'icon';
 }
 

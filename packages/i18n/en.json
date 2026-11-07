@@ -726,7 +726,7 @@
     "noShapeStyle": "Select a shape to apply a style",
     "distributeNeedsThree": "Select three or more objects to distribute them",
     "noVisibilityChange": "The objects already have this visibility",
-    "paneNotBuilt": "This pane is not available in this version",
+    "noSidePanel": "Open the side panel to use this pane",
     "noEffectChange": "The objects do not have this effect",
     "noLockChange": "The aspect ratio already has this setting",
     "noArrangeChange": "The objects are already in this position",
@@ -1403,6 +1403,7 @@
     "hiddenName": "{name} (hidden)",
     "rename": "Name",
     "selectFirst": "Select an object first",
+    "keyHint": "Press H to show or hide the focused object, and F2 to rename it.",
     "emptyTitle": "No objects",
     "emptyBody": "Shapes, pictures, and text boxes on this slide show here."
   }

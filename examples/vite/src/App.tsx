@@ -12,7 +12,12 @@ import {
   type DragEvent,
   type ReactNode,
 } from 'react';
-import type { EditorModule, PptxEditorInstance, SidePanelTab } from '@pptx-editor.dev/core/editor';
+import {
+  listenPaneRequests,
+  type EditorModule,
+  type PptxEditorInstance,
+  type SidePanelTab,
+} from '@pptx-editor.dev/core/editor';
 import { drawingModule } from '@pptx-editor.dev/pro/drawing';
 import {
   PptxEditor,
@@ -111,6 +116,17 @@ function Shell({
   const [panel, setPanel] = useState(panelStartsOpen);
   const [panelTab, setPanelTab] = useState<SidePanelTab>('format');
   useEffect(() => followPanelWidth(setPanel), []);
+  // The toolbar's Selection Pane and Format Pane controls open the panel on their tab.
+  useEffect(
+    () =>
+      editor
+        ? listenPaneRequests(editor, (pane) => {
+            setPanelTab(pane);
+            setPanel(true);
+          })
+        : undefined,
+    [editor]
+  );
   const [dragging, setDragging] = useState(false);
   // The slide thumbnails over the slide, on a narrow window only.
   const [rail, setRail] = useState(false);

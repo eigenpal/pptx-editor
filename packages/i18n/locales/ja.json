@@ -726,7 +726,7 @@
     "noShapeStyle": "スタイルを適用する図形を選択してください",
     "distributeNeedsThree": "整列するには 3 つ以上のオブジェクトを選択してください",
     "noVisibilityChange": "オブジェクトはすでにこの表示状態です",
-    "paneNotBuilt": "このバージョンでは、このウィンドウは使用できません",
+    "noSidePanel": "このウィンドウを使うにはサイド パネルを開いてください",
     "noEffectChange": "オブジェクトにこの効果は設定されていません",
     "noLockChange": "縦横比はすでにこの設定です",
     "noArrangeChange": "オブジェクトはすでにこの位置にあります",
@@ -1403,6 +1403,7 @@
     "hiddenName": "{name} (非表示)",
     "rename": "名前",
     "selectFirst": "最初にオブジェクトを選択してください",
+    "keyHint": "H キーでフォーカスのあるオブジェクトを表示または非表示にし、F2 キーで名前を変更します。",
     "emptyTitle": "オブジェクトがありません",
     "emptyBody": "このスライドの図形、画像、テキスト ボックスがここに表示されます。"
   }

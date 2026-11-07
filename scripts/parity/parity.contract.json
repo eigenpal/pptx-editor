@@ -39,9 +39,11 @@
     },
     "PptxEditorSidePanel": {
       "reactProps": "SidePanelProps",
-      "paired": ["className", "onClose", "onTabChange", "paneWidth", "style", "tab"],
+      "paired": ["className", "onClose", "paneWidth", "style", "tab"],
       "deferredInVue": {},
-      "reactCallbacksAsVueEmits": {},
+      "reactCallbacksAsVueEmits": {
+        "onTabChange": ["tabChange", "update:tab"]
+      },
       "reactRenderPropsAsVueSlots": {},
       "reactClassNameAsVueClass": {},
       "vueExclusive": {}

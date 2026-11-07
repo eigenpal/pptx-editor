@@ -357,7 +357,10 @@ export type ChromeControlState =
 | {
     readonly kind: 'panel';
 }
-/** Opens a task pane: the Format pane or the selection pane. Neither is built yet. */
+/**
+* Shows a tab of the side panel: Format or Selection. The slot sends `requestPane`, which a
+* mounted side panel and the host answer.
+*/
 | {
     readonly kind: 'pane';
     readonly pane: 'format' | 'selection';
@@ -3002,6 +3005,9 @@ export function listenLinkPanelKey(editor: object, reading: () => boolean, doc?:
 // @internal
 export function listenLinkRequests(editor: object, enabled: () => boolean, open: (anchor: HTMLElement | null) => void): () => void;
 
+// @public
+export function listenPaneRequests(editor: object, open: (pane: SidePanelTab) => void): () => void;
+
 // @internal
 export function listenPopoverDismiss(options: {
     readonly panel: () => HTMLElement | null;
@@ -4138,6 +4144,9 @@ export function requestDialogSection(editor: object, dialog: string, section: st
 // @internal
 export function requestLinkPopup(editor: unknown, anchor?: HTMLElement | null): void;
 
+// @public
+export function requestPane(editor: object, pane: SidePanelTab): boolean;
+
 // @internal
 export function requestSectionRenameIn(editor: object | null, sectionId: string): void;
 
@@ -4484,6 +4493,9 @@ export interface SelectionGeometry {
 }
 
 // @internal
+export function selectionPaneAllIds(shapes: readonly ShapeSummary[] | undefined): string[];
+
+// @internal
 export function selectionPaneAncestors(shapes: readonly ShapeSummary[] | undefined, ids: ReadonlySet<string>): string[];
 
 // @internal
@@ -4494,6 +4506,8 @@ export function selectionPaneKey(rows: readonly SelectionPaneRow[], focused: str
     readonly open: boolean;
 } | {
     readonly rename: string;
+} | {
+    readonly toggle: string;
 } | null;
 
 // @internal
@@ -4520,9 +4534,6 @@ export function selectionPaneRows(shapes: readonly ShapeSummary[] | undefined, e
 
 // @internal
 export function selectionPaneSelected(selection: EditorSelection): ReadonlySet<string>;
-
-// @internal
-export function selectionPaneTopIds(shapes: readonly ShapeSummary[] | undefined): string[];
 
 // @internal
 export function selectNotes(root: HTMLElement, start: number, end?: number): void;

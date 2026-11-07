@@ -726,7 +726,7 @@
     "noShapeStyle": "스타일을 적용할 도형을 선택하세요",
     "distributeNeedsThree": "배분하려면 개체를 세 개 이상 선택하세요",
     "noVisibilityChange": "개체가 이미 이 표시 상태입니다",
-    "paneNotBuilt": "이 버전에서는 이 창을 사용할 수 없습니다",
+    "noSidePanel": "이 창을 사용하려면 사이드 패널을 여세요",
     "noEffectChange": "개체에 이 효과가 없습니다",
     "noLockChange": "가로 세로 비율이 이미 이 설정입니다",
     "noArrangeChange": "개체가 이미 이 위치에 있습니다",
@@ -1403,6 +1403,7 @@
     "hiddenName": "{name} (숨김)",
     "rename": "이름",
     "selectFirst": "먼저 개체를 선택하세요",
+    "keyHint": "H 키를 눌러 포커스가 있는 개체를 표시하거나 숨기고, F2 키를 눌러 이름을 바꿉니다.",
     "emptyTitle": "개체 없음",
     "emptyBody": "이 슬라이드의 도형, 그림, 텍스트 상자가 여기에 표시됩니다."
   }

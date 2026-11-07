@@ -4,7 +4,15 @@
 // rows, keys, and selection rules come from core (`selection-pane.ts`), so the Vue twin behaves
 // the same.
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+} from 'react';
 import {
   SELECTION_PANE_NAME_MAX,
   selectFromPane,
@@ -12,7 +20,7 @@ import {
   selectionPaneKey,
   selectionPaneRows,
   selectionPaneSelected,
-  selectionPaneTopIds,
+  selectionPaneAllIds,
   type SelectionPaneRow,
 } from '@pptx-editor.dev/core/editor';
 import { Icon, ToolButton, keepFocus } from './chrome.tsx';
@@ -28,7 +36,14 @@ export interface SelectionPaneProps {
  * The selection pane: select, show or hide, rename, and reorder the elements of the current
  * slide. Render it inside the editor root, or open the side panel's **Selection** tab. @public
  */
-export function SelectionPane({ className }: SelectionPaneProps = {}) {
+export function SelectionPane(props: SelectionPaneProps = {}) {
+  // Node ids repeat across slides: a new slide starts a new pane, so no rename, focus, or open
+  // group carries over to an element of another slide.
+  const slideId = useEditorState((s) => s.slides[s.currentSlide]?.id ?? '');
+  return <SlidePane key={slideId} {...props} />;
+}
+
+function SlidePane({ className }: SelectionPaneProps) {
   const editor = usePptxEditor();
   const { t } = useTranslation();
   const shapes = useEditorState((s) => s.shapes);
@@ -38,6 +53,7 @@ export function SelectionPane({ className }: SelectionPaneProps = {}) {
   const [focused, setFocused] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const tree = useRef<HTMLDivElement>(null);
+  const hintId = useId();
   const selected = useMemo(() => selectionPaneSelected(selection), [selection]);
   // A selected child of a group shows: its groups open when the selection reaches it.
   useEffect(() => {
@@ -74,18 +90,21 @@ export function SelectionPane({ className }: SelectionPaneProps = {}) {
     if (ids.length) editor?.exec({ type: 'setShapesVisible', nodeIds: ids, visible });
   };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>, row: SelectionPaneRow): void => {
-    if (e.target !== e.currentTarget) return;
+    if (e.target !== e.currentTarget || e.altKey) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       if (editor) selectFromPane(editor, row, e.shiftKey || e.ctrlKey || e.metaKey);
       return;
     }
+    if (e.ctrlKey || e.metaKey) return;
     const step = selectionPaneKey(rows, row.nodeId, e.key);
     if (!step) return;
     e.preventDefault();
     if ('focus' in step) focusRow(step.focus);
     else if ('expand' in step) toggle(step.expand, step.open);
-    else if (editable) setRenaming(step.rename);
+    else if (!editable) return;
+    else if ('rename' in step) setRenaming(step.rename);
+    else setVisible([row.nodeId], row.hidden);
   };
 
   if (rows.length === 0) {
@@ -103,7 +122,7 @@ export function SelectionPane({ className }: SelectionPaneProps = {}) {
           type="button"
           className="pptx-button"
           disabled={!editable}
-          onClick={() => setVisible(selectionPaneTopIds(shapes), true)}
+          onClick={() => setVisible(selectionPaneAllIds(shapes), true)}
         >
           {t('selectionPane.showAll')}
         </button>
@@ -111,7 +130,7 @@ export function SelectionPane({ className }: SelectionPaneProps = {}) {
           type="button"
           className="pptx-button"
           disabled={!editable}
-          onClick={() => setVisible(selectionPaneTopIds(shapes), false)}
+          onClick={() => setVisible(selectionPaneAllIds(shapes), false)}
         >
           {t('selectionPane.hideAll')}
         </button>
@@ -132,10 +151,16 @@ export function SelectionPane({ className }: SelectionPaneProps = {}) {
           />
         </span>
       </div>
+      {editable ? (
+        <p id={hintId} className="pptx-selection-pane__hint">
+          {t('selectionPane.keyHint')}
+        </p>
+      ) : null}
       <div
         ref={tree}
         role="tree"
         aria-label={t('selectionPane.label')}
+        aria-describedby={editable ? hintId : undefined}
         aria-multiselectable="true"
         className="pptx-selection-pane__tree"
       >
@@ -155,12 +180,15 @@ export function SelectionPane({ className }: SelectionPaneProps = {}) {
             onToggle={() => toggle(row.nodeId, !row.expanded)}
             onVisible={() => setVisible([row.nodeId], row.hidden)}
             onRename={() => editable && setRenaming(row.nodeId)}
-            onRenamed={(name) => {
+            onRenamed={(name, refocus) => {
               setRenaming(null);
               const next = name?.trim();
-              if (next && next !== row.name)
+              // The element must still be on the slide: a peer can delete it while you type.
+              const here = selectionPaneAllIds(editor?.snapshot().shapes).includes(row.nodeId);
+              if (here && next && next !== row.name)
                 editor?.exec({ type: 'renameShape', nodeId: row.nodeId, name: next });
-              focusRow(row.nodeId);
+              // Enter and Escape give the row its focus back; a click elsewhere keeps its own.
+              if (refocus && here) focusRow(row.nodeId);
             }}
           />
         ))}
@@ -181,8 +209,8 @@ interface PaneRowProps {
   readonly onToggle: () => void;
   readonly onVisible: () => void;
   readonly onRename: () => void;
-  /** The new name, or null to keep the old one. */
-  readonly onRenamed: (name: string | null) => void;
+  /** The new name, or null to keep the old one; `refocus` after Enter or Escape. */
+  readonly onRenamed: (name: string | null, refocus: boolean) => void;
 }
 
 function PaneRow(props: PaneRowProps) {
@@ -202,6 +230,7 @@ function PaneRow(props: PaneRowProps) {
       aria-expanded={row.branch ? row.expanded : undefined}
       aria-label={row.hidden ? t('selectionPane.hiddenName', { name: row.name }) : row.name}
       aria-description={kind}
+      aria-keyshortcuts={props.editable ? 'H F2' : undefined}
       tabIndex={props.tabStop ? 0 : -1}
       style={{ paddingInlineStart: `${(row.level - 1) * 16 + 4}px` }}
       onFocus={props.onFocus}
@@ -259,7 +288,7 @@ function PaneRow(props: PaneRowProps) {
 function RenameField(props: {
   name: string;
   label: string;
-  onDone: (name: string | null) => void;
+  onDone: (name: string | null, refocus: boolean) => void;
 }) {
   const field = useRef<HTMLInputElement>(null);
   const done = useRef(false);
@@ -267,10 +296,10 @@ function RenameField(props: {
     field.current?.focus();
     field.current?.select();
   }, []);
-  const finish = (name: string | null): void => {
+  const finish = (name: string | null, refocus: boolean): void => {
     if (done.current) return;
     done.current = true;
-    props.onDone(name);
+    props.onDone(name, refocus);
   };
   return (
     <input
@@ -283,13 +312,13 @@ function RenameField(props: {
         e.stopPropagation();
         if (e.key === 'Enter') {
           e.preventDefault();
-          finish(e.currentTarget.value);
+          finish(e.currentTarget.value, true);
         } else if (e.key === 'Escape') {
           e.preventDefault();
-          finish(null);
+          finish(null, true);
         }
       }}
-      onBlur={(e) => finish(e.currentTarget.value)}
+      onBlur={(e) => finish(e.currentTarget.value, false)}
     />
   );
 }

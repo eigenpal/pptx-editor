@@ -10,7 +10,7 @@ import {
   selectionPaneKey,
   selectionPaneRows,
   selectionPaneSelected,
-  selectionPaneTopIds,
+  selectionPaneAllIds,
 } from '../selection-pane.ts';
 import type { ShapeSummary } from '../../contracts/index.ts';
 
@@ -54,10 +54,13 @@ describe('selection pane rows', () => {
     expect(names(rows)).toEqual(['1:Cards', '2:Card B', '2:Card A', '1:Two', '1:One']);
     expect(rows[0]).toMatchObject({ branch: true, expanded: true, position: 1, siblings: 3 });
     expect(rows[1]).toMatchObject({ parent: cards, branch: false, position: 1, siblings: 2 });
-    expect(selectionPaneTopIds(shapes)).toEqual(shapes.map((s) => s.nodeId));
+    // Show all and Hide all reach the children of a group too.
+    expect(selectionPaneAllIds(shapes)).toEqual(
+      shapes.flatMap((s) => [s.nodeId, ...(s.children ?? []).map((c) => c.nodeId)])
+    );
   });
 
-  test('the tree keys move, open, close, go to the parent, and rename', async () => {
+  test('the tree keys move, open, close, go to the parent, rename, and show or hide', async () => {
     const e = await open();
     const shapes = e.snapshot().shapes!;
     const cards = byName(shapes, 'Cards').nodeId;
@@ -72,6 +75,8 @@ describe('selection pane rows', () => {
     expect(selectionPaneKey(opened, cards, 'End')).toEqual({ focus: opened.at(-1)!.nodeId });
     expect(selectionPaneKey(opened, kid, 'Home')).toEqual({ focus: cards });
     expect(selectionPaneKey(opened, kid, 'F2')).toEqual({ rename: kid });
+    expect(selectionPaneKey(opened, kid, 'h')).toEqual({ toggle: kid });
+    expect(selectionPaneKey(opened, cards, 'H')).toEqual({ toggle: cards });
     expect(selectionPaneKey(opened, kid, 'x')).toBeNull();
     expect(selectionPaneKey([], null, 'ArrowDown')).toBeNull();
   });
