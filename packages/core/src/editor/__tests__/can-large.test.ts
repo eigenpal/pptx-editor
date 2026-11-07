@@ -116,3 +116,37 @@ test('formatting answers hold through a typing burst, and are exact again after 
   expect(settled).not.toBe(held);
   editor.destroy();
 });
+
+test('a large selection keeps the refusals of slide commands and of arguments', async () => {
+  const editor = await open([shapes(LARGE_SELECTION + 1)]);
+  editor.setSelection({ kind: 'shapes', nodeIds: ids(editor) });
+  // The only slide: Delete Slide refuses, as with no selection.
+  expect(editor.can({ type: 'deleteSlide', index: 0 })).toEqual({
+    ok: false,
+    reason: 'disabled.lastSlide',
+  });
+  expect(editor.can({ type: 'deleteSlide', index: 99 }).ok).toBe(false);
+  expect(editor.can({ type: 'setLink', url: 'javascript:alert(1)' })).toEqual({
+    ok: false,
+    reason: 'errors.unsafeLink',
+  });
+  expect(editor.can({ type: 'setFontSize', points: 99_999 }).ok).toBe(false);
+  // A valid argument passes on the first shapes.
+  expect(editor.can({ type: 'setShapeFill', color: '#FF0000' })).toEqual({ ok: true });
+  editor.destroy();
+});
+
+test('typing answers do not carry over to the same text box id on another slide', async () => {
+  const editor = await open([textBox(3), textBox(3)]);
+  const [box] = ids(editor);
+  const at = { paragraph: 0, offset: 0 };
+  editor.setSelection({ kind: 'text', nodeId: box!, anchor: at, focus: at });
+  editor.input('text', 'a');
+  const first = editor.can({ type: 'toggleBold' });
+  editor.selectSlide(1);
+  const [other] = ids(editor, 1);
+  expect(other).toBe(box);
+  editor.setSelection({ kind: 'text', nodeId: other!, anchor: at, focus: at });
+  expect(editor.can({ type: 'toggleBold' })).not.toBe(first);
+  editor.destroy();
+});

@@ -32,13 +32,51 @@ export const STRUCTURE_COMMANDS: ReadonlySet<EditorCommand['type']> = new Set([
 ]);
 
 /**
- * The size from which a shape selection is large: `can` then checks only the mode, not each
- * command, because a check builds the whole edit (a Duplicate of every selected shape). The
- * toolbar asks about every command on every change, and must answer within a frame. A
- * command chosen for a large selection makes the full check when it runs (`exec`) and shows
- * its reason when it cannot apply.
+ * The size from which a shape selection is large: `can` then checks only the mode for the
+ * {@link SELECTION_COMMANDS}, because a check builds the whole edit (a Duplicate of every
+ * selected shape). The toolbar asks about every command on every change, and must answer
+ * within a frame. A command chosen for a large selection makes the full check when it runs
+ * (`exec`) and shows its reason when it cannot apply.
  */
 export const LARGE_SELECTION = 250;
+
+/**
+ * Commands that edit the selected shapes and take no argument, or only a choice from a fixed
+ * set: a large selection answers them from the mode. Every other command checks in full, so a
+ * slide command or an argument (a link address, a font size) keeps its refusal. @internal
+ */
+export const SELECTION_COMMANDS: ReadonlySet<EditorCommand['type']> = new Set([
+  'toggleBold',
+  'toggleItalic',
+  'toggleUnderline',
+  'toggleStrike',
+  'toggleSuperscript',
+  'toggleSubscript',
+  'stepFontSize',
+  'changeCase',
+  'clearFormatting',
+  'setAlign',
+  'setVerticalAlign',
+  'setAutofit',
+  'toggleBullets',
+  'toggleNumbering',
+  'removeBullet',
+  'indent',
+  'order',
+  'alignObjects',
+  'distributeObjects',
+  'flipObjects',
+  'duplicate',
+  'delete',
+  'group',
+  'ungroup',
+  'setLineDash',
+  'setLineEnds',
+  'setLockAspectRatio',
+  'toggleFormatPainter',
+  'copyFormat',
+  'pasteFormat',
+]);
 
 /**
  * The number of XML nodes from which the selected shapes are large for the commands that copy
@@ -88,10 +126,39 @@ export function largeSelectionAnswer(
     return large ? quick : null;
   }
   if (selection.kind !== 'shapes') return null;
+  if (command && !SELECTION_COMMANDS.has(command.type)) return null;
   const ids = selection.nodeIds ?? [];
   if (ids.length > LARGE_SELECTION) return quick;
   const copies = !command || COPYING_COMMANDS.has(command.type);
   return copies && holdsManyNodes(pkg, part, ids) ? quick : null;
+}
+
+/**
+ * The `can` answer for `command` on slide `slide` of `session`, from `check` (the full check,
+ * or a check of the selection `only`). A large target takes `largeSelectionAnswer`. Else a
+ * selection of more than {@link LARGE_SELECTION} shapes is checked on its first
+ * {@link LARGE_SELECTION} shapes first: a refusal of the command or its arguments shows there,
+ * at a fraction of the cost. A pass there is the answer; a refusal there checks the whole
+ * selection, so a refusal is exact. @internal
+ */
+export function checkCommand<
+  S extends { readonly kind: string; readonly nodeIds?: readonly string[] },
+>(
+  command: EditorCommand,
+  selection: S,
+  readOnly: boolean,
+  session: DocumentSession | undefined,
+  slide: number,
+  check: (only?: S) => CanResult
+): CanResult {
+  const large = largeSelectionAnswer(selection, readOnly, session, slide, command);
+  if (large) return large;
+  const ids = selection.kind === 'shapes' ? (selection.nodeIds ?? []) : [];
+  if (ids.length > LARGE_SELECTION) {
+    const first = check({ ...selection, nodeIds: ids.slice(0, LARGE_SELECTION) });
+    if (first.ok) return first;
+  }
+  return check();
 }
 
 /** The answers of `holdsManyNodes` per package, by part and ids: asked once per command. */
@@ -244,7 +311,12 @@ export class CanCache<Active> {
     if (STRUCTURE_COMMANDS.has(command.type))
       return this.answer(`${key}@${structureSlideKey(command, at.pkg, at.slide)}`, compute, true);
     const box = TYPING_STABLE_COMMANDS.has(command.type) ? typingBox(at.selection) : undefined;
-    return this.answer(key, compute, false, box === undefined ? undefined : `${at.mode}${box}`);
+    return this.answer(
+      key,
+      compute,
+      false,
+      box === undefined ? undefined : `${at.mode}:${at.slide}${box}`
+    );
   }
 
   /**

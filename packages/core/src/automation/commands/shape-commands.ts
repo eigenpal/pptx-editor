@@ -413,9 +413,14 @@ export function orderShapes(
   }
   for (const [parentId, selected] of byParent) {
     const shapes = stacked(batch.element(part, parentId));
-    if ([...selected].some((id) => !shapes.includes(id)))
+    const known = new Set(shapes);
+    if ([...selected].some((id) => !known.has(id)))
       throw new CommandRefusal('disabled.unsupportedElement');
     const next = reorder(shapes, selected, move);
+    if (move === 'front' || move === 'back') {
+      moveBlock(batch, part, parentId, shapes, next, selected.size, move === 'front');
+      continue;
+    }
     // Put each shape in its final place from the top down; each move lands it right under the
     // shape already placed above it, so the sibling list ends in `next` order. The lists are
     // kept here as the moves change them: a read of the tree for each shape would cost the
@@ -437,6 +442,58 @@ export function orderShapes(
       current.splice(i, 0, next[i]!);
     }
   }
+}
+
+/**
+ * The number of selected shapes from which Back moves the other shapes up instead: each move
+ * down shifts the shapes that wait to move, and the store then updates their places again.
+ */
+const BACK_MOVES = 32;
+
+/**
+ * Front or Back, in one pass: `next` holds the `picked` selected shapes as a block at the top
+ * (`front`) or the bottom. The selected shapes already in their final place at that end stay.
+ */
+function moveBlock(
+  batch: OpBatch,
+  part: string,
+  parentId: string,
+  shapes: readonly string[],
+  next: readonly string[],
+  picked: number,
+  front: boolean
+): void {
+  const kids = batch.element(part, parentId).children.map((c) => c.id);
+  const n = shapes.length;
+  const at = (i: number) => (front ? n - 1 - i : i);
+  let kept = 0;
+  while (kept < n && shapes[at(kept)] === next[at(kept)]) kept += 1;
+  if (kept >= picked) return;
+  /** Move `ids` (bottom to top) up, to right under shape `under` (or over the last shape). */
+  const raise = (ids: readonly string[], under: string | undefined) => {
+    const top = under === undefined ? kids.indexOf(shapes[n - 1]!) + 1 : kids.indexOf(under);
+    // Top down: each shape comes from below the places that the earlier moves shifted, so the
+    // store reads its place without an update. `moveNode` removes first, then inserts.
+    for (let k = 0; k < ids.length; k += 1) {
+      const id = ids[ids.length - 1 - k]!;
+      batch.push({ op: 'moveNode', part, node: id, parent: parentId, index: top - 1 - k });
+    }
+  };
+  if (front) return raise(next.slice(n - picked, n - kept), shapes[n - kept]);
+  if (picked - kept <= BACK_MOVES) {
+    // Right over the kept run, or in the place of the bottom shape, which is not selected.
+    const to = kept > 0 ? kids.indexOf(shapes[kept - 1]!) + 1 : kids.indexOf(shapes[0]!);
+    for (const id of next.slice(kept, picked).reverse())
+      batch.push({ op: 'moveNode', part, node: id, parent: parentId, index: to });
+    return;
+  }
+  // Many selected shapes: raise the other shapes under the top selected one above it instead.
+  const top = shapes.indexOf(next[picked - 1]!);
+  const chosen = new Set(next.slice(0, picked));
+  raise(
+    shapes.slice(kept, top).filter((id) => !chosen.has(id)),
+    shapes[top + 1]
+  );
 }
 
 /** The ids of a tree's shapes, bottom to top; its `p:extLst` stays last and never moves. */

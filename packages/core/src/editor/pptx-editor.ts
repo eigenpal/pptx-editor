@@ -49,7 +49,7 @@ import { pictureStateAt, withAltText } from './picture-state.ts';
 import { isViewCommand, ViewSettings, type ViewCommand } from './view-settings.ts';
 import { PlaceholderPrompts } from './placeholder-prompts.ts';
 import { RemovalNotice } from './removal-notice.ts';
-import { CanCache, createStructureKey, largeSelectionAnswer, typingBox } from './can-cache.ts';
+import { CanCache, checkCommand, createStructureKey, typingBox } from './can-cache.ts';
 import { itemById, SlideSurface } from './surface.ts';
 import { createShortcut, createSurfaceHost, type SurfaceHostBase } from './surface-host.ts';
 import { setSurfaceRoot } from './surface-registry.ts';
@@ -319,17 +319,17 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       return (seam.canSessionHistory(modules, false) ?? session.store.canRedo) && mode === 'edit'
         ? { ok: true }
         : { ok: false, reason: mode === 'view' ? 'disabled.viewing' : 'disabled.nothingToRedo' };
-    const large = largeSelectionAnswer(selection, mode === 'view', session, slide, command);
-    if (large) return large;
-    try {
-      // A probe: the same compiler without autofit (it adds ops, never a refusal); ops drop.
-      const ctx = context(command, true);
-      if ((painter.compile(ctx, command) ?? cropper.compile(ctx, command)) === null)
-        compile(ctx, command);
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, reason: e instanceof CommandRefusal ? e.reason : 'errors.unsupported' };
-    }
+    return checkCommand(command, selection, mode === 'view', session, slide, (only) => {
+      try {
+        // A probe: the same compiler without autofit (it adds ops, never a refusal); ops drop.
+        const ctx = { ...context(command, true), ...(only ? { selection: only } : {}) };
+        if ((painter.compile(ctx, command) ?? cropper.compile(ctx, command)) === null)
+          compile(ctx, command);
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, reason: e instanceof CommandRefusal ? e.reason : 'errors.unsupported' };
+      }
+    });
   };
 
   /** Publish a refusal (`lastRejection`) and return it; "nothing to do" carries `noop`. */
@@ -551,7 +551,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     if (!carried) arm.clear();
     selection = caret;
     autoListed = listed ? { sel: caret, rev: session.store.revision } : null;
-    canCache.typed(`${mode}${typingBox(caret)}`, emit);
+    canCache.typed(`${mode}:${slide}${typingBox(caret)}`, emit);
     emit();
     return { ok: true };
   };

@@ -8,6 +8,7 @@ import { attr, elements, find, xmlPartOf, type Element } from '../../store/index
 import type { LayoutItem } from '../../layout/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 import { MAX_COORDINATE, MIN_COORDINATE } from '../../automation/commands/package-edits.ts';
+import { reorder } from '../../automation/commands/shape-commands.ts';
 import {
   boxOf,
   findItem,
@@ -156,6 +157,39 @@ describe('E13: z-order with several shapes selected', () => {
     expect((await order(['B', 'A'], 'front')).stack).toEqual(['C', 'D', 'A', 'B', 'extLst']);
     expect((await order(['D', 'C'], 'back')).stack).toEqual(['C', 'D', 'A', 'B', 'extLst']);
     expect((await order(['D', 'A'], 'front')).stack).toEqual(['B', 'C', 'A', 'D', 'extLst']);
+  });
+
+  test('every z-order move of a random selection gives the stacking order of `reorder`', async () => {
+    const names = Array.from({ length: 90 }, (_, i) => `S${i}`);
+    const many = buildPptx({
+      slides: [
+        {
+          shapes:
+            names
+              .map((n, i) => shape({ id: i + 2, name: n, x: IN, y: IN, cx: IN, cy: IN }))
+              .join('') + ext,
+        },
+      ],
+    });
+    let seed = 7;
+    const r = (n: number) => (seed = (seed * 1_103_515_245 + 12_345) % 2 ** 31) % n;
+    for (let round = 0; round < 40; round += 1) {
+      for (const move of ['front', 'back', 'forward', 'backward'] as const) {
+        const e = await open(many);
+        const before = stack(e).slice(0, -1);
+        // From one shape to most of them, so Back takes both of its ways.
+        const share = [1, 3, 20, 60][round % 4]!;
+        const picked = new Set(before.filter(() => r(names.length) < share));
+        if (picked.size === 0) picked.add(before[r(before.length)]!);
+        e.setSelection({ kind: 'shapes', nodeIds: [...picked].map((n) => idByName(e, n)) });
+        const result = e.exec({ type: 'order', move });
+        const want = reorder(before, picked, move);
+        // A move that changes nothing is refused; the stack stays as it was.
+        expect(result.ok).toBe(want.join() !== before.join());
+        expect(stack(e)).toEqual([...want, 'extLst']);
+        e.destroy();
+      }
+    }
   });
 
   test('one undo step restores the order', async () => {
