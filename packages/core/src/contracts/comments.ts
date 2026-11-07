@@ -27,6 +27,11 @@ export interface SlideComment {
   readonly date?: string;
   /** The text, with one line feed between paragraphs. */
   readonly text: string;
+  /**
+   * Whether `editComment` can replace the text of this comment in a deck open for editing.
+   * False for a body that holds more than plain text, such as a mention.
+   */
+  readonly textEditable: boolean;
 }
 
 /** A comment and its replies (`EditorSnapshot.comments`). @public */

@@ -188,13 +188,36 @@ export function deckUses(pkg: PptxPackage, format: 'legacy' | 'modern'): boolean
   );
 }
 
+/** A legacy id field, with `-`, `#`, and `%` encoded, so the id key splits back into its fields. */
+const idField = (raw: string): string => encodeURIComponent(raw).replace(/-/g, '%2D');
+
+/** The key of a legacy comment id (`cm-<author>-<idx>`), with each field encoded. */
+export const legacyKey = (authorId: string, idx: string): string =>
+  `cm-${idField(authorId)}-${idField(idx)}`;
+
+/** The author and index of a legacy id key, or undefined when the key is not one. */
+export function legacyKeyFields(
+  key: string
+): { readonly authorId: string; readonly idx: string } | undefined {
+  const m = /^cm-([^-]*)-([^-]*)$/.exec(key);
+  if (!m) return undefined;
+  try {
+    return { authorId: decodeURIComponent(m[1]!), idx: decodeURIComponent(m[2]!) };
+  } catch {
+    return undefined;
+  }
+}
+
 /** The comment id of a legacy comment: its author and index. */
 export const legacyId = (slidePart: string, authorId: string, idx: string): string =>
-  `${slidePart}#cm-${authorId}-${idx}`;
+  `${slidePart}#${legacyKey(authorId, idx)}`;
 
-/** The comment id of a threaded comment or reply: its GUID. */
-export const modernId = (slidePart: string, guid: string): string =>
-  `${slidePart}#${guid.toUpperCase()}`;
+/**
+ * The comment id of a threaded comment or reply: its GUID. A GUID that the slide already used
+ * (a file can repeat one) takes its ordinal, `~2` for the second, so each id stays unique.
+ */
+export const modernId = (slidePart: string, guid: string, ordinal = 1): string =>
+  `${slidePart}#${guid.toUpperCase()}${ordinal > 1 ? `~${ordinal}` : ''}`;
 
 /** The first descendant with this namespace and local name, at most `depth` levels down. */
 export function descendant(
@@ -232,6 +255,30 @@ function textOfT(run: Element): string {
   let out = '';
   for (const c of t?.children ?? []) if (c.type === 'text') out += c.value;
   return out;
+}
+
+/** Elements a plain comment text body holds; any other content (a mention) is not edited. */
+const PLAIN = new Set(['bodyPr', 'lstStyle', 'p', 'pPr', 'r', 'rPr', 't', 'br', 'endParaRPr']);
+
+function plainBody(el: Element, depth = 0): boolean {
+  if (depth > 0 && (el.ns !== NS.a || !PLAIN.has(el.local))) return false;
+  if (
+    el.local === 'rPr' ||
+    el.local === 'pPr' ||
+    el.local === 'endParaRPr' ||
+    el.local === 'bodyPr'
+  )
+    return true;
+  return depth > 4 ? false : elements(el).every((c) => plainBody(c, depth + 1));
+}
+
+/**
+ * Whether `editComment` can replace the text of a threaded comment or reply: a body of plain
+ * text and no extension list. The reader and the writer share this rule.
+ */
+export function modernTextEditable(el: Element): boolean {
+  const body = child(el, { ns: COMMENTS.p188, local: 'txBody' });
+  return !!body && plainBody(body) && !child(el, { ns: COMMENTS.p188, local: 'extLst' });
 }
 
 /** The legacy author id of an element, canonical, or the raw value when it is not a number. */
@@ -293,18 +340,26 @@ function pointOf(pos: Element | undefined, scale: number): CommentAnchor {
 
 const optionalDate = (date: string | undefined) => (date !== undefined ? { date } : {});
 
+/** How many times the slide's threaded comments used each GUID so far, upper case. */
+type GuidCount = Map<string, number>;
+
 function modernComment(
   slidePart: string,
   el: Element,
-  authors: Map<string, CommentAuthor>
+  authors: Map<string, CommentAuthor>,
+  seen: GuidCount
 ): SlideComment {
   const author = authors.get(attr(el, 'authorId')?.toUpperCase() ?? '');
+  const guid = (attr(el, 'id') ?? '').toUpperCase();
+  const ordinal = (seen.get(guid) ?? 0) + 1;
+  seen.set(guid, ordinal);
   return {
-    id: modernId(slidePart, attr(el, 'id') ?? ''),
+    id: modernId(slidePart, guid, ordinal),
     author: author?.name ?? '',
     initials: author?.initials ?? '',
     ...optionalDate(attr(el, 'created')),
     text: bodyText(child(el, { ns: COMMENTS.p188, local: 'txBody' })),
+    textEditable: modernTextEditable(el),
   };
 }
 
@@ -313,7 +368,8 @@ function modernThreads(
   pkg: PptxPackage,
   slidePart: string,
   listPart: string,
-  keys: ReturnType<typeof shapeKeys>
+  keys: ReturnType<typeof shapeKeys>,
+  seen: GuidCount
 ): CommentThread[] {
   const root = commentTree(pkg, listPart)?.root;
   if (root?.ns !== COMMENTS.p188 || root.local !== 'cmLst') return [];
@@ -321,16 +377,18 @@ function modernThreads(
   const out: CommentThread[] = [];
   for (const cm of elements(root)) {
     if (cm.ns !== COMMENTS.p188 || cm.local !== 'cm' || !attr(cm, 'id')) continue;
+    // The thread before its replies: `findModern` counts a repeated GUID in this order.
+    const head = modernComment(slidePart, cm, authors, seen);
     // Every reply list: two collaborators who give a thread its first reply at once give it two
     // until a save joins them.
     const replies = elements(cm)
       .filter((l) => l.ns === COMMENTS.p188 && l.local === 'replyLst')
       .flatMap((l) => elements(l))
       .filter((r) => r.ns === COMMENTS.p188 && r.local === 'reply' && attr(r, 'id'))
-      .map((r) => modernComment(slidePart, r, authors));
+      .map((r) => modernComment(slidePart, r, authors, seen));
     const status = attr(cm, 'status');
     out.push({
-      ...modernComment(slidePart, cm, authors),
+      ...head,
       format: 'modern',
       resolved: status === 'resolved' || status === 'closed',
       anchor: modernAnchor(cm, keys),
@@ -359,6 +417,7 @@ function legacyThreads(pkg: PptxPackage, slidePart: string, listPart: string): C
       initials: author?.initials ?? '',
       ...optionalDate(attr(cm, 'dt')),
       text: textOfPlain(child(cm, 'p:text')),
+      textEditable: !!child(cm, 'p:text'),
     };
     const parent = descendant(child(cm, 'p:extLst'), NS.p15, 'parentCm', 4);
     if (parent) {
@@ -407,8 +466,9 @@ export function readSlideComments(pkg: PptxPackage, slidePart: string): CommentT
   const { legacy, modern } = slideCommentParts(pkg, slidePart);
   if (legacy.length === 0 && modern.length === 0) return [];
   const keys = shapeKeys(xmlPartOf(pkg, slidePart)?.root);
+  const seen: GuidCount = new Map();
   return [
     ...legacy.flatMap((part) => legacyThreads(pkg, slidePart, part)),
-    ...modern.flatMap((part) => modernThreads(pkg, slidePart, part, keys)),
+    ...modern.flatMap((part) => modernThreads(pkg, slidePart, part, keys, seen)),
   ];
 }

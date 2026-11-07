@@ -37,6 +37,8 @@ import {
   descendant,
   findCommentAuthor,
   legacyAuthors,
+  legacyKey,
+  legacyKeyFields,
   LEGACY_POS_EMU,
   presentationTarget,
   slideCommentParts,
@@ -201,7 +203,7 @@ export function addLegacyComment(
     index: root.children.length,
     spec: fragment(commentXml(id, date, idx, pos, text)),
   });
-  return `cm-${id}-${idx}`;
+  return legacyKey(id, String(idx));
 }
 
 /** The parent key (`author:idx`) of a legacy reply, or undefined for a thread. */
@@ -216,7 +218,7 @@ const keyOf = (cm: Element): string =>
   `${canonicalAuthor(attr(cm, 'authorId'))}:${canonicalIdx(attr(cm, 'idx'))}`;
 
 /**
- * A legacy comment of a slide by its id key (`cm-<author>-<idx>`): its list, the comment, and
+ * A legacy comment of a slide by its id key (`cm-<author>-<idx>`, each field encoded): its list, the comment, and
  * the thread it is in (itself for a thread).
  */
 export function findLegacy(
@@ -224,9 +226,9 @@ export function findLegacy(
   slidePart: string,
   key: string
 ): { part: string; cm: Element; thread: Element } {
-  const m = /^cm-([^-]*)-(.*)$/.exec(key);
-  if (!m) throw new CommandRefusal('errors.noComment');
-  const wanted = `${m[1]}:${m[2]}`;
+  const fields = legacyKeyFields(key);
+  if (!fields) throw new CommandRefusal('errors.noComment');
+  const wanted = `${fields.authorId}:${fields.idx}`;
   for (const part of slideCommentParts(batch.pkg, slidePart).legacy) {
     const probe = elements(commentTree(batch.pkg, part)?.root);
     if (!probe.some((cm) => isP(cm, 'cm') && keyOf(cm) === wanted)) continue;
@@ -283,7 +285,7 @@ export function replyLegacy(
       )
     ),
   });
-  return `cm-${id}-${idx}`;
+  return legacyKey(id, String(idx));
 }
 
 /** Replace the text of a legacy comment. */

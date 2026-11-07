@@ -1734,6 +1734,7 @@ export interface SlideComment {
     readonly id: string;
     readonly initials: string;
     readonly text: string;
+    readonly textEditable: boolean;
 }
 
 // @public

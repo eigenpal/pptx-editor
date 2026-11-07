@@ -31,6 +31,7 @@ import {
   COMMENTS,
   commentTree,
   findCommentAuthor,
+  modernTextEditable,
   presentationTarget,
   slideCommentParts,
 } from './comment-read.ts';
@@ -259,31 +260,53 @@ export function addModernComment(
   return id;
 }
 
-/** A threaded comment or reply of a slide by GUID: its list, its thread, and the reply. */
+type ModernHit = { thread: Element; reply?: Element };
+
+/** Every threaded comment and reply of a list with GUID `wanted`, each thread before its replies. */
+function modernHits(root: Element | undefined, wanted: string): ModernHit[] {
+  if (!is(root, 'cmLst')) return [];
+  const out: ModernHit[] = [];
+  for (const cm of elements(root)) {
+    if (!is(cm, 'cm')) continue;
+    if (attr(cm, 'id')?.toUpperCase() === wanted) out.push({ thread: cm });
+    for (const list of elements(cm))
+      if (is(list, 'replyLst'))
+        for (const r of elements(list))
+          if (is(r, 'reply') && attr(r, 'id')?.toUpperCase() === wanted)
+            out.push({ thread: cm, reply: r });
+  }
+  return out;
+}
+
+/**
+ * A threaded comment or reply of a slide by its id key: the GUID, with `~<n>` for the n-th use of
+ * a GUID that the slide repeats (`modernId`). Returns its list, its thread, and the reply.
+ */
 export function findModern(
   batch: OpBatch,
   slidePart: string,
-  guid: string
+  key: string
 ): { part: string; thread: Element; reply?: Element } {
-  const wanted = guid.toUpperCase();
-  const hit = (root: Element | undefined): { thread: Element; reply?: Element } | undefined => {
-    if (!is(root, 'cmLst')) return undefined;
-    for (const cm of elements(root)) {
-      if (!is(cm, 'cm')) continue;
-      if (attr(cm, 'id')?.toUpperCase() === wanted) return { thread: cm };
-      const replies = elements(child(cm, { ns: P188, local: 'replyLst' }));
-      const reply = replies.find((r) => is(r, 'reply') && attr(r, 'id')?.toUpperCase() === wanted);
-      if (reply) return { thread: cm, reply };
+  const lists = slideCommentParts(batch.pkg, slidePart).modern;
+  const at = (guid: string, ordinal: number) => {
+    let left = ordinal;
+    for (const part of lists) {
+      // Read first, so a list without the comment is not rewritten as an XML part.
+      const count = modernHits(commentTree(batch.pkg, part)?.root, guid).length;
+      if (count < left) {
+        left -= count;
+        continue;
+      }
+      const hit = modernHits(editable(batch, part)?.root, guid)[left - 1];
+      return hit ? { part, ...hit } : undefined;
     }
     return undefined;
   };
-  for (const part of slideCommentParts(batch.pkg, slidePart).modern) {
-    // Read first, so a list without the comment is not rewritten as an XML part.
-    if (!hit(commentTree(batch.pkg, part)?.root)) continue;
-    const found = hit(editable(batch, part)?.root);
-    if (found) return { part, ...found };
-  }
-  throw new CommandRefusal('errors.noComment');
+  const wanted = key.toUpperCase();
+  const m = /^(.*)~([1-9]\d{0,5})$/.exec(wanted);
+  const found = at(wanted, 1) ?? (m ? at(m[1]!, Number(m[2])) : undefined);
+  if (!found) throw new CommandRefusal('errors.noComment');
+  return found;
 }
 
 /** Add a reply to the thread `thread` of list `part`. Returns its GUID. */
@@ -324,26 +347,10 @@ export function replyModern(
   return id;
 }
 
-/** Elements a plain comment text body holds; any other content (a mention) is not edited. */
-const PLAIN = new Set(['bodyPr', 'lstStyle', 'p', 'pPr', 'r', 'rPr', 't', 'br', 'endParaRPr']);
-
-function plainBody(el: Element, depth = 0): boolean {
-  if (depth > 0 && (el.ns !== NS.a || !PLAIN.has(el.local))) return false;
-  if (
-    el.local === 'rPr' ||
-    el.local === 'pPr' ||
-    el.local === 'endParaRPr' ||
-    el.local === 'bodyPr'
-  )
-    return true;
-  return depth > 4 ? false : elements(el).every((c) => plainBody(c, depth + 1));
-}
-
 /** Replace the text of a threaded comment or reply. A body that holds more than text is kept. */
 export function editModern(batch: OpBatch, part: string, el: Element, text: string): void {
-  const body = child(el, { ns: P188, local: 'txBody' });
-  if (!body || !plainBody(body) || child(el, { ns: P188, local: 'extLst' }))
-    throw new CommandRefusal('disabled.commentNotEditable');
+  if (!modernTextEditable(el)) throw new CommandRefusal('disabled.commentNotEditable');
+  const body = child(el, { ns: P188, local: 'txBody' })!;
   for (const p of elements(body))
     if (p.ns === NS.a && p.local === 'p') batch.push({ op: 'removeNode', part, node: p.id });
   const fresh = batch.element(part, body.id);
@@ -362,7 +369,7 @@ export function deleteModern(
   reply: Element | undefined
 ): void {
   if (reply) {
-    const list = elements(thread).find((c) => is(c, 'replyLst'))!;
+    const list = elements(thread).find((c) => is(c, 'replyLst') && c.children.includes(reply))!;
     const only = elements(list).length === 1;
     batch.push({ op: 'removeNode', part, node: only ? list.id : reply.id });
     return;

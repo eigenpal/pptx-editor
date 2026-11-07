@@ -67,8 +67,11 @@ function descendant(el: Element | undefined, local: string): Element | undefined
   return undefined;
 }
 
+/** An id field with `-`, `#`, and `%` encoded, as the engine's legacy comment ids hold it. */
+const idField = (raw: string): string => encodeURIComponent(raw).replace(/-/g, '%2D');
+
 const commentId = (slidePart: string, authorId: string, idx: string): string =>
-  `${slidePart}#cm-${authorId}-${idx}`;
+  `${slidePart}#cm-${idField(authorId)}-${idField(idx)}`;
 
 /** Every legacy comment of every slide, in slide order and then file order. */
 export function legacyComments(pkg: PptxPackage): ReviewItem[] {

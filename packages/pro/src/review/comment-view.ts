@@ -145,17 +145,17 @@ export function reviewItems(
 ): readonly ReviewItemView[] {
   const threads: readonly CommentThread[] = snapshot?.comments ?? [];
   if (!editor || !snapshot || threads.length === 0) return [];
-  const can = (command: Parameters<PptxEditorInstance['can']>[0]): boolean =>
-    editor.can(command).ok;
+  // From the thread data, not one `editor.can` per item: each `can` reads the whole list, so a
+  // pane of many threads would take quadratic time. `editComment` and the status commands are
+  // refused only in a read-only deck, for a comment the editor cannot write back, and for the
+  // legacy format's status; the review tests hold the two in agreement.
+  const writable = !reviewReadOnly(snapshot);
   const out: ReviewItemView[] = [];
   for (const thread of threads) {
     const isActive = thread.id === snapshot.activeComment;
     const anchorName =
       thread.anchor.kind === 'shape' ? shapeName(snapshot.shapes, thread.anchor.nodeId) : undefined;
-    const resolvable = can({
-      type: thread.resolved ? 'reopenComment' : 'resolveComment',
-      commentId: thread.id,
-    });
+    const resolvable = writable && thread.format === 'modern';
     const item = (c: SlideComment, parentId?: string): ReviewItemView => ({
       key: c.id,
       id: c.id,
@@ -171,7 +171,7 @@ export function reviewItems(
       ...(parentId !== undefined ? { parentId } : {}),
       replyIds: parentId === undefined ? thread.replies.map((r) => r.id) : [],
       isActive,
-      editable: can({ type: 'editComment', commentId: c.id, text: 'x' }),
+      editable: writable && c.textEditable,
       resolvable,
     });
     out.push(item(thread));
