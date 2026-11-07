@@ -149,7 +149,6 @@ export function createSlideSummaries(): (
     session: DocumentSession,
     pkg: PptxPackage,
     index: number,
-    fonts: string,
     old: SlideSummary | undefined,
     parts: string[]
   ): SlideSummary => {
@@ -166,7 +165,7 @@ export function createSlideSummaries(): (
             pending: true as const,
             ...(s.layoutPart ? { layoutId: s.layoutPart } : {}),
           };
-    const key = renderKey(pkg, index, fonts, parts) ?? '';
+    const key = renderKey(pkg, index, session.paintKey(s.partName), parts) ?? '';
     // Part names are never reused in a session, so the part name is the slide's identity.
     return old &&
       old.key === key &&
@@ -212,7 +211,7 @@ export function createSlideSummaries(): (
       let next: SlideSummary[] | null = null;
       for (const index of affected) {
         const names: string[] = [];
-        const summary = summarize(session, pkg, index, fonts, prev[index], names);
+        const summary = summarize(session, pkg, index, prev[index], names);
         for (const name of readParts[index] ?? []) readers.get(name)?.delete(index);
         readParts[index] = names;
         for (const name of [slides[index].partName, ...names]) {
@@ -243,7 +242,7 @@ export function createSlideSummaries(): (
         return old;
       }
       const names: string[] = [];
-      const summary = summarize(session, pkg, index, fonts, old, names);
+      const summary = summarize(session, pkg, index, old, names);
       parts.push(names);
       return summary;
     });

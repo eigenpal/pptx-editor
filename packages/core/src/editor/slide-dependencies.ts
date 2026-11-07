@@ -116,7 +116,7 @@ function idOf(value: unknown): string {
 
 /**
  * A string that changes whenever slide `index` may render differently: its dependencies, or
- * the paint generation (`DocumentSession.paintGeneration`: new faces, or converted pictures).
+ * its paint key (`DocumentSession.paintKey`: new faces, or its converted pictures).
  */
 export function renderKey(
   pkg: PptxPackage,

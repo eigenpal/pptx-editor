@@ -18,6 +18,10 @@ import { paintSlide } from '../output/index.ts';
 import type { PptxPackage } from '../store/index.ts';
 import type { DocumentSession } from './document-session.ts';
 import { renderKey } from './slide-dependencies.ts';
+
+/** The render key of slide `index`: its parts, its faces, and its converted pictures. */
+const keyOf = (session: DocumentSession, index: number): string | undefined =>
+  renderKey(session.store.package, index, session.paintKey(session.info.slides[index]?.partName));
 import { idleCallback, ThumbnailQueue, type Ask, type IdleDeadline } from './thumbnail-queue.ts';
 
 /** The label of a frame the engine does not draw ("Chart (not rendered in this version)"). */
@@ -101,7 +105,7 @@ export class ThumbnailPainter {
     // A slide still opening waits as a placeholder in a deferred list. A caller that paints at
     // once (no `defer`) gets the slide now: its layout parses it.
     if (defer && session.slidePending(index)) return this.#placeholder(session, index, container);
-    const key = renderKey(session.store.package, index, session.paintGeneration);
+    const key = keyOf(session, index);
     const part = session.info.slides[index]?.partName;
     if (!key || !part) return;
     const was = this.#painted.get(container);
@@ -215,14 +219,14 @@ export class ThumbnailPainter {
       return;
     }
     if (session.slidePending(index)) return void session.opening?.want(ask.part);
-    const key = renderKey(session.store.package, index, session.paintGeneration);
+    const key = keyOf(session, index);
     const was = this.#painted.get(container);
     if (was?.session === session && was.key === key) return;
     this.#paint(session, index, container);
   }
 
   #paint(session: DocumentSession, index: number, container: HTMLElement): void {
-    const key = renderKey(session.store.package, index, session.paintGeneration);
+    const key = keyOf(session, index);
     const part = session.info.slides[index]?.partName;
     const lay = session.layout(index);
     if (!key || !part || !lay) return;
@@ -266,7 +270,7 @@ export class ThumbnailPainter {
       this.#pending.delete(container);
       if (!session) continue;
       const was = this.#painted.get(container);
-      const key = renderKey(session.store.package, index, session.paintGeneration);
+      const key = keyOf(session, index);
       if (was?.session === session && was.key === key) continue;
       this.#paint(session, index, container);
       painted += 1;

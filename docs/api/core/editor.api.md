@@ -1245,6 +1245,8 @@ export class DocumentSession {
     // @internal
     get paintGeneration(): string;
     // @internal
+    paintKey(slide: string | undefined): string;
+    // @internal
     parsedAt: number;
     // @internal
     picture(target: string): DrawablePicture | undefined;

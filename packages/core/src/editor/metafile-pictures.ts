@@ -58,6 +58,9 @@ export class MetafilePictures {
   #done = new WeakMap<Uint8Array, Uint8Array | null>();
   /** The last PNG of each metafile part that converted: it draws until a new one is ready. */
   #last = new WeakMap<Uint8Array, Uint8Array>();
+  /** A number for each PNG, so a key can name the PNGs a slide draws (`stateOf`). */
+  #serials = new WeakMap<Uint8Array, number>();
+  #serial = 0;
   /** Each metafile that waits or converts, with what resolves its `convert` promise. */
   #pending = new Map<
     Uint8Array,
@@ -69,9 +72,10 @@ export class MetafilePictures {
   #epoch = 0;
   #fontFiles: readonly Uint8Array[] | null = null;
   #repaint: ReturnType<typeof setTimeout> | null = null;
+  /** Stops the conversions with the current fonts: a font change or `dispose()` aborts it. */
   #abort = new AbortController();
-  /** The blob URL of each picture part, with the bytes it draws. */
-  #urls = new Map<Uint8Array, { readonly drawn: Uint8Array; readonly url: string }>();
+  /** The blob URL of each picture part name, with the bytes it draws. */
+  #urls = new Map<string, { readonly drawn: Uint8Array; readonly url: string }>();
   #disposed = false;
   readonly #fonts: () => readonly Uint8Array[];
   readonly #changed: () => void;
@@ -100,17 +104,18 @@ export class MetafilePictures {
   }
 
   /**
-   * A blob URL for `picture`, the drawable bytes of the part `bytes`. A new PNG of the part
-   * revokes the URL of the old one; `dispose()` revokes the rest. Undefined with no `Blob`.
+   * A blob URL for `picture`, the drawable bytes of the part `part`. New bytes for the part (a
+   * new PNG, or a replaced picture) revoke the URL of the old ones; `dispose()` revokes the
+   * rest. Undefined with no `Blob`.
    */
-  url(bytes: Uint8Array, picture: DrawablePicture): string | undefined {
-    const hit = this.#urls.get(bytes);
+  url(part: string, picture: DrawablePicture): string | undefined {
+    const hit = this.#urls.get(part);
     if (hit?.drawn === picture.bytes) return hit.url;
     if (this.#disposed || typeof URL === 'undefined' || typeof Blob === 'undefined') return;
     if (hit) URL.revokeObjectURL(hit.url);
     const blob = new Blob([picture.bytes.slice().buffer], { type: picture.mime });
     const url = URL.createObjectURL(blob);
-    this.#urls.set(bytes, { drawn: picture.bytes, url });
+    this.#urls.set(part, { drawn: picture.bytes, url });
     return url;
   }
 
@@ -137,14 +142,28 @@ export class MetafilePictures {
     const late = new Promise<boolean>((resolve) => (timer = setTimeout(resolve, waitMs, false)));
     const all = Promise.all(metafiles.map((b) => this.convert(b))).then(() => true);
     try {
-      return await Promise.race([all, late]);
+      // A cache disposed meanwhile converted nothing more: its pictures are not ready.
+      return (await Promise.race([all, late])) && !this.#disposed;
     } finally {
       clearTimeout(timer);
     }
   }
 
+  /** A key that changes when the PNG of a metafile that slide part `slide` shows changes. */
+  stateOf(pkg: PptxPackage, slide: string | undefined): string {
+    return (slide ? metafilesOf(pkg, [slide]) : [])
+      .map((b) => {
+        const png = this.#done.get(b) ?? this.#last.get(b);
+        return png ? this.#serials.get(png) : '-';
+      })
+      .join(',');
+  }
+
   /** The fonts changed: each metafile converts again with them. The last PNGs draw until then. */
   fontsChanged(): void {
+    // Conversions with the old fonts stop, and run again with the new ones.
+    this.#abort.abort();
+    this.#abort = new AbortController();
     this.#done = new WeakMap();
     this.#fontFiles = null;
     this.#epoch += 1;
@@ -193,7 +212,10 @@ export class MetafilePictures {
       return;
     }
     this.#done.set(bytes, png);
-    if (png) this.#last.set(bytes, png);
+    if (png) {
+      this.#last.set(bytes, png);
+      this.#serials.set(png, (this.#serial += 1));
+    }
     const pending = this.#pending.get(bytes);
     this.#pending.delete(bytes);
     pending?.resolve();

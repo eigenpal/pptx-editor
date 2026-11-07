@@ -13,6 +13,7 @@ import { MetafilePictures, metafilesOf } from '../metafile-pictures.ts';
 const IN = 914_400;
 const R_IMAGE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
 const SLIDE = '/ppt/slides/slide1.xml';
+const PART = '/ppt/media/image1.emf';
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const pic = (id: number, rId: string): string =>
@@ -75,6 +76,23 @@ test('a metafile paints the placeholder, then its PNG after one repaint', async 
   editor.destroy();
 });
 
+test('a converted picture changes the key of its own slide only', async () => {
+  const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  expect((await editor.load(deck())).ok).toBe(true);
+  const session = editor.session!;
+  const before = editor.snapshot().slides;
+  const keys = [SLIDE, '/ppt/slides/slide2.xml'].map((p) => session.paintKey(p));
+  await session.picturesReady(0);
+  await wait(50);
+  expect(session.paintKey(SLIDE)).not.toBe(keys[0]);
+  expect(session.paintKey('/ppt/slides/slide2.xml')).toBe(keys[1]!);
+  // The rail keeps the summary of the other slide, so its thumbnail does not repaint.
+  const after = editor.snapshot().slides;
+  expect(after[0]).not.toBe(before[0]);
+  expect(after[1]).toBe(before[1]!);
+  editor.destroy();
+});
+
 test('picturesReady waits for the pictures of one slide, or of every slide', async () => {
   const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
   expect((await editor.load(deck())).ok).toBe(true);
@@ -82,8 +100,8 @@ test('picturesReady waits for the pictures of one slide, or of every slide', asy
   await session.picturesReady(0);
   expect(session.picture('/ppt/media/image1.emf')).toBeDefined();
   expect(session.picture('/ppt/media/image4.emf')).toBeUndefined();
-  expect(await session.picturesReady(-1)).toBe(true);
-  expect(await session.picturesReady(9)).toBe(true);
+  expect(await session.picturesReady(-1)).toBe(false);
+  expect(await session.picturesReady(9)).toBe(false);
   expect(await session.picturesReady()).toBe(true);
   expect(session.picture('/ppt/media/image4.emf')).toBeDefined();
   editor.destroy();
@@ -153,7 +171,7 @@ test('new fonts convert again, and the old PNG draws until then', async () => {
   await pictures.ready([bytes]);
   const first = pictures.drawable(bytes, 'image/x-emf');
   expect(first?.mime).toBe('image/png');
-  const url = pictures.url(bytes, first!);
+  const url = pictures.url(PART, first!);
   pictures.fontsChanged();
   pictures.fontsChanged();
   // Until the new PNG is ready, the old one draws, also after two changes in a row.
@@ -167,14 +185,14 @@ test('new fonts convert again, and the old PNG draws until then', async () => {
   const revoke = URL.revokeObjectURL;
   URL.revokeObjectURL = (u: string) => (revoked.push(u), revoke(u));
   try {
-    expect(pictures.url(bytes, next)).not.toBe(url);
+    expect(pictures.url(PART, next)).not.toBe(url);
     expect(revoked).toEqual([url!]);
   } finally {
     URL.revokeObjectURL = revoke;
   }
   pictures.dispose();
   // A disposed cache makes no URL that nothing would revoke.
-  expect(pictures.url(bytes, next)).toBeUndefined();
+  expect(pictures.url(PART, next)).toBeUndefined();
 });
 
 test('a wait for pictures ends at its limit', async () => {
@@ -199,6 +217,7 @@ test('a disposed cache converts nothing and stays quiet', async () => {
   expect(pictures.busy).toBe(true);
   pictures.dispose();
   await pictures.convert(bytes);
+  expect(await pictures.ready([bytes])).toBe(false);
   await wait(200);
   expect(changed).toBe(0);
   expect(pictures.busy).toBe(false);

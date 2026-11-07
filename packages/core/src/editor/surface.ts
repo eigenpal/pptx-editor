@@ -64,7 +64,7 @@ export interface SurfaceHost extends SurfaceInputHost {
   readonly selection: () => EditorSelection;
   readonly readOnly: () => boolean;
   readonly imageUrl: (part: string, rId: string) => string | undefined;
-  /** Changes when the same layout paints differently (`DocumentSession.paintGeneration`). */
+  /** Changes when the slide paints differently with no edit (`DocumentSession.paintKey`). */
   readonly paintGeneration?: () => string | undefined;
   readonly imageSize?: (part: string, rId: string) => { cx: number; cy: number } | undefined;
   readonly label: (key: string, params?: Record<string, string | number>) => string;

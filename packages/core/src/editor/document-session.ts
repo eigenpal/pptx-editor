@@ -613,6 +613,11 @@ export class DocumentSession {
     return `${this.#generation}.${this.#pictureGeneration}`;
   }
 
+  /** Changes when slide part `slide` paints differently: new faces, or its pictures. @internal */
+  paintKey(slide: string | undefined): string {
+    return `${this.#generation}.${this.#pictures.stateOf(this.store.package, slide)}`;
+  }
+
   get fontReport(): FontReport {
     return {
       embeddedFaces: this.#fonts.embedded.length,
@@ -813,14 +818,10 @@ export class DocumentSession {
     const target = relTarget(pkg, sourcePart, rId);
     const bytes = target ? binaryPartOf(pkg, target) : undefined;
     const picture = bytes && this.#pictures.drawable(bytes, imageMime(target!));
-    return picture ? this.#pictures.url(bytes, picture) : undefined;
+    return picture ? this.#pictures.url(target!, picture) : undefined;
   };
 
-  /**
-   * The bytes of the picture part `target` as they draw, from their signature: undefined for a
-   * damaged, mislabeled, or oversized picture (`drawable-image.ts`), which draws the
-   * placeholder. An EMF or WMF part draws as its PNG once converted. @internal
-   */
+  /** The bytes of the picture part `target` as they draw (`MetafilePictures.drawable`). @internal */
   picture(target: string): DrawablePicture | undefined {
     const bytes = binaryPartOf(this.store.package, target);
     return bytes ? this.#pictures.drawable(bytes, imageMime(target)) : undefined;
@@ -828,12 +829,14 @@ export class DocumentSession {
 
   /**
    * Waits until the EMF and WMF pictures of slide `index`, or of every slide when you omit it,
-   * have converted, so an export draws them. Resolves `true` when all are ready, and `false`
-   * after 30 seconds: a picture that is not ready then draws as the placeholder.
+   * have converted, so an export draws them. Resolves `true` when all are ready. Resolves
+   * `false` for a slide that does not exist, and after 30 seconds: a picture that is not ready
+   * then draws as the placeholder.
    */
   picturesReady(index?: number): Promise<boolean> {
     const slides = this.info.slides.map((s) => s.partName);
-    const shown = index === undefined ? slides : slides[index] ? [slides[index]] : [];
+    const shown = index === undefined ? slides : slides[index] ? [slides[index]] : null;
+    if (!shown) return Promise.resolve(false);
     return this.#pictures.ready(metafilesOf(this.store.package, shown));
   }
 

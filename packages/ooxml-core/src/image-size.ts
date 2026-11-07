@@ -1,6 +1,7 @@
-// Read an image's pixel size and resolution from its header: PNG (`IHDR`, `pHYs`), JPEG (`SOFn`,
-// JFIF density), GIF, BMP, and WebP (`VP8 `, `VP8L`, `VP8X`). Every read is bounds-checked and the scan is capped, because the
-// bytes come from the file (AGENTS.md "Security"). Nothing is decoded.
+// Read an image's pixel size and resolution from its header: PNG (`IHDR`, `pHYs`), JPEG
+// (`SOFn`, JFIF density), GIF, BMP, and WebP (`VP8 `, `VP8L`, `VP8X`). Every read is
+// bounds-checked and the scan is capped, because the bytes come from the file (AGENTS.md
+// "Security"). Nothing is decoded.
 
 /** Pixel size and resolution. `dpiX`/`dpiY` are undefined when the file states none. */
 export interface ImageSize {

@@ -272,13 +272,15 @@ describe('damaged notes parts and notes themes', () => {
   test.each([
     ['slide', '/ppt/slides/slide1.xml', 'notesSlide'],
     ['slide master', '/ppt/slideMasters/slideMaster1.xml', 'notesMaster'],
+    ['slide layout', '/ppt/slideLayouts/slideLayout1.xml', 'notesSlide'],
+    ['slide master theme', '/ppt/theme/theme1.xml', 'notesSlide'],
   ])('a damaged %s with a notes content type still refuses the deck', (_, part, notesType) => {
     const bytes = notesDeck((entries) => {
       entries.set(part, new TextEncoder().encode('<p:sld><broken'));
       const types = new TextDecoder().decode(entries.get(CT));
       const retyped = types.replace(
-        new RegExp(`(PartName="${part}" ContentType="${PML}).*?\\+xml"`),
-        `$1${notesType}+xml"`
+        new RegExp(`(PartName="${part}" ContentType=")[^"]*"`),
+        `$1${PML}${notesType}+xml"`
       );
       expect(retyped).not.toBe(types);
       entries.set(CT, new TextEncoder().encode(retyped));
