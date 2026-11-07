@@ -8,13 +8,14 @@
 // A first paint (a new container, or one that changes slide or document) is immediate, unless
 // the caller asks to defer it (`defer`): the rail and the slide sorter mount one container per
 // slide, and a long deck must not paint every slide before the editor can be used. Then the
-// current slide's container paints at once. Of the others, `ThumbnailQueue`
+// current slide's container paints at once, unless the slide is large: it paints when idle.
+// Of the others, `ThumbnailQueue`
 // (thumbnail-queue.ts) paints the first of a task at once and the ones in view before the
 // frame; the rest paint when they scroll into view or when idle. A container never shows a
 // wrong slide: one that waits is empty.
 
 import type { SlideLayout } from '../layout/index.ts';
-import { paintSlide } from '../output/index.ts';
+import { paintSlide, SlidePainter, type PaintOptions } from '../output/index.ts';
 import type { PptxPackage } from '../store/index.ts';
 import type { DocumentSession } from './document-session.ts';
 import { renderKey } from './slide-dependencies.ts';
@@ -54,6 +55,15 @@ interface Painted {
   readonly key: string;
 }
 
+/** The number of items from which a current slide's first thumbnail waits for idle time. */
+const LARGE_SLIDE_ITEMS = 2_000;
+
+/**
+ * The new items an idle repaint paints into one thumbnail. A large slide fills its thumbnail
+ * over several idle periods, so no idle repaint blocks input for long.
+ */
+const IDLE_PAINT_BUDGET = 1_000;
+
 /** Quiet time after the last change before a changed slide repaints. */
 const QUIET_MS = 150;
 /** The longest a changed slide waits while edits go on. */
@@ -65,6 +75,8 @@ export class ThumbnailPainter {
   #layouts = new WeakMap<HTMLElement, { pkg: PptxPackage; id: string; key: string }>();
   /** The layout of each gallery container, to repaint it when its pictures convert. */
   #layoutBoxes = new Map<HTMLElement, string>();
+  /** The size of `#layoutBoxes` from which the next call drops the boxes no longer shown. */
+  #pruneAt = 64;
   /** Containers waiting for an idle repaint, with the slide index asked for last. */
   #pending = new Map<HTMLElement, number>();
   /** How many times each container was asked for: a disposer acts for the last ask only. */
@@ -74,6 +86,12 @@ export class ThumbnailPainter {
   /** When the oldest waiting repaint was asked for (0: none waits). */
   #since = 0;
   #count = 0;
+  /**
+   * The painter of each container. It keeps the nodes of the items it painted, so a slide that
+   * changed in place repaints the items that changed, not the whole slide.
+   */
+  #painters = new WeakMap<HTMLElement, SlidePainter>();
+  readonly #frameLabel = (kind: string): string => this.#host.frameLabel(kind);
   /** First paints of containers out of view, which wait for view or idle time. */
   readonly #queue = new ThumbnailQueue({
     paint: (container, ask) => this.#paintFirst(container, ask),
@@ -119,6 +137,15 @@ export class ThumbnailPainter {
     if (!was || was.session !== session || was.part !== part) {
       this.#pending.delete(container);
       const current = !defer || index === this.#host.currentSlide?.();
+      // A large current slide paints its thumbnail when idle, not in the frame that paints the
+      // slide itself. Until then, the container is empty.
+      if (defer && current && (session.layout(index)?.items.length ?? 0) > LARGE_SLIDE_ITEMS) {
+        this.#queue.drop(container);
+        if (this.#painted.delete(container) || container.firstChild) container.replaceChildren();
+        this.#pending.set(container, index);
+        this.#schedule();
+        return;
+      }
       if (current || this.#queue.paintNow(container, { index, part }, !!was)) {
         this.#queue.drop(container);
         this.#paint(session, index, container);
@@ -137,7 +164,13 @@ export class ThumbnailPainter {
     const session = this.#host.session();
     const pkg = session?.store.package;
     if (!session || !pkg) return;
-    for (const box of this.#layoutBoxes.keys()) if (!box.isConnected) this.#layoutBoxes.delete(box);
+    // Drop detached boxes once the map doubles: a scan on each call would cost the size of the
+    // gallery each time, so painting a gallery of many layouts would grow with its square.
+    if (this.#layoutBoxes.size >= this.#pruneAt) {
+      for (const box of this.#layoutBoxes.keys())
+        if (!box.isConnected) this.#layoutBoxes.delete(box);
+      this.#pruneAt = Math.max(64, this.#layoutBoxes.size * 2);
+    }
     this.#layoutBoxes.set(container, layoutId);
     const was = this.#layouts.get(container);
     const key = session.paintKey(layoutId);
@@ -241,23 +274,47 @@ export class ThumbnailPainter {
     this.#paint(session, index, container);
   }
 
-  #paint(session: DocumentSession, index: number, container: HTMLElement): void {
+  /**
+   * Paint slide `index` into `container`: at most `budget` new items. A paint that leaves items
+   * out marks the container as not painted and returns false: the idle repaints go on with it.
+   */
+  #paint(
+    session: DocumentSession,
+    index: number,
+    container: HTMLElement,
+    budget = Infinity
+  ): boolean {
     const key = keyOf(session, index);
     const part = session.info.slides[index]?.partName;
     const lay = session.layout(index);
-    if (!key || !part || !lay) return;
-    this.#count += 1;
-    const svg = paintSlide(container.ownerDocument, lay, {
+    if (!key || !part || !lay) return true;
+    const opts: Omit<PaintOptions, 'idPrefix'> = {
       images: session.imageUrl,
       imageSize: session.imageSize,
-      idPrefix: `${this.#host.idPrefix}t${index}n${this.#count}`,
       hitTargets: false,
-      frameLabel: (kind) => this.#host.frameLabel(kind),
-    });
-    svg.setAttribute('width', '100%');
-    svg.setAttribute('height', '100%');
-    container.replaceChildren(svg);
-    this.#painted.set(container, { session, part, key });
+      frameLabel: this.#frameLabel,
+    };
+    let painter = this.#painters.get(container);
+    if (!painter?.paints({ ...opts, idPrefix: painter.idPrefix })) {
+      this.#count += 1;
+      painter = new SlidePainter(container.ownerDocument, {
+        ...opts,
+        idPrefix: `${this.#host.idPrefix}t${this.#count}`,
+      });
+      this.#painters.set(container, painter);
+    }
+    // Converted pictures, or new faces: every item paints again.
+    painter.invalidate(session.paintKey(part));
+    const svg = painter.paint(lay, budget);
+    if (svg.getAttribute('width') !== '100%') {
+      svg.setAttribute('width', '100%');
+      svg.setAttribute('height', '100%');
+    }
+    if (container.firstChild !== svg || container.childNodes.length !== 1)
+      container.replaceChildren(svg);
+    // Items left out: the slide is not painted yet, and its next repaint goes on with it.
+    this.#painted.set(container, { session, part, key: painter.pending ? '' : key });
+    return !painter.pending;
   }
 
   #schedule(): void {
@@ -288,7 +345,8 @@ export class ThumbnailPainter {
       const was = this.#painted.get(container);
       const key = keyOf(session, index);
       if (was?.session === session && was.key === key) continue;
-      this.#paint(session, index, container);
+      if (!this.#paint(session, index, container, all ? Infinity : IDLE_PAINT_BUDGET))
+        this.#pending.set(container, index);
       painted += 1;
     }
     if (this.#pending.size > 0) this.#whenIdle();

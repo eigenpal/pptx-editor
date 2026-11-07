@@ -1036,6 +1036,7 @@
   },
   "fonts": {
     "notice": "Some fonts in this presentation aren’t available, so substitutes are shown: {families}.",
+    "more": "{families}, and {count} more",
     "useLocal": "Use fonts on this computer",
     "dismiss": "Dismiss",
     "localNone": "None of these fonts are installed on this computer.",

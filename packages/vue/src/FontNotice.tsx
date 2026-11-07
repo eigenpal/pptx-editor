@@ -17,6 +17,7 @@ import {
   applyLocalFonts,
   canQueryLocalFonts,
   fontNoticeFamilies,
+  fontNoticeList,
 } from '@pptx-editor.dev/core/editor';
 import { ToolButton, keepFocus } from './chrome.tsx';
 import { useEditorState, usePptxEditor } from './composables.ts';
@@ -86,7 +87,9 @@ export const PptxEditorFontNotice = defineComponent({
           onMousedown={keepFocus}
         >
           <span class="pptx-font-notice__text">
-            {families.length ? t('fonts.notice', { families: families.join(', ') }) : status.value}
+            {families.length
+              ? t('fonts.notice', { families: fontNoticeList(families, t) })
+              : status.value}
             {families.length && status.value ? ` ${status.value}` : ''}
           </span>
           {families.length && canQueryLocalFonts() ? (

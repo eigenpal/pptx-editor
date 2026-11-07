@@ -49,12 +49,7 @@ import { pictureStateAt, withAltText } from './picture-state.ts';
 import { isViewCommand, ViewSettings, type ViewCommand } from './view-settings.ts';
 import { PlaceholderPrompts } from './placeholder-prompts.ts';
 import { RemovalNotice } from './removal-notice.ts';
-import {
-  CanCache,
-  createStructureKey,
-  STRUCTURE_COMMANDS,
-  structureSlideKey,
-} from './can-cache.ts';
+import { CanCache, checkCommand, createStructureKey, typingBox } from './can-cache.ts';
 import { itemById, SlideSurface } from './surface.ts';
 import { createShortcut, createSurfaceHost, type SurfaceHostBase } from './surface-host.ts';
 import { setSurfaceRoot } from './surface-registry.ts';
@@ -305,10 +300,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         ? // Commands carrying bytes are cached by object identity, not serialized.
           `${command.type}:${partVersion(command)}`
         : commandCacheKey(command);
-    if (!STRUCTURE_COMMANDS.has(command.type))
-      return canCache.answer(key, () => canUncached(command));
-    const at = structureSlideKey(command, session.store.package, slide);
-    return canCache.answer(`${key}@${at}`, () => canUncached(command), true);
+    const at = { pkg: session.store.package, slide, mode, selection };
+    return canCache.ask(command, key, at, () => canUncached(command));
   };
 
   const sectionIds = () => sectionSummaries(session?.store.package).map((x) => x.id);
@@ -325,15 +318,17 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       return (seam.canSessionHistory(modules, false) ?? session.store.canRedo) && mode === 'edit'
         ? { ok: true }
         : { ok: false, reason: mode === 'view' ? 'disabled.viewing' : 'disabled.nothingToRedo' };
-    try {
-      // A probe: the same compiler without autofit (it adds ops, never a refusal); ops drop.
-      const ctx = context(command, true);
-      if ((painter.compile(ctx, command) ?? cropper.compile(ctx, command)) === null)
-        compile(ctx, command);
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, reason: e instanceof CommandRefusal ? e.reason : 'errors.unsupported' };
-    }
+    return checkCommand(command, selection, mode === 'view', session, slide, (only) => {
+      try {
+        // A probe: the same compiler without autofit (it adds ops, never a refusal); ops drop.
+        const ctx = { ...context(command, true), ...(only ? { selection: only } : {}) };
+        if ((painter.compile(ctx, command) ?? cropper.compile(ctx, command)) === null)
+          compile(ctx, command);
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, reason: e instanceof CommandRefusal ? e.reason : 'errors.unsupported' };
+      }
+    });
   };
 
   /** Publish a refusal (`lastRejection`) and return it; "nothing to do" carries `noop`. */
@@ -555,6 +550,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     if (!carried) arm.clear();
     selection = caret;
     autoListed = listed ? { sel: caret, rev: session.store.revision } : null;
+    canCache.typed(`${mode}:${slide}${typingBox(caret)}`, emit);
     emit();
     return { ok: true };
   };
@@ -759,6 +755,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       session?.dispose();
       fonts?.dispose();
       arm.clear();
+      canCache.dispose();
       session = r.session;
       fonts = r.faces;
       const opened = session;
@@ -959,6 +956,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       surface = null;
       setSurfaceRoot(instance, null);
       thumbnails.clear();
+      canCache.dispose();
       groups.closeAll();
       detachModules();
       hostFonts.dispose();

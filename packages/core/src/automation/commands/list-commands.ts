@@ -89,6 +89,8 @@ function findBody(
   txBodyId: string
 ): readonly ResolvedParagraph[] | undefined {
   for (const el of elements) {
+    // Node ids repeat across parts: a layout or master shape can have the same one.
+    if (el.layer !== 'slide') continue;
     if (el.nodeId === nodeId && el.kind === 'shape') return el.text?.paragraphs;
     if (el.nodeId === nodeId && el.kind === 'graphicFrame')
       return el.table?.cells.find((c) => c.text.nodeId === txBodyId)?.text.paragraphs;
@@ -111,6 +113,30 @@ export function resolvedParagraphs(
 }
 
 /**
+ * The paragraphs of each text body of slide `slide`, as the cascade resolves the batch's state
+ * now: one resolve for many targets, where `resolvedParagraphs` resolves the slide each time.
+ */
+export function paragraphLookup(
+  batch: OpBatch,
+  slide: number
+): (target: ListTarget) => readonly ResolvedParagraph[] {
+  const shapes = new Map<string, readonly ResolvedParagraph[]>();
+  const cells = new Map<string, readonly ResolvedParagraph[]>();
+  const walk = (elements: readonly ResolvedElement[]): void => {
+    for (const el of elements) {
+      if (el.layer !== 'slide') continue;
+      if (el.kind === 'shape') shapes.set(el.nodeId, el.text?.paragraphs ?? []);
+      else if (el.kind === 'graphicFrame')
+        for (const c of el.table?.cells ?? [])
+          cells.set(`${el.nodeId}\u0000${c.text.nodeId}`, c.text.paragraphs);
+      else if (el.kind === 'group') walk(el.children);
+    }
+  };
+  walk(resolveSlide(batch.pkg, slide)?.elements ?? []);
+  return (t) => shapes.get(t.shapeId) ?? cells.get(`${t.shapeId}\u0000${t.txBodyId}`) ?? [];
+}
+
+/**
  * Turn a list on or off for the target paragraphs. `resolve` is false for a probe ("can this
  * command run"), which only needs ops, not the inheritance check.
  */
@@ -122,12 +148,58 @@ export function setListKind(
   kind: ListKind,
   resolve = true
 ): void {
+  setListKinds(batch, part, slide, [target], kind, resolve);
+}
+
+/**
+ * `setListKind` for each of `targets`, with one resolve of the slide between the two phases:
+ * the edits of one target change only its own paragraphs, never how another one resolves.
+ * Answers the targets it wrote into.
+ */
+export function setListKinds(
+  batch: OpBatch,
+  part: string,
+  slide: number,
+  targets: readonly ListTarget[],
+  kind: ListKind,
+  resolve = true
+): ListTarget[] {
+  if (targets.length === 0) return [];
+  const wrote = new Set<ListTarget>();
+  const step = <T>(t: ListTarget, run: () => T): T => {
+    const at = batch.ops.length;
+    const out = run();
+    if (batch.ops.length !== at) wrote.add(t);
+    return out;
+  };
+  const dropped = targets.map((t) => step(t, () => dropListOverrides(batch, part, t, kind)));
+  const lookup = resolve ? paragraphLookup(batch, slide) : () => [];
+  targets.forEach((t, i) =>
+    step(t, () => addList(batch, part, t, kind, resolve, dropped[i]!, lookup(t)))
+  );
+  return targets.filter((t) => wrote.has(t));
+}
+
+/**
+ * Phase 1: drop the target paragraphs' own list overrides, so inheritance shows through.
+ * Answers their `a:pPr` ids, and the margins dropped on trust: phase 2 puts one back unless
+ * it was the bullet's position.
+ */
+function dropListOverrides(
+  batch: OpBatch,
+  part: string,
+  target: ListTarget,
+  kind: ListKind
+): { pPrs: (string | undefined)[]; dropped: (string | undefined)[] } {
   const all = paragraphsOf(batch.element(part, target.txBodyId));
-  const pPrs = target.paragraphs.map((i) => ensureParagraphProps(batch, part, all[i].id));
-  // A margin dropped on trust in phase 1: put back unless it was the bullet's position.
+  // A paragraph with no `a:pPr` has no list override to drop: phase 2 adds one if it writes.
+  const pPrs = target.paragraphs.map((i) => child(all[i], 'a:pPr')?.id);
   const dropped: (string | undefined)[] = [];
-  // Phase 1: drop the paragraph's own list overrides, so inheritance shows through.
   for (const pPrId of pPrs) {
+    if (pPrId === undefined) {
+      dropped.push(undefined);
+      continue;
+    }
     const pPr = batch.element(part, pPrId);
     const suppressed = !!child(pPr, 'a:buNone');
     removeBulletChildren(batch, part, pPrId);
@@ -144,35 +216,49 @@ export function setListKind(
       setPPrAttr(batch, part, pPrId, 'indent', null);
     }
   }
-  // Phase 2: add what inheritance does not give.
-  const inherited = resolve ? resolvedParagraphs(batch, slide, target) : [];
+  return { pPrs, dropped };
+}
+
+/** Phase 2: add what inheritance (`inherited`, resolved after phase 1) does not give. */
+function addList(
+  batch: OpBatch,
+  part: string,
+  target: ListTarget,
+  kind: ListKind,
+  resolve: boolean,
+  { pPrs, dropped }: { pPrs: (string | undefined)[]; dropped: (string | undefined)[] },
+  inherited: readonly ResolvedParagraph[]
+): void {
+  const all = paragraphsOf(batch.element(part, target.txBodyId));
   target.paragraphs.forEach((index, k) => {
-    const pPrId = pPrs[k];
+    // The paragraph's `a:pPr`, made at the first write: a paragraph left as it was gets none.
+    let made = pPrs[k];
+    const props = (): string => (made ??= ensureParagraphProps(batch, part, all[index].id));
     const bullet = inherited[index]?.bullet ?? null;
     if (kind === 'none') {
       if (bullet || !resolve) {
         // CT_TextParagraphProperties order: `a:buNone` after the spacing, color, and size.
-        const index = bulletIndex(batch, part, pPrId);
-        batch.insert({ op: 'insertNode', part, parent: pPrId, index, spec: aSpec('buNone') });
-        setPPrAttr(batch, part, pPrId, 'marL', '0');
-        setPPrAttr(batch, part, pPrId, 'indent', '0');
+        const index = bulletIndex(batch, part, props());
+        batch.insert({ op: 'insertNode', part, parent: props(), index, spec: aSpec('buNone') });
+        setPPrAttr(batch, part, props(), 'marL', '0');
+        setPPrAttr(batch, part, props(), 'indent', '0');
       }
       return;
     }
     const own = dropped[k];
     const at = inherited[index] && Math.round(inherited[index].marL + inherited[index].indent);
     if (bullet && own !== undefined && String(at) !== own) {
-      setPPrAttr(batch, part, pPrId, 'marL', own);
-      setPPrAttr(batch, part, pPrId, 'indent', '0');
+      setPPrAttr(batch, part, props(), 'marL', own);
+      setPPrAttr(batch, part, props(), 'indent', '0');
     }
     const wanted = kind === 'bullet' ? 'char' : 'autonum';
     if (bullet?.type === wanted) return;
-    insertBullet(batch, part, pPrId, kind);
+    insertBullet(batch, part, props(), kind);
     if (!bullet) {
       // No inherited list: an explicit hanging indent at this paragraph's level.
-      const level = levelOf(batch.element(part, pPrId));
-      setPPrAttr(batch, part, pPrId, 'marL', String(HANG + level * LEVEL_STEP));
-      setPPrAttr(batch, part, pPrId, 'indent', String(-HANG));
+      const level = levelOf(batch.element(part, props()));
+      setPPrAttr(batch, part, props(), 'marL', String(HANG + level * LEVEL_STEP));
+      setPPrAttr(batch, part, props(), 'indent', String(-HANG));
     }
   });
 }
@@ -183,15 +269,16 @@ export function setListKind(
  * hanging indent. The level stays, so the paragraph keeps its level's spacing and font. This
  * is Backspace at the start of a list item. A probe resolves too, so `can` and `exec` agree
  * on a paragraph with no bullet. Answers whether any paragraph had a bullet to remove.
+ * `resolved` gives the paragraphs as the cascade resolves them (`paragraphLookup`).
  */
 export function removeBulletInPlace(
   batch: OpBatch,
   part: string,
   slide: number,
-  target: ListTarget
+  target: ListTarget,
+  resolved = resolvedParagraphs(batch, slide, target)
 ): boolean {
   const all = paragraphsOf(batch.element(part, target.txBodyId));
-  const resolved = resolvedParagraphs(batch, slide, target);
   let removed = false;
   for (const index of target.paragraphs) {
     const r = resolved[index];
@@ -205,6 +292,23 @@ export function removeBulletInPlace(
     setPPrAttr(batch, part, pPrId, 'marL', String(marL));
     setPPrAttr(batch, part, pPrId, 'indent', '0');
   }
+  return removed;
+}
+
+/**
+ * `removeBulletInPlace` for each of `targets`, with one resolve of the slide: a removal changes
+ * only its own paragraphs, never another target's. Answers whether any bullet went.
+ */
+export function removeBullets(
+  batch: OpBatch,
+  part: string,
+  slide: number,
+  targets: readonly ListTarget[]
+): boolean {
+  const lookup = paragraphLookup(batch, slide);
+  let removed = false;
+  for (const t of targets)
+    removed = removeBulletInPlace(batch, part, slide, t, lookup(t)) || removed;
   return removed;
 }
 

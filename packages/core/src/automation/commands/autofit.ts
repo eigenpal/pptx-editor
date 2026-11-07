@@ -31,6 +31,8 @@ function findShape(
   sy = 1
 ): Found | undefined {
   for (const el of elements) {
+    // Node ids repeat across parts: a layout or master shape can have the same one.
+    if (el.layer !== 'slide') continue;
     if (el.nodeId === nodeId && el.kind === 'shape') return { shape: el, sx, sy };
     if (el.kind === 'group') {
       // As the layout places a child (`placeInGroup`): its box scales with the group.
@@ -42,6 +44,31 @@ function findShape(
     }
   }
   return undefined;
+}
+
+/** The shapes of a resolved slide by node id, built once: a re-fit of many shapes reads it. */
+const shapeTables = new WeakMap<ResolvedSlide, Map<string, Found>>();
+
+function shapeTable(slide: ResolvedSlide): Map<string, Found> {
+  let table = shapeTables.get(slide);
+  if (table) return table;
+  const out = new Map<string, Found>();
+  const walk = (elements: readonly ResolvedElement[], sx: number, sy: number): void => {
+    for (const el of elements) {
+      if (el.layer !== 'slide') continue;
+      if (el.kind === 'shape' && !out.has(el.nodeId)) out.set(el.nodeId, { shape: el, sx, sy });
+      if (el.kind === 'group') {
+        // As `findShape` scales a group child.
+        const ext = el.childExtent;
+        const gx = ext.cx ? el.xfrm.cx / ext.cx : 1;
+        const gy = ext.cy ? el.xfrm.cy / ext.cy : 1;
+        walk(el.children, sx * gx, sy * gy);
+      }
+    }
+  };
+  walk(slide.elements, 1, 1);
+  shapeTables.set(slide, (table = out));
+  return table;
 }
 
 /**
@@ -58,9 +85,14 @@ export function refit(
   resolved?: ResolvedSlide
 ): void {
   const slide = resolved ?? resolveSlide(batch.pkg, index);
-  const found = slide ? findShape(slide.elements, nodeId) : undefined;
+  // One shape: a walk to it. Many shapes share `resolved` and its table.
+  const found = !slide
+    ? undefined
+    : resolved
+      ? shapeTable(resolved).get(nodeId)
+      : findShape(slide.elements, nodeId);
   // A table frame: its size follows its rows, which grow to fit cell text.
-  if (!found) return void refitTable(batch, index, part, nodeId, measurer);
+  if (!found) return void refitTable(batch, index, part, nodeId, measurer, resolved);
   const { shape, sx, sy } = found;
   if (!shape.text || shape.layer !== 'slide') return;
   noteFit(measurer, part, nodeId);
@@ -97,7 +129,7 @@ export function refitAll(
   nodeIds: Iterable<string>,
   measurer: TextMeasurer
 ): void {
-  const ids = [...nodeIds];
+  const ids = [...new Set(nodeIds)];
   if (ids.length === 0) return;
   const resolved = ids.length > 1 ? resolveSlide(batch.pkg, index) : undefined;
   for (const id of ids) refit(batch, index, part, id, measurer, resolved);

@@ -5,6 +5,7 @@ import { afterAll, expect, test } from 'bun:test';
 import { GlobalWindow } from 'happy-dom';
 import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { createPptxEditor } from '../../editor/index.ts';
+import type { LayoutItem } from '../../layout/index.ts';
 import { paintSlide, SlidePainter, type PaintOptions } from '../paint.ts';
 
 const win = new GlobalWindow();
@@ -101,5 +102,129 @@ test('a removed shape leaves no node and no definitions behind', async () => {
   expect(svg.querySelector(`[data-node-id="${gone}"]`)).toBeNull();
   expect(svg.querySelector('defs')!.children.length).toBeLessThan(defs);
   expect(normalized(svg)).toBe(normalized(paintSlide(doc, next, opts)));
+  editor.destroy();
+});
+
+test('a budget paints a slide over several calls, in paint order, as one paint would', async () => {
+  const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  expect((await editor.load(deck())).ok).toBe(true);
+  const opts: PaintOptions = { images: () => undefined, idPrefix: 'x' };
+  const painter = new SlidePainter(doc, opts);
+  const layout = editor.session!.layout(0)!;
+  const ids = layout.items.map((i) => i.element.nodeId);
+  const shown = (svg: Element) =>
+    [...svg.querySelectorAll('[data-kind="content"] > [data-node-id]')].map((n) =>
+      n.getAttribute('data-node-id')
+    );
+  const svg = painter.paint(layout, 5);
+  expect(painter.pending).toBe(true);
+  expect(shown(svg)).toEqual(ids.slice(0, 5));
+  // An edit while items wait: the painted items stay, and new ones still wait for the budget.
+  editor.setSelection({
+    kind: 'text',
+    nodeId: ids[8]!,
+    anchor: { paragraph: 0, offset: 0 },
+    focus: { paragraph: 0, offset: 0 },
+  });
+  editor.input('text', 'z');
+  const next = editor.session!.layout(0)!;
+  const kept = new Map(
+    ids.slice(0, 5).map((id) => [id, svg.querySelector(`[data-node-id="${id}"]`)])
+  );
+  expect(painter.paint(next, 5)).toBe(svg);
+  expect(shown(svg)).toEqual(ids.slice(0, 10));
+  for (const [id, node] of kept) expect(svg.querySelector(`[data-node-id="${id}"]`)).toBe(node);
+  painter.paint(next, 5);
+  expect(painter.pending).toBe(false);
+  expect(shown(svg)).toEqual(ids);
+  expect(normalized(svg)).toBe(normalized(paintSlide(doc, next, opts)));
+  editor.destroy();
+});
+
+test('while a budget repaints new items, each earlier node stays in its place', async () => {
+  const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  expect((await editor.load(deck())).ok).toBe(true);
+  const opts: PaintOptions = { images: () => undefined, idPrefix: 'x' };
+  const painter = new SlidePainter(doc, opts);
+  const layout = editor.session!.layout(0)!;
+  const ids = layout.items.map((i) => i.element.nodeId);
+  const shown = (svg: Element) =>
+    [...svg.querySelectorAll('[data-kind="content"] > [data-node-id]')].map((n) =>
+      n.getAttribute('data-node-id')
+    );
+  const svg = painter.paint(layout);
+  const before = new Map(ids.map((id) => [id, svg.querySelector(`[data-node-id="${id}"]`)]));
+  // Every item new, as after a font load: the same shapes, new objects.
+  const fresh = { ...layout, items: layout.items.map((i) => ({ ...i })) };
+  painter.paint(fresh, 5);
+  expect(painter.pending).toBe(true);
+  expect(shown(svg)).toEqual(ids);
+  ids.forEach((id, i) => {
+    const node = svg.querySelector(`[data-node-id="${id}"]`);
+    if (i < 5) expect(node).not.toBe(before.get(id)!);
+    else expect(node).toBe(before.get(id)!);
+  });
+  painter.paint(fresh, 5);
+  painter.paint(fresh, 5);
+  expect(painter.pending).toBe(false);
+  expect(shown(svg)).toEqual(ids);
+  for (const id of ids)
+    expect(svg.querySelector(`[data-node-id="${id}"]`)).not.toBe(before.get(id)!);
+  expect(normalized(svg)).toBe(normalized(paintSlide(doc, fresh, opts)));
+  editor.destroy();
+});
+
+test('a new key repaints the same items, each earlier node standing in until it does', async () => {
+  const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  expect((await editor.load(deck())).ok).toBe(true);
+  const opts: PaintOptions = { images: () => undefined, idPrefix: 'x' };
+  const painter = new SlidePainter(doc, opts);
+  const layout = editor.session!.layout(0)!;
+  const ids = layout.items.map((i) => i.element.nodeId);
+  const node = (id: string) => svg.querySelector(`[data-node-id="${id}"]`);
+  expect(painter.invalidate('a')).toBe(true);
+  const svg = painter.paint(layout);
+  const before = new Map(ids.map((id) => [id, node(id)]));
+  // The same key: nothing paints again.
+  expect(painter.invalidate('a')).toBe(false);
+  painter.paint(layout);
+  for (const id of ids) expect(node(id)).toBe(before.get(id)!);
+  // A new key (a converted picture): the same layout items paint again over several calls.
+  expect(painter.invalidate('b')).toBe(true);
+  painter.paint(layout, 5);
+  expect(painter.pending).toBe(true);
+  ids.forEach((id, i) => {
+    if (i < 5) expect(node(id)).not.toBe(before.get(id)!);
+    else expect(node(id)).toBe(before.get(id)!);
+  });
+  while (painter.pending) painter.paint(layout, 5);
+  for (const id of ids) expect(node(id)).not.toBe(before.get(id)!);
+  // Done: the next paint keeps every node.
+  const after = new Map(ids.map((id) => [id, node(id)]));
+  painter.paint(layout, 5);
+  expect(painter.pending).toBe(false);
+  for (const id of ids) expect(node(id)).toBe(after.get(id)!);
+  expect(normalized(svg)).toBe(normalized(paintSlide(doc, layout, opts)));
+  editor.destroy();
+});
+
+test('a stand-in is the earlier node of the same part and layer, not of a shared node id', async () => {
+  const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  expect((await editor.load(deck())).ok).toBe(true);
+  const layout = editor.session!.layout(0)!;
+  const first = layout.items[0]!;
+  // Node ids are numbered per part: a master shape can share the id of a slide shape.
+  const master = {
+    ...first,
+    element: { ...first.element, partName: '/ppt/slideMasters/slideMaster1.xml' },
+  } as LayoutItem;
+  const items: LayoutItem[] = [master, ...layout.items];
+  const painter = new SlidePainter(doc, { images: () => undefined, idPrefix: 'x' });
+  const svg = painter.paint({ ...layout, items });
+  const content = () => [...svg.querySelectorAll('[data-kind="content"] > *')];
+  const before = content();
+  expect(before.length).toBe(items.length);
+  painter.paint({ ...layout, items: items.map((i) => ({ ...i })) }, 0);
+  expect(content()).toEqual(before);
   editor.destroy();
 });

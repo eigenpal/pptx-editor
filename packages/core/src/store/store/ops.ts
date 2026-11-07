@@ -222,6 +222,20 @@ class Transaction {
     return node?.type === 'element' ? node : undefined;
   }
 
+  /** The element `id` of `part`, not held: see `OpenTransaction.peek`. */
+  peek(part: string, id: string): Element | undefined {
+    const node = this.#trees.get(part)?.get(id)?.node;
+    if (node) return node.type === 'element' ? node : undefined;
+    return this.element(part, id);
+  }
+
+  parentId(part: string, id: string): string | null | undefined {
+    const open = this.#trees.get(part);
+    if (open) return open.get(id)?.parent;
+    const p = (this.#parts ?? this.#base.parts).get(part);
+    return p?.kind === 'xml' ? nodeIndex(p.xml).get(id)?.parent : undefined;
+  }
+
   apply(op: PptxOp): OpRejection | null {
     const shape = checkOpShape(op);
     if (shape) return shape;
@@ -363,6 +377,13 @@ export interface OpenTransaction {
   nextId(part: string): number | undefined;
   /** The element `id` of `part` as the applied ops left it, or undefined. */
   element(part: string, id: string): Element | undefined;
+  /**
+   * The element `id` of `part`, read for a moment: unlike `element`, a later op may change it,
+   * so the caller must not keep it. An edit after it then writes in place, and copies nothing.
+   */
+  peek(part: string, id: string): Element | undefined;
+  /** The parent id of node `id` of `part` as the applied ops left it: null for the root. */
+  parentId(part: string, id: string): string | null | undefined;
   /** The package after every applied op. The transaction is done after it. */
   finish(): PptxPackage;
 }
@@ -378,6 +399,8 @@ export function openTransaction(pkg: PptxPackage): OpenTransaction {
     apply: (op) => tx.apply(op),
     nextId: (part) => tx.nextId(part),
     element: (part, id) => tx.element(part, id),
+    peek: (part, id) => tx.peek(part, id),
+    parentId: (part, id) => tx.parentId(part, id),
     finish: () => tx.finish(),
   };
 }

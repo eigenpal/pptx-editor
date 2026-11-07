@@ -8,6 +8,7 @@ import {
   resolveSlide,
   type ResolvedElement,
   type ResolvedGraphicFrame,
+  type ResolvedSlide,
 } from '../../cascade/index.ts';
 import { layoutTable, type TextMeasurer } from '../../layout/index.ts';
 import {
@@ -30,6 +31,8 @@ function findFrame(
   nodeId: string
 ): ResolvedGraphicFrame | undefined {
   for (const el of elements) {
+    // Node ids repeat across parts: a layout or master frame can have the same one.
+    if (el.layer !== 'slide') continue;
     if (el.nodeId === nodeId && el.kind === 'graphicFrame') return el;
     if (el.kind === 'group') {
       const hit = findFrame(el.children, nodeId);
@@ -37,6 +40,35 @@ function findFrame(
     }
   }
   return undefined;
+}
+
+/** The slide's table frames of a resolved slide by node id, built once. */
+const frameTables = new WeakMap<ResolvedSlide, Map<string, ResolvedGraphicFrame>>();
+
+function frameTable(slide: ResolvedSlide): Map<string, ResolvedGraphicFrame> {
+  let table = frameTables.get(slide);
+  if (table) return table;
+  table = new Map();
+  const walk = (elements: readonly ResolvedElement[]): void => {
+    for (const el of elements) {
+      if (el.layer !== 'slide') continue;
+      if (el.kind === 'graphicFrame' && !table!.has(el.nodeId)) table!.set(el.nodeId, el);
+      if (el.kind === 'group') walk(el.children);
+    }
+  };
+  walk(slide.elements);
+  frameTables.set(slide, table);
+  return table;
+}
+
+/** `resolveSlide` of a package that never changes (a drag's start), once per slide. */
+const baseSlides = new WeakMap<PptxPackage, Map<number, ResolvedSlide | undefined>>();
+
+function resolveBase(base: PptxPackage, slide: number): ResolvedSlide | undefined {
+  let known = baseSlides.get(base);
+  if (!known) baseSlides.set(base, (known = new Map()));
+  if (!known.has(slide)) known.set(slide, resolveSlide(base, slide));
+  return known.get(slide);
 }
 
 /**
@@ -81,7 +113,7 @@ export function resizeTable(
   const restore = (): void => rows.forEach((r, i) => set(r, 'h', mins[i]));
   if (!(bcy > 0 && Math.abs(box.cy - bcy) > 1) || !Number.isFinite(box.cy) || box.cy <= 0)
     return (restore(), true);
-  const frame = findFrame(resolveSlide(base, slide)?.elements ?? [], nodeId);
+  const frame = findFrame(resolveBase(base, slide)?.elements ?? [], nodeId);
   if (!frame?.table) return (restore(), true);
   const laid = layoutTable(frame.table, measurer);
   if (laid.rowY.length !== rows.length + 1) return (restore(), true);
@@ -157,10 +189,13 @@ export function refitTable(
   index: number,
   part: string,
   nodeId: string,
-  measurer: TextMeasurer
+  measurer: TextMeasurer,
+  resolved?: ResolvedSlide
 ): boolean {
-  const slide = resolveSlide(batch.pkg, index);
-  const frame = slide ? findFrame(slide.elements, nodeId) : undefined;
+  // Many tables re-fit from one resolve (`refitAll`): a re-fit changes only its own frame.
+  const frame = resolved
+    ? frameTable(resolved).get(nodeId)
+    : findFrame(resolveSlide(batch.pkg, index)?.elements ?? [], nodeId);
   if (!frame?.table || frame.layer !== 'slide') return false;
   noteFit(measurer, part, nodeId);
   const t = layoutTable(frame.table, measurer);

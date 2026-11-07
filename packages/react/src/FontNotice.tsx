@@ -10,6 +10,7 @@ import {
   applyLocalFonts,
   canQueryLocalFonts,
   fontNoticeFamilies,
+  fontNoticeList,
   type ChromeTranslate,
 } from '@pptx-editor.dev/core/editor';
 import { withChromeTranslate } from './headless-hooks.tsx';
@@ -74,7 +75,7 @@ function FontNoticeRoot({ className }: Omit<FontNoticeProps, 't'>) {
       onMouseDown={keepFocus}
     >
       <span className="pptx-font-notice__text">
-        {missing.length ? t('fonts.notice', { families: missing.join(', ') }) : status}
+        {missing.length ? t('fonts.notice', { families: fontNoticeList(missing, t) }) : status}
         {missing.length && status ? ` ${status}` : ''}
       </span>
       {missing.length && canQueryLocalFonts() ? (
