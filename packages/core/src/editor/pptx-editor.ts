@@ -156,6 +156,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       cropper.state,
       arm.version,
       views.presentationView,
+      comments.version, // The moved ids, which refuse an expect without identity.
     ],
     // The slide is part of each answer's key instead (`structureSlideKey`).
     () => [...structureOf(session), mode, views.presentationView]

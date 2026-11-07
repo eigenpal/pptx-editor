@@ -2,7 +2,7 @@
 // file can repeat a comment's GUID, author, and date (twins); the editor keeps their identities
 // where it can tell them apart, and gives them new ones where it cannot.
 
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { buildPptx, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { buildSlideStructureDeck } from '../../../../../scripts/fixtures/slide-structure.ts';
 import {
@@ -12,6 +12,7 @@ import {
   writePptx,
   type PackagePart,
 } from '../../store/index.ts';
+import * as commentRead from '../../automation/commands/comment-read.ts';
 import { createPptxEditor, type EditorModule, type PptxEditorInstance } from '../index.ts';
 
 const review: EditorModule = {
@@ -99,17 +100,15 @@ describe('comment identity', () => {
     expect(e.snapshot().activeComment).toBe(a!.id);
   });
 
-  test('when twins with one text shrink, no identity or pick moves to another twin', async () => {
+  test('when twins with one text shrink, each list node keeps its identity and the pick', async () => {
     const e = await open(await threads((t) => t + t + t));
     const before = identities(e);
     const [first, second] = e.snapshot().comments!;
     e.selectComment(second!.id);
     expect(e.exec({ type: 'deleteComment', commentId: first!.id }).ok).toBe(true);
-    const after = identities(e);
-    expect(after).toHaveLength(2);
-    for (const id of after) expect(before).not.toContain(id);
-    expect(new Set(after).size).toBe(2);
-    expect(e.snapshot().activeComment).toBeNull();
+    expect(identities(e)).toEqual(before.slice(1));
+    const [now] = e.snapshot().comments!;
+    expect(e.snapshot().activeComment).toBe(now!.id);
   });
 
   test('the comment that takes the id of a deleted pick can be picked', async () => {
@@ -457,6 +456,75 @@ describe('comment identity', () => {
     // A zoom change makes a new snapshot, which reads the threads of the slide from the cache.
     e.setZoom(2);
     expect(e.snapshot().comments).toBe(shown);
+  });
+
+  test('can follows exec once a snapshot ends the refusal of a moved id', async () => {
+    const e = await open(await threads((t) => as(t, 'A') + as(t, 'B') + as(t, 'C')));
+    const [a] = e.snapshot().comments!;
+    expect(e.exec({ type: 'deleteComment', commentId: a!.id }).ok).toBe(true);
+    e.snapshot();
+    expect(e.exec({ type: 'undo' }).ok).toBe(true);
+    const facts = { author: a!.author, date: a!.date!, text: a!.text };
+    // Before a snapshot, the id may still be the host's id for another twin.
+    expect(
+      e.can({ type: 'editComment', commentId: a!.id, text: 'z', expect: facts })
+    ).toMatchObject({ ok: false, reason: 'errors.commentChanged' });
+    const now = e.snapshot().comments!.find((t) => t.id === a!.id)!;
+    const command = {
+      type: 'editComment',
+      commentId: now.id,
+      text: 'z',
+      expect: { author: now.author, date: now.date!, text: now.text },
+    } as const;
+    expect(e.can(command).ok).toBe(true);
+    expect(e.exec(command).ok).toBe(true);
+  });
+
+  test('a check on another slide reads it once while its parts stay', async () => {
+    const e0 = createPptxEditor({
+      fixedMeasurer: true,
+      substitutes: false,
+      modules: [review],
+      author: 'Ada Lovelace',
+    });
+    const sh = shape({ id: 2, name: 'Title', x: 0, y: 0, cx: 914_400, cy: 914_400 });
+    expect((await e0.load(buildPptx({ slides: [{ shapes: sh }, { shapes: sh }] }))).ok).toBe(true);
+    e0.goToSlide(1);
+    expect(e0.exec({ type: 'addComment', text: 'Two', date: DATE }).ok).toBe(true);
+    const e = await open(e0.save()!);
+    e0.destroy();
+    e.goToSlide(1);
+    const [two] = e.snapshot().comments!;
+    e.goToSlide(0);
+    e.snapshot();
+    const seen = {
+      author: two!.author,
+      date: two!.date!,
+      text: two!.text,
+      identity: two!.identity,
+    };
+    const reads = spyOn(commentRead, 'readSlideComments');
+    try {
+      for (let i = 0; i < 5; i += 1)
+        expect(
+          e.can({ type: 'editComment', commentId: two!.id, text: `x${i}`, expect: seen }).ok
+        ).toBe(true);
+      expect(reads).toHaveBeenCalledTimes(1);
+      // The slide shows the threads that the checks read.
+      e.goToSlide(1);
+      expect(e.snapshot().comments![0]!.identity).toBe(two!.identity);
+      expect(reads).toHaveBeenCalledTimes(1);
+    } finally {
+      reads.mockRestore();
+    }
+  });
+
+  test('a delete of the first of two exact duplicates keeps the identity of the other', async () => {
+    const e = await open(await threads((t) => as(t, 'Dup') + as(t, 'Dup')));
+    const [a, b] = e.snapshot().comments!;
+    const full = { author: a!.author, date: a!.date!, text: a!.text, identity: a!.identity };
+    expect(e.exec({ type: 'deleteComment', commentId: a!.id, expect: full }).ok).toBe(true);
+    expect(identities(e)).toEqual([b!.identity]);
   });
 
   test('a deck that opens after another shows none of its identities', async () => {
