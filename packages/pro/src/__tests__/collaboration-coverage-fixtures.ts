@@ -320,7 +320,7 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
   setSlideNumbers: { command: () => ({ type: 'setSlideNumbers', show: true }) },
   setFooter: { command: () => ({ type: 'setFooter', text: 'Quarterly results' }) },
   setDateTime: {
-    command: () => ({ type: 'setDateTime', show: true, text: '11/7/2026', fixed: true }),
+    command: () => ({ type: 'setDateTime', show: true, text: '11/7/2026' }),
   },
   setSlideBackground: {
     command: () => ({

@@ -20,7 +20,7 @@ import {
   type PptxPackage,
 } from '../../store/index.ts';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
-import { nextShapeId, spTreeOf, xmlAttr, xmlText } from './package-edits.ts';
+import { fieldId, nextShapeId, spTreeOf, xmlAttr, xmlText } from './package-edits.ts';
 import { specFromXml } from './shape-commands.ts';
 import { removeShapes } from './shape-removal.ts';
 import { setSlideNumbers } from './slide-numbers.ts';
@@ -49,22 +49,56 @@ function shapesOfKind(pkg: PptxPackage, part: string | undefined, kind: HeaderFo
   return tree ? elements(tree).filter(isKind(kind)) : [];
 }
 
-/** The text of the footer of slide `index`, or null when it shows none. */
-export function footerText(pkg: PptxPackage, index: number): string | null {
-  const shape = shapesOfKind(pkg, presentationInfo(pkg).slides[index]?.partName, 'ftr')[0];
-  return shape ? textOf(find(shape, 'p:txBody')) : null;
+/** The footer text and date of one parsed slide part. A part keeps its object until it changes. */
+const shown = new WeakMap<object, { readonly footer: string | null; readonly date: boolean }>();
+
+function shownOn(pkg: PptxPackage, part: string | undefined) {
+  const xml = part ? xmlPartOf(pkg, part) : undefined;
+  if (!xml) return { footer: null, date: false };
+  let got = shown.get(xml);
+  if (!got) {
+    const footer = shapesOfKind(pkg, part, 'ftr')[0];
+    got = {
+      footer: footer ? textOf(find(footer, 'p:txBody')) : null,
+      date: shapesOfKind(pkg, part, 'dt').length > 0,
+    };
+    shown.set(xml, got);
+  }
+  return got;
 }
 
-/** Whether slide `index` shows a date. */
-export function hasDate(pkg: PptxPackage, index: number): boolean {
-  return shapesOfKind(pkg, presentationInfo(pkg).slides[index]?.partName, 'dt').length > 0;
+/**
+ * Which slides a deck-level read may parse. A progressive open passes the slides that are open
+ * already, so a read does not parse the slides that wait. Default: all.
+ */
+export type SlideReady = (index: number) => boolean;
+
+/**
+ * The footer text that the deck shows: slide `index`'s, else that of the first slide with a
+ * footer. Null when no slide shows one. Footers apply to all slides, so this is the menu state.
+ */
+export function footerText(
+  pkg: PptxPackage,
+  index: number,
+  ready: SlideReady = () => true
+): string | null {
+  const slides = presentationInfo(pkg).slides;
+  const own = shownOn(pkg, slides[index]?.partName).footer;
+  if (own !== null) return own;
+  for (const [i, slide] of slides.entries()) {
+    const text = ready(i) ? shownOn(pkg, slide.partName).footer : null;
+    if (text !== null) return text;
+  }
+  return null;
 }
 
-/** A field GUID in braces (`a:fld/@id`, `ST_Guid`). */
-function fieldId(): string {
-  const hex = (n: number) =>
-    Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-  return `{${hex(8)}-${hex(4)}-4${hex(3)}-${'89AB'[Math.floor(Math.random() * 4)]}${hex(3)}-${hex(12)}}`.toUpperCase();
+/** Whether slide `index` or any other slide shows a date: the menu state of the date. */
+export function hasDate(pkg: PptxPackage, index: number, ready: SlideReady = () => true): boolean {
+  const slides = presentationInfo(pkg).slides;
+  return (
+    shownOn(pkg, slides[index]?.partName).date ||
+    slides.some((s, i) => ready(i) && shownOn(pkg, s.partName).date)
+  );
 }
 
 /** The paragraph of a footer or date: plain text, or a date field that updates on open. */
@@ -93,7 +127,23 @@ function replaceText(
   field: boolean
 ): void {
   const body = find(shape, 'p:txBody');
-  if (!body) return;
+  if (!body) {
+    // `p:txBody` follows `p:spPr` and `p:style` (`CT_Shape`).
+    let after = -1;
+    shape.children.forEach((c, i) => {
+      if (c.type === 'element' && ['nvSpPr', 'spPr', 'style'].includes(c.local)) after = i;
+    });
+    batch.insert({
+      op: 'insertNode',
+      part,
+      parent: shape.id,
+      index: after + 1,
+      spec: specFromXml(
+        `<p:txBody><a:bodyPr/><a:lstStyle/>${paragraphXml(kind, text, field)}</p:txBody>`
+      ),
+    });
+    return;
+  }
   const [first, ...rest] = elements(body).filter((c) => c.local === 'p');
   for (const p of rest) batch.push({ op: 'removeNode', part, node: p.id });
   if (!first) {
@@ -113,17 +163,32 @@ function replaceText(
   if (run && t) {
     xmlText(text, NAMES[kind]);
     batch.push({ op: 'setText', part, node: t.id, text });
+    // The text is a `datetime1` date, so a field of another format takes that format.
+    if (wanted === 'fld' && attr(run, 'type') !== 'datetime1')
+      batch.push({
+        op: 'setAttribute',
+        part,
+        node: run.id,
+        name: { ns: '', local: 'type' },
+        value: 'datetime1',
+      });
   } else {
-    const xml = paragraphXml(kind, text, field);
-    const inner = /<a:p>(.*)<a:endParaRPr/.exec(xml)![1]!;
+    const t = xmlText(text, NAMES[kind]);
+    const rPr = run ? find(run, 'a:rPr') : undefined;
+    const inner =
+      wanted === 'fld'
+        ? `<a:fld id="${fieldId()}" type="datetime1">${rPr ? '' : '<a:rPr lang="en-US"/>'}<a:t>${t}</a:t></a:fld>`
+        : `<a:r>${rPr ? '' : '<a:rPr lang="en-US"/>'}<a:t>${t}</a:t></a:r>`;
     const end = first.children.findIndex((c) => c.type === 'element' && c.local === 'endParaRPr');
-    batch.insert({
+    const created = batch.insert({
       op: 'insertNode',
       part,
       parent: first.id,
       index: end < 0 ? first.children.length : end,
       spec: specFromXml(inner),
     });
+    // The new run or field keeps the character format of the old one.
+    if (rPr) batch.push({ op: 'moveNode', part, node: rPr.id, parent: created, index: 0 });
   }
   for (const c of content) if (c !== run || !t) batch.push({ op: 'removeNode', part, node: c.id });
 }
@@ -150,6 +215,11 @@ export function setHeaderFooter(
     if (!slide) continue;
     const tree = spTreeOf(batch, slide.partName);
     const existing = elements(tree).filter(isKind(kind));
+    const template =
+      shapesOfKind(batch.pkg, slide.layoutPart, kind)[0] ??
+      shapesOfKind(batch.pkg, slide.masterPart, kind)[0];
+    if (!template && existing.length === 0) continue;
+    possible += 1;
     if (text === null) {
       removeShapes(
         batch,
@@ -157,14 +227,8 @@ export function setHeaderFooter(
         existing.map((el) => el.id)
       );
       changed += existing.length > 0 ? 1 : 0;
-      possible += 1;
       continue;
     }
-    const template =
-      shapesOfKind(batch.pkg, slide.layoutPart, kind)[0] ??
-      shapesOfKind(batch.pkg, slide.masterPart, kind)[0];
-    if (!template && existing.length === 0) continue;
-    possible += 1;
     const field = !options.fixed;
     if (existing.length > 0) {
       for (const shape of existing) replaceText(batch, slide.partName, shape, kind, text, field);

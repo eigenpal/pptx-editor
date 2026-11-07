@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Insert > Footer: the Vue twin of `FooterRow` in examples/vite/src/menus.tsx. It turns the
 // footer on or off for every slide, through each layout's footer placeholder
-// (`p:ph type="ftr"`). The demo writes the localized word "Footer"; a host passes its own text.
+// (`p:ph type="ftr"`). The check shows whether any slide has a footer, so the row never writes
+// over existing footers. A new footer says "Footer"; a host passes its own text.
 import {
   PptxEditorMenu,
   useEditorState,

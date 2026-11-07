@@ -102,4 +102,86 @@ test('a deck without footer and date placeholders refuses with a reason', async 
   expect(footer.ok ? undefined : footer.reason).toBe('disabled.noFooterPlaceholder');
   const date = e.exec({ type: 'setDateTime', show: true });
   expect(date.ok ? undefined : date.reason).toBe('disabled.noDatePlaceholder');
+  // Hiding what the deck cannot show is refused too, so `can` offers no empty step.
+  expect(e.can({ type: 'setFooter', text: null }).ok).toBe(false);
+  expect(e.can({ type: 'setDateTime', show: false }).ok).toBe(false);
+});
+
+/** A placeholder of `type` with `idx`, and `body` as its text body (none when empty). */
+const placeholder = (id: number, type: string, idx: number, body: string): string =>
+  `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${type} ${id}"/><p:cNvSpPr/>` +
+  `<p:nvPr><p:ph type="${type}" idx="${idx}"/></p:nvPr></p:nvSpPr><p:spPr/>${body}</p:sp>`;
+
+/** The header-footer deck, with `shapes` on slide 2. */
+const withSlide2 = (shapes: string): Uint8Array => {
+  const deck = headerFooterDeck();
+  return buildPptx({ ...deck, slides: [deck.slides[0]!, { ...deck.slides[1]!, shapes }] });
+};
+
+describe('existing placeholders', () => {
+  test('a footer without a text body gets one, after the shape properties', async () => {
+    const e = await open(withSlide2(placeholder(4, 'ftr', 11, '')));
+    expect(e.exec({ type: 'setFooter', text: 'Hello' }).ok).toBe(true);
+    expect(slideXml(e, 1)).toMatch(/<p:spPr\/><p:txBody>.*Hello.*<\/p:txBody><\/p:sp>/);
+    expect(painted(e, 1)).toContain('Hello');
+  });
+
+  test('a footer keeps its first paragraph only, with its format', async () => {
+    const body =
+      '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="r"/><a:r><a:rPr lang="de-DE" b="1"/>' +
+      '<a:t>One</a:t></a:r><a:br/><a:r><a:rPr lang="de-DE"/><a:t>Two</a:t></a:r></a:p>' +
+      '<a:p><a:r><a:t>Three</a:t></a:r></a:p></p:txBody>';
+    const e = await open(withSlide2(placeholder(4, 'ftr', 11, body)));
+    expect(e.exec({ type: 'setFooter', text: 'New' }).ok).toBe(true);
+    const xml = slideXml(e, 1);
+    expect(xml).toContain(
+      '<a:p><a:pPr algn="r"/><a:r><a:rPr lang="de-DE" b="1"/><a:t>New</a:t></a:r></a:p>'
+    );
+    expect(xml).not.toMatch(/Two|Three|<a:br/);
+  });
+
+  test('a fixed date that becomes a field keeps its character format', async () => {
+    const body =
+      '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="de-DE" sz="900" b="1"/>' +
+      '<a:t>7.11.2026</a:t></a:r></a:p></p:txBody>';
+    const e = await open(withSlide2(placeholder(4, 'dt', 10, body)));
+    expect(e.exec({ type: 'setDateTime', show: true, text: '11/7/2026' }).ok).toBe(true);
+    expect(slideXml(e, 1)).toMatch(
+      /<a:fld id="\{[0-9A-F-]{36}\}" type="datetime1"><a:rPr lang="de-DE" sz="900" b="1"\/><a:t>11\/7\/2026<\/a:t><\/a:fld>/
+    );
+    expect(slideXml(e, 1)).not.toContain('7.11.2026');
+  });
+
+  test('a date field of another format takes the format of its new text', async () => {
+    const body =
+      '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:fld id="{B6F15528-21DE-4FAA-801E-634DDDAF4B2C}" ' +
+      'type="datetime4"><a:rPr lang="en-US"/><a:t>November 7, 2026</a:t></a:fld></a:p></p:txBody>';
+    const e = await open(withSlide2(placeholder(4, 'dt', 10, body)));
+    expect(e.exec({ type: 'setDateTime', show: true, text: '11/7/2026' }).ok).toBe(true);
+    const xml = slideXml(e, 1);
+    expect(xml).toContain('id="{B6F15528-21DE-4FAA-801E-634DDDAF4B2C}" type="datetime1"');
+    expect(xml).toContain('<a:t>11/7/2026</a:t>');
+  });
+});
+
+test('a layout without a footer placeholder uses the one of its master', async () => {
+  const deck = headerFooterDeck();
+  const e = await open(
+    buildPptx({
+      ...deck,
+      layouts: [{ name: 'Bare', shapes: '' }],
+      slides: [{ ...deck.slides[1]!, layoutName: 'Bare' }],
+    })
+  );
+  expect(e.exec({ type: 'setFooter', text: 'From the master' }).ok).toBe(true);
+  // The master's footer placeholder has idx 3.
+  expect(slideXml(e, 0)).toContain('<p:ph type="ftr" sz="quarter" idx="3"/>');
+  expect(painted(e, 0)).toContain('From the master');
+});
+
+test('the menu state is the deck state: a slide without a footer reads the others', async () => {
+  const e = await open(buildPptx(headerFooterDeck()));
+  e.selectSlide(1);
+  expect(e.snapshot().footer).toBe('Footer text & more');
+  expect(e.snapshot().dateTime).toBe(false);
 });

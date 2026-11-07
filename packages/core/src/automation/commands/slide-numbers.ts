@@ -17,7 +17,7 @@ import {
   type PptxPackage,
 } from '../../store/index.ts';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
-import { nextShapeId, spTreeOf, xmlAttr } from './package-edits.ts';
+import { fieldId, nextShapeId, spTreeOf, xmlAttr } from './package-edits.ts';
 import { specFromXml } from './shape-commands.ts';
 import { removeShapes } from './shape-removal.ts';
 
@@ -35,13 +35,6 @@ export function hasSlideNumber(pkg: PptxPackage, index: number): boolean {
   const part = presentationInfo(pkg).slides[index]?.partName;
   const tree = part ? find(xmlPartOf(pkg, part)?.root, 'p:spTree') : undefined;
   return !!tree && elements(tree).some(isSlideNumber);
-}
-
-/** A field GUID in braces (`a:fld/@id`, `ST_Guid`). */
-function fieldId(): string {
-  const hex = (n: number) =>
-    Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-  return `{${hex(8)}-${hex(4)}-4${hex(3)}-${'89AB'[Math.floor(Math.random() * 4)]}${hex(3)}-${hex(12)}}`.toUpperCase();
 }
 
 /**

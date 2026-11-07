@@ -65,7 +65,8 @@ function SlideNumbersRow(): ReactNode {
 
 /**
  * Insert > Footer: on or off for every slide, through each layout's footer placeholder
- * (`p:ph type="ftr"`). The demo writes the localized word "Footer"; a host passes its own text.
+ * (`p:ph type="ftr"`). The check shows whether any slide has a footer, so the row never writes
+ * over existing footers. A new footer says "Footer"; a host passes its own text.
  */
 function FooterRow(): ReactNode {
   const { t } = useTranslation();

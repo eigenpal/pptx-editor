@@ -887,13 +887,14 @@ export interface EditorSnapshot {
   /** Whether the current slide shows its slide number (Insert > Slide numbers). */
   readonly slideNumbers: boolean;
   /**
-   * The footer text of the current slide (Insert > Footer), or null when it shows no footer.
-   * Optional and additive: absent reads as null.
+   * The footer text (Insert > Footer): the current slide's, else that of the first slide with a
+   * footer. Null when no slide shows one. `setFooter` applies to all slides, so this is its menu
+   * state. Optional, so that snapshots from hosts without it stay valid: absent reads as null.
    */
   readonly footer?: string | null;
   /**
-   * Whether the current slide shows a date (Insert > Date and time). Optional and additive:
-   * absent reads as `false`.
+   * Whether any slide shows a date (Insert > Date and time), the menu state of `setDateTime`.
+   * Optional, so that snapshots from hosts without it stay valid: absent reads as `false`.
    */
   readonly dateTime?: boolean;
   /** The current slide's background. */
