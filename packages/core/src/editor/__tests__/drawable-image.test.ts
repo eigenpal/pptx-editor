@@ -82,6 +82,69 @@ test('an SVG picture with a <use> cycle, an entity, or deep nesting draws nothin
   expect(drawableImageMime(deep, 'image/svg+xml')).toBeUndefined();
 });
 
+const svg = (bytes: Uint8Array) => drawableImageMime(bytes, 'image/svg+xml');
+
+test('an SVG picture with a nested SVG document in a data: URI draws nothing', () => {
+  const inner = btoa('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>');
+  const uri = `data:image/svg+xml;base64,${inner}`;
+  expect(svg(svgDoc(`<image href="${uri}"/>`))).toBeUndefined();
+  expect(svg(svgDoc(`<image xlink:href=" DATA:Image/SVG+XML,%3Csvg/%3E"/>`))).toBeUndefined();
+  expect(svg(svgDoc(`<filter id="f"><feImage href="${uri}"/></filter>`))).toBeUndefined();
+  expect(svg(svgDoc(`<rect style="fill: url('${uri}')"/>`))).toBeUndefined();
+  expect(svg(svgDoc(`<style>rect { fill: url("${uri}") }</style><rect/>`))).toBeUndefined();
+  // A CSS escape spells the same URI.
+  expect(svg(svgDoc(`<style>rect { fill: url(\\64 ata:image/svg+xml,x) }</style>`))).toBe(
+    undefined
+  );
+  // A raster picture in a data: URI draws.
+  const png = 'data:image/png;base64,iVBORw0KGgo=';
+  expect(svg(svgDoc(`<image href="${png}" width="1" height="1"/>`))).toBe('image/svg+xml');
+});
+
+/** A path of `n` vertices. */
+const path = (n: number, attrs = '') =>
+  `<path d="M0 0${' L1 1'.repeat(n - 1)}"${attrs ? ` ${attrs}` : ''}/>`;
+
+test('an SVG picture whose markers draw past the limit at the vertices draws nothing', () => {
+  const marker = (body: string) => `<defs><marker id="m">${body}</marker></defs>`;
+  // A marker of 100 elements at each of 5,000 vertices draws 500,000 elements.
+  const dots = '<circle r="1"/>'.repeat(99);
+  expect(svg(svgDoc(marker(dots) + path(5_000, 'marker-mid="url(#m)"')))).toBeUndefined();
+  // The same marker from a style, from an ancestor, or from a style sheet.
+  expect(svg(svgDoc(marker(dots) + path(5_000, 'style="marker-mid:url(#m)"')))).toBeUndefined();
+  expect(svg(svgDoc(`${marker(dots)}<g marker-end="url(#m)">${path(5_000)}</g>`))).toBe(undefined);
+  const sheet = '<style>path { marker: url(#m) }</style>';
+  expect(svg(svgDoc(sheet + marker(dots) + path(5_000)))).toBeUndefined();
+  // A polyline counts its points.
+  const points = Array.from({ length: 5_000 }, (_, i) => `${i},0`).join(' ');
+  expect(
+    svg(svgDoc(`${marker(dots)}<polyline points="${points}" marker-mid="url(#m)"/>`))
+  ).toBeUndefined();
+  // An arrowhead at each end of a few hundred lines draws.
+  const arrow = marker('<path d="M0 0 L10 5 L0 10 z"/>');
+  const lines = Array.from(
+    { length: 300 },
+    (_, i) => `<line x1="0" y1="${i}" x2="10" y2="${i}" marker-end="url(#m)"/>`
+  ).join('');
+  expect(svg(svgDoc(arrow + lines))).toBe('image/svg+xml');
+});
+
+test('an SVG picture with a marker inside marker content draws nothing', () => {
+  const nested =
+    '<defs><marker id="a"><circle r="1"/></marker>' +
+    `<marker id="b">${path(3, 'marker-mid="url(#a)"')}</marker></defs>` +
+    path(3, 'marker-mid="url(#b)"');
+  expect(svg(svgDoc(nested))).toBeUndefined();
+  // A marker property on the marker's ancestor reaches its content.
+  const inherited = `<g marker-mid="url(#a)"><marker id="a">${path(3)}</marker></g>${path(3)}`;
+  expect(svg(svgDoc(inherited))).toBeUndefined();
+  // Marker content that links to a path with a marker.
+  const linked =
+    `<defs>${path(3, 'id="p" marker-mid="url(#a)"')}` +
+    '<marker id="a"><use href="#p"/></marker></defs><use href="#p"/>';
+  expect(svg(svgDoc(linked))).toBeUndefined();
+});
+
 test('an SVG picture with a plain document type declaration draws', () => {
   const doctype =
     '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" ' +

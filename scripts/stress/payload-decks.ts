@@ -15,6 +15,8 @@ import {
   emfBigBitmap,
   svgUseBomb,
   svgUseCycle,
+  svgDataUriBomb,
+  svgMarkerBomb,
   svgBlurHuge,
   svgDeep,
   svgExternal,
@@ -192,6 +194,16 @@ export function payloadDecks(): HangDeck[] {
       id: 'svg-use-bomb',
       target: 'an SVG picture whose <use> chain expands to 10^10 shapes',
       bytes: () => svgPictureDeck(svgUseBomb()),
+    },
+    {
+      id: 'svg-data-uri-bomb',
+      target: 'an SVG picture with the <use> bomb as a nested SVG data: URI in <image> and feImage',
+      bytes: () => svgPictureDeck(svgDataUriBomb()),
+    },
+    {
+      id: 'svg-marker-bomb',
+      target: 'an SVG picture with a 1000-element marker at 100000 vertices, and nested markers',
+      bytes: () => svgPictureDeck(svgMarkerBomb()),
     },
     {
       id: 'svg-use-cycle',

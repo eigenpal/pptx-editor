@@ -211,6 +211,36 @@ export const svgUseBomb = (): Uint8Array => {
   return svgDoc(400, 300, `${body}</defs><use href="#l10" xlink:href="#l10"/>`);
 };
 
+/** The `<use>` bomb as a nested SVG document in a `data:` URI of an `<image>` and an `feImage`. */
+export const svgDataUriBomb = (): Uint8Array => {
+  const uri = `data:image/svg+xml;base64,${btoa(String.fromCharCode(...svgUseBomb()))}`;
+  return svgDoc(
+    400,
+    300,
+    `<defs><filter id="f"><feImage href="${uri}"/></filter></defs>` +
+      `<image href="${uri}" xlink:href="${uri}" width="400" height="300"/>` +
+      '<rect width="400" height="300" filter="url(#f)"/>'
+  );
+};
+
+/**
+ * Markers that multiply: a marker of 1,000 circles at each of 100,000 vertices of a path
+ * (10^8 circles), and a chain of markers inside marker content.
+ */
+export const svgMarkerBomb = (): Uint8Array => {
+  const dots = '<circle r="1"/>'.repeat(1_000);
+  let chain = '<marker id="c0"><circle r="1"/></marker>';
+  for (let i = 1; i <= 10; i += 1)
+    chain += `<marker id="c${i}"><path d="M0 0${' l1 1'.repeat(9)}" marker-mid="url(#c${i - 1})"/></marker>`;
+  return svgDoc(
+    400,
+    300,
+    `<defs><marker id="m" markerWidth="4" markerHeight="4">${dots}</marker>${chain}</defs>` +
+      `<path d="M0 0${' l0.001 0.001'.repeat(100_000)}" marker-mid="url(#m)" stroke="black"/>` +
+      `<path d="M0 0${' l1 1'.repeat(9)}" marker-mid="url(#c10)"/>`
+  );
+};
+
 /** A `<use>` that refers to its own ancestor. */
 export const svgUseCycle = (): Uint8Array =>
   svgDoc(
