@@ -16,6 +16,7 @@ import {
 } from 'vue';
 import {
   defineFontResolver,
+  EAGER_FONTS_WAIT_MS,
   requestLinkPopup,
   type PptxEditorInstance,
 } from '@pptx-editor.dev/core/editor';
@@ -443,6 +444,24 @@ describe('usePptxSource (Vue)', () => {
       'Acme Sans'
     );
     scope.stop();
+  });
+
+  test('eager fonts that never settle hold the deck only for the font wait', async () => {
+    const warn = console.warn;
+    console.warn = () => undefined;
+    const scope = effectScope();
+    try {
+      const bytes = new Uint8Array([1]);
+      const never = () => new Promise<{ supportedFamilies: string[] }>(() => {});
+      const eager = scope.run(() => usePptxSource(bytes, { fonts: never }))!;
+      expect(eager.document.value).toBeUndefined();
+      await new Promise((r) => setTimeout(r, EAGER_FONTS_WAIT_MS + 100));
+      expect(eager.document.value).toBe(bytes);
+      expect(eager.isLoading.value).toBe(false);
+    } finally {
+      scope.stop();
+      console.warn = warn;
+    }
   });
 
   test('an on-demand resolver releases the deck; a failed URL is the error', async () => {

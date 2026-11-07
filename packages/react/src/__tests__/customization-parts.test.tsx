@@ -15,7 +15,11 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import { defineFontResolver, type PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import {
+  defineFontResolver,
+  EAGER_FONTS_WAIT_MS,
+  type PptxEditorInstance,
+} from '@pptx-editor.dev/core/editor';
 import { buildPptx, para, run, shape } from '../../../../scripts/fixtures/builder.ts';
 import { requestLinkPopup } from '../chrome-actions.tsx';
 import { requestFindBar } from '../FindBar.tsx';
@@ -390,6 +394,23 @@ describe('usePptxSource', () => {
     expect((result.current.fonts as { supportedFamilies?: string[] }).supportedFamilies).toContain(
       'Acme Sans'
     );
+  });
+
+  test('eager fonts that never settle hold the deck only for the font wait', async () => {
+    const warn = console.warn;
+    console.warn = () => undefined;
+    try {
+      const bytes = new Uint8Array([1]);
+      const never = () => new Promise<{ supportedFamilies: string[] }>(() => {});
+      const { result } = renderHook(() => usePptxSource(bytes, { fonts: never }));
+      expect(result.current.document).toBeUndefined();
+      await waitFor(() => expect(result.current.document).toBe(bytes), {
+        timeout: EAGER_FONTS_WAIT_MS + 500,
+      });
+      expect(result.current.isLoading).toBe(false);
+    } finally {
+      console.warn = warn;
+    }
   });
 
   test('an on-demand resolver releases the deck and keeps one identity', () => {

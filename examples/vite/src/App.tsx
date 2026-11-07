@@ -42,6 +42,7 @@ import {
   exportDeck as saveDeck,
   exportSlides as saveSlides,
   fetchDeck,
+  fetchFirstDeck,
   refuseDeckFetch,
   fileTitle,
   followPanelWidth,
@@ -387,15 +388,19 @@ export function App() {
     if (unsaved.current?.dirty()) setDiscard(() => run);
     else run();
   }, []);
+  // The first deck's download: a deck the user opens before it arrives cancels it.
+  const cancelFirst = useRef<() => void>(() => {});
   // The name changes only once the deck opened: a refused file keeps the open deck's name.
   const openBytes = useCallback(
     async (next: Uint8Array, label: string) => {
+      cancelFirst.current();
       if (await openDeck(editor, next)) setTitle(label);
     },
     [editor]
   );
   const loadUrl = useCallback(
     async (name: string, label: string) => {
+      cancelFirst.current();
       try {
         await openBytes(await fetchDeck(base, name), label);
       } catch (cause) {
@@ -407,9 +412,12 @@ export function App() {
   const [deckFailed, setDeckFailed] = useState<unknown>(null);
   useEffect(() => {
     // The first deck: `initial` comes from the URL at mount.
-    void fetchDeck(base, EXAMPLES[initial].file).then(setBytes, (cause: unknown) =>
-      setDeckFailed(cause ?? new Error('fetch failed'))
-    );
+    const cancel = fetchFirstDeck(base, EXAMPLES[initial].file, {
+      loaded: setBytes,
+      failed: setDeckFailed,
+    });
+    cancelFirst.current = cancel;
+    return cancel;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {

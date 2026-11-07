@@ -1309,6 +1309,9 @@ export function dragOverSlide(drag: SlideDrag, index: number, axis: 'x' | 'y', r
 export function dropSlideDrag(editor: PptxEditorInstance | null, drag: SlideDrag | null, grouped: readonly SlideSection[] | null): void;
 
 // @internal
+export const EAGER_FONTS_WAIT_MS = 2000;
+
+// @internal
 export function editBulletGlyph(d: BulletsDialogFields, field: 'char' | 'font', value: string, seed?: BulletsDialogFields): BulletsDialogFields;
 
 // @internal
@@ -2086,7 +2089,7 @@ export function exportSlidesPngZip(session: DocumentSession, options?: SlideImag
 export function exportSlideSvg(session: DocumentSession, index: number, options?: SlideImageOptions): string;
 
 // @internal
-export function fetchPptxSource(url: string | URL, init: RequestInit | undefined, signal: AbortSignal): Promise<Uint8Array>;
+export function fetchPptxSource(url: string | URL, init: RequestInit | undefined, signal: AbortSignal, stallMs?: number): Promise<Uint8Array>;
 
 // @internal
 export const fieldPart: (name: string) => {
@@ -5191,6 +5194,9 @@ export function sorterKeyDown(e: PaneKeyEvent, ctx: SlideListKeyContext & {
 // @internal
 export function sorterKeyTarget(list: HTMLElement | null, from: HTMLElement | null, key: string): HTMLElement | null;
 
+// @internal
+export const SOURCE_STALL_MS = 10000;
+
 // @public
 export type SpacingChoice = 'normal' | 'expanded' | 'condensed';
 
@@ -6213,6 +6219,12 @@ export function warnUnknownSlot(slot: string, parts?: ToolbarPartNames): void;
 
 // @internal
 export function warnUnsupportedOverride(slot: string, setting: 'icon' | 'asChild', parts?: ToolbarPartNames): void;
+
+// @internal
+export function watchEagerPptxFonts(source: PptxFontsSource, handlers: {
+    readonly resolved: (fonts: FontConfiguration) => void;
+    readonly release: () => void;
+}, waitMs?: number): () => void;
 
 // @internal
 export function watchRailFold(rail: HTMLElement | null, orientation: SlideRailOrientation | undefined, onChange: (folded: boolean) => void): () => void;

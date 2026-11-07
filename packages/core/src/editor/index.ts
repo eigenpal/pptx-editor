@@ -825,12 +825,15 @@ export type * from '../contracts/index.ts';
 export * from './font-composition.ts';
 export * from './font-resolver.ts';
 export {
+  EAGER_FONTS_WAIT_MS,
   fetchPptxSource,
   isAbortError,
   pptxFontsShape,
   pptxSourceBytes,
   pptxSourceFontsResolver,
   resolveEagerPptxFonts,
+  SOURCE_STALL_MS,
+  watchEagerPptxFonts,
   type PptxFontOrigin,
   type PptxFontsInput,
   type PptxFontsShape,

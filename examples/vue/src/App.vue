@@ -11,6 +11,7 @@ import {
   BLANK,
   EXAMPLES,
   fetchDeck,
+  fetchFirstDeck,
   refuseDeckFetch,
   fileTitle,
   initialExample,
@@ -54,12 +55,18 @@ function confirmDiscard(): void {
   run?.();
 }
 
+// The first deck's download: a deck the user opens before it arrives cancels it.
+let cancelFirst = (): void => {};
+onBeforeUnmount(() => cancelFirst());
+
 // The name changes only once the deck opened: a refused file keeps the open deck's name.
 async function openBytes(next: Uint8Array, label: string): Promise<void> {
+  cancelFirst();
   if (await openDeck(editor.value, next)) title.value = label;
 }
 
 async function loadUrl(file: string, label: string): Promise<void> {
+  cancelFirst();
   try {
     await openBytes(await fetchDeck(base, file), label);
   } catch (cause) {
@@ -75,13 +82,12 @@ function openFile(file: File): void {
 
 // The first deck: `initial` comes from the URL at mount.
 const deckFailed = shallowRef<unknown>(null);
-onMounted(
-  () =>
-    void fetchDeck(base, EXAMPLES[initial].file).then(
-      (b) => (bytes.value = b),
-      (cause: unknown) => (deckFailed.value = cause ?? new Error('fetch failed'))
-    )
-);
+onMounted(() => {
+  cancelFirst = fetchFirstDeck(base, EXAMPLES[initial].file, {
+    loaded: (b) => (bytes.value = b),
+    failed: (cause) => (deckFailed.value = cause),
+  });
+});
 watch([deckFailed, editor], ([failed, instance]) => {
   if (failed && instance) refuseDeckFetch(instance, failed);
 });

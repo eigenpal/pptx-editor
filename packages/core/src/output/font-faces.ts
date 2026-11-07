@@ -6,9 +6,16 @@ import type { RegisteredFace } from '../layout/index.ts';
 
 /** Registered faces, removable when the document closes. */
 export interface FontFaceHandle {
+  /**
+   * Settles when every face loads or fails, or after `FACE_LOAD_WAIT_MS`: a face whose load
+   * never settles cannot hold the open. Paint uses a late face once it loads.
+   */
   readonly ready: Promise<void>;
   dispose(): void;
 }
+
+/** The longest `FontFaceHandle.ready` waits for the faces to load. */
+export const FACE_LOAD_WAIT_MS = 2000;
 
 /** Options of `registerFontFaces`. */
 export interface RegisterFontFacesOptions {
@@ -17,6 +24,8 @@ export interface RegisterFontFacesOptions {
    * paints under other names (and rewrites the painted family names) gives them here.
    */
   readonly family?: (face: RegisteredFace) => string;
+  /** The longest `ready` waits. Defaults to `FACE_LOAD_WAIT_MS`. */
+  readonly waitMs?: number;
 }
 
 /** Add faces to `doc.fonts`. Bytes are copied into the FontFace; nothing touches disk. */
@@ -46,8 +55,14 @@ export function registerFontFaces(
     doc.fonts.add(face);
     added.push(face);
   }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, options.waitMs ?? FACE_LOAD_WAIT_MS);
+  });
   return {
-    ready: Promise.all(loads).then(() => undefined),
+    ready: Promise.race([Promise.all(loads).then(() => undefined), late]).finally(() =>
+      clearTimeout(timer)
+    ),
     dispose: () => {
       for (const face of added) doc.fonts.delete(face);
     },

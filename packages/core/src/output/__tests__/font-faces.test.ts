@@ -89,4 +89,24 @@ describe('registerFontFaces', () => {
     await handle.ready;
     expect(created).toEqual(['host-pptx-face-1', 'host-pptx-face-2']);
   });
+
+  test('ready settles after the wait when a face never loads', async () => {
+    class StuckFontFace {
+      load(): Promise<this> {
+        return new Promise(() => {});
+      }
+    }
+    const doc = { fonts: { add: () => undefined, delete: () => undefined } };
+    const host = globalThis as { FontFace?: unknown };
+    host.FontFace = StuckFontFace;
+    try {
+      const t0 = performance.now();
+      const handle = registerFontFaces(doc as unknown as Document, [face], { waitMs: 40 });
+      await handle.ready;
+      expect(performance.now() - t0).toBeGreaterThanOrEqual(35);
+      handle.dispose();
+    } finally {
+      delete host.FontFace;
+    }
+  });
 });
