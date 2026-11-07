@@ -138,6 +138,17 @@ export function commentTarget(
   return name === undefined ? null : { nodeId: id, name };
 }
 
+/**
+ * The element of a draft from a menu while the slide still holds it at its top level, else null:
+ * the draft then points at the selected element, or at the slide.
+ */
+export function liveDraftTarget(
+  target: ReviewCommentTarget | null,
+  shapes: readonly ShapeSummary[] | undefined
+): ReviewCommentTarget | null {
+  return target && shapes?.some((s) => s.nodeId === target.nodeId) ? target : null;
+}
+
 /** The items of the snapshot's threads: each thread, then its replies. */
 export function reviewItems(
   editor: PptxEditorInstance | null,

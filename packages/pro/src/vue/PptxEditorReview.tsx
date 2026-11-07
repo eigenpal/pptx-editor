@@ -30,6 +30,7 @@ import { registerCommentDraft } from '@pptx-editor.dev/core/editor';
 import { useEditorState, usePptxEditor } from '@pptx-editor.dev/vue';
 import {
   commentTarget,
+  liveDraftTarget,
   reviewReadOnly,
   type ReviewCommentTarget,
   type ReviewItemView,
@@ -193,8 +194,14 @@ const ReviewRoot = defineComponent({
     const noModule = useEditorState((s) => s.status === 'ready' && s.comments == null);
     const slide = useEditorState((s) => s.slides[s.currentSlide]?.id ?? '');
     const drafting = ref(false);
-    // The element a draft from a menu points at: the one the right-click selected.
-    const draftTarget = shallowRef<ReviewCommentTarget | null>(null);
+    // The element a draft from a menu points at: the one the right-click selected. A deleted
+    // element no longer counts: the draft then points at the selection or the slide.
+    const pinnedTarget = shallowRef<ReviewCommentTarget | null>(null);
+    const shapes = useEditorState((s) => s.shapes);
+    const draftTarget = computed(() => liveDraftTarget(pinnedTarget.value, shapes.value));
+    watch(draftTarget, (live) => {
+      if (live === null) pinnedTarget.value = null;
+    });
     const editing = shallowRef<string | null>(null);
     const root = ref<HTMLElement | null>(null);
     const editor = usePptxEditor();
@@ -218,15 +225,16 @@ const ReviewRoot = defineComponent({
     // The canvas menus' New comment row opens a draft here, on the selected element.
     let unregister: (() => void) | null = null;
     watch(
-      [editor, noModule],
-      ([e, off]) => {
+      [editor, noModule, () => props.hidden],
+      ([e, off, hidden]) => {
         unregister?.();
         unregister = null;
-        if (!e || off) return;
+        // A hidden pane opens no draft: the row then asks a pane that shows.
+        if (!e || off || hidden) return;
         unregister = registerCommentDraft(e, () => {
           const snap = e.snapshot();
           if (reviewReadOnly(snap)) return;
-          draftTarget.value = commentTarget(snap.selection, snap.shapes);
+          pinnedTarget.value = commentTarget(snap.selection, snap.shapes);
           drafting.value = true;
           // A draft that was already open takes the focus again.
           void nextTick(() =>
@@ -264,12 +272,12 @@ const ReviewRoot = defineComponent({
       drafting,
       draftTarget,
       beginDraft: () => {
-        draftTarget.value = null;
+        pinnedTarget.value = null;
         drafting.value = true;
       },
       endDraft: () => {
         drafting.value = false;
-        draftTarget.value = null;
+        pinnedTarget.value = null;
         void nextTick(() =>
           requestAnimationFrame(() =>
             root.value?.querySelector<HTMLElement>('[data-review-add]')?.focus()

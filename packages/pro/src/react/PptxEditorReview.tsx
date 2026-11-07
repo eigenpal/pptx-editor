@@ -35,6 +35,7 @@ import { registerCommentDraft } from '@pptx-editor.dev/core/editor';
 import { useEditorState, usePptxEditor } from '@pptx-editor.dev/react';
 import {
   commentTarget,
+  liveDraftTarget,
   reviewReadOnly,
   type ReviewCommentTarget,
   type ReviewItemView,
@@ -152,8 +153,15 @@ function ReviewRoot({ className, hidden, t, card, children, preset = true, filte
   const label = useReviewLabelFrom(t);
   const noModule = useEditorState((s) => s.status === 'ready' && s.comments == null);
   const [drafting, setDrafting] = useState(false);
-  // The element a draft from a menu points at: the one the right-click selected.
-  const [draftTarget, setDraftTarget] = useState<ReviewCommentTarget | null>(null);
+  // The element a draft from a menu points at: the one the right-click selected. A deleted
+  // element no longer counts: the draft then points at the selection or the slide.
+  const [pinnedTarget, setDraftTarget] = useState<ReviewCommentTarget | null>(null);
+  const shapes = useEditorState((s) => s.shapes);
+  const draftTarget = liveDraftTarget(pinnedTarget, shapes);
+  const targetGone = pinnedTarget !== null && draftTarget === null;
+  useEffect(() => {
+    if (targetGone) setDraftTarget(null);
+  }, [targetGone]);
   const [editing, setEditing] = useState<string | null>(null);
   const root = useRef<HTMLElement>(null);
 
@@ -173,8 +181,9 @@ function ReviewRoot({ className, hidden, t, card, children, preset = true, filte
     setEditing(null);
   }, [slide, review.readOnly]);
   // The canvas menus' New comment row opens a draft here, on the selected element.
+  // A hidden pane opens no draft: the row then asks a pane that shows.
   useEffect(() => {
-    if (!editor || noModule) return undefined;
+    if (!editor || noModule || hidden) return undefined;
     return registerCommentDraft(editor, () => {
       const snap = editor.snapshot();
       if (reviewReadOnly(snap)) return;
@@ -185,7 +194,7 @@ function ReviewRoot({ className, hidden, t, card, children, preset = true, filte
         root.current?.querySelector<HTMLElement>('[data-draft] [data-comment-field]')?.focus()
       );
     });
-  }, [editor, noModule]);
+  }, [editor, noModule, hidden]);
 
   const focusCard = useCallback((key: string) => {
     requestAnimationFrame(() => {

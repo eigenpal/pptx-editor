@@ -44,7 +44,7 @@ export interface ReviewPaneValue {
    * The element a draft from the canvas menus' New comment row points at, or null: the draft then
    * points at the selected element.
    */
-  readonly draftTarget: Ref<ReviewCommentTarget | null>;
+  readonly draftTarget: Readonly<Ref<ReviewCommentTarget | null>>;
   readonly beginDraft: () => void;
   readonly endDraft: () => void;
   readonly editing: Ref<string | null>;

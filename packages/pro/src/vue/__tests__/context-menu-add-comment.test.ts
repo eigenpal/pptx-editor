@@ -6,13 +6,23 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // The twin of `../../react/__tests__/context-menu-add-comment.test.tsx`.
 
 import { afterEach, describe, expect, test } from 'bun:test';
-import { createApp, defineComponent, h, nextTick, type App, type Component, type VNode } from 'vue';
+import {
+  createApp,
+  defineComponent,
+  h,
+  nextTick,
+  ref,
+  type App,
+  type Component,
+  type VNode,
+} from 'vue';
 import type { EditorModule, PptxEditorInstance } from '@pptx-editor.dev/core/editor';
 import {
   PptxEditorContent,
   PptxEditorRoot,
   PptxEditorSidePanel,
   PptxEditorViewport,
+  useEditorCommand,
 } from '@pptx-editor.dev/vue';
 import { buildPptx, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { PptxEditorReview, reviewModule } from '../index.ts';
@@ -163,5 +173,53 @@ describe('New comment in the canvas context menu (Vue)', () => {
     row()!.click();
     await settle();
     expect(field()).toBeNull();
+  });
+  test('a draft whose element is deleted posts on the slide', async () => {
+    const editor = await mount([reviewModule()], () => h(PptxEditorReview));
+    await rightClickTitle();
+    row()!.click();
+    await settle();
+    expect(document.body.textContent).toContain('Points at Title');
+    editor.exec({ type: 'delete' });
+    await settle();
+    expect(document.body.textContent).not.toContain('Points at Title');
+    const el = field()!;
+    el.value = 'On the slide';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+    el.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    );
+    await settle();
+    const [thread] = editor.snapshot().comments!;
+    expect(thread).toMatchObject({ text: 'On the slide', anchor: { kind: 'slide' } });
+  });
+
+  test('a hidden pane opens no draft, so the row does not show', async () => {
+    await mount([reviewModule()], () => h(PptxEditorReview, { hidden: true }));
+    await rightClickTitle();
+    expect(row()).toBeNull();
+  });
+
+  test('useEditorCommand follows the pane as it mounts and unmounts', async () => {
+    const on = ref(false);
+    const Probe = defineComponent({
+      setup() {
+        const command = useEditorCommand('review.addComment');
+        return () => h('output', { 'data-testid': 'probe' }, String(command.isEnabled.value));
+      },
+    });
+    await mount([reviewModule()], () =>
+      h('div', [h(Probe), on.value ? h(PptxEditorReview) : null])
+    );
+    const probe = (): string | null | undefined =>
+      document.querySelector('[data-testid="probe"]')?.textContent;
+    expect(probe()).toBe('false');
+    on.value = true;
+    await settle();
+    expect(probe()).toBe('true');
+    on.value = false;
+    await settle();
+    expect(probe()).toBe('false');
   });
 });

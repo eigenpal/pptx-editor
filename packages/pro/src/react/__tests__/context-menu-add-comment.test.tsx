@@ -9,13 +9,14 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { EditorModule, PptxEditorInstance } from '@pptx-editor.dev/core/editor';
 import {
   PptxEditorContent,
   PptxEditorRoot,
   PptxEditorViewport,
   SidePanel,
+  useEditorCommand,
 } from '@pptx-editor.dev/react';
 import { buildPptx, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { PptxEditorReview, reviewModule } from '../index.ts';
@@ -134,5 +135,49 @@ describe('New comment in the canvas context menu', () => {
     expect(row()?.getAttribute('aria-disabled')).toBe('true');
     act(() => void fireEvent.click(row()!));
     expect(screen.queryByRole('textbox', { name: 'Add a comment…' })).toBeNull();
+  });
+  test('a draft whose element is deleted posts on the slide', async () => {
+    const editor = await mount([reviewModule()], <PptxEditorReview />);
+    rightClickTitle();
+    act(() => void fireEvent.click(row()!));
+    expect(screen.getByText('Points at Title')).toBeDefined();
+    act(() => void editor.exec({ type: 'delete' }));
+    expect(screen.queryByText('Points at Title')).toBeNull();
+    const field = screen.getByRole('textbox', { name: 'Add a comment…' });
+    act(() => void fireEvent.change(field, { target: { value: 'On the slide' } }));
+    act(() => void fireEvent.keyDown(field, { key: 'Enter' }));
+    const [thread] = editor.snapshot().comments!;
+    expect(thread).toMatchObject({ text: 'On the slide', anchor: { kind: 'slide' } });
+  });
+
+  test('a hidden pane opens no draft, so the row does not show', async () => {
+    await mount([reviewModule()], <PptxEditorReview hidden />);
+    rightClickTitle();
+    expect(row()).toBeNull();
+  });
+
+  test('useEditorCommand follows the pane as it mounts and unmounts', async () => {
+    let show: (on: boolean) => void = () => {};
+    function Probe() {
+      const command = useEditorCommand('review.addComment');
+      return <output data-testid="probe">{String(command.isEnabled)}</output>;
+    }
+    function Toggle() {
+      const [on, setOn] = useState(false);
+      show = setOn;
+      return (
+        <>
+          <Probe />
+          {on ? <PptxEditorReview /> : null}
+        </>
+      );
+    }
+    await mount([reviewModule()], <Toggle />);
+    const probe = (): string | null => screen.getByTestId('probe').textContent;
+    expect(probe()).toBe('false');
+    act(() => show(true));
+    expect(probe()).toBe('true');
+    act(() => show(false));
+    expect(probe()).toBe('false');
   });
 });
