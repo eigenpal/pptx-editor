@@ -261,12 +261,17 @@ test('a paint does not convert again a picture that ran out of time twice', asyn
   await Bun.sleep(0);
   expect(calls).toBe(2);
   expect(pictures.busy).toBe(false);
+  // The next wait tries once more; the waits after it (one for each slide of a ZIP) do not.
+  expect(await pictures.ready([bytes])).toBe(false);
+  expect(calls).toBe(4);
+  expect(await pictures.ready([bytes])).toBe(false);
+  expect(calls).toBe(4);
   // A font change tries again, with one retry.
   pictures.fontsChanged();
   pictures.drawable(bytes, 'image/x-emf');
   await pictures.ready([bytes], 0);
   await Bun.sleep(0);
-  expect(calls).toBe(4);
+  expect(calls).toBe(6);
   pictures.dispose();
 });
 

@@ -75,7 +75,7 @@ The editor converts EMF and WMF pictures to PNG in the background. A picture sho
 - `exportSlideSvg()` is synchronous. Await `session.picturesReady(index)` before you call it.
 - PNG and ZIP export wait for the pictures of each slide for up to 30 seconds. Set `picturesTimeoutMs` to change that limit for each slide.
 - `session.picturesReady(index?, { timeoutMs })` resolves `true` when every picture draws. Omit `index` to wait for every slide.
-- It resolves `false` when a picture cannot convert, when the slide does not exist, or after `timeoutMs` (default 30000). Pass `Infinity` to wait until each picture converted or failed.
+- It resolves `false` when a picture cannot convert, when the slide does not exist, or after `timeoutMs` (default 30000). Pass `Infinity` to wait until each picture converted or failed. A picture fails after two tries of 10 seconds each. The next wait for it tries once more.
 
 A picture that is not ready exports as the placeholder. After a font change, it exports as its last converted version until the new one is ready.
 

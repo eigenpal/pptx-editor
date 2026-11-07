@@ -63,6 +63,8 @@ export class ThumbnailPainter {
   readonly #host: ThumbnailHost;
   #painted = new WeakMap<HTMLElement, Painted>();
   #layouts = new WeakMap<HTMLElement, { pkg: PptxPackage; id: string; key: string }>();
+  /** The layout of each gallery container, to repaint it when its pictures convert. */
+  #layoutBoxes = new Map<HTMLElement, string>();
   /** Containers waiting for an idle repaint, with the slide index asked for last. */
   #pending = new Map<HTMLElement, number>();
   /** How many times each container was asked for: a disposer acts for the last ask only. */
@@ -135,6 +137,7 @@ export class ThumbnailPainter {
     const session = this.#host.session();
     const pkg = session?.store.package;
     if (!session || !pkg) return;
+    this.#layoutBoxes.set(container, layoutId);
     const was = this.#layouts.get(container);
     const key = session.paintKey(layoutId);
     if (was && was.pkg === pkg && was.id === layoutId && was.key === key) return;
@@ -152,6 +155,17 @@ export class ThumbnailPainter {
     svg.setAttribute('height', '100%');
     container.replaceChildren(svg);
     this.#layouts.set(container, { pkg, id: layoutId, key });
+  }
+
+  /**
+   * EMF or WMF pictures converted: repaint the layout previews that show them. A slide
+   * thumbnail repaints when its summary changes; a layout no slide uses has no summary.
+   */
+  picturesChanged(): void {
+    for (const [container, id] of [...this.#layoutBoxes]) {
+      if (container.isConnected) this.renderLayout(id, container);
+      else this.#layoutBoxes.delete(container);
+    }
   }
 
   /** Paint every waiting thumbnail now. */
@@ -179,6 +193,7 @@ export class ThumbnailPainter {
   clear(): void {
     this.#cancel();
     this.#pending.clear();
+    this.#layoutBoxes.clear();
     this.#queue.clear();
   }
 

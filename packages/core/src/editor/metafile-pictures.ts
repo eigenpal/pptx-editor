@@ -82,8 +82,10 @@ export class MetafilePictures {
   #queue: Uint8Array[] = [];
   /** Metafiles whose conversion ran out of time once: a second stop waits for a new request. */
   #retried = new WeakSet<Uint8Array>();
-  /** Metafiles stopped twice by the time limit: only `ready()` or a font change tries again. */
+  /** Metafiles stopped twice by the time limit: a font change, or one `ready()`, tries again. */
   #timedOut = new WeakSet<Uint8Array>();
+  /** Metafiles that a `ready()` tried again after they ran out of time, with these fonts. */
+  #readyRetried = new WeakSet<Uint8Array>();
   #running = 0;
   /** Bumped when the fonts change: a conversion with the old fonts runs again. */
   #epoch = 0;
@@ -121,8 +123,7 @@ export class MetafilePictures {
     const mime = drawableImageMime(bytes, named);
     if (mime) return { bytes, mime };
     if (!metafileFormat(bytes)) return undefined;
-    // A paint does not convert again a metafile that ran out of time twice.
-    if (!this.#done.has(bytes) && !this.#timedOut.has(bytes)) void this.convert(bytes);
+    if (!this.#done.has(bytes)) void this.convert(bytes);
     const png = this.#drawn(bytes);
     return png ? { bytes: png, mime: 'image/png' } : undefined;
   }
@@ -145,7 +146,9 @@ export class MetafilePictures {
 
   /** Convert the metafile `bytes` once. Resolves when its PNG is ready or it did not convert. */
   convert(bytes: Uint8Array): Promise<void> {
-    if (this.#done.has(bytes) || this.#disposed) return Promise.resolve();
+    // A metafile that ran out of time twice does not convert again on each paint.
+    if (this.#done.has(bytes) || this.#timedOut.has(bytes) || this.#disposed)
+      return Promise.resolve();
     const pending = this.#pending.get(bytes);
     if (pending) return pending.promise;
     let resolve = (): void => {};
@@ -174,8 +177,13 @@ export class MetafilePictures {
       // A font change while it waits converts again: wait for the conversions with the new fonts.
       for (;;) {
         const epoch = this.#epoch;
-        // An explicit wait tries again the metafiles that ran out of time.
-        for (const b of metafiles) this.#timedOut.delete(b);
+        // The first wait for a metafile that ran out of time tries it again, once for these
+        // fonts: an export that waits for each slide does not wait again for a shared picture.
+        for (const b of metafiles) {
+          if (!this.#timedOut.has(b) || this.#readyRetried.has(b)) continue;
+          this.#timedOut.delete(b);
+          this.#readyRetried.add(b);
+        }
         const work = Promise.all(metafiles.map((b) => this.convert(b)));
         // The pictures a caller waits for convert before those that only the rail asked for.
         this.#queue.sort((a, b) => Number(wanted.has(b)) - Number(wanted.has(a)));
@@ -209,6 +217,7 @@ export class MetafilePictures {
     this.#done = new WeakMap();
     this.#retried = new WeakSet();
     this.#timedOut = new WeakSet();
+    this.#readyRetried = new WeakSet();
     this.#fontFiles = null;
     this.#epoch += 1;
   }
