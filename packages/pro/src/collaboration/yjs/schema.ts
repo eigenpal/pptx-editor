@@ -32,6 +32,11 @@ import * as Y from 'yjs';
  * The room format. A replica attaches only to a room of its own format, so a replica of another
  * format refuses the room and keeps its own deck (`schema-version-mismatch`).
  *
+ * - 6: a read puts back a paragraph that a write removed from any text body while a peer typed
+ *   into it, with that text (`withRemovedRuns` in `text-identity.ts`), counts a move mark only
+ *   while another record lists the node, and shows a run that the move rescue put back without
+ *   any write listing it there. A replica of format 5 shows no such paragraph, so it would
+ *   show other text.
  * - 5: an undo records where each node it unlists was (`pptx-undone-v1`) and marks each
  *   character it puts back with the character it stands for (`pptx-restored-v1`), and every
  *   replica repairs by them. A replica of format 4 neither writes nor reads them: it would
@@ -51,7 +56,7 @@ import * as Y from 'yjs';
  *
  * No format before 3 was published.
  */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export const META_KEY = 'pptx-meta-v1';
 export const PARTS_KEY = 'pptx-parts-v1';

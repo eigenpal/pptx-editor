@@ -106,6 +106,9 @@ export interface YjsCollaborationSession extends EditorCollaborationSession {
 
 let sessionCounter = 0;
 
+/** The meta field of a history step: the peer runs a repair moved as part of it. */
+const FOLLOWED = 'followed';
+
 /** Call every listener; one that throws does not stop the others or reach the caller. */
 function notify<A extends unknown[]>(listeners: Set<(...args: A) => void>, ...args: A): void {
   for (const listener of [...listeners]) {
@@ -261,7 +264,12 @@ export function createYjsCollaborationSession(
     // What the step must not take from a peer or put back twice (`undo-unlisted.ts`,
     // `undo-splits.ts`), set on the step before Yjs applies it.
     if (undo) {
-      noteUndoneListings(room, top, (write) => doc.transact(write, UNDONE_ORIGIN));
+      noteUndoneListings(
+        room,
+        top,
+        (write) => doc.transact(write, UNDONE_ORIGIN),
+        top.meta.get(FOLLOWED) as Set<string> | undefined
+      );
       top.deletions = withoutLoserRestores(room, top);
     } else {
       const kept = withoutTakenRedo(room, top);
@@ -544,13 +552,35 @@ export function createYjsCollaborationSession(
           package: port.package(),
         };
         const moved: [Y.ID, Y.ID, number][] = [];
+        const runs: [Y.ID, Y.ID, Y.ID, string][] = [];
         doc.transact(() => {
           for (const [part, keys] of fresh)
-            repairCopies(room, part, keys, deleted, view, (from, to, length) =>
-              moved.push([from, to, length])
+            repairCopies(
+              room,
+              part,
+              keys,
+              deleted,
+              view,
+              (from, to, length) => moved.push([from, to, length]),
+              (anchor, gone, added, run) => runs.push([anchor, gone, added, run])
             );
           repairFollows(room, follows, deleted);
         }, TEXT_REPAIR_ORIGIN);
+        const one = (id: Y.ID) => {
+          const set = Y.createDeleteSet();
+          set.clients.set(id.client, [{ clock: id.clock, len: 1 }] as never);
+          return set;
+        };
+        // A peer's run that followed this replica's Enter goes back with an undo of the Enter.
+        for (const [anchor, gone, added, run] of runs)
+          for (const item of [...undoManager.undoStack, ...undoManager.redoStack]) {
+            if (!Y.isDeleted(item.insertions, anchor)) continue;
+            item.insertions = Y.mergeDeleteSets([item.insertions, one(added)]);
+            item.deletions = Y.mergeDeleteSets([item.deletions, one(gone)]);
+            const followed = item.meta.get(FOLLOWED) as Set<string> | undefined;
+            if (followed) followed.add(run);
+            else item.meta.set(FOLLOWED, new Set([run]));
+          }
         for (const [from, to, length] of moved)
           for (const item of [...undoManager.undoStack, ...undoManager.redoStack]) {
             if (!Y.isDeleted(item.insertions, from)) continue;

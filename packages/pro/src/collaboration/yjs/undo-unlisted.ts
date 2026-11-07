@@ -87,7 +87,8 @@ function entryOf(key: string, value: unknown, partName?: string): UndoneEntry | 
 export function noteUndoneListings(
   room: Room,
   step: StepRanges,
-  transact: (write: () => void) => void
+  transact: (write: () => void) => void,
+  moved: ReadonlySet<string> = new Set()
 ): void {
   const nodes: unknown = room.nodes;
   const listed = new Map<Y.Array<unknown>, Set<string>>();
@@ -109,6 +110,9 @@ export function noteUndoneListings(
     for (const k of item.content.getContent()) if (typeof k === 'string') keys.add(k);
   });
   if (listed.size === 0) return;
+  // A peer's run that a repair moved after this replica's Enter as part of the step
+  // (`followEnter` in `text-repair.ts`): the undo lists it at its old place again.
+  for (const keys of listed.values()) for (const k of moved) keys.delete(k);
   const undone = room.doc.getMap(UNDONE_KEY);
   const client = room.doc.clientID;
   const clock = Y.getState(room.doc.store, client);

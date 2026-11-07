@@ -631,6 +631,17 @@ async function runSeed(d: FuzzDeck, seed: number) {
 /** Fixed histories that once failed. Add a shrunk seed here when its issue is fixed. */
 const REGRESSIONS: readonly FuzzRegression<TableAction>[] = [
   {
+    name: 'an undo of a merge after a peer deleted its first column keeps the merged text',
+    seed: 95,
+    actions: [
+      { kind: 'edit', peer: 2, edit: 'merge', row: 2, column: 1, row2: 2, column2: 0 },
+      { kind: 'flush' },
+      { kind: 'edit', peer: 0, edit: 'deleteColumn', row: 0, column: 0 },
+      { kind: 'deliver', from: 0, to: 2, count: 1 },
+      { kind: 'edit', peer: 2, edit: 'undo', row: 2, column: 0 },
+    ],
+  },
+  {
     name: 'concurrent deletes of the last two columns after a row insert save a valid table',
     seed: 291,
     actions: [

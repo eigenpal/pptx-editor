@@ -19,9 +19,9 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 //   placed and brings back only characters its peer removed or that a concurrent edit took.
 // - After each flush, every session is `ready`, and the replicas hold the same package.
 // - Text conservation (`fuzz-ledger.ts`): each character shows at most once, shows unless a
-//   peer removed it, and stays removed unless a peer brought it back. A character placed at the
-//   same time as a peer's removal of its paragraph (a join, a delete across paragraphs, an undo
-//   of Enter) may be lost.
+//   peer removed it, and stays removed unless a peer brought it back. This holds also for a
+//   character placed at the same time as a peer's removal of its paragraph (a join, a delete
+//   across paragraphs, an undo of Enter): no edit is exempt.
 // - At the end, each replica's save reopens to the same deck, a second save keeps it, and the
 //   saved deck passes the part checks.
 
@@ -285,19 +285,9 @@ class TextRun {
     // The place of a character that showed: the rest of its paragraph.
     const placeOf = (ch: string) =>
       new Set([...(shown.find((x) => x.includes(ch)) ?? '')].filter((c) => !came.has(c)));
+    // No edit is risky: a join, a delete across paragraphs, an undo of Enter, and a redo of a
+    // join keep what a peer types into the paragraph they remove at the same time.
     this.ledger.record(clock, gone, came, placeOf);
-    if (action.edit === 'join' && result.ok)
-      this.ledger.risk({ clock, region: new Set(ps[p - 1]! + ps[p]!), view: before });
-    if (across && result.ok)
-      this.ledger.risk({ clock, region: new Set(ps[p]! + ps[p + 1]!), view: before });
-    // An undo of Enter, or a redo of a join, removes a paragraph as a join does: its region is
-    // the paragraphs that do not show the same after it.
-    if (history && result.ok && shown.length < ps.length)
-      this.ledger.risk({
-        clock,
-        region: new Set(ps.filter((x) => !shown.includes(x)).join('')),
-        view: before,
-      });
   }
 
   /** What one edit may change on its own replica. */
@@ -423,6 +413,46 @@ async function runSeed(seed: number, mode: Mode) {
 const FIXED: Readonly<Record<Mode, readonly FuzzRegression<TextAction>[]>> = {
   text: [
     {
+      name: 'text typed into a paragraph that a peer empties and joins stays',
+      seed: 163,
+      actions: [
+        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 0, offset: 5, length: 0 },
+        { kind: 'deliver', from: 2, to: 0, count: 1 },
+        { kind: 'edit', peer: 2, edit: 'join', paragraph: 1, offset: 3, length: 3 },
+        { kind: 'deliver', from: 2, to: 0, count: 1 },
+        { kind: 'edit', peer: 0, edit: 'deleteAcross', paragraph: 0, offset: 4, length: 1 },
+        { kind: 'edit', peer: 2, edit: 'undo', paragraph: 0, offset: 5, length: 1 },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 1, offset: 0, length: 3 },
+        { kind: 'edit', peer: 2, edit: 'type', paragraph: 1, offset: 0, length: 3, letter: 'Ă' },
+        { kind: 'edit', peer: 0, edit: 'deleteAcross', paragraph: 0, offset: 0, length: 2 },
+      ],
+    },
+    {
+      name: 'a run that a join moved into a paragraph that a peer deletes at once shows there',
+      seed: 184,
+      actions: [
+        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 1, offset: 0, length: 2, over: true },
+        { kind: 'deliver', from: 2, to: 0, count: 1 },
+        { kind: 'deliver', from: 2, to: 1, count: 1 },
+        { kind: 'edit', peer: 0, edit: 'join', paragraph: 2, offset: 0, length: 3 },
+        { kind: 'edit', peer: 1, edit: 'deleteAcross', paragraph: 0, offset: 0, length: 2 },
+      ],
+    },
+    {
+      name: 'text typed into a run that a peer deleted before it removes the paragraph stays',
+      seed: 121,
+      actions: [
+        { kind: 'edit', peer: 1, edit: 'enter', paragraph: 0, offset: 8, length: 0 },
+        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 1, offset: 4, length: 0 },
+        { kind: 'edit', peer: 1, edit: 'join', paragraph: 2, offset: 1, length: 2 },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 2, edit: 'deleteAcross', paragraph: 1, offset: 0, length: 3 },
+        { kind: 'edit', peer: 2, edit: 'join', paragraph: 0, offset: 0, length: 2 },
+        { kind: 'edit', peer: 1, edit: 'type', paragraph: 1, offset: 4, length: 2, letter: 'Ć' },
+      ],
+    },
+    {
       name: 'a deleted character stays deleted after a peer that saw the delete presses Enter',
       seed: 8,
       actions: [
@@ -493,7 +523,50 @@ const FIXED: Readonly<Record<Mode, readonly FuzzRegression<TextAction>[]>> = {
 
 /** Histories that fail today, each with its issue and the problem it pins. */
 const KNOWN_FAILURES: Readonly<Record<Mode, readonly FuzzKnownFailure<TextAction>[]>> = {
-  text: [],
+  text: [
+    {
+      name: "an undo of a peer's Enter and a delete across it keep text typed beside them",
+      issue: '#3',
+      seed: 62,
+      problem: 'characters that no peer removed are lost: "ĉ" in ["Ă","","","L"]',
+      actions: [
+        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 1, offset: 1, length: 2, over: true },
+        { kind: 'edit', peer: 1, edit: 'type', paragraph: 0, offset: 7, length: 0, letter: 'Ă' },
+        { kind: 'edit', peer: 0, edit: 'deleteAcross', paragraph: 0, offset: 0, length: 3 },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 1, edit: 'type', paragraph: 0, offset: 1, length: 2, letter: 'Ć' },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 0, offset: 1, length: 3 },
+        { kind: 'edit', peer: 1, edit: 'enter', paragraph: 0, offset: 2, length: 0 },
+        { kind: 'deliver', from: 1, to: 2, count: 1 },
+        { kind: 'edit', peer: 2, edit: 'enter', paragraph: 0, offset: 0, length: 3 },
+        { kind: 'edit', peer: 0, edit: 'enter', paragraph: 0, offset: 1, length: 0 },
+        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 0, offset: 0, length: 0 },
+        { kind: 'edit', peer: 2, edit: 'type', paragraph: 3, offset: 0, length: 3, letter: 'ĉ' },
+        { kind: 'deliver', from: 2, to: 0, count: 5 },
+        { kind: 'edit', peer: 0, edit: 'deleteAcross', paragraph: 0, offset: 1, length: 2 },
+      ],
+    },
+    {
+      name: 'an undo of Enter after a redo of a join keeps text typed into the joined run',
+      issue: '#3',
+      seed: 73,
+      problem: 'characters that no peer removed are lost: "Ċ" in ["ĉAEFGH"]',
+      actions: [
+        { kind: 'edit', peer: 2, edit: 'join', paragraph: 0, offset: 5, length: 2 },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 0, edit: 'enter', paragraph: 0, offset: 1, length: 3, over: true },
+        { kind: 'edit', peer: 2, edit: 'undo', paragraph: 0, offset: 9, length: 3 },
+        { kind: 'edit', peer: 2, edit: 'redo', paragraph: 1, offset: 2, length: 0 },
+        { kind: 'edit', peer: 0, edit: 'enter', paragraph: 1, offset: 0, length: 2 },
+        { kind: 'flush' },
+        { kind: 'edit', peer: 2, edit: 'type', paragraph: 0, offset: 0, length: 0, letter: 'ĉ' },
+        { kind: 'edit', peer: 2, edit: 'deleteAcross', paragraph: 0, offset: 2, length: 0 },
+        { kind: 'edit', peer: 1, edit: 'type', paragraph: 0, offset: 2, length: 1, letter: 'Ċ' },
+        { kind: 'edit', peer: 0, edit: 'undo', paragraph: 3, offset: 5, length: 1 },
+      ],
+    },
+  ],
   format: [
     {
       name: 'two formats of one run after a peer typed into it show each character once',
