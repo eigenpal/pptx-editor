@@ -658,7 +658,8 @@ export function layoutTextOn(
         caretX.push(x);
         cur.xs.push(x);
         cur.text += String.fromCharCode(u.code);
-        x += u.advance + (extra ? extra[i - range.start] : 0);
+        // `extra` ends at the content end: trailing spaces and breaks after it get no extra.
+        x += u.advance + (extra?.[i - range.start] ?? 0);
       }
       flush();
       caretX.push(x);

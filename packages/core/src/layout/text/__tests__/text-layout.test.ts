@@ -211,3 +211,19 @@ describe('tab stops (ECMA-376 Part 1, 21.1.2.1.36 tab)', () => {
     expect(x[2]).toBeCloseTo(x[1], 0);
   });
 });
+
+describe('justified lines (ECMA-376 Part 1, 21.1.2.2.7 pPr algn)', () => {
+  const words = 'justified text that wraps onto more than one line in the box '.repeat(4);
+
+  test('a wrapped line keeps finite caret positions after its trailing space', () => {
+    const t = lay(`<a:p><a:pPr algn="just"/>${r(words)}${end()}</a:p>`);
+    expect(t.lines.length).toBeGreaterThan(1);
+    for (const line of t.lines) {
+      for (const x of line.caretX) expect(Number.isFinite(x)).toBe(true);
+      for (const run of line.runs) for (const x of run.x) expect(Number.isFinite(x)).toBe(true);
+    }
+    // The caret after the trailing space sits at or after the caret before it.
+    const first = t.lines[0].caretX;
+    expect(first[first.length - 1]).toBeGreaterThanOrEqual(first[first.length - 2]);
+  });
+});
