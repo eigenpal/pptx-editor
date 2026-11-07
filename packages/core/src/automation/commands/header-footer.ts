@@ -59,11 +59,14 @@ interface Shown {
   readonly fieldType: string | undefined;
 }
 
+/** A placeholder without text shows nothing, so it does not count as a footer or a date. */
 function shownBy(shape: Element | undefined): Shown | null {
   if (!shape) return null;
   const body = find(shape, 'p:txBody');
+  const text = textOf(body);
+  if (text.trim() === '') return null;
   const field = body ? find(body, 'a:fld') : undefined;
-  return { text: textOf(body), fieldType: field ? (attr(field, 'type') ?? '') : undefined };
+  return { text, fieldType: field ? (attr(field, 'type') ?? '') : undefined };
 }
 
 /** The footer and date of one parsed slide part. A part keeps its object until it changes. */
@@ -208,15 +211,29 @@ function replaceText(
   } else {
     const rPr = run ? find(run, 'a:rPr') : undefined;
     const end = first.children.findIndex((c) => c.type === 'element' && c.local === 'endParaRPr');
+    const endPr = end < 0 ? undefined : (first.children[end] as Element);
     const created = batch.insert({
       op: 'insertNode',
       part,
       parent: first.id,
       index: end < 0 ? first.children.length : end,
-      spec: specFromXml(contentXml(text, what, field, !rPr)),
+      spec: specFromXml(contentXml(text, what, field, !rPr && !endPr)),
     });
-    // The new run or field keeps the character format of the old one.
+    // The new run or field keeps the character format of the old one; in an empty paragraph, it
+    // takes the end-of-paragraph format (`a:endParaRPr` is a `CT_TextCharacterProperties` too).
     if (rPr) batch.push({ op: 'moveNode', part, node: rPr.id, parent: created, index: 0 });
+    else if (endPr) {
+      const attrs = endPr.attrs
+        .map((a) => ` ${a.prefix ? `${a.prefix}:` : ''}${a.local}="${xmlAttr(a.value, 'format')}"`)
+        .join('');
+      batch.insert({
+        op: 'insertNode',
+        part,
+        parent: created,
+        index: 0,
+        spec: specFromXml(`<a:rPr${attrs}/>`),
+      });
+    }
   }
   for (const c of content) if (c !== run || !t) batch.push({ op: 'removeNode', part, node: c.id });
 }
@@ -244,6 +261,8 @@ interface Showing {
   /** The field type for new text; undefined for fixed text. */
   readonly field: string | undefined;
   readonly fallback: (() => Shown) | undefined;
+  /** Without text: turn the date fields that slides keep into fixed text. */
+  readonly toFixed?: boolean;
 }
 
 /**
@@ -257,8 +276,16 @@ function applyKind(
   showing: Showing
 ): number {
   const what = NAMES[kind];
-  if (showing.text !== undefined && showing.text.length > MAX_HEADER_FOOTER_TEXT)
+  // One line of text: a line break inside `a:t` is not a line break (`a:br` is).
+  if (
+    showing.text !== undefined &&
+    (showing.text.trim() === '' ||
+      showing.text.length > MAX_HEADER_FOOTER_TEXT ||
+      /[\r\n\u000b\u2028\u2029]/.test(showing.text))
+  )
     throw new CommandRefusal('errors.unsupported', what);
+  if (targets.show.length + targets.hide.length === 0)
+    throw new CommandRefusal('errors.unsupported', 'slides');
   const pkg = batch.pkg;
   const slides = presentationInfo(pkg).slides;
   let changed = 0;
@@ -286,7 +313,17 @@ function applyKind(
       continue;
     }
     if (existing.length > 0) {
-      if (showing.text === undefined) continue; // Keeps its own text.
+      if (showing.text === undefined) {
+        // Keeps its own text; `fixed` turns a date field into that text.
+        if (!showing.toFixed) continue;
+        for (const shape of existing) {
+          const own = shownBy(shape);
+          if (own?.fieldType !== undefined)
+            replaceText(batch, slide.partName, shape, what, own.text, undefined);
+        }
+        changed += 1;
+        continue;
+      }
       for (const shape of existing)
         replaceText(batch, slide.partName, shape, what, showing.text, showing.field);
       changed += 1;
@@ -294,7 +331,7 @@ function applyKind(
     }
     const text = showing.text ?? deck?.text;
     if (text === undefined) throw new CommandRefusal('disabled.noFooterText');
-    const field = showing.text !== undefined ? showing.field : deck?.fieldType;
+    const field = showing.text !== undefined || showing.toFixed ? showing.field : deck?.fieldType;
     const ph = path(template!, 'p:nvSpPr', 'p:nvPr', 'p:ph');
     const phAttrs = ['type', 'orient', 'sz', 'idx']
       .map((a) => {
@@ -325,7 +362,7 @@ function applyKind(
 /**
  * Show or hide the footer. With `text`, every slide that shows it shows `text`; without it, a
  * slide keeps its footer, and a slide without one takes the deck's footer text. Refuses without
- * text when no slide has a footer (`disabled.noFooterText`), and for empty text.
+ * text when no slide has a footer (`disabled.noFooterText`), and for blank or multi-line text.
  */
 export function setFooter(
   batch: OpBatch,
@@ -333,7 +370,6 @@ export function setFooter(
   text?: string,
   options: HeaderFooterTargets = {}
 ): number {
-  if (show && text === '') throw new CommandRefusal('disabled.noFooterText');
   const targets = headerFooterTargets(batch.pkg, show, options);
   return applyKind(batch, 'ftr', targets, { text, field: undefined, fallback: undefined });
 }
@@ -342,7 +378,7 @@ export function setFooter(
  * Show or hide the date. With `text`, every slide that shows it shows `text`: a `datetime1` field
  * that a presentation application can update when it opens the file, or fixed text with `fixed`.
  * Without `text`, a slide keeps its date, and a slide without one takes the deck's date, else
- * today's date as a field.
+ * today's date as a field; `fixed` then turns the dates into fixed text.
  */
 export function setDateTime(
   batch: OpBatch,
@@ -351,12 +387,12 @@ export function setDateTime(
   fixed = false,
   options: HeaderFooterTargets = {}
 ): number {
-  if (show && text === '') throw new CommandRefusal('errors.unsupported', NAMES.dt);
   const targets = headerFooterTargets(batch.pkg, show, options);
   return applyKind(batch, 'dt', targets, {
     text,
     field: fixed ? undefined : 'datetime1',
     fallback: () => ({ text: shortDate(), fieldType: 'datetime1' }),
+    toFixed: fixed && text === undefined,
   });
 }
 
@@ -389,6 +425,11 @@ export function applyHeaderFooter(batch: OpBatch, command: HeaderFooterCommand):
           setSlideNumbers(batch, show, indices);
           done = true;
         } catch (error) {
+          if (
+            !(error instanceof CommandRefusal) ||
+            error.reason !== 'disabled.noSlideNumberPlaceholder'
+          )
+            throw error;
           refusal = error;
         }
       }

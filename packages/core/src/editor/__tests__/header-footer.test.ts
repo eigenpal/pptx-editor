@@ -204,7 +204,7 @@ describe('on without text keeps what the slides show', () => {
     const r = e.exec({ type: 'setFooter', show: true });
     expect(r.ok ? undefined : r.reason).toBe('disabled.noFooterText');
     const empty = e.exec({ type: 'setFooter', show: true, text: '' });
-    expect(empty.ok ? undefined : empty.reason).toBe('disabled.noFooterText');
+    expect(empty.ok ? undefined : empty.reason).toBe('errors.unsupported');
   });
 
   test('the date: a field of another format stays, and spreads with its format', async () => {
@@ -272,5 +272,87 @@ describe('targets', () => {
       expect(e.exec(command).ok).toBe(true);
     expect(slideXml(e, 0)).not.toMatch(/type="(sldNum|ftr|dt)"/);
     expect(slideXml(e, 1)).toMatch(/type="sldNum"[^]*type="ftr"[^]*type="dt"/);
+  });
+
+  test('no slides or slides out of range are refused', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    for (const indices of [[], [7]]) {
+      const r = e.exec({ type: 'setFooter', show: true, text: 'X', indices });
+      expect(r.ok ? undefined : r.reason).toBe('errors.unsupported');
+    }
+  });
+});
+
+describe('edge cases', () => {
+  const emptyFooter =
+    '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="de-DE" sz="2000" b="1"/></a:p></p:txBody>';
+
+  test('an empty footer is no footer: the deck text comes from a slide with text', async () => {
+    const deck = headerFooterDeck();
+    const e = await open(
+      buildPptx({
+        ...deck,
+        slides: [
+          {
+            ...deck.slides[1]!,
+            shapes: deck.slides[1]!.shapes + placeholder(9, 'ftr', 11, emptyFooter),
+          },
+          deck.slides[0]!,
+          deck.slides[1]!,
+        ],
+      })
+    );
+    expect(e.snapshot().footer).toBe('Footer text & more');
+    expect(e.exec({ type: 'setFooter', show: true }).ok).toBe(true);
+    expect(painted(e, 2)).toContain('Footer text & more');
+  });
+
+  test('text in an empty paragraph takes its end-of-paragraph format', async () => {
+    const e = await open(withSlide2(placeholder(9, 'ftr', 11, emptyFooter)));
+    expect(e.exec({ type: 'setFooter', show: true, text: 'Formatted' }).ok).toBe(true);
+    expect(slideXml(e, 1)).toContain(
+      '<a:r><a:rPr lang="de-DE" sz="2000" b="1"/><a:t>Formatted</a:t></a:r><a:endParaRPr'
+    );
+  });
+
+  test('blank and multi-line text is refused', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    for (const text of ['  ', 'a\nb', 'a\rb'])
+      expect(e.exec({ type: 'setFooter', show: true, text }).ok).toBe(false);
+    expect(e.exec({ type: 'setDateTime', show: true, text: 'a\nb' }).ok).toBe(false);
+  });
+
+  test('fixed without text turns the date fields into fixed text', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    e.exec({ type: 'setDateTime', show: true, text: '11/7/2026' });
+    expect(e.exec({ type: 'setDateTime', show: true, fixed: true }).ok).toBe(true);
+    expect(e.snapshot().dateTime).toEqual({ text: '11/7/2026', fixed: true });
+    expect(slideXml(e, 1)).not.toContain('a:fld');
+  });
+
+  test('hiding slide numbers that no slide can have is refused', async () => {
+    const e = await open(
+      buildPptx({
+        slides: [
+          { shapes: shape({ id: 2, x: 0, y: 0, cx: 914400, cy: 914400, text: para(run('S')) }) },
+        ],
+      })
+    );
+    const r = e.exec({ type: 'setSlideNumbers', show: false });
+    expect(r.ok ? undefined : r.reason).toBe('disabled.noSlideNumberPlaceholder');
+  });
+
+  test('a title slide hides its number while the other slides show theirs', async () => {
+    const deck = headerFooterDeck();
+    const e = await open(
+      buildPptx({
+        ...deck,
+        layouts: [{ name: 'Title Slide', type: 'title', shapes: '' }],
+        slides: [{ ...deck.slides[1]!, layoutName: 'Title Slide' }, deck.slides[1]!],
+      })
+    );
+    expect(e.exec({ type: 'setSlideNumbers', show: true, hideOnTitleSlides: true }).ok).toBe(true);
+    expect(slideXml(e, 0)).not.toContain('type="sldNum"');
+    expect(slideXml(e, 1)).toContain('type="sldNum"');
   });
 });

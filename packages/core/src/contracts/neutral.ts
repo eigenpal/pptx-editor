@@ -183,7 +183,7 @@ export type EditorCommand =
   /**
    * Insert > Slide numbers: show or hide the slide number, through the slide-number placeholder
    * of each slide's layout or master. Takes the `HeaderFooterTargets` options; by default, every
-   * slide.
+   * slide. Refused, also to hide, when no target slide can have a slide number.
    */
   | ({ readonly type: 'setSlideNumbers'; readonly show: boolean } & HeaderFooterTargets)
   /**
@@ -191,9 +191,9 @@ export type EditorCommand =
    * of each slide's layout or master. With `text`, every slide that shows the footer shows
    * `text`. Without `text`, a slide keeps its footer text, and a slide without a footer takes the
    * text that the other slides show. A slide that has a footer keeps its box and format. Refused
-   * when no target slide's layout or master has a footer placeholder, for empty text, and
-   * without `text` when no slide shows a footer (`disabled.noFooterText`). Text is 1,024
-   * characters at most.
+   * when no target slide's layout or master has a footer placeholder, for blank or multi-line
+   * text, and without `text` when no slide shows a footer (`disabled.noFooterText`). Text is one
+   * line of 1,024 characters at most.
    */
   | ({
       readonly type: 'setFooter';
@@ -206,8 +206,9 @@ export type EditorCommand =
    * date shows `text`: a `datetime1` field, which a presentation application can update when it
    * opens the file, or fixed text with `fixed: true`. Without `text`, a slide keeps its date, and
    * a slide without one takes the date that the other slides show, else today's date
-   * (month/day/year) as a field. A slide that has a date keeps its box and format. Refused when no
-   * target slide's layout or master has a date placeholder.
+   * (month/day/year) as a field; with `fixed: true`, the dates become fixed text. A slide that has
+   * a date keeps its box and format. Refused when no target slide's layout or master has a date
+   * placeholder, and for blank or multi-line text.
    */
   | ({
       readonly type: 'setDateTime';
@@ -875,7 +876,8 @@ export interface EditorSnapshot {
   readonly slideNumbers: boolean;
   /**
    * The footer text (Insert > Footer): the current slide's, else that of the first slide with a
-   * footer. Null when no slide shows one. It reads only the slides that are open: while
+   * footer. Null when no slide shows one. Unlike `slideNumbers`, which reads the current slide,
+   * it reads the deck, as the command acts on the deck. It reads only the slides that are open: while
    * `pendingSlides` is above 0, a slide that waits can have a footer. Optional, so that snapshots
    * from hosts without it stay valid: absent reads as null.
    */
