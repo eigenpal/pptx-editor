@@ -80,7 +80,7 @@ export class MetafilePictures {
     { readonly promise: Promise<void>; readonly resolve: () => void }
   >();
   #queue: Uint8Array[] = [];
-  /** Metafiles whose conversion ran out of time once: a second stop is final. */
+  /** Metafiles whose conversion ran out of time once: a second stop waits for a new request. */
   #retried = new WeakSet<Uint8Array>();
   #running = 0;
   /** Bumped when the fonts change: a conversion with the old fonts runs again. */
@@ -94,14 +94,20 @@ export class MetafilePictures {
   #disposed = false;
   readonly #fonts: () => readonly Uint8Array[];
   readonly #changed: () => void;
+  readonly #convert: typeof metafilePng;
 
   /**
    * `fonts` gives the font files that metafile text draws with. `changed` hears that PNGs are
-   * ready, once for the metafiles that finish close together.
+   * ready, once for the metafiles that finish close together. `convert` is for tests.
    */
-  constructor(fonts: () => readonly Uint8Array[], changed: () => void) {
+  constructor(
+    fonts: () => readonly Uint8Array[],
+    changed: () => void,
+    convert: typeof metafilePng = metafilePng
+  ) {
     this.#fonts = fonts;
     this.#changed = changed;
+    this.#convert = convert;
   }
 
   /**
@@ -149,13 +155,18 @@ export class MetafilePictures {
 
   /**
    * Convert `metafiles`. Resolves `true` when each one converted, so all draw. Resolves `false`
-   * when one did not convert, and after `waitMs`: a picture that is not ready by then keeps
-   * converting, and draws as the placeholder (or its PNG from before a font change) until it is.
+   * when one did not convert, and after `waitMs` (`Infinity` waits for all): a picture that is
+   * not ready by then keeps converting, and draws as the placeholder (or its PNG from before a
+   * font change) until it is.
    */
   async ready(metafiles: readonly Uint8Array[], waitMs = PICTURES_WAIT_MS): Promise<boolean> {
     const wanted = new Set(metafiles);
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const late = new Promise<boolean>((resolve) => (timer = setTimeout(resolve, waitMs, false)));
+    // `Infinity` waits until every picture is done; a timer takes at most 2^31 - 1 ms.
+    const ms = Number.isNaN(waitMs) ? 0 : Math.max(0, waitMs);
+    const late = new Promise<boolean>((resolve) => {
+      if (ms < 2 ** 31) timer = setTimeout(resolve, ms, false);
+    });
     const all = (async (): Promise<boolean> => {
       // A font change while it waits converts again: wait for the conversions with the new fonts.
       for (;;) {
@@ -222,7 +233,7 @@ export class MetafilePictures {
       // One array for each font set, so the converter reuses the fonts it has read.
       this.#fontFiles ??= this.#fonts();
       this.#running += 1;
-      void metafilePng(bytes, this.#fontFiles, this.#abort.signal)
+      void this.#convert(bytes, this.#fontFiles, this.#abort.signal)
         .catch(() => null)
         .then((png) => this.#finish(bytes, png, epoch));
     }
@@ -237,7 +248,7 @@ export class MetafilePictures {
     this.#running -= 1;
     if (this.#disposed) return;
     // The fonts changed while it converted, or it ran out of time the first time (a busy page,
-    // the first load of the converter): convert again.
+    // a hidden tab, the first load of the converter): convert again.
     const retry = png === undefined && !this.#retried.has(bytes);
     if (epoch !== this.#epoch || retry) {
       if (retry && epoch === this.#epoch) this.#retried.add(bytes);
@@ -245,8 +256,9 @@ export class MetafilePictures {
       this.#pump();
       return;
     }
-    png ??= null;
-    this.#done.set(bytes, png);
+    // A second stop by the time limit is not final: the next request converts it again.
+    this.#retried.delete(bytes);
+    if (png !== undefined) this.#done.set(bytes, png);
     if (png) {
       this.#last.set(bytes, png);
       this.#serials.set(png, (this.#serial += 1));

@@ -62,7 +62,7 @@ const MAX_WAIT_MS = 1000;
 export class ThumbnailPainter {
   readonly #host: ThumbnailHost;
   #painted = new WeakMap<HTMLElement, Painted>();
-  #layouts = new WeakMap<HTMLElement, { pkg: PptxPackage; id: string; fonts: string }>();
+  #layouts = new WeakMap<HTMLElement, { pkg: PptxPackage; id: string; key: string }>();
   /** Containers waiting for an idle repaint, with the slide index asked for last. */
   #pending = new Map<HTMLElement, number>();
   /** How many times each container was asked for: a disposer acts for the last ask only. */
@@ -136,8 +136,8 @@ export class ThumbnailPainter {
     const pkg = session?.store.package;
     if (!session || !pkg) return;
     const was = this.#layouts.get(container);
-    if (was && was.pkg === pkg && was.id === layoutId && was.fonts === session.paintGeneration)
-      return;
+    const key = session.paintKey(layoutId);
+    if (was && was.pkg === pkg && was.id === layoutId && was.key === key) return;
     const lay = this.#host.layoutPreview(session, layoutId);
     if (!lay) return container.replaceChildren();
     this.#count += 1;
@@ -151,7 +151,7 @@ export class ThumbnailPainter {
     svg.setAttribute('width', '100%');
     svg.setAttribute('height', '100%');
     container.replaceChildren(svg);
-    this.#layouts.set(container, { pkg, id: layoutId, fonts: session.paintGeneration });
+    this.#layouts.set(container, { pkg, id: layoutId, key });
   }
 
   /** Paint every waiting thumbnail now. */

@@ -9,6 +9,7 @@ import { readPptx } from '../../store/index.ts';
 import { paintLayout } from '../export-image.ts';
 import { createPptxEditor } from '../index.ts';
 import { MetafilePictures, metafilesOf } from '../metafile-pictures.ts';
+import { metafilePng } from '../../output/metafile-png.ts';
 
 const IN = 914_400;
 const R_IMAGE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
@@ -224,6 +225,35 @@ test('the pictures a caller waits for convert before the rest of the queue', asy
   const done = queued.filter((b) => pictures.drawable(b, 'image/x-emf'));
   expect(done).toContain(last);
   expect(done.length).toBeLessThan(8);
+  pictures.dispose();
+});
+
+test('a picture stopped twice by the time limit converts on a later request', async () => {
+  let calls = 0;
+  const png = (await metafilePng(emfRectangle()))!;
+  // Two stops (a hidden tab), then a conversion.
+  const convert = async () => ((calls += 1) <= 2 ? undefined : png);
+  const pictures = new MetafilePictures(
+    () => [],
+    () => {},
+    convert
+  );
+  const bytes = emfRectangle();
+  expect(await pictures.ready([bytes])).toBe(false);
+  expect(calls).toBe(2);
+  expect(await pictures.ready([bytes])).toBe(true);
+  expect(pictures.drawable(bytes, 'image/x-emf')?.bytes).toBe(png);
+  pictures.dispose();
+});
+
+test('an endless wait waits, and a wait of NaN or less than zero ends at once', async () => {
+  const pictures = new MetafilePictures(
+    () => [],
+    () => {}
+  );
+  const big = emfRectangle(3000, 1500);
+  expect(await pictures.ready([emfRectangle(2900, 1500)], Number.NaN)).toBe(false);
+  expect(await pictures.ready([big], Infinity)).toBe(true);
   pictures.dispose();
 });
 

@@ -413,7 +413,8 @@ async function imageFor(target: string, p: PageOps): Promise<PDFImage | null> {
   if (bytes && metafile) {
     const fonts = (p.res.metafileFonts ??= [...p.res.faces.values()].map((f) => f.bytes));
     bytes = (await metafilePng(bytes, fonts, p.res.work.signal)) ?? undefined;
-    // A conversion that the signal or the time limit stopped fails the export, not the picture.
+    // When the export's signal or deadline stopped the conversion, the export fails. A picture
+    // that the converter's own time limit stopped reports `picture.metafile`.
     p.res.work.check();
   }
   const png = bytes ? isPng(bytes) : false;

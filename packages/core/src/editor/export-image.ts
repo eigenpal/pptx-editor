@@ -25,6 +25,11 @@ export interface SlideImageOptions {
   readonly width?: number;
   /** The label of an element the editor draws as a placeholder (chart, diagram), as on the canvas. */
   readonly frameLabel?: (kind: string) => string;
+  /**
+   * PNG export only: how long to wait for the slide's EMF and WMF pictures, in milliseconds.
+   * Default 30000; `Infinity` waits until each one converted or failed.
+   */
+  readonly picturesTimeoutMs?: number;
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -194,7 +199,8 @@ async function decodeSvg(text: string): Promise<HTMLImageElement> {
 /**
  * Slide `index` as a PNG of `options.width` pixels (default 1920), drawn from the editor's own
  * paint. It waits for the slide's EMF and WMF pictures (`session.picturesReady`); one that is
- * not ready after 30 seconds draws as the placeholder. To know, await `picturesReady` first.
+ * not ready after `options.picturesTimeoutMs` (default 30 seconds) draws as the placeholder.
+ * To know whether every picture draws, await `picturesReady` first.
  * Rejects with a `CommandRefusal` (`errors.exportSize`, `errors.exportFailed`). @public
  */
 export async function exportSlidePng(
@@ -202,7 +208,8 @@ export async function exportSlidePng(
   index: number,
   options: SlideImageOptions = {}
 ): Promise<Blob> {
-  await Promise.all([document.fonts?.ready, session.picturesReady(index)]);
+  const timeoutMs = options.picturesTimeoutMs;
+  await Promise.all([document.fonts?.ready, session.picturesReady(index, { timeoutMs })]);
   const { svg, width, height } = paintAlone(session, index, options, () => true);
   return drawPng(svg, width, height);
 }

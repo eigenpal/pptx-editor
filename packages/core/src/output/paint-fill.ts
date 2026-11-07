@@ -189,7 +189,6 @@ function blipFilter(doc: Document, defs: Defs, effects: readonly BlipEffect[]): 
   return defs.add(svg(doc, 'filter', { id, 'color-interpolation-filters': 'sRGB' }, primitives));
 }
 
-/** Resolve a fill to an SVG paint over a `w`×`h` local box. */
 /** The image URL of a picture fill: its SVG image, else its bitmap. Undefined when neither resolves. */
 export function pictureUrl(
   ctx: Pick<PaintContext, 'images' | 'sourcePart'>,
@@ -200,6 +199,7 @@ export function pictureUrl(
   );
 }
 
+/** Resolve a fill to an SVG paint over a `w`×`h` local box. */
 export function fillPaint(
   fill: ResolvedFill,
   w: number,

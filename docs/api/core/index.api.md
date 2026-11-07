@@ -4884,6 +4884,7 @@ export function slideDropMarker(drag: SlideDrag | null, index: number): SlideDra
 // @public
 export interface SlideImageOptions {
     readonly frameLabel?: (kind: string) => string;
+    readonly picturesTimeoutMs?: number;
     readonly width?: number;
 }
 
