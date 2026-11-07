@@ -22,11 +22,13 @@ describe('deferred font faces in the editor', () => {
       fonts: { sources: [face('Segoe UI')], deferred: late.promise },
     });
     await editor.load(missingFontsDeck());
-    expect(substituted(editor)).not.toContain('Segoe UI');
-    expect(substituted(editor)).toContain('Aptos');
+    // Late faces are on the way: the deck shows, and no substitution reports yet.
+    expect(editor.fontMeasurement().resolving).toBe(true);
+    expect(substituted(editor)).toEqual([]);
     const generation = editor.session!.fontGeneration;
     late.resolve({ sources: [face('Aptos')] });
     await settle();
+    expect(editor.fontMeasurement().resolving).toBe(false);
     expect(editor.session!.fontGeneration).toBeGreaterThan(generation);
     expect(substituted(editor)).not.toContain('Aptos');
     expect(substituted(editor)).not.toContain('Segoe UI');
@@ -83,7 +85,8 @@ describe('deferred font faces in the editor', () => {
     const editor = createPptxEditor();
     await editor.load(missingFontsDeck());
     await editor.setFonts({ sources: [], deferred: late.promise });
-    expect(substituted(editor)).toContain('Segoe UI');
+    expect(editor.fontMeasurement().resolving).toBe(true);
+    expect(substituted(editor)).toEqual([]);
     late.resolve({ sources: [face('Segoe UI')] });
     await settle();
     expect(substituted(editor)).not.toContain('Segoe UI');

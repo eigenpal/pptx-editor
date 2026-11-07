@@ -263,6 +263,11 @@ export class ShapeDrag {
   }
 
   /** After the slide was painted again: the preview goes on the new painting. */
+  /** Put the painted slide back as it was painted, before the painter reuses its nodes. */
+  beforeRepaint(): void {
+    this.#preview.clear();
+  }
+
   repainted(layout: SlideLayout): void {
     this.#preview.clear();
     if (this.#drag) this.#show(layout);

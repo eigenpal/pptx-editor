@@ -8,6 +8,7 @@
     "openFailed": "This file could not be opened: {reason}",
     "dropHint": "Drop a .pptx file to open it",
     "dropRefused": "{detail} is not a .pptx file. Only .pptx presentations open here.",
+    "deckFetchFailed": "The presentation did not load. Check your connection and reload the page, or open a file with Open.",
     "pdfExportFailed": "The PDF could not be made. Try again.",
     "pdfTooLarge": "This presentation is too large for the PDF export of this demo. The limit is 4 MiB.",
     "pdfTooComplex": "This presentation has too much content for the PDF export of this demo.",
@@ -958,6 +959,7 @@
   },
   "canvas": {
     "ariaLabel": "Slide {index} of {total}",
+    "emptyAriaLabel": "No presentation open",
     "inputAriaLabel": "Text of the selected shape",
     "adjustHandle": "Drag to change the shape",
     "placeholderTable": "Insert a table here",
@@ -1053,11 +1055,16 @@
     "reasons": {
       "damaged": "The file is damaged, or it is not a PPTX presentation. Open another file.",
       "notPptx": "The file holds no presentation. Open a PPTX file.",
-      "tooLarge": "The file is larger than the editor accepts.",
-      "unknown": "The editor could not open the file."
+      "tooLarge": "The file is too large or too complex for the editor. Open another file.",
+      "blocked": "This file contains content that the editor does not open, for security reasons. Open another file.",
+      "unknown": "The editor could not open the file. Try to open it again. If the problem continues, contact your support team."
     },
     "kept": "The presentation that was open stays open.",
     "code": "Error code: {code}",
+    "copyDetails": "Copy details",
+    "copied": "Details copied",
+    "copyFailed": "The browser did not allow the copy. Select the details below, and copy them.",
+    "report": "Error details",
     "close": "Close"
   },
   "pictureFormat": {

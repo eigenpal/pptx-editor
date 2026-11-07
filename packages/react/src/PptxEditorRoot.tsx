@@ -16,6 +16,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  churnWarning,
   createEditorRefApi,
   createPptxEditor,
   localeContentKey,
@@ -190,9 +191,14 @@ export const PptxEditorRoot = forwardRef<PptxEditorRef, PptxEditorRootProps>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // In development, a `document` or `fonts` made anew on each render warns.
+    const [documentChurn] = useState(() => churnWarning('PptxEditor.Root', 'document'));
+    const [fontsChurn] = useState(() => churnWarning('PptxEditor.Root', 'fonts'));
     useEffect(() => {
-      if (editor && bytes) void editor.load(bytes);
-    }, [editor, bytes]);
+      if (!editor || !bytes) return;
+      documentChurn();
+      void editor.load(bytes);
+    }, [editor, bytes, documentChurn]);
 
     useEffect(() => {
       editor?.setMode(mode);
@@ -211,9 +217,10 @@ export const PptxEditorRoot = forwardRef<PptxEditorRef, PptxEditorRootProps>(
     useEffect(() => {
       if (!editor || createdFonts.current === fonts) return;
       createdFonts.current = fonts;
+      fontsChurn();
       // Rejects only after destroy; font failures report through `onFontError`.
       editor.setFonts(fonts).catch(() => {});
-    }, [editor, fonts]);
+    }, [editor, fonts, fontsChurn]);
 
     // A new `fontFamilies` list updates the font picker in place. The instance compares by
     // content, so an inline array made on each render changes nothing.

@@ -11,7 +11,7 @@ import { isIdeographic } from './line-break.ts';
 import {
   DEFAULT_FALLBACK_FAMILY,
   eastAsianFallbackFamilies,
-  FONT_SUBSTITUTES,
+  fontSubstitutes,
   type FaceMetrics,
   type FontRequest,
   type ResolvedFace,
@@ -126,11 +126,40 @@ const MAX_TEXT = 100_000;
 /** Advance arrays kept per measurer; the least recently used go first (`AdvanceCache`). */
 const CACHE_LIMIT = 20_000;
 
-function readOs2Underline(
-  face: InstanceType<HarfBuzzModule['Face']>,
-  upem: number
-): [number, number] {
-  const post = face.referenceTable('post');
+/**
+ * An sfnt table of face 0, read from the font bytes in JavaScript. `Face.referenceTable` makes
+ * a HarfBuzz blob that is never freed and holds a copy of the whole font, so each new measurer
+ * leaked its fonts into the WebAssembly heap until it was full. @internal
+ */
+export function sfntTable(bytes: Uint8Array, tag: string): Uint8Array | undefined {
+  if (bytes.length < 12) return undefined;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  // A collection ('ttcf') lists the offset of each font's table directory from byte 12.
+  const ttc = view.getUint32(0) === 0x74746366;
+  const base = ttc ? (bytes.length >= 16 ? view.getUint32(12) : -1) : 0;
+  if (base < 0 || base + 12 > bytes.length) return undefined;
+  const count = view.getUint16(base + 4);
+  for (let i = 0; i < count; i += 1) {
+    const rec = base + 12 + i * 16;
+    if (rec + 16 > bytes.length) return undefined;
+    const name = String.fromCharCode(
+      bytes[rec]!,
+      bytes[rec + 1]!,
+      bytes[rec + 2]!,
+      bytes[rec + 3]!
+    );
+    if (name !== tag) continue;
+    const offset = view.getUint32(rec + 8);
+    const length = view.getUint32(rec + 12);
+    return length > 0 && offset <= bytes.length && length <= bytes.length - offset
+      ? bytes.subarray(offset, offset + length)
+      : undefined;
+  }
+  return undefined;
+}
+
+function readOs2Underline(bytes: Uint8Array, upem: number): [number, number] {
+  const post = sfntTable(bytes, 'post');
   if (post && post.length >= 12) {
     const view = new DataView(post.buffer, post.byteOffset, post.byteLength);
     return [view.getInt16(8) / upem, Math.max(1, view.getInt16(10)) / upem];
@@ -169,14 +198,14 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
       const font = new module.Font(face);
       const upem = face.upem || 1000;
       const ext = font.hExtents();
-      const line = os2LineExtents(face.referenceTable('OS/2'));
-      const [underlinePosition, underlineThickness] = readOs2Underline(face, upem);
+      const line = os2LineExtents(sfntTable(entry.bytes, 'OS/2'));
+      const [underlinePosition, underlineThickness] = readOs2Underline(entry.bytes, upem);
       const out: LoadedFace = {
         entry,
         font,
         upem,
         kerns:
-          entry.origin === HOST_SUBSTITUTE_ORIGIN || (face.referenceTable('kern')?.length ?? 0) > 0,
+          entry.origin === HOST_SUBSTITUTE_ORIGIN || sfntTable(entry.bytes, 'kern') !== undefined,
         metrics: {
           ascent: (line ? line[0] : Math.abs(ext.ascender)) / upem,
           descent: (line ? line[1] : Math.abs(ext.descender)) / upem,
@@ -212,7 +241,7 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     if (hit) return hit;
     const order = [
       r.family,
-      ...(FONT_SUBSTITUTES[r.family.toLowerCase()] ?? []),
+      ...fontSubstitutes(r.family),
       ...fallbackOrder,
       DEFAULT_FALLBACK_FAMILY,
     ];

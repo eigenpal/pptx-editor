@@ -120,9 +120,11 @@ export function corrections(
   if (trigger === '.' && before.endsWith('..'))
     return { edits: [{ from: before.length - 2, to: before.length, text: '' }], typed: '…' };
   if (!TRIGGERS.has(trigger)) return { edits, typed };
-  const token = /(\S+)$/u.exec(before);
-  const start = token ? before.length - token[1].length : before.length;
-  const word = token?.[1] ?? '';
+  // The last word, by a scan back to the space before it. `/(\S+)$/u` retried from each
+  // position, which made a space after a long word quadratic.
+  let start = before.length;
+  while (start > 0 && !/\s/u.test(before[start - 1]!)) start -= 1;
+  const word = before.slice(start);
   if (Object.hasOwn(FRACTIONS, word))
     edits.push({ from: start, to: before.length, text: FRACTIONS[word] });
   if (

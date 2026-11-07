@@ -42,6 +42,7 @@ import {
   exportDeck as saveDeck,
   exportSlides as saveSlides,
   fetchDeck,
+  refuseDeckFetch,
   fileTitle,
   followPanelWidth,
   initialExample,
@@ -83,6 +84,7 @@ function Shell({
   setMode,
   theme,
   setTheme,
+  deckFailed,
   children,
 }: {
   onOpenFile: (f: File) => void;
@@ -96,6 +98,8 @@ function Shell({
   setMode: (m: 'edit' | 'view') => void;
   theme: 'light' | 'dark';
   setTheme: (t: 'light' | 'dark') => void;
+  /** The first deck did not load: no spinner while no deck is open. */
+  deckFailed: boolean;
   /** Dialogs of the demo, inside the editor scope so the editor's tokens apply. */
   children?: ReactNode;
 }) {
@@ -108,6 +112,8 @@ function Shell({
   // A phone sizes the slide area to the slide's shape (shell.css).
   const slideRatio = useEditorState((s) => (s.slideWidth ? s.slideHeight / s.slideWidth : 0.5625));
   const show = useSlideshow();
+  // With no deck to open (its fetch failed), the notice says why in place of the spinner.
+  const waiting = useEditorState((s) => s.status === 'empty');
   // Closed on a narrow window, so the slide keeps a usable zoom (demo-files.ts).
   const [panel, setPanel] = useState(panelStartsOpen);
   const [panelTab, setPanelTab] = useState<SidePanelTab>('format');
@@ -322,7 +328,7 @@ function Shell({
             >
               <PptxEditor.Content />
               <PptxEditor.FindBar />
-              <PptxEditor.Loading overlay />
+              {deckFailed && waiting ? null : <PptxEditor.Loading overlay />}
               <PptxEditor.FontNotice />
             </div>
             {/* The view switch and the zoom stay in view in both views, under the slide. */}
@@ -389,14 +395,26 @@ export function App() {
     [editor]
   );
   const loadUrl = useCallback(
-    async (name: string, label: string) => openBytes(await fetchDeck(base, name), label),
-    [openBytes]
+    async (name: string, label: string) => {
+      try {
+        await openBytes(await fetchDeck(base, name), label);
+      } catch (cause) {
+        refuseDeckFetch(editor, cause);
+      }
+    },
+    [openBytes, editor]
   );
+  const [deckFailed, setDeckFailed] = useState<unknown>(null);
   useEffect(() => {
     // The first deck: `initial` comes from the URL at mount.
-    void fetchDeck(base, EXAMPLES[initial].file).then(setBytes);
+    void fetchDeck(base, EXAMPLES[initial].file).then(setBytes, (cause: unknown) =>
+      setDeckFailed(cause ?? new Error('fetch failed'))
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    if (deckFailed && editor) refuseDeckFetch(editor, deckFailed);
+  }, [deckFailed, editor]);
   useEffect(() => {
     document.documentElement.style.colorScheme = theme;
   }, [theme]);
@@ -444,6 +462,7 @@ export function App() {
           )
         }
         onSaved={() => unsaved.current?.markSaved()}
+        deckFailed={deckFailed !== null}
       >
         {discard ? (
           <DiscardDialog

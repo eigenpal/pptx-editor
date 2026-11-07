@@ -17,7 +17,7 @@ import {
 import { parseXmlPart, type Element, type XmlPart, type TreeRejection } from './tree.ts';
 import { serializeXmlPart, canonicalFingerprint, bytesFingerprint } from './serialize.ts';
 import { attr, children, elements } from './query.ts';
-import { CONTENT_TYPE, NS, REL } from './namespaces.ts';
+import { NS, REL } from './namespaces.ts';
 import { repairPresentationRoot } from './presentation-repair.ts';
 import { markFileTimings, repairTimingRoot } from './timing.ts';
 import { sha256FontBytes } from '@eigenpal/ooxml-core';
@@ -58,8 +58,12 @@ const decoder = new TextDecoder('utf-8', { fatal: false });
 const PML = 'application/vnd.openxmlformats-officedocument.presentationml.';
 const PPT_MACRO = 'application/vnd.ms-powerpoint.';
 
-/** Content types of the parts the engine cannot work without. They must parse, or the deck is refused. */
-const REQUIRED_TYPES = new Set(
+/**
+ * The main part types of a presentation, a slide show, a template, and their macro-enabled
+ * forms (ECMA-376 Part 1, 13.3.6). The engine reads them all the same way; a macro part stays
+ * as inert bytes and is never run.
+ */
+const MAIN_TYPES = new Set(
   [
     `${PML}presentation.main+xml`,
     `${PML}slideshow.main+xml`,
@@ -67,6 +71,13 @@ const REQUIRED_TYPES = new Set(
     `${PPT_MACRO}presentation.macroEnabled.main+xml`,
     `${PPT_MACRO}slideshow.macroEnabled.main+xml`,
     `${PPT_MACRO}template.macroEnabled.main+xml`,
+  ].map(asciiFold)
+);
+
+/** Content types of the parts the engine cannot work without. They must parse, or the deck is refused. */
+const REQUIRED_TYPES = new Set(
+  [
+    ...MAIN_TYPES,
     `${PML}slide+xml`,
     `${PML}slideLayout+xml`,
     `${PML}slideMaster+xml`,
@@ -108,18 +119,82 @@ function roleByType(partName: string, contentType: string | undefined): PartRole
   return 'binary';
 }
 
-function partRole(partName: string, types: ContentTypeIndex): PartRole {
+/** The relationship types whose targets make up the deck: they must parse, whatever their type. */
+const STRUCTURAL_RELS = new Set<string>([
+  REL.officeDocument,
+  REL.slide,
+  REL.slideLayout,
+  REL.slideMaster,
+  REL.theme,
+  REL.notesSlide,
+  REL.notesMaster,
+]);
+
+/**
+ * The parts a structural relationship points to. A part's role follows what points to it as
+ * well as its content type: a slide with a generic content type is still a slide, and a part
+ * of a required type that no structural relationship reaches never refuses the deck.
+ *
+ * Keys are folded part names (`partNameKey`), as OPC part names compare. A part that several
+ * relationships reach keeps the strongest type: the main part first, notes last.
+ */
+function structuralTargets(rels: ReadonlyMap<string, PackagePart>): Map<string, string> {
+  const pkg: PptxPackage = { parts: rels };
+  const out = new Map<string, string>();
+  const rank = (type: string | undefined): number =>
+    type === undefined
+      ? 0
+      : type === REL.officeDocument
+        ? 3
+        : type === REL.notesSlide || type === REL.notesMaster
+          ? 1
+          : 2;
+  for (const name of rels.keys()) {
+    const source = relsSource(name);
+    if (source === undefined) continue;
+    for (const rel of relationshipsOf(pkg, source)) {
+      if (rel.target === undefined || !STRUCTURAL_RELS.has(rel.type)) continue;
+      const key = partNameKey(rel.target);
+      if (rank(rel.type) > rank(out.get(key))) out.set(key, rel.type);
+    }
+  }
+  return out;
+}
+
+function partRole(
+  partName: string,
+  types: ContentTypeIndex,
+  structural: ReadonlyMap<string, string>
+): PartRole {
   if (partName === CONTENT_TYPES_PART) return 'required';
   if (asciiFold(partName).endsWith('.rels')) {
     // Relationships are always parsed. Those of the package and of required parts must parse.
     const source = relsSource(partName);
     if (source === '/') return 'required';
     if (source === undefined) return 'optional';
-    return roleByType(source, lookupContentType(types, source)) === 'required'
-      ? 'required'
-      : 'optional';
+    // Those of the main part must parse too. Damaged relationships of a slide, a layout, or a
+    // master stay as bytes: that part draws without them, and the deck still opens.
+    return structural.get(partNameKey(source)) === REL.officeDocument ? 'required' : 'optional';
   }
-  return roleByType(partName, lookupContentType(types, partName));
+  const contentType = lookupContentType(types, partName);
+  const role = roleByType(partName, contentType);
+  const via = structural.get(partNameKey(partName));
+  // A part that is not XML by its type or its name (a picture that a slide relationship names)
+  // stays as bytes, whatever points to it.
+  const xml = role !== 'binary' || (contentType !== undefined && isXmlType(contentType));
+  if (via === undefined) return role === 'required' ? 'optional' : role;
+  // A structural part named `.xml` under a type that is not XML may still be the slide: it
+  // parses, and stays as bytes when it does not.
+  if (!xml) return asciiFold(partName).endsWith('.xml') ? 'optional' : role;
+  // Speaker notes are not needed to show the slides: a damaged notes part stays as bytes.
+  if (via === REL.notesSlide || via === REL.notesMaster) return 'optional';
+  return 'required';
+}
+
+/** Whether a content type names XML: `application/xml`, `text/xml`, or any `+xml` type. */
+function isXmlType(contentType: string): boolean {
+  const type = asciiFold(contentType.trim()).split(';')[0]!.trim();
+  return type.endsWith('+xml') || type === 'application/xml' || type === 'text/xml';
 }
 
 /**
@@ -182,14 +257,27 @@ export function readPptxDeferred(
   if (!ct.ok)
     return { ok: false, error: { reason: 'xml', partName: CONTENT_TYPES_PART, detail: ct.reason } };
   const types = contentTypeIndex(ct.part);
+  // Relationships first: what points to a part decides whether it must parse.
+  const rels = new Map<string, PackagePart>();
+  const relsTrees = new Map<string, ReturnType<typeof parseXmlPart>>();
+  for (const [partName, data] of zip.entries) {
+    if (!asciiFold(partName).endsWith('.rels')) continue;
+    const tree = parseXmlPart(partName, decodeXml(data));
+    relsTrees.set(partName, tree);
+    if (tree.ok) rels.set(partName, { kind: 'xml', partName, xml: tree.part });
+  }
+  const structural = structuralTargets(rels);
   const parts = new Map<string, PackagePart>();
   for (const [partName, data] of zip.entries) {
-    const role = partRole(partName, types);
+    const role = partRole(partName, types, structural);
     if (role === 'binary') {
       parts.set(partName, { kind: 'binary', partName, bytes: data });
       continue;
     }
-    const kind = deferred ? deferrableKind(partName, types) : undefined;
+    const kind =
+      deferred && structural.has(partNameKey(partName))
+        ? deferrableKind(partName, types)
+        : undefined;
     if (kind && deferred!.defer(partName)) {
       const finish = deferred!.finish;
       parts.set(
@@ -205,7 +293,10 @@ export function readPptxDeferred(
       );
       continue;
     }
-    const tree = partName === CONTENT_TYPES_PART ? ct : parseXmlPart(partName, decodeXml(data));
+    const tree =
+      partName === CONTENT_TYPES_PART
+        ? ct
+        : (relsTrees.get(partName) ?? parseXmlPart(partName, decodeXml(data)));
     if (tree.ok) {
       parts.set(partName, { kind: 'xml', partName, xml: tree.part });
       if (isSlideRoot(tree.part.root)) markFileTimings(tree.part.root);
@@ -214,19 +305,20 @@ export function readPptxDeferred(
   }
   const pkg: PptxPackage = { parts };
   const main = mainPresentationPart(pkg);
-  if (!main || contentTypeOf(pkg, main) !== CONTENT_TYPE.presentation)
+  const mainType = main ? contentTypeOf(pkg, main) : undefined;
+  if (!mainType || !MAIN_TYPES.has(asciiFold(mainType.trim())))
     return { ok: false, error: { reason: 'not-a-presentation' } };
   return { ok: true, pkg };
 }
 
 const SLIDE_TYPE = asciiFold(`${PML}slide+xml`);
-const NOTES_TYPE = asciiFold(`${PML}notesSlide+xml`);
 
 /** Whether `partName` is a slide or a notes slide, the parts a progressive open may defer. */
 function deferrableKind(partName: string, types: ContentTypeIndex): 'slide' | 'notes' | undefined {
   const type = lookupContentType(types, partName);
   const folded = type === undefined ? undefined : asciiFold(type.trim());
-  return folded === SLIDE_TYPE ? 'slide' : folded === NOTES_TYPE ? 'notes' : undefined;
+  // Notes parse with the package: a damaged notes part stays as bytes, as `partRole` says.
+  return folded === SLIDE_TYPE ? 'slide' : undefined;
 }
 
 /**

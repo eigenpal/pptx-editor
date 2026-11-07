@@ -58,11 +58,18 @@ import { OpBatch } from '../automation/commands/op-batch.ts';
 import { createPackagedFileFetch } from './packaged-file-fetch.ts';
 import { replicaBindingOf } from './replica-ids.ts';
 import { sameDependencies, slideDependencies } from './slide-dependencies.ts';
+import { carryFits } from '../automation/commands/table-fit.ts';
+import { refitEditedText } from './late-fit.ts';
+import { drawableImageMime } from './drawable-image.ts';
+import { within } from './within.ts';
 import {
   openingOrder,
   ProgressiveOpen,
   PROGRESSIVE_OPEN_CONTENT_BYTES,
 } from './progressive-open.ts';
+
+/** The longest the late fit waits for substitutes that slides parsed late name. */
+const LATE_SUBSTITUTE_WAIT_MS = 10_000;
 
 /** The resolution of a tiled image whose header states none (measured on `fixtures/fills-lines.pdf`). */
 const TILE_DPI = 72;
@@ -75,6 +82,14 @@ export interface OpenOptions {
   readonly substitutes?: boolean;
   /** Use the deterministic fixed measurer (tests only). */
   readonly fixedMeasurer?: boolean;
+  /**
+   * The longest the open waits for the text engine (HarfBuzz WebAssembly) and the packaged
+   * substitutes, in milliseconds. After it, the session measures with the fixed measurer and
+   * switches to shaped measurement when they arrive (`DocumentSession.shaping`), as DOCX Editor
+   * opens before its fonts. Omitted, the open waits for them: a PDF export or a server session
+   * needs shaped measurement from the start. @internal
+   */
+  readonly shapingWaitMs?: number;
   /**
    * Open a long deck progressively: only slide `startSlide` (and its notes) parses now, and
    * the session's `opening` parses the rest (`progressive-open.ts`). A deck whose other slides
@@ -499,6 +514,21 @@ export class DocumentSession {
   damage: Extract<PackageRejection, { reason: 'xml' }> | null = null;
   /** Hears `damage` at once, where the read happened. The editor sets it. @internal */
   onDamage: ((rejection: Extract<PackageRejection, { reason: 'xml' }>) => void) | null = null;
+  /**
+   * Shaped measurement still on the way: the open stopped waiting for the text engine or the
+   * packaged substitutes (`OpenOptions.shapingWaitMs`). Resolves `true` once the session
+   * measures with them, `false` when they cannot load and the fixed measurer stays. Null when
+   * nothing is on the way. @internal
+   */
+  shaping: Promise<boolean> | null = null;
+  /** Why shaped measurement did not start, once `shaping` resolved `false`. @internal */
+  shapingError: unknown = null;
+  /**
+   * When the parse ended (`performance.now()`), so a font wait after the open counts from the
+   * parse and not from the bytes: a long parse does not use up the wait. @internal
+   */
+  parsedAt = performance.now();
+  #disposed = false;
 
   constructor(store: PptxDocumentStore, fonts: FontSet) {
     this.store = store;
@@ -602,7 +632,17 @@ export class DocumentSession {
    * chose them from the parts it had parsed, and a slide parsed later can name another family.
    * Re-measures only when a family was added. Resolves true when it was. @internal
    */
-  async addMissingSubstitutes(): Promise<boolean> {
+  addMissingSubstitutes(): Promise<boolean> {
+    // One load at a time: two at once (the opening lane and late shaping) chose the same
+    // families and added each face twice.
+    const next = this.#substituteLoad.then(() => this.#loadMissingSubstitutes());
+    this.#substituteLoad = next.catch(() => false);
+    return next;
+  }
+
+  #substituteLoad: Promise<unknown> = Promise.resolve();
+
+  async #loadMissingSubstitutes(): Promise<boolean> {
     const loaded = this.#fonts.substituteFamilies;
     if (this.#fonts.fixed || !loaded) return false;
     const missing = substituteFamiliesFor(this.store.package).filter((f) => !loaded.includes(f));
@@ -619,6 +659,21 @@ export class DocumentSession {
     return true;
   }
 
+  /**
+   * Switch from the fixed measurer to shaped measurement with the substitutes that loaded
+   * late, and measure again. @internal
+   */
+  useShapedMeasurer(loaded: SubstituteLoad): void {
+    if (this.#disposed) return;
+    this.#fonts = {
+      ...this.#fonts,
+      fixed: false,
+      substitutes: loaded.sources,
+      substituteFailures: loaded.failures,
+    };
+    this.#remeasure();
+  }
+
   /** Remove every host face. @internal */
   clearHostFaces(): void {
     this.setHostFaces(NO_HOST_FACES);
@@ -626,12 +681,22 @@ export class DocumentSession {
 
   #remeasure(): void {
     const built = buildMeasurer(this.#fonts);
+    // The fits of the fixed measurer fit again when shaping starts (`late-fit.ts`).
+    if (this.#fonts.fixed) carryFits(this.#measurer, built.measurer);
     this.#measurer = built.measurer;
     this.#faces = built.faces;
     this.#layouts = new WeakMap();
     this.#bySlide.clear();
     this.#substitutions = null;
     this.#generation += 1;
+  }
+
+  /**
+   * Whether the session measures with the fixed measurer: `OpenOptions.fixedMeasurer`, or until
+   * `shaping` resolves. Read it through `editor.fontMeasurement()`. @internal
+   */
+  get fixedMeasurer(): boolean {
+    return this.#fonts.fixed;
   }
 
   /**
@@ -734,8 +799,10 @@ export class DocumentSession {
     const pkg = this.store.package;
     const target = relTarget(pkg, sourcePart, rId);
     if (!target) return undefined;
-    const mime = imageMime(target);
     const bytes = binaryPartOf(pkg, target);
+    // The signature decides the type: a damaged, mislabeled, or oversized picture draws the
+    // placeholder (`drawable-image.ts`).
+    const mime = bytes ? drawableImageMime(bytes, imageMime(target)) : undefined;
     if (!mime || !bytes) return undefined;
     const key = `${target}\u0000${bytes.length}`;
     const hit = this.#urls.get(key);
@@ -763,8 +830,19 @@ export class DocumentSession {
       : undefined;
   };
 
+  /** The families whose packaged substitutes the session loads; null when it loads none. */
+  get substituteFamilies(): readonly DefaultFamily[] | null {
+    return this.#fonts.substituteFamilies;
+  }
+
+  /** Whether `dispose` ran. @internal */
+  get disposed(): boolean {
+    return this.#disposed;
+  }
+
   /** Release blob URLs. */
   dispose(): void {
+    this.#disposed = true;
     for (const url of this.#urls.values()) URL.revokeObjectURL(url);
     this.#urls.clear();
   }
@@ -812,17 +890,56 @@ export async function openPresentation(
     return made;
   };
   if (options.fixedMeasurer) return { ok: true, session: make({ ...base, fixed: true }) };
-  await initializeHarfBuzz();
   const families = options.substitutes === false ? null : substituteFamiliesFor(read.pkg);
-  const loaded = families ? await substituteFonts(families) : { sources: [], failures: [] };
-  const fonts: FontSet = {
+  const parsedAt = performance.now();
+  const shaping = initializeHarfBuzz().then(() =>
+    families ? substituteFonts(families) : { sources: [], failures: [] }
+  );
+  const shaped = (loaded: SubstituteLoad): FontSet => ({
     ...base,
     substitutes: loaded.sources,
     substituteFailures: loaded.failures,
     substituteFamilies: families,
     fixed: false,
-  };
-  return { ok: true, session: make(fonts) };
+  });
+  if (options.shapingWaitMs === undefined)
+    return { ok: true, session: make(shaped(await shaping)) };
+  // A failure to load the text engine opens with the fixed measurer, as a stall does.
+  const settled = shaping.then(
+    (loaded) => ({ loaded }),
+    (error: unknown) => ({ error })
+  );
+  const inTime = await within(settled, options.shapingWaitMs, undefined);
+  if (inTime && 'loaded' in inTime) {
+    const session = make(shaped(inTime.loaded));
+    session.parsedAt = parsedAt;
+    return { ok: true, session };
+  }
+  const session = make({ ...base, substituteFamilies: families, fixed: true });
+  session.parsedAt = parsedAt;
+  session.shapingError = inTime?.error ?? null;
+  // The shapes that edits fit with the fixed measurer fit again when shaping starts, unless
+  // their XML is back to the opened package's (an undone edit).
+  const openedPackage = session.store.package;
+  session.shaping = inTime
+    ? Promise.resolve(false)
+    : settled.then((late) => {
+        if (!('loaded' in late)) {
+          session.shapingError = late.error;
+          return false;
+        }
+        const fixed = session.measurer;
+        session.useShapedMeasurer(late.loaded);
+        // Slides that parsed while the measurer was fixed can name families the open did not
+        // load: `addMissingSubstitutes` skipped them then.
+        // The fit waits for those substitutes, but a stalled or failed load does not stop it.
+        const refit = (): true => (refitEditedText(session, fixed, openedPackage), true);
+        return within(session.addMissingSubstitutes(), LATE_SUBSTITUTE_WAIT_MS, undefined).then(
+          refit,
+          refit
+        );
+      });
+  return { ok: true, session };
 }
 
 /** A slide index: a finite number truncated and clamped to `count` slides, else 0. @internal */

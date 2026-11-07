@@ -8,6 +8,7 @@
     "openFailed": "이 파일을 열 수 없습니다: {reason}",
     "dropHint": ".pptx 파일을 끌어다 놓아 여세요",
     "dropRefused": "{detail}은(는) .pptx 파일이 아닙니다. 여기에서는 .pptx 프레젠테이션만 열 수 있습니다.",
+    "deckFetchFailed": "프레젠테이션을 불러오지 못했습니다. 연결을 확인하고 페이지를 새로 고치거나 [열기]로 파일을 여세요.",
     "pdfExportFailed": "PDF를 만들 수 없습니다. 다시 시도하세요.",
     "pdfTooLarge": "이 프레젠테이션은 이 데모의 PDF 내보내기에 너무 큽니다. 한도는 4MiB입니다.",
     "pdfTooComplex": "이 프레젠테이션은 이 데모의 PDF 내보내기에 내용이 너무 많습니다.",
@@ -958,6 +959,7 @@
   },
   "canvas": {
     "ariaLabel": "슬라이드 {index}/{total}",
+    "emptyAriaLabel": "열린 프레젠테이션 없음",
     "inputAriaLabel": "선택한 도형의 텍스트",
     "adjustHandle": "끌어서 도형 모양 변경",
     "placeholderTable": "여기에 표 삽입",
@@ -1053,11 +1055,16 @@
     "reasons": {
       "damaged": "파일이 손상되었거나 PPTX 프레젠테이션이 아닙니다. 다른 파일을 여세요.",
       "notPptx": "파일에 프레젠테이션이 없습니다. PPTX 파일을 여세요.",
-      "tooLarge": "파일이 편집기에서 허용하는 크기보다 큽니다.",
-      "unknown": "편집기에서 파일을 열 수 없습니다."
+      "tooLarge": "파일이 너무 크거나 복잡하여 편집기에서 열 수 없습니다. 다른 파일을 여세요.",
+      "blocked": "이 파일에는 보안상의 이유로 편집기에서 열지 않는 내용이 포함되어 있습니다. 다른 파일을 여세요.",
+      "unknown": "편집기에서 파일을 열 수 없습니다. 다시 열어 보세요. 문제가 계속되면 지원팀에 문의하세요."
     },
     "kept": "열려 있던 프레젠테이션은 계속 열려 있습니다.",
     "code": "오류 코드: {code}",
+    "copyDetails": "세부 정보 복사",
+    "copied": "세부 정보를 복사했습니다",
+    "copyFailed": "브라우저에서 복사를 허용하지 않았습니다. 아래 세부 정보를 선택하여 복사하세요.",
+    "report": "오류 세부 정보",
     "close": "닫기"
   },
   "pictureFormat": {

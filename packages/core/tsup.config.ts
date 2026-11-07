@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { copyFile, readFile } from 'node:fs/promises';
 import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +11,11 @@ import { defineConfig, type Options } from 'tsup';
 // URL goes through `setHarfBuzzWasmUrl`, and `harfbuzz.wasm` ships in `dist/`.
 
 const here = dirname(fileURLToPath(import.meta.url));
+
+/** The package version, inlined for `openFailureReport` (`__PPTX_EDITOR_VERSION__`). */
+const { version } = JSON.parse(readFileSync(resolve(here, 'package.json'), 'utf8')) as {
+  version: string;
+};
 
 /** How the inlined runtime locates its binary, verbatim from the minified glue. */
 export const WASM_URL_EXPRESSION = 'new URL("harfbuzz.wasm",import.meta.url).href';
@@ -87,6 +93,7 @@ export default defineConfig({
   sourcemap: false,
   splitting: true,
   noExternal: ['harfbuzzjs', '@eigenpal/ooxml-core'],
+  define: { __PPTX_EDITOR_VERSION__: JSON.stringify(version) },
   esbuildPlugins: [harfBuzzWasmUrlEscapeHatch],
   esbuildOptions(options) {
     options.alias = { ...options.alias, module: resolve(here, 'src/layout/node-module-shim.ts') };

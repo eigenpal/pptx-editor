@@ -51,18 +51,41 @@ function declaringAncestors(ac: Element, root: Element | undefined): readonly El
   return map.get(ac) ?? [root];
 }
 
+/**
+ * Each element's own prefix declarations, first one wins, built once per element: a `Requires`
+ * list checks each prefix on every scope, and a part can declare thousands of prefixes.
+ */
+const declsByElement = new WeakMap<Element, ReadonlyMap<string, string>>();
+
+function declsOf(el: Element): ReadonlyMap<string, string> {
+  let map = declsByElement.get(el);
+  if (!map) {
+    const built = new Map<string, string>();
+    for (const d of el.nsDecls) if (!built.has(d.prefix)) built.set(d.prefix, d.uri);
+    declsByElement.set(el, built);
+    map = built;
+  }
+  return map;
+}
+
 /** The namespace bound to `prefix` on the first of `scopes` that declares it. */
 function namespaceOf(prefix: string, scopes: readonly Element[]): string | undefined {
   for (const el of scopes) {
-    const decl = el.nsDecls.find((d) => d.prefix === prefix);
-    if (decl) return decl.uri;
+    if (el.nsDecls.length === 0) continue;
+    const uri = declsOf(el).get(prefix);
+    if (uri !== undefined) return uri;
   }
   return undefined;
 }
 
-/** Whether every element of a branch is a shape kind the cascade draws. */
+/**
+ * Whether every element of a branch is a shape kind the cascade draws, or another
+ * `mc:AlternateContent`, which resolves in turn.
+ */
 function isDrawable(branch: Element): boolean {
-  return elements(branch).every((el) => el.ns === NS.p && DRAWABLE.has(el.local));
+  return elements(branch).every(
+    (el) => (el.ns === NS.p && DRAWABLE.has(el.local)) || isAlternateContent(el)
+  );
 }
 
 /**
@@ -100,13 +123,12 @@ export function alternateBranch(ac: Element, root?: Element): Element | undefine
  */
 export function contentElements(tree: Element | undefined, root?: Element): Element[] {
   const out: Element[] = [];
-  for (const el of elements(tree)) {
-    if (!isAlternateContent(el)) {
-      out.push(el);
-      continue;
-    }
-    const branch = alternateBranch(el, root);
-    for (const inner of elements(branch)) out.push(inner);
-  }
+  const add = (el: Element, depth: number): void => {
+    if (!isAlternateContent(el)) return void out.push(el);
+    // A chosen branch can hold another `mc:AlternateContent`: it resolves the same way.
+    if (depth >= MAX_DEPTH) return;
+    for (const inner of elements(alternateBranch(el, root))) add(inner, depth + 1);
+  };
+  for (const el of elements(tree)) add(el, 0);
   return out;
 }

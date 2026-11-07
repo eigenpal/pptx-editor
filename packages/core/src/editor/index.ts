@@ -4,7 +4,11 @@
 export * from './document-session.ts';
 export { createPptxEditor } from './pptx-editor.ts';
 export { createBrowserAutomationHost } from './automation-host.ts';
-export type { PptxEditorInstance, PptxEditorOptions } from './pptx-editor-types.ts';
+export type {
+  FontMeasurementState,
+  PptxEditorInstance,
+  PptxEditorOptions,
+} from './pptx-editor-types.ts';
 export {
   CHROME_GROUPS,
   chromeControlForSlot,
@@ -127,7 +131,13 @@ export {
 export { createEditorRefApi, type EditorRefApi } from './editor-ref.ts';
 export {
   OPEN_FAILURE_MESSAGE_KEYS,
+  copyOpenFailureReport,
+  type OpenFailureCopy,
+  COPY_RESULT_GAP_MS,
+  openFailureKey,
   documentOpenFailure,
+  openFailureReport,
+  type OpenFailureReportContext,
   loadingSheetSize,
   sameLoadingSheetSize,
   shownOpenFailure,
@@ -496,6 +506,7 @@ export {
   warnIgnoredSlotAttributes,
   warnUnsupportedOverride,
   warnModulesChanged,
+  churnWarning,
   sameModules,
   type MenuPartNames,
   type OpenFailureActionNames,

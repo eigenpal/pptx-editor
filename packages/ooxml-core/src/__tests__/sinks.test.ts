@@ -48,6 +48,17 @@ describe('sanitizeHref', () => {
     // Embedded control chars must not let "java\nscript:" through.
     expect(sanitizeHref('java\nscript:alert(1)')).toEqual({ ok: false, inert: true });
     expect(sanitizeHref('  java\tscript:alert(1)')).toEqual({ ok: false, inert: true });
+    // A URL parser drops leading C0 controls before it reads the scheme.
+    expect(sanitizeHref('\u0001javascript:alert(1)')).toEqual({ ok: false, inert: true });
+    expect(sanitizeHref('\u0000\u001f data:text/html,x')).toEqual({ ok: false, inert: true });
+  });
+
+  test('a long run of controls trims in linear time', () => {
+    const run = '\u0000'.repeat(200_000);
+    const started = performance.now();
+    expect(sanitizeHref(`a${run}b`)).toEqual({ ok: true, href: `a${run}b` });
+    expect(sanitizeHref(`${run}x${run}`)).toEqual({ ok: true, href: 'x' });
+    expect(performance.now() - started).toBeLessThan(500);
   });
 });
 

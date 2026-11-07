@@ -10,7 +10,8 @@ import { isCanonicalPartName, partNameKey } from '@eigenpal/ooxml-core';
 import type { PackagePart, PptxPackage } from '../package/package.ts';
 import { DerivedParts } from '../package/parts-map.ts';
 import { isValidXmlText } from '@eigenpal/ooxml-core';
-import { parseXmlPart } from '../package/tree.ts';
+import { parseXmlPart, type Element } from '../package/tree.ts';
+import { nodeIndex } from './node-index.ts';
 import { MAX_XML_DEPTH } from '@eigenpal/ooxml-core';
 import { checkOpShape, checkSpec } from './op-checks.ts';
 import { materialize, withAttr, type NodeSpec } from './tree-edit.ts';
@@ -204,6 +205,23 @@ class Transaction {
     return tree;
   }
 
+  /** The id the next node inserted into `part` gets: the open tree's, else the part's. */
+  nextId(part: string): number | undefined {
+    const open = this.#trees.get(part);
+    if (open) return open.nextId;
+    const p = (this.#parts ?? this.#base.parts).get(part);
+    return p?.kind === 'xml' ? p.xml.nextId : undefined;
+  }
+
+  /** The element `id` of `part`: from the open tree, else from the part's own index. */
+  element(part: string, id: string): Element | undefined {
+    const open = this.#trees.get(part);
+    if (open) return open.element(id);
+    const p = (this.#parts ?? this.#base.parts).get(part);
+    const node = p?.kind === 'xml' ? nodeIndex(p.xml).get(id)?.node : undefined;
+    return node?.type === 'element' ? node : undefined;
+  }
+
   apply(op: PptxOp): OpRejection | null {
     const shape = checkOpShape(op);
     if (shape) return shape;
@@ -335,6 +353,33 @@ class Transaction {
         this.#partsForWrite().set(name, { kind: 'xml', partName: name, xml: tree.result() });
     return this.#parts ? { parts: this.#parts.seal() } : this.#base;
   }
+}
+
+/** A transaction left open across ops: each op checks and applies at once. @internal */
+export interface OpenTransaction {
+  /** Apply one op; a rejection leaves the transaction unusable. */
+  apply(op: PptxOp): OpRejection | null;
+  /** The id the next node inserted into `part` gets, or undefined for no such XML part. */
+  nextId(part: string): number | undefined;
+  /** The element `id` of `part` as the applied ops left it, or undefined. */
+  element(part: string, id: string): Element | undefined;
+  /** The package after every applied op. The transaction is done after it. */
+  finish(): PptxPackage;
+}
+
+/**
+ * Open a transaction on `pkg` that ops apply to one at a time. A part's id index is copied once
+ * per transaction, not once per op, so n ops on one part cost O(n + part), not O(n × part).
+ * Pure: never mutates `pkg`. @internal
+ */
+export function openTransaction(pkg: PptxPackage): OpenTransaction {
+  const tx = new Transaction(pkg);
+  return {
+    apply: (op) => tx.apply(op),
+    nextId: (part) => tx.nextId(part),
+    element: (part, id) => tx.element(part, id),
+    finish: () => tx.finish(),
+  };
 }
 
 /** Apply ops in order against one working copy. All or nothing. Pure: never mutates `pkg`. */

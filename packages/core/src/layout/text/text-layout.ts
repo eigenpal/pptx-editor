@@ -359,14 +359,17 @@ export function layoutText(
 
 /**
  * `layoutText` with the single line that the body's lines are spaced on (`LineBasis`): diagram
- * text takes the face's line (`face`).
+ * text takes the face's line (`face`). With `untilOverflow`, a single column stops after the
+ * first paragraph that ends below the box: line heights and spacings are never negative, so
+ * the text cannot fit after that. Only a fit check reads such a layout (`contentHeight`).
  * @internal
  */
 export function layoutTextOn(
   body: ResolvedTextBody,
   rect: { x: number; y: number; width: number; height: number },
   measurer: TextMeasurer,
-  basis: LineBasis
+  basis: LineBasis,
+  untilOverflow = false
 ): TextLayout {
   const bp = body.body;
   const vert = bp.vert;
@@ -387,8 +390,11 @@ export function layoutTextOn(
   const paragraphLengths: number[] = [];
   let y = 0;
   const numbering = new AutonumberCounters();
+  const overflowAt = untilOverflow && columns <= 1 ? outerH + 1 - bp.tIns - bp.bIns : Infinity;
+  let overflowed = false;
 
   body.paragraphs.forEach((p, pi) => {
+    if (overflowed) return;
     const segments = buildSegments(p, measurer, fontScale, substitutions, vert === 'wordArtVert');
     const sourceLength = p.runs.reduce((n, r) => n + (r.kind === 'break' ? 1 : r.text.length), 0);
     paragraphLengths.push(sourceLength);
@@ -681,6 +687,7 @@ export function layoutTextOn(
     });
     if (!isLast || bp.spcFirstLastPara)
       y += paragraphSpacingPt(p.spaceAfter, firstSize) * EMU_PER_PT;
+    if (y > overflowAt) overflowed = true;
   });
 
   // Columns: flow lines into the next column when the box height is exceeded. Baselines are

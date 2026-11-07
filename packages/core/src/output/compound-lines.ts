@@ -29,7 +29,7 @@ export function compoundBands(
   width: number,
   closed: boolean
 ): { outer: Band[]; inner: Band[] } | null {
-  let bands = COMPOUND_BANDS[cmpd];
+  let bands = Object.hasOwn(COMPOUND_BANDS, cmpd) ? COMPOUND_BANDS[cmpd] : undefined;
   if (!bands) return null;
   if (!closed && (cmpd === 'thickThin' || cmpd === 'thinThick')) bands = COMPOUND_BANDS.dbl;
   const outer: Band[] = [];

@@ -3,6 +3,7 @@
 // their geometry's text rectangle. Paint reads these records and never re-derives geometry.
 
 import type {
+  ResolvedElement,
   ResolvedGraphicFrame,
   ResolvedGroup,
   ResolvedPicture,
@@ -96,13 +97,35 @@ export interface SlideLayout {
   readonly diagnostics: readonly string[];
 }
 
+/**
+ * Laid-out elements by their resolved element, with the measurer they were measured with. The
+ * cascade keeps a resolved element's object while nothing it reads changed
+ * (`resolveSlide`), and a top-level element lays out from it and the measurer only: the same
+ * pair gives the same item, so an unchanged shape keeps its item and its paint.
+ */
+const laidByElement = new WeakMap<
+  ResolvedElement,
+  {
+    readonly measurer: TextMeasurer;
+    readonly item: LayoutItem | null;
+    readonly diagnostics: readonly string[];
+  }
+>();
+
 /** Lay out a resolved slide. */
 export function layoutSlide(slide: ResolvedSlide, measurer: TextMeasurer): SlideLayout {
   const diagnostics = new Set<string>();
   const items: LayoutItem[] = [];
   for (const el of slide.elements) {
-    const item = layoutElement(el, IDENTITY, null, measurer, diagnostics);
-    if (item) items.push(item);
+    let hit = laidByElement.get(el);
+    if (!hit || hit.measurer !== measurer) {
+      const own = new Set<string>();
+      const item = layoutElement(el, IDENTITY, null, measurer, own);
+      hit = { measurer, item, diagnostics: [...own] };
+      laidByElement.set(el, hit);
+    }
+    for (const d of hit.diagnostics) diagnostics.add(d);
+    if (hit.item) items.push(hit.item);
   }
   for (const id of slideApproximations(items, slide.background))
     diagnostics.add(`approximation: ${id}`);

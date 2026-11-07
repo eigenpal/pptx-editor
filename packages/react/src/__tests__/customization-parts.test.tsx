@@ -488,3 +488,79 @@ describe('useEditorHostDocument', () => {
     expect(seen === document).toBe(true);
   });
 });
+
+describe('Close on the open-failure notice', () => {
+  test('with no deck open, focus goes to the slide canvas, not the page body', async () => {
+    let editor: PptxEditorInstance | null = null;
+    render(
+      <PptxEditor.Root onReady={(e) => (editor = e)}>
+        <PptxEditor.Content />
+        <PptxEditor.OpenFailure />
+      </PptxEditor.Root>
+    );
+    await act(async () => void (await editor!.load(new Uint8Array([1, 2, 3]))));
+    expect(editor!.session).toBeNull();
+    const close = screen.getByRole('button', { name: 'Close' });
+    close.focus();
+    act(() => void fireEvent.click(close));
+    expect(document.querySelector('.pptx-open-failure')).toBeNull();
+    const canvas = document.querySelector('.pptx-surface');
+    expect(document.activeElement).toBe(canvas);
+    expect(canvas!.getAttribute('aria-label')).toBe('No presentation open');
+  });
+});
+
+describe('Copy details on the open-failure notice', () => {
+  test('copies the report and says so; showCopy hides it', async () => {
+    const written: string[] = [];
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (text: string) => void written.push(text) },
+    });
+    let editor: PptxEditorInstance | null = null;
+    render(
+      <PptxEditor.Root onReady={(e) => (editor = e)}>
+        <PptxEditor.OpenFailure />
+        <PptxEditor.OpenFailure showCopy={false} className="no-copy" />
+      </PptxEditor.Root>
+    );
+    await act(async () => void (await editor!.load(new Uint8Array([1, 2, 3]))));
+    expect(document.querySelector('.no-copy')!.textContent).not.toContain('Copy details');
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Copy details' })));
+    await waitFor(() =>
+      expect(document.querySelector('.pptx-open-failure__status')?.textContent).toBe(
+        'Details copied'
+      )
+    );
+    expect(written).toHaveLength(1);
+    expect(written[0]).toStartWith('PPTX Editor could not open a file.\nCode: zip');
+    expect(document.querySelector('.pptx-open-failure__report')).toBeNull();
+  });
+
+  test('a blocked clipboard shows the report to copy by hand', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async () => Promise.reject(new Error('NotAllowedError')) },
+    });
+    let editor: PptxEditorInstance | null = null;
+    render(
+      <PptxEditor.Root onReady={(e) => (editor = e)}>
+        <PptxEditor.OpenFailure />
+      </PptxEditor.Root>
+    );
+    await act(async () => void (await editor!.load(new Uint8Array([1, 2, 3]))));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Copy details' })));
+    await waitFor(() =>
+      expect(document.querySelector('.pptx-open-failure__status')?.textContent).toContain(
+        'did not allow'
+      )
+    );
+    const report = document.querySelector<HTMLTextAreaElement>('.pptx-open-failure__report')!;
+    expect(report.readOnly).toBe(true);
+    expect(report.getAttribute('aria-label')).toBe('Error details');
+    expect(report.value).toStartWith('PPTX Editor could not open a file.\nCode: zip');
+    // The blocked copy moves focus to the report, which selects it for the copy key.
+    expect(document.activeElement).toBe(report);
+    expect([report.selectionStart, report.selectionEnd]).toEqual([0, report.value.length]);
+  });
+});

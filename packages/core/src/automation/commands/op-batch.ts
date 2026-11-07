@@ -3,11 +3,12 @@
 // part), so the store re-applying the same ops produces the same ids.
 
 import {
-  applyOp,
   applyOps,
   nodeIndex,
+  openTransaction,
   xmlPartOf,
   type Element,
+  type OpenTransaction,
   type OpRejection,
   type PptxOp,
   type PptxPackage,
@@ -80,6 +81,13 @@ const NO_NAMES: ReadonlySet<string> = new Set();
 
 export class OpBatch {
   #pkg: PptxPackage;
+  /**
+   * The transaction the ops since the last read of `pkg` apply to, and those ops. One
+   * transaction for a run of pushes: a format check pushes an op for each paragraph, and a
+   * transaction per op copied the part's id index each time.
+   */
+  #tx: OpenTransaction | null = null;
+  #open: PptxOp[] = [];
   readonly ops: PptxOp[] = [];
   /** Case-folded part names that new parts must not take. */
   readonly reservedPartNames: ReadonlySet<string>;
@@ -120,14 +128,32 @@ export class OpBatch {
 
   /** The working package after every op so far. */
   get pkg(): PptxPackage {
+    this.#settle();
     return this.#pkg;
+  }
+
+  /** Close the open transaction into `#pkg`. */
+  #settle(): void {
+    if (!this.#tx) return;
+    this.#pkg = this.#tx.finish();
+    this.#tx = null;
+    this.#open = [];
   }
 
   /** Apply an op to the working package, or refuse the transaction. */
   push(op: PptxOp): void {
-    const r = applyOp(this.#pkg, op);
-    if (!r.ok) throw new CommandRefusal('errors.unsupported', describe(r.rejection));
-    this.#pkg = r.pkg;
+    this.#tx ??= openTransaction(this.#pkg);
+    const rejection = this.#tx.apply(op);
+    if (rejection) {
+      // A refused op leaves the open transaction unusable: rebuild the package from the ops
+      // that applied, so the batch stays what its `ops` say.
+      const kept = applyOps(this.#pkg, this.#open);
+      this.#tx = null;
+      this.#open = [];
+      if (kept.ok) this.#pkg = kept.pkg;
+      throw new CommandRefusal('errors.unsupported', describe(rejection));
+    }
+    this.#open.push(op);
     this.ops.push(op);
   }
 
@@ -138,6 +164,7 @@ export class OpBatch {
    */
   pushAll(ops: readonly PptxOp[]): void {
     if (ops.length === 0) return;
+    this.#settle();
     const r = applyOps(this.#pkg, ops);
     if (!r.ok) throw new CommandRefusal('errors.unsupported', describe(r.rejection));
     this.#pkg = r.pkg;
@@ -146,15 +173,23 @@ export class OpBatch {
 
   /** Insert and return the new element's id. */
   insert(op: Extract<PptxOp, { op: 'insertNode' }>): string {
-    const before = xmlPartOf(this.#pkg, op.part)?.nextId ?? 0;
+    // From the open transaction: reading `pkg` would close it before each insert.
+    const before =
+      (this.#tx ? this.#tx.nextId(op.part) : xmlPartOf(this.#pkg, op.part)?.nextId) ?? 0;
     this.push(op);
     return `n${before}`;
   }
 
   /** The current element for an id in a part. */
   element(part: string, id: string): Element {
-    const xml = xmlPartOf(this.#pkg, part);
-    const node = xml ? nodeIndex(xml).get(id)?.node : undefined;
+    // From the open transaction: reading `pkg` would close it before each op.
+    let node: Element | undefined;
+    if (this.#tx) node = this.#tx.element(part, id);
+    else {
+      const xml = xmlPartOf(this.#pkg, part);
+      const found = xml ? nodeIndex(xml).get(id)?.node : undefined;
+      node = found?.type === 'element' ? found : undefined;
+    }
     if (!node || node.type !== 'element')
       throw new CommandRefusal('errors.unsupported', `missing node ${id}`);
     return node;

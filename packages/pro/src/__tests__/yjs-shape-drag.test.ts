@@ -142,11 +142,16 @@ describe('a shape drag in a collaboration room', () => {
   test('a peer edit to another shape repaints the slide and keeps the drag', async () => {
     const { a, b, host, dragA, release, done } = await room();
     dragA();
-    const slide = host.querySelector('.pptx-surface__slide');
+    // Node ids are each peer's own: A paints `host`, B edits.
+    const shownB = a.session!.layout(0)!.items[1]!.element.nodeId;
+    const paintedB = () => host.querySelector(`.pptx-surface__slide [data-node-id="${shownB}"]`);
+    const before = paintedB();
+    expect(before).not.toBeNull();
     // The peer fills shape B green.
     b.setSelection({ kind: 'shapes', nodeIds: [b.session!.layout(0)!.items[1]!.element.nodeId] });
     expect(b.exec({ type: 'setShapeFill', color: '#70AD47' }).ok).toBe(true);
-    expect(host.querySelector('.pptx-surface__slide')).not.toBe(slide);
+    // Shape B paints again; the slide keeps the nodes of the shapes that did not change.
+    expect(paintedB()).not.toBe(before);
     expect(preview(host)).not.toBeNull();
     release();
     // Both edits stay: the move and the peer's fill.

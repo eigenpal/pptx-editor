@@ -723,6 +723,129 @@ function contentCorners(
   return out;
 }
 
+/** The painted node of one item and the definitions it added. */
+interface PaintedItem {
+  readonly node: SVGElement | null;
+  readonly defs: readonly SVGElement[];
+}
+
+/**
+ * Paints the slides of one view again and again, and reuses the nodes of the items it painted
+ * before. A layout item is an immutable value, and the layout keeps an item's object while its
+ * shape is unchanged (`layoutSlide`), so the same item paints the same nodes: an edit paints the
+ * items it changed, not the whole slide. `paintSlide` paints from nothing, for exports,
+ * thumbnails, and the fidelity check; both paint each item with `paintItem`.
+ *
+ * Nothing else may change the nodes it returns, except for a while: a drag preview hides nodes
+ * and must put them back (`PaintedPreview.clear`) before the next `paint`. @internal
+ */
+export class SlidePainter {
+  readonly #doc: Document;
+  readonly #opts: PaintOptions;
+  readonly #defs: Defs;
+  #root: SVGSVGElement | null = null;
+  #content: SVGElement | null = null;
+  #background: PaintedItem | null = null;
+  #items = new Map<LayoutItem, PaintedItem>();
+  /** Items that a layout held twice: their second paint is never reused. */
+  #twice: PaintedItem[] = [];
+  #slide = '';
+
+  constructor(doc: Document, opts: PaintOptions) {
+    this.#doc = doc;
+    this.#opts = opts;
+    this.#defs = new Defs(doc, opts.idPrefix);
+  }
+
+  /** Whether this painter paints with `opts`: the same ports and id prefix. */
+  paints(opts: PaintOptions): boolean {
+    const a = this.#opts;
+    return (
+      a.images === opts.images &&
+      a.imageSize === opts.imageSize &&
+      a.idPrefix === opts.idPrefix &&
+      a.frameLabel === opts.frameLabel &&
+      a.hitTargets === opts.hitTargets &&
+      a.altText === opts.altText
+    );
+  }
+
+  /** Paint `layout`, reusing the nodes of items painted before. Returns the same `<svg>`. */
+  paint(layout: SlideLayout): SVGSVGElement {
+    const doc = this.#doc;
+    const { width, height } = layout.slide;
+    const slide = `${layout.slide.partName} ${width}x${height}`;
+    if (!this.#root || !this.#content || this.#slide !== slide) {
+      this.#root = doc.createElementNS(SVG_NS, 'svg') as SVGSVGElement;
+      this.#root.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      this.#root.setAttribute('preserveAspectRatio', 'none');
+      this.#root.setAttribute('data-slide-part', layout.slide.partName);
+      this.#defs.element.replaceChildren();
+      this.#root.appendChild(this.#defs.element);
+      this.#content = svg(doc, 'g', { 'data-kind': 'content' });
+      this.#root.appendChild(this.#content);
+      this.#background = null;
+      this.#items.clear();
+      this.#twice = [];
+      this.#slide = slide;
+    }
+    const root = this.#root;
+    const content = this.#content;
+    const ctx: PaintContext = {
+      defs: this.#defs,
+      images: this.#opts.images,
+      ...(this.#opts.imageSize ? { imageSize: this.#opts.imageSize } : {}),
+      sourcePart: layout.slide.backgroundPart,
+    };
+    // The background is one rectangle: it paints each time.
+    const drop = (painted: PaintedItem): void => {
+      painted.node?.remove();
+      for (const d of painted.defs) d.remove();
+    };
+    if (this.#background) drop(this.#background);
+    for (const painted of this.#twice.splice(0)) drop(painted);
+    const background = this.#defs.capture(() => {
+      const bg = fillPaint(layout.slide.background, width, height, ctx);
+      return svg(doc, 'rect', {
+        width,
+        height,
+        fill: bg.paint === 'none' ? '#ffffff' : bg.paint,
+        'fill-opacity': bg.opacity < 1 ? num(bg.opacity) : undefined,
+        'data-kind': 'background',
+      });
+    });
+    this.#background = { node: background.value, defs: background.defs };
+    root.insertBefore(background.value, content);
+    const next = new Map<LayoutItem, PaintedItem>();
+    const nodes: SVGElement[] = [];
+    const paintFresh = (item: LayoutItem): PaintedItem => {
+      const fresh = this.#defs.capture(() => paintItem(doc, item, ctx, this.#opts, 1));
+      return { node: fresh.value, defs: fresh.defs };
+    };
+    for (const item of layout.items) {
+      let painted: PaintedItem;
+      if (next.has(item)) {
+        // An item twice in one layout paints twice: one node cannot stand in two places.
+        painted = paintFresh(item);
+        this.#twice.push(painted);
+      } else {
+        painted = this.#items.get(item) ?? paintFresh(item);
+        next.set(item, painted);
+      }
+      if (painted.node) nodes.push(painted.node);
+    }
+    for (const [item, painted] of this.#items) if (!next.has(item)) drop(painted);
+    this.#items = next;
+    // Put the nodes in paint order, moving only the ones out of place.
+    nodes.forEach((node, i) => {
+      const at = content.childNodes[i] ?? null;
+      if (at !== node) content.insertBefore(node, at);
+    });
+    while (content.childNodes.length > nodes.length) content.lastChild?.remove();
+    return root;
+  }
+}
+
 /** Paint a slide into a new `<svg>` sized by viewBox in EMU. The caller sets CSS size. */
 export function paintSlide(doc: Document, layout: SlideLayout, opts: PaintOptions): SVGSVGElement {
   const { width, height } = layout.slide;

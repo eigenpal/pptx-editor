@@ -20,6 +20,7 @@ export function watchOpenFailures(editor: Editor, showMessage: (message: string)
       damaged: 'This presentation is damaged.',
       'not-pptx': 'Choose a PPTX presentation.',
       'too-large': 'This presentation exceeds the input limits.',
+      blocked: 'This presentation uses content that is refused for security.',
       unknown: 'The presentation could not be opened.',
     };
     showMessage(messages[failure.reason]);
@@ -27,7 +28,24 @@ export function watchOpenFailures(editor: Editor, showMessage: (message: string)
 }
 ```
 
-Call the returned function when you remove your integration. `failure.code` provides a diagnostic code. The failure object contains no filename or presentation content.
+Call the returned function when you remove your integration. `failure.code` provides a diagnostic code, such as `xml-depth-limit`. The failure object contains no filename or presentation content.
+
+An open that throws ends in a failure with the `failed` code. `load()` resolves with `ok: false`, and the loading screen closes. A text engine that does not start is not a failure: the presentation opens with a fixed measurer, and `onFontError` reports why.
+
+## Send a failure to support
+
+`openFailureReport()` turns a failure into plain text for a support request. The text holds the code, the reason, the editor version, the browser, and the time. It is in English for the support team, whatever the editor's locale. This sample logs the report with each failure:
+
+```ts
+import { onEditorEvent, openFailureReport } from '@pptx-editor.dev/core/editor';
+import type { Editor } from '@pptx-editor.dev/core/contracts';
+
+export function logOpenFailures(editor: Editor, log: (report: string) => void) {
+  return onEditorEvent(editor, 'openFailure', (failure) => log(openFailureReport(failure)));
+}
+```
+
+The packaged notice shows **Copy details**, which copies the same text. When the browser blocks the clipboard, the notice shows the text so the person can select and copy it.
 
 A failed replacement can leave the previous presentation open. Check `openFailure`, rather than treating `status === 'ready'` as proof that the replacement succeeded.
 

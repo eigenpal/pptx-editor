@@ -89,6 +89,7 @@ Pass options as the `openFailure` object on `PptxEditor`, or as props of `PptxEd
 | `title` | `openFailure.title` | The notice title. |
 | `message` | The message for the `reason` | Content, or a function of the `DocumentOpenFailure`. In Vue, the `message` slot wins over it. |
 | `showCode` | `true` | Shows the error code. |
+| `showCopy` | `true` | Shows **Copy details**, which copies the `openFailureReport()` text for a support request. |
 | `actions` | None | Your own buttons, as a function of the context. In Vue, the `actions` slot wins over it. |
 | `closeLabel` | `openFailure.close` | The **Close** label. |
 | `showClose` | `true` | Shows **Close**. |
@@ -105,8 +106,9 @@ The notice uses the `.pptx-open-failure` class, with `data-reason` set to the fa
 | --- | --- | --- |
 | `damaged` | `zip`, `xml`, `no-content-types` | `openFailure.reasons.damaged` |
 | `not-pptx` | `not-a-presentation`, `empty` | `openFailure.reasons.notPptx` |
-| `too-large` | `too-many-parts` | `openFailure.reasons.tooLarge` |
-| `unknown` | Any other code | `openFailure.reasons.unknown` |
+| `too-large` | `too-many-parts`, `zip-entry-limit`, `zip-size-limit`, `xml-size-limit`, `xml-depth-limit`, `xml-element-limit` | `openFailure.reasons.tooLarge` |
+| `blocked` | `xml-dtd-forbidden` | `openFailure.reasons.blocked` |
+| `unknown` | `failed` (the open threw), and any other code | `openFailure.reasons.unknown` |
 
 To change a message in every editor, override its key in `locale`.
 

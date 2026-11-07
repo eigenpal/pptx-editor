@@ -61,6 +61,8 @@ const title = defineModel<string>('title', { required: true });
 const mode = defineModel<'edit' | 'view'>('mode', { required: true });
 const theme = defineModel<'light' | 'dark'>('theme', { required: true });
 const emit = defineEmits<{ openFile: [file: File]; new: []; example: []; saved: [] }>();
+/** The first deck did not load: no spinner while no deck is open. */
+const props = defineProps<{ deckFailed: boolean }>();
 
 const { t } = useTranslation();
 const editor = usePptxEditor();
@@ -68,6 +70,8 @@ const sorter = useEditorState((s) => s.presentationView === 'slideSorter');
 // `?chrome=ribbon` shows the ribbon and the status bar in place of the flat toolbar.
 const ribbon = ribbonChrome(location.search);
 const canPresent = useEditorState((s) => s.status === 'ready' && s.slides.length > 0);
+// With no deck to open (its fetch failed), the notice says why in place of the spinner.
+const waiting = useEditorState((s) => s.status === 'empty');
 // A phone opens with the notes closed, so the slide gets the room; one tap opens them.
 const phoneScreen =
   typeof matchMedia === 'function' && matchMedia('(max-height: 500px), (max-width: 600px)').matches;
@@ -293,7 +297,7 @@ function onDrop(e: DragEvent): void {
           <div class="demo-canvas" :hidden="sorter" :style="{ '--demo-slide-ratio': slideRatio }">
             <PptxEditorContent />
             <PptxEditorFindBar />
-            <PptxEditorLoading overlay />
+            <PptxEditorLoading v-if="!(props.deckFailed && waiting)" overlay />
             <PptxEditorFontNotice />
           </div>
           <!-- The view switch and the zoom stay in view in both views, under the slide. -->

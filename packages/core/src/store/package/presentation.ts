@@ -4,6 +4,7 @@
 
 import {
   changedPartNames,
+  contentTypeOf,
   equivalentPartName,
   mainPresentationPart,
   relationshipById,
@@ -118,6 +119,23 @@ function remember(pkg: PptxPackage, info: PresentationInfo): PresentationInfo {
   return info;
 }
 
+const SLIDE_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.presentationml.slide+xml';
+
+/**
+ * Whether `partName` is a slide: an XML part with the slide content type, or one whose root is
+ * `p:sld`. A slide with a missing or generic content type still counts. A layout, a master, a
+ * theme, or the presentation part never does, so a slide edit never writes into a part that
+ * other slides share. Only a part with the slide content type is deferred, so the root check
+ * never forces a deferred parse.
+ */
+function isSlidePart(pkg: PptxPackage, partName: string): boolean {
+  const part = pkg.parts.get(partName);
+  if (part?.kind !== 'xml') return false;
+  if (contentTypeOf(pkg, partName)?.trim().toLowerCase() === SLIDE_CONTENT_TYPE) return true;
+  const root = part.xml.root;
+  return root.ns === NS.p && root.local === 'sld';
+}
+
 /** Read the presentation structure. Memoized per package identity. */
 export function presentationInfo(pkg: PptxPackage): PresentationInfo {
   const hit = cache.get(pkg);
@@ -138,11 +156,14 @@ export function presentationInfo(pkg: PptxPackage): PresentationInfo {
   const entries = mainPresentationPart(pkg) ? (repairedPresentationRoot(pkg) ?? root) : root;
   for (const el of children(path(entries, 'p:sldIdLst'), 'p:sldId')) {
     const rId = attr(el, 'r:id');
-    const target = rId ? relTarget(pkg, presentationPart, rId) : undefined;
+    // Only a slide relationship names a slide: an entry that names the master, a layout, or the
+    // theme would let edits to that "slide" write into the part every slide shares.
+    const rel = rId ? relationshipById(pkg, presentationPart, rId) : undefined;
+    const target = rel?.type === REL.slide ? relTarget(pkg, presentationPart, rId!) : undefined;
     // OPC part names fold ASCII case (ECMA-376 Part 2, 6.2.2.3), as the writer's repair does
     // (`liveRelationshipIds`): a target that differs only in case names the part.
     const partName = target ? equivalentPartName(pkg, target) : undefined;
-    if (!rId || !partName || pkg.parts.get(partName)?.kind !== 'xml') continue;
+    if (!rId || !partName || !isSlidePart(pkg, partName)) continue;
     const layoutPart = relTargetByType(pkg, partName, REL.slideLayout);
     const masterPart = layoutPart ? relTargetByType(pkg, layoutPart, REL.slideMaster) : undefined;
     const themePart = masterPart ? relTargetByType(pkg, masterPart, REL.theme) : undefined;

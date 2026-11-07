@@ -112,6 +112,13 @@ export interface RegisterFontFacesOptions {
 export function serializeSvgElement(root: Element): string;
 
 // @internal
+export class SlidePainter {
+    constructor(doc: Document, opts: PaintOptions);
+    paint(layout: SlideLayout): SVGSVGElement;
+    paints(opts: PaintOptions): boolean;
+}
+
+// @internal
 export const STORED_PIXELS_STYLE = "image-orientation: none";
 
 // @public (undocumented)

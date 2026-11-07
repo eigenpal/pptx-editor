@@ -387,6 +387,9 @@ export interface FontSource {
 }
 
 // @public
+export function fontSubstitutes(family: string): readonly string[];
+
+// @public
 export type FontValidationResult = {
     readonly valid: true;
 } | {
@@ -535,7 +538,7 @@ export function layoutTextOn(body: ResolvedTextBody, rect: {
     y: number;
     width: number;
     height: number;
-}, measurer: TextMeasurer, basis: LineBasis): TextLayout;
+}, measurer: TextMeasurer, basis: LineBasis, untilOverflow?: boolean): TextLayout;
 
 // @public
 export interface Line {
@@ -729,6 +732,9 @@ export const SCRIPT_SIZE_SCALE: number;
 
 // @public
 export function setHarfBuzzWasmUrl(url: string | URL): void;
+
+// @internal
+export function sfntTable(bytes: Uint8Array, tag: string): Uint8Array | undefined;
 
 // @public
 export const sha256FontBytes: (bytes: Uint8Array) => string;

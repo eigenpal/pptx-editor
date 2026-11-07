@@ -4,7 +4,7 @@
 
 import { child, type Element } from '../store/index.ts';
 import type { EditorSelection, TextPoint } from '../contracts/index.ts';
-import { refit } from '../automation/commands/autofit.ts';
+import { refit, refitAll } from '../automation/commands/autofit.ts';
 import { tblOf } from '../automation/commands/table-model.ts';
 import { tableTextTargets } from './table-commands.ts';
 import type { ListTarget } from '../automation/commands/list-commands.ts';
@@ -94,7 +94,9 @@ export function refitTargets(
   part: string,
   targets: readonly { readonly shapeId: string }[]
 ): void {
-  for (const id of new Set(targets.map((t) => t.shapeId))) refitShape(batch, ctx, part, id);
+  if (ctx.probe) return;
+  const ids = new Set(targets.map((t) => t.shapeId));
+  refitAll(batch, ctx.slide, part, ids, ctx.session.measurer);
 }
 
 export function forRuns(

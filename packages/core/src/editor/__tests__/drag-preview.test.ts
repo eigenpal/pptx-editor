@@ -296,10 +296,14 @@ describe('a shape drag', () => {
     // The box's top stays on the text box's top: the smart guide shows.
     expect(host.querySelector('.pptx-surface__overlay .pptx-surface__guide')).not.toBeNull();
 
+    const hidden = painted('B');
     release(9.5 * IN, 1.5 * IN);
     expect(itemOf(e, 'B').element.xfrm).toMatchObject({ x: 9 * IN, y: IN });
     expect(host.querySelector('.pptx-surface__overlay .pptx-surface__guide')).toBeNull();
-    expect(host.querySelector('.pptx-surface__slide')).not.toBe(slide);
+    // The moved shape paints again at its new place, and the preview is gone.
+    expect(painted('B')).not.toBe(hidden);
+    expect(painted('B').getAttribute('display')).toBeNull();
+    expect(shown('B')).toBeNull();
     e.exec({ type: 'undo' });
     expect(itemOf(e, 'B').element.xfrm).toMatchObject({ x: 8 * IN, y: IN });
     expect(e.snapshot().canUndo).toBe(false);

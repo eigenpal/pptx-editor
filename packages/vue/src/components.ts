@@ -21,6 +21,7 @@ import {
   type PropType,
 } from 'vue';
 import {
+  churnWarning,
   createEditorRefApi,
   createPptxEditor,
   localeContentKey,
@@ -209,10 +210,15 @@ export const PptxEditorRoot = defineComponent({
       editor.value = null;
       instance?.destroy();
     });
+    // In development, a `document` or `fonts` made anew on each render warns.
+    const documentChurn = churnWarning('PptxEditorRoot', 'document');
+    const fontsChurn = churnWarning('PptxEditorRoot', 'fonts');
     watch(
       () => props.document,
       (bytes) => {
-        if (editor.value && bytes) void editor.value.load(bytes);
+        if (!editor.value || !bytes) return;
+        documentChurn();
+        void editor.value.load(bytes);
       }
     );
     watch(
@@ -234,6 +240,7 @@ export const PptxEditorRoot = defineComponent({
       ([instance, fonts]) => {
         if (!instance || createdFonts === fonts) return;
         createdFonts = fonts;
+        fontsChurn();
         // Rejects only after destroy; font failures report through `fontError`.
         instance.setFonts(fonts).catch(() => {});
       },

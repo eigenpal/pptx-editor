@@ -174,13 +174,14 @@ function rPrSpecAt(p: Element, offset: number, slideNumber: number | undefined):
 
 /** Index in the paragraph's children where inline content at `offset` starts. */
 function childIndexForOffset(p: Element, offset: number, slideNumber: number | undefined): number {
-  const slots = slotsOf(p, slideNumber);
+  // By element id, built once: a find for each child made a long paragraph quadratic.
+  const slots = new Map(slotsOf(p, slideNumber).map((s) => [s.el.id, s] as const));
   let index = 0;
   for (let i = 0; i < p.children.length; i += 1) {
     const c = p.children[i];
     if (c.type !== 'element') continue;
     if (c.local === 'pPr') index = i + 1;
-    const slot = slots.find((s) => s.el.id === c.id);
+    const slot = slots.get(c.id);
     if (slot && slot.end <= offset) index = i + 1;
   }
   return index;

@@ -58,6 +58,27 @@ export interface PptxEditorOptions extends Omit<OpenOptions, 'fonts'> {
   readonly modules?: readonly seam.EditorModule[];
 }
 
+/**
+ * Which measurer the open deck's layout runs on, and whether the host's fonts are still on
+ * the way. Returned by {@link PptxEditorInstance.fontMeasurement}, as in DOCX Editor. @public
+ */
+export interface FontMeasurementState {
+  /**
+   * `fixed` estimates advance widths; `shaped` measures real font bytes with HarfBuzz. It is
+   * `fixed` while no deck is open, and until the text engine and its faces arrive.
+   */
+  readonly measurer: 'fixed' | 'shaped';
+  /**
+   * True while font work for the deck is still running: the text engine, the packaged
+   * substitutes, or faces the deck asked the `fonts` origins for. Late faces count for at most
+   * 10 seconds. The deck shows with stand-in faces meanwhile, and `substitutedFonts` stays
+   * empty, so a substitution notice does not show for fonts that are still loading.
+   */
+  readonly resolving: boolean;
+  // No `producer`, unlike DOCX Editor: `DocumentSession.fontGeneration` identifies the
+  // measurer here.
+}
+
 /** The editor instance: the Editor contract plus engine extras. @public */
 export interface PptxEditorInstance extends Editor {
   /**
@@ -74,6 +95,12 @@ export interface PptxEditorInstance extends Editor {
    * another origin (`withFontOrigin`) to add faces without dropping the host's.
    */
   readonly fonts: PptxEditorOptions['fonts'];
+  /**
+   * Which measurer the deck's layout runs on, and whether the host's fonts are still on the
+   * way. A deck that opens waits at most 2 seconds for its fonts, then shows with stand-in
+   * faces; the host's faces install when they arrive.
+   */
+  fontMeasurement(): FontMeasurementState;
   /** The open session (store, measurer, layouts), for advanced hosts and tests. */
   readonly session: DocumentSession | null;
   /** Set the selection programmatically (shape ids or a text range). */

@@ -14,6 +14,7 @@ import { binaryPartOf, fontEmbeddingPermission, relTarget, writeZip } from '../s
 import { elementsWithAttribute, paintSlide } from '../output/index.ts';
 import type { RegisteredFace, SlideLayout } from '../layout/index.ts';
 import { imageMime, type DocumentSession } from './document-session.ts';
+import { drawableImageMime } from './drawable-image.ts';
 import { toBase64 } from '../automation/commands/base64.ts';
 import { CommandRefusal } from '../automation/commands/op-batch.ts';
 import { uniquePrefix } from './paint-ids.ts';
@@ -125,8 +126,10 @@ export function paintLayout(
       const target = relTarget(pkg, source, rId);
       if (!target) return undefined;
       if (!pictures.has(target)) {
-        const mime = imageMime(target);
+        // The same check as the editor's paint: a damaged or oversized picture exports as
+        // the placeholder.
         const bytes = binaryPartOf(pkg, target);
+        const mime = bytes ? drawableImageMime(bytes, imageMime(target)) : undefined;
         pictures.set(target, mime && bytes ? `data:${mime};base64,${toBase64(bytes)}` : undefined);
       }
       return pictures.get(target);

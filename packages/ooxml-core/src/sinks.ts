@@ -1,5 +1,5 @@
 // Copied from docx-editor/packages/core/src/store/package/sinks.ts at bafbf5ac (EigenPal).
-// Keep it equal to that file.
+// Keep it equal to that file, except `sanitizeHref`, which also strips leading C0 controls.
 // Runtime-sink sanitization and inert executable content (document-engine task
 // 2.8 / lossless-package-model "Safe relationships and inert executable content"
 // + "DOM and CSS sinks are string-safe"). Raw relationship/citation targets stay
@@ -29,10 +29,21 @@ export type HrefProjection =
  * scheme allowlist, and renders everything else inert. Never fetches.
  */
 export function sanitizeHref(raw: string): HrefProjection {
-  const cleaned = raw.replace(/[\t\n\r]/g, '').trim();
+  // A URL parser drops leading and trailing C0 controls and spaces before it reads the scheme
+  // (WHATWG URL, basic URL parser), so `\u0001javascript:` must not pass as a relative URL.
+  const cleaned = trimControls(raw.replace(/[\t\n\r]/g, ''));
   const m = SCHEME_RE.exec(cleaned);
   if (m && !HREF_SCHEMES.has(m[1].toLowerCase())) return { ok: false, inert: true };
   return { ok: true, href: cleaned };
+}
+
+/** `s` without leading and trailing C0 controls and spaces, in linear time. */
+function trimControls(s: string): string {
+  let start = 0;
+  let end = s.length;
+  while (start < end && s.charCodeAt(start) <= 0x20) start++;
+  while (end > start && s.charCodeAt(end - 1) <= 0x20) end--;
+  return s.slice(start, end);
 }
 
 const XML_ESCAPES: Record<string, string> = {

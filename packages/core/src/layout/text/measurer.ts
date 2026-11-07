@@ -109,6 +109,15 @@ export const METRIC_COMPATIBLE: Readonly<Record<string, string>> = Object.freeze
   'century gothic': 'tex gyre adventor',
 });
 
+/**
+ * The substitutes of `family`. A deck names any family, so only own keys count: a family named
+ * `constructor` has none.
+ */
+export function fontSubstitutes(family: string): readonly string[] {
+  const key = family.toLowerCase();
+  return Object.hasOwn(FONT_SUBSTITUTES, key) ? FONT_SUBSTITUTES[key]! : [];
+}
+
 /** Whether measuring `family` with `substitute` keeps the original's advance widths. */
 export function isMetricCompatible(family: string, substitute: string): boolean {
   return METRIC_COMPATIBLE[family.toLowerCase()] === substitute.toLowerCase();

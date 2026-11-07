@@ -2080,6 +2080,31 @@
   color: var(--doc-text-muted);
   font-size: 12px;
 }
+.pptx-open-failure__status:empty {
+  /* Empty, it stays in the accessibility tree as a live region; it takes no space. */
+  margin-top: -10px;
+}
+.pptx-open-failure__status {
+  margin: 0;
+  font-size: 12px;
+}
+.pptx-open-failure__report {
+  box-sizing: border-box;
+  width: 100%;
+  resize: none;
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font-family: ui-monospace, monospace;
+  margin: 0;
+  padding: 6px 8px;
+  max-height: 8em;
+  overflow: auto;
+  border: 1px solid var(--doc-border);
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .pptx-open-failure__actions {
   display: flex;
   flex-wrap: wrap;

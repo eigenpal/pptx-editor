@@ -228,6 +228,22 @@ A lower rank still serves a style that a higher rank lacks. `snapshot().substitu
 
 ## Configure loading
 
+A deck that opens waits at most 2 seconds for its fonts: the text engine, the packaged substitutes, and the faces of your `fonts` origins. Faces that arrive later install when they land, and the slides lay out again. A slow or blocked font download never holds the loading screen.
+
+Until the text engine starts, the deck measures text with a fixed measurer and paints with the faces the browser already has. Embedded faces and your `fonts` faces paint when the text engine starts. The shapes whose text you edit before then fit again when the text engine starts. Other shapes keep the fit that the file has, also when you move them. The new fit is one undo step of its own, so the first undo gives back the estimated fit.
+
+When the text engine cannot start, for example because a Content Security Policy blocks WebAssembly, the fixed measurer and the browser's faces stay, and `onFontError` reports why.
+
+`editor.fontMeasurement()` says which measurer the deck uses and whether fonts are still on the way. In this sample, `editor` is the `PptxEditorInstance` that `onReady` gives you. In React, `usePptxEditor()` returns it; in Vue, `usePptxEditor().value` holds it. A change of `resolving` publishes an editor state change, so read the value again in a `useEditorState` selector or a `subscribe` callback:
+
+```ts
+const { measurer, resolving } = editor.fontMeasurement();
+// measurer: 'shaped' | 'fixed'.
+// resolving: true while fonts arrive. Late fonts count for at most 10 seconds.
+```
+
+While `resolving` is `true`, `snapshot().substitutedFonts` stays empty, so the font notice does not show for fonts that are still loading.
+
 To load an origin's faces after the first paint, wrap it in `deferFonts()`. The deck opens with the other faces and lays out again when these arrive.
 
 ```tsx

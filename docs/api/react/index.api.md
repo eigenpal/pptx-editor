@@ -1170,6 +1170,7 @@ export interface PptxEditorOpenFailureProps {
     readonly onDismiss?: (failure: DocumentOpenFailure) => void;
     readonly showClose?: boolean;
     readonly showCode?: boolean;
+    readonly showCopy?: boolean;
     readonly style?: CSSProperties;
     readonly t?: ChromeTranslate;
     readonly title?: string;

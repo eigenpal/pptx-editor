@@ -11,6 +11,7 @@ import {
   BLANK,
   EXAMPLES,
   fetchDeck,
+  refuseDeckFetch,
   fileTitle,
   initialExample,
   initialTheme,
@@ -59,7 +60,11 @@ async function openBytes(next: Uint8Array, label: string): Promise<void> {
 }
 
 async function loadUrl(file: string, label: string): Promise<void> {
-  await openBytes(await fetchDeck(base, file), label);
+  try {
+    await openBytes(await fetchDeck(base, file), label);
+  } catch (cause) {
+    refuseDeckFetch(editor.value, cause);
+  }
 }
 
 function openFile(file: File): void {
@@ -69,7 +74,17 @@ function openFile(file: File): void {
 }
 
 // The first deck: `initial` comes from the URL at mount.
-onMounted(() => void fetchDeck(base, EXAMPLES[initial].file).then((b) => (bytes.value = b)));
+const deckFailed = shallowRef<unknown>(null);
+onMounted(
+  () =>
+    void fetchDeck(base, EXAMPLES[initial].file).then(
+      (b) => (bytes.value = b),
+      (cause: unknown) => (deckFailed.value = cause ?? new Error('fetch failed'))
+    )
+);
+watch([deckFailed, editor], ([failed, instance]) => {
+  if (failed && instance) refuseDeckFetch(instance, failed);
+});
 watchEffect(() => {
   document.documentElement.style.colorScheme = theme.value;
 });
@@ -115,6 +130,7 @@ function onReady(instance: PptxEditorInstance): void {
       @example="replaceDeck(() => loadUrl(EXAMPLES.showcase.file, EXAMPLES.showcase.title))"
       @open-file="openFile"
       @saved="unsaved?.markSaved()"
+      :deck-failed="deckFailed !== null"
     >
       <DiscardDialog v-if="discard" @cancel="discard = null" @discard="confirmDiscard" />
     </Shell>

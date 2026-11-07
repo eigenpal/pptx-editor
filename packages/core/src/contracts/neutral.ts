@@ -709,9 +709,11 @@ export interface SlideSection {
  * What a person can do about a file that did not open, after DOCX Editor's reason groups:
  * `damaged` (the archive or its XML is broken, or the file is not a ZIP package at all),
  * `not-pptx` (the package holds no presentation, or the file is empty), `too-large` (the file
- * crosses a size or count limit), and `unknown`. @public
+ * crosses a size, count, or depth limit), `blocked` (the file uses XML features that the editor
+ * refuses for security), and `unknown`. @public
  */
-export type DocumentOpenFailureReason = 'damaged' | 'not-pptx' | 'too-large' | 'unknown';
+export type DocumentOpenFailureReason =
+  'damaged' | 'not-pptx' | 'too-large' | 'blocked' | 'unknown';
 
 /** Options of `Editor.load`. @public */
 export interface LoadOptions {

@@ -37,6 +37,7 @@ export function svg(
 export class Defs {
   readonly element: SVGElement;
   #next = 0;
+  #captured: SVGElement[] | null = null;
   constructor(
     readonly doc: Document,
     readonly prefix: string
@@ -60,7 +61,21 @@ export class Defs {
   /** Add a definition and return `url(#id)`. */
   add(el: SVGElement): string {
     this.element.appendChild(el);
+    this.#captured?.push(el);
     return `url(#${el.getAttribute('id')})`;
+  }
+
+  /** Run `paint`, and return what it painted with the definitions it added. */
+  capture<T>(paint: () => T): { readonly value: T; readonly defs: readonly SVGElement[] } {
+    const outer = this.#captured;
+    const defs: SVGElement[] = [];
+    this.#captured = defs;
+    try {
+      return { value: paint(), defs };
+    } finally {
+      this.#captured = outer;
+      outer?.push(...defs);
+    }
   }
 }
 
