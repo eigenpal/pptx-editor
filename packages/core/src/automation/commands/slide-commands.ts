@@ -26,7 +26,7 @@ import {
 import { partNameKey } from '@eigenpal/ooxml-core';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
 import {
-  addOverride,
+  addOverrides,
   addRelationship,
   addRelationships,
   freePartName,
@@ -169,7 +169,10 @@ export function registerSlides(
   const info = presentationInfo(batch.pkg);
   const presentation = info.presentationPart;
   const rIds = addRelationships(batch, presentation, REL.slide, partNames);
-  for (const part of partNames) addOverride(batch, part, CONTENT_TYPE.slide);
+  addOverrides(
+    batch,
+    partNames.map((part) => [part, CONTENT_TYPE.slide])
+  );
   const list = path(xmlPartOf(batch.pkg, presentation)?.root, 'p:sldIdLst') ?? slideIdList(batch);
   if (!list) throw new CommandRefusal('errors.malformed');
   const nextId = freeSlideIds(list, batch);
@@ -263,6 +266,8 @@ interface CopyRun {
   readonly name: (prefix: string, suffix: string) => string;
   /** The `p14:creationId` values in use. */
   readonly creationIds: Set<number>;
+  /** The content type overrides of the copied notes, which the caller adds (`addOverrides`). */
+  readonly overrides: [string, string][];
 }
 
 /**
@@ -299,7 +304,7 @@ function copySlideParts(batch: OpBatch, ref: SlideRef, run: CopyRun): string {
         type === REL.slide ? { part: partName } : undefined
       ),
     });
-    addOverride(batch, notesName, CONTENT_TYPE.notesSlide);
+    run.overrides.push([notesName, CONTENT_TYPE.notesSlide]);
   }
   copier.finish();
   freshCreationIdAmong(batch, partName, run.creationIds);
@@ -315,14 +320,17 @@ function copySlideParts(batch: OpBatch, ref: SlideRef, run: CopyRun): string {
 export function duplicateSlide(batch: OpBatch, index: number): number {
   const info = presentationInfo(batch.pkg);
   const ref = slideRef(batch.pkg, index);
-  const partName = copySlideParts(batch, ref, {
+  const run: CopyRun = {
     info,
     name: (prefix, suffix) => freePartName(batch, prefix, suffix),
     creationIds: creationIdsOf(
       batch,
       info.slides.map((s) => s.partName)
     ),
-  });
+    overrides: [],
+  };
+  const partName = copySlideParts(batch, ref, run);
+  addOverrides(batch, run.overrides);
   const id = registerSlide(batch, partName, index + 1);
   placeInSection(batch, info.presentationPart, id, ref.sldId, 'after');
   return index + 1;
@@ -344,8 +352,11 @@ export function duplicateSlidesAt(batch: OpBatch, indices: readonly number[]): s
       batch,
       info.slides.map((s) => s.partName)
     ),
+    overrides: [],
   };
   const parts = refs.map((ref) => copySlideParts(batch, ref, run));
+  // The content types once for all the copies, not once for each: the list grows with the deck.
+  addOverrides(batch, run.overrides);
   const copies = registerSlides(batch, parts, indices[indices.length - 1]! + 1);
   placeBlock(batch, copies);
   return copies;

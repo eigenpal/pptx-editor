@@ -252,22 +252,34 @@ export function removeUnusedHyperlink(
 
 /** Add a content-type override for a part. */
 export function addOverride(batch: OpBatch, partName: string, contentType: string): void {
+  addOverrides(batch, [[partName, contentType]]);
+}
+
+/** Add content-type overrides, as `[partName, contentType]`, in one read of the content types. */
+export function addOverrides(
+  batch: OpBatch,
+  overrides: readonly (readonly [string, string])[]
+): void {
+  if (overrides.length === 0) return;
   const ct = xmlPartOf(batch.pkg, CONTENT_TYPES_PART);
   if (!ct) throw new CommandRefusal('errors.malformed');
-  batch.push({
-    op: 'insertNode',
-    part: CONTENT_TYPES_PART,
-    parent: ct.root.id,
-    index: ct.root.children.length,
-    spec: {
-      ns: NS.ct,
-      local: 'Override',
-      attrs: [
-        { ns: '', local: 'PartName', value: partName },
-        { ns: '', local: 'ContentType', value: contentType },
-      ],
-    },
-  });
+  const index = ct.root.children.length;
+  overrides.forEach(([partName, contentType], i) =>
+    batch.push({
+      op: 'insertNode',
+      part: CONTENT_TYPES_PART,
+      parent: ct.root.id,
+      index: index + i,
+      spec: {
+        ns: NS.ct,
+        local: 'Override',
+        attrs: [
+          { ns: '', local: 'PartName', value: partName },
+          { ns: '', local: 'ContentType', value: contentType },
+        ],
+      },
+    })
+  );
 }
 
 /**

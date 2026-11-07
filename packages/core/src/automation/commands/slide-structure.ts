@@ -697,7 +697,8 @@ function sectionOfList(batch: OpBatch, presentation: string, list: Element): Ele
 export function placeBlock(batch: OpBatch, block: readonly string[], section?: string): void {
   const info = presentationInfo(batch.pkg);
   const ids = info.slides.map((s) => s.nodeId);
-  const sldIdOf = (nodeId: string) => info.slides.find((s) => s.nodeId === nodeId)?.sldId ?? '';
+  const byNode = new Map(info.slides.map((s) => [s.nodeId, s.sldId]));
+  const sldIdOf = (nodeId: string) => byNode.get(nodeId) ?? '';
   const first = ids.indexOf(block[0]);
   const before = first > 0 ? ids[first - 1] : undefined;
   const after = ids[first + block.length];
