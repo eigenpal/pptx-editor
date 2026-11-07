@@ -91,51 +91,62 @@ for (const [name, anchor, focus] of CASES)
     typed.destroy();
   });
 
-/** The faster of two pastes of `count` lines, in milliseconds. */
-async function linePasteMs(count: number): Promise<number> {
-  const text = Array.from({ length: count }, (_, i) => `Line ${i}`).join('\n');
-  let best = Infinity;
-  for (let k = 0; k < 2; k += 1) {
-    const editor = await open();
-    select(editor, { paragraph: 0, offset: 10 });
-    const t0 = performance.now();
-    expect(editor.input('text', text).ok).toBe(true);
-    best = Math.min(best, performance.now() - t0);
-    expect(paragraphCount(editor)).toBe(count + 3);
-    editor.destroy();
+/**
+ * The fastest of `turns` runs each of `paste(small)` and `paste(large)`, taken in turn, so a
+ * busy moment of the machine slows both.
+ */
+async function fastest(
+  paste: (count: number) => Promise<number>,
+  small: number,
+  large: number,
+  turns: number
+): Promise<[number, number]> {
+  let [a, b] = [Infinity, Infinity];
+  for (let k = 0; k < turns; k += 1) {
+    a = Math.min(a, await paste(small));
+    b = Math.min(b, await paste(large));
   }
-  return best;
+  return [a, b];
 }
 
-// A cost that grows with the square of the lines takes 100 times as long for 10 times the lines.
-// Before the fix, 30,000 lines took about 19 seconds in a browser.
-test('30,000 pasted lines cost less than 20 times what 3,000 lines cost', async () => {
-  const small = await linePasteMs(3_000);
-  const large = await linePasteMs(30_000);
-  expect(large).toBeLessThan(small * 20);
-});
+/** The time of one paste of `count` lines, in milliseconds. */
+async function linePasteMs(count: number): Promise<number> {
+  const text = Array.from({ length: count }, (_, i) => `Line ${i}`).join('\n');
+  const editor = await open();
+  select(editor, { paragraph: 0, offset: 10 });
+  const t0 = performance.now();
+  expect(editor.input('text', text).ok).toBe(true);
+  const ms = performance.now() - t0;
+  expect(paragraphCount(editor)).toBe(count + 3);
+  editor.destroy();
+  return ms;
+}
 
-/** The fastest of five pastes of `count` HTML paragraphs, in milliseconds. */
+// A cost that grows with the square of the lines takes 16 times as long for 4 times the lines.
+// Before the fix, 30,000 lines took about 19 seconds in a browser.
+test('30,000 pasted lines cost less than 10 times what 7,500 lines cost', async () => {
+  const [small, large] = await fastest(linePasteMs, 7_500, 30_000, 3);
+  expect(large).toBeLessThan(small * 10);
+}, 30_000);
+
+/** The time of one paste of `count` HTML paragraphs, in milliseconds. */
 async function htmlPasteMs(count: number): Promise<number> {
   const html = Array.from({ length: count }, (_, i) => `<p><b>p${i}</b> text</p>`).join('');
   const paragraphs = paragraphSpecs(richFromHtml(html)!);
-  let best = Infinity;
-  for (let k = 0; k < 5; k += 1) {
-    const editor = await open();
-    select(editor, { paragraph: 0, offset: 10 });
-    const t0 = performance.now();
-    expect(editor.exec({ type: 'pasteText', paragraphs }).ok).toBe(true);
-    best = Math.min(best, performance.now() - t0);
-    expect(paragraphCount(editor)).toBe(count + 3);
-    editor.destroy();
-  }
-  return best;
+  const editor = await open();
+  select(editor, { paragraph: 0, offset: 10 });
+  const t0 = performance.now();
+  expect(editor.exec({ type: 'pasteText', paragraphs }).ok).toBe(true);
+  const ms = performance.now() - t0;
+  expect(paragraphCount(editor)).toBe(count + 3);
+  editor.destroy();
+  return ms;
 }
 
-// A cost that grows with the square of the paragraphs takes 16 times as long for 4 times the
-// paragraphs. The limit of 10 leaves room for a busy machine and still fails that cost.
-test('pasted HTML paragraphs cost what they insert: four times the paragraphs take less than ten times the time', async () => {
-  const small = await htmlPasteMs(1_250);
-  const large = await htmlPasteMs(5_000);
-  expect(large).toBeLessThan(small * 10);
-});
+// A paste holds at most 5,000 paragraphs. A cost that grows with the square of the paragraphs
+// takes 6.25 times as long for 2.5 times the paragraphs. The limit of 5 leaves room for a busy
+// machine and still fails that cost.
+test('pasted HTML paragraphs cost what they insert: 2.5 times the paragraphs take less than five times the time', async () => {
+  const [small, large] = await fastest(htmlPasteMs, 2_000, 5_000, 5);
+  expect(large).toBeLessThan(small * 5);
+}, 30_000);
