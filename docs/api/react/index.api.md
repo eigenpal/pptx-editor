@@ -14,6 +14,7 @@ import { ChromeGroupId } from '@pptx-editor.dev/core/editor';
 import { ChromeMenuId } from '@pptx-editor.dev/core/editor';
 import { ChromeSlotId } from '@pptx-editor.dev/core/editor';
 import { ChromeTranslate } from '@pptx-editor.dev/core/editor';
+import { ClipboardDrawingReader } from '@pptx-editor.dev/core/editor';
 import { ColorMode } from '@pptx-editor.dev/core/editor';
 import { ColumnsDialogFields } from '@pptx-editor.dev/core/editor';
 import { CommandResult } from '@pptx-editor.dev/core/editor';
@@ -1220,6 +1221,7 @@ export interface PptxEditorProps {
     readonly onReady?: (editor: PptxEditorInstance) => void;
     readonly openFailure?: boolean | PptxEditorOpenFailureProps;
     readonly popups?: PptxEditorPopups;
+    readonly readClipboardDrawing?: ClipboardDrawingReader;
     readonly renderOpenFailureActions?: (context: OpenFailureContext) => ReactNode;
     readonly slideRail?: boolean | SlideRailProps;
     readonly toolbar?: boolean | ToolbarProps;
@@ -1256,6 +1258,7 @@ export interface PptxEditorRootProps {
     readonly onFontError?: (error: EditorFontError) => void;
     readonly onReady?: (editor: PptxEditorInstance) => void;
     readonly popups?: PptxEditorPopups;
+    readonly readClipboardDrawing?: ClipboardDrawingReader;
 }
 
 // @public

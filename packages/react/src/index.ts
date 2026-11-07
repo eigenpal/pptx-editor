@@ -13,6 +13,7 @@ import { withChromeTranslate } from './headless-hooks.tsx';
 import { MenuTableGrid } from './TableControls.tsx';
 import {
   warnOpenFailureActions,
+  type ClipboardDrawingReader,
   type ColorMode,
   type EditorFontError,
   type EditorFontsOption,
@@ -87,6 +88,7 @@ import {
 } from './context-menu-parts.tsx';
 import type { ContextMenuPartName, MenuRowPartName } from '@pptx-editor.dev/core/editor';
 import { MenuRow, MenuSeparator, MenuSubmenu } from './ContextMenu.tsx';
+import { OPEN_FAILURE_ACTION_NAMES, partProps } from './sugar-parts.ts';
 import { Ribbon as RibbonRoot, RibbonTab, type RibbonProps } from './Ribbon.tsx';
 import {
   StatusBar as StatusBarRoot,
@@ -773,6 +775,8 @@ export interface PptxEditorProps {
   readonly modules?: readonly EditorModule[];
   /** AutoCorrect while typing, as on `PptxEditor.Root`. Read at mount. */
   readonly autoCorrect?: boolean;
+  /** Reads copied shapes from the system clipboard, as on `PptxEditor.Root`. Read at mount. */
+  readonly readClipboardDrawing?: ClipboardDrawingReader;
   /**
    * The notice for a file that does not open (`PptxEditor.OpenFailure`). An object is
    * `PptxEditorOpenFailureProps`, passed straight through. `false` removes the notice, for a host that
@@ -825,10 +829,6 @@ export interface PptxEditorProps {
   readonly children?: ReactNode;
 }
 
-/** The props an object value gives, or none for `true`. */
-const partProps = <P extends object>(value: boolean | P | undefined): P =>
-  typeof value === 'object' ? value : ({} as P);
-
 /**
  * The `popups` the sugar passes to the root: the host's entries, with `contextMenu` and
  * `hyperlinkPopup` mapped onto the same entries. A host entry wins.
@@ -854,11 +854,6 @@ function sugarPopups(
   };
 }
 
-const OPEN_FAILURE_ACTION_NAMES = {
-  actions: 'renderOpenFailureActions',
-  off: 'openFailure={false}',
-} as const;
-
 /**
  * The complete default editor: toolbar, slide rail, canvas, speaker notes, zoom pill, and the
  * slide show (F5).
@@ -881,6 +876,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
     fontFamilies,
     modules,
     autoCorrect,
+    readClipboardDrawing,
     openFailure = true,
     renderOpenFailureActions,
     toolbar = true,
@@ -928,6 +924,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
       ...(fontFamilies ? { fontFamilies } : {}),
       ...(modules ? { modules } : {}),
       ...(autoCorrect === false ? { autoCorrect } : {}),
+      ...(readClipboardDrawing ? { readClipboardDrawing } : {}),
     },
     createElement(
       PptxEditorViewport,

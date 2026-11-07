@@ -15,6 +15,7 @@ import { ChromeGroupId } from '@pptx-editor.dev/core/editor';
 import { ChromeMenuId } from '@pptx-editor.dev/core/editor';
 import { ChromeSlotId } from '@pptx-editor.dev/core/editor';
 import { ChromeTranslate } from '@pptx-editor.dev/core/editor';
+import { ClipboardDrawingReader } from '@pptx-editor.dev/core/editor';
 import { ColorMode } from '@pptx-editor.dev/core/editor';
 import { ColumnsDialogFields } from '@pptx-editor.dev/core/editor';
 import { CommandResult } from '@pptx-editor.dev/core/editor';
@@ -2326,6 +2327,10 @@ export const PptxEditor: {
             readonly type: BooleanConstructor;
             readonly default: true;
         };
+        readonly readClipboardDrawing: {
+            readonly type: PropType<ClipboardDrawingReader>;
+            readonly default: undefined;
+        };
         readonly popups: {
             readonly type: PropType<PptxEditorPopups>;
             readonly default: undefined;
@@ -2388,6 +2393,7 @@ export const PptxEditor: {
         readonly fontFamilies: readonly string[];
         readonly modules: readonly EditorModule[];
         readonly autoCorrect: boolean;
+        readonly readClipboardDrawing: ClipboardDrawingReader;
         readonly popups: PptxEditorPopups;
         readonly colorMode: ColorMode;
         readonly hyperlinkPopup: boolean;
@@ -2427,6 +2433,10 @@ export const PptxEditor: {
         readonly autoCorrect: {
             readonly type: BooleanConstructor;
             readonly default: true;
+        };
+        readonly readClipboardDrawing: {
+            readonly type: PropType<ClipboardDrawingReader>;
+            readonly default: undefined;
         };
         readonly popups: {
             readonly type: PropType<PptxEditorPopups>;
@@ -2486,6 +2496,7 @@ export const PptxEditor: {
         readonly fontFamilies: readonly string[];
         readonly modules: readonly EditorModule[];
         readonly autoCorrect: boolean;
+        readonly readClipboardDrawing: ClipboardDrawingReader;
         readonly popups: PptxEditorPopups;
         readonly colorMode: ColorMode;
         readonly hyperlinkPopup: boolean;
@@ -2519,6 +2530,10 @@ export const PptxEditor: {
     readonly autoCorrect: {
         readonly type: BooleanConstructor;
         readonly default: true;
+    };
+    readonly readClipboardDrawing: {
+        readonly type: PropType<ClipboardDrawingReader>;
+        readonly default: undefined;
     };
     readonly popups: {
         readonly type: PropType<PptxEditorPopups>;
@@ -2582,6 +2597,7 @@ export const PptxEditor: {
     readonly fontFamilies: readonly string[];
     readonly modules: readonly EditorModule[];
     readonly autoCorrect: boolean;
+    readonly readClipboardDrawing: ClipboardDrawingReader;
     readonly popups: PptxEditorPopups;
     readonly colorMode: ColorMode;
     readonly hyperlinkPopup: boolean;
@@ -2619,6 +2635,10 @@ export const PptxEditor: {
         readonly autoCorrect: {
             readonly type: BooleanConstructor;
             readonly default: true;
+        };
+        readonly readClipboardDrawing: {
+            readonly type: PropType<ClipboardDrawingReader>;
+            readonly default: undefined;
         };
         readonly popups: {
             readonly type: PropType<PptxEditorPopups>;
@@ -2665,6 +2685,10 @@ export const PptxEditor: {
             readonly type: BooleanConstructor;
             readonly default: true;
         };
+        readonly readClipboardDrawing: {
+            readonly type: PropType<ClipboardDrawingReader>;
+            readonly default: undefined;
+        };
         readonly popups: {
             readonly type: PropType<PptxEditorPopups>;
             readonly default: undefined;
@@ -2685,6 +2709,7 @@ export const PptxEditor: {
         readonly fontFamilies: readonly string[];
         readonly modules: readonly EditorModule[];
         readonly autoCorrect: boolean;
+        readonly readClipboardDrawing: ClipboardDrawingReader;
         readonly popups: PptxEditorPopups;
         readonly colorMode: ColorMode;
     }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
@@ -6031,6 +6056,10 @@ export const PptxEditorRoot: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: BooleanConstructor;
         readonly default: true;
     };
+    readonly readClipboardDrawing: {
+        readonly type: PropType<ClipboardDrawingReader>;
+        readonly default: undefined;
+    };
     readonly popups: {
         readonly type: PropType<PptxEditorPopups>;
         readonly default: undefined;
@@ -6076,6 +6105,10 @@ export const PptxEditorRoot: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: BooleanConstructor;
         readonly default: true;
     };
+    readonly readClipboardDrawing: {
+        readonly type: PropType<ClipboardDrawingReader>;
+        readonly default: undefined;
+    };
     readonly popups: {
         readonly type: PropType<PptxEditorPopups>;
         readonly default: undefined;
@@ -6096,6 +6129,7 @@ export const PptxEditorRoot: vue.DefineComponent<vue.ExtractPropTypes<{
     readonly fontFamilies: readonly string[];
     readonly modules: readonly EditorModule[];
     readonly autoCorrect: boolean;
+    readonly readClipboardDrawing: ClipboardDrawingReader;
     readonly popups: PptxEditorPopups;
     readonly colorMode: ColorMode;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;

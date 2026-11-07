@@ -232,7 +232,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Copy and paste text, shapes, and slides in the editor and between editors. Text from other applications pastes as HTML with its formatting, list levels, and bullets; a picture pastes at the size its resolution gives. Copied text leaves as HTML, and copied shapes as a picture, or as text for text boxes. Shapes copied in another application paste as a picture: browsers cannot read their shape format.',
+      'Copy and paste text, shapes, and slides in the editor and between editors. Text from other applications pastes as HTML with its formatting, list levels, and bullets; a picture pastes at the size its resolution gives. Copied text leaves as HTML, and copied shapes as a picture, or as text for text boxes. Shapes copied in another application paste as a picture in a browser, which cannot read their shape format; a desktop host that reads the system clipboard pastes them as editable shapes.',
   },
   {
     id: 'text.format-painter',

@@ -50,6 +50,8 @@ export const REACT_ONLY = {
   'PptxEditorRoot.tsx': 'The Vue twin is components.ts.',
   'Ribbon.tsx': 'The Vue twin is ribbon.ts.',
   'StatusBar.tsx': 'The Vue twin is status-bar.ts.',
+  'sugar-parts.ts':
+    'Helpers of the React <PptxEditor> sugar component; the Vue sugar component holds them in index.ts.',
   'toolbar-action.tsx': 'ToolbarAction; Vue holds it in toolbar-parts.ts.',
   'toolbar-named-parts.tsx': 'The named toolbar parts; Vue holds them in toolbar-parts.ts.',
   'Toolbar.tsx':

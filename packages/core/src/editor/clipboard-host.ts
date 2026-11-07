@@ -11,7 +11,9 @@
 //   applications: the text of text boxes, or a picture of the shapes.
 //
 // What a paste reads, in order: cells, this editor's text or shapes, HTML text, a picture file,
-// and plain text. Text pasted with no text selected goes in a new text box.
+// and plain text. Text pasted with no text selected goes in a new text box. A host that reads
+// the system clipboard (`readDrawing`) turns a picture paste into the shapes it shows, when the
+// clipboard also holds them as a DrawingML package (`clipboard-drawing.ts`).
 
 import type { ClipboardPayload, EditorCommand, EditorSelection } from '../contracts/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
@@ -44,6 +46,7 @@ import {
   pngResolution,
   type ShapesPicture,
 } from './clipboard-picture.ts';
+import { drawingClipboardPayload } from './clipboard-drawing.ts';
 import type { DocumentSession } from './document-session.ts';
 import { selectedText } from './selection-state.ts';
 import { copyCellsTo, tablePasteFrom } from './table-clipboard.ts';
@@ -70,7 +73,16 @@ export interface ClipboardEditor {
   selectedSlides(): readonly number[];
   /** Run a command: a paste, a cleared cell range (a cut of cells), a picture. */
   exec(command: EditorCommand): void;
+  /** The DrawingML clipboard package on the system clipboard, from the host, if it reads one. */
+  readDrawing?: ClipboardDrawingReader;
 }
+
+/**
+ * Reads the DrawingML clipboard package from the system clipboard: its bytes, or null when the
+ * clipboard holds none. @public
+ */
+export type ClipboardDrawingReader = () =>
+  Uint8Array | null | undefined | Promise<Uint8Array | null | undefined>;
 
 /** Picture types a paste inserts. */
 const PICTURE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/bmp', 'image/webp']);
@@ -200,11 +212,29 @@ export function createClipboardHost(editor: ClipboardEditor) {
   const pasteParagraphs = (paragraphs: readonly RichParagraph[]): void =>
     editor.exec({ type: 'pasteText', paragraphs: paragraphSpecs(paragraphs) });
 
+  /** The deck and slide a paste is made on: a paste that ends on another slide is dropped. */
+  const place = (): string => `${editor.session()?.id}:${editor.slide()}`;
+
+  /**
+   * Paste the shapes of the host's DrawingML package, or the picture when the host reads no
+   * package, or one that holds no shape this editor pastes.
+   */
+  const pasteDrawing = async (file: File, read: ClipboardDrawingReader): Promise<void> => {
+    const at = place();
+    let payload: ClipboardPayload | null = null;
+    try {
+      const bytes = await read();
+      payload = bytes ? drawingClipboardPayload(bytes) : null;
+    } catch {
+      // A host read that fails pastes the picture.
+    }
+    if (!payload) return pastePicture(file, at);
+    if (place() === at) editor.exec({ type: 'paste', payload });
+  };
+
   /** Insert a picture file from the clipboard, at the size its resolution gives. */
-  const pastePicture = async (file: File): Promise<void> => {
+  const pastePicture = async (file: File, at = place()): Promise<void> => {
     if (file.size === 0 || file.size > MAX_PICTURE) return editor.refuse('errors.clipboard');
-    // The picture goes on the slide the paste was made on: another slide by then drops it.
-    const at = `${editor.session()?.id}:${editor.slide()}`;
     const bytes = new Uint8Array(await file.arrayBuffer());
     let width = 640;
     let height = 480;
@@ -218,7 +248,7 @@ export function createClipboardHost(editor: ClipboardEditor) {
     }
     // The command counts pixels at 96 per inch: a 144 dpi screenshot is two-thirds as large.
     const scale = 96 / (pngResolution(bytes) ?? 96);
-    if (`${editor.session()?.id}:${editor.slide()}` !== at) return;
+    if (place() !== at) return;
     editor.exec({
       type: 'insertImage',
       bytes,
@@ -346,7 +376,11 @@ export function createClipboardHost(editor: ClipboardEditor) {
         return true;
       }
       if (file) {
-        void pastePicture(file).catch(() => editor.refuse('errors.clipboard'));
+        // The picture of shapes copied in another application: the host may read the shapes.
+        const read = editing ? undefined : editor.readDrawing;
+        void (read ? pasteDrawing(file, read) : pastePicture(file)).catch(() =>
+          editor.refuse('errors.clipboard')
+        );
         return true;
       }
       const text = data.getData('text/plain');

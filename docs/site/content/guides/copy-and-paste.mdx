@@ -1,6 +1,6 @@
 ---
 title: 'Copy and paste'
-description: 'What copy writes and paste reads, between the editor and other applications, and the paste commands for hosts.'
+description: 'What copy writes and paste reads, between the editor and other applications, how a desktop host pastes editable shapes, and the paste commands for hosts.'
 category: 'Guides'
 ---
 
@@ -30,9 +30,110 @@ A paste uses the first format it finds, in this order:
 
 When you edit text, pasted text replaces the selection or goes in at the caret. With no text selected, it goes in a new text box in the middle of the slide, and the new text box is selected. To paste without formatting, use the browser's paste-as-plain-text command, such as Cmd+Shift+V in Chrome.
 
-Shapes copied in another application paste as a picture: browsers give web pages a picture of the shapes, not their shape format. A paste works when the focus is on the slide, in the slide list, or on a toolbar button, so a paste after a click on another slide in the slide list puts the shapes on that slide. With text selected and the focus on a toolbar button, plain text goes in at the caret.
+Shapes copied in another application paste as a picture in a browser: browsers give web pages a picture of the shapes, not their shape format. A desktop host can paste them as editable shapes; see [Paste shapes in a desktop app](#paste-shapes-in-a-desktop-app). A paste works when the focus is on the slide, in the slide list, or on a toolbar button, so a paste after a click on another slide in the slide list puts the shapes on that slide. With text selected and the focus on a toolbar button, plain text goes in at the caret.
 
 Pasted content is untrusted input. HTML is read by a bounded tokenizer: nothing in it runs or loads, and only text and its formatting are kept. A pasted file goes through the same limits as an opened file.
+
+## Paste shapes in a desktop app
+
+Presentation applications write copied shapes to the system clipboard as a DrawingML package and as a picture. A browser gives a web page only the picture. If your app runs the editor in a desktop wrapper that can read the system clipboard, such as Electron, pass a `readClipboardDrawing` function. When a paste holds a picture, the editor calls it and pastes the package's shapes as editable shapes, at the positions they had on the source slide.
+
+The package is in the clipboard type that `DRAWING_CLIPBOARD_TYPES` names: `com.microsoft.Art--GVML-ClipFormat` on macOS and `Art::GVML ClipFormat` on Windows. In Electron, read it in the main process and expose it to the page. This main process handler reads only those two types:
+
+```ts
+// main.ts (Electron main process)
+import { clipboard, ipcMain } from 'electron';
+
+const DRAWING_TYPES = new Set(['com.microsoft.Art--GVML-ClipFormat', 'Art::GVML ClipFormat']);
+
+ipcMain.handle('read-clipboard-drawing', (_event, type: string) => {
+  if (!DRAWING_TYPES.has(type)) return null;
+  const bytes = clipboard.readBuffer(type);
+  return bytes.length ? new Uint8Array(bytes) : null;
+});
+```
+
+The preload script exposes the handler to the page:
+
+```ts
+// preload.ts
+import { contextBridge, ipcRenderer } from 'electron';
+
+contextBridge.exposeInMainWorld('desktop', {
+  readClipboardDrawing: (type: string): Promise<Uint8Array | null> =>
+    ipcRenderer.invoke('read-clipboard-drawing', type),
+});
+```
+
+The page passes a reader to the editor. The reader can return the bytes, `null`, or a promise of either:
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { PptxEditor } from '@pptx-editor.dev/react';
+import { DRAWING_CLIPBOARD_TYPES } from '@pptx-editor.dev/core';
+
+declare global {
+  interface Window {
+    desktop: { readClipboardDrawing(type: string): Promise<Uint8Array | null> };
+  }
+}
+
+const type = navigator.userAgent.includes('Mac')
+  ? DRAWING_CLIPBOARD_TYPES.macos
+  : DRAWING_CLIPBOARD_TYPES.windows;
+const readDrawing = () => window.desktop.readClipboardDrawing(type);
+
+export function Editor({ bytes }: { bytes: Uint8Array }) {
+  return <PptxEditor document={bytes} readClipboardDrawing={readDrawing} />;
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { PptxEditor } from '@pptx-editor.dev/vue';
+import { DRAWING_CLIPBOARD_TYPES } from '@pptx-editor.dev/core';
+
+defineProps<{ bytes: Uint8Array }>();
+
+const desktop = (
+  window as unknown as {
+    desktop: { readClipboardDrawing(type: string): Promise<Uint8Array | null> };
+  }
+).desktop;
+const type = navigator.userAgent.includes('Mac')
+  ? DRAWING_CLIPBOARD_TYPES.macos
+  : DRAWING_CLIPBOARD_TYPES.windows;
+const readDrawing = () => desktop.readClipboardDrawing(type);
+</script>
+
+<template>
+  <PptxEditor :document="bytes" :read-clipboard-drawing="readDrawing" />
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+The editor reads the prop once, when it is created. Shapes, pictures, connectors, groups, and tables paste as editable content. Theme colors and theme fonts follow the theme of the slide you paste on. Charts, diagrams, and embedded objects need parts that the package does not carry, so they are left out. When the reader returns `null`, throws, or returns bytes that hold no shape the editor pastes, the picture pastes.
+
+To paste a package from your own code, convert it with `drawingClipboardPayload` and run `paste`:
+
+```ts
+import { drawingClipboardPayload, type Editor } from '@pptx-editor.dev/core';
+
+function pasteDrawing(editor: Editor, bytes: Uint8Array) {
+  const payload = drawingClipboardPayload(bytes);
+  // Null: the bytes are not a DrawingML clipboard package with shapes.
+  return payload ? editor.exec({ type: 'paste', payload }) : null;
+}
+```
+
+The package bytes are untrusted input. They are read within size limits, nothing in them runs or loads, and links to outside the package are dropped.
 
 ## Paste from your own code
 
