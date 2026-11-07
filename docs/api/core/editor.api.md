@@ -533,6 +533,9 @@ export function clampSlide(index: number | undefined, count: number): number;
 export function clearNotesFindMatch(root: HTMLElement | null): void;
 
 // @public
+export type ClipboardDrawingReader = () => Uint8Array | null | undefined | Promise<Uint8Array | null | undefined>;
+
+// @public
 export interface ClipboardNode {
     // (undocumented)
     readonly attrs?: readonly {
@@ -1304,6 +1307,15 @@ export function dragOverSlide(drag: SlideDrag, index: number, axis: 'x' | 'y', r
     clientX: number;
     clientY: number;
 }): SlideDrag;
+
+// @public
+export const DRAWING_CLIPBOARD_TYPES: Readonly<{
+    macos: "com.microsoft.Art--GVML-ClipFormat";
+    windows: "Art::GVML ClipFormat";
+}>;
+
+// @public
+export function drawingClipboardPayload(bytes: Uint8Array): ClipboardPayload | null;
 
 // @internal
 export function dropSlideDrag(editor: PptxEditorInstance | null, drag: SlideDrag | null, grouped: readonly SlideSection[] | null): void;
@@ -4139,6 +4151,7 @@ export interface PptxEditorOptions extends Omit<OpenOptions, 'fonts'> {
     readonly mode?: EditorMode;
     readonly modules?: readonly EditorModule[];
     readonly onFontError?: (error: EditorFontError) => void;
+    readonly readClipboardDrawing?: ClipboardDrawingReader;
     readonly smartGuides?: boolean;
     readonly translate?: (key: string, params?: Record<string, string | number>) => string;
     // (undocumented)

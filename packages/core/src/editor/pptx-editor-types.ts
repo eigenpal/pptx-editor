@@ -9,6 +9,7 @@ import type {
   EditorSelection,
   TableStyleChoice,
 } from '../contracts/index.ts';
+import type { ClipboardDrawingReader } from './clipboard-host.ts';
 import type { DocumentSession, OpenOptions } from './document-session.ts';
 import type { EditorFontError } from './editor-font-error.ts';
 import type { EditorFontsOption } from './host-fonts.ts';
@@ -56,6 +57,14 @@ export interface PptxEditorOptions extends Omit<OpenOptions, 'fonts'> {
   readonly onFontError?: (error: EditorFontError) => void;
   /** Capability modules, such as the review and collaboration modules of the pro package. */
   readonly modules?: readonly seam.EditorModule[];
+  /**
+   * Reads the DrawingML clipboard package from the system clipboard, for a host that can,
+   * such as a desktop wrapper. Presentation applications write copied shapes in this package
+   * (`DRAWING_CLIPBOARD_TYPES`) and as a picture, and browsers give a page only the picture.
+   * When a paste holds a picture, the editor calls this reader and pastes the package's
+   * shapes as editable shapes. Without a package, or without this option, the picture pastes.
+   */
+  readonly readClipboardDrawing?: ClipboardDrawingReader;
 }
 
 /**

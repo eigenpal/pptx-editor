@@ -663,6 +663,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     refuse: (reason) => void refuse(reason),
     exec: (command) => void exec(command),
     selectedSlides: () => slideSel.indices(session?.info.slides ?? [], slide),
+    ...(options.readClipboardDrawing ? { readDrawing: options.readClipboardDrawing } : {}),
   });
 
   /**

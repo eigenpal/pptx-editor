@@ -22,6 +22,7 @@ import {
   type EditorFontError,
   type EditorFontsOption,
   type EditorMode,
+  type ClipboardDrawingReader,
   type EditorModule,
   type PptxEditorInstance,
 } from '@pptx-editor.dev/core/editor';
@@ -471,6 +472,7 @@ export type {
   ChromeGroupId,
   ChromeMenuId,
   ChromeSlotId,
+  ClipboardDrawingReader,
   ColumnsDialogFields,
   CommandResult,
   DocumentOpenFailure,
@@ -517,6 +519,11 @@ const pptxEditorProps = {
   modules: { type: Array as PropType<readonly EditorModule[]>, default: undefined },
   /** AutoCorrect while typing, as on `PptxEditorRoot`. Read at mount. */
   autoCorrect: { type: Boolean, default: true },
+  /** Reads copied shapes from the system clipboard, as on `PptxEditorRoot`. Read at mount. */
+  readClipboardDrawing: {
+    type: Function as PropType<ClipboardDrawingReader>,
+    default: undefined,
+  },
   /** Customize the dialogs the editor mounts, as on `PptxEditorRoot`. */
   popups: { type: Object as PropType<PptxEditorPopups>, default: undefined },
   /** The chrome color mode, as on `PptxEditorRoot`. */
@@ -668,6 +675,9 @@ const PptxEditorDefault = defineComponent({
           ...(props.fonts ? { fonts: props.fonts } : {}),
           ...(props.modules ? { modules: props.modules } : {}),
           ...(props.autoCorrect === false ? { autoCorrect: false } : {}),
+          ...(props.readClipboardDrawing
+            ? { readClipboardDrawing: props.readClipboardDrawing }
+            : {}),
           // Forwarded only with a listener, so the root still warns when nobody listens.
           ...(instance?.vnode.props?.onFontError
             ? { onFontError: (error: EditorFontError) => emit('fontError', error) }

@@ -25,6 +25,7 @@ import {
   translateKeyOrText,
   warnModulesChanged,
   type ColorMode,
+  type ClipboardDrawingReader,
   type CommandResult,
   type LoadOptions,
   type EditorCommand,
@@ -97,6 +98,13 @@ export interface PptxEditorRootProps {
    * once, when the editor is created.
    */
   readonly autoCorrect?: boolean;
+  /**
+   * Reads the DrawingML clipboard package from the system clipboard, for a desktop host that
+   * can. A paste of copied shapes from another application then pastes editable shapes, not
+   * their picture. See `PptxEditorOptions.readClipboardDrawing`. Read once, when the editor is
+   * created.
+   */
+  readonly readClipboardDrawing?: ClipboardDrawingReader;
   /** Customize the dialogs the editor mounts. Set an entry to `false` to turn one off. */
   readonly popups?: PptxEditorPopups;
   /**
@@ -172,6 +180,7 @@ export const PptxEditorRoot = forwardRef<PptxEditorRef, PptxEditorRootProps>(
         ...(props.fonts ? { fonts: props.fonts } : {}),
         ...(props.modules ? { modules: props.modules } : {}),
         ...(props.autoCorrect === false ? { autoCorrect: false } : {}),
+        ...(props.readClipboardDrawing ? { readClipboardDrawing: props.readClipboardDrawing } : {}),
         onFontError: (error) => reportFontError(error, callbacks.current.onFontError),
         translate: (key, params) => translateKeyOrText(tRef.current, key, params),
       });

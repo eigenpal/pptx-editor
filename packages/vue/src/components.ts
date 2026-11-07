@@ -38,6 +38,7 @@ import {
   type EditorFontError,
   type EditorFontsOption,
   type EditorMode,
+  type ClipboardDrawingReader,
   type EditorModule,
   type PptxEditorInstance,
 } from '@pptx-editor.dev/core/editor';
@@ -89,6 +90,16 @@ const pptxEditorRootProps = {
    * once, when the editor is created.
    */
   autoCorrect: { type: Boolean, default: true },
+  /**
+   * Reads the DrawingML clipboard package from the system clipboard, for a desktop host that
+   * can. A paste of copied shapes from another application then pastes editable shapes, not
+   * their picture. See `PptxEditorOptions.readClipboardDrawing`. Read once, when the editor is
+   * created.
+   */
+  readClipboardDrawing: {
+    type: Function as PropType<ClipboardDrawingReader>,
+    default: undefined,
+  },
   /** Customize the dialogs the editor mounts. Set an entry to `false` to turn one off. */
   popups: { type: Object as PropType<PptxEditorPopups>, default: undefined },
   /** The chrome color mode: `'light'` (default), `'dark'`, or `'system'`. */
@@ -191,6 +202,7 @@ export const PptxEditorRoot = defineComponent({
         ...(props.fonts ? { fonts: props.fonts } : {}),
         ...(props.modules ? { modules: props.modules } : {}),
         ...(props.autoCorrect === false ? { autoCorrect: false } : {}),
+        ...(props.readClipboardDrawing ? { readClipboardDrawing: props.readClipboardDrawing } : {}),
         onFontError,
         translate: (key, params) => translateKeyOrText(t.value, key, params),
       });

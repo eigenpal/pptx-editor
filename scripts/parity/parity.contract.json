@@ -93,6 +93,7 @@
         "notesPane",
         "openFailure",
         "popups",
+        "readClipboardDrawing",
         "slideRail",
         "toolbar"
       ],
@@ -122,7 +123,8 @@
         "locale",
         "mode",
         "modules",
-        "popups"
+        "popups",
+        "readClipboardDrawing"
       ],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {
@@ -1108,6 +1110,7 @@
       "ChromeGroupId",
       "ChromeMenuId",
       "ChromeSlotId",
+      "ClipboardDrawingReader",
       "ColumnsDialogFields",
       "CommandResult",
       "DocumentOpenFailure",
