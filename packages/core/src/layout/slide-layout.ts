@@ -7,6 +7,7 @@ import type {
   ResolvedGraphicFrame,
   ResolvedGroup,
   ResolvedPicture,
+  ResolvedLine,
   ResolvedShape,
   ResolvedSlide,
 } from '../cascade/index.ts';
@@ -45,6 +46,8 @@ export type LayoutItem = ItemPlacement &
         readonly element: ResolvedShape;
         readonly matrix: Matrix;
         readonly geometry: EvaluatedGeometry;
+        /** Outline used for paint when native dash expansion exceeds the resource limit. */
+        readonly paintLine?: ResolvedLine;
         readonly text?: TextLayout;
         /** Local text frame → slide. Text is never mirrored by a flip. */
         readonly textMatrix?: Matrix;
@@ -54,6 +57,8 @@ export type LayoutItem = ItemPlacement &
         readonly element: ResolvedPicture;
         readonly matrix: Matrix;
         readonly geometry: EvaluatedGeometry;
+        /** Outline used for paint when native dash expansion exceeds the resource limit. */
+        readonly paintLine?: ResolvedLine;
       }
     | {
         readonly kind: 'group';

@@ -110,3 +110,68 @@ describe('registerFontFaces', () => {
     }
   });
 });
+
+test('registration keeps late faces until disposal and never adds them again', async () => {
+  let complete!: () => void;
+  class SlowFontFace {
+    load(): Promise<void> {
+      return new Promise((resolve) => {
+        complete = resolve;
+      });
+    }
+  }
+  const fonts = new Set<unknown>();
+  const doc = {
+    defaultView: { FontFace: SlowFontFace },
+    fonts: { add: (f: unknown) => fonts.add(f), delete: (f: unknown) => fonts.delete(f) },
+  };
+  const handle = registerFontFaces(doc as unknown as Document, [face]);
+  let ready = false;
+  void handle.ready.then(() => {
+    ready = true;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(ready).toBe(false);
+  expect(fonts.size).toBe(1);
+  handle.dispose();
+  await handle.ready;
+  complete();
+  await Promise.resolve();
+  expect(fonts.size).toBe(0);
+});
+
+test('dispose releases a pending browser registration wait', async () => {
+  class SlowFontFace {
+    load(): Promise<void> {
+      return new Promise(() => {});
+    }
+  }
+  const fonts = new Set<unknown>();
+  const doc = {
+    defaultView: { FontFace: SlowFontFace },
+    fonts: { add: (f: unknown) => fonts.add(f), delete: (f: unknown) => fonts.delete(f) },
+  };
+  const handle = registerFontFaces(doc as unknown as Document, [face]);
+  handle.dispose();
+  await handle.ready;
+  expect(fonts.size).toBe(0);
+}, 500);
+
+test('a constructor failure removes faces already registered', () => {
+  let count = 0;
+  class BrokenFontFace {
+    constructor() {
+      if (++count === 2) throw new Error('font failure');
+    }
+    load(): Promise<void> {
+      return Promise.resolve();
+    }
+  }
+  const fonts = new Set<unknown>();
+  const doc = {
+    defaultView: { FontFace: BrokenFontFace },
+    fonts: { add: (f: unknown) => fonts.add(f), delete: (f: unknown) => fonts.delete(f) },
+  };
+  expect(() => registerFontFaces(doc as unknown as Document, [face, face])).toThrow('font failure');
+  expect(fonts.size).toBe(0);
+});

@@ -56,6 +56,20 @@ The demo builds against workspace source, so it needs no package build.
 5. Add a changeset for code changes with `bun changeset`. Documentation, test, and CI-only changes do not need one.
 6. Submit a pull request against `main` with a conventional-commit title.
 
+## Browser responsiveness checks
+
+Run these checks against the source demos in this checkout:
+
+```bash
+bun run test:hang:browser
+bun run test:stress:interactions
+bun run test:fixtures:browser
+```
+
+The hang corpus covers large presentations, extreme text, geometry, tables, and font waits. It records open time and event-loop delays, then checks recovery with another presentation. The interaction suite runs the same navigation, editing, paste, and replacement sequences in React and Vue. The fixture suite opens each synthetic fixture, navigates its slides, and saves and reopens it. These checks test responsiveness. They do not replace PDF fidelity comparisons.
+
+Set `HANG_BROWSER=firefox` or `HANG_BROWSER=webkit` to use another browser engine. Install the engines first with `bunx playwright install chromium firefox webkit`. Set `HANG_ONLY=slides-3000,tabs-many-stops` to select hang corpus cases. Each suite starts its own servers and refuses occupied ports.
+
 ## Add a collaboration fixture
 
 Every editing command and every kind of text input must converge when two people edit one deck. The gate, `packages/pro/src/__tests__/collaboration-coverage.test.ts`, runs each edit on peer A of two editors on linked Y.Docs, flushes, and compares both replicas and their saved decks. When you add a command:

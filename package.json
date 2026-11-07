@@ -82,7 +82,10 @@
     "changeset": "changeset",
     "version-packages": "changeset version && bun install --lockfile-only",
     "release": "bun run build:packages && bun run notices:generate && bun run check:package-artifacts && changeset publish",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:hang:browser": "playwright test --config e2e/hang.config.ts",
+    "test:stress:interactions": "playwright test --config e2e/interactions.config.ts",
+    "test:fixtures:browser": "playwright test --config e2e/fixtures.config.ts"
   },
   "dependencies": {
     "@pptx-editor.dev/pptx-to-pdf": "workspace:*"

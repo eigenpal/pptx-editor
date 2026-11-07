@@ -387,7 +387,7 @@ function paintGeometry(
   const el = item.element;
   const { cx: w, cy: h } = el.xfrm;
   const out: SVGElement[] = [];
-  const line = el.line;
+  const line = item.paintLine ?? el.line;
   const stroke = line ? strokeAttrs(line, w, h, ctx, groupScale) : { stroke: 'none' };
   const paintFor = shapePaints(item, ctx);
   const effects = item.geometry.paths.length <= MAX_OVERLAY_PATHS ? el.effects : undefined;

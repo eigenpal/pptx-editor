@@ -105,21 +105,27 @@ function decorationRects(
 
 /**
  * Split a run into stretches painted along the line and single characters painted upright.
- * Offsets are UTF-16; a surrogate pair stays together.
+ * Offsets are UTF-16; a surrogate pair stays together. Tabs have no glyph and are omitted.
+ * Their advances remain in the layout, which also supplies decoration and caret positions.
  */
 export function uprightPieces(
   text: string,
   mode: TextLayout['upright']
 ): { start: number; end: number; upright: boolean }[] {
-  if (mode === 'none') return [{ start: 0, end: text.length, upright: false }];
+  if (mode === 'none' && !text.includes('\t'))
+    return [{ start: 0, end: text.length, upright: false }];
   const out: { start: number; end: number; upright: boolean }[] = [];
   let i = 0;
   while (i < text.length) {
     const cp = text.codePointAt(i) ?? 0;
     const len = cp > 0xffff ? 2 : 1;
-    const upright = mode === 'all' ? text[i] !== ' ' : isIdeographic(cp);
+    if (cp === 9) {
+      i += len;
+      continue;
+    }
+    const upright = mode === 'all' ? text[i] !== ' ' : mode !== 'none' && isIdeographic(cp);
     const last = out[out.length - 1];
-    if (!upright && last && !last.upright) last.end = i + len;
+    if (!upright && last && !last.upright && last.end === i) last.end = i + len;
     else out.push({ start: i, end: i + len, upright });
     i += len;
   }

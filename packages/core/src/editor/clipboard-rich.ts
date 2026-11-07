@@ -439,27 +439,30 @@ const isNameChar = (c: number): boolean =>
  */
 function* htmlTokens(source: string): Generator<HtmlToken> {
   let i = 0;
+  let textStart = 0;
   const n = source.length;
   while (i < n) {
     const lt = source.indexOf('<', i);
     if (lt < 0) {
-      yield { kind: 'text', text: source.slice(i) };
+      yield { kind: 'text', text: source.slice(textStart) };
       return;
     }
-    if (lt > i) yield { kind: 'text', text: source.slice(i, lt) };
     if (source.startsWith('<!--', lt)) {
+      if (lt > textStart) yield { kind: 'text', text: source.slice(textStart, lt) };
       const end = source.indexOf('-->', lt + 4);
       if (end < 0) return;
       i = end + 3;
+      textStart = i;
       continue;
     }
     const close = source.charCodeAt(lt + 1) === 47; // '/'
     const nameStart = lt + (close ? 2 : 1);
     if (!isLetter(source.charCodeAt(nameStart))) {
-      yield { kind: 'text', text: '<' };
+      // A literal '<' stays with adjacent text, rather than creating a run per character.
       i = lt + 1;
       continue;
     }
+    if (lt > textStart) yield { kind: 'text', text: source.slice(textStart, lt) };
     let j = nameStart + 1;
     while (j < n && isNameChar(source.charCodeAt(j))) j += 1;
     const name = source.slice(nameStart, j);
@@ -475,7 +478,9 @@ function* htmlTokens(source: string): Generator<HtmlToken> {
     if (j >= n) return;
     yield { kind: 'tag', close, name, attrs: source.slice(attrsStart, j), end: j + 1 };
     i = j + 1;
+    textStart = i;
   }
+  if (textStart < n) yield { kind: 'text', text: source.slice(textStart) };
 }
 
 interface ListFrame {

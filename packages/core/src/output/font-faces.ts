@@ -43,27 +43,36 @@ export function registerFontFaces(
   const FontFaceCtor = ((doc.defaultView ?? globalThis) as { FontFace?: typeof FontFace }).FontFace;
   if (typeof FontFaceCtor !== 'function' || !doc.fonts)
     return { ready: Promise.resolve(), dispose: () => {} };
-  for (const f of faces) {
-    // Every face is the only member of its family and is declared regular, so the page draws
-    // it as-is; paint adds font-weight/font-style only to synthesize a missing style.
-    const family = options.family?.(f) ?? f.id;
-    const face = new FontFaceCtor(family, f.bytes.slice().buffer, {
-      weight: '400',
-      style: 'normal',
-    });
-    loads.push(face.load().catch(() => undefined));
-    doc.fonts.add(face);
-    added.push(face);
+  try {
+    for (const f of faces) {
+      // Every face is the only member of its family and is declared regular, so the page draws
+      // it as-is; paint adds font-weight/font-style only to synthesize a missing style.
+      const family = options.family?.(f) ?? f.id;
+      const face = new FontFaceCtor(family, f.bytes.slice().buffer, {
+        weight: '400',
+        style: 'normal',
+      });
+      loads.push(face.load().catch(() => undefined));
+      doc.fonts.add(face);
+      added.push(face);
+    }
+  } catch (cause) {
+    for (const face of added) doc.fonts.delete(face);
+    throw cause;
   }
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const late = new Promise<void>((resolve) => {
-    timer = setTimeout(resolve, options.waitMs ?? FACE_LOAD_WAIT_MS);
+  // `ready` settles when every face loads, after the wait, or on disposal, whichever is first:
+  // a face whose load never settles cannot hold the open, and disposal releases a waiting caller.
+  let finish!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    finish = resolve;
+    void Promise.all(loads).then(finish);
   });
+  const timer = setTimeout(() => finish(), options.waitMs ?? FACE_LOAD_WAIT_MS);
+  void ready.then(() => clearTimeout(timer));
   return {
-    ready: Promise.race([Promise.all(loads).then(() => undefined), late]).finally(() =>
-      clearTimeout(timer)
-    ),
+    ready,
     dispose: () => {
+      finish();
       for (const face of added) doc.fonts.delete(face);
     },
   };

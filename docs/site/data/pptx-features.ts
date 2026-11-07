@@ -445,7 +445,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Dashes and line ends draw at measured sizes, at every line width. Compound line bands are not measured.',
+      'Dashes and line ends draw at measured sizes. Shape and picture outlines and table borders draw solid when their estimated dash count exceeds 100,000. Save preserves the original pattern. Compound line bands are not measured.',
   },
   {
     id: 'fills-lines.theme-colors',

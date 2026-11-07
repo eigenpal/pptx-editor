@@ -534,3 +534,19 @@ describe('the clipboard host', () => {
     expect(data).toEqual({});
   });
 });
+
+test('literal angle brackets stay in one clipboard run and preserve their text', () => {
+  const text = '<'.repeat(50_000);
+  const paragraphs = richFromHtml(`<p>${text}</p>`)!;
+  expect(paragraphs).toHaveLength(1);
+  expect(paragraphs[0]!.runs).toEqual([{ text }]);
+  expect(richFromHtml('before << 2<b>bold</b>after <')!.flatMap((p) => p.runs)).toEqual([
+    { text: 'before << 2' },
+    { text: 'bold', bold: true },
+    { text: 'after <' },
+  ]);
+  expect(richFromHtml('before <<<!--comment-->after <span title="')![0]!.runs).toEqual([
+    { text: 'before <<' },
+    { text: 'after' },
+  ]);
+});

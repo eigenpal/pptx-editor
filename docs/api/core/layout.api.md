@@ -53,6 +53,7 @@ export interface CellLayout {
     readonly cell: ResolvedTableCell;
     // (undocumented)
     readonly height: number;
+    readonly paintBorders?: CellBorders;
     // (undocumented)
     readonly text: TextLayout;
     // (undocumented)
@@ -504,6 +505,7 @@ export type LayoutItem = ItemPlacement & ({
     readonly element: ResolvedShape;
     readonly matrix: Matrix;
     readonly geometry: EvaluatedGeometry;
+    readonly paintLine?: ResolvedLine;
     readonly text?: TextLayout;
     readonly textMatrix?: Matrix;
 } | {
@@ -511,6 +513,7 @@ export type LayoutItem = ItemPlacement & ({
     readonly element: ResolvedPicture;
     readonly matrix: Matrix;
     readonly geometry: EvaluatedGeometry;
+    readonly paintLine?: ResolvedLine;
 } | {
     readonly kind: 'group';
     readonly element: ResolvedGroup;

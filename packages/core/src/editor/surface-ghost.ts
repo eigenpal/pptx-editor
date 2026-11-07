@@ -8,6 +8,7 @@
 import type { EditorSelection } from '../contracts/index.ts';
 import type { LayoutItem, Matrix } from '../layout/index.ts';
 import { SVG_NS } from '../output/index.ts';
+import { paintClusterRanges } from '../layout/text/paint-clusters.ts';
 
 const EMU_PER_PT = 12_700;
 
@@ -28,22 +29,24 @@ export function ghostBullet(
   const g = doc.createElementNS(SVG_NS, 'g');
   g.setAttribute('class', 'pptx-surface__ghost-bullet');
   g.setAttribute('transform', `matrix(${m.join(' ')}) scale(${EMU_PER_PT})`);
-  const text = doc.createElementNS(SVG_NS, 'text');
-  text.setAttribute(
-    'x',
-    run.x
-      .slice(0, -1)
-      .map((v) => String(v / EMU_PER_PT))
-      .join(' ')
-  );
-  text.setAttribute('y', String((line.baseline - run.rise) / EMU_PER_PT));
-  text.setAttribute('font-family', `${run.face.id}, sans-serif`);
-  text.setAttribute('font-size', String(run.sizePt));
-  const fill = run.props.fill;
-  if (fill.type === 'solid')
-    text.setAttribute('fill', `rgb(${fill.color.r} ${fill.color.g} ${fill.color.b})`);
-  text.setAttribute('xml:space', 'preserve');
-  text.textContent = run.text;
-  g.appendChild(text);
+  for (const piece of paintClusterRanges(run.text)) {
+    const text = doc.createElementNS(SVG_NS, 'text');
+    text.setAttribute(
+      'x',
+      run.x
+        .slice(piece.start, piece.end)
+        .map((v) => String(v / EMU_PER_PT))
+        .join(' ')
+    );
+    text.setAttribute('y', String((line.baseline - run.rise) / EMU_PER_PT));
+    text.setAttribute('font-family', `${run.face.id}, sans-serif`);
+    text.setAttribute('font-size', String(run.sizePt));
+    const fill = run.props.fill;
+    if (fill.type === 'solid')
+      text.setAttribute('fill', `rgb(${fill.color.r} ${fill.color.g} ${fill.color.b})`);
+    text.setAttribute('xml:space', 'preserve');
+    text.textContent = run.text.slice(piece.start, piece.end);
+    g.appendChild(text);
+  }
   return g;
 }

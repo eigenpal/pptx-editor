@@ -46,7 +46,7 @@ function edge(
 }
 
 function borders(c: CellLayout, p: PageOps, scope: FillScope): void {
-  const b = c.cell.borders;
+  const b = c.paintBorders ?? c.cell.borders;
   const r = c.x + c.width;
   const bottom = c.y + c.height;
   edge(b.tlToBr, c.x, c.y, r, bottom, p, scope);

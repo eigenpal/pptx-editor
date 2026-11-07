@@ -149,7 +149,7 @@ export async function completeDeferredAnswer<T extends OriginAnswer>(
 }
 
 /** The longest chain of late answers an export waits through before it reports and stops. */
-const MAX_DEFERRED_STEPS = 256;
+export const MAX_DEFERRED_STEPS = 256;
 
 /** The answer re-read without the failures it already reported. */
 export function withoutReportedFailures(answer: OriginAnswer): OriginAnswer {

@@ -87,3 +87,37 @@ describe('table cells are laid out once (P8)', () => {
     expect(table.calls).toBe(once.calls);
   });
 });
+
+describe('bounded table border paint', () => {
+  const border = (side: string) =>
+    `<a:${side} w="1"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:prstDash val="sysDot"/></a:${side}>`;
+
+  test('keeps small dashed borders and bounds long horizontal, vertical, and diagonal borders', () => {
+    const borders = ['lnL', 'lnR', 'lnT', 'lnB', 'lnTlToBr', 'lnBlToTr'].map(border).join('');
+    const small = tableOf('<a:tr h="100">' + cell('', { tcPr: borders }) + '</a:tr>', [100]);
+    const smallCell = layoutTable(small, createFixedMeasurer()).cells[0];
+    expect((smallCell.paintBorders ?? smallCell.cell.borders).top).toBe(smallCell.cell.borders.top);
+    expect(smallCell.cell.borders.top?.dash).toBe('sysDot');
+    const large = tableOf(
+      '<a:tr h="2147483647">' + cell('', { tcPr: borders }) + '</a:tr>',
+      [2147483647]
+    );
+    const painted = layoutTable(large, createFixedMeasurer()).cells[0];
+    expect(painted.cell).toBe(large.cells[0]);
+    for (const side of ['top', 'bottom', 'left', 'right', 'tlToBr', 'blToTr'] as const) {
+      expect(painted.cell.borders[side]?.dash).toBe('sysDot');
+      expect(painted.paintBorders?.[side]?.dash).toBe('solid');
+    }
+  });
+
+  test('the horizontal budget includes the border start', () => {
+    for (const width of [199_998, 200_000]) {
+      const source = tableOf('<a:tr h="100">' + cell('', { tcPr: border('lnT') }) + '</a:tr>', [
+        width,
+      ]);
+      const painted = layoutTable(source, createFixedMeasurer()).cells[0];
+      expect(painted.paintBorders?.top?.dash).toBe(width === 199_998 ? undefined : 'solid');
+      expect(source.cells[0].borders.top?.dash).toBe('sysDot');
+    }
+  });
+});

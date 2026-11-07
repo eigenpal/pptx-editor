@@ -328,3 +328,41 @@ describe('links, clear formatting, backgrounds, and line end points', () => {
     expect(slideXml(e)).toContain('flipH="1" flipV="1"');
   });
 });
+
+test('a bounded outline keeps its source dash in the toolbar and after resizing', async () => {
+  const e = await open(
+    buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          shapes: shape({
+            id: 2,
+            x: 0,
+            y: 0,
+            cx: 2147483647,
+            cy: 2147483647,
+            prst: 'ellipse',
+            line: '<a:ln w="1">' + solid('000000') + '<a:prstDash val="sysDot"/></a:ln>',
+          }),
+        },
+      ],
+    })
+  );
+  try {
+    e.setSelection({ kind: 'shapes', nodeIds: ids(e) });
+    expect(e.snapshot().geometry?.lineDash).toBe('sysDot');
+    const before = e.session!.layout(0)!.items[0];
+    if (before.kind !== 'shape') throw new Error('no shape');
+    expect(before.paintLine?.dash).toBe('solid');
+    expect(e.exec({ type: 'setTransform', ...e.snapshot().geometry!, cx: 100, cy: 100 }).ok).toBe(
+      true
+    );
+    expect(e.snapshot().geometry?.lineDash).toBe('sysDot');
+    const after = e.session!.layout(0)!.items[0];
+    if (after.kind !== 'shape') throw new Error('no shape');
+    expect((after.paintLine ?? after.element.line)?.dash).toBe('sysDot');
+    expect(slideXml(e)).toContain('<a:prstDash val="sysDot"/>');
+  } finally {
+    e.destroy();
+  }
+});

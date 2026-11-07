@@ -7,18 +7,65 @@
 import type {
   ResolvedElement,
   ResolvedGraphicFrame,
+  ResolvedLine,
   ResolvedShape,
   Xfrm,
 } from '../cascade/index.ts';
 import { fitShape } from './autofit.ts';
+import { boundedDashLine } from './dash-limit.ts';
 import { drawingRenderers } from './drawing-renderers.ts';
-import { evaluateGeometry } from './geometry/geometry.ts';
+import { evaluateGeometry, type EvaluatedGeometry } from './geometry/geometry.ts';
+import { dashArray, strokeWidth } from './line-strokes.ts';
 import { boxMatrix, multiply, type Matrix } from './matrix.ts';
 import type { ItemPlacement, LayoutItem, SourceMap } from './slide-layout.ts';
 import { layoutTable } from './table-layout.ts';
 import { layoutTextOn, type TextLayout } from './text/text-layout.ts';
 import type { LineBasis } from './text/line-metrics.ts';
 import type { TextMeasurer } from './text/measurer.ts';
+
+/**
+ * Bound native dash expansion by the control-polygon length, an upper bound for each curve.
+ * Source properties remain unchanged; both SVG and PDF receive this laid-out outline.
+ */
+function boundedOutline(
+  line: ResolvedLine | undefined,
+  geometry: EvaluatedGeometry,
+  diagnostics: Set<string>,
+  picture = false
+): ResolvedLine | undefined {
+  if (!line || line.fill.type === 'none') return undefined;
+  const dashes = dashArray(line, strokeWidth(line));
+  if (!dashes) return undefined;
+  let length = 0;
+  let starts = 0;
+  for (const path of geometry.paths) {
+    if (!path.stroke && !picture) continue;
+    let x = 0,
+      y = 0,
+      startX = 0,
+      startY = 0;
+    const to = (nextX: number, nextY: number): void => {
+      length += Math.hypot(nextX - x, nextY - y);
+      x = nextX;
+      y = nextY;
+    };
+    for (const command of path.commands) {
+      if (command.op === 'M') {
+        x = startX = command.x;
+        y = startY = command.y;
+        starts += 1;
+      } else if (command.op === 'Z') to(startX, startY);
+      else {
+        if (command.op === 'Q' || command.op === 'C') to(command.x1, command.y1);
+        if (command.op === 'C') to(command.x2, command.y2);
+        to(command.x, command.y);
+      }
+    }
+  }
+  const paintLine = boundedDashLine(line, length, starts);
+  if (paintLine) diagnostics.add('approximation: dash-complexity');
+  return paintLine;
+}
 
 /** Maps a group's child coordinates (`chOff`/`chExt`) into the group's local box. */
 type ChildMap = SourceMap;
@@ -174,6 +221,7 @@ function layoutPlaced(
     case 'shape':
     case 'connector': {
       const geometry = evaluateGeometry(el.geometry, el.xfrm.cx, el.xfrm.cy);
+      const paintLine = boundedOutline(el.line, geometry, diagnostics);
       if (geometry.unknownPreset)
         diagnostics.add(`unknown preset geometry: ${geometry.unknownPreset}`);
       let text: TextLayout | undefined;
@@ -206,19 +254,24 @@ function layoutPlaced(
         ...placement,
         kind: 'shape',
         element: el as ResolvedShape,
+        ...(paintLine ? { paintLine } : {}),
         matrix,
         geometry,
         ...(text ? { text, textMatrix } : {}),
       };
     }
-    case 'picture':
+    case 'picture': {
+      const geometry = evaluateGeometry(el.geometry, el.xfrm.cx, el.xfrm.cy);
+      const paintLine = boundedOutline(el.line, geometry, diagnostics, true);
       return {
         ...placement,
         kind: 'picture',
         element: el,
+        ...(paintLine ? { paintLine } : {}),
         matrix,
-        geometry: evaluateGeometry(el.geometry, el.xfrm.cx, el.xfrm.cy),
+        geometry,
       };
+    }
     case 'group': {
       const chExt = el.childExtent;
       const childMap: ChildMap = {
@@ -238,6 +291,8 @@ function layoutPlaced(
       if (el.table) {
         const substituted = new Set<string>();
         const table = layoutTable(el.table, measurer, substituted);
+        if (table.cells.some((cell) => cell.paintBorders))
+          diagnostics.add('approximation: dash-complexity');
         for (const s of substituted) diagnostics.add(`font substituted: ${s}`);
         return { ...placement, kind: 'frame', element: el, matrix, table };
       }

@@ -54,6 +54,7 @@ import {
 } from './font-composition.ts';
 import { configuredDefaultFontFamily } from './font-composition.ts';
 import {
+  MAX_DEFERRED_STEPS,
   completeDeferredAnswer,
   composeLateOrigins,
   splitDeferredAnswer,
@@ -366,7 +367,8 @@ export interface ComposePreparedFontOriginsOptions extends ComposeFontOriginsOpt
 async function composeFontOriginsInternal(
   origins: readonly FontOrigin[],
   request: FontResolutionRequest,
-  options: ComposePreparedFontOriginsOptions
+  options: ComposePreparedFontOriginsOptions,
+  deferredSteps = 0
 ): Promise<FontConfigurationFragment | undefined> {
   const executionCeiling = options.maxExecutionFontBytes ?? HARD_MAX_FONT_BYTES;
   if (
@@ -391,7 +393,6 @@ async function composeFontOriginsInternal(
   const failures: unknown[] = [];
   const inherited = request.resolvedFaces ?? [];
   let defaultFamily = request.defaultFamily;
-  // Per origin position: the immediate answer as given, and its late faces.
   const answered: (FontConfiguration | FontConfigurationFragment | undefined)[] = [];
   const late: (Promise<FontConfigurationFragment | undefined> | undefined)[] = [];
   // Origins that held everything back. They never become the base, on this pass or on a
@@ -462,6 +463,16 @@ async function composeFontOriginsInternal(
         const split = splitDeferredAnswer(answer);
         answer = split.now;
         pendingLate = split.later;
+        // Bound background cycles too, so microtasks cannot prevent timers and paint.
+        if (pendingLate && deferredSteps >= MAX_DEFERRED_STEPS) {
+          pendingLate = undefined;
+          reportOriginFailure(
+            options,
+            origin,
+            originIndex,
+            new RangeError(`Font loading stopped after ${MAX_DEFERRED_STEPS} deferred steps`)
+          );
+        }
       }
       const answerFailures = 'failures' in answer ? answer.failures : undefined;
       // A partial origin can keep its usable faces while reporting failed fetches. Snapshot
@@ -573,10 +584,12 @@ async function composeFontOriginsInternal(
   const deferred = late.some(Boolean)
     ? composeLateOrigins(answered, late, request.signal, {
         compose: (merged) =>
-          composeFontOriginsInternal(merged, request, {
-            ...options,
-            placeholderOrigins: placeholders,
-          }),
+          composeFontOriginsInternal(
+            merged,
+            request,
+            { ...options, placeholderOrigins: placeholders },
+            deferredSteps + 1
+          ),
         report: (index, cause) => reportOriginFailure(options, origins[index], index, cause),
       })
     : undefined;

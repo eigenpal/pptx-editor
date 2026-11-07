@@ -5,6 +5,7 @@ import { resolveSlide } from '../../../cascade/index.ts';
 import {
   createFixedMeasurer,
   layoutSlide,
+  layoutText,
   type TextLayout,
   type TextMeasurer,
 } from '../../index.ts';
@@ -225,5 +226,46 @@ describe('justified lines (ECMA-376 Part 1, 21.1.2.2.7 pPr algn)', () => {
     // The caret after the trailing space sits at or after the caret before it.
     const first = t.lines[0].caretX;
     expect(first[first.length - 1]).toBeGreaterThanOrEqual(first[first.length - 2]);
+  });
+});
+
+describe('large explicit tab lists', () => {
+  test('does not rescan all stops for each tab character', () => {
+    const count = 4096;
+    const opened = readPptx(
+      buildPptx({
+        slides: [{ shapes: shape(`<a:p>${r('\t'.repeat(count))}</a:p>`), layout: 'blank' }],
+      })
+    );
+    if (!opened.ok) throw new Error('open failed');
+    const el = resolveSlide(opened.pkg, 0)!.elements[0];
+    if (el.kind !== 'shape' || !el.text) throw new Error('no text');
+    let reads = 0;
+    const tabs = Array.from({ length: count }, () => ({
+      get pos() {
+        reads += 1;
+        return 0;
+      },
+      align: 'l',
+    }));
+    const body = { ...el.text, paragraphs: [{ ...el.text.paragraphs[0], tabs }] };
+    const text = layoutText(
+      body,
+      { x: 0, y: 0, width: 6_000_000, height: 4_000_000 },
+      createFixedMeasurer()
+    );
+    expect(text.lines[0].end).toBe(count);
+    // Count work rather than elapsed time: slow machines must enforce the same bound.
+    expect(reads).toBeLessThan(count * 4);
+  });
+
+  test('keeps the first matching stop from unsorted and duplicate positions', () => {
+    const stops =
+      '<a:tab pos="2000000" algn="l"/><a:tab pos="1000000" algn="r"/>' +
+      '<a:tab pos="2000000" algn="r"/><a:tab pos="4000000" algn="l"/>';
+    const canonical = '<a:tab pos="2000000" algn="l"/><a:tab pos="4000000" algn="l"/>';
+    const body = (tabs: string) =>
+      `<a:p><a:pPr><a:tabLst>${tabs}</a:tabLst></a:pPr>${r('a\tb\tc')}</a:p>`;
+    expect(lay(body(stops))).toEqual(lay(body(canonical)));
   });
 });

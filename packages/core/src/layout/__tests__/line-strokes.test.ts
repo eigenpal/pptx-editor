@@ -2,8 +2,13 @@
 // are measured on the reference PDF of the `line-ends-dashes` fixture.
 
 import { describe, expect, test } from 'bun:test';
+import { buildPptx, shape } from '../../../../../scripts/fixtures/builder.ts';
+import { readPptx, writePptx } from '../../store/index.ts';
+import { resolveSlide } from '../../cascade/index.ts';
 import type { LineEnd, ResolvedLine } from '../../cascade/index.ts';
 import {
+  createFixedMeasurer,
+  layoutSlide,
   dashArray,
   lineEndReach,
   outsideDashArray,
@@ -237,4 +242,90 @@ describe('line ends', () => {
     const lg = lineEndReach(line({ tail: end('triangle', 'lg', 'lg') }));
     expect(lg).toBeCloseTo(Math.hypot(5, 2.5) * 25_400, 3);
   });
+});
+
+describe('native dash expansion limits', () => {
+  function deck(width: number, preset = 'line') {
+    const opened = readPptx(
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes: shape({
+              id: 2,
+              x: 0,
+              y: 0,
+              cx: width,
+              cy: preset === 'line' ? 0 : width,
+              prst: preset,
+              line: '<a:ln w="1"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:prstDash val="sysDot"/></a:ln>',
+            }),
+          },
+        ],
+      })
+    );
+    if (!opened.ok) throw new Error('open failed');
+    return opened.pkg;
+  }
+
+  test('keeps tiny dashes on short paths and at the expansion bound', () => {
+    for (const width of [100, 199_998]) {
+      const layout = layoutSlide(resolveSlide(deck(width), 0)!, createFixedMeasurer());
+      const item = layout.items[0];
+      if (item.kind !== 'shape') throw new Error('no shape');
+      expect(item.element.line?.dash).toBe('sysDot');
+      expect(layout.diagnostics).not.toContain('approximation: dash-complexity');
+    }
+  });
+
+  test('draws over-budget straight and curved outlines solid without changing saved properties', () => {
+    for (const [width, preset] of [
+      [200_000, 'line'],
+      [2147483647, 'ellipse'],
+    ] as const) {
+      const pkg = deck(width, preset);
+      const resolved = resolveSlide(pkg, 0)!;
+      const layout = layoutSlide(resolved, createFixedMeasurer());
+      const item = layout.items[0];
+      if (item.kind !== 'shape') throw new Error('no shape');
+      expect(item.paintLine?.dash).toBe('solid');
+      expect(item.element.line?.dash).toBe('sysDot');
+      expect(layout.diagnostics).toContain('approximation: dash-complexity');
+      const source = resolved.elements[0];
+      if (source.kind !== 'shape') throw new Error('no source shape');
+      expect(source.line?.dash).toBe('sysDot');
+      const reopened = readPptx(writePptx(pkg));
+      if (!reopened.ok) throw new Error('reopen failed');
+      const kept = resolveSlide(reopened.pkg, 0)!.elements[0];
+      if (kept.kind !== 'shape') throw new Error('no saved shape');
+      expect(kept.line?.dash).toBe('sysDot');
+    }
+  });
+});
+
+test('picture outlines bound even custom paths marked without a stroke', () => {
+  const bytes = buildPptx({
+    slides: [
+      {
+        layout: 'blank',
+        shapes:
+          '<p:pic><p:nvPicPr><p:cNvPr id="2" name="P"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill/>' +
+          '<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1000000" cy="1000000"/></a:xfrm>' +
+          '<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="0" t="0" r="r" b="b"/>' +
+          '<a:pathLst><a:path w="1000000" h="1000000" stroke="0"><a:moveTo><a:pt x="0" y="0"/></a:moveTo>' +
+          '<a:lnTo><a:pt x="1000000" y="0"/></a:lnTo><a:lnTo><a:pt x="1000000" y="1000000"/></a:lnTo>' +
+          '<a:close/></a:path></a:pathLst></a:custGeom>' +
+          '<a:ln w="1"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:prstDash val="sysDot"/></a:ln>' +
+          '</p:spPr></p:pic>',
+      },
+    ],
+  });
+  const opened = readPptx(bytes);
+  if (!opened.ok) throw new Error('open failed');
+  const layout = layoutSlide(resolveSlide(opened.pkg, 0)!, createFixedMeasurer());
+  const picture = layout.items[0];
+  if (picture.kind !== 'picture') throw new Error('no picture');
+  expect(picture.geometry.paths[0].stroke).toBe(false);
+  expect(picture.element.line?.dash).toBe('sysDot');
+  expect(picture.paintLine?.dash).toBe('solid');
 });

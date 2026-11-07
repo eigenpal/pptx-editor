@@ -33,7 +33,7 @@ function edge(
 }
 
 function borders(doc: Document, c: CellLayout, ctx: PaintContext): SVGElement[] {
-  const b = c.cell.borders;
+  const b = c.paintBorders ?? c.cell.borders;
   const r = c.x + c.width;
   const bottom = c.y + c.height;
   return [

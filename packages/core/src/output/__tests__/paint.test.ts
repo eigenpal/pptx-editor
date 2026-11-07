@@ -12,6 +12,7 @@ import { readPptx } from '../../store/index.ts';
 import { resolveSlide } from '../../cascade/index.ts';
 import { createFixedMeasurer, layoutSlide } from '../../layout/index.ts';
 import { paintSlide } from '../index.ts';
+import { uprightPieces } from '../paint-text.ts';
 
 // A DOM for this file only: the engine test run registers no global DOM.
 const win = new GlobalWindow();
@@ -267,5 +268,73 @@ describe('text elements', () => {
     expect(group.getAttribute('style')).toContain('font-kerning:none');
     // `white-space` does not inherit into a `<text>` in every browser: each one sets it.
     expect(root.querySelector('text')!.getAttribute('style')).toBe('white-space:pre');
+  });
+});
+
+describe('tab glyph paint', () => {
+  test('tabs separate glyph spans without changing upright or surrogate positions', () => {
+    expect(uprightPieces('A\t縦𠀋\tB', 'eastAsian')).toEqual([
+      { start: 0, end: 1, upright: false },
+      { start: 2, end: 3, upright: true },
+      { start: 3, end: 5, upright: true },
+      { start: 6, end: 7, upright: false },
+    ]);
+    expect(uprightPieces('A\t𠀋', 'all')).toEqual([
+      { start: 0, end: 1, upright: true },
+      { start: 2, end: 4, upright: true },
+    ]);
+    expect(uprightPieces('A\t縦𠀋\tB', 'none')).toEqual([
+      { start: 0, end: 1, upright: false },
+      { start: 2, end: 5, upright: false },
+      { start: 6, end: 7, upright: false },
+    ]);
+  });
+  test('keeps text positions and decorations without sending tabs to SVG text layout', () => {
+    const opened = readPptx(
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes: shape({
+              id: 2,
+              x: 0,
+              y: 0,
+              cx: 6_000_000,
+              cy: 4_000_000,
+              text: para(run('A\t\tB', 'sz="1800" u="sng"')),
+            }),
+          },
+        ],
+      })
+    );
+    if (!opened.ok) throw new Error('open failed');
+    const layout = layoutSlide(resolveSlide(opened.pkg, 0)!, createFixedMeasurer());
+    const item = layout.items[0];
+    if (item.kind !== 'shape' || !item.text) throw new Error('no text');
+    const source = item.text.lines[0].runs[0];
+    const root = paintSlide(doc, layout, { images: () => undefined, idPrefix: 'tabs' });
+    const text = [...root.querySelectorAll('text')];
+    expect(text.map((t) => t.textContent)).toEqual(['A', 'B']);
+    expect(Number(text[0].getAttribute('x'))).toBeCloseTo(source.x[0] / 12_700, 3);
+    expect(Number(text[1].getAttribute('x'))).toBeCloseTo(source.x[3] / 12_700, 3);
+    const underline = root.querySelector('[data-pptx-text] rect');
+    expect(Number(underline?.getAttribute('width'))).toBeCloseTo(
+      (source.x[4] - source.x[0]) / 12_700,
+      3
+    );
+  });
+
+  test('a long tab-only run emits no SVG text node', () => {
+    const root = paint(
+      shape({
+        id: 2,
+        x: 0,
+        y: 0,
+        cx: 6_000_000,
+        cy: 4_000_000,
+        text: para(run('\t'.repeat(60_000), 'sz="1800"')),
+      })
+    );
+    expect(root.querySelectorAll('text').length).toBe(0);
   });
 });
