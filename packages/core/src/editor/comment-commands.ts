@@ -100,7 +100,7 @@ export function compileCommentCommand(
         editLegacy(batch, found.part, found.cm, commentText(command.text));
         break;
       case 'deleteComment':
-        deleteLegacy(batch, slidePart, found.part, found.cm);
+        deleteLegacy(batch, found.part, found.cm);
         break;
     }
     return { label };
@@ -117,7 +117,7 @@ export function compileCommentCommand(
       editModern(batch, found.part, found.reply ?? found.thread, commentText(command.text));
       break;
     case 'deleteComment':
-      deleteModern(batch, slidePart, found.part, found.thread, found.reply);
+      deleteModern(batch, found.part, found.thread, found.reply);
       break;
     case 'resolveComment':
     case 'reopenComment':

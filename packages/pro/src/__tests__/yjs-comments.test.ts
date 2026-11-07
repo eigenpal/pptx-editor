@@ -202,6 +202,35 @@ describe('threaded comments in a room', () => {
     }
   });
 
+  test('a delete of the only thread and a new comment at once keep the new comment', async () => {
+    const { a, b, sync } = await peers(coverageDeck());
+    try {
+      run(a, { type: 'addComment', text: 'Only', date: DATE });
+      const id = threads(a)[0]!.id;
+      sync.pause();
+      run(a, { type: 'deleteComment', commentId: id });
+      run(b, { type: 'addComment', text: 'From Ben', date: DATE });
+      sync.flush();
+      converged(a, b);
+      expect(threads(a).map((t) => t.text)).toEqual(['From Ben']);
+      expect(threads(b).map((t) => t.text)).toEqual(['From Ben']);
+      // A save after the last delete holds no comment list.
+      run(b, { type: 'deleteComment', commentId: threads(b)[0]!.id });
+      expect(threads(a)).toEqual([]);
+      const saved = readPptx(a.save()!);
+      if (!saved.ok) throw new Error('the saved deck does not reopen');
+      const slide = presentationInfo(saved.pkg).slides[0]!.partName;
+      expect(relationshipsOf(saved.pkg, slide).filter((r) => r.type.endsWith('/comments'))).toEqual(
+        []
+      );
+      expect([...saved.pkg.parts.keys()].filter((n) => /comment/i.test(n))).toEqual([]);
+      expect(serializeXmlPart(xmlPartOf(saved.pkg, slide)!)).not.toContain('commentRel');
+    } finally {
+      a.destroy();
+      b.destroy();
+    }
+  });
+
   test('two peers who add the first comment of a slide at once converge', async () => {
     const { a, b, sync } = await peers(coverageDeck());
     try {
@@ -253,6 +282,23 @@ describe('threaded comments in a room', () => {
 });
 
 describe('legacy comments in a room', () => {
+  test('a delete of the only thread and a new comment at once keep the new comment', async () => {
+    const bytes = new Uint8Array(readFileSync(join(FIXTURES, 'slide-structure.pptx')));
+    const { a, b, sync } = await peers(bytes);
+    try {
+      const id = threads(a)[0]!.id;
+      sync.pause();
+      run(a, { type: 'deleteComment', commentId: id });
+      run(b, { type: 'addComment', text: 'From Ben', date: DATE });
+      sync.flush();
+      converged(a, b);
+      expect(threads(a).map((t) => `${t.format}: ${t.text}`)).toEqual(['legacy: From Ben']);
+    } finally {
+      a.destroy();
+      b.destroy();
+    }
+  });
+
   test('two new authors who comment at once get their own ids and indexes', async () => {
     const bytes = new Uint8Array(readFileSync(join(FIXTURES, 'slide-structure.pptx')));
     const { a, b, sync } = await peers(bytes);

@@ -34,7 +34,7 @@ import {
   presentationTarget,
   slideCommentParts,
 } from './comment-read.ts';
-import { dropCommentList, fragment, freeName, newGuid, slideExtList } from './comment-write.ts';
+import { fragment, freeName, newGuid, slideExtList } from './comment-write.ts';
 
 const P188 = COMMENTS.p188;
 const DECLS = `xmlns:a="${NS.a}" xmlns:r="${NS.r}" xmlns:p188="${P188}"`;
@@ -351,10 +351,12 @@ export function editModern(batch: OpBatch, part: string, el: Element, text: stri
     batch.push({ op: 'insertNode', part, parent: fresh.id, index: fresh.children.length, spec });
 }
 
-/** Delete a reply, or a thread with its replies; an empty list goes with its relationship. */
+/**
+ * Delete a reply, or a thread with its replies. An empty list stays while the deck is open, so a
+ * comment that a collaborator adds at the same time is kept; the save drops empty lists.
+ */
 export function deleteModern(
   batch: OpBatch,
-  slidePart: string,
   part: string,
   thread: Element,
   reply: Element | undefined
@@ -366,8 +368,6 @@ export function deleteModern(
     return;
   }
   batch.push({ op: 'removeNode', part, node: thread.id });
-  const root = xmlPartOf(batch.pkg, part)?.root;
-  if (elements(root).length === 0) dropCommentList(batch, slidePart, part);
 }
 
 /** Set the status of a thread: `resolved`, or active (the default, no attribute). */

@@ -41,7 +41,7 @@ import {
   presentationTarget,
   slideCommentParts,
 } from './comment-read.ts';
-import { dropCommentList, fragment, freeName } from './comment-write.ts';
+import { fragment, freeName } from './comment-write.ts';
 
 const isP = (el: Element | undefined, local: string): el is Element =>
   el?.ns === NS.p && el.local === local;
@@ -293,14 +293,15 @@ export function editLegacy(batch: OpBatch, part: string, cm: Element, text: stri
   batch.push({ op: 'setText', part, node: node.id, text });
 }
 
-/** Delete a reply, or a thread with its replies; an empty list goes with its relationship. */
-export function deleteLegacy(batch: OpBatch, slidePart: string, part: string, cm: Element): void {
+/**
+ * Delete a reply, or a thread with its replies. An empty list stays while the deck is open, so a
+ * comment that a collaborator adds at the same time is kept; the save drops empty lists.
+ */
+export function deleteLegacy(batch: OpBatch, part: string, cm: Element): void {
   const own = keyOf(cm);
   const thread = !parentKey(cm);
   const root = xmlPartOf(batch.pkg, part)!.root;
   for (const c of elements(root))
     if (c.id === cm.id || (thread && isP(c, 'cm') && parentKey(c) === own))
       batch.push({ op: 'removeNode', part, node: c.id });
-  if (elements(xmlPartOf(batch.pkg, part)?.root).length === 0)
-    dropCommentList(batch, slidePart, part);
 }

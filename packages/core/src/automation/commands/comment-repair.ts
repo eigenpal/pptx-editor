@@ -2,8 +2,9 @@
 // list per slide and format, one reply list per threaded comment, and a threaded comment names
 // the slide that holds it. Two collaborators who add the first author, the first comment of a
 // slide, or the first reply of a thread at the same time each add one, and a file can hold
-// such copies too. The save joins the copies into the first one, and points each threaded
-// comment at its own slide, so the saved file holds each list once. The store does not change.
+// such copies too. The save joins the copies into the first one, drops a list that holds no
+// comment, and points each threaded comment at its own slide, so the saved file holds each list
+// once. The store does not change.
 
 import {
   attr,
@@ -93,6 +94,11 @@ function joinLists(
   for (const part of rest) {
     join(batch, keep!, part, key);
     dropCommentList(batch, slidePart, part);
+  }
+  // A delete keeps an emptied list while the deck is open; the saved file never holds one.
+  if (keep && elements(xmlPartOf(batch.pkg, keep)?.root).length === 0) {
+    dropCommentList(batch, slidePart, keep);
+    return undefined;
   }
   return keep;
 }

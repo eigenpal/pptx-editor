@@ -175,10 +175,16 @@ export function slideCommentParts(
   return { legacy, modern };
 }
 
-/** Whether any slide of the deck has a comment list of `format`. */
+/**
+ * Whether any slide of the deck has a comment list of `format` that holds a comment. A list that
+ * a delete emptied stays until the save, and does not count.
+ */
 export function deckUses(pkg: PptxPackage, format: 'legacy' | 'modern'): boolean {
-  return presentationInfo(pkg).slides.some(
-    (s) => slideCommentParts(pkg, s.partName)[format].length > 0
+  return presentationInfo(pkg).slides.some((s) =>
+    slideCommentParts(pkg, s.partName)[format].some((part) => {
+      const root = commentTree(pkg, part)?.root;
+      return !root || elements(root).length > 0;
+    })
   );
 }
 
