@@ -196,6 +196,11 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'edit.no-date-placeholder',
     'The layouts and the master have no date placeholder. Add one to the layout first.',
   ],
+  [
+    'disabled.noFooterText',
+    'edit.no-footer-text',
+    'No slide shows a footer, so there is no text to keep. Pass text.',
+  ],
   ['disabled.noTable', 'edit.not-a-table', 'The shape is not a table. Use a table shape.'],
   [
     'disabled.notAGroup',

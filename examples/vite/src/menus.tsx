@@ -65,17 +65,22 @@ function SlideNumbersRow(): ReactNode {
 
 /**
  * Insert > Footer: on or off for every slide, through each layout's footer placeholder
- * (`p:ph type="ftr"`). The check shows whether any slide has a footer, so the row never writes
- * over existing footers. A new footer says "Footer"; a host passes its own text.
+ * (`p:ph type="ftr"`). On keeps the footers that slides have. A deck without one gets the text
+ * "Footer text"; a host passes its own `text`. The row waits until all slides are open, so its
+ * check reads every slide.
  */
 function FooterRow(): ReactNode {
   const { t } = useTranslation();
   const editor = usePptxEditor();
   const on = useEditorState((s) => (s.footer ?? null) !== null);
+  const command = (on: boolean): EditorCommand =>
+    on
+      ? { type: 'setFooter', show: false }
+      : { type: 'setFooter', show: true, text: t('menu.footerText') };
   const reason = useEditorState((s) => {
     if (!editor) return 'disabled.noEditor';
-    const text = (s.footer ?? null) !== null ? null : t('menu.footer');
-    const can = editor.can({ type: 'setFooter', text });
+    if ((s.pendingSlides ?? 0) > 0) return 'disabled.slidesOpening';
+    const can = editor.can(command((s.footer ?? null) !== null));
     return can.ok ? null : can.reason;
   });
   return (
@@ -85,22 +90,24 @@ function FooterRow(): ReactNode {
       checked={on}
       disabled={!!reason}
       reason={reason ? translateKeyOrText(t, reason) : null}
-      onSelect={() => editor?.exec({ type: 'setFooter', text: on ? null : t('menu.footer') })}
+      onSelect={() => editor?.exec(command(on))}
     />
   );
 }
 
 /**
  * Insert > Date and time: on or off for every slide, through each layout's date placeholder
- * (`p:ph type="dt"`). The date is a field that shows the date when the file opens.
+ * (`p:ph type="dt"`). On keeps the dates that slides have; a deck without one gets today's date
+ * as a field. The row waits until all slides are open, so its check reads every slide.
  */
 function DateTimeRow(): ReactNode {
   const { t } = useTranslation();
   const editor = usePptxEditor();
-  const on = useEditorState((s) => s.dateTime === true);
+  const on = useEditorState((s) => (s.dateTime ?? null) !== null);
   const reason = useEditorState((s) => {
     if (!editor) return 'disabled.noEditor';
-    const can = editor.can({ type: 'setDateTime', show: s.dateTime !== true });
+    if ((s.pendingSlides ?? 0) > 0) return 'disabled.slidesOpening';
+    const can = editor.can({ type: 'setDateTime', show: (s.dateTime ?? null) === null });
     return can.ok ? null : can.reason;
   });
   return (

@@ -621,7 +621,7 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
     parts: [/^\/ppt\/slides\/slide1\.xml$/],
     edit: (t) => {
       t.run({ type: 'setSlideNumbers', show: true });
-      t.run({ type: 'setFooter', text: 'Quarterly results' });
+      t.run({ type: 'setFooter', show: true, text: 'Quarterly results' });
       t.run({ type: 'setDateTime', show: true, text: '11/7/2026' });
     },
     check: (d) => {

@@ -22,6 +22,7 @@
   "menu": {
     "slideNumbers": "スライド番号",
     "footer": "フッター",
+    "footerText": "フッターのテキスト",
     "dateTime": "日付と時刻",
     "file": "ファイル",
     "edit": "編集",
@@ -694,6 +695,8 @@
     "noSlideNumberPlaceholder": "このプレゼンテーションのレイアウトにはスライド番号のプレースホルダーがありません",
     "noFooterPlaceholder": "このプレゼンテーションのレイアウトにはフッターのプレースホルダーがありません",
     "noDatePlaceholder": "このプレゼンテーションのレイアウトには日付のプレースホルダーがありません",
+    "noFooterText": "先にフッターのテキストを指定してください",
+    "slidesOpening": "すべてのスライドが開くまでお待ちください",
     "lastSlide": "プレゼンテーションには少なくとも 1 枚のスライドが必要です",
     "unsupportedElement": "このバージョンでは、この種類の要素は編集できません",
     "noTable": "先に表内をクリックしてください",

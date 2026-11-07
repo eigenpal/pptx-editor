@@ -22,6 +22,7 @@
   "menu": {
     "slideNumbers": "Slide numbers",
     "footer": "Footer",
+    "footerText": "Footer text",
     "dateTime": "Date and time",
     "file": "File",
     "edit": "Edit",
@@ -694,6 +695,8 @@
     "noSlideNumberPlaceholder": "This deck's layouts have no slide number placeholder",
     "noFooterPlaceholder": "This deck's layouts have no footer placeholder",
     "noDatePlaceholder": "This deck's layouts have no date placeholder",
+    "noFooterText": "Give the footer a text first",
+    "slidesOpening": "Wait until all slides are open",
     "lastSlide": "A presentation must keep at least one slide",
     "unsupportedElement": "This element type cannot be edited in this version",
     "noTable": "Click in a table first",

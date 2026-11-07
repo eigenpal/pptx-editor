@@ -1,12 +1,12 @@
-// Insert > Footer and Insert > Date and time, applied to all slides, as a Header and Footer
-// dialog applies them.
+// Insert > Slide numbers, Insert > Footer, and Insert > Date and time.
 //
 // A slide shows its footer and its date through the footer (`p:ph type="ftr"`) and date
 // (`p:ph type="dt"`) placeholders that its layout defines, or its master when the layout has
-// none (ECMA-376 Part 1, 19.3.1.36 ph). Turning one on gives each slide that placeholder, so
-// position and style come from the layout. A slide that has one already gets the new text, and
-// keeps its own box and format. Turning one off removes the slide's placeholders of that type.
-// A slide whose layout and master define no such placeholder is skipped.
+// none (ECMA-376 Part 1, 19.3.1.36 ph). Turning one on gives each target slide that placeholder,
+// so position and style come from the layout. A slide that has one already keeps its own box and
+// format; it keeps its text too, unless the command gives new text. Turning one off removes the
+// slide's placeholders of that type. A slide whose layout and master define no such placeholder
+// is skipped.
 
 import {
   attr,
@@ -24,7 +24,11 @@ import { fieldId, nextShapeId, spTreeOf, xmlAttr, xmlText } from './package-edit
 import { specFromXml } from './shape-commands.ts';
 import { removeShapes } from './shape-removal.ts';
 import { setSlideNumbers } from './slide-numbers.ts';
-import type { EditorCommand } from '../../contracts/neutral.ts';
+import type {
+  DateTimeState as DateShown,
+  EditorCommand,
+  HeaderFooterTargets,
+} from '../../contracts/neutral.ts';
 
 /** The header and footer placeholders that these commands write. */
 export type HeaderFooterKind = 'ftr' | 'dt';
@@ -49,22 +53,34 @@ function shapesOfKind(pkg: PptxPackage, part: string | undefined, kind: HeaderFo
   return tree ? elements(tree).filter(isKind(kind)) : [];
 }
 
-/** The footer text and date of one parsed slide part. A part keeps its object until it changes. */
-const shown = new WeakMap<object, { readonly footer: string | null; readonly date: boolean }>();
+/** What one placeholder shows: its text, and the field type of its first field, if any. */
+interface Shown {
+  readonly text: string;
+  readonly fieldType: string | undefined;
+}
 
-function shownOn(pkg: PptxPackage, part: string | undefined) {
+function shownBy(shape: Element | undefined): Shown | null {
+  if (!shape) return null;
+  const body = find(shape, 'p:txBody');
+  const field = body ? find(body, 'a:fld') : undefined;
+  return { text: textOf(body), fieldType: field ? (attr(field, 'type') ?? '') : undefined };
+}
+
+/** The footer and date of one parsed slide part. A part keeps its object until it changes. */
+const cache = new WeakMap<object, { readonly ftr: Shown | null; readonly dt: Shown | null }>();
+
+function shownOn(pkg: PptxPackage, part: string | undefined, kind: HeaderFooterKind) {
   const xml = part ? xmlPartOf(pkg, part) : undefined;
-  if (!xml) return { footer: null, date: false };
-  let got = shown.get(xml);
+  if (!xml) return null;
+  let got = cache.get(xml);
   if (!got) {
-    const footer = shapesOfKind(pkg, part, 'ftr')[0];
     got = {
-      footer: footer ? textOf(find(footer, 'p:txBody')) : null,
-      date: shapesOfKind(pkg, part, 'dt').length > 0,
+      ftr: shownBy(shapesOfKind(pkg, part, 'ftr')[0]),
+      dt: shownBy(shapesOfKind(pkg, part, 'dt')[0]),
     };
-    shown.set(xml, got);
+    cache.set(xml, got);
   }
-  return got;
+  return got[kind];
 }
 
 /**
@@ -72,6 +88,23 @@ function shownOn(pkg: PptxPackage, part: string | undefined) {
  * already, so a read does not parse the slides that wait. Default: all.
  */
 export type SlideReady = (index: number) => boolean;
+
+/** What the placeholder of `kind` shows: on slide `index`, else on the first slide with one. */
+function deckShown(
+  pkg: PptxPackage,
+  kind: HeaderFooterKind,
+  index: number,
+  ready: SlideReady
+): Shown | null {
+  const slides = presentationInfo(pkg).slides;
+  const own = shownOn(pkg, slides[index]?.partName, kind);
+  if (own) return own;
+  for (const [i, slide] of slides.entries()) {
+    const got = ready(i) ? shownOn(pkg, slide.partName, kind) : null;
+    if (got) return got;
+  }
+  return null;
+}
 
 /**
  * The footer text that the deck shows: slide `index`'s, else that of the first slide with a
@@ -82,33 +115,32 @@ export function footerText(
   index: number,
   ready: SlideReady = () => true
 ): string | null {
-  const slides = presentationInfo(pkg).slides;
-  const own = shownOn(pkg, slides[index]?.partName).footer;
-  if (own !== null) return own;
-  for (const [i, slide] of slides.entries()) {
-    const text = ready(i) ? shownOn(pkg, slide.partName).footer : null;
-    if (text !== null) return text;
-  }
-  return null;
+  return deckShown(pkg, 'ftr', index, ready)?.text ?? null;
 }
 
-/** Whether slide `index` or any other slide shows a date: the menu state of the date. */
-export function hasDate(pkg: PptxPackage, index: number, ready: SlideReady = () => true): boolean {
-  const slides = presentationInfo(pkg).slides;
-  return (
-    shownOn(pkg, slides[index]?.partName).date ||
-    slides.some((s, i) => ready(i) && shownOn(pkg, s.partName).date)
-  );
+/** The date that the deck shows, read as `footerText` reads the footer. Null when none. */
+export function dateShown(
+  pkg: PptxPackage,
+  index: number,
+  ready: SlideReady = () => true
+): DateShown | null {
+  const got = deckShown(pkg, 'dt', index, ready);
+  return got ? { text: got.text, fixed: got.fieldType === undefined } : null;
 }
 
-/** The paragraph of a footer or date: plain text, or a date field that updates on open. */
-function paragraphXml(kind: HeaderFooterKind, text: string, field: boolean): string {
-  const t = xmlText(text, NAMES[kind]);
-  const content =
-    kind === 'dt' && field
-      ? `<a:fld id="${fieldId()}" type="datetime1"><a:rPr lang="en-US"/><a:t>${t}</a:t></a:fld>`
-      : `<a:r><a:rPr lang="en-US"/><a:t>${t}</a:t></a:r>`;
-  return `<a:p>${content}<a:endParaRPr lang="en-US"/></a:p>`;
+/** The paragraph content of a footer or date: plain text, or a date field. */
+function contentXml(text: string, what: string, field: string | undefined, rPr: boolean): string {
+  const t = xmlText(text, what);
+  const format = rPr ? '<a:rPr lang="en-US"/>' : '';
+  // A field type copied from another slide is file content: escape it.
+  const type = field ? ` type="${xmlAttr(field, 'field type')}"` : '';
+  return field !== undefined
+    ? `<a:fld id="${fieldId()}"${type}>${format}<a:t>${t}</a:t></a:fld>`
+    : `<a:r>${format}<a:t>${t}</a:t></a:r>`;
+}
+
+function paragraphXml(text: string, what: string, field: string | undefined): string {
+  return `<a:p>${contentXml(text, what, field, true)}<a:endParaRPr lang="en-US"/></a:p>`;
 }
 
 const TEXT_CONTENT = new Set(['r', 'fld', 'br']);
@@ -116,15 +148,16 @@ const TEXT_CONTENT = new Set(['r', 'fld', 'br']);
 /**
  * Show `text` in an existing placeholder. The first paragraph and its first run or field stay,
  * so the placeholder keeps its paragraph and character format; other text is removed. A date
- * that changes between a field and fixed text gets a new run in place of the old one.
+ * that changes between a field and fixed text gets a new run in place of the old one, with the
+ * old character format.
  */
 function replaceText(
   batch: OpBatch,
   part: string,
   shape: Element,
-  kind: HeaderFooterKind,
+  what: string,
   text: string,
-  field: boolean
+  field: string | undefined
 ): void {
   const body = find(shape, 'p:txBody');
   if (!body) {
@@ -139,7 +172,7 @@ function replaceText(
       parent: shape.id,
       index: after + 1,
       spec: specFromXml(
-        `<p:txBody><a:bodyPr/><a:lstStyle/>${paragraphXml(kind, text, field)}</p:txBody>`
+        `<p:txBody><a:bodyPr/><a:lstStyle/>${paragraphXml(text, what, field)}</p:txBody>`
       ),
     });
     return;
@@ -152,40 +185,35 @@ function replaceText(
       part,
       parent: body.id,
       index: body.children.length,
-      spec: specFromXml(paragraphXml(kind, text, field)),
+      spec: specFromXml(paragraphXml(text, what, field)),
     });
     return;
   }
   const content = elements(first).filter((c) => TEXT_CONTENT.has(c.local));
   const run = content.find((c) => c.local === 'r' || c.local === 'fld');
-  const wanted = kind === 'dt' && field ? 'fld' : 'r';
+  const wanted = field !== undefined ? 'fld' : 'r';
   const t = run?.local === wanted ? find(run, 'a:t') : undefined;
   if (run && t) {
-    xmlText(text, NAMES[kind]);
+    xmlText(text, what);
     batch.push({ op: 'setText', part, node: t.id, text });
-    // The text is a `datetime1` date, so a field of another format takes that format.
-    if (wanted === 'fld' && attr(run, 'type') !== 'datetime1')
+    // The new text has the field's format, so a field of another format takes that format.
+    if (field !== undefined && attr(run, 'type') !== field)
       batch.push({
         op: 'setAttribute',
         part,
         node: run.id,
         name: { ns: '', local: 'type' },
-        value: 'datetime1',
+        value: field,
       });
   } else {
-    const t = xmlText(text, NAMES[kind]);
     const rPr = run ? find(run, 'a:rPr') : undefined;
-    const inner =
-      wanted === 'fld'
-        ? `<a:fld id="${fieldId()}" type="datetime1">${rPr ? '' : '<a:rPr lang="en-US"/>'}<a:t>${t}</a:t></a:fld>`
-        : `<a:r>${rPr ? '' : '<a:rPr lang="en-US"/>'}<a:t>${t}</a:t></a:r>`;
     const end = first.children.findIndex((c) => c.type === 'element' && c.local === 'endParaRPr');
     const created = batch.insert({
       op: 'insertNode',
       part,
       parent: first.id,
       index: end < 0 ? first.children.length : end,
-      spec: specFromXml(inner),
+      spec: specFromXml(contentXml(text, what, field, !rPr)),
     });
     // The new run or field keeps the character format of the old one.
     if (rPr) batch.push({ op: 'moveNode', part, node: rPr.id, parent: created, index: 0 });
@@ -193,34 +221,62 @@ function replaceText(
   for (const c of content) if (c !== run || !t) batch.push({ op: 'removeNode', part, node: c.id });
 }
 
+/** The target slides, split into those that show and those that hide. */
+export function headerFooterTargets(
+  pkg: PptxPackage,
+  show: boolean,
+  options: HeaderFooterTargets
+): { readonly show: readonly number[]; readonly hide: readonly number[] } {
+  const slides = presentationInfo(pkg).slides;
+  const targets = (options.indices ?? slides.map((_, i) => i)).filter((i) => slides[i]);
+  if (!show) return { show: [], hide: targets };
+  if (!options.hideOnTitleSlides) return { show: targets, hide: [] };
+  const isTitle = (i: number): boolean => {
+    const layout = slides[i]!.layoutPart;
+    return !!layout && attr(xmlPartOf(pkg, layout)?.root, 'type') === 'title';
+  };
+  return { show: targets.filter((i) => !isTitle(i)), hide: targets.filter(isTitle) };
+}
+
+/** What to show: new text, or (`text` absent) the slide's own, else the deck's, else `fallback`. */
+interface Showing {
+  readonly text: string | undefined;
+  /** The field type for new text; undefined for fixed text. */
+  readonly field: string | undefined;
+  readonly fallback: (() => Shown) | undefined;
+}
+
 /**
- * Show `text` in the placeholder of `kind` on the given slides (all slides by default), or hide
- * it with null. A date is a field unless `fixed`. Returns the number of slides changed. Refuses
- * when no slide has such a placeholder on its layout or master.
+ * Show the placeholder of `kind` on the `show` slides and hide it on the `hide` slides. Returns
+ * the number of slides changed. Refuses when none of those slides can show the placeholder.
  */
-export function setHeaderFooter(
+function applyKind(
   batch: OpBatch,
   kind: HeaderFooterKind,
-  text: string | null,
-  options: { readonly fixed?: boolean; readonly indices?: readonly number[] } = {}
+  targets: { readonly show: readonly number[]; readonly hide: readonly number[] },
+  showing: Showing
 ): number {
-  if (text !== null && text.length > MAX_HEADER_FOOTER_TEXT)
-    throw new CommandRefusal('errors.unsupported', NAMES[kind]);
-  const slides = presentationInfo(batch.pkg).slides;
-  const targets = options.indices ?? slides.map((_, i) => i);
+  const what = NAMES[kind];
+  if (showing.text !== undefined && showing.text.length > MAX_HEADER_FOOTER_TEXT)
+    throw new CommandRefusal('errors.unsupported', what);
+  const pkg = batch.pkg;
+  const slides = presentationInfo(pkg).slides;
   let changed = 0;
   let possible = 0;
-  for (const index of targets) {
-    const slide = slides[index];
-    if (!slide) continue;
+  // Text absent: a slide without the placeholder shows what the first slide with one shows.
+  const deck =
+    showing.text === undefined && targets.show.length > 0
+      ? (deckShown(pkg, kind, targets.show[0]!, () => true) ?? showing.fallback?.() ?? null)
+      : null;
+  for (const index of [...targets.show, ...targets.hide]) {
+    const slide = slides[index]!;
     const tree = spTreeOf(batch, slide.partName);
     const existing = elements(tree).filter(isKind(kind));
     const template =
-      shapesOfKind(batch.pkg, slide.layoutPart, kind)[0] ??
-      shapesOfKind(batch.pkg, slide.masterPart, kind)[0];
+      shapesOfKind(pkg, slide.layoutPart, kind)[0] ?? shapesOfKind(pkg, slide.masterPart, kind)[0];
     if (!template && existing.length === 0) continue;
     possible += 1;
-    if (text === null) {
+    if (!targets.show.includes(index)) {
       removeShapes(
         batch,
         slide.partName,
@@ -229,12 +285,16 @@ export function setHeaderFooter(
       changed += existing.length > 0 ? 1 : 0;
       continue;
     }
-    const field = !options.fixed;
     if (existing.length > 0) {
-      for (const shape of existing) replaceText(batch, slide.partName, shape, kind, text, field);
+      if (showing.text === undefined) continue; // Keeps its own text.
+      for (const shape of existing)
+        replaceText(batch, slide.partName, shape, what, showing.text, showing.field);
       changed += 1;
       continue;
     }
+    const text = showing.text ?? deck?.text;
+    if (text === undefined) throw new CommandRefusal('disabled.noFooterText');
+    const field = showing.text !== undefined ? showing.field : deck?.fieldType;
     const ph = path(template!, 'p:nvSpPr', 'p:nvPr', 'p:ph');
     const phAttrs = ['type', 'orient', 'sz', 'idx']
       .map((a) => {
@@ -244,9 +304,9 @@ export function setHeaderFooter(
       .join('');
     const id = nextShapeId(batch, tree);
     const xml =
-      `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${NAMES[kind]} Placeholder ${id - 1}"/>` +
+      `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${what} Placeholder ${id - 1}"/>` +
       `<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph${phAttrs}/></p:nvPr></p:nvSpPr>` +
-      `<p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/>${paragraphXml(kind, text, field)}` +
+      `<p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/>${paragraphXml(text, what, field)}` +
       '</p:txBody></p:sp>';
     const ext = tree.children.findIndex((c) => c.type === 'element' && c.local === 'extLst');
     batch.insert({
@@ -262,6 +322,44 @@ export function setHeaderFooter(
   return changed;
 }
 
+/**
+ * Show or hide the footer. With `text`, every slide that shows it shows `text`; without it, a
+ * slide keeps its footer, and a slide without one takes the deck's footer text. Refuses without
+ * text when no slide has a footer (`disabled.noFooterText`), and for empty text.
+ */
+export function setFooter(
+  batch: OpBatch,
+  show: boolean,
+  text?: string,
+  options: HeaderFooterTargets = {}
+): number {
+  if (show && text === '') throw new CommandRefusal('disabled.noFooterText');
+  const targets = headerFooterTargets(batch.pkg, show, options);
+  return applyKind(batch, 'ftr', targets, { text, field: undefined, fallback: undefined });
+}
+
+/**
+ * Show or hide the date. With `text`, every slide that shows it shows `text`: a `datetime1` field
+ * that a presentation application can update when it opens the file, or fixed text with `fixed`.
+ * Without `text`, a slide keeps its date, and a slide without one takes the deck's date, else
+ * today's date as a field.
+ */
+export function setDateTime(
+  batch: OpBatch,
+  show: boolean,
+  text?: string,
+  fixed = false,
+  options: HeaderFooterTargets = {}
+): number {
+  if (show && text === '') throw new CommandRefusal('errors.unsupported', NAMES.dt);
+  const targets = headerFooterTargets(batch.pkg, show, options);
+  return applyKind(batch, 'dt', targets, {
+    text,
+    field: fixed ? undefined : 'datetime1',
+    fallback: () => ({ text: shortDate(), fieldType: 'datetime1' }),
+  });
+}
+
 /** Today's date as the `datetime1` field shows it in English: month/day/year. */
 export function shortDate(now: Date = new Date()): string {
   return `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`;
@@ -273,19 +371,35 @@ export type HeaderFooterCommand = Extract<
   { readonly type: 'setSlideNumbers' | 'setFooter' | 'setDateTime' }
 >;
 
-/** Run a slide-number, footer, or date command on all slides. Returns its history label. */
+/** Run a slide-number, footer, or date command. Returns its history label. */
 export function applyHeaderFooter(batch: OpBatch, command: HeaderFooterCommand): string {
+  const options = { indices: command.indices, hideOnTitleSlides: command.hideOnTitleSlides };
   switch (command.type) {
-    case 'setSlideNumbers':
-      setSlideNumbers(batch, command.show);
+    case 'setSlideNumbers': {
+      const targets = headerFooterTargets(batch.pkg, command.show, options);
+      // Refused only when neither the slides that show nor those that hide can have a number.
+      let refusal: unknown = new CommandRefusal('disabled.noSlideNumberPlaceholder');
+      let done = false;
+      for (const [show, indices] of [
+        [true, targets.show],
+        [false, targets.hide],
+      ] as const) {
+        if (indices.length === 0) continue;
+        try {
+          setSlideNumbers(batch, show, indices);
+          done = true;
+        } catch (error) {
+          refusal = error;
+        }
+      }
+      if (!done) throw refusal;
       return 'slideNumbers';
-    case 'setFooter':
-      setHeaderFooter(batch, 'ftr', command.text);
-      return 'footer';
-    case 'setDateTime': {
-      const text = command.show ? (command.text ?? shortDate()) : null;
-      setHeaderFooter(batch, 'dt', text, { fixed: command.fixed });
-      return 'dateTime';
     }
+    case 'setFooter':
+      setFooter(batch, command.show, command.text, options);
+      return 'footer';
+    case 'setDateTime':
+      setDateTime(batch, command.show, command.text, command.fixed, options);
+      return 'dateTime';
   }
 }

@@ -22,6 +22,7 @@
   "menu": {
     "slideNumbers": "幻灯片编号",
     "footer": "页脚",
+    "footerText": "页脚文本",
     "dateTime": "日期和时间",
     "file": "文件",
     "edit": "编辑",
@@ -694,6 +695,8 @@
     "noSlideNumberPlaceholder": "此演示文稿的版式没有幻灯片编号占位符",
     "noFooterPlaceholder": "此演示文稿的版式没有页脚占位符",
     "noDatePlaceholder": "此演示文稿的版式没有日期占位符",
+    "noFooterText": "请先指定页脚文本",
+    "slidesOpening": "请等待所有幻灯片打开",
     "lastSlide": "演示文稿必须至少保留一张幻灯片",
     "unsupportedElement": "此版本无法编辑此类型的元素",
     "noTable": "请先在表格中单击",

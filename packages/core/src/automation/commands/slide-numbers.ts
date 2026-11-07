@@ -55,6 +55,10 @@ export function setSlideNumbers(
     if (!slide) continue;
     const tree = spTreeOf(batch, slide.partName);
     const existing = elements(tree).filter(isSlideNumber);
+    const template =
+      templateIn(batch.pkg, slide.layoutPart) ?? templateIn(batch.pkg, slide.masterPart);
+    if (!template && existing.length === 0) continue;
+    possible += 1;
     if (!show) {
       removeShapes(
         batch,
@@ -62,14 +66,9 @@ export function setSlideNumbers(
         existing.map((el) => el.id)
       );
       changed += existing.length > 0 ? 1 : 0;
-      possible += 1;
       continue;
     }
-    const template =
-      templateIn(batch.pkg, slide.layoutPart) ?? templateIn(batch.pkg, slide.masterPart);
-    if (!template) continue;
-    possible += 1;
-    if (existing.length > 0) continue;
+    if (existing.length > 0 || !template) continue;
     const ph = path(template, 'p:nvSpPr', 'p:nvPr', 'p:ph');
     const phAttrs = ['type', 'orient', 'sz', 'idx']
       .map((a) => {
