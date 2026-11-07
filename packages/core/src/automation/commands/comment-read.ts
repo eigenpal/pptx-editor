@@ -191,6 +191,9 @@ export function deckUses(pkg: PptxPackage, format: 'legacy' | 'modern'): boolean
 /** A legacy id field, with `-`, `#`, and `%` encoded, so the id key splits back into its fields. */
 const idField = (raw: string): string => encodeURIComponent(raw).replace(/-/g, '%2D');
 
+/** A field of a comment identity: encoded, so it holds no `~` and no `#`. */
+const identityField = (raw: string): string => encodeURIComponent(raw).replace(/~/g, '%7E');
+
 /** The key of a legacy comment id (`cm-<author>-<idx>`), with each field encoded. */
 export const legacyKey = (authorId: string, idx: string): string =>
   `cm-${idField(authorId)}-${idField(idx)}`;
@@ -379,15 +382,28 @@ function pointOf(pos: Element | undefined, scale: number): CommentAnchor {
 const optionalDate = (date: string | undefined) => (date !== undefined ? { date } : {});
 
 /**
- * The ids of a slide's threaded comments: how many comments use each GUID (upper case), and how
- * many with each GUID and mark the reader has met so far.
+ * The ids of a slide's comments: how many threaded comments use each GUID (upper case), how many
+ * use each GUID and mark (twins), and each GUID, mark, and text; and how many of each the reader
+ * has met so far. Legacy comments count by author and index.
  */
 interface GuidCount {
   readonly uses: Map<string, number>;
-  /** How many comments use each GUID and mark. */
   readonly twins: Map<string, number>;
+  readonly texts: Map<string, number>;
   readonly seen: Map<string, number>;
+  readonly seenText: Map<string, number>;
+  readonly legacy: Map<string, number>;
+  readonly seenLegacy: Map<string, number>;
 }
+
+const bump = (map: Map<string, number>, key: string): number => {
+  const n = (map.get(key) ?? 0) + 1;
+  map.set(key, n);
+  return n;
+};
+
+const modernText = (el: Element): string =>
+  bodyText(child(el, { ns: COMMENTS.p188, local: 'txBody' }));
 
 /** The threads and replies the reader shows: a thread with an id, a reply with an id. */
 function eachModern(root: Element | undefined, visit: (el: Element) => void): void {
@@ -412,14 +428,19 @@ function modernComment(
   const guid = (attr(el, 'id') ?? '').toUpperCase();
   const mark = modernMark(el);
   const key = `${guid}\u0000${mark}`;
-  const ordinal = (count.seen.get(key) ?? 0) + 1;
-  count.seen.set(key, ordinal);
+  const ordinal = bump(count.seen, key);
   const repeated = (count.uses.get(guid) ?? 0) > 1 || guid.includes('~');
-  const text = bodyText(child(el, { ns: COMMENTS.p188, local: 'txBody' }));
+  const text = modernText(el);
   // The GUID and the mark, which edits, resolves, and deletes of other comments keep. Twins (one
-  // GUID, author, and date) also take their place and text: nothing else tells them apart.
+  // GUID, author, and date) also take a hash of their text, and twins with one text their place
+  // among each other: nothing else in the file tells them apart. `CommentState` carries the
+  // identity of a twin across its own edits and the deletes of other twins.
+  const hash = fnv(text);
+  const same = `${key}\u0000${hash}`;
+  const place = bump(count.seenText, same);
   const twins = (count.twins.get(key) ?? 0) > 1;
-  const identity = `${slidePart}#${guid}~${mark}${twins ? `~${ordinal}~${fnv(text)}` : ''}`;
+  const suffix = twins ? `~${hash}${(count.texts.get(same) ?? 0) > 1 ? `~${place}` : ''}` : '';
+  const identity = `${slidePart}#m~${identityField(guid)}~${mark}${suffix}`;
   return {
     id: modernId(slidePart, guid, repeated ? { mark, ordinal } : undefined),
     identity,
@@ -429,6 +450,22 @@ function modernComment(
     text,
     textEditable: modernTextEditable(el),
   };
+}
+
+/**
+ * The group of a comment `identity`: the part that names its GUID and mark, or its legacy author
+ * and index. Comments of one group are twins.
+ */
+export function identityGroup(identity: string): string {
+  const cut = identity.lastIndexOf('#');
+  return (
+    identity.slice(0, cut + 1) +
+    identity
+      .slice(cut + 1)
+      .split('~')
+      .slice(0, 3)
+      .join('~')
+  );
 }
 
 /** The threaded comments of one list. */
@@ -467,7 +504,12 @@ function modernThreads(
 }
 
 /** The legacy comments of one list, with replies under their parent. */
-function legacyThreads(pkg: PptxPackage, slidePart: string, listPart: string): CommentThread[] {
+function legacyThreads(
+  pkg: PptxPackage,
+  slidePart: string,
+  listPart: string,
+  count: GuidCount
+): CommentThread[] {
   const root = commentTree(pkg, listPart)?.root;
   if (root?.ns !== NS.p || root.local !== 'cmLst') return [];
   const authors = legacyAuthors(pkg);
@@ -479,9 +521,13 @@ function legacyThreads(pkg: PptxPackage, slidePart: string, listPart: string): C
     const authorId = canonicalAuthor(attr(cm, 'authorId'));
     const idx = canonicalIdx(attr(cm, 'idx'));
     const author = authors.get(authorId);
+    // A file can repeat an author and index: each repeat also takes its place.
+    const key = `${authorId}\u0000${idx}`;
+    const place = bump(count.seenLegacy, key);
+    const base = `${slidePart}#l~${identityField(authorId)}~${identityField(idx)}`;
     const comment: SlideComment = {
       id: legacyId(slidePart, authorId, idx),
-      identity: legacyId(slidePart, authorId, idx),
+      identity: (count.legacy.get(key) ?? 0) > 1 ? `${base}~${place}` : base,
       author: author?.name ?? '',
       initials: author?.initials ?? '',
       ...optionalDate(attr(cm, 'dt')),
@@ -535,16 +581,35 @@ export function readSlideComments(pkg: PptxPackage, slidePart: string): CommentT
   const { legacy, modern } = slideCommentParts(pkg, slidePart);
   if (legacy.length === 0 && modern.length === 0) return [];
   const keys = shapeKeys(xmlPartOf(pkg, slidePart)?.root);
-  const count: GuidCount = { uses: new Map(), twins: new Map(), seen: new Map() };
+  const count: GuidCount = {
+    uses: new Map(),
+    twins: new Map(),
+    texts: new Map(),
+    seen: new Map(),
+    seenText: new Map(),
+    legacy: new Map(),
+    seenLegacy: new Map(),
+  };
   for (const part of modern)
     eachModern(commentTree(pkg, part)?.root, (el) => {
       const guid = (attr(el, 'id') ?? '').toUpperCase();
       const key = `${guid}\u0000${modernMark(el)}`;
-      count.uses.set(guid, (count.uses.get(guid) ?? 0) + 1);
-      count.twins.set(key, (count.twins.get(key) ?? 0) + 1);
+      bump(count.uses, guid);
+      bump(count.twins, key);
+      bump(count.texts, `${key}\u0000${fnv(modernText(el))}`);
     });
+  for (const part of legacy) {
+    const root = commentTree(pkg, part)?.root;
+    if (root?.ns !== NS.p || root.local !== 'cmLst') continue;
+    for (const cm of elements(root))
+      if (cm.ns === NS.p && cm.local === 'cm')
+        bump(
+          count.legacy,
+          `${canonicalAuthor(attr(cm, 'authorId'))}\u0000${canonicalIdx(attr(cm, 'idx'))}`
+        );
+  }
   return [
-    ...legacy.flatMap((part) => legacyThreads(pkg, slidePart, part)),
+    ...legacy.flatMap((part) => legacyThreads(pkg, slidePart, part, count)),
     ...modern.flatMap((part) => modernThreads(pkg, slidePart, part, keys, count)),
   ];
 }
