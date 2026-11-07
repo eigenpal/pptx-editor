@@ -55,6 +55,41 @@ test('a WebP passes the same size checks', () => {
   expect(drawableImageMime(text('RIFF\0\0\0\0WEBPVP8 '), 'image/webp')).toBeUndefined();
 });
 
+const svgDoc = (body: string) =>
+  text(
+    '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">' +
+      `${body}</svg>`
+  );
+
+test('an SVG picture whose <use> links expand past the limit draws nothing', () => {
+  // Six levels of ten copies: 10^6 drawn rectangles from 60 elements.
+  let defs = '<rect id="l0" width="1" height="1"/>';
+  for (let i = 1; i <= 6; i += 1)
+    defs += `<g id="l${i}">${`<use xlink:href="#l${i - 1}"/>`.repeat(10)}</g>`;
+  const bomb = svgDoc(`<defs>${defs}</defs><use href="#l6"/>`);
+  expect(drawableImageMime(bomb, 'image/svg+xml')).toBeUndefined();
+  // Four levels draw 10^4 rectangles: within the limit.
+  const icon = svgDoc(`<defs>${defs}</defs><use href="#l4"/>`);
+  expect(drawableImageMime(icon, 'image/svg+xml')).toBe('image/svg+xml');
+});
+
+test('an SVG picture with a <use> cycle, an entity, or deep nesting draws nothing', () => {
+  const cycle = svgDoc('<g id="a"><rect width="1" height="1"/><use href="#a"/></g>');
+  expect(drawableImageMime(cycle, 'image/svg+xml')).toBeUndefined();
+  const entity = text('<!DOCTYPE svg [<!ENTITY a "aaaa">]><svg><text>&a;</text></svg>');
+  expect(drawableImageMime(entity, 'image/svg+xml')).toBeUndefined();
+  const deep = svgDoc(`${'<g>'.repeat(1000)}${'</g>'.repeat(1000)}`);
+  expect(drawableImageMime(deep, 'image/svg+xml')).toBeUndefined();
+});
+
+test('an SVG picture with a plain document type declaration draws', () => {
+  const doctype =
+    '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" ' +
+    '"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">';
+  const plain = text(`${doctype}<svg><rect/></svg>`);
+  expect(drawableImageMime(plain, 'image/svg+xml')).toBe('image/svg+xml');
+});
+
 test('an export paints a damaged picture as the placeholder', async () => {
   const IN = 914_400;
   const R_IMAGE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';

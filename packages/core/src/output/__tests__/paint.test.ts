@@ -232,3 +232,40 @@ describe('an empty text body', () => {
     expect(paint(box(para(run('x')))).innerHTML).not.toBe(none.innerHTML);
   });
 });
+
+describe('text elements', () => {
+  const body = (vert: string, text: string): string =>
+    shape({
+      id: 2,
+      x: 1_000_000,
+      y: 1_000_000,
+      cx: 1_000_000,
+      cy: 4_000_000,
+      text: para(run(text)),
+      bodyPr: `<a:bodyPr vert="${vert}" wrap="square"><a:noAutofit/></a:bodyPr>`,
+    });
+
+  test('stacked letters paint as one text element, each letter at its own place', () => {
+    const texts = [...paint(body('wordArtVert', 'STACK ME')).querySelectorAll('text')];
+    expect(texts).toHaveLength(1);
+    const text = texts[0]!;
+    expect(text.textContent).toBe('STACK ME');
+    expect(text.getAttribute('text-anchor')).toBe('middle');
+    expect(text.getAttribute('x')!.split(' ')).toHaveLength(8);
+    expect(new Set(text.getAttribute('y')!.split(' ')).size).toBe(8);
+    expect(text.parentElement!.getAttribute('transform')).toBe('rotate(-90)');
+  });
+
+  test('a character outside the basic plane keeps a text element of its own', () => {
+    const texts = [...paint(body('wordArtVert', 'A\u{1F600}B')).querySelectorAll('text')];
+    expect(texts.map((t) => t.textContent)).toEqual(['A', '\u{1F600}', 'B']);
+  });
+
+  test('the text group sets the kerning and ligature style once for its runs', () => {
+    const root = paint(body('horz', 'one two'));
+    const group = root.querySelector('[data-pptx-text]')!;
+    expect(group.getAttribute('style')).toContain('font-kerning:none');
+    // `white-space` does not inherit into a `<text>` in every browser: each one sets it.
+    expect(root.querySelector('text')!.getAttribute('style')).toBe('white-space:pre');
+  });
+});

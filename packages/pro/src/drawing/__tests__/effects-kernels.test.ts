@@ -136,6 +136,22 @@ describe('glow', () => {
     expect(Number(filter.attrs['height'])).toBeCloseTo(1_000_000 + 2 * m, 0);
   });
 
+  test('the alpha moves only within the bounds and the spread around them', () => {
+    const fx: ResolvedEffects = { glow: { radius: 18 * PT, color: black }, unsupported: [] };
+    const prims = primitives(glowEffect(fx, bounds, ids()));
+    const m = 9 * PT + 9525;
+    for (const p of prims.filter((e) => e.tag === 'feMorphology')) {
+      expect(Number(p.attrs.x)).toBeCloseTo(-m, 0);
+      expect(Number(p.attrs.width)).toBeCloseTo(2_000_000 + 2 * m, 0);
+    }
+  });
+
+  test('a glow past 200 pt draws as a 200 pt glow', () => {
+    const huge: ResolvedEffects = { glow: { radius: 2 ** 31, color: black }, unsupported: [] };
+    const most: ResolvedEffects = { glow: { radius: 200 * PT, color: black }, unsupported: [] };
+    expect(glowEffect(huge, bounds, ids())).toEqual(glowEffect(most, bounds, ids()));
+  });
+
   test('a glow of radius 0 makes no filter', () => {
     const fx: ResolvedEffects = { glow: { radius: 0, color: black }, unsupported: [] };
     expect(glowEffect(fx, bounds, ids())).toBeNull();
@@ -166,11 +182,32 @@ describe('soft edge', () => {
   });
 
   test('the region holds the shrink of a large soft edge on a small shape', () => {
-    const small = { x: 0, y: 0, r: 100_000, b: 100_000 };
+    const small = { x: 0, y: 0, r: 200_000, b: 200_000 };
     const filter = filterOf(
       bodyEffects({ softEdge: { radius: 100_000 }, unsupported: [] }, small, ids())
     );
     expect(Number(filter.attrs['x'])).toBeLessThanOrEqual(-84_000 - 9525);
+  });
+
+  test('a shrink past half the narrower side paints nothing, with no morphology', () => {
+    // 0.84 × 1,000,000 is more than half of the 1,000,000 EMU height.
+    const fx: ResolvedEffects = { softEdge: { radius: 1_000_000 }, unsupported: [] };
+    const prims = primitives(bodyEffects(fx, bounds, ids()));
+    expect(prims.map((p) => p.tag)).toEqual(['feFlood']);
+    expect(prims[0]!.attrs['flood-opacity']).toBe('0');
+  });
+
+  test('a soft edge shrinks the outline by at most 100 pt', () => {
+    const wide = { x: 0, y: 0, r: 100_000_000, b: 100_000_000 };
+    const fx: ResolvedEffects = { softEdge: { radius: 1000 * PT }, unsupported: [] };
+    const prims = primitives(bodyEffects(fx, wide, ids()));
+    const radii = attr(prims, 'feMorphology', 'radius').map((r) => r!.split(' ').map(Number));
+    expect(radii[0]).toEqual([100 * PT, 9525]);
+    // The blur keeps the radius.
+    expect(Number(attr(prims, 'feGaussianBlur', 'stdDeviation')[0])).toBeCloseTo(
+      (1000 * PT) / 3,
+      0
+    );
   });
 
   test('a soft edge of radius 0 makes no filter', () => {
