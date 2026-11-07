@@ -1,5 +1,33 @@
 # @pptx-editor.dev/editor-api
 
+## 0.3.0
+
+### Patch Changes
+
+- 30dc48e: Add `setFooter` and `setDateTime` commands that show or hide the footer and the date, through the placeholders of each layout or its master. They and `setSlideNumbers` take `indices` and `hideOnTitleSlides`. Turning one on without `text` keeps what the slides show. `EditorSnapshot.footer` and `EditorSnapshot.dateTime` report what the open slides show. A slide that shows a footer or a date keeps its box and format. `setSlideNumbers` with `show: false` is refused, as `show: true` is, when no slide can have a slide number.
+- Updated dependencies [8253ddb]
+- Updated dependencies [30dc48e]
+- Updated dependencies [a90b74e]
+- Updated dependencies [a90b74e]
+- Updated dependencies [a90b74e]
+- Updated dependencies [dfb5df0]
+- Updated dependencies [8253ddb]
+- Updated dependencies [c47f5ce]
+- Updated dependencies [30dc48e]
+- Updated dependencies [8253ddb]
+- Updated dependencies [a90b74e]
+- Updated dependencies [a90b74e]
+- Updated dependencies [8253ddb]
+- Updated dependencies [9d3e18e]
+- Updated dependencies [7666155]
+- Updated dependencies [8253ddb]
+- Updated dependencies [cbee759]
+- Updated dependencies [8253ddb]
+- Updated dependencies [8253ddb]
+- Updated dependencies [8253ddb]
+- Updated dependencies [30dc48e]
+  - @pptx-editor.dev/core@0.3.0
+
 ## 0.2.0
 
 ### Patch Changes

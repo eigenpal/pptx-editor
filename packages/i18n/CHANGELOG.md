@@ -1,5 +1,59 @@
 # @pptx-editor.dev/i18n
 
+## 0.3.0
+
+### Minor Changes
+
+- 8253ddb: Drag the adjust handles of a selected preset shape on the canvas, or set its adjust values with the `setAdjustments` command. Values are bounded to the ranges of the handles, and one drag is one undo step.
+- c47f5ce: A deck no longer stays on the loading spinner. The open waits at most 2 seconds for host fonts, HarfBuzz, and the packaged substitutes. Then it paints with fixed metrics and the faces it has. Late fonts install when they arrive, and the editor reflows. A deck that opens in a hidden tab no longer waits for the tab to show.
+
+  - `editor.fontMeasurement()` tells whether fonts are still resolving. The font substitution list stays empty until they finish.
+  - An error during the open shows the open-failure message with the code `failed`, in place of the spinner. Zip and XML limits have their own codes, for example `xml-depth-limit`. A DTD shows the new `blocked` reason: add it to an exhaustive map of `DocumentOpenFailureReason` values.
+  - The open-failure message has a **Copy details** button (`showCopy`). `openFailureReport()` gives the same text: code, reason, editor version, browser, and time. When the browser blocks the clipboard, the message shows the text to copy by hand.
+  - Large decks open and edit in linear time. This covers many slide IDs, `mc:Requires` prefixes, unmatched placeholders, nested namespace declarations, toolbar state on long text, font changes on many shapes, Replace All in a long run, and AutoCorrect after a long word.
+  - The font wait and the text engine wait run at the same time, under one 2 second limit.
+  - The shapes whose text you edit before the text engine starts fit again when it starts. Other shapes keep the fit that the file has. The new fit is one undo step, `fit text`.
+  - A load that fails during its font step keeps the fonts and the font waits of the deck that stays open.
+  - Typing repaints only the shapes that change. Unchanged shapes keep their resolved style, layout, and SVG nodes. A shrink-on-overflow fit stops measuring at the first paragraph that overflows. A fit value that the file already has writes no change.
+  - Repeated opens no longer grow memory: the text engine reads font tables without a copy of the whole font.
+  - Each packaged font file loads once per open. A `packagedFonts()` origin no longer fetches the substitutes that the engine loads itself. A `googleFonts()` origin no longer fetches Arimo, Tinos, or Cousine when the engine loads their metric-compatible substitutes. An origin that serves the requested family itself, such as `customFonts()` with your own Calibri, still loads it.
+  - Slide show, template, and macro-enabled decks open. A macro part stays as inert bytes and never runs.
+  - A slide whose content type is missing or generic still opens as a slide. A part that no slide, layout, master, theme, or notes relationship reaches no longer refuses the deck when it does not parse.
+  - A picture paints and exports only when its bytes are a PNG, JPEG, GIF, BMP, WebP, or SVG picture within the size limits. A damaged, mislabeled, or oversized picture paints the placeholder. A picture that a slide relationship names never refuses the deck.
+  - A font or a compound line type named after an object member, such as `constructor`, no longer stops layout and paint.
+  - A slide list entry is read as a slide only when its part has the slide content type or a `p:sld` root. An edit can no longer write into the master, a layout, the theme, or the presentation part.
+  - A damaged notes slide or damaged slide relationships no longer refuse the deck. The damaged part stays as the file's bytes on save.
+  - A nested `mc:AlternateContent` resolves its chosen branch in turn, so the inner shapes draw.
+  - **Duplicate slide** works on a slide whose relationship points to a missing part.
+  - `sanitizeHref` also removes leading C0 control characters before it reads the scheme.
+  - With no deck open, the slide canvas is named "No presentation open". **Close** on the open-failure message moves focus to it.
+  - In development, the editor warns when the `document` or `fonts` prop changes more than 10 times in 1 second.
+
+- 8253ddb: Fill shapes with a preset pattern (`setShapePattern`) or a stretched or tiled picture (`setShapePicture`), and set a pattern or tiled picture as the slide background. The fill menu adds **Pattern…** and **Picture…**, the Format Background dialog adds a pattern and a tile option, and the new `PatternDialog` shows the 54 patterns with their colors.
+- 8253ddb: Add the selection pane: the side panel's new **Selection** tab, and the `SelectionPane` component, list the objects of the current slide as a tree to select, show or hide, rename, and reorder them. `SidePanel` takes `tab` and `onTabChange` (`v-model:tab` in Vue) to open a tab from your own control. The toolbar's Selection pane and Format shape controls call the new `requestPane`, which a side panel and your host answer through `listenPaneRequests`. Both adapters export the two functions. The Vue adapter requires Vue 3.5 or later, as its components use `useId`.
+- 8253ddb: Link text to a slide of the presentation or to an email address. `setLink` takes `#slide-3` and `#first-slide`, `#last-slide`, `#next-slide`, or `#previous-slide`, and the link popup adds **Link to** with web, email, and slide fields. A slide link shows a button in the popup that goes to its slide, and it moves the slide show. `HyperLink.Fields` now renders a wrapper with the kind choice, so its `className` goes on that wrapper.
+- 8253ddb: Change the slide size with the `setSlideSize` command or in **Page setup**. Pick a preset or a custom size in either orientation, and scale the content to fit as one undo step.
+
+### Patch Changes
+
+- 30dc48e: Add `setFooter` and `setDateTime` commands that show or hide the footer and the date, through the placeholders of each layout or its master. They and `setSlideNumbers` take `indices` and `hideOnTitleSlides`. Turning one on without `text` keeps what the slides show. `EditorSnapshot.footer` and `EditorSnapshot.dateTime` report what the open slides show. A slide that shows a footer or a date keeps its box and format. `setSlideNumbers` with `show: false` is refused, as `show: true` is, when no slide can have a slide number.
+- 9d3e18e: Large decks no longer freeze the editor. A slide of thousands of shapes opens and edits without a long pause, and clicks, keys, and toolbar updates on large slides answer in a few frames.
+
+  - A slide with more than 2,000 shapes paints over several frames. Until a shape paints again, its earlier picture stays on screen.
+  - The thumbnail of a large current slide paints when the editor is idle. A thumbnail repaints only the shapes that changed, and a large slide fills its thumbnail over several idle periods.
+  - On a selection of more than 250 shapes, `can()` checks only the editing mode for the commands that arrange shapes, and checks other commands on the first 250 shapes first. It checks only the mode for `duplicate` on a selection of more than 20,000 XML nodes. The `applyLayout` and `resetSlides` commands also count a named slide of more than 20,000 XML nodes as large. `exec()` makes the full check.
+  - A text format check reads at most 64 runs or paragraphs, with the same answer as a full check. List buttons are exact again on the key that starts a list. On a text box of 50,000 runs, Select All and Escape answer in one frame.
+  - A transaction writes in place into the elements it made. Ops on the runs of one long paragraph no longer copy its run list once per run.
+  - Clicks, double-clicks, and Select All on a slide of 10,000 shapes no longer lay out the slide again. The pointer's cursor sits on a layer over the slide, so a cursor change no longer restyles every shape.
+  - Shrink-on-overflow fit lays out a long paragraph once per step only up to the box, and finds its font slots and line breaks once.
+  - Placeholder matching, Duplicate, Delete, and Group stay linear on slides of thousands of shapes.
+  - A space after a long run of spaces or a long word no longer slows AutoCorrect.
+  - The missing-fonts notice names up to four families. With five or more, it names three, then "and N more".
+  - Bring to Front, Send to Back, Bring Forward, and Send Backward move thousands of shapes in one pass. Bullets, Numbering, Remove Bullet, and Bullet Format resolve the slide once for all selected shapes. Auto-fit, Columns, Text Direction, Paste Format, and a resize of many shapes re-fit them in one pass.
+  - A resize of many shapes no longer copies the slide's shape list once per shape.
+  - When fonts load or a picture converts, the slide and its thumbnail paint every shape again, and each earlier picture stays on screen until its shape paints.
+  - A shape that is selected twice is edited once. A text command or a re-fit on a slide shape or table no longer reads a layout or master shape that has the same node id. Text commands on many tables re-fit them in one pass.
+
 ## 0.2.0
 
 ### Patch Changes
