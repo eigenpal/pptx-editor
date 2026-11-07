@@ -2006,7 +2006,7 @@ export type FillCommand =
 };
 
 // @internal
-export function fillWithPictureFile(editor: PptxEditorInstance, file: File): Promise<void>;
+export function fillWithPictureFile(editor: PptxEditorInstance, file: File, from?: Element | null): Promise<void>;
 
 // @internal
 export function filterFontFamilies(all: readonly string[], query: string): readonly string[];
@@ -3069,13 +3069,19 @@ export type LocalFontsOutcome = {
 };
 
 // @public
-export function mailtoParts(url: string): {
-    address: string;
-    subject: string;
-};
+export interface MailtoParts {
+    // (undocumented)
+    readonly address: string;
+    readonly rest: string;
+    // (undocumented)
+    readonly subject: string;
+}
 
 // @public
-export function mailtoUrl(address: string, subject: string): string;
+export function mailtoParts(url: string): MailtoParts;
+
+// @public
+export function mailtoUrl(address: string, subject: string, rest?: string): string;
 
 // @internal
 export function markDialogError(dialog: HTMLElement | null | undefined, error: DialogError | null, errorId: string): void;
@@ -3681,7 +3687,7 @@ export function pickBulletStyle(d: BulletsDialogFields, key: string): BulletsDia
 export function pickImageInto(editor: PptxEditorInstance, doc?: Document, target?: 'replaceImage'): void;
 
 // @internal
-export function pickPictureFill(editor: PptxEditorInstance, doc?: Document): void;
+export function pickPictureFill(editor: PptxEditorInstance, from?: Element | null, doc?: Document): void;
 
 // @internal
 export const PICTURE_FILL_TYPES = "image/png,image/jpeg,image/gif";
@@ -4394,6 +4400,12 @@ export interface SelectedImageState {
     readonly widthEmu: number;
 }
 
+// @internal
+export function selectFromPane(editor: PptxEditorInstance, row: SelectionPaneRow, extend: boolean): void;
+
+// @internal
+export const SELECTION_PANE_NAME_MAX = 255;
+
 // @public
 export interface SelectionFormat {
     // (undocumented)
@@ -4464,6 +4476,47 @@ export interface SelectionGeometry {
     // (undocumented)
     readonly y: number;
 }
+
+// @internal
+export function selectionPaneAncestors(shapes: readonly ShapeSummary[] | undefined, ids: ReadonlySet<string>): string[];
+
+// @internal
+export function selectionPaneKey(rows: readonly SelectionPaneRow[], focused: string | null, key: string): {
+    readonly focus: string;
+} | {
+    readonly expand: string;
+    readonly open: boolean;
+} | {
+    readonly rename: string;
+} | null;
+
+// @internal
+export interface SelectionPaneRow {
+    readonly branch: boolean;
+    readonly expanded: boolean;
+    // (undocumented)
+    readonly hidden: boolean;
+    // (undocumented)
+    readonly kind: ShapeSummary['kind'];
+    readonly level: number;
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly nodeId: string;
+    readonly parent: string | null;
+    readonly position: number;
+    // (undocumented)
+    readonly siblings: number;
+}
+
+// @internal
+export function selectionPaneRows(shapes: readonly ShapeSummary[] | undefined, expanded: ReadonlySet<string>): readonly SelectionPaneRow[];
+
+// @internal
+export function selectionPaneSelected(selection: EditorSelection): ReadonlySet<string>;
+
+// @internal
+export function selectionPaneTopIds(shapes: readonly ShapeSummary[] | undefined): string[];
 
 // @internal
 export function selectNotes(root: HTMLElement, start: number, end?: number): void;
@@ -4603,6 +4656,12 @@ export function shownOpenFailure(snapshot: EditorSnapshot): DocumentOpenFailure 
 
 // @internal
 export function showsLoading(snapshot: EditorSnapshot): boolean;
+
+// @internal
+export const SIDE_PANEL_TABS: readonly ["format", "selection", "comments"];
+
+// @public
+export type SidePanelTab = (typeof SIDE_PANEL_TABS)[number];
 
 // @internal
 export const SIZE_ERROR_MS = 5000;

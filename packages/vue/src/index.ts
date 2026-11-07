@@ -38,6 +38,7 @@ import type { PptxEditorPopups } from './popups.ts';
 import { DefaultWorkspace } from './SlideSorter.tsx';
 import { PptxEditorSlideRail } from './panes.tsx';
 import { PptxEditorNotesPane } from './NotesPane.tsx';
+import { PptxEditorSelectionPane } from './SelectionPane.tsx';
 import { PptxEditorFindBar } from './FindBar.tsx';
 import { PptxEditorEditNotice } from './EditNotice.tsx';
 import {
@@ -348,6 +349,7 @@ export {
   type ZoomPillProps,
 } from './panes.tsx';
 export { PptxEditorNotesPane, type NotesPaneProps } from './NotesPane.tsx';
+export { PptxEditorSelectionPane, type SelectionPaneProps } from './SelectionPane.tsx';
 export { PptxEditorSlideSorter, type SlideSorterProps } from './SlideSorter.tsx';
 export { requestSectionRename } from './RailSections.tsx';
 export {
@@ -484,6 +486,7 @@ export type {
   GradientFill,
   PatternFill,
   PatternPreset,
+  SidePanelTab,
   ParagraphDialogFields,
   PptxEditorInstance,
   RibbonTabId,
@@ -725,6 +728,7 @@ export const PptxEditor = Object.assign(PptxEditorDefault, {
   NotesPane: PptxEditorNotesPane,
   ZoomPill: PptxEditorZoomPill,
   SidePanel: PptxEditorSidePanel,
+  SelectionPane: PptxEditorSelectionPane,
   FontNotice: PptxEditorFontNotice,
   EditNotice: PptxEditorEditNotice,
   OpenFailure: PptxEditorOpenFailure,

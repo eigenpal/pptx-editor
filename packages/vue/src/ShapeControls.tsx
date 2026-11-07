@@ -356,7 +356,7 @@ export const FillControl = defineComponent({
                   </MenuItem>
                   <MenuItem
                     onSelect={() => {
-                      if (editor.value) pickPictureFill(editor.value);
+                      if (editor.value) pickPictureFill(editor.value, anchor.value);
                       open.value = false;
                     }}
                   >

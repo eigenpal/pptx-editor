@@ -136,6 +136,7 @@ export async function vueAdapterShape(contract?: ParityContract): Promise<VueAda
       component: vue.PptxEditorSidePanel,
       values: { paneWidth: { props: { paneWidth: 321 }, shows: (s) => hasWidth(s, 321) } },
     },
+    PptxEditorSelectionPane: { component: vue.PptxEditorSelectionPane },
     PptxEditorZoomPill: { component: vue.PptxEditorZoomPill },
     PptxEditorSlideSorter: { component: vue.PptxEditorSlideSorter },
     GradientDialog: { component: vue.GradientDialog, props: { open: false } },

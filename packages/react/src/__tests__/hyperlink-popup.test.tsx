@@ -495,10 +495,11 @@ describe('PptxEditor.HyperLink link kinds', () => {
     act(() => void fireEvent.click(screen.getByRole('button', { name: 'Edit link' })));
     const kind = () => screen.getByRole('combobox', { name: 'Link to' }) as HTMLSelectElement;
     expect(kind().value).toBe('web');
-    // Email: the address takes focus, and the subject is percent-encoded into the one draft.
+    // Email: focus stays on Link to, and the subject is percent-encoded into the one draft.
+    kind().focus();
     act(() => void fireEvent.change(kind(), { target: { value: 'email' } }));
     const address = screen.getByRole('textbox', { name: 'Email address' }) as HTMLInputElement;
-    expect(document.activeElement).toBe(address);
+    expect(document.activeElement).toBe(kind());
     act(() => void fireEvent.change(address, { target: { value: 'ana@example.com' } }));
     const subject = screen.getByRole('textbox', { name: 'Subject' });
     act(() => void fireEvent.change(subject, { target: { value: 'Q3 & plans' } }));
@@ -526,8 +527,8 @@ describe('PptxEditor.HyperLink link kinds', () => {
     expect(editor.snapshot().format?.link).toBe('#slide-1');
     // Reading mode: Go to slide, and no Copy.
     await clickSlide(editor);
-    const go = screen.getByRole('button', { name: 'Slide 1' });
-    expect(go.getAttribute('title')).toBe('Go to slide');
+    const go = screen.getByRole('button', { name: 'Go to Slide 1' });
+    expect(go.textContent).toBe('Slide 1');
     expect(screen.queryByRole('button', { name: 'Copy link' })).toBe(null);
     act(() => void fireEvent.click(go));
     expect(panel()).toBe(null);

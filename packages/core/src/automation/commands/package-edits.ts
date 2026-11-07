@@ -196,12 +196,17 @@ function namesRelationship(root: Element, id: string): boolean {
 
 /**
  * Remove the hyperlink relationship `id` of `source` when nothing in the part names it any
- * more. A relationship of another type, or one that an element still names, stays.
+ * more. A relationship of another type than `types`, or one that an element still names, stays.
  */
-export function removeUnusedHyperlink(batch: OpBatch, source: string, id: string): void {
+export function removeUnusedHyperlink(
+  batch: OpBatch,
+  source: string,
+  id: string,
+  types: readonly string[] = [REL.hyperlink]
+): void {
   const rels = xmlPartOf(batch.pkg, relsPartName(source));
   const rel = rels ? elements(rels.root).find((r) => attr(r, 'Id') === id) : undefined;
-  if (!rel || attr(rel, 'Type') !== REL.hyperlink) return;
+  if (!rel || !types.includes(attr(rel, 'Type') ?? '')) return;
   const xml = xmlPartOf(batch.pkg, source);
   if (xml && namesRelationship(xml.root, id)) return;
   batch.push({ op: 'removeNode', part: relsPartName(source), node: rel.id });

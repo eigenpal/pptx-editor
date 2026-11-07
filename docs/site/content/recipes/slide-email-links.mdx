@@ -43,18 +43,19 @@ editor.exec({ type: 'setLink', url: `mailto:ana@example.com?subject=${subject}` 
 
 ## Read a link
 
-With a caret inside linked text, `editor.snapshot().format.link` returns the same URL forms: `#slide-3`, `#next-slide`, or the `mailto:` address.
+With a caret inside linked text, `editor.snapshot().format?.link` returns the same URL forms: `#slide-3`, `#next-slide`, or the `mailto:` address.
 
 ## What users see
 
 In the default editor, the link popup has a **Link to** choice: **Web address**, **Email**, or **Slide**. **Email** shows the address and subject fields. **Slide** lists the four relative jumps and each slide by number.
 
-A click into a slide link shows **Go to slide**, which shows that slide in the editor. **Copy** is hidden for slide links. In the slide show, a click on a slide link moves the show to that slide. A click on any other link opens it in a new tab.
+A click into a slide link shows the slide it goes to as a button, such as **Slide 3**. The button's accessible name is "Go to Slide 3", and it shows that slide in the editor. **Copy** is hidden for slide links. In the slide show, a click on a slide link moves the show to that slide. A click on any other link opens it in a new tab.
 
 ## Limits
 
-- `setLink` refuses a slide number past the end, `#slide-0`, and any other `#` form.
-- A link to a custom show, another file, or a program is kept on save. The link popup does not show or edit it.
+- `setLink` refuses a slide number past the end, `#slide-0`, and any other `#` form with `errors.slideNotFound`.
+- A link that starts a custom show or a program keeps its action on save. The popup shows only an external target of such a link, and **Edit** replaces the action.
+- `mailto:` fields other than the subject, such as `cc` and `body`, stay in the link when you edit the address or the subject.
 
 ## See also
 

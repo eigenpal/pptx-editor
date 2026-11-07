@@ -51,7 +51,9 @@ import {
   elementKindLabelKey,
   elementRotates,
   TABLE_OPTION_ROWS,
+  SIDE_PANEL_TABS,
   platformShortcuts,
+  type SidePanelTab,
   type SlideRailOrientation,
   type SlideSummary,
 } from '@pptx-editor.dev/core/editor';
@@ -77,9 +79,11 @@ import {
   useSlideSections,
 } from './RailSections.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
+import { SelectionPane } from './SelectionPane.tsx';
+
+export { SelectionPane, type SelectionPaneProps } from './SelectionPane.tsx';
 
 /** The side panel's tabs, in order. */
-const PANEL_TABS = ['format', 'comments'] as const;
 
 const sameSlides = (a: readonly SlideSummary[], b: readonly SlideSummary[]): boolean =>
   a.length === b.length && a.every((s, i) => s === b[i]);
@@ -907,13 +911,29 @@ export interface SidePanelProps {
   readonly paneWidth?: number;
   /** Inline styles for the panel; a `width` here wins over `paneWidth`. */
   readonly style?: CSSProperties;
+  /** The tab that shows. Set it with `onTabChange` to control the tab; omit it to start on Format. */
+  readonly tab?: SidePanelTab;
+  /** Called with the tab the user picks. */
+  readonly onTabChange?: (tab: SidePanelTab) => void;
 }
 
-/** The side panel: Format · Comments. @public */
-export function SidePanel({ onClose, className, paneWidth, style }: SidePanelProps) {
+/** The side panel: Format · Selection · Comments. @public */
+export function SidePanel({
+  onClose,
+  className,
+  paneWidth,
+  style,
+  tab: shown,
+  onTabChange,
+}: SidePanelProps) {
   const { t } = useTranslation();
   const editor = usePptxEditor();
-  const [tab, setTab] = useState<'format' | 'comments'>('format');
+  const [own, setOwn] = useState<SidePanelTab>(shown ?? 'format');
+  const tab = shown ?? own;
+  const setTab = (next: SidePanelTab): void => {
+    setOwn(next);
+    onTabChange?.(next);
+  };
   return (
     <aside
       className={['pptx-panel', className].filter(Boolean).join(' ')}
@@ -927,14 +947,14 @@ export function SidePanel({ onClose, className, paneWidth, style }: SidePanelPro
           role="tablist"
           // One Tab stop: the selected tab; the arrow keys move between tabs.
           onKeyDown={(e) => {
-            const next = radioGroupStep(PANEL_TABS, tab, e.key);
+            const next = radioGroupStep(SIDE_PANEL_TABS, tab, e.key);
             if (!next) return;
             e.preventDefault();
             setTab(next);
             e.currentTarget.querySelector<HTMLElement>(`[data-tab="${next}"]`)?.focus();
           }}
         >
-          {PANEL_TABS.map((id) => (
+          {SIDE_PANEL_TABS.map((id) => (
             <button
               key={id}
               type="button"
@@ -957,6 +977,7 @@ export function SidePanel({ onClose, className, paneWidth, style }: SidePanelPro
         onKeyDown={(e) => panelHistoryKey(e, editor)}
       >
         {tab === 'format' ? <FormatTab /> : null}
+        {tab === 'selection' ? <SelectionPane /> : null}
         {tab === 'comments' ? (
           <div className="pptx-empty">
             <p className="pptx-empty__title">{t('panel.comments.emptyTitle')}</p>

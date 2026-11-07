@@ -1,0 +1,138 @@
+import { afterEach, describe, expect, test } from 'bun:test';
+import { createApp, defineComponent, h, nextTick, shallowRef, type App, type Component } from 'vue';
+import type { PptxEditorInstance, SidePanelTab } from '@pptx-editor.dev/core/editor';
+import { buildPptx, shape } from '../../../scripts/fixtures/builder.ts';
+import {
+  PptxEditorContent,
+  PptxEditorRoot,
+  PptxEditorSelectionPane,
+  PptxEditorSidePanel,
+  PptxEditorViewport,
+} from '../src/index.ts';
+
+const IN = 914_400;
+const group =
+  '<p:grpSp><p:nvGrpSpPr><p:cNvPr id="10" name="Cards"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>' +
+  '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1828800" cy="914400"/><a:chOff x="0" y="0"/>' +
+  '<a:chExt cx="1828800" cy="914400"/></a:xfrm></p:grpSpPr>' +
+  shape({ id: 11, name: 'Card A', x: 0, y: 0, cx: IN, cy: IN }) +
+  '</p:grpSp>';
+
+let app: App | null = null;
+let host: HTMLElement | null = null;
+afterEach(() => {
+  app?.unmount();
+  host?.remove();
+  app = null;
+  host = null;
+  document.body.replaceChildren();
+});
+
+async function mount(inner: () => unknown): Promise<PptxEditorInstance> {
+  host = document.createElement('div');
+  document.body.append(host);
+  let ready: PptxEditorInstance | null = null;
+  app = createApp(
+    defineComponent({
+      setup: () => () =>
+        h(PptxEditorRoot, { onReady: (e: PptxEditorInstance) => (ready = e) }, () =>
+          h(PptxEditorViewport, null, () => [h(PptxEditorContent), inner()])
+        ),
+    }) as Component
+  );
+  app.mount(host);
+  await nextTick();
+  const deck = buildPptx({
+    slides: [
+      {
+        shapes:
+          shape({ id: 2, name: 'One', x: IN, y: IN, cx: IN, cy: IN }) +
+          shape({ id: 3, name: 'Two', x: 2 * IN, y: IN, cx: IN, cy: IN }) +
+          group,
+      },
+    ],
+  });
+  const editor = ready as PptxEditorInstance | null;
+  expect((await editor!.load(deck)).ok).toBe(true);
+  await nextTick();
+  return editor!;
+}
+
+const rows = () => [...document.querySelectorAll<HTMLElement>('[role="treeitem"]')];
+const row = (name: string) => rows().find((r) => r.getAttribute('aria-label')?.startsWith(name))!;
+const key = async (el: Element, k: string): Promise<void> => {
+  el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+  await nextTick();
+  await nextTick();
+};
+
+describe('PptxEditorSelectionPane', () => {
+  test('lists the slide top first, selects, hides, renames, and shows all', async () => {
+    const editor = await mount(() => h(PptxEditorSelectionPane));
+    expect(rows().map((r) => r.getAttribute('aria-label'))).toEqual(['Cards', 'Two', 'One']);
+    row('Two').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await nextTick();
+    const two = editor.snapshot().shapes!.find((s) => s.name === 'Two')!.nodeId;
+    expect(editor.snapshot().selection).toEqual({ kind: 'shapes', nodeIds: [two] });
+    expect(row('Two').getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(row('Two'));
+    row('Two').querySelector<HTMLButtonElement>('[aria-label="Hide Two"]')!.click();
+    await nextTick();
+    expect(row('Two').getAttribute('aria-label')).toBe('Two (hidden)');
+    await key(row('One'), 'F2');
+    const field = document.querySelector<HTMLInputElement>('input[aria-label="Name"]')!;
+    expect(document.activeElement).toBe(field);
+    field.value = 'Headline';
+    await key(field, 'Enter');
+    expect(row('Headline')).toBeDefined();
+    expect(document.activeElement).toBe(row('Headline'));
+    await key(row('Headline'), 'F2');
+    const again = document.querySelector<HTMLInputElement>('input[aria-label="Name"]')!;
+    again.value = 'Other';
+    await key(again, 'Escape');
+    expect(row('Headline')).toBeDefined();
+    document.querySelector<HTMLButtonElement>('.pptx-selection-pane__bar .pptx-button')!.click();
+    await nextTick();
+    expect(editor.snapshot().shapes!.every((s) => !s.hidden)).toBe(true);
+  });
+
+  test('a group opens with the arrow keys and for a selected child', async () => {
+    const editor = await mount(() => h(PptxEditorSelectionPane));
+    expect(row('Cards').getAttribute('aria-expanded')).toBe('false');
+    await key(row('Cards'), 'ArrowRight');
+    expect(row('Cards').getAttribute('aria-expanded')).toBe('true');
+    expect(row('Card A').getAttribute('aria-level')).toBe('2');
+    await key(row('Cards'), 'ArrowLeft');
+    expect(row('Card A')).toBeUndefined();
+    const cards = editor.snapshot().shapes!.find((s) => s.name === 'Cards')!;
+    editor.setSelection({
+      kind: 'shapes',
+      nodeIds: [cards.children![0]!.nodeId],
+      group: cards.nodeId,
+    });
+    await nextTick();
+    await nextTick();
+    expect(row('Card A').getAttribute('aria-selected')).toBe('true');
+  });
+
+  test('the side panel shows it on its Selection tab, as a controlled tab', async () => {
+    const tab = shallowRef<SidePanelTab>('selection');
+    const picked: SidePanelTab[] = [];
+    await mount(() =>
+      h(PptxEditorSidePanel, {
+        tab: tab.value,
+        onTabChange: (t: SidePanelTab) => (picked.push(t), (tab.value = t)),
+      })
+    );
+    const tabOf = (name: string) =>
+      [...document.querySelectorAll<HTMLElement>('[role="tab"]')].find(
+        (t) => t.textContent === name
+      )!;
+    expect(tabOf('Selection').getAttribute('aria-selected')).toBe('true');
+    expect(document.querySelector('[role="tree"]') !== null).toBe(true);
+    tabOf('Format').click();
+    await nextTick();
+    expect(picked).toEqual(['format']);
+    expect(document.querySelector('[role="tree"]')).toBe(null);
+  });
+});

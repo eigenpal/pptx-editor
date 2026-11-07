@@ -288,6 +288,54 @@ function NotesToggle() {
 
 Render one notes pane in each root. For the pane props and the notes height, see [Pane configuration](/docs/customization/reference/layout#pane-configuration).
 
+## Open the selection pane
+
+The selection pane lists the objects of the current slide, top first, with groups as a tree. A click selects an object, even a hidden one. The eye button shows or hides it, and a double-click or F2 renames it. **Show all**, **Hide all**, and the order buttons act on the slide.
+
+The side panel shows the pane on its **Selection** tab. To open that tab from your own control, set `tab` and `onTabChange`:
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { useState } from 'react';
+import { PptxEditor, type SidePanelTab } from '@pptx-editor.dev/react';
+
+export function Panel() {
+  const [tab, setTab] = useState<SidePanelTab>('format');
+  return (
+    <>
+      <button type="button" onClick={() => setTab('selection')}>
+        Selection pane
+      </button>
+      <PptxEditor.SidePanel tab={tab} onTabChange={setTab} />
+    </>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { shallowRef } from 'vue';
+import { PptxEditorSidePanel, type SidePanelTab } from '@pptx-editor.dev/vue';
+
+const tab = shallowRef<SidePanelTab>('format');
+</script>
+
+<template>
+  <button type="button" @click="tab = 'selection'">Selection pane</button>
+  <PptxEditorSidePanel :tab="tab" :on-tab-change="(next: SidePanelTab) => (tab = next)" />
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+Render these components inside the editor root. To show the pane outside the side panel, render `PptxEditor.SelectionPane` (`PptxEditorSelectionPane` in Vue) anywhere inside the root. The pane writes through the `setShapesVisible`, `renameShape`, and `order` commands, so each change is one undo step. In view mode, the pane selects but does not change objects.
+
 ## Open failure
 
 The editor refuses a file that it cannot open safely, such as a damaged archive or a file that holds no presentation. When a deck was open before, it stays open. The open-failure notice shows a generic message, says whether the open deck stays, and shows a stable error code. It names no contact of its own.

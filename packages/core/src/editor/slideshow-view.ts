@@ -105,7 +105,8 @@ export function slideshowLinkAt(
     : undefined;
   if (rId.action) {
     const parts = session.info.slides.map((s) => s.partName);
-    return slideLinkOf(rId.action, rel && !rel.external ? rel.target : undefined, parts) ?? null;
+    const slide = slideLinkOf(rId.action, rel && !rel.external ? rel.target : undefined, parts);
+    if (slide) return slide;
   }
   if (!rel?.external || !rel.externalTarget) return null;
   const safe = sanitizeHref(rel.externalTarget);

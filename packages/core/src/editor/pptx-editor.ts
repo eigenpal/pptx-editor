@@ -206,13 +206,15 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       format: formatAt(arm.layout() ?? lay, selection, (rId, action) => {
         const part = info?.slides[slide]?.partName;
         const rel = pkg && part && rId ? relationshipById(pkg, part, rId) : undefined;
-        if (action)
-          return slideLinkOf(
-            action,
-            rel && !rel.external ? rel.target : undefined,
-            info?.slides.map((s) => s.partName) ?? []
-          );
-        return rel?.external ? rel.externalTarget : undefined;
+        const slideLink = action
+          ? slideLinkOf(
+              action,
+              rel && !rel.external ? rel.target : undefined,
+              info?.slides.map((s) => s.partName) ?? []
+            )
+          : undefined;
+        // Any other action with an external target (a file link) shows that target.
+        return slideLink ?? (rel?.external ? rel.externalTarget : undefined);
       }),
       geometry: withAltText(
         geometryOf(lay, selection, (id) => elementIn(pkg, partAt(slide), id)),

@@ -77,25 +77,25 @@ To open the pattern dialog from your own control, render `PatternDialog` inside 
 
 ```tsx
 import { useState } from 'react';
-import { PatternDialog, usePptxEditor, useEditorState } from '@pptx-editor.dev/react';
+import { PatternDialog, usePptxEditor, type PatternFill } from '@pptx-editor.dev/react';
 
 export function PatternButton() {
   const editor = usePptxEditor();
-  const shown = useEditorState((s) => s.geometry?.pattern ?? null);
-  const [open, setOpen] = useState(false);
+  // The pattern the dialog starts from, read once when it opens; false while it is closed.
+  const [start, setStart] = useState<PatternFill | null | false>(false);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)}>
+      <button type="button" onClick={() => setStart(editor?.snapshot().geometry?.pattern ?? null)}>
         Pattern
       </button>
       <PatternDialog
-        open={open}
-        initial={shown}
+        open={start !== false}
+        initial={start || null}
         base="#4472C4"
-        onClose={() => setOpen(false)}
+        onClose={() => setStart(false)}
         onApply={(pattern) => {
           editor?.exec({ type: 'setShapePattern', pattern });
-          setOpen(false);
+          setStart(false);
         }}
       />
     </>
@@ -108,27 +108,31 @@ export function PatternButton() {
 
 ```vue
 <script setup lang="ts">
-import { ref } from 'vue';
-import { PatternDialog, usePptxEditor, useEditorState } from '@pptx-editor.dev/vue';
+import { shallowRef } from 'vue';
+import { PatternDialog, usePptxEditor } from '@pptx-editor.dev/vue';
 import type { PatternFill } from '@pptx-editor.dev/vue';
 
 const editor = usePptxEditor();
-const shown = useEditorState((s) => s.geometry?.pattern ?? null);
-const open = ref(false);
+// The pattern the dialog starts from, read once when it opens; false while it is closed.
+const start = shallowRef<PatternFill | null | false>(false);
+
+function openDialog() {
+  start.value = editor.value?.snapshot().geometry?.pattern ?? null;
+}
 
 function apply(pattern: PatternFill) {
   editor.value?.exec({ type: 'setShapePattern', pattern });
-  open.value = false;
+  start.value = false;
 }
 </script>
 
 <template>
-  <button type="button" @click="open = true">Pattern</button>
+  <button type="button" @click="openDialog">Pattern</button>
   <PatternDialog
-    :open="open"
-    :initial="shown"
+    :open="start !== false"
+    :initial="start || null"
     base="#4472C4"
-    @close="open = false"
+    @close="start = false"
     @apply="apply"
   />
 </template>
@@ -137,7 +141,7 @@ function apply(pattern: PatternFill) {
 </Framework>
 </FrameworkTabs>
 
-`onClose` runs on **Cancel**, Escape, and a click on the backdrop. `onApply` receives the chosen `PatternFill`.
+`onClose` runs on **Cancel**, Escape, and a click on the backdrop. `onApply` receives the chosen `PatternFill`. Read the start pattern once when the dialog opens: a new `initial` object while the dialog is open starts the dialog again.
 
 ## See also
 

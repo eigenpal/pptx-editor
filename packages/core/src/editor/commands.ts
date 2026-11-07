@@ -4,7 +4,7 @@
 // only the autofit re-measurement (`refitShape`), which never refuses (its sizes are bounded
 // by `XFRM_BOUND`, and a missing `a:off` or `a:ext` is added).
 
-import { attr, child, elements, type Element, type PptxPackage } from '../store/index.ts';
+import { attr, child, elements, REL, type Element, type PptxPackage } from '../store/index.ts';
 import type { LayoutItem } from '../layout/index.ts';
 import type { EditorCommand, EditorSelection, TransformItem } from '../contracts/index.ts';
 import { refit } from '../automation/commands/autofit.ts';
@@ -22,7 +22,7 @@ import {
   ungroupShapes,
 } from '../automation/commands/group-commands.ts';
 import { CommandRefusal, OpBatch } from '../automation/commands/op-batch.ts';
-import { parentOf } from '../automation/commands/package-edits.ts';
+import { parentOf, removeUnusedHyperlink } from '../automation/commands/package-edits.ts';
 import { linkSpec } from '../automation/commands/slide-links.ts';
 import {
   boxOf,
@@ -322,11 +322,25 @@ function linkedRunsAt(
   const here = para
     ? slotsOf(para, n).find((sl) => sel.focus.offset > sl.start && sel.focus.offset <= sl.end)
     : undefined;
-  const rIdOf = (el: Element): string | undefined =>
-    attr(child(child(el, 'a:rPr'), 'a:hlinkClick'), 'r:id');
-  const rId = here ? rIdOf(here.el) : undefined;
-  if (!rId) return [];
-  return slots.map((sl) => sl.el).filter((el) => rIdOf(el) === rId);
+  const linkOf = (el: Element) => child(child(el, 'a:rPr'), 'a:hlinkClick');
+  const link = here ? linkOf(here.el) : undefined;
+  if (!link) return [];
+  const rId = attr(link, 'r:id');
+  if (rId) return slots.map((sl) => sl.el).filter((el) => attr(linkOf(el), 'r:id') === rId);
+  // A slide jump (`#next-slide`) has no relationship (`r:id=""`): its runs are the unbroken
+  // stretch around the caret with the same action, so two jump links in one text stay apart.
+  const action = attr(link, 'action');
+  if (!action) return [];
+  const same = (el: Element): boolean => {
+    const l = linkOf(el);
+    return !!l && !attr(l, 'r:id') && attr(l, 'action') === action;
+  };
+  const at = slots.findIndex((sl) => sl.el === here!.el);
+  let from = at;
+  let to = at;
+  while (from > 0 && same(slots[from - 1]!.el)) from -= 1;
+  while (to < slots.length - 1 && same(slots[to + 1]!.el)) to += 1;
+  return slots.slice(from, to + 1).map((sl) => sl.el);
 }
 
 /** What clear formatting keeps on a run: its language and proofing state, and its link. */
@@ -474,11 +488,20 @@ export function compile(
       if (collapsed && linked.length === 0 && word.length === 0)
         throw new CommandRefusal('disabled.selectText');
       const spec = command.url === null ? null : linkSpec(batch, part, command.url);
-      if (linked.length)
-        for (const run of linked) setRunChild(batch, part, run, ['hlinkClick'], spec);
-      else if (word.length)
-        for (const run of word) setRunChild(batch, part, run, ['hlinkClick'], spec);
-      else forRuns(batch, part, ctx, (run) => setRunChild(batch, part, run, ['hlinkClick'], spec));
+      // The relationships the replaced links named: each goes once nothing names it.
+      const old = new Set<string>();
+      const relink = (run: Element): void => {
+        const rId = attr(
+          child(child(batch.element(part, run.id), 'a:rPr'), 'a:hlinkClick'),
+          'r:id'
+        );
+        if (rId) old.add(rId);
+        setRunChild(batch, part, run, ['hlinkClick'], spec);
+      };
+      if (linked.length) linked.forEach(relink);
+      else if (word.length) word.forEach(relink);
+      else forRuns(batch, part, ctx, relink);
+      for (const id of old) removeUnusedHyperlink(batch, part, id, [REL.hyperlink, REL.slide]);
       return { batch, effect: { label: 'link' } };
     }
     case 'clearFormatting': {

@@ -19,30 +19,54 @@ export function linkKindOf(url: string): LinkKind {
   return raw.startsWith('#') ? 'slide' : 'web';
 }
 
-/** The address and subject of a `mailto:` draft; any other draft gives empty fields. */
-export function mailtoParts(url: string): { address: string; subject: string } {
-  const raw = url.trim();
-  if (!/^mailto:/i.test(raw)) return { address: '', subject: '' };
-  const [to = '', query = ''] = raw.slice('mailto:'.length).split('?', 2);
-  const subject = new URLSearchParams(query).get('subject') ?? '';
-  let address = to;
+/** The fields of an email link the form edits, and the fields it keeps as they are. */
+export interface MailtoParts {
+  readonly address: string;
+  readonly subject: string;
+  /** The other fields of the link (`cc`, `body`), still encoded, joined with `&`. */
+  readonly rest: string;
+}
+
+/** Decode a `mailto:` part as RFC 6068 writes it: `+` stays a plus sign. */
+function decodePart(text: string): string {
   try {
-    address = decodeURIComponent(to);
+    return decodeURIComponent(text);
   } catch {
     // A malformed escape keeps the text as written.
+    return text;
   }
-  return { address, subject };
+}
+
+/** The address, subject, and other fields of a `mailto:` draft; any other draft gives none. */
+export function mailtoParts(url: string): MailtoParts {
+  const raw = url.trim();
+  if (!/^mailto:/i.test(raw)) return { address: '', subject: '', rest: '' };
+  const body = raw.slice('mailto:'.length);
+  const q = body.indexOf('?');
+  const to = q < 0 ? body : body.slice(0, q);
+  let subject = '';
+  const rest: string[] = [];
+  for (const field of q < 0 ? [] : body.slice(q + 1).split('&')) {
+    if (!field) continue;
+    const eq = field.indexOf('=');
+    const key = (eq < 0 ? field : field.slice(0, eq)).toLowerCase();
+    if (key === 'subject' && !subject) subject = decodePart(field.slice(eq + 1));
+    else rest.push(field);
+  }
+  return { address: decodePart(to), subject, rest: rest.join('&') };
 }
 
 /**
- * The `mailto:` draft of an address and a subject. The subject is percent-encoded, so its text
- * cannot add other fields. An empty address gives an empty draft, which Apply cannot send.
+ * The `mailto:` draft of an address, a subject, and the other fields of the link. The address
+ * and the subject are percent-encoded where needed, so their text cannot add other fields. An
+ * empty address gives an empty draft, which Apply cannot send.
  */
-export function mailtoUrl(address: string, subject: string): string {
-  const to = address.trim();
+export function mailtoUrl(address: string, subject: string, rest = ''): string {
+  const to = address.trim().replace(/[%?#&\s]/gu, (c) => encodeURIComponent(c));
   if (!to) return '';
   const s = subject.trim();
-  return `mailto:${to}${s ? `?subject=${encodeURIComponent(s)}` : ''}`;
+  const fields = [...(s ? [`subject=${encodeURIComponent(s)}`] : []), ...(rest ? [rest] : [])];
+  return `mailto:${to}${fields.length ? `?${fields.join('&')}` : ''}`;
 }
 
 /** The slide targets the form lists: the four jumps, then each slide by number. */

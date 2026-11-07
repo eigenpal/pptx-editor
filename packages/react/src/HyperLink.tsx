@@ -40,6 +40,7 @@ import {
   slideLinkChoices,
   slideLinkLabel,
   type LinkKind,
+  type MailtoParts,
   openHyperlinkPopup,
   requestLinkPopup,
   translateKeyOrText,
@@ -286,7 +287,8 @@ function HyperLinkUrl({ className, asChild, hidden, children }: HyperLinkPartPro
     const props: HostElementProps = {
       type: 'button',
       className: join('pptx-link__url pptx-link__slide', className),
-      title: t('link.goToSlide'),
+      'aria-label': t('link.goToTarget', { target: slide }),
+      title: t('link.goToTarget', { target: slide }),
       onMouseDown: guardMousedown,
       onClick: () => void openTarget(),
     };
@@ -390,12 +392,12 @@ function HyperLinkFields({ className, hidden }: HyperLinkPartProps) {
   const [kind, setKind] = useState<LinkKind>(() => linkKindOf(state.draft));
   const [mail, setMail] = useState(() => mailtoParts(state.draft));
   const field = useRef<HTMLInputElement & HTMLSelectElement>(null);
-  // After the popover is placed: a browser does not focus into a hidden panel. A new kind moves
-  // focus to its first field.
+  // After the popover is placed: a browser does not focus into a hidden panel. A change of kind
+  // keeps focus on Link to, so the arrow keys can step through the kinds.
   useEffect(() => {
     field.current?.focus({ preventScroll: true });
     if (field.current instanceof HTMLInputElement) field.current.select();
-  }, [kind]);
+  }, []);
   if (hidden) return null;
   const invalid = {
     'aria-invalid': state.error ? true : undefined,
@@ -407,9 +409,9 @@ function HyperLinkFields({ className, hidden }: HyperLinkPartProps) {
     e.preventDefault();
     commitEdit();
   };
-  const setMailField = (next: { address: string; subject: string }): void => {
+  const setMailField = (next: MailtoParts): void => {
     setMail(next);
-    setUrl(mailtoUrl(next.address, next.subject));
+    setUrl(mailtoUrl(next.address, next.subject, next.rest));
   };
   return (
     <div className={join('pptx-link__fields', className)}>
@@ -420,7 +422,7 @@ function HyperLinkFields({ className, hidden }: HyperLinkPartProps) {
           onChange={(e) => {
             const next = e.target.value as LinkKind;
             setKind(next);
-            setMail({ address: '', subject: '' });
+            setMail({ address: '', subject: '', rest: '' });
             setUrl(next === 'slide' ? '#next-slide' : '');
           }}
         >

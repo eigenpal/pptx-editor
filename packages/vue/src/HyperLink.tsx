@@ -34,6 +34,7 @@ import {
   translateKeyOrText,
   type HyperlinkPopupState,
   type LinkKind,
+  type MailtoParts,
 } from '@pptx-editor.dev/core/editor';
 import { Icon, Popover } from './chrome.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
@@ -129,7 +130,8 @@ const HyperLinkUrl = part(
           const attrs = {
             type: 'button' as const,
             class: ['pptx-link__url pptx-link__slide', props.className],
-            title: t('link.goToSlide'),
+            'aria-label': t('link.goToTarget', { target: slide }),
+            title: t('link.goToTarget', { target: slide }),
             onMousedown: guardMousedown,
             onClick: () => void openTarget(),
           };
@@ -240,23 +242,21 @@ const HyperLinkFields = part(
       const kind = ref<LinkKind>(linkKindOf(state.value.draft));
       const mail = shallowRef(mailtoParts(state.value.draft));
       const field = ref<HTMLInputElement | HTMLSelectElement | null>(null);
-      // After the popover is placed: a browser does not focus into a hidden panel. A new kind
-      // moves focus to its first field.
-      const focusField = (): void => {
+      // After the popover is placed: a browser does not focus into a hidden panel. A change of
+      // kind keeps focus on Link to, so the arrow keys can step through the kinds.
+      onMounted(() => {
         field.value?.focus({ preventScroll: true });
         if (field.value instanceof HTMLInputElement) field.value.select();
-      };
-      onMounted(focusField);
-      watch(kind, focusField, { flush: 'post' });
+      });
       const onEnter = (e: KeyboardEvent): void => {
         if (e.key !== 'Enter') return;
         // The Enter that applies must not reach the element focus moves to next.
         e.preventDefault();
         commitEdit();
       };
-      const setMail = (next: { address: string; subject: string }): void => {
+      const setMail = (next: MailtoParts): void => {
         mail.value = next;
-        setUrl(mailtoUrl(next.address, next.subject));
+        setUrl(mailtoUrl(next.address, next.subject, next.rest));
       };
       const KIND_LABEL = {
         web: 'link.kindWeb',
@@ -280,7 +280,7 @@ const HyperLinkFields = part(
                 onChange={(e: Event) => {
                   const next = value(e) as LinkKind;
                   kind.value = next;
-                  mail.value = { address: '', subject: '' };
+                  mail.value = { address: '', subject: '', rest: '' };
                   setUrl(next === 'slide' ? '#next-slide' : '');
                 }}
               >

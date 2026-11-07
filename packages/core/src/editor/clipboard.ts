@@ -337,15 +337,16 @@ export function pasteShapes(batch: OpBatch, part: string, raw: unknown, offset: 
   }
   const rewrite = (spec: NodeSpec): NodeSpec | null => {
     let attrs = spec.attrs ?? [];
-    const relAttrs = attrs.filter((a) => a.ns === NS.r);
+    // An empty `r:id` names no relationship: a slide jump (`#next-slide`) keeps it as it is.
+    const relAttrs = attrs.filter((a) => a.ns === NS.r && a.value !== '');
     if (relAttrs.some((a) => !map.has(a.value)) && HYPERLINKS.has(spec.local)) return null;
     // A pasted table is a new table: it holds no structure mark (table-edit-marks.ts).
     if (isStructureMarkSpec(spec)) return null;
     // An `a:extLst` that held only marks goes with them.
     if (spec.local === 'extLst' && isOnlyStructureMarks(spec)) return null;
     attrs = attrs
-      .filter((a) => a.ns !== NS.r || map.has(a.value))
-      .map((a) => (a.ns === NS.r ? { ...a, value: map.get(a.value)! } : a));
+      .filter((a) => a.ns !== NS.r || a.value === '' || map.has(a.value))
+      .map((a) => (a.ns === NS.r && a.value !== '' ? { ...a, value: map.get(a.value)! } : a));
     const kids: (NodeSpec | { text: string })[] = [];
     for (const c of spec.children ?? []) {
       if ('text' in c) kids.push(c);

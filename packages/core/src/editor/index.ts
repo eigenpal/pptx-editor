@@ -696,6 +696,18 @@ export {
   type TableOptionRow,
 } from './canvas-support.ts';
 export {
+  SELECTION_PANE_NAME_MAX,
+  SIDE_PANEL_TABS,
+  selectFromPane,
+  selectionPaneAncestors,
+  selectionPaneKey,
+  selectionPaneRows,
+  selectionPaneSelected,
+  selectionPaneTopIds,
+  type SelectionPaneRow,
+  type SidePanelTab,
+} from './selection-pane.ts';
+export {
   applyLocalFonts,
   dispatchFindRequest,
   editNoticeShows,
@@ -755,6 +767,7 @@ export {
   slideLinkChoices,
   slideLinkLabel,
   type LinkKind,
+  type MailtoParts,
 } from './link-fields.ts';
 export type { FindStep, PptxFind, ReplaceAllResult } from './find-session.ts';
 export { findNotesMatch, onFindShown } from './find-session.ts';

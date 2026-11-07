@@ -12,14 +12,15 @@ import { addExternalRelationship, addRelationship } from './package-edits.ts';
 /**
  * The `a:hlinkClick` of a link from `part` to `url`, with its relationship: a slide in its `#`
  * form, or an address that passes `sanitizeHref`. A bare host ("example.com") is a web address.
- * Anything else is refused with `errors.unsafeLink`.
+ * Anything else is refused with `errors.unsafeLink`, and a `#` form that names no slide with
+ * `errors.slideNotFound`.
  */
 export function linkSpec(batch: OpBatch, part: string, url: string): NodeSpec {
   const raw = url.trim();
   if (!raw || raw.length > 2048) throw new CommandRefusal('errors.unsafeLink');
   if (raw.startsWith('#')) {
     const target = parseSlideLink(raw);
-    if (!target) throw new CommandRefusal('errors.unsafeLink');
+    if (!target) throw new CommandRefusal('errors.slideNotFound');
     return slideLinkSpec(batch, part, target);
   }
   const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`;
@@ -80,7 +81,7 @@ export function slideLinkSpec(batch: OpBatch, part: string, target: SlideLinkTar
     };
   }
   const slide = presentationInfo(batch.pkg).slides[target.slide];
-  if (!slide) throw new CommandRefusal('errors.unsafeLink');
+  if (!slide) throw new CommandRefusal('errors.slideNotFound');
   const rId = addRelationship(batch, part, REL.slide, slide.partName);
   return {
     ns: NS.a,

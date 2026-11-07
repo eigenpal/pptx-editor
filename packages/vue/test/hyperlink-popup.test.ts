@@ -330,9 +330,10 @@ describe('PptxEditorHyperLink link kinds', () => {
     };
     const input = (label: string) =>
       document.querySelector<HTMLInputElement>(`.pptx-link input[aria-label="${label}"]`)!;
-    // Email: the address takes focus, and the subject is percent-encoded into the one draft.
+    // Email: focus stays on Link to, and the subject is percent-encoded into the one draft.
+    kind().focus();
     await change(kind(), 'email');
-    expect(document.activeElement).toBe(input('Email address'));
+    expect(document.activeElement).toBe(kind());
     await type(input('Email address'), 'ana@example.com');
     await type(input('Subject'), 'Q3 & plans');
     await apply();
@@ -361,7 +362,7 @@ describe('PptxEditorHyperLink link kinds', () => {
     // Reading mode: Go to slide, and no Copy.
     await clickSlide(editor);
     const go = document.querySelector<HTMLButtonElement>('.pptx-link__slide')!;
-    expect([go.textContent, go.getAttribute('title')]).toEqual(['Slide 1', 'Go to slide']);
+    expect([go.textContent, go.getAttribute('aria-label')]).toEqual(['Slide 1', 'Go to Slide 1']);
     expect(button('Copy link')).toBe(null);
     go.click();
     await nextTick();

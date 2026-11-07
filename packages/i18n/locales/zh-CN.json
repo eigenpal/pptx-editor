@@ -794,6 +794,7 @@
     "close": "关闭面板",
     "tabs": {
       "format": "格式",
+      "selection": "选择",
       "comments": "批注"
     },
     "format": {
@@ -934,7 +935,8 @@
     "lastSlide": "最后一张幻灯片",
     "nextSlide": "下一张幻灯片",
     "previousSlide": "上一张幻灯片",
-    "goToSlide": "转到幻灯片"
+    "goToSlide": "转到幻灯片",
+    "goToTarget": "转到{target}"
   },
   "zoom": {
     "ariaLabel": "缩放",
@@ -1391,5 +1393,17 @@
       "trellis": "棚架",
       "zigZag": "锯齿"
     }
+  },
+  "selectionPane": {
+    "label": "此幻灯片上的对象",
+    "showAll": "全部显示",
+    "hideAll": "全部隐藏",
+    "show": "显示 {name}",
+    "hide": "隐藏 {name}",
+    "hiddenName": "{name} (已隐藏)",
+    "rename": "名称",
+    "selectFirst": "请先选择一个对象",
+    "emptyTitle": "没有对象",
+    "emptyBody": "此幻灯片上的形状、图片和文本框显示在此处。"
   }
 }

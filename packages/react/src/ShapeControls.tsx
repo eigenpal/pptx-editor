@@ -298,7 +298,7 @@ export function FillControl({ slot, control }: FillControlProps) {
           </MenuItem>
           <MenuItem
             onSelect={() => {
-              if (editor) pickPictureFill(editor);
+              if (editor) pickPictureFill(editor, anchor.current);
               setOpen(false);
             }}
           >

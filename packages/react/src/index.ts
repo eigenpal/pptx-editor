@@ -1,9 +1,7 @@
 /**
- * `@pptx-editor.dev/react` — the React adapter for PPTX Editor.
- *
- * Provider-first: `PptxEditor.Root` owns the engine instance; `.Viewport` scopes the styles;
- * `.Content` attaches the slide surface. Every piece of chrome is a hook consumer, and the
- * toolbar derives from the engine's `CHROME_GROUPS`.
+ * `@pptx-editor.dev/react`, the React adapter for PPTX Editor. `PptxEditor.Root` owns the engine
+ * instance, `.Viewport` scopes the styles, and `.Content` attaches the slide surface. Every piece
+ * of chrome is a hook consumer, and the toolbar derives from the engine's `CHROME_GROUPS`.
  *
  * @packageDocumentation
  * @public
@@ -34,6 +32,7 @@ import { ToolbarAction, ToolbarSeparator } from './toolbar-action.tsx';
 import { TOOLBAR_PARTS, type ToolbarNamedParts } from './toolbar-named-parts.tsx';
 import {
   NotesPane,
+  SelectionPane,
   SidePanel,
   SlideRail as SlideRailRoot,
   ZoomPill,
@@ -458,8 +457,10 @@ export {
   NotesPane,
   ZoomPill,
   SidePanel,
+  SelectionPane,
   type NotesPaneProps,
   type PaneProps,
+  type SelectionPaneProps,
   type SidePanelProps,
   type SlideRailProps,
   type ZoomPillProps,
@@ -635,15 +636,6 @@ export {
 export { useParagraphFormat, type UseParagraphFormatReturn } from './useParagraphFormat.ts';
 export { useFontFormat, type UseFontFormatReturn } from './useFontFormat.ts';
 export { useBulletFormat, type UseBulletFormatReturn } from './useBulletFormat.ts';
-// The hook's value types, next to the hook, as DOCX Editor exports them with `useParagraphFormat`.
-export type {
-  BulletFormat,
-  BulletFormatRead,
-  FontFormatCommand,
-  FontFormatRead,
-  ParagraphFormatCommand,
-  ParagraphFormatRead,
-} from '@pptx-editor.dev/core/editor';
 export { useFonts, type FontsInput, type UseFontsReturn } from './useFonts.ts';
 export { useFontFamily, type UseFontFamilyReturn } from './useFontFamily.ts';
 export { EditorFontError } from '@pptx-editor.dev/core/editor';
@@ -681,8 +673,10 @@ export {
 } from '@pptx-editor.dev/core/editor';
 // The core types that the adapter's own props, hooks, and parts use, re-exported as DOCX
 // Editor's adapters re-export `Editor`, `EditorCommand`, and `EditorSnapshot`, so a host types
-// its handlers with an import from this package only.
+// its handlers with an import from this package only. The format hooks' value types are here too.
 export type {
+  BulletFormat,
+  BulletFormatRead,
   BulletsDialogFields,
   CanvasMenuKind,
   ChromeControl,
@@ -701,6 +695,8 @@ export type {
   EditorRemoval,
   EditorSnapshot,
   FontDialogFields,
+  FontFormatCommand,
+  FontFormatRead,
   FontPickerGroup,
   FontPickerGroupId,
   FontPickerRow,
@@ -708,10 +704,13 @@ export type {
   PatternFill,
   PatternPreset,
   ParagraphDialogFields,
+  ParagraphFormatCommand,
+  ParagraphFormatRead,
   PptxEditorInstance,
   RibbonTabId,
   ShapeStyleChoice,
   ShapeStyleValue,
+  SidePanelTab,
   SlideBackground,
   SlideLayoutSummary,
   SlideRailOrientation,
@@ -977,6 +976,7 @@ export const PptxEditor = Object.assign(PptxEditorDefault, {
   NotesPane,
   ZoomPill,
   SidePanel,
+  SelectionPane,
   FontNotice,
   EditNotice,
   OpenFailure,

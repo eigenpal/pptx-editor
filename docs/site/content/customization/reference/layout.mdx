@@ -18,7 +18,8 @@ This page lists the layout parts and their props. For the tasks, see [Layout](/d
 | `PptxEditor.SlideRail` | `open`, `defaultOpen`, `onOpenChange`, `paneWidth`, `toggle`, `orientation`, `preset`, `t`, `className`, `style`, and part children. | The slide thumbnails, as a column or as a row. The **Hide thumbnails** button hides the rail to a strip with a **Show thumbnails** button. |
 | `PptxEditor.NotesPane` | `open`, `defaultOpen`, `onOpenChange`, `showFormatButtons`, `className`, `style`. | The speaker notes of the current slide. Shares its open state with `useNotesPane()`. Use one per root. `showFormatButtons={false}` removes the **B**, **I**, and **U** buttons. The shortcut keys still format the notes. |
 | `PptxEditor.SlideSorter` | `className`. | The Slide Sorter view: every slide as a tile, grouped by section. Render it in place of the rail, the canvas, and the notes while `presentationView` is `slideSorter`. Without a mounted sorter in that view, a development warning says so. |
-| `PptxEditor.SidePanel` | `onClose`, `paneWidth`, `className`, `style`. | The **Format** tab, and a **Comments** tab that shows an empty state in this version. Render it to show it. Remove it to hide it. |
+| `PptxEditor.SidePanel` | `onClose`, `tab`, `onTabChange`, `paneWidth`, `className`, `style`. | The **Format** tab, the **Selection** tab with the selection pane, and a **Comments** tab that shows an empty state in this version. Render it to show it. Remove it to hide it. Set `tab` and `onTabChange` to control the tab. Without `tab`, it starts on **Format**. |
+| `PptxEditor.SelectionPane` | `className`. | The objects of the current slide as a tree: select, show or hide, rename, and reorder them. See [Open the selection pane](/docs/customization/layout#open-the-selection-pane). |
 | `PptxEditor.ZoomPill` | `className`. | A floating zoom control, placed in the nearest positioned ancestor. |
 | `PptxEditor.StatusBar` | `className`, `preset`, `t`, and children. | A row with **Slide x of y**, **Notes**, the view switch, and the zoom pill. See [Status bar](/docs/customization/ribbon#status-bar). |
 | `PptxEditor.FindBar` | `className`, `t`. | The find and replace bar, placed in the nearest positioned ancestor. Without it, Find and Replace stay disabled with a reason. |
@@ -111,7 +112,7 @@ To change a message in every editor, override its key in `locale`.
 
 ## React and Vue reference
 
-The Vue adapter has the root, the viewport, the content, the toolbar, the loading screen, the find bar (`PptxEditorFindBar`), the slide show (`PptxEditorSlideshow`, `useSlideshow`), and the font and edit notices (`PptxEditorFontNotice`, `PptxEditorEditNotice`). It has the panes too: `PptxEditorSlideRail`, `PptxEditorSlideSorter`, `PptxEditorNotesPane` (which shares its open state with `useNotesPane`), `PptxEditorSidePanel`, and `PptxEditorZoomPill`.
+The Vue adapter has the root, the viewport, the content, the toolbar, the loading screen, the find bar (`PptxEditorFindBar`), the slide show (`PptxEditorSlideshow`, `useSlideshow`), and the font and edit notices (`PptxEditorFontNotice`, `PptxEditorEditNotice`). It has the panes too: `PptxEditorSlideRail`, `PptxEditorSlideSorter`, `PptxEditorNotesPane` (which shares its open state with `useNotesPane`), `PptxEditorSidePanel`, `PptxEditorSelectionPane`, and `PptxEditorZoomPill`.
 
 A pane's `onOpenChange` is the `update:open` event, so `v-model:open` controls it. Each part takes `className`, and `style` where React has it. A host `class` and `style` also work. `PptxEditorSidePanel` takes `onClose` as a prop, as in React: with it, the panel shows its close button.
 
@@ -120,4 +121,4 @@ In Vue, the slide rail parts are statics of `PptxEditorSlideRail` (`PptxEditorSl
 ## See also
 
 - [Layout](/docs/customization/layout)
-- [`@pptx-editor.dev/react` API report](https://github.com/eigenpal/pptx-editor/blob/main/docs/api/react/index.api.md), for `PaneProps`, `SlideRailProps`, `SlideRailNamespace`, `SlideRailPartProps`, `SlideSorterProps`, `NotesPaneProps`, `SidePanelProps`, `ZoomPillProps`, and `UseNotesPaneReturn`
+- [`@pptx-editor.dev/react` API report](https://github.com/eigenpal/pptx-editor/blob/main/docs/api/react/index.api.md), for `PaneProps`, `SlideRailProps`, `SlideRailNamespace`, `SlideRailPartProps`, `SlideSorterProps`, `NotesPaneProps`, `SidePanelProps`, `SidePanelTab`, `SelectionPaneProps`, `ZoomPillProps`, and `UseNotesPaneReturn`

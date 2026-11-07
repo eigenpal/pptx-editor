@@ -7,6 +7,8 @@ import { createTranslator } from '@pptx-editor.dev/i18n';
 import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 import {
   attr,
+  child,
+  textOf,
   elements,
   find,
   readPptx,
@@ -115,10 +117,119 @@ describe('setLink to a slide', () => {
   test('a slide past the end and a malformed # form are refused', async () => {
     const e = await open();
     selectWord(e);
-    expect(e.exec({ type: 'setLink', url: '#slide-9' }).ok).toBe(false);
+    expect(e.exec({ type: 'setLink', url: '#slide-9' })).toMatchObject({
+      ok: false,
+      reason: 'errors.slideNotFound',
+    });
     expect(e.exec({ type: 'setLink', url: '#slide-0' }).ok).toBe(false);
     expect(e.exec({ type: 'setLink', url: '#somewhere' }).ok).toBe(false);
     expect(linkEl(root(e))).toBeUndefined();
+  });
+});
+
+describe('editing a link at a caret', () => {
+  /** Select `from`..`to` of the first paragraph on slide 1. */
+  const range = (e: PptxEditorInstance, from: number, to: number): void =>
+    e.setSelection({
+      kind: 'text',
+      nodeId: shapeId(e),
+      anchor: { paragraph: 0, offset: from },
+      focus: { paragraph: 0, offset: to },
+    });
+  const runs = (e: PptxEditorInstance): string[] =>
+    elements(find(root(e), 'a:p')!)
+      .filter((r) => r.local === 'r')
+      .map((r) => {
+        const text = textOf(child(r, 'a:t'));
+        const l = linkEl(r);
+        return l ? `${text}|${attr(l, 'action')?.replace(/^.*jump=/, '')}` : text;
+      });
+
+  test('Remove and Edit change the whole jump link, and two jump links stay apart', async () => {
+    const e = await open();
+    // "Go there": "Go" and "there" are two links to the next slide, with a plain space between.
+    range(e, 0, 2);
+    expect(e.exec({ type: 'setLink', url: '#next-slide' }).ok).toBe(true);
+    range(e, 3, 8);
+    expect(e.exec({ type: 'setLink', url: '#next-slide' }).ok).toBe(true);
+    expect(runs(e)).toEqual(['Go|nextslide', ' ', 'there|nextslide']);
+    // Edit at a caret in "there" relinks all of "there" and leaves "Go".
+    range(e, 5, 5);
+    expect(e.exec({ type: 'setLink', url: '#last-slide' }).ok).toBe(true);
+    expect(runs(e)).toEqual(['Go|nextslide', ' ', 'there|lastslide']);
+    // Remove at a caret in "there" unlinks all of it.
+    range(e, 5, 5);
+    expect(e.exec({ type: 'setLink', url: null }).ok).toBe(true);
+    expect(runs(e).filter((r) => r.includes('|'))).toEqual(['Go|nextslide']);
+  });
+
+  test('relinking and removing leave no unused relationships', async () => {
+    const e = await open();
+    for (const url of ['#slide-2', '#slide-2', '#slide-3', 'mailto:a@b.c', 'https://a.test/']) {
+      selectWord(e);
+      expect(e.exec({ type: 'setLink', url }).ok).toBe(true);
+    }
+    const rels = () =>
+      relationshipsOf(e.session!.store.package, partOf(e, 0)).filter(
+        (r) => r.type.endsWith('/slide') || r.type.endsWith('/hyperlink')
+      );
+    expect(rels().length).toBe(1);
+    selectWord(e);
+    expect(e.exec({ type: 'setLink', url: null }).ok).toBe(true);
+    expect(rels()).toEqual([]);
+    // Undo brings the link and its relationship back.
+    expect(e.exec({ type: 'undo' }).ok).toBe(true);
+    expect(rels().length).toBe(1);
+    expect(caretLink(e)).toBe('https://a.test/');
+  });
+});
+
+describe('copy and paste', () => {
+  test('a pasted shape keeps its jump link, which needs no relationship', async () => {
+    const e = await open();
+    selectWord(e);
+    expect(e.exec({ type: 'setLink', url: '#next-slide' }).ok).toBe(true);
+    e.setSelection({ kind: 'shapes', nodeIds: [shapeId(e)] });
+    const payload = e.copy()!;
+    e.goToSlide(1);
+    expect(e.exec({ type: 'paste', payload }).ok).toBe(true);
+    const pasted = find(root(e, 1), 'a:hlinkClick');
+    expect([attr(pasted, 'r:id'), attr(pasted, 'action')]).toEqual([
+      '',
+      'ppaction://hlinkshowjump?jump=nextslide',
+    ]);
+  });
+});
+
+describe('links with other actions', () => {
+  test('an action with an external target shows that target; a custom show keeps its action', async () => {
+    const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink';
+    const text =
+      '<a:p><a:r><a:rPr lang="en-US"><a:hlinkClick r:id="rId9" action="ppaction://hlinkfile"/>' +
+      '</a:rPr><a:t>File</a:t></a:r><a:r><a:rPr lang="en-US"><a:hlinkClick r:id="" ' +
+      'action="ppaction://customshow?id=0"/></a:rPr><a:t> show</a:t></a:r></a:p>';
+    const e = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    const deck = buildPptx({
+      slides: [
+        {
+          shapes: shape({ id: 2, name: 'T', x: IN, y: IN, cx: 6 * IN, cy: 2 * IN, text }),
+          rels: [['rId9', R, 'https://a.test/report.pdf', 'External']],
+        },
+      ],
+    });
+    expect((await e.load(deck)).ok).toBe(true);
+    expect(caretLink(e)).toBe('https://a.test/report.pdf');
+    e.setSelection({
+      kind: 'text',
+      nodeId: shapeId(e),
+      anchor: { paragraph: 0, offset: 6 },
+      focus: { paragraph: 0, offset: 6 },
+    });
+    expect(e.snapshot().format?.link).toBeUndefined();
+    // Save keeps the custom show action.
+    const show = elements(find(root(e), 'a:p')!).filter((r) => r.local === 'r')[1]!;
+    expect(attr(linkEl(show), 'action')).toBe('ppaction://customshow?id=0');
+    expect(readPptx(e.save()!).ok).toBe(true);
   });
 });
 
@@ -181,8 +292,17 @@ describe('link form helpers', () => {
     expect(mailtoParts('mailto:a%40b@c.d?subject=Hi%20there')).toEqual({
       address: 'a@b@c.d',
       subject: 'Hi there',
+      rest: '',
     });
-    expect(mailtoParts('https://a.test')).toEqual({ address: '', subject: '' });
+    expect(mailtoParts('https://a.test')).toEqual({ address: '', subject: '', rest: '' });
+    // A plus sign stays a plus sign, and the fields the form does not edit are kept.
+    const parts = mailtoParts('mailto:a@b.c?cc=d@e.f&subject=C++&body=Hi%20you');
+    expect(parts).toEqual({ address: 'a@b.c', subject: 'C++', rest: 'cc=d@e.f&body=Hi%20you' });
+    expect(mailtoUrl('x@y.z', parts.subject, parts.rest)).toBe(
+      'mailto:x@y.z?subject=C%2B%2B&cc=d@e.f&body=Hi%20you'
+    );
+    // An address cannot start the fields either.
+    expect(mailtoUrl('a?cc=b@c.d', '')).toBe('mailto:a%3Fcc=b@c.d');
     expect(mailtoUrl('  ', 'x')).toBe('');
     // A subject cannot add another field.
     expect(mailtoUrl('a@b.c', 'x&cc=evil@d.e')).toBe('mailto:a@b.c?subject=x%26cc%3Devil%40d.e');

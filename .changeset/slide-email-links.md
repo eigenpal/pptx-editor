@@ -5,4 +5,4 @@
 '@pptx-editor.dev/i18n': minor
 ---
 
-Link text to a slide of the presentation or to an email address. `setLink` takes `#slide-3` and `#first-slide`, `#last-slide`, `#next-slide`, or `#previous-slide`, and the link popup adds **Link to** with web, email, and slide fields. A slide link shows **Go to slide** in the popup and moves the slide show.
+Link text to a slide of the presentation or to an email address. `setLink` takes `#slide-3` and `#first-slide`, `#last-slide`, `#next-slide`, or `#previous-slide`, and the link popup adds **Link to** with web, email, and slide fields. A slide link shows a button in the popup that goes to its slide, and it moves the slide show. `HyperLink.Fields` now renders a wrapper with the kind choice, so its `className` goes on that wrapper.

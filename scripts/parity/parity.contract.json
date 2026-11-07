@@ -39,7 +39,16 @@
     },
     "PptxEditorSidePanel": {
       "reactProps": "SidePanelProps",
-      "paired": ["className", "onClose", "paneWidth", "style"],
+      "paired": ["className", "onClose", "onTabChange", "paneWidth", "style", "tab"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorSelectionPane": {
+      "reactProps": "SelectionPaneProps",
+      "paired": ["className"],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {},
       "reactRenderPropsAsVueSlots": {},
@@ -940,6 +949,7 @@
     "paired": [
       "NotesPaneProps",
       "PaneProps",
+      "SelectionPaneProps",
       "SidePanelProps",
       "SlideRailProps",
       "SlideSorterProps",
@@ -1112,6 +1122,7 @@
       "GradientFill",
       "PatternFill",
       "PatternPreset",
+      "SidePanelTab",
       "ParagraphDialogFields",
       "PptxEditorInstance",
       "RibbonTabId",
@@ -1276,6 +1287,7 @@
     "reactNamesAsVueNames": {
       "SlideRail": "PptxEditorSlideRail",
       "SidePanel": "PptxEditorSidePanel",
+      "SelectionPane": "PptxEditorSelectionPane",
       "ZoomPill": "PptxEditorZoomPill",
       "SlideSorter": "PptxEditorSlideSorter",
       "NotesPane": "PptxEditorNotesPane",

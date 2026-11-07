@@ -17,6 +17,7 @@ const emit = defineEmits<{
   example: [];
   export: [];
   exportSlides: [kind: SlideExport];
+  selectionPane: [];
 }>();
 const { t } = useTranslation();
 // The PDF row waits while the server makes a PDF, as the Export menu's row does.
@@ -92,6 +93,15 @@ onBeforeUnmount(watchPdfExport((busy) => (pdfBusy.value = busy)));
       </PptxEditorMenu.Group>
       <SlideNumbersRow />
     </PptxEditorMenu.Insert>
+    <!-- Arrange > Selection pane opens the side panel on its Selection tab. -->
+    <PptxEditorMenu.Arrange>
+      <PptxEditorMenu.Separator />
+      <PptxEditorMenu.Row
+        :label="t('toolbar.selectionPane')"
+        icon="view_sidebar"
+        @select="emit('selectionPane')"
+      />
+    </PptxEditorMenu.Arrange>
     <PptxEditorMenu.Entry id="help" :label="t('menu.help')">
       <PptxEditorMenu.Row
         :label="t('menu.about')"

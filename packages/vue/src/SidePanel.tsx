@@ -4,6 +4,7 @@
 // element's position, size, rotation, and text fitting through engine commands.
 
 import {
+  computed,
   defineComponent,
   ref,
   type CSSProperties,
@@ -15,6 +16,8 @@ import {
   elementKindLabelKey,
   elementRotates,
   TABLE_OPTION_ROWS,
+  SIDE_PANEL_TABS,
+  type SidePanelTab,
   panelHistoryKey,
   platformShortcuts,
   radioGroupStep,
@@ -23,9 +26,7 @@ import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { ToolButton, keepFocus } from './chrome.tsx';
 import { useEditorDialog } from './popups.ts';
 import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
-
-/** The side panel's tabs, in order. */
-const PANEL_TABS = ['format', 'comments'] as const;
+import { PptxEditorSelectionPane } from './SelectionPane.tsx';
 
 const EMU_PER_INCH = 914_400;
 const inches = (emu: number): string => (emu / EMU_PER_INCH).toFixed(2);
@@ -252,6 +253,10 @@ const sidePanelProps = {
   className: { type: String, default: undefined },
   /** Inline styles for the panel, as React's `style`; a `width` here wins over `paneWidth`. */
   style: { type: Object as PropType<CSSProperties>, default: undefined },
+  /** The tab that shows. Set it with `onTabChange` to control the tab; omit it to start on Format. */
+  tab: { type: String as PropType<SidePanelTab>, default: undefined },
+  /** Called with the tab the user picks, as React's `onTabChange`. */
+  onTabChange: { type: Function as PropType<(tab: SidePanelTab) => void>, default: undefined },
 } as const;
 
 /**
@@ -262,7 +267,7 @@ const sidePanelProps = {
 export type SidePanelProps = ExtractPublicPropTypes<typeof sidePanelProps>;
 
 /**
- * The side panel: Format · Comments, the twin of React's `PptxEditor.SidePanel`. The host
+ * The side panel: Format · Selection · Comments, the twin of React's `PptxEditor.SidePanel`. The host
  * shows or hides the panel by rendering it. @public
  */
 export const PptxEditorSidePanel = defineComponent({
@@ -272,7 +277,12 @@ export const PptxEditorSidePanel = defineComponent({
   setup(props, { attrs }) {
     const { t } = useTranslation();
     const editor = usePptxEditor();
-    const tab = ref<'format' | 'comments'>('format');
+    const own = ref<SidePanelTab>(props.tab ?? 'format');
+    const tab = computed<SidePanelTab>(() => props.tab ?? own.value);
+    const setTab = (next: SidePanelTab): void => {
+      own.value = next;
+      props.onTabChange?.(next);
+    };
     return () => {
       const { class: hostClass, style: hostStyle, ...rest } = attrs;
       const style = [hostStyle as StyleValue, props.style];
@@ -294,16 +304,16 @@ export const PptxEditorSidePanel = defineComponent({
               role="tablist"
               // One Tab stop: the selected tab; the arrow keys move between tabs.
               onKeydown={(e: KeyboardEvent) => {
-                const next = radioGroupStep(PANEL_TABS, tab.value, e.key);
+                const next = radioGroupStep(SIDE_PANEL_TABS, tab.value, e.key);
                 if (!next) return;
                 e.preventDefault();
-                tab.value = next;
+                setTab(next);
                 (e.currentTarget as HTMLElement)
                   .querySelector<HTMLElement>(`[data-tab="${next}"]`)
                   ?.focus();
               }}
             >
-              {PANEL_TABS.map((id) => (
+              {SIDE_PANEL_TABS.map((id) => (
                 <button
                   key={id}
                   type="button"
@@ -312,9 +322,7 @@ export const PptxEditorSidePanel = defineComponent({
                   data-tab={id}
                   aria-selected={tab.value === id}
                   tabindex={tab.value === id ? 0 : -1}
-                  onClick={() => {
-                    tab.value = id;
-                  }}
+                  onClick={() => setTab(id)}
                 >
                   {t(`panel.tabs.${id}`)}
                 </button>
@@ -330,6 +338,7 @@ export const PptxEditorSidePanel = defineComponent({
             onKeydown={(e: KeyboardEvent) => panelHistoryKey(e, editor.value)}
           >
             {tab.value === 'format' ? <FormatTab /> : null}
+            {tab.value === 'selection' ? <PptxEditorSelectionPane /> : null}
             {tab.value === 'comments' ? (
               <div class="pptx-empty">
                 <p class="pptx-empty__title">{t('panel.comments.emptyTitle')}</p>

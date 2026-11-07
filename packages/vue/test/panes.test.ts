@@ -233,13 +233,17 @@ describe('Vue panes match React', () => {
     ]) {
       const el = await mount();
       const tabs = () => [...el.querySelectorAll<HTMLElement>('[role="tab"]')];
-      expect(tabs().map((t) => t.tabIndex)).toEqual([0, -1]);
+      expect(tabs().map((t) => t.tabIndex)).toEqual([0, -1, -1]);
       tabs()[0]!.focus();
       key(tabs()[0]!, 'ArrowRight');
       await nextTick();
       await act(async () => undefined);
-      expect(tabs().map((t) => t.getAttribute('aria-selected'))).toEqual(['false', 'true']);
-      expect(tabs().map((t) => t.tabIndex)).toEqual([-1, 0]);
+      expect(tabs().map((t) => t.getAttribute('aria-selected'))).toEqual([
+        'false',
+        'true',
+        'false',
+      ]);
+      expect(tabs().map((t) => t.tabIndex)).toEqual([-1, 0, -1]);
       expect(document.activeElement).toBe(tabs()[1]!);
       cleanup();
     }

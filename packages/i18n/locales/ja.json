@@ -794,6 +794,7 @@
     "close": "パネルを閉じる",
     "tabs": {
       "format": "書式",
+      "selection": "選択",
       "comments": "コメント"
     },
     "format": {
@@ -934,7 +935,8 @@
     "lastSlide": "最後のスライド",
     "nextSlide": "次のスライド",
     "previousSlide": "前のスライド",
-    "goToSlide": "スライドへ移動"
+    "goToSlide": "スライドへ移動",
+    "goToTarget": "{target} へ移動"
   },
   "zoom": {
     "ariaLabel": "ズーム",
@@ -1391,5 +1393,17 @@
       "trellis": "トレリス",
       "zigZag": "ジグザグ"
     }
+  },
+  "selectionPane": {
+    "label": "このスライドのオブジェクト",
+    "showAll": "すべて表示",
+    "hideAll": "すべて非表示",
+    "show": "{name} を表示",
+    "hide": "{name} を非表示",
+    "hiddenName": "{name} (非表示)",
+    "rename": "名前",
+    "selectFirst": "最初にオブジェクトを選択してください",
+    "emptyTitle": "オブジェクトがありません",
+    "emptyBody": "このスライドの図形、画像、テキスト ボックスがここに表示されます。"
   }
 }

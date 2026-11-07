@@ -2082,6 +2082,110 @@
   padding: 6px 16px 24px;
   overflow-y: auto;
 }
+/* Selection pane: Show all, Hide all, and the order buttons over a tree of the slide's
+   elements, top first. A hidden element is muted and shows a closed eye. */
+.pptx-selection-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pptx-selection-pane__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.pptx-selection-pane__order {
+  display: flex;
+  gap: 2px;
+  margin-inline-start: auto;
+}
+.pptx-selection-pane__tree {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.pptx-selection-pane__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding-inline-end: 4px;
+  border-radius: 6px;
+  color: var(--doc-text);
+  font-size: 13px;
+  cursor: default;
+  user-select: none;
+}
+.pptx-selection-pane__row:hover {
+  background: var(--doc-bg-hover);
+}
+.pptx-selection-pane__row[aria-selected='true'] {
+  background: color-mix(in srgb, var(--doc-primary) 16%, transparent);
+}
+.pptx-selection-pane__row:focus-visible {
+  outline: 2px solid var(--doc-primary);
+  outline-offset: -2px;
+}
+.pptx-selection-pane__row[data-hidden] .pptx-selection-pane__name {
+  color: var(--doc-text-muted);
+}
+.pptx-selection-pane__twisty {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+.pptx-selection-pane__twisty .pptx-icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.pptx-selection-pane__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pptx-selection-pane__field {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--doc-primary);
+  border-radius: 4px;
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+}
+.pptx-selection-pane__eye {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--doc-text-muted);
+  cursor: pointer;
+}
+.pptx-selection-pane__eye .pptx-icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.pptx-selection-pane__eye:hover:not(:disabled) {
+  background: var(--doc-bg-hover);
+  color: var(--doc-text);
+}
+.pptx-selection-pane__eye:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
 .pptx-panel__section {
   display: flex;
   flex-direction: column;

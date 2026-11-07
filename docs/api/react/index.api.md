@@ -97,6 +97,7 @@ import { ResolvedColorMode } from '@pptx-editor.dev/core/editor';
 import { RibbonTabId } from '@pptx-editor.dev/core/editor';
 import { ShapeStyleChoice } from '@pptx-editor.dev/core/editor';
 import { ShapeStyleValue } from '@pptx-editor.dev/core/editor';
+import { SidePanelTab } from '@pptx-editor.dev/core/editor';
 import { SlideBackground } from '@pptx-editor.dev/core/editor';
 import { SlideLayoutSummary } from '@pptx-editor.dev/core/editor';
 import { SlideRailOrientation } from '@pptx-editor.dev/core/editor';
@@ -1011,6 +1012,7 @@ export const PptxEditor: react.ForwardRefExoticComponent<PptxEditorProps & react
     NotesPane: typeof NotesPane;
     ZoomPill: typeof ZoomPill;
     SidePanel: typeof SidePanel;
+    SelectionPane: typeof SelectionPane;
     FontNotice: (props: FontNoticeProps) => ReactNode;
     EditNotice: (props: EditNoticeProps) => ReactNode;
     OpenFailure: (props: PptxEditorOpenFailureProps) => ReactNode;
@@ -1361,6 +1363,14 @@ export interface SectionMenuState {
 }
 
 // @public
+export function SelectionPane(input?: SelectionPaneProps): react.JSX.Element;
+
+// @public
+export interface SelectionPaneProps {
+    readonly className?: string;
+}
+
+// @public
 export function ShapeGalleryControl(input: ShapeGalleryControlProps): react.JSX.Element;
 
 // @public
@@ -1407,9 +1417,13 @@ export function SidePanel(input: SidePanelProps): react.JSX.Element;
 export interface SidePanelProps {
     readonly className?: string;
     readonly onClose?: () => void;
+    readonly onTabChange?: (tab: SidePanelTab) => void;
     readonly paneWidth?: number;
     readonly style?: CSSProperties;
+    readonly tab?: SidePanelTab;
 }
+
+export { SidePanelTab }
 
 export { SlideBackground }
 
