@@ -16,7 +16,10 @@ const MAX_FILE = 50 * 1024 * 1024;
 const MAX_TEXT = Math.ceil(MAX_FILE / 3) * 4 + 64 * 1024;
 const MAX_SLIDES = 10_000;
 
-/** The clipboard text for slides `slides` of the session's presentation, or null when too large. */
+/**
+ * The clipboard text for slides `slides` of the session's presentation, or null when it is too
+ * large or does not save.
+ */
 export function slidesClipboard(
   session: DocumentSession,
   slides: readonly number[]
@@ -25,7 +28,14 @@ export function slidesClipboard(
   const pkg = session.store.package;
   let file = saved.get(pkg);
   if (file === undefined) {
-    const bytes = writePptx(repairTablesForSave(pkg));
+    // A deck with a slide that did not parse has no file to copy, as it has none to save.
+    if (session.damage) return null;
+    let bytes: Uint8Array;
+    try {
+      bytes = writePptx(repairTablesForSave(pkg));
+    } catch {
+      return null;
+    }
     file = bytes.length > MAX_FILE ? null : toBase64(bytes);
     saved.set(pkg, file);
   }
