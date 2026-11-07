@@ -1,6 +1,6 @@
 {
   "name": "@pptx-editor.dev/pro",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Commercial capabilities for PPTX Editor, as EditorModules: the review module (comments and suggestions), realtime collaboration, and advanced drawing rendering (charts, glow, inner shadow, reflection, and soft edge).",
   "type": "module",
   "sideEffects": false,
@@ -29,7 +29,7 @@
     "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/pro"
   },
   "peerDependencies": {
-    "@pptx-editor.dev/core": "~0.2.0"
+    "@pptx-editor.dev/core": "~0.3.0"
   },
   "devDependencies": {
     "@pptx-editor.dev/core": "workspace:*"

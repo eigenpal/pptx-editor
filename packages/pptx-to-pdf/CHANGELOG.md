@@ -1,5 +1,52 @@
 # @pptx-editor.dev/pptx-to-pdf
 
+## 0.3.0
+
+### Minor Changes
+
+- dfb5df0: EMF and WMF pictures draw as pictures, not as placeholders. The editor converts each one to a PNG in the background with `emf-converter`, which loads only for a deck that has a metafile. The placeholder shows until the PNG is ready, and then the editor repaints. The picture file stays unchanged.
+
+  - `session.picturesReady(index)` waits until the EMF and WMF pictures of a slide, or of every slide, have converted. It resolves `false` when a picture cannot convert or is not ready after 30 seconds. PNG and ZIP export wait for it. Call it before `exportSlideSvg()`.
+  - `session.pictureStatus(index)` lists each EMF and WMF picture as `ready`, `pending`, `failed`, or `timed-out`.
+  - `picturesTimeoutMs` sets how long PNG and ZIP export wait for the pictures of each slide.
+  - An OLE object whose preview is an EMF or WMF picture draws the preview.
+  - PDF export draws EMF and WMF pictures with the same converter. On Node.js it draws with `@napi-rs/canvas` when that package is installed, and with its own rasterizer otherwise, so the pixels can differ from the browser's.
+  - A WebP picture must pass the same size limits as other pictures before it draws.
+  - The natural size of an EMF or WMF picture comes from its picture frame.
+
+  Damaged and unusual files open and save more safely:
+
+  - A save keeps the grid columns of a table whose rows have more cells than columns. Extra cells with text stay in the file.
+  - In the editor and in image export, a shape whose picture fill is missing or damaged draws the picture placeholder, not nothing.
+  - A damaged notes part, or a damaged theme of the notes master, drops the notes and no longer refuses the deck. A damaged theme of the handout master no longer refuses the deck.
+  - Edits, renames, deletes, and layout changes find every copy of a shape in nested `mc:AlternateContent`.
+
+### Patch Changes
+
+- Updated dependencies [8253ddb]
+- Updated dependencies [30dc48e]
+- Updated dependencies [a90b74e]
+- Updated dependencies [a90b74e]
+- Updated dependencies [a90b74e]
+- Updated dependencies [dfb5df0]
+- Updated dependencies [8253ddb]
+- Updated dependencies [c47f5ce]
+- Updated dependencies [30dc48e]
+- Updated dependencies [8253ddb]
+- Updated dependencies [a90b74e]
+- Updated dependencies [a90b74e]
+- Updated dependencies [8253ddb]
+- Updated dependencies [9d3e18e]
+- Updated dependencies [7666155]
+- Updated dependencies [8253ddb]
+- Updated dependencies [cbee759]
+- Updated dependencies [8253ddb]
+- Updated dependencies [8253ddb]
+- Updated dependencies [8253ddb]
+- Updated dependencies [30dc48e]
+  - @pptx-editor.dev/core@0.3.0
+  - @pptx-editor.dev/pro@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

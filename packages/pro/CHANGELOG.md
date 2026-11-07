@@ -1,5 +1,32 @@
 # @pptx-editor.dev/pro
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [8253ddb]
+- Updated dependencies [30dc48e]
+- Updated dependencies [a90b74e]
+- Updated dependencies [a90b74e]
+- Updated dependencies [a90b74e]
+- Updated dependencies [dfb5df0]
+- Updated dependencies [8253ddb]
+- Updated dependencies [c47f5ce]
+- Updated dependencies [30dc48e]
+- Updated dependencies [8253ddb]
+- Updated dependencies [a90b74e]
+- Updated dependencies [a90b74e]
+- Updated dependencies [8253ddb]
+- Updated dependencies [9d3e18e]
+- Updated dependencies [7666155]
+- Updated dependencies [8253ddb]
+- Updated dependencies [cbee759]
+- Updated dependencies [8253ddb]
+- Updated dependencies [8253ddb]
+- Updated dependencies [8253ddb]
+- Updated dependencies [30dc48e]
+  - @pptx-editor.dev/core@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
