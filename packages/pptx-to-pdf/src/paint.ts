@@ -42,7 +42,8 @@ import {
   type StrokePlan,
 } from '@pptx-editor.dev/core/layout';
 import {
-  drawEffectsBehind,
+  drawGlow,
+  drawShadows,
   drawInnerShadow,
   drawReflection,
   effectDiagnostics,
@@ -57,7 +58,7 @@ import {
   type FillScope,
 } from './paint-fill.ts';
 import { drawTable } from './paint-table.ts';
-import { fillFacets, threeDOf, turnsFace } from './paint-three-d.ts';
+import { faceMatrix, fillFacets, threeDOf, turnsFace } from './paint-three-d.ts';
 import { drawText } from './paint-text.ts';
 import {
   clip,
@@ -327,9 +328,17 @@ async function drawItem(
     }
     if (turned) p.push(popGraphicsState());
   };
-  // The reflection, shadows, glow, and extrusion paint under the content, as in the SVG paint.
+  // A face turned edge-on paints only its extrusion: it has no area to paint or to copy.
+  if (threeD && !threeD.showsFace) {
+    fillFacets(threeD.behind, p);
+    return;
+  }
+  // The reflection, shadows, glow, and extrusion paint under the content, in the SVG paint's
+  // order; the shadows and the glow take the camera's turn of the face.
+  const face = faceMatrix(threeD);
   if (shown) await drawReflection(item, p, drawContent);
-  if (shown) await drawEffectsBehind(item, p, local);
+  if (shown) await drawShadows(item, p, local, face);
+  if (shown) await drawGlow(item, p, local, face);
   if (threeD) fillFacets(threeD.behind, p);
   await drawContent();
 }

@@ -15,7 +15,7 @@ import {
   type ThreeDFacet,
   type ThreeDPaint,
 } from '@pptx-editor.dev/core/layout';
-import { threeDColor } from '@pptx-editor.dev/core/output';
+import { finiteFacet, threeDColor } from '@pptx-editor.dev/core/output';
 import { rgb, tracePath, type PageOps } from './page-ops.ts';
 
 type Drawable = Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>;
@@ -41,18 +41,27 @@ export function turnsFace(paint: ThreeDPaint | null): paint is ThreeDPaint {
   return paint !== null && paint.front.some((v, i) => Math.abs(v - id[i]!) > 1e-12);
 }
 
-/** Fill polygons in the current space, each in its color and alpha. */
+/** The transform of the face and its effects: the camera's turn, else the identity. */
+export function faceMatrix(paint: ThreeDPaint | null): Matrix {
+  return paint?.front ?? [1, 0, 0, 1, 0, 0];
+}
+
+/**
+ * Fill facets in the current space, each in its color and alpha, as one nonzero path. A facet
+ * with a value that is not finite is skipped, as the SVG paint skips it.
+ */
 export function fillFacets(facets: readonly ThreeDFacet[], p: PageOps): void {
   for (const f of facets) {
-    if (f.points.length < 3 || f.color.a <= 0) continue;
+    const polygons = f.polygons.filter((poly) => poly.length >= 3);
+    if (polygons.length === 0 || f.color.a <= 0 || !finiteFacet(f)) continue;
     p.push(pushGraphicsState());
     p.alpha(f.color.a, 1);
     p.push(setFillingRgbColor(...rgb(f.color)));
     tracePath(
-      [
-        ...f.points.map((q, i) => ({ op: i ? ('L' as const) : ('M' as const), x: q.x, y: q.y })),
+      polygons.flatMap((poly) => [
+        ...poly.map((q, i) => ({ op: i ? ('L' as const) : ('M' as const), x: q.x, y: q.y })),
         { op: 'Z' as const },
-      ],
+      ]),
       p
     );
     p.push(fill(), popGraphicsState());

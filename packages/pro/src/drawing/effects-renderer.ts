@@ -196,7 +196,8 @@ export function bodyEffects(
 export function glowEffect(
   effects: ResolvedEffects,
   bounds: EffectBounds,
-  ids: EffectIds
+  ids: EffectIds,
+  alone = false
 ): EffectFilterPaint | null {
   const glow = effects.glow;
   if (!glow || glow.radius <= 0) return null;
@@ -211,10 +212,14 @@ export function glowEffect(
       result: 'gc',
     }),
     node('feComposite', { in: 'gc', in2: 'gb', operator: 'in', result: 'glow' }),
-    node('feMerge', {}, [
-      node('feMergeNode', { in: 'glow' }),
-      node('feMergeNode', { in: 'SourceGraphic' }),
-    ]),
+    ...(alone
+      ? []
+      : [
+          node('feMerge', {}, [
+            node('feMergeNode', { in: 'glow' }),
+            node('feMergeNode', { in: 'SourceGraphic' }),
+          ]),
+        ]),
   ]);
   return { defs: [filter], filter: id };
 }

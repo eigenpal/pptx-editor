@@ -90,6 +90,11 @@ export interface FixtureOptions {
   readonly defaultLanguage?: string;
   /** The theme's `a:theme/@name`, which a layout picker shows. Default `Fixture`. */
   readonly themeName?: string;
+  /**
+   * The content of the theme's `a:effectStyleLst`: three `a:effectStyle` elements. Default: two
+   * empty styles and an outer shadow.
+   */
+  readonly effectStyles?: string;
   /** Extra XML parts: `[partName without leading slash, contentType, xml]`. */
   readonly extraParts?: readonly (readonly [string, string, string])[];
   /** `a:tblStyle` elements written into `ppt/tableStyles.xml`. */
@@ -148,7 +153,8 @@ function theme(
   minor: string,
   colors?: ThemeColors,
   name = 'Fixture',
-  scriptFonts: readonly (readonly [string, string])[] = []
+  scriptFonts: readonly (readonly [string, string])[] = [],
+  effectStyles?: string
 ): string {
   const scripts = scriptFonts.map(([script, face]) => `<a:font script="${script}" typeface="${face}"/>`).join('');
   const clr = (name: string, hex: string): string => `<a:${name}><a:srgbClr val="${colors?.[name as keyof ThemeColors] ?? hex}"/></a:${name}>`;
@@ -169,9 +175,12 @@ function theme(
     `<a:minorFont><a:latin typeface="${minor}"/><a:ea typeface=""/><a:cs typeface=""/>${scripts}</a:minorFont></a:fontScheme>` +
     '<a:fmtScheme name="Default"><a:fillStyleLst>' + fill + fill + fill + '</a:fillStyleLst>' +
     '<a:lnStyleLst>' + line(6350) + line(12700) + line(19050) + '</a:lnStyleLst>' +
-    '<a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle>' +
-    '<a:effectStyle><a:effectLst><a:outerShdw blurRad="57150" dist="19050" dir="5400000" algn="ctr" rotWithShape="0">' +
-    '<a:srgbClr val="000000"><a:alpha val="63000"/></a:srgbClr></a:outerShdw></a:effectLst></a:effectStyle></a:effectStyleLst>' +
+    '<a:effectStyleLst>' +
+    (effectStyles ??
+      '<a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle>' +
+        '<a:effectStyle><a:effectLst><a:outerShdw blurRad="57150" dist="19050" dir="5400000" algn="ctr" rotWithShape="0">' +
+        '<a:srgbClr val="000000"><a:alpha val="63000"/></a:srgbClr></a:outerShdw></a:effectLst></a:effectStyle>') +
+    '</a:effectStyleLst>' +
     '<a:bgFillStyleLst>' + fill + fill + fill + '</a:bgFillStyleLst></a:fmtScheme></a:themeElements>' +
     '<a:objectDefaults/><a:extraClrSchemeLst/></a:theme>'
   );
@@ -418,7 +427,14 @@ export function buildPptx(opts: FixtureOptions): Uint8Array {
   );
   put(
     'ppt/theme/theme1.xml',
-    theme(opts.majorFont ?? 'Carlito', opts.minorFont ?? 'Carlito', opts.colors, opts.themeName, opts.scriptFonts)
+    theme(
+      opts.majorFont ?? 'Carlito',
+      opts.minorFont ?? 'Carlito',
+      opts.colors,
+      opts.themeName,
+      opts.scriptFonts,
+      opts.effectStyles
+    )
   );
   put('ppt/theme/theme2.xml', theme('Carlito', 'Carlito'));
   const extra = opts.layouts ?? [];

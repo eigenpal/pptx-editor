@@ -9,13 +9,9 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // Vectors use slide axes: x to the right, y down, and z toward the viewer for normals and light
 // directions. A turned point keeps z as depth away from the viewer.
 //
-// The camera rotations are measured from the desktop presentation app's scripting values: a
-// deck with one shape for each preset (`a:camera` with no `a:rot`) gave each preset's rotation
-// about x, y, and z in degrees. They convert to lat = y, lon = -x, and rev = -z, rounded to
-// 0.01 degree. That conversion is fitted to the reference PDF of the `three-d-effects` fixture
-// (slide 3): the projected outlines of 12 isometric presets fall within 0.03 in, and no other
-// choice of axes and signs comes within 0.12 in. The perspective presets use the same conversion
-// and draw as parallel projections.
+// The camera rotations are measured on the `three-d-effects` reference PDF (slide 3): the
+// projected outlines of 12 isometric presets fall within 0.03 in. The perspective presets draw
+// as parallel projections.
 //
 // The light is fitted to the bevel cross-sections of that fixture (slide 1): the three-point rig
 // from the top, on the warm matte and plastic materials, within 7 levels of 255 in the green

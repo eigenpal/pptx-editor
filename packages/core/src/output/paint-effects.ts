@@ -14,6 +14,7 @@
 import { toCss, type ResolvedEffects } from '../cascade/index.ts';
 import {
   apply,
+  multiply,
   type EffectCopySource,
   type EffectNode,
   type Matrix,
@@ -21,6 +22,7 @@ import {
 } from '../layout/index.ts';
 import { blurSigma, boundsOf, effectMatrix, grow, PX, type Bounds } from './effect-transforms.ts';
 import { matrixAttr, num, svg, type Defs } from './svg.ts';
+import { finiteFacet } from './painter-math.ts';
 
 /** The filter region attributes for bounds in user space. */
 function region(b: Bounds): Record<string, string> {
@@ -113,8 +115,11 @@ export function facetElements(
   facets: readonly ThreeDFacet[],
   seam: number
 ): SVGElement[] {
-  return facets.map((f) => {
-    const d = f.points.map((p, i) => `${i ? 'L' : 'M'}${num(p.x)} ${num(p.y)}`).join('') + 'Z';
+  return facets.filter(finiteFacet).map((f) => {
+    const d = f.polygons
+      .filter((poly) => poly.length >= 3)
+      .map((poly) => poly.map((p, i) => `${i ? 'L' : 'M'}${num(p.x)} ${num(p.y)}`).join('') + 'Z')
+      .join('');
     const color = toCss({ ...f.color, a: 1 });
     const opacity = f.color.a < 1 ? num(f.color.a) : undefined;
     return svg(doc, 'path', {
@@ -139,9 +144,13 @@ export function shadowCopy(
   const shadow = effects?.[which];
   if (!shadow) return null;
   const doc = defs.doc;
-  const m = effectMatrix(shadow, source.matrix, source.width, source.height);
+  const placed = effectMatrix(shadow, source.matrix, source.width, source.height);
+  // On a turned face, the shadow is placed on the face and turns with it.
+  const face = source.face;
+  const m = face ? multiply(face.front, placed) : placed;
+  const corners = face ? face.corners : source.corners;
   const sigma = blurSigma(shadow.blur);
-  const bounds = grow(boundsOf(source.corners.map((p) => apply(m, p.x, p.y))), 3 * sigma + PX);
+  const bounds = grow(boundsOf(corners.map((p) => apply(m, p.x, p.y))), 3 * sigma + PX);
   const id = defs.id('shadow');
   const prims = [
     sigma > 0
@@ -155,5 +164,8 @@ export function shadowCopy(
     svg(doc, 'feComposite', { in: 'sc', in2: 'sb', operator: 'in' }),
   ];
   const filter = defs.add(svg(doc, 'filter', { id, ...region(bounds) }, prims));
-  return svg(doc, 'g', { filter, 'data-effect': 'shadow' }, [copyOf(doc, source, m)]);
+  const copy = face
+    ? svg(doc, 'use', { href: `#${face.id}`, transform: matrixAttr(m) })
+    : copyOf(doc, source, m);
+  return svg(doc, 'g', { filter, 'data-effect': 'shadow' }, [copy]);
 }

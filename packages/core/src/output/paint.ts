@@ -642,6 +642,12 @@ function paintItem(
               color: threeDColor(item.element.fill),
             })
           : null;
+      const extrusion = threeD ? facetElements(doc, threeD.behind, SEAM) : [];
+      // A face turned edge-on paints only its extrusion: it has no area to paint or to copy.
+      if (threeD && !threeD.showsFace) {
+        for (const node of extrusion) outer.appendChild(node);
+        return outer;
+      }
       const body = svg(doc, 'g', { transform: matrixAttr(item.matrix) });
       if (threeD) for (const node of facetElements(doc, threeD.under, SEAM)) body.appendChild(node);
       for (const node of paintGeometry(doc, item, local, parentScale)) body.appendChild(node);
@@ -660,19 +666,22 @@ function paintItem(
             paintText(doc, item.text, local),
           ])
         );
-      // A turned camera turns the face and its text about the shape's center.
-      const turned = threeD && threeD.front.some((v, i) => v !== IDENTITY[i]);
+      // A turned camera turns the face and its text about the shape's center, and the regions
+      // of the effects that copy the face turn with it.
+      const front = threeD?.front.some((v, i) => v !== IDENTITY[i]) ? threeD.front : undefined;
+      const corners = front
+        ? contentCorners(item).map((q) => applyMatrix(front, q.x, q.y))
+        : contentCorners(item);
+      const face = front ? svg(doc, 'g', {}, parts) : undefined;
       const content = svg(doc, 'g', {}, [
-        turned ? svg(doc, 'g', { transform: matrixAttr(threeD.front) }, parts) : parts[0]!,
-        ...(turned ? [] : parts.slice(1)),
+        face && front ? svg(doc, 'g', { transform: matrixAttr(front) }, [face]) : parts[0]!,
+        ...(face ? [] : parts.slice(1)),
       ]);
-      const blurFx =
-        pro?.blur && effects?.blur ? pro.blur(effects, boundsOf(contentCorners(item)), ids) : null;
+      const blurFx = pro?.blur && effects?.blur ? pro.blur(effects, boundsOf(corners), ids) : null;
       if (blurFx) effectDefs(ctx.defs, blurFx.defs);
       const shown = blurFx
         ? svg(doc, 'g', { filter: `url(#${blurFx.filter})` }, [content])
         : content;
-      const extrusion = threeD ? facetElements(doc, threeD.behind, SEAM) : [];
       const copies = effects?.outerShadow || (pro && (effects?.reflection || effects?.glow));
       if (!effects || !copies) {
         for (const node of extrusion) outer.appendChild(node);
@@ -682,12 +691,15 @@ function paintItem(
       // Shadow, reflection, and glow use the content, text included (design D1 of `effects-fidelity`).
       const contentId = ctx.defs.id('content');
       content.setAttribute('id', contentId);
+      const faceId = face ? ctx.defs.id('face') : undefined;
+      if (face && faceId) face.setAttribute('id', faceId);
       const source: EffectSource = {
         contentId,
         matrix: item.matrix,
         width: el.xfrm.cx,
         height: el.xfrm.cy,
-        corners: contentCorners(item),
+        corners,
+        ...(front && faceId ? { face: { id: faceId, corners: contentCorners(item), front } } : {}),
       };
       const reflection = pro && effects.reflection ? pro.reflection(effects, source, ids) : null;
       if (reflection) {
@@ -699,10 +711,21 @@ function paintItem(
       if (second) outer.appendChild(second);
       const shadow = shadowCopy(ctx.defs, effects, source);
       if (shadow) outer.appendChild(shadow);
-      for (const node of extrusion) outer.appendChild(node);
-      const glow = pro && effects.glow ? pro.glow(effects, boundsOf(source.corners), ids) : null;
+      // The glow lies under the extrusion: a copy that paints the glow alone, then the sides.
+      const under = extrusion.length > 0;
+      const glow =
+        pro && effects.glow ? pro.glow(effects, boundsOf(source.corners), ids, under) : null;
       if (glow) effectDefs(ctx.defs, glow.defs);
-      outer.appendChild(glow ? svg(doc, 'g', { filter: `url(#${glow.filter})` }, [shown]) : shown);
+      if (glow && under)
+        outer.appendChild(
+          svg(doc, 'g', { filter: `url(#${glow.filter})`, 'data-effect': 'glow' }, [
+            svg(doc, 'use', { href: `#${contentId}` }),
+          ])
+        );
+      for (const node of extrusion) outer.appendChild(node);
+      outer.appendChild(
+        glow && !under ? svg(doc, 'g', { filter: `url(#${glow.filter})` }, [shown]) : shown
+      );
       return outer;
     }
   }

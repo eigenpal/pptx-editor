@@ -11,7 +11,9 @@
  * `header-footer`, with its date and footer placeholders, 2 copies, no prompt;
  * `picture-bullets`, 2 copies, no prompt; `text-warp`, 2 copies, no prompt; and
  * `chart-data`, 2 copies, no prompt; `three-d-effects`, 2 copies, no prompt;
- * `diagram-editing`, 2 copies, no prompt; and `equations`, 2 copies, no prompt.
+ * `diagram-editing`, 2 copies, no prompt; `equations`, 2 copies, no prompt; and
+ * `three-d-turned-effects`, 2 copies and a copy with bevels set and removed on theme-styled
+ * shapes, no prompt.
  */
 export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'alignment-anchor',
@@ -66,6 +68,7 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'text-runs',
   'text-warp',
   'three-d-effects',
+  'three-d-turned-effects',
   'vertical-columns',
   'vertical-east-asian',
 ];

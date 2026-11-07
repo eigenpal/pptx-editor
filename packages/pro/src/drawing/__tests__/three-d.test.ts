@@ -16,6 +16,7 @@ import {
   installDrawingRenderers,
   layoutSlide,
   type GeometryPath,
+  type ThreeDFacet,
 } from '@pptx-editor.dev/core/layout';
 import { paintSlide } from '@pptx-editor.dev/core/output';
 import { installDrawing } from '../index.ts';
@@ -53,6 +54,10 @@ const effects = (threeD: Partial<NonNullable<ResolvedEffects['threeD']>>): Resol
   },
 });
 
+/** Every polygon of a list of facets, each with its facet's color. */
+const polygons = (facets: readonly ThreeDFacet[]) =>
+  facets.flatMap((f) => f.polygons.map((points) => ({ points, color: f.color })));
+
 const input = (fx: ResolvedEffects) => ({
   effects: fx,
   paths: RECT,
@@ -67,11 +72,13 @@ describe('3-D polygons', () => {
     const paint = threeDPaint(
       input(effects({ bevelTop: { w: 76_200, h: 76_200, preset: 'circle' } }))
     )!;
-    expect(paint.over).toHaveLength(4 * 8);
+    const strips = polygons(paint.over);
+    expect(strips).toHaveLength(4 * 8);
     expect(paint.behind).toHaveLength(0);
     expect(paint.front).toEqual([1, 0, 0, 1, 0, 0]);
+    expect(paint.showsFace).toBe(true);
     // The outermost strip of each edge: top, right, bottom, left.
-    const [top, right, bottom, left] = [0, 1, 2, 3].map((i) => paint.over[i]!.color.g);
+    const [top, right, bottom, left] = [0, 1, 2, 3].map((i) => strips[i]!.color.g);
     expect(right).toBeLessThan(left!);
     expect(bottom).toBeLessThan(top!);
     // The outer right strip is close to the measured 0x17.
@@ -83,19 +90,21 @@ describe('3-D polygons', () => {
     const turned = threeDPaint(input(effects({ camera: 'isometricTopUp', extrusionH: 228_600 })))!;
     expect(turned.front).not.toEqual([1, 0, 0, 1, 0, 0]);
     // Four sides and the front cap.
-    expect(turned.behind).toHaveLength(5);
+    expect(polygons(turned.behind)).toHaveLength(5);
     const oblique = threeDPaint(input(effects({ camera: 'obliqueTopLeft', extrusionH: 228_600 })))!;
     expect(oblique.front).toEqual([1, 0, 0, 1, 0, 0]);
     // The top and left sides face the depth, and the front cap.
-    expect(oblique.behind).toHaveLength(3);
+    expect(polygons(oblique.behind)).toHaveLength(3);
   });
 
   test('a contour is a ring outside the outline; a flat material does not shade', () => {
     const contour = threeDPaint(
       input(effects({ contourW: 38_100, contourColor: { r: 192, g: 0, b: 0, a: 1 } }))
     )!;
-    expect(contour.under).toHaveLength(4);
-    expect(contour.under[0]!.points.some((p) => p.y < IN)).toBe(true);
+    // One color: the four sides of the ring are one facet.
+    expect(contour.under).toHaveLength(1);
+    expect(polygons(contour.under)).toHaveLength(4);
+    expect(contour.under[0]!.polygons[0]!.some((p) => p.y < IN)).toBe(true);
     const flat = threeDPaint(
       input(effects({ material: 'flat', bevelTop: { w: 76_200, h: 76_200, preset: 'angle' } }))
     )!;
@@ -147,8 +156,179 @@ describe('3-D paint', () => {
     expect(paint().querySelectorAll('path').length).toBe(1);
     installDrawing();
     const svg = paint();
-    // The geometry, 32 bevel strips, four sides, and the front cap.
-    expect(svg.querySelectorAll('path').length).toBe(1 + 32 + 5);
+    // The geometry, 32 bevel strips, four sides, and the front cap, as subpaths: polygons of
+    // one color share a path.
+    const subpaths = [...svg.querySelectorAll('path')].map(
+      (p) => (p.getAttribute('d') ?? '').split('M').length - 1
+    );
+    expect(subpaths.reduce((a, b) => a + b, 0)).toBe(1 + 32 + 5);
     expect(svg.querySelector('g[data-kind="shape"] g g[transform]')).not.toBeNull();
+  });
+});
+
+describe('degenerate 3-D shapes', () => {
+  const line: GeometryPath[] = [
+    {
+      commands: [
+        { op: 'M', x: IN / 2, y: 0 },
+        { op: 'L', x: IN, y: 0 },
+        { op: 'L', x: 0, y: 0 },
+        { op: 'Z' },
+      ],
+      fill: 'norm',
+      stroke: true,
+    },
+  ];
+  const square: GeometryPath[] = [
+    {
+      commands: [
+        { op: 'M', x: 0, y: 0 },
+        { op: 'L', x: IN, y: 0 },
+        { op: 'L', x: IN, y: IN },
+        { op: 'L', x: 0, y: IN },
+        { op: 'Z' },
+      ],
+      fill: 'norm',
+      stroke: true,
+    },
+  ];
+  const finite = (facets: readonly ThreeDFacet[]) =>
+    polygons(facets).every(
+      (f) =>
+        [f.color.r, f.color.g, f.color.b, f.color.a].every(Number.isFinite) &&
+        f.points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
+    );
+
+  test('a bevel on an outline with no inside has no strips and no NaN', () => {
+    const fx = effects({ bevelTop: { w: 76_200, h: 76_200, preset: 'hardEdge' } });
+    const paint = threeDPaint({ ...input(fx), paths: line, width: IN, height: 0 });
+    expect(paint?.over ?? []).toHaveLength(0);
+    expect(finite(paint?.under ?? []) && finite(paint?.behind ?? [])).toBe(true);
+  });
+
+  test('a zero-height shape with a bevel paints no NaN', () => {
+    installDrawing();
+    const deck = shape({
+      id: 2,
+      x: IN,
+      y: IN,
+      cx: IN,
+      cy: 0,
+      prst: 'triangle',
+      fill: solid('C00000'),
+      effects:
+        '<a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>' +
+        '<a:sp3d><a:bevelT w="76200" h="76200" prst="hardEdge"/></a:sp3d>',
+    });
+    const r = readPptx(buildPptx({ slides: [{ shapes: deck, layout: 'blank' }] }));
+    if (!r.ok) throw new Error('open failed');
+    const layout = layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer());
+    const svg = paintSlide(doc, layout, { images: () => undefined, idPrefix: 'z' });
+    expect(svg.outerHTML).not.toContain('NaN');
+  });
+
+  test('a face turned edge-on hides; a half turn mirrors it', () => {
+    const edge = threeDPaint({
+      ...input(effects({ cameraRot: { lat: 0, lon: 90, rev: 0 }, extrusionH: IN })),
+      paths: square,
+      width: IN,
+      height: IN,
+    })!;
+    expect(edge.showsFace).toBe(false);
+    // The extrusion still shows: its side toward the viewer.
+    expect(polygons(edge.behind).length).toBeGreaterThan(0);
+    expect(finite(edge.behind)).toBe(true);
+    const back = threeDPaint({
+      ...input(effects({ cameraRot: { lat: 0, lon: 180, rev: 0 } })),
+      paths: square,
+      width: IN,
+      height: IN,
+    })!;
+    expect(back.showsFace).toBe(true);
+    // A turn about the vertical axis: x mirrors, y stays.
+    expect(back.front[0]).toBeCloseTo(-1, 9);
+    expect(back.front[3]).toBeCloseTo(1, 9);
+  });
+
+  test('an edge-on face paints only its extrusion', () => {
+    installDrawing();
+    const deck = shape({
+      id: 2,
+      x: IN,
+      y: IN,
+      cx: IN,
+      cy: IN,
+      fill: solid('4472C4'),
+      effects:
+        '<a:effectLst><a:outerShdw dist="76200" dir="2700000"><a:prstClr val="black"/></a:outerShdw></a:effectLst>' +
+        '<a:scene3d><a:camera prst="orthographicFront"><a:rot lat="0" lon="5400000" rev="0"/></a:camera>' +
+        '<a:lightRig rig="threePt" dir="t"/></a:scene3d><a:sp3d extrusionH="228600"/>',
+    });
+    const r = readPptx(buildPptx({ slides: [{ shapes: deck, layout: 'blank' }] }));
+    if (!r.ok) throw new Error('open failed');
+    const layout = layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer());
+    const svg = paintSlide(doc, layout, { images: () => undefined, idPrefix: 'e' });
+    const item = svg.querySelector('g[data-kind="shape"]')!;
+    // No face, no shadow copy: the extrusion paths alone.
+    expect(item.querySelector('use')).toBeNull();
+    expect(item.querySelector('g[transform]')).toBeNull();
+    expect(item.querySelectorAll('path').length).toBeGreaterThan(0);
+  });
+
+  test('the blur region holds the turned face', () => {
+    installDrawing();
+    // A camera turned 45 degrees about the view axis: the 2 by 0.5 in face reaches 0.88 in
+    // above and below its center, past the unturned box.
+    const deck = shape({
+      id: 2,
+      x: IN,
+      y: 2 * IN,
+      cx: 2 * IN,
+      cy: IN / 2,
+      fill: solid('4472C4'),
+      effects:
+        '<a:effectLst><a:blur rad="12700" grow="0"/></a:effectLst>' +
+        '<a:scene3d><a:camera prst="orthographicFront"><a:rot lat="0" lon="0" rev="2700000"/></a:camera>' +
+        '<a:lightRig rig="threePt" dir="t"/></a:scene3d>',
+    });
+    const r = readPptx(buildPptx({ slides: [{ shapes: deck, layout: 'blank' }] }));
+    if (!r.ok) throw new Error('open failed');
+    const layout = layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer());
+    const svg = paintSlide(doc, layout, { images: () => undefined, idPrefix: 'b' });
+    const filter = svg.querySelector('filter[id*="blur"]')!;
+    const y = Number(filter.getAttribute('y'));
+    const h = Number(filter.getAttribute('height'));
+    const center = 2.25 * IN;
+    const reach = (Math.SQRT1_2 * (2 * IN + IN / 2)) / 2;
+    expect(y).toBeLessThanOrEqual(center - reach);
+    expect(y + h).toBeGreaterThanOrEqual(center + reach);
+  });
+
+  test('a long outline is thinned, and neighboring polygons of one color share a path', () => {
+    const N = 4000;
+    const commands: GeometryPath['commands'][number][] = [{ op: 'M', x: 2 * IN, y: IN }];
+    for (let i = 1; i < N; i += 1) {
+      const a = (i / N) * 2 * Math.PI;
+      commands.push({ op: 'L', x: IN + Math.cos(a) * IN, y: IN + Math.sin(a) * IN });
+    }
+    commands.push({ op: 'Z' });
+    const fx = effects({
+      bevelTop: { w: 76_200, h: 76_200, preset: 'circle' },
+      contourW: 12_700,
+      cameraRot: { lat: 20, lon: 30, rev: 0 },
+      extrusionH: IN,
+    });
+    const paint = threeDPaint({
+      ...input(fx),
+      paths: [{ commands, fill: 'norm', stroke: true }],
+      width: 2 * IN,
+      height: 2 * IN,
+    })!;
+    const facets = paint.over.length + paint.under.length + paint.behind.length;
+    const all = polygons(paint.over).length + polygons(paint.under).length;
+    // The 3-D work follows every fourth point: 1,000 points, 8 strips and a contour side each.
+    expect(all).toBe(1000 * 8 + 1000);
+    // Neighboring polygons of one color share a path: 40,001 paths before, about 3,700 now.
+    expect(facets).toBeLessThan(4000);
   });
 });

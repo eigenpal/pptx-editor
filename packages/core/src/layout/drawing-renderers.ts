@@ -69,6 +69,15 @@ export interface EffectCopySource {
   readonly height: number;
   /** Slide-space corners of everything the content paints (box and text). */
   readonly corners: readonly { x: number; y: number }[];
+  /**
+   * A face that a 3-D camera turns: the id of the face before the turn, its corners, and the
+   * turn. A shadow is placed on the face, then turns with it.
+   */
+  readonly face?: {
+    readonly id: string;
+    readonly corners: readonly { x: number; y: number }[];
+    readonly front: Matrix;
+  };
 }
 
 /** Definitions and one node that the paint puts under the content. @internal */
@@ -77,9 +86,12 @@ export interface EffectCopyPaint {
   readonly node: EffectNode;
 }
 
-/** One flat polygon of a 3-D paint, filled with one color. @internal */
+/**
+ * Flat polygons of a 3-D paint that share one color, filled together as one path with the
+ * nonzero rule. @internal
+ */
 export interface ThreeDFacet {
-  readonly points: readonly { readonly x: number; readonly y: number }[];
+  readonly polygons: readonly (readonly { readonly x: number; readonly y: number }[])[];
   readonly color: Rgba;
 }
 
@@ -106,6 +118,11 @@ export interface ThreeDInput {
 export interface ThreeDPaint {
   /** The slide-space transform the camera gives the front face, applied before `matrix`. */
   readonly front: Matrix;
+  /**
+   * False when the camera turns the face edge-on (`front` is singular): the face, its text, and
+   * the effects of the face do not paint, and only the extrusion shows.
+   */
+  readonly showsFace: boolean;
   /** Extrusion sides, in slide space, painted under everything else of the element. */
   readonly behind: readonly ThreeDFacet[];
   /** The contour, in the local box, painted under the geometry. */
@@ -127,11 +144,15 @@ export interface DrawingEffectsRenderer {
     bounds: EffectBounds,
     ids: EffectIds
   ) => EffectFilterPaint | null;
-  /** Glow, as a filter over the content. `bounds` hold the content. */
+  /**
+   * Glow, as a filter over the content. `bounds` hold the content. With `alone`, the filter
+   * paints the glow without the content, for a copy under a 3-D extrusion.
+   */
   readonly glow: (
     effects: ResolvedEffects,
     bounds: EffectBounds,
-    ids: EffectIds
+    ids: EffectIds,
+    alone?: boolean
   ) => EffectFilterPaint | null;
   /** The reflection, painted under the content. */
   readonly reflection: (

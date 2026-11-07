@@ -1,9 +1,11 @@
 // The 3-D fixture: shape bevels (`a:sp3d/a:bevelT`, ECMA-376 Part 1, 20.1.5.9), contours,
 // materials, and light rigs under the front cameras, camera presets with an extrusion
 // (`a:scene3d/a:camera`, 20.1.5.5), preset shadows (`a:prstShdw`, 20.1.8.49), and blur
-// (`a:blur`, 20.1.8.15). The shapes hold no text, so the pixels alone measure the paint.
+// (`a:blur`, 20.1.8.15). The second deck has turned faces with an outer shadow and a glow, and
+// a bevel from the theme effect style. Only the half-turned face holds text, so the pixels
+// measure the paint.
 
-import { shape, solid, type FixtureSlide } from './builder.ts';
+import { para, run, shape, solid, type FixtureSlide } from './builder.ts';
 
 const IN = 914_400;
 const BLUE = '4472C4';
@@ -35,6 +37,8 @@ interface Cell {
   readonly fill?: string;
   readonly line?: string;
   readonly effects?: string;
+  readonly style?: string;
+  readonly text?: string;
 }
 
 /** A grid of `cols` columns; each shape is `w` by `h` inches. */
@@ -56,6 +60,10 @@ function grid(cells: readonly Cell[], cols: number, w = 1.9, h = 1.3): FixtureSl
           fill: solid(c.fill ?? BLUE),
           line: c.line,
           effects: `${c.effects ?? ''}${c.threeD}`,
+          style: c.style,
+          ...(c.text === undefined
+            ? {}
+            : { text: c.text, bodyPr: '<a:bodyPr wrap="square" rtlCol="0" anchor="ctr"/>' }),
         })
       )
       .join(''),
@@ -101,6 +109,26 @@ const CAMERAS = [
 
 const black = (alpha: number): string =>
   `<a:prstClr val="black"><a:alpha val="${alpha}"/></a:prstClr>`;
+
+/** An outer shadow down and to the right, and a gold glow. */
+const SHADOW =
+  '<a:outerShdw blurRad="38100" dist="152400" dir="2700000" algn="tl" rotWithShape="0">' +
+  `${black(40_000)}</a:outerShdw>`;
+const GLOW = '<a:glow rad="127000"><a:srgbClr val="FFC000"><a:alpha val="60000"/></a:srgbClr></a:glow>';
+
+/**
+ * The theme effect styles of the turned 3-D deck: the third has a front scene and a top bevel, so a
+ * shape that refers to it has a bevel it does not own.
+ */
+export const THREE_D_EFFECT_STYLES =
+  '<a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle>' +
+  '<a:effectStyle><a:effectLst/><a:scene3d><a:camera prst="orthographicFront"/>' +
+  '<a:lightRig rig="threePt" dir="t"/></a:scene3d><a:sp3d><a:bevelT w="101600" h="50800" prst="angle"/></a:sp3d></a:effectStyle>';
+
+/** A `p:style` that refers to the third theme effect style. */
+const EFFECT_STYLE_3 =
+  '<p:style><a:lnRef idx="0"><a:schemeClr val="accent1"/></a:lnRef><a:fillRef idx="1"><a:schemeClr val="accent1"/></a:fillRef>' +
+  '<a:effectRef idx="3"><a:schemeClr val="accent1"/></a:effectRef><a:fontRef idx="minor"><a:schemeClr val="lt1"/></a:fontRef></p:style>';
 
 export const threeDFixtures: Record<string, FixtureSlide[]> = {
   'three-d-effects': [
@@ -214,6 +242,55 @@ export const threeDFixtures: Record<string, FixtureSlide[]> = {
         },
       ],
       4,
+      2.2,
+      1.5
+    ),
+  ],
+  'three-d-turned-effects': [
+    // Turned faces with an outer shadow and a glow: the shadow and the glow follow the turned
+    // face, under it and over the extrusion. A half turn about the vertical axis, with text, and
+    // a quarter turn, which shows the face edge-on.
+    grid(
+      [
+        {
+          effects: `<a:effectLst>${GLOW}${SHADOW}</a:effectLst>`,
+          threeD: scene('isometricOffAxis1Right') + sp3d({ attrs: ' extrusionH="228600"' }),
+        },
+        {
+          effects: `<a:effectLst>${SHADOW}</a:effectLst>`,
+          threeD: scene('isometricOffAxis1Right') + sp3d({ attrs: ' extrusionH="228600"' }),
+        },
+        {
+          effects: `<a:effectLst>${GLOW}</a:effectLst>`,
+          threeD: scene('isometricOffAxis1Right') + sp3d({ attrs: ' extrusionH="228600"' }),
+        },
+        {
+          effects: `<a:effectLst>${SHADOW}</a:effectLst>`,
+          threeD: scene('orthographicFront', 'threePt', 't', '<a:rot lat="0" lon="0" rev="2700000"/>'),
+        },
+        {
+          threeD: scene('orthographicFront', 'threePt', 't', '<a:rot lat="0" lon="10800000" rev="0"/>'),
+          text: para(run('AB', 'sz="4000"'), '<a:pPr algn="ctr"/>'),
+        },
+        {
+          threeD:
+            scene('orthographicFront', 'threePt', 't', '<a:rot lat="0" lon="5400000" rev="0"/>') +
+            sp3d({ attrs: ' extrusionH="457200"' }),
+        },
+      ],
+      3,
+      2.2,
+      1.4
+    ),
+    // A bevel from the theme effect style: inherited, removed with an own empty `a:sp3d`, and
+    // replaced by an own bevel.
+    grid(
+      [
+        { style: EFFECT_STYLE_3, threeD: '' },
+        { style: EFFECT_STYLE_3, threeD: '<a:sp3d/>' },
+        { style: EFFECT_STYLE_3, threeD: sp3d({ bevel: 'circle' }) },
+      ],
+      3,
       2.2,
       1.5
     ),
