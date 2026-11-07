@@ -1252,9 +1252,8 @@ export class DocumentSession {
     picture(target: string): DrawablePicture | undefined;
     // @internal
     readonly pictures: MetafilePictures;
-    picturesReady(index?: number, options?: {
-        timeoutMs?: number;
-    }): Promise<boolean>;
+    picturesReady(index?: number, options?: PicturesWait): Promise<boolean>;
+    pictureStatus(index?: number): PictureStatus[];
     // @internal
     probeBatch(base?: PptxPackage): OpBatch;
     // @internal
@@ -3935,7 +3934,10 @@ export interface PictureStatus {
 }
 
 // @public
-export function pictureStatus(session: DocumentSession, index?: number): PictureStatus[];
+export interface PicturesWait {
+    readonly retry?: boolean;
+    readonly timeoutMs?: number;
+}
 
 // @internal
 export function placeInFixedFrame<T extends FixedPoint>(host: Element | null | undefined, size: FixedSize, place: (size: FixedSize, view: FixedView) => T): T;

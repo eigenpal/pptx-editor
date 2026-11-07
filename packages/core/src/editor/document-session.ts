@@ -60,7 +60,8 @@ import { replicaBindingOf } from './replica-ids.ts';
 import { sameDependencies, slideDependencies } from './slide-dependencies.ts';
 import { carryFits } from '../automation/commands/table-fit.ts';
 import { refitEditedText } from './late-fit.ts';
-import { MetafilePictures, metafilesOf, type DrawablePicture } from './metafile-pictures.ts';
+import { MetafilePictures, type DrawablePicture } from './metafile-pictures.ts';
+import type { PicturesWait, PictureStatus } from './metafile-pictures.ts';
 import { within } from './within.ts';
 import {
   openingOrder,
@@ -829,15 +830,16 @@ export class DocumentSession {
 
   /**
    * Waits until the EMF and WMF pictures of slide `index`, or of every slide when you omit it,
-   * have converted, so an export draws them. Resolves `true` when all draw. Resolves `false`
-   * when one cannot convert, for a slide that does not exist, and after `timeoutMs` (default
-   * 30000; `Infinity` waits): a picture that is not ready then draws as the placeholder.
+   * have converted. Resolves `true` when all draw, also as a PNG from before a font change, and
+   * `false` when one cannot convert, for a slide that does not exist, or after the wait.
    */
-  picturesReady(index?: number, options: { timeoutMs?: number } = {}): Promise<boolean> {
-    const slides = this.info.slides.map((s) => s.partName);
-    const shown = index === undefined ? slides : slides[index] ? [slides[index]] : null;
-    if (!shown) return Promise.resolve(false);
-    return this.pictures.ready(metafilesOf(this.store.package, shown), options.timeoutMs);
+  picturesReady(index?: number, options: PicturesWait = {}): Promise<boolean> {
+    return this.pictures.readySlides(this.store.package, this.info.slides, index, options);
+  }
+
+  /** The EMF and WMF pictures of slide `index`, or of every slide, each with its state. */
+  pictureStatus(index?: number): PictureStatus[] {
+    return this.pictures.statusOfSlides(this.store.package, this.info.slides, index);
   }
 
   /**

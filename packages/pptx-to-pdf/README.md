@@ -114,7 +114,7 @@ Each diagnostic has a fixed `code`. Handle an unknown code by its `severity`. Th
 | `text.synthetic-style`, `text.upright`, `text.missing-glyph` | `approximation` | Synthetic bold and italic, upright vertical characters, and characters the face lacks. | `missing-glyph` |
 | `font.missing`, `font.not-embedded` | `unsupported` | A face has no bytes, or may not be embedded; its text is not drawn. The message names the font. | `font-embedding` |
 | `font.substitute-failed` | `approximation` | A packaged substitute face did not load, so its text measures and draws with another face. The diagnostic is document-wide: it has no slide or page. `fontResolution.substituteFailures` lists each failure as `{ family, file, diagnostic }`. | `font-origin-failed` |
-| `frame.chart`, `frame.diagram`, `frame.ole`, `frame.unknown` | `unsupported` | A chart type outside the drawing module (3-D, of-pie, stock, bubble, surface, or a chart with trendlines or error bars), a diagram with no saved drawing, an OLE object with no PNG, JPEG, GIF, or BMP picture, or another graphic frame is not drawn. Tables, OLE pictures, other charts, and diagrams with a saved drawing draw. A `frame.diagram` message says why the diagram is not drawn: it has no saved drawing, its drawing holds content that is not drawn yet, or the drawing is past a shape, nesting, or slide limit. | `drawing` |
+| `frame.chart`, `frame.diagram`, `frame.ole`, `frame.unknown` | `unsupported` | A chart type outside the drawing module (3-D, of-pie, stock, bubble, surface, or a chart with trendlines or error bars), a diagram with no saved drawing, an OLE object with no preview picture, or another graphic frame is not drawn. Tables, OLE pictures, other charts, and diagrams with a saved drawing draw. A `frame.diagram` message says why the diagram is not drawn: it has no saved drawing, its drawing holds content that is not drawn yet, or the drawing is past a shape, nesting, or slide limit. | `drawing` |
 | `frame.table` | `unsupported` | A table frame with no grid (no `a:tbl`, or no rows or columns) is not drawn. |  |
 | `geometry.unknown-preset` | `approximation` | An unknown preset geometry is drawn as a rectangle. |  |
 | `slide.not-laid-out` | `unsupported` | The slide could not be laid out and has no page. |  |
@@ -177,7 +177,7 @@ One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`sho
 | Preset and custom geometry, groups, rotation, flips | Drawn, from the engine's evaluated paths |
 | Solid fills and lines, with transparency; caps and joins | Drawn |
 | PNG and JPEG pictures, identified by their signature: cropped by `srcRect`, placed by `fillRect`, clipped to the geometry, with transparency | Drawn |
-| EMF and WMF pictures | Drawn as a PNG at twice their pixel size, at most 4096 pixels on a side, with the deck's fonts that the PDF may embed. The converter draws with the optional peer `@napi-rs/canvas` (`^1.0.9`) when it is installed. Without it, the converter's own rasterizer can refuse a picture with text or an embedded bitmap: that picture reports `picture.metafile` and is not drawn. A picture that runs out of time (10 seconds) converts once more, then reports `picture.metafile` |
+| EMF and WMF pictures | Drawn as a PNG at 192 DPI, at most 4096 pixels on a side, with the deck's fonts that the PDF may embed. The converter draws with the optional peer `@napi-rs/canvas` (`^1.0.9`) when it is installed. Without it, the converter's own rasterizer can refuse a picture with text or an embedded bitmap: that picture reports `picture.metafile` and is not drawn. A picture that runs out of time (10 seconds) converts once more, then reports `picture.metafile` |
 | Linear and path gradients on shapes, backgrounds, and table cells; picture fills; group fills; lighten and darken path fills | Drawn, as PDF shadings and clipped pictures |
 | Tables: background, cell fills, borders, and cell text | Drawn, from the engine's table layout |
 | Text: every run at the position layout measured; bold, italic, size, color, caps, spacing, superscript and subscript, highlight | Drawn, searchable; subset fonts embedded |
@@ -197,7 +197,7 @@ One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`sho
 | Diagrams with a saved drawing | Drawn from the saved drawing, read-only, as in the editor |
 | Charts: bar, column, line, area, scatter, pie, doughnut, and radar, from the values cached in the chart part | Drawn, from the engine's layout of the shapes and labels that `@pptx-editor.dev/pro/drawing` gives |
 | 3-D, of-pie, stock, bubble, and surface charts; charts with trendlines or error bars | Not drawn (`unsupported`) |
-| Diagrams with no saved drawing, OLE objects with no PNG, JPEG, GIF, BMP, EMF, or WMF picture | Not drawn (`unsupported`) |
+| Diagrams with no saved drawing, OLE objects with no preview picture | Not drawn (`unsupported`). An OLE preview that is not PNG, JPEG, EMF, or WMF reports `picture.format` |
 | Video and audio | The poster picture is drawn; the media is not embedded or played |
 | GIF, BMP, and TIFF pictures | Not drawn (`unsupported`) |
 | SVG pictures | Drawn from their PNG fallback (`information`); without a fallback, not drawn |

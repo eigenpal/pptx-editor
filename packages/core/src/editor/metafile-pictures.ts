@@ -13,7 +13,15 @@ export interface DrawablePicture {
   readonly mime: string;
 }
 
-/** The state of one EMF or WMF picture part (`pictureStatus`). @public */
+/** How `session.picturesReady` waits. @public */
+export interface PicturesWait {
+  /** How long to wait, in milliseconds. Default 30000; `Infinity` waits for every picture. */
+  readonly timeoutMs?: number;
+  /** Convert again the pictures that ran out of time (`timed-out`). Default `false`. */
+  readonly retry?: boolean;
+}
+
+/** The state of one EMF or WMF picture part (`session.pictureStatus`). @public */
 export interface PictureStatus {
   /** The picture's part name, such as `/ppt/media/image1.emf`. */
   readonly part: string;
@@ -22,8 +30,9 @@ export interface PictureStatus {
    * - `pending`: it is not converted yet: it converts, waits to, or converts when its slide
    *   paints. It draws as the placeholder, or as its PNG from before a font change.
    * - `failed`: it cannot convert: a damaged picture, or content the converter does not draw.
-   * - `timed-out`: two conversions ran out of time. The first `picturesReady` that waits for it,
-   *   a font change, and a hidden page that shows again each try once more.
+   * - `timed-out`: two conversions ran out of time. `picturesReady` with `retry: true` converts
+   *   it again. The first `picturesReady` after the timeout, a font change, and a page that shows
+   *   again after it ran out of time while hidden also try once more.
    */
   readonly state: 'ready' | 'pending' | 'failed' | 'timed-out';
 }
@@ -52,6 +61,20 @@ export function metafilesOf(pkg: PptxPackage, slides: readonly string[]): Uint8A
 }
 
 /** The metafile parts that `slides` can show (`metafilesOf`), with their part names. */
+/**
+ * The metafiles of slide `index` of `slides`, or of every slide when it is undefined; null for a
+ * slide that does not exist.
+ */
+export function slideMetafiles(
+  pkg: PptxPackage,
+  slides: readonly { readonly partName: string }[],
+  index: number | undefined
+): ShownMetafiles | null {
+  const parts = slides.map((s) => s.partName);
+  const shown = index === undefined ? parts : parts[index] ? [parts[index]] : null;
+  return shown ? metafilePartsOf(pkg, shown) : null;
+}
+
 export function metafilePartsOf(pkg: PptxPackage, slides: readonly string[]): ShownMetafiles {
   if (slides.length !== 1) return walkMetafiles(pkg, slides);
   // One slide at a time is what each paint asks: keep the answer for this revision of the deck.
@@ -108,7 +131,10 @@ export class MetafilePictures {
   /** Metafiles whose conversion ran out of time once: a second stop waits for a new request. */
   #retried = new WeakSet<Uint8Array>();
   /** Metafiles stopped twice by the time limit: a font change, or one `ready()`, tries again. */
-  #timedOut = new Set<Uint8Array>();
+  #timedOut = new WeakSet<Uint8Array>();
+  /** Metafiles that ran out of time while the page was hidden: they convert when it shows. */
+  #hiddenTimeouts = new Set<Uint8Array>();
+  #listening = false;
   /** Metafiles that a `ready()` tried again after they ran out of time, with these fonts. */
   #readyRetried = new WeakSet<Uint8Array>();
   #running = 0;
@@ -137,7 +163,6 @@ export class MetafilePictures {
     this.#fonts = fonts;
     this.#changed = changed;
     this.#convert = convert;
-    globalThis.document?.addEventListener('visibilitychange', this.#shown);
   }
 
   /**
@@ -146,11 +171,21 @@ export class MetafilePictures {
    */
   readonly #shown = (): void => {
     if (globalThis.document?.hidden || this.#disposed) return;
-    const again = [...this.#timedOut];
-    this.#timedOut.clear();
-    for (const b of again) this.#readyRetried.delete(b);
+    this.#listen(false);
+    const again = [...this.#hiddenTimeouts];
+    this.#hiddenTimeouts.clear();
+    for (const b of again) this.#timedOut.delete(b);
     for (const b of again) void this.convert(b);
   };
+
+  /** Listen for the page to show only while a picture waits for it, so nothing holds the cache. */
+  #listen(on: boolean): void {
+    if (on === this.#listening) return;
+    this.#listening = on;
+    const page = globalThis.document;
+    if (on) page?.addEventListener('visibilitychange', this.#shown);
+    else page?.removeEventListener('visibilitychange', this.#shown);
+  }
 
   /**
    * The bytes to draw a picture part with, or undefined while it cannot draw: a damaged or
@@ -198,12 +233,16 @@ export class MetafilePictures {
   }
 
   /**
-   * Convert `metafiles`. Resolves `true` when each one converted, so all draw. Resolves `false`
-   * when one did not convert, and after `waitMs` (`Infinity` waits for all): a picture that is
-   * not ready by then keeps converting, and draws as the placeholder (or its PNG from before a
-   * font change) until it is.
+   * Convert `metafiles`. Resolves `true` when each one draws, also as its PNG from before a font
+   * change. Resolves `false` when one did not convert, and after `waitMs` (`Infinity` waits for
+   * all): a picture that is not ready by then keeps converting, and draws as the placeholder
+   * until it is. `retry` converts again the ones that ran out of time.
    */
-  async ready(metafiles: readonly Uint8Array[], waitMs = PICTURES_WAIT_MS): Promise<boolean> {
+  async ready(
+    metafiles: readonly Uint8Array[],
+    waitMs = PICTURES_WAIT_MS,
+    retry = false
+  ): Promise<boolean> {
     const wanted = new Set(metafiles);
     let timer: ReturnType<typeof setTimeout> | undefined;
     // `Infinity` waits until every picture is done; a timer takes at most 2^31 - 1 ms.
@@ -219,10 +258,11 @@ export class MetafilePictures {
         // fonts: an export that waits for each slide waits at most once more for a shared
         // picture.
         for (const b of metafiles) {
-          if (!this.#timedOut.has(b) || this.#readyRetried.has(b)) continue;
+          if (!this.#timedOut.has(b) || (this.#readyRetried.has(b) && !retry)) continue;
           this.#timedOut.delete(b);
           this.#readyRetried.add(b);
         }
+        retry = false;
         const work = Promise.all(metafiles.map((b) => this.convert(b)));
         // The pictures a caller waits for convert before those that only the rail asked for.
         this.#queue.sort((a, b) => Number(wanted.has(b)) - Number(wanted.has(a)));
@@ -238,8 +278,33 @@ export class MetafilePictures {
     }
   }
 
-  /** The state of the metafile `bytes` (`PictureStatus`). */
-  statusOf(bytes: Uint8Array): PictureStatus['state'] {
+  /** `ready` for slide `index` of `slides`, or every slide (`slideMetafiles`). */
+  readySlides(
+    pkg: PptxPackage,
+    slides: readonly { readonly partName: string }[],
+    index: number | undefined,
+    { timeoutMs, retry }: PicturesWait
+  ): Promise<boolean> {
+    const shown = slideMetafiles(pkg, slides, index);
+    return shown ? this.ready(shown.bytes, timeoutMs, retry) : Promise.resolve(false);
+  }
+
+  /** `statusOf` for slide `index` of `slides`, or every slide (`slideMetafiles`). */
+  statusOfSlides(
+    pkg: PptxPackage,
+    slides: readonly { readonly partName: string }[],
+    index: number | undefined
+  ): PictureStatus[] {
+    return this.statusOf(slideMetafiles(pkg, slides, index));
+  }
+
+  /** The state of each metafile of `shown` (`slideMetafiles`); none for null. */
+  statusOf(shown: ShownMetafiles | null): PictureStatus[] {
+    const { parts = [], bytes = [] } = shown ?? {};
+    return parts.map((part, i) => ({ part, state: this.#state(bytes[i]!) }));
+  }
+
+  #state(bytes: Uint8Array): PictureStatus['state'] {
     const png = this.#done.get(bytes);
     if (png) return 'ready';
     if (png === null) return 'failed';
@@ -263,7 +328,8 @@ export class MetafilePictures {
     this.#abort = new AbortController();
     this.#done = new WeakMap();
     this.#retried = new WeakSet();
-    this.#timedOut.clear();
+    this.#timedOut = new WeakSet();
+    this.#hiddenTimeouts.clear();
     this.#readyRetried = new WeakSet();
     this.#fontFiles = null;
     this.#epoch += 1;
@@ -280,8 +346,8 @@ export class MetafilePictures {
    */
   dispose(): void {
     this.#disposed = true;
-    globalThis.document?.removeEventListener('visibilitychange', this.#shown);
-    this.#timedOut.clear();
+    this.#listen(false);
+    this.#hiddenTimeouts.clear();
     for (const { url } of this.#urls.values()) URL.revokeObjectURL(url);
     this.#urls.clear();
     this.#abort.abort();
@@ -324,6 +390,11 @@ export class MetafilePictures {
     // A second stop by the time limit is not final: the next `ready()` converts it again.
     this.#retried.delete(bytes);
     if (png === undefined) this.#timedOut.add(bytes);
+    // A hidden page slows the converter's timers: try again when it shows.
+    if (png === undefined && globalThis.document?.hidden) {
+      this.#hiddenTimeouts.add(bytes);
+      this.#listen(true);
+    }
     if (png !== undefined) this.#done.set(bytes, png);
     if (png) {
       this.#last.set(bytes, png);

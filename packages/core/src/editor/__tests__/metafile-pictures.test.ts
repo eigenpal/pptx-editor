@@ -6,10 +6,14 @@ import { GlobalWindow } from 'happy-dom';
 import { buildPptx } from '../../../../../scripts/fixtures/builder.ts';
 import { emfRectangle, wmfRectangle } from '../../../../../scripts/fixtures/picture-bytes.ts';
 import { readPptx } from '../../store/index.ts';
-import { paintLayout, pictureStatus } from '../export-image.ts';
+import { paintLayout } from '../export-image.ts';
 import { createPptxEditor } from '../index.ts';
 import { MetafilePictures, metafilesOf } from '../metafile-pictures.ts';
 import { metafilePng } from '../../output/metafile-png.ts';
+
+/** The state of one metafile. */
+const stateOf = (pictures: MetafilePictures, bytes: Uint8Array) =>
+  pictures.statusOf({ parts: ['/ppt/media/image1.emf'], bytes: [bytes] })[0]!.state;
 
 const IN = 914_400;
 const R_IMAGE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
@@ -102,12 +106,12 @@ test('picturesReady waits for the pictures of one slide, or of every slide', asy
   expect(session.picture('/ppt/media/image1.emf')).toBeDefined();
   expect(session.picture('/ppt/media/image4.emf')).toBeUndefined();
   // Which picture draws, and which one still converts.
-  expect(pictureStatus(session, 0).every((p) => p.state === 'ready')).toBe(true);
-  expect(pictureStatus(session, 1)).toContainEqual({
+  expect(session.pictureStatus(0).every((p) => p.state === 'ready')).toBe(true);
+  expect(session.pictureStatus(1)).toContainEqual({
     part: '/ppt/media/image4.emf',
     state: 'pending',
   });
-  expect(pictureStatus(session, 9)).toEqual([]);
+  expect(session.pictureStatus(9)).toEqual([]);
   expect(await session.picturesReady(-1)).toBe(false);
   expect(await session.picturesReady(9)).toBe(false);
   expect(await session.picturesReady()).toBe(true);
@@ -273,12 +277,15 @@ test('a paint does not convert again a picture that ran out of time twice', asyn
   expect(calls).toBe(4);
   expect(await pictures.ready([bytes])).toBe(false);
   expect(calls).toBe(4);
+  // `retry` converts it again.
+  expect(await pictures.ready([bytes], undefined, true)).toBe(false);
+  expect(calls).toBe(6);
   // A font change tries again, with one retry.
   pictures.fontsChanged();
   pictures.drawable(bytes, 'image/x-emf');
   await pictures.ready([bytes], 0);
   await Bun.sleep(0);
-  expect(calls).toBe(6);
+  expect(calls).toBe(8);
   pictures.dispose();
 });
 
@@ -290,10 +297,10 @@ test('the status of a picture tells a failed one from one that ran out of time',
     () => {},
     convert
   );
-  expect(pictures.statusOf(damaged)).toBe('pending');
+  expect(stateOf(pictures, damaged)).toBe('pending');
   expect(await pictures.ready([damaged, slow])).toBe(false);
-  expect(pictures.statusOf(damaged)).toBe('failed');
-  expect(pictures.statusOf(slow)).toBe('timed-out');
+  expect(stateOf(pictures, damaged)).toBe('failed');
+  expect(stateOf(pictures, slow)).toBe('timed-out');
   pictures.dispose();
 });
 
@@ -403,7 +410,7 @@ test('a picture that ran out of time in a hidden page converts again when the pa
     );
     const bytes = emfRectangle();
     expect(await pictures.ready([bytes])).toBe(false);
-    expect(pictures.statusOf(bytes)).toBe('timed-out');
+    expect(stateOf(pictures, bytes)).toBe('timed-out');
     // The next wait tries once more; the waits after it do not.
     expect(await pictures.ready([bytes])).toBe(false);
     expect(await pictures.ready([bytes])).toBe(false);
@@ -412,7 +419,20 @@ test('a picture that ran out of time in a hidden page converts again when the pa
     page.dispatchEvent(new Event('visibilitychange'));
     await Bun.sleep(5);
     expect(calls).toBe(5);
-    expect(pictures.statusOf(bytes)).toBe('ready');
+    // A picture that ran out of time while the page showed does not try again on a tab switch.
+    const shownBytes = emfRectangle(150, 100);
+    const late = new MetafilePictures(
+      () => [],
+      () => {},
+      async () => ((calls += 1), undefined)
+    );
+    await late.ready([shownBytes]);
+    const before = calls;
+    page.dispatchEvent(new Event('visibilitychange'));
+    await Bun.sleep(5);
+    expect(calls).toBe(before);
+    late.dispose();
+    expect(stateOf(pictures, bytes)).toBe('ready');
     expect(changed).toBe(1);
     pictures.dispose();
   } finally {
