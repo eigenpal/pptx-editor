@@ -84,7 +84,7 @@ function listBody(
 ): VNodeChild {
   const parts = partOverrides(template);
   return roots.map((item) => (
-    <ReviewItemScope key={item.key} item={item}>
+    <ReviewItemScope key={item.identity} item={item}>
       {{
         default: () => (
           <li class="pptx-review__slot">

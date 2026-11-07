@@ -38,6 +38,11 @@ export interface ReviewItemView {
   readonly key: string;
   /** The comment id, as the comment commands take it. Equal to `key`. */
   readonly id: string;
+  /**
+   * The comment's `identity`: edits, resolves, and deletes of other comments keep it, even where
+   * `id` changes. The pane keys its cards and open fields by it.
+   */
+  readonly identity: string;
   /** Always `comment`: PresentationML has no tracked-change markup. */
   readonly kind: 'comment';
   /** The author's display name, or an empty string when the file names none. */
@@ -149,15 +154,6 @@ export function liveDraftTarget(
   return target && shapes?.some((s) => s.nodeId === target.nodeId) ? target : null;
 }
 
-/**
- * What a field that edits or answers `item` remembers of it when it opens: the author, the date,
- * and the text. When the comment under the field's key no longer matches (a peer deleted it, and
- * a repeat of its id took the key), the field closes and saves nothing.
- */
-export function itemIdentity(item: ReviewItemView): string {
-  return [item.author, item.date ?? '', item.text].join('\u0000');
-}
-
 /** The items of the snapshot's threads: each thread, then its replies. */
 export function reviewItems(
   editor: PptxEditorInstance | null,
@@ -179,6 +175,7 @@ export function reviewItems(
     const item = (c: SlideComment, parentId?: string): ReviewItemView => ({
       key: c.id,
       id: c.id,
+      identity: c.identity,
       kind: 'comment',
       author: c.author,
       initials: commentInitials(c),

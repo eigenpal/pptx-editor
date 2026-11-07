@@ -3,9 +3,8 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// A deck whose slide repeats one threaded comment GUID, as a file can: threads "A" and "B" with
-// the same author and creation time, and "C" created later. B takes A's id when A is deleted.
-// The React and Vue review tests open it.
+// A deck whose slide repeats one threaded comment GUID, as a file can. The React and Vue review
+// tests open it.
 
 import { createPptxEditor } from '@pptx-editor.dev/core/editor';
 import {
@@ -20,8 +19,12 @@ import { reviewModule } from '../index.ts';
 
 const IN = 914_400;
 
-/** A one-slide deck with threads "A", "B", and "C" that share a GUID; A and B share a date. */
-export async function repeatedThreadDeck(): Promise<Uint8Array> {
+/**
+ * A one-slide deck with threads that share a GUID. `twins`: "A" and "B" share an author and a
+ * date, and "C" is later; B takes A's id when A is deleted. `pair`: only "A" and "B", with B
+ * later; when A is deleted, B's id loses its mark.
+ */
+export async function repeatedThreadDeck(kind: 'twins' | 'pair' = 'twins'): Promise<Uint8Array> {
   const editor = createPptxEditor({
     fixedMeasurer: true,
     substitutes: false,
@@ -43,17 +46,15 @@ export async function repeatedThreadDeck(): Promise<Uint8Array> {
     const xml =
       part.kind === 'xml' ? serializeXmlPart(part.xml) : new TextDecoder().decode(part.bytes);
     const thread = /<p188:cm [^>]*>.*?<\/p188:cm>/s.exec(xml)![0];
-    const parsed = parseXmlPart(
-      name,
-      xml.replace(
-        thread,
-        thread +
-          thread.replace('<a:t>A</a:t>', '<a:t>B</a:t>') +
-          thread
-            .replace('<a:t>A</a:t>', '<a:t>C</a:t>')
-            .replace(/ created="[^"]*"/, ' created="2026-11-07T11:00:00.000"')
-      )
-    );
+    const copy = (text: string, created?: string): string => {
+      const t = thread.replace('<a:t>A</a:t>', `<a:t>${text}</a:t>`);
+      return created ? t.replace(/ created="[^"]*"/, ` created="${created}"`) : t;
+    };
+    const more =
+      kind === 'twins'
+        ? copy('B') + copy('C', '2026-11-07T11:00:00.000')
+        : copy('B', '2026-11-07T10:30:00.000');
+    const parsed = parseXmlPart(name, xml.replace(thread, thread + more));
     if (!parsed.ok) throw new Error('the patched list does not parse');
     parts.set(name, { kind: 'xml', partName: name, xml: parsed.part });
   }

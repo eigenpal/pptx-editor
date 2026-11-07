@@ -41,7 +41,7 @@ export interface ReviewPaneValue {
   readonly beginDraft: () => void;
   /** Close it, posted or not. */
   readonly endDraft: () => void;
-  /** The comment whose text is open for an edit, or null. */
+  /** The `identity` of the comment whose text is open for an edit, or null. */
   readonly editing: string | null;
   /** Open the edit of a comment, or close it with null. */
   readonly setEditing: (key: string | null) => void;

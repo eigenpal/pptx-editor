@@ -146,16 +146,73 @@ describe('PptxEditorReview', () => {
     act(() => void fireEvent.click(edit));
     const box = screen.getByRole('textbox', { name: 'Edit comment' });
     act(() => void fireEvent.change(box, { target: { value: 'A edited' } }));
-    // A peer deletes A: B, a repeat with A's author and date, takes A's id and card.
+    // A peer deletes A: B, a repeat with A's author and date, takes A's id but not its card.
     act(() => void editor.exec({ type: 'deleteComment', commentId: a!.id }));
     expect(editor.snapshot().comments!.map((t) => [t.id === a!.id, t.text])).toEqual([
       [true, 'B'],
       [false, 'C'],
     ]);
     expect(screen.queryByRole('textbox', { name: 'Edit comment' })).toBeNull();
-    const left = screen.getByRole('textbox', { name: 'Reply to Ada Lovelace' });
-    expect((left as HTMLTextAreaElement).value).toBe('');
+    // The pick ends with A, so no reply line carries A's draft to B.
+    expect(editor.snapshot().activeComment).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Reply to Ada Lovelace' })).toBeNull();
     expect(editor.snapshot().comments![0]!.replies).toEqual([]);
+  });
+
+  test("a peer's edit of the thread keeps the unsent reply and the open edit box", async () => {
+    const editor = await mount([reviewModule()]);
+    post('First');
+    const [thread] = editor.snapshot().comments!;
+    act(() => editor.selectComment(thread!.id));
+    const reply = screen.getByRole('textbox', { name: 'Reply to Ada Lovelace' });
+    act(() => void fireEvent.change(reply, { target: { value: 'Draft' } }));
+    const edit = screen.getByRole('button', { name: 'Edit comment by Ada Lovelace' });
+    act(() => void fireEvent.click(edit));
+    const box = screen.getByRole('textbox', { name: 'Edit comment' });
+    act(() => void fireEvent.change(box, { target: { value: 'Mine' } }));
+    act(() => void editor.exec({ type: 'editComment', commentId: thread!.id, text: 'Theirs' }));
+    expect(editor.snapshot().comments![0]!.text).toBe('Theirs');
+    const value = (name: string): string =>
+      (screen.getByRole('textbox', { name }) as HTMLTextAreaElement).value;
+    expect(value('Edit comment')).toBe('Mine');
+    expect(value('Reply to Ada Lovelace')).toBe('Draft');
+    act(
+      () =>
+        void fireEvent.keyDown(screen.getByRole('textbox', { name: 'Edit comment' }), {
+          key: 'Enter',
+        })
+    );
+    expect(editor.snapshot().comments![0]!.text).toBe('Mine');
+  });
+
+  test('a delete that changes a thread id keeps its card, its pick, and its fields', async () => {
+    const editor = await mount([reviewModule()]);
+    await act(async () => void (await editor.load(await repeatedThreadDeck('pair'))));
+    const [a, b] = editor.snapshot().comments!;
+    act(() => editor.selectComment(b!.id));
+    const reply = screen.getByRole('textbox', { name: 'Reply to Ada Lovelace' });
+    act(() => void fireEvent.change(reply, { target: { value: 'For B' } }));
+    const edit = screen.getAllByRole('button', { name: 'Edit comment by Ada Lovelace' })[1]!;
+    act(() => void fireEvent.click(edit));
+    const box = screen.getByRole('textbox', { name: 'Edit comment' });
+    act(() => void fireEvent.change(box, { target: { value: 'B edited' } }));
+    // A peer deletes A: B is the last copy of the GUID, so its id loses the mark.
+    act(() => void editor.exec({ type: 'deleteComment', commentId: a!.id }));
+    const [left] = editor.snapshot().comments!;
+    expect(left).toMatchObject({ text: 'B', identity: b!.identity });
+    expect(left!.id).not.toBe(b!.id);
+    expect(editor.snapshot().activeComment).toBe(left!.id);
+    const value = (name: string): string =>
+      (screen.getByRole('textbox', { name }) as HTMLTextAreaElement).value;
+    expect(value('Edit comment')).toBe('B edited');
+    expect(value('Reply to Ada Lovelace')).toBe('For B');
+    act(
+      () =>
+        void fireEvent.keyDown(screen.getByRole('textbox', { name: 'Reply to Ada Lovelace' }), {
+          key: 'Enter',
+        })
+    );
+    expect(editor.snapshot().comments![0]!.replies.map((r) => r.text)).toEqual(['For B']);
   });
 
   test('parts: hidden removes a part, a card class reaches each card, filter picks threads', async () => {

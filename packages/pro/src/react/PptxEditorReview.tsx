@@ -107,7 +107,7 @@ export const ReviewList = markPart(function ReviewList({
   return (
     <ul className={cx('pptx-review__list', className)} aria-label={t('comments.label')}>
       {roots.map((item) => (
-        <ReviewItemContext.Provider key={item.key} value={item}>
+        <ReviewItemContext.Provider key={item.identity} value={item}>
           <li className="pptx-review__slot">
             {typeof children === 'function' ? children(item) : card()}
           </li>

@@ -254,7 +254,7 @@ export const ReviewSummary = markPart(function ReviewSummary({
   const entry = useContext(ReviewItemContext);
   const { editing } = usePane();
   if (hidden || !entry) return null;
-  if (editing === entry.key) return <ReviewEditBox item={entry} />;
+  if (editing === entry.identity) return <ReviewEditBox item={entry} />;
   const shared = { className: cx('pptx-review__summary', className) };
   if (asChild) return slotted(children, shared);
   return <div {...shared}>{children ?? <p className="pptx-review__text">{entry.text}</p>}</div>;
@@ -279,7 +279,7 @@ export const ReviewReplies = markPart(function ReviewReplies({
       aria-label={t('comments.replies', { author: entry.author || t('comments.unknownAuthor') })}
     >
       {replies.map((reply) => (
-        <ReviewItemContext.Provider key={reply.key} value={reply}>
+        <ReviewItemContext.Provider key={reply.identity} value={reply}>
           <li
             className="pptx-review__reply"
             data-reply-id={reply.id}
@@ -371,7 +371,7 @@ export const ReviewEdit = actionPart({
   icon: 'edit',
   label: () => 'comments.editOf',
   shows: (item) => item.editable,
-  run: ({ setEditing }, item) => setEditing(item.key),
+  run: ({ setEditing }, item) => setEditing(item.identity),
 });
 
 /** Delete the reply, or the thread with its replies. Shown on hover and focus. @public */

@@ -169,7 +169,7 @@ describe('PptxEditorReview (Vue)', () => {
     await type(field('Reply to Ada Lovelace')!, 'For A');
     await click(button('Edit comment by Ada Lovelace'));
     await type(field('Edit comment')!, 'A edited');
-    // A peer deletes A: B, a repeat with A's author and date, takes A's id and card.
+    // A peer deletes A: B, a repeat with A's author and date, takes A's id but not its card.
     editor.exec({ type: 'deleteComment', commentId: a!.id });
     await settle();
     expect(editor.snapshot().comments!.map((t) => [t.id === a!.id, t.text])).toEqual([
@@ -177,8 +177,54 @@ describe('PptxEditorReview (Vue)', () => {
       [false, 'C'],
     ]);
     expect(field('Edit comment')).toBeNull();
-    expect(field('Reply to Ada Lovelace')!.value).toBe('');
+    // The pick ends with A, so no reply line carries A's draft to B.
+    expect(editor.snapshot().activeComment).toBeNull();
+    expect(field('Reply to Ada Lovelace')).toBeNull();
     expect(editor.snapshot().comments![0]!.replies).toEqual([]);
+  });
+
+  test("a peer's edit of the thread keeps the unsent reply and the open edit box", async () => {
+    const editor = await mount([reviewModule()]);
+    await post('First');
+    const [thread] = editor.snapshot().comments!;
+    editor.selectComment(thread!.id);
+    await settle();
+    await type(field('Reply to Ada Lovelace')!, 'Draft');
+    await click(button('Edit comment by Ada Lovelace'));
+    await type(field('Edit comment')!, 'Mine');
+    editor.exec({ type: 'editComment', commentId: thread!.id, text: 'Theirs' });
+    await settle();
+    expect(editor.snapshot().comments![0]!.text).toBe('Theirs');
+    expect(field('Edit comment')!.value).toBe('Mine');
+    expect(field('Reply to Ada Lovelace')!.value).toBe('Draft');
+    await key(field('Edit comment')!, { key: 'Enter' });
+    expect(editor.snapshot().comments![0]!.text).toBe('Mine');
+  });
+
+  test('a delete that changes a thread id keeps its card, its pick, and its fields', async () => {
+    const editor = await mount([reviewModule()]);
+    expect((await editor.load(await repeatedThreadDeck('pair'))).ok).toBe(true);
+    await settle();
+    const [a, b] = editor.snapshot().comments!;
+    editor.selectComment(b!.id);
+    await settle();
+    await type(field('Reply to Ada Lovelace')!, 'For B');
+    const edits = [...document.querySelectorAll<HTMLButtonElement>('button')].filter(
+      (el) => el.getAttribute('aria-label') === 'Edit comment by Ada Lovelace'
+    );
+    await click(edits[1]);
+    await type(field('Edit comment')!, 'B edited');
+    // A peer deletes A: B is the last copy of the GUID, so its id loses the mark.
+    editor.exec({ type: 'deleteComment', commentId: a!.id });
+    await settle();
+    const [left] = editor.snapshot().comments!;
+    expect(left).toMatchObject({ text: 'B', identity: b!.identity });
+    expect(left!.id).not.toBe(b!.id);
+    expect(editor.snapshot().activeComment).toBe(left!.id);
+    expect(field('Edit comment')!.value).toBe('B edited');
+    expect(field('Reply to Ada Lovelace')!.value).toBe('For B');
+    await key(field('Reply to Ada Lovelace')!, { key: 'Enter' });
+    expect(editor.snapshot().comments![0]!.replies.map((r) => r.text)).toEqual(['For B']);
   });
 
   test('parts: hidden removes a part, a card class reaches each card, filter picks threads', async () => {

@@ -47,6 +47,7 @@ export interface ReviewPaneValue {
   readonly draftTarget: Readonly<Ref<ReviewCommentTarget | null>>;
   readonly beginDraft: () => void;
   readonly endDraft: () => void;
+  /** The `identity` of the comment whose text is open for an edit, or null. */
   readonly editing: Ref<string | null>;
   readonly setEditing: (key: string | null) => void;
   readonly focusCard: (key: string) => void;

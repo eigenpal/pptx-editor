@@ -277,7 +277,8 @@ export const ReviewSummary = markPart(
       return () => {
         const item = entry.value;
         if (props.hidden || !item) return null;
-        if (editing.value === item.key) return <ReviewEditBox item={item} key={item.key} />;
+        if (editing.value === item.identity)
+          return <ReviewEditBox item={item} key={item.identity} />;
         const shared = { class: cx('pptx-review__summary', props.className) };
         if (props.asChild) return slotted(slots.default?.(), shared);
         return (
@@ -313,7 +314,7 @@ export const ReviewReplies = markPart(
             })}
           >
             {replies.map((reply) => (
-              <ReviewItemScope key={reply.key} item={reply}>
+              <ReviewItemScope key={reply.identity} item={reply}>
                 {{
                   default: () => (
                     <li
@@ -426,7 +427,7 @@ export const ReviewEdit = actionPart({
   icon: 'edit',
   label: 'comments.editOf',
   shows: (item) => item.editable,
-  run: ({ setEditing }, item) => setEditing(item.key),
+  run: ({ setEditing }, item) => setEditing(item.identity),
 });
 
 /** Delete the reply, or the thread with its replies. @public */

@@ -17,7 +17,6 @@ import {
   authorHooks,
   authorStyle,
   commentFieldKey,
-  itemIdentity,
   type ReviewItemView,
 } from '../review/comment-view.ts';
 import { commentInitials } from '@pptx-editor.dev/core/editor';
@@ -214,8 +213,9 @@ export function ReviewReply({ className, hidden, children }: ReviewPartProps) {
   // Held here, so the draft stays while the reply line shows.
   const [text, setText] = useState('');
   const id = useId();
-  // Another comment under this card's key drops the reply meant for the one before.
-  const who = entry ? itemIdentity(entry) : '';
+  // Another comment in this card (the one answered is gone) drops the reply meant for it. An edit
+  // or a resolve of the thread keeps the reply.
+  const who = entry?.identity ?? '';
   const [openedFor, setOpenedFor] = useState(who);
   if (who !== openedFor) {
     setOpenedFor(who);
@@ -291,9 +291,10 @@ export function ReviewEditBox({ item }: { readonly item: ReviewItemView }) {
   const t = useReviewLabel();
   const [text, setText] = useState(item.text);
   const id = useId();
-  // Another comment under this key (the one opened is gone): close and save nothing.
-  const opened = useRef(itemIdentity(item));
-  const moved = itemIdentity(item) !== opened.current;
+  // Another comment in this card (the one opened is gone): close and save nothing. An edit of the
+  // same comment by a peer keeps the box and its text.
+  const opened = useRef(item.identity);
+  const moved = item.identity !== opened.current;
   useEffect(() => {
     if (moved) setEditing(null);
   }, [moved, setEditing]);

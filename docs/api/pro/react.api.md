@@ -98,6 +98,7 @@ export interface ReviewItemView {
     readonly editable: boolean;
     readonly format: CommentFormat;
     readonly id: string;
+    readonly identity: string;
     readonly initials: string;
     readonly isActive: boolean;
     readonly key: string;
