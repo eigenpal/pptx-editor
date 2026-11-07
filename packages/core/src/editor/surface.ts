@@ -65,7 +65,7 @@ export interface SurfaceHost extends SurfaceInputHost {
   readonly readOnly: () => boolean;
   readonly imageUrl: (part: string, rId: string) => string | undefined;
   /** Changes when the slide paints differently with no edit (`DocumentSession.paintKey`). */
-  readonly paintGeneration?: () => string | undefined;
+  readonly paintKey?: () => string | undefined;
   readonly imageSize?: (part: string, rId: string) => { cx: number; cy: number } | undefined;
   readonly label: (key: string, params?: Record<string, string | number>) => string;
   /** The alt text of an element: pictures are named by it, and the live region says it. */
@@ -130,7 +130,7 @@ export class SlideSurface {
   #zoomAnchor: { x: number; y: number } | null = null;
   #renderedZoom: number | null = null;
   #paintKey: unknown = null;
-  #paintGeneration: string | undefined;
+  #slidePaintKey: string | undefined;
   /** Paints the slide, reusing the nodes of unchanged items (`SlidePainter`). */
   #painter: SlidePainter | null = null;
   /**
@@ -304,10 +304,10 @@ export class SlideSurface {
       this.host.scrollTop += st.top + keep.fy * st.height - keep.client.y;
     }
     const painted = this.editor.paintLayout?.(layout) ?? layout;
-    const generation = this.editor.paintGeneration?.();
-    if (generation !== this.#paintGeneration) {
+    const paintKey = this.editor.paintKey?.();
+    if (paintKey !== this.#slidePaintKey) {
       // Converted pictures, or new faces: paint every item again.
-      this.#paintGeneration = generation;
+      this.#slidePaintKey = paintKey;
       this.#paintKey = null;
       this.#painter = null;
     }

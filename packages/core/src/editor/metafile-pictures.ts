@@ -140,9 +140,14 @@ export class MetafilePictures {
   async ready(metafiles: readonly Uint8Array[], waitMs = PICTURES_WAIT_MS): Promise<boolean> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<boolean>((resolve) => (timer = setTimeout(resolve, waitMs, false)));
-    const all = Promise.all(metafiles.map((b) => this.convert(b))).then(() =>
-      metafiles.every((b) => !!this.#done.get(b))
-    );
+    const all = (async (): Promise<boolean> => {
+      // A font change while it waits converts again: wait for the conversions with the new fonts.
+      for (;;) {
+        const epoch = this.#epoch;
+        await Promise.all(metafiles.map((b) => this.convert(b)));
+        if (epoch === this.#epoch) return metafiles.every((b) => !!this.#done.get(b));
+      }
+    })();
     try {
       // A cache disposed meanwhile converted nothing more: its pictures are not ready.
       return (await Promise.race([all, late])) && !this.#disposed;

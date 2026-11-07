@@ -195,6 +195,21 @@ test('new fonts convert again, and the old PNG draws until then', async () => {
   expect(pictures.url(PART, next)).toBeUndefined();
 });
 
+test('a font change during a wait still resolves true once every picture draws', async () => {
+  const pictures = new MetafilePictures(
+    () => [],
+    () => {}
+  );
+  const a = emfRectangle(100, 50);
+  const b = emfRectangle(120, 50);
+  await pictures.ready([a]);
+  const both = pictures.ready([a, b]);
+  pictures.fontsChanged();
+  expect(await both).toBe(true);
+  expect(pictures.drawable(a, 'image/x-emf')?.mime).toBe('image/png');
+  pictures.dispose();
+});
+
 test('a wait for pictures ends at its limit', async () => {
   const pictures = new MetafilePictures(
     () => [],
