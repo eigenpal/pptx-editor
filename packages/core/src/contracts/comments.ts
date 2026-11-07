@@ -92,7 +92,10 @@ export interface CommentAuthorInput {
  * Without `identity`, an id with a place is also refused when another twin has the same text
  * (`errors.commentAmbiguous`), and when it named another comment since the last snapshot
  * (`errors.commentChanged`, until the next snapshot). With `identity`, the editor checks it
- * instead. So a collaborator's edit of a comment without a twin never refuses yours. @public
+ * instead. So a collaborator's edit of a comment without a twin never refuses yours.
+ *
+ * Always pass `identity`. Without it, after the next snapshot, an old id can reach another twin
+ * with the same author, date, and text. @public
  */
 export interface CommentExpect {
   /** The author's display name, as `SlideComment.author` gave it. */
@@ -103,8 +106,9 @@ export interface CommentExpect {
   readonly text: string;
   /**
    * The `identity`, as the snapshot gave it. With it, the editor refuses the command when the
-   * snapshot shows another identity at `commentId`. This tells apart twins whose texts changed,
-   * where the text alone can name the wrong one.
+   * comment at `commentId` has another identity now: as the snapshot shows it for the current
+   * slide, and as the editor reads the slide's comments now for another slide. It tells apart
+   * twins, even twins with the same text.
    */
   readonly identity?: string;
 }

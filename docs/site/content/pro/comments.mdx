@@ -222,7 +222,7 @@ An `expect` without `identity` can still fail for a twin, even with ids from the
 - When another twin has the same text, the editor cannot tell the two apart, and refuses with `errors.commentAmbiguous`.
 - When the id named another twin before, for example after a delete and an undo, the editor refuses with `errors.commentChanged` until your next call to `editor.snapshot()`.
 
-Pass `identity` to act on such a twin. In this sample, `thread` is a thread of `editor.snapshot().comments`:
+Send `identity` whenever you act on a comment. Without it, after your next call to `editor.snapshot()`, an old id can reach another twin with the same author, date, and text. In this sample, `thread` is a thread of `editor.snapshot().comments`:
 
 ```ts
 const result = editor.exec({
@@ -241,7 +241,7 @@ if (!result.ok && result.reason === 'errors.commentChanged') {
 }
 ```
 
-The comments pane sends `expect` with each action. When the editor refuses a new comment, a save, or a reply, the field keeps its text and shows the reason. After a notice that the comment changed, the edit box shows what the comment reads now, and a second save or reply applies to the comment as it shows now. The pane sends the identity, so it acts on the copy of an exact duplicate that it shows.
+The comments pane sends `expect` with each action. When the editor refuses a new comment, a save, or a reply, the field keeps its text and shows the reason. After a notice that the comment changed, the edit box shows what the comment reads now, and a second save or reply applies to the comment as it shows now. The pane sends the identity, so it acts on the copy of an exact duplicate that it shows. A reply item of `useReview` reports its thread as `parent`, and the `reply`, `resolve`, and `reopen` actions on a reply item send it as `expect`.
 
 `addComment` and `replyToComment` also take `author`, `initials`, and `date`. They override the editor's author for that comment. The date is an ISO 8601 date and time. Without a date, the editor uses the current time in UTC. Each command is one undo step.
 
