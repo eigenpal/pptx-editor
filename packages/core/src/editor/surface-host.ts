@@ -42,6 +42,7 @@ export type SurfaceHostBase = Pick<
   | 'select'
   | 'copy'
   | 'paste'
+  | 'warmCopy'
   | 'cropping'
   | 'textInput'
   | 'shortcut'

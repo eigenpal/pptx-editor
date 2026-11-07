@@ -167,6 +167,12 @@ export type EditorCommand =
    */
   | { readonly type: 'addSlide'; readonly layoutId?: string }
   | { readonly type: 'duplicateSlide'; readonly index: number }
+  /**
+   * Paste copied slides after the current slide. `file` is a presentation (`.pptx` bytes),
+   * read with the limits of any opened file, and `slides` are its slide indexes in order. The
+   * slides go on this presentation's layouts of the same type (destination theme).
+   */
+  | { readonly type: 'pasteSlides'; readonly file: Uint8Array; readonly slides: readonly number[] }
   | { readonly type: 'deleteSlide'; readonly index: number }
   /**
    * Move slide `from` to position `to`. It joins the section of the slide before it, or

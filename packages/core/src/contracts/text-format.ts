@@ -3,6 +3,7 @@
 // Split from `index.ts`, which re-exports them, for the line cap.
 
 import type { ColorChoice } from './neutral.ts';
+import type { ClipboardNode } from './clipboard.ts';
 
 /**
  * Numbering schemes the editor sets: the `ST_TextAutonumberScheme` values that layout numbers
@@ -352,4 +353,11 @@ export type TextFormatCommand =
    * format of the selected paragraphs (Office.js `ParagraphFormat.bulletFormat`).
    * `null` is the gallery's None: the list turns off.
    */
-  | { readonly type: 'setBulletFormat'; readonly format: BulletFormat | null };
+  | { readonly type: 'setBulletFormat'; readonly format: BulletFormat | null }
+  /**
+   * Paste formatted text: DrawingML paragraphs (`a:p`, as `ClipboardNode`s) replace the selected
+   * text, or, with no text selected, go in a new text box in the middle of the slide. The
+   * paragraphs are checked as untrusted input: runs, breaks, and their formatting are kept, and
+   * links, pictures, and relationship references are left out. A field becomes plain text.
+   */
+  | { readonly type: 'pasteText'; readonly paragraphs: readonly ClipboardNode[] };

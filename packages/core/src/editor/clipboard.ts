@@ -196,7 +196,7 @@ const isObj = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /** Validate an untrusted node: names, strings, depth, and size. */
-function sanitizeNode(v: unknown, depth: number, budget: { n: number }): NodeSpec | null {
+export function sanitizeNode(v: unknown, depth: number, budget: { n: number }): NodeSpec | null {
   if (!isObj(v) || depth > MAX_DEPTH || (budget.n -= 1) < 0) return null;
   const { ns, local, prefix, attrs, nsDecls, children } = v;
   if (typeof ns !== 'string' || typeof local !== 'string' || !NAME.test(local)) return null;

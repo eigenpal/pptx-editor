@@ -254,6 +254,16 @@ export type EditorCommand = {
 } | {
     readonly type: 'duplicateSlide';
     readonly index: number;
+}
+/**
+* Paste copied slides after the current slide. `file` is a presentation (`.pptx` bytes),
+* read with the limits of any opened file, and `slides` are its slide indexes in order. The
+* slides go on this presentation's layouts of the same type (destination theme).
+*/
+| {
+    readonly type: 'pasteSlides';
+    readonly file: Uint8Array;
+    readonly slides: readonly number[];
 } | {
     readonly type: 'deleteSlide';
     readonly index: number;
@@ -1640,6 +1650,16 @@ export type TextFormatCommand =
 | {
     readonly type: 'setBulletFormat';
     readonly format: BulletFormat | null;
+}
+/**
+* Paste formatted text: DrawingML paragraphs (`a:p`, as `ClipboardNode`s) replace the selected
+* text, or, with no text selected, go in a new text box in the middle of the slide. The
+* paragraphs are checked as untrusted input: runs, breaks, and their formatting are kept, and
+* links, pictures, and relationship references are left out. A field becomes plain text.
+*/
+| {
+    readonly type: 'pasteText';
+    readonly paragraphs: readonly ClipboardNode[];
 };
 
 // @public

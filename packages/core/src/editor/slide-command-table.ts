@@ -3,7 +3,10 @@
 // transaction, so one undo step.
 
 import { createTranslator } from '@pptx-editor.dev/i18n';
-import { presentationInfo, xmlPartOf } from '../store/index.ts';
+import { presentationInfo, readPptx, xmlPartOf } from '../store/index.ts';
+import { importSlides } from '../automation/commands/slide-import.ts';
+import { normalizePresentation } from '../automation/commands/slide-sections.ts';
+import { MAX_IMPORT_BYTES } from '../automation/plan-import.ts';
 import type { EditorCommand } from '../contracts/index.ts';
 import { refit } from '../automation/commands/autofit.ts';
 import type { CommandContext, CommandEffect } from './commands.ts';
@@ -35,7 +38,8 @@ export type SlideCommand = Extract<
       | 'removeSection'
       | 'removeAllSections'
       | 'moveSection'
-      | 'setSlideSize';
+      | 'setSlideSize'
+      | 'pasteSlides';
   }
 >;
 
@@ -50,6 +54,7 @@ const TYPES: ReadonlySet<string> = new Set([
   'removeAllSections',
   'moveSection',
   'setSlideSize',
+  'pasteSlides',
 ]);
 
 const english = createTranslator();
@@ -82,6 +87,35 @@ function setHidden(batch: OpBatch, index: number, hidden: boolean): void {
   });
 }
 
+/**
+ * Paste copied slides after the current slide, on this presentation's layouts. The file is
+ * untrusted bytes: `readPptx` reads it with the limits of any opened file.
+ */
+function pasteSlides(
+  ctx: CommandContext,
+  batch: OpBatch,
+  command: Extract<SlideCommand, { type: 'pasteSlides' }>
+): CommandEffect {
+  const { file, slides } = command;
+  if (!(file instanceof Uint8Array) || file.length === 0 || file.length > MAX_IMPORT_BYTES)
+    throw new CommandRefusal('errors.clipboard');
+  const read = readPptx(file);
+  if (!read.ok) throw new CommandRefusal('errors.clipboard');
+  const count = presentationInfo(read.pkg).slides.length;
+  if (
+    !Array.isArray(slides) ||
+    slides.length === 0 ||
+    new Set(slides).size !== slides.length ||
+    !slides.every((i) => Number.isInteger(i) && i >= 0 && i < count)
+  )
+    throw new CommandRefusal('errors.clipboard');
+  normalizePresentation(batch);
+  const after = Math.min(ctx.slide, presentationInfo(batch.pkg).slides.length - 1);
+  importSlides(batch, { source: read.pkg, slides, after, formatting: 'useDestinationTheme' });
+  const added = slides.map((_, i) => after + 1 + i);
+  return { label: 'pasteSlides', slide: added[0], slides: added, selection: { kind: 'none' } };
+}
+
 /** Compile a slide command into `batch`. Throws CommandRefusal. */
 export function compileSlideCommand(
   ctx: CommandContext,
@@ -89,6 +123,8 @@ export function compileSlideCommand(
   command: SlideCommand
 ): CommandEffect {
   switch (command.type) {
+    case 'pasteSlides':
+      return pasteSlides(ctx, batch, command);
     case 'setSlideSize': {
       const content = command.content ?? 'scale';
       if (content !== 'scale' && content !== 'keep')
