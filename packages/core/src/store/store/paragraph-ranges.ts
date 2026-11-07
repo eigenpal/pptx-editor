@@ -133,9 +133,12 @@ function slid(
     const s = deletes ? a : b;
     const start = deletes ? h.aStart : h.bStart;
     const end = deletes ? h.aEnd : h.bEnd;
+    // A deletion that starts at a line feed joins the paragraph after it: aim at that paragraph,
+    // whose own line feed an empty paragraph follows.
+    const aim = deletes && a[hint] === '\n' ? hint + 1 : hint;
     let t = 0;
-    while (h.aStart + t > hint && h.aStart + t > lo && s[start + t - 1] === s[end + t - 1]) t -= 1;
-    while (h.aStart + t < hint && h.aEnd + t < hi && s[start + t] === s[end + t]) t += 1;
+    while (h.aStart + t > aim && h.aStart + t > lo && s[start + t - 1] === s[end + t - 1]) t -= 1;
+    while (h.aStart + t < aim && h.aEnd + t < hi && s[start + t] === s[end + t]) t += 1;
     if (t === 0) return h;
     return { aStart: h.aStart + t, aEnd: h.aEnd + t, bStart: h.bStart + t, bEnd: h.bEnd + t };
   });
@@ -164,7 +167,8 @@ function paragraphMap(
   const r = diffResult(a, b);
   if (r.exact) return charMap(was, is, slid(a, b, r.hunks, at && charAt(was, at)));
   // Too many changes for a character diff: compare whole paragraphs, one character each, and
-  // then the characters of each changed block of paragraphs.
+  // then the characters of each changed block of paragraphs. Each paragraph is one character.
+  if (was.length + is.length > 0xffff) return charMap(was, is, r.hunks);
   const ids = new Map<string, number>();
   const token = (t: string): string => {
     let id = ids.get(t);
@@ -173,7 +177,6 @@ function paragraphMap(
   };
   const pa = was.map(token).join('');
   const pb = is.map(token).join('');
-  if (ids.size > 0xffff) return charMap(was, is, r.hunks);
   // An edit that starts in the second half of a paragraph keeps that paragraph.
   const len = at === undefined ? 0 : (was[at.paragraph]?.length ?? 0);
   const first =
@@ -312,13 +315,17 @@ export function paragraphRangeFixes(
     // The copy whose paragraphs changed: the one that the editor draws.
     const olds = old.get(t.spid) ?? [];
     const news = now.get(t.spid) ?? [];
-    const k = news.findIndex(
-      (is, i) => olds[i] !== undefined && olds[i]!.texts.length !== is.texts.length
-    );
+    // The same copy before the edit, by its node: an edit of one copy in mc:AlternateContent can
+    // remove the out-of-date copies in the other branches.
+    const prior = (c: Copy): Copy | undefined => olds.find((o) => o.node === c.node);
+    const k = news.findIndex((c) => {
+      const o = prior(c);
+      return o !== undefined && o.texts.length !== c.texts.length;
+    });
     // A shape that the edit added or removed follows its own rules (`timingRemovals`). An edit
     // that keeps the number of paragraphs keeps their indexes.
-    if (k < 0 || olds.length !== news.length) continue;
-    const was = olds[k]!.texts;
+    if (k < 0) continue;
+    const was = prior(news[k]!)!.texts;
     const is = news[k]!.texts;
     // A range that the same transaction added names the new paragraphs already.
     const range = oldRanges.get(t.pRg.id);
