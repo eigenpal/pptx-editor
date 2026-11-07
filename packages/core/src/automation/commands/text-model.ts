@@ -12,6 +12,7 @@ import {
   elements,
   NS,
   presentationInfo,
+  relsPartName,
   specOf,
   textOf,
   type Element,
@@ -21,24 +22,44 @@ import type { TextPoint } from '../../contracts/neutral.ts';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
 import { caretWordRange } from '@eigenpal/ooxml-core';
 
-/** Slide numbers by part, per batch: slide order does not change inside a text edit. */
-const slideNumbers = new WeakMap<OpBatch, Map<string, number | undefined>>();
+/**
+ * Slide numbers by part, per batch, with the presentation part and its relationships that
+ * they come from. A batch can add or move a slide between two text edits (one automation
+ * `context.sync()`): those parts change, and the numbers are read again.
+ */
+interface SlideNumbers {
+  readonly presentationPart: string;
+  readonly presentation: unknown;
+  readonly rels: unknown;
+  readonly byPart: Map<string, number | undefined>;
+}
+const slideNumbers = new WeakMap<OpBatch, SlideNumbers>();
 
 /**
  * The number a `slidenum` field shows in `part` (1-based slide index, as the cascade resolves
  * it), or undefined for a part that is not a slide (notes, layouts) where the stored text shows.
  */
 export function slideNumberOf(batch: OpBatch, part: string): number | undefined {
-  let byPart = slideNumbers.get(batch);
-  if (!byPart) {
+  const parts = batch.pkg.parts;
+  let known = slideNumbers.get(batch);
+  if (
+    !known ||
+    parts.get(known.presentationPart) !== known.presentation ||
+    parts.get(relsPartName(known.presentationPart)) !== known.rels
+  ) {
     // Every slide at once: a Replace All across a long deck asks for each of its slides.
-    byPart = new Map();
-    presentationInfo(batch.pkg).slides.forEach(
-      (s, i) => byPart!.has(s.partName) || byPart!.set(s.partName, i + 1)
-    );
-    slideNumbers.set(batch, byPart);
+    const info = presentationInfo(batch.pkg);
+    const byPart = new Map<string, number | undefined>();
+    info.slides.forEach((s, i) => byPart.has(s.partName) || byPart.set(s.partName, i + 1));
+    known = {
+      presentationPart: info.presentationPart,
+      presentation: parts.get(info.presentationPart),
+      rels: parts.get(relsPartName(info.presentationPart)),
+      byPart,
+    };
+    slideNumbers.set(batch, known);
   }
-  return byPart.get(part);
+  return known.byPart.get(part);
 }
 
 /** The text an inline item shows: its `a:t`, or the slide number for a `slidenum` field. */
