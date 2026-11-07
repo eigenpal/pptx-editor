@@ -21,6 +21,8 @@ import {
   createPptxEditor,
   MOUNT_FIRST_ITEMS,
   resetDevWarnings,
+  SLIDE_DRAG_IMAGE_CLASS,
+  SLIDE_DRAG_TYPE,
   type PptxEditorInstance,
 } from '@pptx-editor.dev/core/editor';
 import { buildPptx, para, run, shape } from '../../../scripts/fixtures/builder.ts';
@@ -307,6 +309,37 @@ describe('the Vue slide rail', () => {
     editor.exec({ type: 'undo' });
     expect(editor.snapshot().slides[0]!.id).toBe(first);
   });
+
+  test('a drag shows the dragged thumbnail alone, and sets slide data, as in React', async () => {
+    for (const [pane, item] of [
+      [PptxEditorSlideRail, '.pptx-rail__item'],
+      [PptxEditorSlideSorter, '.pptx-sorter__item'],
+    ] as const) {
+      await dragImageOf(pane, item);
+    }
+  });
+
+  async function dragImageOf(pane: Component, item: string): Promise<void> {
+    const editor = await flatDeck();
+    const el = await mountVue(() => h(pane), editor);
+    const dragged = el.querySelectorAll<HTMLElement>(item)[1]!;
+    const thumb = dragged.querySelector<HTMLElement>('.pptx-rail__thumb')!;
+    thumb.getBoundingClientRect = () => ({ left: 0, top: 0, width: 160, height: 90 }) as DOMRect;
+    const images: Element[] = [];
+    const types: string[] = [];
+    const start = new Event('dragstart', { bubbles: true });
+    Object.defineProperty(start, 'dataTransfer', {
+      value: {
+        effectAllowed: '',
+        setData: (type: string) => types.push(type),
+        setDragImage: (image: Element) => images.push(image),
+      },
+    });
+    dragged.dispatchEvent(start);
+    expect(images.map((i) => i.className)).toEqual([SLIDE_DRAG_IMAGE_CLASS]);
+    expect(images[0]!.contains(dragged)).toBe(false);
+    expect(types).toEqual([SLIDE_DRAG_TYPE]);
+  }
 
   test('a click selects; Shift+click a range; the buttons act on the selection', async () => {
     const editor = await flatDeck();

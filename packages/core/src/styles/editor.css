@@ -1492,6 +1492,56 @@
     0 0 0 1px var(--doc-border);
 }
 
+/* The drag image of a slide drag (`setSlideDragImage`): a copy of the dragged thumbnail on the
+   document or shadow root, which takes the editor's colors inline. The browser takes a snapshot of it
+   when the drag starts, and the editor removes it in the next task. It stays in the viewport,
+   behind the page, because some browsers take an empty snapshot of an element out of view. */
+.pptx-slide-drag-image {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  overflow: hidden;
+  border-radius: 6px;
+  pointer-events: none;
+}
+/* The selection ring, inside the box: the snapshot holds only the element's own box. */
+.pptx-slide-drag-image::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px var(--doc-primary);
+}
+.pptx-slide-drag-image .pptx-rail__thumb {
+  /* Paint the copy, though it is out of view. */
+  content-visibility: visible;
+  transform-origin: 0 0;
+  box-shadow: none;
+  transition: none;
+}
+.pptx-slide-drag-image[data-hidden] .pptx-rail__thumb {
+  opacity: 0.5;
+}
+.pptx-slide-drag-image__count {
+  position: absolute;
+  top: 6px;
+  inset-inline-end: 6px;
+  z-index: 1;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  background: var(--doc-primary);
+  color: var(--doc-on-primary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ============================================================================
  * CANVAS AND SURFACE (the slide itself is never themed)
  * ============================================================================ */
@@ -3553,6 +3603,11 @@ legend.pptx-dialog__label {
 @media (forced-colors: active) {
   .pptx-editor :focus-visible {
     outline-color: Highlight;
+  }
+
+  /* The drag image's ring, a shadow. */
+  .pptx-slide-drag-image::after {
+    border: 2px solid Highlight;
   }
 
   /* Cards and floating surfaces that a shadow outlined. */

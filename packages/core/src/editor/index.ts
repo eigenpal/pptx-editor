@@ -289,6 +289,7 @@ export {
   selectSectionByName,
   selectSlideSection,
   slideClickMode,
+  slideDragCount,
   slideDropMarker,
   slideItemName,
   slideItemLabels,
@@ -306,6 +307,7 @@ export {
   type SlideDrag,
   type SlideListKeyContext,
 } from './pane-support.ts';
+export { SLIDE_DRAG_IMAGE_CLASS, SLIDE_DRAG_TYPE, setSlideDragImage } from './slide-drag-image.ts';
 export {
   RAIL_FOLD_WIDTH,
   railDragAxis,
