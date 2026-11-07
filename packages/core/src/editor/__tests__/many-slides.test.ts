@@ -16,7 +16,7 @@ import {
   type PptxPackage,
 } from '../../store/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
-import { readSlidesClipboard, slidesClipboard } from '../slide-clipboard.ts';
+import { readSlidesClipboard, savedSlideCopy, slidesClipboard } from '../slide-clipboard.ts';
 
 const IN = 914_400;
 const P14 = 'http://schemas.microsoft.com/office/powerpoint/2010/main';
@@ -164,6 +164,22 @@ test('a slide copy writes only the copied slides, and pastes them in their order
     'S2|Notes of S2',
     'S1|Notes of S1',
   ]);
+});
+
+test('copies of different slides keep one saved file per revision, and a repeat reuses it', async () => {
+  const e = await open(deck(6));
+  const pkg = pkgOf(e);
+  const first = slidesClipboard(e.session!, [0]);
+  expect(savedSlideCopy(pkg)).toBe('0');
+  slidesClipboard(e.session!, [1]);
+  slidesClipboard(e.session!, [2, 3]);
+  expect(savedSlideCopy(pkg)).toBe('2,3');
+  const again = slidesClipboard(e.session!, [3, 2]);
+  expect(readSlidesClipboard(again!)!.slides).toEqual([1, 0]);
+  expect(savedSlideCopy(pkg)).toBe('2,3');
+  // A copy of slide 0 again saves it again, with the same slides.
+  expect(slidesClipboard(e.session!, [0])).toBe(first);
+  expect(savedSlideCopy(pkg)).toBe('0');
 });
 
 /** The fastest of three runs of `command` on a deck of `n` slides, in milliseconds. */

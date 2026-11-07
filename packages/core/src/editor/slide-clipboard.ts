@@ -42,12 +42,12 @@ export function slidesClipboard(
   const count = session.info.slides.length;
   const copied = [...new Set(slides)].filter((i) => i >= 0 && i < count).sort((a, b) => a - b);
   if (copied.length === 0) return null;
-  // One save per revision and set of slides: copying them again before an edit reuses it.
+  // One save per revision: copying the same slides again before an edit reuses it. A copy of
+  // other slides replaces it, so a package keeps at most one saved file.
   const pkg = session.store.package;
   const key = copied.join(',');
-  const files = saved.get(pkg) ?? new Map<string, string | null>();
-  saved.set(pkg, files);
-  let file = files.get(key);
+  const last = saved.get(pkg);
+  let file = last?.key === key ? last.file : undefined;
   if (file === undefined) {
     // A deck with a slide that did not parse has no file to copy, as it has none to save.
     if (session.damage) return null;
@@ -58,15 +58,20 @@ export function slidesClipboard(
       return null;
     }
     file = bytes.length > MAX_FILE ? null : toBase64(bytes);
-    files.set(key, file);
+    saved.set(pkg, { key, file });
   }
   // The copied slides keep their order in the file, which holds only them.
   const indexes = slides.map((i) => copied.indexOf(i)).filter((i) => i >= 0);
   return file === null ? null : JSON.stringify({ version: 1, slides: indexes, file });
 }
 
-/** The saved files of each package that a slide copy saved, by slides, as base64. */
-const saved = new WeakMap<object, Map<string, string | null>>();
+/** The last file that a slide copy saved of each package, as base64, with its slides. */
+const saved = new WeakMap<object, { readonly key: string; readonly file: string | null }>();
+
+/** The slides of the file that the last slide copy of `pkg` saved, for tests. */
+export function savedSlideCopy(pkg: object): string | undefined {
+  return saved.get(pkg)?.key;
+}
 
 /** Read slides from clipboard text: the file and the slide indexes, or null. */
 export function readSlidesClipboard(
