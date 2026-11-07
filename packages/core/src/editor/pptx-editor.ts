@@ -76,6 +76,7 @@ import { createSlideSummaries, SlideSelection } from './slide-selection.ts';
 import { createLayoutSummaries } from '../automation/commands/slide-layouts.ts';
 import { createSectionSummaries } from '../automation/commands/slide-sections.ts';
 import { hasSlideNumber } from '../automation/commands/slide-numbers.ts';
+import { footerText, hasDate } from '../automation/commands/header-footer.ts';
 import { frameLabelOf, ThumbnailPainter } from './thumbnails.ts';
 import { uniquePrefix } from './paint-ids.ts';
 import { createFind } from './find-session.ts';
@@ -196,6 +197,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       currentSlide: slide,
       selectedSlides: slideSel.indices(info?.slides ?? [], slide),
       slideNumbers: pkg ? hasSlideNumber(pkg, slide) : false,
+      footer: pkg ? footerText(pkg, slide) : null,
+      dateTime: pkg ? hasDate(pkg, slide) : false,
       slideBackground: stableBackground(lay),
       slideWidth: info?.width ?? 12_192_000,
       slideHeight: info?.height ?? 6_858_000,

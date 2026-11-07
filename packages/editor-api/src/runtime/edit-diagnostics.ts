@@ -186,6 +186,16 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'edit.no-slide-number-placeholder',
     'The layouts have no slide number placeholder. Add one to the layout first.',
   ],
+  [
+    'disabled.noFooterPlaceholder',
+    'edit.no-footer-placeholder',
+    'The layouts and the master have no footer placeholder. Add one to the layout first.',
+  ],
+  [
+    'disabled.noDatePlaceholder',
+    'edit.no-date-placeholder',
+    'The layouts and the master have no date placeholder. Add one to the layout first.',
+  ],
   ['disabled.noTable', 'edit.not-a-table', 'The shape is not a table. Use a table shape.'],
   [
     'disabled.notAGroup',

@@ -272,6 +272,29 @@ export type EditorCommand = {
     readonly type: 'setSlideNumbers';
     readonly show: boolean;
 }
+/**
+* Insert > Footer: show `text` in the footer of every slide, through the layout's footer
+* placeholder (`p:ph type="ftr"`), or hide the footers with null. A slide that shows a footer
+* already gets the new text and keeps its box and format. Refused when no layout or master of
+* the slides has a footer placeholder. Text is 1,024 characters at most.
+*/
+| {
+    readonly type: 'setFooter';
+    readonly text: string | null;
+}
+/**
+* Insert > Date and time: show the date on every slide, through the layout's date
+* placeholder (`p:ph type="dt"`), or hide it. `text` is the date that the slides show; it
+* defaults to today's date as month/day/year. Without `fixed`, the date is a field
+* (`datetime1`) that a presentation application can update when it opens the file; with
+* `fixed`, it stays as written. Refused when no layout or master has a date placeholder.
+*/
+| {
+    readonly type: 'setDateTime';
+    readonly show: boolean;
+    readonly text?: string;
+    readonly fixed?: boolean;
+}
 /** Delete the selected slides (`EditorSnapshot.selectedSlides`) as one undo step. */
 | {
     readonly type: 'deleteSlides';
@@ -666,12 +689,14 @@ export interface EditorSnapshot {
     readonly collapsedSections?: readonly string[];
     // (undocumented)
     readonly currentSlide: number;
+    readonly dateTime?: boolean;
     // (undocumented)
     readonly embeddedFontFaces: number;
     // (undocumented)
     readonly error?: string;
     // (undocumented)
     readonly fitZoom: boolean;
+    readonly footer?: string | null;
     // (undocumented)
     readonly format: SelectionFormat | null;
     readonly formatPainter?: FormatPainterMode;

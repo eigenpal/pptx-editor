@@ -7,7 +7,8 @@
  * `.edited.pptx` (a scripted edit session, then save). Add a name only after you do that check
  * (CONTRIBUTING.md, "Fidelity harness"). Last checked on 6 November 2026: all 44 fixtures,
  * 88 copies written at commit 79a5d22, no prompt. On 7 November 2026: `header-footer`,
- * `hyperlinks`, `preserved-content`, and `svg-tab-stops`, 8 copies, no prompt.
+ * `hyperlinks`, `preserved-content`, and `svg-tab-stops`, 8 copies, no prompt; and again
+ * `header-footer`, with its date and footer placeholders, 2 copies, no prompt.
  */
 export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'alignment-anchor',
@@ -122,7 +123,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
     'sha256:9e99e23ce91f4fb75343c48c460eb9d545bcc703621c1fee23a533b37af91388',
   'shapes.styles-gallery':
     'sha256:56f55da0a23919445ff463e4400ec23c3bdb33e046dc2606c42c23c9195e7825',
-  'slides.header-footer': 'sha256:6f4f68d582525254e5c07c8127ed77e9a46789a247941f11d55cdc6808a7f19b',
+  'slides.header-footer': 'sha256:71adad7795149d7b22c3438b8af207d75a3454e1959e965c9d9d17b93dc0ebbb',
   'slides.hidden': 'sha256:f1c99bf87bd4bfe96988737f06ffc2412e9a260f6b4eebb867f75e5e19cd602c',
   'slides.notes': 'sha256:ec160fc621cbd580462d1e80f07a520364a5a7baa1819b68b84ad291cb2ddfdd',
   'slides.placeholder-prompts':

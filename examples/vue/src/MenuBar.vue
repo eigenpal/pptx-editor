@@ -9,6 +9,8 @@ import { PptxEditorMenu, useTranslation } from '@pptx-editor.dev/vue';
 import { watchPdfExport, type SlideExport } from '../../shared/demo-files.ts';
 import DuplicateSlideRow from './DuplicateSlideRow.vue';
 import SlideNumbersRow from './SlideNumbersRow.vue';
+import FooterRow from './FooterRow.vue';
+import DateTimeRow from './DateTimeRow.vue';
 
 const emit = defineEmits<{
   rename: [];
@@ -92,6 +94,8 @@ onBeforeUnmount(watchPdfExport((busy) => (pdfBusy.value = busy)));
         <PptxEditorMenu.Item slot-id="slide.reset" />
       </PptxEditorMenu.Group>
       <SlideNumbersRow />
+      <FooterRow />
+      <DateTimeRow />
     </PptxEditorMenu.Insert>
     <!-- Arrange > Selection pane opens the side panel on its Selection tab. -->
     <PptxEditorMenu.Arrange>

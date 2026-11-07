@@ -327,7 +327,7 @@ export function svgTabStopsDeck(image: Uint8Array): FixtureOptions {
 }
 
 /**
- * Layouts with a slide-number placeholder. Slide 1 shows its number and a footer with its own
+ * Layouts with slide-number, date, and footer placeholders. Slide 1 shows its number and a footer with its own
  * box; slide 2 shows neither.
  */
 export function headerFooterDeck(): FixtureOptions {
@@ -339,6 +339,7 @@ export function headerFooterDeck(): FixtureOptions {
     '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:fld id="{B6F15528-21DE-4FAA-801E-634DDDAF4B2B}" type="slidenum"><a:rPr lang="en-US"/><a:t>1</a:t></a:fld><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>';
   return {
     footers: true,
+    datesAndFooters: true,
     slides: [
       { shapes: title('Slide 1: a footer and a number') + footer + number },
       { shapes: title('Slide 2: no number yet') },

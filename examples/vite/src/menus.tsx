@@ -1,6 +1,7 @@
 // The demo's menu bar, built on the library's `PptxEditor.Menu`: the built-in menus (File,
 // Edit, View, Insert, Format, Arrange, Slide Show) come from the chrome registry, and the demo
-// adds its own rows: opening and exporting files, slide structure, slide numbers, and Help.
+// adds its own rows: opening and exporting files, slide structure, slide numbers,
+// footers, dates, and Help.
 // Every built-in row runs a registered slot, so its state and action are the toolbar's.
 
 import { useEffect, useState, type ReactNode } from 'react';
@@ -58,6 +59,57 @@ function SlideNumbersRow(): ReactNode {
       disabled={!!reason}
       reason={reason ? translateKeyOrText(t, reason) : null}
       onSelect={() => editor?.exec({ type: 'setSlideNumbers', show: !on })}
+    />
+  );
+}
+
+/**
+ * Insert > Footer: on or off for every slide, through each layout's footer placeholder
+ * (`p:ph type="ftr"`). The demo writes the localized word "Footer"; a host passes its own text.
+ */
+function FooterRow(): ReactNode {
+  const { t } = useTranslation();
+  const editor = usePptxEditor();
+  const on = useEditorState((s) => (s.footer ?? null) !== null);
+  const reason = useEditorState((s) => {
+    if (!editor) return 'disabled.noEditor';
+    const text = (s.footer ?? null) !== null ? null : t('menu.footer');
+    const can = editor.can({ type: 'setFooter', text });
+    return can.ok ? null : can.reason;
+  });
+  return (
+    <PptxEditor.Menu.Row
+      label={t('menu.footer')}
+      icon="call_to_action"
+      checked={on}
+      disabled={!!reason}
+      reason={reason ? translateKeyOrText(t, reason) : null}
+      onSelect={() => editor?.exec({ type: 'setFooter', text: on ? null : t('menu.footer') })}
+    />
+  );
+}
+
+/**
+ * Insert > Date and time: on or off for every slide, through each layout's date placeholder
+ * (`p:ph type="dt"`). The date is a field that shows the date when the file opens.
+ */
+function DateTimeRow(): ReactNode {
+  const { t } = useTranslation();
+  const editor = usePptxEditor();
+  const on = useEditorState((s) => s.dateTime === true);
+  const reason = useEditorState((s) => {
+    if (!editor) return 'disabled.noEditor';
+    const can = editor.can({ type: 'setDateTime', show: s.dateTime !== true });
+    return can.ok ? null : can.reason;
+  });
+  return (
+    <PptxEditor.Menu.Row
+      label={t('menu.dateTime')}
+      icon="calendar_today"
+      checked={on}
+      disabled={!!reason}
+      reason={reason ? translateKeyOrText(t, reason) : null}
+      onSelect={() => editor?.exec({ type: 'setDateTime', show: !on })}
     />
   );
 }
@@ -158,6 +210,8 @@ export function MenuBar({
           <PptxEditor.Menu.Item slotId="slide.reset" />
         </PptxEditor.Menu.Group>
         <SlideNumbersRow />
+        <FooterRow />
+        <DateTimeRow />
       </PptxEditor.Menu.Insert>
       {/* Arrange > Selection pane opens the side panel on its Selection tab. */}
       <PptxEditor.Menu.Arrange>

@@ -88,6 +88,7 @@ export function coverageDeck(): Uint8Array {
   });
   return buildPptx({
     footers: true,
+    datesAndFooters: true,
     slides: [
       {
         layout: 'blank',

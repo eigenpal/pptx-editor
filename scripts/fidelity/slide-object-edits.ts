@@ -617,13 +617,28 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
   'slides.header-footer': {
     fixture: 'header-footer',
     slide: 1,
-    edit: (t) => t.run({ type: 'setSlideNumbers', show: true }),
-    check: (d) =>
-      all(
-        has(d.slideXml(1), 'type="sldNum"', 'type="slidenum"'),
-        // Apply to All: slide 1 keeps its number and its footer.
-        kept(d, 0, 'Slide Number Placeholder 4', 'Footer Placeholder 3')
-      ),
+    // Apply to All: the footer of slide 1 takes the new text.
+    parts: [/^\/ppt\/slides\/slide1\.xml$/],
+    edit: (t) => {
+      t.run({ type: 'setSlideNumbers', show: true });
+      t.run({ type: 'setFooter', text: 'Quarterly results' });
+      t.run({ type: 'setDateTime', show: true, text: '11/7/2026' });
+    },
+    check: (d) => {
+      const footer = d.shapeXml(0, 'Footer Placeholder 3');
+      return all(
+        has(d.slideXml(1), 'type="sldNum"', 'type="slidenum"', 'type="ftr"', 'type="dt"'),
+        has(d.slideXml(1), 'Quarterly results', 'type="datetime1"', '11/7/2026'),
+        // Apply to All: slide 1 keeps its number, and its footer keeps its box and format.
+        kept(d, 0, 'Slide Number Placeholder 4'),
+        has(footer, 'Quarterly results', '<a:pPr algn="ctr"/>', 'sz="1200"'),
+        lacks(footer, 'Footer text'),
+        /<p:spPr>.*?<\/p:spPr>/.exec(footer)?.[0] ===
+          /<p:spPr>.*?<\/p:spPr>/.exec(shapeXmlOf(d.original, 0, 'Footer Placeholder 3'))?.[0]
+          ? undefined
+          : 'the footer box changed'
+      );
+    },
   },
   'slides.sorter': {
     fixture: 'slide-layouts',

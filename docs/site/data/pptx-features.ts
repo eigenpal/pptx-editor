@@ -737,7 +737,8 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'full',
     tier: 'community',
-    notes: 'Slide numbers have a command. Dates and footers do not.',
+    notes:
+      'Turn slide numbers, the footer, and the date on or off for all slides (`setSlideNumbers`, `setFooter`, `setDateTime`), through the placeholders of each layout or its master. A slide that shows a footer or a date already keeps its box and format. A date is a `datetime1` field, or fixed text with `fixed: true`. Editing is partial: the commands apply to all slides, and the title slide is not skipped.',
   },
   {
     id: 'slides.size',

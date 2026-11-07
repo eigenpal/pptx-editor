@@ -45,6 +45,8 @@ export const EMPTY_EDITOR_SNAPSHOT: EditorSnapshot = Object.freeze({
   currentSlide: 0,
   selectedSlides: [],
   slideNumbers: false,
+  footer: null,
+  dateTime: false,
   slideBackground: { kind: 'none', inherited: true },
   slideWidth: 12_192_000,
   slideHeight: 6_858_000,

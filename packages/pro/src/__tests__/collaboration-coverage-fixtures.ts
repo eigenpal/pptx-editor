@@ -318,6 +318,10 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
   deleteSlides: { command: () => ({ type: 'deleteSlides', indices: [1, 2] }) },
   moveSlides: { command: () => ({ type: 'moveSlides', indices: [0, 1], to: 1 }) },
   setSlideNumbers: { command: () => ({ type: 'setSlideNumbers', show: true }) },
+  setFooter: { command: () => ({ type: 'setFooter', text: 'Quarterly results' }) },
+  setDateTime: {
+    command: () => ({ type: 'setDateTime', show: true, text: '11/7/2026', fixed: true }),
+  },
   setSlideBackground: {
     command: () => ({
       type: 'setSlideBackground',

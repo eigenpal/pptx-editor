@@ -14,6 +14,8 @@ export type {
 export type { EditorExecOptions, HistoryGroup, HistoryGroupOptions } from './history-group.ts';
 import type { EditorRejection, EditorRemoval } from './notices.ts';
 export type { EditorRejection, EditorRemoval } from './notices.ts';
+import type { ClipboardPayload } from './clipboard.ts';
+export type { ClipboardNode, ClipboardPayload, ClipboardRelationship } from './clipboard.ts';
 
 import type {
   ObjectAxis,
@@ -179,6 +181,26 @@ export type EditorCommand =
    * slide-number placeholder. The change applies to all slides, as Header and Footer > Apply to All.
    */
   | { readonly type: 'setSlideNumbers'; readonly show: boolean }
+  /**
+   * Insert > Footer: show `text` in the footer of every slide, through the layout's footer
+   * placeholder (`p:ph type="ftr"`), or hide the footers with null. A slide that shows a footer
+   * already gets the new text and keeps its box and format. Refused when no layout or master of
+   * the slides has a footer placeholder. Text is 1,024 characters at most.
+   */
+  | { readonly type: 'setFooter'; readonly text: string | null }
+  /**
+   * Insert > Date and time: show the date on every slide, through the layout's date
+   * placeholder (`p:ph type="dt"`), or hide it. `text` is the date that the slides show; it
+   * defaults to today's date as month/day/year. Without `fixed`, the date is a field
+   * (`datetime1`) that a presentation application can update when it opens the file; with
+   * `fixed`, it stays as written. Refused when no layout or master has a date placeholder.
+   */
+  | {
+      readonly type: 'setDateTime';
+      readonly show: boolean;
+      readonly text?: string;
+      readonly fixed?: boolean;
+    }
   /** Delete the selected slides (`EditorSnapshot.selectedSlides`) as one undo step. */
   | { readonly type: 'deleteSlides'; readonly indices: readonly number[] }
   /** Duplicate the selected slides; the copies follow the last one, in order. */
@@ -516,36 +538,6 @@ export interface TransformItem {
   /** Flips; absent keeps the current ones. A line's direction is its flips. */
   readonly flipH?: boolean;
   readonly flipV?: boolean;
-}
-
-/** A serialized element, structurally the store's `NodeSpec`. @public */
-export interface ClipboardNode {
-  readonly ns: string;
-  readonly local: string;
-  readonly prefix?: string;
-  readonly attrs?: readonly { ns: string; local: string; prefix?: string; value: string }[];
-  readonly nsDecls?: readonly { prefix: string; uri: string }[];
-  readonly children?: readonly (ClipboardNode | { readonly text: string })[];
-}
-
-/** A relationship a copied shape uses, with the bytes of its target. @public */
-export interface ClipboardRelationship {
-  readonly id: string;
-  readonly type: string;
-  readonly part: string;
-  readonly contentType: string;
-  readonly base64: string;
-}
-
-/** The clipboard format for shapes (`application/x-pptx-editor+json`). @public */
-export interface ClipboardPayload {
-  readonly version: 1;
-  /** The session the shapes came from; pasting into it reuses its parts. */
-  readonly document: string;
-  /** The slide part the shapes came from; pasting onto it offsets them. */
-  readonly slidePart: string;
-  readonly shapes: readonly ClipboardNode[];
-  readonly relationships: readonly ClipboardRelationship[];
 }
 
 /** The command type names. @public */
@@ -894,6 +886,16 @@ export interface EditorSnapshot {
   readonly selectedSlides: readonly number[];
   /** Whether the current slide shows its slide number (Insert > Slide numbers). */
   readonly slideNumbers: boolean;
+  /**
+   * The footer text of the current slide (Insert > Footer), or null when it shows no footer.
+   * Optional and additive: absent reads as null.
+   */
+  readonly footer?: string | null;
+  /**
+   * Whether the current slide shows a date (Insert > Date and time). Optional and additive:
+   * absent reads as `false`.
+   */
+  readonly dateTime?: boolean;
   /** The current slide's background. */
   readonly slideBackground: SlideBackgroundState;
   /** Slide size in EMU. */
