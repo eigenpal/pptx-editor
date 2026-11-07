@@ -35,6 +35,7 @@ import { zoomKeyAction } from './zoom.ts';
 export type SurfaceHostBase = Pick<
   SurfaceHost,
   | 'idPrefix'
+  | 'pickImage'
   | 'layout'
   | 'label'
   | 'select'

@@ -29,6 +29,7 @@ import {
   useSlideshow,
   useTranslation,
   type SidePanelTab,
+  listenPaneRequests,
 } from '@pptx-editor.dev/vue';
 import {
   PPTX_MIME,
@@ -45,7 +46,6 @@ import {
   ribbonChrome,
   type SlideExport,
 } from '../../shared/demo-files.ts';
-import { listenPaneRequests } from '@pptx-editor.dev/core/editor';
 import AdapterSwitcher from './AdapterSwitcher.vue';
 import BrandLogo from './BrandLogo.vue';
 import ExportMenu from './ExportMenu.vue';

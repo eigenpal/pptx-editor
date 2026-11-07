@@ -27,6 +27,16 @@ export function insertPng(editor: Editor, bytes: Uint8Array, width: number, heig
 
 The editor centers the picture and reduces it when needed to fit the slide. The inserted picture becomes selected.
 
+## Fill an empty placeholder
+
+When the current slide has an empty content or picture placeholder, `insertImage` puts the picture there instead. It fills the placeholder that is selected or holds the caret, or else the first one on the slide. The picture keeps the placeholder's shape ID, name, and index, so animations and connectors that name the placeholder go on to name the picture.
+
+- A content placeholder holds the whole picture, centered, and never larger than the picture's own size.
+- A picture placeholder is filled to its edges. The picture is cropped from the middle to the placeholder's shape.
+- A placeholder with text, or with its own fill, line, or effect, stays. The picture goes to the middle of the slide.
+
+In the editor, each empty placeholder shows a dotted outline. Empty content and table placeholders also show a **Table** button in their middle, and empty content and picture placeholders show a **Picture** button. **Table** inserts a 3 × 3 table, and **Picture** opens the file chooser. Keyboard users insert from the **Insert** menu, which fills the placeholder in the same way. The outline and buttons are editing chrome: thumbnails, the slide show, PDF export, and saved files never show them. One undo brings the empty placeholder back.
+
 The command inserts on the current slide at execution time. If you load image bytes asynchronously, confirm the target before you execute.
 
 ## Resize the selected picture

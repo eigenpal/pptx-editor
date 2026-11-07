@@ -1686,6 +1686,30 @@
 .pptx-surface__table-handle:hover .pptx-surface__table-handle-icon {
   fill: var(--doc-primary);
 }
+/* An empty placeholder: a dotted outline in a mid gray, which shows on light and dark slides,
+   and insert buttons in its middle. */
+.pptx-surface__placeholder-outline {
+  fill: none;
+  stroke: rgb(128 128 128 / 0.9);
+}
+.pptx-surface__placeholder-insert {
+  pointer-events: all;
+  cursor: pointer;
+}
+.pptx-surface__placeholder-insert-box {
+  fill: var(--doc-surface);
+  fill-opacity: 0.9;
+  stroke: var(--doc-border-dark);
+}
+.pptx-surface__placeholder-insert-icon {
+  fill: var(--doc-text-muted);
+}
+.pptx-surface__placeholder-insert:hover .pptx-surface__placeholder-insert-box {
+  stroke: var(--doc-primary);
+}
+.pptx-surface__placeholder-insert:hover .pptx-surface__placeholder-insert-icon {
+  fill: var(--doc-primary);
+}
 .pptx-surface__table-line {
   stroke: var(--doc-primary);
   stroke-opacity: 0.75;

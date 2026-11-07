@@ -17,6 +17,10 @@ type PaneListener = (pane: SidePanelTab) => void;
 const listeners = new WeakMap<object, Set<PaneListener>>();
 /** Who follows the listeners coming and going: the toolbar slots read them. */
 const watchers = new Set<() => void>();
+/** The last request of each editor, until a side panel takes it (`takePaneRequest`). */
+const recent = new WeakMap<object, { readonly pane: SidePanelTab; readonly at: number }>();
+/** A side panel that mounts this soon after a request answers it: the host just opened it. */
+const RECENT_MS = 1000;
 let version = 0;
 const changed = (): void => {
   version += 1;
@@ -48,6 +52,7 @@ export function listenPaneRequests(editor: object, open: (pane: SidePanelTab) =>
 export function requestPane(editor: object, pane: SidePanelTab): boolean {
   const set = listeners.get(editor);
   if (!set || set.size === 0) return false;
+  recent.set(editor, { pane, at: Date.now() });
   let failure: { error: unknown } | null = null;
   for (const listener of [...set]) {
     try {
@@ -58,6 +63,23 @@ export function requestPane(editor: object, pane: SidePanelTab): boolean {
   }
   if (failure) throw failure.error;
   return true;
+}
+
+/**
+ * The tab of a request that no side panel has taken yet, made in the last second, or null. A
+ * side panel takes it when it turns to a tab, and when it mounts: a host that shows a closed
+ * panel for a request mounts the panel after the request. @internal
+ */
+export function takePaneRequest(editor: object | null | undefined): SidePanelTab | null {
+  if (!editor) return null;
+  const last = recent.get(editor);
+  recent.delete(editor);
+  return last && Date.now() - last.at < RECENT_MS ? last.pane : null;
+}
+
+/** Whether a slot is a pane slot, which follows the pane listeners. @internal */
+export function isPaneSlot(slot: string): boolean {
+  return slot === 'arrange.selectionPane' || slot === 'shape.properties';
 }
 
 /** Whether a side panel or a host listens for pane requests of `editor`. @internal */

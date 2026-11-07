@@ -2863,6 +2863,9 @@ export function isDialogBackdropPoint(dialog: Element, event: {
 // @public
 export function isFontResolver(value: unknown): value is MarkedFontResolver;
 
+// @internal
+export function isPaneSlot(slot: string): boolean;
+
 // @public
 export function isTableChromeSlot(slot: ChromeSlotId): slot is TableChromeSlotId;
 
@@ -5376,6 +5379,9 @@ export type TableStyleOption = 'firstRow' | 'lastRow' | 'bandRow' | 'firstCol' |
 
 // @internal
 export function takeDialogSection(editor: object | null, dialog: string): string | undefined;
+
+// @internal
+export function takePaneRequest(editor: object | null | undefined): SidePanelTab | null;
 
 // @public
 export type TextAlign = 'l' | 'ctr' | 'r' | 'just';

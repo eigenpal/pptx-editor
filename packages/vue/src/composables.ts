@@ -61,6 +61,7 @@ import {
   warnOutsideRoot,
   paneListenersVersion,
   subscribePaneListeners,
+  isPaneSlot,
 } from '@pptx-editor.dev/core/editor';
 import { NOTES_SLOTS, useNotesTarget } from './notes-target.ts';
 
@@ -261,10 +262,12 @@ export function useEditorCommand(slot: MaybeRefOrGetter<ChromeSlotId>): UseEdito
   // The deps read the slot and the root's `popups` (through the host), so a host that changes
   // `popups` at runtime turns the control on or off at once, not at the next editor change.
   // The pane slots are on while a side panel or the host listens for pane requests.
-  const panes = useExternalVersion(subscribePaneListeners, paneListenersVersion);
+  const panes = isPaneSlot(toValue(slot))
+    ? useExternalVersion(subscribePaneListeners, paneListenersVersion)
+    : null;
   const state = useSlice<ChromeCommandState>(read, sameChromeCommandState, () => [
     toValue(slot),
-    panes.value,
+    panes?.value,
     read(),
   ]);
   // While a speaker notes field has focus, bold, italic, underline, and strikethrough format

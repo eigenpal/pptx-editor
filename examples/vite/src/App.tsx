@@ -12,12 +12,7 @@ import {
   type DragEvent,
   type ReactNode,
 } from 'react';
-import {
-  listenPaneRequests,
-  type EditorModule,
-  type PptxEditorInstance,
-  type SidePanelTab,
-} from '@pptx-editor.dev/core/editor';
+import type { EditorModule, PptxEditorInstance, SidePanelTab } from '@pptx-editor.dev/core/editor';
 import { drawingModule } from '@pptx-editor.dev/pro/drawing';
 import {
   PptxEditor,
@@ -28,6 +23,7 @@ import {
   usePptxEditor,
   useSlideshow,
   useTranslation,
+  listenPaneRequests,
 } from '@pptx-editor.dev/react';
 import { BrandLogo } from './BrandLogo.tsx';
 import { ThemeToggle } from './ThemeToggle.tsx';

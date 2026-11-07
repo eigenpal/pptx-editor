@@ -710,10 +710,12 @@ export {
 } from './selection-pane.ts';
 export {
   hasPaneListener,
+  isPaneSlot,
   listenPaneRequests,
   paneListenersVersion,
   requestPane,
   subscribePaneListeners,
+  takePaneRequest,
 } from './pane-requests.ts';
 export {
   applyLocalFonts,

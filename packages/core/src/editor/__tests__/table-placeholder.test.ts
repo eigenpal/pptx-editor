@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { buildPptx, para, run } from '../../../../../scripts/fixtures/builder.ts';
+import { timingWriter } from '../../../../../scripts/fixtures/timing.ts';
 import { attr, elements, find, path, xmlPartOf, type Element } from '../../store/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 
@@ -45,7 +46,7 @@ describe('a new table fills an empty content placeholder', () => {
     const e = await open(title + placeholder(3, '1'));
     expect(e.exec({ type: 'insertTable', rows: 2, cols: 3 }).ok).toBe(true);
     const els = tree(e);
-    expect(els.map(nameOf)).toEqual(['Title 1', 'Table 3 (table)']);
+    expect(els.map(nameOf)).toEqual(['Title 1', 'Content Placeholder 3 (table)']);
     const frame = els[1]!;
     expect(attr(path(frame, 'p:nvGraphicFramePr', 'p:nvPr', 'p:ph'), 'idx')).toBe('1');
     const colW = Math.floor(BOX.cx / 3);
@@ -69,7 +70,11 @@ describe('a new table fills an empty content placeholder', () => {
     const second = tree(e)[2]!.id;
     e.setSelection({ kind: 'shapes', nodeIds: [second] });
     expect(e.exec({ type: 'insertTable', rows: 1, cols: 2 }).ok).toBe(true);
-    expect(tree(e).map(nameOf)).toEqual(['Title 1', 'Content Placeholder 3', 'Table 4 (table)']);
+    expect(tree(e).map(nameOf)).toEqual([
+      'Title 1',
+      'Content Placeholder 3',
+      'Content Placeholder 4 (table)',
+    ]);
     expect(offOf(tree(e)[2]!)).toEqual({ x: 6_096_000, y: 1_825_625, cx: 5_181_600 });
   });
 
@@ -82,5 +87,76 @@ describe('a new table fills an empty content placeholder', () => {
     const { width } = e.session!.info;
     const { x, cx } = offOf(els[2]!);
     expect(Math.abs(x - (width - cx) / 2)).toBeLessThanOrEqual(1);
+  });
+
+  test('the placeholder that holds the caret wins; a turned one is passed over', async () => {
+    const own =
+      '<a:xfrm><a:off x="6096000" y="1825625"/><a:ext cx="5181600" cy="4351338"/></a:xfrm>';
+    const turned =
+      '<a:xfrm rot="5400000"><a:off x="838200" y="1825625"/><a:ext cx="5181600" cy="4351338"/></a:xfrm>';
+    const e = await open(title + placeholder(3, '1', '', turned) + placeholder(4, '2', '', own));
+    // Without a selection, the turned first placeholder is passed over for the second.
+    expect(e.exec({ type: 'insertTable', rows: 1, cols: 1 }).ok).toBe(true);
+    expect(tree(e).map(nameOf)).toEqual([
+      'Title 1',
+      'Content Placeholder 3',
+      'Content Placeholder 4 (table)',
+    ]);
+    expect(e.exec({ type: 'undo' }).ok).toBe(true);
+    // With the caret in the second placeholder, it is the one filled.
+    const plain = await open(title + placeholder(3, '1') + placeholder(4, '2', '', own));
+    const second = tree(plain)[2]!.id;
+    plain.setSelection({
+      kind: 'text',
+      nodeId: second,
+      anchor: { paragraph: 0, offset: 0 },
+      focus: { paragraph: 0, offset: 0 },
+    });
+    expect(plain.exec({ type: 'insertTable', rows: 1, cols: 2 }).ok).toBe(true);
+    expect(tree(plain).map(nameOf)).toEqual([
+      'Title 1',
+      'Content Placeholder 3',
+      'Content Placeholder 4 (table)',
+    ]);
+  });
+
+  test('a table placeholder is filled; body, hidden, and formatted placeholders are not', async () => {
+    const typed = (id: number, ph: string, extra = '', spPr = '') =>
+      `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="P ${id}"${extra}/><p:cNvSpPr/><p:nvPr>${ph}</p:nvPr>` +
+      `</p:nvSpPr><p:spPr>${spPr}</p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody></p:sp>`;
+    const red = '<a:solidFill><a:srgbClr val="FF0000"/></a:solidFill>';
+    const skipped =
+      typed(3, '<p:ph type="body" idx="1"/>') +
+      typed(4, '<p:ph idx="2"/>', ' hidden="1"') +
+      typed(5, '<p:ph idx="3"/>', '', red);
+    const none = await open(title + skipped);
+    expect(none.exec({ type: 'insertTable', rows: 1, cols: 1 }).ok).toBe(true);
+    expect(tree(none).at(-1)!.local).toBe('graphicFrame');
+    expect(path(tree(none).at(-1)!, 'p:nvGraphicFramePr', 'p:nvPr', 'p:ph')).toBeUndefined();
+    const e = await open(title + skipped + typed(6, '<p:ph type="tbl" idx="4"/>'));
+    expect(e.exec({ type: 'insertTable', rows: 1, cols: 1 }).ok).toBe(true);
+    const ph = path(tree(e).at(-1)!, 'p:nvGraphicFramePr', 'p:nvPr', 'p:ph');
+    expect([attr(ph, 'type'), attr(ph, 'idx')]).toEqual(['tbl', '4']);
+  });
+
+  test('the table keeps the shape id, so an animation of the placeholder stays', async () => {
+    const { effect, click, mainSeq, timing } = timingWriter();
+    const e = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    const deck = buildPptx({
+      slides: [
+        {
+          layout: 'title',
+          shapes: title + placeholder(3, '1'),
+          ext: timing(mainSeq(click(effect(3))), [3]),
+        },
+      ],
+    });
+    expect((await e.load(deck)).ok).toBe(true);
+    expect(e.exec({ type: 'insertTable', rows: 1, cols: 1 }).ok).toBe(true);
+    const frame = tree(e)[1]!;
+    expect(attr(find(frame, 'p:cNvPr'), 'id')).toBe('3');
+    const part = e.session!.info.slides[0]!.partName;
+    const root = xmlPartOf(e.session!.store.package, part)!.root;
+    expect(attr(find(root, 'p:spTgt'), 'spid')).toBe('3');
   });
 });

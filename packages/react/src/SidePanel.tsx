@@ -11,6 +11,7 @@ import {
   elementRotates,
   formatPanelSize,
   listenPaneRequests,
+  takePaneRequest,
   panelHistoryKey,
   platformShortcuts,
   radioGroupStep,
@@ -281,12 +282,18 @@ export function SidePanel({
     () =>
       editor
         ? listenPaneRequests(editor, (pane) => {
+            takePaneRequest(editor);
             latest.current(pane);
             setAsked({ pane });
           })
         : undefined,
     [editor]
   );
+  // A host that shows a closed panel for a request mounts it after the request: take it now.
+  useEffect(() => {
+    const pane = takePaneRequest(editor);
+    if (pane) setAsked({ pane });
+  }, [editor]);
   useEffect(() => {
     if (asked) root.current?.querySelector<HTMLElement>(`[data-tab="${asked.pane}"]`)?.focus();
   }, [asked]);

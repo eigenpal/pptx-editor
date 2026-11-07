@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { createApp, defineComponent, h, nextTick, shallowRef, type App, type Component } from 'vue';
+import {
+  createApp,
+  defineComponent,
+  h,
+  nextTick,
+  shallowRef,
+  watch,
+  type App,
+  type Component,
+} from 'vue';
 import {
   runToolbarCommand,
   type PptxEditorInstance,
@@ -9,6 +18,7 @@ import { buildPptx, shape } from '../../../scripts/fixtures/builder.ts';
 import {
   listenPaneRequests,
   useEditorCommand,
+  usePptxEditor,
   PptxEditorContent,
   PptxEditorRoot,
   PptxEditorSelectionPane,
@@ -229,5 +239,41 @@ describe('PptxEditorSelectionPane', () => {
     stop();
     await nextTick();
     expect(probe()).toBe('false disabled.noSidePanel');
+  });
+
+  test('a host that opens a closed panel for a request lands the focus on the tab', async () => {
+    const open = shallowRef(false);
+    const tab = shallowRef<SidePanelTab>('format');
+    const Host = defineComponent({
+      setup() {
+        const editor = usePptxEditor();
+        watch(
+          editor,
+          (e, _old, onCleanup) => {
+            if (!e) return;
+            onCleanup(
+              listenPaneRequests(e, (pane) => {
+                tab.value = pane;
+                open.value = true;
+              })
+            );
+          },
+          { immediate: true }
+        );
+        return () =>
+          open.value
+            ? h(PptxEditorSidePanel, {
+                tab: tab.value,
+                'onUpdate:tab': (t: SidePanelTab) => (tab.value = t),
+              })
+            : null;
+      },
+    });
+    const editor = await mount(() => h(Host));
+    expect(runToolbarCommand(editor, 'arrange.selectionPane')).toEqual({ ok: true });
+    await nextTick();
+    await nextTick();
+    await nextTick();
+    expect(document.activeElement?.textContent).toBe('Selection');
   });
 });

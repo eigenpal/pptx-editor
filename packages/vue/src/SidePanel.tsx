@@ -7,6 +7,7 @@ import {
   computed,
   defineComponent,
   nextTick,
+  onMounted,
   ref,
   watch,
   type CSSProperties,
@@ -19,6 +20,7 @@ import {
   elementRotates,
   formatPanelSize,
   listenPaneRequests,
+  takePaneRequest,
   TABLE_OPTION_ROWS,
   SIDE_PANEL_TABS,
   type SidePanelTab,
@@ -312,21 +314,27 @@ export const PptxEditorSidePanel = defineComponent({
     // The toolbar's Selection pane and Format shape slots ask for a tab (`requestPane`). The
     // focus goes to that tab, so a keyboard user lands in the panel.
     const root = ref<HTMLElement | null>(null);
+    const focusTab = (pane: SidePanelTab): void =>
+      void nextTick(() => root.value?.querySelector<HTMLElement>(`[data-tab="${pane}"]`)?.focus());
     watch(
       editor,
       (e, _old, onCleanup) => {
         if (!e) return;
         onCleanup(
           listenPaneRequests(e, (pane) => {
+            takePaneRequest(e);
             setTab(pane);
-            void nextTick(() =>
-              root.value?.querySelector<HTMLElement>(`[data-tab="${pane}"]`)?.focus()
-            );
+            focusTab(pane);
           })
         );
       },
       { immediate: true }
     );
+    // A host that shows a closed panel for a request mounts it after the request: take it now.
+    onMounted(() => {
+      const pane = takePaneRequest(editor.value);
+      if (pane) focusTab(pane);
+    });
     return () => {
       const { class: hostClass, style: hostStyle, ...rest } = attrs;
       const style = [hostStyle as StyleValue, props.style];

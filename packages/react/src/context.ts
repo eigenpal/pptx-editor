@@ -13,6 +13,7 @@ import {
   subscribeSectionRenamers,
   subscribePaneListeners,
   paneListenersVersion,
+  isPaneSlot,
   EMPTY_EDITOR_SNAPSHOT,
   editorCommandFor,
   platformShortcuts,
@@ -196,10 +197,11 @@ export function useEditorCommand(slot: ChromeSlotId): UseEditorCommandReturn {
     () => false
   );
   // The pane slots are on while a side panel or the host listens for pane requests.
+  const pane = isPaneSlot(slot);
   const panes = useSyncExternalStore(
-    subscribePaneListeners,
-    paneListenersVersion,
-    paneListenersVersion
+    pane ? subscribePaneListeners : NO_SUBSCRIPTION,
+    () => (pane ? paneListenersVersion() : 0),
+    () => 0
   );
   const select = useCallback((): UseEditorCommandReturn => {
     void panes;

@@ -4,6 +4,7 @@
 // only the autofit re-measurement (`refitShape`), which never refuses (its sizes are bounded
 // by `XFRM_BOUND`, and a missing `a:off` or `a:ext` is added).
 
+import { placeholderFor } from '../automation/commands/placeholder-fill.ts';
 import { attr, child, elements, REL, type Element, type PptxPackage } from '../store/index.ts';
 import type { LayoutItem } from '../layout/index.ts';
 import type { EditorCommand, EditorSelection, TransformItem } from '../contracts/index.ts';
@@ -595,15 +596,19 @@ export function compile(
       };
     }
     case 'insertImage': {
+      // The picture can fill an empty placeholder (`placeholder-fill.ts`).
+      const part = slidePart(ctx);
+      const into = placeholderFor(batch, part, ctx.slide, ctx.selection, 'picture');
       const id = insertImage(
         batch,
-        slidePart(ctx),
+        part,
         command.bytes,
         command.mime,
         command.width,
         command.height,
         slideW,
-        slideH
+        slideH,
+        into
       );
       return {
         batch,

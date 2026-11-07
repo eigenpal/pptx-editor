@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   runToolbarCommand,
   type PptxEditorInstance,
@@ -8,7 +8,7 @@ import {
 } from '@pptx-editor.dev/core/editor';
 import { buildPptx, shape } from '../../../../scripts/fixtures/builder.ts';
 import { PptxEditorContent, PptxEditorRoot } from '../PptxEditorRoot.tsx';
-import { SelectionPane, SidePanel, Toolbar, listenPaneRequests } from '../index.ts';
+import { SelectionPane, SidePanel, Toolbar, listenPaneRequests, usePptxEditor } from '../index.ts';
 
 const IN = 914_400;
 const group =
@@ -200,7 +200,7 @@ describe('PptxEditor.SelectionPane', () => {
     const button = screen.getByRole('button', { name: 'Selection pane' });
     expect(button.getAttribute('aria-disabled')).toBe('true');
     const reason = document.getElementById(button.getAttribute('aria-describedby')!);
-    expect(reason?.textContent).toBe('Open the side panel to use this pane');
+    expect(reason?.textContent).toBe('This editor shows no side panel for this pane');
     expect(runToolbarCommand(editor, 'arrange.selectionPane')).toEqual({
       ok: false,
       reason: 'disabled.noSidePanel',
@@ -211,5 +211,37 @@ describe('PptxEditor.SelectionPane', () => {
     expect(button.getAttribute('aria-disabled')).toBe(null);
     act(() => stop());
     expect(button.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  test('a host that opens a closed panel for a request lands the focus on the tab', async () => {
+    function Host() {
+      const editor = usePptxEditor();
+      const [open, setOpen] = useState(false);
+      const [tab, setTab] = useState<SidePanelTab>('format');
+      useEffect(
+        () =>
+          editor
+            ? listenPaneRequests(editor, (pane) => {
+                setTab(pane);
+                setOpen(true);
+              })
+            : undefined,
+        [editor]
+      );
+      return (
+        <>
+          <Toolbar preset={false}>
+            <Toolbar.Slot slotId="arrange.selectionPane" />
+          </Toolbar>
+          {open ? <SidePanel tab={tab} onTabChange={setTab} /> : null}
+        </>
+      );
+    }
+    await mount(<Host />);
+    expect(screen.queryByRole('tablist')).toBe(null);
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Selection pane' })));
+    const selection = screen.getByRole('tab', { name: 'Selection' });
+    expect(selection.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(selection);
   });
 });

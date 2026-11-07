@@ -3,6 +3,7 @@
 // Snapshot contract (same as docx-editor's facade): `snapshot()` returns the SAME object until
 // state moves, so `useSyncExternalStore` selectors only re-render when their slice changes.
 
+import { pickImageInto } from './chrome-actions.ts';
 import { slideLinkOf } from '../automation/commands/slide-links.ts';
 import { documentOpenFailure, yieldToPaint } from './loading.ts';
 import { relationshipById, writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
@@ -902,6 +903,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         },
         zoom: effectiveZoom,
         setZoom: (value) => instance.setZoom(value),
+        pickImage: () => pickImageInto(instance, element.ownerDocument),
       };
       surface = new SlideSurface(
         element,

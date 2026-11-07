@@ -32,6 +32,7 @@ import { CommandRefusal, OpBatch } from '../automation/commands/op-batch.ts';
 import { insertText, paragraphsOf, splitParagraph } from '../automation/commands/text-model.ts';
 import { addSlide, FOOTER_PLACEHOLDERS } from '../automation/commands/slide-commands.ts';
 import { deckLayouts } from '../automation/commands/slide-layouts.ts';
+import { emptyText } from '../automation/commands/placeholder-fill.ts';
 import { warnUnknownLayout } from './dev-warnings.ts';
 
 /** The prompt key of each placeholder type (§19.7.10 `ST_PlaceholderType`). */
@@ -50,16 +51,6 @@ const PROMPT_KEYS: Readonly<Record<string, string>> = {
 };
 
 const PROMPT_KEY_LIST: readonly string[] = [...new Set(Object.values(PROMPT_KEYS))];
-
-/** Whether a text body holds no character (a field counts as one). */
-function isEmpty(txBody: Element): boolean {
-  const walk = (el: Element, depth: number): boolean =>
-    depth < 64 &&
-    elements(el).every(
-      (c) => !((c.local === 't' && textOf(c).length > 0) || c.local === 'fld') && walk(c, depth + 1)
-    );
-  return walk(txBody, 0);
-}
 
 /**
  * The prompt paragraphs of a slide placeholder: the layout placeholder's own text when it has a
@@ -190,7 +181,7 @@ export function withPrompts(
       const txBody = child(el, 'p:txBody');
       const type = attr(ph, 'type') ?? 'obj';
       if (el.kind !== 'sp' || !ph || !txBody || el.id === editing) continue;
-      if (FOOTER_PLACEHOLDERS.has(type) || !isEmpty(txBody)) continue;
+      if (FOOTER_PLACEHOLDERS.has(type) || !emptyText(txBody)) continue;
       if (boolAttr(path(el, 'p:nvSpPr', 'p:cNvPr'), 'hidden')) continue;
       const lines = promptOf(layoutPlaceholderOf(pkg, index, el), type, t);
       if (!lines.length || !paragraphsOf(txBody).length) continue;

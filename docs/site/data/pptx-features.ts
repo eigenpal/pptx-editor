@@ -711,7 +711,8 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Empty placeholders show their prompt in the editor only. A click in an empty text placeholder or text box places the caret. Content placeholders show no insert icons and no dotted outline.',
+      'Empty placeholders show their prompt and a dotted outline in the editor only. A click in an empty text placeholder or text box places the caret. Empty content and table placeholders show a Table button, and empty content and picture placeholders show a Picture button. The new object goes in place of the placeholder. The buttons cover tables and pictures only, and a keyboard user inserts from the Insert menu, which fills the placeholder too.',
+    docsLink: '/docs/guides/images#fill-an-empty-placeholder',
   },
   {
     id: 'slides.notes',

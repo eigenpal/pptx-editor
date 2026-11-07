@@ -12,7 +12,8 @@ The toolbar shows the `table` group while the selection is in a table. Customize
 
 `insertTable` adds a table to the current slide with the deck's default table style, Header Row, and Banded Rows. The caret goes into the first cell. Where the table goes depends on the slide:
 
-- When the slide has an empty content or table placeholder, the table takes its place. It fills the selected placeholder, or else the first one on the slide. The table starts at the placeholder's top-left corner, is as wide as the placeholder, and keeps its index, so the slide layout still positions it. One undo brings the empty placeholder back.
+- When the slide has an empty content or table placeholder, the table takes its place. It fills the placeholder that is selected or holds the caret, or else the first one on the slide. The table starts at the placeholder's top-left corner and is as wide as the placeholder. It keeps the placeholder's index, so a layout change moves it with the placeholder. One undo brings the empty placeholder back.
+- A placeholder with its own fill, line, or effect is not empty: the table goes to the middle of the slide.
 - Otherwise, the table is two thirds of the slide wide and centered.
 
 ```tsx

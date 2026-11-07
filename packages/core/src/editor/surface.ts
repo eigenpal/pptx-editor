@@ -11,6 +11,7 @@ export { caretAt, pointAt, textFrameMatrix };
 import { selectionRects } from './surface-text-selection.ts';
 import { cellsOverlay, TableGestures } from './surface-table.ts';
 import { TableChrome } from './surface-table-chrome.ts';
+import { PlaceholderChrome } from './surface-placeholder-chrome.ts';
 import { textItemOf } from './table-cells.ts';
 import { paragraphUnits, wordSelectionAt } from '../automation/commands/text-units.ts';
 import {
@@ -93,6 +94,8 @@ export interface SurfaceHost extends SurfaceInputHost {
   aspectLocked?(nodeId: string): boolean;
   /** Lay out a dragged item at a new box, for the drag preview (drag-preview.ts). */
   relayout?: Relayout;
+  /** Ask the user for a picture file and insert it (an empty placeholder's picture button). */
+  pickImage?(): void;
 }
 
 /** Find a slide item by node id, inside groups too. */
@@ -118,6 +121,7 @@ export class SlideSurface {
   #unitPress = false;
   readonly #table: TableGestures;
   readonly #tableChrome: TableChrome;
+  readonly #placeholderChrome: PlaceholderChrome;
   readonly #unbindInput: () => void;
   #zoomAnchor: { x: number; y: number } | null = null;
   #renderedZoom: number | null = null;
@@ -153,6 +157,7 @@ export class SlideSurface {
     this.#overlay.setAttribute('aria-hidden', 'true'); // Selection chrome: the live region says it.
     this.#table = new TableGestures(editor);
     this.#tableChrome = new TableChrome(editor);
+    this.#placeholderChrome = new PlaceholderChrome(editor);
     this.#input = doc.createElement('textarea');
     this.#input.className = 'pptx-surface__input';
     // The input receives keystrokes and IME composition for the engine; it is focusable and
@@ -313,7 +318,10 @@ export class SlideSurface {
     const ns = SVG_NS;
     const px = EMU_PER_PX / zoom;
     // The area outside the slide, dimmed over the parts of shapes that lie there.
-    const parts: Element[] = [outsideVeil(doc, layout.slide.width, layout.slide.height)];
+    const parts: Element[] = [
+      outsideVeil(doc, layout.slide.width, layout.slide.height),
+      ...this.#placeholderChrome.elements(doc, layout, px),
+    ];
     const sel = this.editor.selection();
     const ids = sel.kind === 'shapes' ? sel.nodeIds : sel.kind === 'none' ? [] : [sel.nodeId];
     const scope = selectionScope(layout.items, sel);
@@ -516,6 +524,12 @@ export class SlideSurface {
     if (crop && (cropHandle || onCropImage(crop, p))) {
       this.#cropDrag = startCropDrag(crop, cropHandle ?? 'move', p, `g${++this.#gestures}`);
       this.root.focus({ preventScroll: true });
+      e.preventDefault();
+      return;
+    }
+    // An empty placeholder's buttons insert a table or a picture that fills it.
+    if (!painting && this.#placeholderChrome.press(layout, target)) {
+      this.focus();
       e.preventDefault();
       return;
     }

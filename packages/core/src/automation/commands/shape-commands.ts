@@ -2,9 +2,15 @@
 // z-order, and object alignment. Each compiles to ops on an OpBatch against one slide part.
 
 import {
+  placeholderIndex,
+  removeFilledPlaceholder,
+  type EmptyPlaceholder,
+} from './placeholder-fill.ts';
+import {
   attr,
   child,
   elements,
+  escapeXmlAttribute,
   NS,
   parseXmlPart,
   REL,
@@ -244,7 +250,12 @@ export function addImagePart(
   return addRelationship(batch, part, REL.image, media);
 }
 
-/** Insert a picture from image bytes, fit inside 60% of the slide. */
+/**
+ * Insert a picture from image bytes (`w` × `h` px). It fits inside 60% of the slide, centered.
+ * With `into`, it takes the place of that empty placeholder, as a placeholder with the same
+ * index: a picture placeholder is filled and the picture cropped to its shape; a content
+ * placeholder holds the picture whole, centered, never larger than its own size.
+ */
 export function insertImage(
   batch: OpBatch,
   part: string,
@@ -253,24 +264,46 @@ export function insertImage(
   w: number,
   h: number,
   slideW: number,
-  slideH: number
+  slideH: number,
+  into?: EmptyPlaceholder
 ): string {
   const rId = addImagePart(batch, part, bytes, mime);
-  const scale = Math.min(
-    (slideW * 0.6) / Math.max(1, w * 9525),
-    (slideH * 0.6) / Math.max(1, h * 9525),
-    1
-  );
-  const cx = Math.round(w * 9525 * scale);
-  const cy = Math.round(h * 9525 * scale);
-  const id = nextShapeId(batch, spTreeOf(batch, part));
-  return appendShape(
-    batch,
+  const pw = Math.max(1, w * 9525);
+  const ph = Math.max(1, h * 9525);
+  const fills = into !== undefined && into.type !== 'obj';
+  const box = into ?? { x: 0, y: 0, cx: slideW * 0.6, cy: slideH * 0.6 };
+  const scale = fills ? 1 : Math.min(box.cx / pw, box.cy / ph, 1);
+  const cx = fills ? box.cx : Math.round(pw * scale);
+  const cy = fills ? box.cy : Math.round(ph * scale);
+  const x = into ? box.x + (box.cx - cx) / 2 : (slideW - cx) / 2;
+  const y = into ? box.y + (box.cy - cy) / 2 : (slideH - cy) / 2;
+  // A filled picture placeholder crops the picture to the box's shape, from the middle.
+  let crop = '';
+  if (fills) {
+    const over = pw / ph / (box.cx / box.cy);
+    const cut = (k: number) => int(((1 - 1 / k) / 2) * 100_000);
+    if (over > 1) crop = `<a:srcRect l="${cut(over)}" r="${cut(over)}"/>`;
+    else if (over < 1) crop = `<a:srcRect t="${cut(1 / over)}" b="${cut(1 / over)}"/>`;
+  }
+  const tree = spTreeOf(batch, part);
+  const id = into ? into.shapeId : String(nextShapeId(batch, tree));
+  const name = into ? escapeXmlAttribute(into.name) : `Picture ${Number(id) - 1}`;
+  const xml =
+    `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="${name}"/><p:cNvPicPr><a:picLocks${into ? ' noGrp="1"' : ''} noChangeAspect="1"/></p:cNvPicPr><p:nvPr>${into ? into.ph : ''}</p:nvPr></p:nvPicPr>` +
+    `<p:blipFill><a:blip r:embed="${rId}"/>${crop}<a:stretch><a:fillRect/></a:stretch></p:blipFill>` +
+    `<p:spPr><a:xfrm><a:off x="${int(x)}" y="${int(y)}"/><a:ext cx="${int(cx)}" cy="${int(cy)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+  const at = into ? placeholderIndex(batch, part, into) : -1;
+  if (at < 0) return appendShape(batch, part, xml);
+  // The picture takes the placeholder's place in the z-order.
+  const pic = batch.insert({
+    op: 'insertNode',
     part,
-    `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="Picture ${id - 1}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>` +
-      `<p:blipFill><a:blip r:embed="${rId}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>` +
-      `<p:spPr><a:xfrm><a:off x="${int((slideW - cx) / 2)}" y="${int((slideH - cy) / 2)}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`
-  );
+    parent: tree.id,
+    index: at,
+    spec: specFromXml(xml),
+  });
+  removeFilledPlaceholder(batch, part, into!);
+  return pic;
 }
 
 /**
