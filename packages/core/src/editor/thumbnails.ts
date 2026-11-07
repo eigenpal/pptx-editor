@@ -137,6 +137,7 @@ export class ThumbnailPainter {
     const session = this.#host.session();
     const pkg = session?.store.package;
     if (!session || !pkg) return;
+    for (const box of this.#layoutBoxes.keys()) if (!box.isConnected) this.#layoutBoxes.delete(box);
     this.#layoutBoxes.set(container, layoutId);
     const was = this.#layouts.get(container);
     const key = session.paintKey(layoutId);

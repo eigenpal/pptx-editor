@@ -384,3 +384,39 @@ test('an OLE object with an EMF preview draws the preview, not the labeled place
   expect(session.imageUrl(SLIDE, 'rIdEmf')).toStartWith('blob:');
   editor.destroy();
 });
+
+test('a picture that ran out of time in a hidden page converts again when the page shows', async () => {
+  // Converted before the stand-in page: the converter looks for a DOM.
+  const png = (await metafilePng(emfRectangle()))!;
+  const page = Object.assign(new EventTarget(), { hidden: true });
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', { value: page, configurable: true });
+  try {
+    let calls = 0;
+    // Slow while the page is hidden.
+    const convert = async () => ((calls += 1), page.hidden ? undefined : png);
+    let changed = 0;
+    const pictures = new MetafilePictures(
+      () => [],
+      () => (changed += 1),
+      convert
+    );
+    const bytes = emfRectangle();
+    expect(await pictures.ready([bytes])).toBe(false);
+    expect(pictures.statusOf(bytes)).toBe('timed-out');
+    // The next wait tries once more; the waits after it do not.
+    expect(await pictures.ready([bytes])).toBe(false);
+    expect(await pictures.ready([bytes])).toBe(false);
+    expect(calls).toBe(4);
+    page.hidden = false;
+    page.dispatchEvent(new Event('visibilitychange'));
+    await Bun.sleep(5);
+    expect(calls).toBe(5);
+    expect(pictures.statusOf(bytes)).toBe('ready');
+    expect(changed).toBe(1);
+    pictures.dispose();
+  } finally {
+    if (had) Object.defineProperty(globalThis, 'document', had);
+    else delete (globalThis as { document?: unknown }).document;
+  }
+});

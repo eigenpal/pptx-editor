@@ -13,15 +13,18 @@ export interface DrawablePicture {
   readonly mime: string;
 }
 
-/**
- * The state of one EMF or WMF picture part. `pending`: it converts or waits to, and draws as the
- * placeholder (or its PNG from before a font change). `failed`: it cannot convert (damaged, or
- * a content the converter does not draw). `timed-out`: two conversions ran out of time; the next
- * `picturesReady` tries once more. @public
- */
+/** The state of one EMF or WMF picture part (`pictureStatus`). @public */
 export interface PictureStatus {
   /** The picture's part name, such as `/ppt/media/image1.emf`. */
   readonly part: string;
+  /**
+   * - `ready`: it draws as its PNG.
+   * - `pending`: it is not converted yet: it converts, waits to, or converts when its slide
+   *   paints. It draws as the placeholder, or as its PNG from before a font change.
+   * - `failed`: it cannot convert: a damaged picture, or content the converter does not draw.
+   * - `timed-out`: two conversions ran out of time. The first `picturesReady` that waits for it,
+   *   a font change, and a hidden page that shows again each try once more.
+   */
   readonly state: 'ready' | 'pending' | 'failed' | 'timed-out';
 }
 
@@ -105,7 +108,7 @@ export class MetafilePictures {
   /** Metafiles whose conversion ran out of time once: a second stop waits for a new request. */
   #retried = new WeakSet<Uint8Array>();
   /** Metafiles stopped twice by the time limit: a font change, or one `ready()`, tries again. */
-  #timedOut = new WeakSet<Uint8Array>();
+  #timedOut = new Set<Uint8Array>();
   /** Metafiles that a `ready()` tried again after they ran out of time, with these fonts. */
   #readyRetried = new WeakSet<Uint8Array>();
   #running = 0;
@@ -134,7 +137,20 @@ export class MetafilePictures {
     this.#fonts = fonts;
     this.#changed = changed;
     this.#convert = convert;
+    globalThis.document?.addEventListener('visibilitychange', this.#shown);
   }
+
+  /**
+   * A hidden page slows the converter's timers, so a picture can run out of time there: when
+   * the page shows again, the pictures that ran out of time convert again.
+   */
+  readonly #shown = (): void => {
+    if (globalThis.document?.hidden || this.#disposed) return;
+    const again = [...this.#timedOut];
+    this.#timedOut.clear();
+    for (const b of again) this.#readyRetried.delete(b);
+    for (const b of again) void this.convert(b);
+  };
 
   /**
    * The bytes to draw a picture part with, or undefined while it cannot draw: a damaged or
@@ -200,7 +216,8 @@ export class MetafilePictures {
       for (;;) {
         const epoch = this.#epoch;
         // The first wait for a metafile that ran out of time tries it again, once for these
-        // fonts: an export that waits for each slide does not wait again for a shared picture.
+        // fonts: an export that waits for each slide waits at most once more for a shared
+        // picture.
         for (const b of metafiles) {
           if (!this.#timedOut.has(b) || this.#readyRetried.has(b)) continue;
           this.#timedOut.delete(b);
@@ -246,7 +263,7 @@ export class MetafilePictures {
     this.#abort = new AbortController();
     this.#done = new WeakMap();
     this.#retried = new WeakSet();
-    this.#timedOut = new WeakSet();
+    this.#timedOut.clear();
     this.#readyRetried = new WeakSet();
     this.#fontFiles = null;
     this.#epoch += 1;
@@ -263,6 +280,8 @@ export class MetafilePictures {
    */
   dispose(): void {
     this.#disposed = true;
+    globalThis.document?.removeEventListener('visibilitychange', this.#shown);
+    this.#timedOut.clear();
     for (const { url } of this.#urls.values()) URL.revokeObjectURL(url);
     this.#urls.clear();
     this.#abort.abort();

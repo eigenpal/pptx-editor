@@ -3931,7 +3931,6 @@ export function picturePropertiesWithValue(fields: PicturePropertiesDraftFields,
 // @public
 export interface PictureStatus {
     readonly part: string;
-    // (undocumented)
     readonly state: 'ready' | 'pending' | 'failed' | 'timed-out';
 }
 

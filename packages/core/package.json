@@ -60,6 +60,14 @@
     "api:extract": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/core --local",
     "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/core"
   },
+  "peerDependencies": {
+    "@napi-rs/canvas": "^1.0.9"
+  },
+  "peerDependenciesMeta": {
+    "@napi-rs/canvas": {
+      "optional": true
+    }
+  },
   "dependencies": {
     "@docx-editor.dev/fonts": "^2.34.0",
     "@pptx-editor.dev/i18n": "^0.2.0",

@@ -114,6 +114,12 @@
         "@eigenpal/ooxml-core": "workspace:*",
         "harfbuzzjs": "1.6.4",
       },
+      "peerDependencies": {
+        "@napi-rs/canvas": "^1.0.9",
+      },
+      "optionalPeers": [
+        "@napi-rs/canvas",
+      ],
     },
     "packages/editor-api": {
       "name": "@pptx-editor.dev/editor-api",
