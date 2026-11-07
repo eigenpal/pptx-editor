@@ -120,7 +120,7 @@ Registering a module is the whole enablement story. Without modules, the free en
 
 ## Charts
 
-`@pptx-editor.dev/pro/drawing` draws bar and column charts (clustered, stacked, and percent stacked), line, area, scatter, pie, doughnut, and radar charts, with titles, legends, axes, gridlines, data labels, and number formats. 3-D, of-pie, stock, bubble, and surface charts, and charts with trendlines or error bars, keep the placeholder. A chart is not editable, and its part saves unchanged.
+`@pptx-editor.dev/pro/drawing` draws bar and column charts (clustered, stacked, and percent stacked), line, area, scatter, pie, doughnut, and radar charts, with titles, legends, axes, gridlines, data labels, and number formats. 3-D, of-pie, stock, bubble, and surface charts, and charts with trendlines or error bars, keep the placeholder. Drawing is the only part that needs the module: the free engine edits chart data. See [Charts](https://pptx-editor.dev/docs/guides/charts).
 
 ```ts
 import { createPptxEditor } from '@pptx-editor.dev/core/editor';

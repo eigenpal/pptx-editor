@@ -19,6 +19,8 @@ import type {
   TextInputKind,
 } from '@pptx-editor.dev/core/editor';
 import { png, type ConvergenceFixture, type TextInputFixture } from './convergence-harness.ts';
+import { buildPptx } from '../../../../scripts/fixtures/builder.ts';
+import { chartDataDeck } from '../../../../scripts/fixtures/chart-data.ts';
 
 const IN = 914_400;
 
@@ -492,6 +494,28 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
   setAltText: {
     arrange: select(PICTURE),
     command: () => ({ type: 'setAltText', description: 'A gray square', title: 'Square' }),
+  },
+
+  // Charts: the chart part and its embedded workbook are written again in one transaction.
+  setChartData: {
+    deck: () => buildPptx(chartDataDeck()),
+    arrange: select('Chart 1'),
+    command: (e) => {
+      const read = e.chartData();
+      if (!read.ok) throw new Error(read.reason);
+      const { kind, categories, series } = read.data;
+      return {
+        type: 'setChartData',
+        data: {
+          kind,
+          categories: [...categories.slice(1), { label: 'Central' }],
+          series: [
+            ...series.map((s) => ({ ...s, values: [...s.values.slice(1), 1] })),
+            { name: 'Stretch', values: [1, 2, 3, 4] },
+          ],
+        },
+      };
+    },
   },
 
   // Tables.

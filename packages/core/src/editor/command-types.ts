@@ -134,6 +134,8 @@ const COMMAND_TABLE = {
   setImageStyle: true,
   setImageProperties: true,
   setAltText: true,
+  // Charts
+  setChartData: true,
   // Tables
   insertTable: true,
   insertRow: true,

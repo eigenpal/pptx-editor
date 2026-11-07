@@ -140,7 +140,8 @@
     "cannotCopyFrame": "Charts, diagrams, and objects cannot be copied or cut in this version",
     "altText": "Edit alt text…",
     "paragraph": "Paragraph…",
-    "font": "Font…"
+    "font": "Font…",
+    "chartLabel": "Chart actions"
   },
   "mode": {
     "label": "Mode",
@@ -172,7 +173,8 @@
       "slide": "Slide",
       "image": "Picture",
       "section": "Section",
-      "table": "Table"
+      "table": "Table",
+      "chart": "Chart"
     },
     "smartGuides": "Smart guides",
     "find": "Find (Ctrl+F)",
@@ -808,7 +810,8 @@
     "animationsReadOnly": "The effects of this slide use markup that the editor does not change",
     "noAnimation": "This slide has no such effect",
     "noAnimationChange": "The effect or transition already has these settings",
-    "instantAnimation": "This effect is instant, so it has no duration"
+    "instantAnimation": "This effect is instant, so it has no duration",
+    "noChart": "Select a chart"
   },
   "rail": {
     "ariaLabel": "Slides",
@@ -1136,7 +1139,22 @@
     "customShowNotFound": "This presentation has no such custom show.",
     "unsafeFileLink": "Type a relative path that starts with ./ or ../, such as ./report.pdf. Program and script files cannot be linked.",
     "sectionName": "A section name needs 1 to 255 characters.",
-    "view": "The editor has no such view."
+    "view": "The editor has no such view.",
+    "chartData": {
+      "noChart": "Select one chart.",
+      "noData": "The chart has no data series.",
+      "combination": "The chart combines more than one chart type.",
+      "unsupportedType": "The editor does not edit the data of this chart type.",
+      "filtered": "The chart hides some of its series.",
+      "multiLevel": "The chart has categories in more than one level.",
+      "mixedCategories": "The series of the chart use different categories.",
+      "tooLarge": "The chart has more data than the editor edits.",
+      "empty": "A chart needs at least one series and one category.",
+      "invalidText": "A name or label has characters that a chart cannot keep.",
+      "notNumber": "Each value must be a number.",
+      "layout": "The cell references of the chart do not form one table, so you can change only names and values.",
+      "workbook": "The embedded workbook cannot take this change. Give each series a different name, and keep the cells beside the data empty."
+    }
   },
   "find": {
     "label": "Find and replace",
@@ -1478,6 +1496,7 @@
       "view": "View",
       "shapeFormat": "Shape Format",
       "pictureFormat": "Picture Format",
+      "chartDesign": "Chart Design",
       "tableDesign": "Table Design",
       "tableLayout": "Table Layout"
     }
@@ -1553,5 +1572,33 @@
     "keyHint": "Press H to show or hide the focused object, and F2 to rename it.",
     "emptyTitle": "No objects",
     "emptyBody": "Shapes, pictures, and text boxes on this slide show here."
+  },
+  "chartData": {
+    "editData": "Edit data…",
+    "title": "Edit chart data",
+    "close": "Close",
+    "grid": "Chart data",
+    "categories": "Categories",
+    "xValues": "X values",
+    "seriesName": "Name of series {number}",
+    "categoryLabel": "Category {number}",
+    "xValueLabel": "X value {number}",
+    "cellLabel": "{series}, {category}",
+    "newSeries": "Series {number}",
+    "newCategory": "Category {number}",
+    "addCategory": "Add category",
+    "removeCategory": "Remove category",
+    "addSeries": "Add series",
+    "removeSeries": "Remove series",
+    "help": "Type a value in each cell. Leave a cell empty for no value. Use the arrow keys to move between cells.",
+    "workbookKept": "The embedded workbook keeps its old values. The chart shows the values you enter.",
+    "workbookExternal": "The chart gets its data from a linked workbook. The chart shows the values you enter and stops updating from the link.",
+    "notEditable": "You cannot edit the data of this chart. {reason}",
+    "errors": {
+      "number": "Enter a number, or leave the cell empty.",
+      "xNumber": "Enter a number for each X value.",
+      "tooLong": "Use 255 characters or fewer.",
+      "cell": "{cell}: {message}"
+    }
   }
 }

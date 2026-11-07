@@ -372,13 +372,13 @@ export type CanResult = {
 export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly ChromeMenuEntry[]>>;
 
 // @public
-export type CanvasMenuKind = 'shapes' | 'picture' | 'text' | 'table' | 'tableFrame' | 'slide';
+export type CanvasMenuKind = 'shapes' | 'picture' | 'chart' | 'text' | 'table' | 'tableFrame' | 'slide';
 
 // @internal
-export function canvasMenuKind(snapshot: Pick<EditorSnapshot, 'selection' | 'image'> & Partial<Pick<EditorSnapshot, 'table'>>): CanvasMenuKind;
+export function canvasMenuKind(snapshot: Pick<EditorSnapshot, 'selection' | 'image'> & Partial<Pick<EditorSnapshot, 'table' | 'chart'>>): CanvasMenuKind;
 
 // @internal
-export function canvasMenuLabelKey(kind: CanvasMenuKind): 'contextMenu.textLabel' | 'contextMenu.tableLabel' | 'contextMenu.shapeLabel' | 'contextMenu.pictureLabel' | 'contextMenu.canvasLabel';
+export function canvasMenuLabelKey(kind: CanvasMenuKind): 'contextMenu.textLabel' | 'contextMenu.tableLabel' | 'contextMenu.shapeLabel' | 'contextMenu.pictureLabel' | 'contextMenu.chartLabel' | 'contextMenu.canvasLabel';
 
 // @internal
 export function canvasMenuPoint(owner: Element, at: {
@@ -391,6 +391,121 @@ export function canvasMenuPoint(owner: Element, at: {
 
 // @public
 export type CapsStyle = 'none' | 'small' | 'all';
+
+// @public
+export type ChartCommand = {
+    readonly type: 'setChartData';
+    readonly nodeId?: string;
+    readonly data: Omit<ChartData, 'workbook'>;
+};
+
+// @public
+export interface ChartData {
+    // (undocumented)
+    readonly categories: readonly ChartDataCategory[];
+    // (undocumented)
+    readonly kind: ChartDataKind;
+    // (undocumented)
+    readonly series: readonly ChartDataSeries[];
+    readonly workbook?: ChartWorkbookState;
+}
+
+// @public
+export interface ChartDataCategory {
+    readonly label: string;
+    readonly source?: number;
+}
+
+// @internal
+export interface ChartDataDraft {
+    // (undocumented)
+    readonly columns: readonly ChartDraftColumn[];
+    // (undocumented)
+    readonly kind: ChartDataKind;
+    readonly numericX: boolean;
+    // (undocumented)
+    readonly rows: readonly ChartDraftRow[];
+    readonly workbook: ChartWorkbookState;
+}
+
+// @internal
+export interface ChartDataDraftFields {
+    // (undocumented)
+    readonly grid: ChartDataDraft;
+}
+
+// @public
+export type ChartDataKind = 'category' | 'xy';
+
+// @public
+export type ChartDataRead = {
+    readonly ok: true;
+    readonly data: ChartData;
+} | {
+    readonly ok: false;
+    readonly reason: string;
+};
+
+// @public
+export interface ChartDataSeries {
+    readonly name: string;
+    readonly source?: number;
+    readonly values: readonly (number | null)[];
+}
+
+// @internal
+export function chartDraftCell(draft: ChartDataDraft, row: number, column: number): string;
+
+// @internal
+export function chartDraftCellErrors(draft: ChartDataDraft): ReadonlyMap<string, string>;
+
+// @internal
+export interface ChartDraftColumn {
+    readonly cells: readonly string[];
+    // (undocumented)
+    readonly name: string;
+    readonly source?: number;
+}
+
+// @internal
+export function chartDraftCommand(fields: ChartDataDraftFields): EditorCommand | null;
+
+// @internal
+export function chartDraftFrom(data: ChartData): ChartDataDraftFields;
+
+// @internal
+export interface ChartDraftRow {
+    // (undocumented)
+    readonly label: string;
+    readonly source?: number;
+}
+
+// @internal
+export function chartGridMove(key: {
+    readonly key: string;
+    readonly shiftKey?: boolean;
+    readonly ctrlKey?: boolean;
+}, at: ChartGridPosition, size: {
+    readonly rows: number;
+    readonly columns: number;
+}, caret?: {
+    readonly atStart: boolean;
+    readonly atEnd: boolean;
+}): ChartGridPosition | null;
+
+// @internal
+export interface ChartGridPosition {
+    // (undocumented)
+    readonly column: number;
+    // (undocumented)
+    readonly row: number;
+}
+
+// @public
+export type ChartSlotId = 'chart.editData';
+
+// @public
+export type ChartWorkbookState = 'embedded' | 'kept' | 'external' | 'none';
 
 // @public
 export type CheckState = boolean | 'mixed';
@@ -522,7 +637,7 @@ export type ChromeControlState =
 export type ChromeControlToggle = 'pressed' | 'choice';
 
 // @public
-export type ChromeDialogKey = 'pageSetup' | 'background' | 'paragraph' | 'font' | 'bulletsAndNumbering' | 'columns' | 'imageAltText' | 'imageProperties';
+export type ChromeDialogKey = 'pageSetup' | 'background' | 'paragraph' | 'font' | 'bulletsAndNumbering' | 'columns' | 'imageAltText' | 'imageProperties' | 'chartData';
 
 // @public
 export interface ChromeGroup {
@@ -536,7 +651,7 @@ export interface ChromeGroup {
 }
 
 // @public
-export type ChromeGroupId = 'history' | 'font' | 'text' | 'script' | 'paragraph' | 'list' | 'insert' | 'shape' | 'format' | 'arrange' | 'more' | 'find' | 'view' | 'file' | 'edit' | 'slide' | 'image' | 'section' | 'table';
+export type ChromeGroupId = 'history' | 'font' | 'text' | 'script' | 'paragraph' | 'list' | 'insert' | 'shape' | 'format' | 'arrange' | 'more' | 'find' | 'view' | 'file' | 'edit' | 'slide' | 'image' | 'section' | 'table' | 'chart';
 
 // @internal
 export function chromeKeepsFocus(target: EventTarget | null): boolean;
@@ -615,7 +730,7 @@ export function chromeOptionChecked(value: unknown, option: string): boolean;
 export function chromeRowState(editor: PptxEditorInstance | null, slot: ChromeSlotId, value?: string, host?: Pick<ChromeActionHost, 'unavailable'>): ChromeCommandState;
 
 // @public
-export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.textEffects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | TableSlotId | ImageSlotId;
+export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.textEffects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | TableSlotId | ImageSlotId | ChartSlotId;
 
 // @public
 export function chromeSlotIds(): ChromeSlotId[];
@@ -1031,6 +1146,7 @@ export const CONTEXT_MENU_NAMED_PARTS: {
     readonly ImageAltText: MenuNamedRow;
     readonly ImageChange: MenuNamedRow;
     readonly ImageProperties: MenuNamedRow;
+    readonly ChartEditData: MenuNamedRow;
     readonly FormatBackground: MenuNamedRow;
     readonly NewSlide: MenuNamedRow;
     readonly InsertRowAbove: MenuNamedRow;
@@ -1959,7 +2075,7 @@ export type EditorCommand = {
 /** Apply the copied formatting to the selection as one undo step (Ctrl/Cmd+Shift+V). */
 | {
     readonly type: 'pasteFormat';
-} | TextFormatCommand | PictureCommand | FillCommand | AnimationCommand
+} | TextFormatCommand | PictureCommand | ChartCommand | FillCommand | AnimationCommand
 /**
 * Shape Effects: set or remove one effect of the selected shapes, connectors, and pictures.
 * A shape whose effects come from its theme style (`a:effectRef`) gets that style's effects
@@ -2136,6 +2252,7 @@ export interface EditorSnapshot {
     readonly canRedo: boolean;
     // (undocumented)
     readonly canUndo: boolean;
+    readonly chart?: SelectedChartState | null;
     readonly collapsedSections?: readonly string[];
     // (undocumented)
     readonly currentSlide: number;
@@ -3104,6 +3221,12 @@ export type ImageStyleId = 'simpleFrameWhite' | 'simpleFrameBlack' | 'softEdgeRe
 
 // @internal
 export function inFixedView<R extends object>(r: R, view: FixedView): R;
+
+// @internal
+export function insertChartDraftColumn(draft: ChartDataDraft, at: number, name: string): ChartDataDraft;
+
+// @internal
+export function insertChartDraftRow(draft: ChartDataDraft, at: number, label: string): ChartDataDraft;
 
 // @internal
 export function insertImageFile(editor: PptxEditorInstance, file: File, target?: 'replaceImage'): Promise<void>;
@@ -4276,6 +4399,7 @@ export interface PptxEditorEvents {
 
 // @public
 export interface PptxEditorInstance extends Editor {
+    chartData(nodeId?: string): ChartDataRead;
     readonly find: PptxFind;
     // @internal
     finishOpening(): boolean;
@@ -4450,6 +4574,12 @@ export const REMOVAL_NOTICE_MS = 10000;
 export function removalNoticeShows(removal: EditorRemoval | null | undefined, closed: number | null): removal is EditorRemoval;
 
 // @internal
+export function removeChartDraftColumn(draft: ChartDataDraft, column: number): ChartDataDraft;
+
+// @internal
+export function removeChartDraftRow(draft: ChartDataDraft, row: number): ChartDataDraft;
+
+// @internal
 export function renderedColorOf(pick: ColorPick, rows: readonly (readonly ThemeSwatch[])[], current?: string | null): string | null;
 
 // @internal
@@ -4573,7 +4703,7 @@ export interface ReviewModuleContribution {
 export const RIBBON_TABS: readonly RibbonTab[];
 
 // @public
-export type RibbonContext = 'shape' | 'picture' | 'table';
+export type RibbonContext = 'shape' | 'picture' | 'chart' | 'table';
 
 // @public
 export function ribbonContextActive(snapshot: RibbonSelection, context: RibbonContext): boolean;
@@ -4592,7 +4722,7 @@ export function ribbonInsertTab<T extends {
 }>(tabs: readonly T[]): string | null;
 
 // @public
-export type RibbonSelection = Pick<EditorSnapshot, 'selection' | 'image' | 'table'>;
+export type RibbonSelection = Pick<EditorSnapshot, 'selection' | 'image' | 'table'> & Partial<Pick<EditorSnapshot, 'chart'>>;
 
 // @internal
 export function ribbonShownTab<T extends {
@@ -4616,7 +4746,7 @@ export interface RibbonTab {
 export function ribbonTabGroups(tab: RibbonTab, groups?: readonly ChromeGroup[]): ChromeGroup[];
 
 // @public
-export type RibbonTabId = 'quickAccess' | 'home' | 'insert' | 'design' | 'slideShow' | 'view' | 'shapeFormat' | 'pictureFormat' | 'tableDesign' | 'tableLayout';
+export type RibbonTabId = 'quickAccess' | 'home' | 'insert' | 'design' | 'slideShow' | 'view' | 'shapeFormat' | 'pictureFormat' | 'chartDesign' | 'tableDesign' | 'tableLayout';
 
 // @public
 export interface RibbonTabLayout {
@@ -4737,6 +4867,13 @@ export function seedParagraphFields(format: ParagraphFormatRead | null): Paragra
 
 // @internal
 export function seedSlideSizeFields(width: number, height: number): SlideSizeFields;
+
+// @public
+export interface SelectedChartState {
+    readonly editable: boolean;
+    readonly nodeId: string;
+    readonly reason?: string;
+}
 
 // @public
 export interface SelectedImageState {
@@ -4892,6 +5029,9 @@ export function selectSlideSection(editor: PptxEditorInstance | null, section: S
 
 // @internal
 export function separatorCost(bar: HTMLElement, style: CSSStyleDeclaration): number;
+
+// @internal
+export function setChartDraftCell(draft: ChartDataDraft, row: number, column: number, text: string): ChartDataDraft;
 
 // @internal
 export function setNotesTarget(editor: object, target: NotesTarget | null): void;
@@ -6011,6 +6151,7 @@ export const TOOLBAR_NAMED_PARTS: {
     readonly ImageCropToShape: "image.cropToShape";
     readonly ImageCropFit: "image.cropFit";
     readonly ImageProperties: "image.properties";
+    readonly ChartEditData: "chart.editData";
     readonly TableInsert: "table.insert";
     readonly TableStyle: "table.style";
     readonly TableHeaderRow: "table.headerRow";
@@ -6093,10 +6234,10 @@ export interface ToolbarCommandState {
 export function toolbarCommandState(editor: Editor | null, id: ChromeSlotId): ToolbarCommandState;
 
 // @internal
-export type ToolbarContext = 'none' | 'text' | 'shape' | 'picture' | 'table' | 'tableFrame' | 'notes';
+export type ToolbarContext = 'none' | 'text' | 'shape' | 'picture' | 'chart' | 'table' | 'tableFrame' | 'notes';
 
 // @internal
-export function toolbarContextOf(snapshot: Pick<EditorSnapshot, 'selection' | 'image' | 'table'>): ToolbarContext;
+export function toolbarContextOf(snapshot: Pick<EditorSnapshot, 'selection' | 'image' | 'table'> & Partial<Pick<EditorSnapshot, 'chart'>>): ToolbarContext;
 
 // @internal
 export interface ToolbarDropdownRow {
@@ -6346,6 +6487,9 @@ export function validateAltTextDraft(fields: AltTextDraftFields): DialogErrors<A
 
 // @internal
 export function validateBackgroundDraft(fields: BackgroundDraftFields, initial: BackgroundDraftFields, picked?: boolean): DialogErrors<BackgroundDraftFields>;
+
+// @internal
+export function validateChartDraft(fields: ChartDataDraftFields): DialogErrors<ChartDataDraftFields>;
 
 // @internal
 export function validatePicturePropertiesDraft(f: PicturePropertiesDraftFields, initial?: PicturePropertiesDraftFields): DialogErrors<PicturePropertiesDraftFields>;

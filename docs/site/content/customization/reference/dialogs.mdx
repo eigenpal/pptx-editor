@@ -18,6 +18,7 @@ Pass the map through `popups` on `PptxEditor.Root`. A function renders that surf
 | `bulletsAndNumbering` | The Bullets and Numbering dialog (**Format > Bullets and numbering…** and the last row of the Bullets and Numbering galleries): the bullet or number style, size, color, and start number. |
 | `imageAltText` | The alt text of the selected object: description, title, and **Mark as decorative**. |
 | `imageProperties` | Format Picture: the size, rotation, and crop of the selected picture. |
+| `chartData` | The Edit Data dialog (**Edit data…** on the chart toolbar group and in the chart context menu): the series names, category labels, and values of the selected chart. |
 | `columns` | The Columns dialog (**Format > Columns…** and **Columns > More columns…**): the column count and the spacing between columns. |
 | `paragraph` | The Paragraph dialog (**Format > Paragraph…**, **Line Spacing > Line Spacing Options…**, and the text context menu): alignment, indents, spacing, and line spacing. |
 | `hyperlink` | The link popup (Ctrl+K or Cmd+K, the toolbar's link control, **Insert > Link…**). |
@@ -28,7 +29,7 @@ Pass the map through `popups` on `PptxEditor.Root`. A function renders that surf
 
 ### What a `false` entry does
 
-A `false` entry turns off automatic rendering for that key. It does not turn off the operation. `setLink`, `editor.find`, `setSlideBackground`, `setFontFormat`, `setParagraphFormat`, `setBulletFormat`, `setColumns`, `setAltText`, and `setImageProperties` keep working from the API. `useEditorCommand('image.altText').execute(description)` also sets the description with the popup off.
+A `false` entry turns off automatic rendering for that key. It does not turn off the operation. `setLink`, `editor.find`, `setSlideBackground`, `setFontFormat`, `setParagraphFormat`, `setBulletFormat`, `setColumns`, `setAltText`, `setImageProperties`, and `setChartData` keep working from the API. `useEditorCommand('image.altText').execute(description)` also sets the description with the popup off.
 
 The toolbar control or menu row that opens the surface stays visible. It is disabled with a reason, such as "Links are turned off in this editor". There are two exceptions:
 
@@ -39,7 +40,7 @@ When you replace an input popup, give your users another way to reach its operat
 
 ### Open a dialog by key
 
-`useEditorDialog(key).open()` opens a modal dialog from your own control. The keys are `pageSetup`, `background`, `font`, `paragraph`, `bulletsAndNumbering`, `columns`, `imageAltText`, and `imageProperties`. `isAvailable` is `false` when the entry is `false`.
+`useEditorDialog(key).open()` opens a modal dialog from your own control. The keys are `pageSetup`, `background`, `font`, `paragraph`, `bulletsAndNumbering`, `columns`, `imageAltText`, `imageProperties`, and `chartData`. `isAvailable` is `false` when the entry is `false`.
 
 ## The link popup renderer
 

@@ -9,6 +9,7 @@ import { BulletFormatMixed } from '@pptx-editor.dev/core/editor';
 import { BulletFormatRead } from '@pptx-editor.dev/core/editor';
 import { BulletsDialogFields } from '@pptx-editor.dev/core/editor';
 import { CanvasMenuKind } from '@pptx-editor.dev/core/editor';
+import { ChartDataDraftFields } from '@pptx-editor.dev/core/editor';
 import { ChromeControl } from '@pptx-editor.dev/core/editor';
 import { ChromeGroupId } from '@pptx-editor.dev/core/editor';
 import { ChromeMenuId } from '@pptx-editor.dev/core/editor';
@@ -174,6 +175,32 @@ export interface BulletsAndNumberingDialogProps extends DialogCustomizationProps
 export { BulletsDialogFields }
 
 export { CanvasMenuKind }
+
+// @public
+export const ChartDataDialog: typeof ChartDataDialogRoot & {
+    Header: (props: DialogPartProps) => ReactNode;
+    Title: (props: DialogPartProps) => ReactNode;
+    Body: (props: DialogPartProps) => ReactNode;
+    Footer: (props: DialogPartProps) => ReactNode;
+    Field: (props: DialogPartProps & {
+        readonly name: "grid";
+    }) => ReactNode;
+    Error: (props: DialogPartProps) => ReactNode;
+    Apply: (props: DialogPartProps) => ReactNode;
+    Cancel: (props: DialogPartProps) => ReactNode;
+};
+
+// @public
+export type ChartDataDialogFieldName = 'grid';
+
+// @public
+export type ChartDataDialogFields = ChartDataDraftFields;
+
+// @public
+export interface ChartDataDialogProps extends DialogCustomizationProps {
+    readonly onClose: () => void;
+    readonly open: boolean;
+}
 
 export { ChromeControl }
 
@@ -1073,6 +1100,18 @@ export const PptxEditor: react.ForwardRefExoticComponent<PptxEditorProps & react
         Apply: (props: DialogPartProps) => ReactNode;
         Cancel: (props: DialogPartProps) => ReactNode;
     };
+    ChartDataDialog: ((props: ChartDataDialogProps) => ReactNode) & {
+        Header: (props: DialogPartProps) => ReactNode;
+        Title: (props: DialogPartProps) => ReactNode;
+        Body: (props: DialogPartProps) => ReactNode;
+        Footer: (props: DialogPartProps) => ReactNode;
+        Field: (props: DialogPartProps & {
+            readonly name: "grid";
+        }) => ReactNode;
+        Error: (props: DialogPartProps) => ReactNode;
+        Apply: (props: DialogPartProps) => ReactNode;
+        Cancel: (props: DialogPartProps) => ReactNode;
+    };
     ParagraphDialog: ((input: ParagraphDialogProps) => ReactNode) & {
         Header: (props: DialogPartProps) => ReactNode;
         Title: (props: DialogPartProps) => ReactNode;
@@ -1155,7 +1194,7 @@ export interface PptxEditorContextMenuProps {
 }
 
 // @public
-export type PptxEditorDialogKey = 'pageSetup' | 'background' | 'paragraph' | 'font' | 'bulletsAndNumbering' | 'columns' | 'imageAltText' | 'imageProperties';
+export type PptxEditorDialogKey = 'pageSetup' | 'background' | 'paragraph' | 'font' | 'bulletsAndNumbering' | 'columns' | 'imageAltText' | 'imageProperties' | 'chartData';
 
 export { PptxEditorEvents }
 
@@ -1186,6 +1225,7 @@ export type PptxEditorPopup<Props extends object> = false | ((props: Props) => R
 export interface PptxEditorPopups {
     background?: PptxEditorPopup<BackgroundDialogProps>;
     bulletsAndNumbering?: PptxEditorPopup<BulletsAndNumberingDialogProps>;
+    chartData?: PptxEditorPopup<ChartDataDialogProps>;
     columns?: PptxEditorPopup<ColumnsDialogProps>;
     contextMenu?: PptxEditorPopup<PptxEditorContextMenuProps>;
     find?: PptxEditorPopup<FindPopupProps>;
@@ -1636,6 +1676,7 @@ export interface ToolbarNamedParts {
     readonly BulletStyle: ToolbarSlotPartComponent;
     readonly ChangeCase: ToolbarSlotPartComponent;
     readonly CharacterSpacing: ToolbarSlotPartComponent;
+    readonly ChartEditData: ToolbarPartComponent;
     readonly ClearFormatting: ToolbarPartComponent;
     readonly CollapseAllSections: ToolbarPartComponent;
     readonly Columns: ToolbarSlotPartComponent;
@@ -1856,6 +1897,12 @@ export function useBulletsAndNumberingDialog(): UseBulletsAndNumberingDialogRetu
 
 // @public
 export type UseBulletsAndNumberingDialogReturn = UseDialogReturn<BulletsDialogFields>;
+
+// @public
+export function useChartDataDialog(): UseChartDataDialogReturn;
+
+// @public
+export type UseChartDataDialogReturn = UseDialogReturn<ChartDataDialogFields>;
 
 // @public
 export function useChromeTranslate(overrides?: ReadonlyMap<string, string>): ChromeTranslate;

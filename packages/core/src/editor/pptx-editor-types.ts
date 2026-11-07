@@ -8,6 +8,7 @@ import type {
   EditorMode,
   EditorSelection,
   TableStyleChoice,
+  ChartDataRead,
 } from '../contracts/index.ts';
 import type { DocumentSession, OpenOptions } from './document-session.ts';
 import type { EditorFontError } from './editor-font-error.ts';
@@ -115,6 +116,13 @@ export interface PptxEditorInstance extends Editor {
   setFontFamilies(families: readonly string[]): void;
   /** Table styles the Table Styles picker offers: the deck's own and the built-in default. */
   tableStyles(): readonly TableStyleChoice[];
+  /**
+   * The data of the selected chart, or of the chart frame `nodeId` on the current slide: its
+   * categories, series names, and values, and where its workbook is. Refused with a reason
+   * (a translation key) for a chart whose data shape the editor does not edit. The Edit Data
+   * dialog shows it; `setChartData` writes it back.
+   */
+  chartData(nodeId?: string): ChartDataRead;
   /** The shapes copied last in this editor (paste uses it when the clipboard is not readable). */
   readonly lastCopied: ClipboardPayload | null;
   /**

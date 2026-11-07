@@ -53,6 +53,7 @@ const OFF_REASONS: Readonly<Record<string, string>> = {
   background: 'dialog.unavailable',
   imageAltText: 'dialog.unavailable',
   imageProperties: 'dialog.unavailable',
+  chartData: 'dialog.unavailable',
   paragraph: 'dialog.unavailable',
   font: 'dialog.unavailable',
   bulletsAndNumbering: 'dialog.unavailable',

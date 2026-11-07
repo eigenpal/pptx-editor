@@ -4,7 +4,7 @@ description: 'Use tabs and contextual tabs in the PPTX editor, and change each t
 category: 'Customization'
 ---
 
-`PptxEditor.Ribbon` arranges the chrome groups on tabs: the Quick Access Toolbar, Home, Insert, Design, Slide Show, and View, and the contextual tabs Shape Format, Picture Format, Table Design, and Table Layout. Use it in place of `PptxEditor.Toolbar`, which stays as the flat form of the same groups.
+`PptxEditor.Ribbon` arranges the chrome groups on tabs: the Quick Access Toolbar, Home, Insert, Design, Slide Show, and View, and the contextual tabs Shape Format, Picture Format, Chart Design, Table Design, and Table Layout. Use it in place of `PptxEditor.Toolbar`, which stays as the flat form of the same groups.
 
 The ribbon is a layer over the toolbar. Each tab panel is the toolbar with that tab's groups, and every button is a toolbar slot (`ChromeSlotId`) that runs the same command as the toolbar and the menus. Every toolbar customization works inside a tab: `Toolbar.Slot`, named parts, `Toolbar.Group` with `priority`, `Toolbar.Action`, `hidden`, and the More menu.
 
@@ -34,8 +34,9 @@ The ribbon is a layer over the toolbar. Each tab panel is the toolbar with that 
 | `design` | `file` (slide size), `slide` (`background`) | Always |
 | `slideShow` | `view` (`playFromStart`, `playFromCurrent`), `slide` (`hide`) | Always |
 | `view` | `view` (`presentationView`, `smartGuides`) | Always |
-| `shapeFormat` | `insert` (`shape`, `line`, `textBox`), `shape`, `arrange` | While shapes are selected, or the text of a shape is edited, and no picture or table is selected |
+| `shapeFormat` | `insert` (`shape`, `line`, `textBox`), `shape`, `arrange` | While shapes are selected, or the text of a shape is edited, and no picture, chart, or table is selected |
 | `pictureFormat` | `image`, `arrange` | While every selected element is a picture (`snapshot.image`) |
+| `chartDesign` | `chart` (`editData`), `arrange` | While one chart is selected (`snapshot.chart`) |
 | `tableDesign` | `table` (table style options, styles, shading, borders) | While the selection is in or on a table (`snapshot.table`) |
 | `tableLayout` | `table` (select, delete, insert, merge, split, distribute, margins) | While the selection is in or on a table |
 
@@ -43,7 +44,7 @@ A group in parentheses shows only the controls named there. `arrange` follows th
 
 When the selected tab goes away (a contextual tab after the selection changes), the ribbon selects Home, calls `onTabChange('home')`, and moves the keyboard focus to the Home tab name when the focus was in the ribbon. Selecting an object shows its contextual tab, and the user opens it. Inserting an object (a shape, line, text box, picture, or table) opens its tab: the ribbon reads `snapshot.insertions` and selects the first contextual tab that shows, and a controlled host hears it through `onTabChange`.
 
-A change inside `Ribbon.Tab` applies to that tab only. The `shape` and `arrange` groups are on Home and on Shape Format, and `arrange` is on Picture Format too: to hide a group or a control everywhere, hide it in each tab.
+A change inside `Ribbon.Tab` applies to that tab only. The `shape` and `arrange` groups are on Home and on Shape Format, and `arrange` is on Picture Format and Chart Design too: to hide a group or a control everywhere, hide it in each tab.
 
 ### Development warnings
 

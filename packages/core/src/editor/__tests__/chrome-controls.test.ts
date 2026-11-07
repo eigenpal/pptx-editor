@@ -131,6 +131,7 @@ const SLOT_UNION = {
   'table.distributeRows': true,
   'table.distributeColumns': true,
   'table.cellMargins': true,
+  'chart.editData': true,
 } as const satisfies Record<ChromeSlotId, true>;
 
 const en = JSON.parse(

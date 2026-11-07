@@ -159,6 +159,52 @@ export type CanResult = {
 export type CapsStyle = 'none' | 'small' | 'all';
 
 // @public
+export type ChartCommand = {
+    readonly type: 'setChartData';
+    readonly nodeId?: string;
+    readonly data: Omit<ChartData, 'workbook'>;
+};
+
+// @public
+export interface ChartData {
+    // (undocumented)
+    readonly categories: readonly ChartDataCategory[];
+    // (undocumented)
+    readonly kind: ChartDataKind;
+    // (undocumented)
+    readonly series: readonly ChartDataSeries[];
+    readonly workbook?: ChartWorkbookState;
+}
+
+// @public
+export interface ChartDataCategory {
+    readonly label: string;
+    readonly source?: number;
+}
+
+// @public
+export type ChartDataKind = 'category' | 'xy';
+
+// @public
+export type ChartDataRead = {
+    readonly ok: true;
+    readonly data: ChartData;
+} | {
+    readonly ok: false;
+    readonly reason: string;
+};
+
+// @public
+export interface ChartDataSeries {
+    readonly name: string;
+    readonly source?: number;
+    readonly values: readonly (number | null)[];
+}
+
+// @public
+export type ChartWorkbookState = 'embedded' | 'kept' | 'external' | 'none';
+
+// @public
 export interface ClipboardNode {
     // (undocumented)
     readonly attrs?: readonly {
@@ -694,7 +740,7 @@ export type EditorCommand = {
 /** Apply the copied formatting to the selection as one undo step (Ctrl/Cmd+Shift+V). */
 | {
     readonly type: 'pasteFormat';
-} | TextFormatCommand | PictureCommand | FillCommand | AnimationCommand
+} | TextFormatCommand | PictureCommand | ChartCommand | FillCommand | AnimationCommand
 /**
 * Shape Effects: set or remove one effect of the selected shapes, connectors, and pictures.
 * A shape whose effects come from its theme style (`a:effectRef`) gets that style's effects
@@ -813,6 +859,7 @@ export interface EditorSnapshot {
     readonly canRedo: boolean;
     // (undocumented)
     readonly canUndo: boolean;
+    readonly chart?: SelectedChartState | null;
     readonly collapsedSections?: readonly string[];
     // (undocumented)
     readonly currentSlide: number;
@@ -1276,6 +1323,13 @@ export interface RenderThumbnailOptions {
 
 // @public
 export type RotateChoice = 'right90' | 'left90' | 'flipVertical' | 'flipHorizontal';
+
+// @public
+export interface SelectedChartState {
+    readonly editable: boolean;
+    readonly nodeId: string;
+    readonly reason?: string;
+}
 
 // @public
 export interface SelectedImageState {
