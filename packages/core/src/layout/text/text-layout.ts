@@ -12,6 +12,7 @@ import { AutonumberCounters, autonumberText, symbolBulletText } from './autonumb
 import { fontSlotPieces, slotFamily, type FontSlot } from './font-slots.ts';
 import {
   breakOpportunities,
+  forcedLineEnd,
   isHangingPunctuation,
   isIdeographic,
   isTrailingSpace,
@@ -600,7 +601,8 @@ export function layoutTextOn(
       for (let i = 0; i < s.text.length; i += 1)
         units.push({ seg: si, code: s.text.charCodeAt(i), advance: s.advances[i] });
     });
-    const breaks = paragraphBreaks(p, segments.map((s) => s.text).join(''));
+    const paragraphText = segments.map((s) => s.text).join('');
+    const breaks = paragraphBreaks(p, paragraphText);
 
     const bullet = sourceLength > 0 ? marker : null;
     const pending = sourceLength > 0 ? null : marker;
@@ -670,7 +672,7 @@ export function layoutTextOn(
           p.hangingPunct && i > start && isHangingPunctuation(u.code) && x - left <= limit + 1;
         if (wrap && next - left > limit + 1 && !isTrailingSpace(u.code) && !hangs) {
           if (lastBreak > start) end = lastBreak;
-          else end = Math.max(i, start + 1);
+          else end = forcedLineEnd(paragraphText, breaks, start, i);
           break;
         }
         x = next;
