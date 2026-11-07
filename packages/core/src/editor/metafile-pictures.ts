@@ -60,7 +60,6 @@ export function metafilesOf(pkg: PptxPackage, slides: readonly string[]): Uint8A
   return metafilePartsOf(pkg, slides).bytes;
 }
 
-/** The metafile parts that `slides` can show (`metafilesOf`), with their part names. */
 /**
  * The metafiles of slide `index` of `slides`, or of every slide when it is undefined; null for a
  * slide that does not exist.
@@ -75,6 +74,7 @@ export function slideMetafiles(
   return shown ? metafilePartsOf(pkg, shown) : null;
 }
 
+/** The metafile parts that `slides` can show (`metafilesOf`), with their part names. */
 export function metafilePartsOf(pkg: PptxPackage, slides: readonly string[]): ShownMetafiles {
   if (slides.length !== 1) return walkMetafiles(pkg, slides);
   // One slide at a time is what each paint asks: keep the answer for this revision of the deck.
@@ -326,6 +326,7 @@ export class MetafilePictures {
     // Conversions with the old fonts stop, and run again with the new ones.
     this.#abort.abort();
     this.#abort = new AbortController();
+    this.#listen(false);
     this.#done = new WeakMap();
     this.#retried = new WeakSet();
     this.#timedOut = new WeakSet();
