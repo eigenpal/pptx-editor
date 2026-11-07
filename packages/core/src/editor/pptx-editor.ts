@@ -258,7 +258,6 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   const tableState = createTableStateSource();
   const substitutions = createSubstitutionSource();
   const stableSubstitutions = (pkg: PptxPackage | undefined) => substitutions(session, pkg);
-  /** The substitutions while the host's fonts are on the way: none yet. */
   const NO_SUBSTITUTIONS: EditorSnapshot['substitutedFonts'] = Object.freeze([]);
   const partVersion = createVersionSource();
 
@@ -736,8 +735,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       ok: false,
       reason: destroyed ? 'disabled.destroyed' : 'errors.superseded',
     });
-    // Any throw ends the open with a refusal the person can read and report: the loading
-    // screen never stays up for an open that failed.
+    // Any throw ends the open with a refusal to report: the loading screen never stays up.
     let phase = 'paint';
     // The new deck's session once it mounts: a throw after that drops it.
     let adopted: DocumentSession | null = null;
@@ -749,9 +747,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       // A collaboration room needs every part, so a deck that joins one opens whole.
       const startSlide = clampSlide(loadOptions?.startSlide, Number.MAX_SAFE_INTEGER);
       const progressive = modules.collaboration ? {} : { progressive: { startSlide } };
-      const step = (next: string) => void (phase = next);
       const openOptions = { ...openOptionsOf(options), ...progressive };
-      const r = await prepareDeck(bytes, openOptions, hostFonts, stale, step);
+      const r = await prepareDeck(bytes, openOptions, hostFonts, stale, (s) => void (phase = s));
       if (r.kind === 'stale') return superseded();
       if (r.kind === 'refused') {
         opening.resume(session);
