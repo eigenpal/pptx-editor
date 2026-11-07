@@ -57,6 +57,7 @@ import {
   type PageOps,
   type StopFunctions,
 } from './page-ops.ts';
+import { fontEmbeddingDecision } from './pdf-font-embedding.ts';
 
 /**
  * The largest picture this writer decodes. `pdf-lib` decodes every PNG pixel, so a small file
@@ -411,11 +412,26 @@ async function imageFor(target: string, p: PageOps): Promise<PDFImage | null> {
   // An EMF or WMF picture draws as its PNG, converted as in the editor.
   const metafile = bytes !== undefined && metafileFormat(bytes) !== undefined;
   if (bytes && metafile) {
-    const fonts = (p.res.metafileFonts ??= [...p.res.faces.values()].map((f) => f.bytes));
-    bytes = (await metafilePng(bytes, fonts, p.res.work.signal)) ?? undefined;
-    // When the export's signal or deadline stopped the conversion, the export fails. A picture
-    // that the converter's own time limit stopped reports `picture.metafile`.
+    // Metafile text draws only with fonts that their embedding permission lets the PDF carry.
+    const fonts = (p.res.metafileFonts ??= [...p.res.faces.values()]
+      .filter((f) => {
+        const face = {
+          identity: f.id,
+          bytes: f.bytes,
+          faceIndex: 0,
+          request: { family: f.family },
+        };
+        return fontEmbeddingDecision(face).kind !== 'refuse';
+      })
+      .map((f) => f.bytes));
+    let png = await metafilePng(bytes, fonts, p.res.work.signal);
+    // When the export's signal or deadline stopped the conversion, the export fails.
     p.res.work.check();
+    // A picture that the converter's own time limit stopped tries once more (a busy machine),
+    // then reports `picture.metafile`.
+    if (png === undefined) png = await metafilePng(bytes, fonts, p.res.work.signal);
+    p.res.work.check();
+    bytes = png ?? undefined;
   }
   const png = bytes ? isPng(bytes) : false;
   if (!bytes && metafile)

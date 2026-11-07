@@ -246,6 +246,30 @@ test('a picture stopped twice by the time limit converts on a later request', as
   pictures.dispose();
 });
 
+test('a paint does not convert again a picture that ran out of time twice', async () => {
+  let calls = 0;
+  const convert = async () => ((calls += 1), undefined);
+  const pictures = new MetafilePictures(
+    () => [],
+    () => {},
+    convert
+  );
+  const bytes = emfRectangle();
+  expect(await pictures.ready([bytes])).toBe(false);
+  expect(calls).toBe(2);
+  for (let i = 0; i < 5; i += 1) expect(pictures.drawable(bytes, 'image/x-emf')).toBeUndefined();
+  await Bun.sleep(0);
+  expect(calls).toBe(2);
+  expect(pictures.busy).toBe(false);
+  // A font change tries again, with one retry.
+  pictures.fontsChanged();
+  pictures.drawable(bytes, 'image/x-emf');
+  await pictures.ready([bytes], 0);
+  await Bun.sleep(0);
+  expect(calls).toBe(4);
+  pictures.dispose();
+});
+
 test('an endless wait waits, and a wait of NaN or less than zero ends at once', async () => {
   const pictures = new MetafilePictures(
     () => [],

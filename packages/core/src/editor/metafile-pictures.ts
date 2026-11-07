@@ -82,6 +82,8 @@ export class MetafilePictures {
   #queue: Uint8Array[] = [];
   /** Metafiles whose conversion ran out of time once: a second stop waits for a new request. */
   #retried = new WeakSet<Uint8Array>();
+  /** Metafiles stopped twice by the time limit: only `ready()` or a font change tries again. */
+  #timedOut = new WeakSet<Uint8Array>();
   #running = 0;
   /** Bumped when the fonts change: a conversion with the old fonts runs again. */
   #epoch = 0;
@@ -119,7 +121,8 @@ export class MetafilePictures {
     const mime = drawableImageMime(bytes, named);
     if (mime) return { bytes, mime };
     if (!metafileFormat(bytes)) return undefined;
-    if (!this.#done.has(bytes)) void this.convert(bytes);
+    // A paint does not convert again a metafile that ran out of time twice.
+    if (!this.#done.has(bytes) && !this.#timedOut.has(bytes)) void this.convert(bytes);
     const png = this.#drawn(bytes);
     return png ? { bytes: png, mime: 'image/png' } : undefined;
   }
@@ -171,6 +174,8 @@ export class MetafilePictures {
       // A font change while it waits converts again: wait for the conversions with the new fonts.
       for (;;) {
         const epoch = this.#epoch;
+        // An explicit wait tries again the metafiles that ran out of time.
+        for (const b of metafiles) this.#timedOut.delete(b);
         const work = Promise.all(metafiles.map((b) => this.convert(b)));
         // The pictures a caller waits for convert before those that only the rail asked for.
         this.#queue.sort((a, b) => Number(wanted.has(b)) - Number(wanted.has(a)));
@@ -202,6 +207,8 @@ export class MetafilePictures {
     this.#abort.abort();
     this.#abort = new AbortController();
     this.#done = new WeakMap();
+    this.#retried = new WeakSet();
+    this.#timedOut = new WeakSet();
     this.#fontFiles = null;
     this.#epoch += 1;
   }
@@ -256,8 +263,9 @@ export class MetafilePictures {
       this.#pump();
       return;
     }
-    // A second stop by the time limit is not final: the next request converts it again.
+    // A second stop by the time limit is not final: the next `ready()` converts it again.
     this.#retried.delete(bytes);
+    if (png === undefined) this.#timedOut.add(bytes);
     if (png !== undefined) this.#done.set(bytes, png);
     if (png) {
       this.#last.set(bytes, png);

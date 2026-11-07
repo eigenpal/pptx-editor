@@ -26,8 +26,8 @@ export interface SlideImageOptions {
   /** The label of an element the editor draws as a placeholder (chart, diagram), as on the canvas. */
   readonly frameLabel?: (kind: string) => string;
   /**
-   * PNG export only: how long to wait for the slide's EMF and WMF pictures, in milliseconds.
-   * Default 30000; `Infinity` waits until each one converted or failed.
+   * PNG and ZIP export only: how long to wait for each slide's EMF and WMF pictures, in
+   * milliseconds. Default 30000; `Infinity` waits until each one converted or failed.
    */
   readonly picturesTimeoutMs?: number;
 }
