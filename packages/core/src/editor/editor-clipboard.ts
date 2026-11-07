@@ -13,7 +13,7 @@
 /** What the binding asks of the editor: the surface's own clipboard handlers. */
 export interface EditorClipboardHost {
   copy(data: DataTransfer, cut: boolean, slideList?: boolean): boolean;
-  paste(data: DataTransfer): boolean;
+  paste(data: DataTransfer, slideList?: boolean): boolean;
   warmCopy?(): void;
 }
 
@@ -56,11 +56,12 @@ export function bindEditorClipboard(surface: HTMLElement, host: EditorClipboardH
   const doc = surface.ownerDocument;
   const onClipboard = (e: ClipboardEvent): void => {
     if (e.defaultPrevented || !e.clipboardData || !isEditorChromeEvent(surface, e.target)) return;
-    // In the slide list and the slide sorter, Copy and Cut take the selected slides.
+    // In the slide list and the slide sorter, Copy and Cut take the selected slides, and Paste
+    // puts in copied slides also while text on the current slide is edited.
     const slideList = e.target instanceof Element && !!e.target.closest(SLIDE_LISTS);
     const done =
       e.type === 'paste'
-        ? host.paste(e.clipboardData)
+        ? host.paste(e.clipboardData, slideList)
         : host.copy(e.clipboardData, e.type === 'cut', slideList);
     if (done) e.preventDefault();
   };

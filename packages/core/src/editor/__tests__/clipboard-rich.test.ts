@@ -494,6 +494,17 @@ describe('the clipboard host', () => {
     expect(other.session!.info.slides).toHaveLength(1);
   });
 
+  test('slides paste into edited text only from the slide list', async () => {
+    const { ran, clip } = await host((e) => caret(e, 0, 0));
+    const data: Record<string, string> = {};
+    expect(clip.copyTo(transfer(data), false, true)).toBe(true);
+    // On the slide, the browser keeps the paste: the edited text takes no slides.
+    expect(clip.pasteFrom(transfer(data))).toBe(false);
+    expect(ran).toEqual([]);
+    expect(clip.pasteFrom(transfer(data), true)).toBe(true);
+    expect(ran[0]).toMatchObject({ type: 'pasteSlides', slides: [0] });
+  });
+
   test('pasteSlides refuses a file that is not a presentation and indexes it does not have', async () => {
     const e = await open();
     const bad = e.exec({ type: 'pasteSlides', file: new Uint8Array([1, 2, 3]), slides: [0] });

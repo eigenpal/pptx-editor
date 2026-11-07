@@ -292,9 +292,10 @@ export function createClipboardHost(editor: ClipboardEditor) {
     },
     /**
      * Paste from a clipboard event. Plain text into text editing is left to the browser (it
-     * arrives as typed text), and so is a clipboard with nothing the editor takes.
+     * arrives as typed text), and so is a clipboard with nothing the editor takes. `slideList`:
+     * the event comes from the slide list, where copied slides paste also while text is edited.
      */
-    pasteFrom(data: DataTransfer): boolean {
+    pasteFrom(data: DataTransfer, slideList = false): boolean {
       if (editor.readOnly()) return false;
       // Copied cells or tab-separated text fill cells; one copied cell goes in at the caret.
       const table = tablePasteFrom(data, editor.selection());
@@ -302,8 +303,8 @@ export function createClipboardHost(editor: ClipboardEditor) {
         return (editor.exec({ type: 'pasteCells', texts: table.cells }), true);
       if (table) return (editor.insertText(table.text), true);
       const editing = editor.selection().kind === 'text';
-      // Copied slides go in after the current slide; while text is edited, they do not.
-      const slides = editing ? '' : data.getData(SLIDES_MIME);
+      // Copied slides go in after the current slide; a paste into edited text takes none.
+      const slides = editing && !slideList ? '' : data.getData(SLIDES_MIME);
       if (slides) {
         const read = readSlidesClipboard(slides);
         if (!read) return (editor.refuse('errors.clipboard'), true);

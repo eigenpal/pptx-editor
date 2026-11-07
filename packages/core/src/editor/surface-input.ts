@@ -17,8 +17,11 @@ export interface SurfaceInputHost {
    * from the slide list, and copies the selected slides.
    */
   copy(data: DataTransfer, cut: boolean, slideList?: boolean): boolean;
-  /** Paste from a paste event; false leaves the event to the browser. */
-  paste(data: DataTransfer): boolean;
+  /**
+   * Paste from a paste event; false leaves the event to the browser. `slideList`: the event
+   * comes from the slide list.
+   */
+  paste(data: DataTransfer, slideList?: boolean): boolean;
   /** A copy may come next (Cmd or Ctrl went down, a menu opened): get ready for it. */
   warmCopy?(): void;
   /**
