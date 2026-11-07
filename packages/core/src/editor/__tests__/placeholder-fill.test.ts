@@ -6,6 +6,7 @@ import { describe, expect, test } from 'bun:test';
 import { GlobalWindow } from 'happy-dom';
 import { buildPptx, para, run } from '../../../../../scripts/fixtures/builder.ts';
 import { attr, elements, find, path, xmlPartOf, type Element } from '../../store/index.ts';
+import { emptyPlaceholderType } from '../../automation/commands/placeholder-fill.ts';
 import type { EditorCommand } from '../../contracts/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 import { PlaceholderChrome, type PlaceholderChromeHost } from '../surface-placeholder-chrome.ts';
@@ -120,6 +121,10 @@ function chrome(e: PptxEditorInstance, readOnly = false) {
       expect(e.exec(command).ok).toBe(true);
     },
     pickImage: () => picked.push(JSON.stringify(e.snapshot().selection)),
+    fillableType: (id) => {
+      const el = tree(e).find((c) => c.id === id);
+      return el ? emptyPlaceholderType(el) : undefined;
+    },
   };
   return { c: new PlaceholderChrome(host), commands, picked };
 }
@@ -171,8 +176,13 @@ describe('the placeholder chrome', () => {
       )!;
       return c.press(layoutOf(e), button.firstElementChild!);
     };
+    // The Picture press selects the placeholder; the click that follows asks for the file.
     expect(press('picture')).toBe(true);
+    expect(picked).toEqual([]);
+    expect(c.click()).toBe(true);
     expect(picked).toEqual([JSON.stringify({ kind: 'shapes', nodeIds: [id] })]);
+    // A second click, with no press before it, asks for nothing.
+    expect(c.click()).toBe(false);
     expect(press('table')).toBe(true);
     expect(commands).toEqual([{ type: 'insertTable', rows: 3, cols: 3 }]);
     expect(tree(e).map((el) => el.local)).toEqual(['sp', 'graphicFrame']);
@@ -180,5 +190,33 @@ describe('the placeholder chrome', () => {
     expect(c.press(layoutOf(e), doc.createElementNS('http://www.w3.org/2000/svg', 'rect'))).toBe(
       false
     );
+  });
+
+  test('a placeholder with its own fill shows its outline but no buttons', async () => {
+    const red =
+      '<p:sp><p:nvSpPr><p:cNvPr id="3" name="Red"/><p:cNvSpPr/><p:nvPr><p:ph idx="1"/></p:nvPr></p:nvSpPr>' +
+      '<p:spPr><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill></p:spPr>' +
+      '<p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody></p:sp>';
+    const e = await open(title() + red);
+    const parts = chrome(e).c.elements(doc, layoutOf(e), PX);
+    expect(
+      parts.filter((p) => p.getAttribute('class') === 'pptx-surface__placeholder-outline')
+    ).toHaveLength(1);
+    expect(buttons(parts)).toEqual([]);
+  });
+});
+
+describe('a filled picture placeholder keeps its shape and its links', () => {
+  test('a round picture placeholder gives a round picture', async () => {
+    const own =
+      '<a:xfrm><a:off x="914400" y="914400"/><a:ext cx="3657600" cy="3657600"/></a:xfrm>' +
+      '<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>';
+    const e = await open(title() + placeholder(3, '<p:ph type="pic" idx="1"/>', '', own));
+    expect(e.exec(image(400, 400)).ok).toBe(true);
+    const pic = tree(e)[1]!;
+    expect(attr(find(pic, 'a:prstGeom'), 'prst')).toBe('ellipse');
+    // The picture has an id of its own: two people who fill one placeholder make two ids.
+    expect(attr(find(pic, 'p:cNvPr'), 'id')).not.toBe('3');
+    expect(attr(find(pic, 'p:cNvPr'), 'name')).toBe('Placeholder 3');
   });
 });

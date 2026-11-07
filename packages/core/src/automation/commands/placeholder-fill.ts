@@ -2,7 +2,7 @@
 // index, so the slide layout still positions it (ECMA-376 Part 1, 19.3.1.36 ph). DOM-free, so
 // the editor commands and the surface chrome read the same rules.
 
-import { resolveSlide } from '../../cascade/index.ts';
+import { layoutPlaceholderOf, resolveSlide } from '../../cascade/index.ts';
 import {
   attr,
   boolAttr,
@@ -11,6 +11,7 @@ import {
   escapeXmlAttribute,
   path,
   textOf,
+  xmlPartOf,
   type Element,
 } from '../../store/index.ts';
 import type { EditorSelection } from '../../contracts/neutral.ts';
@@ -67,11 +68,14 @@ export interface EmptyPlaceholder {
   /** The `p:sp` node id. */
   readonly nodeId: string;
   /**
-   * Its `p:cNvPr` id and name, which the new object keeps: animations and connectors that name
-   * the placeholder go on to name the object.
+   * Its `p:cNvPr` id: the animations and connector ends that name it go on to name the new
+   * object (`removeFilledPlaceholder`).
    */
   readonly shapeId: string;
+  /** Its `p:cNvPr` name, which the new object keeps. */
   readonly name: string;
+  /** Its geometry (`a:prstGeom` or `a:custGeom`), from the slide or the layout, if any. */
+  readonly geometry?: Element;
   /** Its placeholder type; `obj` when the file names none. */
   readonly type: string;
   /** Its box on the slide, EMU, from the slide, layout, or master. */
@@ -108,6 +112,9 @@ export function emptyPlaceholderOf(
   const box = boxOf(el.id)!;
   const ph = path(el, 'p:nvSpPr', 'p:nvPr', 'p:ph')!;
   const nv = path(el, 'p:nvSpPr', 'p:cNvPr');
+  const geometryOf = (sp: Element | undefined) =>
+    elements(child(sp, 'p:spPr')).find((c) => c.local === 'prstGeom' || c.local === 'custGeom');
+  const geometry = geometryOf(el) ?? geometryOf(layoutPlaceholderOf(batch.pkg, slideIndex, el));
   const kept = KEPT_PH_ATTRS.map((name) => [name, attr(ph, name)] as const)
     .filter(([, v]) => v !== undefined)
     .map(([name, v]) => ` ${name}="${escapeXmlAttribute(v!)}"`)
@@ -122,6 +129,7 @@ export function emptyPlaceholderOf(
     cx: box.cx,
     cy: box.cy,
     ph: `<p:ph${kept}/>`,
+    ...(geometry ? { geometry } : {}),
   };
 }
 
@@ -136,14 +144,40 @@ export function placeholderIndex(batch: OpBatch, part: string, into: EmptyPlaceh
 }
 
 /**
- * Remove the placeholder that a new frame filled. The frame holds the placeholder's shape id, so
- * the animations and connector ends that name it stay.
+ * Remove the placeholder that the new object `shapeId` filled. The animations and connector
+ * ends that name the placeholder name the object instead, so they stay. A text build by
+ * paragraph (`p:bldP`) goes: the object has no paragraphs. The object has its own id: two
+ * people who fill one placeholder at once make two objects with two ids.
  */
 export function removeFilledPlaceholder(
   batch: OpBatch,
   part: string,
-  into: EmptyPlaceholder
+  into: EmptyPlaceholder,
+  shapeId: string
 ): void {
+  const root = xmlPartOf(batch.pkg, part)?.root;
+  const set = (el: Element, name: string): void =>
+    batch.push({
+      op: 'setAttribute',
+      part,
+      node: el.id,
+      name: { ns: '', local: name },
+      value: shapeId,
+    });
+  const walk = (el: Element, depth: number): void => {
+    if (depth > 64) return;
+    for (const c of elements(el)) {
+      if (c.local === 'bldP' && attr(c, 'spid') === into.shapeId) {
+        batch.push({ op: 'removeNode', part, node: c.id });
+        continue;
+      }
+      if (attr(c, 'spid') === into.shapeId) set(c, 'spid');
+      if ((c.local === 'stCxn' || c.local === 'endCxn') && attr(c, 'id') === into.shapeId)
+        set(c, 'id');
+      walk(c, depth + 1);
+    }
+  };
+  if (root && into.shapeId) walk(root, 0);
   removeShapes(batch, part, [into.nodeId]);
 }
 

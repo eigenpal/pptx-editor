@@ -292,7 +292,9 @@ export function SidePanel({
   // A host that shows a closed panel for a request mounts it after the request: take it now.
   useEffect(() => {
     const pane = takePaneRequest(editor);
-    if (pane) setAsked({ pane });
+    if (!pane) return;
+    latest.current(pane);
+    setAsked({ pane });
   }, [editor]);
   useEffect(() => {
     if (asked) root.current?.querySelector<HTMLElement>(`[data-tab="${asked.pane}"]`)?.focus();

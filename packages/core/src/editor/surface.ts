@@ -96,6 +96,8 @@ export interface SurfaceHost extends SurfaceInputHost {
   relayout?: Relayout;
   /** Ask the user for a picture file and insert it (an empty placeholder's picture button). */
   pickImage?(): void;
+  /** The placeholder type a new table or picture can fill on this slide (`emptyPlaceholderType`). */
+  fillableType?(nodeId: string): string | undefined;
 }
 
 /** Find a slide item by node id, inside groups too. */
@@ -178,6 +180,9 @@ export class SlideSurface {
     host.append(this.root);
     this.#stage.addEventListener('pointerdown', this.#onPointerDown);
     this.#stage.addEventListener('dblclick', this.#onDoubleClick);
+    this.#stage.addEventListener('click', (e) => {
+      if (this.#placeholderChrome.click()) e.preventDefault();
+    });
     this.#stage.addEventListener('contextmenu', (e) =>
       selectForContextMenu(e, editor, this.#hit.bind(this), this.#slidePoint.bind(this), (id, p) =>
         this.#cellCaret(id, p)

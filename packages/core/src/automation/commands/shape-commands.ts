@@ -286,8 +286,8 @@ export function insertImage(
     else if (over < 1) crop = `<a:srcRect t="${cut(1 / over)}" b="${cut(1 / over)}"/>`;
   }
   const tree = spTreeOf(batch, part);
-  const id = into ? into.shapeId : String(nextShapeId(batch, tree));
-  const name = into ? escapeXmlAttribute(into.name) : `Picture ${Number(id) - 1}`;
+  const id = nextShapeId(batch, tree);
+  const name = into ? escapeXmlAttribute(into.name) : `Picture ${id - 1}`;
   const xml =
     `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="${name}"/><p:cNvPicPr><a:picLocks${into ? ' noGrp="1"' : ''} noChangeAspect="1"/></p:cNvPicPr><p:nvPr>${into ? into.ph : ''}</p:nvPr></p:nvPicPr>` +
     `<p:blipFill><a:blip r:embed="${rId}"/>${crop}<a:stretch><a:fillRect/></a:stretch></p:blipFill>` +
@@ -302,7 +302,16 @@ export function insertImage(
     index: at,
     spec: specFromXml(xml),
   });
-  removeFilledPlaceholder(batch, part, into!);
+  // A filled picture placeholder keeps its shape (a round photo frame stays round).
+  const geometry = fills ? into!.geometry : undefined;
+  if (geometry) {
+    const spPr = child(batch.element(part, pic), 'p:spPr')!;
+    const rect = child(spPr, 'a:prstGeom')!;
+    const index = spPr.children.indexOf(rect);
+    batch.push({ op: 'removeNode', part, node: rect.id });
+    batch.insert({ op: 'insertNode', part, parent: spPr.id, index, spec: specOf(geometry) });
+  }
+  removeFilledPlaceholder(batch, part, into!, String(id));
   return pic;
 }
 

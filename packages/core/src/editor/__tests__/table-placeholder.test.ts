@@ -139,7 +139,7 @@ describe('a new table fills an empty content placeholder', () => {
     expect([attr(ph, 'type'), attr(ph, 'idx')]).toEqual(['tbl', '4']);
   });
 
-  test('the table keeps the shape id, so an animation of the placeholder stays', async () => {
+  test('an animation of the placeholder goes on to the table, which has an id of its own', async () => {
     const { effect, click, mainSeq, timing } = timingWriter();
     const e = createPptxEditor({ fixedMeasurer: true, substitutes: false });
     const deck = buildPptx({
@@ -154,9 +154,10 @@ describe('a new table fills an empty content placeholder', () => {
     expect((await e.load(deck)).ok).toBe(true);
     expect(e.exec({ type: 'insertTable', rows: 1, cols: 1 }).ok).toBe(true);
     const frame = tree(e)[1]!;
-    expect(attr(find(frame, 'p:cNvPr'), 'id')).toBe('3');
+    const id = attr(find(frame, 'p:cNvPr'), 'id');
+    expect(id).not.toBe('3');
     const part = e.session!.info.slides[0]!.partName;
     const root = xmlPartOf(e.session!.store.package, part)!.root;
-    expect(attr(find(root, 'p:spTgt'), 'spid')).toBe('3');
+    expect(attr(find(root, 'p:spTgt'), 'spid')).toBe(id);
   });
 });

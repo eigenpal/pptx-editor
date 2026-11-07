@@ -333,7 +333,9 @@ export const PptxEditorSidePanel = defineComponent({
     // A host that shows a closed panel for a request mounts it after the request: take it now.
     onMounted(() => {
       const pane = takePaneRequest(editor.value);
-      if (pane) focusTab(pane);
+      if (!pane) return;
+      setTab(pane);
+      focusTab(pane);
     });
     return () => {
       const { class: hostClass, style: hostStyle, ...rest } = attrs;

@@ -43,11 +43,11 @@ export function insertTableFrame(
   const y = into ? into.y : Math.round((slideH - cy) / 2);
   const tree = spTreeOf(batch, part);
   // In a collaboration session the id comes from the actor's stripe (`shapeIds`).
-  const id = into ? into.shapeId : String(nextShapeId(batch, tree));
+  const id = nextShapeId(batch, tree);
   const cell =
     '<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="en-US" dirty="0"/></a:p></a:txBody><a:tcPr/></a:tc>';
   const xml =
-    `<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="${id}" name="${into ? escapeXmlAttribute(into.name) : `Table ${Number(id) - 1}`}"/>` +
+    `<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="${id}" name="${into ? escapeXmlAttribute(into.name) : `Table ${id - 1}`}"/>` +
     '<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr>' +
     `<p:nvPr>${into ? into.ph : ''}</p:nvPr></p:nvGraphicFramePr>` +
     `<p:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></p:xfrm>` +
@@ -66,6 +66,6 @@ export function insertTableFrame(
     index: at >= 0 ? at : ext < 0 ? tree.children.length : ext,
     spec: specFromXml(xml),
   });
-  if (into && at >= 0) removeFilledPlaceholder(batch, part, into);
+  if (into && at >= 0) removeFilledPlaceholder(batch, part, into, String(id));
   return frame;
 }
