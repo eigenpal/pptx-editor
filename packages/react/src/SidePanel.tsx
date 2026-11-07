@@ -1,18 +1,18 @@
 /** @jsxImportSource react */
-// The side panel: Format, Selection (the selection pane), Animations, and Comments. The Format
+// The side panel: Format, Chart Data, Selection (the selection pane), Animations, and Comments. The Format
 // tab writes the selected element's position, size, rotation, and text fitting through engine
 // commands.
 // The Vue twin is `packages/vue/src/SidePanel.tsx`.
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
-  SIDE_PANEL_TABS,
   TABLE_OPTION_ROWS,
   elementKindLabelKey,
   elementRotates,
   formatPanelSize,
   listenPaneRequests,
   takePaneRequest,
+  visibleSidePanelTabs,
   panelHistoryKey,
   platformShortcuts,
   radioGroupStep,
@@ -25,6 +25,7 @@ import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
 import { paneStyle } from './pane-state.ts';
 import { SelectionPane } from './SelectionPane.tsx';
 import { AnimationsPane } from './AnimationsPane.tsx';
+import { ChartDataPane } from './ChartDataPane.tsx';
 
 const EMU_PER_INCH = 914_400;
 const inches = (emu: number): string => (emu / EMU_PER_INCH).toFixed(2);
@@ -257,7 +258,7 @@ export interface SidePanelProps {
   readonly onTabChange?: (tab: SidePanelTab) => void;
 }
 
-/** The side panel: Format · Selection · Animations · Comments. @public */
+/** The side panel: Format · Chart Data · Selection · Animations · Comments. @public */
 export function SidePanel({
   onClose,
   className,
@@ -270,6 +271,9 @@ export function SidePanel({
   const editor = usePptxEditor();
   const [own, setOwn] = useState<SidePanelTab>(shown ?? 'format');
   const tab = shown ?? own;
+  // The Chart Data tab shows while a chart is selected, or while it is open.
+  const chartSelected = useEditorState((s) => !!s.chart);
+  const tabs = visibleSidePanelTabs(chartSelected, tab);
   const setTab = (next: SidePanelTab): void => {
     setOwn(next);
     onTabChange?.(next);
@@ -315,14 +319,14 @@ export function SidePanel({
           role="tablist"
           // One Tab stop: the selected tab; the arrow keys move between tabs.
           onKeyDown={(e) => {
-            const next = radioGroupStep(SIDE_PANEL_TABS, tab, e.key);
+            const next = radioGroupStep(tabs, tab, e.key);
             if (!next) return;
             e.preventDefault();
             setTab(next);
             e.currentTarget.querySelector<HTMLElement>(`[data-tab="${next}"]`)?.focus();
           }}
         >
-          {SIDE_PANEL_TABS.map((id) => (
+          {tabs.map((id) => (
             <button
               key={id}
               type="button"
@@ -345,6 +349,7 @@ export function SidePanel({
         onKeyDown={(e) => panelHistoryKey(e, editor)}
       >
         {tab === 'format' ? <FormatTab /> : null}
+        {tab === 'chart' ? <ChartDataPane /> : null}
         {tab === 'selection' ? <SelectionPane /> : null}
         {tab === 'animations' ? <AnimationsPane /> : null}
         {tab === 'comments' ? (

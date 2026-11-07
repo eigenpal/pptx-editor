@@ -441,24 +441,6 @@ export interface ChartDataCategory {
     readonly source?: number;
 }
 
-// @internal
-export interface ChartDataDraft {
-    // (undocumented)
-    readonly columns: readonly ChartDraftColumn[];
-    // (undocumented)
-    readonly kind: ChartDataKind;
-    readonly numericX: boolean;
-    // (undocumented)
-    readonly rows: readonly ChartDraftRow[];
-    readonly workbook: ChartWorkbookState;
-}
-
-// @internal
-export interface ChartDataDraftFields {
-    // (undocumented)
-    readonly grid: ChartDataDraft;
-}
-
 // @public
 export type ChartDataKind = 'category' | 'xy';
 
@@ -478,56 +460,54 @@ export interface ChartDataSeries {
     readonly values: readonly (number | null)[];
 }
 
-// @internal
-export function chartDraftCell(draft: ChartDataDraft, row: number, column: number): string;
-
-// @internal
-export function chartDraftCellErrors(draft: ChartDataDraft): ReadonlyMap<string, string>;
-
-// @internal
-export interface ChartDraftColumn {
-    readonly cells: readonly string[];
-    // (undocumented)
+// @public
+export type ChartPaneChange = {
+    readonly type: 'value';
+    readonly series: number;
+    readonly category: number;
+    readonly text: string;
+} | {
+    readonly type: 'seriesName';
+    readonly series: number;
+    readonly text: string;
+} | {
+    readonly type: 'label';
+    readonly category: number;
+    readonly text: string;
+} | {
+    readonly type: 'addSeries';
     readonly name: string;
-    readonly source?: number;
-}
-
-// @internal
-export function chartDraftCommand(fields: ChartDataDraftFields): EditorCommand | null;
-
-// @internal
-export function chartDraftFrom(data: ChartData): ChartDataDraftFields;
-
-// @internal
-export interface ChartDraftRow {
-    // (undocumented)
+} | {
+    readonly type: 'removeSeries';
+    readonly series: number;
+} | {
+    readonly type: 'addCategory';
     readonly label: string;
-    readonly source?: number;
-}
+} | {
+    readonly type: 'removeCategory';
+    readonly category: number;
+};
 
-// @internal
-export function chartGridMove(key: {
-    readonly key: string;
-    readonly shiftKey?: boolean;
-    readonly ctrlKey?: boolean;
-}, at: ChartGridPosition, size: {
-    readonly rows: number;
-    readonly columns: number;
-}, caret?: {
-    readonly atStart: boolean;
-    readonly atEnd: boolean;
-}): ChartGridPosition | null;
+// @public
+export function chartPaneCommand(data: ChartData, change: ChartPaneChange): ChartPaneResult;
 
-// @internal
-export interface ChartGridPosition {
-    // (undocumented)
-    readonly column: number;
-    // (undocumented)
-    readonly row: number;
-}
+// @public
+export function chartPaneNumericX(data: Pick<ChartData, 'kind' | 'categories'>): boolean;
+
+// @public
+export type ChartPaneResult = {
+    readonly ok: true;
+    readonly command: EditorCommand;
+} | {
+    readonly ok: false;
+    readonly error: 'chartData.errors.number' | 'chartData.errors.xNumber' | 'chartData.errors.tooLong' | 'chartData.errors.limit';
+};
 
 // @public
 export type ChartSlotId = 'chart.editData';
+
+// @public
+export const chartValueText: (v: number | null | undefined) => string;
 
 // @public
 export type ChartWorkbookState = 'embedded' | 'kept' | 'external' | 'none';
@@ -630,12 +610,12 @@ export type ChromeControlState =
     readonly kind: 'panel';
 }
 /**
-* Shows a tab of the side panel: Format or Selection. The slot sends `requestPane`, which a
-* mounted side panel and the host answer.
+* Shows a tab of the side panel: Format, Selection, or Chart Data. The slot sends
+* `requestPane`, which a mounted side panel and the host answer.
 */
 | {
     readonly kind: 'pane';
-    readonly pane: 'format' | 'selection';
+    readonly pane: 'format' | 'selection' | 'chart';
 }
 /**
 * Opens a dialog of the `popups` registry by its key. With a probe command, the slot is on when
@@ -662,7 +642,7 @@ export type ChromeControlState =
 export type ChromeControlToggle = 'pressed' | 'choice';
 
 // @public
-export type ChromeDialogKey = 'pageSetup' | 'background' | 'paragraph' | 'font' | 'bulletsAndNumbering' | 'columns' | 'imageAltText' | 'imageProperties' | 'chartData';
+export type ChromeDialogKey = 'pageSetup' | 'background' | 'paragraph' | 'font' | 'bulletsAndNumbering' | 'columns' | 'imageAltText' | 'imageProperties';
 
 // @public
 export interface ChromeGroup {
@@ -3251,12 +3231,6 @@ export type ImageStyleId = 'simpleFrameWhite' | 'simpleFrameBlack' | 'softEdgeRe
 export function inFixedView<R extends object>(r: R, view: FixedView): R;
 
 // @internal
-export function insertChartDraftColumn(draft: ChartDataDraft, at: number, name: string): ChartDataDraft;
-
-// @internal
-export function insertChartDraftRow(draft: ChartDataDraft, at: number, label: string): ChartDataDraft;
-
-// @internal
 export function insertImageFile(editor: PptxEditorInstance, file: File, target?: 'replaceImage'): Promise<void>;
 
 // @internal
@@ -3706,6 +3680,9 @@ export function mountedSections(grouped: readonly SlideSection[], limit: number)
 // @public
 export function namedFamilies(pkg: PptxPackage): string[];
 
+// @public
+export function nextChartCategoryLabel(data: Pick<ChartData, 'kind' | 'categories'>, fallback: string): string;
+
 // @public (undocumented)
 export const NO_HOST_FACES: HostFaces;
 
@@ -4135,6 +4112,9 @@ export interface ParagraphLineSpacing {
 
 // @internal
 export const parseAmount: (text: string) => number;
+
+// @public
+export function parseChartValue(text: string): number | null | undefined;
 
 // @public
 export function parseSeconds(text: string): number | null;
@@ -4602,12 +4582,6 @@ export const REMOVAL_NOTICE_MS = 10000;
 export function removalNoticeShows(removal: EditorRemoval | null | undefined, closed: number | null): removal is EditorRemoval;
 
 // @internal
-export function removeChartDraftColumn(draft: ChartDataDraft, column: number): ChartDataDraft;
-
-// @internal
-export function removeChartDraftRow(draft: ChartDataDraft, row: number): ChartDataDraft;
-
-// @internal
 export function renderedColorOf(pick: ColorPick, rows: readonly (readonly ThemeSwatch[])[], current?: string | null): string | null;
 
 // @internal
@@ -5059,9 +5033,6 @@ export function selectSlideSection(editor: PptxEditorInstance | null, section: S
 export function separatorCost(bar: HTMLElement, style: CSSStyleDeclaration): number;
 
 // @internal
-export function setChartDraftCell(draft: ChartDataDraft, row: number, column: number, text: string): ChartDataDraft;
-
-// @internal
 export function setNotesTarget(editor: object, target: NotesTarget | null): void;
 
 // @internal
@@ -5196,7 +5167,7 @@ export function shownOpenFailure(snapshot: EditorSnapshot): DocumentOpenFailure 
 export function showsLoading(snapshot: EditorSnapshot): boolean;
 
 // @internal
-export const SIDE_PANEL_TABS: readonly ["format", "selection", "animations", "comments"];
+export const SIDE_PANEL_TABS: readonly ["format", "chart", "selection", "animations", "comments"];
 
 // @public
 export type SidePanelTab = (typeof SIDE_PANEL_TABS)[number];
@@ -6517,9 +6488,6 @@ export function validateAltTextDraft(fields: AltTextDraftFields): DialogErrors<A
 export function validateBackgroundDraft(fields: BackgroundDraftFields, initial: BackgroundDraftFields, picked?: boolean): DialogErrors<BackgroundDraftFields>;
 
 // @internal
-export function validateChartDraft(fields: ChartDataDraftFields): DialogErrors<ChartDataDraftFields>;
-
-// @internal
 export function validatePicturePropertiesDraft(f: PicturePropertiesDraftFields, initial?: PicturePropertiesDraftFields): DialogErrors<PicturePropertiesDraftFields>;
 
 // @internal
@@ -6530,6 +6498,9 @@ export function valueSlotShown<K extends keyof ToolbarValueMap>(slot: K, raw: un
 
 // @public
 export type VerticalAlign = 't' | 'ctr' | 'b';
+
+// @internal
+export function visibleSidePanelTabs(chartSelected: boolean, open: SidePanelTab): readonly SidePanelTab[];
 
 // @internal
 export function warnAsChildChild(slot: string, parts?: ToolbarPartNames): void;

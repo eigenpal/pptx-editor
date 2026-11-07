@@ -340,7 +340,7 @@ In the pane, a row keeps the keyboard focus. Up and Down move, Right and Left op
 
 ### Open the side panel from the toolbar
 
-The toolbar's **Selection pane** and **Format shape** controls call `requestPane(editor, pane)`. A mounted side panel turns to that tab and moves the focus to it. While no side panel is mounted and your host does not listen, the controls are disabled with the `disabled.noSidePanel` reason.
+The toolbar's **Selection pane**, **Format shape**, and **Edit data…** controls call `requestPane(editor, pane)`. A mounted side panel turns to that tab and moves the focus to it. While no side panel is mounted and your host does not listen, the controls are disabled with the `disabled.noSidePanel` reason.
 
 When your layout can hide the side panel, listen for the requests and show the panel. `listenPaneRequests` returns a function that stops the listener:
 

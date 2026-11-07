@@ -1,5 +1,5 @@
-// The data of a chart part (`c:chartSpace`, ECMA-376 Part 1, 21.2.2.27), as the Edit Data
-// dialog and `setChartData` read it: the series of the one plot of the chart, their names
+// The data of a chart part (`c:chartSpace`, ECMA-376 Part 1, 21.2.2.27), as the Chart Data
+// tab and `setChartData` read it: the series of the one plot of the chart, their names
 // (`c:tx`), their categories (`c:cat`, or `c:xVal` of a scatter chart), and their values
 // (`c:val`, or `c:yVal`), from the caches the chart part holds (`c:strCache`, `c:numCache`) or
 // from literal values (`c:strLit`, `c:numLit`). The cell references (`c:f`) give the place of

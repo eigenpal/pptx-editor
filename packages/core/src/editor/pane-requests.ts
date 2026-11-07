@@ -6,11 +6,11 @@
 // This module imports nothing: the refusal scan of the automation hosts follows imports.
 
 /** The tabs of the side panel, in order. @internal */
-export const SIDE_PANEL_TABS = ['format', 'selection', 'animations', 'comments'] as const;
+export const SIDE_PANEL_TABS = ['format', 'chart', 'selection', 'animations', 'comments'] as const;
 
 /**
- * A tab of the side panel: Format, Selection (the selection pane), Animations, or Comments.
- * @public
+ * A tab of the side panel: Format, Chart Data, Selection (the selection pane), Animations, or
+ * Comments. @public
  */
 export type SidePanelTab = (typeof SIDE_PANEL_TABS)[number];
 
@@ -82,7 +82,22 @@ export function takePaneRequest(editor: object | null | undefined): SidePanelTab
 
 /** Whether a slot is a pane slot, which follows the pane listeners. @internal */
 export function isPaneSlot(slot: string): boolean {
-  return slot === 'arrange.selectionPane' || slot === 'shape.properties';
+  return (
+    slot === 'arrange.selectionPane' || slot === 'shape.properties' || slot === 'chart.editData'
+  );
+}
+
+/**
+ * The tabs the side panel shows, in order: Chart Data only while a chart is selected, or while
+ * it is the open tab (it then says to select a chart). @internal
+ */
+export function visibleSidePanelTabs(
+  chartSelected: boolean,
+  open: SidePanelTab
+): readonly SidePanelTab[] {
+  return chartSelected || open === 'chart'
+    ? SIDE_PANEL_TABS
+    : SIDE_PANEL_TABS.filter((tab) => tab !== 'chart');
 }
 
 /** Whether a side panel or a host listens for pane requests of `editor`. @internal */

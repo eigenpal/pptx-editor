@@ -9,12 +9,7 @@ import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { binaryPartOf, readPptx, readZip, serializeXmlPart } from '../../store/index.ts';
 import type { ChartData } from '../../contracts/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
-import {
-  chartDraftCellErrors,
-  chartDraftCommand,
-  chartDraftFrom,
-  setChartDraftCell,
-} from '../chart-data-fields.ts';
+import { chartPaneCommand, nextChartCategoryLabel } from '../chart-pane.ts';
 
 const FIXTURES = join(import.meta.dir, '../../../../../fixtures');
 const fixture = (name: string): Uint8Array =>
@@ -385,24 +380,73 @@ describe('chart data: the workbook and the chart stay in step', () => {
     expect(chart).toContain('<c:v>50</c:v>');
   });
 
-  test('the dialog checks X values only when they are numbers', () => {
-    const text = chartDraftFrom({
+  test('the Chart Data tab checks X values only when they are numbers', () => {
+    const text: ChartData = {
       kind: 'xy',
       categories: [{ label: 'a', source: 0 }],
       series: [{ name: 's', values: [1], source: 0 }],
-      workbook: 'none',
+    };
+    expect(chartPaneCommand(text, { type: 'label', category: 0, text: 'b' })).toMatchObject({
+      ok: true,
+      command: { data: { categories: [{ label: 'b', source: 0 }] } },
     });
-    expect([...chartDraftCellErrors(text.grid)]).toEqual([]);
-    expect(chartDraftCommand(text)).toMatchObject({
-      data: { categories: [{ label: 'a', source: 0 }] },
+    const numbers: ChartData = { ...text, categories: [{ label: '1', source: 0 }] };
+    expect(chartPaneCommand(numbers, { type: 'label', category: 0, text: 'x' })).toEqual({
+      ok: false,
+      error: 'chartData.errors.xNumber',
     });
-    const numbers = chartDraftFrom({
-      kind: 'xy',
-      categories: [{ label: '1', source: 0 }],
-      series: [{ name: 's', values: [1], source: 0 }],
-      workbook: 'none',
+    expect(nextChartCategoryLabel(numbers, 'New')).toBe('2');
+    expect(nextChartCategoryLabel(text, 'New')).toBe('New');
+  });
+});
+
+describe('chart data: the Chart Data tab', () => {
+  test('each committed field is one undo step, with every series and point kept', async () => {
+    const e = await open(fixture('chart-data'));
+    const d = read(e);
+    const value = chartPaneCommand(d, { type: 'value', series: 1, category: 2, text: '99,5' });
+    if (!value.ok) throw new Error(value.error);
+    expect(e.exec(value.command).ok).toBe(true);
+    expect(read(e).series[1]!.values[2]).toBe(99.5);
+    expect(read(e).series.map((s) => s.source)).toEqual([0, 1, 2]);
+    e.exec({ type: 'undo' });
+    expect(read(e).series[1]!.values[2]).toBe(d.series[1]!.values[2]!);
+  });
+
+  test('adds and removes series and categories, and refuses text that is not a value', () => {
+    const d: ChartData = {
+      kind: 'category',
+      categories: [
+        { label: 'A', source: 0 },
+        { label: 'B', source: 1 },
+      ],
+      series: [{ name: 'S', values: [1, 2], source: 0 }],
+    };
+    const added = chartPaneCommand(d, { type: 'addCategory', label: 'C' });
+    expect(added).toMatchObject({
+      ok: true,
+      command: {
+        data: { categories: [{}, {}, { label: 'C' }], series: [{ values: [1, 2, null] }] },
+      },
     });
-    const typed = setChartDraftCell(numbers.grid, 1, 0, 'x');
-    expect(chartDraftCellErrors(typed).get('1,0')).toBe('chartData.errors.xNumber');
+    expect(chartPaneCommand(d, { type: 'addSeries', name: 'T' })).toMatchObject({
+      command: { data: { series: [{ name: 'S' }, { name: 'T', values: [null, null] }] } },
+    });
+    expect(chartPaneCommand(d, { type: 'removeCategory', category: 0 })).toMatchObject({
+      command: { data: { categories: [{ label: 'B', source: 1 }], series: [{ values: [2] }] } },
+    });
+    expect(chartPaneCommand(d, { type: 'removeSeries', series: 0 })).toEqual({
+      ok: false,
+      error: 'chartData.errors.limit',
+    });
+    expect(chartPaneCommand(d, { type: 'value', series: 0, category: 0, text: 'ten' })).toEqual({
+      ok: false,
+      error: 'chartData.errors.number',
+    });
+    expect(chartPaneCommand(d, { type: 'value', series: 0, category: 0, text: ' ' })).toMatchObject(
+      {
+        command: { data: { series: [{ values: [null, 2] }] } },
+      }
+    );
   });
 });

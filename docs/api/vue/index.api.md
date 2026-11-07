@@ -10,7 +10,6 @@ import { BulletFormatMixed } from '@pptx-editor.dev/core/editor';
 import { BulletFormatRead } from '@pptx-editor.dev/core/editor';
 import { BulletsDialogFields } from '@pptx-editor.dev/core/editor';
 import { CanvasMenuKind } from '@pptx-editor.dev/core/editor';
-import { ChartDataDraftFields } from '@pptx-editor.dev/core/editor';
 import { ChromeControl } from '@pptx-editor.dev/core/editor';
 import { ChromeGroupId } from '@pptx-editor.dev/core/editor';
 import { ChromeMenuId } from '@pptx-editor.dev/core/editor';
@@ -371,122 +370,6 @@ export type BulletsAndNumberingDialogProps = ExtractPublicPropTypes<typeof bulle
 export { BulletsDialogFields }
 
 export { CanvasMenuKind }
-
-// @public
-export const ChartDataDialog: {
-    new (...args: any[]): vue.CreateComponentPublicInstanceWithMixins<Readonly<vue.ExtractPropTypes<{
-        readonly open: {
-            readonly type: BooleanConstructor;
-            readonly required: true;
-        };
-        readonly onClose: {
-            readonly type: PropType<() => void>;
-            readonly required: true;
-        };
-        readonly preset: {
-            readonly type: BooleanConstructor;
-            readonly default: true;
-        };
-        readonly className: {
-            readonly type: StringConstructor;
-            readonly default: undefined;
-        };
-        readonly style: {
-            readonly type: PropType<CSSProperties>;
-            readonly default: undefined;
-        };
-    }>> & Readonly<{}>, () => VNode<vue.RendererNode, vue.RendererElement, {
-        [key: string]: any;
-    }> | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, vue.PublicProps, {
-        readonly className: string;
-        readonly style: CSSProperties;
-        readonly preset: boolean;
-    }, true, {}, {}, vue.GlobalComponents, vue.GlobalDirectives, string, {}, any, vue.ComponentProvideOptions, {
-        P: {};
-        B: {};
-        D: {};
-        C: {};
-        M: {};
-        Defaults: {};
-    }, Readonly<vue.ExtractPropTypes<{
-        readonly open: {
-            readonly type: BooleanConstructor;
-            readonly required: true;
-        };
-        readonly onClose: {
-            readonly type: PropType<() => void>;
-            readonly required: true;
-        };
-        readonly preset: {
-            readonly type: BooleanConstructor;
-            readonly default: true;
-        };
-        readonly className: {
-            readonly type: StringConstructor;
-            readonly default: undefined;
-        };
-        readonly style: {
-            readonly type: PropType<CSSProperties>;
-            readonly default: undefined;
-        };
-    }>> & Readonly<{}>, () => VNode<vue.RendererNode, vue.RendererElement, {
-        [key: string]: any;
-    }> | null, {}, {}, {}, {
-        readonly className: string;
-        readonly style: CSSProperties;
-        readonly preset: boolean;
-    }>;
-    __isFragment?: never;
-    __isTeleport?: never;
-    __isSuspense?: never;
-} & vue.ComponentOptionsBase<Readonly<vue.ExtractPropTypes<{
-    readonly open: {
-        readonly type: BooleanConstructor;
-        readonly required: true;
-    };
-    readonly onClose: {
-        readonly type: PropType<() => void>;
-        readonly required: true;
-    };
-    readonly preset: {
-        readonly type: BooleanConstructor;
-        readonly default: true;
-    };
-    readonly className: {
-        readonly type: StringConstructor;
-        readonly default: undefined;
-    };
-    readonly style: {
-        readonly type: PropType<CSSProperties>;
-        readonly default: undefined;
-    };
-}>> & Readonly<{}>, () => VNode<vue.RendererNode, vue.RendererElement, {
-    [key: string]: any;
-}> | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, {
-    readonly className: string;
-    readonly style: CSSProperties;
-    readonly preset: boolean;
-}, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & {
-    Header: vue.DefineComponent<DialogPartProps>;
-    Title: vue.DefineComponent<DialogPartProps>;
-    Body: vue.DefineComponent<DialogPartProps>;
-    Footer: vue.DefineComponent<DialogPartProps>;
-    Field: vue.DefineComponent<DialogPartProps & {
-        readonly name: "grid";
-    }>;
-    Error: vue.DefineComponent<DialogPartProps>;
-    Apply: vue.DefineComponent<DialogPartProps>;
-    Cancel: vue.DefineComponent<DialogPartProps>;
-};
-
-// @public
-export type ChartDataDialogFieldName = 'grid';
-
-// @public
-export type ChartDataDialogFields = ChartDataDraftFields;
-
-// @public
-export type ChartDataDialogProps = ExtractPublicPropTypes<typeof chartDataDialogProps>;
 
 export { ChromeControl }
 
@@ -3562,14 +3445,14 @@ export const PptxEditor: {
             readonly default: undefined;
         };
     }>> & Readonly<{
-        onTabChange?: ((_tab: "format" | "comments" | "animations" | "selection") => any) | undefined;
-        "onUpdate:tab"?: ((_tab: "format" | "comments" | "animations" | "selection") => any) | undefined;
+        onTabChange?: ((_tab: "format" | "chart" | "comments" | "animations" | "selection") => any) | undefined;
+        "onUpdate:tab"?: ((_tab: "format" | "chart" | "comments" | "animations" | "selection") => any) | undefined;
     }>, {
         readonly className: string;
         readonly style: vue.CSSProperties;
         readonly paneWidth: number;
         readonly onClose: () => void;
-        readonly tab: "format" | "comments" | "animations" | "selection";
+        readonly tab: "format" | "chart" | "comments" | "animations" | "selection";
     }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
     SelectionPane: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly className: {
@@ -4278,111 +4161,6 @@ export const PptxEditor: {
         Footer: vue.DefineComponent<DialogPartProps>;
         Field: vue.DefineComponent<DialogPartProps & {
             readonly name: ImagePropertiesDialogFieldName;
-        }>;
-        Error: vue.DefineComponent<DialogPartProps>;
-        Apply: vue.DefineComponent<DialogPartProps>;
-        Cancel: vue.DefineComponent<DialogPartProps>;
-    };
-    ChartDataDialog: {
-        new (...args: any[]): vue.CreateComponentPublicInstanceWithMixins<Readonly<vue.ExtractPropTypes<{
-            readonly open: {
-                readonly type: BooleanConstructor;
-                readonly required: true;
-            };
-            readonly onClose: {
-                readonly type: PropType<() => void>;
-                readonly required: true;
-            };
-            readonly preset: {
-                readonly type: BooleanConstructor;
-                readonly default: true;
-            };
-            readonly className: {
-                readonly type: StringConstructor;
-                readonly default: undefined;
-            };
-            readonly style: {
-                readonly type: PropType<vue.CSSProperties>;
-                readonly default: undefined;
-            };
-        }>> & Readonly<{}>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
-            [key: string]: any;
-        }> | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, vue.PublicProps, {
-            readonly className: string;
-            readonly style: vue.CSSProperties;
-            readonly preset: boolean;
-        }, true, {}, {}, vue.GlobalComponents, vue.GlobalDirectives, string, {}, any, vue.ComponentProvideOptions, {
-            P: {};
-            B: {};
-            D: {};
-            C: {};
-            M: {};
-            Defaults: {};
-        }, Readonly<vue.ExtractPropTypes<{
-            readonly open: {
-                readonly type: BooleanConstructor;
-                readonly required: true;
-            };
-            readonly onClose: {
-                readonly type: PropType<() => void>;
-                readonly required: true;
-            };
-            readonly preset: {
-                readonly type: BooleanConstructor;
-                readonly default: true;
-            };
-            readonly className: {
-                readonly type: StringConstructor;
-                readonly default: undefined;
-            };
-            readonly style: {
-                readonly type: PropType<vue.CSSProperties>;
-                readonly default: undefined;
-            };
-        }>> & Readonly<{}>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
-            [key: string]: any;
-        }> | null, {}, {}, {}, {
-            readonly className: string;
-            readonly style: vue.CSSProperties;
-            readonly preset: boolean;
-        }>;
-        __isFragment?: never;
-        __isTeleport?: never;
-        __isSuspense?: never;
-    } & vue.ComponentOptionsBase<Readonly<vue.ExtractPropTypes<{
-        readonly open: {
-            readonly type: BooleanConstructor;
-            readonly required: true;
-        };
-        readonly onClose: {
-            readonly type: PropType<() => void>;
-            readonly required: true;
-        };
-        readonly preset: {
-            readonly type: BooleanConstructor;
-            readonly default: true;
-        };
-        readonly className: {
-            readonly type: StringConstructor;
-            readonly default: undefined;
-        };
-        readonly style: {
-            readonly type: PropType<vue.CSSProperties>;
-            readonly default: undefined;
-        };
-    }>> & Readonly<{}>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
-        [key: string]: any;
-    }> | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, {
-        readonly className: string;
-        readonly style: vue.CSSProperties;
-        readonly preset: boolean;
-    }, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & {
-        Header: vue.DefineComponent<DialogPartProps>;
-        Title: vue.DefineComponent<DialogPartProps>;
-        Body: vue.DefineComponent<DialogPartProps>;
-        Footer: vue.DefineComponent<DialogPartProps>;
-        Field: vue.DefineComponent<DialogPartProps & {
-            readonly name: "grid";
         }>;
         Error: vue.DefineComponent<DialogPartProps>;
         Apply: vue.DefineComponent<DialogPartProps>;
@@ -6022,7 +5800,6 @@ export type PptxEditorPopup<Props extends object> = false | ((props: Props) => V
 export interface PptxEditorPopups {
     background?: PptxEditorPopup<BackgroundDialogProps>;
     bulletsAndNumbering?: PptxEditorPopup<BulletsAndNumberingDialogProps>;
-    chartData?: PptxEditorPopup<ChartDataDialogProps>;
     columns?: PptxEditorPopup<ColumnsDialogProps>;
     contextMenu?: PptxEditorPopup<PptxEditorContextMenuProps>;
     find?: PptxEditorPopup<FindPopupProps>;
@@ -6390,14 +6167,14 @@ export const PptxEditorSidePanel: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly default: undefined;
     };
 }>> & Readonly<{
-    onTabChange?: ((_tab: "format" | "comments" | "animations" | "selection") => any) | undefined;
-    "onUpdate:tab"?: ((_tab: "format" | "comments" | "animations" | "selection") => any) | undefined;
+    onTabChange?: ((_tab: "format" | "chart" | "comments" | "animations" | "selection") => any) | undefined;
+    "onUpdate:tab"?: ((_tab: "format" | "chart" | "comments" | "animations" | "selection") => any) | undefined;
 }>, {
     readonly className: string;
     readonly style: CSSProperties;
     readonly paneWidth: number;
     readonly onClose: () => void;
-    readonly tab: "format" | "comments" | "animations" | "selection";
+    readonly tab: "format" | "chart" | "comments" | "animations" | "selection";
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 
 // @public
@@ -8591,12 +8368,6 @@ export function useBulletsAndNumberingDialog(): UseBulletsAndNumberingDialogRetu
 
 // @public
 export type UseBulletsAndNumberingDialogReturn = UseDialogReturn<BulletsDialogFields>;
-
-// @public
-export function useChartDataDialog(): UseChartDataDialogReturn;
-
-// @public
-export type UseChartDataDialogReturn = UseDialogReturn<ChartDataDialogFields>;
 
 // @public
 export function useChromeTranslate(overrides?: ReadonlyMap<string, string>): UseChromeTranslateReturn;

@@ -858,6 +858,7 @@
     "close": "Close panel",
     "tabs": {
       "format": "Format",
+      "chart": "Chart",
       "selection": "Selection",
       "animations": "Animations",
       "comments": "Comments"
@@ -1580,9 +1581,6 @@
   },
   "chartData": {
     "editData": "Edit data…",
-    "title": "Edit chart data",
-    "close": "Close",
-    "grid": "Chart data",
     "categories": "Categories",
     "xValues": "X values",
     "seriesName": "Name of series {number}",
@@ -1592,18 +1590,24 @@
     "newSeries": "Series {number}",
     "newCategory": "Category {number}",
     "addCategory": "Add category",
-    "removeCategory": "Remove category",
     "addSeries": "Add series",
-    "removeSeries": "Remove series",
-    "help": "Type a value in each cell. Leave a cell empty for no value. Use the arrow keys to move between cells.",
+    "help": "Press Enter or leave a field to apply it. Leave a value empty for no value.",
     "workbookKept": "The embedded workbook keeps its old values. The chart shows the values you enter.",
     "workbookExternal": "The chart gets its data from a linked workbook. The chart shows the values you enter and stops updating from the link.",
-    "notEditable": "You cannot edit the data of this chart. {reason}",
     "errors": {
       "number": "Enter a number, or leave the cell empty.",
       "xNumber": "Enter a number for each X value.",
       "tooLong": "Use 255 characters or fewer.",
-      "cell": "{cell}: {message}"
-    }
+      "limit": "A chart keeps at least one series and one category, and up to 255 series and 4,000 categories."
+    },
+    "name": "Name",
+    "series": "Series",
+    "unnamed": "Unnamed series",
+    "emptyTitle": "No chart selected",
+    "emptyBody": "Select a chart on the slide to edit its data.",
+    "notEditableTitle": "This chart data is read-only",
+    "removeCategoryNamed": "Remove category {name}",
+    "removeSeriesNamed": "Remove series {name}",
+    "removeSeries": "Remove series"
   }
 }

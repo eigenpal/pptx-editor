@@ -1,5 +1,5 @@
 // Read and replace the data of the chart behind a chart frame: the `setChartData` command and
-// the read that the Edit Data dialog shows. The chart part, and an embedded workbook when its
+// the read that the Chart Data tab shows. The chart part, and an embedded workbook when its
 // structure allows it, are written again whole as bytes, in one transaction (`removePart` and
 // `addPart`).
 
