@@ -177,7 +177,7 @@ One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`sho
 | Preset and custom geometry, groups, rotation, flips | Drawn, from the engine's evaluated paths |
 | Solid fills and lines, with transparency; caps and joins | Drawn |
 | PNG and JPEG pictures, identified by their signature: cropped by `srcRect`, placed by `fillRect`, clipped to the geometry, with transparency | Drawn |
-| EMF and WMF pictures | Drawn as a PNG at twice their pixel size, at most 4096 pixels on a side; text in them uses the deck's fonts |
+| EMF and WMF pictures | Drawn as a PNG at twice their pixel size, at most 4096 pixels on a side, with the deck's fonts. The converter draws with `@napi-rs/canvas` when it is installed, else with its own rasterizer |
 | Linear and path gradients on shapes, backgrounds, and table cells; picture fills; group fills; lighten and darken path fills | Drawn, as PDF shadings and clipped pictures |
 | Tables: background, cell fills, borders, and cell text | Drawn, from the engine's table layout |
 | Text: every run at the position layout measured; bold, italic, size, color, caps, spacing, superscript and subscript, highlight | Drawn, searchable; subset fonts embedded |

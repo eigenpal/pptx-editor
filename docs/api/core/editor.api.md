@@ -1248,7 +1248,7 @@ export class DocumentSession {
     parsedAt: number;
     // @internal
     picture(target: string): DrawablePicture | undefined;
-    picturesReady(index?: number): Promise<void>;
+    picturesReady(index?: number): Promise<boolean>;
     // @internal
     probeBatch(base?: PptxPackage): OpBatch;
     // @internal

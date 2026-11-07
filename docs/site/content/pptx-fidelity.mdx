@@ -137,7 +137,7 @@ Each item below is a place where the renderer does not yet follow the specificat
 - **Picture brightness and contrast.** `a:lum` adds brightness to each component, then scales around mid-gray by contrast. The specification gives no formula, so washed-out pictures can draw lighter than expected.
 - **Picture recolor.** Grayscale, duotone, and black and white take the luminance with Rec. 709 weights. The specification gives no weights.
 - **Dashes on picture borders.** A picture's border draws outside the picture. Dashes get butt caps, and round dots draw as squares.
-- **EMF and WMF pictures.** They draw as a PNG at twice their pixel size, at most 4096 pixels on a side, so a large zoom can show pixels. Text in a picture draws with the fonts of the deck. A font that the deck does not have is replaced by a deck font of the same pitch and family. The placeholder shows until the PNG is ready.
+- **EMF and WMF pictures.** They draw as a PNG at twice their pixel size, at most 4096 pixels on a side, so a large zoom can show pixels. Text in a picture draws with the fonts that the editor loaded for the deck. The converter replaces a font that is not loaded with a loaded font of the same pitch and family. With no loaded fonts, text draws with the fonts of the browser. The placeholder shows until the PNG is ready.
 - **Inset lines.** `a:ln/@algn="in"` draws as a centered line. A picture's border always draws outside the picture.
 - **Hyperlink text.** Link text draws in the theme `hlink` color with a single underline, unless the run states otherwise.
 - **Compound lines.** The widths of the bands of `dbl`, `thickThin`, `thinThick`, and `tri` lines follow fixed fractions. The specification gives no fractions.

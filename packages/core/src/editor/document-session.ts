@@ -811,9 +811,9 @@ export class DocumentSession {
   imageUrl = (sourcePart: string, rId: string): string | undefined => {
     const pkg = this.store.package;
     const target = relTarget(pkg, sourcePart, rId);
-    if (!target) return undefined;
-    const picture = this.picture(target);
-    return picture ? this.#pictures.url(picture) : undefined;
+    const bytes = target ? binaryPartOf(pkg, target) : undefined;
+    const picture = bytes && this.#pictures.drawable(bytes, imageMime(target!));
+    return picture ? this.#pictures.url(bytes, picture) : undefined;
   };
 
   /**
@@ -827,13 +827,13 @@ export class DocumentSession {
   }
 
   /**
-   * Resolves when the EMF and WMF pictures of slide `index` (of every slide when you omit it)
-   * have converted, so an export draws them. It waits 30 seconds at most: a picture that is not
-   * ready by then draws as the placeholder.
+   * Waits until the EMF and WMF pictures of slide `index`, or of every slide when you omit it,
+   * have converted, so an export draws them. Resolves `true` when all are ready, and `false`
+   * after 30 seconds: a picture that is not ready then draws as the placeholder.
    */
-  picturesReady(index?: number): Promise<void> {
+  picturesReady(index?: number): Promise<boolean> {
     const slides = this.info.slides.map((s) => s.partName);
-    const shown = index === undefined ? slides : slides.slice(index, index + 1);
+    const shown = index === undefined ? slides : slides[index] ? [slides[index]] : [];
     return this.#pictures.ready(metafilesOf(this.store.package, shown));
   }
 

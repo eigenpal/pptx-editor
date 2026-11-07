@@ -791,6 +791,12 @@ describe('round 3 cases', () => {
     }
   });
 
+  test('an EMF that does not convert reports picture.metafile', async () => {
+    const result = await exportPdf(pictureWith(emfRectangle(0, 0), 'img.emf', 'image/x-emf'), BEST);
+    expect(codes(result)).toContain('picture.metafile');
+    expect(codes(result)).not.toContain('picture.format');
+  });
+
   test('a picture that is not drawn casts no shadow', async () => {
     const gif = new TextEncoder().encode('GIF89a\u0001\u0000\u0001\u0000');
     const result = await exportPdf(pictureWith(gif, 'img.gif', 'image/gif'), BEST);

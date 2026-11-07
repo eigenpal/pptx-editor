@@ -5,8 +5,8 @@
 
 EMF and WMF pictures draw as pictures, not as placeholders. The editor converts each one to a PNG in the background with `emf-converter`, which loads only for a deck that has a metafile. The placeholder shows until the PNG is ready, and then the editor repaints. The picture file stays unchanged.
 
-- `session.picturesReady()` resolves when every EMF and WMF picture has converted. PNG and ZIP export wait for it. Call it before `exportSlideSvg()`.
-- PDF export draws EMF and WMF pictures with the same conversion.
+- `session.picturesReady(index)` waits until the EMF and WMF pictures of a slide, or of every slide, have converted. It resolves `false` when they are not ready after 30 seconds. PNG and ZIP export wait for it. Call it before `exportSlideSvg()`.
+- PDF export draws EMF and WMF pictures with the same converter. On Node.js it draws with `@napi-rs/canvas` when that package is installed, and with its own rasterizer otherwise, so the pixels can differ from the browser's.
 - A WebP picture must pass the same size limits as other pictures before it draws.
 - The natural size of an EMF or WMF picture comes from its picture frame.
 

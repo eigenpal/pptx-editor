@@ -17,8 +17,8 @@ export interface DrawablePicture {
 const PARALLEL = 2;
 /** How long a wait for converted pictures lasts at most, in ms (`ready`). */
 export const PICTURES_WAIT_MS = 30_000;
-/** How long the repaint after a conversion waits for others to finish with it, in ms. */
-const REPAINT_DELAY_MS = 50;
+/** How often converted pictures repaint at most while others still convert, in ms. */
+const REPAINT_INTERVAL_MS = 250;
 /** Relationships that do not lead to what a slide shows. */
 const OTHER_CONTENT = new Set<string>([
   REL.slide,
@@ -54,10 +54,10 @@ export function metafilesOf(pkg: PptxPackage, slides: readonly string[]): Uint8A
 }
 
 export class MetafilePictures {
-  /** The PNG of each converted metafile part, or null when it did not convert. */
+  /** The PNG of each metafile part with the current fonts, or null when it did not convert. */
   #done = new WeakMap<Uint8Array, Uint8Array | null>();
-  /** The PNGs from before the fonts changed: each draws until its new PNG is ready. */
-  #stale = new WeakMap<Uint8Array, Uint8Array | null>();
+  /** The last PNG of each metafile part that converted: it draws until a new one is ready. */
+  #last = new WeakMap<Uint8Array, Uint8Array>();
   /** Each metafile that waits or converts, with what resolves its `convert` promise. */
   #pending = new Map<
     Uint8Array,
@@ -70,8 +70,8 @@ export class MetafilePictures {
   #fontFiles: readonly Uint8Array[] | null = null;
   #repaint: ReturnType<typeof setTimeout> | null = null;
   #abort = new AbortController();
-  /** Blob URLs by the bytes they draw. */
-  #urls = new Map<Uint8Array, string>();
+  /** The blob URL of each picture part, with the bytes it draws. */
+  #urls = new Map<Uint8Array, { readonly drawn: Uint8Array; readonly url: string }>();
   #disposed = false;
   readonly #fonts: () => readonly Uint8Array[];
   readonly #changed: () => void;
@@ -93,22 +93,24 @@ export class MetafilePictures {
   drawable(bytes: Uint8Array, named: string | undefined): DrawablePicture | undefined {
     const mime = drawableImageMime(bytes, named);
     if (mime) return { bytes, mime };
-    const png = this.#done.get(bytes);
-    if (png) return { bytes: png, mime: 'image/png' };
-    if (png === null || !metafileFormat(bytes)) return undefined;
-    void this.convert(bytes);
-    const old = this.#stale.get(bytes);
-    return old ? { bytes: old, mime: 'image/png' } : undefined;
+    if (!metafileFormat(bytes)) return undefined;
+    if (!this.#done.has(bytes)) void this.convert(bytes);
+    const png = this.#done.get(bytes) ?? this.#last.get(bytes);
+    return png ? { bytes: png, mime: 'image/png' } : undefined;
   }
 
-  /** A blob URL for `picture`, made once and revoked by `dispose()`. Undefined with no `Blob`. */
-  url(picture: DrawablePicture): string | undefined {
-    const hit = this.#urls.get(picture.bytes);
-    if (hit) return hit;
-    if (typeof URL === 'undefined' || typeof Blob === 'undefined') return undefined;
+  /**
+   * A blob URL for `picture`, the drawable bytes of the part `bytes`. A new PNG of the part
+   * revokes the URL of the old one; `dispose()` revokes the rest. Undefined with no `Blob`.
+   */
+  url(bytes: Uint8Array, picture: DrawablePicture): string | undefined {
+    const hit = this.#urls.get(bytes);
+    if (hit?.drawn === picture.bytes) return hit.url;
+    if (this.#disposed || typeof URL === 'undefined' || typeof Blob === 'undefined') return;
+    if (hit) URL.revokeObjectURL(hit.url);
     const blob = new Blob([picture.bytes.slice().buffer], { type: picture.mime });
     const url = URL.createObjectURL(blob);
-    this.#urls.set(picture.bytes, url);
+    this.#urls.set(bytes, { drawn: picture.bytes, url });
     return url;
   }
 
@@ -126,22 +128,23 @@ export class MetafilePictures {
   }
 
   /**
-   * Convert `metafiles`. Resolves when each converted or failed, or after `waitMs`: a picture
-   * that is not ready by then keeps converting, and draws as the placeholder until it is.
+   * Convert `metafiles`. Resolves `true` when each converted or failed, or `false` after
+   * `waitMs`: a picture that is not ready by then keeps converting, and draws as the
+   * placeholder (or its PNG from before a font change) until it is.
    */
-  async ready(metafiles: readonly Uint8Array[], waitMs = PICTURES_WAIT_MS): Promise<void> {
+  async ready(metafiles: readonly Uint8Array[], waitMs = PICTURES_WAIT_MS): Promise<boolean> {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const late = new Promise<void>((resolve) => (timer = setTimeout(resolve, waitMs)));
+    const late = new Promise<boolean>((resolve) => (timer = setTimeout(resolve, waitMs, false)));
+    const all = Promise.all(metafiles.map((b) => this.convert(b))).then(() => true);
     try {
-      await Promise.race([Promise.all(metafiles.map((b) => this.convert(b))), late]);
+      return await Promise.race([all, late]);
     } finally {
       clearTimeout(timer);
     }
   }
 
-  /** The fonts changed: each metafile converts again with them. The old PNGs draw until then. */
+  /** The fonts changed: each metafile converts again with them. The last PNGs draw until then. */
   fontsChanged(): void {
-    this.#stale = this.#done;
     this.#done = new WeakMap();
     this.#fontFiles = null;
     this.#epoch += 1;
@@ -158,7 +161,7 @@ export class MetafilePictures {
    */
   dispose(): void {
     this.#disposed = true;
-    for (const url of this.#urls.values()) URL.revokeObjectURL(url);
+    for (const { url } of this.#urls.values()) URL.revokeObjectURL(url);
     this.#urls.clear();
     this.#abort.abort();
     if (this.#repaint) clearTimeout(this.#repaint);
@@ -190,11 +193,23 @@ export class MetafilePictures {
       return;
     }
     this.#done.set(bytes, png);
+    if (png) this.#last.set(bytes, png);
     const pending = this.#pending.get(bytes);
     this.#pending.delete(bytes);
     pending?.resolve();
     this.#pump();
-    if (png && !this.#repaint) this.#repaint = setTimeout(() => this.#notify(), REPAINT_DELAY_MS);
+    if (png) this.#schedule();
+  }
+
+  /**
+   * Repaint once the conversions end, and every `REPAINT_INTERVAL_MS` while they go on, so a
+   * deck with many metafiles does not repaint once for each one.
+   */
+  #schedule(): void {
+    const idle = this.#pending.size === 0;
+    if (this.#repaint && !idle) return;
+    if (this.#repaint) clearTimeout(this.#repaint);
+    this.#repaint = setTimeout(() => this.#notify(), idle ? 0 : REPAINT_INTERVAL_MS);
   }
 
   /** Tell the session to repaint. A listener that throws does not stop the conversions. */

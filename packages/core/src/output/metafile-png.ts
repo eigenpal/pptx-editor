@@ -1,6 +1,8 @@
 // EMF and WMF pictures as PNG. An image element cannot draw a metafile, so the editor, the image
-// export, and the PDF writer convert one with `emf-converter`, which replays the records into
-// pixels with no DOM. It is imported lazily: only a deck with a metafile loads it.
+// export, and the PDF writer convert one with `emf-converter`, which replays the records onto
+// the host's canvas: the browser canvas in the editor and the fidelity harness; on Node.js,
+// `@napi-rs/canvas` when it is installed, else the converter's own rasterizer. It needs no DOM.
+// It is imported lazily: only a deck with a metafile loads it.
 //
 // The approach is from DOCX Editor `packages/core/src/editor/browser-image-decode-port.ts`
 // (`convertPlainMetafile`) at commit bac199e196492ecc3fb5fea249942ffd3657ea66.

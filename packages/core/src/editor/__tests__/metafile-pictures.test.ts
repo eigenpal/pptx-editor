@@ -82,7 +82,9 @@ test('picturesReady waits for the pictures of one slide, or of every slide', asy
   await session.picturesReady(0);
   expect(session.picture('/ppt/media/image1.emf')).toBeDefined();
   expect(session.picture('/ppt/media/image4.emf')).toBeUndefined();
-  await session.picturesReady();
+  expect(await session.picturesReady(-1)).toBe(true);
+  expect(await session.picturesReady(9)).toBe(true);
+  expect(await session.picturesReady()).toBe(true);
   expect(session.picture('/ppt/media/image4.emf')).toBeDefined();
   editor.destroy();
 });
@@ -151,13 +153,28 @@ test('new fonts convert again, and the old PNG draws until then', async () => {
   await pictures.ready([bytes]);
   const first = pictures.drawable(bytes, 'image/x-emf');
   expect(first?.mime).toBe('image/png');
+  const url = pictures.url(bytes, first!);
   pictures.fontsChanged();
-  // Until the new PNG is ready, the old one draws.
+  pictures.fontsChanged();
+  // Until the new PNG is ready, the old one draws, also after two changes in a row.
   expect(pictures.drawable(bytes, 'image/x-emf')?.bytes).toBe(first!.bytes);
-  await pictures.ready([bytes]);
+  expect(await pictures.ready([bytes])).toBe(true);
   expect(fontSets).toBe(2);
-  expect(pictures.drawable(bytes, 'image/x-emf')?.bytes).not.toBe(first!.bytes);
+  const next = pictures.drawable(bytes, 'image/x-emf')!;
+  expect(next.bytes).not.toBe(first!.bytes);
+  // The new PNG gets a new URL, and the old URL is revoked.
+  const revoked: string[] = [];
+  const revoke = URL.revokeObjectURL;
+  URL.revokeObjectURL = (u: string) => (revoked.push(u), revoke(u));
+  try {
+    expect(pictures.url(bytes, next)).not.toBe(url);
+    expect(revoked).toEqual([url!]);
+  } finally {
+    URL.revokeObjectURL = revoke;
+  }
   pictures.dispose();
+  // A disposed cache makes no URL that nothing would revoke.
+  expect(pictures.url(bytes, next)).toBeUndefined();
 });
 
 test('a wait for pictures ends at its limit', async () => {
@@ -166,7 +183,7 @@ test('a wait for pictures ends at its limit', async () => {
     () => {}
   );
   const started = performance.now();
-  await pictures.ready([emfRectangle(4000, 4000)], 1);
+  expect(await pictures.ready([emfRectangle(4000, 4000)], 1)).toBe(false);
   expect(performance.now() - started).toBeLessThan(500);
   pictures.dispose();
 });
