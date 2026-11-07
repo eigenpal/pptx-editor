@@ -196,17 +196,13 @@ for (const [name, make] of Object.entries(CASES)) {
   });
 }
 
-/** The fastest of three checks of `bytes`, in milliseconds. */
+/** The average time of one check of `bytes` over at least 40 ms of checks, in milliseconds. */
 function checkMs(bytes: Uint8Array): number {
-  let best = Infinity;
-  for (let k = 0; k < 3; k += 1) {
-    // A copy: the check keeps its answer for each array.
-    const copy = bytes.slice();
-    const t0 = performance.now();
-    svgDrawable(copy);
-    best = Math.min(best, performance.now() - t0);
-  }
-  return best;
+  // A copy for each check: the check keeps its answer for each array.
+  let runs = 0;
+  const t0 = performance.now();
+  for (; performance.now() - t0 < 40; runs += 1) svgDrawable(bytes.slice());
+  return (performance.now() - t0) / runs;
 }
 
 /** Inputs that made a checker slow, at `n` bytes or so. */
@@ -223,7 +219,13 @@ const SLOW: Record<string, (n: number) => string> = {
 for (const [name, make] of Object.entries(SLOW))
   test(`the check of ${name} grows linearly: twice the input takes less than three times as long`, () => {
     const n = MAX_SVG_BYTES / 4;
-    const small = checkMs(enc(make(n)));
-    const large = checkMs(enc(make(2 * n)));
-    expect(large).toBeLessThan(Math.max(small, 1) * 3);
+    const [a, b] = [enc(make(n)), enc(make(2 * n))];
+    // The fastest of five turns each, taken in turn, so a busy moment slows both.
+    let small = Infinity;
+    let large = Infinity;
+    for (let k = 0; k < 5; k += 1) {
+      small = Math.min(small, checkMs(a));
+      large = Math.min(large, checkMs(b));
+    }
+    expect(large).toBeLessThan(small * 3);
   });
