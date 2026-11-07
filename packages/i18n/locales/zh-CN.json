@@ -8,6 +8,7 @@
     "openFailed": "无法打开此文件：{reason}",
     "dropHint": "拖放 .pptx 文件以将其打开",
     "dropRefused": "{detail} 不是 .pptx 文件。此处只能打开 .pptx 演示文稿。",
+    "deckFetchFailed": "未能加载演示文稿。请检查网络连接并重新加载页面，或使用“打开”打开文件。",
     "pdfExportFailed": "无法生成 PDF。请重试。",
     "pdfTooLarge": "此演示文稿对本演示的 PDF 导出来说太大。上限为 4 MiB。",
     "pdfTooComplex": "此演示文稿的内容对本演示的 PDF 导出来说太多。",
@@ -951,6 +952,7 @@
   },
   "canvas": {
     "ariaLabel": "第 {index} 张幻灯片，共 {total} 张",
+    "emptyAriaLabel": "未打开演示文稿",
     "inputAriaLabel": "所选形状的文本",
     "adjustHandle": "拖动以更改形状",
     "placeholderTable": "在此处插入表格",
@@ -1046,11 +1048,16 @@
     "reasons": {
       "damaged": "文件已损坏或不是 PPTX 演示文稿。请打开其他文件。",
       "notPptx": "文件中没有演示文稿。请打开 PPTX 文件。",
-      "tooLarge": "文件超出了编辑器可接受的大小。",
-      "unknown": "编辑器无法打开该文件。"
+      "tooLarge": "文件过大或过于复杂，编辑器无法打开。请打开其他文件。",
+      "blocked": "出于安全原因，编辑器不会打开包含此类内容的文件。请打开其他文件。",
+      "unknown": "编辑器无法打开该文件。请再次尝试打开。如果问题仍然存在，请联系支持团队。"
     },
     "kept": "之前打开的演示文稿保持打开状态。",
     "code": "错误代码：{code}",
+    "copyDetails": "复制详细信息",
+    "copied": "已复制详细信息",
+    "copyFailed": "浏览器不允许复制。请选择下方的详细信息并复制。",
+    "report": "错误详细信息",
     "close": "关闭"
   },
   "pictureFormat": {

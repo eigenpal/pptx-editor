@@ -65,7 +65,8 @@ describe('open failure', () => {
     expect(snap.status).toBe('ready');
     expect(snap.slides.length).toBe(3);
     expect(snap.openFailure).toEqual({ code: 'zip', reason: 'damaged' });
-    const el = screen.getByRole('alert');
+    const el = screen.getByRole('group', { name: 'The file did not open' });
+    expect(screen.getByRole('alert').textContent).toContain('Error code: zip');
     expect(el.textContent).toContain('The file did not open');
     expect(el.textContent).toContain('The file is damaged, or it is not a PPTX presentation.');
     expect(el.textContent).toContain('The presentation that was open stays open.');

@@ -33,7 +33,7 @@
 
 import { XFRM_BOUND, type ResolvedShape } from '../cascade/index.ts';
 import { evaluateGeometry } from './geometry/geometry.ts';
-import { layoutText } from './text/text-layout.ts';
+import { layoutText, layoutTextOn } from './text/text-layout.ts';
 import type { TextMeasurer } from './text/measurer.ts';
 
 /** `ST_PositiveCoordinate`'s maximum (`MAX_COORDINATE` in package-edits.ts). */
@@ -179,7 +179,8 @@ type Rect = Parameters<typeof layoutText>[1];
 
 /** Whether the text fits its frame: the frame is the swapped one for rotated text. */
 const fits = (text: Text, rect: Rect, measurer: TextMeasurer): boolean => {
-  const laid = layoutText(text, rect, measurer);
+  // The layout stops at the first paragraph past the box: the rest cannot make it fit.
+  const laid = layoutTextOn(text, rect, measurer, 'size', true);
   return laid.contentHeight <= laid.box.height + 1;
 };
 

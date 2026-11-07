@@ -552,3 +552,95 @@ describe('useEditorHostDocument (Vue)', () => {
     expect(seen === document).toBe(true);
   });
 });
+
+describe('Copy details on the open-failure notice', () => {
+  /** The copy result line, once it has text. */
+  const copyResult = async (): Promise<string> => {
+    const status = document.querySelector('.pptx-open-failure__status')!;
+    for (let i = 0; i < 50 && !status.textContent; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      await settle();
+    }
+    return status.textContent ?? '';
+  };
+
+  test('copies the report and says so; showCopy hides it', async () => {
+    const written: string[] = [];
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (text: string) => void written.push(text) },
+    });
+    let editor: PptxEditorInstance | null = null;
+    mount(() =>
+      h(PptxEditor.Root, { onReady: (e: PptxEditorInstance) => (editor = e) }, () => [
+        h(PptxEditor.OpenFailure),
+        h(PptxEditor.OpenFailure, { showCopy: false, className: 'no-copy' }),
+      ])
+    );
+    await settle();
+    await editor!.load(new Uint8Array([1, 2, 3]));
+    await settle();
+    expect(document.querySelector('.no-copy')!.textContent).not.toContain('Copy details');
+    const button = [...document.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Copy details'
+    )!;
+    button.click();
+    expect(await copyResult()).toBe('Details copied');
+    expect(written).toHaveLength(1);
+    expect(written[0]).toStartWith('PPTX Editor could not open a file.\nCode: zip');
+    expect(document.querySelector('.pptx-open-failure__report')).toBeNull();
+  });
+
+  test('a blocked clipboard shows the report to copy by hand', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async () => Promise.reject(new Error('NotAllowedError')) },
+    });
+    let editor: PptxEditorInstance | null = null;
+    mount(() =>
+      h(PptxEditor.Root, { onReady: (e: PptxEditorInstance) => (editor = e) }, () => [
+        h(PptxEditor.OpenFailure),
+      ])
+    );
+    await settle();
+    await editor!.load(new Uint8Array([1, 2, 3]));
+    await settle();
+    const button = [...document.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Copy details'
+    )!;
+    button.click();
+    expect(await copyResult()).toContain('did not allow');
+    await settle();
+    const report = document.querySelector<HTMLTextAreaElement>('.pptx-open-failure__report')!;
+    expect(report.readOnly).toBe(true);
+    expect(report.getAttribute('aria-label')).toBe('Error details');
+    expect(report.value).toStartWith('PPTX Editor could not open a file.\nCode: zip');
+    // The blocked copy moves focus to the report, which selects it for the copy key.
+    expect(document.activeElement).toBe(report);
+    expect([report.selectionStart, report.selectionEnd]).toEqual([0, report.value.length]);
+  });
+});
+
+describe('Close on the open-failure notice', () => {
+  test('with no deck open, focus goes to the slide canvas, not the page body', async () => {
+    let editor: PptxEditorInstance | null = null;
+    mount(() =>
+      h(PptxEditor.Root, { onReady: (e: PptxEditorInstance) => (editor = e) }, () => [
+        h(PptxEditor.Content),
+        h(PptxEditor.OpenFailure),
+      ])
+    );
+    await settle();
+    await editor!.load(new Uint8Array([1, 2, 3]));
+    await settle();
+    expect(editor!.session).toBeNull();
+    const close = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Close')!;
+    close.focus();
+    close.click();
+    await settle();
+    expect(document.querySelector('.pptx-open-failure')).toBeNull();
+    const canvas = document.querySelector('.pptx-surface');
+    expect(document.activeElement).toBe(canvas);
+    expect(canvas!.getAttribute('aria-label')).toBe('No presentation open');
+  });
+});

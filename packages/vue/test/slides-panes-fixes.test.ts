@@ -105,11 +105,15 @@ describe('open failure', () => {
     await tick();
     expect(editor.snapshot().status).toBe('ready');
     expect(editor.snapshot().slides.length).toBe(3);
-    const el = document.querySelector<HTMLElement>('[role="alert"]')!;
+    const el = document
+      .querySelector<HTMLElement>('[role="alert"]')!
+      .closest<HTMLElement>('.pptx-open-failure')!;
     expect(el.textContent).toContain('The file did not open');
     expect(el.textContent).toContain('The presentation that was open stays open.');
     expect(el.textContent).toContain('Error code: zip');
-    document.querySelector<HTMLButtonElement>('.pptx-open-failure__action')!.click();
+    expect(editor.snapshot().openFailure).toEqual({ code: 'zip', reason: 'damaged' });
+    const close = [...el.querySelectorAll('button')].find((b) => b.textContent === 'Close')!;
+    close.click();
     await tick();
     expect(dismissed).toBe(1);
     expect(document.querySelector('.pptx-open-failure') === null).toBe(true);

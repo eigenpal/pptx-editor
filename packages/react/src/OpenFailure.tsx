@@ -9,14 +9,26 @@
 // The default text is generic on purpose: it explains the refusal and shows the stable code,
 // and names no contact. A host adds its own support action through `actions`.
 
-import { useCallback, useId, useState, type CSSProperties, type ReactNode } from 'react';
 import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
+import {
+  copyOpenFailureReport,
   OPEN_FAILURE_MESSAGE_KEYS,
+  COPY_RESULT_GAP_MS,
+  openFailureKey,
+  type OpenFailureCopy,
   shownOpenFailure,
   type ChromeTranslate,
   type DocumentOpenFailure,
 } from '@pptx-editor.dev/core/editor';
-import { useEditorState, useTranslation } from './context.ts';
+import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
 import { withChromeTranslate } from './headless-hooks.tsx';
 
 /** Options for `useOpenFailure`, as DOCX Editor's `UseOpenFailureOptions`. @public */
@@ -86,6 +98,12 @@ export interface PptxEditorOpenFailureProps {
   readonly message?: ReactNode | ((failure: DocumentOpenFailure) => ReactNode);
   /** Show the stable error code under the message. Defaults to `true`. */
   readonly showCode?: boolean;
+  /**
+   * Show **Copy details**, which copies `openFailureReport(failure)`: the code, the reason,
+   * the editor version, the browser, and the time, for a support request. It holds no file
+   * content. Defaults to `true`.
+   */
+  readonly showCopy?: boolean;
   /** Your own buttons, before **Close**. The notice shows no contact of its own. */
   readonly actions?: (context: OpenFailureContext) => ReactNode;
   /** The label of the **Close** button. Defaults to the translated `openFailure.close`. */
@@ -130,6 +148,7 @@ function OpenFailureRoot({
   title,
   message,
   showCode = true,
+  showCopy = true,
   actions,
   closeLabel,
   showClose = true,
@@ -140,22 +159,44 @@ function OpenFailureRoot({
   const { t } = useTranslation();
   const { failure, message: packaged, kept, dismiss } = useOpenFailure();
   const titleId = useId();
+  // The last copy and its result, for the refusal it copied: a later refusal starts fresh.
+  const [copy, setCopy] = useState<OpenFailureCopy | null>(null);
+  const reportRef = useRef<HTMLTextAreaElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const editor = usePptxEditor();
+  // A blocked copy moves focus to the report, which selects it for the copy key.
+  useEffect(() => {
+    if (copy && !copy.copied) reportRef.current?.focus();
+  }, [copy]);
   if (!failure || packaged === null) return null;
+  const copyReport = async (): Promise<void> => {
+    // Clear the result first, so the same result a second time is read again.
+    setCopy(null);
+    await new Promise((resolve) => setTimeout(resolve, COPY_RESULT_GAP_MS));
+    setCopy(await copyOpenFailureReport(failure));
+  };
+  const copyShown = copy?.failure === failure ? copy : null;
   const close = (): void => {
+    // Focus inside the notice goes back to the editor, not to the page body.
+    const focused = rootRef.current?.contains(document.activeElement) ?? false;
     dismiss(failure);
     onDismiss?.(failure);
+    if (focused) editor?.focus();
   };
   const context: OpenFailureContext = { failure, message: packaged, dismiss: close };
   const body = typeof message === 'function' ? message(failure) : (message ?? packaged);
   return (
     <div
+      key={openFailureKey(failure)}
+      ref={rootRef}
       className={`pptx-open-failure${className ? ` ${className}` : ''}`}
       style={style}
-      role="alert"
+      role="group"
       aria-labelledby={titleId}
       data-reason={failure.reason}
     >
-      <div className="pptx-open-failure__text">
+      {/* Only the reason is an alert: the copy result and the report read on their own. */}
+      <div className="pptx-open-failure__text" role="alert">
         <p id={titleId} className="pptx-open-failure__title">
           {title ?? t('openFailure.title')}
         </p>
@@ -165,8 +206,31 @@ function OpenFailureRoot({
           <p className="pptx-open-failure__code">{t('openFailure.code', { code: failure.code })}</p>
         ) : null}
       </div>
+      <p className="pptx-open-failure__status" role="status">
+        {copyShown ? t(copyShown.copied ? 'openFailure.copied' : 'openFailure.copyFailed') : null}
+      </p>
+      {copyShown && !copyShown.copied ? (
+        <textarea
+          ref={reportRef}
+          className="pptx-open-failure__report"
+          readOnly
+          rows={6}
+          aria-label={t('openFailure.report')}
+          value={copyShown.report}
+          onFocus={(e) => e.currentTarget.select()}
+        />
+      ) : null}
       <div className="pptx-open-failure__actions">
         {actions?.(context)}
+        {showCopy ? (
+          <button
+            type="button"
+            className="pptx-open-failure__action"
+            onClick={() => void copyReport()}
+          >
+            {t('openFailure.copyDetails')}
+          </button>
+        ) : null}
         {showClose ? (
           <button type="button" className="pptx-open-failure__action" onClick={close}>
             {closeLabel ?? t('openFailure.close')}

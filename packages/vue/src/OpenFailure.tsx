@@ -10,6 +10,7 @@
 import {
   computed,
   defineComponent,
+  nextTick,
   shallowRef,
   useId,
   type ComputedRef,
@@ -20,12 +21,16 @@ import {
   type VNodeChild,
 } from 'vue';
 import {
+  copyOpenFailureReport,
   OPEN_FAILURE_MESSAGE_KEYS,
+  COPY_RESULT_GAP_MS,
+  openFailureKey,
+  type OpenFailureCopy,
   shownOpenFailure,
   type ChromeTranslate,
   type DocumentOpenFailure,
 } from '@pptx-editor.dev/core/editor';
-import { useEditorState, useTranslation } from './composables.ts';
+import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
 import { chromeTranslateProp, useChromeTranslateScope } from './headless-hooks.ts';
 
 /** Options for `useOpenFailure`, the twin of React's `UseOpenFailureOptions`. @public */
@@ -103,6 +108,12 @@ const openFailureProps = {
   /** Show the stable error code under the message. Defaults to `true`. */
   showCode: { type: Boolean, default: true },
   /**
+   * Show **Copy details**, which copies `openFailureReport(failure)`: the code, the reason,
+   * the editor version, the browser, and the time, for a support request. It holds no file
+   * content. Defaults to `true`.
+   */
+  showCopy: { type: Boolean, default: true },
+  /**
    * Your own buttons, before **Close**: the function form of the `actions` slot, for the
    * `openFailure` object on `PptxEditor`. The slot wins over it. The notice shows no contact of
    * its own.
@@ -166,24 +177,44 @@ export const PptxEditorOpenFailure = defineComponent({
     // A component does not inject what it provides itself, so the scoped `t` goes in directly.
     const { failure, message, kept, dismiss } = useOpenFailure({ t: t as ChromeTranslate });
     const titleId = useId();
+    // The last copy and its result, for the refusal it copied: a later refusal starts fresh.
+    const copy = shallowRef<OpenFailureCopy | null>(null);
+    const reportRef = shallowRef<HTMLTextAreaElement | null>(null);
+    const rootRef = shallowRef<HTMLDivElement | null>(null);
+    const editor = usePptxEditor();
     return () => {
       const shown = failure.value;
       const packaged = message.value;
       if (!shown || packaged === null) return null;
+      const copyReport = async (): Promise<void> => {
+        // Clear the result first, so the same result a second time is read again.
+        copy.value = null;
+        await new Promise((resolve) => setTimeout(resolve, COPY_RESULT_GAP_MS));
+        copy.value = await copyOpenFailureReport(shown);
+        // A blocked copy moves focus to the report, which selects it for the copy key.
+        if (!copy.value.copied) void nextTick(() => reportRef.value?.focus());
+      };
+      const copyShown = copy.value?.failure === shown ? copy.value : null;
       const close = (): void => {
+        // Focus inside the notice goes back to the editor, not to the page body.
+        const focused = rootRef.value?.contains(document.activeElement) ?? false;
         dismiss(shown);
         emit('dismiss', shown);
+        if (focused) editor.value?.focus();
       };
       const context: OpenFailureContext = { failure: shown, message: packaged, dismiss: close };
       return (
         <div
+          key={openFailureKey(shown)}
+          ref={rootRef}
           class={['pptx-open-failure', props.className]}
           style={props.style}
-          role="alert"
+          role="group"
           aria-labelledby={titleId}
           data-reason={shown.reason}
         >
-          <div class="pptx-open-failure__text">
+          {/* Only the reason is an alert: the copy result and the report read on their own. */}
+          <div class="pptx-open-failure__text" role="alert">
             <p id={titleId} class="pptx-open-failure__title">
               {props.title ?? t('openFailure.title')}
             </p>
@@ -199,8 +230,33 @@ export const PptxEditorOpenFailure = defineComponent({
               <p class="pptx-open-failure__code">{t('openFailure.code', { code: shown.code })}</p>
             ) : null}
           </div>
+          <p class="pptx-open-failure__status" role="status">
+            {copyShown
+              ? t(copyShown.copied ? 'openFailure.copied' : 'openFailure.copyFailed')
+              : null}
+          </p>
+          {copyShown && !copyShown.copied ? (
+            <textarea
+              ref={reportRef}
+              class="pptx-open-failure__report"
+              readonly
+              rows={6}
+              aria-label={t('openFailure.report')}
+              value={copyShown.report}
+              onFocus={(e: FocusEvent) => (e.currentTarget as HTMLTextAreaElement).select()}
+            />
+          ) : null}
           <div class="pptx-open-failure__actions">
             {slots.actions ? slots.actions(context) : props.actions?.(context)}
+            {props.showCopy ? (
+              <button
+                type="button"
+                class="pptx-open-failure__action"
+                onClick={() => void copyReport()}
+              >
+                {t('openFailure.copyDetails')}
+              </button>
+            ) : null}
             {props.showClose ? (
               <button type="button" class="pptx-open-failure__action" onClick={close}>
                 {props.closeLabel ?? t('openFailure.close')}

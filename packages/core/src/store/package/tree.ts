@@ -112,7 +112,12 @@ export function parseXmlPart(partName: string, xml: string, limits?: XmlLimits):
   if (roots.length !== 1 || roots[0].type !== 'element') return { ok: false, reason: 'no-root' };
   const counter = { next: 1 };
   try {
-    const root = build(roots[0], new Map([['xml', NS.xml]]), null, counter);
+    const root = build(
+      roots[0],
+      { decls: new Map([['xml', NS.xml]]), parent: null },
+      null,
+      counter
+    );
     if (root.type !== 'element') return { ok: false, reason: 'no-root' };
     return { ok: true, part: { partName, root, nextId: counter.next } };
   } catch (e) {
@@ -127,14 +132,32 @@ function splitName(raw: string): { prefix: string; local: string } {
   return { prefix: raw.slice(0, colon), local: raw.slice(colon + 1) };
 }
 
+/**
+ * The prefixes in scope: an element's own declarations, then its parent's scope. A chain, not a
+ * copy per declaring element: copying a large inherited scope at each of many declaring
+ * elements was quadratic. The XML depth limit bounds the walk.
+ */
+interface NamespaceScope {
+  readonly decls: ReadonlyMap<string, string>;
+  readonly parent: NamespaceScope | null;
+}
+
+function lookupPrefix(scope: NamespaceScope, prefix: string): string | undefined {
+  for (let s: NamespaceScope | null = scope; s; s = s.parent) {
+    const uri = s.decls.get(prefix);
+    if (uri !== undefined) return uri;
+  }
+  return undefined;
+}
+
 function build(
   node: Extract<XmlNode, { type: 'element' }>,
-  scope: ReadonlyMap<string, string>,
+  scope: NamespaceScope,
   parentKind: NodeKind | null,
   counter: { next: number }
 ): Element {
   const nsDecls: NamespaceDecl[] = [];
-  let local = scope;
+  let own: Map<string, string> | null = null;
   const rawAttrs: [string, string][] = [];
   for (const name of Object.keys(node.attributes)) {
     const value = node.attributes[name];
@@ -145,14 +168,15 @@ function build(
       const bindingError = namespaceBindingError(prefix, value);
       if (bindingError) throw new TreeBuildError('bad-name', `${name}: ${bindingError.detail}`);
       nsDecls.push({ prefix, uri: value });
-      if (local === scope) local = new Map(scope);
-      (local as Map<string, string>).set(prefix, value);
+      own ??= new Map();
+      own.set(prefix, value);
     } else rawAttrs.push([name, value]);
   }
+  const local: NamespaceScope = own ? { decls: own, parent: scope } : scope;
   const { prefix, local: localName } = splitName(node.name);
   if (!isNcName(localName) || (prefix && !isNcName(prefix)))
     throw new TreeBuildError('bad-name', node.name);
-  const ns = local.get(prefix);
+  const ns = lookupPrefix(local, prefix);
   if (ns === undefined && prefix !== '') throw new TreeBuildError('unbound-prefix', node.name);
   const elementError = qualifiedNameError(ns ?? '', localName, prefix || undefined, false);
   if (elementError) throw new TreeBuildError('bad-name', `${node.name}: ${elementError.detail}`);
@@ -161,7 +185,7 @@ function build(
     const split = splitName(name);
     if (!isNcName(split.local) || (split.prefix && !isNcName(split.prefix)))
       throw new TreeBuildError('bad-name', name);
-    const attrNs = split.prefix === '' ? '' : local.get(split.prefix);
+    const attrNs = split.prefix === '' ? '' : lookupPrefix(local, split.prefix);
     if (attrNs === undefined) throw new TreeBuildError('unbound-prefix', name);
     const attrError = qualifiedNameError(attrNs, split.local, split.prefix || undefined, true);
     if (attrError) throw new TreeBuildError('bad-name', `${name}: ${attrError.detail}`);

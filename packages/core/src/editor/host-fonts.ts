@@ -37,6 +37,7 @@ import {
 import { EditorFontError } from './editor-font-error.ts';
 import { FONT_NAME } from '../automation/commands/font-format.ts';
 import { createFontResolutionLifetime } from './font-resolution-lifetime.ts';
+import { within } from './within.ts';
 
 /** What the `fonts` option and prop take, as DOCX Editor's `DocxEditorConfig.fonts`. @public */
 export type EditorFontsOption = FontConfiguration | FontConfigurationFragment | FontResolver;
@@ -183,10 +184,35 @@ export function withFontOrigin(
 
 const isAbort = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
 
+/**
+ * The longest a deck that opens waits for the host's fonts, as DOCX Editor's
+ * `PREPARED_WORK_WAIT_MS`. After it, the deck paints with the embedded and built-in faces, and
+ * the host's faces install when they arrive. A stalled download never holds the loading screen.
+ */
+export const FONT_WAIT_MS = 2000;
+
+/** The answer `within` gives when the host's fonts did not arrive in time. */
+const LATE = Symbol('late');
+
+/**
+ * How long late faces may hold `resolving` and hide the substitution notice, as DOCX Editor's
+ * `LATE_FONT_WAIT_MS`. A stalled download must not hold them for the whole session. Faces
+ * that arrive after this still install.
+ */
+export const LATE_FONT_WAIT_MS = 10_000;
+
 /** The host's fonts for one editor. */
 export interface HostFonts {
-  /** Resolve the origins for a deck that is opening, before its first paint. */
-  open(session: DocumentSession, stale: () => boolean): Promise<void>;
+  /**
+   * Resolve the origins for a deck that is opening, before its first paint, for at most
+   * `waitMs` (default {@link FONT_WAIT_MS}); faces that arrive later install then.
+   */
+  open(session: DocumentSession, stale: () => boolean, waitMs?: number): Promise<void>;
+  /**
+   * The deck that `open` resolved for does not mount (a later load, a throw): the deck on
+   * screen gets back the font state it had, and its late faces resolve again.
+   */
+  abandon(session: DocumentSession): void;
   /** Replace the `fonts` origin, as DOCX Editor's `setFonts`. */
   setFonts(fonts: EditorFontsOption | undefined): Promise<void>;
   /** Ask the origins for picked families that no face covers. */
@@ -195,6 +221,13 @@ export interface HostFonts {
   current(): EditorFontsOption | undefined;
   /** Families the origins can serve, for the font picker. */
   supportedFamilies(): readonly string[];
+  /** Whether faces the deck asked for are still on the way, for at most {@link LATE_FONT_WAIT_MS}. */
+  resolving(): boolean;
+  /**
+   * Shaped measurement that arrives after `session` opened: count it in `resolving`. Then,
+   * while the editor shows `session`, register the new faces, or report why it did not load.
+   */
+  awaitShaping(session: DocumentSession): void;
   dispose(): void;
 }
 
@@ -202,6 +235,12 @@ export interface HostFonts {
 export function createHostFonts(
   options: HostFontOptions,
   host: {
+    /** Overrides {@link FONT_WAIT_MS}; for tests. */
+    readonly waitMs?: number;
+    /** Overrides {@link LATE_FONT_WAIT_MS}; for tests. */
+    readonly lateWaitMs?: number;
+    /** `resolving()` changed with nothing installed: publish. */
+    readonly changed: () => void;
     readonly session: () => DocumentSession | null;
     /** The session's faces changed: register them for paint and publish. */
     readonly installed: (session: DocumentSession) => Promise<void>;
@@ -214,6 +253,61 @@ export function createHostFonts(
   let base: FontConfigurationFragment | undefined;
   let picked: FontConfigurationFragment[] = [];
   const requested = new Set<string>();
+  // Late answers still on the way, each with the timer that stops waiting for it.
+  const waiting = new Map<object, ReturnType<typeof setTimeout>>();
+  // The open that has not mounted, and the state of the deck on screen before it.
+  let opening: {
+    readonly session: DocumentSession;
+    readonly base: FontConfigurationFragment | undefined;
+    readonly picked: readonly FontConfigurationFragment[];
+    readonly requested: readonly string[];
+    /** Faces of the deck on screen were still on the way. */
+    readonly pending: boolean;
+  } | null = null;
+  const abandoned = new WeakSet<DocumentSession>();
+  /** Stop waiting for `token`; `quiet` when an installation publishes the change. */
+  const settle = (token: object, quiet = false): void => {
+    const timer = waiting.get(token);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    waiting.delete(token);
+    if (!quiet && !destroyed) host.changed();
+  };
+  /** Waits for the session's own shaped measurement: new host fonts do not cancel them. */
+  const shapingWaits = new WeakSet<object>();
+  /** Stop waiting; `keepShaping` keeps the waits for the session's shaped measurement. */
+  const stopWaiting = (keepShaping = false): void => {
+    for (const [token, timer] of waiting) {
+      if (keepShaping && shapingWaits.has(token)) continue;
+      clearTimeout(timer);
+      waiting.delete(token);
+    }
+  };
+  /** Wait for `late`; `arrived` installs it and answers whether it installed anything. */
+  const track = <T>(late: Promise<T>, arrived: (value: T, token: object) => boolean): object => {
+    const token = {};
+    waiting.set(
+      token,
+      setTimeout(() => settle(token), host.lateWaitMs ?? LATE_FONT_WAIT_MS)
+    );
+    late.then(
+      (value) => {
+        let installed = false;
+        try {
+          installed = arrived(value, token);
+        } catch (cause) {
+          // A late answer is untrusted shape: a failure to install is reported, never thrown.
+          report(cause);
+        }
+        if (!installed) settle(token);
+      },
+      (cause: unknown) => {
+        if (waiting.has(token)) report(cause);
+        settle(token);
+      }
+    );
+    return token;
+  };
 
   const report = (cause: unknown): void =>
     reportFontError(toEditorFontError(cause), options.onFontError);
@@ -237,12 +331,15 @@ export function createHostFonts(
     current: () => boolean
   ): void => {
     if (!late) return;
-    void late.then(async (answer) => {
-      if (!answer || !current() || host.session() !== session) return;
+    track(late, (answer, token) => {
+      if (!answer || !current() || host.session() !== session) return false;
       base = withoutLate(answer);
       apply(session);
-      await host.installed(session);
+      // Quietly: the installation publishes `resolving` with the new faces.
+      settle(token, true);
       follow(session, answer.deferred, current);
+      void host.installed(session);
+      return true;
     });
   };
 
@@ -271,22 +368,46 @@ export function createHostFonts(
   };
 
   return {
-    async open(session, stale) {
+    async open(session, stale, waitMs = host.waitMs ?? FONT_WAIT_MS) {
+      // An earlier open that has not mounted keeps the state from before it.
+      const earlier = opening && host.session() !== opening.session ? opening : null;
+      opening = earlier
+        ? { ...earlier, session }
+        : { session, base, picked, requested: [...requested], pending: waiting.size > 0 };
+      stopWaiting();
       base = undefined;
       picked = [];
       requested.clear();
-      // A `setFonts` while the deck opens cancels this resolution; resolve again for it.
+      // A `setFonts` while the deck opens cancels this resolution; resolve again for it, in
+      // the same wait: the retries do not extend it.
+      const deadline = performance.now() + waitMs;
       for (let attempt = 0; attempt < 4; attempt += 1) {
         const lease = lifetime.advance();
         lease.cancelPrevious();
-        let result: Awaited<ReturnType<typeof compose>>;
+        let result: Awaited<ReturnType<typeof compose>> | typeof LATE;
+        const composed = compose(session, lease.signal);
         try {
-          result = await compose(session, lease.signal);
+          result = await within(composed, Math.max(0, deadline - performance.now()), LATE);
         } catch (cause) {
           report(cause);
           return;
         }
         if (stale() || destroyed) return;
+        if (result === LATE) {
+          // The deck opens with the faces it has; the host's faces replace them on arrival.
+          track(composed, (late, token) => {
+            if (!late || !lease.current() || destroyed || abandoned.has(session)) return false;
+            base = late.answer ? withoutLate(late.answer) : undefined;
+            apply(session);
+            follow(session, late.answer?.deferred, lease.current);
+            // Before the editor adopts the session, it registers these faces itself.
+            if (host.session() !== session) return false;
+            settle(token, true);
+            void host.installed(session);
+            return true;
+          });
+          return;
+        }
         if (!result) continue;
         base = result.answer ? withoutLate(result.answer) : undefined;
         apply(session);
@@ -295,10 +416,39 @@ export function createHostFonts(
       }
     },
 
+    abandon(session) {
+      if (destroyed || opening?.session !== session) return;
+      const kept = opening;
+      opening = null;
+      abandoned.add(session);
+      base = kept.base;
+      picked = [...kept.picked];
+      requested.clear();
+      for (const family of kept.requested) requested.add(family);
+      // The open stopped the shown deck's waits: wait for its shaping again (a settled one
+      // ends at once), and resolve its late faces again.
+      const shown = host.session();
+      if (shown?.shaping) shapingWaits.add(track(shown.shaping, () => false));
+      if (!shown || !kept.pending) return;
+      const lease = lifetime.advance();
+      lease.cancelPrevious();
+      void compose(shown, lease.signal).then(
+        (result) => {
+          if (!result || !lease.current() || host.session() !== shown) return;
+          base = result.answer ? withoutLate(result.answer) : undefined;
+          apply(shown);
+          void host.installed(shown);
+          follow(shown, result.answer?.deferred, lease.current);
+        },
+        (cause: unknown) => report(cause)
+      );
+    },
+
     async setFonts(next) {
       if (destroyed) throw new Error('A destroyed editor cannot replace fonts');
       const lease = lifetime.advance();
       try {
+        stopWaiting(true);
         fonts = next;
         picked = [];
         requested.clear();
@@ -367,6 +517,19 @@ export function createHostFonts(
       return fonts;
     },
 
+    resolving: () => waiting.size > 0,
+
+    awaitShaping(session) {
+      const work = session.shaping;
+      if (!work) return;
+      shapingWaits.add(track(work, () => false));
+      void work.then((ok) => {
+        if (destroyed || host.session() !== session) return;
+        if (ok) void host.installed(session);
+        else report(session.shapingError);
+      });
+    },
+
     supportedFamilies() {
       const out: string[] = [];
       for (const layer of [base, ...picked])
@@ -376,6 +539,7 @@ export function createHostFonts(
 
     dispose() {
       destroyed = true;
+      stopWaiting();
       lifetime.dispose();
     },
   };

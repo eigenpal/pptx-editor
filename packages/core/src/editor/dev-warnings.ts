@@ -490,6 +490,37 @@ export function warnModulesChanged(
   );
 }
 
+/** How many changes in {@link CHURN_WINDOW_MS} count as a prop that changes on every render. */
+const CHURN_LIMIT = 10;
+const CHURN_WINDOW_MS = 1000;
+
+/**
+ * A counter for one root prop whose identity reloads or replaces something (`document` loads
+ * the deck, `fonts` replaces the fonts). A prop made anew on each render, with a host that
+ * renders on `onChange`, loads forever. Call the result on each change; past ten changes in
+ * one second it warns once, in development. `root` is the adapter's root name. @internal
+ */
+export function churnWarning(root: string, prop: 'document' | 'fonts'): () => void {
+  let times: number[] = [];
+  let warned = false;
+  return () => {
+    if (warned) return;
+    const now = Date.now();
+    times = times.filter((t) => now - t < CHURN_WINDOW_MS);
+    times.push(now);
+    if (times.length <= CHURN_LIMIT) return;
+    warned = true;
+    devWarning(
+      prop === 'document'
+        ? `${root} got new \`document\` bytes ${times.length} times in one second, and each one ` +
+            'loads the deck again. Keep the bytes in state, and pass the same Uint8Array until ' +
+            'the deck changes.'
+        : `${root} got a new \`fonts\` value ${times.length} times in one second, and each one ` +
+            'replaces the fonts. Make it once with `useFonts(...)` or outside the component.'
+    );
+  };
+}
+
 /** A slide rail `orientation` that is not `vertical` or `horizontal`: the rail stays vertical. @internal */
 export function warnInvalidRailOrientation(part: string, value: unknown): void {
   devWarning(

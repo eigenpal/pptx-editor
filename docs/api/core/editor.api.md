@@ -517,6 +517,9 @@ export interface ChromeTooltipState {
 export type ChromeTranslate = (key: string, params?: TranslationParams) => string;
 
 // @internal
+export function churnWarning(root: string, prop: 'document' | 'fonts'): () => void;
+
+// @internal
 export function clampSlide(index: number | undefined, count: number): number;
 
 // @internal
@@ -918,6 +921,12 @@ export const CONTEXT_MENU_NAMED_PARTS: {
 export type ContextMenuPartName = keyof typeof CONTEXT_MENU_NAMED_PARTS;
 
 // @internal
+export const COPY_RESULT_GAP_MS = 100;
+
+// @internal
+export function copyOpenFailureReport(failure: DocumentOpenFailure): Promise<OpenFailureCopy>;
+
+// @internal
 export interface CorrectionGridCell {
     readonly brightness: number;
     readonly contrast: number;
@@ -1133,7 +1142,7 @@ export interface DocumentOpenFailure {
 export function documentOpenFailure(code: string): DocumentOpenFailure;
 
 // @public
-export type DocumentOpenFailureReason = 'damaged' | 'not-pptx' | 'too-large' | 'unknown';
+export type DocumentOpenFailureReason = 'damaged' | 'not-pptx' | 'too-large' | 'blocked' | 'unknown';
 
 // @internal
 export interface DocumentSearch {
@@ -1194,7 +1203,11 @@ export class DocumentSession {
         reason: 'xml';
     }> | null;
     dispose(): void;
+    // @internal
+    get disposed(): boolean;
     get faces(): readonly RegisteredFace[];
+    // @internal
+    get fixedMeasurer(): boolean;
     get fontGeneration(): number;
     // (undocumented)
     get fontReport(): FontReport;
@@ -1222,15 +1235,23 @@ export class DocumentSession {
     // @internal
     opening: ProgressiveOpen | null;
     // @internal
+    parsedAt: number;
+    // @internal
     probeBatch(base?: PptxPackage): OpBatch;
     // @internal
     setHostFaces(next: HostFaces): void;
+    // @internal
+    shaping: Promise<boolean> | null;
+    // @internal
+    shapingError: unknown;
     // @internal
     slidePending(index: number): boolean;
     // (undocumented)
     readonly store: PptxDocumentStore;
     substitutedFamilies(): FontSubstitution[];
     get usedPartNames(): ReadonlySet<string>;
+    // @internal
+    useShapedMeasurer(loaded: SubstituteLoad): void;
 }
 
 // @internal
@@ -2348,6 +2369,12 @@ export type FontLoadFailureReason = 'networkError' | 'httpError' | 'hashMismatch
 | 'invalidRequest'
 /** The bytes are not a font at all — most often an HTML error page served with 200. */
 | 'malformed';
+
+// @public
+export interface FontMeasurementState {
+    readonly measurer: 'fixed' | 'shaped';
+    readonly resolving: boolean;
+}
 
 // @internal
 export function fontNoticeFamilies(substituted: readonly {
@@ -3489,6 +3516,7 @@ export const OPEN_FAILURE_MESSAGE_KEYS: {
     readonly damaged: "openFailure.reasons.damaged";
     readonly 'not-pptx': "openFailure.reasons.notPptx";
     readonly 'too-large': "openFailure.reasons.tooLarge";
+    readonly blocked: "openFailure.reasons.blocked";
     readonly unknown: "openFailure.reasons.unknown";
 };
 
@@ -3504,6 +3532,26 @@ export interface OpenFailureActionNames {
 }
 
 // @internal
+export interface OpenFailureCopy {
+    readonly copied: boolean;
+    // (undocumented)
+    readonly failure: DocumentOpenFailure;
+    readonly report: string;
+}
+
+// @internal
+export function openFailureKey(failure: DocumentOpenFailure): number;
+
+// @public
+export function openFailureReport(failure: DocumentOpenFailure, context?: OpenFailureReportContext): string;
+
+// @public
+export interface OpenFailureReportContext {
+    readonly time?: Date;
+    readonly userAgent?: string;
+}
+
+// @internal
 export function openHyperlinkPopup(controller: HyperlinkPopupController, editor: object, link: {
     readonly url: string;
 } | null | undefined, anchor: HTMLElement | null | undefined): void;
@@ -3516,6 +3564,8 @@ export interface OpenOptions {
     readonly progressive?: {
         readonly startSlide?: number;
     };
+    // @internal
+    readonly shapingWaitMs?: number;
     readonly substitutes?: boolean;
 }
 
@@ -3952,6 +4002,7 @@ export interface PptxEditorInstance extends Editor {
     // @internal
     finishOpening(): boolean;
     fontFamilies(): readonly string[];
+    fontMeasurement(): FontMeasurementState;
     readonly fonts: PptxEditorOptions['fonts'];
     input(kind: TextInputKind, data?: string): CommandResult;
     readonly lastCopied: ClipboardPayload | null;

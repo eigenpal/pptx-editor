@@ -260,10 +260,103 @@ export function replaceMatches(
       b.paragraph - a.paragraph ||
       b.start - a.start
   );
+  // Only a cell with more than one text body can need a join. Check each text body once, not
+  // each match: the check reads the whole part, and a long run can hold thousands of matches.
+  const inSplitCell = new Map<string, boolean>();
+  const runs = createRunEdits(batch);
   for (const m of order) {
-    joinCellBodies(batch, m);
+    const key = `${m.part}\u0000${m.txBodyId}`;
+    let split = inSplitCell.get(key);
+    if (split === undefined) inSplitCell.set(key, (split = isSplitCellBody(batch, m)));
+    if (split) {
+      runs.flush();
+      joinCellBodies(batch, m);
+    }
+    if (runs.replace(m, text)) continue;
+    runs.flush();
     replaceOne(batch, m, text);
   }
+  runs.flush();
+}
+
+/** A run slot of a paragraph: its text node, and where its text starts and ends. */
+interface RunSlot {
+  readonly textId: string;
+  readonly start: number;
+  readonly end: number;
+  readonly text: string;
+}
+
+/**
+ * Replacements inside one run, written once for the run: a run with thousands of matches is
+ * written one time, not one time for each match, which made a long run quadratic. Matches
+ * come latest first, so the slots before the run being written keep their offsets. A match
+ * that crosses runs, or that would leave its run empty, is not taken (`replace` answers false),
+ * and `replaceOne` handles it after a `flush`.
+ */
+function createRunEdits(batch: OpBatch) {
+  let paragraph: { key: string; slots: readonly RunSlot[] } | null = null;
+  let open: { part: string; slot: RunSlot; text: string } | null = null;
+  const slotsAt = (m: FindMatch): readonly RunSlot[] => {
+    const key = `${m.part}\u0000${m.txBodyId}\u0000${m.paragraph}`;
+    if (paragraph?.key === key) return paragraph.slots;
+    const p = paragraphsOf(batch.element(m.part, m.txBodyId))[m.paragraph];
+    const slots: RunSlot[] = [];
+    for (const s of p ? slotsOf(p, slideNumberOf(batch, m.part)) : []) {
+      const t = s.kind === 'run' ? child(s.el, 'a:t') : undefined;
+      if (t) slots.push({ textId: t.id, start: s.start, end: s.end, text: s.text });
+    }
+    paragraph = { key, slots };
+    return slots;
+  };
+  /** The run slot that holds all of `[start, end)`, by binary search over the sorted slots. */
+  const slotOf = (slots: readonly RunSlot[], start: number, end: number): RunSlot | undefined => {
+    let lo = 0;
+    let hi = slots.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const s = slots[mid]!;
+      if (s.end <= start) lo = mid + 1;
+      else if (s.start > start) hi = mid - 1;
+      else return end <= s.end ? s : undefined;
+    }
+    return undefined;
+  };
+  const flush = (): void => {
+    if (open && open.text !== open.slot.text)
+      batch.push({ op: 'setText', part: open.part, node: open.slot.textId, text: open.text });
+    open = null;
+    // A write outside this helper can change the paragraph: read it again next time.
+    paragraph = null;
+  };
+  return {
+    flush,
+    replace(m: FindMatch, replacement: string): boolean {
+      if (m.end <= m.start) return false;
+      const slot = slotOf(slotsAt(m), m.start, m.end);
+      if (!slot) return false;
+      if (open && open.slot !== slot) {
+        const keep = paragraph;
+        flush();
+        paragraph = keep;
+      }
+      const current = open?.text ?? slot.text;
+      const from = m.start - slot.start;
+      const to = m.end - slot.start;
+      if (current.slice(from, to) !== m.text) throw new CommandRefusal('errors.findStale');
+      const next = current.slice(0, from) + replacement + current.slice(to);
+      if (next === '') return false;
+      open = { part: m.part, slot, text: next };
+      return true;
+    },
+  };
+}
+
+/** Whether the match's text body is the first of a cell with more than one text body. */
+function isSplitCellBody(batch: OpBatch, m: FindMatch): boolean {
+  const tc = ancestorsOf(xmlPartOf(batch.pkg, m.part)!, m.txBodyId).at(-1);
+  const bodies = children(tc, 'a:txBody');
+  return tc?.local === 'tc' && bodies[0]?.id === m.txBodyId && bodies.length > 1;
 }
 
 /**

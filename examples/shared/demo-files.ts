@@ -81,10 +81,23 @@ export function ribbonChrome(search: string): boolean {
   return new URLSearchParams(search).get('chrome') === 'ribbon';
 }
 
-/** Fetch a deck that the demo serves. */
+/** The longest the demo waits for a deck it serves. */
+const DECK_FETCH_MS = 30_000;
+
+/** Fetch a deck that the demo serves. Rejects on a network error, an HTTP error, or a stall. */
 export async function fetchDeck(base: string, file: string): Promise<Uint8Array> {
-  const res = await fetch(`${base}${file}`);
+  const res = await fetch(`${base}${file}`, { signal: AbortSignal.timeout(DECK_FETCH_MS) });
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${file}`);
   return new Uint8Array(await res.arrayBuffer());
+}
+
+/** Say that a deck the demo serves did not load, in the editor's notice. */
+export function refuseDeckFetch(
+  editor: PptxEditorInstance | null | undefined,
+  cause: unknown
+): void {
+  console.error('[demo] The presentation did not load', cause);
+  editor?.reject('app.deckFetchFailed');
 }
 
 /** Save bytes or a blob as a file through a temporary link. */

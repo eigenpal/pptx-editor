@@ -125,6 +125,30 @@ function findElement(root: Element, id: string): Element | undefined {
 }
 
 /**
+ * The shapes and table frames that each measurer fit, by part name. A deck that measures with
+ * the fixed measurer until the text engine starts fits exactly these again (`late-fit.ts`).
+ */
+const fitWith = new WeakMap<TextMeasurer, Map<string, Set<string>>>();
+
+/** Record that `measurer` fit `nodeId` in `part`. @internal */
+export function noteFit(measurer: TextMeasurer, part: string, nodeId: string): void {
+  let parts = fitWith.get(measurer);
+  if (!parts) fitWith.set(measurer, (parts = new Map()));
+  let ids = parts.get(part);
+  if (!ids) parts.set(part, (ids = new Set()));
+  ids.add(nodeId);
+}
+
+/** Give `to` the fits of `from`: a rebuilt fixed measurer keeps them. @internal */
+export function carryFits(from: TextMeasurer, to: TextMeasurer): void {
+  for (const [part, ids] of fitWith.get(from) ?? []) for (const id of ids) noteFit(to, part, id);
+}
+
+/** The shapes and table frames that `measurer` fit, by part name. @internal */
+export const fittedWith = (measurer: TextMeasurer): ReadonlyMap<string, ReadonlySet<string>> =>
+  fitWith.get(measurer) ?? new Map();
+
+/**
  * Set the size of the table frame `nodeId` on slide `index` to its laid-out table. Returns
  * false when `nodeId` is not a table frame on the slide.
  */
@@ -138,6 +162,7 @@ export function refitTable(
   const slide = resolveSlide(batch.pkg, index);
   const frame = slide ? findFrame(slide.elements, nodeId) : undefined;
   if (!frame?.table || frame.layer !== 'slide') return false;
+  noteFit(measurer, part, nodeId);
   const t = layoutTable(frame.table, measurer);
   const { xfrm } = frame;
   const cx = Math.round(t.width);

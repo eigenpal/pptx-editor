@@ -14,7 +14,9 @@ import {
   NS,
   path,
   presentationInfo,
+  REL,
   relTarget,
+  relTargetByType,
   shapeTreeOf,
   xmlPartOf,
   type Element,
@@ -33,6 +35,7 @@ import {
   themeFill,
   type ResolvedFill,
 } from './paint-props.ts';
+import { layerKey, partContent, relsKey, sameKey } from './resolve-keys.ts';
 import { resolveFrameTable } from './table.ts';
 import {
   diagramParts,
@@ -85,7 +88,18 @@ interface SlideScope {
   readonly masterPlaceholders: readonly PlaceholderEntry[];
   /** Shapes and groups resolved from diagram drawings on this slide so far. */
   readonly diagramShapes: { count: number };
+  /** The color map, the slide number, and the kinsoku rules as text: part of `textKey`. */
+  readonly textContext: string;
 }
+
+/**
+ * Resolved paragraphs by their XML element, with what else they read (`resolveText`): a
+ * keystroke in a long text body resolves the edited paragraph, not every paragraph.
+ */
+const resolvedParagraphs = new WeakMap<
+  Element,
+  { readonly key: readonly unknown[]; readonly value: ReturnType<typeof resolveParagraph> }
+>();
 
 const MAX_GROUP_DEPTH = 32;
 
@@ -105,14 +119,42 @@ function treeOf(pkg: PptxPackage, part: string | undefined): { tree?: Element; r
   return { ...(tree ? { tree } : {}), ...(root ? { root } : {}) };
 }
 
-function collectPlaceholders(pkg: PptxPackage, part: string | undefined): PlaceholderEntry[] {
+/** A part's content elements, split into placeholders and the rest. */
+interface PartElements {
+  readonly tree: Element;
+  readonly placeholders: readonly PlaceholderEntry[];
+  /** The content elements that are not placeholders, in document order. */
+  readonly others: readonly Element[];
+}
+
+/**
+ * The content of a part by its root, which an edit of the part replaces: a layout or a master
+ * splits into placeholders and content once, not on each resolution of each slide.
+ */
+const partElements = new WeakMap<Element, PartElements>();
+
+function partElementsOf(pkg: PptxPackage, part: string | undefined): PartElements | undefined {
   const { tree, root } = treeOf(pkg, part);
-  const out: PlaceholderEntry[] = [];
+  if (!tree) return undefined;
+  const hit = root ? partElements.get(root) : undefined;
+  if (hit && hit.tree === tree) return hit;
+  const placeholders: PlaceholderEntry[] = [];
+  const others: Element[] = [];
   for (const el of contentElements(tree, root)) {
     const key = placeholderOf(el);
-    if (key) out.push({ ...key, el });
+    if (key) placeholders.push({ ...key, el });
+    else others.push(el);
   }
+  const out = { tree, placeholders, others };
+  if (root) partElements.set(root, out);
   return out;
+}
+
+function collectPlaceholders(
+  pkg: PptxPackage,
+  part: string | undefined
+): readonly PlaceholderEntry[] {
+  return partElementsOf(pkg, part)?.placeholders ?? [];
 }
 
 /** The master placeholder type a layout/slide placeholder type falls back to. */
@@ -123,17 +165,49 @@ function masterTypeFor(type: string): string {
   return type;
 }
 
+/** The first entry of each idx, type, and master type of a placeholder list. */
+interface PlaceholderIndex {
+  readonly byIdx: ReadonlyMap<string, Element>;
+  readonly byType: ReadonlyMap<string, Element>;
+  readonly byMasterType: ReadonlyMap<string, Element>;
+}
+
+/**
+ * Lookups by key, built once per list: a slide can hold thousands of placeholders that match
+ * nothing, and a scan per placeholder made that quadratic.
+ */
+const placeholderIndexes = new WeakMap<readonly PlaceholderEntry[], PlaceholderIndex>();
+
+function placeholderIndex(list: readonly PlaceholderEntry[]): PlaceholderIndex {
+  let index = placeholderIndexes.get(list);
+  if (!index) {
+    const byIdx = new Map<string, Element>();
+    const byType = new Map<string, Element>();
+    const byMasterType = new Map<string, Element>();
+    for (const p of list) {
+      if (p.idx !== undefined && !byIdx.has(p.idx)) byIdx.set(p.idx, p.el);
+      if (!byType.has(p.type)) byType.set(p.type, p.el);
+      const master = masterTypeFor(p.type);
+      if (!byMasterType.has(master)) byMasterType.set(master, p.el);
+    }
+    index = { byIdx, byType, byMasterType };
+    placeholderIndexes.set(list, index);
+  }
+  return index;
+}
+
 function findLayoutPlaceholder(
   key: PlaceholderKey,
   list: readonly PlaceholderEntry[]
 ): Element | undefined {
+  const index = placeholderIndex(list);
   if (key.idx !== undefined && key.idx !== '0') {
-    const byIdx = list.find((p) => p.idx === key.idx);
-    if (byIdx) return byIdx.el;
+    const byIdx = index.byIdx.get(key.idx);
+    if (byIdx) return byIdx;
   }
   return (
-    list.find((p) => p.type === key.type)?.el ??
-    list.find((p) => masterTypeFor(p.type) === masterTypeFor(key.type) && key.type !== 'obj')?.el
+    index.byType.get(key.type) ??
+    (key.type !== 'obj' ? index.byMasterType.get(masterTypeFor(key.type)) : undefined)
   );
 }
 
@@ -142,9 +216,8 @@ function findMasterPlaceholder(
   list: readonly PlaceholderEntry[]
 ): Element | undefined {
   const want = masterTypeFor(type);
-  return (
-    list.find((p) => p.type === want)?.el ?? list.find((p) => masterTypeFor(p.type) === want)?.el
-  );
+  const index = placeholderIndex(list);
+  return index.byType.get(want) ?? index.byMasterType.get(want);
 }
 
 /** The largest offset or size the cascade reads from `a:xfrm`, in EMU (four slide widths). @internal */
@@ -296,18 +369,40 @@ function resolveText(
     ...(refEntry ? [refEntry] : []),
     ...lstChain.flatMap((ls) => levelEntries(ls, level)),
   ];
+  // Everything a paragraph reads besides its own XML: the level chains come from these.
+  const key: readonly unknown[] = [
+    scope.theme,
+    scope.textContext,
+    scope.defaultTextStyle,
+    masterStyle,
+    JSON.stringify(fontRef ?? null),
+    ...lstChain,
+  ];
+  const cached = (p: Element) => {
+    const hit = resolvedParagraphs.get(p);
+    return hit && sameKey(hit.key, key) ? hit.value : undefined;
+  };
+  const remember = (p: Element, value: ReturnType<typeof resolveParagraph>) => {
+    resolvedParagraphs.set(p, { key, value });
+    return value;
+  };
   const paragraphs = elements(txBody)
     .filter((p) => p.kind === 'paragraph')
-    .map((p) =>
-      resolveParagraph({
-        paragraph: p,
-        chainFor,
-        ctx: scope.ctx,
-        theme: scope.theme,
-        ...(fontRef ? { fontRef } : {}),
-        slideNumber: scope.slideNumber,
-        ...(scope.kinsoku ? { kinsoku: scope.kinsoku } : {}),
-      })
+    .map(
+      (p) =>
+        cached(p) ??
+        remember(
+          p,
+          resolveParagraph({
+            paragraph: p,
+            chainFor,
+            ctx: scope.ctx,
+            theme: scope.theme,
+            ...(fontRef ? { fontRef } : {}),
+            slideNumber: scope.slideNumber,
+            ...(scope.kinsoku ? { kinsoku: scope.kinsoku } : {}),
+          })
+        )
     );
   return { nodeId: txBody.id, body: readBodyProps(bodyChain), paragraphs };
 }
@@ -773,6 +868,17 @@ export function layoutPlaceholderOf(
   return findLayoutPlaceholder(key, collectPlaceholders(pkg, ref.layoutPart));
 }
 
+/**
+ * Resolved elements by their XML element, for the next resolution of the same slide. The
+ * package is persistent: an edit replaces only the elements on the path it changes, so an
+ * element that keeps its object resolves the same, when everything else it reads is the same
+ * too (`layerKey`). A keystroke then resolves the edited shape, not the whole slide.
+ */
+const resolvedByElement = new WeakMap<
+  Element,
+  { readonly key: readonly unknown[]; readonly value: ResolvedElement }
+>();
+
 /** Resolve slide `index` (0-based, presentation order). */
 export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | undefined {
   const info = presentationInfo(pkg);
@@ -803,19 +909,49 @@ export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | u
     layoutPlaceholders: collectPlaceholders(pkg, ref.layoutPart),
     masterPlaceholders: collectPlaceholders(pkg, ref.masterPart),
     diagramShapes: { count: 0 },
+    textContext: JSON.stringify([[...colorMap], index + 1, kinsoku ?? null]),
   };
   const bg = resolveBackground([slide, layout, master], scope);
   const backgroundPart = [ref.partName, ref.layoutPart, ref.masterPart][bg.index] ?? ref.partName;
   const showMaster = (el: Element | undefined): boolean => attr(el, 'showMasterSp') !== '0';
   const out: ResolvedElement[] = [];
+  // Everything the elements of every layer read from outside their part (see `layerKey`).
+  const shared: unknown[] = [
+    theme,
+    master,
+    layout,
+    index,
+    info.width,
+    info.height,
+    child(slide, 'p:clrMapOvr'),
+    child(presentation, 'p:defaultTextStyle'),
+    JSON.stringify(kinsoku ?? null),
+    partContent(pkg, relTargetByType(pkg, info.presentationPart, REL.tableStyles)),
+    // A slide placeholder inherits pictures and links through the layout and the master.
+    ...relsKey(pkg, ref.layoutPart),
+    ...relsKey(pkg, ref.masterPart),
+  ];
   const addLayer = (layer: Layer, partName: string | undefined): void => {
     const { tree, root } = treeOf(pkg, partName);
     if (!tree || !partName) return;
-    for (const el of contentElements(tree, root)) {
-      // Layout and master placeholders are templates, not content: they never paint on a slide.
-      if (layer !== 'slide' && placeholderOf(el)) continue;
+    const key = layerKey(pkg, layer, partName, root, shared);
+    // Layout and master placeholders are templates, not content: they never paint on a slide.
+    const content =
+      layer === 'slide'
+        ? contentElements(tree, root)
+        : (partElementsOf(pkg, partName)?.others ?? []);
+    for (const el of content) {
+      const hit = resolvedByElement.get(el);
+      if (hit && sameKey(hit.key, key)) {
+        out.push(hit.value);
+        continue;
+      }
+      const diagrams = scope.diagramShapes.count;
       const r = resolveElement(el, layer, partName, scope, 0);
-      if (r) out.push(r);
+      if (!r) continue;
+      out.push(r);
+      // A diagram's shapes count across the slide: an element with diagrams always resolves.
+      if (scope.diagramShapes.count === diagrams) resolvedByElement.set(el, { key, value: r });
     }
   };
   if (showMaster(slide) && showMaster(layout)) addLayer('master', ref.masterPart);

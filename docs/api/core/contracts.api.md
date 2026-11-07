@@ -133,7 +133,7 @@ export interface DocumentOpenFailure {
 }
 
 // @public
-export type DocumentOpenFailureReason = 'damaged' | 'not-pptx' | 'too-large' | 'unknown';
+export type DocumentOpenFailureReason = 'damaged' | 'not-pptx' | 'too-large' | 'blocked' | 'unknown';
 
 // @public
 export interface Editor {

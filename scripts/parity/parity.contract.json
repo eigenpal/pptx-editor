@@ -600,6 +600,7 @@
         "message",
         "showClose",
         "showCode",
+        "showCopy",
         "style",
         "t",
         "title"

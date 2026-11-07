@@ -22,6 +22,7 @@ import {
   SLIDE_W,
   step,
   type,
+  until,
   type Demo,
   type DemoOptions,
 } from './demo-dom.ts';
@@ -78,7 +79,8 @@ export function demoShellCases(
       const failure = () =>
         screen
           .queryAllByRole('alert')
-          .find((a) => a.textContent?.includes('The file did not open'));
+          .find((a) => a.textContent?.includes('The file did not open'))
+          ?.closest<HTMLElement>('.pptx-open-failure') ?? undefined;
       expect(failure()).toBeDefined();
       expect(failure()!.textContent).toContain('Error code: zip');
       expect(failure()!.textContent).toContain('The presentation that was open stays open.');
@@ -94,6 +96,18 @@ export function demoShellCases(
       expect(document.querySelector('.pptx-edit-notice')!.textContent).toContain(
         'tables.pdf is not a .pptx file.'
       );
+    });
+
+    test('a deck that does not load says why, in place of the spinner', async () => {
+      const demo = await openDemo({ failDecks: true });
+      await until(() => {
+        const notice = document.querySelector('.pptx-edit-notice');
+        if (!notice?.textContent?.includes('The presentation did not load.'))
+          throw new Error('no notice');
+      });
+      expect(document.querySelector('.pptx-loading')).toBeNull();
+      expect(demo.editor.snapshot().status).toBe('empty');
+      expect(demo.errors.join('\n')).toContain('HTTP 503 for sample.pptx');
     });
 
     test('a mouse drag in the rail reorders slides, with no file-drop hint', async () => {

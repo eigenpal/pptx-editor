@@ -39,8 +39,13 @@ export interface Download {
 let packagedAssets: URL | null = null;
 
 /** The demo's fetches: decks from its `public/` folder, fonts from the font package. */
-async function demoFetch(publicDir: URL, input: RequestInfo | URL): Promise<Response> {
+async function demoFetch(
+  publicDir: URL,
+  input: RequestInfo | URL,
+  failDecks = false
+): Promise<Response> {
   const url = String(input instanceof Request ? input.url : input);
+  if (failDecks && url.endsWith('.pptx')) return new Response(null, { status: 503 });
   if (url.startsWith('file://')) {
     packagedAssets ??= new URL('./', url);
     return new Response(readFileSync(fileURLToPath(url)));
@@ -97,6 +102,8 @@ export interface DemoOptions {
   readonly css?: boolean;
   /** Measure the toolbar this many pixels wide (see `installGeometry`). */
   readonly barWidth?: number;
+  /** Answer every deck request with HTTP 503, and do not wait for a deck to open. */
+  readonly failDecks?: boolean;
 }
 
 let host: DemoHost | null = null;
@@ -137,7 +144,7 @@ export async function openDemoWith(next: DemoHost, options: DemoOptions = {}): P
   win.happyDOM.setViewport({ width, height });
   win.happyDOM.setURL(`http://localhost:5297/${query}`);
   globalThis.fetch = ((input: RequestInfo | URL) =>
-    demoFetch(next.publicDir, input)) as typeof fetch;
+    demoFetch(next.publicDir, input, options.failDecks)) as typeof fetch;
   installGeometry(options.barWidth);
   const errors: string[] = [];
   const downloads: Download[] = [];
@@ -189,6 +196,14 @@ export async function openDemoWith(next: DemoHost, options: DemoOptions = {}): P
   };
   restoreStubs = restore;
   await next.mount();
+  if (options.failDecks) {
+    await until(() => {
+      if (!(window as unknown as { __pptxEditor?: unknown }).__pptxEditor)
+        throw new Error('no editor');
+    }, 30_000);
+    const editor = (window as unknown as { __pptxEditor: PptxEditorInstance }).__pptxEditor;
+    return { editor, errors, downloads };
+  }
   await until(() => {
     if (document.querySelectorAll('.pptx-rail__item').length !== 5) throw new Error('no deck');
     if (!document.querySelector('.pptx-surface__slide')) throw new Error('no paint');

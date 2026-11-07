@@ -61,6 +61,7 @@
     "validate:xsd": "bun scripts/validate-xsd.ts",
     "validate:xsd:corpus": "bun scripts/validate-xsd.ts --corpus",
     "bench:edit": "bun scripts/bench/edit-bench.ts",
+    "stress:hang": "bun scripts/stress/hang-check.ts",
     "bench:edit:browser": "playwright test --config e2e/bench.config.ts e2e/edit.bench.ts",
     "bench:open:browser": "playwright test --config e2e/bench.config.ts e2e/open.bench.ts",
     "fidelity": "bun scripts/fidelity/run.ts",

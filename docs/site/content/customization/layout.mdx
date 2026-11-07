@@ -422,7 +422,9 @@ To show the pane outside the side panel, render `PptxEditor.SelectionPane` (`Ppt
 
 ## Open failure
 
-The editor refuses a file that it cannot open safely, such as a damaged archive or a file that holds no presentation. When a deck was open before, it stays open. The open-failure notice shows a generic message, says whether the open deck stays, and shows a stable error code. It names no contact of its own.
+The editor refuses a file that it cannot open safely, such as a damaged archive or a file that holds no presentation. An open that throws is refused too, so the loading screen never stays up after a failure. When a deck was open before, it stays open. The open-failure notice shows a generic message, says whether the open deck stays, and shows a stable error code. It names no contact of its own.
+
+**Copy details** copies a plain-text report that a person can paste into a support request: the code, the reason, the editor version, the browser, and the time. The report holds no file content and no file name. When the browser blocks the clipboard, the notice shows the report so the person can select and copy it. Build the same text yourself with `openFailureReport(failure)` from `@pptx-editor.dev/core/editor`. Hide the button with `showCopy={false}` (Vue: `:show-copy="false"`).
 
 `<PptxEditor>` renders the notice. A composed editor does not: add `PptxEditor.OpenFailure` (Vue: `PptxEditorOpenFailure`) inside `PptxEditor.Root`, in a positioned box. For its options and the error codes, see [Open-failure options](/docs/customization/reference/layout#open-failure-options).
 

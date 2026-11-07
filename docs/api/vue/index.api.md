@@ -3527,6 +3527,10 @@ export const PptxEditor: {
             readonly type: BooleanConstructor;
             readonly default: true;
         };
+        readonly showCopy: {
+            readonly type: BooleanConstructor;
+            readonly default: true;
+        };
         readonly actions: {
             readonly type: PropType<(context: OpenFailureContext) => VNodeChild>;
             readonly default: undefined;
@@ -3566,6 +3570,10 @@ export const PptxEditor: {
             readonly type: BooleanConstructor;
             readonly default: true;
         };
+        readonly showCopy: {
+            readonly type: BooleanConstructor;
+            readonly default: true;
+        };
         readonly actions: {
             readonly type: PropType<(context: OpenFailureContext) => VNodeChild>;
             readonly default: undefined;
@@ -3593,6 +3601,7 @@ export const PptxEditor: {
         readonly title: string;
         readonly message: VNodeChild | ((failure: _pptx_editor_dev_core_contracts.DocumentOpenFailure) => VNodeChild);
         readonly showCode: boolean;
+        readonly showCopy: boolean;
         readonly actions: (context: OpenFailureContext) => VNodeChild;
         readonly closeLabel: string;
         readonly showClose: boolean;
@@ -5691,6 +5700,10 @@ export const PptxEditorOpenFailure: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: BooleanConstructor;
         readonly default: true;
     };
+    readonly showCopy: {
+        readonly type: BooleanConstructor;
+        readonly default: true;
+    };
     readonly actions: {
         readonly type: PropType<(context: OpenFailureContext) => VNodeChild>;
         readonly default: undefined;
@@ -5730,6 +5743,10 @@ export const PptxEditorOpenFailure: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: BooleanConstructor;
         readonly default: true;
     };
+    readonly showCopy: {
+        readonly type: BooleanConstructor;
+        readonly default: true;
+    };
     readonly actions: {
         readonly type: PropType<(context: OpenFailureContext) => VNodeChild>;
         readonly default: undefined;
@@ -5757,6 +5774,7 @@ export const PptxEditorOpenFailure: vue.DefineComponent<vue.ExtractPropTypes<{
     readonly title: string;
     readonly message: VNodeChild | ((failure: DocumentOpenFailure) => VNodeChild);
     readonly showCode: boolean;
+    readonly showCopy: boolean;
     readonly actions: (context: OpenFailureContext) => VNodeChild;
     readonly closeLabel: string;
     readonly showClose: boolean;

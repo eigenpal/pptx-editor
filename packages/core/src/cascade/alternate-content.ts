@@ -51,11 +51,29 @@ function declaringAncestors(ac: Element, root: Element | undefined): readonly El
   return map.get(ac) ?? [root];
 }
 
+/**
+ * Each element's own prefix declarations, first one wins, built once per element: a `Requires`
+ * list checks each prefix on every scope, and a part can declare thousands of prefixes.
+ */
+const declsByElement = new WeakMap<Element, ReadonlyMap<string, string>>();
+
+function declsOf(el: Element): ReadonlyMap<string, string> {
+  let map = declsByElement.get(el);
+  if (!map) {
+    const built = new Map<string, string>();
+    for (const d of el.nsDecls) if (!built.has(d.prefix)) built.set(d.prefix, d.uri);
+    declsByElement.set(el, built);
+    map = built;
+  }
+  return map;
+}
+
 /** The namespace bound to `prefix` on the first of `scopes` that declares it. */
 function namespaceOf(prefix: string, scopes: readonly Element[]): string | undefined {
   for (const el of scopes) {
-    const decl = el.nsDecls.find((d) => d.prefix === prefix);
-    if (decl) return decl.uri;
+    if (el.nsDecls.length === 0) continue;
+    const uri = declsOf(el).get(prefix);
+    if (uri !== undefined) return uri;
   }
   return undefined;
 }

@@ -3,12 +3,17 @@
 // them.
 
 import { attr, child, NS, type Element } from '../../store/index.ts';
-import { resolveSlide, type ResolvedElement, type ResolvedShape } from '../../cascade/index.ts';
+import {
+  resolveSlide,
+  type ResolvedElement,
+  type ResolvedShape,
+  type ResolvedSlide,
+} from '../../cascade/index.ts';
 import type { TextMeasurer } from '../../layout/index.ts';
 import { fitShape } from '../../layout/autofit.ts';
 import type { OpBatch } from './op-batch.ts';
 import { setTransform, specFromXml, transformHost } from './shape-commands.ts';
-import { refitTable } from './table-fit.ts';
+import { noteFit, refitTable } from './table-fit.ts';
 
 export { autofitStepsFor, columnFlowHeight } from '../../layout/autofit.ts';
 
@@ -39,20 +44,26 @@ function findShape(
   return undefined;
 }
 
-/** Re-fit one shape on slide `index` after its text changed. */
+/**
+ * Re-fit one shape on slide `index` after its text changed. `resolved` is the slide as resolved
+ * after every text change and before any re-fit: a re-fit changes only its own shape, so many
+ * shapes re-fit from one resolution (`refitAll`).
+ */
 export function refit(
   batch: OpBatch,
   index: number,
   part: string,
   nodeId: string,
-  measurer: TextMeasurer
+  measurer: TextMeasurer,
+  resolved?: ResolvedSlide
 ): void {
-  const slide = resolveSlide(batch.pkg, index);
+  const slide = resolved ?? resolveSlide(batch.pkg, index);
   const found = slide ? findShape(slide.elements, nodeId) : undefined;
   // A table frame: its size follows its rows, which grow to fit cell text.
   if (!found) return void refitTable(batch, index, part, nodeId, measurer);
   const { shape, sx, sy } = found;
   if (!shape.text || shape.layer !== 'slide') return;
+  noteFit(measurer, part, nodeId);
   // A shape with no transform host (a broken file with no p:spPr) keeps its size.
   const host = transformHost(batch.element(part, nodeId));
   if (!host) return;
@@ -73,6 +84,23 @@ export function refit(
     if (Math.abs(cx - xfrm.cx) + Math.abs(cy - xfrm.cy) === 0) return;
     setTransform(batch, part, nodeId, xfrm.x, xfrm.y, cx, cy, rot, flips);
   } else if (fit) writeNormAutofit(batch, part, nodeId, fit.scale, fit.reduction);
+}
+
+/**
+ * Re-fit each of `nodeIds` on slide `index` from one resolution of the slide. A resolution for
+ * each shape made a format change on many shapes quadratic.
+ */
+export function refitAll(
+  batch: OpBatch,
+  index: number,
+  part: string,
+  nodeIds: Iterable<string>,
+  measurer: TextMeasurer
+): void {
+  const ids = [...nodeIds];
+  if (ids.length === 0) return;
+  const resolved = ids.length > 1 ? resolveSlide(batch.pkg, index) : undefined;
+  for (const id of ids) refit(batch, index, part, id, measurer, resolved);
 }
 
 function writeNormAutofit(
@@ -102,8 +130,11 @@ function writeNormAutofit(
     });
     norm = batch.element(part, id);
   }
-  const set = (name: string, value: string | null): void =>
+  // A value the file already has writes no op, so peers and the saved file see no change.
+  const set = (name: string, value: string | null): void => {
+    if ((attr(norm, name) ?? null) === value) return;
     batch.push({ op: 'setAttribute', part, node: norm!.id, name: { ns: '', local: name }, value });
+  };
   set('fontScale', scale < 1 ? String(Math.round(scale * 100_000)) : null);
   set('lnSpcReduction', reduction > 0 ? String(Math.round(reduction * 100_000)) : null);
 }

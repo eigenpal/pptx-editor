@@ -1,6 +1,6 @@
 // The editable slide surface translates input into editor commands and paints layout geometry.
 
-import { paintSlide, type AltTextPort } from '../output/index.ts';
+import { SlidePainter, type AltTextPort } from '../output/index.ts';
 import type { LayoutItem, SlideLayout } from '../layout/index.ts';
 import type { EditorSelection, ImageCrop, TransformItem } from '../contracts/index.ts';
 import { SVG_NS } from '../output/index.ts';
@@ -128,6 +128,8 @@ export class SlideSurface {
   #zoomAnchor: { x: number; y: number } | null = null;
   #renderedZoom: number | null = null;
   #paintKey: unknown = null;
+  /** Paints the slide, reusing the nodes of unchanged items (`SlidePainter`). */
+  #painter: SlidePainter | null = null;
   /**
    * The slide size the fit zoom was last computed for. The fit reads computed styles and the
    * host's size, which make the browser lay out the whole document. A render that keeps the
@@ -258,7 +260,12 @@ export class SlideSurface {
     if (!layout) {
       this.#stage.querySelector('.pptx-surface__slide')?.remove();
       this.#paintKey = null;
+      this.#painter = null;
       this.#overlay.replaceChildren();
+      // Focus can still land here (Close on an open failure): give the canvas a true name.
+      const empty = this.editor.label('canvas.emptyAriaLabel');
+      if (this.root.getAttribute('aria-label') !== empty)
+        this.root.setAttribute('aria-label', empty);
       return;
     }
     // A zoom change keeps the slide point under its anchor (the pointer, or the view center).
@@ -295,14 +302,21 @@ export class SlideSurface {
     const painted = this.editor.paintLayout?.(layout) ?? layout;
     if (this.#paintKey !== painted) {
       this.#paintKey = painted;
-      const svg = paintSlide(this.host.ownerDocument, painted, {
+      const opts = {
         ...this.#paintOptions(layout),
         ...(this.editor.altText ? { altText: this.editor.altText } : {}),
-      });
+      };
+      // One painter for the view: an edit paints the items it changed, not the whole slide.
+      if (!this.#painter?.paints(opts))
+        this.#painter = new SlidePainter(this.host.ownerDocument, opts);
+      this.#drag.beforeRepaint();
+      const svg = this.#painter.paint(painted);
       svg.setAttribute('class', 'pptx-surface__slide');
       const old = this.#stage.querySelector('.pptx-surface__slide');
-      if (old) old.replaceWith(svg);
-      else this.#stage.prepend(svg);
+      if (old !== svg) {
+        if (old) old.replaceWith(svg);
+        else this.#stage.prepend(svg);
+      }
       // A repaint during a drag (a peer's edit to another shape) keeps the preview.
       this.#drag.repainted(layout);
     }

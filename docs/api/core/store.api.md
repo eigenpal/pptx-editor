@@ -408,6 +408,17 @@ export const NS: Readonly<{
     xmlns: "http://www.w3.org/2000/xmlns/";
 }>;
 
+// @internal
+export interface OpenTransaction {
+    apply(op: PptxOp): OpRejection | null;
+    element(part: string, id: string): Element_2 | undefined;
+    finish(): PptxPackage;
+    nextId(part: string): number | undefined;
+}
+
+// @internal
+export function openTransaction(pkg: PptxPackage): OpenTransaction;
+
 // @public
 export type OpRejection = {
     readonly code: 'unknown-part';

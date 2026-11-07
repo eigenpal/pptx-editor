@@ -5,7 +5,8 @@
 
 import { pickImageInto } from './chrome-actions.ts';
 import { slideLinkOf } from '../automation/commands/slide-links.ts';
-import { documentOpenFailure, yieldToPaint } from './loading.ts';
+import { documentOpenFailure, OPEN_FAILED, openRejectionCode } from './loading.ts';
+import { prepareDeck } from './open-steps.ts';
 import { relationshipById, writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
 import { registerFontFaces, type FontFaceHandle } from '../output/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
@@ -24,7 +25,7 @@ import { tableStyleList } from '../cascade/index.ts';
 import { createClipboardHost } from './clipboard-host.ts';
 import { createOpeningLane } from './pptx-editor-opening.ts';
 import { commandCacheKey, compile, type CommandContext } from './commands.ts';
-import { clampSlide, openPresentation, type DocumentSession } from './document-session.ts';
+import { clampSlide, type DocumentSession } from './document-session.ts';
 import { changedSlide, isHistoryMark, validSelection, type HistoryMark } from './history-marks.ts';
 import { EditorHistoryGroups } from './history-groups.ts';
 import {
@@ -229,7 +230,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       notes: notesOf(pkg),
       notesFormatted: notesFormatted(session, pkg, slide),
       embeddedFontFaces: session?.fontReport.embeddedFaces ?? 0,
-      substitutedFonts: stableSubstitutions(pkg),
+      // Fonts still on the way are not substitutions yet, as in DOCX Editor.
+      substitutedFonts: hostFonts.resolving() ? NO_SUBSTITUTIONS : stableSubstitutions(pkg),
       themeColors: themeColors(session ? pkg : undefined, slide),
       lastRejection,
       lastRemoval: removal.current,
@@ -253,6 +255,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   const tableState = createTableStateSource();
   const substitutions = createSubstitutionSource();
   const stableSubstitutions = (pkg: PptxPackage | undefined) => substitutions(session, pkg);
+  /** The substitutions while the host's fonts are on the way: none yet. */
+  const NO_SUBSTITUTIONS: EditorSnapshot['substitutedFonts'] = Object.freeze([]);
   const partVersion = createVersionSource();
 
   // A format armed at a word edge for the text typed next (caret-arm.ts).
@@ -621,6 +625,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   const hostFonts = createHostFonts(options, {
     session: () => session,
     installed: refreshFaces,
+    changed: () => {
+      cached = null;
+      emit();
+    },
   });
   const ensureFamilies = (families: readonly string[]) => hostFonts.request(families);
 
@@ -711,7 +719,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   const opening = createOpeningLane({
     session: () => session,
     emit,
-    refuse: (owner, rejection) => void refuseOpen(rejection.reason, owner),
+    refuse: (owner, rejection) => void refuseOpen(openRejectionCode(rejection), owner),
     facesChanged: refreshFaces,
     requestFamilies: (families) => hostFonts.request(families),
   });
@@ -725,78 +733,87 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       ok: false,
       reason: destroyed ? 'disabled.destroyed' : 'errors.superseded',
     });
-    status = 'loading';
-    // The open deck's background parse waits: the new file gets the thread.
-    opening.pause(session);
-    emit();
-    // Let the loading screen paint before the parse blocks the main thread (a large deck).
-    await yieldToPaint();
-    if (stale()) return superseded();
-    // A collaboration room needs every part, so a deck that joins one opens whole.
-    const startSlide = clampSlide(loadOptions?.startSlide, Number.MAX_SAFE_INTEGER);
-    const progressive = modules.collaboration ? {} : { progressive: { startSlide } };
-    const r = await openPresentation(bytes, { ...openOptionsOf(options), ...progressive });
-    if (r.ok && !stale()) await hostFonts.open(r.session, stale);
-    if (stale()) {
-      if (r.ok) r.session.dispose();
-      return superseded();
-    }
-    if (!r.ok) {
-      opening.resume(session);
-      return refuseOpen(r.error.reason);
-    }
-    let faces: FontFaceHandle | null = null;
-    if (typeof document !== 'undefined') {
-      faces = registerFontFaces(document, r.session.faces);
-      await faces.ready;
-      if (stale()) {
-        faces.dispose();
-        r.session.dispose();
-        return superseded();
-      }
-    }
-    session?.dispose();
-    fonts?.dispose();
-    arm.clear();
-    session = r.session;
-    fonts = faces;
-    const opened = session;
-    detachModules();
-    const detachSession = seam.attachEditorModules(modules, opened.store);
-    const offPresence = presence.subscribe(() => surface?.render());
-    presence.reset();
-    detachModules = () => (offPresence(), detachSession());
-    opened.store.subscribe(() => {
-      cached = null;
-      // A change made on the store directly (a host, a script): the editor did not set the
-      // slide and the selection for it, so keep them valid and tell the chrome.
-      if (committing > 0 || session !== opened) return;
-      const at = opened.info.slides.findIndex((s) => s.partName === shownPart);
-      if (at < 0) selection = { kind: 'none' };
-      slide = at >= 0 ? at : Math.min(slide, Math.max(0, opened.info.slides.length - 1));
-      if (at < 0) slideSel.reset(partAt(slide));
-      arm.follow(() => {
-        selection = presence.followRemote(opened.store.package, partAt(slide), selection);
-        selection = validSelection(layout(), selection);
-      });
+    // Any throw ends the open with a refusal the person can read and report: the loading
+    // screen never stays up for an open that failed.
+    let phase = 'paint';
+    // The new deck's session once it mounts: a throw after that drops it.
+    let adopted: DocumentSession | null = null;
+    try {
+      status = 'loading';
+      // The open deck's background parse waits: the new file gets the thread.
+      opening.pause(session);
       emit();
-    });
-    thumbnails.clear();
-    status = 'ready';
-    failure = undefined;
-    readOnly = null;
-    mode = hostMode;
-    slide = clampSlide(startSlide, session.info.slides.length);
-    slideSel.reset(session.info.slides[slide]?.partName);
-    selection = { kind: 'none' };
-    lastRejection = null;
-    removal.clear();
-    views.reset();
-    painter.reset(true);
-    groups.closeAll();
-    emit();
-    opening.start(opened);
-    return { ok: true };
+      // A collaboration room needs every part, so a deck that joins one opens whole.
+      const startSlide = clampSlide(loadOptions?.startSlide, Number.MAX_SAFE_INTEGER);
+      const progressive = modules.collaboration ? {} : { progressive: { startSlide } };
+      const step = (next: string) => void (phase = next);
+      const openOptions = { ...openOptionsOf(options), ...progressive };
+      const r = await prepareDeck(bytes, openOptions, hostFonts, stale, step);
+      if (r.kind === 'stale') return superseded();
+      if (r.kind === 'refused') {
+        opening.resume(session);
+        return refuseOpen(openRejectionCode(r.error));
+      }
+      phase = 'mount';
+      adopted = r.session;
+      session?.dispose();
+      fonts?.dispose();
+      arm.clear();
+      session = r.session;
+      fonts = r.faces;
+      const opened = session;
+      detachModules();
+      const detachSession = seam.attachEditorModules(modules, opened.store);
+      const offPresence = presence.subscribe(() => surface?.render());
+      presence.reset();
+      detachModules = () => (offPresence(), detachSession());
+      opened.store.subscribe(() => {
+        cached = null;
+        // A change made on the store directly (a host, a script): the editor did not set the
+        // slide and the selection for it, so keep them valid and tell the chrome.
+        if (committing > 0 || session !== opened) return;
+        const at = opened.info.slides.findIndex((s) => s.partName === shownPart);
+        if (at < 0) selection = { kind: 'none' };
+        slide = at >= 0 ? at : Math.min(slide, Math.max(0, opened.info.slides.length - 1));
+        if (at < 0) slideSel.reset(partAt(slide));
+        arm.follow(() => {
+          selection = presence.followRemote(opened.store.package, partAt(slide), selection);
+          selection = validSelection(layout(), selection);
+        });
+        emit();
+      });
+      thumbnails.clear();
+      status = 'ready';
+      failure = undefined;
+      readOnly = null;
+      mode = hostMode;
+      slide = clampSlide(startSlide, session.info.slides.length);
+      slideSel.reset(session.info.slides[slide]?.partName);
+      selection = { kind: 'none' };
+      lastRejection = null;
+      removal.clear();
+      views.reset();
+      painter.reset(true);
+      groups.closeAll();
+      emit();
+      opening.start(opened);
+      // Register faces that arrived before the mount. Shaped measurement can still be late.
+      if (opened.fontGeneration !== r.generation) void refreshFaces(opened);
+      hostFonts.awaitShaping(opened);
+      return { ok: true };
+    } catch (cause) {
+      console.error(`[pptx-editor] The open failed (${phase})`, cause);
+      if (adopted && session === adopted) {
+        // The new deck was on screen, half set up: it goes, as a deck with a damaged part does.
+        // The load is over, so the refusal sets the status the open leaves.
+        status = 'ready';
+        return refuseOpen(OPEN_FAILED, adopted);
+      }
+      if (adopted) (hostFonts.abandon(adopted), adopted.dispose());
+      if (stale()) return superseded();
+      opening.resume(session);
+      return refuseOpen(OPEN_FAILED);
+    }
   };
 
   const instance: PptxEditorInstance = {
@@ -806,6 +823,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     get fonts() {
       return hostFonts.current();
     },
+    fontMeasurement: () => ({
+      measurer: session && !session.fixedMeasurer ? 'shaped' : 'fixed',
+      resolving: hostFonts.resolving(),
+    }),
     get lastCopied() {
       return clipboard.lastCopied;
     },

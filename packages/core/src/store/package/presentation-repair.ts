@@ -75,20 +75,29 @@ function takenSlideIds(root: Element): Set<string> {
   return taken;
 }
 
-/** A slide id that `taken` does not hold: one past the largest, or the first gap from 256. */
-function freshSlideId(taken: Set<string>): string {
-  let max = MIN_SLIDE_ID - 1;
+/**
+ * Slide ids that `taken` does not hold: one past the largest, then the gaps from 256. One scan
+ * finds the largest, and the gap search goes on from where it stopped, so n fresh ids cost
+ * O(n + taken), not O(n × taken). Each id it gives is added to `taken`.
+ */
+function slideIdAllocator(taken: Set<string>): () => string {
+  let next = MIN_SLIDE_ID;
   for (const id of taken) {
     // Only an `ST_SlideId` counts: "1e3" or "-1" sets no maximum.
-    if (!isSlideId(id)) continue;
-    const n = Number(id);
-    if (n > max) max = n;
+    if (isSlideId(id)) next = Math.max(next, Number(id) + 1);
   }
-  let next = max + 1;
-  if (next > MAX_SLIDE_ID) for (next = MIN_SLIDE_ID; taken.has(String(next));) next += 1;
-  const id = String(next);
-  taken.add(id);
-  return id;
+  let gap = MIN_SLIDE_ID;
+  return () => {
+    let id: number;
+    if (next <= MAX_SLIDE_ID) id = next++;
+    else {
+      while (taken.has(String(gap))) gap += 1;
+      id = gap++;
+    }
+    const value = String(id);
+    taken.add(value);
+    return value;
+  };
 }
 
 /** The entries that stay, to the entry as it is saved, and the slide ids that were renewed. */
@@ -128,7 +137,7 @@ function keptEntries(root: Element, live: LiveRelationships | undefined): KeptEn
     count.set(key, (count.get(key) ?? 0) + 1);
   }
   const ids = new Set<string>();
-  let taken: Set<string> | undefined;
+  let fresh: (() => string) | undefined;
   const out = new Map<Element, Element>();
   const renewed = new Map<string, string>();
   for (const s of candidates) {
@@ -139,17 +148,17 @@ function keptEntries(root: Element, live: LiveRelationships | undefined): KeptEn
       out.set(s, s);
       continue;
     }
-    taken ??= takenSlideIds(root);
-    const fresh = freshSlideId(taken);
-    ids.add(fresh);
+    fresh ??= slideIdAllocator(takenSlideIds(root));
+    const given = fresh();
+    ids.add(given);
     // Only an invalid id that one entry has: a repeated id belongs to the slide that kept it.
-    if (id && !isSlideId(id) && count.get(key) === 1) renewed.set(key, fresh);
+    if (id && !isSlideId(id) && count.get(key) === 1) renewed.set(key, given);
     const has = s.attrs.some((a) => a.ns === '' && a.local === 'id');
     out.set(s, {
       ...s,
       attrs: has
-        ? s.attrs.map((a) => (a.ns === '' && a.local === 'id' ? { ...a, value: fresh } : a))
-        : [{ ns: '', local: 'id', value: fresh }, ...s.attrs],
+        ? s.attrs.map((a) => (a.ns === '' && a.local === 'id' ? { ...a, value: given } : a))
+        : [{ ns: '', local: 'id', value: given }, ...s.attrs],
     });
   }
   return { out, renewed };
