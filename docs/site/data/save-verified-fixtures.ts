@@ -13,7 +13,7 @@
  * `chart-data`, 2 copies, no prompt; `three-d-effects`, 2 copies, no prompt;
  * `diagram-editing`, 2 copies, no prompt; `equations`, 2 copies, no prompt; and
  * `three-d-turned-effects`, 2 copies and a copy with bevels set and removed on theme-styled
- * shapes, no prompt.
+ * shapes, no prompt. On 8 November 2026: `equation-lines`, 2 copies, no prompt.
  */
 export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'alignment-anchor',
@@ -32,6 +32,7 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'east-asian-theme-fonts',
   'east-asian-typography',
   'effects',
+  'equation-lines',
   'equations',
   'fill-fidelity',
   'fills-lines',
@@ -87,6 +88,8 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
  * `effects.3d-and-other` copy, which sets and clears bevels, cameras, and blur, the
  * `objects.diagrams` copy, which types in, adds, and deletes diagram shapes, and
  * `review.comments` and `slides.structure`, with comment parts saved as XML trees, no prompt.
+ * On 8 November 2026: the new `objects.equations` copy, whose inserted equation box is shorter
+ * after the change to equation line heights, no prompt.
  */
 export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'collaboration.automation-api':

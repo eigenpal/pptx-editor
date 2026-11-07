@@ -96,7 +96,85 @@ function slide(name: string, items: readonly (readonly [string, string])[]): Fix
   };
 }
 
+const SERIF_FONT = '<a:latin typeface="Liberation Serif"/><a:ea typeface="Liberation Serif"/><a:cs typeface="Liberation Serif"/>';
+/** A normal-text math run (`m:nor`) in STIX Two Math. */
+const nor = (t: string): string => r(t, '<m:nor/>');
+/**
+ * A normal-text math run (`m:nor`) in Liberation Serif, a face with no MATH table. Math text in
+ * such a face is not here: the presentation app draws it in a math font that is not open.
+ */
+const serif = (t: string): string =>
+  `<m:r><m:rPr><m:nor/></m:rPr><a:rPr lang="en-US" i="1" dirty="0">${SERIF_FONT}</a:rPr><m:t>${escapeText(t)}</m:t></m:r>`;
+
+/** One paragraph of a stacked box: math (`m:oMath` content) or plain text. */
+type Para = { readonly math: string } | { readonly text: string };
+
+/**
+ * A top-anchored text box of several paragraphs, for the height of lines that hold equations:
+ * equations stacked on one another, and text lines above and below them. `spacing` is the
+ * paragraphs' line spacing in percent.
+ */
+function stacked(id: number, col: number, row: number, paras: readonly Para[], spacing?: number): string {
+  const x = Math.round((0.4 + col * 4.25) * IN);
+  const y = Math.round((1.1 + row * 3.1) * IN);
+  const nv = `<p:nvSpPr><p:cNvPr id="${id}" name="Stack ${id}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>`;
+  const spPr =
+    `<p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${Math.round(4 * IN)}" cy="${Math.round(2.9 * IN)}"/></a:xfrm>` +
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/>' +
+    '<a:ln w="6350"><a:solidFill><a:srgbClr val="BFBFBF"/></a:solidFill></a:ln></p:spPr>';
+  const bodyPr = '<a:bodyPr wrap="square" rtlCol="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/>';
+  const pPr = spacing ? `<a:pPr><a:lnSpc><a:spcPct val="${spacing * 1000}"/></a:lnSpc></a:pPr>` : '';
+  const end = `<a:endParaRPr lang="en-US" sz="1800" dirty="0">${TEXT_FONT}</a:endParaRPr>`;
+  const run = (t: string) => `<a:r><a:rPr lang="en-US" sz="1800" dirty="0">${TEXT_FONT}</a:rPr><a:t>${escapeText(t)}</a:t></a:r>`;
+  const choice = paras
+    .map((p) =>
+      'math' in p
+        ? `<a:p>${pPr}<a14:m><m:oMathPara xmlns:m="${MATH}"><m:oMathParaPr><m:jc m:val="centerGroup"/></m:oMathParaPr>` +
+          `<m:oMath>${p.math}</m:oMath></m:oMathPara></a14:m>${end}</a:p>`
+        : `<a:p>${pPr}${run(p.text)}${end}</a:p>`
+    )
+    .join('');
+  const fallback = paras.map((p) => `<a:p>${pPr}${'text' in p ? run(p.text) : ''}${end}</a:p>`).join('');
+  return (
+    `<mc:AlternateContent xmlns:mc="${MC}"><mc:Choice xmlns:a14="${A14}" Requires="a14"><p:sp>${nv}${spPr}<p:txBody>${bodyPr}` +
+    `${choice}</p:txBody></p:sp></mc:Choice>` +
+    `<mc:Fallback><p:sp>${nv}${spPr}<p:txBody>${bodyPr}${fallback}</p:txBody></p:sp></mc:Fallback></mc:AlternateContent>`
+  );
+}
+
+function stackSlide(name: string, boxes: readonly (readonly [readonly Para[], number?])[]): FixtureSlide {
+  return {
+    shapes: title(name) + boxes.map(([paras, spacing], i) => stacked(3 + i, i % 3, Math.floor(i / 3), paras, spacing)).join(''),
+  };
+}
+
+const fr = frac(r('a'), r('b'));
+const emc = (run: (t: string) => string, script: (t: string) => string): string =>
+  run('E') + run('=') + run('m') + sup(run('c'), script('2'));
+
 export const equationFixtures: Record<string, FixtureSlide[]> = {
+  // Lines that hold equations, in top-anchored boxes: stacked display fractions and scripts,
+  // text above and below, and 150 % line spacing. The second slide holds normal text (`m:nor`)
+  // in scripts and in a radical degree, also in a face with no MATH table.
+  'equation-lines': [
+    stackSlide('Equation lines', [
+      [[{ math: fr }, { math: fr }]],
+      [[{ text: 'Text above gyp' }, { math: fr }, { text: 'Text below Ég' }]],
+      [[{ math: sup(r('x'), r('2')) }, { math: sup(r('x'), r('2')) }, { text: 'Text below gyp' }]],
+      [[{ math: fr }, { math: fr }], 150],
+      [[{ text: 'Text above gyp' }, { math: emc(r, r) }, { text: 'Text below Ég' }]],
+      [[{ math: frac(frac(r('1'), r('x')), r('2')) }, { text: 'Text below gyp' }]],
+    ]),
+    stackSlide('Normal text in scripts', [
+      [[{ text: 'Math base, normal script' }, { math: sub(r('v'), nor('max')) + r('+') + sup(r('x'), nor('n')) }]],
+      [[{ text: 'Nested scripts' }, { math: sup(r('x'), sup(r('y'), r('z'))) + r('+') + sup(r('x'), sup(r('y'), nor('z'))) }]],
+      [[{ text: 'Normal radical degree' }, { math: rad(r('x'), nor('3')) + r('+') + rad(r('x'), r('3')) }]],
+      [[{ math: sub(r('x'), nor('i')) + r('+') + sup(r('y'), nor('k')) }, { text: 'Text below gyp' }]],
+      [[{ text: 'Serif, normal text' }, { math: emc(serif, serif) }]],
+      [[{ text: 'Math font, normal script' }, { math: emc(r, nor) }]],
+    ]),
+  ],
+
   equations: [
     slide('Runs and scripts', [
       [r('E') + r('=') + r('m') + sup(r('c'), r('2')), 'E = mc^2'],

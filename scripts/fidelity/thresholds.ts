@@ -153,6 +153,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'east-asian-theme-fonts': 16,
     'east-asian-typography': 77,
     effects: 4,
+    'equation-lines': 17,
     equations: 11,
     'fill-fidelity': 0,
     'fills-lines': 0,
@@ -196,6 +197,8 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
   slides: {
     'east-asian-line-breaking/4': ['pixels'],
     'east-asian-typography/2': ['extra-text'],
+    'equation-lines/1': ['baseline'],
+    'equation-lines/2': ['line-breaks', 'baseline', 'extra-text'],
     'equations/1': ['line-breaks', 'baseline'],
     'equations/3': ['baseline'],
     'equations/4': ['line-position'],

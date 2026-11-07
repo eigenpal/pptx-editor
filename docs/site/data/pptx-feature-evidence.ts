@@ -193,7 +193,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     fixtures: ['preserve-unsupported', 'slide-structure', 'preserved-content'],
   },
   'objects.equations': {
-    fixtures: ['equations', 'preserved-content'],
+    fixtures: ['equations', 'equation-lines', 'preserved-content'],
     approximations: ['equations'],
   },
   // --- Slides, layouts & notes -------------------------------------------
