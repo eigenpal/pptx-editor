@@ -10,7 +10,7 @@
  * `hyperlinks`, `preserved-content`, and `svg-tab-stops`, 8 copies, no prompt; and again
  * `header-footer`, with its date and footer placeholders, 2 copies, no prompt;
  * `picture-bullets`, 2 copies, no prompt; `text-warp`, 2 copies, no prompt; and
- * `chart-data`, 2 copies, no prompt.
+ * `chart-data`, 2 copies, no prompt; and `three-d-effects`, 2 copies, no prompt.
  */
 export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'alignment-anchor',
@@ -62,6 +62,7 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'text-direction',
   'text-runs',
   'text-warp',
+  'three-d-effects',
   'vertical-columns',
   'vertical-east-asian',
 ];
@@ -76,14 +77,15 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
  * the recipes and fixtures as they are now, no prompt; the `text.clipboard` copy, no prompt; and again
  * `presenting.animations-transitions`, with its new effects and transition,
  * `lists.bullets-numbering` and `text.hyperlinks`, with picture bullets and custom show and file
- * links, and the new `objects.charts` copy, which edits chart data, no prompt.
+ * links, and the new `objects.charts` copy, which edits chart data, no prompt; and the new
+ * `effects.3d-and-other` copy, which sets and clears bevels, cameras, and blur, no prompt.
  */
 export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'collaboration.automation-api':
     'sha256:dd9192d0997886b39bf62e39c1b3cabeb08decee94e95d6e5cdda95715ecb911',
   'collaboration.realtime':
     'sha256:47e811007d57bbb5b9257d1727c1396f4add81546e85417cc8dd61361aa54189',
-  'effects.3d-and-other': 'sha256:7f521bf4e87dd4507133e5a1afa183f8f38797d7575cb807ffc7973f6b462465',
+  'effects.3d-and-other': 'sha256:e97f4075d4485c849ef3dba4419a7593ebda6ddeaefcdc1dabb093eb21703f6a',
   'effects.fill-overlay': 'sha256:88e9c3cc500e47ff17f120022a184f682c8c08dcbc07ab7d0d5abda814ba2fbd',
   'effects.glow-reflection':
     'sha256:331acbe87981e8c099e725961c34f216079391deeb2a91734ae00e0ea5b2da72',

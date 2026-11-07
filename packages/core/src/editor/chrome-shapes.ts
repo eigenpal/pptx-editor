@@ -1,5 +1,5 @@
 // The Shape Format chrome: Quick Styles (the theme styles gallery), Shape Effects (one menu with
-// Shadow, Reflection, Glow, and Soft Edges, on Shape Format), Text Effects (the Transform
+// Shadow, Reflection, Glow, Soft Edges, Bevel, and 3-D Rotation, on Shape Format), Text Effects (the Transform
 // gallery of text warps), and
 // Format Shape in the `shape` group, and the Arrange rows that rotate, flip, distribute, and open
 // the selection pane. Slot names follow the Names rule of `editor-ui-parity`: an existing PPTX
@@ -7,9 +7,11 @@
 
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import type {
+  BevelPreset,
   EditorCommand,
   EditorSnapshot,
   ReflectionPreset,
+  Rotation3DPreset,
   RotateChoice,
   ShadowPreset,
   ShapeEffectChoice,
@@ -26,6 +28,7 @@ import {
   SHAPE_STYLE_ROWS,
   SOFT_EDGE_SIZES,
 } from '../automation/commands/effect-commands.ts';
+import { BEVEL_PRESETS, ROTATION_3D_PRESETS } from '../automation/commands/three-d-commands.ts';
 import { ICON_PATHS } from './icon-paths.ts';
 import {
   TEXT_EFFECTS_CONTROL,
@@ -85,9 +88,11 @@ const EFFECT_GROUPS = [
   { id: 'reflection', labelKey: 'toolbar.reflection' },
   { id: 'glow', labelKey: 'toolbar.glow' },
   { id: 'softEdge', labelKey: 'toolbar.softEdges' },
+  { id: 'bevel', labelKey: 'toolbar.bevel' },
+  { id: 'rotation3d', labelKey: 'toolbar.rotation3d' },
 ] as const satisfies readonly { id: ShapeEffectChoice['kind']; labelKey: TranslationKey }[];
 
-const none = (group: ShapeEffectChoice['kind']) => ({
+const none = (group: (typeof EFFECT_GROUPS)[number]['id']) => ({
   value: `${group}.none`,
   labelKey: `toolbar.noEffect.${group}` as const,
   group,
@@ -165,6 +170,18 @@ export const SHAPE_FORMAT_CONTROLS: readonly ChromeControl[] = [
       ...glowVariations(),
       none('softEdge'),
       ...sizes('softEdge', SOFT_EDGE_SIZES, 'toolbar.softEdgeValue'),
+      none('bevel'),
+      ...BEVEL_PRESETS.map((b) => ({
+        value: `bevel.${b}`,
+        labelKey: `toolbar.bevels.${b}` as const,
+        group: 'bevel',
+      })),
+      none('rotation3d'),
+      ...ROTATION_3D_PRESETS.map((r) => ({
+        value: `rotation3d.${r}`,
+        labelKey: `toolbar.rotations3d.${r}` as const,
+        group: 'rotation3d',
+      })),
     ],
     state: { kind: 'value' },
   },
@@ -217,6 +234,20 @@ export function shapeEffectCommand(value: unknown): EditorCommand | null {
         ? {
             type: 'setShapeEffect',
             effect: { kind: 'reflection', preset: off ? null : (pick as ReflectionPreset) },
+          }
+        : null;
+    case 'bevel':
+      return off || BEVEL_PRESETS.includes(pick as BevelPreset)
+        ? {
+            type: 'setShapeEffect',
+            effect: { kind: 'bevel', preset: off ? null : (pick as BevelPreset) },
+          }
+        : null;
+    case 'rotation3d':
+      return off || ROTATION_3D_PRESETS.includes(pick as Rotation3DPreset)
+        ? {
+            type: 'setShapeEffect',
+            effect: { kind: 'rotation3d', preset: off ? null : (pick as Rotation3DPreset) },
           }
         : null;
     case 'glow':
@@ -305,6 +336,8 @@ export function shapeFormatSlotValue(slot: ChromeSlotId, snap: EditorSnapshot): 
     `reflection.${fx.reflection}`,
     fx.glow && fx.glowAccent ? `glow.${fx.glow}.${fx.glowAccent}` : `glow.${size(fx.glow)}`,
     `softEdge.${size(fx.softEdge)}`,
+    `bevel.${fx.bevel}`,
+    `rotation3d.${fx.rotation3d}`,
   ].join(' ');
 }
 

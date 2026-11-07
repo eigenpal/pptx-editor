@@ -133,6 +133,9 @@ export const STORED_PIXELS_STYLE = "image-orientation: none";
 // @public (undocumented)
 export const SVG_NS = "http://www.w3.org/2000/svg";
 
+// @internal
+export function threeDColor(fill: ResolvedFill): Rgba;
+
 // (No @packageDocumentation comment for this package)
 
 ```

@@ -116,8 +116,28 @@ describe('effect model', () => {
 
   test('unknown effects are reported', () => {
     expect(parse('<a:blur rad="1000"/><a:presetShdw prst="shdw1"/>').unsupported).toEqual([
-      'blur',
       'presetShdw',
     ]);
+  });
+
+  test('blur and preset shadows resolve, with a second copy for the double presets', () => {
+    const fx = parse(
+      '<a:blur rad="38100" grow="0"/>' +
+        '<a:prstShdw prst="shdw13" dist="50800" dir="2700000"><a:srgbClr val="000000"><a:alpha val="50000"/></a:srgbClr></a:prstShdw>'
+    );
+    expect(fx.blur).toEqual({ radius: 38100, grow: false });
+    expect(fx.outerShadow).toMatchObject({ blur: 0, dist: 50800, dir: 45, sx: 1, sy: 1 });
+    expect(fx.secondShadow).toMatchObject({ dist: 101600 });
+    expect(fx.secondShadow!.color.a).toBeCloseTo(0.3, 5);
+    const lean = parse(
+      '<a:prstShdw prst="shdw7" dist="38100"><a:srgbClr val="000000"/></a:prstShdw>'
+    );
+    expect(lean.outerShadow).toMatchObject({ sy: -0.5, kx: -60, align: 'b' });
+    expect(lean.secondShadow).toBeUndefined();
+    // An unknown preset is a plain copy; a hostile distance is clamped.
+    const odd = parse(
+      '<a:prstShdw prst="nope" dist="99999999999999"><a:srgbClr val="000000"/></a:prstShdw>'
+    );
+    expect(odd.outerShadow!.dist).toBeLessThan(1e9);
   });
 });

@@ -149,6 +149,8 @@ export function effectDiagnostics(item: Drawable, p: PageOps, scope: FillScope):
     );
   if (pro && softEdge && softEdge.radius > 0)
     p.diag.add('effect.soft-edge', 'approximation', 'Soft edges are drawn hard.');
+  if (pro && effects.blur && effects.blur.radius > 0)
+    p.diag.add('effect.blur', 'approximation', 'Blur is not drawn.');
   if (
     pro &&
     reflection &&
@@ -451,8 +453,9 @@ export async function drawEffectsBehind(
   const effects = item.element.effects;
   if (!effects) return;
   const { cx: w, cy: h } = item.element.xfrm;
-  const shadow = effects.outerShadow;
-  if (shadow && shadow.color.a > 0) {
+  // A preset shadow's second copy lies under its first.
+  for (const shadow of [effects.secondShadow, effects.outerShadow]) {
+    if (!shadow || shadow.color.a <= 0) continue;
     const m = effectMatrix(shadow, item.matrix, w, h);
     const sigma = blurSigma(shadow.blur);
     for (const cls of await silhouette(item, m, p, scope))

@@ -74,3 +74,16 @@ export function circleGradientGeometry(
 export function gradientPaintStops(stops: readonly GradientStop[]): GradientStop[] {
   return paintStops(stops);
 }
+
+/**
+ * The color that a bevel and an extrusion shade: the solid fill, the middle stop of a gradient,
+ * the pattern's foreground, else mid gray (a picture fill, or no fill).
+ * @internal
+ */
+export function threeDColor(fill: ResolvedFill): Rgba {
+  if (fill.type === 'solid') return fill.color;
+  if ((fill.type === 'linear' || fill.type === 'path') && fill.stops.length > 0)
+    return fill.stops[Math.floor(fill.stops.length / 2)]!.color;
+  if (fill.type === 'pattern') return fill.fg;
+  return { r: 128, g: 128, b: 128, a: 1 };
+}

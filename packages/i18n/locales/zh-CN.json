@@ -402,6 +402,33 @@
     },
     "softEdges": "柔化边缘",
     "softEdgeValue": "{value} pt",
+    "bevel": "棱台",
+    "bevels": {
+      "circle": "圆",
+      "relaxedInset": "松散嵌入",
+      "cross": "十字形",
+      "coolSlant": "冷色斜面",
+      "angle": "角度",
+      "softRound": "柔圆",
+      "convex": "凸起",
+      "slope": "斜面",
+      "divot": "角度凹陷",
+      "riblet": "回旋",
+      "hardEdge": "硬边缘",
+      "artDeco": "艺术装饰"
+    },
+    "rotation3d": "三维旋转",
+    "rotations3d": {
+      "isometricLeftDown": "等轴：左下",
+      "isometricRightUp": "等轴：右上",
+      "isometricTopUp": "等轴：顶部朝上",
+      "isometricOffAxis1Left": "离轴 1：左",
+      "isometricOffAxis1Right": "离轴 1：右",
+      "obliqueTopLeft": "倾斜：左上",
+      "obliqueTopRight": "倾斜：右上",
+      "obliqueBottomLeft": "倾斜：左下",
+      "obliqueBottomRight": "倾斜：右下"
+    },
     "rotate": "旋转",
     "rotations": {
       "right90": "向右旋转 90°",
@@ -468,7 +495,9 @@
       "shadow": "无阴影",
       "reflection": "无映像",
       "glow": "无发光",
-      "softEdge": "无柔化边缘"
+      "softEdge": "无柔化边缘",
+      "bevel": "无棱台",
+      "rotation3d": "无旋转"
     },
     "newSlide": "新建幻灯片(Ctrl+M)",
     "slideLayout": "版式",

@@ -1,8 +1,9 @@
-// The chrome choices this build offers. Glow, inner shadow, reflection, and soft edge paint only
-// through the `effects` drawing renderer (`@pptx-editor.dev/pro/drawing`). Without it, the chrome
-// does not offer the Shape Effects and Picture Styles options that write them, as DOCX Editor
-// leaves out the controls of a module that is not installed. Removing an effect needs no
-// renderer: No Reflection, No Glow, and No Soft Edges stay while the selection has that effect,
+// The chrome choices this build offers. Glow, inner shadow, reflection, soft edge, bevels, and 3-D
+// rotation paint only through the `effects` drawing renderer (`@pptx-editor.dev/pro/drawing`).
+// Without it, the chrome does not offer the Shape Effects and Picture Styles options that write
+// them, as DOCX Editor leaves out the controls of a module that is not installed. Removing an
+// effect needs no renderer: No Reflection, No Glow, No Soft Edges, No Bevel, and No Rotation
+// stay while the selection has that effect,
 // so an effect from the file can still be removed. No Shadow always stays, and it also removes
 // an inner shadow. The registry (`CHROME_GROUPS`) keeps every option, and the commands keep
 // every effect: a host or an automation can still write them, and save keeps them.
@@ -17,7 +18,7 @@ import { PICTURE_STYLES } from './picture-presets.ts';
 const RENDERER_EFFECTS = /<a:(?:glow|innerShdw|reflection|softEdge)\b/;
 
 /** The effects whose `none` row a build without the renderer offers when the selection has one. */
-const REMOVABLE = ['reflection', 'glow', 'softEdge'] as const;
+const REMOVABLE = ['reflection', 'glow', 'softEdge', 'bevel', 'rotation3d'] as const;
 type Removable = (typeof REMOVABLE)[number];
 
 const NOTHING_TO_REMOVE: ReadonlySet<Removable> = new Set();
@@ -35,7 +36,13 @@ export function chromeOptionNeedsEffects(slot: ChromeSlotId, value: string): boo
     const [kind = '', preset = ''] = value.split('.');
     if (kind === 'shadow')
       return own(SHADOW_PRESETS, preset) && SHADOW_PRESETS[preset as ShadowPreset].inner;
-    return kind === 'reflection' || kind === 'glow' || kind === 'softEdge';
+    return (
+      kind === 'reflection' ||
+      kind === 'glow' ||
+      kind === 'softEdge' ||
+      kind === 'bevel' ||
+      kind === 'rotation3d'
+    );
   }
   if (slot === 'image.styles') {
     const effects = own(PICTURE_STYLES, value)
@@ -57,7 +64,10 @@ function removableEffects(editor: Pick<Editor, 'can'>): ReadonlySet<Removable> {
   for (const kind of REMOVABLE) {
     const ok = editor.can({
       type: 'setShapeEffect',
-      effect: kind === 'reflection' ? { kind, preset: null } : { kind, size: null },
+      effect:
+        kind === 'reflection' || kind === 'bevel' || kind === 'rotation3d'
+          ? { kind, preset: null }
+          : { kind, size: null },
     }).ok;
     if (ok) out.add(kind);
   }

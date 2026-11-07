@@ -5,6 +5,13 @@ export * from './types.ts';
 export * from './color.ts';
 export * from './theme.ts';
 export * from './paint-props.ts';
+export {
+  BEVEL_PRESET_TYPES,
+  type BevelPresetType,
+  type ResolvedBevel,
+  type ResolvedThreeD,
+  type Rotation3D,
+} from './three-d.ts';
 export * from './text-style.ts';
 export { inheritedPlaceholders, layoutPlaceholderOf, resolveSlide, XFRM_BOUND } from './slide.ts';
 export { CHART_CONTENT_TYPE, resolveChartPart, type ResolvedChartPart } from './chart-part.ts';

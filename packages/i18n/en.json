@@ -402,6 +402,33 @@
     },
     "softEdges": "Soft edges",
     "softEdgeValue": "{value} pt",
+    "bevel": "Bevel",
+    "bevels": {
+      "circle": "Circle",
+      "relaxedInset": "Relaxed inset",
+      "cross": "Cross",
+      "coolSlant": "Cool slant",
+      "angle": "Angle",
+      "softRound": "Soft round",
+      "convex": "Convex",
+      "slope": "Slope",
+      "divot": "Divot",
+      "riblet": "Riblet",
+      "hardEdge": "Hard edge",
+      "artDeco": "Art deco"
+    },
+    "rotation3d": "3-D rotation",
+    "rotations3d": {
+      "isometricLeftDown": "Isometric: left down",
+      "isometricRightUp": "Isometric: right up",
+      "isometricTopUp": "Isometric: top up",
+      "isometricOffAxis1Left": "Off axis 1: left",
+      "isometricOffAxis1Right": "Off axis 1: right",
+      "obliqueTopLeft": "Oblique: top left",
+      "obliqueTopRight": "Oblique: top right",
+      "obliqueBottomLeft": "Oblique: bottom left",
+      "obliqueBottomRight": "Oblique: bottom right"
+    },
     "rotate": "Rotate",
     "rotations": {
       "right90": "Rotate right 90°",
@@ -468,7 +495,9 @@
       "shadow": "No shadow",
       "reflection": "No reflection",
       "glow": "No glow",
-      "softEdge": "No soft edges"
+      "softEdge": "No soft edges",
+      "bevel": "No bevel",
+      "rotation3d": "No rotation"
     },
     "newSlide": "New slide (Ctrl+M)",
     "slideLayout": "Layout",

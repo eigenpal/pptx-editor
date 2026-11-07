@@ -132,6 +132,8 @@ const CHILDREN: Readonly<Record<string, readonly Group[]>> = Object.assign(
         'prstShdw',
         'glow',
         'highlight',
+        'extrusionClr',
+        'contourClr',
         'buClr',
         'lnRef',
         'fillRef',
@@ -139,6 +141,12 @@ const CHILDREN: Readonly<Record<string, readonly Group[]>> = Object.assign(
         'fontRef',
       ].map((n) => [n, COLOR])
     ),
+    // CT_Scene3D, CT_Camera, CT_LightRig, and CT_Shape3D: one camera, light rig, rotation,
+    // and bevel of each side, so two first bevels or cameras keep one winner.
+    scene3d: [one('camera'), one('lightRig'), one('backdrop'), one('extLst')],
+    camera: [one('rot')],
+    lightRig: [one('rot')],
+    sp3d: [one('bevelT'), one('bevelB'), one('extrusionClr'), one('contourClr'), one('extLst')],
     // CT_ShapeStyle.
     style: [one('lnRef'), one('fillRef'), one('effectRef'), one('fontRef')],
     // CT_Shape, CT_Picture, CT_Connector, CT_GroupShape, CT_GraphicalObjectFrame.

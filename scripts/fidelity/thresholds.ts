@@ -186,6 +186,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'text-direction': 47,
     'text-runs': 11,
     'text-warp': 0,
+    'three-d-effects': 0,
     'vertical-columns': 12,
     'vertical-east-asian': 0,
   },
@@ -212,6 +213,10 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'shape-effects-presets/3': ['line-breaks'],
     'text-direction/1': ['pixels', 'extra-text'],
     'text-warp/3': ['pixels'],
+    'three-d-effects/1': ['pixels'],
+    'three-d-effects/2': ['pixels'],
+    'three-d-effects/3': ['pixels'],
+    'three-d-effects/4': ['pixels'],
     'vertical-east-asian/1': ['pixels'],
   },
 };

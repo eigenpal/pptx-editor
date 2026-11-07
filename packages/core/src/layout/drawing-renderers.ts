@@ -1,9 +1,10 @@
 // Drawing renderers that a capability package installs, after DOCX Editor's
 // `packages/core/src/store/package/drawing-renderers.ts`.
 //
-// The engine paints shapes, pictures, fills, lines, text, and outer shadows on its own. A shape
-// or picture paints without the effects that no renderer paints: glow, inner shadow,
-// reflection, and soft edge come from the `effects` renderer (`@pptx-editor.dev/pro/drawing`).
+// The engine paints shapes, pictures, fills, lines, text, and outer and preset shadows on its
+// own. A shape or picture paints without the effects that no renderer paints: glow, inner
+// shadow, reflection, soft edge, blur, and 3-D (bevels, contours, extrusion, and camera
+// rotation) come from the `effects` renderer (`@pptx-editor.dev/pro/drawing`).
 // A chart keeps its labeled placeholder until a `chart` renderer is installed. Other capability
 // packages add their own keys to `DrawingRenderers`.
 //
@@ -15,9 +16,11 @@
 // same engine; install renderers before any document opens. Looking up a renderer is one
 // property read.
 
+import type { GeometryPath } from '@eigenpal/ooxml-core';
 import type {
   ResolvedChartPart,
   ResolvedEffects,
+  Rgba,
   ResolvedElement,
   ResolvedGraphicFrame,
 } from '../cascade/index.ts';
@@ -74,9 +77,46 @@ export interface EffectCopyPaint {
   readonly node: EffectNode;
 }
 
+/** One flat polygon of a 3-D paint, filled with one color. @internal */
+export interface ThreeDFacet {
+  readonly points: readonly { readonly x: number; readonly y: number }[];
+  readonly color: Rgba;
+}
+
+/** What a 3-D renderer reads for one shape or picture. @internal */
+export interface ThreeDInput {
+  /** The element's effects; `effects.threeD` holds its 3-D properties. */
+  readonly effects: ResolvedEffects;
+  /** The geometry, in the element's local box. */
+  readonly paths: readonly GeometryPath[];
+  /** The element's local box to the slide. */
+  readonly matrix: Matrix;
+  readonly width: number;
+  readonly height: number;
+  /** The color the bevel and the extrusion shade: the solid fill, or a color of the fill. */
+  readonly color: Rgba;
+}
+
 /**
- * Glow, inner shadow, reflection, and soft edge (ECMA-376 Part 1, 20.1.8). The outer shadow is
- * the engine's.
+ * Bevels, contours, and extrusions as flat polygons (ECMA-376 Part 1, 20.1.5). The SVG paint
+ * and the PDF writer fill the same polygons.
+ *
+ * @internal
+ */
+export interface ThreeDPaint {
+  /** The slide-space transform the camera gives the front face, applied before `matrix`. */
+  readonly front: Matrix;
+  /** Extrusion sides, in slide space, painted under everything else of the element. */
+  readonly behind: readonly ThreeDFacet[];
+  /** The contour, in the local box, painted under the geometry. */
+  readonly under: readonly ThreeDFacet[];
+  /** Face light and bevel bands, in the local box, painted over the geometry and under text. */
+  readonly over: readonly ThreeDFacet[];
+}
+
+/**
+ * Glow, inner shadow, reflection, soft edge, and blur (ECMA-376 Part 1, 20.1.8), and bevels,
+ * contours, extrusion, and camera rotation (20.1.5). The outer shadow is the engine's.
  *
  * @internal
  */
@@ -99,6 +139,14 @@ export interface DrawingEffectsRenderer {
     source: EffectCopySource,
     ids: EffectIds
   ) => EffectCopyPaint | null;
+  /** Blur (`a:blur`), as a filter over the content. `bounds` hold the content. */
+  readonly blur?: (
+    effects: ResolvedEffects,
+    bounds: EffectBounds,
+    ids: EffectIds
+  ) => EffectFilterPaint | null;
+  /** Bevels, contour, extrusion, and the camera (`a:scene3d`, `a:sp3d`). */
+  readonly threeD?: (input: ThreeDInput) => ThreeDPaint | null;
 }
 
 /** What a chart renderer reads for one chart frame. @internal */
@@ -160,6 +208,8 @@ function guardedRenderers(renderers: Partial<DrawingRenderers>): Partial<Drawing
             body: guard(effects.body, null),
             glow: guard(effects.glow, null),
             reflection: guard(effects.reflection, null),
+            ...(effects.blur ? { blur: guard(effects.blur, null) } : {}),
+            ...(effects.threeD ? { threeD: guard(effects.threeD, null) } : {}),
           }),
         }
       : {}),
@@ -237,7 +287,10 @@ export function drawingRenderersListenerCount(): number {
  * @public
  */
 export interface DrawingCapabilities {
-  /** Glow, inner shadow, reflection, and soft edge paint (`@pptx-editor.dev/pro/drawing`). */
+  /**
+   * Glow, inner shadow, reflection, soft edge, blur, and 3-D paint
+   * (`@pptx-editor.dev/pro/drawing`).
+   */
   readonly effects: boolean;
   /**
    * Charts draw from their cached values (`@pptx-editor.dev/pro/drawing`). Without it, a chart
