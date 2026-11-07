@@ -566,11 +566,21 @@ export function layoutTextOn(
         underline: 'none',
         strike: 'noStrike',
       };
-      const face = measurer.resolve({
-        family: p.bullet.font ?? firstProps.latin,
-        bold: p.bullet.font ? false : firstProps.bold,
-        italic: p.bullet.font ? false : firstProps.italic,
-      });
+      // A number in Arabic, Hebrew, or East Asian characters draws in the first run's font for
+      // that script, not the bullet font (reference PDF of `rtl-text`: `أ-` in the run's
+      // `a:cs` face, where the bullet font has no Arabic glyphs).
+      const scriptSlot =
+        p.bullet.type === 'autonum'
+          ? fontSlotPieces(raw, firstProps).find((s) => s.slot === 'cs' || s.slot === 'ea')?.slot
+          : undefined;
+      const face =
+        (scriptSlot === 'cs' || scriptSlot === 'ea') && slotFamily(firstProps, scriptSlot) !== ''
+          ? faceFor(firstProps, measurer, slotFamily(firstProps, scriptSlot), scriptSlot)
+          : measurer.resolve({
+              family: p.bullet.font ?? firstProps.latin,
+              bold: p.bullet.font ? false : firstProps.bold,
+              italic: p.bullet.font ? false : firstProps.italic,
+            });
       // A Wingdings or Symbol bullet is a byte of that font. When the font is not loaded, the
       // bullet draws its Unicode twin (DOCX Editor's table), not the plain letter; the file
       // keeps its character.
