@@ -16,7 +16,7 @@ A deck no longer stays on the loading spinner. The open waits at most 2 seconds 
 - A load that fails during its font step keeps the fonts and the font waits of the deck that stays open.
 - Typing repaints only the shapes that change. Unchanged shapes keep their resolved style, layout, and SVG nodes. A shrink-on-overflow fit stops measuring at the first paragraph that overflows. A fit value that the file already has writes no change.
 - Repeated opens no longer grow memory: the text engine reads font tables without a copy of the whole font.
-- Each packaged font file loads once per open. A `packagedFonts()` origin no longer fetches the substitutes that the engine loads itself. An origin that serves the requested family itself, such as `customFonts()` with your own Calibri, still loads it.
+- Each packaged font file loads once per open. A `packagedFonts()` origin no longer fetches the substitutes that the engine loads itself. A `googleFonts()` origin no longer fetches Arimo, Tinos, or Cousine when the engine loads their metric-compatible substitutes. An origin that serves the requested family itself, such as `customFonts()` with your own Calibri, still loads it.
 - Slide show, template, and macro-enabled decks open. A macro part stays as inert bytes and never runs.
 - A slide whose content type is missing or generic still opens as a slide. A part that no slide, layout, master, theme, or notes relationship reaches no longer refuses the deck when it does not parse.
 - A picture paints and exports only when its bytes are a PNG, JPEG, GIF, BMP, WebP, or SVG picture within the size limits. A damaged, mislabeled, or oversized picture paints the placeholder. A picture that a slide relationship names never refuses the deck.

@@ -41,6 +41,16 @@ describe('hostile packages', () => {
     expect(slides(patched((t) => t.replace(`${PML}presentation.main+xml`, type)))).toBe(1);
   });
 
+  test('a slide with a content type that is not XML is still a slide', () => {
+    const bytes = patched((t) =>
+      t.replace(
+        /(<Override PartName="\/ppt\/slides\/slide1\.xml" ContentType=")[^"]*"/,
+        '$1application/octet-stream"'
+      )
+    );
+    expect(slides(bytes)).toBe(1);
+  });
+
   test('a slide with no content type override is still a slide', () => {
     const bytes = patched((t) =>
       t.replace(/<Override PartName="\/ppt\/slides\/slide1\.xml"[^>]*\/>/, '')

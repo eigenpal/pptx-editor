@@ -182,7 +182,10 @@ function partRole(
   // A part that is not XML by its type or its name (a picture that a slide relationship names)
   // stays as bytes, whatever points to it.
   const xml = role !== 'binary' || (contentType !== undefined && isXmlType(contentType));
-  if (via === undefined || !xml) return role === 'required' ? 'optional' : role;
+  if (via === undefined) return role === 'required' ? 'optional' : role;
+  // A structural part named `.xml` under a type that is not XML may still be the slide: it
+  // parses, and stays as bytes when it does not.
+  if (!xml) return asciiFold(partName).endsWith('.xml') ? 'optional' : role;
   // Speaker notes are not needed to show the slides: a damaged notes part stays as bytes.
   if (via === REL.notesSlide || via === REL.notesMaster) return 'optional';
   return 'required';

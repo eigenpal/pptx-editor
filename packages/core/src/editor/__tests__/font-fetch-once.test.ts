@@ -4,10 +4,11 @@
 
 import { expect, test } from 'bun:test';
 import { packagedFonts } from '@docx-editor.dev/fonts';
+import { googleFonts } from '@docx-editor.dev/fonts/google';
 import { createPptxEditor } from '../index.ts';
 import { customFonts } from '../custom-fonts.ts';
 import { composeFontOrigins, defineFontResolver } from '../font-resolver.ts';
-import { fontBytes, missingFontsDeck, settle } from './font-test-helpers.ts';
+import { fontBytes, missingFontsDeck, settle, themedDeck } from './font-test-helpers.ts';
 
 test('packagedFonts() fetches no file that the engine loads itself', async () => {
   const fetched: string[] = [];
@@ -24,6 +25,20 @@ test('packagedFonts() fetches no file that the engine loads itself', async () =>
   expect(families).toContain('Arial');
   const twice = fetched.filter((url) => /Carlito|LiberationSans-/.test(url));
   expect(twice).toEqual([]);
+  editor.destroy();
+});
+
+test('googleFonts() fetches no metric-compatible face that the engine loads', async () => {
+  const fetched: string[] = [];
+  const counting = (async (input: RequestInfo | URL) => {
+    fetched.push(String(input));
+    return new Response(null, { status: 404 });
+  }) as typeof fetch;
+  const deck = themedDeck({ major: 'Times New Roman', minor: 'Courier New', latin: 'Arial' });
+  const editor = createPptxEditor({ fonts: googleFonts({ fetcher: counting }) });
+  expect((await editor.load(deck)).ok).toBe(true);
+  await settle(10);
+  expect(fetched.filter((url) => /Tinos|Cousine|Arimo/i.test(url))).toEqual([]);
   editor.destroy();
 });
 

@@ -47,17 +47,21 @@ const SUBSTITUTE_STYLES = [
   { weight: 700, style: 'italic' },
 ] as const;
 
-/** The open family that each packaged substitute family loads. */
+/**
+ * The open families that each packaged substitute family covers: the face the engine loads,
+ * and the metric-compatible face that `googleFonts()` serves for the same family (Arimo,
+ * Tinos, Cousine), which draws the same metrics.
+ */
 const PACKAGED_SUBSTITUTE: Readonly<
-  Record<NonNullable<DocumentSession['substituteFamilies']>[number], string>
+  Record<NonNullable<DocumentSession['substituteFamilies']>[number], readonly string[]>
 > = {
-  Calibri: 'Carlito',
-  Cambria: 'Caladea',
-  Arial: 'Liberation Sans',
-  'Times New Roman': 'Liberation Serif',
-  'Courier New': 'Liberation Mono',
-  'Century Gothic': 'TeX Gyre Adventor',
-  'Segoe UI': 'Selawik',
+  Calibri: ['Carlito'],
+  Cambria: ['Caladea'],
+  Arial: ['Liberation Sans', 'Arimo'],
+  'Times New Roman': ['Liberation Serif', 'Tinos'],
+  'Courier New': ['Liberation Mono', 'Cousine'],
+  'Century Gothic': ['TeX Gyre Adventor'],
+  'Segoe UI': ['Selawik'],
 };
 
 /** What the `fonts` option and prop take, as DOCX Editor's `DocxEditorConfig.fonts`. @public */
@@ -375,11 +379,9 @@ export function createHostFonts(
     if (!families || families.length === 0) return {};
     return {
       resolvedFaces: families.flatMap((family) =>
-        SUBSTITUTE_STYLES.map((s) => ({
-          family: PACKAGED_SUBSTITUTE[family],
-          weight: s.weight,
-          style: s.style,
-        }))
+        PACKAGED_SUBSTITUTE[family].flatMap((open) =>
+          SUBSTITUTE_STYLES.map((s) => ({ family: open, weight: s.weight, style: s.style }))
+        )
       ),
     };
   };
