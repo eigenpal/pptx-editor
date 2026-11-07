@@ -821,8 +821,8 @@ export class DocumentSession {
     const pkg = this.store.package;
     const target = relTarget(pkg, sourcePart, rId);
     const bytes = target ? binaryPartOf(pkg, target) : undefined;
-    const picture = bytes && this.pictures.drawable(bytes, imageMime(target!));
-    return picture ? this.pictures.url(target!, picture) : undefined;
+    const shown = bytes && this.pictures.shown(bytes, imageMime(target!), pkg, sourcePart);
+    return shown ? this.pictures.url(target!, shown.picture, shown.key) : undefined;
   };
 
   /** The bytes of the picture part `target` as they draw (`MetafilePictures.drawable`). @internal */
