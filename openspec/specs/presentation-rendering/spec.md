@@ -149,3 +149,17 @@ The editor and the PDF export SHALL draw dashes and line ends from the same geom
 
 - **WHEN** a line has `cap="sq"` and `<a:prstDash val="dot"/>`
 - **THEN** each dot is one line width long, and only the ends of the line get a square cap
+
+### Requirement: Equations
+
+The layout SHALL draw an equation (`a14:m`) whose constructs it reads, within its depth and size limits, with the rules of TeX, in the editor canvas and in the PDF export from one layout. It SHALL draw the fallback of the text box for any other equation.
+
+#### Scenario: A supported equation
+
+- **WHEN** a slide holds a fraction in `mc:AlternateContent` with a fallback picture
+- **THEN** the numerator, the rule, and the denominator draw, and the fallback picture does not
+
+#### Scenario: An unsupported construct
+
+- **WHEN** an equation holds a construct that the layout does not read
+- **THEN** the `mc:Fallback` branch draws

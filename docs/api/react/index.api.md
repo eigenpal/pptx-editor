@@ -342,6 +342,34 @@ export { EditorRemoval }
 export { EditorSnapshot }
 
 // @public
+export const EquationDialog: typeof EquationDialogRoot & {
+    Header: (props: DialogPartProps) => ReactNode;
+    Title: (props: DialogPartProps) => ReactNode;
+    Body: (props: DialogPartProps) => ReactNode;
+    Footer: (props: DialogPartProps) => ReactNode;
+    Field: (props: DialogPartProps & {
+        readonly name: EquationDialogFieldName;
+    }) => ReactNode;
+    Error: (props: DialogPartProps) => ReactNode;
+    Apply: (props: DialogPartProps) => ReactNode;
+    Cancel: (props: DialogPartProps) => ReactNode;
+};
+
+// @public
+export type EquationDialogFieldName = 'gallery' | 'linear';
+
+// @public
+export interface EquationDialogFields {
+    readonly linear: string;
+}
+
+// @public
+export interface EquationDialogProps extends DialogCustomizationProps {
+    readonly onClose: () => void;
+    readonly open: boolean;
+}
+
+// @public
 export function FillControl(input: FillControlProps): react.JSX.Element;
 
 // @public
@@ -1076,6 +1104,18 @@ export const PptxEditor: react.ForwardRefExoticComponent<PptxEditorProps & react
         Apply: (props: DialogPartProps) => ReactNode;
         Cancel: (props: DialogPartProps) => ReactNode;
     };
+    EquationDialog: ((props: EquationDialogProps) => ReactNode) & {
+        Header: (props: DialogPartProps) => ReactNode;
+        Title: (props: DialogPartProps) => ReactNode;
+        Body: (props: DialogPartProps) => ReactNode;
+        Footer: (props: DialogPartProps) => ReactNode;
+        Field: (props: DialogPartProps & {
+            readonly name: EquationDialogFieldName;
+        }) => ReactNode;
+        Error: (props: DialogPartProps) => ReactNode;
+        Apply: (props: DialogPartProps) => ReactNode;
+        Cancel: (props: DialogPartProps) => ReactNode;
+    };
     ParagraphDialog: ((input: ParagraphDialogProps) => ReactNode) & {
         Header: (props: DialogPartProps) => ReactNode;
         Title: (props: DialogPartProps) => ReactNode;
@@ -1158,7 +1198,7 @@ export interface PptxEditorContextMenuProps {
 }
 
 // @public
-export type PptxEditorDialogKey = 'pageSetup' | 'background' | 'paragraph' | 'font' | 'bulletsAndNumbering' | 'columns' | 'imageAltText' | 'imageProperties';
+export type PptxEditorDialogKey = 'pageSetup' | 'background' | 'paragraph' | 'font' | 'bulletsAndNumbering' | 'columns' | 'imageAltText' | 'imageProperties' | 'equation';
 
 export { PptxEditorEvents }
 
@@ -1191,6 +1231,7 @@ export interface PptxEditorPopups {
     bulletsAndNumbering?: PptxEditorPopup<BulletsAndNumberingDialogProps>;
     columns?: PptxEditorPopup<ColumnsDialogProps>;
     contextMenu?: PptxEditorPopup<PptxEditorContextMenuProps>;
+    equation?: PptxEditorPopup<EquationDialogProps>;
     find?: PptxEditorPopup<FindPopupProps>;
     font?: PptxEditorPopup<FontDialogProps>;
     hyperlink?: PptxEditorPopup<HyperlinkPopupProps>;
@@ -1656,6 +1697,7 @@ export interface ToolbarNamedParts {
     readonly DiagramAddBelow: ToolbarPartComponent;
     readonly DiagramDelete: ToolbarPartComponent;
     readonly Duplicate: ToolbarPartComponent;
+    readonly Equation: ToolbarPartComponent;
     readonly ExpandAllSections: ToolbarPartComponent;
     readonly Find: ToolbarPartComponent;
     readonly Font: ToolbarPartComponent;
@@ -1972,6 +2014,12 @@ export interface UseEditorValueCommandReturn<V, S = V> {
     readonly options: readonly V[];
     readonly value: S | null;
 }
+
+// @public
+export function useEquationDialog(): UseEquationDialogReturn;
+
+// @public
+export type UseEquationDialogReturn = UseDialogReturn<EquationDialogFields>;
 
 // @public
 export function useFontDialog(): UseFontDialogReturn;

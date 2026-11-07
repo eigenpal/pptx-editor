@@ -10,7 +10,7 @@
 // `check_box_outline_blank`, `view_column_2`, `dashboard`, `restart_alt`, `visibility_off`,
 // `view_agenda`, `grid_view`, `unfold_less`, `unfold_more`, `add_row_*`/`add_column_*`,
 // `toolbar`, `call_to_action`, `dock_to_*`, `crop`, `brightness_6`, `palette`, `opacity`,
-// `imagesmode`, `style`, `frame_person`, `list_alt`, `table_chart`, and `accessibility_new` from the official
+// `imagesmode`, `style`, `frame_person`, `list_alt`, `table_chart`, `functions`, and `accessibility_new` from the official
 // Material Symbols; the table icons (`table`, `table_rows`, `view_column`, `border_*`, `padding`,
 // `height`, `fit_width`, `delete_sweep`, `open_with`) from DOCX Editor's `generated-icon-paths.ts`, also
 // official Material Symbols; `add_comment`, `send`, and `refresh` from DOCX Editor's review icons
@@ -20,6 +20,7 @@
 
 /** Material Symbol name → SVG path data. */
 export const ICON_PATHS: Readonly<Record<string, readonly string[]>> = {
+  functions: ['M240-160v-80l260-240-260-240v-80h480v120H431l215 200-215 200h289v120H240Z'],
   table_chart: [
     'M760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120ZM200-640h560v-120H200v120Zm100 80H200v360h100v-360Zm360 0v360h100v-360H660Zm-80 0H380v360h200v-360Z',
   ],

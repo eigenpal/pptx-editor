@@ -48,6 +48,7 @@ export const TOOLBAR_NAMED_PARTS = {
   Line: 'insert.line',
   Shapes: 'insert.shape',
   ImageInsert: 'insert.image',
+  Equation: 'insert.equation',
   ShapeFill: 'shape.fill',
   LineColor: 'shape.lineColor',
   LineWidth: 'shape.lineWidth',

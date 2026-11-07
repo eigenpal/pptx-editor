@@ -177,6 +177,38 @@ function pointPathData(commands: readonly PathCommand[]): string {
 }
 
 /**
+ * The marks of a line's equations (fraction rules, radical signs, stretched delimiters, braces):
+ * filled paths in the math run's fill, after the line's glyphs.
+ */
+function paintMarks(
+  doc: Document,
+  line: TextLayout['lines'][number],
+  group: SVGElement,
+  bounds: TextBounds,
+  ctx: PaintContext
+): void {
+  for (const mark of line.marks ?? []) {
+    const fill = textFill(mark.props.fill, bounds, ctx);
+    if (fill.paint === 'none') continue;
+    const commands = mark.commands.map((c): PathCommand => {
+      if (c.op === 'Z') return c;
+      if (c.op === 'Q') return { ...c, y1: line.baseline - c.y1, y: line.baseline - c.y };
+      if (c.op === 'C')
+        return { ...c, y1: line.baseline - c.y1, y2: line.baseline - c.y2, y: line.baseline - c.y };
+      return { ...c, y: line.baseline - c.y };
+    });
+    group.appendChild(
+      svg(doc, 'path', {
+        d: pointPathData(commands),
+        fill: fill.paint,
+        'fill-opacity': fill.opacity < 1 ? num(fill.opacity) : undefined,
+        'data-run': String(mark.runIndex),
+      })
+    );
+  }
+}
+
+/**
  * Paint warped text (`a:prstTxWarp`): each run's glyphs as one filled path that layout mapped
  * into the warp, with its highlight behind and its underline over it, in the run's fills.
  */
@@ -347,6 +379,7 @@ export function paintText(doc: Document, layout: TextLayout, ctx: PaintContext):
         for (const d of decorationRects(doc, run, line.baseline, fill, under)) group.appendChild(d);
       }
     }
+    if (line.marks) paintMarks(doc, line, group, bounds, ctx);
   }
   return outer;
 }

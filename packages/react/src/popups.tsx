@@ -36,6 +36,7 @@ import {
   type BulletsAndNumberingDialogProps,
 } from './BulletsAndNumberingDialog.tsx';
 import { ColumnsDialog, type ColumnsDialogProps } from './ColumnsDialog.tsx';
+import { EquationDialog, type EquationDialogProps } from './EquationDialog.tsx';
 import { markReadingPopup } from '@pptx-editor.dev/core/editor';
 import { usePptxEditor } from './context.ts';
 import type { PptxEditorContextMenuProps } from './context-menu-parts.tsx';
@@ -170,6 +171,12 @@ export interface PptxEditorPopups {
    */
   imageProperties?: PptxEditorPopup<ImagePropertiesDialogProps>;
   /**
+   * Insert > Equation: a gallery and the linear form of an equation, which inserts an equation
+   * or edits the selected one. `false` turns it off; `insertEquation` and `setEquation` keep
+   * working from the API.
+   */
+  equation?: PptxEditorPopup<EquationDialogProps>;
+  /**
    * The menu of a section header in the slide rail and in the slide sorter (Rename, Remove,
    * Move, Collapse all). A callback renders the host's menu, or `SectionContextMenu` with its
    * own options; `false` shows no menu. The section commands keep working from the API.
@@ -186,7 +193,8 @@ export type PptxEditorDialogKey =
   | 'bulletsAndNumbering'
   | 'columns'
   | 'imageAltText'
-  | 'imageProperties';
+  | 'imageProperties'
+  | 'equation';
 
 /** What `useEditorDialog` returns. @public */
 export interface UseEditorDialogReturn {
@@ -349,6 +357,7 @@ function ActiveDialog({ host }: { host: DialogHost }): ReactNode {
     return renderEntry(popups?.imageAltText, ImageAltTextDialog, props);
   if (active === 'imageProperties')
     return renderEntry(popups?.imageProperties, ImagePropertiesDialog, props);
+  if (active === 'equation') return renderEntry(popups?.equation, EquationDialog, props);
   return null;
 }
 

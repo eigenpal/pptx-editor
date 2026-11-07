@@ -97,6 +97,7 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
     return;
   }
   let bounds: ReturnType<typeof textBounds> | undefined;
+  const markBounds: { box?: ReturnType<typeof textBounds> } = {};
   if (layout.upright !== 'none' && hasCharacters(layout))
     p.diag.add('text.upright', 'approximation', 'Upright vertical characters are drawn rotated.');
   for (const line of layout.lines) {
@@ -185,8 +186,65 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
       p.push(popGraphicsState());
       decorate();
     }
+    if (line.marks) drawMarks(layout, line, p, scope, markBounds);
   }
   p.push(popGraphicsState());
+}
+
+/**
+ * Fill a path of a text body in a text fill: a gradient spans the body's laid-out bounds, as in
+ * the SVG paint. `bounds` keeps the bounds once measured.
+ */
+function fillTextPath(
+  layout: TextLayout,
+  fillValue: ResolvedFill,
+  commands: readonly PathCommand[],
+  p: PageOps,
+  scope: FillScope,
+  bounds: { box?: ReturnType<typeof textBounds> }
+): void {
+  if (commands.length === 0) return;
+  const own = ownFill(fillValue, scope).fill;
+  if (own.type === 'linear' || own.type === 'path') {
+    if (own.stops.length === 0) return;
+    const box = (bounds.box ??= textBounds(layout));
+    p.push(pushGraphicsState());
+    tracePath(commands, p);
+    p.push(clipNonZero(), endPath(), concatTransformationMatrix(1, 0, 0, 1, box.x, box.y));
+    gradientBox(own, box.w, box.h, p);
+    p.push(popGraphicsState());
+    return;
+  }
+  const color = flatColor(fillValue, scope, p, 'text');
+  if (!color) return;
+  p.push(pushGraphicsState());
+  p.alpha(color.a, 1);
+  p.push(setFillingRgbColor(...rgb(color)));
+  tracePath(commands, p);
+  p.push(fill(), popGraphicsState());
+}
+
+/**
+ * The marks of a line's equations (fraction rules, radical signs, stretched delimiters,
+ * braces), filled in the math run's fill, as in the SVG paint.
+ */
+function drawMarks(
+  layout: TextLayout,
+  line: TextLayout['lines'][number],
+  p: PageOps,
+  scope: FillScope,
+  bounds: { box?: ReturnType<typeof textBounds> }
+): void {
+  for (const mark of line.marks ?? []) {
+    const commands = mark.commands.map((c): PathCommand => {
+      if (c.op === 'Z') return c;
+      if (c.op === 'Q') return { ...c, y1: line.baseline - c.y1, y: line.baseline - c.y };
+      if (c.op === 'C')
+        return { ...c, y1: line.baseline - c.y1, y2: line.baseline - c.y2, y: line.baseline - c.y };
+      return { ...c, y: line.baseline - c.y };
+    });
+    fillTextPath(layout, mark.props.fill, commands, p, scope, bounds);
+  }
 }
 
 /**
@@ -202,28 +260,9 @@ async function drawWarped(
   p: PageOps,
   scope: FillScope
 ): Promise<void> {
-  let bounds: ReturnType<typeof textBounds> | undefined;
-  const paint = (fillValue: ResolvedFill, commands: readonly PathCommand[]): void => {
-    if (commands.length === 0) return;
-    const own = ownFill(fillValue, scope).fill;
-    if (own.type === 'linear' || own.type === 'path') {
-      if (own.stops.length === 0) return;
-      bounds ??= textBounds(layout);
-      p.push(pushGraphicsState());
-      tracePath(commands, p);
-      p.push(clipNonZero(), endPath(), concatTransformationMatrix(1, 0, 0, 1, bounds.x, bounds.y));
-      gradientBox(own, bounds.w, bounds.h, p);
-      p.push(popGraphicsState());
-      return;
-    }
-    const color = flatColor(fillValue, scope, p, 'text');
-    if (!color) return;
-    p.push(pushGraphicsState());
-    p.alpha(color.a, 1);
-    p.push(setFillingRgbColor(...rgb(color)));
-    tracePath(commands, p);
-    p.push(fill(), popGraphicsState());
-  };
+  const bounds: { box?: ReturnType<typeof textBounds> } = {};
+  const paint = (fillValue: ResolvedFill, commands: readonly PathCommand[]): void =>
+    fillTextPath(layout, fillValue, commands, p, scope, bounds);
   for (const w of warped) {
     const run = layout.lines[w.line]?.runs[w.run];
     if (!run) continue;

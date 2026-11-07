@@ -410,6 +410,7 @@ export const NS: Readonly<{
     a14: "http://schemas.microsoft.com/office/drawing/2010/main";
     a16: "http://schemas.microsoft.com/office/drawing/2014/main";
     asvg: "http://schemas.microsoft.com/office/drawing/2016/SVG/main";
+    m: "http://schemas.openxmlformats.org/officeDocument/2006/math";
     pic: "http://schemas.openxmlformats.org/drawingml/2006/picture";
     c: "http://schemas.openxmlformats.org/drawingml/2006/chart";
     dgm: "http://schemas.openxmlformats.org/drawingml/2006/diagram";

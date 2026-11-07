@@ -136,6 +136,25 @@ An edit of chart data SHALL change the series names, category labels, values, po
 - **WHEN** the chart's embedded workbook has a formula in its data cells
 - **THEN** the chart part changes, and the workbook saves unchanged
 
+### Requirement: Equation editing
+
+Insert Equation and Edit Equation SHALL write Office Math from a linear form in one undo step, and SHALL refuse a linear form that the parser does not read, with no change. A new equation SHALL be a text box in `mc:AlternateContent`, with the math in a `mc:Choice` that requires `a14` and the equation as plain text in a `mc:Fallback`. An edit of the math SHALL keep the alignment and the first run's format, SHALL remove the stale fallback, and SHALL refuse an equation whose math the linear form cannot write.
+
+#### Scenario: Insert an equation
+
+- **WHEN** `insertEquation` runs with the linear form `A=\pi r^2`
+- **THEN** the slide gains a selected text box whose math has a superscript, and its fallback holds `A=πr^2`
+
+#### Scenario: Edit an equation
+
+- **WHEN** `setEquation` runs on a selected equation with the linear form `y=(a+1)/b`
+- **THEN** the math is a fraction, the run font stays, and the wrapper has no fallback
+
+#### Scenario: Unreadable linear form
+
+- **WHEN** `insertEquation` runs with the linear form `x^`
+- **THEN** the command refuses, and the undo history does not change
+
 ### Requirement: Diagram editing
 
 A text edit in a diagram shape SHALL write the drawing shape's text and the text of the data model point that the shape shows, in one transaction. An added or deleted diagram shape SHALL change the data model's points and connections, renumber the sibling order, and lay the saved drawing out again, in one undo step. A diagram whose saved drawing is not one line of shapes with up to one level of children SHALL refuse structure edits, and SHALL write nothing.

@@ -666,6 +666,124 @@ export { EditorRemoval }
 export { EditorSnapshot }
 
 // @public
+export const EquationDialog: {
+    new (...args: any[]): vue.CreateComponentPublicInstanceWithMixins<Readonly<vue.ExtractPropTypes<{
+        readonly open: {
+            readonly type: BooleanConstructor;
+            readonly required: true;
+        };
+        readonly onClose: {
+            readonly type: PropType<() => void>;
+            readonly required: true;
+        };
+        readonly preset: {
+            readonly type: BooleanConstructor;
+            readonly default: true;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly style: {
+            readonly type: PropType<CSSProperties>;
+            readonly default: undefined;
+        };
+    }>> & Readonly<{}>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }> | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, vue.PublicProps, {
+        readonly className: string;
+        readonly style: CSSProperties;
+        readonly preset: boolean;
+    }, true, {}, {}, vue.GlobalComponents, vue.GlobalDirectives, string, {}, any, vue.ComponentProvideOptions, {
+        P: {};
+        B: {};
+        D: {};
+        C: {};
+        M: {};
+        Defaults: {};
+    }, Readonly<vue.ExtractPropTypes<{
+        readonly open: {
+            readonly type: BooleanConstructor;
+            readonly required: true;
+        };
+        readonly onClose: {
+            readonly type: PropType<() => void>;
+            readonly required: true;
+        };
+        readonly preset: {
+            readonly type: BooleanConstructor;
+            readonly default: true;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly style: {
+            readonly type: PropType<CSSProperties>;
+            readonly default: undefined;
+        };
+    }>> & Readonly<{}>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }> | null, {}, {}, {}, {
+        readonly className: string;
+        readonly style: CSSProperties;
+        readonly preset: boolean;
+    }>;
+    __isFragment?: never;
+    __isTeleport?: never;
+    __isSuspense?: never;
+} & vue.ComponentOptionsBase<Readonly<vue.ExtractPropTypes<{
+    readonly open: {
+        readonly type: BooleanConstructor;
+        readonly required: true;
+    };
+    readonly onClose: {
+        readonly type: PropType<() => void>;
+        readonly required: true;
+    };
+    readonly preset: {
+        readonly type: BooleanConstructor;
+        readonly default: true;
+    };
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly style: {
+        readonly type: PropType<CSSProperties>;
+        readonly default: undefined;
+    };
+}>> & Readonly<{}>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
+    [key: string]: any;
+}> | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, {
+    readonly className: string;
+    readonly style: CSSProperties;
+    readonly preset: boolean;
+}, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & {
+    Header: vue.DefineComponent<DialogPartProps>;
+    Title: vue.DefineComponent<DialogPartProps>;
+    Body: vue.DefineComponent<DialogPartProps>;
+    Footer: vue.DefineComponent<DialogPartProps>;
+    Field: vue.DefineComponent<DialogPartProps & {
+        readonly name: EquationDialogFieldName;
+    }>;
+    Error: vue.DefineComponent<DialogPartProps>;
+    Apply: vue.DefineComponent<DialogPartProps>;
+    Cancel: vue.DefineComponent<DialogPartProps>;
+};
+
+// @public
+export type EquationDialogFieldName = 'gallery' | 'linear';
+
+// @public
+export interface EquationDialogFields {
+    readonly linear: string;
+}
+
+// @public
+export type EquationDialogProps = ExtractPublicPropTypes<typeof equationDialogProps>;
+
+// @public
 export const FillControl: vue.DefineComponent<vue.ExtractPropTypes<{
     readonly slot: {
         readonly type: PropType<ChromeSlotId>;
@@ -4196,6 +4314,111 @@ export const PptxEditor: {
         Apply: vue.DefineComponent<DialogPartProps>;
         Cancel: vue.DefineComponent<DialogPartProps>;
     };
+    EquationDialog: {
+        new (...args: any[]): vue.CreateComponentPublicInstanceWithMixins<Readonly<vue.ExtractPropTypes<{
+            readonly open: {
+                readonly type: BooleanConstructor;
+                readonly required: true;
+            };
+            readonly onClose: {
+                readonly type: PropType<() => void>;
+                readonly required: true;
+            };
+            readonly preset: {
+                readonly type: BooleanConstructor;
+                readonly default: true;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly style: {
+                readonly type: PropType<vue.CSSProperties>;
+                readonly default: undefined;
+            };
+        }>> & Readonly<{}>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
+            [key: string]: any;
+        }> | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, vue.PublicProps, {
+            readonly className: string;
+            readonly style: vue.CSSProperties;
+            readonly preset: boolean;
+        }, true, {}, {}, vue.GlobalComponents, vue.GlobalDirectives, string, {}, any, vue.ComponentProvideOptions, {
+            P: {};
+            B: {};
+            D: {};
+            C: {};
+            M: {};
+            Defaults: {};
+        }, Readonly<vue.ExtractPropTypes<{
+            readonly open: {
+                readonly type: BooleanConstructor;
+                readonly required: true;
+            };
+            readonly onClose: {
+                readonly type: PropType<() => void>;
+                readonly required: true;
+            };
+            readonly preset: {
+                readonly type: BooleanConstructor;
+                readonly default: true;
+            };
+            readonly className: {
+                readonly type: StringConstructor;
+                readonly default: undefined;
+            };
+            readonly style: {
+                readonly type: PropType<vue.CSSProperties>;
+                readonly default: undefined;
+            };
+        }>> & Readonly<{}>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
+            [key: string]: any;
+        }> | null, {}, {}, {}, {
+            readonly className: string;
+            readonly style: vue.CSSProperties;
+            readonly preset: boolean;
+        }>;
+        __isFragment?: never;
+        __isTeleport?: never;
+        __isSuspense?: never;
+    } & vue.ComponentOptionsBase<Readonly<vue.ExtractPropTypes<{
+        readonly open: {
+            readonly type: BooleanConstructor;
+            readonly required: true;
+        };
+        readonly onClose: {
+            readonly type: PropType<() => void>;
+            readonly required: true;
+        };
+        readonly preset: {
+            readonly type: BooleanConstructor;
+            readonly default: true;
+        };
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+        readonly style: {
+            readonly type: PropType<vue.CSSProperties>;
+            readonly default: undefined;
+        };
+    }>> & Readonly<{}>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }> | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, {
+        readonly className: string;
+        readonly style: vue.CSSProperties;
+        readonly preset: boolean;
+    }, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & {
+        Header: vue.DefineComponent<DialogPartProps>;
+        Title: vue.DefineComponent<DialogPartProps>;
+        Body: vue.DefineComponent<DialogPartProps>;
+        Footer: vue.DefineComponent<DialogPartProps>;
+        Field: vue.DefineComponent<DialogPartProps & {
+            readonly name: EquationDialogFieldName;
+        }>;
+        Error: vue.DefineComponent<DialogPartProps>;
+        Apply: vue.DefineComponent<DialogPartProps>;
+        Cancel: vue.DefineComponent<DialogPartProps>;
+    };
     ParagraphDialog: {
         new (...args: any[]): vue.CreateComponentPublicInstanceWithMixins<Readonly<vue.ExtractPropTypes<{
             readonly open: {
@@ -5832,6 +6055,7 @@ export interface PptxEditorPopups {
     bulletsAndNumbering?: PptxEditorPopup<BulletsAndNumberingDialogProps>;
     columns?: PptxEditorPopup<ColumnsDialogProps>;
     contextMenu?: PptxEditorPopup<PptxEditorContextMenuProps>;
+    equation?: PptxEditorPopup<EquationDialogProps>;
     find?: PptxEditorPopup<FindPopupProps>;
     font?: PptxEditorPopup<FontDialogProps>;
     hyperlink?: PptxEditorPopup<HyperlinkPopupProps>;
@@ -8559,6 +8783,12 @@ export interface UseEditorValueCommandReturn<V, S = V> {
     readonly options: ComputedRef<readonly V[]>;
     readonly value: ComputedRef<S | null>;
 }
+
+// @public
+export function useEquationDialog(): UseEquationDialogReturn;
+
+// @public
+export type UseEquationDialogReturn = UseDialogReturn<EquationDialogFields>;
 
 // @public
 export function useFontDialog(): UseFontDialogReturn;

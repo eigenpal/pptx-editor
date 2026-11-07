@@ -153,6 +153,7 @@ export const CHROME_MENUS: readonly ChromeMenu[] = [
       item('insert.image', 'menu.picture'),
       item('insert.shape', 'menu.shape'),
       item('insert.line', 'menu.line'),
+      item('insert.equation', 'menu.equation'),
       SEPARATOR,
       item('text.link', 'menu.link', 'contextMenu.shortcuts.link'),
     ],

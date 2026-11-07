@@ -572,6 +572,7 @@ export interface Line {
     readonly fontHeight: number;
     // (undocumented)
     readonly height: number;
+    readonly marks?: readonly LineMark[];
     // (undocumented)
     readonly paragraph: number;
     readonly pendingBullet?: GlyphRun;
@@ -610,6 +611,14 @@ export function lineHeightPt(sizePt: number, spacing: {
 } | {
     pts: number;
 }, reduction: number): number;
+
+// @public
+export interface LineMark {
+    readonly commands: readonly PathCommand[];
+    // (undocumented)
+    readonly props: RunProps;
+    readonly runIndex: number;
+}
 
 // @public
 export type MarkedFontResolver<T extends FontResolver = FontResolver> = T & FontResolverMark;

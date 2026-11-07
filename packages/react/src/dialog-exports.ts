@@ -26,6 +26,14 @@ export {
   type UseImageAltTextDialogReturn,
 } from './ImageAltTextDialog.tsx';
 export {
+  EquationDialog,
+  useEquationDialog,
+  type EquationDialogFieldName,
+  type EquationDialogFields,
+  type EquationDialogProps,
+  type UseEquationDialogReturn,
+} from './EquationDialog.tsx';
+export {
   ImagePropertiesDialog,
   useImagePropertiesDialog,
   type ImagePropertiesDialogFieldName,

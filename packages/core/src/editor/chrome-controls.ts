@@ -15,9 +15,9 @@ import type {
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { warnChromeSlotRun, warnDialogSlotRun, warnInvalidSlotValue } from './dev-warnings.ts';
 import { ICON_PATHS } from './icon-paths.ts';
-import { IMAGE_CHROME_GROUP, imageSlotState } from './chrome-picture.ts';
+import { IMAGE_CHROME_GROUP, imageSlotState, type ImageSlotId } from './chrome-picture.ts';
 import { adapterActionState } from './chrome-adapter-state.ts';
-import type { ImageSlotId } from './chrome-picture.ts';
+import { EQUATION_PROBES, INSERT_GROUP, type EquationSlotId } from './chrome-insert.ts';
 import { CHART_CHROME_GROUP, chartSlotState, type ChartSlotId } from './chrome-chart.ts';
 import { DIAGRAM_CHROME_GROUP, type DiagramSlotId } from './chrome-diagram.ts';
 import { isNothingToDo } from '../automation/commands/op-batch.ts';
@@ -53,7 +53,6 @@ import {
 import {
   LINE_DASHES,
   LINE_ENDS,
-  LINE_KINDS,
   LINE_WIDTHS,
   commandForSlot,
   commandForSlotValue,
@@ -126,7 +125,8 @@ export type ChromeDialogKey =
   | 'bulletsAndNumbering'
   | 'columns'
   | 'imageAltText'
-  | 'imageProperties';
+  | 'imageProperties'
+  | 'equation';
 
 /** How a control renders. @public */
 export type ChromeControlShape =
@@ -391,36 +391,7 @@ export const CHROME_GROUPS: readonly ChromeGroup[] = [
       LINE_SPACING_CONTROL,
     ],
   },
-  {
-    id: 'insert',
-    labelKey: 'toolbar.groups.insert',
-    controls: [
-      {
-        id: 'textBox',
-        labelKey: 'toolbar.textBox',
-        paths: icon('text_fields'),
-        state: { kind: 'command' },
-      },
-      {
-        // Lines and connectors; the chrome draws each option as the line it inserts.
-        id: 'line',
-        shape: 'dropdown',
-        labelKey: 'toolbar.line',
-        paths: null,
-        options: LINE_KINDS.map((k) => ({ value: k, labelKey: `toolbar.lines.${k}` as const })),
-        state: { kind: 'value' },
-      },
-      {
-        // A gallery of every preset in `SHAPE_GALLERY`, drawn from the spec geometry.
-        id: 'shape',
-        shape: 'gallery',
-        labelKey: 'toolbar.shape',
-        paths: icon('shapes'),
-        state: { kind: 'value' },
-      },
-      { id: 'image', labelKey: 'toolbar.image', paths: icon('image'), state: { kind: 'load' } },
-    ],
-  },
+  INSERT_GROUP,
   {
     id: 'shape',
     labelKey: 'toolbar.groups.shape',
@@ -787,7 +758,8 @@ export type ChromeSlotId =
   | TableSlotId
   | ImageSlotId
   | ChartSlotId
-  | DiagramSlotId;
+  | DiagramSlotId
+  | EquationSlotId;
 
 /** Every slot id, derived from the registry. @public */
 export function chromeSlotIds(): ChromeSlotId[] {
@@ -833,6 +805,7 @@ const PROBES: Partial<Record<ChromeSlotId, unknown>> = {
   ...SHAPE_FORMAT_PROBES,
   'view.presentationView': 'normal',
   ...TABLE_PROBES,
+  ...EQUATION_PROBES,
 };
 
 /** The shared can-before-exec state of one control. @public */

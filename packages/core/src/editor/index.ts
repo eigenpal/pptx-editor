@@ -495,6 +495,17 @@ export {
   type ChartPaneResult,
 } from './chart-pane.ts';
 export { type ChartSlotId } from './chrome-chart.ts';
+export {
+  EQUATION_GALLERY,
+  MAX_LINEAR_LENGTH,
+  equationDialogEdits,
+  equationDraftCommand,
+  equationDraftFrom,
+  validateEquationDraft,
+  type EquationDraftFields,
+  type EquationGalleryItem,
+} from './equation-fields.ts';
+export { type EquationSlotId } from './chrome-insert.ts';
 export { type DiagramSlotId } from './chrome-diagram.ts';
 export { type ImageSlotId } from './chrome-picture.ts';
 export {

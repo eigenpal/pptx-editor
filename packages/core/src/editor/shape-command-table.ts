@@ -1,6 +1,7 @@
 // Shape commands that `commands.ts` sends here: the adjust values of a preset shape, which its
 // adjust handles drag (`surface-adjust.ts`), the pattern and picture fills, and the text warp.
-// Each compiles to one transaction, so one undo step.
+// The equation commands go on to `equation-command-table.ts`. Each compiles to one transaction,
+// so one undo step.
 
 import type { EditorCommand } from '../contracts/index.ts';
 import { child, type Element } from '../store/index.ts';
@@ -13,11 +14,20 @@ import { CommandRefusal, type OpBatch } from '../automation/commands/op-batch.ts
 import type { CommandContext, CommandEffect } from './commands.ts';
 import { selectedIds } from './commands.ts';
 import { slidePart } from './text-targets.ts';
+import { compileEquationCommand, isEquationCommand } from './equation-command-table.ts';
 
 /** The commands this table compiles. */
 export type ShapeCommand = Extract<
   EditorCommand,
-  { readonly type: 'setAdjustments' | 'setShapePattern' | 'setShapePicture' | 'setTextWarp' }
+  {
+    readonly type:
+      | 'setAdjustments'
+      | 'setShapePattern'
+      | 'setShapePicture'
+      | 'setTextWarp'
+      | 'insertEquation'
+      | 'setEquation';
+  }
 >;
 
 const TYPES: ReadonlySet<string> = new Set([
@@ -25,6 +35,8 @@ const TYPES: ReadonlySet<string> = new Set([
   'setShapePattern',
   'setShapePicture',
   'setTextWarp',
+  'insertEquation',
+  'setEquation',
 ]);
 
 export function isShapeCommand(command: EditorCommand): command is ShapeCommand {
@@ -36,6 +48,7 @@ export function compileShapeCommand(
   batch: OpBatch,
   command: ShapeCommand
 ): CommandEffect {
+  if (isEquationCommand(command)) return compileEquationCommand(ctx, batch, command);
   if (command.type === 'setShapePattern') {
     setShapePattern(batch, slidePart(ctx), selectedIds(ctx.selection), command.pattern);
     return { label: 'shapeFill' };

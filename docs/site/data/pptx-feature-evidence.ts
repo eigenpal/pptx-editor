@@ -192,7 +192,10 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   'objects.media-ole': {
     fixtures: ['preserve-unsupported', 'slide-structure', 'preserved-content'],
   },
-  'objects.equations': { fixtures: ['preserved-content'] },
+  'objects.equations': {
+    fixtures: ['equations', 'preserved-content'],
+    approximations: ['equations'],
+  },
   // --- Slides, layouts & notes -------------------------------------------
   'slides.structure': { fixtures: ['slide-structure', 'slide-layouts'] },
   'slides.hidden': { fixtures: ['slide-layouts'] },

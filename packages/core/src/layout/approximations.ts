@@ -82,6 +82,7 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'inconsistent-merges', title: 'Inconsistent cell merges', perSlide: false },
   { id: 'text-warp', title: 'Text warp', perSlide: true },
   { id: 'diagram-drawing', title: 'Diagram drawings', perSlide: true },
+  { id: 'equations', title: 'Equations', perSlide: true },
 ] satisfies Approximation[]);
 
 const CONTENT_PLACEHOLDERS = new Set(['pic', 'tbl', 'chart', 'clipArt', 'dgm', 'media']);
@@ -203,6 +204,7 @@ class Collector {
       // (`svg-tab-stops`); right-to-left and unwrapped text are not.
       const tabbed = p.tabs.some((t) => t.align !== 'l') && (p.rtl || bp.wrap !== 'square');
       for (const run of p.runs) {
+        if (run.kind === 'math') this.add('equations');
         const props = run.props;
         if (tabbed && run.text.includes('\t')) this.add('tab-stops');
         if (props.caps === 'small') this.add('small-caps');

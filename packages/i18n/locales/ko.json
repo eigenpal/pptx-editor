@@ -74,7 +74,8 @@
     "link": "링크…",
     "alignOrDistribute": "맞춤 또는 배분",
     "slideBackground": "슬라이드 배경…",
-    "columns": "열…"
+    "columns": "열…",
+    "equation": "수식…"
   },
   "contextMenu": {
     "railLabel": "슬라이드 작업",
@@ -509,7 +510,8 @@
     "views": {
       "normal": "기본",
       "slideSorter": "여러 슬라이드"
-    }
+    },
+    "equation": "수식"
   },
   "table": {
     "insert": "표",
@@ -1206,7 +1208,9 @@
       "layoutUnsupported": "이 다이어그램은 다시 배치할 수 없으므로 도형을 추가하거나 삭제할 수 없습니다.",
       "noChildren": "이 다이어그램은 최상위 아래의 도형을 표시하지 않습니다.",
       "tooLarge": "다이어그램의 도형이 편집기에서 편집할 수 있는 수보다 많습니다."
-    }
+    },
+    "equationEmpty": "수식을 입력하세요.",
+    "equationSyntax": "이 수식을 읽을 수 없습니다. 괄호와 백슬래시 뒤의 이름을 확인하세요."
   },
   "find": {
     "label": "찾기 및 바꾸기",
@@ -1695,5 +1699,25 @@
     "addBefore": "앞에 도형 추가",
     "addBelow": "아래에 도형 추가",
     "delete": "도형 삭제"
+  },
+  "equation": {
+    "close": "닫기",
+    "insertTitle": "수식 삽입",
+    "editTitle": "수식 편집",
+    "gallery": "자주 쓰는 수식",
+    "linear": "선형 형식",
+    "linearHelp": "분수는 a/b, 첨자는 x^2 또는 x_i, 근호는 \\sqrt(x), 그리스 문자는 \\alpha로 입력합니다.",
+    "notEditable": "선택한 수식에는 선형 형식으로 쓸 수 없는 부분이 있습니다. 확인을 누르면 새 수식을 삽입합니다.",
+    "insert": "삽입",
+    "galleryItems": {
+      "circleArea": "원의 넓이",
+      "quadratic": "근의 공식",
+      "pythagoras": "피타고라스 정리",
+      "sum": "정수의 합",
+      "integral": "정적분",
+      "limit": "극한",
+      "matrix": "행렬",
+      "euler": "오일러 등식"
+    }
   }
 }

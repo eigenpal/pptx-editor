@@ -22,6 +22,7 @@ import { readCommentThreads } from '@pptx-editor.dev/core/editor';
 import { png, type ConvergenceFixture, type TextInputFixture } from './convergence-harness.ts';
 import { buildPptx } from '../../../../scripts/fixtures/builder.ts';
 import { chartDataDeck } from '../../../../scripts/fixtures/chart-data.ts';
+import { equationFixtures } from '../../../../scripts/fixtures/equations.ts';
 import { diagramEditingDeck } from '../../../../scripts/fixtures/diagram-editing.ts';
 
 const IN = 914_400;
@@ -544,6 +545,23 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
           ],
         },
       };
+    },
+  },
+
+  // Equations: the math, and its plain-text fallback, in one Markup Compatibility wrapper.
+  insertEquation: {
+    command: () => ({ type: 'insertEquation', linear: 'x=(-b\\pm\\sqrt(b^2-4ac))/(2a)' }),
+  },
+  setEquation: {
+    deck: () => buildPptx({ slides: equationFixtures.equations! }),
+    arrange: (e) => {
+      e.selectSlide(1);
+      select('Equation 3')(e);
+    },
+    command: (e) => {
+      const equation = e.snapshot().equation;
+      if (!equation) throw new Error('no equation is selected');
+      return { type: 'setEquation', nodeId: equation.nodeId, linear: 'y=(a+1)/b' };
     },
   },
 

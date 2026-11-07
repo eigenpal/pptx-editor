@@ -187,6 +187,7 @@ export const MENU_NAMED_PARTS = {
   TextBox: row('insert.textBox'),
   TableInsert: row('table.insert'),
   ImageInsert: row('insert.image'),
+  Equation: row('insert.equation'),
   Shapes: row('insert.shape'),
   Line: row('insert.line'),
   Link: row('text.link'),

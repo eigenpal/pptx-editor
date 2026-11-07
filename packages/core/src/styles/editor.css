@@ -4686,3 +4686,35 @@ legend.pptx-dialog__label {
 .pptx-chart-pane__remove {
   align-self: flex-start;
 }
+
+/* The Equation dialog: a gallery of common equations in a grid of two columns (one on a phone),
+   each button with its name and its linear form, above the linear form field. */
+.pptx-dialog[data-pptx-dialog='equation'] {
+  width: min(560px, calc(100vw - 32px));
+}
+.pptx-equation-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.pptx-equation-gallery__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  height: auto;
+  padding: 6px 10px;
+  text-align: start;
+}
+.pptx-equation-gallery__item code {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85em;
+}
+.pptx-equation-gallery__item[aria-pressed='true'] {
+  border-color: var(--doc-primary);
+  background: var(--doc-primary-light);
+}

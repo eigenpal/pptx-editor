@@ -586,7 +586,8 @@ export interface ResolvedRun {
     // (undocumented)
     readonly fieldType?: string;
     // (undocumented)
-    readonly kind: 'text' | 'break' | 'field';
+    readonly kind: 'text' | 'break' | 'field' | 'math';
+    readonly math?: MathZone;
     readonly nodeId: string;
     // (undocumented)
     readonly props: RunProps;
