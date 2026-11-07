@@ -10,6 +10,7 @@
 // in the HTML are not kept; a table's cells become text.
 
 import { NS, type NodeSpec } from '../store/index.ts';
+import type { ClipboardNode } from '../contracts/index.ts';
 
 /** One run of pasted text: its text, or a line break. Sizes in points. @internal */
 export interface RichRun {
@@ -825,4 +826,18 @@ export function richHtml(paragraphs: readonly RichParagraph[]): string {
     })
     .join('');
   return `<meta charset="utf-8"><!--StartFragment-->${body}<!--EndFragment-->`;
+}
+
+/**
+ * DrawingML paragraphs for the `pasteText` command, from clipboard HTML or plain text: HTML
+ * keeps its formatting as a paste from another application does. Use it to paste text from your
+ * own code. Returns an empty array when there is no text. @public
+ */
+export function textClipboardParagraphs(source: {
+  readonly html?: string;
+  readonly text?: string;
+}): ClipboardNode[] {
+  const rich = source.html ? richFromHtml(source.html) : null;
+  if (rich) return paragraphSpecs(rich);
+  return source.text ? paragraphSpecs(richFromText(source.text)) : [];
 }

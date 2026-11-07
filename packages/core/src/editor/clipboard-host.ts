@@ -301,15 +301,15 @@ export function createClipboardHost(editor: ClipboardEditor) {
       if (table && 'cells' in table)
         return (editor.exec({ type: 'pasteCells', texts: table.cells }), true);
       if (table) return (editor.insertText(table.text), true);
-      // Copied slides go in after the current slide.
-      const slides = data.getData(SLIDES_MIME);
+      const editing = editor.selection().kind === 'text';
+      // Copied slides go in after the current slide; while text is edited, they do not.
+      const slides = editing ? '' : data.getData(SLIDES_MIME);
       if (slides) {
         const read = readSlidesClipboard(slides);
         if (!read) return (editor.refuse('errors.clipboard'), true);
         editor.exec({ type: 'pasteSlides', ...read });
         return true;
       }
-      const editing = editor.selection().kind === 'text';
       // This editor's formatted text.
       const ownText = data.getData(TEXT_MIME);
       if (ownText) {
@@ -343,7 +343,7 @@ export function createClipboardHost(editor: ClipboardEditor) {
         return true;
       }
       if (file) {
-        void pastePicture(file);
+        void pastePicture(file).catch(() => editor.refuse('errors.clipboard'));
         return true;
       }
       if (editing) return false;

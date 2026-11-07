@@ -48,4 +48,17 @@ async function pasteFirstSlides(editor: Editor, file: File) {
 }
 ```
 
-The `pasteText` command takes DrawingML paragraphs (`a:p` elements as `ClipboardNode` objects) and pastes them as a text paste does. Each command is one undo step, and a refusal returns `{ ok: false, reason: 'errors.clipboard' }`.
+Run `pasteText` to paste text as a paste from another application does. Build its paragraphs with `textClipboardParagraphs`, from HTML or plain text. With text selected, the text replaces the selection; otherwise it goes in a new text box:
+
+```ts
+import { textClipboardParagraphs, type Editor } from '@pptx-editor.dev/core';
+
+function pasteSummary(editor: Editor) {
+  const paragraphs = textClipboardParagraphs({
+    html: '<p><b>Summary</b></p><ul><li>Revenue up 12%</li></ul>',
+  });
+  return editor.exec({ type: 'pasteText', paragraphs });
+}
+```
+
+Each command is one undo step, and a refusal returns `{ ok: false, reason: 'errors.clipboard' }`.

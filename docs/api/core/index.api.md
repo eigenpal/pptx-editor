@@ -5535,6 +5535,12 @@ export type TextAlign = 'l' | 'ctr' | 'r' | 'just';
 export type TextCase = 'sentence' | 'lower' | 'upper' | 'capitalize' | 'toggle';
 
 // @public
+export function textClipboardParagraphs(source: {
+    readonly html?: string;
+    readonly text?: string;
+}): ClipboardNode[];
+
+// @public
 export interface TextColumns {
     readonly count: number;
     readonly gapEmu: number;

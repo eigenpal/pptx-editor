@@ -22,6 +22,7 @@ import {
   richFromHtml,
   richFromText,
   richHtml,
+  textClipboardParagraphs,
 } from '../clipboard-rich.ts';
 import { cleanParagraphs, TEXT_MIME } from '../clipboard-text.ts';
 import { pngResolution, withPngResolution } from '../clipboard-picture.ts';
@@ -363,6 +364,16 @@ describe('the pasteText command', () => {
     expect(texts(shapes(e)[0]!)).toEqual(['Hello world', 'Secondabcxy']);
     const again = createPptxEditor({ fixedMeasurer: true, substitutes: false });
     expect((await again.load(e.save()!)).ok).toBe(true);
+  });
+
+  test('textClipboardParagraphs builds the paragraphs from HTML or plain text', async () => {
+    const e = await open();
+    e.setSelection({ kind: 'none' });
+    const html = textClipboardParagraphs({ html: '<p><b>Summary</b></p><ul><li>Up</li></ul>' });
+    expect(e.exec({ type: 'pasteText', paragraphs: html }).ok).toBe(true);
+    expect(texts(shapes(e)[2]!)).toEqual(['Summary', 'Up']);
+    expect(textClipboardParagraphs({ text: 'a\nb' })).toHaveLength(2);
+    expect(textClipboardParagraphs({})).toEqual([]);
   });
 
   test('refuses what is not paragraphs', async () => {
