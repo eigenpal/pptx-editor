@@ -61,6 +61,21 @@ const ICONS: Record<string, Uint8Array> = {
       '<use href="#dot" x="10" y="10" width="20" height="20"/>' +
       '<use xlink:href="#dot" x="60" y="60" width="20" height="20"/></g>'
   ),
+  noViewBox: svg(
+    '<g transform="translate(-592 -312)"><path d="M640 320 L 680 360Z" fill="#000000"/></g>',
+    '',
+    'width="96px" height="96" xml:space="preserve" overflow="hidden"'
+  ),
+  editorData: svg(
+    '<sodipodi:namedview id="n" pagecolor="#fff" inkscape:zoom="2"><inkscape:grid id="g"/>' +
+      '</sodipodi:namedview><g inkscape:label="Layer 1" inkscape:groupmode="layer">' +
+      '<path d="M1 1h20v20z" sodipodi:nodetypes="ccc"/></g>',
+    '',
+    'viewBox="0 0 24 24" inkscape:version="1.0"' +
+      ' xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"' +
+      ' xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"'
+  ),
+  textInTitleAndDesc: svg('<title>Icon <!-- a note --> name</title><desc>About it</desc><rect/>'),
   metadata: svg(
     '<metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/></metadata>' +
       '<ellipse cx="48" cy="48" rx="40" ry="20" fill="#ccc" data-name="shape" aria-hidden="true"/>'
@@ -162,12 +177,20 @@ const REFUSED: Record<string, Uint8Array> = {
   ),
   duplicateIds: svg(`<defs>${chain(undefined, '<g id="a#"/>')}</defs><use href="#a9"/>`),
   percentId: svg(`<defs>${chain((i) => `#%61${i}`)}</defs><use href="#%619"/>`),
-  noViewBox: svg('<rect/>', '', 'width="96" height="96"'),
+  noViewBox: svg('<rect/>'.repeat(2), '', ''),
+  noViewBoxPercentSize: svg('<rect/>', '', 'width="100%" height="96"'),
+  noViewBoxInfiniteSize: svg('<rect/>', '', 'width="1e999" height="96"'),
   zeroViewBox: svg('<rect/>', '', 'viewBox="0 0 0 96"'),
   infiniteViewBox: svg('<rect/>', '', 'viewBox="0 0 1e999 96"'),
   slice: svg('<rect/>', '', 'viewBox="0 0 96 96" preserveAspectRatio="xMidYMid slice"'),
   upperCaseElement: svg('<RECT/>'),
-  otherNamespace: svg('<x:rect xmlns:x="urn:x"/>'),
+  otherNamespaceHoldsSvg: svg('<x:g xmlns:x="urn:x"><rect/></x:g>'),
+  otherNamespaceHoldsXhtml: svg(
+    '<x:g xmlns:x="urn:x"><p xmlns="http://www.w3.org/1999/xhtml"/></x:g>'
+  ),
+  otherNamespaceStyle: svg('<x:style xmlns:x="urn:x">rect{filter:blur(9px)}</x:style><rect/>'),
+  otherNamespaceHoldsSet: svg('<x:g xmlns:x="urn:x"><x:set attributeName="fill"/></x:g><rect/>'),
+  unboundPrefixElement: svg('<x:g/>'),
   rootInOtherNamespace: enc('<svg xmlns="urn:x" viewBox="0 0 9 9"/>'),
   twoRoots: enc(`<svg ${NS} viewBox="0 0 9 9"/><svg ${NS} viewBox="0 0 9 9"/>`),
   manyAttributes: svg(
@@ -219,7 +242,26 @@ const REFUSED: Record<string, Uint8Array> = {
   xmlStylesheet: svg('', '<?xml-stylesheet type="text/css" href="data:text/css,a"?>'),
   internalDtd: svg('', '<!DOCTYPE svg [<!ENTITY a "a">]>'),
   twoDoctypes: svg('', '<!DOCTYPE svg><!DOCTYPE svg>'),
-  otherPrefixedAttribute: svg('<rect x:fill="red" xmlns:x="urn:x"/>'),
+  svgNamespaceAttribute: svg('<rect s:fill="red" xmlns:s="http://www.w3.org/2000/svg"/>'),
+  unboundPrefixAttribute: svg('<rect x:fill="red"/>'),
+  xmlBase: svg('<rect xml:base="https://example.test/"/>'),
+  metadataStyle: svg(
+    '<metadata><style>line{stroke-dasharray:0.001;filter:blur(30px)}</style></metadata>' +
+      '<line x1="0" y1="0" x2="96" y2="0" stroke="black"/>'.repeat(900)
+  ),
+  titleSet: svg(
+    '<title><set href="#p" attributeName="fill" to="blue"/></title><path id="p" d="M0 0h9"/>'
+  ),
+  descFilter: svg(
+    '<desc><filter id="f"><feGaussianBlur stdDeviation="50"/></filter></desc><rect/>'
+  ),
+  metadataXhtml: svg('<metadata><div xmlns="http://www.w3.org/1999/xhtml"/></metadata><rect/>'),
+  descOtherNamespaceStyle: svg(
+    '<desc><x:style xmlns:x="urn:x">rect{fill:red}</x:style></desc><rect/>'
+  ),
+  titleNestedSet: svg(
+    '<title><x:a xmlns:x="urn:x"><set attributeName="fill"/></x:a></title><rect/>'
+  ),
   hrefOnRect: svg('<rect href="#a"/><g id="a"/>'),
 };
 

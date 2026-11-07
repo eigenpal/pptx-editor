@@ -31,6 +31,7 @@ import {
   svgEntities,
   svgEvenOddCrossing,
   svgRoundRects,
+  svgMetadataStyle,
   pic,
   pictureDeck,
   png,
@@ -288,6 +289,11 @@ export function payloadDecks(): HangDeck[] {
       id: 'svg-round-rects',
       target: 'an SVG picture with 2000 full-size stroked rounded rectangles',
       bytes: () => svgPictureDeck(svgRoundRects()),
+    },
+    {
+      id: 'svg-metadata-style',
+      target: 'an SVG picture with a dash and blur style sheet inside <metadata> over 900 lines',
+      bytes: () => svgPictureDeck(svgMetadataStyle()),
     },
 
     // Metafiles.

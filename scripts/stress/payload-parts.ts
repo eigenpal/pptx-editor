@@ -300,6 +300,17 @@ export const svgEvenOddCrossing = (n = 5_000): Uint8Array => {
   return svgDoc(400, 300, `<path d="${d}" fill="red" fill-rule="evenodd" stroke="blue"/>`);
 };
 
+/** 900 lines dashed and blurred by a style sheet inside `<metadata>`. */
+export const svgMetadataStyle = (): Uint8Array =>
+  svgDoc(
+    1600,
+    900,
+    '<metadata><style>line{stroke-dasharray:0.001;filter:blur(30px)}</style></metadata>' +
+      range(900)
+        .map((i) => `<line x1="0" y1="${i}" x2="1600" y2="${i}" stroke="black"/>`)
+        .join('')
+  );
+
 /** 2,000 full-size rounded rectangles with a huge corner radius, stroked. */
 export const svgRoundRects = (): Uint8Array =>
   svgDoc(

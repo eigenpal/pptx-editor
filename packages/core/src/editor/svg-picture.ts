@@ -4,12 +4,15 @@
 // presentation carries a raster alternative, so the editor draws an SVG picture as vector art
 // only when it is a plain icon, and draws the raster alternative otherwise.
 //
-// An icon here: at most `MAX_SVG_BYTES`, a root `<svg>` with a finite `viewBox`, only the
-// elements in `ALLOWED`, attributes from a fixed list with the value rules of
-// svg-picture-css.ts, solid paint, links only from `<use>` and `clip-path` to elements of the
-// icon, and simple style sheets. With each `<use>` expanded, also where it sits in `<defs>` or
-// `<symbol>`, its shapes, path vertices, and groups with opacity, each as a share of
-// `MAX_SVG_SHAPES`, `MAX_SVG_VERTICES`, and `MAX_SVG_LAYERS`, add up to at most 1. With the
+// An icon here: at most `MAX_SVG_BYTES`, a root `<svg>` with a finite `viewBox` (or a finite
+// width and height in pixels), only the elements in `ALLOWED`, attributes from a fixed list
+// with the value rules of svg-picture-css.ts, solid paint, an editor's own elements and
+// attributes in other namespaces only where they hold no SVG, XHTML, style sheet, or
+// animation, links only from `<use>` and `clip-path` to elements of the icon, and simple style
+// sheets. `<title>`, `<desc>`, and `<metadata>` hold the same inert content. With each
+// `<use>` expanded, also where it sits in `<defs>` or `<symbol>`, its shapes, path vertices,
+// and groups with opacity, each as a share of `MAX_SVG_SHAPES`, `MAX_SVG_VERTICES`, and
+// `MAX_SVG_LAYERS`, add up to at most 1. With the
 // even-odd rule anywhere, the squares of each path's vertices also count, as a share of
 // `MAX_SVG_EVEN_ODD`: a browser fills a path that crosses itself with the even-odd rule in
 // time that grows with the square of its vertices. Each limit alone draws in about 250 ms in
@@ -40,6 +43,19 @@ const MAX_USE_CHAIN = 8;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const XLINK_NS = 'http://www.w3.org/1999/xlink';
+const XHTML_NS = 'http://www.w3.org/1999/xhtml';
+/** Elements a browser applies or runs in any namespace and anywhere in the document. */
+const ACTIVE: ReadonlySet<string> = new Set([
+  'style',
+  'script',
+  'set',
+  'animate',
+  'animateColor',
+  'animateMotion',
+  'animateTransform',
+  'discard',
+  'mpath',
+]);
 const SHAPES: ReadonlySet<string> = new Set([
   'path',
   'rect',
@@ -62,7 +78,7 @@ const ALLOWED: ReadonlySet<string> = new Set([
   'desc',
   'metadata',
 ]);
-/** Elements whose content is not drawn and not read. */
+/** Elements whose content is not drawn: it may hold only text and inert elements. */
 const IGNORED: ReadonlySet<string> = new Set(['title', 'desc', 'metadata']);
 /** Geometry attributes: finite lengths. */
 const LENGTHS: ReadonlySet<string> = new Set([
@@ -175,37 +191,71 @@ function check(bytes: Uint8Array): boolean {
     return undefined;
   };
 
+  /** The namespaces `el` declares, on top of `parent`. */
+  const scopeOf = (el: Element, parent: Scope | null): Scope | null => {
+    let declared: Map<string, string> | undefined;
+    for (const name in el.attributes)
+      if (name === 'xmlns' || name.startsWith('xmlns:'))
+        (declared ??= new Map()).set(name === 'xmlns' ? '' : name.slice(6), el.attributes[name]!);
+    return declared ? { names: declared, parent } : parent;
+  };
+  const nameOf = (el: Element, scope: Scope | null): [string | undefined, string] => {
+    const colon = el.name.indexOf(':');
+    return [resolve(scope, colon < 0 ? '' : el.name.slice(0, colon)), el.name.slice(colon + 1)];
+  };
+
+  /**
+   * Whether the children of `el` draw and run nothing: text, and elements outside the SVG and
+   * XHTML namespaces with no style sheet, script, or animation, to any depth.
+   */
+  const inert = (el: Element, scope: Scope | null): boolean => {
+    for (const c of el.children) {
+      if (c.type === 'text') continue;
+      elements += 1;
+      const inner = scopeOf(c, scope);
+      const [ns, local] = nameOf(c, inner);
+      if (ns === undefined || ns === SVG_NS || ns === XHTML_NS || ACTIVE.has(local)) return false;
+      if (!inert(c, inner)) return false;
+    }
+    return true;
+  };
+
   /** Read `el` into a node, or null when it is not part of an icon. */
   const build = (el: Element, parent: Scope | null, root: boolean): Node | null => {
     elements += 1;
     const entries = Object.entries(el.attributes);
     if (entries.length > MAX_ATTRIBUTES) return null;
-    let declared: Map<string, string> | undefined;
-    for (const [name, value] of entries)
-      if (name === 'xmlns' || name.startsWith('xmlns:'))
-        (declared ??= new Map()).set(name === 'xmlns' ? '' : name.slice(6), value);
-    const scope = declared ? { names: declared, parent } : parent;
-    const colon = el.name.indexOf(':');
-    const local = el.name.slice(colon + 1);
-    if (resolve(scope, colon < 0 ? '' : el.name.slice(0, colon)) !== SVG_NS) return null;
-    if (!ALLOWED.has(local) || (root && local !== 'svg')) return null;
+    const scope = scopeOf(el, parent);
+    const [elementNs, local] = nameOf(el, scope);
     const empty = { load: 0, squares: 0 };
-    if (IGNORED.has(local))
-      return { name: local, own: empty, children: [], use: undefined, clips: [] };
+    const nothing = { name: '', own: empty, children: [], use: undefined, clips: [] };
+    // An element in another namespace (an editor's own data) draws nothing when it holds no
+    // SVG or XHTML content.
+    if (!root && elementNs !== undefined && elementNs !== SVG_NS && elementNs !== XHTML_NS)
+      return ACTIVE.has(local) || !inert(el, scope) ? null : nothing;
+    if (elementNs !== SVG_NS) return null;
+    if (!ALLOWED.has(local) || (root && local !== 'svg')) return null;
+    if (IGNORED.has(local)) return inert(el, scope) ? nothing : null;
 
     const found = { clips: [] as string[], opacity: false, evenOdd: false };
     let use: string | undefined;
     let vertices = 0;
     let box = false;
+    // With no `viewBox`, a root of finite width and height in pixels is its own view box.
+    const size = (v: string | undefined) => v !== undefined && isLength(v) && parseFloat(v) > 0;
+    if (root && size(el.attributes.width) && size(el.attributes.height)) box = true;
     for (const [name, value] of entries) {
       if (name === 'xmlns' || name.startsWith('xmlns:')) continue;
       const at = name.indexOf(':');
       if (at >= 0) {
-        // `xlink:href` and `xml:space` are the only prefixed attributes.
+        // Of the SVG, XLink, and XML namespaces, only `xlink:href` and `xml:space`. An
+        // attribute in another namespace (an editor's own data) draws nothing.
         const ns = name.slice(0, at) === 'xml' ? 'xml' : resolve(scope, name.slice(0, at));
         const attr = name.slice(at + 1);
         if (ns === 'xml' && attr === 'space') continue;
-        if (ns !== XLINK_NS || attr !== 'href') return null;
+        if (ns === undefined || ns === SVG_NS || (ns === 'xml' && attr !== 'space')) return null;
+        if (ns !== XLINK_NS) continue;
+        if (attr !== 'href') return null;
       }
       const attr = name.slice(at + 1);
       if (attr === 'href') {
