@@ -52,6 +52,14 @@ describe('sanitizeHref', () => {
     expect(sanitizeHref('\u0001javascript:alert(1)')).toEqual({ ok: false, inert: true });
     expect(sanitizeHref('\u0000\u001f data:text/html,x')).toEqual({ ok: false, inert: true });
   });
+
+  test('a long run of controls trims in linear time', () => {
+    const run = '\u0000'.repeat(200_000);
+    const started = performance.now();
+    expect(sanitizeHref(`a${run}b`)).toEqual({ ok: true, href: `a${run}b` });
+    expect(sanitizeHref(`${run}x${run}`)).toEqual({ ok: true, href: 'x' });
+    expect(performance.now() - started).toBeLessThan(500);
+  });
 });
 
 describe('string escaping', () => {

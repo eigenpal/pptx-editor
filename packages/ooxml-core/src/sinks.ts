@@ -31,10 +31,19 @@ export type HrefProjection =
 export function sanitizeHref(raw: string): HrefProjection {
   // A URL parser drops leading and trailing C0 controls and spaces before it reads the scheme
   // (WHATWG URL, basic URL parser), so `\u0001javascript:` must not pass as a relative URL.
-  const cleaned = raw.replace(/[\t\n\r]/g, '').replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, '');
+  const cleaned = trimControls(raw.replace(/[\t\n\r]/g, ''));
   const m = SCHEME_RE.exec(cleaned);
   if (m && !HREF_SCHEMES.has(m[1].toLowerCase())) return { ok: false, inert: true };
   return { ok: true, href: cleaned };
+}
+
+/** `s` without leading and trailing C0 controls and spaces, in linear time. */
+function trimControls(s: string): string {
+  let start = 0;
+  let end = s.length;
+  while (start < end && s.charCodeAt(start) <= 0x20) start++;
+  while (end > start && s.charCodeAt(end - 1) <= 0x20) end--;
+  return s.slice(start, end);
 }
 
 const XML_ESCAPES: Record<string, string> = {
