@@ -84,6 +84,11 @@ test('text edited on the fixed measurer fits again with shaped text', async () =
   const kept = late.session!.layout(0)!.items.filter((i) => i.kind === 'shape')[1]!;
   late.setSelection({ kind: 'shapes', nodeIds: [kept.element.nodeId] });
   expect(late.exec({ type: 'nudge', dx: IN / 10, dy: 0 }).ok).toBe(true);
+  // Typing that is undone leaves the opened text: that shape keeps its fit too.
+  const start = { paragraph: 0, offset: 0 };
+  late.setSelection({ kind: 'text', nodeId: kept.element.nodeId, anchor: start, focus: start });
+  late.input('text', 'x');
+  expect(late.exec({ type: 'undo' }).ok).toBe(true);
   typeInto(late);
   const fixedFit = fit(late);
   const undoable = late.snapshot().canUndo;

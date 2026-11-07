@@ -2,19 +2,58 @@
 // measurer, an edit fits its text (`normAutofit` scales, `spAutoFit` sizes, table rows) with
 // estimated widths and writes the result. When the text engine and its faces arrive, the shapes
 // that those edits fit fit again with real widths, so the saved values match the text that
-// shows. A shape whose XML is back to the opened file's (an undone edit) and every shape that
-// no edit fit keep the values the file has. The fit is one undo step of its own, "fit text".
+// shows. A shape whose text is the opened file's again (an undone edit, a refused commit) and
+// every shape that no edit fit keep the values the file has, also after a move. The fit is one
+// undo step of its own.
 
 import { refitAll } from '../automation/commands/autofit.ts';
 import { OpBatch } from '../automation/commands/op-batch.ts';
 import { fittedWith } from '../automation/commands/table-fit.ts';
 import type { TextMeasurer } from '../layout/index.ts';
-import { nodeById, presentationInfo, xmlPartOf, type PptxPackage } from '../store/index.ts';
+import {
+  child,
+  nodeById,
+  presentationInfo,
+  xmlPartOf,
+  type Element,
+  type Node,
+  type PptxPackage,
+} from '../store/index.ts';
 import type { DocumentSession } from './document-session.ts';
+
+/** The content of a node as text: names, attributes, and text, without node ids. */
+function content(node: Node | undefined, out: string[] = []): string[] {
+  if (!node) return out;
+  if (node.type === 'text') {
+    out.push(JSON.stringify(node.value));
+    return out;
+  }
+  out.push(`<${node.ns} ${node.local}`);
+  for (const a of node.attrs) out.push(` ${a.ns} ${a.local}=${JSON.stringify(a.value)}`);
+  for (const c of node.children) content(c, out);
+  out.push('>');
+  return out;
+}
+
+/** The text a fit reads: a shape's text body, or a table frame's table. */
+function fitText(el: Element): Node | undefined {
+  return (
+    child(el, 'p:txBody') ??
+    child(child(child(el, 'a:graphic'), 'a:graphicData'), 'a:tbl') ??
+    undefined
+  );
+}
+
+/** Whether the fitted text of `now` differs from that of `was`, the opened file's node. */
+function textChanged(now: Node, was: Node | undefined): boolean {
+  if (now === was) return false;
+  if (!was || now.type !== 'element' || was.type !== 'element') return true;
+  return content(fitText(now)).join('') !== content(fitText(was)).join('');
+}
 
 /**
  * Fit again, with the session's measurer, the shapes and table frames that `fixed` fit whose
- * XML differs from `opened`, as one undoable change. Does nothing when no fit changes.
+ * text differs from `opened`, as one undoable change. Does nothing when no fit changes.
  */
 export function refitEditedText(
   session: DocumentSession,
@@ -31,10 +70,9 @@ export function refitEditedText(
     const part = ids && xmlPartOf(pkg, s.partName);
     if (!ids || !part) return;
     const was = xmlPartOf(opened, s.partName);
-    // The store is persistent: a shape that no landed edit changed keeps its object.
     const changed = [...ids].filter((id) => {
       const node = nodeById(part, id);
-      return node !== undefined && (!was || nodeById(was, id) !== node);
+      return node !== undefined && textChanged(node, was && nodeById(was, id));
     });
     refitAll(batch, index, s.partName, changed, session.measurer);
   });

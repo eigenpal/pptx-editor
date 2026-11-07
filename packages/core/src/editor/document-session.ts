@@ -67,6 +67,9 @@ import {
   PROGRESSIVE_OPEN_CONTENT_BYTES,
 } from './progressive-open.ts';
 
+/** The longest the late fit waits for substitutes that slides parsed late name. */
+const LATE_SUBSTITUTE_WAIT_MS = 10_000;
+
 /** The resolution of a tiled image whose header states none (measured on `fixtures/fills-lines.pdf`). */
 const TILE_DPI = 72;
 
@@ -921,9 +924,11 @@ export async function openPresentation(
         session.useShapedMeasurer(late.loaded);
         // Slides that parsed while the measurer was fixed can name families the open did not
         // load: `addMissingSubstitutes` skipped them then.
-        return session.addMissingSubstitutes().then(
-          () => (refitEditedText(session, fixed, openedPackage), true),
-          () => true
+        // The fit waits for those substitutes, but a stalled or failed load does not stop it.
+        const refit = (): true => (refitEditedText(session, fixed, openedPackage), true);
+        return within(session.addMissingSubstitutes(), LATE_SUBSTITUTE_WAIT_MS, undefined).then(
+          refit,
+          refit
         );
       });
   return { ok: true, session };
