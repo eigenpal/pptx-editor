@@ -421,26 +421,40 @@ export function orderShapes(
       moveBlock(batch, part, parentId, shapes, next, selected.size, move === 'front');
       continue;
     }
-    // Put each shape in its final place from the top down; each move lands it right under the
-    // shape already placed above it, so the sibling list ends in `next` order. The lists are
-    // kept here as the moves change them: a read of the tree for each shape would cost the
-    // length of the list each time, and a selection can hold thousands of shapes.
-    const kids = batch.element(part, parentId).children.map((c) => c.id);
-    const current = [...shapes];
-    for (let i = next.length - 1; i >= 0; i -= 1) {
-      if (current[i] === next[i]) continue;
-      const above = next[i + 1];
-      const index =
-        above === undefined ? kids.indexOf(current[current.length - 1]!) + 1 : kids.indexOf(above);
-      const from = kids.indexOf(next[i]!);
-      // `moveNode` removes first, then inserts: an index after the old place shifts down by one.
-      const to = from < index ? index - 1 : index;
-      batch.push({ op: 'moveNode', part, node: next[i]!, parent: parentId, index: to });
-      kids.splice(from, 1);
-      kids.splice(to, 0, next[i]!);
-      current.splice(current.indexOf(next[i]!), 1);
-      current.splice(i, 0, next[i]!);
+    stepRuns(batch, part, parentId, shapes, selected, move === 'forward');
+  }
+}
+
+/**
+ * Forward or Backward, in one pass. Each run of adjacent selected shapes trades places with the
+ * shape that is not selected right above it (Forward) or right under it (Backward): that one
+ * shape moves to the other end of the run. The runs go from the top down, so a move never
+ * shifts a run that waits below it, and its places in the first list stay true.
+ */
+function stepRuns(
+  batch: OpBatch,
+  part: string,
+  parentId: string,
+  shapes: readonly string[],
+  selected: ReadonlySet<string>,
+  forward: boolean
+): void {
+  const place = new Map(batch.element(part, parentId).children.map((c, i) => [c.id, i] as const));
+  let top = shapes.length - 1;
+  while (top >= 0) {
+    if (!selected.has(shapes[top]!)) {
+      top -= 1;
+      continue;
     }
+    let bottom = top;
+    while (bottom > 0 && selected.has(shapes[bottom - 1]!)) bottom -= 1;
+    // `moveNode` removes first, then inserts.
+    const other = forward ? shapes[top + 1] : shapes[bottom - 1];
+    if (other !== undefined) {
+      const to = forward ? place.get(shapes[bottom]!)! : place.get(shapes[top]!)!;
+      batch.push({ op: 'moveNode', part, node: other, parent: parentId, index: to });
+    }
+    top = bottom - 1;
   }
 }
 

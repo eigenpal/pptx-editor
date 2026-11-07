@@ -111,6 +111,29 @@ export function resolvedParagraphs(
 }
 
 /**
+ * The paragraphs of each text body of slide `slide`, as the cascade resolves the batch's state
+ * now: one resolve for many targets, where `resolvedParagraphs` resolves the slide each time.
+ */
+export function paragraphLookup(
+  batch: OpBatch,
+  slide: number
+): (target: ListTarget) => readonly ResolvedParagraph[] {
+  const shapes = new Map<string, readonly ResolvedParagraph[]>();
+  const cells = new Map<string, readonly ResolvedParagraph[]>();
+  const walk = (elements: readonly ResolvedElement[]): void => {
+    for (const el of elements) {
+      if (el.kind === 'shape') shapes.set(el.nodeId, el.text?.paragraphs ?? []);
+      else if (el.kind === 'graphicFrame')
+        for (const c of el.table?.cells ?? [])
+          cells.set(`${el.nodeId}\u0000${c.text.nodeId}`, c.text.paragraphs);
+      else if (el.kind === 'group') walk(el.children);
+    }
+  };
+  walk(resolveSlide(batch.pkg, slide)?.elements ?? []);
+  return (t) => shapes.get(t.shapeId) ?? cells.get(`${t.shapeId}\u0000${t.txBodyId}`) ?? [];
+}
+
+/**
  * Turn a list on or off for the target paragraphs. `resolve` is false for a probe ("can this
  * command run"), which only needs ops, not the inheritance check.
  */
@@ -183,15 +206,16 @@ export function setListKind(
  * hanging indent. The level stays, so the paragraph keeps its level's spacing and font. This
  * is Backspace at the start of a list item. A probe resolves too, so `can` and `exec` agree
  * on a paragraph with no bullet. Answers whether any paragraph had a bullet to remove.
+ * `resolved` gives the paragraphs as the cascade resolves them (`paragraphLookup`).
  */
 export function removeBulletInPlace(
   batch: OpBatch,
   part: string,
   slide: number,
-  target: ListTarget
+  target: ListTarget,
+  resolved = resolvedParagraphs(batch, slide, target)
 ): boolean {
   const all = paragraphsOf(batch.element(part, target.txBodyId));
-  const resolved = resolvedParagraphs(batch, slide, target);
   let removed = false;
   for (const index of target.paragraphs) {
     const r = resolved[index];
@@ -205,6 +229,23 @@ export function removeBulletInPlace(
     setPPrAttr(batch, part, pPrId, 'marL', String(marL));
     setPPrAttr(batch, part, pPrId, 'indent', '0');
   }
+  return removed;
+}
+
+/**
+ * `removeBulletInPlace` for each of `targets`, with one resolve of the slide: a removal changes
+ * only its own paragraphs, never another target's. Answers whether any bullet went.
+ */
+export function removeBullets(
+  batch: OpBatch,
+  part: string,
+  slide: number,
+  targets: readonly ListTarget[]
+): boolean {
+  const lookup = paragraphLookup(batch, slide);
+  let removed = false;
+  for (const t of targets)
+    removed = removeBulletInPlace(batch, part, slide, t, lookup(t)) || removed;
   return removed;
 }
 

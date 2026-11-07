@@ -1,7 +1,7 @@
-// `can` answers within a frame on large targets: a selection of more than 250 shapes, a
+// `can` answers within a frame on large targets: an arrange command on more than 250 shapes, a
 // Duplicate of shapes with more than 20,000 XML nodes, and Apply Layout or Reset Slide on a slide
-// of more than 20,000 XML nodes check only the editing mode. Below those sizes, and for every
-// other command, the full check runs. A text format check reads at most 64 runs, but the
+// of more than 20,000 XML nodes check only the editing mode. Other commands on more than 250
+// shapes check the first 250 first, and a refusal there checks them all. A text format check reads at most 64 runs, but the
 // command formats every run. Formatting answers hold through a typing burst.
 
 import { expect, test } from 'bun:test';
@@ -133,6 +133,16 @@ test('a large selection keeps the refusals of slide commands and of arguments', 
   expect(editor.can({ type: 'setFontSize', points: 99_999 }).ok).toBe(false);
   // A valid argument passes on the first shapes.
   expect(editor.can({ type: 'setShapeFill', color: '#FF0000' })).toEqual({ ok: true });
+  // Refusals that read the editor state or the text stay exact.
+  expect(editor.can({ type: 'pasteFormat' })).toEqual({
+    ok: false,
+    reason: 'disabled.noFormatCopied',
+  });
+  expect(editor.can({ type: 'setAlign', align: 'ctr' })).toEqual({
+    ok: false,
+    reason: 'disabled.noText',
+  });
+  expect(editor.can({ type: 'removeBullet' }).ok).toBe(false);
   editor.destroy();
 });
 

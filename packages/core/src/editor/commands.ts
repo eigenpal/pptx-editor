@@ -87,7 +87,7 @@ import { normalizePresentation } from '../automation/commands/slide-sections.ts'
 import { deckLayout, newSlideLayout } from '../automation/commands/slide-layouts.ts';
 import { findMatches, replaceMatches } from '../automation/commands/find.ts';
 import {
-  removeBulletInPlace,
+  removeBullets,
   setListKind,
   shiftListLevel,
 } from '../automation/commands/list-commands.ts';
@@ -555,11 +555,9 @@ export function compile(
     case 'removeBullet': {
       const part = slidePart(ctx);
       const targets = textTargets(batch, part, ctx.selection);
-      let removed = false;
-      for (const t of targets)
-        removed =
-          removeBulletInPlace(batch, part, ctx.slide, listTarget(batch, part, t)) || removed;
-      if (!removed) throw new CommandRefusal('disabled.noList');
+      const lists = targets.map((t) => listTarget(batch, part, t));
+      if (!removeBullets(batch, part, ctx.slide, lists))
+        throw new CommandRefusal('disabled.noList');
       refitTargets(batch, ctx, part, targets);
       return { batch, effect: { label: 'removeBullet' } };
     }

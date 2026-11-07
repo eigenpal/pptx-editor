@@ -41,27 +41,12 @@ export const STRUCTURE_COMMANDS: ReadonlySet<EditorCommand['type']> = new Set([
 export const LARGE_SELECTION = 250;
 
 /**
- * Commands that edit the selected shapes and take no argument, or only a choice from a fixed
- * set: a large selection answers them from the mode. Every other command checks in full, so a
- * slide command or an argument (a link address, a font size) keeps its refusal. @internal
+ * Commands that arrange the selected shapes as a whole: a large selection answers them from
+ * the mode. A check of the first shapes alone could refuse one wrongly (Ungroup when the first
+ * shapes hold no group), and a full check costs a frame or more. Their argument, a choice from
+ * a fixed set, goes unchecked until `exec`. Every other command takes `checkCommand`. @internal
  */
 export const SELECTION_COMMANDS: ReadonlySet<EditorCommand['type']> = new Set([
-  'toggleBold',
-  'toggleItalic',
-  'toggleUnderline',
-  'toggleStrike',
-  'toggleSuperscript',
-  'toggleSubscript',
-  'stepFontSize',
-  'changeCase',
-  'clearFormatting',
-  'setAlign',
-  'setVerticalAlign',
-  'setAutofit',
-  'toggleBullets',
-  'toggleNumbering',
-  'removeBullet',
-  'indent',
   'order',
   'alignObjects',
   'distributeObjects',
@@ -70,12 +55,6 @@ export const SELECTION_COMMANDS: ReadonlySet<EditorCommand['type']> = new Set([
   'delete',
   'group',
   'ungroup',
-  'setLineDash',
-  'setLineEnds',
-  'setLockAspectRatio',
-  'toggleFormatPainter',
-  'copyFormat',
-  'pasteFormat',
 ]);
 
 /**
