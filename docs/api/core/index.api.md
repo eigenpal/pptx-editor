@@ -3601,6 +3601,8 @@ export class OpBatch {
     push(op: PptxOp): void;
     pushAll(ops: readonly PptxOp[]): void;
     readonly reservedPartNames: ReadonlySet<string>;
+    // @internal
+    writesTo(part: string): number;
 }
 
 // @public

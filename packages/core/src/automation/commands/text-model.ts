@@ -23,38 +23,37 @@ import { CommandRefusal, type OpBatch } from './op-batch.ts';
 import { caretWordRange } from '@eigenpal/ooxml-core';
 
 /**
- * Slide numbers by part, per batch, with the presentation part and its relationships that
- * they come from. A batch can add or move a slide between two text edits (one automation
- * `context.sync()`): those parts change, and the numbers are read again.
+ * Slide numbers by part, per batch, with the writes to the presentation part and its
+ * relationships when they were read. A batch can add or move a slide between two text edits
+ * (one automation `context.sync()`): it writes those parts, and the numbers are read again.
+ * The check counts writes (`OpBatch.writesTo`): it does not read `batch.pkg`, which closes the
+ * open transaction, so a paste of many line breaks keeps one transaction.
  */
 interface SlideNumbers {
   readonly presentationPart: string;
-  readonly presentation: unknown;
-  readonly rels: unknown;
+  readonly writes: number;
   readonly byPart: Map<string, number | undefined>;
 }
 const slideNumbers = new WeakMap<OpBatch, SlideNumbers>();
+
+/** The writes of `batch` to the presentation part `part` and to its relationships. */
+const structureWrites = (batch: OpBatch, part: string): number =>
+  batch.writesTo(part) + batch.writesTo(relsPartName(part));
 
 /**
  * The number a `slidenum` field shows in `part` (1-based slide index, as the cascade resolves
  * it), or undefined for a part that is not a slide (notes, layouts) where the stored text shows.
  */
 export function slideNumberOf(batch: OpBatch, part: string): number | undefined {
-  const parts = batch.pkg.parts;
   let known = slideNumbers.get(batch);
-  if (
-    !known ||
-    parts.get(known.presentationPart) !== known.presentation ||
-    parts.get(relsPartName(known.presentationPart)) !== known.rels
-  ) {
+  if (!known || structureWrites(batch, known.presentationPart) !== known.writes) {
     // Every slide at once: a Replace All across a long deck asks for each of its slides.
     const info = presentationInfo(batch.pkg);
     const byPart = new Map<string, number | undefined>();
     info.slides.forEach((s, i) => byPart.has(s.partName) || byPart.set(s.partName, i + 1));
     known = {
       presentationPart: info.presentationPart,
-      presentation: parts.get(info.presentationPart),
-      rels: parts.get(relsPartName(info.presentationPart)),
+      writes: structureWrites(batch, info.presentationPart),
       byPart,
     };
     slideNumbers.set(batch, known);

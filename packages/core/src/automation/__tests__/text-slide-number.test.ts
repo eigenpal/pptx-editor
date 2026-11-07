@@ -3,7 +3,7 @@
 // edits: the edits after it read the new numbers.
 
 import { expect, test } from 'bun:test';
-import { buildPptx, shape } from '../../../../../scripts/fixtures/builder.ts';
+import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 import {
   find,
   presentationInfo,
@@ -13,7 +13,7 @@ import {
 } from '../../store/index.ts';
 import { OpBatch } from '../commands/op-batch.ts';
 import { addSlide, moveSlide } from '../commands/slide-commands.ts';
-import { insertText, slideNumberOf } from '../commands/text-model.ts';
+import { insertBreak, insertText, slideNumberOf } from '../commands/text-model.ts';
 
 const IN = 914_400;
 const FIELD =
@@ -61,4 +61,32 @@ test('a text edit on a slide added in the same batch reads its slide number', ()
   const added = presentationInfo(batch.pkg).slides[index]!.partName;
   expect(slideNumberOf(batch, added)).toBe(index + 1);
   expect(slideNumberOf(batch, presentationInfo(batch.pkg).slides[11]!.partName)).toBe(12);
+});
+
+/** The fastest of three runs of 1,000 line breaks on a slide with `extra` other shapes, in ms. */
+function breaksMs(extra: number): number {
+  let shapes = shape({ id: 2, name: 'Body', x: IN, y: IN, cx: IN, cy: IN, text: para(run('ab')) });
+  for (let i = 0; i < extra; i += 1)
+    shapes += shape({ id: 10 + i, x: i * 10, y: 0, cx: IN, cy: IN, text: para(run(`s${i}`)) });
+  const read = readPptx(buildPptx({ slides: [{ shapes }] }));
+  if (!read.ok) throw new Error('deck does not read');
+  const part = presentationInfo(read.pkg).slides[0]!.partName;
+  let best = Infinity;
+  for (let k = 0; k < 3; k += 1) {
+    const batch = new OpBatch(read.pkg);
+    const body = txBodyOf(batch, part);
+    const t0 = performance.now();
+    let at = { paragraph: 0, offset: 1 };
+    for (let i = 0; i < 1_000; i += 1) at = insertBreak(batch, part, body, at);
+    best = Math.min(best, performance.now() - t0);
+  }
+  return best;
+}
+
+// Each line break reads its slide's number. A read of `batch.pkg` closes the open transaction,
+// and the next op opens one on a copy of the slide part, so the cost grew with the slide.
+test('line breaks beside 10,000 shapes cost less than three times what they cost beside 100', () => {
+  const small = breaksMs(100);
+  const large = breaksMs(10_000);
+  expect(large).toBeLessThan(small * 3);
 });
