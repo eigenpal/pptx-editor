@@ -72,7 +72,8 @@ export function isTextWarpName(name: string): boolean {
 
 /**
  * The paths of a preset text warp at a size (EMU), with its adjust values, in shape-local EMU.
- * Undefined for `textNoShape` and for a name the table does not hold.
+ * Undefined for `textNoShape` and for a name the table does not hold. An arc with one zero
+ * radius draws as a line, so that `textCanDown` with a zero adjust value keeps flat paths.
  */
 export function evaluatePresetTextWarp(
   name: string,
@@ -81,7 +82,7 @@ export function evaluatePresetTextWarp(
   adjust: ReadonlyMap<string, number>
 ): readonly GeometryPath[] | undefined {
   if (!own(name)) return undefined;
-  return evaluateGeometry(PRESET_TEXT_WARPS[name]!, w, h, adjust).paths;
+  return evaluateGeometry(PRESET_TEXT_WARPS[name]!, w, h, adjust, { flatArcs: true }).paths;
 }
 
 /**

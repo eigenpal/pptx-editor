@@ -126,8 +126,13 @@ interface LoadedFace {
 const MAX_TEXT = 100_000;
 /** Advance arrays kept per measurer; the least recently used go first (`AdvanceCache`). */
 const CACHE_LIMIT = 20_000;
-/** Outline commands kept for one glyph: a real glyph has a few hundred at most. */
-const MAX_OUTLINE_COMMANDS = 10_000;
+/**
+ * Outline commands for one glyph: a real glyph has a few hundred at most. A glyph with more has
+ * no outline, so a text warp skips it.
+ */
+const MAX_OUTLINE_COMMANDS = 2_000;
+/** Outline commands kept in the outline cache, over all glyphs. */
+const MAX_CACHED_OUTLINE_COMMANDS = 1_000_000;
 
 /**
  * An sfnt table of face 0, read from the font bytes in JavaScript. `Face.referenceTable` makes
@@ -371,10 +376,12 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     return found ?? undefined;
   };
 
-  // Glyph outlines in em, y up, by face id and code point; bounded like the advance cache.
+  // Glyph outlines in em, y up, by face id and code point; bounded by entries and by commands.
   const outlines = new Map<string, readonly PathCommand[] | null>();
+  let cachedCommands = 0;
   let draw: InstanceType<HarfBuzzModule['DrawFuncs']> | null = null;
   let sink: PathCommand[] = [];
+  let overflow = false;
   let k = 1;
   const glyphOutline = (face: ResolvedFace, cp: number): readonly PathCommand[] | undefined => {
     const key = `${face.id}|${cp}`;
@@ -391,6 +398,7 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
         draw = new module.DrawFuncs();
         const add = (c: PathCommand): void => {
           if (sink.length < MAX_OUTLINE_COMMANDS) sink.push(c);
+          else overflow = true;
         };
         draw.setMoveToFunc((x, y) => add({ op: 'M', x: x * k, y: y * k }));
         draw.setLineToFunc((x, y) => add({ op: 'L', x: x * k, y: y * k }));
@@ -403,11 +411,17 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
         draw.setClosePathFunc(() => add({ op: 'Z' }));
       }
       sink = [];
+      overflow = false;
       lf.font.drawGlyph(glyph, draw);
-      out = sink;
+      out = overflow ? null : sink;
       sink = [];
     }
-    if (outlines.size >= CACHE_LIMIT) outlines.clear();
+    const commands = out?.length ?? 0;
+    if (outlines.size >= CACHE_LIMIT || cachedCommands + commands > MAX_CACHED_OUTLINE_COMMANDS) {
+      outlines.clear();
+      cachedCommands = 0;
+    }
+    cachedCommands += commands;
     outlines.set(key, out);
     return out ?? undefined;
   };

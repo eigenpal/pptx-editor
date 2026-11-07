@@ -14,9 +14,14 @@
 //   the middle, each as far as its face is tall (ascent and descent), not at the flat line
 //   pitch. Text longer than the path scales down to fit.
 // - Lines split between pairs (or paths) in order; the first ones take the extra line.
+// - The warp's own path count decides pairs. A path of zero length (an adjust value at the end
+//   of its range) is a point, and its band narrows to that point.
 //
 // Glyphs bend with the warp: every outline is cut into short pieces before it maps. The caret
-// and the selection keep the flat layout.
+// and the selection keep the flat layout. Each character draws its font's nominal glyph, with
+// no shaping: ligatures, contextual forms, and complex-script clusters draw as separate
+// glyphs. A picture bullet does not bend: it turns and stretches with the warp at its corners.
+// The cutting spends one output budget, so a font with huge glyphs draws the text flat early.
 
 import type { PathCommand } from '@eigenpal/ooxml-core';
 import { evaluatePresetTextWarp } from '@eigenpal/ooxml-core';
@@ -45,6 +50,16 @@ export interface WarpedRun {
   readonly underline: readonly PathCommand[];
   /** The highlight behind the run. */
   readonly highlight: readonly PathCommand[];
+  /**
+   * The picture of a picture bullet, as a parallelogram in the text frame (EMU): the warped
+   * place of its top-left corner, and the vectors to its top-right and bottom-left corners.
+   * The picture does not bend; it turns and stretches with the warp at its corners.
+   */
+  readonly picture?: {
+    readonly origin: readonly [number, number];
+    readonly across: readonly [number, number];
+    readonly down: readonly [number, number];
+  };
 }
 
 type Point = readonly [number, number];
@@ -90,12 +105,17 @@ function trackOf(commands: readonly PathCommand[], dx: number, dy: number): Trac
   return trackThrough(pts);
 }
 
+/**
+ * A track through points, or null when there are none. A path of zero length is a point track
+ * (`total` 0): it keeps its place in the pairs, and a band between it and a path narrows to it.
+ */
 function trackThrough(pts: readonly Point[]): Track | null {
+  if (pts.length === 0) return null;
   const len = [0];
   for (let i = 1; i < pts.length; i += 1)
     len.push(len[i - 1]! + Math.hypot(pts[i]![0] - pts[i - 1]![0], pts[i]![1] - pts[i - 1]![1]));
-  const total = len[len.length - 1] ?? 0;
-  return total > 0 ? { pts, len, total } : null;
+  const total = len[len.length - 1]!;
+  return Number.isFinite(total) ? { pts, len, total } : null;
 }
 
 /**
@@ -103,12 +123,13 @@ function trackThrough(pts: readonly Point[]): Track | null {
  * its own spacing on its own baseline.
  */
 function offsetTrack(track: Track, d: number): Track {
-  if (d === 0) return track;
+  if (d === 0 || track.total <= 0) return track;
   const pts = track.pts.map((p, i): Point => {
     const t = along(track, track.len[i]!).t;
     return [p[0] - t[1] * d, p[1] + t[0] * d];
   });
-  return trackThrough(pts) ?? track;
+  const moved = trackThrough(pts);
+  return moved && moved.total > 0 ? moved : track;
 }
 
 /** The point at length `s` along a track and the unit direction there; extends past the ends. */
@@ -137,8 +158,16 @@ function along(track: Track, s: number): { p: Point; t: Point } {
 interface Shape {
   readonly line: number;
   readonly run: number;
-  readonly kind: 'glyphs' | 'underline' | 'highlight';
+  readonly kind: 'glyphs' | 'underline' | 'highlight' | 'picture';
   readonly rings: readonly Polyline[];
+}
+
+/**
+ * The output commands still allowed for one text body. Cutting spends it point by point, so a
+ * font with huge glyphs stops the work early instead of after every glyph is cut.
+ */
+interface Budget {
+  left: number;
 }
 
 /** Cut a glyph outline (em, y up) at `step` (em) into polylines in the flat frame. */
@@ -147,13 +176,15 @@ function glyphRings(
   ox: number,
   baseline: number,
   size: number,
-  step: number
+  step: number,
+  budget: Budget
 ): Polyline[] {
   const rings: Polyline[] = [];
   let ring: Polyline = [];
   let cur: Point = [0, 0];
   let start: Point = [0, 0];
   const put = (p: Point): void => {
+    budget.left -= 1;
     ring.push([ox + p[0] * size, baseline - p[1] * size]);
   };
   const line = (p: Point): void => {
@@ -162,10 +193,18 @@ function glyphRings(
       put([cur[0] + ((p[0] - cur[0]) * i) / n, cur[1] + ((p[1] - cur[1]) * i) / n]);
     cur = p;
   };
+  // Each ring also writes a close command.
+  const close = (): void => {
+    if (ring.length > 1) {
+      rings.push(ring);
+      budget.left -= 1;
+    }
+    ring = [];
+  };
   for (const c of outline) {
+    if (budget.left < 0) return rings;
     if (c.op === 'M') {
-      if (ring.length > 1) rings.push(ring);
-      ring = [];
+      close();
       cur = start = [c.x, c.y];
       put(cur);
     } else if (c.op === 'L') line([c.x, c.y]);
@@ -195,16 +234,22 @@ function glyphRings(
       cur = [c.x, c.y];
     } else {
       line(start);
-      if (ring.length > 1) rings.push(ring);
-      ring = [];
+      close();
     }
   }
-  if (ring.length > 1) rings.push(ring);
+  close();
   return rings;
 }
 
 /** A rectangle in the flat frame, cut at `step` (EMU). */
-function rectRing(x0: number, y0: number, x1: number, y1: number, step: number): Polyline {
+function rectRing(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  step: number,
+  budget: Budget
+): Polyline {
   const ring: Polyline = [];
   const edge = (a: Point, b: Point): void => {
     const n = Math.min(256, Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / step)));
@@ -215,6 +260,7 @@ function rectRing(x0: number, y0: number, x1: number, y1: number, step: number):
   edge([x1, y0], [x1, y1]);
   edge([x1, y1], [x0, y1]);
   edge([x0, y1], [x0, y0]);
+  budget.left -= ring.length + 1;
   return ring;
 }
 
@@ -224,8 +270,9 @@ function runBars(
   top: number,
   height: number,
   baseline: number,
-  step: number
-): Shape['rings'][] {
+  step: number,
+  budget: Budget
+): [Polyline[], Polyline[], Polyline[]] {
   const size = run.sizePt * EMU_PER_PT;
   let end = run.text.length;
   while (end > 0 && run.text[end - 1] === ' ') end -= 1;
@@ -234,23 +281,23 @@ function runBars(
   const strike: Polyline[] = [];
   const under: Polyline[] = [];
   const highlight: Polyline[] = [];
-  if (run.props.highlight)
-    highlight.push(rectRing(x0, top, run.x[run.x.length - 1]!, top + height, step));
+  const rect = (a: number, b: number, c: number, d: number): Polyline =>
+    rectRing(a, b, c, d, step, budget);
+  if (run.props.highlight && run.kind === 'text')
+    highlight.push(rect(x0, top, run.x[run.x.length - 1]!, top + height));
   if (run.kind === 'text' && x1 > x0) {
     const m = run.face.metrics;
     const thick = Math.max(m.underlineThickness * size, size / 20);
     const y = baseline - run.rise;
     if (run.props.underline !== 'none') {
       const ty = y - m.underlinePosition * size;
-      under.push(rectRing(x0, ty, x1, ty + thick, step));
-      if (run.props.underline === 'dbl')
-        under.push(rectRing(x0, ty + thick * 2, x1, ty + thick * 3, step));
+      under.push(rect(x0, ty, x1, ty + thick));
+      if (run.props.underline === 'dbl') under.push(rect(x0, ty + thick * 2, x1, ty + thick * 3));
     }
     if (run.props.strike !== 'noStrike') {
       const sy = y - size * 0.3;
-      strike.push(rectRing(x0, sy - thick / 2, x1, sy + thick / 2, step));
-      if (run.props.strike === 'dblStrike')
-        strike.push(rectRing(x0, sy - thick * 2, x1, sy - thick, step));
+      strike.push(rect(x0, sy - thick / 2, x1, sy + thick / 2));
+      if (run.props.strike === 'dblStrike') strike.push(rect(x0, sy - thick * 2, x1, sy - thick));
     }
   }
   return [strike, under, highlight];
@@ -276,46 +323,70 @@ export function warpTextLayout(
     return { flat: 'rotated or vertical text' };
   if (!measurer.glyphOutline) return { flat: 'no glyph outlines' };
   const paths = evaluatePresetTextWarp(warp.preset, w, h, warp.adjust) ?? [];
-  const tracks = paths
-    .map((p) => trackOf(p.commands, layout.box.x, layout.box.y))
-    .filter((t): t is Track => t !== null);
-  if (tracks.length === 0) return { flat: 'no warp paths' };
+  // One track for each path, in order: a path of zero length stays as a point, so the pairs
+  // still form from the paths that the warp defines.
+  const tracks: Track[] = [];
+  for (const p of paths) {
+    const track = trackOf(p.commands, layout.box.x, layout.box.y);
+    if (!track) return { flat: 'no warp paths' };
+    tracks.push(track);
+  }
+  if (!tracks.some((t) => t.total > 0)) return { flat: 'no warp paths' };
   let characters = 0;
   for (const line of layout.lines) for (const run of line.runs) characters += run.text.length;
   if (characters > MAX_WARP_CHARACTERS) return { flat: 'too much text' };
 
-  // Every glyph and bar as polylines in the flat frame.
+  // Every glyph and bar as polylines in the flat frame, within the output budget.
+  const budget: Budget = { left: MAX_WARP_COMMANDS };
   const shapes: Shape[] = [];
   const lines = layout.lines;
-  lines.forEach((line, li) => {
-    line.runs.forEach((run, ri) => {
+  for (let li = 0; li < lines.length; li += 1) {
+    const line = lines[li]!;
+    for (let ri = 0; ri < line.runs.length; ri += 1) {
+      const run = line.runs[ri]!;
+      const pic = run.picture;
+      if (pic) {
+        const x0 = run.x[0]!;
+        const x1 = run.x[run.x.length - 1]!;
+        if (x1 > x0 && pic.height > 0) {
+          const ring = rectRing(
+            x0,
+            line.baseline - pic.height,
+            x1,
+            line.baseline,
+            Infinity,
+            budget
+          );
+          shapes.push({ line: li, run: ri, kind: 'picture', rings: [ring] });
+        }
+        continue;
+      }
       const size = run.sizePt * EMU_PER_PT;
-      if (size <= 0) return;
+      if (size <= 0) continue;
       const step = 0.03;
       const glyphs: Polyline[] = [];
       for (let i = 0; i < run.text.length; i += 1) {
         const cp = run.text.codePointAt(i) ?? 0;
         const x = run.x[i]!;
         if (cp > 0xffff) i += 1;
-        const outline = measurer.glyphOutline!(run.face, cp);
+        const outline = measurer.glyphOutline(run.face, cp);
         if (!outline) continue;
-        for (const ring of glyphRings(outline, x, line.baseline - run.rise, size, step))
+        for (const ring of glyphRings(outline, x, line.baseline - run.rise, size, step, budget))
           glyphs.push(ring);
+        if (budget.left < 0) return { flat: 'too much text' };
       }
-      const [strike, under, highlight] = runBars(
-        run,
-        line.top,
-        line.height,
-        line.baseline,
-        size * step
-      );
-      shapes.push({ line: li, run: ri, kind: 'glyphs', rings: [...glyphs, ...strike] });
+      const bars = runBars(run, line.top, line.height, line.baseline, size * step, budget);
+      if (budget.left < 0) return { flat: 'too much text' };
+      const [strike, under, highlight] = bars;
+      for (const ring of strike) glyphs.push(ring);
+      shapes.push({ line: li, run: ri, kind: 'glyphs', rings: glyphs });
       if (under.length) shapes.push({ line: li, run: ri, kind: 'underline', rings: under });
       if (highlight.length) shapes.push({ line: li, run: ri, kind: 'highlight', rings: highlight });
-    });
-  });
+    }
+  }
+  if (budget.left < 0) return { flat: 'too much text' };
 
-  // Lines split between pairs, or between paths, in order.
+  // Lines split between pairs, or between paths, in order. The warp's own path count decides.
   const pairs = tracks.length % 2 === 0;
   const groups = pairs ? tracks.length / 2 : tracks.length;
   const groupOf = (li: number): number => {
@@ -340,21 +411,37 @@ export function warpTextLayout(
     if (map) maps.set(g, map);
   }
 
-  const out = new Map<
-    string,
-    { glyphs: PathCommand[]; underline: PathCommand[]; highlight: PathCommand[] }
-  >();
-  let budget = MAX_WARP_COMMANDS;
+  type Entry = {
+    glyphs: PathCommand[];
+    underline: PathCommand[];
+    highlight: PathCommand[];
+    picture?: WarpedRun['picture'];
+  };
+  const out = new Map<string, Entry>();
   for (const s of shapes) {
     const map = maps.get(groupOf(s.line));
     if (!map) continue;
     const key = `${s.line}|${s.run}`;
     let entry = out.get(key);
     if (!entry) out.set(key, (entry = { glyphs: [], underline: [], highlight: [] }));
+    if (s.kind === 'picture') {
+      // The ring starts at the top-left corner and runs to the top-right, then down.
+      const ring = s.rings[0]!;
+      const [x0, y0] = ring[0]!;
+      const x1 = ring[1]![0];
+      const y1 = ring[2]![1];
+      const o = map([x0, y0], s.line);
+      const a = map([x1, y0], s.line);
+      const d = map([x0, y1], s.line);
+      entry.picture = {
+        origin: o,
+        across: [a[0] - o[0], a[1] - o[1]],
+        down: [d[0] - o[0], d[1] - o[1]],
+      };
+      continue;
+    }
     const target = entry[s.kind];
     for (const ring of s.rings) {
-      budget -= ring.length + 1;
-      if (budget < 0) return { flat: 'too much text' };
       ring.forEach((pt, i) => {
         const [x, y] = map(pt, s.line);
         target.push({ op: i === 0 ? 'M' : 'L', x, y });
@@ -415,8 +502,9 @@ function pathMap(
   for (const li of own) {
     let [a, b] = [Infinity, -Infinity];
     for (const run of layout.lines[li]!.runs) {
-      let end = run.text.length;
-      while (end > 0 && run.text[end - 1] === ' ') end -= 1;
+      // A picture bullet has no text; its edges are its extent.
+      let end = run.picture ? run.x.length - 1 : run.text.length;
+      while (!run.picture && end > 0 && run.text[end - 1] === ' ') end -= 1;
       if (end === 0) continue;
       a = Math.min(a, run.x[0]!);
       b = Math.max(b, run.x[end]!);

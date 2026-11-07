@@ -39,7 +39,7 @@ Pass `null` to draw the text flat again:
 editor.exec({ type: 'setTextWarp', preset: null });
 ```
 
-The command refuses with `disabled.noEffectChange` when no selected shape has a warp.
+The command removes the shape's own warp. When the shape inherits a warp from its layout placeholder, the command writes `textNoShape` instead, which draws the text flat. The command refuses with `disabled.noEffectChange` when no selected shape draws warped text.
 
 ## How warped text draws
 
@@ -48,7 +48,9 @@ Text lays out flat in its text box first. Then each glyph outline maps into the 
 - A warp with pairs of paths stretches the text between each pair.
 - A warp with one or three paths lays each line along a path at its font size.
 - The caret, the selection, and text editing use the flat layout.
-- Vertical text, rotated text, and text bodies with more than 2,000 characters draw flat.
+- Each character draws its font's own glyph, without shaping. Ligatures, contextual forms, and complex-script clusters draw as separate glyphs.
+- A picture bullet does not bend. It turns and stretches with the warp at its corners.
+- Vertical text, rotated text, diagram text, and text bodies with more than 2,000 characters draw flat. Text whose glyphs make too many path commands also draws flat.
 
 For the measured rules and their limits, see the text warp item of [PPTX fidelity](/docs/pptx-fidelity).
 

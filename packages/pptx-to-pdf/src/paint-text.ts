@@ -22,6 +22,9 @@ import {
   pushGraphicsState,
   setFillingRgbColor,
   setFontAndSize,
+  setLineWidth,
+  setStrokingRgbColor,
+  stroke,
   setTextMatrix,
   setTextRenderingMode,
   showText,
@@ -89,7 +92,7 @@ function enterFrame(layout: TextLayout, p: PageOps): void {
 export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope): Promise<void> {
   enterFrame(layout, p);
   if (layout.warped) {
-    drawWarped(layout, layout.warped, p, scope);
+    await drawWarped(layout, layout.warped, p, scope);
     p.push(popGraphicsState());
     return;
   }
@@ -189,15 +192,16 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
 /**
  * Warped text (`a:prstTxWarp`) as the paths layout mapped into the warp, as in the SVG paint
  * (`core/src/output/paint-text.ts`, `paintWarped`): the highlight, then the glyphs in the run's
- * fill (nonzero, as glyph outlines fill), then the underline. Paths, not text, so the warped
+ * fill (nonzero, as glyph outlines fill), their solid outline, then the underline. A picture
+ * bullet draws on the parallelogram that the warp gives it. Paths, not text, so the warped
  * words are not in the PDF text layer.
  */
-function drawWarped(
+async function drawWarped(
   layout: TextLayout,
   warped: readonly WarpedRun[],
   p: PageOps,
   scope: FillScope
-): void {
+): Promise<void> {
   let bounds: ReturnType<typeof textBounds> | undefined;
   const paint = (fillValue: ResolvedFill, commands: readonly PathCommand[]): void => {
     if (commands.length === 0) return;
@@ -223,16 +227,52 @@ function drawWarped(
   for (const w of warped) {
     const run = layout.lines[w.line]?.runs[w.run];
     if (!run) continue;
+    if (run.picture) {
+      if (w.picture) await drawWarpedPicture(run, w.picture, p);
+      continue;
+    }
     if (run.props.highlight && w.highlight.length) {
       p.push(pushGraphicsState(), setFillingRgbColor(...rgb(run.props.highlight)));
       tracePath(w.highlight, p);
       p.push(fill(), popGraphicsState());
     }
-    if (run.props.outline)
-      p.diag.add('text.outline', 'unsupported', 'Text outlines are not drawn yet.');
     paint(run.props.fill, w.glyphs);
+    // The outline strokes the warped glyphs over their fill, as the SVG paint does: a solid
+    // outline in its color, any other outline not at all.
+    const outline = run.props.outline;
+    if (outline && outline.fill.type === 'solid' && w.glyphs.length) {
+      p.push(pushGraphicsState(), setStrokingRgbColor(...rgb(outline.fill.color)));
+      p.push(setLineWidth(outline.width));
+      tracePath(w.glyphs, p);
+      p.push(stroke(), popGraphicsState());
+    }
     paint(run.props.underlineFill ?? run.props.fill, w.underline);
   }
+}
+
+/** A picture bullet of warped text, stretched over the parallelogram the warp gives it. */
+async function drawWarpedPicture(
+  run: GlyphRun,
+  box: NonNullable<WarpedRun['picture']>,
+  p: PageOps
+): Promise<void> {
+  const pic = run.picture;
+  const w = run.x[run.x.length - 1] - run.x[0];
+  if (!pic || !(w > 0) || !(pic.height > 0)) return;
+  const { origin, across, down } = box;
+  p.push(
+    pushGraphicsState(),
+    concatTransformationMatrix(
+      across[0] / w,
+      across[1] / w,
+      down[0] / pic.height,
+      down[1] / pic.height,
+      origin[0],
+      origin[1]
+    )
+  );
+  await drawPicture(pic.part, bulletFill(pic), w, pic.height, p);
+  p.push(popGraphicsState());
 }
 
 /** Underline styles the bars draw exactly; the SVG paint draws every other style the same way. */
@@ -324,8 +364,17 @@ async function drawBulletPicture(run: GlyphRun, baseline: number, p: PageOps): P
   const x = run.x[0];
   const w = run.x[run.x.length - 1] - x;
   if (!(w > 0) || !(pic.height > 0)) return;
+  p.push(pushGraphicsState(), concatTransformationMatrix(1, 0, 0, 1, x, baseline - pic.height));
+  await drawPicture(pic.part, bulletFill(pic), w, pic.height, p);
+  p.push(popGraphicsState());
+}
+
+/** The picture of a picture bullet as a stretched picture fill. */
+function bulletFill(
+  pic: NonNullable<GlyphRun['picture']>
+): Extract<ResolvedFill, { type: 'picture' }> {
   const none = { l: 0, t: 0, r: 0, b: 0 };
-  const fill: Extract<ResolvedFill, { type: 'picture' }> = {
+  return {
     type: 'picture',
     rId: pic.rId,
     ...(pic.svgRId ? { svgRId: pic.svgRId } : {}),
@@ -335,9 +384,6 @@ async function drawBulletPicture(run: GlyphRun, baseline: number, p: PageOps): P
     effects: [],
     rotWithShape: true,
   };
-  p.push(pushGraphicsState(), concatTransformationMatrix(1, 0, 0, 1, x, baseline - pic.height));
-  await drawPicture(pic.part, fill, w, pic.height, p);
-  p.push(popGraphicsState());
 }
 
 /** The laid-out bounds of a text body in its frame, as the SVG paint's gradient text spans. */

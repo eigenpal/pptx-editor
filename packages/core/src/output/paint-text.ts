@@ -191,6 +191,31 @@ function paintWarped(
   for (const w of warped) {
     const run = layout.lines[w.line]?.runs[w.run];
     if (!run) continue;
+    const pic = run.picture;
+    if (pic) {
+      // The bullet's picture on the parallelogram the warp gives its corners.
+      const url =
+        ctx.images(pic.part, pic.svgRId ?? pic.rId) ??
+        (pic.svgRId ? ctx.images(pic.part, pic.rId) : undefined);
+      if (url && w.picture) {
+        const { origin, across, down } = w.picture;
+        const m = [across[0], across[1], down[0], down[1], origin[0], origin[1]];
+        group.appendChild(
+          svg(doc, 'image', {
+            href: url,
+            x: '0',
+            y: '0',
+            width: '1',
+            height: '1',
+            preserveAspectRatio: 'none',
+            transform: `matrix(${m.map((v) => num(v / EMU_PER_PT)).join(' ')})`,
+            style: STORED_PIXELS_STYLE,
+            'data-run': 'bullet',
+          })
+        );
+      }
+      continue;
+    }
     const fill = textFill(run.props.fill, bounds, ctx);
     if (w.highlight.length && run.props.highlight)
       group.appendChild(
