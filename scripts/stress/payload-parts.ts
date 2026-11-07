@@ -293,6 +293,23 @@ export const svgOpacityOverdraw = (): Uint8Array =>
       '<use href="#r" opacity="0.5"/>'.repeat(20_000)
   );
 
+/** A path of `n` segments that crosses itself across the picture, with the even-odd rule. */
+export const svgEvenOddCrossing = (n = 5_000): Uint8Array => {
+  let d = 'M0 0';
+  for (let i = 0; i < n; i += 1) d += ` L${i % 2 ? 0 : 400} ${(i * 37) % 300}`;
+  return svgDoc(400, 300, `<path d="${d}" fill="red" fill-rule="evenodd" stroke="blue"/>`);
+};
+
+/** 2,000 full-size rounded rectangles with a huge corner radius, stroked. */
+export const svgRoundRects = (): Uint8Array =>
+  svgDoc(
+    400,
+    300,
+    '<rect width="400" height="300" rx="1e30" ry="1e30" fill="red" stroke="blue" stroke-width="10"/>'.repeat(
+      2_000
+    )
+  );
+
 /** A path of 100,000 full-size segments, copied 1,000 times. */
 export const svgUseHugePath = (): Uint8Array =>
   svgDoc(

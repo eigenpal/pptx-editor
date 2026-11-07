@@ -29,6 +29,8 @@ import {
   svgExternal,
   svgHugeSize,
   svgEntities,
+  svgEvenOddCrossing,
+  svgRoundRects,
   pic,
   pictureDeck,
   png,
@@ -276,6 +278,16 @@ export function payloadDecks(): HangDeck[] {
       id: 'svg-entity-bomb',
       target: 'an SVG picture with nested entity expansion',
       bytes: () => svgPictureDeck(svgEntities()),
+    },
+    {
+      id: 'svg-evenodd-crossing',
+      target: 'an SVG picture with a self-crossing path of 5000 segments and the even-odd rule',
+      bytes: () => svgPictureDeck(svgEvenOddCrossing()),
+    },
+    {
+      id: 'svg-round-rects',
+      target: 'an SVG picture with 2000 full-size stroked rounded rectangles',
+      bytes: () => svgPictureDeck(svgRoundRects()),
     },
 
     // Metafiles.

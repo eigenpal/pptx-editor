@@ -512,7 +512,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Insert, move, resize, rotate, and Change Picture. Change Picture fits the new image in the old frame; this rule is not measured. Change Picture takes PNG, JPEG, and GIF only, not SVG. An SVG picture draws as vector art when it uses only shapes, paths, text, groups, gradients, clip paths, `<use>`, style sheets, and raster pictures, within a drawing cost limit and 2 MB. Otherwise, for example with filters, masks, patterns, markers, or animation, it draws its PNG fallback.',
+      'Insert, move, resize, rotate, and Change Picture. Change Picture fits the new image in the old frame; this rule is not measured. Change Picture takes PNG, JPEG, and GIF only, not SVG. An SVG picture draws as vector art when it is a plain icon: at most 256 KB, with a root `viewBox`, solid colors, and only shapes, paths, groups, `<use>`, `<symbol>`, clip paths, and simple style sheets, within 1,000 shapes and 4,000 path vertices. Otherwise, for example with text, gradients, filters, masks, markers, or animation, it draws its PNG fallback.',
   },
   {
     id: 'pictures.adjustments',

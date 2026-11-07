@@ -36,9 +36,11 @@ test('empty, unknown, and markup bytes in a raster part draw nothing', () => {
   ).toBeUndefined();
 });
 
+const ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9 9"><rect/></svg>';
+
 test('an SVG part must start as markup', () => {
   const bom = String.fromCharCode(0xfeff);
-  expect(drawableImageMime(text(`${bom}  <svg/>`), 'image/svg+xml')).toBe('image/svg+xml');
+  expect(drawableImageMime(text(`${bom}  ${ICON}`), 'image/svg+xml')).toBe('image/svg+xml');
   expect(drawableImageMime(png(10, 10), 'image/svg+xml')).toBeUndefined();
 });
 
@@ -57,8 +59,8 @@ test('a WebP passes the same size checks', () => {
 
 const svgDoc = (body: string) =>
   text(
-    '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">' +
-      `${body}</svg>`
+    '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"' +
+      ` viewBox="0 0 9 9">${body}</svg>`
   );
 
 test('an SVG picture with a <use> cycle, an entity, or deep nesting draws nothing', () => {
@@ -70,8 +72,8 @@ test('an SVG picture with a <use> cycle, an entity, or deep nesting draws nothin
   expect(drawableImageMime(deep, 'image/svg+xml')).toBeUndefined();
 });
 
-// The SVG subset and its cost rules: svg-picture.test.ts.
-test('an SVG picture outside the subset draws nothing', () => {
+// The SVG icon subset and its limits: svg-picture.test.ts.
+test('an SVG picture outside the icon subset draws nothing', () => {
   const marker = '<defs><marker id="m"><path d="M0 0L1 1"/></marker></defs>';
   expect(drawableImageMime(svgDoc(marker), 'image/svg+xml')).toBeUndefined();
   const icon = '<path d="M0 0h9v9z" fill="#4472c4"/>';
@@ -82,7 +84,7 @@ test('an SVG picture with a plain document type declaration draws', () => {
   const doctype =
     '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" ' +
     '"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">';
-  const plain = text(`${doctype}<svg><rect/></svg>`);
+  const plain = text(`${doctype}${ICON}`);
   expect(drawableImageMime(plain, 'image/svg+xml')).toBe('image/svg+xml');
 });
 

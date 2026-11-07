@@ -1,25 +1,132 @@
-// An SVG picture draws as vector art only inside a small subset, within a cost budget. Each
-// hostile picture below draws its raster alternative; each ordinary one draws as vector art.
-// More cases, and the cost of the check itself: svg-picture-subset.test.ts.
+// An SVG picture draws as vector art only when it is a plain icon (svg-picture.ts). Each icon
+// below draws as vector art. Each other picture draws its raster alternative. More probes,
+// and the cost of the check itself: svg-picture-subset.test.ts.
 
 import { expect, test } from 'bun:test';
-import { svgDrawable } from '../svg-picture.ts';
+import {
+  MAX_SVG_BYTES,
+  MAX_SVG_EVEN_ODD,
+  MAX_SVG_LAYERS,
+  MAX_SVG_SHAPES,
+  MAX_SVG_VERTICES,
+  svgDrawable,
+} from '../svg-picture.ts';
 
 const enc = (s: string) => new TextEncoder().encode(s);
 const NS = 'xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"';
-const svg = (body: string, prolog = '', attrs = '') =>
-  enc(`${prolog}<svg ${NS} ${attrs}>${body}</svg>`);
+const svg = (body: string, prolog = '', root = 'viewBox="0 0 96 96"') =>
+  enc(`${prolog}<svg ${NS} ${root}>${body}</svg>`);
+const drawn = (bytes: Uint8Array) => svgDrawable(bytes);
 
-/** The signature and header of a PNG of `w` x `h` pixels, in base64: no pixels follow. */
-function pngHeader(w: number, h: number): string {
-  const b = new Uint8Array(33);
-  b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
-  new DataView(b.buffer).setUint32(16, w);
-  new DataView(b.buffer).setUint32(20, h);
-  b[24] = 8;
-  b[25] = 6;
-  return btoa(String.fromCharCode(...b));
-}
+const ICONS: Record<string, Uint8Array> = {
+  themeClassIcon: svg(
+    '<style>.MsftOfcThm_Accent1_Fill_v2 {fill:#4472C4;}</style>' +
+      '<path d="M48 12C29.2 12 14 27.2 14 46s15.2 34 34 34 34-15.2 34-34-15.2-34-34-34z"' +
+      ' class="MsftOfcThm_Accent1_Fill_v2" fill="#4472C4"/>',
+    '',
+    'width="96" height="96" viewBox="0 0 96 96" id="Icons_Person" overflow="hidden"'
+  ),
+  percentSize: svg(
+    '<g><path d="M48 12C29 12 14 27 14 46z" fill="#4472C4"/></g>',
+    '',
+    'width="100%" height="100%" viewBox="0 0 96 96" overflow="hidden"'
+  ),
+  generatorDoctype: svg(
+    '<style type="text/css">.st0{fill:#FFFFFF;}</style><path class="st0" d="M0 0h10v10z"/>',
+    '<?xml version="1.0" encoding="utf-8"?>\n<!-- Generator: an editor -->\n' +
+      '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" ' +
+      '"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n',
+    'version="1.1" id="Layer_1" x="0px" y="0px" viewBox="0 0 512 512"' +
+      ' style="enable-background:new 0 0 512 512;" xml:space="preserve"'
+  ),
+  logo: svg(
+    '<title>Logo</title><desc>A ring and a bar</desc>' +
+      '<g transform="translate(8 8) scale(0.8)"><circle cx="40" cy="40" r="30" fill="none"' +
+      ' stroke="rgb(20, 40, 160)" stroke-width="8"/><rect x="10" y="70" width="60" height="8"' +
+      ' rx="4" fill="#e23" opacity="0.8"/></g>'
+  ),
+  arrow: svg(
+    '<line x1="8" y1="48" x2="80" y2="48" stroke="currentColor" stroke-width="6"' +
+      ' stroke-linecap="round"/><polyline points="60,28 82,48 60,68" fill="none"' +
+      ' stroke="currentColor" stroke-width="6" stroke-linejoin="round"/>'
+  ),
+  ring: svg(
+    '<path fill-rule="evenodd" d="M48 8a40 40 0 1 0 0 80a40 40 0 1 0 0-80zm0 16a24 24 0 1 1' +
+      ' 0 48a24 24 0 1 1 0-48z" fill="#0a0"/>'
+  ),
+  symbolUse: svg(
+    '<defs><symbol id="dot" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"/></symbol>' +
+      '<clipPath id="c"><rect width="96" height="96" rx="12"/></clipPath></defs>' +
+      '<g clip-path="url(#c)" style="fill:navy;stroke:none">' +
+      '<use href="#dot" x="10" y="10" width="20" height="20"/>' +
+      '<use xlink:href="#dot" x="60" y="60" width="20" height="20"/></g>'
+  ),
+  metadata: svg(
+    '<metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/></metadata>' +
+      '<ellipse cx="48" cy="48" rx="40" ry="20" fill="#ccc" data-name="shape" aria-hidden="true"/>'
+  ),
+};
+
+for (const [name, bytes] of Object.entries(ICONS))
+  test(`an icon draws as vector art: ${name}`, () => {
+    expect(drawn(bytes)).toBe(true);
+  });
+
+/** A path that crosses itself `n` times across the box. */
+const crossing = (n: number) => {
+  let d = 'M0 0';
+  for (let i = 0; i < n; i += 1) d += ` L${i % 2 ? 0 : 96} ${(i * 37) % 96}`;
+  return d;
+};
+const rect = '<rect width="96" height="96" fill="red" stroke="blue" stroke-width="4"/>';
+const layer = '<g opacity="0.5"><rect width="96" height="96"/></g>';
+/** The most vertices of one path with the even-odd rule: v / MAX_SVG_VERTICES + v² / MAX = 1. */
+const a = 1 / MAX_SVG_VERTICES;
+const evenOddRoot = (-a + Math.sqrt(a * a + 4 / MAX_SVG_EVEN_ODD)) / (2 / MAX_SVG_EVEN_ODD);
+const [evenOdd, pastEvenOdd] = [Math.floor(evenOddRoot) - 5, Math.ceil(evenOddRoot) + 5];
+
+const LIMITS: Record<string, [Uint8Array, Uint8Array]> = {
+  shapes: [svg(rect.repeat(MAX_SVG_SHAPES - 1)), svg(rect.repeat(MAX_SVG_SHAPES + 1))],
+  vertices: [
+    svg(`<path d="${crossing(MAX_SVG_VERTICES - 10)}"/>`),
+    svg(`<path d="${crossing(MAX_SVG_VERTICES)}"/>`),
+  ],
+  layers: [
+    svg('<g opacity="0.5"/>'.repeat(MAX_SVG_LAYERS - 1)),
+    svg('<g opacity="0.5"/>'.repeat(MAX_SVG_LAYERS + 1)),
+  ],
+  evenOdd: [
+    svg(`<path fill-rule="evenodd" d="${crossing(evenOdd)}"/>`),
+    svg(`<path fill-rule="evenodd" d="${crossing(pastEvenOdd)}"/>`),
+  ],
+  evenOddInSheet: [
+    svg(`<style>*{clip-rule:evenodd}</style><path d="${crossing(evenOdd)}"/>`),
+    svg(`<style>*{clip-rule:evenodd}</style><path d="${crossing(pastEvenOdd)}"/>`),
+  ],
+  sharesAddUp: [
+    svg(rect.repeat(MAX_SVG_SHAPES / 2 - 10) + layer.repeat(MAX_SVG_LAYERS / 3)),
+    svg(rect.repeat(MAX_SVG_SHAPES / 2) + layer.repeat(MAX_SVG_LAYERS / 2)),
+  ],
+  useCopies: [
+    svg(`<defs><path id="p" d="${crossing(99)}"/></defs>${'<use href="#p"/>'.repeat(30)}`),
+    svg(`<defs><path id="p" d="${crossing(99)}"/></defs>${'<use href="#p"/>'.repeat(41)}`),
+  ],
+  sheetOpacity: [
+    svg(`<style>g{opacity:.5}</style>${'<g/>'.repeat(MAX_SVG_LAYERS - 10)}`),
+    svg(`<style>g{opacity:.5}</style>${'<g/>'.repeat(MAX_SVG_LAYERS)}`),
+  ],
+};
+
+for (const [name, [inside, outside]] of Object.entries(LIMITS))
+  test(`an icon at the ${name} limit draws, and one past it draws the raster alternative`, () => {
+    expect(drawn(inside)).toBe(true);
+    expect(drawn(outside)).toBe(false);
+  });
+
+test('an SVG picture longer than the size limit draws the raster alternative', () => {
+  const comment = `<!--${' '.repeat(MAX_SVG_BYTES)}-->`;
+  expect(drawn(svg(`<rect/>${comment}`))).toBe(false);
+});
 
 /** Nine levels of ten `<use>` copies: 10^9 paths. `ref` spells the link to `a{i}`. */
 function chain(ref = (i: number) => `#a${i}`, extra = ''): string {
@@ -29,134 +136,94 @@ function chain(ref = (i: number) => `#a${i}`, extra = ''): string {
   return s;
 }
 const M = `<defs><marker id="m">${'<rect/>'.repeat(100)}</marker></defs>`;
-const P = `d="M0 0${' l1 1'.repeat(5_000)}"`;
-const at = (n: number) => '<rect width="9" height="9"/>'.repeat(n);
+const P = `d="M0 0${' l1 1'.repeat(500)}"`;
 let masks = '<mask id="k0"><rect width="9" height="9" fill="white"/></mask>';
 for (let i = 1; i <= 10; i += 1)
   masks += `<mask id="k${i}">${`<rect width="9" height="9" mask="url(#k${i - 1})"/>`.repeat(10)}</mask>`;
-
-const HOSTILE: Record<string, Uint8Array> = {
-  use: svg(`<defs>${chain()}</defs><use href="#a9"/>`),
-  mask: svg(`<defs>${chain()}<mask id="m"><use href="#a9"/></mask></defs><rect mask="url(#m)"/>`),
-  pattern: svg(
-    `<defs>${chain()}<pattern id="p"><use href="#a9"/></pattern></defs><rect fill="url(#p)"/>`
-  ),
-  clipPath: svg(
-    `<defs>${chain()}<clipPath id="c"><use href="#a9"/></clipPath></defs><rect clip-path="url(#c)"/>`
-  ),
-  feImage: svg(
-    `<defs>${chain()}<filter id="f"><feImage href="#a9"/></filter></defs><rect filter="url(#f)"/>`
-  ),
-  maskManyLinks: svg(
-    `<defs><mask id="m">${at(1_000)}</mask></defs>${'<rect mask="url(#m)"/>'.repeat(1_000)}`
-  ),
-  nestedMasks: svg(`<defs>${masks}</defs><rect mask="url(#k10)"/>`),
-  nestedMasksOutsideDefs: svg(`${masks}<rect mask="url(#k10)"/>`),
-  nestedSvgUse: svg(`<defs>${chain()}</defs><svg><use href="#a9"/></svg>`),
-  duplicateIds: svg(`<defs>${chain(undefined, '<g id="a#"/>')}</defs><use href="#a9"/>`),
-  duplicateMarker: svg(
-    `<defs><marker id="m">${at(1_000)}</marker><marker id="m"/></defs><path marker-mid="url(#m)" ${P}/>`
-  ),
-  percentUse: svg(`<defs>${chain((i) => `#%61${i}`)}</defs><use href="#%619"/>`),
-  percentMarker: svg(`${M}<path marker-mid="url(#%6d)" ${P}/>`),
-  foreignObject: svg('<foreignObject width="9" height="9"/>'),
-  srcset: svg(
-    '<foreignObject><img xmlns="http://www.w3.org/1999/xhtml" srcset="data:image/svg+xml,%3Csvg/%3E 1x"/></foreignObject>'
-  ),
-  imageSet: svg('<style>g{background-image:image-set("data:image/svg+xml,%3Csvg/%3E" 1x)}</style>'),
-  leadingSpace: svg(`<image href="${' '.repeat(300)}data:image/svg+xml,%3Csvg/%3E"/>`),
-  leadingTabs: svg(`<image href="${'&#9;'.repeat(300)}data:image/svg+xml,%3Csvg/%3E"/>`),
-  splitScheme: svg('<image href="da&#10;ta:image/svg+xml,%3Csvg/%3E"/>'),
-  plainImage: svg('<image href="data:image/svg+xml,%3Csvg/%3E"/>'),
-  xmlStylesheet: svg('', '<?xml-stylesheet type="text/css" href="data:text/css,a"?>'),
-  markerAttributeSelector: svg(`<style>[d]{marker-mid:url(#m)}</style>${M}<path ${P}/>`),
-  markerOnUse: svg(
-    `<defs><marker id="m">${at(100)}</marker><path id="p" ${P}/></defs><use href="#p" style="marker-mid:url(#m)"/>`
-  ),
-  markerShorthand: svg(`${M}<path marker="url(#m)" ${P}/>`),
-  markerImportant: svg(`<style>path{marker-mid:url(#m)!important}</style>${M}<path ${P}/>`),
-  markerMedia: svg(`<style>@media all{path{marker-mid:url(#m)}}</style>${M}<path ${P}/>`),
-  markerSupports: svg(
-    `<style>@supports (display:block){path{marker-mid:url(#m)}}</style>${M}<path ${P}/>`
-  ),
-  markerSheetVar: svg(`<style>svg{--m:url(#m)} path{marker-mid:var(--m)}</style>${M}<path ${P}/>`),
-  markerStyleVar: svg(`<g style="--m:url(#m)">${M}<path style="marker-mid:var(--m)" ${P}/></g>`),
-  markerEscapedId: svg(`<style>path{marker-mid:url(#\\6d)}</style>${M}<path ${P}/>`),
-  markerEscapedProperty: svg(`<style>path{m\\61rker-mid:url(#m)}</style>${M}<path ${P}/>`),
-  markerUpperSelector: svg(`<style>PATH{marker-mid:url(#m)}</style>${M}<path ${P}/>`),
-  markerNamespaceSelector: svg(`<style>svg|path{marker-mid:url(#m)}</style>${M}<path ${P}/>`),
-  markerEscapedClass: svg(`<style>.\\61{marker-mid:url(#m)}</style>${M}<path class="a" ${P}/>`),
-  markerCommentInDeclaration: svg(`<style>path{marker-mid/**/:url(#m)}</style>${M}<path ${P}/>`),
-  markerPath: svg(`${M}<path marker-mid="url(#m)" ${P}/>`),
-  markerPolyline: svg(`${M}<polyline marker-mid="url(#m)" points="${'1,1 '.repeat(5_000)}"/>`),
-  markerImplicitLines: svg(`${M}<path marker-mid="url(#m)" d="M0 0${' 1 1'.repeat(5_000)}"/>`),
-  markerPackedArcs: svg(
-    `${M}<path marker-mid="url(#m)" d="M0 0a1 1 0 0 1 1 1${' 1 1 0 001 1'.repeat(5_000)}"/>`
-  ),
-  markerArcsNoSpaces: svg(
-    `${M}<path marker-mid="url(#m)" d="M0 0${'a1,1,0,0,1,1,1'.repeat(5_000)}"/>`
-  ),
-  markerPackedDots: svg(`${M}<path marker-mid="url(#m)" d="M0 0l${'.5.5'.repeat(5_000)}"/>`),
-  markerInSymbol: svg(
-    `<defs><marker id="m">${at(100)}</marker><symbol id="s"><path marker-mid="url(#m)" d="M0 0${' l1 1'.repeat(200)}"/></symbol></defs>${'<use href="#s"/>'.repeat(20)}`
-  ),
-  internalDtd: svg('', '<!DOCTYPE svg [<!ENTITY ns_svg "http://www.w3.org/2000/svg">]>'),
-  hugePicture: svg(
-    `<image width="9" height="9" href="data:image/png;base64,${pngHeader(16_000, 16_000)}"/>`
-  ),
-  externalPicture: svg('<image width="9" height="9" href="https://example.test/a.png"/>'),
-  fullRects: svg('<rect width="1600" height="900"/>'.repeat(5_000), ' ', 'viewBox="0 0 1600 900"'),
-};
-
-for (const [name, bytes] of Object.entries(HOSTILE))
-  test(`a hostile SVG picture draws its raster alternative: ${name}`, () => {
-    expect(svgDrawable(bytes)).toBe(false);
-  });
-
-const arrow = '<defs><marker id="a"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>';
-/** A valid 1 x 1 PNG. */
+let clips = '<clipPath id="c0"><rect width="9" height="9"/></clipPath>';
+for (let i = 1; i <= 10; i += 1)
+  clips += `<clipPath id="c${i}">${`<rect width="9" height="9" clip-path="url(#c${i - 1})"/>`.repeat(10)}</clipPath>`;
 const PNG =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
-const ORDINARY: Record<string, Uint8Array> = {
-  labels: svg(
-    '<style>.a{font:12px sans-serif}</style><text class="a" aria-label="Sales data: 2024">Hi</text>' +
-      `<image href="data:image/png;base64,${PNG}"/><desc>url(data:text/plain,x)</desc>`
+
+/** Pictures outside the icon subset, each refused for the reason in its name. */
+const REFUSED: Record<string, Uint8Array> = {
+  useChain: svg(`<defs>${chain()}</defs><use href="#a9"/>`),
+  useChainInDefs: svg(`<defs>${chain()}<g><use href="#a9"/></g></defs>`),
+  useChainInSymbol: svg(`<symbol id="s">${chain()}<use href="#a9"/></symbol>`),
+  clipChain: svg(`<defs>${clips}</defs><rect clip-path="url(#c10)"/>`),
+  clipToNonClip: svg(`<defs><g id="g"/></defs><rect clip-path="url(#g)"/>`),
+  useCycle: svg('<g id="a"><use href="#a"/></g>'),
+  useMissing: svg('<use href="#nothing"/>'),
+  useExternal: svg('<use href="other.svg#a"/>'),
+  useLongChain: svg(
+    Array.from({ length: 10 }, (_, i) => `<g id="u${i}"><use href="#u${i + 1}"/></g>`).join('') +
+      '<g id="u10"/>'
   ),
-  fonts: svg(
-    '<style>@font-face{font-family:a;src:url(data:font/woff2;base64,AAAA) format("woff2")}' +
-      '@font-face{font-family:b;src:url(data:application/x-font-ttf;base64,AAAA)}' +
-      '@font-face{font-family:c;src:url(data:application/vnd.ms-fontobject;base64,AAAA)}</style>'
+  duplicateIds: svg(`<defs>${chain(undefined, '<g id="a#"/>')}</defs><use href="#a9"/>`),
+  percentId: svg(`<defs>${chain((i) => `#%61${i}`)}</defs><use href="#%619"/>`),
+  noViewBox: svg('<rect/>', '', 'width="96" height="96"'),
+  zeroViewBox: svg('<rect/>', '', 'viewBox="0 0 0 96"'),
+  infiniteViewBox: svg('<rect/>', '', 'viewBox="0 0 1e999 96"'),
+  slice: svg('<rect/>', '', 'viewBox="0 0 96 96" preserveAspectRatio="xMidYMid slice"'),
+  upperCaseElement: svg('<RECT/>'),
+  otherNamespace: svg('<x:rect xmlns:x="urn:x"/>'),
+  rootInOtherNamespace: enc('<svg xmlns="urn:x" viewBox="0 0 9 9"/>'),
+  twoRoots: enc(`<svg ${NS} viewBox="0 0 9 9"/><svg ${NS} viewBox="0 0 9 9"/>`),
+  manyAttributes: svg(
+    `<rect ${Array.from({ length: 65 }, (_, i) => `data-a${i}="1"`).join(' ')}/>`
   ),
-  octetStreamFont: svg(
-    '<style>@font-face{font-family:x;src:url(data:application/octet-stream;base64,AAAA)}</style>'
+  text: svg('<text x="9" y="9">Label</text>'),
+  gradient: svg(
+    '<defs><linearGradient id="g"><stop offset="0"/></linearGradient></defs><rect fill="url(#g)"/>'
   ),
-  upperCasePng: svg(`<image href="data:image/PNG;base64,${PNG}"/>`),
-  longPath: svg(`<path d="M0 0${' l1 1'.repeat(250_000)}"/>`),
-  plainDoctype: svg(
-    '',
-    '<?xml version="1.0"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">'
-  ),
-  gradients: svg(
-    '<defs><linearGradient id="g"><stop offset="0"/><stop offset="1"/></linearGradient></defs>' +
-      '<rect fill="url(#g)"/>'.repeat(2_000)
-  ),
+  image: svg(`<image width="9" height="9" href="data:image/png;base64,${PNG}"/>`),
+  externalImage: svg('<image width="9" height="9" href="https://example.test/a.png"/>'),
+  filter: svg('<defs><filter id="f"><feGaussianBlur/></filter></defs><rect filter="url(#f)"/>'),
+  mask: svg(`<defs>${masks}</defs><rect mask="url(#k10)"/>`),
+  pattern: svg('<defs><pattern id="p"/></defs><rect fill="url(#p)"/>'),
+  marker: svg(`${M}<path marker-mid="url(#m)" ${P}/>`),
+  markerInSheet: svg(`<style>path{marker-mid:url(#m)}</style>${M}<path ${P}/>`),
+  markerInStyle: svg(`${M}<path style="marker:url(#m)" ${P}/>`),
+  animation: svg('<use href="#a"><set attributeName="href" to="#b"/></use><g id="a"/>'),
+  foreignObject: svg('<foreignObject width="9" height="9"/>'),
+  switch: svg('<switch><rect/></switch>'),
+  script: svg('<script>1</script>'),
+  anchor: svg('<a href="https://example.test"><rect/></a>'),
+  eventAttribute: svg('<rect onclick="x()"/>'),
+  urlPaint: svg('<rect fill="url(#p)"/>'),
+  urlPaintInStyle: svg('<rect style="fill:url(#p)"/>'),
+  urlPaintFallback: svg('<rect fill="url(#p) red"/>'),
+  dasharray: svg('<path d="M0 0h96" stroke="red" stroke-dasharray="0.01"/>'),
+  miterClip: svg('<path d="M0 0h96" stroke="red" stroke-linejoin="miter-clip"/>'),
+  highMiter: svg('<path d="M0 0h96" stroke="red" stroke-miterlimit="1e9"/>'),
+  percentLength: svg('<rect width="100%" height="100%"/>'),
+  emLength: svg('<rect width="1em" height="1em"/>'),
+  calcLength: svg('<rect style="stroke-width:calc(5000px)"/>'),
+  cssScale: svg('<g style="scale:2000"><rect/></g>'),
+  blend: svg('<g style="mix-blend-mode:difference"><rect/></g>'),
+  paintOrder: svg('<rect paint-order="stroke" vector-effect="non-scaling-stroke"/>'),
+  transformFunction: svg('<g transform="perspective(9)"><rect/></g>'),
+  infiniteTransform: svg('<g transform="scale(1e999)"><rect/></g>'),
+  pathLetter: svg('<path d="M0 0 X9 9"/>'),
+  sheetAtRule: svg('<style>@media all{rect{fill:red}}</style><rect/>'),
+  sheetEscape: svg('<style>.\\61{fill:red}</style><rect class="a"/>'),
+  sheetCombinator: svg('<style>g rect{fill:red}</style><rect/>'),
+  sheetAttributeSelector: svg('<style>[d]{fill:red}</style><rect/>'),
+  sheetVar: svg('<style>svg{--m:red} rect{fill:var(--m)}</style><rect/>'),
+  sheetNested: svg('<style>g{rect{fill:red}}</style><rect/>'),
+  sheetOpen: svg('<style>rect{fill:red</style><rect/>'),
+  sheetTextOutsideRules: svg('<style>rect{fill:red} x</style><rect/>'),
+  sheetCommentSplit: svg('<style>rect{mar<!---->ker-mid:url(#m)}</style><rect/>'),
+  sheetCdataSplit: svg('<style>rect{mar<![CDATA[ker-mid:url(#m)]]>}</style><rect/>'),
+  xmlStylesheet: svg('', '<?xml-stylesheet type="text/css" href="data:text/css,a"?>'),
+  internalDtd: svg('', '<!DOCTYPE svg [<!ENTITY a "a">]>'),
+  twoDoctypes: svg('', '<!DOCTYPE svg><!DOCTYPE svg>'),
+  otherPrefixedAttribute: svg('<rect x:fill="red" xmlns:x="urn:x"/>'),
+  hrefOnRect: svg('<rect href="#a"/><g id="a"/>'),
 };
 
-for (const [name, bytes] of Object.entries(ORDINARY))
-  test(`an ordinary SVG picture draws: ${name}`, () => {
-    expect(svgDrawable(bytes)).toBe(true);
-  });
-
-// Markers are outside the subset: these draw their raster alternative.
-const MARKERS: Record<string, Uint8Array> = {
-  arrows: svg(arrow + '<line x1="0" y1="0" x2="9" y2="9" marker-end="url(#a)"/>'.repeat(500)),
-  descendantSelectorArrows: svg(
-    `${arrow}<style>#chart .edge path{marker-end:url(#a)}</style>` +
-      `<g id="chart">${'<g class="edge"><path d="M0 0L9 9"/></g>'.repeat(200)}</g>`
-  ),
-};
-
-for (const [name, bytes] of Object.entries(MARKERS))
-  test(`an SVG picture with markers draws its raster alternative: ${name}`, () => {
-    expect(svgDrawable(bytes)).toBe(false);
+for (const [name, bytes] of Object.entries(REFUSED))
+  test(`an SVG picture outside the icon subset draws its raster alternative: ${name}`, () => {
+    expect(drawn(bytes)).toBe(false);
   });

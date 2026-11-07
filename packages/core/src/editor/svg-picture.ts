@@ -1,58 +1,46 @@
 // Whether an SVG picture part draws as vector art. The browser draws an SVG picture on the
-// page's main thread, and many SVG features cost per pixel, per vertex, or per layer, not per
-// element: filters, masks, patterns, markers, animation, and links that copy content. Every
-// SVG picture of a presentation carries a raster alternative, so the editor draws an SVG
-// picture only when it stays inside a small subset whose cost this check can bound, and draws
-// the raster alternative otherwise.
+// page's main thread, and most SVG features can cost seconds per picture: text, gradients,
+// filters, masks, patterns, markers, blending, and animation. Every SVG picture of a
+// presentation carries a raster alternative, so the editor draws an SVG picture as vector art
+// only when it is a plain icon, and draws the raster alternative otherwise.
 //
-// The subset: the elements in `ALLOWED`, in the SVG namespace; `<image>` with a raster `data:`
-// URI of at most 40 megapixels; links only to ids in the same document (`<use>`, and
-// `url(#id)` to a gradient or a clip path); style sheets with no escape, custom property, or
-// at-rule other than `@font-face` and `@media`; and no filter, mask, marker, dash array, or a
-// path that a style sets. Its cost (`MAX_SVG_COST`) counts each element, path vertex, text
-// character, layer, picture pixel, and the share of the picture that each shape covers, with
-// each `<use>` expanded where it sits, also in `<defs>` and `<symbol>`, where browsers build
-// it too. The check reads at most `MAX_SVG_BYTES`, in time and memory linear in the part. It
-// needs no DOM.
+// An icon here: at most `MAX_SVG_BYTES`, a root `<svg>` with a finite `viewBox`, only the
+// elements in `ALLOWED`, attributes from a fixed list with the value rules of
+// svg-picture-css.ts, solid paint, links only from `<use>` and `clip-path` to elements of the
+// icon, and simple style sheets. With each `<use>` expanded, also where it sits in `<defs>` or
+// `<symbol>`, its shapes, path vertices, and groups with opacity, each as a share of
+// `MAX_SVG_SHAPES`, `MAX_SVG_VERTICES`, and `MAX_SVG_LAYERS`, add up to at most 1. With the
+// even-odd rule anywhere, the squares of each path's vertices also count, as a share of
+// `MAX_SVG_EVEN_ODD`: a browser fills a path that crosses itself with the even-odd rule in
+// time that grows with the square of its vertices. Each limit alone draws in about 250 ms in
+// the browsers the editor supports. The check takes time linear in the part and needs no DOM.
 
-import { imageSize, readXml, type XmlNode } from '@eigenpal/ooxml-core';
-import { fromBase64 } from '../automation/commands/base64.ts';
+import { readXml, type XmlNode } from '@eigenpal/ooxml-core';
 import {
-  foreignLink,
-  fragmentId,
-  largestLength,
-  rasterData,
-  scalingTransform,
-  scanCss,
-  squeeze,
-  type CssScan,
+  declarations,
+  isLength,
+  isTransform,
+  numbers,
+  paintValue,
+  styleSheet,
 } from './svg-picture-css.ts';
 
-/** The longest SVG picture part this check reads. A longer one draws its raster alternative. */
-export const MAX_SVG_BYTES = 2 * 1024 * 1024;
-/**
- * The most an SVG picture may cost. One unit is about 0.4 microseconds of drawing on a
- * laptop, so the budget keeps a picture under about 200 ms.
- */
-export const MAX_SVG_COST = 500_000;
-/** The cost of a shape that covers the whole picture. */
-const AREA_COST = 280;
-/** The cost of an element drawn with opacity: a layer of its own. */
-const LAYER_COST = 400;
-const PIXELS_PER_UNIT = 200;
-const MAX_IMAGE_PIXELS = 40_000_000;
-/** The most `<use>` links that an expansion may follow in a chain. */
-const MAX_USE_CHAIN = 16;
+/** The longest SVG picture part that can draw as vector art. */
+export const MAX_SVG_BYTES = 256 * 1024;
+/** The most shapes, path vertices, and groups with opacity an icon draws, each alone. */
+export const MAX_SVG_SHAPES = 1_000;
+export const MAX_SVG_VERTICES = 4_000;
+export const MAX_SVG_LAYERS = 100;
+/** The most of the sum of the squares of path vertices, with the even-odd rule. */
+export const MAX_SVG_EVEN_ODD = 1_000_000;
+/** The most elements, attributes on one element, and `<use>` links in a chain. */
+const MAX_ELEMENTS = 10_000;
+const MAX_ATTRIBUTES = 64;
+const MAX_USE_CHAIN = 8;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-/** The SVG elements of the subset. `title`, `desc`, and `metadata` draw nothing. */
-const ALLOWED: ReadonlySet<string> = new Set([
-  'svg',
-  'g',
-  'defs',
-  'title',
-  'desc',
-  'metadata',
+const XLINK_NS = 'http://www.w3.org/1999/xlink';
+const SHAPES: ReadonlySet<string> = new Set([
   'path',
   'rect',
   'circle',
@@ -60,112 +48,88 @@ const ALLOWED: ReadonlySet<string> = new Set([
   'line',
   'polyline',
   'polygon',
-  'text',
-  'tspan',
-  'linearGradient',
-  'radialGradient',
-  'stop',
-  'clipPath',
+]);
+const ALLOWED: ReadonlySet<string> = new Set([
+  ...SHAPES,
+  'svg',
+  'g',
+  'defs',
   'use',
   'symbol',
+  'clipPath',
   'style',
-  'image',
+  'title',
+  'desc',
+  'metadata',
 ]);
-/** Attributes that pull in what the subset leaves out (by local name). */
-const REFUSED_ATTRIBUTES = /^(?:filter|mask|marker(?:-start|-mid|-end)?|stroke-dasharray)$/;
+/** Elements whose content is not drawn and not read. */
+const IGNORED: ReadonlySet<string> = new Set(['title', 'desc', 'metadata']);
+/** Geometry attributes: finite lengths. */
+const LENGTHS: ReadonlySet<string> = new Set([
+  'x',
+  'y',
+  'width',
+  'height',
+  'cx',
+  'cy',
+  'r',
+  'rx',
+  'ry',
+  'x1',
+  'y1',
+  'x2',
+  'y2',
+]);
+/** Attributes that draw nothing, with any value. */
+const INERT: ReadonlySet<string> = new Set(['id', 'class', 'version', 'role', 'focusable', 'type']);
 
 type Element = Extract<XmlNode, { type: 'element' }>;
 
-/** One element of the subset, with what its cost needs. */
-interface Node {
-  readonly name: string;
-  readonly children: Node[];
-  /** Its own cost, less its area: itself, its vertices or characters, its layer, its picture. */
-  readonly own: number;
-  /** Its extent in user units, before the stroke, when it is a shape. */
-  readonly extent: { readonly w: number; readonly h: number } | undefined;
-  /** For text, how many characters it draws. */
-  readonly glyphs: number;
-  /** The id that its `<use>` links to. */
-  readonly use: string | undefined;
-  /** The ids that its `url(#id)` values name: a clip path among them costs its content. */
-  readonly links: readonly string[];
+/**
+ * What an element draws, with each `<use>` and clip path expanded: its shapes, vertices, and
+ * layers as one share of the limits, and the squares of its paths' vertices.
+ */
+interface Count {
+  readonly load: number;
+  readonly squares: number;
 }
 
-// --- Path data -----------------------------------------------------------------------------
+interface Node {
+  readonly name: string;
+  readonly own: Count;
+  readonly children: Node[];
+  readonly use: string | undefined;
+  readonly clips: readonly string[];
+}
 
-const TOKEN = /[a-df-z]|[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/gi;
-/** The numbers of one segment of each path command. An arc counts 4: its flags can pack. */
-const SEGMENT: Readonly<Record<string, number>> = {
-  m: 2,
-  l: 2,
-  t: 2,
-  h: 1,
-  v: 1,
-  c: 6,
-  s: 4,
-  q: 4,
-  a: 4,
-};
+const PATH_CHARS = /[^\d\s.,+\-eEMmLlHhVvCcSsQqTtAaZz]/;
+const TOKEN = /[MmLlHhVvCcSsQqTtAaZz]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g;
 
 /**
- * At most how many vertices path data (or a point list, `points`) has, and a bound on its
- * extent: no point lies farther from the origin than the sum of all its numbers, and an arc
- * bulges at most twice that.
+ * The vertices of path data: one for each coordinate pair, each number of `H` and `V`, each
+ * arc segment (counted as four numbers, as its flags can pack), and each `Z`; or -1 for path
+ * data with characters it cannot hold.
  */
-function pathData(text: string, points: boolean): { vertices: number; reach: number } {
+function pathVertices(d: string): number {
+  if (PATH_CHARS.test(d)) return -1;
   let total = 0;
   let per = 2;
   let run = 0;
-  let reach = 0;
-  for (const m of text.matchAll(TOKEN)) {
-    const token = m[0];
-    const letter = token.length === 1 ? token.toLowerCase() : '';
-    if (points || !(letter >= 'a' && letter <= 'z')) {
+  for (const [token] of d.matchAll(TOKEN)) {
+    const c = token.charCodeAt(0);
+    const letter = (c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a);
+    if (!letter) {
       run += 1;
-      reach += Math.abs(Number(token)) || 0;
       continue;
     }
     total += Math.ceil(run / per);
     run = 0;
-    if (letter === 'z') total += 1;
-    else per = SEGMENT[letter] ?? 1;
+    const lower = token.toLowerCase();
+    if (lower === 'z') total += 1;
+    else per = lower === 'h' || lower === 'v' ? 1 : lower === 'a' ? 4 : 2;
   }
-  return { vertices: total + Math.ceil(run / per) + 1, reach: 2 * reach };
+  return total + Math.ceil(run / per);
 }
-
-/** A length attribute in user units; a percent or a relative unit reads as unbounded. */
-const length = (value: string | undefined): number =>
-  value === undefined ? 0 : largestLength(value);
-
-/** The extent of a shape from its attributes, before the stroke. */
-function shapeExtent(
-  local: string,
-  a: Readonly<Record<string, string>>
-): { w: number; h: number } | undefined {
-  switch (local) {
-    case 'rect':
-    case 'image':
-      return { w: length(a.width), h: length(a.height) };
-    case 'circle':
-      return { w: 2 * length(a.r), h: 2 * length(a.r) };
-    case 'ellipse':
-      return { w: 2 * length(a.rx), h: 2 * length(a.ry) };
-    case 'line':
-      return { w: length(a.x1) + length(a.x2), h: length(a.y1) + length(a.y2) };
-    case 'path':
-    case 'polyline':
-    case 'polygon': {
-      const data = local === 'path' ? (a.d ?? '') : (a.points ?? '');
-      const { reach } = pathData(data, local !== 'path');
-      return { w: reach, h: reach };
-    }
-    default:
-      return undefined;
-  }
-}
-
-// --- The check -----------------------------------------------------------------------------
 
 const results = new WeakMap<Uint8Array, boolean>();
 
@@ -178,129 +142,141 @@ export function svgDrawable(bytes: Uint8Array): boolean {
   return ok;
 }
 
-/** A document type declaration without an internal subset: it declares nothing to expand. */
-const PLAIN_DOCTYPE = /<!DOCTYPE[^[>]*>/;
+/** The text without its document type declaration, or null for one with an internal subset. */
+function withoutDoctype(text: string): string | null {
+  const at = text.indexOf('<!DOCTYPE');
+  if (at < 0) return text;
+  const end = text.indexOf('>', at);
+  if (end < 0 || text.slice(at, end).includes('[')) return null;
+  if (text.indexOf('<!DOCTYPE', end) >= 0) return null;
+  return text.slice(0, at) + text.slice(end + 1);
+}
 
 function check(bytes: Uint8Array): boolean {
   if (bytes.length > MAX_SVG_BYTES) return false;
-  const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
-  // A style sheet from outside the tree: the subset has none.
-  if (text.includes('<?xml-stylesheet')) return false;
-  const read = readXml(text.replace(PLAIN_DOCTYPE, ''), {
-    maxBytes: bytes.length + 1,
-    maxElements: MAX_SVG_COST,
-  });
+  const decoded = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+  if (decoded.includes('<?xml-stylesheet')) return false;
+  const text = withoutDoctype(decoded);
+  if (text === null) return false;
+  const read = readXml(text, { maxBytes: bytes.length + 1, maxElements: MAX_ELEMENTS });
   if (!read.ok) return false;
+
   const ids = new Map<string, Node[]>();
-  let sheet = '';
+  const sheet = { clips: [] as string[], opacity: false, evenOdd: false };
   let elements = 0;
-  // What the whole picture can do to the size of a shape: scale it, stroke it, set its font.
-  let scales = false;
-  let stroke = 1;
-  let font = 16;
-  let view: { w: number; h: number } | undefined;
-  const styled = (scan: CssScan): void => {
-    scales ||= scan.scales;
-    stroke = Math.max(stroke, scan.stroke);
-    font = Math.max(font, scan.font);
+
+  /** The namespaces an element declares, and its parent's: a chain, not a copy each. */
+  type Scope = { readonly names: ReadonlyMap<string, string>; readonly parent: Scope | null };
+  const resolve = (scope: Scope | null, prefix: string): string | undefined => {
+    for (let s = scope; s; s = s.parent) {
+      const ns = s.names.get(prefix);
+      if (ns !== undefined) return ns;
+    }
+    return undefined;
   };
 
-  /** Read the attributes of an SVG element into `node`, or answer false to leave the subset. */
-  const readAttributes = (
-    local: string,
-    a: Readonly<Record<string, string>>,
-    node: { own: number; use: string | undefined; links: string[] }
-  ): boolean => {
-    for (const [name, value] of Object.entries(a)) {
+  /** Read `el` into a node, or null when it is not part of an icon. */
+  const build = (el: Element, parent: Scope | null, root: boolean): Node | null => {
+    elements += 1;
+    const entries = Object.entries(el.attributes);
+    if (entries.length > MAX_ATTRIBUTES) return null;
+    let declared: Map<string, string> | undefined;
+    for (const [name, value] of entries)
+      if (name === 'xmlns' || name.startsWith('xmlns:'))
+        (declared ??= new Map()).set(name === 'xmlns' ? '' : name.slice(6), value);
+    const scope = declared ? { names: declared, parent } : parent;
+    const colon = el.name.indexOf(':');
+    const local = el.name.slice(colon + 1);
+    if (resolve(scope, colon < 0 ? '' : el.name.slice(0, colon)) !== SVG_NS) return null;
+    if (!ALLOWED.has(local) || (root && local !== 'svg')) return null;
+    const empty = { load: 0, squares: 0 };
+    if (IGNORED.has(local))
+      return { name: local, own: empty, children: [], use: undefined, clips: [] };
+
+    const found = { clips: [] as string[], opacity: false, evenOdd: false };
+    let use: string | undefined;
+    let vertices = 0;
+    let box = false;
+    for (const [name, value] of entries) {
       if (name === 'xmlns' || name.startsWith('xmlns:')) continue;
-      const attr = name.slice(name.indexOf(':') + 1);
-      if (REFUSED_ATTRIBUTES.test(attr)) return false;
+      const at = name.indexOf(':');
+      if (at >= 0) {
+        // `xlink:href` and `xml:space` are the only prefixed attributes.
+        const ns = name.slice(0, at) === 'xml' ? 'xml' : resolve(scope, name.slice(0, at));
+        const attr = name.slice(at + 1);
+        if (ns === 'xml' && attr === 'space') continue;
+        if (ns !== XLINK_NS || attr !== 'href') return null;
+      }
+      const attr = name.slice(at + 1);
       if (attr === 'href') {
-        const plain = squeeze(value);
-        if (local === 'use' && plain.startsWith('#')) node.use = fragmentId(plain.slice(1));
-        else if (local === 'image') {
-          const data = rasterData(value);
-          const bytes = data === undefined ? null : fromBase64(data);
-          const size = bytes ? imageSize(bytes) : null;
-          if (!size || size.width * size.height > MAX_IMAGE_PIXELS) return false;
-          node.own += Math.ceil((size.width * size.height) / PIXELS_PER_UNIT);
-        } else if (!plain.startsWith('#')) return false;
+        if (local !== 'use' || !value.trim().startsWith('#')) return null;
+        use = value.trim().slice(1);
         continue;
       }
-      let scan: CssScan | null | undefined;
-      if (attr === 'style') scan = scanCss(value, false);
-      else if (/url\(/i.test(value)) scan = scanCss(`${attr}:${value}`, false);
-      if (scan === null || foreignLink(value)) return false;
-      if (scan) {
-        node.links.push(...scan.ids);
-        styled(scan);
-        if (scan.opacity) node.own += LAYER_COST;
+      if (INERT.has(attr) || attr.startsWith('data-') || attr.startsWith('aria-')) continue;
+      if (root && (attr === 'width' || attr === 'height')) continue;
+      if (LENGTHS.has(attr)) {
+        if (!isLength(value)) return null;
+        continue;
       }
-      if (attr === 'opacity' && !(Number(value) >= 1)) node.own += LAYER_COST;
-      if (attr === 'transform' && scalingTransform(value)) scales = true;
-      if (attr === 'stroke-width') stroke = Math.max(stroke, length(value));
-      if (attr === 'font-size') font = Math.max(font, length(value));
+      switch (attr) {
+        case 'd': {
+          if (local !== 'path') return null;
+          const n = pathVertices(value);
+          if (n < 0) return null;
+          vertices += n;
+          continue;
+        }
+        case 'points': {
+          const list = numbers(value);
+          if (!list) return null;
+          vertices += Math.ceil(list.length / 2);
+          continue;
+        }
+        case 'viewBox': {
+          const v = numbers(value);
+          if (!v || v.length !== 4 || !(v[2]! > 0) || !(v[3]! > 0)) return null;
+          box = true;
+          continue;
+        }
+        case 'preserveAspectRatio':
+          if (/slice/i.test(value)) return null;
+          continue;
+        case 'transform':
+          if (!isTransform(value)) return null;
+          continue;
+        case 'clipPathUnits':
+          if (!/^(?:userSpaceOnUse|objectBoundingBox)$/.test(value.trim())) return null;
+          continue;
+        case 'style':
+          if (!declarations(value, found)) return null;
+          continue;
+        default:
+          if (paintValue(attr, value, found) !== true) return null;
+      }
     }
-    return true;
-  };
+    if (root && !box) return null;
 
-  /** Read `el` in the namespaces `scope` into a node, or null when it leaves the subset. */
-  const build = (el: Element, scope: ReadonlyMap<string, string>, root: boolean): Node | null => {
-    elements += 1;
-    let inner: Map<string, string> | undefined;
-    for (const [name, value] of Object.entries(el.attributes))
-      if (name === 'xmlns' || name.startsWith('xmlns:'))
-        (inner ??= new Map(scope)).set(name === 'xmlns' ? '' : name.slice(6), value);
-    const names = inner ?? scope;
-    const colon = el.name.indexOf(':');
-    const svg = names.get(colon < 0 ? '' : el.name.slice(0, colon)) === SVG_NS;
-    const local = el.name.slice(colon + 1);
-    const a = el.attributes;
-    const read = { own: 1, use: undefined as string | undefined, links: [] as string[] };
-    // An element in another namespace draws nothing, but its SVG content can be linked to.
-    if (svg) {
-      if (!ALLOWED.has(local) || !readAttributes(local, a, read)) return null;
-      if (local === 'image' && read.own === 1) return null; // no picture
-      // A viewBox scales its content; the root's sets the picture's own size.
-      if (a.viewBox !== undefined && !root) scales = true;
-      if (root) {
-        const box = a.viewBox
-          ?.trim()
-          .split(/[\s,]+/)
-          .map(Number);
-        view =
-          box?.length === 4
-            ? { w: box[2]!, h: box[3]! }
-            : { w: length(a.width) || 300, h: length(a.height) || 150 };
-      }
-      if (local === 'path' || local === 'polyline' || local === 'polygon') {
-        const data = local === 'path' ? (a.d ?? '') : (a.points ?? '');
-        read.own += pathData(data, local !== 'path').vertices;
-      }
-    }
     const children: Node[] = [];
-    let glyphs = 0;
     for (const c of el.children) {
       if (c.type === 'text') {
-        if (!svg) continue;
-        if (local === 'style') sheet += c.value;
-        else if (local === 'text' || local === 'tspan') glyphs += c.value.length;
+        if (local === 'style' && !styleSheet(c.value, sheet)) return null;
         continue;
       }
-      const node = build(c, names, false);
+      const node = build(c, scope, false);
       if (!node) return null;
       children.push(node);
     }
-    const node: Node = {
-      name: svg ? local : '',
-      children,
-      own: read.own + glyphs,
-      extent: svg ? shapeExtent(local, a) : undefined,
-      glyphs,
-      use: read.use,
-      links: read.links,
+    if (found.evenOdd) sheet.evenOdd = true;
+    const own = {
+      load:
+        (SHAPES.has(local) ? 1 / MAX_SVG_SHAPES : 0) +
+        vertices / MAX_SVG_VERTICES +
+        (found.opacity ? 1 / MAX_SVG_LAYERS : 0),
+      squares: vertices * vertices,
     };
-    const id = a.id;
+    const node: Node = { name: local, own, children, use, clips: found.clips };
+    const id = el.attributes.id;
     if (id !== undefined) {
       const same = ids.get(id);
       if (same) same.push(node);
@@ -312,72 +288,60 @@ function check(bytes: Uint8Array): boolean {
   const roots: Node[] = [];
   for (const n of read.nodes) {
     if (n.type !== 'element') continue;
-    const node = build(n, new Map(), true);
-    if (!node) return false;
+    const node = build(n, null, true);
+    if (!node || roots.length > 0) return false;
     roots.push(node);
   }
-  // The sheets join their text and CDATA pieces with nothing between, as the browser does.
-  const sheetScan = sheet ? scanCss(sheet, true) : undefined;
-  if (sheetScan === null) return false;
-  if (sheetScan) styled(sheetScan);
+  if (roots.length !== 1) return false;
 
-  // The share of the picture that a shape covers, as a cost: all of it when anything can
-  // scale shapes, or when the picture has no size. Each glyph covers a font size square.
-  const viewArea = view && view.w > 0 && view.h > 0 ? view.w * view.h : 0;
-  const share = (w: number, h: number): number =>
-    Math.min(1, ((w + stroke) * (h + stroke)) / viewArea);
-  const areaCost = (node: Node): number => {
-    if (!node.extent && node.glyphs === 0) return 0;
-    if (scales || !viewArea) return AREA_COST * Math.max(1, node.glyphs);
-    const shape = node.extent ? share(node.extent.w, node.extent.h) : 0;
-    return Math.ceil(AREA_COST * (shape + node.glyphs * share(font, font)));
-  };
-
-  // The cost of each node with its content, and of each id (the largest of its elements),
-  // each computed once. A `<use>` costs its target where it sits, also in `<defs>` and
-  // `<symbol>`: browsers build those copies even where they draw nothing.
-  const costs = new Map<Node, number>();
-  const idCosts = new Map<string, number>();
+  // Each node and each id counted once. A `<use>` and a `clip-path` must link to an element of
+  // the icon (a clip path for `clip-path`); a missing one, a cycle, or a long chain refuses.
+  const counts = new Map<Node, Count>();
+  const idCounts = new Map<string, Count>();
   const active = new Set<Node>();
   let chain = 0;
   let refused = false;
-  const idCost = (id: string, clipOnly: boolean): number => {
-    const key = `${clipOnly ? 'c' : 'u'}#${id}`;
-    const known = idCosts.get(key);
-    if (known !== undefined) return known;
-    let largest = 0;
-    for (const node of ids.get(id) ?? [])
-      if (!clipOnly || node.name === 'clipPath') largest = Math.max(largest, cost(node));
-    idCosts.set(key, largest);
+  const OVER: Count = { load: Infinity, squares: Infinity };
+  const add = (a: Count, b: Count, times = 1): Count => ({
+    load: a.load + times * b.load,
+    squares: a.squares + times * b.squares,
+  });
+  const share = (c: Count): number => c.load + (sheet.evenOdd ? c.squares / MAX_SVG_EVEN_ODD : 0);
+  const over = (c: Count): boolean => !(share(c) <= 1);
+  const linked = (id: string, clip: boolean): Count => {
+    const key = `${clip ? 'c' : 'u'}#${id}`;
+    const known = idCounts.get(key);
+    if (known) return known;
+    const nodes = (ids.get(id) ?? []).filter((n) => !clip || n.name === 'clipPath');
+    if (nodes.length === 0 || ++chain > MAX_USE_CHAIN) return ((refused = true), OVER);
+    let largest: Count = { load: 0, squares: 0 };
+    for (const n of nodes) {
+      const c = count(n);
+      if (share(c) > share(largest)) largest = c;
+    }
+    chain -= 1;
+    idCounts.set(key, largest);
     return largest;
   };
-  const follow = (id: string, clipOnly: boolean): number => {
-    chain += 1;
-    const c = chain > MAX_USE_CHAIN ? ((refused = true), Infinity) : idCost(id, clipOnly);
-    chain -= 1;
-    return c;
-  };
-  const cost = (node: Node): number => {
-    const known = costs.get(node);
-    if (known !== undefined) return known;
-    if (active.has(node) || refused) return ((refused = true), Infinity);
+  const count = (node: Node): Count => {
+    const known = counts.get(node);
+    if (known) return known;
+    if (active.has(node) || refused) return ((refused = true), OVER);
     active.add(node);
-    let total = node.own + areaCost(node);
+    let total = node.own;
     for (const child of node.children) {
-      total += cost(child);
-      if (total > MAX_SVG_COST) break;
+      total = add(total, count(child));
+      if (over(total)) break;
     }
-    if (node.use !== undefined && total <= MAX_SVG_COST) total += follow(node.use, false);
-    for (const id of node.links) if (total <= MAX_SVG_COST) total += follow(id, true);
+    if (node.use !== undefined && !over(total)) total = add(total, linked(node.use, false));
+    for (const id of node.clips) if (!over(total)) total = add(total, linked(id, true));
     active.delete(node);
-    costs.set(node, total);
+    counts.set(node, total);
     return total;
   };
-  let total = 0;
-  for (const root of roots) total += cost(root);
+  let total = count(roots[0]!);
   // A sheet's clip paths and opacity can reach every element.
-  let sheetEach = sheetScan?.opacity ? LAYER_COST : 0;
-  for (const id of sheetScan?.ids ?? []) sheetEach += idCost(id, true);
-  total += sheetEach * elements;
-  return !refused && total <= MAX_SVG_COST;
+  for (const id of sheet.clips) total = add(total, linked(id, true), elements);
+  if (sheet.opacity) total = add(total, { load: elements / MAX_SVG_LAYERS, squares: 0 });
+  return !refused && !over(total);
 }

@@ -1,13 +1,19 @@
-// Probes of the SVG picture subset (svg-picture.ts): bypasses of a counting check, features
-// whose cost grows per pixel, vertex, or layer, inputs that make a check slow, and SVG files
-// from common tools. A refused picture draws its raster alternative.
+// Probes of the SVG icon subset (svg-picture.ts): bypasses of a counting check, features whose
+// cost grows per pixel, vertex, glyph, or layer, inputs that make a check slow, and SVG files
+// from common tools. Each draws its raster alternative.
 
 import { expect, test } from 'bun:test';
 import { MAX_SVG_BYTES, svgDrawable } from '../svg-picture.ts';
 
 const NS = 'xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"';
 const W = 'width="1600" height="900" viewBox="0 0 1600 900"';
-const svg = (body: string, prolog = '') => `${prolog}<svg ${NS} ${W}>${body}</svg>`;
+const svg = (body: string, root = W) => `<svg ${NS} ${root}>${body}</svg>`;
+/** A path that crosses itself `n` times across the box. */
+const crossing = (n: number) => {
+  let d = 'M0 0';
+  for (let i = 0; i < n; i += 1) d += ` L${i % 2 ? 0 : 1600} ${(i * 337) % 900}`;
+  return d;
+};
 let chain = '<g id="a0"><rect width="1600" height="900" fill="red" opacity="0.5"/></g>';
 for (let i = 1; i <= 9; i++) chain += `<g id="a${i}">${`<use href="#a${i - 1}"/>`.repeat(10)}</g>`;
 const M = `<defs><marker id="m" markerWidth="9" markerHeight="9">${'<rect width="3" height="3"/>'.repeat(100)}</marker></defs>`;
@@ -154,72 +160,172 @@ const CASES: Record<string, () => string> = {
     svg(`<image width="9" height="9" href="data:image/svg+xml;base64,PHN2Zy8+"/>`),
   imageXPng: () => svg(`<image width="9" height="9" href="data:image/x-png;base64,iVBOR"/>`),
   emptyTypeFont: () => svg(`<style>@font-face{font-family:a;src:url(data:;base64,AAAA)}</style>`),
-  officeIcon: () =>
+  // Costs that grow per vertex, glyph, gradient stop, pixel, or layer.
+  crossPath20k: () => svg(`<path d="${crossing(20_000)}" fill="red"/>`),
+  crossStroke20k: () =>
+    svg(`<path d="${crossing(20_000)}" fill="none" stroke="red" stroke-width="3"/>`),
+  crossEvenOdd2k: () => svg(`<path d="${crossing(2_000)}" fill="red" fill-rule="evenodd"/>`),
+  crossEvenOddClip: () =>
     svg(
-      `<g><path d="M48 12C29.2 12 14 27.2 14 46s15.2 34 34 34 34-15.2 34-34-15.2-34-34-34z" fill="#4472C4"/></g>`
+      `<defs><clipPath id="c"><path d="${crossing(1_500)}" clip-rule="evenodd"/></clipPath></defs><rect ${fullRect} clip-path="url(#c)"/>`
+    ),
+  crossPolygon20k: () => svg(`<polygon points="${crossing(20_000).slice(4).replace(/L/g, '')}"/>`),
+  crossClip200: () =>
+    svg(
+      `<defs><clipPath id="c"><path d="${crossing(2_000)}"/></clipPath></defs>${`<rect ${fullRect} fill="red" clip-path="url(#c)"/>`.repeat(200)}`
+    ),
+  clipBoundingBox: () =>
+    svg(
+      `<defs><clipPath id="c" clipPathUnits="objectBoundingBox">${'<rect width="1" height="1"/>'.repeat(200)}</clipPath></defs>${`<rect ${fullRect} fill="red" clip-path="url(#c)"/>`.repeat(1_000)}`
+    ),
+  roundRects1700: () => svg(`<rect ${fullRect} rx="1e30" ry="1e30" fill="red"/>`.repeat(1_700)),
+  layers200: () => svg(`<g opacity="0.5"><rect ${fullRect} fill="red"/></g>`.repeat(200)),
+  sliceViewBox: () =>
+    svg(
+      `<defs><g id="a">${'<rect width="2" height="1"/>'.repeat(100)}</g></defs>${'<use href="#a"/>'.repeat(20)}`,
+      'width="1600" height="900" viewBox="0 0 1000000 1" preserveAspectRatio="xMinYMin slice"'
+    ),
+  rootPercent: () =>
+    svg(
+      `<defs><g id="a">${`<rect ${fullRect} fill="red"/>`.repeat(100)}</g><g id="b">${'<use href="#a"/>'.repeat(100)}</g></defs><use href="#b"/>`,
+      'width="100%" height="100%"'
+    ),
+  calcStroke: () =>
+    svg(`<style>.s{stroke-width:calc(5000px)}</style><rect class="s" width="1" height="1"/>`),
+  cssScale: () => svg(`<g style="scale:2000"><rect width="1" height="1"/></g>`),
+  hugeMiter: () =>
+    svg(
+      '<path d="M0 0 L1 0.0000001 L0 0.0000002" stroke="red" stroke-miterlimit="1e9" fill="none"/>'
+    ),
+  percentStroke: () => svg('<rect width="1" height="1" stroke="red" stroke-width="900%"/>'),
+  blend: () =>
+    svg(`<g style="mix-blend-mode:difference"><rect ${fullRect} fill="red"/></g>`.repeat(100)),
+  isolation: () => svg(`<g style="isolation:isolate"><rect ${fullRect}/></g>`),
+  paintOrder: () =>
+    svg(
+      `<rect ${fullRect} stroke="blue" paint-order="stroke" vector-effect="non-scaling-stroke"/>`
+    ),
+  gradientStops: () =>
+    svg(
+      `<defs><linearGradient id="g">${'<stop offset="0.5" stop-color="red"/>'.repeat(1_000)}</linearGradient></defs><rect ${fullRect} fill="url(#g)"/>`
+    ),
+  gradientSpread: () =>
+    svg(
+      `<defs><radialGradient id="g" r="0.00001" spreadMethod="reflect"><stop offset="0"/></radialGradient></defs><rect ${fullRect} fill="url(#g)"/>`
+    ),
+  textLength: () => svg(`<text y="20" textLength="160000000">${'W'.repeat(1_000)}</text>`),
+  textRotate: () =>
+    svg(`<text y="400" rotate="${'1 2 3 '.repeat(1_000)}">${'Wi'.repeat(1_000)}</text>`),
+  textBidi: () => svg(`<text y="400">${'aא'.repeat(1_000)}</text>`),
+  textCombining: () => svg(`<text y="400">${`a${'́̂'.repeat(100)}`.repeat(100)}</text>`),
+  emFont: () => svg(`<g font-size="5em"><path d="M0 0h1"/></g>`),
+  // Inputs that made a checker slow.
+  checkerDoctypeOpen: () => '<!DOCTYPE'.repeat(20_000),
+  checkerDoctypeInComment: () => svg(`<!--${'<!DOCTYPE'.repeat(20_000)}-->`),
+  checkerNamespaceCopies: () => {
+    let decl = '';
+    for (let i = 0; i < 2_000; i += 1) decl += ` xmlns:p${i}="u"`;
+    return svg('<g xmlns:z="u"/>'.repeat(2_000), `${W}${decl}`);
+  },
+  checkerElements: () => svg('<g/>'.repeat(20_000)),
+  checkerUseChain: () => {
+    let s = '<defs>';
+    for (let i = 0; i < 5_000; i += 1) s += `<g id="i${i}"><use href="#i${i + 1}"/></g>`;
+    return svg(`${s}<g id="i5000"/></defs>`);
+  },
+  checkerClipLinks: () =>
+    svg(
+      `<defs><clipPath id="c"><rect width="1" height="1"/></clipPath></defs><g clip-path="${'url(#c)'.repeat(10_000)}"/>`
+    ),
+  // Files from common tools, which use features outside the icon subset.
+  pdfImport: () =>
+    svg(
+      `<g transform="matrix(1.3333 0 0 -1.3333 0 600)">${Array.from({ length: 2_500 }, (_, i) => `<path d="M${i % 50} ${(i / 50) | 0}h4v4h-4z" fill="#333"/>`).join('')}</g>`
+    ),
+  chartDash: () =>
+    svg('<line x1="0" y1="10" x2="400" y2="10" stroke="#ccc" stroke-dasharray="4 2"/>'),
+  chartLabels: () =>
+    svg(
+      '<rect width="100%" height="100%" fill="#fff"/><text x="10" y="20" style="font-size:1.2em">Hi</text>'
     ),
 };
 
-/** Ordinary files inside the subset, and two harmless sheets the check reads in linear time. */
-const ACCEPTED = new Set([
-  'checkerCommentOpen',
-  'checkerSheetNoBraces',
-  'emptyTypeFont',
-  'excalidrawFonts',
-  'highchartsMedia',
-  'matplotlibScatter',
-  'officeIcon',
-]);
-/** Ordinary files that need an element or a property outside the subset: they draw the PNG. */
+/** Ordinary files that need a feature outside the icon subset: they draw the PNG. */
 const FALLBACK: Record<string, string> = {
   drawioSwitch: 'a <switch> and a <foreignObject>',
   illustratorSwitch: 'a <switch> and a <foreignObject>',
   mermaidHtmlLabels: 'a <foreignObject>',
   inkscapeGradients: 'a filter',
+  matplotlibScatter: 'more shapes than an icon',
   figmaShadow: 'a filter and a pattern',
+  excalidrawFonts: 'text and fonts',
+  highchartsMedia: 'an at-rule',
+  pdfImport: 'more shapes than an icon',
+  chartDash: 'a dash array',
+  chartLabels: 'text',
   nestedSvgImage: 'an SVG document in an <image>',
-  imageXPng: 'the image/x-png type',
+  imageXPng: 'an <image>',
 };
 
 const enc = (s: string) => new TextEncoder().encode(s);
 
 for (const [name, make] of Object.entries(CASES)) {
-  const accepted = ACCEPTED.has(name);
   const why = FALLBACK[name];
-  const label = accepted
-    ? 'draws as vector art'
-    : why
-      ? `draws the PNG: it needs ${why}`
-      : 'draws its raster alternative';
+  const label = why ? `draws the PNG: it needs ${why}` : 'draws its raster alternative';
   test(`${name} ${label}`, () => {
-    expect(svgDrawable(enc(make()))).toBe(accepted);
+    expect(svgDrawable(enc(make()))).toBe(false);
   });
 }
 
-/** The average time of one check of `bytes` over at least 40 ms of checks, in milliseconds. */
+/** The fastest check of `bytes` in 20 ms of checks, in milliseconds. */
 function checkMs(bytes: Uint8Array): number {
-  // A copy for each check: the check keeps its answer for each array.
-  let runs = 0;
-  const t0 = performance.now();
-  for (; performance.now() - t0 < 40; runs += 1) svgDrawable(bytes.slice());
-  return (performance.now() - t0) / runs;
+  // A collection first, so one left by an earlier turn does not land in this one.
+  Bun.gc(true);
+  let best = Infinity;
+  for (const t0 = performance.now(); performance.now() - t0 < 20;) {
+    // A copy for each check: the check keeps its answer for each array.
+    const copy = bytes.slice();
+    const start = performance.now();
+    svgDrawable(copy);
+    best = Math.min(best, performance.now() - start);
+  }
+  return best;
 }
 
 /** Inputs that made a checker slow, at `n` bytes or so. */
 const SLOW: Record<string, (n: number) => string> = {
   sheetNoBraces: (n) => svg(`<style>${'a'.repeat(n)}</style>`),
+  sheetRules: (n) => svg(`<style>${'.a{fill:red}'.repeat(n / 12)}</style><g class="a"/>`),
+  sheetComments: (n) => svg(`<style>${'/**/'.repeat(n / 4)}</style>`),
+  sheetCommentOpen: (n) => svg(`<style>${'/*'.repeat(n / 2)}</style>`),
+  styleAttribute: (n) => svg(`<g style="${'fill:red;'.repeat(n / 9)}"/>`),
   urlNoParen: (n) => svg(`<g fill="${'url('.repeat(n / 4)}"/>`),
+  doctypeOpen: (n) => '<!DOCTYPE'.repeat(n / 9),
+  doctypeInComment: (n) => svg(`<!--${'<!DOCTYPE'.repeat(n / 9)}-->`),
+  namespaceCopies: (n) => {
+    const k = Math.floor(n / 40);
+    let decl = '';
+    for (let i = 0; i < 60; i += 1) decl += ` xmlns:p${i}="u"`;
+    return svg('<g xmlns:z="u"/>'.repeat(k), `${W}${decl}`);
+  },
   duplicateIds: (n) =>
-    svg(`<defs>${'<g id="x"/>'.repeat(n / 10)}</defs>${'<use href="#x"/>'.repeat(n / 10)}`),
-  rulesTimesElements: (n) =>
-    svg(`<style>${'.a{fill:url(#b)}'.repeat(n / 20)}</style>${'<g class="z"/>'.repeat(n / 20)}`),
-  commentOpen: (n) => svg(`<g style="${'/*'.repeat(n / 2)}"/>`),
+    svg(`<defs>${'<g id="x"/>'.repeat(n / 26)}</defs>${'<use href="#x"/>'.repeat(n / 26)}`),
+  useChain: (n) => {
+    const k = Math.floor(n / 40);
+    let s = '<defs>';
+    for (let i = 0; i < k; i += 1) s += `<g id="i${i}"><use href="#i${i + 1}"/></g>`;
+    return svg(`${s}</defs>`);
+  },
+  pathNumbers: (n) => svg(`<path d="M0 0${' 1'.repeat(n / 2)}"/>`),
+  points: (n) => svg(`<polygon points="${'1,1 '.repeat(n / 4)}"/>`),
+  transforms: (n) => svg(`<g transform="${'scale(1) '.repeat(n / 9)}"/>`),
 };
 
 for (const [name, make] of Object.entries(SLOW))
-  test(`the check of ${name} grows linearly: twice the input takes less than three times as long`, () => {
-    const n = MAX_SVG_BYTES / 4;
-    const [a, b] = [enc(make(n)), enc(make(2 * n))];
+  test(`the check of ${name} grows linearly: four times the input takes less than six times as long`, () => {
+    const n = MAX_SVG_BYTES * 0.8;
+    const [a, b] = [enc(make(n / 4)), enc(make(n))];
+    expect(b.length).toBeLessThanOrEqual(MAX_SVG_BYTES);
     // The fastest of five turns each, taken in turn, so a busy moment slows both.
     let small = Infinity;
     let large = Infinity;
@@ -227,5 +333,5 @@ for (const [name, make] of Object.entries(SLOW))
       small = Math.min(small, checkMs(a));
       large = Math.min(large, checkMs(b));
     }
-    expect(large).toBeLessThan(small * 3);
+    expect(large).toBeLessThan(small * 6);
   });
