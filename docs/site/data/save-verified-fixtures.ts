@@ -68,7 +68,7 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
  * change its fingerprint, only after you open its copy with no prompt. `feature-edits.test.ts`
  * fails when a recipe or an engine change gives a copy with another fingerprint: then open the new
  * copy, and record its fingerprint. Last checked on 7 November 2026: all 66 copies, written by
- * the recipes and fixtures as they are now, no prompt.
+ * the recipes and fixtures as they are now, no prompt; and the `text.clipboard` copy, no prompt.
  */
 export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'collaboration.automation-api':
@@ -145,6 +145,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'text.change-case': 'sha256:73f0bc49d5856e5bfdbae4ae90815e40f613dfe8f53c50bb19b964d84441208b',
   'text.character-spacing':
     'sha256:702aff38ffdf6a441aabc4c8407b18d5a9cb62f058a56523101ef47614d5cf20',
+  'text.clipboard': 'sha256:11f9ad15e9d57168de2ccd5c357bfc34782b4737f93fb1fc7009b496a344efa4',
   'text.color-highlight': 'sha256:cb0c2ab5b21e2b6cef6f2a0204a43a12eda971165cb76470054e883714050632',
   'text.complex-scripts': 'sha256:e402ea570ff05a3119aaa7c0fdea9c60f4ea3f0eea149ca037ea9f1cd02634f1',
   'text.find-replace': 'sha256:9667d4f2087fb86efe2571042ea7c7e1d371e91cb66189b57a0b44750c317c74',

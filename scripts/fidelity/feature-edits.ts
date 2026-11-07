@@ -38,9 +38,15 @@ import {
   shapeXmlOf,
   SHAPE_KINDS,
   slidePart,
+  NEW_SLIDES,
   type FeatureEdit,
 } from './feature-edit-kit.ts';
 import { SLIDE_AND_OBJECT_EDITS } from './slide-object-edits.ts';
+import {
+  paragraphSpecs,
+  richFromHtml,
+  richFromText,
+} from '../../packages/core/src/editor/clipboard-rich.ts';
 
 /** The recipes, by row id. Rows without a recipe cannot claim a full round trip. */
 export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
@@ -207,6 +213,37 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       );
     },
     parts: [/^\/ppt\/notesSlides\/notesSlide2\.xml$/],
+  },
+  'text.clipboard': {
+    fixture: 'text-runs',
+    edit: (t) => {
+      // HTML from another application at a caret: a bold red run, then a bulleted paragraph.
+      const html =
+        '<p><b style="color:#C00000;font-size:20pt">Pasted</b> text</p>' +
+        '<ul><li>Second <i>item</i></li></ul>';
+      t.selectText('Shape 2', 0, 0, 1);
+      t.run({ type: 'pasteText', paragraphs: paragraphSpecs(richFromHtml(html)!) });
+      // Plain text with a shape selected goes in a new text box.
+      t.select('Shape 2');
+      t.run({ type: 'pasteText', paragraphs: paragraphSpecs(richFromText('Box line')) });
+      // Copy a shape and paste it; copy the slide and paste it after itself.
+      t.select('Shape 2');
+      const payload = t.editor.copy();
+      if (!payload) throw new Error('nothing to copy');
+      t.run({ type: 'paste', payload });
+      t.run({ type: 'pasteSlides', file: t.editor.save()!, slides: [0] });
+    },
+    check: (d) => {
+      const slide = d.slideXml(0);
+      return all(
+        has(slide, '<a:t>Pasted</a:t>'),
+        has(slide, 'sz="2000" b="1"'),
+        has(slide, '<a:buChar char="•"/>'),
+        has(slide, '<a:t>Box line</a:t>'),
+        has(d.slideXml(1), '<a:t>Box line</a:t>')
+      );
+    },
+    parts: [...NEW_SLIDES],
   },
   'text.format-painter': {
     fixture: 'text-runs',

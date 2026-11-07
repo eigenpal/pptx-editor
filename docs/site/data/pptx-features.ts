@@ -224,6 +224,17 @@ export const pptxFeatures: PptxFeature[] = [
     notes: 'Searches slide text and speaker notes.',
   },
   {
+    id: 'text.clipboard',
+    name: 'Copy and paste',
+    category: 'text',
+    editing: 'full',
+    rendering: 'none',
+    roundTrip: 'full',
+    tier: 'community',
+    notes:
+      'Copy and paste text, shapes, and slides in the editor and between editors. Text from other applications pastes as HTML with its formatting, list levels, and bullets; a picture pastes at the size its resolution gives. Copied text leaves as HTML, and copied shapes as a picture, or as text for text boxes. Shapes copied in another application paste as a picture: browsers cannot read their shape format.',
+  },
+  {
     id: 'text.format-painter',
     name: 'Format painter',
     category: 'text',

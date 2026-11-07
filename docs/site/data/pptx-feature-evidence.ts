@@ -51,6 +51,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['script-fonts', 'rtl'],
   },
   'text.find-replace': { fixtures: ['slide-layouts'] },
+  'text.clipboard': { fixtures: ['text-runs', 'bullets-numbering'] },
   'text.format-painter': { fixtures: ['text-runs'] },
   // --- Paragraphs & text boxes -------------------------------------------
   'paragraphs.alignment': {
