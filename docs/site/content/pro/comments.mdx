@@ -213,21 +213,28 @@ export function askForReview(editor: PptxEditorInstance) {
 | `resolveComment` | `commentId` | Marks the thread as resolved |
 | `reopenComment` | `commentId` | Marks the thread as open |
 
-Every command except `addComment` also takes `expect`: the `author`, `date`, and `text` of the comment as your view shows it. The editor then refuses the command with `errors.commentChanged` when the comment at `commentId` is not that comment. It compares the author and the date. A twin shares its GUID, author, and creation time with another comment of the slide, or, in the legacy format, its author and index, and its id holds its place among its twins. For such an id, the editor also compares the text, and it refuses the command when no twin is left. So an edit that a collaborator makes to a comment does not refuse yours, unless the comment has a twin. In this sample, `thread` is a thread of `editor.snapshot().comments`:
+Every command except `addComment` also takes `expect`: the `author`, `date`, `text`, and `identity` of the comment as your view shows it. The editor then refuses the command with `errors.commentChanged` when the comment at `commentId` is not that comment. It compares the author, the date, and the identity.
+
+A twin shares its GUID, author, and creation time with another comment of the slide, or, in the legacy format, its author and index. Its id holds its place among its twins. For such an id, the editor also compares the text. It refuses the command with `errors.noComment` when no twin is left, and with `errors.commentAmbiguous` when another twin has the same text. After a delete of a twin, an old id with a place can name no comment, or it can reach the remaining twin, so take ids from the current snapshot. So an edit that a collaborator makes to a comment does not refuse yours, unless the comment has a twin. In this sample, `thread` is a thread of `editor.snapshot().comments`:
 
 ```ts
 const result = editor.exec({
   type: 'editComment',
   commentId: thread.id,
   text: 'Check the totals again',
-  expect: { author: thread.author, date: thread.date, text: thread.text },
+  expect: {
+    author: thread.author,
+    date: thread.date,
+    text: thread.text,
+    identity: thread.identity,
+  },
 });
 if (!result.ok && result.reason === 'errors.commentChanged') {
   // Keep the user's text, and show the comment again.
 }
 ```
 
-The comments pane sends `expect` with each action. When the editor refuses a save or a reply, the field keeps its text and shows the reason. After a notice that the comment changed, a second save or reply applies to the comment as it shows now.
+The comments pane sends `expect` with each action. When the editor refuses a new comment, a save, or a reply, the field keeps its text and shows the reason. After a notice that the comment changed, the edit box shows what the comment reads now, and a second save or reply applies to the comment as it shows now. A twin with the same text as another stays refused.
 
 `addComment` and `replyToComment` also take `author`, `initials`, and `date`. They override the editor's author for that comment. The date is an ISO 8601 date and time. Without a date, the editor uses the current time in UTC. Each command is one undo step.
 
