@@ -1249,6 +1249,7 @@ export class DocumentSession {
     // (undocumented)
     readonly store: PptxDocumentStore;
     substitutedFamilies(): FontSubstitution[];
+    get substituteFamilies(): readonly DefaultFamily[] | null;
     get usedPartNames(): ReadonlySet<string>;
     // @internal
     useShapedMeasurer(loaded: SubstituteLoad): void;

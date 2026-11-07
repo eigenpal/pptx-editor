@@ -39,6 +39,14 @@ import { FONT_NAME } from '../automation/commands/font-format.ts';
 import { createFontResolutionLifetime } from './font-resolution-lifetime.ts';
 import { within } from './within.ts';
 
+/** The four faces of each packaged substitute family. */
+const SUBSTITUTE_STYLES = [
+  { weight: 400, style: 'normal' },
+  { weight: 700, style: 'normal' },
+  { weight: 400, style: 'italic' },
+  { weight: 700, style: 'italic' },
+] as const;
+
 /** What the `fonts` option and prop take, as DOCX Editor's `DocxEditorConfig.fonts`. @public */
 export type EditorFontsOption = FontConfiguration | FontConfigurationFragment | FontResolver;
 
@@ -343,6 +351,20 @@ export function createHostFonts(
     });
   };
 
+  /**
+   * The faces the engine loads itself: the packaged substitutes of the session's families.
+   * An origin that serves the same files (`packagedFonts()`) skips them, so no file loads twice.
+   */
+  const engineFaces = (session: DocumentSession): { resolvedFaces?: FontFaceRequest[] } => {
+    const families = session.substituteFamilies;
+    if (!families || families.length === 0) return {};
+    return {
+      resolvedFaces: families.flatMap((family) =>
+        SUBSTITUTE_STYLES.map((s) => ({ family, weight: s.weight, style: s.style }))
+      ),
+    };
+  };
+
   /** Compose the origins for the session; undefined when the resolution was cancelled. */
   const compose = async (
     session: DocumentSession,
@@ -353,7 +375,7 @@ export function createHostFonts(
     try {
       const answer = await composeFontOrigins(
         list,
-        deckFontRequest(session.store.package, signal),
+        { ...deckFontRequest(session.store.package, signal), ...engineFaces(session) },
         {
           onOriginFailure: (failure) => {
             if (!isAbort(signal)) report(failure.cause);
@@ -499,6 +521,7 @@ export function createHostFonts(
             families: wanted,
             defaultFamily: deckDefaultFamily(session.store.package),
             signal: lease.signal,
+            ...engineFaces(session),
           },
           { onOriginFailure: (failure) => !isAbort(lease.signal) && report(failure.cause) }
         );

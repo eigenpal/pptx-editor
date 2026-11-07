@@ -827,6 +827,11 @@ export class DocumentSession {
       : undefined;
   };
 
+  /** The families whose packaged substitutes the session loads; null when it loads none. */
+  get substituteFamilies(): readonly DefaultFamily[] | null {
+    return this.#fonts.substituteFamilies;
+  }
+
   /** Whether `dispose` ran. @internal */
   get disposed(): boolean {
     return this.#disposed;
