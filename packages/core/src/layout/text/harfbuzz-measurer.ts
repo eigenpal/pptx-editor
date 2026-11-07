@@ -11,7 +11,7 @@ import { isIdeographic } from './line-break.ts';
 import {
   DEFAULT_FALLBACK_FAMILY,
   eastAsianFallbackFamilies,
-  FONT_SUBSTITUTES,
+  fontSubstitutes,
   type FaceMetrics,
   type FontRequest,
   type ResolvedFace,
@@ -241,7 +241,7 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     if (hit) return hit;
     const order = [
       r.family,
-      ...(FONT_SUBSTITUTES[r.family.toLowerCase()] ?? []),
+      ...fontSubstitutes(r.family),
       ...fallbackOrder,
       DEFAULT_FALLBACK_FAMILY,
     ];

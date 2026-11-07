@@ -78,9 +78,14 @@ function namespaceOf(prefix: string, scopes: readonly Element[]): string | undef
   return undefined;
 }
 
-/** Whether every element of a branch is a shape kind the cascade draws. */
+/**
+ * Whether every element of a branch is a shape kind the cascade draws, or another
+ * `mc:AlternateContent`, which resolves in turn.
+ */
 function isDrawable(branch: Element): boolean {
-  return elements(branch).every((el) => el.ns === NS.p && DRAWABLE.has(el.local));
+  return elements(branch).every(
+    (el) => (el.ns === NS.p && DRAWABLE.has(el.local)) || isAlternateContent(el)
+  );
 }
 
 /**
@@ -118,13 +123,12 @@ export function alternateBranch(ac: Element, root?: Element): Element | undefine
  */
 export function contentElements(tree: Element | undefined, root?: Element): Element[] {
   const out: Element[] = [];
-  for (const el of elements(tree)) {
-    if (!isAlternateContent(el)) {
-      out.push(el);
-      continue;
-    }
-    const branch = alternateBranch(el, root);
-    for (const inner of elements(branch)) out.push(inner);
-  }
+  const add = (el: Element, depth: number): void => {
+    if (!isAlternateContent(el)) return void out.push(el);
+    // A chosen branch can hold another `mc:AlternateContent`: it resolves the same way.
+    if (depth >= MAX_DEPTH) return;
+    for (const inner of elements(alternateBranch(el, root))) add(inner, depth + 1);
+  };
+  for (const el of elements(tree)) add(el, 0);
   return out;
 }

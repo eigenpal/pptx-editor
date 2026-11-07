@@ -59,6 +59,23 @@ describe('hostile packages', () => {
     expect(slides(bytes)).toBe(1);
   });
 
+  test('a slide entry that names the master or a layout is not a slide', () => {
+    const zip = readZip(deck());
+    if (!zip.ok) throw new Error('zip');
+    const entries = new Map(zip.entries);
+    const name = '/ppt/presentation.xml';
+    const rels = new TextDecoder().decode(entries.get('/ppt/_rels/presentation.xml.rels'));
+    const master = /Id="(rId\d+)"[^>]*slideMaster"/.exec(rels)?.[1];
+    expect(master).toBeDefined();
+    const xml = new TextDecoder().decode(entries.get(name));
+    const slideRef = /<p:sldId [^>]*r:id="(rId\d+)"/.exec(xml)![1]!;
+    entries.set(
+      name,
+      new TextEncoder().encode(xml.replace(`r:id="${slideRef}"`, `r:id="${master}"`))
+    );
+    expect(slides(writeZip(entries))).toBe(0);
+  });
+
   test('a slide with a relationship to a missing part duplicates', async () => {
     const { createPptxEditor } = await import('../../editor/index.ts');
     const bytes = patched((t, entries) => {

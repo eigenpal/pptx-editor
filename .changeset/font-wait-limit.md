@@ -20,6 +20,10 @@ A deck no longer stays on the loading spinner. The open waits at most 2 seconds 
 - Slide show, template, and macro-enabled decks open. A macro part stays as inert bytes and never runs.
 - A slide whose content type is missing or generic still opens as a slide. A part that no slide, layout, master, theme, or notes relationship reaches no longer refuses the deck when it does not parse.
 - A picture paints only when its bytes are a PNG, JPEG, GIF, BMP, WebP, or SVG picture within the size limits. A damaged, mislabeled, or oversized picture paints the placeholder.
+- A font or a compound line type named after an object member, such as `constructor`, no longer stops layout and paint.
+- A slide list entry that names the master, a layout, notes, or the theme is not read as a slide, so an edit can no longer write into a part that every slide shares.
+- A damaged notes slide or damaged slide relationships no longer refuse the deck. The damaged part stays as the file's bytes on save.
+- A nested `mc:AlternateContent` resolves its chosen branch in turn, so the inner shapes draw.
 - **Duplicate slide** works on a slide whose relationship points to a missing part.
 - `sanitizeHref` also removes leading C0 control characters before it reads the scheme.
 - With no deck open, the slide canvas is named "No presentation open". **Close** on the open-failure message moves focus to it.

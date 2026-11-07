@@ -49,11 +49,6 @@ function typeHere(editor: PptxEditorInstance, text: string): void {
   for (const ch of text) editor.input('text', ch);
 }
 
-async function refused(editor: PptxEditorInstance): Promise<void> {
-  for (let i = 0; i < 2000 && !editor.snapshot().openFailure; i += 1) await wait(2);
-  expect(editor.snapshot().openFailure).toMatchObject({ code: 'xml', reason: 'damaged' });
-}
-
 /** Wait until the deck turns read-only after edits. */
 async function readOnly(editor: PptxEditorInstance): Promise<void> {
   for (let i = 0; i < 2000 && !editor.snapshot().readOnlyReason; i += 1) await wait(1);
@@ -318,7 +313,7 @@ describe('a damaged part in a progressive open', () => {
     editor.destroy();
   });
 
-  test('a damaged notes slide refuses the deck once the background reads it', async () => {
+  test('a damaged notes slide keeps the deck open, and the save keeps its bytes', async () => {
     const LONG = 'Quarterly results show steady growth across every region. '.repeat(40);
     const IN = 914_400;
     const base = buildPptx({
@@ -339,14 +334,22 @@ describe('a damaged part in a progressive open', () => {
     if (!r.ok) throw new Error('read');
     const notes = [...r.pkg.parts.keys()].find((n) => n.includes('/notesSlides/'))!;
     expect(notes).toBeDefined();
-    const bytes = withPart(base, notes, '<p:notes xmlns:p="urn:x"><p:cSld>');
+    const damaged = '<p:notes xmlns:p="urn:x"><p:cSld>';
+    const bytes = withPart(base, notes, damaged);
     const editor = editorFor();
     expect((await editor.load(bytes)).ok).toBe(true);
-    expect(editor.snapshot().pendingSlides).toBeGreaterThan(0);
-    await refused(editor);
-    // No edits: the deck closes.
-    expect(editor.session).toBeNull();
-    expect(editor.snapshot().status).toBe('error');
+    for (let i = 0; i < 2000 && (editor.snapshot().pendingSlides ?? 0) > 0; i += 1) await wait(2);
+    expect(editor.snapshot().status).toBe('ready');
+    expect(editor.snapshot().readOnlyReason ?? null).toBeNull();
+    expect(editor.snapshot().slides.length).toBe(SLIDES);
+    // The notes part is speaker notes only: it stays as the file's bytes.
+    const saved = readPptx(editor.save()!);
+    if (!saved.ok) throw new Error('reopen');
+    const part = saved.pkg.parts.get(notes);
+    expect(part?.kind).toBe('binary');
+    expect(new TextDecoder().decode(part?.kind === 'binary' ? part.bytes : undefined)).toBe(
+      damaged
+    );
     editor.destroy();
   });
 

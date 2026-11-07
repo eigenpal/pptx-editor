@@ -387,6 +387,9 @@ export interface FontSource {
 }
 
 // @public
+export function fontSubstitutes(family: string): readonly string[];
+
+// @public
 export type FontValidationResult = {
     readonly valid: true;
 } | {
