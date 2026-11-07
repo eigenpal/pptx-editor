@@ -31,9 +31,12 @@ const timing = (effects: string): string =>
   '</p:childTnLst></p:cTn></p:par></p:tnLst><p:bldLst><p:bldP spid="2" grpId="0" build="p"/></p:bldLst></p:timing>';
 
 /** A deck whose shape 2 holds paragraphs A, B, and C; B and C each have an effect. */
-async function open(effects = effect(10, 1, 1) + effect(20, 2, 2)): Promise<PptxEditorInstance> {
+async function open(
+  effects = effect(10, 1, 1) + effect(20, 2, 2),
+  texts = ['Alpha', 'Beta', 'Gamma']
+): Promise<PptxEditorInstance> {
   const e = createPptxEditor({ fixedMeasurer: true, substitutes: false });
-  const text = para(run('Alpha')) + para(run('Beta')) + para(run('Gamma'));
+  const text = texts.map((t) => para(t ? run(t) : '')).join('');
   const deck = buildPptx({
     slides: [
       {
@@ -55,6 +58,17 @@ function ranges(root: Element): [string | undefined, string | undefined][] {
   const out: [string | undefined, string | undefined][] = [];
   const walk = (el: Element): void => {
     if (el.local === 'pRg') out.push([attr(el, 'st'), attr(el, 'end')]);
+    for (const c of elements(el)) walk(c);
+  };
+  walk(find(root, 'p:timing') ?? root);
+  return out;
+}
+
+/** The `p:cTn/@id` of each click effect, in document order. */
+function ids(root: Element): string[] {
+  const out: string[] = [];
+  const walk = (el: Element): void => {
+    if (el.local === 'cTn' && attr(el, 'nodeType') === 'clickEffect') out.push(attr(el, 'id')!);
     for (const c of elements(el)) walk(c);
   };
   walk(find(root, 'p:timing') ?? root);
@@ -193,6 +207,62 @@ describe('paragraph ranges of effects', () => {
     const e = await open();
     remove(e, 0, 0, 1, 0);
     expect(e.exec({ type: 'undo' }).ok).toBe(true);
+    expect(ranges(rootOf(e))).toEqual([
+      ['1', '1'],
+      ['2', '2'],
+    ]);
+  });
+
+  test('deleting the first of two identical paragraphs keeps the effect of the second', async () => {
+    const e = await open(effect(10, 0, 0) + effect(20, 1, 1), ['Same', 'Same', 'Gamma']);
+    remove(e, 0, 0, 1, 0);
+    // The effect of the deleted paragraph goes; the effect of the second moves up.
+    expect(ranges(rootOf(e))).toEqual([['0', '0']]);
+    expect(ids(rootOf(e))).toEqual(['20']);
+  });
+
+  test('deleting the second of two identical paragraphs keeps the effect of the first', async () => {
+    const e = await open(effect(10, 0, 0) + effect(20, 1, 1), ['Same', 'Same', 'Gamma']);
+    remove(e, 0, 4, 1, 4);
+    expect(ranges(rootOf(e))).toEqual([['0', '0']]);
+    expect(ids(rootOf(e))).toEqual(['10']);
+  });
+
+  test('Enter between identical paragraphs moves only the ranges after the caret', async () => {
+    const e = await open(effect(10, 0, 0) + effect(20, 1, 1), ['', '', 'Gamma']);
+    e.setSelection({
+      kind: 'text',
+      nodeId: shapeNode(e),
+      anchor: { paragraph: 1, offset: 0 },
+      focus: { paragraph: 1, offset: 0 },
+    });
+    expect(e.input('paragraph').ok).toBe(true);
+    expect(ranges(rootOf(e))).toEqual([
+      ['0', '0'],
+      ['2', '2'],
+    ]);
+  });
+
+  test('an edit with many changes keeps the ranges of the paragraphs it did not change', async () => {
+    const e = await open(effect(10, 1, 1) + effect(20, 3, 3), [
+      'a'.repeat(300),
+      'Beta',
+      'Gamma',
+      'Delta',
+      'b'.repeat(300),
+    ]);
+    const part = e.session!.info.slides[0]!.partName;
+    const paras = find(rootOf(e), 'p:txBody')!;
+    const ps = elements(paras).filter((p) => p.local === 'p');
+    const t = (p: Element): string => find(p, 'a:t')!.id;
+    // Two far-apart changes that differ in more places than a character diff compares, and the
+    // removal of Gamma: Beta stays at 1, and Delta moves from 3 to 2.
+    const r = e.session!.store.transact([
+      { op: 'setText', part, node: t(ps[0]!), text: 'x'.repeat(300) },
+      { op: 'setText', part, node: t(ps[4]!), text: 'y'.repeat(300) },
+      { op: 'removeNode', part, node: ps[2]!.id },
+    ]);
+    expect(r.ok).toBe(true);
     expect(ranges(rootOf(e))).toEqual([
       ['1', '1'],
       ['2', '2'],

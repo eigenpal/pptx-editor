@@ -27,6 +27,7 @@ import { createOpeningLane } from './pptx-editor-opening.ts';
 import { commandCacheKey, compile, type CommandContext } from './commands.ts';
 import { clampSlide, type DocumentSession } from './document-session.ts';
 import { changedSlide, isHistoryMark, validSelection, type HistoryMark } from './history-marks.ts';
+import { markOptions } from './history-marks.ts';
 import { EditorHistoryGroups } from './history-groups.ts';
 import {
   CommandRefusal,
@@ -365,8 +366,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     try {
       const r = session!.store.transact(withoutStaleCopies(session!.store.package, ops), {
         ...options,
-        selectionBefore: before,
-        ...(after ? { selectionAfter: after } : {}),
+        ...markOptions(before, after),
       });
       if (r.ok) ((lastRejection = null), removal.clear());
       return r;
