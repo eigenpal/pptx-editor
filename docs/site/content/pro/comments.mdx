@@ -213,17 +213,34 @@ export function askForReview(editor: PptxEditorInstance) {
 | `resolveComment` | `commentId` | Marks the thread as resolved |
 | `reopenComment` | `commentId` | Marks the thread as open |
 
+Every command except `addComment` also takes `expect`: the `author`, `date`, and `text` of the comment as your view shows it. The editor then refuses the command with `errors.commentChanged` when the comment at `commentId` is not that comment. It compares the author and the date, and the text only for a comment whose GUID, author, and creation time another comment of the slide shares. So an edit that a collaborator makes to a comment does not refuse yours, unless the comment has such a twin. In this sample, `thread` is a thread of `editor.snapshot().comments`:
+
+```ts
+const result = editor.exec({
+  type: 'editComment',
+  commentId: thread.id,
+  text: 'Check the totals again',
+  expect: { author: thread.author, date: thread.date, text: thread.text },
+});
+if (!result.ok && result.reason === 'errors.commentChanged') {
+  // Keep the user's text, and show the comment again.
+}
+```
+
+The comments pane sends `expect` with each action. When the editor refuses a save or a reply, the field keeps its text and shows a notice.
+
 `addComment` and `replyToComment` also take `author`, `initials`, and `date`. They override the editor's author for that comment. The date is an ISO 8601 date and time. Without a date, the editor uses the current time in UTC. Each command is one undo step.
 
 ## Read the threads
 
-`editor.snapshot().comments` lists the threads of the current slide. It is `null` without the review module. `activeComment` is the id of the selected thread. Each thread has `id`, `identity`, `format` (`modern` or `legacy`), `author`, `initials`, `date`, `text`, `textEditable`, `resolved`, `anchor`, and `replies`. `textEditable` is `false` for a comment whose content `editComment` cannot write back, such as a mention. Pass `id` to the comment commands. Key your own UI state, such as an open reply field, by `identity`. When a file repeats a GUID, a delete of another comment can change `id`, and `identity` stays:
+`editor.snapshot().comments` lists the threads of the current slide. It is `null` without the review module. `activeComment` is the id of the selected thread. Each thread has `id`, `identity`, `format` (`modern` or `legacy`), `author`, `initials`, `date`, `text`, `textEditable`, `resolved`, `anchor`, and `replies`. `textEditable` is `false` for a comment whose content `editComment` cannot write back, such as a mention. Pass `id` to the comment commands. Key your own UI state, such as an open reply field, by `identity`. When a file repeats a GUID, a delete of another comment can change `id`. Once shown, an `identity` never names another comment, also after the slide changes and comes back:
 
-- A comment whose GUID, author, and creation time no other comment of the slide shares keeps its `identity` through every change except its own delete.
-- Twins, which share all three, keep their `identity` through their own edits and the delete of a twin with another text.
-- When a twin goes and another twin has the same text, the editor cannot tell which one went. Every twin of that group takes a new `identity`, so state that you keyed by the old one ends. The comments pane closes such a field without saving.
+- A comment that never had a twin keeps its `identity` until it is deleted. A twin shares the GUID, author, and creation time of another comment of the slide.
+- Twins keep their `identity` when one change explains their group: an edit or a resolve that changes at most one text, or one twin more or less at one place.
+- After any other change, every twin of the group takes a new `identity`, so state that you keyed by the old one ends. The comments pane closes such a field without saving.
+- A comment that a slide shows after its first read takes a new `identity`.
 
-An `identity` that is gone never names another comment. `readCommentThreads` reads `identity` from the file alone, so twins can change it there.
+`readCommentThreads` reads `identity` from the file alone, without this carry.
 
 To read the threads of any slide, call `readCommentThreads` with a package and a slide part name:
 
