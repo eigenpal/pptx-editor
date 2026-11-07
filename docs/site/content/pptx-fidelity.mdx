@@ -149,7 +149,7 @@ Each item below is a place where the renderer does not yet follow the specificat
 - **Missing glyphs.** When a font does not have a character, paint uses the system `sans-serif` font. Measurement uses an estimated width.
 - **East Asian, complex-script, and symbol fonts.** Each character takes the `a:ea`, `a:cs`, `a:sym`, or `a:latin` font of its slot. Which characters that both Latin and East Asian text use take `a:ea` follows a fixed list and the run's `lang` and `altLang`. A theme script font (`a:font`) applies only through `lang` or `altLang`. A character that the slot's face lacks uses the first loaded face that has it, East Asian faces first. Lines with Malgun Gothic and Arial text can be about 1 pt off their baseline. East Asian punctuation does not compress.
 - **Right-to-left text.** There is no bidirectional layout. `a:pPr/@rtl` is ignored.
-- **Tab stops.** Right, center, and decimal tab stops behave as left tab stops.
+- **Tab stops.** Right, center, and decimal tab stops in right-to-left text, or in text that does not wrap, are not measured.
 - **Anchoring and alignment variants.** `anchorCtr` is ignored. `anchor="just"` and `anchor="dist"` behave as top. `justLow` and `thaiDist` alignments behave as left.
 - **Upright East Asian text (`eaVert`).** East Asian characters draw upright. Vertical metrics and vertical glyph alternates are not used.
 - **Stacked text (`wordArtVert`).** Each letter advances by the font's line height. A second line goes to the left of the first.

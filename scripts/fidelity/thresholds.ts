@@ -207,7 +207,6 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'rtl-text/4': ['pixels'],
     'shape-effects-presets/2': ['line-breaks'],
     'shape-effects-presets/3': ['line-breaks'],
-    'svg-tab-stops/1': ['pixels', 'baseline', 'line-position'],
     'text-direction/1': ['pixels', 'extra-text'],
     'vertical-east-asian/1': ['pixels'],
   },

@@ -263,7 +263,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'The Paragraph dialog sets the indent before text and a first-line or hanging indent. Indent and outdent change the list level. Tab stops are approximate and not editable. No ruler.',
+      'The Paragraph dialog sets the indent before text and a first-line or hanging indent. Indent and outdent change the list level. Text at a tab stop aligns left, centered, right, or on its decimal point. Tab stops are not editable. No ruler.',
   },
   {
     id: 'paragraphs.autofit',
