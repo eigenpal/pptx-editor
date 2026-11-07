@@ -16,6 +16,7 @@
 // The two are the same as types (`() => X` is assignable to `(request) => X`), so the mark,
 // not the arity, picks the path.
 
+import { ZIP_HARD_LIMITS } from '@eigenpal/ooxml-core';
 import type { FontConfiguration } from '../contracts/index.ts';
 import {
   composeFontConfiguration,
@@ -189,15 +190,18 @@ export const SOURCE_STALL_MS = 10_000;
 
 /**
  * Fetch a URL source with the browser's `fetch`, as the caller wrote it. Rejects with a
- * `TimeoutError` when no response or no body bytes arrive for `stallMs`, and with the abort
- * when `signal` aborts. A URL from user input needs the caller's own check first: this adds
+ * `TimeoutError` when no response or no body bytes arrive for `stallMs`, with a `RangeError`
+ * when the body is longer than `maxBytes`, and with the abort when `signal` aborts. The default
+ * `maxBytes` is the largest archive the engine ever reads, so a server that never stops sending
+ * cannot grow the page's memory without end. A URL from user input needs the caller's own check first: this adds
  * no allowlist. @internal
  */
 export async function fetchPptxSource(
   url: string | URL,
   init: RequestInit | undefined,
   signal: AbortSignal,
-  stallMs = SOURCE_STALL_MS
+  stallMs = SOURCE_STALL_MS,
+  maxBytes = ZIP_HARD_LIMITS.maxTotalBytes
 ): Promise<Uint8Array> {
   signal.throwIfAborted();
   const controller = new AbortController();
@@ -227,8 +231,14 @@ export async function fetchPptxSource(
     ]);
     if (!response.ok)
       throw new Error(`could not open the presentation: ${response.status} ${response.statusText}`);
-    if (!response.body)
-      return new Uint8Array(await Promise.race([response.arrayBuffer(), aborted]));
+    const tooLarge = () => new RangeError(`the presentation is larger than ${maxBytes} bytes`);
+    const declared = Number(response.headers.get('content-length'));
+    if (declared > maxBytes) throw tooLarge();
+    if (!response.body) {
+      const whole = new Uint8Array(await Promise.race([response.arrayBuffer(), aborted]));
+      if (whole.byteLength > maxBytes) throw tooLarge();
+      return whole;
+    }
     const reader = response.body.getReader();
     const chunks: Uint8Array[] = [];
     let size = 0;
@@ -239,6 +249,7 @@ export async function fetchPptxSource(
         if (next.done) break;
         chunks.push(next.value);
         size += next.value.byteLength;
+        if (size > maxBytes) throw tooLarge();
       }
     } catch (cause) {
       void reader.cancel(cause).catch(() => undefined);

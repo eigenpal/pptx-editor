@@ -73,6 +73,43 @@ describe('fetchPptxSource', () => {
     expect(ms).toBeLessThan(STALL);
   });
 
+  test('a body longer than the limit fails while it downloads', async () => {
+    let sent = 0;
+    serve(async (c) => {
+      for (;;) {
+        c.enqueue(new Uint8Array(64));
+        sent += 64;
+        await sleep(1);
+      }
+    });
+    const run = fetchPptxSource(
+      'https://example.test/deck.pptx',
+      undefined,
+      new AbortController().signal,
+      STALL,
+      256
+    );
+    const { result } = await settle(run);
+    expect((result as Error).name).toBe('RangeError');
+    expect(sent).toBeLessThan(1024);
+  });
+
+  test('a declared length over the limit fails before the body', async () => {
+    globalThis.fetch = (async () =>
+      new Response(new Uint8Array(8), {
+        headers: { 'content-length': '4096' },
+      })) as unknown as typeof fetch;
+    const run = fetchPptxSource(
+      'https://example.test/deck.pptx',
+      undefined,
+      new AbortController().signal,
+      STALL,
+      256
+    );
+    const { result } = await settle(run);
+    expect((result as Error).name).toBe('RangeError');
+  });
+
   test('an HTTP error fails at once', async () => {
     globalThis.fetch = (async () => new Response('', { status: 404 })) as unknown as typeof fetch;
     const { result } = await fetchWithStall();
