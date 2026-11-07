@@ -755,7 +755,11 @@
     "noRoot": "Put this control inside the editor root (PptxEditor.Root or PptxEditorRoot) to use it",
     "dialogSlot": "This control opens a dialog",
     "selectWord": "Click in a word or select text",
-    "mixedSize": "The selected text has more than one size"
+    "mixedSize": "The selected text has more than one size",
+    "animationsReadOnly": "The effects of this slide use markup that the editor does not change",
+    "noAnimation": "This slide has no such effect",
+    "noAnimationChange": "The effect or transition already has these settings",
+    "instantAnimation": "This effect is instant, so it has no duration"
   },
   "rail": {
     "ariaLabel": "Slides",
@@ -803,6 +807,7 @@
     "tabs": {
       "format": "Format",
       "selection": "Selection",
+      "animations": "Animations",
       "comments": "Comments"
     },
     "format": {
@@ -843,6 +848,69 @@
     "comments": {
       "emptyTitle": "No comments",
       "emptyBody": "Comments are preserved when you save. Reviewing them is not available in this version."
+    },
+    "animations": {
+      "transition": "Slide transition",
+      "transitionKind": "Transition",
+      "kinds": {
+        "none": "None",
+        "fade": "Fade",
+        "push": "Push",
+        "wipe": "Wipe",
+        "split": "Split",
+        "cut": "Cut",
+        "other": "Other"
+      },
+      "duration": "Duration",
+      "secondsUnit": "s",
+      "advanceOnClick": "Advance on click",
+      "advanceAfter": "Advance after",
+      "applyToAll": "Apply to all slides",
+      "effects": "Effects",
+      "addEffect": "Add effect",
+      "add": "Add",
+      "classes": {
+        "entrance": "Entrance",
+        "emphasis": "Emphasis",
+        "exit": "Exit",
+        "motionPath": "Motion path",
+        "other": "Other effect"
+      },
+      "presets": {
+        "appear": "Appear",
+        "fade": "Fade",
+        "flyIn": "Fly in",
+        "wipe": "Wipe",
+        "zoom": "Zoom",
+        "pulse": "Pulse",
+        "spin": "Spin",
+        "growShrink": "Grow or shrink",
+        "disappear": "Disappear",
+        "fadeOut": "Fade out",
+        "flyOut": "Fly out",
+        "wipeOut": "Wipe out",
+        "zoomOut": "Zoom out"
+      },
+      "listLabel": "Effects of this slide",
+      "emptyTitle": "No effects",
+      "emptyBody": "Select a shape on the slide, then add an effect.",
+      "readOnly": "The editor shows these effects but does not change them.",
+      "noPlayback": "The editor does not play effects or transitions.",
+      "start": "Start",
+      "triggers": {
+        "onClick": "On click",
+        "withPrevious": "With previous",
+        "afterPrevious": "After previous"
+      },
+      "delay": "Delay",
+      "moveEarlier": "Move earlier",
+      "moveLater": "Move later",
+      "remove": "Remove effect",
+      "onShapeClick": "On click of {shape}",
+      "paragraphs": "Paragraphs {start} to {end}",
+      "unnamed": "Missing shape",
+      "step": "Click {step}",
+      "withSlide": "With the slide"
     }
   },
   "pageSetup": {

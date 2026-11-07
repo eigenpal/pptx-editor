@@ -1,5 +1,5 @@
 /** @jsxImportSource vue */
-// The side panel (Format and Comments): the Vue twin of `SidePanel` in the React adapter's
+// The side panel (Format, Selection, Animations, and Comments): the Vue twin of `SidePanel` in the React adapter's
 // `panes.tsx`, with the same markup, classes, and ARIA. The Format tab writes the selected
 // element's position, size, rotation, and text fitting through engine commands.
 
@@ -33,6 +33,7 @@ import { ToolButton, keepFocus } from './chrome.tsx';
 import { useEditorDialog } from './popups.ts';
 import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
 import { PptxEditorSelectionPane } from './SelectionPane.tsx';
+import { AnimationsPane } from './AnimationsPane.tsx';
 
 const EMU_PER_INCH = 914_400;
 const inches = (emu: number): string => (emu / EMU_PER_INCH).toFixed(2);
@@ -290,7 +291,7 @@ const sidePanelProps = {
 export type SidePanelProps = ExtractPublicPropTypes<typeof sidePanelProps>;
 
 /**
- * The side panel: Format · Selection · Comments, the twin of React's `PptxEditor.SidePanel`. The host
+ * The side panel: Format · Selection · Animations · Comments, the twin of React's `PptxEditor.SidePanel`. The host
  * shows or hides the panel by rendering it. @public
  */
 export const PptxEditorSidePanel = defineComponent({
@@ -394,6 +395,7 @@ export const PptxEditorSidePanel = defineComponent({
           >
             {tab.value === 'format' ? <FormatTab /> : null}
             {tab.value === 'selection' ? <PptxEditorSelectionPane /> : null}
+            {tab.value === 'animations' ? <AnimationsPane /> : null}
             {tab.value === 'comments' ? (
               <div class="pptx-empty">
                 <p class="pptx-empty__title">{t('panel.comments.emptyTitle')}</p>

@@ -64,7 +64,6 @@ const KEPT: Readonly<Record<string, Kept>> = {
     names: ['Audio clip', 'Video clip', 'Embedded workbook'],
   },
   'objects.equations': { fixture: 'preserved-content', names: ['Equation'] },
-  'presenting.animations-transitions': { fixture: 'preserved-content' },
   'review.comments': { fixture: 'slide-structure' },
   'themes.placeholder-inheritance': { fixture: 'placeholders-background' },
 };

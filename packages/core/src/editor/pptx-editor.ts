@@ -42,8 +42,7 @@ import {
   createVersionSource,
 } from './snapshot-sources.ts';
 import { createShapeListSource, elementIn } from './shape-list.ts';
-import { activeOf, createBackgroundSource } from './selection-state.ts';
-import { formatAt, geometryOf } from './selection-state.ts';
+import { activeOf, createBackgroundSource, formatAt, geometryOf } from './selection-state.ts';
 import { FormatPainter } from './format-painter.ts';
 import { CropMode } from './crop-mode.ts';
 import { pictureStateAt, withAltText } from './picture-state.ts';
@@ -74,6 +73,7 @@ import { createLayoutSummaries } from '../automation/commands/slide-layouts.ts';
 import { createSectionSummaries } from '../automation/commands/slide-sections.ts';
 import { hasSlideNumber } from '../automation/commands/slide-numbers.ts';
 import { dateShown, footerText } from '../automation/commands/header-footer.ts';
+import { createAnimationsSource } from './animation-command-table.ts';
 import { frameLabelOf, ThumbnailPainter } from './thumbnails.ts';
 import { uniquePrefix } from './paint-ids.ts';
 import { createFind } from './find-session.ts';
@@ -109,8 +109,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   let cached: EditorSnapshot | null = null;
   // The typing burst, the drag, and the host handles that make one undo step each.
   const groups = new EditorHistoryGroups();
-  // Repeated pastes of one payload cascade; a payload parsed from the clipboard is cached by
-  // its text so the series survives re-reading it.
+  // Repeated pastes of one payload cascade; a parsed payload is cached by its clipboard text.
   let pasteSeries: { payload: unknown; count: number } = { payload: null, count: 0 };
   let lastRejection: EditorRejection | null = null;
   const removal = new RemovalNotice(); // `snapshot.lastRemoval`
@@ -239,10 +238,12 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       sections: sectionSummaries(pkg),
       table: tableState(pkg, partAt(slide), lay, selection),
       shapes: shapeList(pkg, partAt(slide)),
+      animations: animationsOf(pkg, partAt(slide)),
     };
     return cached;
   };
   const [slideSummaries, shapeList] = [createSlideSummaries(), createShapeListSource()];
+  const animationsOf = createAnimationsSource();
   const [layoutSummaries, sectionSummaries] = [createLayoutSummaries(), createSectionSummaries()];
   const slideSel = new SlideSelection();
   const notesSource = createNotesSource();

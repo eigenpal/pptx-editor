@@ -354,6 +354,33 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
   deleteSlides: { command: () => ({ type: 'deleteSlides', indices: [1, 2] }) },
   moveSlides: { command: () => ({ type: 'moveSlides', indices: [0, 1], to: 1 }) },
   setSlideNumbers: { command: () => ({ type: 'setSlideNumbers', show: true }) },
+  setTransition: {
+    command: () => ({
+      type: 'setTransition',
+      kind: 'push',
+      durationMs: 1000,
+      advanceAfterMs: 3000,
+    }),
+  },
+  addAnimation: { arrange: select('B'), command: () => ({ type: 'addAnimation', preset: 'fade' }) },
+  removeAnimation: {
+    command: (e) => ({ type: 'removeAnimation', effectId: e.snapshot().animations!.effects[1].id }),
+  },
+  moveAnimation: {
+    command: (e) => ({
+      type: 'moveAnimation',
+      effectId: e.snapshot().animations!.effects[2].id,
+      to: 0,
+    }),
+  },
+  setAnimationTiming: {
+    command: (e) => ({
+      type: 'setAnimationTiming',
+      effectId: e.snapshot().animations!.effects[1].id,
+      trigger: 'afterPrevious',
+      delayMs: 250,
+    }),
+  },
   setFooter: { command: () => ({ type: 'setFooter', show: true, text: 'Quarterly results' }) },
   setDateTime: {
     command: () => ({ type: 'setDateTime', show: true, text: '11/7/2026' }),
@@ -581,6 +608,7 @@ export const TEXT_INPUT_FIXTURES: Record<TextInputKind, TextInputFixture> = {
  */
 export const NO_WRITE_PROBES: Partial<Record<EditorCommandType, ConvergenceFixture>> = {
   toggleSmartGuides: { command: () => ({ type: 'toggleSmartGuides' }) },
+  showAnimationOrder: { command: () => ({ type: 'showAnimationOrder', show: true }) },
   setTableBorderPen: {
     command: () => ({
       type: 'setTableBorderPen',

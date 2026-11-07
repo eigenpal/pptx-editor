@@ -723,6 +723,16 @@ export {
   type SidePanelTab,
 } from './selection-pane.ts';
 export {
+  ANIMATION_PRESET_GROUPS,
+  ANIMATION_TRIGGERS,
+  TRANSITION_KINDS,
+  animationEffectLabelKey,
+  animationListParts,
+  parseSeconds,
+  secondsText,
+  transitionKindLabelKey,
+} from './animation-pane.ts';
+export {
   hasPaneListener,
   isPaneSlot,
   listenPaneRequests,

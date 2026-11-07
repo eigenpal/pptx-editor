@@ -31,6 +31,8 @@ import { textItemOf } from './table-cells.ts';
 import { applyTableKey, tableKeyAction } from './table-keys.ts';
 import { isCaretKey, moveTextSelection, type TextInputKind } from './text-input.ts';
 import { zoomKeyAction } from './zoom.ts';
+import { createAnimationsSource } from './animation-command-table.ts';
+import { animationMarks } from './surface-animation-marks.ts';
 
 /** The surface calls the editor passes through as they are. */
 export type SurfaceHostBase = Pick<
@@ -72,6 +74,7 @@ export interface SurfaceHostState {
 }
 
 export function createSurfaceHost(base: SurfaceHostBase, s: SurfaceHostState): SurfaceHost {
+  const animations = createAnimationsSource();
   return {
     ...base,
     paintLayout: (l) => s.prompts.paint(s.session(), l, s.selection(), s.viewing()) ?? l,
@@ -89,6 +92,10 @@ export function createSurfaceHost(base: SurfaceHostBase, s: SurfaceHostState): S
     imageSize: (p, id) => s.session()?.imageSize(p, id),
     altText: (p, id) => altTextAt(s.session()?.store.package, p, id),
     presence: () => s.presence.painted(s.session()?.store.package, s.part()),
+    animationMarks: () =>
+      s.views.animationOrder
+        ? animationMarks(animations(s.session()?.store.package, s.part()).effects)
+        : [],
     transform: (items, gesture) => {
       const session = s.session();
       if (!session) return;

@@ -1,6 +1,7 @@
 /** @jsxImportSource react */
-// The side panel: Format, Selection (the selection pane), and Comments. The Format tab writes
-// the selected element's position, size, rotation, and text fitting through engine commands.
+// The side panel: Format, Selection (the selection pane), Animations, and Comments. The Format
+// tab writes the selected element's position, size, rotation, and text fitting through engine
+// commands.
 // The Vue twin is `packages/vue/src/SidePanel.tsx`.
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
@@ -23,6 +24,7 @@ import { useEditorDialog } from './popups.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
 import { paneStyle } from './pane-state.ts';
 import { SelectionPane } from './SelectionPane.tsx';
+import { AnimationsPane } from './AnimationsPane.tsx';
 
 const EMU_PER_INCH = 914_400;
 const inches = (emu: number): string => (emu / EMU_PER_INCH).toFixed(2);
@@ -255,7 +257,7 @@ export interface SidePanelProps {
   readonly onTabChange?: (tab: SidePanelTab) => void;
 }
 
-/** The side panel: Format · Selection · Comments. @public */
+/** The side panel: Format · Selection · Animations · Comments. @public */
 export function SidePanel({
   onClose,
   className,
@@ -344,6 +346,7 @@ export function SidePanel({
       >
         {tab === 'format' ? <FormatTab /> : null}
         {tab === 'selection' ? <SelectionPane /> : null}
+        {tab === 'animations' ? <AnimationsPane /> : null}
         {tab === 'comments' ? (
           <div className="pptx-empty">
             <p className="pptx-empty__title">{t('panel.comments.emptyTitle')}</p>

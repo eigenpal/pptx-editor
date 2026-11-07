@@ -835,12 +835,13 @@ export const pptxFeatures: PptxFeature[] = [
     id: 'presenting.animations-transitions',
     name: 'Animations and transitions',
     category: 'presenting',
-    editing: 'none',
+    editing: 'partial',
     rendering: 'none',
-    roundTrip: 'preserved',
+    roundTrip: 'full',
     tier: 'community',
+    docsLink: '/docs/guides/animations',
     notes:
-      'Kept on save and not played. Deleting, cutting, or ungrouping shapes, deleting a table, and turning slide numbers off remove the animations of the removed shapes. A paragraph animation range (`p:pRg`) follows its paragraphs when you add, delete, split, or join paragraphs. An effect whose paragraphs are all deleted goes too. Between paragraphs with the same text, an edit in the editor keeps each effect with its own paragraph. An automation edit that names no selection decides by the text, so an effect can stay with the wrong one of two identical paragraphs.',
+      'You can add, reorder, time, and remove the entrance, emphasis, and exit effects of the main sequence, from 13 presets. You can set fade, push, wipe, split, and cut transitions with a duration and advance timing. Motion paths and interactive sequences are listed, and you cannot add them. Timing in markup-compatibility content is read-only. The editor does not play effects or transitions. Deleting, cutting, or ungrouping shapes, deleting a table, and turning slide numbers off remove the animations of the removed shapes. A paragraph animation range (`p:pRg`) follows its paragraphs when you add, delete, split, or join paragraphs. An effect whose paragraphs are all deleted goes too. Between paragraphs with the same text, an edit in the editor keeps each effect with its own paragraph. An automation edit that names no selection decides by the text, so an effect can stay with the wrong one of two identical paragraphs.',
   },
 
   // --- Comments & review -----------------------------------------------

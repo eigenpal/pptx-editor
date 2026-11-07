@@ -23,6 +23,7 @@ import {
   type TextDragUnit,
 } from './text-drag.ts';
 import { presenceElements } from './surface-presence.ts';
+import { animationMarkElements, type AnimationMark } from './surface-animation-marks.ts';
 import type { PaintedPresence } from './collaboration-presence.ts';
 import {
   cornersOf,
@@ -75,6 +76,8 @@ export interface SurfaceHost extends SurfaceInputHost {
   select(selection: EditorSelection): void;
   /** Collaboration peers on this slide, painted as editing chrome. */
   presence?(): readonly PaintedPresence[];
+  /** The animation order marks to draw (`showAnimationOrder`). */
+  animationMarks?(): readonly AnimationMark[];
   /** The boxes a shape drag writes on release, in file coordinates: one undo step. */
   transform(items: readonly TransformItem[], gesture: string): void;
   fitChanged(zoom: number): void;
@@ -397,6 +400,7 @@ export class SlideSurface {
           ...adjustHandleElements(doc, selected[0], px, this.editor.label('canvas.adjustHandle'))
         );
     }
+    parts.push(...animationMarkElements(doc, layout, this.editor.animationMarks?.() ?? [], px));
     parts.push(...presenceElements(doc, layout, this.editor.presence?.() ?? [], px));
     parts.push(...guideElements(doc, this.#drag.guides, px));
     if (this.#marquee) {

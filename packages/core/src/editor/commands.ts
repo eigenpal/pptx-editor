@@ -68,6 +68,8 @@ import { deleteSlides, duplicateSlides, moveSlides } from '../automation/command
 import { applyHeaderFooter } from '../automation/commands/header-footer.ts';
 import { notesShown, setNotes } from '../automation/commands/notes-commands.ts';
 import { compilePictureCommand, isPictureCommand } from './picture-commands.ts';
+import { compileAnimationCommand, isAnimationCommand } from './animation-command-table.ts';
+import { isViewCommand } from './view-settings.ts';
 import { compileSlideCommand, isSlideCommand } from './slide-command-table.ts';
 import { compileShapeCommand, isShapeCommand } from './shape-command-table.ts';
 import { compileTextFormatCommand, isTextFormatCommand } from './text-format-commands.ts';
@@ -374,14 +376,7 @@ export function compile(
   ctx: CommandContext,
   command: EditorCommand
 ): { batch: OpBatch; effect: CommandEffect } {
-  if (
-    command.type === 'undo' ||
-    command.type === 'redo' ||
-    command.type === 'toggleSmartGuides' ||
-    command.type === 'setPresentationView' ||
-    command.type === 'setSectionsCollapsed' ||
-    command.type === 'setTableBorderPen'
-  )
+  if (command.type === 'undo' || command.type === 'redo' || isViewCommand(command))
     throw new Error('history and view commands do not compile');
   if (ctx.readOnly) throw new CommandRefusal('disabled.viewing');
   // In the Slide Sorter, the Insert commands are off: a new shape waits for the Normal view.
@@ -395,6 +390,8 @@ export function compile(
     return { batch, effect: compilePictureCommand(ctx, batch, slidePart(ctx), command) };
   if (isTextFormatCommand(command))
     return { batch, effect: compileTextFormatCommand(ctx, batch, command) };
+  if (isAnimationCommand(command))
+    return { batch, effect: compileAnimationCommand(ctx, batch, command) };
   const info = ctx.session.info;
   const { width: slideW, height: slideH } = info;
   switch (command.type) {

@@ -46,6 +46,114 @@ export function altTextDraftFrom(alt: AltText | undefined): AltTextDraftFields;
 // @internal
 export const amountText: (n: number) => string;
 
+// @public
+export const ANIMATION_PRESET_GROUPS: readonly {
+    readonly effectClass: 'entrance' | 'emphasis' | 'exit';
+    readonly presets: readonly AnimationPreset[];
+}[];
+
+// @public
+export const ANIMATION_TRIGGERS: readonly AnimationTrigger[];
+
+// @public
+export type AnimationClass = 'entrance' | 'emphasis' | 'exit' | 'motionPath' | 'other';
+
+// @public
+export type AnimationCommand =
+/**
+* Add an effect to each selected shape, at the end of the main sequence. A shape in a group
+* animates as its whole group. `trigger` defaults to `onClick`.
+*/
+    {
+    readonly type: 'addAnimation';
+    readonly preset: AnimationPreset;
+    readonly trigger?: AnimationTrigger;
+}
+/** Remove the effect `effectId` (`AnimationEffect.id`) of the current slide. */
+| {
+    readonly type: 'removeAnimation';
+    readonly effectId: string;
+}
+/** Move the effect `effectId` to position `to` of the main sequence (0-based). */
+| {
+    readonly type: 'moveAnimation';
+    readonly effectId: string;
+    readonly to: number;
+}
+/**
+* Change when the effect `effectId` starts and how long it plays. Absent fields stay. Delay is
+* 0 to 3,600,000 ms; duration is 10 to 59,000 ms and is refused for an instant effect.
+*/
+| {
+    readonly type: 'setAnimationTiming';
+    readonly effectId: string;
+    readonly trigger?: AnimationTrigger;
+    readonly delayMs?: number;
+    readonly durationMs?: number;
+}
+/**
+* Set the transition of the current slide, or of the slides `indices`. Absent fields keep
+* their values. `kind: 'none'` removes the effect. Duration is 10 to 59,000 ms;
+* `advanceAfterMs` is 0 to 3,600,000 ms, or null to clear it.
+*/
+| {
+    readonly type: 'setTransition';
+    readonly kind?: TransitionKind | 'none';
+    readonly durationMs?: number;
+    readonly advanceOnClick?: boolean;
+    readonly advanceAfterMs?: number | null;
+    readonly indices?: readonly number[];
+}
+/**
+* Show the order number of each effect on its shape on the canvas. A view setting, not an
+* edit: no undo step, never saved.
+*/
+| {
+    readonly type: 'showAnimationOrder';
+    readonly show: boolean;
+};
+
+// @public
+interface AnimationEffect_2 {
+    readonly delayMs: number;
+    readonly durationMs: number | null;
+    readonly editable: boolean;
+    // (undocumented)
+    readonly effectClass: AnimationClass;
+    readonly id: string;
+    readonly nodeId: string | null;
+    readonly paragraphs?: {
+        readonly start: number;
+        readonly end: number;
+    };
+    readonly preset: AnimationPreset | null;
+    readonly presetId: number | null;
+    readonly sequence: 'main' | 'interactive';
+    readonly shapeId: string;
+    readonly shapeName: string;
+    readonly step: number | null;
+    // (undocumented)
+    readonly trigger: AnimationTrigger;
+    readonly triggerShapeId?: string;
+    readonly triggerShapeName?: string;
+}
+export { AnimationEffect_2 as AnimationEffect }
+
+// @public
+export function animationEffectLabelKey(effect: Pick<AnimationEffect_2, 'preset' | 'effectClass'>): `panel.animations.presets.${AnimationPreset}` | `panel.animations.classes.${AnimationEffect_2['effectClass']}`;
+
+// @public
+export function animationListParts(effects: readonly AnimationEffect_2[]): {
+    readonly main: readonly AnimationEffect_2[];
+    readonly other: readonly AnimationEffect_2[];
+};
+
+// @public
+export type AnimationPreset = 'appear' | 'fade' | 'flyIn' | 'wipe' | 'zoom' | 'pulse' | 'spin' | 'growShrink' | 'disappear' | 'fadeOut' | 'flyOut' | 'wipeOut' | 'zoomOut';
+
+// @public
+export type AnimationTrigger = 'onClick' | 'withPrevious' | 'afterPrevious';
+
 // @internal
 export function applyLocalFonts(editor: PptxEditorInstance, families: readonly string[]): Promise<'fonts.localDenied' | 'fonts.localNone' | 'fonts.localAdded'>;
 
@@ -1810,7 +1918,7 @@ export type EditorCommand = {
 /** Apply the copied formatting to the selection as one undo step (Ctrl/Cmd+Shift+V). */
 | {
     readonly type: 'pasteFormat';
-} | TextFormatCommand | PictureCommand | FillCommand
+} | TextFormatCommand | PictureCommand | FillCommand | AnimationCommand
 /**
 * Shape Effects: set or remove one effect of the selected shapes, connectors, and pictures.
 * A shape whose effects come from its theme style (`a:effectRef`) gets that style's effects
@@ -1981,6 +2089,8 @@ export type EditorSelection = {
 
 // @public (undocumented)
 export interface EditorSnapshot {
+    readonly animationOrder?: boolean;
+    readonly animations?: SlideAnimations;
     // (undocumented)
     readonly canRedo: boolean;
     // (undocumented)
@@ -3827,6 +3937,9 @@ export interface ParagraphLineSpacing {
 // @internal
 export const parseAmount: (text: string) => number;
 
+// @public
+export function parseSeconds(text: string): number | null;
+
 // @internal
 export function parseToolbarSize(draft: string | null): number | null;
 
@@ -4526,6 +4639,9 @@ export function sameParagraphFormat(a: ParagraphFormatRead | null, b: ParagraphF
 // @internal
 export function scrollIntoNearestScroller(target: HTMLElement, within?: Element | null): void;
 
+// @public
+export function secondsText(ms: number): string;
+
 // @internal
 export function sectionHeaderKeyDown(e: PaneKeyEvent, node: HTMLElement, ctx: SectionKeyContext): void;
 
@@ -4857,7 +4973,7 @@ export function shownOpenFailure(snapshot: EditorSnapshot): DocumentOpenFailure 
 export function showsLoading(snapshot: EditorSnapshot): boolean;
 
 // @internal
-export const SIDE_PANEL_TABS: readonly ["format", "selection", "comments"];
+export const SIDE_PANEL_TABS: readonly ["format", "selection", "animations", "comments"];
 
 // @public
 export type SidePanelTab = (typeof SIDE_PANEL_TABS)[number];
@@ -4885,6 +5001,14 @@ export const SLIDE_SIZE_PRESETS: Readonly<Record<Exclude<SlideSizePreset, 'custo
     readonly width: number;
     readonly height: number;
 }>>;
+
+// @public
+export interface SlideAnimations {
+    readonly editable: boolean;
+    readonly effects: readonly AnimationEffect_2[];
+    // (undocumented)
+    readonly transition: SlideTransitionState;
+}
 
 // @public
 export type SlideBackground = {
@@ -5175,6 +5299,14 @@ export function slideThemeFonts(session: DocumentSession | null, slide: number):
     readonly headings: string | null;
     readonly body: string | null;
 };
+
+// @public
+export interface SlideTransitionState {
+    readonly advanceAfterMs: number | null;
+    readonly advanceOnClick: boolean;
+    readonly durationMs: number;
+    readonly kind: TransitionKind | 'none' | 'other';
+}
 
 // @internal
 export const SLOT_POPUP_KEYS: Readonly<Partial<Record<ChromeSlotId, string>>>;
@@ -6098,6 +6230,15 @@ export interface TransformItem {
     // (undocumented)
     readonly y: number;
 }
+
+// @public
+export const TRANSITION_KINDS: readonly (TransitionKind | 'none')[];
+
+// @public
+export type TransitionKind = 'fade' | 'push' | 'wipe' | 'split' | 'cut';
+
+// @public
+export const transitionKindLabelKey: (kind: SlideTransitionState["kind"]) => `panel.animations.kinds.${SlideTransitionState["kind"]}`;
 
 // @internal
 export function translateDialogErrors<Fields extends object>(t: Translate, errors: DialogErrors<Fields>): DialogErrors<Fields>;

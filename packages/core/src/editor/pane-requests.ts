@@ -6,9 +6,12 @@
 // This module imports nothing: the refusal scan of the automation hosts follows imports.
 
 /** The tabs of the side panel, in order. @internal */
-export const SIDE_PANEL_TABS = ['format', 'selection', 'comments'] as const;
+export const SIDE_PANEL_TABS = ['format', 'selection', 'animations', 'comments'] as const;
 
-/** A tab of the side panel: Format, Selection (the selection pane), or Comments. @public */
+/**
+ * A tab of the side panel: Format, Selection (the selection pane), Animations, or Comments.
+ * @public
+ */
 export type SidePanelTab = (typeof SIDE_PANEL_TABS)[number];
 
 type PaneListener = (pane: SidePanelTab) => void;
