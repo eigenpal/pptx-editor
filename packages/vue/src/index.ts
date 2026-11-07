@@ -62,7 +62,6 @@ import { ToolbarControl } from './toolbar.ts';
 import { PageSetupDialog } from './PageSetupDialog.ts';
 import { ImageAltTextDialog } from './ImageAltTextDialog.ts';
 import { ImagePropertiesDialog } from './ImagePropertiesDialog.ts';
-import { ChartDataDialog } from './ChartDataDialog.ts';
 import { BackgroundDialog } from './BackgroundDialog.tsx';
 import { ParagraphDialog } from './ParagraphDialog.tsx';
 import { FontDialog } from './FontDialog.tsx';
@@ -235,14 +234,6 @@ export {
   type ImagePropertiesDialogProps,
   type UseImagePropertiesDialogReturn,
 } from './ImagePropertiesDialog.ts';
-export {
-  ChartDataDialog,
-  useChartDataDialog,
-  type ChartDataDialogFieldName,
-  type ChartDataDialogFields,
-  type ChartDataDialogProps,
-  type UseChartDataDialogReturn,
-} from './ChartDataDialog.ts';
 export {
   BackgroundDialog,
   useBackgroundDialog,
@@ -759,7 +750,6 @@ export const PptxEditor = Object.assign(PptxEditorDefault, {
   BackgroundDialog,
   ImageAltTextDialog,
   ImagePropertiesDialog,
-  ChartDataDialog,
   ParagraphDialog,
   FontDialog,
   BulletsAndNumberingDialog,

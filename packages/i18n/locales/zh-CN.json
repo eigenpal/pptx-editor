@@ -858,6 +858,7 @@
     "close": "关闭面板",
     "tabs": {
       "format": "格式",
+      "chart": "图表",
       "selection": "选择",
       "animations": "动画",
       "comments": "批注"
@@ -1580,9 +1581,6 @@
   },
   "chartData": {
     "editData": "编辑数据…",
-    "title": "编辑图表数据",
-    "close": "关闭",
-    "grid": "图表数据",
     "categories": "类别",
     "xValues": "X 值",
     "seriesName": "系列 {number} 的名称",
@@ -1592,18 +1590,24 @@
     "newSeries": "系列 {number}",
     "newCategory": "类别 {number}",
     "addCategory": "添加类别",
-    "removeCategory": "删除类别",
     "addSeries": "添加系列",
-    "removeSeries": "删除系列",
-    "help": "在每个单元格中输入值。没有值时请将单元格留空。使用箭头键在单元格之间移动。",
+    "help": "按 Enter 或离开字段即可应用。留空表示无值。",
     "workbookKept": "嵌入的工作簿保留原来的值。图表显示你输入的值。",
     "workbookExternal": "此图表使用链接工作簿中的数据。图表显示你输入的值，并停止从链接更新。",
-    "notEditable": "无法编辑此图表的数据。{reason}",
     "errors": {
       "number": "请输入数字，或将单元格留空。",
       "xNumber": "请为每个 X 值输入数字。",
       "tooLong": "请输入不超过 255 个字符。",
-      "cell": "{cell}：{message}"
-    }
+      "limit": "图表至少保留一个系列和一个类别，最多 255 个系列和 4,000 个类别。"
+    },
+    "name": "名称",
+    "series": "系列",
+    "unnamed": "未命名系列",
+    "emptyTitle": "未选择图表",
+    "emptyBody": "选择幻灯片上的图表以编辑其数据。",
+    "notEditableTitle": "此图表数据为只读",
+    "removeCategoryNamed": "删除类别 {name}",
+    "removeSeriesNamed": "删除系列 {name}",
+    "removeSeries": "删除系列"
   }
 }

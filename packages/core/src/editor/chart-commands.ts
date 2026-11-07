@@ -1,6 +1,6 @@
 // The chart data command (`setChartData`) on the editor's selection, and the selected chart as
-// the snapshot reports it (`EditorSnapshot.chart`) for the chart controls and the Edit Data
-// dialog. The edit itself is DOM-free (`automation/commands/chart-data.ts`).
+// the snapshot reports it (`EditorSnapshot.chart`) for the chart controls and the Chart Data
+// tab. The edit itself is DOM-free (`automation/commands/chart-data.ts`).
 
 import type {
   ChartCommand,

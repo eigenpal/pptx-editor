@@ -259,17 +259,6 @@
       "reactClassNameAsVueClass": {},
       "vueExclusive": {}
     },
-    "ChartDataDialog": {
-      "reactProps": "ChartDataDialogProps",
-      "paired": ["className", "onClose", "open", "preset", "style"],
-      "deferredInVue": {},
-      "reactCallbacksAsVueEmits": {},
-      "reactRenderPropsAsVueSlots": {
-        "children": "default"
-      },
-      "reactClassNameAsVueClass": {},
-      "vueExclusive": {}
-    },
     "ColumnsDialog": {
       "reactProps": "ColumnsDialogProps",
       "paired": ["className", "onClose", "open", "preset", "style"],
@@ -1004,10 +993,6 @@
       "BulletsAndNumberingDialog",
       "BulletsAndNumberingDialogFieldName",
       "BulletsAndNumberingDialogProps",
-      "ChartDataDialog",
-      "ChartDataDialogFieldName",
-      "ChartDataDialogFields",
-      "ChartDataDialogProps",
       "ColumnsDialog",
       "ColumnsDialogFieldName",
       "ColumnsDialogProps",
@@ -1019,13 +1004,11 @@
       "ParagraphDialogProps",
       "UseBackgroundDialogReturn",
       "UseBulletsAndNumberingDialogReturn",
-      "UseChartDataDialogReturn",
       "UseColumnsDialogReturn",
       "UseFontDialogReturn",
       "UseParagraphDialogReturn",
       "useBackgroundDialog",
       "useBulletsAndNumberingDialog",
-      "useChartDataDialog",
       "useColumnsDialog",
       "useFontDialog",
       "useParagraphDialog",

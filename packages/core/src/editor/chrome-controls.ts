@@ -99,10 +99,10 @@ export type ChromeControlState =
    */
   | { readonly kind: 'panel' }
   /**
-   * Shows a tab of the side panel: Format or Selection. The slot sends `requestPane`, which a
-   * mounted side panel and the host answer.
+   * Shows a tab of the side panel: Format, Selection, or Chart Data. The slot sends
+   * `requestPane`, which a mounted side panel and the host answer.
    */
-  | { readonly kind: 'pane'; readonly pane: 'format' | 'selection' }
+  | { readonly kind: 'pane'; readonly pane: 'format' | 'selection' | 'chart' }
   /**
    * Opens a dialog of the `popups` registry by its key. With a probe command, the slot is on when
    * the engine takes it; the dialog runs the command.
@@ -125,8 +125,7 @@ export type ChromeDialogKey =
   | 'bulletsAndNumbering'
   | 'columns'
   | 'imageAltText'
-  | 'imageProperties'
-  | 'chartData';
+  | 'imageProperties';
 
 /** How a control renders. @public */
 export type ChromeControlShape =

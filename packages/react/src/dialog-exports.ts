@@ -26,14 +26,6 @@ export {
   type UseImageAltTextDialogReturn,
 } from './ImageAltTextDialog.tsx';
 export {
-  ChartDataDialog,
-  useChartDataDialog,
-  type ChartDataDialogFieldName,
-  type ChartDataDialogFields,
-  type ChartDataDialogProps,
-  type UseChartDataDialogReturn,
-} from './ChartDataDialog.tsx';
-export {
   ImagePropertiesDialog,
   useImagePropertiesDialog,
   type ImagePropertiesDialogFieldName,

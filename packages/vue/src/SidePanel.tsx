@@ -1,5 +1,5 @@
 /** @jsxImportSource vue */
-// The side panel (Format, Selection, Animations, and Comments): the Vue twin of `SidePanel` in the React adapter's
+// The side panel (Format, Chart Data, Selection, Animations, and Comments): the Vue twin of `SidePanel` in the React adapter's
 // `panes.tsx`, with the same markup, classes, and ARIA. The Format tab writes the selected
 // element's position, size, rotation, and text fitting through engine commands.
 
@@ -22,7 +22,7 @@ import {
   listenPaneRequests,
   takePaneRequest,
   TABLE_OPTION_ROWS,
-  SIDE_PANEL_TABS,
+  visibleSidePanelTabs,
   type SidePanelTab,
   panelHistoryKey,
   platformShortcuts,
@@ -34,6 +34,7 @@ import { useEditorDialog } from './popups.ts';
 import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
 import { PptxEditorSelectionPane } from './SelectionPane.tsx';
 import { AnimationsPane } from './AnimationsPane.tsx';
+import { ChartDataPane } from './ChartDataPane.tsx';
 
 const EMU_PER_INCH = 914_400;
 const inches = (emu: number): string => (emu / EMU_PER_INCH).toFixed(2);
@@ -291,7 +292,7 @@ const sidePanelProps = {
 export type SidePanelProps = ExtractPublicPropTypes<typeof sidePanelProps>;
 
 /**
- * The side panel: Format · Selection · Animations · Comments, the twin of React's `PptxEditor.SidePanel`. The host
+ * The side panel: Format · Chart Data · Selection · Animations · Comments, the twin of React's `PptxEditor.SidePanel`. The host
  * shows or hides the panel by rendering it. @public
  */
 export const PptxEditorSidePanel = defineComponent({
@@ -307,6 +308,9 @@ export const PptxEditorSidePanel = defineComponent({
     const editor = usePptxEditor();
     const own = ref<SidePanelTab>(props.tab ?? 'format');
     const tab = computed<SidePanelTab>(() => props.tab ?? own.value);
+    // The Chart Data tab shows while a chart is selected, or while it is open.
+    const chartSelected = useEditorState((s) => !!s.chart);
+    const tabs = computed(() => visibleSidePanelTabs(chartSelected.value, tab.value));
     const setTab = (next: SidePanelTab): void => {
       own.value = next;
       emit('tabChange', next);
@@ -360,7 +364,7 @@ export const PptxEditorSidePanel = defineComponent({
               role="tablist"
               // One Tab stop: the selected tab; the arrow keys move between tabs.
               onKeydown={(e: KeyboardEvent) => {
-                const next = radioGroupStep(SIDE_PANEL_TABS, tab.value, e.key);
+                const next = radioGroupStep(tabs.value, tab.value, e.key);
                 if (!next) return;
                 e.preventDefault();
                 setTab(next);
@@ -369,7 +373,7 @@ export const PptxEditorSidePanel = defineComponent({
                   ?.focus();
               }}
             >
-              {SIDE_PANEL_TABS.map((id) => (
+              {tabs.value.map((id) => (
                 <button
                   key={id}
                   type="button"
@@ -394,6 +398,7 @@ export const PptxEditorSidePanel = defineComponent({
             onKeydown={(e: KeyboardEvent) => panelHistoryKey(e, editor.value)}
           >
             {tab.value === 'format' ? <FormatTab /> : null}
+            {tab.value === 'chart' ? <ChartDataPane /> : null}
             {tab.value === 'selection' ? <PptxEditorSelectionPane /> : null}
             {tab.value === 'animations' ? <AnimationsPane /> : null}
             {tab.value === 'comments' ? (

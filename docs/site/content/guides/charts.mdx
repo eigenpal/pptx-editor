@@ -39,18 +39,18 @@ You can change the series names, the category labels, and the values of a chart.
 
 The data of bar, column, line, area, pie, doughnut, radar, and scatter charts is editable. In a scatter chart, the categories are the X values.
 
-### Use the Edit Data dialog
+### Use the Chart Data tab
 
-Select a chart. Then choose **Edit data…** on the chart toolbar group, on the **Chart Design** ribbon tab, or in the chart's context menu. The dialog shows the data as a grid:
+Select a chart. Then choose **Edit data…** on the chart toolbar group, on the **Chart Design** ribbon tab, or in the chart's context menu. The side panel opens on its **Chart Data** tab, beside the slide. The tab shows while a chart is selected:
 
-- The first row holds the series names. The first column holds the category labels, or the X values of a scatter chart.
-- An empty cell is a blank value.
-- **Add category** and **Add series** insert after the focused cell. **Remove category** and **Remove series** remove the focused row or column.
-- **OK** writes all changes as one undo step.
+- **Categories** lists a field for each category label, or **X values** for a scatter chart. Each row has a remove button. **Add category** adds a category at the end.
+- **Series** shows a card for each series, with its name and a value field for each category. A card opens and closes with its title. **Add series** adds a series at the end, and **Remove series** removes the series of its card.
+- A field applies when you press Enter or leave it. Each applied field, add, or remove is one undo step, and the slide updates at once.
+- An empty value field is a blank value. Text that is not a number stays in the field with a reason, and Escape restores the chart's value.
 
-The grid is a `grid` with one tab stop. The arrow keys move between cells. Left and Right move to the next cell at the edge of the cell's text. Enter and Shift+Enter move down and up. Ctrl+Home and Ctrl+End go to the first and last cells. Each cell has a label with its series and category.
+Every field has a label with its series and category, such as "Plan, North". The tab uses plain form fields, so Tab and Shift+Tab move through it.
 
-To open the dialog from your own control, call `useEditorDialog('chartData').open()`. To replace or turn off the packaged dialog, set the `chartData` entry of `popups`. See [Open a dialog from your control](/docs/customization/dialogs#open-a-dialog-from-your-control).
+The controls send `requestPane(editor, 'chart')`. When your layout can hide the side panel, listen for the request and show the panel. See [Open the side panel from the toolbar](/docs/customization/layout#open-the-side-panel-from-the-toolbar).
 
 ### Edit data from code
 
@@ -100,7 +100,7 @@ One edit changes the chart part and the embedded workbook together:
 
 `workbook` describes the chart's data as it is now. An edit of an `embedded` workbook writes the workbook too, or is refused with `errors.chartData.workbook`. That happens when a series in a workbook table gets an empty name or the name of another series, or when a grown table would cover cells that hold content. So the chart and an `embedded` workbook never disagree.
 
-When the workbook is `kept` or `external`, the dialog shows a note. An application that rebuilds the chart from its workbook can show the old values.
+When the workbook is `kept` or `external`, the tab shows a note. An application that rebuilds the chart from its workbook can show the old values.
 
 ### Limits
 

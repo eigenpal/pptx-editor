@@ -858,6 +858,7 @@
     "close": "パネルを閉じる",
     "tabs": {
       "format": "書式",
+      "chart": "グラフ",
       "selection": "選択",
       "animations": "アニメーション",
       "comments": "コメント"
@@ -1580,9 +1581,6 @@
   },
   "chartData": {
     "editData": "データの編集…",
-    "title": "グラフ データの編集",
-    "close": "閉じる",
-    "grid": "グラフ データ",
     "categories": "項目",
     "xValues": "X の値",
     "seriesName": "系列 {number} の名前",
@@ -1592,18 +1590,24 @@
     "newSeries": "系列 {number}",
     "newCategory": "項目 {number}",
     "addCategory": "項目を追加",
-    "removeCategory": "項目を削除",
     "addSeries": "系列を追加",
-    "removeSeries": "系列を削除",
-    "help": "各セルに値を入力します。値がない場合はセルを空のままにします。矢印キーでセル間を移動します。",
+    "help": "Enter キーを押すか、フィールドから移動すると適用されます。値なしにするには空欄にします。",
     "workbookKept": "埋め込みブックは以前の値のままです。グラフには入力した値が表示されます。",
     "workbookExternal": "このグラフはリンクされたブックのデータを使用しています。グラフには入力した値が表示され、リンクからの更新は停止します。",
-    "notEditable": "このグラフのデータは編集できません。{reason}",
     "errors": {
       "number": "数値を入力するか、セルを空のままにしてください。",
       "xNumber": "X の値にはすべて数値を入力してください。",
       "tooLong": "255 文字以内で入力してください。",
-      "cell": "{cell}: {message}"
-    }
+      "limit": "グラフには 1 つ以上の系列と項目が必要で、系列は 255 個、項目は 4,000 個までです。"
+    },
+    "name": "名前",
+    "series": "系列",
+    "unnamed": "名前のない系列",
+    "emptyTitle": "グラフが選択されていません",
+    "emptyBody": "データを編集するには、スライド上のグラフを選択してください。",
+    "notEditableTitle": "このグラフのデータは読み取り専用です",
+    "removeCategoryNamed": "項目 {name} を削除",
+    "removeSeriesNamed": "系列 {name} を削除",
+    "removeSeries": "系列の削除"
   }
 }

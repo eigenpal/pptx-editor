@@ -858,6 +858,7 @@
     "close": "패널 닫기",
     "tabs": {
       "format": "서식",
+      "chart": "차트",
       "selection": "선택",
       "animations": "애니메이션",
       "comments": "메모"
@@ -1580,9 +1581,6 @@
   },
   "chartData": {
     "editData": "데이터 편집…",
-    "title": "차트 데이터 편집",
-    "close": "닫기",
-    "grid": "차트 데이터",
     "categories": "범주",
     "xValues": "X 값",
     "seriesName": "계열 {number} 이름",
@@ -1592,18 +1590,24 @@
     "newSeries": "계열 {number}",
     "newCategory": "범주 {number}",
     "addCategory": "범주 추가",
-    "removeCategory": "범주 제거",
     "addSeries": "계열 추가",
-    "removeSeries": "계열 제거",
-    "help": "각 셀에 값을 입력하세요. 값이 없으면 셀을 비워 두세요. 화살표 키로 셀 사이를 이동합니다.",
+    "help": "Enter 키를 누르거나 필드를 벗어나면 적용됩니다. 값이 없으면 비워 두세요.",
     "workbookKept": "포함된 통합 문서는 이전 값을 유지합니다. 차트에는 입력한 값이 표시됩니다.",
     "workbookExternal": "이 차트는 연결된 통합 문서의 데이터를 사용합니다. 차트에는 입력한 값이 표시되고 연결을 통한 업데이트는 중지됩니다.",
-    "notEditable": "이 차트의 데이터는 편집할 수 없습니다. {reason}",
     "errors": {
       "number": "숫자를 입력하거나 셀을 비워 두세요.",
       "xNumber": "모든 X 값에 숫자를 입력하세요.",
       "tooLong": "255자 이하로 입력하세요.",
-      "cell": "{cell}: {message}"
-    }
+      "limit": "차트에는 계열과 항목이 하나 이상 있어야 하며, 계열은 255개, 항목은 4,000개까지입니다."
+    },
+    "name": "이름",
+    "series": "계열",
+    "unnamed": "이름 없는 계열",
+    "emptyTitle": "선택한 차트 없음",
+    "emptyBody": "데이터를 편집하려면 슬라이드에서 차트를 선택하세요.",
+    "notEditableTitle": "이 차트 데이터는 읽기 전용입니다",
+    "removeCategoryNamed": "항목 {name} 제거",
+    "removeSeriesNamed": "계열 {name} 제거",
+    "removeSeries": "계열 제거"
   }
 }
