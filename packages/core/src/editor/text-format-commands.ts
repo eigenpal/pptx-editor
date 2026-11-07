@@ -10,7 +10,8 @@ import type { CommandContext, CommandEffect } from './commands.ts';
 import {
   forRuns,
   listTarget,
-  refitShape,
+  probeLists,
+  refitIds,
   refitTargets,
   selectedIds,
   slidePart,
@@ -104,17 +105,15 @@ export function compileTextFormatCommand(
       const part = slidePart(ctx);
       let listed = false;
       const changed: { shapeId: string }[] = [];
-      for (const t of textTargets(batch, part, ctx.selection)) {
+      const targets = textTargets(batch, part, ctx.selection);
+      // A format with a kind applies to every paragraph, so a check reads a few. One without
+      // reads which paragraphs show a list: all of them.
+      const lists = command.format?.kind
+        ? probeLists(batch, part, ctx, targets)
+        : targets.map((t) => listTarget(batch, part, t));
+      for (const t of lists) {
         const before = batch.ops.length;
-        listed =
-          setBulletFormat(
-            batch,
-            part,
-            ctx.slide,
-            listTarget(batch, part, t),
-            command.format,
-            !ctx.probe
-          ) || listed;
+        listed = setBulletFormat(batch, part, ctx.slide, t, command.format, !ctx.probe) || listed;
         // Refit only a shape whose bullets changed, as `setColumns` does.
         if (batch.ops.length !== before) changed.push(t);
       }
@@ -132,7 +131,7 @@ export function compileTextFormatCommand(
         command.type === 'setTextDirection'
           ? setTextDirection(batch, part, ids, command.direction)
           : setColumns(batch, part, ids, command.count, command.gapEmu);
-      for (const id of changed) refitShape(batch, ctx, part, id);
+      refitIds(batch, ctx, part, changed);
       return { label: command.type };
     }
     case 'setFontFormat': {

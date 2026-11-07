@@ -75,7 +75,8 @@ import {
   forParagraphs,
   forRuns,
   listTarget,
-  refitShape,
+  probeLists,
+  refitIds,
   refitTargets,
   selectedIds,
   slidePart,
@@ -88,7 +89,7 @@ import { deckLayout, newSlideLayout } from '../automation/commands/slide-layouts
 import { findMatches, replaceMatches } from '../automation/commands/find.ts';
 import {
   removeBullets,
-  setListKind,
+  setListKinds,
   shiftListLevel,
 } from '../automation/commands/list-commands.ts';
 import { selectionBody, textItemOf } from './table-cells.ts';
@@ -268,6 +269,7 @@ function writeTransforms(
     const old = fileXfrm(batch, part, t.nodeId, layout);
     return Math.abs(old.cx - t.cx) > 1 || Math.abs(old.cy - t.cy) > 1;
   });
+  const [sized, fit] = [new Set(resized), [] as string[]];
   setTransforms(batch, part, items, layout);
   // A move keeps the text layout; a resize re-fits autofit text. A table scales its columns
   // and rows from the drag's start (`gestureBase`), also on a move that comes back to the
@@ -285,9 +287,10 @@ function writeTransforms(
         ctx.session.measurer
       );
       if (!ctx.probe) refitTable(batch, ctx.slide, part, t.nodeId, ctx.session.measurer);
-    } else if (resized.includes(t) && child(batch.element(part, t.nodeId), 'p:txBody'))
-      refitShape(batch, ctx, part, t.nodeId);
+    } else if (sized.has(t) && child(batch.element(part, t.nodeId), 'p:txBody')) fit.push(t.nodeId);
   }
+  // After every transform, from one resolve: a re-fit changes only its own shape.
+  refitIds(batch, ctx, part, fit);
   // Autofit can change a height; refit the groups again so their bounds stay tight.
   const groups = new Set(
     items.map((t) => parentOf(batch, part, t.nodeId)).filter((p) => p.kind === 'grpSp')
@@ -540,8 +543,8 @@ export function compile(
       const active = command.type === 'toggleBullets' ? ctx.active.bullets : ctx.active.numbering;
       const kind = active ? 'none' : command.type === 'toggleBullets' ? 'bullet' : 'number';
       const targets = textTargets(batch, part, ctx.selection);
-      for (const t of targets)
-        setListKind(batch, part, ctx.slide, listTarget(batch, part, t), kind, !ctx.probe);
+      const lists = probeLists(batch, part, ctx, targets);
+      setListKinds(batch, part, ctx.slide, lists, kind, !ctx.probe);
       refitTargets(batch, ctx, part, targets);
       return { batch, effect: { label: command.type } };
     }
@@ -795,8 +798,8 @@ export function compile(
     }
     case 'setAutofit': {
       const part = slidePart(ctx);
-      for (const id of setTextFitting(batch, part, selectedIds(ctx.selection), command.mode))
-        refitShape(batch, ctx, part, id);
+      const fitted = setTextFitting(batch, part, selectedIds(ctx.selection), command.mode);
+      refitIds(batch, ctx, part, fitted);
       return { batch, effect: { label: 'textFitting' } };
     }
     case 'addSlide': {

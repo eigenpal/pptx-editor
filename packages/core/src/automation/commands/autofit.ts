@@ -44,6 +44,30 @@ function findShape(
   return undefined;
 }
 
+/** The shapes of a resolved slide by node id, built once: a re-fit of many shapes reads it. */
+const shapeTables = new WeakMap<ResolvedSlide, Map<string, Found>>();
+
+function shapeTable(slide: ResolvedSlide): Map<string, Found> {
+  let table = shapeTables.get(slide);
+  if (table) return table;
+  const out = new Map<string, Found>();
+  const walk = (elements: readonly ResolvedElement[], sx: number, sy: number): void => {
+    for (const el of elements) {
+      if (el.kind === 'shape' && !out.has(el.nodeId)) out.set(el.nodeId, { shape: el, sx, sy });
+      if (el.kind === 'group') {
+        // As `findShape` scales a group child.
+        const ext = el.childExtent;
+        const gx = ext.cx ? el.xfrm.cx / ext.cx : 1;
+        const gy = ext.cy ? el.xfrm.cy / ext.cy : 1;
+        walk(el.children, sx * gx, sy * gy);
+      }
+    }
+  };
+  walk(slide.elements, 1, 1);
+  shapeTables.set(slide, (table = out));
+  return table;
+}
+
 /**
  * Re-fit one shape on slide `index` after its text changed. `resolved` is the slide as resolved
  * after every text change and before any re-fit: a re-fit changes only its own shape, so many
@@ -58,7 +82,12 @@ export function refit(
   resolved?: ResolvedSlide
 ): void {
   const slide = resolved ?? resolveSlide(batch.pkg, index);
-  const found = slide ? findShape(slide.elements, nodeId) : undefined;
+  // One shape: a walk to it. Many shapes share `resolved` and its table.
+  const found = !slide
+    ? undefined
+    : resolved
+      ? shapeTable(resolved).get(nodeId)
+      : findShape(slide.elements, nodeId);
   // A table frame: its size follows its rows, which grow to fit cell text.
   if (!found) return void refitTable(batch, index, part, nodeId, measurer);
   const { shape, sx, sy } = found;

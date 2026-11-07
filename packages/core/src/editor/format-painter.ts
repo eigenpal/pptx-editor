@@ -19,7 +19,7 @@ import type {
   FormatPainterMode,
   TextPoint,
 } from '../contracts/index.ts';
-import { refit } from '../automation/commands/autofit.ts';
+import { refitAll } from '../automation/commands/autofit.ts';
 import { selectedIds, type CommandContext, type CommandEffect } from './commands.ts';
 import { selectionBody } from './table-cells.ts';
 import { tableTextTargets } from './table-commands.ts';
@@ -429,7 +429,7 @@ export class FormatPainter {
         const batch = ctx.session.batch();
         const painted = pasteFormat(batch, part, this.#copied, ctx.selection);
         if (!ctx.probe) {
-          for (const id of painted) refit(batch, ctx.slide, part, id, ctx.session.measurer);
+          refitAll(batch, ctx.slide, part, painted, ctx.session.measurer);
           // A paste ends a painter armed for one paint.
           if (this.#mode === 'once') this.#set('off');
         }

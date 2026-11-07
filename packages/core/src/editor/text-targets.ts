@@ -74,6 +74,38 @@ export function listTarget(
   return { shapeId: t.shapeId, txBodyId: t.txBodyId, paragraphs };
 }
 
+/**
+ * The list targets that a check reads: at most {@link PROBE_TEXT_LIMIT} paragraphs in all for
+ * a probe, as `forParagraphs` does, and every one otherwise.
+ */
+export function probeLists(
+  batch: OpBatch,
+  part: string,
+  ctx: CommandContext,
+  targets: readonly Parameters<typeof listTarget>[2][]
+): ListTarget[] {
+  const lists = targets.map((t) => listTarget(batch, part, t));
+  if (!ctx.probe) return lists;
+  let left = PROBE_TEXT_LIMIT;
+  const out: ListTarget[] = [];
+  for (const t of lists) {
+    if (left <= 0) break;
+    out.push({ ...t, paragraphs: t.paragraphs.slice(0, left) });
+    left -= t.paragraphs.length;
+  }
+  return out;
+}
+
+/** `refitTargets` for the shapes `ids`. */
+export function refitIds(
+  batch: OpBatch,
+  ctx: CommandContext,
+  part: string,
+  ids: readonly string[]
+): void {
+  if (!ctx.probe) refitAll(batch, ctx.slide, part, ids, ctx.session.measurer);
+}
+
 /** Re-fit autofit text after an edit, unless the context only probes. */
 export function refitShape(
   batch: OpBatch,

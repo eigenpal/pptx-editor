@@ -261,7 +261,8 @@ export function setBulletFormat(
       ? resolvedParagraphs(batch, slide, target)
       : before;
   const all = paragraphsOf(batch.element(part, target.txBodyId));
-  for (const i of kind ? target.paragraphs : target.paragraphs.filter((j) => !fresh.includes(j))) {
+  const isFresh = new Set(fresh);
+  for (const i of kind ? target.paragraphs : target.paragraphs.filter((j) => !isFresh.has(j))) {
     const pPrId = ensureParagraphProps(batch, part, all[i].id);
     const shown = before[i]?.bullet;
     const sameKind = !!shown && (shown.type === 'char') === (style.kind === 'bullet');
@@ -285,7 +286,7 @@ export function setBulletFormat(
       );
     if (style.kind === 'bullet') {
       // An absent character keeps the paragraph's own bullet, or takes the first gallery one.
-      const char = style.char ?? (sameKind || fresh.includes(i) ? undefined : FIRST_BULLET.char);
+      const char = style.char ?? (sameKind || isFresh.has(i) ? undefined : FIRST_BULLET.char);
       const font = style.char === undefined && style.font === undefined ? undefined : style.font;
       if (char !== undefined) {
         // A character with no font follows the text font (`a:buFontTx`), also over a list
@@ -323,7 +324,7 @@ export function setBulletFormat(
           ? style.startAt !== undefined && !ownNum
             ? own.scheme
             : undefined
-          : fresh.includes(i)
+          : isFresh.has(i)
             ? undefined
             : FIRST_SCHEME);
       if (scheme !== undefined) {

@@ -117,8 +117,8 @@ export function largeSelectionAnswer(
  * or a check of the selection `only`). A large target takes `largeSelectionAnswer`. Else a
  * selection of more than {@link LARGE_SELECTION} shapes is checked on its first
  * {@link LARGE_SELECTION} shapes first: a refusal of the command or its arguments shows there,
- * at a fraction of the cost. A pass there is the answer; a refusal there checks the whole
- * selection, so a refusal is exact. @internal
+ * at a fraction of the cost. A pass there is the answer, which `exec` can still refuse; a
+ * refusal there checks the whole selection, so a refusal is exact. @internal
  */
 export function checkCommand<
   S extends { readonly kind: string; readonly nodeIds?: readonly string[] },

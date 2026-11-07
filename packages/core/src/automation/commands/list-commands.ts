@@ -145,11 +145,40 @@ export function setListKind(
   kind: ListKind,
   resolve = true
 ): void {
+  setListKinds(batch, part, slide, [target], kind, resolve);
+}
+
+/**
+ * `setListKind` for each of `targets`, with one resolve of the slide between the two phases:
+ * the edits of one target change only its own paragraphs, never how another one resolves.
+ */
+export function setListKinds(
+  batch: OpBatch,
+  part: string,
+  slide: number,
+  targets: readonly ListTarget[],
+  kind: ListKind,
+  resolve = true
+): void {
+  const dropped = targets.map((t) => dropListOverrides(batch, part, t, kind));
+  const lookup = resolve ? paragraphLookup(batch, slide) : () => [];
+  targets.forEach((t, i) => addList(batch, part, t, kind, resolve, dropped[i]!, lookup(t)));
+}
+
+/**
+ * Phase 1: drop the target paragraphs' own list overrides, so inheritance shows through.
+ * Answers their `a:pPr` ids, and the margins dropped on trust: phase 2 puts one back unless
+ * it was the bullet's position.
+ */
+function dropListOverrides(
+  batch: OpBatch,
+  part: string,
+  target: ListTarget,
+  kind: ListKind
+): { pPrs: string[]; dropped: (string | undefined)[] } {
   const all = paragraphsOf(batch.element(part, target.txBodyId));
   const pPrs = target.paragraphs.map((i) => ensureParagraphProps(batch, part, all[i].id));
-  // A margin dropped on trust in phase 1: put back unless it was the bullet's position.
   const dropped: (string | undefined)[] = [];
-  // Phase 1: drop the paragraph's own list overrides, so inheritance shows through.
   for (const pPrId of pPrs) {
     const pPr = batch.element(part, pPrId);
     const suppressed = !!child(pPr, 'a:buNone');
@@ -167,8 +196,19 @@ export function setListKind(
       setPPrAttr(batch, part, pPrId, 'indent', null);
     }
   }
-  // Phase 2: add what inheritance does not give.
-  const inherited = resolve ? resolvedParagraphs(batch, slide, target) : [];
+  return { pPrs, dropped };
+}
+
+/** Phase 2: add what inheritance (`inherited`, resolved after phase 1) does not give. */
+function addList(
+  batch: OpBatch,
+  part: string,
+  target: ListTarget,
+  kind: ListKind,
+  resolve: boolean,
+  { pPrs, dropped }: { pPrs: string[]; dropped: (string | undefined)[] },
+  inherited: readonly ResolvedParagraph[]
+): void {
   target.paragraphs.forEach((index, k) => {
     const pPrId = pPrs[k];
     const bullet = inherited[index]?.bullet ?? null;
