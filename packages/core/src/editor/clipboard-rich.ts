@@ -601,7 +601,9 @@ export function richFromHtml(html: string): RichParagraph[] | null {
       // The bullet's character is near: a bounded look, so many bullet spans stay linear.
       const near = source.slice(tagEnd, tagEnd + BULLET_LOOKAHEAD);
       const end = near.indexOf('</span>');
-      const inner = end < 0 ? '' : decodeEntities(near.slice(0, end).replace(/<[^<>]*>/g, ''));
+      // The character is the text before `</span>`, after any tag inside the span.
+      const head = end < 0 ? '' : near.slice(0, end);
+      const inner = decodeEntities(head.slice(head.lastIndexOf('>') + 1));
       const bullet = specialBullet(css, inner);
       if (bullet) para = { ...para, bullet };
       skipping = 'span';
