@@ -95,16 +95,26 @@ export class DeckStallError extends Error {
   }
 }
 
+/** Options of `fetchDeck`. */
+export interface FetchDeckOptions {
+  /** Fail when no bytes arrive for this long. Defaults to `DECK_STALL_MS`. */
+  readonly stallMs?: number;
+  /** Cancels the download. */
+  readonly signal?: AbortSignal;
+}
+
 /**
- * Fetch a deck that the demo serves. Rejects on a network error, an HTTP error, or a stall:
- * no response or no body bytes for `stallMs`.
+ * Fetch a deck that the demo serves. Rejects on a network error, an HTTP error, a stall (no
+ * response or no body bytes for `stallMs`), or a cancel.
  */
 export async function fetchDeck(
   base: string,
   file: string,
-  stallMs = DECK_STALL_MS
+  { stallMs = DECK_STALL_MS, signal }: FetchDeckOptions = {}
 ): Promise<Uint8Array> {
   const controller = new AbortController();
+  signal?.throwIfAborted();
+  signal?.addEventListener('abort', () => controller.abort(signal.reason), { once: true });
   let timer: ReturnType<typeof setTimeout> | undefined;
   // The stall rejects the wait itself too: a host whose body stream ignores the abort
   // cannot hold the open.
@@ -146,6 +156,31 @@ export async function fetchDeck(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Download the deck the demo opens first. A deck that the user opens before it arrives cancels
+ * it, so a late download never replaces the user's deck, and its failure shows no notice.
+ * Returns the cancel.
+ */
+export function fetchFirstDeck(
+  base: string,
+  file: string,
+  handlers: {
+    readonly loaded: (bytes: Uint8Array) => void;
+    readonly failed: (cause: unknown) => void;
+  }
+): () => void {
+  const controller = new AbortController();
+  fetchDeck(base, file, { signal: controller.signal }).then(
+    (bytes) => {
+      if (!controller.signal.aborted) handlers.loaded(bytes);
+    },
+    (cause: unknown) => {
+      if (!controller.signal.aborted) handlers.failed(cause ?? new Error('fetch failed'));
+    }
+  );
+  return () => controller.abort();
 }
 
 /** Say that a deck the demo serves did not load, in the editor's notice. */

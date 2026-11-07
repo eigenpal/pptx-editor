@@ -1,7 +1,7 @@
 // The demo's deck download: a stall fails soon, and a slow download that keeps sending bytes
 // finishes, however long it takes in all.
 import { afterEach, describe, expect, test } from 'bun:test';
-import { DeckStallError, fetchDeck } from './demo-files.ts';
+import { DeckStallError, fetchDeck, fetchFirstDeck } from './demo-files.ts';
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -14,9 +14,15 @@ const STALL = 60;
 /** Answer with a body that `write` streams. The fake ignores the abort, as a bad host can. */
 function serve(write: (c: ReadableStreamDefaultController<Uint8Array>) => Promise<void>): void {
   globalThis.fetch = (async () =>
-    new Response(new ReadableStream<Uint8Array>({ start: (c) => void write(c) }), {
-      status: 200,
-    })) as unknown as typeof fetch;
+    new Response(
+      new ReadableStream<Uint8Array>({
+        // A cancelled read closes the stream: later writes fail, as a server write would.
+        start: (c) => void write(c).catch(() => undefined),
+      }),
+      {
+        status: 200,
+      }
+    )) as unknown as typeof fetch;
 }
 
 async function settle(run: Promise<Uint8Array>): Promise<{ ms: number; result: unknown }> {
@@ -31,14 +37,14 @@ async function settle(run: Promise<Uint8Array>): Promise<{ ms: number; result: u
 describe('fetchDeck', () => {
   test('a request that never answers fails after the stall limit', async () => {
     globalThis.fetch = (() => new Promise<Response>(() => {})) as unknown as typeof fetch;
-    const { ms, result } = await settle(fetchDeck('/', 'deck.pptx', STALL));
+    const { ms, result } = await settle(fetchDeck('/', 'deck.pptx', { stallMs: STALL }));
     expect(result).toBeInstanceOf(DeckStallError);
     expect(ms).toBeLessThan(STALL * 10);
   });
 
   test('a body that stops halfway fails after the stall limit', async () => {
     serve(async (c) => c.enqueue(new Uint8Array(10)));
-    const { ms, result } = await settle(fetchDeck('/', 'deck.pptx', STALL));
+    const { ms, result } = await settle(fetchDeck('/', 'deck.pptx', { stallMs: STALL }));
     expect(result).toBeInstanceOf(DeckStallError);
     expect(ms).toBeLessThan(STALL * 10);
   });
@@ -51,14 +57,47 @@ describe('fetchDeck', () => {
       }
       c.close();
     });
-    const { ms, result } = await settle(fetchDeck('/', 'deck.pptx', STALL));
+    const { ms, result } = await settle(fetchDeck('/', 'deck.pptx', { stallMs: STALL }));
     expect(result).toEqual(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]));
     expect(ms).toBeGreaterThan(STALL);
   });
 
   test('an HTTP error fails at once', async () => {
     globalThis.fetch = (async () => new Response('', { status: 404 })) as unknown as typeof fetch;
-    const { result } = await settle(fetchDeck('/', 'deck.pptx', STALL));
+    const { result } = await settle(fetchDeck('/', 'deck.pptx', { stallMs: STALL }));
     expect(String(result)).toContain('HTTP 404');
+  });
+});
+
+describe('fetchFirstDeck', () => {
+  test('a cancelled first deck neither opens nor reports a failure, early or late', async () => {
+    const calls: string[] = [];
+    const handlers = {
+      loaded: () => void calls.push('loaded'),
+      failed: () => void calls.push('failed'),
+    };
+    // Arrives after the user opened a file.
+    serve(async (c) => {
+      await sleep(20);
+      c.enqueue(new Uint8Array([1]));
+      c.close();
+    });
+    fetchFirstDeck('/', 'late.pptx', handlers)();
+    // Never arrives: the cancel ends it before the stall limit would.
+    globalThis.fetch = (() => new Promise<Response>(() => {})) as unknown as typeof fetch;
+    fetchFirstDeck('/', 'stalled.pptx', handlers)();
+    await sleep(60);
+    expect(calls).toEqual([]);
+  });
+
+  test('a first deck that is not cancelled opens', async () => {
+    serve(async (c) => {
+      c.enqueue(new Uint8Array([7]));
+      c.close();
+    });
+    const bytes = await new Promise<Uint8Array>((loaded, failed) =>
+      fetchFirstDeck('/', 'deck.pptx', { loaded, failed })
+    );
+    expect(bytes).toEqual(new Uint8Array([7]));
   });
 });
