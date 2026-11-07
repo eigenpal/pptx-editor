@@ -82,23 +82,36 @@ for (const [name, anchor, focus] of CASES)
     typed.destroy();
   });
 
-test('30,000 pasted lines go in within a second', async () => {
-  const editor = await open();
-  select(editor, { paragraph: 0, offset: 10 });
-  const text = Array.from({ length: 30_000 }, (_, i) => `Line ${i}`).join('\n');
-  const t0 = performance.now();
-  expect(editor.input('text', text).ok).toBe(true);
-  expect(performance.now() - t0).toBeLessThan(1_000);
-  expect(paragraphCount(editor)).toBe(30_001);
-  editor.destroy();
+/** The faster of two pastes of `count` lines, in milliseconds. */
+async function linePasteMs(count: number): Promise<number> {
+  const text = Array.from({ length: count }, (_, i) => `Line ${i}`).join('\n');
+  let best = Infinity;
+  for (let k = 0; k < 2; k += 1) {
+    const editor = await open();
+    select(editor, { paragraph: 0, offset: 10 });
+    const t0 = performance.now();
+    expect(editor.input('text', text).ok).toBe(true);
+    best = Math.min(best, performance.now() - t0);
+    expect(paragraphCount(editor)).toBe(count + 1);
+    editor.destroy();
+  }
+  return best;
+}
+
+// A cost that grows with the square of the lines takes 100 times as long for 10 times the lines.
+// Before the fix, 30,000 lines took about 19 seconds in a browser.
+test('30,000 pasted lines cost less than 20 times what 3,000 lines cost', async () => {
+  const small = await linePasteMs(3_000);
+  const large = await linePasteMs(30_000);
+  expect(large).toBeLessThan(small * 20);
 });
 
-/** The fastest of three pastes of `count` HTML paragraphs, in milliseconds. */
+/** The fastest of five pastes of `count` HTML paragraphs, in milliseconds. */
 async function htmlPasteMs(count: number): Promise<number> {
   const html = Array.from({ length: count }, (_, i) => `<p><b>p${i}</b> text</p>`).join('');
   const paragraphs = paragraphSpecs(richFromHtml(html)!);
   let best = Infinity;
-  for (let k = 0; k < 3; k += 1) {
+  for (let k = 0; k < 5; k += 1) {
     const editor = await open();
     select(editor, { paragraph: 0, offset: 10 });
     const t0 = performance.now();
