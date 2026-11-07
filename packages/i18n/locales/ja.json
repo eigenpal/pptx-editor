@@ -402,6 +402,33 @@
     },
     "softEdges": "ぼかし",
     "softEdgeValue": "{value} pt",
+    "bevel": "面取り",
+    "bevels": {
+      "circle": "丸",
+      "relaxedInset": "緩やかな傾斜",
+      "cross": "十字",
+      "coolSlant": "クール スラント",
+      "angle": "角度",
+      "softRound": "ソフト ラウンド",
+      "convex": "凸型",
+      "slope": "スロープ",
+      "divot": "くぼみ",
+      "riblet": "リブレット",
+      "hardEdge": "ハード エッジ",
+      "artDeco": "アール デコ"
+    },
+    "rotation3d": "3-D 回転",
+    "rotations3d": {
+      "isometricLeftDown": "等角投影: 左下",
+      "isometricRightUp": "等角投影: 右上",
+      "isometricTopUp": "等角投影: 上",
+      "isometricOffAxis1Left": "軸外 1: 左",
+      "isometricOffAxis1Right": "軸外 1: 右",
+      "obliqueTopLeft": "斜投影: 左上",
+      "obliqueTopRight": "斜投影: 右上",
+      "obliqueBottomLeft": "斜投影: 左下",
+      "obliqueBottomRight": "斜投影: 右下"
+    },
     "rotate": "回転",
     "rotations": {
       "right90": "右へ 90 度回転",
@@ -468,7 +495,9 @@
       "shadow": "影なし",
       "reflection": "反射なし",
       "glow": "光彩なし",
-      "softEdge": "ぼかしなし"
+      "softEdge": "ぼかしなし",
+      "bevel": "面取りなし",
+      "rotation3d": "回転なし"
     },
     "newSlide": "新しいスライド (Ctrl+M)",
     "slideLayout": "レイアウト",

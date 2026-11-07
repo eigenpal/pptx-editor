@@ -22,6 +22,12 @@ export type Autofit = {
 };
 
 // @public
+export const BEVEL_PRESET_TYPES: readonly ["relaxedInset", "circle", "slope", "cross", "angle", "softRound", "convex", "coolSlant", "divot", "riblet", "hardEdge", "artDeco"];
+
+// @public
+export type BevelPresetType = (typeof BEVEL_PRESET_TYPES)[number];
+
+// @public
 export const BLACK: Rgba;
 
 // @public
@@ -315,6 +321,13 @@ export function resolveChartPart(pkg: PptxPackage, sourcePart: string, graphicDa
 export function resolveColor(el: Element_2 | undefined, ctx: ColorContext): Rgba | undefined;
 
 // @public
+export interface ResolvedBevel {
+    readonly h: number;
+    readonly preset: BevelPresetType;
+    readonly w: number;
+}
+
+// @public
 export type ResolvedBullet = {
     readonly type: 'char';
     readonly char: string;
@@ -359,6 +372,10 @@ export interface ResolvedChartPart {
 
 // @public
 export interface ResolvedEffects {
+    readonly blur?: {
+        readonly radius: number;
+        readonly grow: boolean;
+    };
     readonly fillOverlay?: {
         readonly blend: BlendMode;
         readonly fill: Exclude<ResolvedFill, {
@@ -389,10 +406,14 @@ export interface ResolvedEffects {
         readonly endPos: number;
         readonly fadeDir: number;
     };
+    readonly secondShadow?: EffectPlacement & {
+        readonly color: Rgba;
+    };
     // (undocumented)
     readonly softEdge?: {
         readonly radius: number;
     };
+    readonly threeD?: ResolvedThreeD;
     readonly unsupported: readonly string[];
 }
 
@@ -663,6 +684,24 @@ export interface ResolvedTextBody {
 }
 
 // @public
+export interface ResolvedThreeD {
+    readonly bevelBottom?: ResolvedBevel;
+    readonly bevelTop?: ResolvedBevel;
+    readonly camera: string;
+    readonly cameraRot?: Rotation3D;
+    // (undocumented)
+    readonly contourColor?: Rgba;
+    readonly contourW: number;
+    // (undocumented)
+    readonly extrusionColor?: Rgba;
+    readonly extrusionH: number;
+    // (undocumented)
+    readonly lightDir: string;
+    readonly lightRig: string;
+    readonly material: string;
+}
+
+// @public
 export function resolveEffects(container: Element_2 | undefined, ctx: ColorContext): ResolvedEffects | undefined;
 
 // @public
@@ -696,6 +735,13 @@ export interface Rgba {
     readonly g: number;
     // (undocumented)
     readonly r: number;
+}
+
+// @public
+export interface Rotation3D {
+    readonly lat: number;
+    readonly lon: number;
+    readonly rev: number;
 }
 
 // @public

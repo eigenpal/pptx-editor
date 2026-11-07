@@ -670,22 +670,44 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
     },
   },
   'effects.3d-and-other': {
-    fixture: 'preserved-content',
+    // The camera and bevel slide: change a bevel and turn a camera back to the front, add a
+    // bevel and a camera to a flat-looking shape, replace a camera rotation with a preset, and
+    // blur a shape.
+    fixture: 'three-d-effects',
+    slide: 3,
     edit: (t) => {
-      t.select('3-D shape');
-      t.run({ type: 'setShapeFill', color: '#5B9BD5' });
-      t.run({ type: 'nudge', dx: 91440, dy: 0 });
+      t.select('Shape 2');
+      t.run({ type: 'setShapeEffect', effect: { kind: 'bevel', preset: 'angle' } });
+      t.run({ type: 'setShapeEffect', effect: { kind: 'rotation3d', preset: null } });
+      t.select('Shape 6');
+      t.run({ type: 'setShapeEffect', effect: { kind: 'bevel', preset: 'circle' } });
+      t.run({ type: 'setShapeEffect', effect: { kind: 'rotation3d', preset: 'obliqueTopLeft' } });
+      t.select('Shape 5');
+      t.run({ type: 'setShapeEffect', effect: { kind: 'rotation3d', preset: 'isometricTopUp' } });
+      t.select('Shape 7');
+      t.run({ type: 'setShapeEffect', effect: { kind: 'blur', size: 3 } });
     },
-    check: (d) => {
-      const threeD = (xml: string) => /<a:scene3d>.*<\/a:sp3d>/.exec(xml)?.[0];
-      const xml = d.shapeXml(0, '3-D shape');
-      return all(
-        has(xml, 'val="5B9BD5"'),
-        threeD(xml) === threeD(shapeXmlOf(d.original, 0, '3-D shape'))
-          ? undefined
-          : 'the 3-D scene or shape changed'
-      );
-    },
+    check: (d) =>
+      all(
+        has(
+          d.shapeXml(3, 'Shape 2'),
+          '<a:camera prst="orthographicFront"/>',
+          '<a:sp3d extrusionH="152400"><a:bevelT w="76200" h="76200" prst="angle"/></a:sp3d>'
+        ),
+        has(
+          d.shapeXml(3, 'Shape 6'),
+          '<a:camera prst="obliqueTopLeft"/>',
+          '<a:sp3d extrusionH="228600"><a:bevelT w="76200" h="76200"/></a:sp3d>'
+        ),
+        has(d.shapeXml(3, 'Shape 5'), '<a:camera prst="isometricTopUp"/>'),
+        lacks(d.shapeXml(3, 'Shape 5'), '<a:rot'),
+        has(
+          d.shapeXml(3, 'Shape 7'),
+          '<a:effectLst><a:blur rad="38100"/></a:effectLst><a:scene3d>'
+        ),
+        // The shapes the edit did not touch keep their 3-D properties.
+        kept(d, 3, 'Shape 3', 'Shape 4', 'Shape 8', 'Shape 9')
+      ),
   },
   'effects.outer-shadow': {
     fixture: 'effects',

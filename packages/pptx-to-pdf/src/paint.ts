@@ -57,6 +57,7 @@ import {
   type FillScope,
 } from './paint-fill.ts';
 import { drawTable } from './paint-table.ts';
+import { fillFacets, threeDOf, turnsFace } from './paint-three-d.ts';
 import { drawText } from './paint-text.ts';
 import {
   clip,
@@ -304,10 +305,16 @@ async function drawItem(
   const own = ownFill(item.element.fill, local);
   const shown = own.fill.type !== 'picture' || (await canDrawPicture(own.sourcePart, own.fill, p));
   if (shown) effectDiagnostics(item, p, local);
+  // Bevels, contour, extrusion, and the camera's turn of the face, as the SVG paint draws them.
+  const threeD = threeDOf(item);
+  const turned = turnsFace(threeD);
   const drawContent = async (): Promise<void> => {
+    if (turned) p.push(pushGraphicsState(), concatTransformationMatrix(...threeD.front));
     p.push(pushGraphicsState());
     p.matrix(item.matrix);
+    if (threeD) fillFacets(threeD.under, p);
     await drawGeometry(item, p, local, groupScale);
+    if (threeD) fillFacets(threeD.over, p);
     p.push(popGraphicsState());
     // Over the geometry and under the text, in slide space.
     if (shown) await drawInnerShadow(item, p, local);
@@ -318,10 +325,12 @@ async function drawItem(
       await drawText(item.text, p, local);
       p.push(popGraphicsState());
     }
+    if (turned) p.push(popGraphicsState());
   };
-  // The reflection, shadows, and glow paint under the content, as in the SVG paint.
+  // The reflection, shadows, glow, and extrusion paint under the content, as in the SVG paint.
   if (shown) await drawReflection(item, p, drawContent);
   if (shown) await drawEffectsBehind(item, p, local);
+  if (threeD) fillFacets(threeD.behind, p);
   await drawContent();
 }
 

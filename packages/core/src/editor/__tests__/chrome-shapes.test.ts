@@ -86,7 +86,14 @@ describe('Shape Format slots', () => {
   test('every Shape Effects option is in one of its groups', () => {
     const control = chromeControlForSlot('shape.effects')!;
     const groups = new Set(control.optionGroups!.map((g) => g.id));
-    expect([...groups]).toEqual(['shadow', 'reflection', 'glow', 'softEdge']);
+    expect([...groups]).toEqual([
+      'shadow',
+      'reflection',
+      'glow',
+      'softEdge',
+      'bevel',
+      'rotation3d',
+    ]);
     for (const o of control.options!) {
       expect(groups.has(o.group!)).toBe(true);
       expect(o.value.startsWith(`${o.group}.`)).toBe(true);
@@ -114,11 +121,11 @@ describe('Shape Format slots', () => {
     editor.setSelection({ kind: 'shapes', nodeIds: [id] });
     expect(toolbarCommandState(editor, 'shape.effects')).toMatchObject({
       enabled: true,
-      value: 'shadow.none reflection.none glow.none softEdge.none',
+      value: 'shadow.none reflection.none glow.none softEdge.none bevel.none rotation3d.none',
     });
     editor.exec({ type: 'setShapeEffect', effect: { kind: 'glow', size: 8 } });
     expect(toolbarCommandState(editor, 'shape.effects').value).toBe(
-      'shadow.none reflection.none glow.8.accent1 softEdge.none'
+      'shadow.none reflection.none glow.8.accent1 softEdge.none bevel.none rotation3d.none'
     );
     expect(toolbarCommandState(editor, 'arrange.rotate').enabled).toBe(true);
     // Off while no side panel or host listens for pane requests; on while one does.

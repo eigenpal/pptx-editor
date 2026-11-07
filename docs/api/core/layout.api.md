@@ -153,9 +153,11 @@ export function drawingCapabilities(): DrawingCapabilities;
 
 // @internal
 export interface DrawingEffectsRenderer {
+    readonly blur?: (effects: ResolvedEffects, bounds: EffectBounds, ids: EffectIds) => EffectFilterPaint | null;
     readonly body: (effects: ResolvedEffects, bounds: EffectBounds, ids: EffectIds) => EffectFilterPaint | null;
     readonly glow: (effects: ResolvedEffects, bounds: EffectBounds, ids: EffectIds) => EffectFilterPaint | null;
     readonly reflection: (effects: ResolvedEffects, source: EffectCopySource, ids: EffectIds) => EffectCopyPaint | null;
+    readonly threeD?: (input: ThreeDInput) => ThreeDPaint | null;
 }
 
 // @internal
@@ -851,6 +853,37 @@ export interface TextMeasurer {
     glyphOutline?(face: ResolvedFace, codePoint: number): readonly PathCommand[] | undefined;
     // (undocumented)
     resolve(request: FontRequest): ResolvedFace;
+}
+
+// @internal
+export interface ThreeDFacet {
+    // (undocumented)
+    readonly color: Rgba;
+    // (undocumented)
+    readonly points: readonly {
+        readonly x: number;
+        readonly y: number;
+    }[];
+}
+
+// @internal
+export interface ThreeDInput {
+    readonly color: Rgba;
+    readonly effects: ResolvedEffects;
+    // (undocumented)
+    readonly height: number;
+    readonly matrix: Matrix;
+    readonly paths: readonly GeometryPath[];
+    // (undocumented)
+    readonly width: number;
+}
+
+// @internal
+export interface ThreeDPaint {
+    readonly behind: readonly ThreeDFacet[];
+    readonly front: Matrix;
+    readonly over: readonly ThreeDFacet[];
+    readonly under: readonly ThreeDFacet[];
 }
 
 // @public

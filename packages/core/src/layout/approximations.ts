@@ -35,6 +35,8 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'blur', title: 'Blur', perSlide: true },
   { id: 'shadow-skew', title: 'Shadow skew', perSlide: true },
   { id: 'glow-soft-edge', title: 'Glow and soft edge', perSlide: true },
+  { id: 'preset-shadow', title: 'Preset shadows', perSlide: true },
+  { id: 'three-d', title: '3-D shapes', perSlide: true },
   { id: 'effects-not-drawn', title: 'Effects not drawn', perSlide: true },
   { id: 'fill-overlay', title: 'Fill overlay', perSlide: true },
   { id: 'gradient-colors', title: 'Gradient colors', perSlide: true },
@@ -157,9 +159,13 @@ class Collector {
     if (
       (fx.outerShadow?.blur ?? 0) > 0 ||
       (fx.reflection?.blur ?? 0) > 0 ||
-      (fx.innerShadow?.blur ?? 0) > 0
+      (fx.innerShadow?.blur ?? 0) > 0 ||
+      (fx.blur?.radius ?? 0) > 0
     )
       this.add('blur');
+    if (fx.secondShadow || (fx.outerShadow && fx.outerShadow.blur === 0 && fx.outerShadow.sy !== 1))
+      this.add('preset-shadow');
+    if (fx.threeD) this.add('three-d');
     if (fx.outerShadow && (fx.outerShadow.kx !== 0 || fx.outerShadow.ky !== 0))
       this.add('shadow-skew');
     if (fx.glow || fx.softEdge) this.add('glow-soft-edge');

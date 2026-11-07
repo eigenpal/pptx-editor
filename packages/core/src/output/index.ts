@@ -20,6 +20,7 @@ export {
   gradientPaintStops,
   linearGradientEnds,
   lumTransfer,
+  threeDColor,
 } from './painter-math.ts';
 export {
   registerFontFaces,

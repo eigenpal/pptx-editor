@@ -1,0 +1,82 @@
+---
+title: 'Add 3-D effects'
+description: 'Set and remove bevels, 3-D rotation, and blur on shapes, and learn how 3-D shapes draw.'
+category: 'Guides'
+---
+
+A 3-D shape has a bevel along its outline, a camera that turns it, or an extrusion that gives it depth (`a:scene3d` and `a:sp3d`, ECMA-376 Part 1, 20.1.5). Use the `setShapeEffect` command, or the **Bevel** and **3-D Rotation** submenus of `Toolbar.ShapeEffects`. For the feature status, see <FeatureBadge id="effects.3d-and-other" />.
+
+Bevels, contours, extrusion, camera rotation, and blur paint with the drawing module of `@pptx-editor.dev/pro` (EigenPal Pro License). Without the module, these shapes paint flat, and the menu offers only the rows that remove them. The commands still write every property, and save keeps it. To install the module, see [Drawing](/docs/pro/drawing).
+
+## Set a bevel
+
+This helper accepts an open `PptxEditorInstance` and gives the selected shapes a round top bevel:
+
+```ts
+import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+export function bevelSelection(editor: PptxEditorInstance) {
+  const result = editor.exec({
+    type: 'setShapeEffect',
+    effect: { kind: 'bevel', preset: 'circle' },
+  });
+  if (!result.ok) throw new Error(result.reason);
+}
+```
+
+`preset` is a `BevelPreset`: one of the 12 `ST_BevelPresetType` names, such as `angle`, `softRound`, or `artDeco`. The bevel is 6 pt wide and 6 pt high. A shape with no scene gets a front camera and the three-point light. The command changes the bevel in place, so other 3-D properties of the shape stay.
+
+## Turn the camera
+
+Pass a `Rotation3DPreset` to turn the shape, such as `isometricTopUp` or `obliqueTopLeft`:
+
+```ts
+editor.exec({
+  type: 'setShapeEffect',
+  effect: { kind: 'rotation3d', preset: 'isometricOffAxis1Right' },
+});
+```
+
+The preset replaces the camera's own rotation (`a:rot`). An extrusion of the shape shows only under a turned camera.
+
+## Blur a shape
+
+Pass a radius in points to blur the shape and its text:
+
+```ts
+editor.exec({ type: 'setShapeEffect', effect: { kind: 'blur', size: 3 } });
+```
+
+No menu offers blur. The PDF export does not draw it.
+
+## Remove an effect
+
+Pass `null` to remove the bevel, to turn the camera back to the front, or to remove the blur:
+
+```ts
+editor.exec({ type: 'setShapeEffect', effect: { kind: 'bevel', preset: null } });
+editor.exec({ type: 'setShapeEffect', effect: { kind: 'rotation3d', preset: null } });
+editor.exec({ type: 'setShapeEffect', effect: { kind: 'blur', size: null } });
+```
+
+A bevel that the shape inherits from its theme effect style goes with an own empty `a:sp3d`. Each command refuses with `disabled.noEffectChange` when no selected shape has the effect.
+
+## Read the current effects
+
+`editor.snapshot().geometry.effects` holds the 3-D state of the selection: `bevel` is the bevel preset or `none`, `rotation3d` is the camera preset, `none`, or `other`, and `blur` is the radius in points.
+
+## How 3-D shapes draw
+
+- A bevel draws as shaded strips along the outline. The light model is measured for the circle and angle bevels under the three-point light from the top. Other profiles, lights, and materials are approximate.
+- The face of the shape keeps its fill color.
+- A turned camera draws as a parallel projection, also for perspective presets. The face and its text turn about the center of the shape.
+- Bottom bevels and text in 3-D (`a:bodyPr/a:scene3d`) are not drawn.
+- Preset shadows (`a:prstShdw`) draw in every edition. No command sets them.
+
+The editor canvas and `@pptx-editor.dev/pptx-to-pdf` draw the same polygons. For the measured rules and their limits, see the 3-D shapes item of [PPTX fidelity](/docs/pptx-fidelity).
+
+## See also
+
+- [Drawing](/docs/pro/drawing)
+- [Customize the toolbar](/docs/customization/toolbar)
+- [PPTX fidelity](/docs/pptx-fidelity)

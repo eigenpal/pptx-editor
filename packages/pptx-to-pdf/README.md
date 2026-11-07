@@ -107,8 +107,9 @@ Each diagnostic has a fixed `code`. Handle an unknown code by its `severity`. Th
 | `effect.inner-shadow` | `approximation` | An inner shadow starts at the fill, so an outline wider than 1 pt, an unfilled outline, and overlapping paths are shaded differently. |  |
 | `effect.silhouette` | `approximation` | A shadow or glow uses an opaque silhouette: picture and fill transparency do not shape it. |  |
 | `effect.soft-edge` | `approximation` | Soft edges are drawn hard. |  |
+| `effect.blur` | `approximation` | Blur is not drawn. |  |
 | `effect.reflection-blur` | `approximation` | A reflection is drawn without its blur. |  |
-| `effect.not-rendered` | `unsupported` | An effect the engine does not render (`a:presetShdw`, `a:blur`, and others). |  |
+| `effect.not-rendered` | `unsupported` | An effect the engine does not render (`a:effectDag` and others). |  |
 | `text.outline` | `unsupported` | Text outlines are not drawn. |  |
 | `text.underline-style` | `approximation` | A dotted, dashed, wavy, heavy, or word-only underline is drawn as a single line, as in the editor. |  |
 | `text.synthetic-style`, `text.upright`, `text.missing-glyph` | `approximation` | Synthetic bold and italic, upright vertical characters, and characters the face lacks. | `missing-glyph` |
@@ -220,5 +221,5 @@ The dependencies are the same as DOCX Editor's `docx-to-pdf`.
 | --- | --- | --- |
 | `pdf-lib` 1.17.1 | MIT | PDF writer |
 | `fontkit` 2.0.4 | MIT | Font parsing and subsetting for the embedder copied from DOCX Editor |
-| `@pptx-editor.dev/pro` | EigenPal Pro License | Charts, glow, inner shadow, reflection, and soft edge (`@pptx-editor.dev/pro/drawing`), which the export always installs, as DOCX Editor's `docx-to-pdf` installs `@docx-editor.dev/pro/drawing` |
+| `@pptx-editor.dev/pro` | EigenPal Pro License | Charts, glow, inner shadow, reflection, soft edge, and 3-D shapes (`@pptx-editor.dev/pro/drawing`), which the export always installs, as DOCX Editor's `docx-to-pdf` installs `@docx-editor.dev/pro/drawing` |
 | `pdfjs-dist` 5.4.624 (dev) | Apache-2.0 | Reads the PDF back in tests |

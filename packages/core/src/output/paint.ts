@@ -27,7 +27,14 @@ import {
   type Matrix,
   type SlideLayout,
 } from '../layout/index.ts';
-import { effectDefs, effectElement, shadowCopy, type EffectSource } from './paint-effects.ts';
+import {
+  effectDefs,
+  effectElement,
+  facetElements,
+  shadowCopy,
+  type EffectSource,
+} from './paint-effects.ts';
+import { threeDColor } from './painter-math.ts';
 import { boundsOf, cornersUnder, grow, PX } from './effect-transforms.ts';
 import {
   fillPaint,
@@ -619,30 +626,57 @@ function paintItem(
       const aria = item.kind === 'picture' && opts.altText ? pictureAria(el, opts.altText) : {};
       const outer = svg(doc, 'g', { ...common, 'data-kind': item.kind, ...aria });
       const effects = item.element.effects;
-      // Glow, inner shadow, reflection, and soft edge paint only through the installed effects
-      // renderer (`@pptx-editor.dev/pro/drawing`); the outer shadow is the engine's.
+      // Glow, inner shadow, reflection, soft edge, blur, and 3-D paint only through the installed
+      // effects renderer (`@pptx-editor.dev/pro/drawing`); outer and preset shadows are the
+      // engine's.
       const pro = effects ? drawingRenderers().effects : undefined;
       const ids = ctx.defs;
+      const threeD =
+        pro?.threeD && effects?.threeD
+          ? pro.threeD({
+              effects,
+              paths: item.geometry.paths,
+              matrix: item.matrix,
+              width: el.xfrm.cx,
+              height: el.xfrm.cy,
+              color: threeDColor(item.element.fill),
+            })
+          : null;
       const body = svg(doc, 'g', { transform: matrixAttr(item.matrix) });
+      if (threeD) for (const node of facetElements(doc, threeD.under, SEAM)) body.appendChild(node);
       for (const node of paintGeometry(doc, item, local, parentScale)) body.appendChild(node);
+      // The bevel shades the geometry, under the text (ECMA-376 Part 1, 20.1.5.1).
+      if (threeD) for (const node of facetElements(doc, threeD.over, SEAM)) body.appendChild(node);
       const bodyFx =
         pro && effects && (effects.softEdge || effects.innerShadow)
           ? pro.body(effects, boundsOf(boxCorners(item)), ids)
           : null;
       if (bodyFx) effectDefs(ctx.defs, bodyFx.defs);
-      const content = svg(doc, 'g', {}, [
-        bodyFx ? svg(doc, 'g', { filter: `url(#${bodyFx.filter})` }, [body]) : body,
-      ]);
+      const parts = [bodyFx ? svg(doc, 'g', { filter: `url(#${bodyFx.filter})` }, [body]) : body];
       // An empty body's caret line draws nothing: no group for it.
       if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text))
-        content.appendChild(
+        parts.push(
           svg(doc, 'g', { transform: matrixAttr(item.textMatrix) }, [
             paintText(doc, item.text, local),
           ])
         );
+      // A turned camera turns the face and its text about the shape's center.
+      const turned = threeD && threeD.front.some((v, i) => v !== IDENTITY[i]);
+      const content = svg(doc, 'g', {}, [
+        turned ? svg(doc, 'g', { transform: matrixAttr(threeD.front) }, parts) : parts[0]!,
+        ...(turned ? [] : parts.slice(1)),
+      ]);
+      const blurFx =
+        pro?.blur && effects?.blur ? pro.blur(effects, boundsOf(contentCorners(item)), ids) : null;
+      if (blurFx) effectDefs(ctx.defs, blurFx.defs);
+      const shown = blurFx
+        ? svg(doc, 'g', { filter: `url(#${blurFx.filter})` }, [content])
+        : content;
+      const extrusion = threeD ? facetElements(doc, threeD.behind, SEAM) : [];
       const copies = effects?.outerShadow || (pro && (effects?.reflection || effects?.glow));
       if (!effects || !copies) {
-        outer.appendChild(content);
+        for (const node of extrusion) outer.appendChild(node);
+        outer.appendChild(shown);
         return outer;
       }
       // Shadow, reflection, and glow use the content, text included (design D1 of `effects-fidelity`).
@@ -660,17 +694,23 @@ function paintItem(
         effectDefs(ctx.defs, reflection.defs);
         outer.appendChild(effectElement(doc, reflection.node));
       }
+      // A preset shadow's second copy lies under its first.
+      const second = shadowCopy(ctx.defs, effects, source, 'secondShadow');
+      if (second) outer.appendChild(second);
       const shadow = shadowCopy(ctx.defs, effects, source);
       if (shadow) outer.appendChild(shadow);
+      for (const node of extrusion) outer.appendChild(node);
       const glow = pro && effects.glow ? pro.glow(effects, boundsOf(source.corners), ids) : null;
       if (glow) effectDefs(ctx.defs, glow.defs);
-      outer.appendChild(
-        glow ? svg(doc, 'g', { filter: `url(#${glow.filter})` }, [content]) : content
-      );
+      outer.appendChild(glow ? svg(doc, 'g', { filter: `url(#${glow.filter})` }, [shown]) : shown);
       return outer;
     }
   }
 }
+
+/** The outline width that closes the antialiased seams between 3-D polygons: half a pixel. */
+const SEAM = PX / 2;
+const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
 
 /**
  * How far the outline can paint past the shape's geometry, in slide space: a picture's outline

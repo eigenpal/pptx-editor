@@ -152,13 +152,22 @@ describe('chromeOfferedControl', () => {
       'reflection',
       'glow',
       'softEdge',
+      'bevel',
+      'rotation3d',
     ]);
     expect(commandForSlotValue('shape.effects', 'glow.8')).not.toBeNull();
     expect(commandForSlotValue('image.styles', 'softEdgeOval')).not.toBeNull();
   });
 
   test('the rule names each Pro effect option', () => {
-    for (const v of ['shadow.innerTop', 'reflection.none', 'glow.8.accent2', 'softEdge.5'])
+    for (const v of [
+      'shadow.innerTop',
+      'reflection.none',
+      'glow.8.accent2',
+      'softEdge.5',
+      'bevel.circle',
+      'rotation3d.none',
+    ])
       expect(chromeOptionNeedsEffects('shape.effects', v)).toBe(true);
     for (const v of ['shadow.none', 'shadow.outerTop', 'shadow.toString', 'nope'])
       expect(chromeOptionNeedsEffects('shape.effects', v)).toBe(false);

@@ -39,6 +39,7 @@ import {
 import { entryParts } from './picture-bullet.ts';
 import { layerKey, partContent, relsKey, sameKey } from './resolve-keys.ts';
 import { resolveFrameTable } from './table.ts';
+import { threeDOf } from './three-d.ts';
 import { readAdjustValues, readTextWarp } from './text-warp.ts';
 import {
   diagramParts,
@@ -499,11 +500,13 @@ function resolveShapeLike(
   const line = resolveLine(lnEl, styleLine, ctx, styleRefContext(lnRef, ctx));
   const effectRef = child(style, 'a:effectRef');
   const effIdx = intAttr(effectRef, 'idx') ?? 0;
-  const resolvedEffects = effects
+  const effectStyle = effIdx > 0 ? scope.theme.effectStyles[effIdx - 1] : undefined;
+  const styleCtx = styleRefContext(effectRef, ctx);
+  const listed = effects
     ? resolveEffects(effects, ctx)
-    : effIdx > 0
-      ? resolveEffects(scope.theme.effectStyles[effIdx - 1], styleRefContext(effectRef, ctx))
-      : undefined;
+    : effectStyle && resolveEffects(effectStyle, styleCtx);
+  const threeD = threeDOf(chain.map(spPrOf), effectStyle, ctx, styleCtx);
+  const resolvedEffects = threeD ? { unsupported: [], ...listed, threeD } : listed;
   const cNvPr = nonVisualProps(el);
   const drawingId = el.ns === NS.p ? attr(cNvPr, 'id') : undefined;
   const base = {

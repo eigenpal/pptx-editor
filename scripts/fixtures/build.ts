@@ -20,6 +20,7 @@ import { chartDataDeck } from './chart-data.ts';
 import { buildRoundTripDecks } from './round-trip.ts';
 import { pictureBulletsDeck } from './picture-bullets.ts';
 import { textWarpFixtures } from './text-warp.ts';
+import { threeDFixtures } from './three-d.ts';
 
 const OUT = 'fixtures';
 const IN = 914_400;
@@ -100,6 +101,7 @@ const edgeShapes = (size: { width: number; height: number }): string =>
 const fixtures: Record<string, FixtureSlide[]> = {
   ...shapeFormatFixtures,
   ...textWarpFixtures,
+  ...threeDFixtures,
   ...textScriptFixtures,
   ...followUpFixtures,
   ...lineEndsDashesFixtures,

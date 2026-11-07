@@ -107,6 +107,9 @@ export type AnimationTrigger = 'onClick' | 'withPrevious' | 'afterPrevious';
 export type AutonumberScheme = `${'arabic' | 'romanUc' | 'romanLc' | 'alphaUc' | 'alphaLc'}${'Period' | 'ParenR' | 'ParenBoth'}` | 'arabicPlain';
 
 // @public
+export type BevelPreset = 'circle' | 'relaxedInset' | 'cross' | 'coolSlant' | 'angle' | 'softRound' | 'convex' | 'slope' | 'divot' | 'riblet' | 'hardEdge' | 'artDeco';
+
+// @public
 export type BulletFormat = {
     readonly kind: 'bullet';
     readonly char?: string;
@@ -1325,6 +1328,9 @@ export interface RenderThumbnailOptions {
 export type RotateChoice = 'right90' | 'left90' | 'flipVertical' | 'flipHorizontal';
 
 // @public
+export type Rotation3DPreset = 'isometricLeftDown' | 'isometricRightUp' | 'isometricTopUp' | 'isometricOffAxis1Left' | 'isometricOffAxis1Right' | 'obliqueTopLeft' | 'obliqueTopRight' | 'obliqueBottomLeft' | 'obliqueBottomRight';
+
+// @public
 export interface SelectedChartState {
     readonly editable: boolean;
     readonly nodeId: string;
@@ -1443,16 +1449,34 @@ export type ShapeEffectChoice = {
 | {
     readonly kind: 'softEdge';
     readonly size: number | null;
+}
+/** Blur radius in points (`a:blur`). No gallery offers it. */
+| {
+    readonly kind: 'blur';
+    readonly size: number | null;
+}
+/** A top bevel (`a:sp3d/a:bevelT`), with a front camera when the shape has no scene. */
+| {
+    readonly kind: 'bevel';
+    readonly preset: BevelPreset | null;
+}
+/** A camera preset (`a:scene3d/a:camera`); null turns the camera back to the front. */
+| {
+    readonly kind: 'rotation3d';
+    readonly preset: Rotation3DPreset | null;
 };
 
 // @public
 export interface ShapeEffectsState {
+    readonly bevel: BevelPreset | 'none';
+    readonly blur: number;
     // (undocumented)
     readonly glow: number;
     readonly glowAccent?: Exclude<ShapeStyleColor, 'dk1'>;
     readonly glowColor?: string;
     // (undocumented)
     readonly reflection: ReflectionPreset | 'none' | 'other';
+    readonly rotation3d: Rotation3DPreset | 'none' | 'other';
     // (undocumented)
     readonly shadow: ShadowPreset | 'none' | 'other';
     // (undocumented)
@@ -1460,7 +1484,7 @@ export interface ShapeEffectsState {
 }
 
 // @public
-export type ShapeEffectsValue = `shadow.${ShadowPreset | 'none'}` | `reflection.${ReflectionPreset | 'none'}` | `glow.${number | 'none'}` | `glow.${number}.${Exclude<ShapeStyleColor, 'dk1'>}` | `softEdge.${number | 'none'}`;
+export type ShapeEffectsValue = `shadow.${ShadowPreset | 'none'}` | `reflection.${ReflectionPreset | 'none'}` | `glow.${number | 'none'}` | `glow.${number}.${Exclude<ShapeStyleColor, 'dk1'>}` | `softEdge.${number | 'none'}` | `bevel.${BevelPreset | 'none'}` | `rotation3d.${Rotation3DPreset | 'none'}`;
 
 // @public
 export interface ShapeStyleChoice {

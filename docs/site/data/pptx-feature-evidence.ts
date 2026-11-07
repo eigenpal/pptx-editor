@@ -142,8 +142,8 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['fill-overlay', 'effects-not-drawn'],
   },
   'effects.3d-and-other': {
-    fixtures: ['effects', 'preserved-content'],
-    approximations: ['effects-not-drawn'],
+    fixtures: ['three-d-effects', 'effects', 'preserved-content'],
+    approximations: ['effects-not-drawn', 'three-d', 'preset-shadow', 'blur'],
   },
   // --- Pictures ----------------------------------------------------------
   'pictures.raster-svg': {

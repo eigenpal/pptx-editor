@@ -402,6 +402,33 @@
     },
     "softEdges": "부드러운 가장자리",
     "softEdgeValue": "{value} pt",
+    "bevel": "입체 효과",
+    "bevels": {
+      "circle": "원형",
+      "relaxedInset": "완만한 경사",
+      "cross": "십자형",
+      "coolSlant": "쿨 슬랜트",
+      "angle": "각진 모서리",
+      "softRound": "부드러운 둥근 모서리",
+      "convex": "볼록",
+      "slope": "경사",
+      "divot": "디보트",
+      "riblet": "리블렛",
+      "hardEdge": "단단한 가장자리",
+      "artDeco": "아르데코"
+    },
+    "rotation3d": "3차원 회전",
+    "rotations3d": {
+      "isometricLeftDown": "등각: 왼쪽 아래",
+      "isometricRightUp": "등각: 오른쪽 위",
+      "isometricTopUp": "등각: 위쪽",
+      "isometricOffAxis1Left": "축 이탈 1: 왼쪽",
+      "isometricOffAxis1Right": "축 이탈 1: 오른쪽",
+      "obliqueTopLeft": "빗각: 왼쪽 위",
+      "obliqueTopRight": "빗각: 오른쪽 위",
+      "obliqueBottomLeft": "빗각: 왼쪽 아래",
+      "obliqueBottomRight": "빗각: 오른쪽 아래"
+    },
     "rotate": "회전",
     "rotations": {
       "right90": "오른쪽으로 90° 회전",
@@ -468,7 +495,9 @@
       "shadow": "그림자 없음",
       "reflection": "반사 없음",
       "glow": "네온 없음",
-      "softEdge": "부드러운 가장자리 없음"
+      "softEdge": "부드러운 가장자리 없음",
+      "bevel": "입체 효과 없음",
+      "rotation3d": "회전 없음"
     },
     "newSlide": "새 슬라이드(Ctrl+M)",
     "slideLayout": "레이아웃",

@@ -84,6 +84,8 @@ export type {
   ObjectAxis,
   ShadowPreset,
   ReflectionPreset,
+  BevelPreset,
+  Rotation3DPreset,
   ShapeEffectChoice,
   ShapeStyleRow,
   ShapeStyleColor,
