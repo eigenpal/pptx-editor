@@ -13,7 +13,10 @@ import { paragraphSpecs, richFromHtml } from '../clipboard-rich.ts';
 
 const IN = 914_400;
 
-/** One text box: a bold run, a plain run, and a paragraph mark of its own size. */
+/**
+ * One text box: a bold run, a plain run, and a paragraph mark of its own size; a run in German;
+ * and a run with no run properties before a German paragraph mark.
+ */
 const deck = () =>
   buildPptx({
     slides: [
@@ -28,7 +31,9 @@ const deck = () =>
           bodyPr: '<a:bodyPr wrap="square"/>',
           text:
             para(run('bold ', 'b="1"') + run('plain', 'sz="2000"'), '<a:pPr algn="ctr"/>') +
-            para(run('second', 'i="1"')),
+            para(run('second', 'i="1"')) +
+            para(run('dritte', 'lang="de-DE" sz="2400"').replace(' lang="en-US"', '')) +
+            '<a:p><a:r><a:t>vierte</a:t></a:r><a:endParaRPr lang="de-DE" b="1"/></a:p>',
         }),
       },
     ],
@@ -62,6 +67,10 @@ const CASES: [string, TextPoint, TextPoint?][] = [
   ['inside a run', { paragraph: 0, offset: 7 }],
   ['the start of a paragraph', { paragraph: 1, offset: 0 }],
   ['a range across paragraphs', { paragraph: 0, offset: 2 }, { paragraph: 1, offset: 3 }],
+  ['a run in another language', { paragraph: 2, offset: 3 }],
+  ['the start of a run in another language', { paragraph: 2, offset: 0 }],
+  ['a run with no run properties', { paragraph: 3, offset: 2 }],
+  ['the start of a run with no run properties', { paragraph: 3, offset: 0 }],
 ];
 
 for (const [name, anchor, focus] of CASES)
@@ -92,7 +101,7 @@ async function linePasteMs(count: number): Promise<number> {
     const t0 = performance.now();
     expect(editor.input('text', text).ok).toBe(true);
     best = Math.min(best, performance.now() - t0);
-    expect(paragraphCount(editor)).toBe(count + 1);
+    expect(paragraphCount(editor)).toBe(count + 3);
     editor.destroy();
   }
   return best;
@@ -117,7 +126,7 @@ async function htmlPasteMs(count: number): Promise<number> {
     const t0 = performance.now();
     expect(editor.exec({ type: 'pasteText', paragraphs }).ok).toBe(true);
     best = Math.min(best, performance.now() - t0);
-    expect(paragraphCount(editor)).toBe(count + 1);
+    expect(paragraphCount(editor)).toBe(count + 3);
     editor.destroy();
   }
   return best;

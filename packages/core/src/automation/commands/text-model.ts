@@ -281,14 +281,19 @@ export function insertLines(
   // The run properties `insertText` gives text typed at the start of `p`.
   const host = hostRunAt(slotsOf(p, n), 0);
   const hostRPr = host && child(host.el, 'a:rPr');
-  const rPr = host && child(host.el, 'a:t') ? hostRPr && specOf(hostRPr) : rPrSpecAt(p, 0, n);
+  // The host run is the first run of `p`. Typed text goes into it, so text before the first
+  // line break takes its run properties, or none. A line break, and a new run of text after
+  // it, take the properties that `insertBreak` and `insertText` give there (`rPrSpecAt`).
+  const after = rPrSpecAt(p, 0, n);
+  const rPr = host && child(host.el, 'a:t') ? hostRPr && specOf(hostRPr) : after;
   let index = txBody.children.findIndex((c) => c.id === p.id);
   for (const line of lines) {
     const inline: NodeSpec[] = [];
     line.split('\u000B').forEach((piece, j) => {
-      if (j > 0) inline.push(aSpec('br', {}, [rPr ?? aSpec('rPr', { lang: 'en-US', dirty: '0' })]));
+      if (j > 0) inline.push(aSpec('br', {}, [after]));
+      const own = j === 0 ? rPr : after;
       if (piece)
-        inline.push(aSpec('r', {}, [...(rPr ? [rPr] : []), aSpec('t', {}, [{ text: piece }])]));
+        inline.push(aSpec('r', {}, [...(own ? [own] : []), aSpec('t', {}, [{ text: piece }])]));
     });
     batch.insert({
       op: 'insertNode',
