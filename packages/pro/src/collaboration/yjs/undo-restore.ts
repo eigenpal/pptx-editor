@@ -308,9 +308,9 @@ export function textsOfMarks(room: Room, keys: Iterable<string | null>): Set<Y.T
 /** The texts of `parts` that hold a live character an undo or a redo put back. */
 export function restoredTextsOf(room: Room, parts: ReadonlySet<string>): Set<Y.Text> {
   const texts = new Set<Y.Text>();
-  let looked = 0;
-  for (const key of room.doc.getMap(RESTORED_KEY).keys()) {
-    if ((looked += 1) > MAX_RESTORED) break;
+  // The keys in one order on every replica before the cap, so each looks at the same marks.
+  const keys = [...room.doc.getMap(RESTORED_KEY).keys()].sort().slice(0, MAX_RESTORED);
+  for (const key of keys) {
     for (const text of textsOfMarks(room, [key])) {
       const part = partOfText(room, text);
       if (part !== null && parts.has(part)) texts.add(text);

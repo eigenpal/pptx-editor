@@ -78,11 +78,14 @@ export function carryFollowed(from: Pick<Step, 'meta'>, to: Pick<Step, 'meta'>):
   if (followed) to.meta.set(FOLLOWED, new Map(followed));
 }
 
-/** Whether a list holds a live entry `key`. */
-const lists = (list: Y.Array<string>, key: string): boolean => {
+/**
+ * Whether a list holds a live entry `key`. A list longer than `MAX_ENTRIES` counts as holding
+ * it: the undo then puts the old entry back as usual, so the run is never listed nowhere.
+ */
+export const lists = (list: Y.Array<string>, key: string): boolean => {
   let walked = 0;
-  for (let item = list._start; item !== null && walked < MAX_ENTRIES; item = item.right) {
-    walked += 1;
+  for (let item = list._start; item !== null; item = item.right) {
+    if ((walked += 1) > MAX_ENTRIES) return true;
     if (!item.deleted && item.countable && item.content.getContent().includes(key)) return true;
   }
   return false;
