@@ -63,6 +63,23 @@ describe('break opportunities keep grapheme clusters whole', () => {
     expect([1, 2, 3].filter((i) => b[i])).toEqual([3]);
   });
 
+  // GB9c needs Unicode 15.1 in the runtime ICU: an older browser ICU clusters these differently.
+  test('Devanagari conjuncts', () => {
+    expect(everyBreak('\u0915\u094D\u0937\u0924\u094D\u0930\u093F\u092F')).toEqual([3, 7]);
+  });
+
+  test('Thai vowel signs stay with their consonant', () => {
+    expect(everyBreak('\u0E01\u0E33\u0E25\u0E31\u0E07\u0E17\u0E33')).toEqual([2, 4, 5]);
+  });
+
+  test('three regional indicators', () => {
+    expect(everyBreak('\u{1F1EF}\u{1F1F5}\u{1F1EB}')).toEqual([4]);
+  });
+
+  test('a carriage return and a line feed', () => {
+    expect(everyBreak('a\r\nb')).toEqual([1, 3]);
+  });
+
   test('the rules the cluster check had stay', () => {
     expect(everyBreak('abc')).toEqual([1, 2]);
     // A combining mark after a space belongs to the space.
@@ -90,6 +107,20 @@ describe('forcedLineEnd: a word wider than the line', () => {
     expect(cut(`ab${THUMB_MEDIUM}`, 0, 4)).toBe(2);
     expect(cut(`ab${E_ACUTE}c`, 0, 3)).toBe(2);
     expect(cut(`a${HAN}`, 0, 3)).toBe(1);
+  });
+
+  test('may cut after a joiner where a cluster ends', () => {
+    // An Arabic letter and a zero-width joiner, twenty times: a cluster ends after each joiner.
+    expect(cut('\u0628\u200D'.repeat(20), 0, 5)).toBe(4);
+    expect(cut('\u{1F468}\u200Dab', 0, 3)).toBe(3);
+  });
+
+  test('three regional indicators: one flag and a lone indicator', () => {
+    expect(cut('\u{1F1EF}\u{1F1F5}\u{1F1EB}', 0, 5)).toBe(4);
+  });
+
+  test('never between a carriage return and a line feed', () => {
+    expect(cut('a\r\nb', 0, 2)).toBe(1);
   });
 
   test('keeps a first cluster wider than the line whole', () => {

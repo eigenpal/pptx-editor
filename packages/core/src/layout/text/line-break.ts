@@ -68,29 +68,52 @@ const isLetter = (c: string): boolean => /[\p{L}\p{N}]/u.test(c);
  * The first UTF-16 unit that can join the unit before it, or the unit after it, into one grapheme
  * cluster: combining marks start at U+0300, and every other cluster extender, prepended
  * character, joiner, Hangul jamo, emoji modifier, and surrogate lies above it. Between two units
- * below it a cluster always ends (UAX #29; CR LF never reaches line breaking, which ends a line at
- * each line feed), so Latin text needs no segmentation.
+ * below it a cluster always ends (UAX #29), except CR LF: a `&#13;` in `a:t` reaches line
+ * breaking, so a carriage return takes the segmented path. Latin text needs no segmentation.
  */
 const FIRST_CLUSTER_UNIT = 0x0300;
 
+const CARRIAGE_RETURN = 0x0d;
+
+/** Whether a cluster ends between two units without segmentation: both below U+0300, no CR. */
+const plainSeam = (unit: number, before: number): boolean =>
+  unit < FIRST_CLUSTER_UNIT && before < FIRST_CLUSTER_UNIT && before !== CARRIAGE_RETURN;
+
 /**
- * Whether a line may not end before a unit of one text, as it would split a character: inside a
- * grapheme cluster, before a combining mark or variation selector (also after a space or a tab,
- * which the mark then belongs to), and on either side of a zero-width joiner (UAX #14 LB8a).
- * Segments the text once, on the first question that needs it.
+ * Whether a line may not end before a unit of one text. Segments the text once, on the first
+ * question that needs it.
+ *
+ * The clusters come from the runtime's `Intl.Segmenter`. Indic conjuncts (UAX #29 GB9c, such as
+ * a Devanagari consonant, virama, and consonant) form one cluster only with Unicode 15.1 in the
+ * runtime ICU; an older ICU ends a cluster after the virama.
  */
 class ClusterTest {
   private starts: Uint8Array | null = null;
 
   constructor(private readonly text: string) {}
 
+  /**
+   * Whether a break before unit `i` would split a character: inside a grapheme cluster, before
+   * a combining mark or variation selector (also after a space or a tab, which the mark then
+   * belongs to), and on either side of a zero-width joiner (UAX #14 LB8a).
+   */
   inside(i: number): boolean {
     const text = this.text;
     const unit = text.charCodeAt(i);
     const before = text.charCodeAt(i - 1);
-    if (unit < FIRST_CLUSTER_UNIT && before < FIRST_CLUSTER_UNIT) return false;
+    if (plainSeam(unit, before)) return false;
     if (unit === 0x200d || before === 0x200d) return true;
     if (unit >= FIRST_CLUSTER_UNIT && MARK.test(text[i])) return true;
+    return this.insideCluster(i);
+  }
+
+  /**
+   * Whether unit `i` continues a grapheme cluster, with no line breaking rule on top: the test
+   * for a forced cut, which may fall after a joiner or before a mark where a cluster ends.
+   */
+  insideCluster(i: number): boolean {
+    const text = this.text;
+    if (plainSeam(text.charCodeAt(i), text.charCodeAt(i - 1))) return false;
     if (!this.starts) {
       const starts = new Uint8Array(text.length + 1);
       for (const segment of segmentGraphemes(text)) starts[segment.utf16From] = 1;
@@ -115,8 +138,8 @@ const MARK = /^[\p{M}\uFE00-\uFE0F]$/u;
 export function forcedLineEnd(text: string, breaks: Uint8Array, start: number, at: number): number {
   const test = clusterTests.get(breaks) ?? new ClusterTest(text);
   let end = Math.max(at, start + 1);
-  while (end > start + 1 && end < text.length && test.inside(end)) end -= 1;
-  if (end === start + 1) while (end < text.length && test.inside(end)) end += 1;
+  while (end > start + 1 && end < text.length && test.insideCluster(end)) end -= 1;
+  if (end === start + 1) while (end < text.length && test.insideCluster(end)) end += 1;
   return end;
 }
 
