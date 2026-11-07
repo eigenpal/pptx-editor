@@ -21,10 +21,74 @@
       }
       @keyframes splash-spin { to { transform: rotate(360deg); } }
       @media (prefers-reduced-motion: reduce) { .splash__spinner { animation: none; } }
+      .splash[data-boot-failure] {
+        place-content: center; gap: 12px; padding: 16px; text-align: center;
+        font: 15px/1.4 system-ui, sans-serif; color: #1b1a19;
+      }
+      .splash[data-boot-failure] p { margin: 0; max-width: 36em; }
+      .splash[data-boot-failure] button {
+        justify-self: center; padding: 6px 16px; font: inherit; cursor: pointer;
+        border: 1px solid #1b1a19; border-radius: 6px; background: #fff; color: #1b1a19;
+      }
     </style>
   </head>
   <body>
     <div id="app"><div class="splash" role="status" aria-label="Loading"><span class="splash__spinner"></span></div></div>
+    <script>
+      // The splash cannot wait forever for the app's code. A script that fails, or an error
+      // before the app mounts, shows a reload message at once. When no file finishes loading
+      // for 15 seconds, a slow-load message shows. The app replaces either message when it mounts.
+      (function () {
+        var STALL_MS = 15000;
+        var FAILED = 'The editor did not load. Check your connection and reload the page.';
+        var SLOW = 'The editor takes longer than usual to load. Check your connection, or reload the page.';
+        var timer;
+        var observer;
+        var splash = function () {
+          return document.querySelector('#app > .splash');
+        };
+        var stop = function () {
+          clearTimeout(timer);
+          if (observer) observer.disconnect();
+        };
+        var fail = function (message) {
+          var el = splash();
+          stop();
+          if (!el || el.getAttribute('data-boot-failure') === 'failed') return;
+          var text = document.createElement('p');
+          text.textContent = message;
+          var button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = 'Reload';
+          button.addEventListener('click', function () {
+            location.reload();
+          });
+          el.setAttribute('data-boot-failure', message === FAILED ? 'failed' : 'slow');
+          el.setAttribute('role', 'alert');
+          el.removeAttribute('aria-label');
+          el.replaceChildren(text, button);
+        };
+        var arm = function () {
+          clearTimeout(timer);
+          if (!splash()) return stop();
+          timer = setTimeout(fail, STALL_MS, SLOW);
+        };
+        arm();
+        try {
+          observer = new PerformanceObserver(arm);
+          observer.observe({ type: 'resource' });
+        } catch (e) {
+          // No resource timing: the timer still ends the wait.
+        }
+        window.addEventListener(
+          'error',
+          function (e) {
+            if (splash() && (e instanceof ErrorEvent || e.target instanceof HTMLScriptElement)) fail(FAILED);
+          },
+          true
+        );
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

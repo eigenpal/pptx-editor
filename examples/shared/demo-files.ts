@@ -81,14 +81,71 @@ export function ribbonChrome(search: string): boolean {
   return new URLSearchParams(search).get('chrome') === 'ribbon';
 }
 
-/** The longest the demo waits for a deck it serves. */
-const DECK_FETCH_MS = 30_000;
+/**
+ * A deck download fails when no bytes arrive for this long. The limit is on progress, not on
+ * the whole download, so a slow connection that keeps sending bytes still finishes.
+ */
+export const DECK_STALL_MS = 10_000;
 
-/** Fetch a deck that the demo serves. Rejects on a network error, an HTTP error, or a stall. */
-export async function fetchDeck(base: string, file: string): Promise<Uint8Array> {
-  const res = await fetch(`${base}${file}`, { signal: AbortSignal.timeout(DECK_FETCH_MS) });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${file}`);
-  return new Uint8Array(await res.arrayBuffer());
+/** A deck download that sent no bytes for `DECK_STALL_MS`. */
+export class DeckStallError extends Error {
+  constructor(file: string) {
+    super(`No bytes of ${file} arrived for ${DECK_STALL_MS} ms`);
+    this.name = 'DeckStallError';
+  }
+}
+
+/**
+ * Fetch a deck that the demo serves. Rejects on a network error, an HTTP error, or a stall:
+ * no response or no body bytes for `stallMs`.
+ */
+export async function fetchDeck(
+  base: string,
+  file: string,
+  stallMs = DECK_STALL_MS
+): Promise<Uint8Array> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // The stall rejects the wait itself too: a host whose body stream ignores the abort
+  // cannot hold the open.
+  const stalled = new Promise<never>((_, reject) => {
+    controller.signal.addEventListener('abort', () => reject(controller.signal.reason));
+  });
+  stalled.catch(() => undefined);
+  const arm = (): void => {
+    clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(new DeckStallError(file)), stallMs);
+  };
+  arm();
+  try {
+    const res = await Promise.race([
+      fetch(`${base}${file}`, { signal: controller.signal }),
+      stalled,
+    ]);
+    if (!res.ok) throw new Error(`HTTP ${res.status} for ${file}`);
+    if (!res.body) return new Uint8Array(await Promise.race([res.arrayBuffer(), stalled]));
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+      for (;;) {
+        arm();
+        const next = await Promise.race([reader.read(), stalled]);
+        if (next.done) break;
+        chunks.push(next.value);
+        size += next.value.byteLength;
+      }
+    } catch (cause) {
+      void reader.cancel(cause).catch(() => undefined);
+      throw cause;
+    }
+    const bytes = new Uint8Array(size);
+    let at = 0;
+    for (const chunk of chunks) (bytes.set(chunk, at), (at += chunk.byteLength));
+    return bytes;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Say that a deck the demo serves did not load, in the editor's notice. */
