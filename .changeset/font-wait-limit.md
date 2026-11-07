@@ -16,12 +16,12 @@ A deck no longer stays on the loading spinner. The open waits at most 2 seconds 
 - A load that fails during its font step keeps the fonts and the font waits of the deck that stays open.
 - Typing repaints only the shapes that change. Unchanged shapes keep their resolved style, layout, and SVG nodes. A shrink-on-overflow fit stops measuring at the first paragraph that overflows. A fit value that the file already has writes no change.
 - Repeated opens no longer grow memory: the text engine reads font tables without a copy of the whole font.
-- Each packaged font file loads once per open. A `packagedFonts()` origin no longer fetches the substitutes that the engine loads itself.
+- Each packaged font file loads once per open. A `packagedFonts()` origin no longer fetches the substitutes that the engine loads itself. An origin that serves the requested family itself, such as `customFonts()` with your own Calibri, still loads it.
 - Slide show, template, and macro-enabled decks open. A macro part stays as inert bytes and never runs.
 - A slide whose content type is missing or generic still opens as a slide. A part that no slide, layout, master, theme, or notes relationship reaches no longer refuses the deck when it does not parse.
-- A picture paints only when its bytes are a PNG, JPEG, GIF, BMP, WebP, or SVG picture within the size limits. A damaged, mislabeled, or oversized picture paints the placeholder.
+- A picture paints and exports only when its bytes are a PNG, JPEG, GIF, BMP, WebP, or SVG picture within the size limits. A damaged, mislabeled, or oversized picture paints the placeholder. A picture that a slide relationship names never refuses the deck.
 - A font or a compound line type named after an object member, such as `constructor`, no longer stops layout and paint.
-- A slide list entry that names the master, a layout, notes, or the theme is not read as a slide, so an edit can no longer write into a part that every slide shares.
+- A slide list entry is read as a slide only when its part has the slide content type or a `p:sld` root. An edit can no longer write into the master, a layout, the theme, or the presentation part.
 - A damaged notes slide or damaged slide relationships no longer refuse the deck. The damaged part stays as the file's bytes on save.
 - A nested `mc:AlternateContent` resolves its chosen branch in turn, so the inner shapes draw.
 - **Duplicate slide** works on a slide whose relationship points to a missing part.

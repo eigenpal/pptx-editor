@@ -134,15 +134,29 @@ const STRUCTURAL_RELS = new Set<string>([
  * The parts a structural relationship points to. A part's role follows what points to it as
  * well as its content type: a slide with a generic content type is still a slide, and a part
  * of a required type that no structural relationship reaches never refuses the deck.
+ *
+ * Keys are folded part names (`partNameKey`), as OPC part names compare. A part that several
+ * relationships reach keeps the strongest type: the main part first, notes last.
  */
 function structuralTargets(rels: ReadonlyMap<string, PackagePart>): Map<string, string> {
   const pkg: PptxPackage = { parts: rels };
   const out = new Map<string, string>();
+  const rank = (type: string | undefined): number =>
+    type === undefined
+      ? 0
+      : type === REL.officeDocument
+        ? 3
+        : type === REL.notesSlide || type === REL.notesMaster
+          ? 1
+          : 2;
   for (const name of rels.keys()) {
     const source = relsSource(name);
     if (source === undefined) continue;
-    for (const rel of relationshipsOf(pkg, source))
-      if (rel.target !== undefined && STRUCTURAL_RELS.has(rel.type)) out.set(rel.target, rel.type);
+    for (const rel of relationshipsOf(pkg, source)) {
+      if (rel.target === undefined || !STRUCTURAL_RELS.has(rel.type)) continue;
+      const key = partNameKey(rel.target);
+      if (rank(rel.type) > rank(out.get(key))) out.set(key, rel.type);
+    }
   }
   return out;
 }
@@ -160,14 +174,24 @@ function partRole(
     if (source === undefined) return 'optional';
     // Those of the main part must parse too. Damaged relationships of a slide, a layout, or a
     // master stay as bytes: that part draws without them, and the deck still opens.
-    return structural.get(source) === REL.officeDocument ? 'required' : 'optional';
+    return structural.get(partNameKey(source)) === REL.officeDocument ? 'required' : 'optional';
   }
-  const via = structural.get(partName);
+  const contentType = lookupContentType(types, partName);
+  const role = roleByType(partName, contentType);
+  const via = structural.get(partNameKey(partName));
+  // A part that is not XML by its type or its name (a picture that a slide relationship names)
+  // stays as bytes, whatever points to it.
+  const xml = role !== 'binary' || (contentType !== undefined && isXmlType(contentType));
+  if (via === undefined || !xml) return role === 'required' ? 'optional' : role;
   // Speaker notes are not needed to show the slides: a damaged notes part stays as bytes.
   if (via === REL.notesSlide || via === REL.notesMaster) return 'optional';
-  if (via !== undefined) return 'required';
-  const role = roleByType(partName, lookupContentType(types, partName));
-  return role === 'required' ? 'optional' : role;
+  return 'required';
+}
+
+/** Whether a content type names XML: `application/xml`, `text/xml`, or any `+xml` type. */
+function isXmlType(contentType: string): boolean {
+  const type = asciiFold(contentType.trim()).split(';')[0]!.trim();
+  return type.endsWith('+xml') || type === 'application/xml' || type === 'text/xml';
 }
 
 /**
@@ -247,7 +271,10 @@ export function readPptxDeferred(
       parts.set(partName, { kind: 'binary', partName, bytes: data });
       continue;
     }
-    const kind = deferred && structural.has(partName) ? deferrableKind(partName, types) : undefined;
+    const kind =
+      deferred && structural.has(partNameKey(partName))
+        ? deferrableKind(partName, types)
+        : undefined;
     if (kind && deferred!.defer(partName)) {
       const finish = deferred!.finish;
       parts.set(

@@ -119,22 +119,21 @@ function remember(pkg: PptxPackage, info: PresentationInfo): PresentationInfo {
   return info;
 }
 
-/** Content types of the parts that a slide entry must never name: every slide shares them. */
-const NOT_SLIDE_TYPES = new Set(
-  ['slideLayout', 'slideMaster', 'notesSlide', 'notesMaster', 'handoutMaster'].map((kind) =>
-    `application/vnd.openxmlformats-officedocument.presentationml.${kind}+xml`.toLowerCase()
-  )
-);
-NOT_SLIDE_TYPES.add('application/vnd.openxmlformats-officedocument.theme+xml');
+const SLIDE_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.presentationml.slide+xml';
 
 /**
- * Whether `partName` can be a slide: an XML part whose content type is not that of a layout, a
- * master, notes, or a theme. A slide with a generic content type still counts.
+ * Whether `partName` is a slide: an XML part with the slide content type, or one whose root is
+ * `p:sld`. A slide with a missing or generic content type still counts. A layout, a master, a
+ * theme, or the presentation part never does, so a slide edit never writes into a part that
+ * other slides share. Only a part with the slide content type is deferred, so the root check
+ * never forces a deferred parse.
  */
 function isSlidePart(pkg: PptxPackage, partName: string): boolean {
-  if (pkg.parts.get(partName)?.kind !== 'xml') return false;
-  const type = contentTypeOf(pkg, partName)?.trim().toLowerCase();
-  return type === undefined || !NOT_SLIDE_TYPES.has(type);
+  const part = pkg.parts.get(partName);
+  if (part?.kind !== 'xml') return false;
+  if (contentTypeOf(pkg, partName)?.trim().toLowerCase() === SLIDE_CONTENT_TYPE) return true;
+  const root = part.xml.root;
+  return root.ns === NS.p && root.local === 'sld';
 }
 
 /** Read the presentation structure. Memoized per package identity. */

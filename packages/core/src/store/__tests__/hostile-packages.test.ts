@@ -76,6 +76,74 @@ describe('hostile packages', () => {
     expect(slides(writeZip(entries))).toBe(0);
   });
 
+  test.each(['presProps', 'viewProps', 'tableStyles', 'presentation'])(
+    'a slide entry that names the %s part is not a slide',
+    (kind) => {
+      const zip = readZip(deck());
+      if (!zip.ok) throw new Error('zip');
+      const entries = new Map(zip.entries);
+      const relsName = '/ppt/_rels/presentation.xml.rels';
+      const rels = new TextDecoder().decode(entries.get(relsName));
+      const target = kind === 'presentation' ? 'presentation.xml' : `${kind}.xml`;
+      if (kind !== 'presentation' && !entries.has(`/ppt/${target}`))
+        entries.set(
+          `/ppt/${target}`,
+          new TextEncoder().encode(
+            `<p:${kind} xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>`
+          )
+        );
+      entries.set(
+        relsName,
+        new TextEncoder().encode(
+          rels.replace(
+            /(<Relationship [^>]*Type="[^"]*\/slide"[^>]*Target=")[^"]*"/,
+            `$1${target}"`
+          )
+        )
+      );
+      expect(slides(writeZip(entries))).toBe(0);
+    }
+  );
+
+  test('a slide relationship that names a picture never refuses the deck', () => {
+    const zip = readZip(deck());
+    if (!zip.ok) throw new Error('zip');
+    const entries = new Map(zip.entries);
+    const relsName = '/ppt/_rels/presentation.xml.rels';
+    const rels = new TextDecoder().decode(entries.get(relsName));
+    entries.set('/ppt/media/a.png', new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1, 2]));
+    const types = new TextDecoder().decode(entries.get(CT));
+    entries.set(
+      CT,
+      new TextEncoder().encode(
+        types.replace('</Types>', '<Default Extension="png" ContentType="image/png"/></Types>')
+      )
+    );
+    entries.set(
+      relsName,
+      new TextEncoder().encode(
+        rels.replace(
+          '</Relationships>',
+          `<Relationship Id="rIdPic" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="media/a.png"/></Relationships>`
+        )
+      )
+    );
+    expect(slides(writeZip(entries))).toBe(1);
+  });
+
+  test('a slide relationship whose target differs in case still defers and opens', () => {
+    const bytes = patched((t, entries) => {
+      const relsName = '/ppt/_rels/presentation.xml.rels';
+      const rels = new TextDecoder().decode(entries.get(relsName));
+      entries.set(
+        relsName,
+        new TextEncoder().encode(rels.replace('slides/slide1.xml', 'SLIDES/Slide1.XML'))
+      );
+      return t;
+    });
+    expect(slides(bytes)).toBe(1);
+  });
+
   test('a slide with a relationship to a missing part duplicates', async () => {
     const { createPptxEditor } = await import('../../editor/index.ts');
     const bytes = patched((t, entries) => {
