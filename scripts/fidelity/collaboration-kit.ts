@@ -4,7 +4,7 @@
 // concurrent. AGENTS.md: "Verify collaboration convergence when changing editing behavior."
 
 import { join } from 'node:path';
-import { createPptxEditor } from '../../packages/core/src/editor/index.ts';
+import { createPptxEditor, type PptxEditorInstance } from '../../packages/core/src/editor/index.ts';
 import {
   collaborationModule,
   createYjsCollaborationSession,
@@ -49,21 +49,33 @@ export const openPeers: OpenPeers = async (bytes) => {
       for (const [to, update] of queue.splice(0)) Y.applyUpdate(to, update, 'link');
     },
   };
-  const editors = [];
-  for (const [i, doc] of docs.entries()) {
-    const session = createYjsCollaborationSession({
-      doc,
-      documentId: 'feature-edit',
-      identity: { actorId: `peer-${i}`, name: `Peer ${i + 1}` },
-    });
-    const editor = createPptxEditor({
-      fixedMeasurer: true,
-      substitutes: false,
-      modules: [collaborationModule({ session })],
-    });
-    const result = await editor.load(bytes);
-    if (!result.ok) throw new Error(`peer ${i + 1} did not open: ${JSON.stringify(result)}`);
-    editors.push(editor);
+  const editors: PptxEditorInstance[] = [];
+  const sessions: { destroy(): void }[] = [];
+  const destroy = (): void => {
+    for (const editor of editors) editor.destroy();
+    for (const session of sessions) session.destroy();
+    for (const doc of docs) doc.destroy();
+  };
+  try {
+    for (const [i, doc] of docs.entries()) {
+      const session = createYjsCollaborationSession({
+        doc,
+        documentId: 'feature-edit',
+        identity: { actorId: `peer-${i}`, name: `Peer ${i + 1}` },
+      });
+      sessions.push(session);
+      const editor = createPptxEditor({
+        fixedMeasurer: true,
+        substitutes: false,
+        modules: [collaborationModule({ session })],
+      });
+      editors.push(editor);
+      const result = await editor.load(bytes);
+      if (!result.ok) throw new Error(`peer ${i + 1} did not open: ${JSON.stringify(result)}`);
+    }
+  } catch (error) {
+    destroy();
+    throw error;
   }
-  return { editor: editors[0]!, peer: editors[1]!, link };
+  return { editor: editors[0]!, peer: editors[1]!, link, destroy };
 };

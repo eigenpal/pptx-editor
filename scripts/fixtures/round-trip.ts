@@ -5,12 +5,14 @@
 // edit these decks and check what survives.
 
 import { buildPptx, para, run, shape, solid, type FixtureOptions } from './builder.ts';
+import { workbook } from './slide-structure.ts';
 import { clickEntrances } from './timing.ts';
 
 const IN = 914_400;
 const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const R_HLINK = `${R}/hyperlink`;
 const R_IMAGE = `${R}/image`;
+const R_MEDIA = 'http://schemas.microsoft.com/office/2007/relationships/media';
 const A14 = 'http://schemas.microsoft.com/office/drawing/2010/main';
 const P14 = 'http://schemas.microsoft.com/office/powerpoint/2010/main';
 const MC = 'http://schemas.openxmlformats.org/markup-compatibility/2006';
@@ -51,7 +53,8 @@ export function hyperlinksDeck(): FixtureOptions {
     ) +
     para(linked('A custom show', '', ' action="ppaction://customshow?id=0&amp;return=true"')) +
     para(linked('Another file', 'rIdFile', ' action="ppaction://hlinkfile"')) +
-    para(linked('A link to remove', 'rIdOld'));
+    para(linked('A link to remove', 'rIdOld')) +
+    para(linked('A program', 'rIdProgram', ' action="ppaction://program"'));
   const shapeLink =
     '<p:sp><p:nvSpPr><p:cNvPr id="4" name="Linked shape"><a:hlinkClick r:id="rIdShape"/></p:cNvPr><p:cNvSpPr/><p:nvPr/></p:nvSpPr>' +
     `<p:spPr><a:xfrm><a:off x="${9 * IN}" y="${5.6 * IN}"/><a:ext cx="${2.7 * IN}" cy="${0.9 * IN}"/></a:xfrm><a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>${solid('4472C4')}</p:spPr>` +
@@ -67,6 +70,7 @@ export function hyperlinksDeck(): FixtureOptions {
           ['rIdFile', R_HLINK, 'notes.txt', 'External'],
           ['rIdOld', R_HLINK, 'https://example.org/old', 'External'],
           ['rIdShape', R_HLINK, 'https://example.net/', 'External'],
+          ['rIdProgram', R_HLINK, 'tool.exe', 'External'],
         ],
       },
       { shapes: title('Slide 2: next slide target') },
@@ -92,6 +96,42 @@ export function emfPicture(): Uint8Array {
   view.setUint32(48, bytes.length, true); // nBytes
   view.setUint32(52, records.length, true); // nRecords
   view.setUint32(56, 1, true); // nHandles = 1, reserved = 0
+  return bytes;
+}
+
+/** A minimal WMF picture (MS-WMF 2.3): a rectangle with the default pen and brush, 2 × 1 in. */
+export function wmfPicture(): Uint8Array {
+  // Records: size in 16-bit words (u32), function (u16), parameters (i16).
+  const record = (fn: number, ...params: number[]): number[] => {
+    const size = 3 + params.length;
+    return [size & 0xffff, size >>> 16, fn, ...params];
+  };
+  const body = [
+    ...record(0x020b, 0, 0), // META_SETWINDOWORG y, x
+    ...record(0x020c, 1440, 2880), // META_SETWINDOWEXT y, x
+    ...record(0x041b, 1400, 2840, 40, 40), // META_RECTANGLE bottom, right, top, left
+    ...record(0x0000), // META_EOF
+  ];
+  const size = 9 + body.length;
+  const header = [1, 9, 0x0300, size & 0xffff, size >>> 16, 0, 7, 0, 0];
+  // The placeable header: key, handle, bounds, units per inch, reserved, checksum.
+  const placeable = [0xcdd7, 0x9ac6, 0, 0, 0, 2880, 1440, 1440, 0, 0];
+  placeable.push(placeable.reduce((a, b) => a ^ b, 0));
+  const words = [...placeable, ...header, ...body];
+  const bytes = new Uint8Array(words.length * 2);
+  const view = new DataView(bytes.buffer);
+  words.forEach((w, i) => view.setUint16(i * 2, w & 0xffff, true));
+  return bytes;
+}
+
+/** The smallest MP4 box: a file type box with no media. A video that does not play. */
+export function mp4Stub(): Uint8Array {
+  const bytes = new Uint8Array(20);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(0, 20);
+  [...'ftypisom'].forEach((c, i) => view.setUint8(4 + i, c.charCodeAt(0)));
+  view.setUint32(12, 0x200);
+  [...'isom'].forEach((c, i) => view.setUint8(16 + i, c.charCodeAt(0)));
   return bytes;
 }
 
@@ -124,8 +164,9 @@ const UNKNOWN_EXT =
   '<a:extLst><a:ext uri="{7D0C4A51-2F4B-4E63-9A0E-5B8C1D2E3F40}"><x:note xmlns:x="urn:example:unknown" kept="yes">Unknown extension</x:note></a:ext></a:extLst>';
 
 /**
- * Content that the editor keeps but does not edit: warped text, 3-D, an equation, an EMF
- * picture, an audio clip, animations, a transition, and extensions that no reader knows.
+ * Content that the editor keeps but does not edit: warped text, 3-D, an equation, EMF and WMF
+ * pictures, audio and video clips, an embedded workbook, animations, a transition, and
+ * extensions that no reader knows.
  */
 export function preservedContentDeck(image: Uint8Array): FixtureOptions {
   const warp = shape({
@@ -169,6 +210,23 @@ export function preservedContentDeck(image: Uint8Array): FixtureOptions {
     `<p:extLst><p:ext uri="{DAA4B4D4-6D71-4841-9C94-3DE7FCFB9230}"><p14:media xmlns:p14="${P14}" r:embed="rIdMedia"/></p:ext></p:extLst></p:nvPr></p:nvPicPr>` +
     '<p:blipFill><a:blip r:embed="rIdImg"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>' +
     `<p:spPr>${xfrm(7.8, 3.3, 0.6, 0.45)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+  const wmf =
+    '<p:pic><p:nvPicPr><p:cNvPr id="9" name="WMF picture"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>' +
+    '<p:blipFill><a:blip r:embed="rIdWmf"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>' +
+    `<p:spPr>${xfrm(8.7, 3.3, 2, 1)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+  const video =
+    '<p:pic><p:nvPicPr><p:cNvPr id="10" name="Video clip"><a:hlinkClick r:id="" action="ppaction://media"/></p:cNvPr>' +
+    '<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr><a:videoFile r:link="rIdVideo"/>' +
+    `<p:extLst><p:ext uri="{DAA4B4D4-6D71-4841-9C94-3DE7FCFB9230}"><p14:media xmlns:p14="${P14}" r:embed="rIdVideoMedia"/></p:ext></p:extLst></p:nvPr></p:nvPicPr>` +
+    '<p:blipFill><a:blip r:embed="rIdImg"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>' +
+    `<p:spPr>${xfrm(9.3, 1.3, 1.6, 1.2)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+  const ole =
+    '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="11" name="Embedded workbook"/><p:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr>' +
+    `<p:xfrm><a:off x="${Math.round(11.1 * IN)}" y="${Math.round(1.3 * IN)}"/><a:ext cx="${Math.round(1.6 * IN)}" cy="${Math.round(1.2 * IN)}"/></p:xfrm>` +
+    '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/presentationml/2006/ole">' +
+    `<p:oleObj name="Worksheet" r:id="rIdOle" imgW="${Math.round(1.6 * IN)}" imgH="${Math.round(1.2 * IN)}" progId="Package"><p:embed/>` +
+    '<p:pic><p:nvPicPr><p:cNvPr id="0" name=""/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rIdImg"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>' +
+    `<p:spPr>${xfrm(11.1, 1.3, 1.6, 1.2)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic></p:oleObj></a:graphicData></a:graphic></p:graphicFrame>`;
   const animated =
     '<p:sp><p:nvSpPr><p:cNvPr id="8" name="Animated text">' + UNKNOWN_EXT + '</p:cNvPr><p:cNvSpPr/><p:nvPr/></p:nvSpPr>' +
     `<p:spPr>${xfrm(0.7, 4.9, 11, 1.2)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${solid('DEEBF7')}</p:spPr>` +
@@ -183,12 +241,17 @@ export function preservedContentDeck(image: Uint8Array): FixtureOptions {
   return {
     slides: [
       {
-        shapes: title('Kept content') + warp + threeD + equation + emf + audio + animated,
+        shapes:
+          title('Kept content') + warp + threeD + equation + emf + audio + wmf + video + ole + animated,
         rels: [
           ['rIdImg', R_IMAGE, '../media/image1.png'],
           ['rIdEmf', R_IMAGE, '../media/image2.emf'],
           ['rIdAudio', `${R}/audio`, '../media/media1.wav'],
-          ['rIdMedia', 'http://schemas.microsoft.com/office/2007/relationships/media', '../media/media1.wav'],
+          ['rIdMedia', R_MEDIA, '../media/media1.wav'],
+          ['rIdWmf', R_IMAGE, '../media/image3.wmf'],
+          ['rIdVideo', `${R}/video`, '../media/media2.mp4'],
+          ['rIdVideoMedia', R_MEDIA, '../media/media2.mp4'],
+          ['rIdOle', `${R}/package`, '../embeddings/Embedded_Worksheet1.xlsx'],
         ],
         ext: slideExt,
       },
@@ -197,6 +260,15 @@ export function preservedContentDeck(image: Uint8Array): FixtureOptions {
       { name: 'image1.png', bytes: image, contentType: 'image/png' },
       { name: 'image2.emf', bytes: emfPicture(), contentType: 'image/x-emf' },
       { name: 'media1.wav', bytes: wavClip(), contentType: 'audio/wav' },
+      { name: 'image3.wmf', bytes: wmfPicture(), contentType: 'image/x-wmf' },
+      { name: 'media2.mp4', bytes: mp4Stub(), contentType: 'video/mp4' },
+    ],
+    binaryParts: [
+      {
+        name: 'ppt/embeddings/Embedded_Worksheet1.xlsx',
+        bytes: workbook(),
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      },
     ],
   };
 }

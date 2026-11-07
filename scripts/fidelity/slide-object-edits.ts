@@ -1,7 +1,9 @@
-// The feature edits of the table, slide, theme, collaboration, and kept-content rows. They
-// join the other recipes in `FEATURE_EDITS` (`feature-edits.ts`), which says what a recipe
-// proves. A recipe of a kept-content row edits next to the content, or its box, and its check
-// finds the content as it was.
+// The feature edits of the table, slide, theme, and collaboration rows, and of the kept-content
+// rows of text, pictures, objects, presenting, and review. They join the other recipes in
+// `FEATURE_EDITS` (`feature-edits.ts`), which says what a recipe proves. The kept-content rows
+// of shapes and effects stay with their category there. A recipe of a kept-content row edits
+// next to the content, or its box, and its check finds the content and its relationships as
+// they were.
 
 import {
   canonicalPackageFingerprint,
@@ -18,16 +20,17 @@ import { openPeers } from './collaboration-kit.ts';
 import {
   added,
   all,
-  firstRun,
   has,
   kept,
   keptChild,
+  keptRels,
   lacks,
   nameOf,
   NEW_SLIDES,
   paragraphOf,
   PRESENTATION,
   removed,
+  runsOf,
   shapeElement,
   shapesIn,
   shapeXmlOf,
@@ -35,7 +38,7 @@ import {
   type FeatureEdit,
 } from './feature-edit-kit.ts';
 
-/** The recipes of the table, slide, theme, collaboration, and kept-content rows, by row id. */
+/** The recipes of this file, by row id. */
 export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
   'tables.render': {
     fixture: 'tables',
@@ -339,12 +342,13 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
     collaborate: openPeers,
     edit: (t) => {
       const peer = t.peer!;
-      // Concurrent edits: one peer types into Shape 2, the other formats and moves Shape 3.
+      // Concurrent edits of one paragraph: one peer types at its start, the other bolds its
+      // first word and types at its end. The other peer also moves Shape 3.
       t.link!.pause();
       t.selectText('Shape 2', 0, 0);
       t.type('Peer one: ');
-      peer.selectText('Shape 3', 0, 3);
-      peer.run({ type: 'toggleBold' });
+      peer.selectText('Shape 2', 0, 7);
+      peer.run({ type: 'toggleItalic' });
       peer.run({
         type: 'setTransform',
         nodeId: peer.node('Shape 3'),
@@ -362,12 +366,16 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
       if (canonicalPackageFingerprint(own.pkg) !== canonicalPackageFingerprint(other.pkg))
         throw new Error('the replicas differ');
     },
-    check: (d) =>
-      all(
-        textOf(shapeElement(d.pkg, 0, 'Shape 2')).startsWith('Peer one: ') ? undefined : 'no text',
-        has(firstRun(d.shapeXml(0, 'Shape 3')), 'b="1"'),
+    check: (d) => {
+      const runs = runsOf(d.shapeXml(0, 'Shape 2'));
+      const typed = runs.find((r) => r.text.includes('Peer one: '));
+      const italic = runs.find((r) => r.text.includes('Regular'));
+      return all(
+        typed ? undefined : 'the typed text is gone',
+        italic && /i="1"/.test(italic.rPr) ? undefined : 'the italic of the other peer is gone',
         has(d.shapeXml(0, 'Shape 3'), '<a:off x="6400800" y="914400"/>')
-      ),
+      );
+    },
   },
   'collaboration.automation-api': {
     fixture: 'text-runs',
@@ -429,7 +437,7 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
   },
   'pictures.emf-wmf': {
     fixture: 'preserved-content',
-    edit: (t) =>
+    edit: (t) => {
       t.run({
         type: 'setTransform',
         nodeId: t.node('EMF picture'),
@@ -438,15 +446,26 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
         cx: 2743200,
         cy: 1371600,
         rot: 0,
-      }),
+      });
+      t.select('WMF picture');
+      t.run({ type: 'nudge', dx: 0, dy: 91440 });
+    },
     check: (d) => {
       const fill = (xml: string) => /<p:blipFill>.*?<\/p:blipFill>/.exec(xml)?.[0];
-      const xml = d.shapeXml(0, 'EMF picture');
-      return all(
-        has(xml, '<a:off x="5029200" y="3200400"/>', '<a:ext cx="2743200" cy="1371600"/>'),
-        fill(xml) === fill(shapeXmlOf(d.original, 0, 'EMF picture'))
+      const same = (name: string) =>
+        fill(d.shapeXml(0, name)) === fill(shapeXmlOf(d.original, 0, name))
           ? undefined
-          : 'the fill changed'
+          : `the fill of ${name} changed`;
+      return all(
+        has(
+          d.shapeXml(0, 'EMF picture'),
+          '<a:off x="5029200" y="3200400"/>',
+          '<a:ext cx="2743200" cy="1371600"/>'
+        ),
+        lacks(d.shapeXml(0, 'WMF picture'), shapeXmlOf(d.original, 0, 'WMF picture')),
+        same('EMF picture'),
+        same('WMF picture'),
+        keptRels(d, 0, 'rIdEmf', 'rIdWmf')
       );
     },
   },
@@ -465,7 +484,9 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
         textOf(find(shapeElement(d.pkg, 0, 'Animated text'), 'p:txBody')).startsWith('Edited. ')
           ? undefined
           : 'no text',
-        equation(d.pkg) === equation(d.original) ? undefined : 'the equation changed'
+        equation(d.pkg) === equation(d.original) ? undefined : 'the equation changed',
+        // The picture that the equation's fallback shows.
+        keptRels(d, 0, 'rIdImg')
       );
     },
   },
@@ -481,16 +502,28 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
         cy: 411480,
         rot: 0,
       });
+      t.select('Video clip', 'Embedded workbook');
+      t.run({ type: 'nudge', dx: 0, dy: 182880 });
     },
     check: (d) => {
       const media = (xml: string) => /<p:nvPicPr>.*?<\/p:blipFill>/.exec(xml)?.[0];
-      const xml = d.shapeXml(0, 'Audio clip');
-      return all(
-        has(xml, '<a:off x="7589520" y="3017520"/>'),
-        media(xml) === media(shapeXmlOf(d.original, 0, 'Audio clip'))
+      const same = (name: string) =>
+        media(d.shapeXml(0, name)) === media(shapeXmlOf(d.original, 0, name))
           ? undefined
-          : 'the audio link, media, or poster changed',
-        keptChild(d, 0, 'p:timing')
+          : `the link, media, or poster of ${name} changed`;
+      const ole = (xml: string) => /<a:graphic>.*<\/a:graphic>/.exec(xml)?.[0];
+      const workbook = d.shapeXml(0, 'Embedded workbook');
+      return all(
+        has(d.shapeXml(0, 'Audio clip'), '<a:off x="7589520" y="3017520"/>'),
+        lacks(d.shapeXml(0, 'Video clip'), shapeXmlOf(d.original, 0, 'Video clip')),
+        lacks(workbook, shapeXmlOf(d.original, 0, 'Embedded workbook')),
+        same('Audio clip'),
+        same('Video clip'),
+        ole(workbook) === ole(shapeXmlOf(d.original, 0, 'Embedded workbook'))
+          ? undefined
+          : 'the embedded workbook changed',
+        keptChild(d, 0, 'p:timing'),
+        keptRels(d, 0, 'rIdAudio', 'rIdMedia', 'rIdVideo', 'rIdVideoMedia', 'rIdOle', 'rIdImg')
       );
     },
   },
@@ -502,17 +535,22 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
       t.selectText('Animated text', 0, 0);
       t.type('Typed. ');
     },
-    check: (d) =>
-      all(
+    check: (d) => {
+      // The shape keeps its id, which the animation names, and its unknown extension.
+      const nonVisual = (xml: string) => /<p:cNvPr .*?<\/p:cNvPr>/.exec(xml)?.[0];
+      return all(
         textOf(find(shapeElement(d.pkg, 0, 'Animated text'), 'p:txBody')).startsWith('Typed. ')
           ? undefined
           : 'no text',
         keptChild(d, 0, 'p:transition'),
         keptChild(d, 0, 'p:timing'),
         keptChild(d, 0, 'p:extLst'),
-        // The shape keeps its id, which the animation names, and its unknown extension.
-        has(d.shapeXml(0, 'Animated text'), '<p:cNvPr id="8" name="Animated text"><a:extLst>')
-      ),
+        nonVisual(d.shapeXml(0, 'Animated text')) ===
+          nonVisual(shapeXmlOf(d.original, 0, 'Animated text'))
+          ? undefined
+          : 'the id or the extension of the animated shape changed'
+      );
+    },
   },
   'objects.charts': {
     fixture: 'charts',
@@ -589,27 +627,38 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
   },
   'slides.sorter': {
     fixture: 'slide-layouts',
+    // Slides A to F; sections Opening (A, B) and Details (C to F). A is "Quarterly review", B is
+    // "Agenda", C is "Before and after", and D is "Backup slide".
     edit: (t) => {
-      const s = t.editor.snapshot();
-      const sections = s.sections ?? [];
-      if (sections.length < 2) throw new Error('the fixture has fewer than two sections');
-      t.run({ type: 'moveSlides', indices: [0, 1], to: 2 });
-      t.run({ type: 'duplicateSlides', indices: [4] });
-      t.run({ type: 'setSlidesHidden', indices: [0], hidden: true });
-      t.run({ type: 'deleteSlides', indices: [5] });
-      t.run({ type: 'moveSection', sectionId: sections[1]!.id, direction: -1 });
+      const details = t.editor.snapshot().sections?.find((x) => x.name === 'Details');
+      if (!details) throw new Error('the fixture has no Details section');
+      t.run({ type: 'moveSlides', indices: [0], to: 3 }); // B C D A E F
+      t.run({ type: 'duplicateSlides', indices: [1] }); // B C C' D A E F
+      t.run({ type: 'deleteSlides', indices: [6] }); // B C C' D A E
+      t.run({ type: 'setSlidesHidden', indices: [3], hidden: true }); // D hidden
+      t.run({ type: 'moveSection', sectionId: details.id, direction: -1 }); // C C' D A E B
     },
     check: (d) => {
-      const titles = presentationInfo(d.pkg).slides.map((ref) =>
-        textOf(find(shapesIn(xmlPartOf(d.pkg, ref.partName)!.root)[0]!, 'p:txBody'))
-      );
-      const sectionNames = [
-        ...d.partXml('/ppt/presentation.xml').matchAll(/<p14:section name="([^"]*)"/g),
-      ].map((m) => m[1]);
+      const slides = presentationInfo(d.pkg).slides;
+      const text = (i: number) =>
+        textOf(find(xmlPartOf(d.pkg, slides[i]!.partName)!.root, 'p:spTree'));
+      const starts = ['Before and after', 'Before and after', 'Backup slide', 'Quarterly review'];
+      const presentation = d.partXml('/ppt/presentation.xml');
+      const sections = [
+        ...presentation.matchAll(/<p14:section name="([^"]*)".*?<\/p14:section>/g),
+      ].map((m) => `${m[1]} ${m[0].match(/<p14:sldId /g)?.length ?? 0}`);
       return all(
-        titles.length === 6 ? undefined : `${titles.length} slides`,
-        sectionNames.length >= 2 ? undefined : 'the sections are gone',
-        has(d.slideXml(0), 'show="0"')
+        slides.length === 6 ? undefined : `${slides.length} slides`,
+        starts.every((s, i) => text(i).startsWith(s)) && text(5).startsWith('Agenda')
+          ? undefined
+          : `slide order ${slides.map((_, i) => text(i).slice(0, 16)).join(' | ')}`,
+        slides[0]!.partName !== slides[1]!.partName ? undefined : 'the duplicate is the same part',
+        slides.every((_, i) => (i === 2) === /<p:sld [^>]*show="0"/.test(d.slideXml(i)))
+          ? undefined
+          : 'a slide other than D is hidden, or D is not',
+        sections.join(', ') === 'Details 5, Opening 1'
+          ? undefined
+          : `sections ${sections.join(', ')}`
       );
     },
     parts: [

@@ -158,7 +158,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     gradients: 0,
     'groups-transforms': 4,
     'header-footer': 3,
-    hyperlinks: 12,
+    hyperlinks: 13,
     'line-ends-dashes': 0,
     'line-model': 65,
     'lines-arrows': 0,

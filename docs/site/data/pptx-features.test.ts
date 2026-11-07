@@ -249,6 +249,16 @@ describe('pptx-features: evidence for claims', () => {
     expect(unproven).toEqual([]);
   });
 
+  test('a row with no editing claims "preserved" at most: it has no edit of its own', () => {
+    // The collaboration row edits through the session of two peers, not through a control of
+    // the editor, so its own edit is their concurrent edit.
+    const ownEdit = new Set(['collaboration.realtime']);
+    const wrong = pptxFeatures
+      .filter((row) => row.editing === 'none' && row.roundTrip === 'full' && !ownEdit.has(row.id))
+      .map((row) => row.id);
+    expect(wrong).toEqual([]);
+  });
+
   test('every save-verified feature edit names a row with a recipe', () => {
     const orphans = Object.keys(SAVE_VERIFIED_FEATURE_EDITS).filter(
       (id) => !pptxFeatureById[id] || !FEATURE_EDITS[id]

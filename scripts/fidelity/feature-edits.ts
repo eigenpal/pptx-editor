@@ -25,6 +25,7 @@ import {
   firstRun,
   has,
   kept,
+  keptRels,
   lacks,
   runsOf,
   MEDIA,
@@ -151,18 +152,14 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
         has(slideJump, 'action="ppaction://hlinksldjump"'),
         target('More') === 'slide2.xml' ? undefined : `the slide link targets ${target('More')}`,
         lacks(after[7] ?? '', 'hlinkClick'),
+        has(after[7] ?? '', '<a:t>A link to remove</a:t>'),
         // The links the edit did not touch stay as they were: web, email, slide, the show jumps,
-        // the custom show, the file, and the shape link.
-        after.slice(1, 7).join('') === before.slice(1, 7).join('')
+        // the custom show, the file, the program, and the shape link, with their targets.
+        [1, 2, 3, 4, 5, 6, 8].every((i) => after[i] === before[i])
           ? undefined
           : 'a link the edit did not touch changed',
         kept(d, 0, 'Linked shape'),
-        has(
-          rels,
-          'https://example.com/docs?q=1&amp;r=2',
-          'Target="notes.txt"',
-          'https://example.net/'
-        )
+        keptRels(d, 0, 'rIdWeb', 'rIdMail', 'rIdSlide', 'rIdFile', 'rIdShape', 'rIdProgram')
       );
     },
   },
@@ -655,10 +652,13 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
         pictures.length === 3 ? undefined : `${pictures.length} pictures`,
         replaced ? undefined : `the PNG picture shows ${target}, not the new picture`,
         has(svg, 'rot="900000"', '<a:off x="7315200" y="457200"/>'),
-        // The SVG picture keeps its SVG part and its PNG fallback.
+        // The SVG picture keeps its SVG part and its PNG fallback, which it shared with the PNG
+        // picture: the new picture takes a relationship of its own.
         fill(svg) === fill(shapeXmlOf(d.original, 0, 'SVG picture'))
           ? undefined
-          : 'the SVG picture fill changed'
+          : 'the SVG picture fill changed',
+        embed !== 'rIdPng' ? undefined : 'the new picture reuses the shared relationship',
+        keptRels(d, 0, 'rIdPng', 'rIdSvg')
       );
     },
     parts: MEDIA,

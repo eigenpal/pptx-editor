@@ -62,9 +62,13 @@ export interface PeerLink {
 }
 
 /** Opens a deck in two editors that collaborate (`collaboration-kit.ts`). */
-export type OpenPeers = (
-  bytes: Uint8Array
-) => Promise<{ editor: PptxEditorInstance; peer: PptxEditorInstance; link: PeerLink }>;
+export type OpenPeers = (bytes: Uint8Array) => Promise<{
+  editor: PptxEditorInstance;
+  peer: PptxEditorInstance;
+  link: PeerLink;
+  /** Destroy both editors, their sessions, and their replicas. */
+  destroy(): void;
+}>;
 
 /** What a recipe uses to check the reopened copy. */
 export interface SavedDeck {
@@ -168,7 +172,7 @@ export const lacks = (xml: string, ...parts: string[]): string | undefined => {
 };
 
 /**
- * A failure when the shape named `name` on slide `index` is not as committed: the check of kept
+ * A failure when a shape of `names` on slide `index` is not as committed: the check of kept
  * content that the editor does not edit.
  */
 export function kept(d: SavedDeck, index: number, ...names: string[]): string | undefined {
@@ -191,6 +195,29 @@ export function keptChild(d: SavedDeck, index: number, qname: string): string | 
   const before = child(d.original);
   if (before === undefined) throw new Error(`the fixture has no ${qname} on slide ${index + 1}`);
   return child(d.pkg) === before ? undefined : `${qname} changed`;
+}
+
+/**
+ * A failure when a relationship of `ids` of slide `index` does not have its committed type,
+ * target, and target mode. Kept XML that names an `r:id` keeps its meaning only with this.
+ */
+export function keptRels(d: SavedDeck, index: number, ...ids: string[]): string | undefined {
+  const rel = (pkg: PptxPackage, id: string): string | undefined => {
+    const part = slidePart(pkg, index).replace(/\/([^/]+)$/, '/_rels/$1.rels');
+    const root = xmlPartOf(pkg, part)?.root;
+    const el = root && elements(root).find((c) => attr(c, 'Id') === id);
+    return el && ['Type', 'Target', 'TargetMode'].map((a) => attr(el, a) ?? '').join(' ');
+  };
+  return all(
+    ...ids.map((id) => {
+      const before = rel(d.original, id);
+      if (before === undefined) throw new Error(`the fixture has no relationship ${id}`);
+      const after = rel(d.pkg, id);
+      return after === before
+        ? undefined
+        : `relationship ${id} is ${after ?? 'gone'}, was ${before}`;
+    })
+  );
 }
 
 /** The runs of the first paragraph of a shape, in order: their `a:rPr` and text. */
@@ -362,10 +389,12 @@ export async function runFeatureEdit(id: string, recipe: FeatureEdit): Promise<F
   const fixture = new Uint8Array(readFileSync(join(FIXTURES, `${recipe.fixture}.pptx`)));
   const original = readFixture(recipe.fixture);
   const slide = recipe.slide ?? 0;
-  const peers = recipe.collaborate ? await recipe.collaborate(fixture) : undefined;
-  const editor = peers?.editor ?? (await open(fixture));
+  let peers: Awaited<ReturnType<OpenPeers>> | undefined;
+  let editor: PptxEditorInstance | undefined;
   let reopened: PptxEditorInstance | undefined;
   try {
+    peers = recipe.collaborate ? await recipe.collaborate(fixture) : undefined;
+    editor = peers?.editor ?? (await open(fixture));
     const untouched = editor.save();
     if (!untouched) return { id, ok: false, failure: 'the untouched deck did not save' };
     editor.goToSlide(slide);
@@ -418,17 +447,24 @@ export async function runFeatureEdit(id: string, recipe: FeatureEdit): Promise<F
       (p: string) => p === own.replace(/\/([^/]+)$/, '/_rels/$1.rels'),
       ...(recipe.parts ?? []).map((rule) => (p: string) => allows(rule, p)),
     ];
-    const collateral = differentParts(before.pkg, after.pkg).filter(
-      (p) => !allowed.some((ok) => ok(p))
-    );
+    // A part that the edit does not own is as committed: compared with the fixture itself, so
+    // a loss that a plain open and save would cause is caught too.
+    const collateral = [
+      ...new Set([
+        ...differentParts(before.pkg, after.pkg),
+        ...differentParts(original, after.pkg),
+      ]),
+    ]
+      .filter((p) => !allowed.some((ok) => ok(p)))
+      .sort();
     if (collateral.length)
       return { id, ok: false, failure: `the edit also changed ${collateral.join(', ')}`, bytes };
     return { id, ok: true, bytes, fingerprint: editFingerprint(after.pkg) };
   } catch (error) {
     return { id, ok: false, failure: error instanceof Error ? error.message : String(error) };
   } finally {
-    editor.destroy();
-    peers?.peer.destroy();
+    if (peers) peers.destroy();
+    else editor?.destroy();
     reopened?.destroy();
   }
 }
