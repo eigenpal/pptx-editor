@@ -30,10 +30,13 @@ const slideNumbers = new WeakMap<OpBatch, Map<string, number | undefined>>();
  */
 export function slideNumberOf(batch: OpBatch, part: string): number | undefined {
   let byPart = slideNumbers.get(batch);
-  if (!byPart) slideNumbers.set(batch, (byPart = new Map()));
-  if (!byPart.has(part)) {
-    const index = presentationInfo(batch.pkg).slides.findIndex((s) => s.partName === part);
-    byPart.set(part, index < 0 ? undefined : index + 1);
+  if (!byPart) {
+    // Every slide at once: a Replace All across a long deck asks for each of its slides.
+    byPart = new Map();
+    presentationInfo(batch.pkg).slides.forEach(
+      (s, i) => byPart!.has(s.partName) || byPart!.set(s.partName, i + 1)
+    );
+    slideNumbers.set(batch, byPart);
   }
   return byPart.get(part);
 }
