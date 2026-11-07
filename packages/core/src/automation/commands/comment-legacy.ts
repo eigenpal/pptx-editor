@@ -227,7 +227,7 @@ export function findLegacy(
   batch: OpBatch,
   slidePart: string,
   key: string
-): { part: string; cm: Element; thread: Element; repeated: boolean } {
+): { part: string; cm: Element; thread: Element; placed: boolean; group: number } {
   const fields = legacyKeyFields(key);
   if (!fields) throw new CommandRefusal('errors.noComment');
   const wanted = `${fields.authorId}:${fields.idx}`;
@@ -252,7 +252,7 @@ export function findLegacy(
     const all = elements(root).filter((c) => isP(c, 'cm'));
     const parent = parentKey(cm);
     const thread = (parent && all.find((c) => keyOf(c) === parent && !parentKey(c))) || cm;
-    return { part, cm, thread, repeated: total > 1 };
+    return { part, cm, thread, placed: fields.ordinal !== undefined, group: total };
   }
   throw new CommandRefusal('errors.noComment');
 }

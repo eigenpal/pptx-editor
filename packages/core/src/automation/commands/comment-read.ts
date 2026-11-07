@@ -256,31 +256,36 @@ function fnv(text: string): string {
 
 /**
  * The comment id of a threaded comment or reply: its GUID. A GUID that the slide repeats (a file
- * can) or that holds `~` (no GUID does) also takes the comment's mark (`modernMark`) and its
- * ordinal among the repeats with that mark: `G~<mark>~1`. A delete of another repeat then moves
- * no id onto another comment. `modernKeyParts` reads the key back.
+ * can) or that holds `~` (no GUID does) also takes the comment's mark (`modernMark`):
+ * `G~<mark>`. Twins, comments with one GUID and mark, also take their place among each other:
+ * `G~<mark>~<n>`. A delete of another repeat then moves no id onto another comment, except a
+ * twin's onto a twin. `modernKeyParts` reads the key back.
  */
 export const modernId = (
   slidePart: string,
   guid: string,
-  marked?: { readonly mark: string; readonly ordinal: number }
+  marked?: { readonly mark: string; readonly ordinal?: number }
 ): string =>
-  `${slidePart}#${guid.toUpperCase()}${marked ? `~${marked.mark}~${marked.ordinal}` : ''}`;
+  `${slidePart}#${guid.toUpperCase()}` +
+  (marked ? `~${marked.mark}${marked.ordinal !== undefined ? `~${marked.ordinal}` : ''}` : '');
 
 /** The parts of a threaded comment id key (`modernId`), or undefined for a key that is not one. */
 export interface ModernKey {
   readonly guid: string;
   /** The mark of a repeated GUID, absent for a GUID that the slide holds once. */
   readonly mark?: string;
-  readonly ordinal: number;
+  /** The place among twins, absent for a comment that the key names without one. */
+  readonly ordinal?: number;
 }
 
 /** The parts of a threaded comment id key, in its canonical form only. */
 export function modernKeyParts(key: string): ModernKey | undefined {
   const upper = key.toUpperCase();
-  const m = /^(.+)~([0-9A-F]{8})~([1-9]\d{0,5})$/.exec(upper);
-  if (m) return { guid: m[1]!, mark: m[2]!, ordinal: Number(m[3]) };
-  return upper && !upper.includes('~') ? { guid: upper, ordinal: 1 } : undefined;
+  const placed = /^(.+)~([0-9A-F]{8})~([1-9]\d{0,5})$/.exec(upper);
+  if (placed) return { guid: placed[1]!, mark: placed[2]!, ordinal: Number(placed[3]) };
+  const marked = /^(.+)~([0-9A-F]{8})$/.exec(upper);
+  if (marked) return { guid: marked[1]!, mark: marked[2]! };
+  return upper && !upper.includes('~') ? { guid: upper } : undefined;
 }
 
 /** The first descendant with this namespace and local name, at most `depth` levels down. */
@@ -454,6 +459,7 @@ function modernComment(
   const key = `${guid}\u0000${mark}`;
   const ordinal = bump(count.seen, key);
   const repeated = (count.uses.get(guid) ?? 0) > 1 || guid.includes('~');
+  const twins = (count.twins.get(key) ?? 0) > 1;
   const text = modernText(el);
   // The GUID and the mark, which edits, resolves, and deletes of other comments keep. Twins (one
   // GUID, author, and date) also take a hash of their text, and twins with one text their place
@@ -462,11 +468,10 @@ function modernComment(
   const hash = fnv(text);
   const same = `${key}\u0000${hash}`;
   const place = bump(count.seenText, same);
-  const twins = (count.twins.get(key) ?? 0) > 1;
   const suffix = twins ? `~${hash}${(count.texts.get(same) ?? 0) > 1 ? `~${place}` : ''}` : '';
   const identity = `${slidePart}#m~${identityField(guid)}~${mark}${suffix}`;
   const comment: SlideComment = {
-    id: modernId(slidePart, guid, repeated ? { mark, ordinal } : undefined),
+    id: modernId(slidePart, guid, repeated ? { mark, ...(twins ? { ordinal } : {}) } : undefined),
     identity,
     author: author?.name ?? '',
     initials: author?.initials ?? '',
@@ -476,18 +481,6 @@ function modernComment(
   };
   commentNodes.set(comment, `${listPart}\u0000${el.id}`);
   return comment;
-}
-
-/** Whether another threaded comment of `slidePart` has the GUID and mark of `el`. */
-export function modernHasTwin(pkg: PptxPackage, slidePart: string, el: Element): boolean {
-  const guid = (attr(el, 'id') ?? '').toUpperCase();
-  const mark = modernMark(el);
-  let n = 0;
-  for (const part of slideCommentParts(pkg, slidePart).modern)
-    eachModern(commentTree(pkg, part)?.root, (c) => {
-      if ((attr(c, 'id') ?? '').toUpperCase() === guid && modernMark(c) === mark) n += 1;
-    });
-  return n > 1;
 }
 
 /** What the reader shows of a threaded comment or reply: author, date, and text. */

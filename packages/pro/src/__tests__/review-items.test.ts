@@ -186,10 +186,10 @@ describe('comment ids from a file', () => {
       b!.identity,
       c!.identity,
     ]);
-    // B takes A's id when A goes, but never A's identity.
+    // When A goes, B has no twin: its id loses its place, and it never takes A's identity.
     expect(e.exec({ type: 'deleteComment', commentId: a!.id }).ok).toBe(true);
     const [b2, c2] = e.snapshot().comments!;
-    expect(b2!.id).toBe(a!.id);
+    expect(b2!.id).toBe(a!.id.replace(/~1$/, ''));
     expect(b2!.identity).not.toBe(a!.identity);
     expect(c2!.identity).toBe(c!.identity);
     // C is the last copy of the GUID once B goes: its id loses the mark, its identity stays, and
@@ -257,7 +257,7 @@ describe('review items', () => {
       expect(by('Copy').id).toBe(by('Repeated').id.replace(/~1$/, '~2'));
       expect(by('Copy').editable).toBe(true);
       const [guid, mark] = by('Repeated').id.split('#')[1]!.split('~');
-      expect(by('Tilde').id.split('#')[1]).toBe(`${guid}~2~${mark}~1`);
+      expect(by('Tilde').id.split('#')[1]).toBe(`${guid}~2~${mark}`);
       expect(items.some((i) => i.text === 'Hidden' || i.text === 'No id')).toBe(false);
       expect(
         e.exec({ type: 'editComment', commentId: by('Copy').id, text: 'Copy edited' }).ok

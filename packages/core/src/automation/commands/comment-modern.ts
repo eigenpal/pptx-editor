@@ -284,14 +284,15 @@ function modernHits(root: Element | undefined, wanted: string): ModernHit[] {
 
 /**
  * A threaded comment or reply of a slide by its id key (`modernId`): the GUID of a comment that
- * the slide holds once, or the GUID, mark, and ordinal of a repeat. Returns its list, its thread,
- * and the reply.
+ * the slide holds once, the GUID and mark of a comment that no other comment repeats, or the
+ * GUID, mark, and place of a twin. Returns its list, its thread, the reply, whether the key holds
+ * a place, and how many comments have the GUID and mark.
  */
 export function findModern(
   batch: OpBatch,
   slidePart: string,
   key: string
-): { part: string; thread: Element; reply?: Element } {
+): { part: string; thread: Element; reply?: Element; placed: boolean; group: number } {
   const parsed = modernKeyParts(key);
   if (!parsed) throw new CommandRefusal('errors.noComment');
   const { guid, mark, ordinal } = parsed;
@@ -304,12 +305,16 @@ export function findModern(
   const total = lists.reduce((n, l) => n + l.hits.length, 0);
   // A plain GUID names a comment only while the slide holds that GUID once.
   if (mark === undefined && total !== 1) throw new CommandRefusal('errors.noComment');
-  let left = ordinal;
+  const inGroup = (h: ModernHit): boolean => mark === undefined || markOf(h) === mark;
+  const group = lists.reduce((n, l) => n + l.hits.filter(inGroup).length, 0);
+  // A GUID and mark without a place name a comment only while no twin shares them.
+  if (ordinal === undefined && group !== 1) throw new CommandRefusal('errors.noComment');
+  let left = ordinal ?? 1;
   for (const { part, hits } of lists) {
-    const index = hits.findIndex((h) => (mark === undefined || markOf(h) === mark) && --left === 0);
+    const index = hits.findIndex((h) => inGroup(h) && --left === 0);
     if (index < 0) continue;
     const hit = modernHits(editable(batch, part)?.root, guid)[index];
-    if (hit) return { part, ...hit };
+    if (hit) return { part, ...hit, placed: ordinal !== undefined, group };
     break;
   }
   throw new CommandRefusal('errors.noComment');
