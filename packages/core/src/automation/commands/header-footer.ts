@@ -14,6 +14,7 @@ import {
   find,
   path,
   presentationInfo,
+  specOf,
   textOf,
   xmlPartOf,
   type Element,
@@ -222,18 +223,14 @@ function replaceText(
     // The new run or field keeps the character format of the old one; in an empty paragraph, it
     // takes the end-of-paragraph format (`a:endParaRPr` is a `CT_TextCharacterProperties` too).
     if (rPr) batch.push({ op: 'moveNode', part, node: rPr.id, parent: created, index: 0 });
-    else if (endPr) {
-      const attrs = endPr.attrs
-        .map((a) => ` ${a.prefix ? `${a.prefix}:` : ''}${a.local}="${xmlAttr(a.value, 'format')}"`)
-        .join('');
+    else if (endPr)
       batch.insert({
         op: 'insertNode',
         part,
         parent: created,
         index: 0,
-        spec: specFromXml(`<a:rPr${attrs}/>`),
+        spec: { ...specOf(endPr), local: 'rPr' },
       });
-    }
   }
   for (const c of content) if (c !== run || !t) batch.push({ op: 'removeNode', part, node: c.id });
 }
@@ -267,7 +264,8 @@ interface Showing {
 
 /**
  * Show the placeholder of `kind` on the `show` slides and hide it on the `hide` slides. Returns
- * the number of slides changed. Refuses when none of those slides can show the placeholder.
+ * the number of slides changed. Refuses (`errors.unsupported`) blank, multi-line, or too long
+ * text and an empty target list, and refuses when none of the targets can show the placeholder.
  */
 function applyKind(
   batch: OpBatch,
@@ -279,9 +277,10 @@ function applyKind(
   // One line of text: a line break inside `a:t` is not a line break (`a:br` is).
   if (
     showing.text !== undefined &&
+    targets.show.length > 0 &&
     (showing.text.trim() === '' ||
       showing.text.length > MAX_HEADER_FOOTER_TEXT ||
-      /[\r\n\u000b\u2028\u2029]/.test(showing.text))
+      /[\r\n\u000b\u0085\u2028\u2029]/.test(showing.text))
   )
     throw new CommandRefusal('errors.unsupported', what);
   if (targets.show.length + targets.hide.length === 0)
@@ -314,14 +313,20 @@ function applyKind(
     }
     if (existing.length > 0) {
       if (showing.text === undefined) {
-        // Keeps its own text; `fixed` turns a date field into that text.
-        if (!showing.toFixed) continue;
+        // Keeps its own text; an empty one takes the deck's, and `fixed` turns a date field
+        // into its text.
+        let edited = false;
         for (const shape of existing) {
           const own = shownBy(shape);
-          if (own?.fieldType !== undefined)
+          if (!own && deck) {
+            const field = showing.toFixed ? undefined : deck.fieldType;
+            replaceText(batch, slide.partName, shape, what, deck.text, field);
+          } else if (own && showing.toFixed && own.fieldType !== undefined) {
             replaceText(batch, slide.partName, shape, what, own.text, undefined);
+          } else continue;
+          edited = true;
         }
-        changed += 1;
+        changed += edited ? 1 : 0;
         continue;
       }
       for (const shape of existing)
@@ -413,6 +418,8 @@ export function applyHeaderFooter(batch: OpBatch, command: HeaderFooterCommand):
   switch (command.type) {
     case 'setSlideNumbers': {
       const targets = headerFooterTargets(batch.pkg, command.show, options);
+      if (targets.show.length + targets.hide.length === 0)
+        throw new CommandRefusal('errors.unsupported', 'slides');
       // Refused only when neither the slides that show nor those that hide can have a number.
       let refusal: unknown = new CommandRefusal('disabled.noSlideNumberPlaceholder');
       let done = false;

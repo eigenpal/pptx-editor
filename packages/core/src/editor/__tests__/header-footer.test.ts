@@ -315,9 +315,48 @@ describe('edge cases', () => {
     );
   });
 
+  test('an empty footer takes the deck text when on gives no text', async () => {
+    const deck = headerFooterDeck();
+    const e = await open(
+      buildPptx({
+        ...deck,
+        slides: [
+          {
+            ...deck.slides[1]!,
+            shapes: deck.slides[1]!.shapes + placeholder(9, 'ftr', 11, emptyFooter),
+          },
+          deck.slides[0]!,
+        ],
+      })
+    );
+    expect(e.exec({ type: 'setFooter', show: true }).ok).toBe(true);
+    expect(painted(e, 0)).toContain('Footer text & more');
+    // It keeps its own format, from its end-of-paragraph properties.
+    expect(slideXml(e, 0)).toContain(
+      '<a:rPr lang="de-DE" sz="2000" b="1"/><a:t>Footer text &amp; more'
+    );
+  });
+
+  test('the end-of-paragraph format keeps its fill and font', async () => {
+    const body =
+      '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="en-US" sz="1400">' +
+      '<a:solidFill><a:srgbClr val="FF0000"/></a:solidFill><a:latin typeface="Lato"/></a:endParaRPr></a:p></p:txBody>';
+    const e = await open(withSlide2(placeholder(9, 'ftr', 11, body)));
+    expect(e.exec({ type: 'setFooter', show: true, text: 'Red' }).ok).toBe(true);
+    expect(slideXml(e, 1)).toContain(
+      '<a:r><a:rPr lang="en-US" sz="1400"><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill><a:latin typeface="Lato"/></a:rPr><a:t>Red</a:t></a:r>'
+    );
+  });
+
+  test('hiding ignores the text', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    expect(e.exec({ type: 'setFooter', show: false, text: '' }).ok).toBe(true);
+    expect(e.snapshot().footer).toBeNull();
+  });
+
   test('blank and multi-line text is refused', async () => {
     const e = await open(buildPptx(headerFooterDeck()));
-    for (const text of ['  ', 'a\nb', 'a\rb'])
+    for (const text of ['  ', 'a\nb', 'a\rb', 'a\u0085b'])
       expect(e.exec({ type: 'setFooter', show: true, text }).ok).toBe(false);
     expect(e.exec({ type: 'setDateTime', show: true, text: 'a\nb' }).ok).toBe(false);
   });
