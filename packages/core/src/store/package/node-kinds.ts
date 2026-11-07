@@ -7,6 +7,7 @@ import type { NodeKind } from './tree.ts';
 const P = NS.p;
 const A = NS.a;
 const DSP = NS.dsp;
+const DGM = NS.dgm;
 
 /** Assign a typed kind from the expanded name and the parent's kind. */
 export function kindOf(ns: string, local: string, parent: NodeKind | null): NodeKind {
@@ -48,6 +49,9 @@ export function kindOf(ns: string, local: string, parent: NodeKind | null): Node
   // A diagram's saved drawing (`dsp:drawing`) holds DrawingML text bodies, so its
   // paragraphs and runs carry the typed kinds that text resolution reads.
   if (ns === DSP && local === 'txBody') return 'txBody';
+  // A diagram data point's text (`dgm:t`) is a DrawingML text body too: a diagram text edit
+  // types into it as into the drawing's body.
+  if (ns === DGM && local === 't') return 'txBody';
   return 'generic';
 }
 

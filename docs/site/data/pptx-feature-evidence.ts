@@ -186,7 +186,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     fixtures: ['charts', 'chart-sizes', 'chart-data', 'preserve-unsupported', 'slide-structure'],
   },
   'objects.diagrams': {
-    fixtures: ['diagrams'],
+    fixtures: ['diagrams', 'diagram-editing'],
     approximations: ['diagram-drawing', 'line-model'],
   },
   'objects.media-ole': {

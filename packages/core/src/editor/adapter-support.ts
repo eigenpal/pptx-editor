@@ -17,6 +17,7 @@ import {
 import { NOTES_SLOTS } from './chrome-forms.ts';
 import { isTableChromeSlot } from './chrome-table.ts';
 import { CHART_CHROME_GROUP } from './chrome-chart.ts';
+import { DIAGRAM_CHROME_GROUP } from './chrome-diagram.ts';
 import type {
   Editor,
   EditorCommand,
@@ -207,7 +208,7 @@ const TOOLBAR_SLIDE_GROUP: ChromeGroup = ((g) => ({
  * selected as an object, or a focused speaker notes field. @internal
  */
 export type ToolbarContext =
-  'none' | 'text' | 'shape' | 'picture' | 'chart' | 'table' | 'tableFrame' | 'notes';
+  'none' | 'text' | 'shape' | 'picture' | 'chart' | 'diagram' | 'table' | 'tableFrame' | 'notes';
 
 /**
  * The toolbar context of a snapshot. Adapters select it, so the bar changes only with it.
@@ -215,7 +216,7 @@ export type ToolbarContext =
  */
 export function toolbarContextOf(
   snapshot: Pick<EditorSnapshot, 'selection' | 'image' | 'table'> &
-    Partial<Pick<EditorSnapshot, 'chart'>>
+    Partial<Pick<EditorSnapshot, 'chart' | 'diagram'>>
 ): ToolbarContext {
   const sel = snapshot.selection;
   // A table selected as an object keeps Delete, Duplicate, and Arrange; a caret or a range of
@@ -223,6 +224,8 @@ export function toolbarContextOf(
   if (snapshot.table) return sel.kind === 'shapes' ? 'tableFrame' : 'table';
   if (snapshot.image) return 'picture';
   if (snapshot.chart) return 'chart';
+  // A diagram selected as an object, or the caret in a diagram shape.
+  if (snapshot.diagram) return 'diagram';
   if (sel.kind === 'text') return 'text';
   if (sel.kind === 'shapes' && sel.nodeIds.length > 0) return 'shape';
   return 'none';
@@ -238,6 +241,7 @@ const CONTEXT_GROUP_IDS: Readonly<Record<ToolbarContext, readonly string[]>> = {
   shape: ['history', 'font', 'text', 'paragraph', 'insert', 'shape', 'format', 'arrange', 'more'],
   picture: ['history', 'insert', 'image', 'arrange', 'more'],
   chart: ['history', 'insert', 'chart', 'arrange', 'more'],
+  diagram: ['history', 'insert', 'diagram', 'arrange', 'more'],
   table: ['history', 'font', 'text', 'paragraph', 'list', 'insert', 'format', 'table'],
   tableFrame: [
     'history',
@@ -260,6 +264,7 @@ const CONTEXT_GROUPS: ReadonlyMap<string, ChromeGroup> = new Map(
     TOOLBAR_SLIDE_GROUP,
     ...TOOLBAR_PICTURE_GROUPS.filter((g) => g.id === 'image'),
     CHART_CHROME_GROUP,
+    DIAGRAM_CHROME_GROUP,
     ...TOOLBAR_CONTEXT_GROUPS,
   ].map((g) => [g.id as string, g])
 );
@@ -276,6 +281,7 @@ const GROUPS_BY_CONTEXT: Readonly<Record<ToolbarContext, readonly ChromeGroup[]>
   shape: groupsOf(CONTEXT_GROUP_IDS.shape),
   picture: groupsOf(CONTEXT_GROUP_IDS.picture),
   chart: groupsOf(CONTEXT_GROUP_IDS.chart),
+  diagram: groupsOf(CONTEXT_GROUP_IDS.diagram),
   table: groupsOf(CONTEXT_GROUP_IDS.table),
   tableFrame: groupsOf(CONTEXT_GROUP_IDS.tableFrame),
   notes: groupsOf(CONTEXT_GROUP_IDS.notes).map((g) =>
@@ -300,6 +306,7 @@ const BAR_ORDER: readonly string[] = [
   'insert',
   'image',
   'chart',
+  'diagram',
   'shape',
   'format',
   'arrange',
@@ -309,11 +316,15 @@ const BAR_ORDER: readonly string[] = [
   'table',
 ];
 
-/** The order of a `contextual: false` bar: every bar group, then the picture, chart, and table groups. */
+/**
+ * The order of a `contextual: false` bar: every bar group, then the picture, chart, diagram, and
+ * table groups.
+ */
 const FULL_BAR_ORDER: readonly string[] = [
   ...TOOLBAR_BAR_GROUPS.flatMap((g) => (g.id === 'text' ? ['text', 'script'] : [g.id])),
   'image',
   'chart',
+  'diagram',
   'table',
 ];
 
@@ -340,6 +351,7 @@ const BAR_SLOTS = slotsOf(CONTEXT_GROUPS.values());
 const FULL_BAR_SLOTS = slotsOf([
   ...TOOLBAR_PICTURE_GROUPS,
   CHART_CHROME_GROUP,
+  DIAGRAM_CHROME_GROUP,
   ...TOOLBAR_CONTEXT_GROUPS,
 ]);
 
@@ -449,13 +461,16 @@ export function toolbarGroupsFor(
     ? TOOLBAR_PICTURE_GROUPS
     : context === 'chart'
       ? CHART_BAR_GROUPS
-      : context === 'table' || context === 'tableFrame'
-        ? TABLE_BAR_GROUPS
-        : TOOLBAR_BAR_GROUPS;
+      : context === 'diagram'
+        ? DIAGRAM_BAR_GROUPS
+        : context === 'table' || context === 'tableFrame'
+          ? TABLE_BAR_GROUPS
+          : TOOLBAR_BAR_GROUPS;
 }
 
 const TABLE_BAR_GROUPS: readonly ChromeGroup[] = [...TOOLBAR_BAR_GROUPS, ...TOOLBAR_CONTEXT_GROUPS];
 const CHART_BAR_GROUPS: readonly ChromeGroup[] = [...TOOLBAR_BAR_GROUPS, CHART_CHROME_GROUP];
+const DIAGRAM_BAR_GROUPS: readonly ChromeGroup[] = [...TOOLBAR_BAR_GROUPS, DIAGRAM_CHROME_GROUP];
 
 /**
  * The preset toolbar's groups after the host's group overrides: built-in groups in registry
@@ -725,13 +740,15 @@ export type ChromeTranslate = (key: string, params?: TranslationParams) => strin
 
 /**
  * The caret: the text box that holds it, and a paragraph and an offset in that text box, as
- * DOCX Editor's `EditorCaret`. `cell` names the table cell when the text box is a table. @public
+ * DOCX Editor's `EditorCaret`. `cell` names the table cell when the text box is a table, and
+ * `diagramNode` names the data model node when the text box is a diagram shape. @public
  */
 export interface EditorCaret {
   readonly nodeId: string;
   readonly paragraph: number;
   readonly offset: number;
   readonly cell?: TableCellAddress;
+  readonly diagramNode?: string;
 }
 
 /**
@@ -745,14 +762,15 @@ export function editorCaretOf(
 ): EditorCaret | null {
   const selection = snapshot.selection;
   if (selection.kind !== 'text') return null;
-  const { focus, nodeId, cell } = selection;
+  const { focus, nodeId, cell, diagramNode } = selection;
   if (
     previous &&
     previous.nodeId === nodeId &&
     previous.paragraph === focus.paragraph &&
     previous.offset === focus.offset &&
     previous.cell?.row === cell?.row &&
-    previous.cell?.column === cell?.column
+    previous.cell?.column === cell?.column &&
+    previous.diagramNode === diagramNode
   )
     return previous;
   return {
@@ -760,5 +778,6 @@ export function editorCaretOf(
     paragraph: focus.paragraph,
     offset: focus.offset,
     ...(cell ? { cell: { row: cell.row, column: cell.column } } : {}),
+    ...(diagramNode ? { diagramNode } : {}),
   };
 }

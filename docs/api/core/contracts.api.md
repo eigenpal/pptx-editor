@@ -287,6 +287,21 @@ export interface DateTimeState {
 }
 
 // @public
+export type DiagramCommand = {
+    readonly type: 'addDiagramShape';
+    readonly position: DiagramShapePosition;
+    readonly nodeId?: string;
+    readonly node?: string;
+} | {
+    readonly type: 'deleteDiagramShape';
+    readonly nodeId?: string;
+    readonly node?: string;
+};
+
+// @public
+export type DiagramShapePosition = 'after' | 'before' | 'below';
+
+// @public
 export interface DocumentOpenFailure {
     readonly code: string;
     readonly reason: DocumentOpenFailureReason;
@@ -743,7 +758,7 @@ export type EditorCommand = {
 /** Apply the copied formatting to the selection as one undo step (Ctrl/Cmd+Shift+V). */
 | {
     readonly type: 'pasteFormat';
-} | TextFormatCommand | PictureCommand | ChartCommand | FillCommand | AnimationCommand
+} | TextFormatCommand | PictureCommand | ChartCommand | DiagramCommand | FillCommand | AnimationCommand
 /**
 * Shape Effects: set or remove one effect of the selected shapes, connectors, and pictures.
 * A shape whose effects come from its theme style (`a:effectRef`) gets that style's effects
@@ -847,6 +862,7 @@ export type EditorSelection = {
     readonly anchor: TextPoint;
     readonly focus: TextPoint;
     readonly cell?: TableCellAddress;
+    readonly diagramNode?: string;
 } | {
     readonly kind: 'cells';
     readonly nodeId: string;
@@ -868,6 +884,7 @@ export interface EditorSnapshot {
     readonly currentSlide: number;
     readonly customShows?: readonly CustomShowSummary[];
     readonly dateTime?: DateTimeState | null;
+    readonly diagram?: SelectedDiagramState | null;
     // (undocumented)
     readonly embeddedFontFaces: number;
     // (undocumented)
@@ -1335,6 +1352,14 @@ export interface SelectedChartState {
     readonly editable: boolean;
     readonly nodeId: string;
     readonly reason?: string;
+}
+
+// @public
+export interface SelectedDiagramState {
+    readonly node: string | null;
+    readonly nodeId: string;
+    readonly reason?: string;
+    readonly structure: boolean;
 }
 
 // @public

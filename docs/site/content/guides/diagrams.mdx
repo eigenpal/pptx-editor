@@ -1,0 +1,78 @@
+---
+title: 'Diagrams'
+description: 'Type in the shapes of a diagram, and add and delete diagram shapes.'
+category: 'Guides'
+---
+
+A PPTX diagram is a graphic frame that names a data model part (`dgm:dataModel`, ECMA-376 Part 1, 21.4). The data model holds the diagram's nodes and their text. A saved drawing part (`dsp:drawing`) holds the shapes that the nodes were last laid out as. The editor draws a diagram from its saved drawing. A diagram with no saved drawing shows a placeholder.
+
+You can type in the shapes of a diagram, and you can add and delete shapes. Each edit writes the data model and the saved drawing together, so the two agree. A presentation application lays the diagram out again from its data model.
+
+## Type in a diagram shape
+
+1. Select the diagram.
+2. Click a shape of the diagram. The caret goes into the shape's text.
+3. Type. Run formatting stays as it was.
+
+The keyboard works too. With the diagram selected, press Enter or F2 to put the caret at the end of the first shape. Tab moves the caret to the next shape, and Shift+Tab to the previous one. Escape selects the diagram again.
+
+From code, set a text selection with `diagramNode`, the data model id (`dgm:pt/@modelId`) of the node. `nodeId` is the diagram's graphic frame:
+
+```ts
+const at = { paragraph: 0, offset: 0 };
+editor.setSelection({
+  kind: 'text',
+  nodeId: frameNodeId, // the diagram's graphic frame
+  diagramNode: nodeModelId, // the node whose text to edit
+  anchor: at,
+  focus: at,
+});
+editor.input('text', 'Next step: ');
+```
+
+`editor.snapshot().diagram` reports the selected diagram: its frame, the node that holds the caret, and whether its shapes can be added and deleted.
+
+## Add and delete shapes
+
+Select the diagram, or put the caret in one of its shapes. Then use the **Diagram** toolbar group, the **Diagram Design** ribbon tab, or the diagram's context menu:
+
+- **Add shape after** and **Add shape before** add a node at the same level as the node that holds the caret. With only the diagram selected, they add after the last node or before the first one.
+- **Add shape below** adds a child as the last child of the node that holds the caret.
+- **Delete shape** deletes the node that holds the caret, with its children.
+
+After an add, the caret is in the new, empty shape, so you can type its text. One add or delete is one undo step.
+
+The same edits are commands. This example adds a shape after the node that holds the caret and types its text:
+
+```ts
+const result = editor.exec({ type: 'addDiagramShape', position: 'after' });
+if (result.ok) editor.input('text', 'Review');
+else console.warn(result.reason); // a translation key
+```
+
+`addDiagramShape` and `deleteDiagramShape` also take `nodeId`, the diagram's graphic frame, and `node`, the data model id of the target node.
+
+## How the layout works
+
+A presentation application lays a diagram out with the algorithms of its layout definition. The editor does not run these algorithms. After an add or a delete, the editor lays the saved drawing out again with its own simple rules:
+
+- The top-level shapes stay on their line, in their order. They share the line's length evenly, with the gaps they had.
+- The children of a top-level shape stack across the line, with the size and spacing of the existing children. They shrink only when they would leave the diagram's frame.
+- A shape between two top-level shapes, such as an arrow of a process, moves to the middle of the new gap.
+
+These rules apply when the saved drawing reads as one line of shapes, such as a process, a list, or columns of grouped items. `editor.snapshot().diagram.structure` is `false` for other diagrams, such as cycles, hierarchies, and grids. Their shapes cannot be added or deleted, and the commands are refused with `errors.diagram.layoutUnsupported`. You can still type in their shapes.
+
+## Limits
+
+- The editor's layout after an add or a delete can differ from the layout that a presentation application makes.
+- Diagrams with more than two levels, or with shapes in nested groups, cannot get or lose shapes.
+- **Add shape below** needs a diagram that already shows children.
+- A diagram keeps at least one top-level shape.
+- A shape that shows the text of more than one node, such as a shape with its children as bullets, is read-only.
+- Text formatting commands do not apply to diagram text.
+- Diagram colors, diagram styles, and the layout itself are not editable.
+
+## See also
+
+- [PPTX fidelity](/docs/pptx-fidelity)
+- [Undo history](/docs/guides/undo-history)

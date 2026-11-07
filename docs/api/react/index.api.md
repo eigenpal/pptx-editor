@@ -1643,6 +1643,10 @@ export interface ToolbarNamedParts {
     readonly Copy: ToolbarPartComponent;
     readonly Cut: ToolbarPartComponent;
     readonly Delete: ToolbarPartComponent;
+    readonly DiagramAddAfter: ToolbarPartComponent;
+    readonly DiagramAddBefore: ToolbarPartComponent;
+    readonly DiagramAddBelow: ToolbarPartComponent;
+    readonly DiagramDelete: ToolbarPartComponent;
     readonly Duplicate: ToolbarPartComponent;
     readonly ExpandAllSections: ToolbarPartComponent;
     readonly Find: ToolbarPartComponent;

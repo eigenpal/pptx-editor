@@ -491,6 +491,7 @@ export {
   type ChartPaneResult,
 } from './chart-pane.ts';
 export { type ChartSlotId } from './chrome-chart.ts';
+export { type DiagramSlotId } from './chrome-diagram.ts';
 export { type ImageSlotId } from './chrome-picture.ts';
 export {
   resetDevWarnings,

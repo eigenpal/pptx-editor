@@ -55,6 +55,7 @@ import { createShortcut, createSurfaceHost, type SurfaceHostBase } from './surfa
 import { setSurfaceRoot } from './surface-registry.ts';
 import { refit } from '../automation/commands/autofit.ts';
 import { withAutoCorrect } from './autocorrect.ts';
+import { typeDiagram } from './diagram-commands.ts';
 import { selectAllOf } from './shape-keys.ts';
 import { clampZoom } from './zoom.ts';
 import { snapTextSelection, type TextInputKind } from './text-input.ts';
@@ -511,17 +512,20 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     const deletes = kind === 'deleteBackward' || kind === 'deleteForward';
     const carried =
       deletes || (!typed && (kind === 'text' || kind === 'paragraph' || kind === 'lineBreak'));
-    const armed = typed ? arm.current() : null;
+    const armed = typed && sel.diagramNode === undefined ? arm.current() : null;
     const batch = session.batch(armed?.pkg);
     let at: TextPoint;
     let listed = false;
     try {
-      const txBody = selectionBody(batch, part, sel);
-      if (!txBody) throw new CommandRefusal('disabled.noText');
-      ({ at, list: listed } = typeText(batch, part, slide, txBody.id, item, sel, kind, data));
-      const caret = { part, nodeId: sel.nodeId, at, ...(sel.cell ? { cell: sel.cell } : {}) };
-      if (carried) for (const op of arm.carry(batch.pkg, caret)) batch.push(op);
-      refit(batch, slide, part, sel.nodeId, session.measurer);
+      const txBody = sel.diagramNode === undefined ? selectionBody(batch, part, sel) : undefined;
+      if (sel.diagramNode !== undefined) at = typeDiagram(batch, part, sel, item, kind, data);
+      else if (!txBody) throw new CommandRefusal('disabled.noText');
+      else {
+        ({ at, list: listed } = typeText(batch, part, slide, txBody.id, item, sel, kind, data));
+        const caret = { part, nodeId: sel.nodeId, at, ...(sel.cell ? { cell: sel.cell } : {}) };
+        if (carried) for (const op of arm.carry(batch.pkg, caret)) batch.push(op);
+        refit(batch, slide, part, sel.nodeId, session.measurer);
+      }
     } catch (e) {
       if (e instanceof CommandRefusal) return refuse(e.reason, e.detail);
       throw e;

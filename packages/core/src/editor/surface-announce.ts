@@ -1,11 +1,12 @@
-// What the slide's live region says about the selection: the table cell the caret is in, or the
-// kind, name, and alt text of the one shape that Tab (or a click) selected. Split from
-// `surface.ts` for the line cap.
+// What the slide's live region says about the selection: the table cell or the diagram shape the
+// caret is in, or the kind, name, and alt text of the one shape that Tab (or a click) selected.
+// Split from `surface.ts` for the line cap.
 
 import type { EditorSelection } from '../contracts/index.ts';
 import type { LayoutItem, SlideLayout } from '../layout/index.ts';
 import type { AltTextPort } from '../output/index.ts';
 import { findItem } from '../automation/commands/placement.ts';
+import { diagramTextItems } from './surface-diagram.ts';
 
 /** What the announcement asks of the editor (a part of `SurfaceHost`). */
 export interface AnnouncementHost {
@@ -45,6 +46,14 @@ export function selectionAnnouncement(layout: SlideLayout, host: AnnouncementHos
         ? selection.focus
         : undefined;
   if (cell) return label('canvas.tableCell', { row: cell.row + 1, column: cell.column + 1 });
+  // The caret in a diagram: which shape of the diagram it is in.
+  if (selection.kind === 'text' && selection.diagramNode !== undefined) {
+    const shapes = diagramTextItems(layout, selection.nodeId);
+    const at = shapes.findIndex(
+      (i) => i.element.kind === 'shape' && i.element.diagramNode === selection.diagramNode
+    );
+    return at < 0 ? '' : label('canvas.diagramShape', { index: at + 1, count: shapes.length });
+  }
   const one =
     selection.kind === 'shapes' && selection.nodeIds.length === 1
       ? selection.nodeIds[0]

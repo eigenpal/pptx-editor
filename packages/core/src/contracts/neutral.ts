@@ -24,7 +24,13 @@ import type { ConnectorRoute } from './connectors.ts';
 export type { ConnectionTarget, ConnectorRoute } from './connectors.ts';
 import type { AnimationCommand, SlideAnimations } from './animation.ts';
 export type * from './animation.ts';
-import type { CustomShowSummary, NotesFormat, NotesParagraph, SlideSection } from './deck.ts';
+import type {
+  CustomShowSummary,
+  NotesFormat,
+  NotesParagraph,
+  SlideLayoutSummary,
+  SlideSection,
+} from './deck.ts';
 export type * from './deck.ts';
 
 import type {
@@ -101,9 +107,11 @@ export type {
 
 import type { PictureCommand, SelectedImageState, AltText } from './picture.ts';
 import type { ChartCommand, SelectedChartState } from './chart.ts';
+import type { DiagramCommand, SelectedDiagramState } from './diagram.ts';
 
-// Every chart data type is public: `chart.ts` holds nothing else.
+// Every chart and diagram type is public: `chart.ts` and `diagram.ts` hold nothing else.
 export type * from './chart.ts';
+export type * from './diagram.ts';
 import type { FillCommand, GradientFill, PatternFill, SlideBackground } from './fill.ts';
 import type { SlideBackgroundState } from './fill.ts';
 
@@ -443,6 +451,7 @@ export type EditorCommand =
   | TextFormatCommand
   | PictureCommand
   | ChartCommand
+  | DiagramCommand
   | FillCommand
   | AnimationCommand
   /**
@@ -596,6 +605,8 @@ export type EditorSelection =
       readonly focus: TextPoint;
       /** The table cell whose text is edited; `nodeId` is then the table's graphic frame. */
       readonly cell?: TableCellAddress;
+      /** The edited diagram node (`dgm:pt/@modelId`); `nodeId` is then the diagram frame. */
+      readonly diagramNode?: string;
     }
   | {
       /** A range of table cells, from the cell the drag started in to the cell it is over. */
@@ -763,67 +774,6 @@ export interface DocumentOpenFailure {
   readonly reason: DocumentOpenFailureReason;
 }
 
-/**
- * The kind of a slide layout, with the file's own values: `ST_SlideLayoutType` (ECMA-376 Part 1,
- * §19.7.15). `cust` is a custom layout, and also the value for a file that names none or an
- * unknown kind. The Office.js `SlideLayoutType` enum names the same idea with other values
- * (`"TitleOnly"` for `titleOnly`); the automation API keeps that name for its own type. @public
- */
-export type SlideLayoutKind =
-  | 'title'
-  | 'tx'
-  | 'twoColTx'
-  | 'tbl'
-  | 'txAndChart'
-  | 'chartAndTx'
-  | 'dgm'
-  | 'chart'
-  | 'txAndClipArt'
-  | 'clipArtAndTx'
-  | 'titleOnly'
-  | 'blank'
-  | 'txAndObj'
-  | 'objAndTx'
-  | 'objOnly'
-  | 'obj'
-  | 'txAndMedia'
-  | 'mediaAndTx'
-  | 'objOverTx'
-  | 'txOverObj'
-  | 'txAndTwoObj'
-  | 'twoObjAndTx'
-  | 'twoObjOverTx'
-  | 'fourObj'
-  | 'vertTx'
-  | 'clipArtAndVertTx'
-  | 'vertTitleAndTx'
-  | 'vertTitleAndTxOverChart'
-  | 'twoObj'
-  | 'objAndTwoObj'
-  | 'twoObjAndObj'
-  | 'cust'
-  | 'secHead'
-  | 'twoTxTwoObj'
-  | 'objTx'
-  | 'picTx';
-
-/** One slide layout of the deck, as the Layout and New Slide galleries list it. @public */
-export interface SlideLayoutSummary {
-  /** The layout's identity in the open document. */
-  readonly id: string;
-  /** The layout's name (`p:cSld/@name`, for example "Title and Content"). */
-  readonly name: string;
-  /** `p:sldLayout/@type`. */
-  readonly type: SlideLayoutKind;
-  /** The slide master the layout belongs to; galleries group layouts by master. */
-  readonly masterId: string;
-  /**
-   * The master's name, as the gallery's group header shows it: the master's own name, or the
-   * name of its theme (`a:theme/@name`).
-   */
-  readonly masterName: string;
-}
-
 /** A family the deck names that renders with another face. @public */
 export interface EditorFontSubstitution {
   readonly family: string;
@@ -969,6 +919,8 @@ export interface EditorSnapshot {
    * then. Optional: absent means the implementation does not edit chart data.
    */
   readonly chart?: SelectedChartState | null;
+  /** The selected diagram, or the diagram that holds the caret. Absent: no diagram editing. */
+  readonly diagram?: SelectedDiagramState | null;
   /**
    * The current slide's elements, top first, for the selection pane. Hidden elements are in
    * the list. Optional: absent means the implementation has no selection pane.

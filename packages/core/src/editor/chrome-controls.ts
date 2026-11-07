@@ -19,6 +19,7 @@ import { IMAGE_CHROME_GROUP, imageSlotState } from './chrome-picture.ts';
 import { adapterActionState } from './chrome-adapter-state.ts';
 import type { ImageSlotId } from './chrome-picture.ts';
 import { CHART_CHROME_GROUP, chartSlotState, type ChartSlotId } from './chrome-chart.ts';
+import { DIAGRAM_CHROME_GROUP, type DiagramSlotId } from './chrome-diagram.ts';
 import { isNothingToDo } from '../automation/commands/op-batch.ts';
 import type { ToolbarSlotValue } from './toolbar-values.ts';
 import {
@@ -207,7 +208,8 @@ export type ChromeGroupId =
   | 'image'
   | 'section'
   | 'table'
-  | 'chart';
+  | 'chart'
+  | 'diagram';
 
 /** One toolbar group. @public */
 export interface ChromeGroup {
@@ -683,6 +685,7 @@ export const CHROME_GROUPS: readonly ChromeGroup[] = [
   ...TABLE_GROUPS,
   IMAGE_CHROME_GROUP,
   CHART_CHROME_GROUP,
+  DIAGRAM_CHROME_GROUP,
 ];
 
 // A group with no control left on the bar (`script`) is left out.
@@ -783,7 +786,8 @@ export type ChromeSlotId =
   | 'section.expandAll'
   | TableSlotId
   | ImageSlotId
-  | ChartSlotId;
+  | ChartSlotId
+  | DiagramSlotId;
 
 /** Every slot id, derived from the registry. @public */
 export function chromeSlotIds(): ChromeSlotId[] {

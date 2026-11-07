@@ -243,6 +243,11 @@ export interface ResolvedShape extends ResolvedBase {
    * turn adds to the shape's turn. Text lays out in it, not in the geometry's text rectangle.
    */
   readonly textXfrm?: Xfrm;
+  /**
+   * The data model point (`dgm:pt/@modelId`) whose text a diagram shape shows, when it shows
+   * the text of exactly one node. A diagram text edit writes this point and the shape.
+   */
+  readonly diagramNode?: string;
 }
 
 /** `p:pic`. */

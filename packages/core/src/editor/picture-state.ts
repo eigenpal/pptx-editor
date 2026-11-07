@@ -29,6 +29,7 @@ import {
 } from './picture-commands.ts';
 import { pictureStyleOf } from './picture-presets.ts';
 import { chartStateAt } from './chart-commands.ts';
+import { diagramStateAt } from './diagram-commands.ts';
 
 export { chartDataAt } from './chart-commands.ts';
 
@@ -39,10 +40,15 @@ export function selectedObjectsAt(
   selection: EditorSelection,
   cropping: string | null,
   layout?: SlideLayout
-): { image: SelectedImageState | null; chart: ReturnType<typeof chartStateAt> } {
+): {
+  image: SelectedImageState | null;
+  chart: ReturnType<typeof chartStateAt>;
+  diagram: ReturnType<typeof diagramStateAt>;
+} {
   return {
     image: pictureStateAt(pkg, part, selection, cropping, layout),
     chart: chartStateAt(pkg, part, selection),
+    diagram: diagramStateAt(pkg, part, selection),
   };
 }
 

@@ -141,7 +141,8 @@
     "altText": "代替テキストの編集…",
     "paragraph": "段落…",
     "font": "フォント…",
-    "chartLabel": "グラフの操作"
+    "chartLabel": "グラフの操作",
+    "diagramLabel": "図の操作"
   },
   "mode": {
     "label": "モード",
@@ -174,7 +175,8 @@
       "image": "画像",
       "section": "セクション",
       "table": "表",
-      "chart": "グラフ"
+      "chart": "グラフ",
+      "diagram": "図"
     },
     "smartGuides": "スマート ガイド",
     "find": "検索 (Ctrl+F)",
@@ -1124,6 +1126,7 @@
     "placeholderTable": "ここに表を挿入",
     "placeholderPicture": "ここに画像を挿入",
     "tableCell": "{row} 行、{column} 列",
+    "diagramShape": "図の図形 {index}/{count}",
     "shapeSelected": "{kind} {name} を選択しました",
     "shapeSelectedWithAltText": "{kind} {name}、{description} を選択しました",
     "dragCanceled": "ドラッグを取り消しました",
@@ -1186,6 +1189,15 @@
       "notNumber": "値はすべて数値にしてください。",
       "layout": "このグラフのセル参照は 1 つの表になっていないため、名前と値のみ変更できます。",
       "workbook": "埋め込まれたブックはこの変更を受け付けられません。系列ごとに異なる名前を付け、データの隣のセルを空にしてください。"
+    },
+    "diagram": {
+      "noDiagram": "図を 1 つ選択してください。",
+      "noNode": "図の図形内にカーソルを置いてください。",
+      "noText": "この図形は複数の項目のテキストを表示するため、ここでは編集できません。",
+      "lastShape": "図には最上位の図形が少なくとも 1 つ必要です。",
+      "layoutUnsupported": "この図はレイアウトし直せないため、図形を追加または削除できません。",
+      "noChildren": "この図は最上位より下の図形を表示しません。",
+      "tooLarge": "図の図形がエディターで編集できる数を超えています。"
     }
   },
   "find": {
@@ -1533,7 +1545,8 @@
       "pictureFormat": "図の形式",
       "chartDesign": "グラフのデザイン",
       "tableDesign": "テーブル デザイン",
-      "tableLayout": "テーブル レイアウト"
+      "tableLayout": "テーブル レイアウト",
+      "diagramDesign": "図のデザイン"
     }
   },
   "statusBar": {
@@ -1638,5 +1651,11 @@
     "removeCategoryNamed": "項目 {name} を削除",
     "removeSeriesNamed": "系列 {name} を削除",
     "removeSeries": "系列の削除"
+  },
+  "diagram": {
+    "addAfter": "後に図形を追加",
+    "addBefore": "前に図形を追加",
+    "addBelow": "下に図形を追加",
+    "delete": "図形を削除"
   }
 }

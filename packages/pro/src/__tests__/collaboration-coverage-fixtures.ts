@@ -21,6 +21,7 @@ import type {
 import { png, type ConvergenceFixture, type TextInputFixture } from './convergence-harness.ts';
 import { buildPptx } from '../../../../scripts/fixtures/builder.ts';
 import { chartDataDeck } from '../../../../scripts/fixtures/chart-data.ts';
+import { diagramEditingDeck } from '../../../../scripts/fixtures/diagram-editing.ts';
 
 const IN = 914_400;
 
@@ -29,6 +30,15 @@ function idOf(e: PptxEditorInstance, name: string): string {
   const found = e.snapshot().shapes?.find((s) => s.name === name);
   if (!found) throw new Error(`no element named ${name}`);
   return found.nodeId;
+}
+
+/** The data model id of the first node that the current slide's diagram shows. */
+function firstDiagramNode(e: PptxEditorInstance): string {
+  const frame = e.session!.layout(e.snapshot().currentSlide)?.items.find((i) => i.kind === 'frame');
+  const node = frame?.kind === 'frame' ? frame.drawing?.find((d) => d.kind === 'shape') : undefined;
+  const id = node?.element.kind === 'shape' ? node.element.diagramNode : undefined;
+  if (!id) throw new Error('no diagram node');
+  return id;
 }
 
 const TABLE = 'Table 5';
@@ -516,6 +526,18 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
         },
       };
     },
+  },
+
+  // Diagrams: the data model and the saved drawing are written again in one transaction.
+  addDiagramShape: {
+    deck: () => buildPptx(diagramEditingDeck()),
+    arrange: select('Diagram 1'),
+    command: () => ({ type: 'addDiagramShape', position: 'after' }),
+  },
+  deleteDiagramShape: {
+    deck: () => buildPptx(diagramEditingDeck()),
+    arrange: select('Diagram 1'),
+    command: (e) => ({ type: 'deleteDiagramShape', node: firstDiagramNode(e) }),
   },
 
   // Tables.

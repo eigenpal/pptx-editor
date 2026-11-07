@@ -147,6 +147,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     charts: 58,
     colors: 0,
     'custom-geometry': 0,
+    'diagram-editing': 9,
     diagrams: 20,
     'east-asian-line-breaking': 136,
     'east-asian-theme-fonts': 16,

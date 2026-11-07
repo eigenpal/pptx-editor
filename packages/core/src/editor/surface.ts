@@ -39,6 +39,7 @@ import { cropAt, cropOverlay, onCropImage, startCropDrag } from './surface-crop.
 import type { CropDrag, CropHandle } from './surface-crop.ts';
 import { withHalos } from './surface-halo.ts';
 import { hitItem, inText, onBorder } from './surface-hit.ts';
+import { diagramPress } from './surface-diagram.ts';
 import { fitZoom, outsideVeil, scrollBoxIntoView } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
 import { selectionAnnouncement } from './surface-announce.ts';
@@ -653,6 +654,21 @@ export class SlideSurface {
       else this.root.focus({ preventScroll: true });
       return;
     }
+    // A diagram: a caret in the shape of a node, once the diagram is selected.
+    const diagram = id && !addShape && !painting && !this.editor.readOnly();
+    const node = diagram ? diagramPress(layout, id, sel, p, e.shiftKey) : null;
+    if (node?.kind === 'text') {
+      this.#textDrag = {
+        id: node.nodeId,
+        unit: 'character',
+        anchor: node.anchor,
+        anchorEnd: node.anchor,
+      };
+      this.editor.select(node);
+      e.preventDefault();
+      this.#input.focus({ preventScroll: true });
+      return;
+    }
     if (sel.kind === 'text' && id === sel.nodeId) {
       const item = itemById(layout, id);
       const at = item ? pointAt(item, p.x, p.y) : undefined;
@@ -812,14 +828,12 @@ export class SlideSurface {
       const drag = this.#textDrag;
       const sel = this.editor.selection();
       // A word or paragraph drag in a table cell runs over the cell's own text item.
-      const item =
-        drag.unit !== 'character' && sel.kind === 'text'
-          ? textItemOf(layout, sel)
-          : itemById(layout, drag.id);
+      const own = sel.kind === 'text' && (drag.unit !== 'character' || !!sel.diagramNode);
+      const item = own ? textItemOf(layout, sel) : itemById(layout, drag.id);
       const point = item ? pointAt(item, p.x, p.y) : undefined;
       if (item && point)
         this.editor.select(
-          drag.unit !== 'character' && sel.kind === 'text'
+          own && sel.kind === 'text'
             ? { ...sel, ...dragSelection(drag, item, point) }
             : { kind: 'text', nodeId: drag.id, ...dragSelection(drag, item, point) }
         );

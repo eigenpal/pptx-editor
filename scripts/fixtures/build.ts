@@ -17,6 +17,7 @@ import { followUpFixtures } from './follow-ups.ts';
 import { lineEndsDashesFixtures } from './line-ends-dashes.ts';
 import { chartSizesDeck, chartsDeck, diagramsDeck } from './drawingml.ts';
 import { chartDataDeck } from './chart-data.ts';
+import { diagramEditingDeck } from './diagram-editing.ts';
 import { buildRoundTripDecks } from './round-trip.ts';
 import { pictureBulletsDeck } from './picture-bullets.ts';
 import { textWarpFixtures } from './text-warp.ts';
@@ -861,7 +862,9 @@ writeFileSync(`${OUT}/chart-sizes.pptx`, buildPptx(chartSizesDeck()));
 writeFileSync(`${OUT}/chart-data.pptx`, buildPptx(chartDataDeck()));
 // Diagrams with their saved drawings (ECMA-376 Part 1, 21.4).
 writeFileSync(`${OUT}/diagrams.pptx`, buildPptx(diagramsDeck()));
+// A process and a list diagram, for the diagram text and structure edits.
+writeFileSync(`${OUT}/diagram-editing.pptx`, buildPptx(diagramEditingDeck()));
 // Links, kept content, an SVG picture, and tab stops: the round-trip checks of the feature edits.
 const roundTrip = buildRoundTripDecks(image);
 for (const [name, bytes] of Object.entries(roundTrip)) writeFileSync(`${OUT}/${name}.pptx`, bytes);
-console.log(`${Object.keys(fixtures).length + 7 + Object.keys(roundTrip).length} fixtures written to ${OUT}/`);
+console.log(`${Object.keys(fixtures).length + 8 + Object.keys(roundTrip).length} fixtures written to ${OUT}/`);

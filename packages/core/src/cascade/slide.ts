@@ -40,13 +40,15 @@ import { entryParts } from './picture-bullet.ts';
 import { layerKey, partContent, relsKey, sameKey } from './resolve-keys.ts';
 import { resolveFrameTable } from './table.ts';
 import { threeDOf } from './three-d.ts';
-import { readAdjustValues, readTextWarp } from './text-warp.ts';
+import { readTextWarp } from './text-warp.ts';
 import {
   diagramParts,
   MAX_DIAGRAM_GROUP_DEPTH,
   MAX_DIAGRAM_SHAPES,
   MAX_SLIDE_DIAGRAM_SHAPES,
 } from './diagram.ts';
+import { textNodesOf } from './diagram-model.ts';
+import { readGeometry, readXfrm, ZERO_XFRM } from './shape-xfrm.ts';
 import { DEFAULT_COLOR_MAP, parseTheme, readColorMap, type Theme } from './theme.ts';
 import {
   fontRefEntry,
@@ -228,40 +230,6 @@ function findMasterPlaceholder(
   const want = masterTypeFor(type);
   const index = placeholderIndex(list);
   return index.byType.get(want) ?? index.byMasterType.get(want);
-}
-
-/** The largest offset or size the cascade reads from `a:xfrm`, in EMU (four slide widths). @internal */
-export const XFRM_BOUND = 51_206_400 * 4;
-
-function readXfrm(xfrm: Element | undefined): Xfrm | undefined {
-  if (!xfrm) return undefined;
-  const off = child(xfrm, 'a:off');
-  const ext = child(xfrm, 'a:ext');
-  if (!off && !ext) return undefined;
-  const bound = (v: number | undefined): number =>
-    Math.max(-XFRM_BOUND, Math.min(v ?? 0, XFRM_BOUND));
-  return {
-    x: bound(intAttr(off, 'x')),
-    y: bound(intAttr(off, 'y')),
-    cx: Math.max(0, bound(intAttr(ext, 'cx'))),
-    cy: Math.max(0, bound(intAttr(ext, 'cy'))),
-    rot: ((intAttr(xfrm, 'rot') ?? 0) / 60_000) % 360,
-    flipH: boolAttr(xfrm, 'flipH') ?? false,
-    flipV: boolAttr(xfrm, 'flipV') ?? false,
-  };
-}
-
-const ZERO_XFRM: Xfrm = { x: 0, y: 0, cx: 0, cy: 0, rot: 0, flipH: false, flipV: false };
-
-function readGeometry(spPr: Element | undefined): GeometrySpec | undefined {
-  const prst = child(spPr, 'a:prstGeom');
-  if (prst) {
-    const adjust = readAdjustValues(child(prst, 'a:avLst'));
-    return { kind: 'preset', preset: attr(prst, 'prst') ?? 'rect', adjust };
-  }
-  const cust = child(spPr, 'a:custGeom');
-  if (cust) return { kind: 'custom', element: cust };
-  return undefined;
 }
 
 /** The namespace of a shape's own children: `p:` on a slide, `dsp:` in a diagram drawing. */
@@ -627,6 +595,7 @@ const UNSUPPORTED = Symbol('unsupported');
 interface DiagramBudget {
   shapes: number;
   overLimit: boolean;
+  readonly nodes: ReadonlyMap<string, string>;
 }
 
 /** Stop a diagram at a shape, depth, or slide limit, and remember why. */
@@ -661,7 +630,9 @@ function resolveDiagramElement(
       if (budget.shapes > MAX_DIAGRAM_SHAPES) return overLimit(budget);
       if (scope.diagramShapes.count > MAX_SLIDE_DIAGRAM_SHAPES) return overLimit(budget);
       if (!path(el, 'dsp:spPr', 'a:xfrm')) return UNSUPPORTED;
-      return resolveShapeLike(el, 'shape', layer, drawingPart, scope);
+      const shape = resolveShapeLike(el, 'shape', layer, drawingPart, scope);
+      const node = budget.nodes.get(attr(el, 'modelId') ?? '');
+      return node && shape.kind === 'shape' ? { ...shape, diagramNode: node } : shape;
     }
     case 'grpSp': {
       scope.diagramShapes.count += 1;
@@ -768,7 +739,9 @@ function resolveDiagram(
   const parts = diagramParts(scope.pkg, partName, graphicData);
   const tree = child(parts?.drawing, 'dsp:spTree');
   if (!parts || !tree) return { drawingFallback: 'no-drawing' };
-  const budget: DiagramBudget = { shapes: 0, overLimit: false };
+  // `nodes`: the node whose text each drawing shape shows, by the shape's `modelId`.
+  const nodes = textNodesOf(parts.dataModel);
+  const budget: DiagramBudget = { shapes: 0, overLimit: false, nodes };
   const shapes = resolveDiagramTree(tree, layer, parts.drawingPart, scope, 0, budget);
   if (!shapes) return { drawingFallback: budget.overLimit ? 'limit' : 'unsupported' };
   if (shapes.length === 0) return { drawingFallback: 'no-drawing' };

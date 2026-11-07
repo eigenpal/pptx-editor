@@ -227,7 +227,7 @@ export const CHROME_MENUS: readonly ChromeMenu[] = [
  * table cell (a caret in a cell, or a cell range), or empty slide area. @public
  */
 export type CanvasMenuKind =
-  'shapes' | 'picture' | 'chart' | 'text' | 'table' | 'tableFrame' | 'slide';
+  'shapes' | 'picture' | 'chart' | 'diagram' | 'text' | 'table' | 'tableFrame' | 'slide';
 
 /**
  * The context menu kind for a snapshot: a table cell (a caret in a cell, or a cell range), text
@@ -236,10 +236,11 @@ export type CanvasMenuKind =
  */
 export function canvasMenuKind(
   snapshot: Pick<EditorSnapshot, 'selection' | 'image'> &
-    Partial<Pick<EditorSnapshot, 'table' | 'chart'>>
+    Partial<Pick<EditorSnapshot, 'table' | 'chart' | 'diagram'>>
 ): CanvasMenuKind {
   const sel = snapshot.selection;
   if (sel.kind === 'cells' || (sel.kind === 'text' && sel.cell)) return 'table';
+  if (snapshot.diagram) return 'diagram';
   if (sel.kind === 'text') return 'text';
   if (sel.kind === 'shapes' && snapshot.table) return 'tableFrame';
   if (sel.kind === 'shapes' && snapshot.chart) return 'chart';
@@ -408,6 +409,22 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     SEPARATOR,
     item('arrange.group', 'contextMenu.group', 'contextMenu.shortcuts.group'),
     item('arrange.ungroup', 'contextMenu.ungroup', 'contextMenu.shortcuts.ungroup'),
+    SEPARATOR,
+    item('image.altText', 'contextMenu.altText'),
+  ],
+  // The diagram menu: the shape commands first, then the object rows.
+  diagram: [
+    item('diagram.addAfter'),
+    item('diagram.addBefore'),
+    item('diagram.addBelow'),
+    item('diagram.delete'),
+    SEPARATOR,
+    item('edit.cut', 'contextMenu.cut', 'contextMenu.shortcuts.cut'),
+    item('edit.copy', 'contextMenu.copy', 'contextMenu.shortcuts.copy'),
+    item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
+    item('more.duplicate', 'contextMenu.duplicate', 'contextMenu.shortcuts.duplicate'),
+    SEPARATOR,
+    ...ORDER_ROWS,
     SEPARATOR,
     item('image.altText', 'contextMenu.altText'),
   ],

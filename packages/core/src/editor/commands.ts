@@ -71,6 +71,7 @@ import { compilePictureCommand, isPictureCommand } from './picture-commands.ts';
 import { compileAnimationCommand, isAnimationCommand } from './animation-command-table.ts';
 import { isViewCommand } from './view-settings.ts';
 import { compileChartCommand } from './chart-commands.ts';
+import { compileDiagramCommand } from './diagram-commands.ts';
 import { compileSlideCommand, isSlideCommand } from './slide-command-table.ts';
 import { compileShapeCommand, isShapeCommand } from './shape-command-table.ts';
 import { compileTextFormatCommand, isTextFormatCommand } from './text-format-commands.ts';
@@ -395,6 +396,8 @@ export function compile(
     return { batch, effect: compileAnimationCommand(ctx, batch, command) };
   if (command.type === 'setChartData')
     return { batch, effect: compileChartCommand(ctx, batch, command) };
+  if (command.type === 'addDiagramShape' || command.type === 'deleteDiagramShape')
+    return { batch, effect: compileDiagramCommand(ctx, batch, command) };
   const info = ctx.session.info;
   const { width: slideW, height: slideH } = info;
   switch (command.type) {

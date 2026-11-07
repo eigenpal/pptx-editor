@@ -1,4 +1,5 @@
-// Deck-level summaries of the editor contract: custom shows, sections, and speaker notes.
+// Deck-level summaries of the editor contract: custom shows, sections, speaker notes, and
+// slide layouts.
 // Declaration-only, DOM-free, re-exported by `neutral.ts`.
 
 /** A custom show of the deck (`p:custShow`, ECMA-376 Part 1, 19.2.1.7), for links. @public */
@@ -40,4 +41,65 @@ export interface NotesRun {
 export interface NotesParagraph {
   /** The paragraph's runs; neighbors with the same formatting are joined. */
   readonly runs: readonly NotesRun[];
+}
+
+/**
+ * The kind of a slide layout, with the file's own values: `ST_SlideLayoutType` (ECMA-376 Part 1,
+ * §19.7.15). `cust` is a custom layout, and also the value for a file that names none or an
+ * unknown kind. The Office.js `SlideLayoutType` enum names the same idea with other values
+ * (`"TitleOnly"` for `titleOnly`); the automation API keeps that name for its own type. @public
+ */
+export type SlideLayoutKind =
+  | 'title'
+  | 'tx'
+  | 'twoColTx'
+  | 'tbl'
+  | 'txAndChart'
+  | 'chartAndTx'
+  | 'dgm'
+  | 'chart'
+  | 'txAndClipArt'
+  | 'clipArtAndTx'
+  | 'titleOnly'
+  | 'blank'
+  | 'txAndObj'
+  | 'objAndTx'
+  | 'objOnly'
+  | 'obj'
+  | 'txAndMedia'
+  | 'mediaAndTx'
+  | 'objOverTx'
+  | 'txOverObj'
+  | 'txAndTwoObj'
+  | 'twoObjAndTx'
+  | 'twoObjOverTx'
+  | 'fourObj'
+  | 'vertTx'
+  | 'clipArtAndVertTx'
+  | 'vertTitleAndTx'
+  | 'vertTitleAndTxOverChart'
+  | 'twoObj'
+  | 'objAndTwoObj'
+  | 'twoObjAndObj'
+  | 'cust'
+  | 'secHead'
+  | 'twoTxTwoObj'
+  | 'objTx'
+  | 'picTx';
+
+/** One slide layout of the deck, as the Layout and New Slide galleries list it. @public */
+export interface SlideLayoutSummary {
+  /** The layout's identity in the open document. */
+  readonly id: string;
+  /** The layout's name (`p:cSld/@name`, for example "Title and Content"). */
+  readonly name: string;
+  /** `p:sldLayout/@type`. */
+  readonly type: SlideLayoutKind;
+  /** The slide master the layout belongs to; galleries group layouts by master. */
+  readonly masterId: string;
+  /**
+   * The master's name, as the gallery's group header shows it: the master's own name, or the
+   * name of its theme (`a:theme/@name`).
+   */
+  readonly masterName: string;
 }

@@ -101,6 +101,10 @@ export const TOOLBAR_NAMED_PARTS = {
   ImageCropFit: 'image.cropFit',
   ImageProperties: 'image.properties',
   ChartEditData: 'chart.editData',
+  DiagramAddAfter: 'diagram.addAfter',
+  DiagramAddBefore: 'diagram.addBefore',
+  DiagramAddBelow: 'diagram.addBelow',
+  DiagramDelete: 'diagram.delete',
   // The table group: DOCX Editor's names where it has the part (`TableInsert`,
   // `TableCellFill`, `TableBorderTarget`), and the same `Table` prefix for PPTX-only ideas.
   TableInsert: 'table.insert',

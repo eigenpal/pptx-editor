@@ -98,8 +98,32 @@ export function cellItem(frame: TableFrame, at: TableCellAddress): ShapeItem | u
   return item;
 }
 
+/** The laid-out shape of a diagram frame's drawing that shows the text of `node`. */
+export function diagramTextItem(
+  layout: SlideLayout,
+  frameId: string,
+  node: string
+): ShapeItem | undefined {
+  const frame = findItem(layout.items, frameId);
+  const find = (items: readonly LayoutItem[] | undefined): ShapeItem | undefined => {
+    for (const item of items ?? []) {
+      if (
+        item.kind === 'shape' &&
+        item.element.kind === 'shape' &&
+        item.element.diagramNode === node
+      )
+        return item;
+      const inner = item.kind === 'group' ? find(item.children) : undefined;
+      if (inner) return inner;
+    }
+    return undefined;
+  };
+  return frame?.kind === 'frame' ? find(frame.drawing) : undefined;
+}
+
 /**
- * The text item of a text selection: the selected shape, or the selected table cell. Every
+ * The text item of a text selection: the selected shape, the selected table cell, or the
+ * diagram shape of the selected diagram node. Every
  * caret, selection, and text input path reads text through this.
  */
 export function textItemOf(
@@ -107,6 +131,7 @@ export function textItemOf(
   sel: EditorSelection
 ): ShapeItem | undefined {
   if (sel.kind !== 'text' || !layout) return undefined;
+  if (sel.diagramNode !== undefined) return diagramTextItem(layout, sel.nodeId, sel.diagramNode);
   if (sel.cell) {
     const frame = tableItem(layout, sel.nodeId);
     return frame ? cellItem(frame, sel.cell) : undefined;

@@ -136,6 +136,25 @@ An edit of chart data SHALL change the series names, category labels, values, po
 - **WHEN** the chart's embedded workbook has a formula in its data cells
 - **THEN** the chart part changes, and the workbook saves unchanged
 
+### Requirement: Diagram editing
+
+A text edit in a diagram shape SHALL write the drawing shape's text and the text of the data model point that the shape shows, in one transaction. An added or deleted diagram shape SHALL change the data model's points and connections, renumber the sibling order, and lay the saved drawing out again, in one undo step. A diagram whose saved drawing is not one line of shapes with up to one level of children SHALL refuse structure edits, and SHALL write nothing.
+
+#### Scenario: Type in a diagram shape
+
+- **WHEN** text is typed at the end of a process shape
+- **THEN** the drawing shape and its data point hold the new text, with the run formatting they had
+
+#### Scenario: Add a shape after a node
+
+- **WHEN** a shape is added after the third node of a four-node process
+- **THEN** the data model holds five top-level nodes in order, each named by one connection, and the drawing holds five boxes and four arrows
+
+#### Scenario: Delete a node
+
+- **WHEN** a node is deleted
+- **THEN** its subtree, transition points, connections, and presentation points leave the data model, and no connection names a missing point
+
 ### Requirement: Progressive open
 
 A long deck SHALL show its start slide and take input before its other slides parse, and SHALL parse them in background tasks that give way to input. Every read, edit, undo, search, and save before then SHALL give the result of a deck that parsed whole, and a save SHALL parse the rest first. A slide that does not parse SHALL refuse the deck (or, after edits, make it read-only), and SHALL never be saved. An editor with a collaboration module SHALL parse the whole deck before its first slide shows.
