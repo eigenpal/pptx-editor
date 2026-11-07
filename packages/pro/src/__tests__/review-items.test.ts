@@ -77,7 +77,7 @@ function agreement(e: PptxEditorInstance) {
     const status = e.can({
       type: item.resolved ? 'reopenComment' : 'resolveComment',
       commentId: item.parentId ?? item.id,
-      ...(item.parentId === undefined ? { expect: expect_ } : {}),
+      expect: item.parent ?? expect_,
     }).ok;
     expect({ id: item.id, editable: item.editable, resolvable: item.resolvable }).toEqual({
       id: item.id,
@@ -212,6 +212,31 @@ describe('comment ids from a file', () => {
     expect(c3!.identity).toBe(c!.identity);
     expect(e.exec({ type: 'editComment', commentId: c!.id, text: 'By the old id' }).ok).toBe(true);
     expect(texts(e)).toEqual(['By the old id']);
+  });
+
+  test('the thread actions of a reply item refuse a thread that took its id', async () => {
+    const at = (thread: string, text: string) => thread.replace('>A<', `>${text}<`);
+    const e = await open(await oneThread((t) => at(t, 'A') + at(t, 'B') + at(t, 'C')));
+    for (const t of e.snapshot().comments!)
+      expect(e.exec({ type: 'replyToComment', commentId: t.id, text: `re ${t.text}` }).ok).toBe(
+        true
+      );
+    const stale = reviewItems(e, e.snapshot()).find((i) => i.text === 're B')!;
+    expect(stale.parent).toMatchObject({ text: 'B' });
+    const [a] = e.snapshot().comments!;
+    expect(e.exec({ type: 'deleteComment', commentId: a!.id }).ok).toBe(true);
+    // B's old id names C now: the reply item still shows B as its thread.
+    expect(e.snapshot().comments!.find((t) => t.id === stale.parentId)!.text).toBe('C');
+    const actions = reviewActions(e);
+    expect(actions.resolve(stale)).toBe(false);
+    expect(actions.reply(stale, 'Late')).toBe(false);
+    expect(e.snapshot().comments!.map((t) => [t.text, t.resolved, t.replies.length])).toEqual([
+      ['B', false, 1],
+      ['C', false, 1],
+    ]);
+    const fresh = reviewItems(e, e.snapshot()).find((i) => i.text === 're B')!;
+    expect(actions.resolve(fresh)).toBe(true);
+    expect(e.snapshot().comments!.map((t) => t.resolved)).toEqual([true, false]);
   });
 
   test('a file id that holds # stays reachable', async () => {

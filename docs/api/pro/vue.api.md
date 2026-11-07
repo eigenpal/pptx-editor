@@ -5,6 +5,7 @@
 ```ts
 
 import { CommentAnchor } from '@pptx-editor.dev/core/editor';
+import { CommentExpect } from '@pptx-editor.dev/core/editor';
 import { CommentFormat } from '@pptx-editor.dev/core/editor';
 import { CommentMarkerStyle } from '@pptx-editor.dev/core/editor';
 import { ComputedRef } from 'vue';
@@ -93,6 +94,7 @@ export interface ReviewItemView {
     readonly isActive: boolean;
     readonly key: string;
     readonly kind: 'comment';
+    readonly parent?: CommentExpect;
     readonly parentId?: string;
     readonly replyIds: readonly string[];
     readonly resolvable: boolean;

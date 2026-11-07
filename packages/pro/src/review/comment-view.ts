@@ -18,6 +18,7 @@ import {
   requestPane,
   type EditorRejection,
   type CommentAnchor,
+  type CommentExpect,
   type CommentFormat,
   type CommentThread,
   type EditorSelection,
@@ -68,6 +69,12 @@ export interface ReviewItemView {
   readonly anchorName?: string;
   /** For a reply, the id of its thread; absent on a thread. */
   readonly parentId?: string;
+  /**
+   * For a reply, what the item list showed of its thread: the author, date, text, and identity.
+   * The thread actions on a reply item (`reply`, `resolve`, `reopen`) send it as `expect`, so
+   * they refuse a thread that is no longer the one shown. Absent on a thread.
+   */
+  readonly parent?: CommentExpect;
   /** For a thread, the ids of its replies, oldest first; empty on a reply. */
   readonly replyIds: readonly string[];
   /** Whether the thread is the picked one (`activeKey`). A reply reports its thread's state. */
@@ -274,7 +281,7 @@ export function reviewItems(
       resolved: thread.resolved,
       anchor: thread.anchor,
       ...(anchorName !== undefined ? { anchorName } : {}),
-      ...(parentId !== undefined ? { parentId } : {}),
+      ...(parentId !== undefined ? { parentId, parent: seenOf(thread) } : {}),
       replyIds: parentId === undefined ? thread.replies.map((r) => r.id) : [],
       isActive,
       editable: writable && c.textEditable,
@@ -314,9 +321,10 @@ export function reviewActions(editor: PptxEditorInstance | null): ReviewActions 
     editor ? editor.exec(command).ok : false;
   const author = (name: string | undefined) => (name ? { author: name } : {});
   // What the item showed of the comment that a command acts on. A reply item's thread actions
-  // act on its thread, which the item does not show.
+  // act on its thread, which the item shows as `parent`.
   const own = (item: ReviewItemView) => ({ expect: seenOf(item) });
-  const thread = (item: ReviewItemView) => (item.parentId === undefined ? own(item) : {});
+  const thread = (item: ReviewItemView) =>
+    item.parentId === undefined ? own(item) : item.parent ? { expect: seenOf(item.parent) } : {};
   return {
     setActive: (key, options) => {
       if (!editor) return false;
