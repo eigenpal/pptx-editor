@@ -49,21 +49,26 @@ function targetsOf(root: Element): Target[] {
   return out;
 }
 
-/** The paragraph texts of each shape that `spids` names, by `p:cNvPr/@id`. */
-function paragraphsOf(root: Element, spids: ReadonlySet<string>): Map<string, string[]> {
-  const out = new Map<string, string[]>();
+/**
+ * The paragraph texts of each copy of each shape that `spids` names, by `p:cNvPr/@id`, in
+ * document order. A shape in `mc:AlternateContent` has a copy in each branch.
+ */
+function paragraphsOf(root: Element, spids: ReadonlySet<string>): Map<string, string[][]> {
+  const out = new Map<string, string[][]>();
   const walk = (el: Element, depth: number): void => {
     if (depth > MAX_DEPTH) return;
     if (isP(el, 'sp')) {
       const id = attr(child(child(el, 'p:nvSpPr'), 'p:cNvPr'), 'id');
-      if (id !== undefined && spids.has(id) && !out.has(id))
-        out.set(
-          id,
+      if (id !== undefined && spids.has(id)) {
+        const copies = out.get(id) ?? [];
+        copies.push(
           elements(child(el, 'p:txBody'))
             .filter((p) => p.ns === NS.a && p.local === 'p')
             // A line feed separates paragraphs; one inside a paragraph's text counts as a space.
             .map((p) => textOf(p).replace(/\n/g, ' '))
         );
+        out.set(id, copies);
+      }
       return;
     }
     if (isP(el, 'timing')) return;
@@ -79,22 +84,18 @@ function index(value: string | undefined): number | undefined {
   return Number(value.trim());
 }
 
-/** Where a character of the old text is in the new text; undefined when it changed. */
-function mapPosition(p: number, hunks: readonly TextHunk[]): number | undefined {
-  let delta = 0;
-  for (const h of hunks) {
-    if (p < h.aStart) break;
-    if (p < h.aEnd) return undefined;
-    delta += h.bEnd - h.bStart - (h.aEnd - h.aStart);
-  }
-  return p + delta;
+/** The new paragraphs that an old paragraph went to: the first and the last. */
+interface Moved {
+  readonly low: number;
+  readonly high: number;
 }
 
 /**
- * The new index of each old paragraph, or undefined for a paragraph whose text all changed.
- * `was` and `is` are the paragraph texts before and after the edit.
+ * Where each old paragraph went, or undefined for a paragraph that the edit replaced: fewer
+ * than half of its characters are unchanged. A paragraph that the edit split goes to every
+ * part. `was` and `is` are the paragraph texts before and after the edit.
  */
-function paragraphMap(was: readonly string[], is: readonly string[]): (number | undefined)[] {
+function paragraphMap(was: readonly string[], is: readonly string[]): (Moved | undefined)[] {
   const hunks = diffHunks(was.join('\n'), is.join('\n'));
   // The start offset of each new paragraph in the new text.
   const starts: number[] = [];
@@ -113,25 +114,59 @@ function paragraphMap(was: readonly string[], is: readonly string[]): (number | 
     }
     return lo;
   };
-  const out: (number | undefined)[] = [];
+  // One pass over the old text and the hunks: the new place of each unchanged character.
+  let h = 0;
+  let delta = 0;
+  const mapped = (c: number): number | undefined => {
+    while (h < hunks.length && c >= hunks[h]!.aEnd) {
+      delta += hunks[h]!.bEnd - hunks[h]!.bStart - (hunks[h]!.aEnd - hunks[h]!.aStart);
+      h += 1;
+    }
+    const hunk = hunks[h];
+    return hunk && c >= hunk.aStart ? undefined : c + delta;
+  };
+  const out: (Moved | undefined)[] = [];
   let start = 0;
   was.forEach((text, i) => {
-    let found: number | undefined;
-    for (let c = start; c < start + text.length && found === undefined; c += 1) {
-      const q = mapPosition(c, hunks);
-      if (q !== undefined) found = paragraphAt(q);
+    let low = Infinity;
+    let high = -Infinity;
+    let kept = 0;
+    for (let c = start; c < start + text.length; c += 1) {
+      const q = mapped(c);
+      if (q === undefined) continue;
+      kept += 1;
+      const to = paragraphAt(q);
+      low = Math.min(low, to);
+      high = Math.max(high, to);
     }
-    if (found === undefined && text.length === 0) {
-      // An empty paragraph follows its line feed: the one after it, or before the last one.
-      const feed = i < was.length - 1 ? start : start - 1;
-      const q = feed >= 0 ? mapPosition(feed, hunks) : undefined;
-      if (q !== undefined) found = i < was.length - 1 ? paragraphAt(q) : paragraphAt(q + 1);
-      if (was.length === 1 && is.length > 0) found = 0;
+    if (text.length > 0) out.push(kept * 2 >= text.length ? { low, high } : undefined);
+    else {
+      // An empty paragraph follows its line feed: the one after it, or, for the last
+      // paragraph, the one before it. A single empty paragraph goes to the first one.
+      let to: number | undefined;
+      if (i < was.length - 1) {
+        const q = mapped(start);
+        to = q === undefined ? undefined : paragraphAt(q);
+      } else if (start > 0) {
+        const q = mappedBack(start - 1, hunks);
+        to = q === undefined ? undefined : paragraphAt(q + 1);
+      } else if (is.length > 0) to = 0;
+      out.push(to === undefined ? undefined : { low: to, high: to });
     }
-    out.push(found);
     start += text.length + 1;
   });
   return out;
+}
+
+/** Where a character of the old text is in the new text, by a scan of the hunks. */
+function mappedBack(p: number, hunks: readonly TextHunk[]): number | undefined {
+  let delta = 0;
+  for (const hunk of hunks) {
+    if (p < hunk.aStart) break;
+    if (p < hunk.aEnd) return undefined;
+    delta += hunk.bEnd - hunk.bStart - (hunk.aEnd - hunk.aStart);
+  }
+  return p + delta;
 }
 
 /**
@@ -147,7 +182,7 @@ export function paragraphRangeFixes(part: string, before: Element, after: Elemen
   const now = paragraphsOf(after, spids);
   // The range of a target as it was before the edit: the same `p:pRg` node.
   const oldRanges = new Map(targetsOf(before).map((t) => [t.pRg.id, t.pRg]));
-  const maps = new Map<string, (number | undefined)[]>();
+  const maps = new Map<string, (Moved | undefined)[]>();
   const ops: PptxOp[] = [];
   const gone = new Set<Element>();
   const set = (node: Element, local: string, value: number): void => {
@@ -161,25 +196,32 @@ export function paragraphRangeFixes(part: string, before: Element, after: Elemen
     });
   };
   for (const t of targets) {
-    const was = old.get(t.spid);
-    const is = now.get(t.spid);
+    // The copy whose paragraphs changed: the one that the editor draws.
+    const olds = old.get(t.spid) ?? [];
+    const news = now.get(t.spid) ?? [];
+    const k = news.findIndex((is, i) => olds[i] !== undefined && olds[i]!.length !== is.length);
     // A shape that the edit added or removed follows its own rules (`timingRemovals`). An edit
     // that keeps the number of paragraphs keeps their indexes.
-    if (!was || !is || was.length === is.length) continue;
-    const range = oldRanges.get(t.pRg.id) ?? t.pRg;
+    if (k < 0 || olds.length !== news.length) continue;
+    const was = olds[k]!;
+    const is = news[k]!;
+    // A range that the same transaction added names the new paragraphs already.
+    const range = oldRanges.get(t.pRg.id);
+    if (!range) continue;
     const st = index(attr(range, 'st'));
     const end = index(attr(range, 'end'));
     // A range that the file wrote out of order or out of bounds stays as it is.
     if (st === undefined || end === undefined || st > end || end >= was.length) continue;
-    let map = maps.get(t.spid);
-    if (!map) maps.set(t.spid, (map = paragraphMap(was, is)));
+    const key = `${t.spid} ${k}`;
+    let map = maps.get(key);
+    if (!map) maps.set(key, (map = paragraphMap(was, is)));
     let low = Infinity;
     let high = -Infinity;
     for (let i = st; i <= end; i += 1) {
       const to = map[i];
       if (to === undefined) continue;
-      low = Math.min(low, to);
-      high = Math.max(high, to);
+      low = Math.min(low, to.low);
+      high = Math.max(high, to.high);
     }
     if (high < 0) {
       gone.add(t.spTgt);

@@ -158,9 +158,22 @@ export function repairTimingRoot(root: Element): Element {
   const timings = timingsOf(root);
   if (timings.every((t) => fileTimings.has(t))) return root;
   const remove = new Set(removalsIn(root, NONE, (t) => !fileTimings.has(t), true));
-  if (remove.size === 0) return root;
+  const ranges = rangesPastText(
+    root,
+    timings.filter((t) => !fileTimings.has(t))
+  );
+  if (remove.size === 0 && ranges.size === 0) return root;
   const strip = (el: Element, depth: number): Element => {
     if (depth > MAX_XML_DEPTH) return el;
+    const range = ranges.get(el);
+    if (range) {
+      const attrs = el.attrs.map((a) =>
+        a.ns === '' && (a.local === 'st' || a.local === 'end')
+          ? { ...a, value: String(range[a.local]) }
+          : a
+      );
+      return { ...el, attrs };
+    }
     let changed = false;
     const kids: Node[] = [];
     for (const c of el.children) {
@@ -175,6 +188,49 @@ export function repairTimingRoot(root: Element): Element {
     return changed ? { ...el, children: kids } : el;
   };
   return strip(root, 0);
+}
+
+/**
+ * The paragraph ranges (`p:pRg`) of `timings` that end past the last paragraph of their shape,
+ * with the range that ends at it. Two collaborators who each delete a paragraph before an
+ * animated one both move its range by one, so the merge can leave it one paragraph too far.
+ */
+function rangesPastText(
+  root: Element,
+  timings: readonly Element[]
+): Map<Element, { st: number; end: number }> {
+  const out = new Map<Element, { st: number; end: number }>();
+  if (timings.length === 0) return out;
+  // The number of paragraphs of each shape, by `p:cNvPr/@id`: the most of its copies.
+  const counts = new Map<string, number>();
+  const shapes = (el: Element, depth: number): void => {
+    if (depth > MAX_XML_DEPTH || isP(el, 'timing')) return;
+    if (isP(el, 'sp')) {
+      const id = attr(child(child(el, 'p:nvSpPr'), 'p:cNvPr'), 'id');
+      const n = elements(child(el, 'p:txBody')).filter(
+        (p) => p.ns === NS.a && p.local === 'p'
+      ).length;
+      if (id !== undefined) counts.set(id, Math.max(counts.get(id) ?? 0, n));
+      return;
+    }
+    for (const c of elements(el)) shapes(c, depth + 1);
+  };
+  shapes(root, 0);
+  const walk = (el: Element, depth: number): void => {
+    if (depth > MAX_XML_DEPTH) return;
+    if (isP(el, 'spTgt')) {
+      const pRg = child(child(el, 'p:txEl'), 'p:pRg');
+      const n = counts.get(attr(el, 'spid') ?? '');
+      const st = Number(attr(pRg, 'st'));
+      const end = Number(attr(pRg, 'end'));
+      if (pRg && n && Number.isInteger(st) && Number.isInteger(end) && end >= n)
+        out.set(pRg, { st: Math.min(st, n - 1), end: n - 1 });
+      return;
+    }
+    for (const c of elements(el)) walk(c, depth + 1);
+  };
+  for (const t of timings) walk(t, 0);
+  return out;
 }
 
 /**

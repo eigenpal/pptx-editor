@@ -295,6 +295,10 @@ export function removeOverride(batch: OpBatch, partName: string): void {
 export function freePartName(batch: OpBatch, prefix: string, suffix: string): string {
   const present = new Set<string>();
   for (const name of batch.pkg.parts.keys()) present.add(partNameKey(name));
+  // A content-type override that names no part (a file can hold one) still takes its name: a
+  // new part under it would get a second override with the same part name.
+  for (const el of elements(xmlPartOf(batch.pkg, CONTENT_TYPES_PART)?.root))
+    if (el.local === 'Override') present.add(partNameKey(attr(el, 'PartName') ?? ''));
   const taken = (name: string): boolean => {
     const key = partNameKey(name);
     return present.has(key) || batch.reservedPartNames.has(key);
@@ -469,19 +473,26 @@ export function renumberShapes(
     id === undefined ? undefined : String(unsignedIntId(id) ?? id);
   const map = new Map<string, string>();
   // The copies of one object in the branches of an `mc:AlternateContent` share one id, so they
-  // keep one new id too.
-  const collect = (n: NodeSpec, depth: number, twins?: Map<string, number>): void => {
+  // keep one new id too. Only a copy in another branch shares it: two shapes with one id in the
+  // same branch get two ids.
+  type Twins = Map<string, { readonly id: number; readonly branches: Set<NodeSpec> }>;
+  const collect = (n: NodeSpec, depth: number, twins?: Twins, branch?: NodeSpec): void => {
     if (depth > 64) return;
-    if (n.ns === NS.mc && n.local === 'AlternateContent') twins = new Map();
+    const wrapper = n.ns === NS.mc && n.local === 'AlternateContent';
     if (isCNvPr(n)) {
       const old = key(idOf(n));
       const twin = old === undefined ? undefined : twins?.get(old);
-      const id = twin ?? take();
+      const shared = twin && branch && !twin.branches.has(branch) ? twin : undefined;
+      const id = shared?.id ?? take();
       fresh.push(id);
-      if (old !== undefined && twin === undefined) twins?.set(old, id);
+      if (shared) shared.branches.add(branch!);
+      else if (old !== undefined && !twin && branch)
+        twins?.set(old, { id, branches: new Set([branch]) });
       if (old !== undefined && !map.has(old)) map.set(old, String(id));
     }
-    for (const c of n.children ?? []) if (!('text' in c)) collect(c, depth + 1, twins);
+    const inner = wrapper ? new Map() : twins;
+    for (const c of n.children ?? [])
+      if (!('text' in c)) collect(c, depth + 1, inner, wrapper ? c : branch);
   };
   for (const s of specs) collect(s, 0);
   let next = 0;

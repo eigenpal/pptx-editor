@@ -150,6 +150,45 @@ describe('paragraph ranges of effects', () => {
     ]);
   });
 
+  test('splitting an animated paragraph keeps both parts in its range', async () => {
+    const e = await open();
+    e.setSelection({
+      kind: 'text',
+      nodeId: shapeNode(e),
+      anchor: { paragraph: 1, offset: 2 },
+      focus: { paragraph: 1, offset: 2 },
+    });
+    expect(e.input('paragraph').ok).toBe(true);
+    expect(ranges(rootOf(e))).toEqual([
+      ['1', '2'],
+      ['3', '3'],
+    ]);
+  });
+
+  test('a paragraph whose text was replaced loses its effect', async () => {
+    const e = await open(effect(10, 0, 0) + effect(20, 2, 2));
+    e.setSelection({
+      kind: 'text',
+      nodeId: shapeNode(e),
+      anchor: { paragraph: 0, offset: 0 },
+      focus: { paragraph: 1, offset: 4 },
+    });
+    expect(e.input('text', 'New').ok).toBe(true);
+    // Alpha and Beta became one paragraph, "New"; Gamma moved up.
+    expect(ranges(rootOf(e))).toEqual([['1', '1']]);
+  });
+
+  test('a save ends a range that is past the last paragraph at it', async () => {
+    const e = await open();
+    const pRg = find(find(rootOf(e), 'p:timing')!, 'p:pRg')!;
+    const part = e.session!.info.slides[0]!.partName;
+    const r = e.session!.store.transact([
+      { op: 'setAttribute', part, node: pRg.id, name: { ns: '', local: 'end' }, value: '7' },
+    ]);
+    expect(r.ok).toBe(true);
+    expect((await reopened(e))[0]).toEqual(['1', '2']);
+  });
+
   test('undo restores the ranges with the text', async () => {
     const e = await open();
     remove(e, 0, 0, 1, 0);

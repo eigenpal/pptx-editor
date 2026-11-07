@@ -10,13 +10,17 @@ import {
   attr,
   contentTypeOf,
   find,
+  NS,
   readPptx,
   relationshipsOf,
   xmlPartOf,
   type Element,
+  type NodeSpec,
   type PptxPackage,
 } from '../../store/index.ts';
 import type { ClipboardPayload, ClipboardRelationship } from '../../contracts/index.ts';
+import { OpBatch } from '../../automation/commands/op-batch.ts';
+import { freePartName, renumberShapes } from '../../automation/commands/package-edits.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 
 const IN = 914_400;
@@ -262,5 +266,126 @@ describe('a link to a slide', () => {
     walk(shapes);
     // Only the deck's own link is left.
     expect(links).toHaveLength(1);
+  });
+});
+
+const MC = 'http://schemas.openxmlformats.org/markup-compatibility/2006';
+
+describe('the checks of an untrusted payload', () => {
+  test('refuse an embedded object type that can hold macros', async () => {
+    const payload = await copied('preserved-content', 'Embedded workbook');
+    const relationships = payload.relationships.map((r) =>
+      r.type === `${R}package` ? { ...r, contentType: 'application/vnd.ms-office.vbaProject' } : r
+    );
+    const e = await open(fixture('slide-structure'));
+    expect(e.exec({ type: 'paste', payload: { ...payload, relationships } }).ok).toBe(false);
+  });
+
+  test('refuse a chart part that does not parse or has another root', async () => {
+    const payload = await copied('charts', 'Chart 1');
+    for (const xml of ['<c:chartSpace><not closed', '<p:sld xmlns:p="urn:x"/>']) {
+      const chart = { ...payload.relationships[0]!, base64: Buffer.from(xml).toString('base64') };
+      const e = await open(fixture('slide-structure'));
+      expect(e.exec({ type: 'paste', payload: { ...payload, relationships: [chart] } }).ok).toBe(
+        false
+      );
+    }
+  });
+
+  test('refuse an mc:AlternateContent with an undeclared prefix or a Fallback first', async () => {
+    const payload = await copied('charts', 'Shape 2');
+    const branch = (local: string, extra: object = {}) => ({
+      ns: MC,
+      local,
+      children: [payload.shapes[0]!],
+      ...extra,
+    });
+    const requires = { attrs: [{ ns: '', local: 'Requires', value: 'zz' }] };
+    const declared = { ...requires, nsDecls: [{ prefix: 'zz', uri: 'urn:zz' }] };
+    for (const children of [
+      [branch('Choice', requires), branch('Fallback')],
+      [branch('Fallback'), branch('Choice', declared)],
+    ]) {
+      const bad = { ...payload, shapes: [{ ns: MC, local: 'AlternateContent', children }] };
+      const e = await open(fixture('slide-structure'));
+      expect(e.exec({ type: 'paste', payload: bad as ClipboardPayload }).ok).toBe(false);
+    }
+  });
+});
+
+describe('new part names and shape ids', () => {
+  test('a part name that a content-type override names is taken', async () => {
+    const e = await open(fixture('slide-structure'));
+    const batch = new OpBatch(pkgOf(e));
+    const ct = xmlPartOf(batch.pkg, '/[Content_Types].xml')!;
+    batch.push({
+      op: 'insertNode',
+      part: '/[Content_Types].xml',
+      parent: ct.root.id,
+      index: ct.root.children.length,
+      spec: {
+        ns: 'http://schemas.openxmlformats.org/package/2006/content-types',
+        local: 'Override',
+        attrs: [
+          { ns: '', local: 'PartName', value: '/ppt/charts/extra1.xml' },
+          { ns: '', local: 'ContentType', value: 'application/xml' },
+        ],
+      },
+    });
+    expect(freePartName(batch, '/ppt/charts/extra', '.xml')).toBe('/ppt/charts/extra2.xml');
+  });
+
+  test('copies in two branches share a new id, and two shapes in one branch do not', () => {
+    const sp = (id: string) => ({
+      ns: NS.p,
+      local: 'sp',
+      children: [
+        {
+          ns: NS.p,
+          local: 'nvSpPr',
+          children: [{ ns: NS.p, local: 'cNvPr', attrs: [{ ns: '', local: 'id', value: id }] }],
+        },
+      ],
+    });
+    const wrapper = {
+      ns: MC,
+      local: 'AlternateContent',
+      children: [
+        { ns: MC, local: 'Choice', children: [sp('9'), sp('9')] },
+        { ns: MC, local: 'Fallback', children: [sp('9')] },
+      ],
+    };
+    const ids: string[] = [];
+    const walk = (n: NodeSpec): void => {
+      if (n.local === 'cNvPr') ids.push(n.attrs![0]!.value);
+      for (const c of n.children ?? []) if (!('text' in c)) walk(c);
+    };
+    walk(renumberShapes([wrapper], 4).specs[0]!);
+    expect(ids).toEqual(['4', '5', '4']);
+  });
+});
+
+describe('an mc:AlternateContent', () => {
+  test('copies as its drawn copy alone when a branch needs a part that cannot travel', async () => {
+    const box = (name: string, extra = '') =>
+      shape({ id: 3, name, x: IN, y: IN, cx: 2 * IN, cy: IN, text: para(run(name)) }).replace(
+        '<p:cNvPr ',
+        `<p:cNvPr ${extra}`
+      );
+    const deck = buildPptx({
+      slides: [
+        {
+          shapes:
+            `<mc:AlternateContent xmlns:mc="${MC}">` +
+            '<mc:Choice xmlns:v="urn:schemas-microsoft-com:vml" Requires="v">' +
+            box('Ink', 'r:id="rIdInk" ') +
+            `</mc:Choice><mc:Fallback>${box('Ink')}</mc:Fallback></mc:AlternateContent>`,
+          rels: [['rIdInk', `${R}customXml`, '../customXml/item1.xml']],
+        },
+      ],
+    });
+    const e = await open(deck);
+    e.setSelection({ kind: 'shapes', nodeIds: [nodeOf(e, 'Ink')] });
+    expect(e.copy()!.shapes.map((s) => s.local)).toEqual(['sp']);
   });
 });
