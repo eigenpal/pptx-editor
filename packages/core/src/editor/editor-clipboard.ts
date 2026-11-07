@@ -65,7 +65,11 @@ export function bindEditorClipboard(surface: HTMLElement, host: EditorClipboardH
     if (done) e.preventDefault();
   };
   const onKeyDown = (e: KeyboardEvent): void => {
-    if ((e.key === 'Meta' || e.key === 'Control') && isEditorChromeEvent(surface, e.target))
+    if (
+      (e.key === 'Meta' || e.key === 'Control') &&
+      !e.repeat &&
+      isEditorChromeEvent(surface, e.target)
+    )
       host.warmCopy?.();
   };
   doc.addEventListener('copy', onClipboard);

@@ -21,10 +21,19 @@ export function slidesClipboard(
   session: DocumentSession,
   slides: readonly number[]
 ): string | null {
-  const bytes = writePptx(repairTablesForSave(session.store.package));
-  if (bytes.length > MAX_FILE) return null;
-  return JSON.stringify({ version: 1, slides, file: toBase64(bytes) });
+  // One save per revision: copying slides again before an edit reuses it.
+  const pkg = session.store.package;
+  let file = saved.get(pkg);
+  if (file === undefined) {
+    const bytes = writePptx(repairTablesForSave(pkg));
+    file = bytes.length > MAX_FILE ? null : toBase64(bytes);
+    saved.set(pkg, file);
+  }
+  return file === null ? null : JSON.stringify({ version: 1, slides, file });
 }
+
+/** The saved file of each package a slide copy saved, as base64 (null: too large). */
+const saved = new WeakMap<object, string | null>();
 
 /** Read slides from clipboard text: the file and the slide indexes, or null. */
 export function readSlidesClipboard(

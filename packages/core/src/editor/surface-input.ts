@@ -144,7 +144,7 @@ export function bindSurfaceInput(
   };
   const onKeyDown = (e: KeyboardEvent): void => {
     if (isCompositionKey(e)) return;
-    if (e.key === 'Meta' || e.key === 'Control') host.warmCopy?.();
+    if ((e.key === 'Meta' || e.key === 'Control') && !e.repeat) host.warmCopy?.();
     if (host.shortcut(e.key, e)) {
       e.preventDefault();
       e.stopPropagation();

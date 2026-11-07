@@ -203,6 +203,8 @@ export function createClipboardHost(editor: ClipboardEditor) {
   /** Insert a picture file from the clipboard, at the size its resolution gives. */
   const pastePicture = async (file: File): Promise<void> => {
     if (file.size === 0 || file.size > MAX_PICTURE) return editor.refuse('errors.clipboard');
+    // The picture goes on the slide the paste was made on: another slide by then drops it.
+    const at = `${editor.session()?.id}:${editor.slide()}`;
     const bytes = new Uint8Array(await file.arrayBuffer());
     let width = 640;
     let height = 480;
@@ -216,6 +218,7 @@ export function createClipboardHost(editor: ClipboardEditor) {
     }
     // The command counts pixels at 96 per inch: a 144 dpi screenshot is two-thirds as large.
     const scale = 96 / (pngResolution(bytes) ?? 96);
+    if (`${editor.session()?.id}:${editor.slide()}` !== at) return;
     editor.exec({
       type: 'insertImage',
       bytes,

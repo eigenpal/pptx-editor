@@ -145,7 +145,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'text.change-case': 'sha256:73f0bc49d5856e5bfdbae4ae90815e40f613dfe8f53c50bb19b964d84441208b',
   'text.character-spacing':
     'sha256:702aff38ffdf6a441aabc4c8407b18d5a9cb62f058a56523101ef47614d5cf20',
-  'text.clipboard': 'sha256:11f9ad15e9d57168de2ccd5c357bfc34782b4737f93fb1fc7009b496a344efa4',
+  'text.clipboard': 'sha256:088d7127d31eabe7de43db0c01347ead554fb6bf655a56f812f944c3b9e68f1b',
   'text.color-highlight': 'sha256:cb0c2ab5b21e2b6cef6f2a0204a43a12eda971165cb76470054e883714050632',
   'text.complex-scripts': 'sha256:e402ea570ff05a3119aaa7c0fdea9c60f4ea3f0eea149ca037ea9f1cd02634f1',
   'text.find-replace': 'sha256:9667d4f2087fb86efe2571042ea7c7e1d371e91cb66189b57a0b44750c317c74',

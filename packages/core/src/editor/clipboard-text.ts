@@ -300,7 +300,14 @@ export function pasteParagraphs(
   const paragraphs = paragraphsOf(batch.element(part, txBodyId));
   const lastIndex = paragraphs.findIndex((p) => p.id === lastId);
   const caret = { paragraph: lastIndex, offset: paragraphLength(paragraphs[lastIndex]!, n) };
-  // Join the text after the caret back on.
+  // Join the text after the caret back on. That text keeps its own paragraph's properties.
+  const tail = paragraphs[lastIndex + 1];
+  if (lastIndex > at.paragraph && tail && paragraphLength(tail, n) > 0) {
+    const own = child(paragraphs[lastIndex]!, 'a:pPr');
+    if (own) batch.push({ op: 'removeNode', part, node: own.id });
+    if (firstPPr)
+      batch.insert({ op: 'insertNode', part, parent: lastId, index: 0, spec: specOf(firstPPr) });
+  }
   deleteRange(batch, part, txBodyId, caret, { paragraph: lastIndex + 1, offset: 0 });
   return caret;
 }

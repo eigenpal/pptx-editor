@@ -140,7 +140,7 @@ export function pictureHtml(picture: ShapesPicture, alt: string): string {
 
 /** A piece of a picture's base64 that tells it apart, to find it in pasted HTML. */
 export function pictureMark(picture: ShapesPicture): string {
-  // After the PNG signature and header chunks, where the image data starts to differ.
+  // The end of the image data, before the IEND chunk: its checksum differs from picture to picture.
   return picture.base64.slice(-96, -32);
 }
 

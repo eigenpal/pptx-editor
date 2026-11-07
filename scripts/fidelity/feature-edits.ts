@@ -217,10 +217,11 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
   'text.clipboard': {
     fixture: 'text-runs',
     edit: (t) => {
-      // HTML from another application at a caret: a bold red run, then a bulleted paragraph.
+      // HTML from another application at a caret: a bold red run, a bulleted paragraph, and a
+      // last line that joins the text after the caret.
       const html =
         '<p><b style="color:#C00000;font-size:20pt">Pasted</b> text</p>' +
-        '<ul><li>Second <i>item</i></li></ul>';
+        '<ul><li>Second <i>item</i></li></ul><p>Last line</p>';
       t.selectText('Shape 2', 0, 0, 1);
       t.run({ type: 'pasteText', paragraphs: paragraphSpecs(richFromHtml(html)!) });
       // Plain text with a shape selected goes in a new text box.

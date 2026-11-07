@@ -310,6 +310,8 @@ describe('the pasteText command', () => {
     const ps = children(child(shapes(e)[0]!, 'p:txBody'), 'a:p');
     expect(attr(child(children(ps[0]!, 'a:r')[1]!, 'a:rPr'), 'b')).toBe('1');
     expect(attr(child(ps[1]!, 'a:pPr'), 'lvl')).toBe('1');
+    // The text after the caret keeps its paragraph's properties, not the pasted level.
+    expect(attr(child(ps[2]!, 'a:pPr'), 'lvl')).toBeUndefined();
     // One undo step.
     e.exec({ type: 'undo' });
     expect(texts(shapes(e)[0]!)).toEqual(['Hello world', 'Second']);
