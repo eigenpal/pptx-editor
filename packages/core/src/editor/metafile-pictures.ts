@@ -33,6 +33,19 @@ const OTHER_CONTENT = new Set<string>([
  * other layouts of a master are not followed. Each part is read once.
  */
 export function metafilesOf(pkg: PptxPackage, slides: readonly string[]): Uint8Array[] {
+  if (slides.length !== 1) return walkMetafiles(pkg, slides);
+  // One slide at a time is what each paint asks: keep the answer for this revision of the deck.
+  let bySlide = shownByPackage.get(pkg);
+  if (!bySlide) shownByPackage.set(pkg, (bySlide = new Map()));
+  let hit = bySlide.get(slides[0]!);
+  if (!hit) bySlide.set(slides[0]!, (hit = walkMetafiles(pkg, slides)));
+  return hit;
+}
+
+/** The metafiles of one slide, by package revision (`metafilesOf`). */
+const shownByPackage = new WeakMap<PptxPackage, Map<string, Uint8Array[]>>();
+
+function walkMetafiles(pkg: PptxPackage, slides: readonly string[]): Uint8Array[] {
   const seen = new Set<string>(slides);
   const queue = [...slides];
   const out: Uint8Array[] = [];
@@ -67,6 +80,8 @@ export class MetafilePictures {
     { readonly promise: Promise<void>; readonly resolve: () => void }
   >();
   #queue: Uint8Array[] = [];
+  /** Metafiles whose conversion ran out of time once: a second stop is final. */
+  #retried = new WeakSet<Uint8Array>();
   #running = 0;
   /** Bumped when the fonts change: a conversion with the old fonts runs again. */
   #epoch = 0;
@@ -99,7 +114,7 @@ export class MetafilePictures {
     if (mime) return { bytes, mime };
     if (!metafileFormat(bytes)) return undefined;
     if (!this.#done.has(bytes)) void this.convert(bytes);
-    const png = this.#done.get(bytes) ?? this.#last.get(bytes);
+    const png = this.#drawn(bytes);
     return png ? { bytes: png, mime: 'image/png' } : undefined;
   }
 
@@ -138,14 +153,18 @@ export class MetafilePictures {
    * converting, and draws as the placeholder (or its PNG from before a font change) until it is.
    */
   async ready(metafiles: readonly Uint8Array[], waitMs = PICTURES_WAIT_MS): Promise<boolean> {
+    const wanted = new Set(metafiles);
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<boolean>((resolve) => (timer = setTimeout(resolve, waitMs, false)));
     const all = (async (): Promise<boolean> => {
       // A font change while it waits converts again: wait for the conversions with the new fonts.
       for (;;) {
         const epoch = this.#epoch;
-        await Promise.all(metafiles.map((b) => this.convert(b)));
-        if (epoch === this.#epoch) return metafiles.every((b) => !!this.#done.get(b));
+        const work = Promise.all(metafiles.map((b) => this.convert(b)));
+        // The pictures a caller waits for convert before those that only the rail asked for.
+        this.#queue.sort((a, b) => Number(wanted.has(b)) - Number(wanted.has(a)));
+        await work;
+        if (epoch === this.#epoch) return metafiles.every((b) => !!this.#drawn(b));
       }
     })();
     try {
@@ -209,15 +228,24 @@ export class MetafilePictures {
     }
   }
 
-  #finish(bytes: Uint8Array, png: Uint8Array | null, epoch: number): void {
+  /** The PNG that `bytes` draws: with the current fonts, else from before a font change. */
+  #drawn(bytes: Uint8Array): Uint8Array | undefined {
+    return this.#done.get(bytes) ?? this.#last.get(bytes);
+  }
+
+  #finish(bytes: Uint8Array, png: Uint8Array | null | undefined, epoch: number): void {
     this.#running -= 1;
     if (this.#disposed) return;
-    if (epoch !== this.#epoch) {
-      // The fonts changed while it converted: convert again with the new fonts.
+    // The fonts changed while it converted, or it ran out of time the first time (a busy page,
+    // the first load of the converter): convert again.
+    const retry = png === undefined && !this.#retried.has(bytes);
+    if (epoch !== this.#epoch || retry) {
+      if (retry && epoch === this.#epoch) this.#retried.add(bytes);
       this.#queue.push(bytes);
       this.#pump();
       return;
     }
+    png ??= null;
     this.#done.set(bytes, png);
     if (png) {
       this.#last.set(bytes, png);

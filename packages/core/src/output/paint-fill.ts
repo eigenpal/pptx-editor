@@ -190,6 +190,16 @@ function blipFilter(doc: Document, defs: Defs, effects: readonly BlipEffect[]): 
 }
 
 /** Resolve a fill to an SVG paint over a `w`×`h` local box. */
+/** The image URL of a picture fill: its SVG image, else its bitmap. Undefined when neither resolves. */
+export function pictureUrl(
+  ctx: Pick<PaintContext, 'images' | 'sourcePart'>,
+  fill: Extract<ResolvedFill, { type: 'picture' }>
+): string | undefined {
+  return (
+    ctx.images(ctx.sourcePart, fill.svgRId ?? fill.rId) ?? ctx.images(ctx.sourcePart, fill.rId)
+  );
+}
+
 export function fillPaint(
   fill: ResolvedFill,
   w: number,
@@ -229,8 +239,7 @@ export function fillPaint(
       return { paint, opacity: 1 };
     }
     case 'picture': {
-      const url =
-        ctx.images(ctx.sourcePart, fill.svgRId ?? fill.rId) ?? ctx.images(ctx.sourcePart, fill.rId);
+      const url = pictureUrl(ctx, fill);
       if (!url) return NONE;
       const id = defs.id('pic');
       if (fill.mode === 'tile' && fill.tile) return tilePaint(fill, url, w, h, ctx);

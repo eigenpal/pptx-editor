@@ -1250,7 +1250,9 @@ export class DocumentSession {
     parsedAt: number;
     // @internal
     picture(target: string): DrawablePicture | undefined;
-    picturesReady(index?: number): Promise<boolean>;
+    picturesReady(index?: number, options?: {
+        timeoutMs?: number;
+    }): Promise<boolean>;
     // @internal
     probeBatch(base?: PptxPackage): OpBatch;
     // @internal

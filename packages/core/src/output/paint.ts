@@ -33,6 +33,7 @@ import {
   fillPaint,
   pictureImage,
   pictureRect,
+  pictureUrl,
   strokeAttrs,
   type ImageSizePort,
   type FillContext,
@@ -333,16 +334,6 @@ function withFillOrigin(
 
 /** The fill of the placeholder that a picture the paint cannot draw shows. */
 const PICTURE_PLACEHOLDER = '#e8e8e8';
-
-/** The image URL of a picture fill: its SVG image, else its bitmap. Undefined when neither resolves. */
-function pictureUrl(
-  ctx: PaintContext,
-  fill: Extract<ResolvedFill, { type: 'picture' }>
-): string | undefined {
-  return (
-    ctx.images(ctx.sourcePart, fill.svgRId ?? fill.rId) ?? ctx.images(ctx.sourcePart, fill.rId)
-  );
-}
 
 function paintGeometry(
   doc: Document,

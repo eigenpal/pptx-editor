@@ -308,10 +308,7 @@ const api: HarnessApi = {
     return {
       diagnostics: pictures
         ? layout.diagnostics
-        : [
-            ...layout.diagnostics,
-            'An EMF or WMF picture did not convert: it paints as the placeholder.',
-          ],
+        : [...layout.diagnostics, 'picture not converted: emf-wmf'],
       fonts: [...fonts].sort(),
       markup: await markupOf(svg),
     };

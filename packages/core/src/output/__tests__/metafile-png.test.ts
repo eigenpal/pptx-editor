@@ -17,6 +17,10 @@ test('a large metafile converts within the edge limit', async () => {
   expect(Math.max(size.width, size.height)).toBe(MAX_METAFILE_RASTER_EDGE);
 });
 
+test('a stopped conversion gives undefined, so a later one can run', async () => {
+  expect(await metafilePng(emfRectangle(), [], AbortSignal.abort())).toBeUndefined();
+});
+
 test('other bytes and an empty metafile give null', async () => {
   expect(await metafilePng(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))).toBeNull();
   expect(await metafilePng(emfRectangle(0, 0))).toBeNull();

@@ -210,6 +210,23 @@ test('a font change during a wait still resolves true once every picture draws',
   pictures.dispose();
 });
 
+test('the pictures a caller waits for convert before the rest of the queue', async () => {
+  const pictures = new MetafilePictures(
+    () => [],
+    () => {}
+  );
+  const queued = Array.from({ length: 12 }, (_, i) => emfRectangle(1500 + i, 1500));
+  // The rail asks for every picture first.
+  for (const bytes of queued) pictures.drawable(bytes, 'image/x-emf');
+  const last = queued[11]!;
+  expect(await pictures.ready([last])).toBe(true);
+  // The waited picture is done while most of those queued before it still wait.
+  const done = queued.filter((b) => pictures.drawable(b, 'image/x-emf'));
+  expect(done).toContain(last);
+  expect(done.length).toBeLessThan(8);
+  pictures.dispose();
+});
+
 test('a wait for pictures ends at its limit', async () => {
   const pictures = new MetafilePictures(
     () => [],

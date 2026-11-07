@@ -18,8 +18,9 @@ const DPI_SCALE = 2;
 const PNG_PREFIX = 'data:image/png;base64,';
 
 /**
- * The PNG of an EMF or WMF picture, at most `MAX_METAFILE_RASTER_EDGE` pixels on a side, or
- * null when `bytes` are not a metafile or do not convert within the limits. Text in the
+ * The PNG of an EMF or WMF picture, at most `MAX_METAFILE_RASTER_EDGE` pixels on a side. Null
+ * when `bytes` are not a metafile or do not convert within the limits; undefined when the time
+ * limit or `signal` stopped the conversion, so a later one can succeed. Text in the
  * metafile draws with `fonts` (TrueType or OpenType files): pass the faces that the deck's
  * text uses, so every host draws the same glyphs. Pass the same array again to reuse the fonts
  * the converter has read. `signal` stops the conversion. Never throws. @internal
@@ -28,7 +29,7 @@ export async function metafilePng(
   bytes: Uint8Array,
   fonts: readonly Uint8Array[] = [],
   signal?: AbortSignal
-): Promise<Uint8Array | null> {
+): Promise<Uint8Array | null | undefined> {
   if (!metafileFormat(bytes) || bytes.length > DEFAULT_IMAGE_RESOURCE_LIMITS.maxEncodedBytes)
     return null;
   try {
@@ -51,8 +52,10 @@ export async function metafilePng(
     const size = imageSize(png);
     const fits = (n: number): boolean => n > 0 && n <= MAX_METAFILE_RASTER_EDGE;
     return size && png[0] === 0x89 && fits(size.width) && fits(size.height) ? png : null;
-  } catch {
-    // A damaged metafile, a conversion past its time, or a host where the converter fails.
-    return null;
+  } catch (error) {
+    // Stopped: past its time (`TimeoutError`) or aborted. Anything else: a damaged metafile, or a
+    // host where the converter fails.
+    const name = (error as { name?: unknown } | null)?.name;
+    return name === 'TimeoutError' || name === 'AbortError' || signal?.aborted ? undefined : null;
   }
 }

@@ -830,14 +830,14 @@ export class DocumentSession {
   /**
    * Waits until the EMF and WMF pictures of slide `index`, or of every slide when you omit it,
    * have converted, so an export draws them. Resolves `true` when all draw. Resolves `false`
-   * when one cannot convert, for a slide that does not exist, and after 30 seconds: a picture
-   * that is not ready then draws as the placeholder.
+   * when one cannot convert, for a slide that does not exist, and after `timeoutMs` (default
+   * 30000): a picture that is not ready then draws as the placeholder.
    */
-  picturesReady(index?: number): Promise<boolean> {
+  picturesReady(index?: number, options: { timeoutMs?: number } = {}): Promise<boolean> {
     const slides = this.info.slides.map((s) => s.partName);
     const shown = index === undefined ? slides : slides[index] ? [slides[index]] : null;
     if (!shown) return Promise.resolve(false);
-    return this.#pictures.ready(metafilesOf(this.store.package, shown));
+    return this.#pictures.ready(metafilesOf(this.store.package, shown), options.timeoutMs);
   }
 
   /**

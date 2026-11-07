@@ -193,7 +193,9 @@ async function decodeSvg(text: string): Promise<HTMLImageElement> {
 
 /**
  * Slide `index` as a PNG of `options.width` pixels (default 1920), drawn from the editor's own
- * paint. Rejects with a `CommandRefusal` (`errors.exportSize`, `errors.exportFailed`). @public
+ * paint. It waits for the slide's EMF and WMF pictures (`session.picturesReady`); one that is
+ * not ready after 30 seconds draws as the placeholder. To know, await `picturesReady` first.
+ * Rejects with a `CommandRefusal` (`errors.exportSize`, `errors.exportFailed`). @public
  */
 export async function exportSlidePng(
   session: DocumentSession,

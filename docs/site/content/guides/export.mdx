@@ -68,7 +68,7 @@ export async function slideAssets(editor: PptxEditorInstance) {
 
 SVG export returns a string. ZIP export returns bytes with numbered files such as `slide-01.png`.
 
-The editor converts EMF and WMF pictures to PNG in the background, and shows a placeholder until each one is ready. PNG and ZIP export wait for the conversions. `exportSlideSvg()` is synchronous, so call `session.picturesReady(index)` before it. Omit `index` to wait for the pictures of every slide. It resolves `true` when every picture draws. It resolves `false` when a picture cannot convert, when the slide does not exist, or after 30 seconds. A picture that is not ready exports as the placeholder, or as its last converted version after a font change.
+The editor converts EMF and WMF pictures to PNG in the background, and shows a placeholder until each one is ready. PNG and ZIP export wait for the conversions. `exportSlideSvg()` is synchronous, so call `session.picturesReady(index)` before it. Omit `index` to wait for the pictures of every slide. It resolves `true` when every picture draws. It resolves `false` when a picture cannot convert, when the slide does not exist, or after 30 seconds. Pass `{ timeoutMs }` to wait a different time. To know before a PNG or ZIP export whether every picture draws, call it first. A picture that is not ready exports as the placeholder, or as its last converted version after a font change.
 
 Catch export errors in your UI. Use PNG when you need a fixed raster image. SVG font embedding follows font permissions; another viewer can substitute unavailable fonts.
 
