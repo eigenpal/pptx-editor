@@ -3,7 +3,7 @@
 // transaction, so one undo step.
 
 import { createTranslator } from '@pptx-editor.dev/i18n';
-import { presentationInfo, readPptx, xmlPartOf } from '../store/index.ts';
+import { presentationInfo, readPptx, xmlPartOf, type SlideRef } from '../store/index.ts';
 import { importSlides } from '../automation/commands/slide-import.ts';
 import { normalizePresentation } from '../automation/commands/slide-sections.ts';
 import { MAX_IMPORT_BYTES } from '../automation/plan-import.ts';
@@ -73,8 +73,7 @@ export function isSlideCommand(command: EditorCommand): command is SlideCommand 
  * Hide or show slide `index`: `p:sld/@show` (ECMA-376 Part 1, §19.3.1.38) is `0` for a hidden
  * slide; a shown slide drops the attribute, whose default is true.
  */
-function setHidden(batch: OpBatch, index: number, hidden: boolean): void {
-  const ref = presentationInfo(batch.pkg).slides[index];
+function setHidden(batch: OpBatch, ref: SlideRef | undefined, hidden: boolean): void {
   const root = xmlPartOf(batch.pkg, ref?.partName)?.root;
   if (!ref || !root) throw new CommandRefusal('errors.malformed');
   if (ref.hidden === hidden) return;
@@ -195,7 +194,9 @@ export function compileSlideCommand(
       // hidden already.
       const slides = presentationInfo(batch.pkg).slides;
       const hidden = command.hidden ?? !indices.every((i) => slides[i]?.hidden);
-      for (const i of indices) setHidden(batch, i, hidden);
+      // The slide list as the command found it: a hidden slide changes no part name, so the
+      // deck is read once, not again after each slide.
+      for (const i of indices) setHidden(batch, slides[i], hidden);
       return { label: hidden ? 'hideSlides' : 'showSlides' };
     }
   }

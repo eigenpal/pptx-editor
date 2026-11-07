@@ -1,5 +1,5 @@
-// Commands on many selected slides (Select All in the slide list of a long deck): Delete and
-// Duplicate read the deck once and write the slide list once, so their cost grows with the
+// Commands on many selected slides (Select All in the slide list of a long deck): Delete, Hide
+// Slide, and Duplicate read the deck once and write the slide list once, so their cost grows with the
 // slides they change, not with its square. Their result is the result of one slide at a time:
 // the parts, notes, content types, relationships, and sections.
 
@@ -175,4 +175,17 @@ test('Duplicate of every slide: four times the slides take less than eight times
   const small = await fastest(150, (n) => ({ type: 'duplicateSlides', indices: all(0, n) }));
   const large = await fastest(600, (n) => ({ type: 'duplicateSlides', indices: all(0, n) }));
   expect(large).toBeLessThan(small * 8);
+});
+
+test('Hide Slide on every slide: four times the slides take less than eight times the time', async () => {
+  const small = await fastest(150, (n) => ({ type: 'setSlidesHidden', indices: all(0, n) }));
+  const large = await fastest(600, (n) => ({ type: 'setSlidesHidden', indices: all(0, n) }));
+  expect(large).toBeLessThan(small * 8);
+  const e = await open(deck(4));
+  expect(e.exec({ type: 'setSlidesHidden', indices: [0, 2] }).ok).toBe(true);
+  const hidden = () => presentationInfo(pkgOf(e)).slides.map((s) => s.hidden);
+  expect(hidden()).toEqual([true, false, true, false]);
+  // The toggle shows them again when every one of them is hidden.
+  expect(e.exec({ type: 'setSlidesHidden', indices: [0, 2] }).ok).toBe(true);
+  expect(hidden()).toEqual([false, false, false, false]);
 });
