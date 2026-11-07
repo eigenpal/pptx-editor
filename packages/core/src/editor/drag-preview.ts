@@ -25,6 +25,8 @@ import {
 import type { Xfrm } from '../cascade/index.ts';
 import { paintSlide, type PaintOptions } from '../output/index.ts';
 import { scaledRowHeights } from '../automation/commands/table-fit.ts';
+import { findItem } from '../automation/commands/placement.ts';
+import { followingConnectors } from '../automation/commands/connectors.ts';
 import type { Drag } from './surface-drag.ts';
 
 /** Lays out an item again at a new box in its parent space, or null when it cannot. */
@@ -103,15 +105,37 @@ function stretched(item: LayoutItem, box: Xfrm): LayoutItem {
   return moved(item, multiply(multiply(to, [sx, 0, 0, sy, 0, 0]), invert(item.matrix)));
 }
 
-/** Preview the boxes `items`: keep them, and each shape laid out at its new box. */
+/** A connector with the preset and adjust values of its new route, if the transform has one. */
+function routed(item: LayoutItem, t: TransformItem): LayoutItem {
+  const route = t.connector;
+  if (item.kind !== 'shape' || item.element.geometry.kind !== 'preset') return item;
+  if (route?.preset === undefined && route?.adjust === undefined) return item;
+  const geometry = {
+    kind: 'preset' as const,
+    preset: route.preset ?? item.element.geometry.preset,
+    adjust: new Map(Object.entries(route.adjust ?? {})),
+  };
+  return { ...item, element: { ...item.element, geometry } };
+}
+
+/**
+ * Preview the boxes `items`: keep them, and each shape laid out at its new box. The connectors
+ * glued to the moved shapes follow them, as the release writes them.
+ */
 export function preview(d: Drag, items: readonly TransformItem[], relayout?: Relayout): void {
   const shown = new Map<string, LayoutItem>();
   for (const t of items) {
     const item = d.items.find((i) => i.item.element.nodeId === t.nodeId)?.item;
     if (!item) continue;
     const box = parentBox(item, t);
-    shown.set(t.nodeId, laidOut(d, item, box, relayout) ?? stretched(item, box));
+    shown.set(t.nodeId, laidOut(d, routed(item, t), box, relayout) ?? stretched(item, box));
   }
+  if (relayout)
+    for (const t of followingConnectors(d.slideItems, items)) {
+      const item = findItem(d.slideItems, t.nodeId);
+      const again = item ? relayout(routed(item, t), parentBox(item, t)) : null;
+      if (again) shown.set(t.nodeId, again);
+    }
   d.pending = items;
   d.shown = shown;
 }

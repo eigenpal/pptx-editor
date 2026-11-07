@@ -1703,6 +1703,15 @@
   shape-rendering: crispEdges;
   pointer-events: none;
 }
+/* Connection sites near a dragged connector end (surface-guides.ts); the glued one is filled. */
+.pptx-surface__site {
+  fill: var(--doc-selection-halo);
+  stroke: var(--doc-primary);
+  pointer-events: none;
+}
+.pptx-surface__site--glued {
+  fill: var(--doc-primary);
+}
 .pptx-surface__caret {
   stroke: var(--doc-slide-caret);
   animation: pptx-caret-blink 1.06s steps(1) infinite;
@@ -3978,8 +3987,12 @@ legend.pptx-dialog__label {
   /* The selection marks on the slide. */
   .pptx-surface__outline,
   .pptx-surface__marquee,
-  .pptx-surface__handle {
+  .pptx-surface__handle,
+  .pptx-surface__site {
     stroke: Highlight;
+  }
+  .pptx-surface__site--glued {
+    fill: Highlight;
   }
   .pptx-surface__handle {
     fill: Canvas;

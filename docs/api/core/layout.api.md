@@ -102,6 +102,16 @@ export interface ComposePreparedFontOriginsOptions extends ComposeFontOriginsOpt
 export function configuredDefaultFontFamily(configuration?: FontCatalogConfiguration): string;
 
 // @public
+export interface ConnectionSite {
+    readonly angle: number;
+    readonly x: number;
+    readonly y: number;
+}
+
+// @public
+export function connectionSites(spec: GeometrySpec, w: number, h: number): ConnectionSite[];
+
+// @public
 export function createFixedMeasurer(): TextMeasurer;
 
 // @public
@@ -688,6 +698,7 @@ export interface PresetShapeDefinition {
     ])[];
     // (undocumented)
     readonly av: readonly (readonly [string, string])[];
+    readonly cxn?: readonly (readonly [string, string, string])[];
     // (undocumented)
     readonly gd: readonly (readonly [string, string])[];
     readonly hp?: readonly (readonly [

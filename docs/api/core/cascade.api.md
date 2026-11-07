@@ -114,6 +114,12 @@ export interface ColorContext {
 // @public
 export function colorElement(color: Rgba): Element_2;
 
+// @public
+export interface ConnectionRef {
+    readonly id: string;
+    readonly idx: number;
+}
+
 // @internal
 export function contentElements(tree: Element_2 | undefined, root?: Element_2): Element_2[];
 
@@ -556,6 +562,10 @@ export interface ResolvedRun {
 
 // @public
 export interface ResolvedShape extends ResolvedBase {
+    readonly connections?: {
+        readonly start?: ConnectionRef;
+        readonly end?: ConnectionRef;
+    };
     // (undocumented)
     readonly effects?: ResolvedEffects;
     // (undocumented)

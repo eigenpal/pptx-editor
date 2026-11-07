@@ -47,4 +47,9 @@ export interface PresetShapeDefinition {
     string | null,
     string | null,
   ])[];
+  /**
+   * Connection sites (`a:cxnLst`, ECMA-376 Part 1, 20.1.9.10): the angle a connector leaves
+   * the site at, and the site's position, each as a guide name or a literal.
+   */
+  readonly cxn?: readonly (readonly [string, string, string])[];
 }

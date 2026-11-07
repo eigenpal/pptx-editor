@@ -18,10 +18,10 @@ import {
   fileXfrm,
   groupShapes,
   refitGroup,
-  setTransforms,
   shapesOf,
   ungroupShapes,
 } from '../automation/commands/group-commands.ts';
+import { placeShapes } from '../automation/commands/connector-edits.ts';
 import { CommandRefusal, OpBatch } from '../automation/commands/op-batch.ts';
 import { parentOf, removeUnusedHyperlink } from '../automation/commands/package-edits.ts';
 import { linkSpec } from '../automation/commands/slide-links.ts';
@@ -268,7 +268,7 @@ function writeTransforms(
     const old = fileXfrm(batch, part, t.nodeId, layout);
     return Math.abs(old.cx - t.cx) > 1 || Math.abs(old.cy - t.cy) > 1;
   });
-  setTransforms(batch, part, items, layout);
+  placeShapes(batch, part, items, layout);
   // A move keeps the text layout; a resize re-fits autofit text. A table scales its columns
   // and rows from the drag's start (`gestureBase`), also on a move that comes back to the
   // frame's box, so one box gives one table whatever path the pointer took; the frame then

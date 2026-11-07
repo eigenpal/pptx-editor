@@ -885,6 +885,20 @@ export interface ComposePreparedFontOriginsOptions extends ComposeFontOriginsOpt
 // @public
 export function configuredDefaultFontFamily(configuration?: FontCatalogConfiguration): string;
 
+// @public
+export interface ConnectionTarget {
+    readonly index: number;
+    readonly nodeId: string;
+}
+
+// @public
+export interface ConnectorRoute {
+    readonly adjust?: Readonly<Record<string, number>>;
+    readonly end?: ConnectionTarget | null;
+    readonly preset?: string;
+    readonly start?: ConnectionTarget | null;
+}
+
 // @internal
 export const CONTEXT_MENU_NAMED_PARTS: {
     readonly ImageAltText: MenuNamedRow;
@@ -6024,6 +6038,7 @@ export function trackNotesInset(box: HTMLElement): NotesInsetTracker;
 
 // @public
 export interface TransformItem {
+    readonly connector?: ConnectorRoute;
     // (undocumented)
     readonly cx: number;
     // (undocumented)

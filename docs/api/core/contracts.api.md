@@ -134,6 +134,20 @@ export type CommandResult = {
 };
 
 // @public
+export interface ConnectionTarget {
+    readonly index: number;
+    readonly nodeId: string;
+}
+
+// @public
+export interface ConnectorRoute {
+    readonly adjust?: Readonly<Record<string, number>>;
+    readonly end?: ConnectionTarget | null;
+    readonly preset?: string;
+    readonly start?: ConnectionTarget | null;
+}
+
+// @public
 export interface DateTimeState {
     readonly fixed: boolean;
     readonly text: string;
@@ -1702,6 +1716,7 @@ export interface ThemeSwatch {
 
 // @public
 export interface TransformItem {
+    readonly connector?: ConnectorRoute;
     // (undocumented)
     readonly cx: number;
     // (undocumented)

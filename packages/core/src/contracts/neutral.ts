@@ -20,6 +20,8 @@ import type { DateTimeState, HeaderFooterTargets } from './header-footer.ts';
 export type { DateTimeState, HeaderFooterTargets } from './header-footer.ts';
 import type { FindMatch, FindOptions } from './find.ts';
 export type { FindMatch, FindOptions } from './find.ts';
+import type { ConnectorRoute } from './connectors.ts';
+export type { ConnectionTarget, ConnectorRoute } from './connectors.ts';
 
 import type {
   ObjectAxis,
@@ -534,6 +536,8 @@ export interface TransformItem {
   /** Flips; absent keeps the current ones. A line's direction is its flips. */
   readonly flipH?: boolean;
   readonly flipV?: boolean;
+  /** A connector's route and glued ends (`p:cxnSp` only). Absent keeps them. */
+  readonly connector?: ConnectorRoute;
 }
 
 /** The command type names. @public */
