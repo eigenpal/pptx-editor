@@ -33,6 +33,10 @@
  * - `roundTrip: 'full'` needs at least one fixture, and its saved copies opened with no repair
  *   prompt (`SAVE_VERIFIED_FIXTURES` in `save-verified-fixtures.ts`). That is necessary, not
  *   enough: the row's own edits must also survive save and reopen.
+ * - `roundTrip: 'full'` and `roundTrip: 'preserved'` need a recipe in `FEATURE_EDITS`
+ *   (`scripts/fidelity/feature-edits.ts`) on a fixture of the row, whose copy opened with no
+ *   repair prompt (`SAVE_VERIFIED_FEATURE_EDITS`). A `preserved` recipe edits next to the kept
+ *   content and checks that the content is as it was.
  *
  * Notes rule: notes render inside a table cell, so keep them short. Write Simplified Technical
  * English: active voice, one idea per sentence, 20 words or fewer per sentence. Name the
@@ -180,7 +184,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'text',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Link selected text to a web address, an email address with a subject, or a slide: a slide number, or the first, last, next, or previous slide. A click into a link shows its target with Copy, Edit, and Remove, and a slide link shows a button that goes to its slide. In the slide show, a slide link moves the show. A slide link follows its slide when slides move. Links to custom shows, other files, and programs are kept but not edited. URLs pass an allowlist. Hyperlink text color is approximate.',
@@ -215,7 +219,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'text',
     editing: 'full',
     rendering: 'none',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes: 'Searches slide text and speaker notes.',
   },
@@ -225,7 +229,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'text',
     editing: 'partial',
     rendering: 'none',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
   },
 
@@ -256,10 +260,10 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'paragraphs',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
-      'The Paragraph dialog sets the indent before text and a first-line or hanging indent. Indent and outdent change the list level. Tab stops are approximate and not editable. No ruler.',
+      'The Paragraph dialog sets the indent before text and a first-line or hanging indent. Indent and outdent change the list level. Text at a tab stop aligns left, centered, right, or on its decimal point. Tab stops are not editable. No ruler.',
   },
   {
     id: 'paragraphs.autofit',
@@ -326,7 +330,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'shapes',
     editing: 'none',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'preserved',
     tier: 'community',
     notes: 'No edit points and no freehand tools.',
   },
@@ -415,7 +419,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'fills-lines',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'The fill menu sets a preset pattern with two colors (`setShapePattern`), or a stretched picture (`setShapePicture`, which can also tile). Picture crop, offset, scale, and transparency of a fill are not editable. Tiles use the image resolution, or 72 DPI when it states none, and keep their recolor; the 72 DPI rule is measured on PNG only, and the tile size of a PNG that states no resolution is approximate. Pattern tiles are 8 × 8 pt on the slide grid; 12 of the 54 preset bitmaps are measured, and the others are approximate.',
@@ -472,7 +476,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'effects',
     editing: 'none',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'preserved',
     tier: 'community',
     notes:
       'The overlay blends with the shape fill only. The multiply, screen, and darken modes are measured, and so is the opaque result over a transparent fill. Other cases are approximate.',
@@ -494,7 +498,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'pictures',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Insert, move, resize, rotate, and Change Picture. Change Picture fits the new image in the old frame; this rule is not measured. Change Picture takes PNG, JPEG, and GIF only, not SVG.',
@@ -731,9 +735,10 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'slides',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
-    notes: 'Slide numbers have a command. Dates and footers do not.',
+    notes:
+      'Turn slide numbers, the footer, and the date on or off (`setSlideNumbers`, `setFooter`, `setDateTime`), through the placeholders of each layout or its master. The commands act on all slides or on `indices`, and `hideOnTitleSlides` leaves title slides out. Turning one on without `text` keeps what the slides show. A slide that shows a footer or a date keeps its box and format. New date text is a `datetime1` field, or fixed text with `fixed: true`. Editing is partial: a new date field always has the `datetime1` format.',
   },
   {
     id: 'slides.size',
@@ -763,7 +768,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'slides',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'none',
+    roundTrip: 'full',
     tier: 'community',
     notes: 'Select, move, duplicate, delete, and hide slides by section. No zoom.',
   },
@@ -775,7 +780,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'themes',
     editing: 'none',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'preserved',
     tier: 'community',
     notes: 'Content placeholders are approximate.',
   },
@@ -796,7 +801,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'themes',
     editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'partial',
+    roundTrip: 'full',
     tier: 'community',
     notes:
       'Change layout and reset slide work. Placeholders without a place, animated empty placeholders, and placeholders in mc:AlternateContent keep their box: an approximation. The placeholder match order is not measured. Themes and the slide master cannot be edited.',
@@ -845,7 +850,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'collaboration',
     editing: 'none',
     rendering: 'none',
-    roundTrip: 'none',
+    roundTrip: 'full',
     tier: 'premium',
     notes:
       'The Yjs session of @pptx-editor.dev/pro syncs edits and concurrent typing. Undo reverts your own changes and keeps what a peer wrote into an element you created: the attributes, children, and text that the peer wrote stay, without yours. Text a peer typed into a run whose format you undo stays, and a paragraph you add keeps what a peer typed in it. Text a peer typed into a shape, a table row, or a cell that you add goes with your undo and comes back with your redo. Two property elements written at once (a:pPr, a:rPr, a:tcPr, a:ln) merge; for a fill or effects, one version shows and the other comes back when the winner undoes. A first line width also writes a default line color, which can show instead of the line color that a peer sets at the same time. One attribute written by two peers at once keeps one value. Slides, pictures, links, shapes, tables, and comments that two peers add or copy at once keep separate ids; one notes slide or slide-number placeholder that two peers add first can still show twice. Two peers who format one run at once keep the text once with the format of one peer; when one of them changed the text of the run first, the text can show twice, and a piece the losing peer edited shows twice. Text that a peer types, deletes, or splits with Enter while a format of another peer moves it goes with the moved text. Two peers who press Enter in one paragraph at once keep the text of each paragraph once. A run that a peer deletes keeps the text another peer types into it at the same time; when such a run was also moved by an Enter and typed into at once, a later delete of it can still lose that text. Also, text typed into an empty table cell paragraph that a peer removes at the same time shows; other text typed into a paragraph that a peer removes at the same time is lost. Two peers who type at once into a table cell that holds no text body yet both keep their text in the cell, in the same order for every peer, and each undo removes only the text of its own peer. An undo or a redo after a peer formatted, split, or pressed Enter in the same text shows each character once, next to the characters around it, and two peers who undo their delete of one character show it once; a run that the split of the peer made keeps the format it copied, so the undo of a format can leave it on that run. Three peers whose undo, redo, and Enter meet over the same text show each character once, but such edits can rarely lose a character that a peer typed beside them. A format and an Enter of a peer at once inside the same range can show the text out of order, and an undo after it can show part of the text twice. Content moved into content that a peer deletes at once goes back to its old place in the file. Two peers who join neighboring paragraphs at once keep the text of all of them; when a third peer then types into the joined paragraph, an undo of one join can leave the text of the last paragraph in the first one. A paragraph that two peers move at once shows in one place, and a later delete of that place removes it for every peer. Text in a cell that a peer merges shows once in the merged cell, also when another peer types into that cell or inserts, deletes, splits, or merges rows and columns across it at the same time; some sequences of several such edits can still lose text. When peers delete every row of a merged cell at once, the merged text goes with the rows. After a vertical merge and a concurrent delete of one of its covered rows, the merged cell ends at its last row, and the next row shows on every replica and in the saved file. The canvas shows the selections of peers with name and color. No provider entries yet. The session uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.',
@@ -856,7 +861,7 @@ export const pptxFeatures: PptxFeature[] = [
     category: 'collaboration',
     editing: 'partial',
     rendering: 'none',
-    roundTrip: 'none',
+    roundTrip: 'full',
     tier: 'premium',
     notes:
       '@pptx-editor.dev/editor-api edits slides, shapes, fill and line, text, tables, hyperlinks of slides and text ranges, tags, document properties and custom document properties, custom XML parts, slides imported from another presentation, slide, layout, and master backgrounds, theme colors, table cell borders and margins, table style options, merged areas, and preset adjust values on a server or in an open editor, and binds shapes by id in memory for the lifetime of a runtime, never in the file. The request context gives sync pass-through values, loadRecursive, trace, and debugInfo. Every editing method and property write of the selected Office.js subset has its exact signature. Slide and shape pictures are drawn in a browser, or on a server through a rasterizer that the host supplies, and a shape picture is cut to the shape box; an imported slide with threaded comments is refused, while other comments come along; a background picture is stretched, never tiled, and ShadeFromTitle is a read state; a table style must be defined in the presentation, except the built-in default. The package uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.',

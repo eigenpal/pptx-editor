@@ -65,7 +65,7 @@ import {
   setShapesVisible,
 } from '../automation/commands/arrange-commands.ts';
 import { deleteSlides, duplicateSlides, moveSlides } from '../automation/commands/slide-multi.ts';
-import { setSlideNumbers } from '../automation/commands/slide-numbers.ts';
+import { applyHeaderFooter } from '../automation/commands/header-footer.ts';
 import { notesShown, setNotes } from '../automation/commands/notes-commands.ts';
 import { compilePictureCommand, isPictureCommand } from './picture-commands.ts';
 import { compileSlideCommand, isSlideCommand } from './slide-command-table.ts';
@@ -837,9 +837,11 @@ export function compile(
         },
       };
     }
-    case 'setSlideNumbers': {
-      setSlideNumbers(batch, command.show);
-      return { batch, effect: { label: 'slideNumbers', selection: { kind: 'none' } } };
+    case 'setSlideNumbers':
+    case 'setFooter':
+    case 'setDateTime': {
+      const label = applyHeaderFooter(batch, command);
+      return { batch, effect: { label, selection: { kind: 'none' } } };
     }
     case 'deleteSlides': {
       const slide = deleteSlides(batch, command.indices);

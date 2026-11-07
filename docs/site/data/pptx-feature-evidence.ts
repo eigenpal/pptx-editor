@@ -39,7 +39,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['glyph-advances'],
   },
   'text.change-case': { fixtures: ['font-effects'] },
-  'text.hyperlinks': { fixtures: [], approximations: ['hyperlink-text'] },
+  'text.hyperlinks': { fixtures: ['hyperlinks'], approximations: ['hyperlink-text'] },
   'text.input-method': { fixtures: ['text-runs'] },
   'text.complex-scripts': {
     fixtures: [
@@ -50,8 +50,8 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     ],
     approximations: ['script-fonts', 'rtl'],
   },
-  'text.find-replace': { fixtures: [] },
-  'text.format-painter': { fixtures: [] },
+  'text.find-replace': { fixtures: ['slide-layouts'] },
+  'text.format-painter': { fixtures: ['text-runs'] },
   // --- Paragraphs & text boxes -------------------------------------------
   'paragraphs.alignment': {
     fixtures: ['alignment-anchor', 'east-asian-line-breaking'],
@@ -62,7 +62,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['line-model', 'trailing-break'],
   },
   'paragraphs.indent-tabs': {
-    fixtures: ['bullets-numbering', 'paragraph-format'],
+    fixtures: ['bullets-numbering', 'paragraph-format', 'svg-tab-stops'],
     approximations: ['line-model', 'tab-stops'],
   },
   'paragraphs.autofit': { fixtures: ['autofit', 'line-model'], approximations: ['line-model'] },
@@ -70,7 +70,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     fixtures: ['vertical-columns', 'vertical-east-asian', 'text-direction'],
     approximations: ['line-model', 'script-fonts', 'ea-vert', 'word-art-vert', 'other-vert'],
   },
-  'paragraphs.text-warp': { fixtures: [], approximations: ['text-warp'] },
+  'paragraphs.text-warp': { fixtures: ['preserved-content'], approximations: ['text-warp'] },
   // --- Bullets & numbering -----------------------------------------------
   'lists.bullets-numbering': {
     fixtures: ['bullets-numbering', 'bullets-gallery', 'rtl-text'],
@@ -137,10 +137,13 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     fixtures: ['fill-fidelity'],
     approximations: ['fill-overlay', 'effects-not-drawn'],
   },
-  'effects.3d-and-other': { fixtures: ['effects'], approximations: ['effects-not-drawn'] },
+  'effects.3d-and-other': {
+    fixtures: ['effects', 'preserved-content'],
+    approximations: ['effects-not-drawn'],
+  },
   // --- Pictures ----------------------------------------------------------
   'pictures.raster-svg': {
-    fixtures: ['pictures', 'fill-fidelity'],
+    fixtures: ['pictures', 'fill-fidelity', 'svg-tab-stops'],
     approximations: ['picture-shape-fill'],
   },
   'pictures.adjustments': {
@@ -153,7 +156,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['blur', 'glow-soft-edge', 'picture-border-dots', 'inset-lines'],
   },
   'pictures.alt-text': { fixtures: ['picture-editing'] },
-  'pictures.emf-wmf': { fixtures: [], approximations: ['emf-wmf'] },
+  'pictures.emf-wmf': { fixtures: ['preserved-content'], approximations: ['emf-wmf'] },
   // --- Tables ------------------------------------------------------------
   'tables.render': {
     fixtures: ['tables', 'table-editing'],
@@ -182,14 +185,16 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     fixtures: ['diagrams'],
     approximations: ['diagram-drawing', 'line-model'],
   },
-  'objects.media-ole': { fixtures: ['preserve-unsupported', 'slide-structure'] },
-  'objects.equations': { fixtures: [] },
+  'objects.media-ole': {
+    fixtures: ['preserve-unsupported', 'slide-structure', 'preserved-content'],
+  },
+  'objects.equations': { fixtures: ['preserved-content'] },
   // --- Slides, layouts & notes -------------------------------------------
   'slides.structure': { fixtures: ['slide-structure', 'slide-layouts'] },
   'slides.hidden': { fixtures: ['slide-layouts'] },
   'slides.placeholder-prompts': { fixtures: ['slide-layouts'] },
   'slides.notes': { fixtures: ['slide-layouts'] },
-  'slides.header-footer': { fixtures: ['placeholders-background'] },
+  'slides.header-footer': { fixtures: ['placeholders-background', 'header-footer'] },
   'slides.size': { fixtures: ['slide-size', 'slide-size-rounding'] },
   'slides.sections': { fixtures: ['slide-structure', 'slide-layouts'] },
   'slides.sorter': { fixtures: ['slide-layouts'] },
@@ -205,12 +210,12 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   'themes.change-layout-theme': { fixtures: ['slide-layouts'] },
   // --- Presenting --------------------------------------------------------
   'presenting.slideshow': { fixtures: [] },
-  'presenting.animations-transitions': { fixtures: [] },
+  'presenting.animations-transitions': { fixtures: ['preserved-content'] },
   // --- Comments & review -------------------------------------------------
   'review.comments': { fixtures: ['slide-structure'] },
   // --- Collaboration & automation ----------------------------------------
-  'collaboration.realtime': { fixtures: [] },
-  'collaboration.automation-api': { fixtures: [] },
+  'collaboration.realtime': { fixtures: ['text-runs'] },
+  'collaboration.automation-api': { fixtures: ['text-runs'] },
   // --- Export & print ----------------------------------------------------
   'export.images': { fixtures: [] },
   'export.pdf': {

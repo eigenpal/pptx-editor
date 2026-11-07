@@ -71,6 +71,11 @@ export interface FixtureOptions {
    * so Insert > Slide numbers works. Default false: fixtures keep their parts unchanged.
    */
   readonly footers?: boolean;
+  /**
+   * Also give the master and layouts the standard date and footer placeholders, so Insert > Date
+   * and time and Insert > Footer work. Default false. Needs `footers`.
+   */
+  readonly datesAndFooters?: boolean;
   /** Theme colors (hex, no `#`) for every slot. Default: the built-in default palette. */
   readonly colors?: ThemeColors;
   /** Theme major/minor Latin fonts. Default Carlito, an open font that ships with the engine. */
@@ -187,7 +192,27 @@ export const LAYOUT_SLIDE_NUMBER =
   '<p:sp><p:nvSpPr><p:cNvPr id="6" name="Slide Number Placeholder 5"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="sldNum" sz="quarter" idx="12"/></p:nvPr></p:nvSpPr><p:spPr/>' +
   '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:fld id="{B6F15528-21DE-4FAA-801E-634DDDAF4B2B}" type="slidenum"><a:rPr lang="en-US"/><a:t>‹#›</a:t></a:fld><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>';
 
-function master(footers = false, extraLayouts: readonly string[] = [], order?: readonly string[]): string {
+const MASTER_DATE_AND_FOOTER =
+  '<p:sp><p:nvSpPr><p:cNvPr id="7" name="Date Placeholder 6"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="dt" sz="half" idx="2"/></p:nvPr></p:nvSpPr>' +
+  '<p:spPr><a:xfrm><a:off x="838200" y="6356350"/><a:ext cx="2743200" cy="365125"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>' +
+  '<p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0" anchor="ctr"/><a:lstStyle><a:lvl1pPr algn="l"><a:defRPr sz="1200"><a:solidFill><a:schemeClr val="tx1"><a:tint val="75000"/></a:schemeClr></a:solidFill></a:defRPr></a:lvl1pPr></a:lstStyle>' +
+  '<a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>' +
+  '<p:sp><p:nvSpPr><p:cNvPr id="8" name="Footer Placeholder 7"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="ftr" sz="quarter" idx="3"/></p:nvPr></p:nvSpPr>' +
+  '<p:spPr><a:xfrm><a:off x="4038600" y="6356350"/><a:ext cx="4114800" cy="365125"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>' +
+  '<p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0" anchor="ctr"/><a:lstStyle><a:lvl1pPr algn="ctr"><a:defRPr sz="1200"><a:solidFill><a:schemeClr val="tx1"><a:tint val="75000"/></a:schemeClr></a:solidFill></a:defRPr></a:lvl1pPr></a:lstStyle>' +
+  '<a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>';
+const LAYOUT_DATE_AND_FOOTER =
+  '<p:sp><p:nvSpPr><p:cNvPr id="7" name="Date Placeholder 6"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="dt" sz="half" idx="10"/></p:nvPr></p:nvSpPr><p:spPr/>' +
+  '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>' +
+  '<p:sp><p:nvSpPr><p:cNvPr id="8" name="Footer Placeholder 7"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="ftr" sz="quarter" idx="11"/></p:nvPr></p:nvSpPr><p:spPr/>' +
+  '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>';
+
+function master(
+  footers = false,
+  extraLayouts: readonly string[] = [],
+  order?: readonly string[],
+  datesAndFooters = false
+): string {
   const ids = [
     { name: 'Title and Content', xml: '<p:sldLayoutId id="2147483649" r:id="rId1"/>' },
     { name: 'Blank', xml: '<p:sldLayoutId id="2147483650" r:id="rId2"/>' },
@@ -208,7 +233,8 @@ function master(footers = false, extraLayouts: readonly string[] = [], order?: r
         '<p:sp><p:nvSpPr><p:cNvPr id="3" name="Text Placeholder 2"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>' +
         '<p:spPr><a:xfrm><a:off x="838200" y="1825625"/><a:ext cx="10515600" cy="4351338"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>' +
         '<p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0"><a:normAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr lvl="0"/><a:r><a:rPr lang="en-US"/><a:t>Click to edit Master text styles</a:t></a:r></a:p></p:txBody></p:sp>' +
-        (footers ? MASTER_SLIDE_NUMBER : '')
+        (footers ? MASTER_SLIDE_NUMBER : '') +
+        (datesAndFooters ? MASTER_DATE_AND_FOOTER : '')
     ) +
     '</p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>' +
     `<p:sldLayoutIdLst>${listed.map((l) => l.xml).join('')}</p:sldLayoutIdLst>` +
@@ -219,7 +245,7 @@ function master(footers = false, extraLayouts: readonly string[] = [], order?: r
   );
 }
 
-function layout(kind: 'title' | 'blank', footers = false): string {
+function layout(kind: 'title' | 'blank', footers = false, datesAndFooters = false): string {
   const shapes =
     kind === 'title'
       ? '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title 1"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr><p:spPr/>' +
@@ -229,7 +255,7 @@ function layout(kind: 'title' | 'blank', footers = false): string {
       : '';
   return (
     `${XML}<p:sldLayout ${NS_DECL} type="${kind === 'title' ? 'obj' : 'blank'}" preserve="1"><p:cSld name="${kind === 'title' ? 'Title and Content' : 'Blank'}">` +
-    spTree(shapes + (footers ? LAYOUT_SLIDE_NUMBER : '')) +
+    spTree(shapes + (footers ? LAYOUT_SLIDE_NUMBER : '') + (datesAndFooters ? LAYOUT_DATE_AND_FOOTER : '')) +
     '</p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>'
   );
 }
@@ -401,7 +427,8 @@ export function buildPptx(opts: FixtureOptions): Uint8Array {
     master(
       opts.footers,
       extra.map((l) => l.name),
-      opts.layoutOrder
+      opts.layoutOrder,
+      opts.datesAndFooters
     )
   );
   put(
@@ -426,7 +453,7 @@ export function buildPptx(opts: FixtureOptions): Uint8Array {
     [1, 'title'],
     [2, 'blank'],
   ] as const) {
-    put(`ppt/slideLayouts/slideLayout${n}.xml`, layout(kind, opts.footers));
+    put(`ppt/slideLayouts/slideLayout${n}.xml`, layout(kind, opts.footers, opts.datesAndFooters));
     put(`ppt/slideLayouts/_rels/slideLayout${n}.xml.rels`, rels([['rId1', `${R}/slideMaster`, '../slideMasters/slideMaster1.xml']]));
   }
   put('ppt/notesMasters/notesMaster1.xml', notesMaster());

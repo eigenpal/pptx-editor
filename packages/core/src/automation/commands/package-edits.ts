@@ -37,6 +37,13 @@ export function xmlAttr(value: string, what: string): string {
   }
 }
 
+/** A field GUID in braces (`a:fld/@id`, `ST_Guid`). */
+export function fieldId(): string {
+  const hex = (n: number) =>
+    Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+  return `{${hex(8)}-${hex(4)}-4${hex(3)}-${'89AB'[Math.floor(Math.random() * 4)]}${hex(3)}-${hex(12)}}`.toUpperCase();
+}
+
 /** Character data for an XML template, validated and escaped. Refuses invalid characters. */
 export function xmlText(value: string, what: string): string {
   try {

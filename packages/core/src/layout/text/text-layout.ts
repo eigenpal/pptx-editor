@@ -465,10 +465,38 @@ export function layoutTextOn(
     const lineLeft = (first: boolean): number => (first ? firstLineStart : p.marL);
     const avail = (first: boolean): number => colW - lineLeft(first) - p.marR;
 
-    const tabStopAfter = (x: number): number => {
-      for (const t of p.tabs) if (t.pos > x + 1) return t.pos;
-      const d = p.defaultTab > 0 ? p.defaultTab : 914_400;
-      return (Math.floor(x / d) + 1) * d;
+    /**
+     * The advance of the tab at unit `i`, which starts at `x` (ECMA-376 Part 1, 21.1.2.1.36
+     * tab). The text after a tab runs to the next tab or line end. A left stop starts that
+     * text at the stop, a right stop ends it there, a centered stop centers it on the stop,
+     * and a decimal stop puts its first full stop there (or ends it there, with no full stop).
+     * Text that would start before `x` starts at `x`. Default stops are left stops. In a
+     * wrapped line, text at a centered, right, or decimal stop that would pass `lineEnd` moves
+     * left to end there (reference PDF of `svg-tab-stops`).
+     */
+    const tabAdvance = (i: number, x: number, lineEnd: number): number => {
+      const stop = p.tabs.find((t) => t.pos > x + 1);
+      if (!stop) {
+        const d = p.defaultTab > 0 ? p.defaultTab : 914_400;
+        return (Math.floor(x / d) + 1) * d - x;
+      }
+      if (stop.align !== 'ctr' && stop.align !== 'r' && stop.align !== 'dec') return stop.pos - x;
+      let width = 0;
+      let beforePoint = -1;
+      for (let j = i + 1; j < units.length; j += 1) {
+        const code = units[j].code;
+        if (code === 9 || code === 10) break;
+        if (code === 46 && beforePoint < 0) beforePoint = width;
+        width += units[j].advance;
+      }
+      const span =
+        stop.align === 'ctr'
+          ? width / 2
+          : stop.align === 'dec' && beforePoint >= 0
+            ? beforePoint
+            : width;
+      const advance = stop.pos - x - span;
+      return Math.max(0, wrap ? Math.min(advance, lineEnd - x - width) : advance);
     };
 
     // Greedy fill.
@@ -489,7 +517,7 @@ export function layoutTextOn(
           forced = true;
           break;
         }
-        if (u.code === 9) u.advance = tabStopAfter(x) - x;
+        if (u.code === 9) u.advance = tabAdvance(i, x, left + limit);
         if (i > start && breaks[i]) lastBreak = i;
         const next = x + u.advance;
         // `hangingPunct`: a comma or full stop that starts inside the line hangs past its end.

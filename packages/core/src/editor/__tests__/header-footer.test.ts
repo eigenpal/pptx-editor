@@ -1,0 +1,411 @@
+// Insert > Footer and Insert > Date and time.
+
+import { describe, expect, test } from 'bun:test';
+import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
+import { headerFooterDeck } from '../../../../../scripts/fixtures/round-trip.ts';
+import { presentationInfo, serializeXmlPart, xmlPartOf } from '../../store/index.ts';
+import { shortDate } from '../../automation/commands/header-footer.ts';
+import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
+
+async function open(bytes: Uint8Array): Promise<PptxEditorInstance> {
+  const e = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  expect((await e.load(bytes)).ok).toBe(true);
+  return e;
+}
+
+const slideXml = (e: PptxEditorInstance, index: number): string => {
+  const pkg = e.session!.store.package;
+  return serializeXmlPart(xmlPartOf(pkg, presentationInfo(pkg).slides[index]!.partName)!);
+};
+
+/** The texts that the layout of slide `index` paints. */
+const painted = (e: PptxEditorInstance, index: number): string[] =>
+  e
+    .session!.layout(index)!
+    .items.flatMap((item) =>
+      item.kind === 'shape' && item.text
+        ? item.text.lines.map((l) => l.runs.map((r) => r.text).join(''))
+        : []
+    );
+
+describe('Insert > Footer', () => {
+  test('gives every slide the footer and keeps the format of an existing one', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    expect(e.snapshot().footer).toBe('Footer text & more');
+    expect(e.exec({ type: 'setFooter', show: true, text: 'Quarterly <results>' }).ok).toBe(true);
+    expect(e.snapshot().footer).toBe('Quarterly <results>');
+    // Slide 1 keeps its own box, alignment, and size.
+    const first = slideXml(e, 0);
+    expect(first).toContain('<a:pPr algn="ctr"/>');
+    expect(first).toContain('sz="1200"');
+    expect(first).toContain('Quarterly &lt;results&gt;');
+    expect(first).not.toContain('Footer text');
+    // Slide 2 gets a placeholder from its layout, and paints the text there.
+    expect(slideXml(e, 1)).toContain('type="ftr"');
+    expect(painted(e, 1)).toContain('Quarterly <results>');
+    // The save reopens with the same footer.
+    const again = await open(e.save()!);
+    again.selectSlide(1);
+    expect(again.snapshot().footer).toBe('Quarterly <results>');
+  });
+
+  test('null removes the footer from every slide, and undo restores it', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    expect(e.exec({ type: 'setFooter', show: false }).ok).toBe(true);
+    expect(e.snapshot().footer).toBeNull();
+    expect(slideXml(e, 0)).not.toContain('type="ftr"');
+    e.exec({ type: 'undo' });
+    expect(e.snapshot().footer).toBe('Footer text & more');
+  });
+
+  test('refuses text that is too long or not valid XML', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    expect(e.exec({ type: 'setFooter', show: true, text: 'x'.repeat(1025) }).ok).toBe(false);
+    expect(e.exec({ type: 'setFooter', show: true, text: 'bad \u0001' }).ok).toBe(false);
+    expect(e.snapshot().footer).toBe('Footer text & more');
+  });
+});
+
+describe('Insert > Date and time', () => {
+  test('a field date on every slide, then a fixed date in its place', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    expect(e.snapshot().dateTime).toBeNull();
+    expect(e.exec({ type: 'setDateTime', show: true, text: '11/7/2026' }).ok).toBe(true);
+    expect(e.snapshot().dateTime).toEqual({ text: '11/7/2026', fixed: false });
+    for (const i of [0, 1]) {
+      expect(slideXml(e, i)).toMatch(/<a:fld id="\{[0-9A-F-]{36}\}" type="datetime1">/);
+      expect(painted(e, i)).toContain('11/7/2026');
+    }
+    expect(e.exec({ type: 'setDateTime', show: true, text: '7 November', fixed: true }).ok).toBe(
+      true
+    );
+    expect(slideXml(e, 0)).not.toContain('datetime1');
+    expect(painted(e, 0)).toContain('7 November');
+    expect(e.exec({ type: 'setDateTime', show: false }).ok).toBe(true);
+    expect(e.snapshot().dateTime).toBeNull();
+  });
+
+  test('shortDate writes month/day/year', () => {
+    expect(shortDate(new Date(2026, 10, 7))).toBe('11/7/2026');
+  });
+});
+
+test('a deck without footer and date placeholders refuses with a reason', async () => {
+  const e = await open(
+    buildPptx({
+      slides: [
+        { shapes: shape({ id: 2, x: 0, y: 0, cx: 914400, cy: 914400, text: para(run('S')) }) },
+      ],
+    })
+  );
+  const footer = e.exec({ type: 'setFooter', show: true, text: 'Footer' });
+  expect(footer.ok ? undefined : footer.reason).toBe('disabled.noFooterPlaceholder');
+  const date = e.exec({ type: 'setDateTime', show: true });
+  expect(date.ok ? undefined : date.reason).toBe('disabled.noDatePlaceholder');
+  // Hiding what the deck cannot show is refused too, so `can` offers no empty step.
+  expect(e.can({ type: 'setFooter', show: false }).ok).toBe(false);
+  expect(e.can({ type: 'setDateTime', show: false }).ok).toBe(false);
+});
+
+/** A placeholder of `type` with `idx`, and `body` as its text body (none when empty). */
+const placeholder = (id: number, type: string, idx: number, body: string): string =>
+  `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${type} ${id}"/><p:cNvSpPr/>` +
+  `<p:nvPr><p:ph type="${type}" idx="${idx}"/></p:nvPr></p:nvSpPr><p:spPr/>${body}</p:sp>`;
+
+/** The header-footer deck, with `shapes` on slide 2. */
+const withSlide2 = (shapes: string): Uint8Array => {
+  const deck = headerFooterDeck();
+  return buildPptx({ ...deck, slides: [deck.slides[0]!, { ...deck.slides[1]!, shapes }] });
+};
+
+describe('existing placeholders', () => {
+  test('a footer without a text body gets one, after the shape properties', async () => {
+    const e = await open(withSlide2(placeholder(4, 'ftr', 11, '')));
+    expect(e.exec({ type: 'setFooter', show: true, text: 'Hello' }).ok).toBe(true);
+    expect(slideXml(e, 1)).toMatch(/<p:spPr\/><p:txBody>.*Hello.*<\/p:txBody><\/p:sp>/);
+    expect(painted(e, 1)).toContain('Hello');
+  });
+
+  test('a footer keeps its first paragraph only, with its format', async () => {
+    const body =
+      '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="r"/><a:r><a:rPr lang="de-DE" b="1"/>' +
+      '<a:t>One</a:t></a:r><a:br/><a:r><a:rPr lang="de-DE"/><a:t>Two</a:t></a:r></a:p>' +
+      '<a:p><a:r><a:t>Three</a:t></a:r></a:p></p:txBody>';
+    const e = await open(withSlide2(placeholder(4, 'ftr', 11, body)));
+    expect(e.exec({ type: 'setFooter', show: true, text: 'New' }).ok).toBe(true);
+    const xml = slideXml(e, 1);
+    expect(xml).toContain(
+      '<a:p><a:pPr algn="r"/><a:r><a:rPr lang="de-DE" b="1"/><a:t>New</a:t></a:r></a:p>'
+    );
+    expect(xml).not.toMatch(/Two|Three|<a:br/);
+  });
+
+  test('a fixed date that becomes a field keeps its character format', async () => {
+    const body =
+      '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="de-DE" sz="900" b="1"/>' +
+      '<a:t>7.11.2026</a:t></a:r></a:p></p:txBody>';
+    const e = await open(withSlide2(placeholder(4, 'dt', 10, body)));
+    expect(e.exec({ type: 'setDateTime', show: true, text: '11/7/2026' }).ok).toBe(true);
+    expect(slideXml(e, 1)).toMatch(
+      /<a:fld id="\{[0-9A-F-]{36}\}" type="datetime1"><a:rPr lang="de-DE" sz="900" b="1"\/><a:t>11\/7\/2026<\/a:t><\/a:fld>/
+    );
+    expect(slideXml(e, 1)).not.toContain('7.11.2026');
+  });
+
+  test('a date field of another format takes the format of its new text', async () => {
+    const body =
+      '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:fld id="{B6F15528-21DE-4FAA-801E-634DDDAF4B2C}" ' +
+      'type="datetime4"><a:rPr lang="en-US"/><a:t>November 7, 2026</a:t></a:fld></a:p></p:txBody>';
+    const e = await open(withSlide2(placeholder(4, 'dt', 10, body)));
+    expect(e.exec({ type: 'setDateTime', show: true, text: '11/7/2026' }).ok).toBe(true);
+    const xml = slideXml(e, 1);
+    expect(xml).toContain('id="{B6F15528-21DE-4FAA-801E-634DDDAF4B2C}" type="datetime1"');
+    expect(xml).toContain('<a:t>11/7/2026</a:t>');
+  });
+});
+
+test('a layout without a footer placeholder uses the one of its master', async () => {
+  const deck = headerFooterDeck();
+  const e = await open(
+    buildPptx({
+      ...deck,
+      layouts: [{ name: 'Bare', shapes: '' }],
+      slides: [{ ...deck.slides[1]!, layoutName: 'Bare' }],
+    })
+  );
+  expect(e.exec({ type: 'setFooter', show: true, text: 'From the master' }).ok).toBe(true);
+  // The master's footer placeholder has idx 3.
+  expect(slideXml(e, 0)).toContain('<p:ph type="ftr" sz="quarter" idx="3"/>');
+  expect(painted(e, 0)).toContain('From the master');
+});
+
+test('the menu state is the deck state: a slide without a footer reads the others', async () => {
+  const e = await open(buildPptx(headerFooterDeck()));
+  e.selectSlide(1);
+  expect(e.snapshot().footer).toBe('Footer text & more');
+  expect(e.snapshot().dateTime).toBeNull();
+  e.selectSlide(0);
+  e.exec({ type: 'setDateTime', show: true, text: 'Nov 7', fixed: true, indices: [0] });
+  e.selectSlide(1);
+  expect(e.snapshot().dateTime).toEqual({ text: 'Nov 7', fixed: true });
+});
+
+describe('on without text keeps what the slides show', () => {
+  test('the footer: slides keep theirs, and the others take it', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    expect(e.exec({ type: 'setFooter', show: true }).ok).toBe(true);
+    expect(slideXml(e, 0)).toContain('Footer text &amp; more');
+    expect(painted(e, 1)).toContain('Footer text & more');
+  });
+
+  test('the footer: without text and with no footer anywhere, it is refused', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    e.exec({ type: 'setFooter', show: false });
+    const r = e.exec({ type: 'setFooter', show: true });
+    expect(r.ok ? undefined : r.reason).toBe('disabled.noFooterText');
+    const empty = e.exec({ type: 'setFooter', show: true, text: '' });
+    expect(empty.ok ? undefined : empty.reason).toBe('errors.unsupported');
+  });
+
+  test('the date: a field of another format stays, and spreads with its format', async () => {
+    const body =
+      '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:fld id="{B6F15528-21DE-4FAA-801E-634DDDAF4B2C}" ' +
+      'type="datetime4"><a:rPr lang="en-US"/><a:t>November 7, 2026</a:t></a:fld></a:p></p:txBody>';
+    const deck = headerFooterDeck();
+    const e = await open(
+      buildPptx({
+        ...deck,
+        slides: [{ ...deck.slides[0]!, shapes: placeholder(9, 'dt', 10, body) }, deck.slides[1]!],
+      })
+    );
+    expect(e.exec({ type: 'setDateTime', show: true }).ok).toBe(true);
+    expect(slideXml(e, 0)).toContain('type="datetime4"><a:rPr lang="en-US"/><a:t>November 7, 2026');
+    expect(slideXml(e, 1)).toMatch(/type="datetime4"><a:rPr lang="en-US"\/><a:t>November 7, 2026/);
+  });
+
+  test('the date: with no date anywhere, today as a field', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    expect(e.exec({ type: 'setDateTime', show: true }).ok).toBe(true);
+    expect(e.snapshot().dateTime).toEqual({ text: shortDate(), fixed: false });
+  });
+
+  test('during a progressive open, a footer on a slide that waits is kept', async () => {
+    const deck = headerFooterDeck();
+    const filler =
+      '<p:sp><p:nvSpPr><p:cNvPr id="40" name="Filler"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/>' +
+      `<p:txBody><a:bodyPr/><a:lstStyle/>${para(run('lorem '.repeat(500)))}</p:txBody></p:sp>`;
+    const plain = { ...deck.slides[1]!, shapes: deck.slides[1]!.shapes + filler };
+    const e = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    expect(
+      (await e.load(buildPptx({ ...deck, slides: [...Array(400).fill(plain), deck.slides[0]!] })))
+        .ok
+    ).toBe(true);
+    expect(e.snapshot().pendingSlides ?? 0).toBeGreaterThan(0);
+    expect(e.exec({ type: 'setFooter', show: true }).ok).toBe(true);
+    expect(slideXml(e, 400)).toContain('Footer text &amp; more');
+    expect(slideXml(e, 3)).toContain('Footer text &amp; more');
+  });
+});
+
+describe('targets', () => {
+  test('indices change only those slides', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    expect(e.exec({ type: 'setFooter', show: true, text: 'Only two', indices: [1] }).ok).toBe(true);
+    expect(slideXml(e, 0)).toContain('Footer text &amp; more');
+    expect(slideXml(e, 1)).toContain('Only two');
+  });
+
+  test('hideOnTitleSlides hides the number, footer, and date on title slides', async () => {
+    const deck = headerFooterDeck();
+    const e = await open(
+      buildPptx({
+        ...deck,
+        layouts: [{ name: 'Title Slide', type: 'title', shapes: '' }],
+        slides: [{ ...deck.slides[0]!, layoutName: 'Title Slide' }, deck.slides[1]!],
+      })
+    );
+    for (const command of [
+      { type: 'setSlideNumbers', show: true, hideOnTitleSlides: true },
+      { type: 'setFooter', show: true, text: 'Body', hideOnTitleSlides: true },
+      { type: 'setDateTime', show: true, text: '11/7/2026', hideOnTitleSlides: true },
+    ] as const)
+      expect(e.exec(command).ok).toBe(true);
+    expect(slideXml(e, 0)).not.toMatch(/type="(sldNum|ftr|dt)"/);
+    expect(slideXml(e, 1)).toMatch(/type="sldNum"[^]*type="ftr"[^]*type="dt"/);
+  });
+
+  test('no slides or slides out of range are refused', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    for (const indices of [[], [7]]) {
+      const r = e.exec({ type: 'setFooter', show: true, text: 'X', indices });
+      expect(r.ok ? undefined : r.reason).toBe('errors.unsupported');
+    }
+  });
+});
+
+describe('edge cases', () => {
+  const emptyFooter =
+    '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="de-DE" sz="2000" b="1"/></a:p></p:txBody>';
+
+  test('an empty footer is no footer: the deck text comes from a slide with text', async () => {
+    const deck = headerFooterDeck();
+    const e = await open(
+      buildPptx({
+        ...deck,
+        slides: [
+          {
+            ...deck.slides[1]!,
+            shapes: deck.slides[1]!.shapes + placeholder(9, 'ftr', 11, emptyFooter),
+          },
+          deck.slides[0]!,
+          deck.slides[1]!,
+        ],
+      })
+    );
+    expect(e.snapshot().footer).toBe('Footer text & more');
+    expect(e.exec({ type: 'setFooter', show: true }).ok).toBe(true);
+    expect(painted(e, 2)).toContain('Footer text & more');
+  });
+
+  test('text in an empty paragraph takes its end-of-paragraph format', async () => {
+    const e = await open(withSlide2(placeholder(9, 'ftr', 11, emptyFooter)));
+    expect(e.exec({ type: 'setFooter', show: true, text: 'Formatted' }).ok).toBe(true);
+    expect(slideXml(e, 1)).toContain(
+      '<a:r><a:rPr lang="de-DE" sz="2000" b="1"/><a:t>Formatted</a:t></a:r><a:endParaRPr'
+    );
+  });
+
+  test('an empty footer takes the deck text when on gives no text', async () => {
+    const deck = headerFooterDeck();
+    const e = await open(
+      buildPptx({
+        ...deck,
+        slides: [
+          {
+            ...deck.slides[1]!,
+            shapes: deck.slides[1]!.shapes + placeholder(9, 'ftr', 11, emptyFooter),
+          },
+          deck.slides[0]!,
+        ],
+      })
+    );
+    expect(e.exec({ type: 'setFooter', show: true }).ok).toBe(true);
+    expect(painted(e, 0)).toContain('Footer text & more');
+    // It keeps its own format, from its end-of-paragraph properties.
+    expect(slideXml(e, 0)).toContain(
+      '<a:rPr lang="de-DE" sz="2000" b="1"/><a:t>Footer text &amp; more'
+    );
+  });
+
+  test('the end-of-paragraph format keeps its fill and font', async () => {
+    const body =
+      '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="en-US" sz="1400">' +
+      '<a:solidFill><a:srgbClr val="FF0000"/></a:solidFill><a:latin typeface="Lato"/></a:endParaRPr></a:p></p:txBody>';
+    const e = await open(withSlide2(placeholder(9, 'ftr', 11, body)));
+    expect(e.exec({ type: 'setFooter', show: true, text: 'Red' }).ok).toBe(true);
+    expect(slideXml(e, 1)).toContain(
+      '<a:r><a:rPr lang="en-US" sz="1400"><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill><a:latin typeface="Lato"/></a:rPr><a:t>Red</a:t></a:r>'
+    );
+  });
+
+  test('only empty footers and no text: refused, and new text carries no link', async () => {
+    const e = await open(withSlide2(placeholder(9, 'ftr', 11, emptyFooter)));
+    e.exec({ type: 'setFooter', show: false, indices: [0] });
+    const r = e.exec({ type: 'setFooter', show: true });
+    expect(r.ok ? undefined : r.reason).toBe('disabled.noFooterText');
+    const linked =
+      '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="en-US">' +
+      '<a:hlinkClick xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id=""/>' +
+      '</a:endParaRPr></a:p></p:txBody>';
+    const f = await open(withSlide2(placeholder(9, 'ftr', 11, linked)));
+    expect(f.exec({ type: 'setFooter', show: true, text: 'Plain' }).ok).toBe(true);
+    expect(slideXml(f, 1)).toContain('<a:r><a:rPr lang="en-US"/><a:t>Plain</a:t></a:r>');
+  });
+
+  test('hiding ignores the text', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    expect(e.exec({ type: 'setFooter', show: false, text: '' }).ok).toBe(true);
+    expect(e.snapshot().footer).toBeNull();
+  });
+
+  test('blank and multi-line text is refused', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    for (const text of ['  ', 'a\nb', 'a\rb', 'a\u0085b'])
+      expect(e.exec({ type: 'setFooter', show: true, text }).ok).toBe(false);
+    expect(e.exec({ type: 'setDateTime', show: true, text: 'a\nb' }).ok).toBe(false);
+  });
+
+  test('fixed without text turns the date fields into fixed text', async () => {
+    const e = await open(buildPptx(headerFooterDeck()));
+    e.exec({ type: 'setDateTime', show: true, text: '11/7/2026' });
+    expect(e.exec({ type: 'setDateTime', show: true, fixed: true }).ok).toBe(true);
+    expect(e.snapshot().dateTime).toEqual({ text: '11/7/2026', fixed: true });
+    expect(slideXml(e, 1)).not.toContain('a:fld');
+  });
+
+  test('hiding slide numbers that no slide can have is refused', async () => {
+    const e = await open(
+      buildPptx({
+        slides: [
+          { shapes: shape({ id: 2, x: 0, y: 0, cx: 914400, cy: 914400, text: para(run('S')) }) },
+        ],
+      })
+    );
+    const r = e.exec({ type: 'setSlideNumbers', show: false });
+    expect(r.ok ? undefined : r.reason).toBe('disabled.noSlideNumberPlaceholder');
+  });
+
+  test('a title slide hides its number while the other slides show theirs', async () => {
+    const deck = headerFooterDeck();
+    const e = await open(
+      buildPptx({
+        ...deck,
+        layouts: [{ name: 'Title Slide', type: 'title', shapes: '' }],
+        slides: [{ ...deck.slides[1]!, layoutName: 'Title Slide' }, deck.slides[1]!],
+      })
+    );
+    expect(e.exec({ type: 'setSlideNumbers', show: true, hideOnTitleSlides: true }).ok).toBe(true);
+    expect(slideXml(e, 0)).not.toContain('type="sldNum"');
+    expect(slideXml(e, 1)).toContain('type="sldNum"');
+  });
+});

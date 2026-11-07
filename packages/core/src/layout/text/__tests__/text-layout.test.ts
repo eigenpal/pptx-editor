@@ -171,3 +171,43 @@ describe('symbol font bullets', () => {
     expect(marker('v', createFixedMeasurer())).toBe('v');
   });
 });
+
+describe('tab stops (ECMA-376 Part 1, 21.1.2.1.36 tab)', () => {
+  const LEFT_INSET = 91_440;
+  const tabbed = (tabs: string, text: string): readonly number[] => {
+    const t = lay(
+      `<a:p><a:pPr><a:tabLst>${tabs}</a:tabLst></a:pPr>${r(text)}</a:p>`,
+      '<a:bodyPr wrap="square"/>'
+    );
+    expect(t.lines.length).toBe(1);
+    return t.lines[0].runs.find((x) => x.kind === 'text')!.x;
+  };
+
+  test('right, centered, and decimal stops place the text after the tab', () => {
+    const x = tabbed(
+      '<a:tab pos="2000000" algn="r"/><a:tab pos="3000000" algn="ctr"/><a:tab pos="4000000" algn="dec"/>',
+      'a\tbb\tcc\t1.5'
+    );
+    // "bb" ends at the right stop, "cc" centers on its stop, and the full stop of "1.5" starts
+    // at the decimal stop.
+    expect(x[4]).toBeCloseTo(LEFT_INSET + 2_000_000, 0);
+    expect((x[5] + x[7]) / 2).toBeCloseTo(LEFT_INSET + 3_000_000, 0);
+    expect(x[9]).toBeCloseTo(LEFT_INSET + 4_000_000, 0);
+  });
+
+  test('a decimal stop with no full stop ends the text there', () => {
+    const x = tabbed('<a:tab pos="2000000" algn="dec"/>', 'a\t15');
+    expect(x[4]).toBeCloseTo(LEFT_INSET + 2_000_000, 0);
+  });
+
+  test('text at a stop near the right edge moves left to end at the edge', () => {
+    const x = tabbed('<a:tab pos="5900000" algn="dec"/>', 'a\t12.5');
+    expect(x[x.length - 1]).toBeCloseTo(6_000_000 - LEFT_INSET, 0);
+  });
+
+  test('text wider than the room before a right stop starts at the tab', () => {
+    const x = tabbed('<a:tab pos="200000" algn="r"/>', 'a\tlonger text');
+    expect(x[1]).toBeLessThan(LEFT_INSET + 200_000);
+    expect(x[2]).toBeCloseTo(x[1], 0);
+  });
+});

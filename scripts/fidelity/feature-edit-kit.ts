@@ -48,7 +48,27 @@ export interface EditTools {
   type(text: string): void;
   /** A small PNG picture. */
   readonly png: Uint8Array;
+  /** The second peer of a `collaborate` recipe, on the same slide. */
+  readonly peer?: EditTools;
+  /** The link between the two peers of a `collaborate` recipe. */
+  readonly link?: PeerLink;
 }
+
+/** The sync link of two collaborating peers: pause it to make their edits concurrent. */
+export interface PeerLink {
+  pause(): void;
+  /** Deliver the updates that the pause held back, both ways. */
+  flush(): void;
+}
+
+/** Opens a deck in two editors that collaborate (`collaboration-kit.ts`). */
+export type OpenPeers = (bytes: Uint8Array) => Promise<{
+  editor: PptxEditorInstance;
+  peer: PptxEditorInstance;
+  link: PeerLink;
+  /** Destroy both editors, their sessions, and their replicas. */
+  destroy(): void;
+}>;
 
 /** What a recipe uses to check the reopened copy. */
 export interface SavedDeck {
@@ -70,7 +90,12 @@ export interface FeatureEdit {
   readonly fixture: string;
   /** The slide the edit runs on, 0-based. */
   readonly slide?: number;
-  readonly edit: (t: EditTools) => void;
+  readonly edit: (t: EditTools) => void | Promise<void>;
+  /**
+   * Edit in a collaboration session: the deck opens in two editors on linked replicas, and
+   * the recipe edits through `t` and `t.peer`. The first editor saves.
+   */
+  readonly collaborate?: OpenPeers;
   /** A failure message, or undefined when the reopened copy has the edit. */
   readonly check: (d: SavedDeck) => string | undefined;
   /**
@@ -145,6 +170,55 @@ export const lacks = (xml: string, ...parts: string[]): string | undefined => {
     ? `still has ${present.map((m) => JSON.stringify(m)).join(', ')}`
     : undefined;
 };
+
+/**
+ * A failure when a shape of `names` on slide `index` is not as committed: the check of kept
+ * content that the editor does not edit.
+ */
+export function kept(d: SavedDeck, index: number, ...names: string[]): string | undefined {
+  return all(
+    ...names.map((name) =>
+      d.shapeXml(index, name) === shapeXmlOf(d.original, index, name)
+        ? undefined
+        : `"${name}" changed`
+    )
+  );
+}
+
+/** A failure when the child `qname` of slide `index` (`p:timing`, `p:extLst`) is not as committed. */
+export function keptChild(d: SavedDeck, index: number, qname: string): string | undefined {
+  const child = (pkg: PptxPackage): string | undefined => {
+    const root = xmlPartOf(pkg, slidePart(pkg, index))!.root;
+    const el = elements(root).find((c) => `${c.prefix}:${c.local}` === qname);
+    return el && xmlOf(el, root);
+  };
+  const before = child(d.original);
+  if (before === undefined) throw new Error(`the fixture has no ${qname} on slide ${index + 1}`);
+  return child(d.pkg) === before ? undefined : `${qname} changed`;
+}
+
+/**
+ * A failure when a relationship of `ids` of slide `index` does not have its committed type,
+ * target, and target mode. Kept XML that names an `r:id` keeps its meaning only with this.
+ */
+export function keptRels(d: SavedDeck, index: number, ...ids: string[]): string | undefined {
+  const rel = (pkg: PptxPackage, id: string): string | undefined => {
+    const part = slidePart(pkg, index).replace(/\/([^/]+)$/, '/_rels/$1.rels');
+    const root = xmlPartOf(pkg, part)?.root;
+    const el = root && elements(root).find((c) => attr(c, 'Id') === id);
+    return el && ['Type', 'Target', 'TargetMode'].map((a) => attr(el, a) ?? '').join(' ');
+  };
+  return all(
+    ...ids.map((id) => {
+      const before = rel(d.original, id);
+      if (before === undefined) throw new Error(`the fixture has no relationship ${id}`);
+      const after = rel(d.pkg, id);
+      return after === before
+        ? undefined
+        : `relationship ${id} is ${after ?? 'gone'}, was ${before}`;
+    })
+  );
+}
 
 /** The runs of the first paragraph of a shape, in order: their `a:rPr` and text. */
 export function runsOf(shapeXml: string): { readonly rPr: string; readonly text: string }[] {
@@ -315,13 +389,19 @@ export async function runFeatureEdit(id: string, recipe: FeatureEdit): Promise<F
   const fixture = new Uint8Array(readFileSync(join(FIXTURES, `${recipe.fixture}.pptx`)));
   const original = readFixture(recipe.fixture);
   const slide = recipe.slide ?? 0;
-  const editor = await open(fixture);
+  let peers: Awaited<ReturnType<OpenPeers>> | undefined;
+  let editor: PptxEditorInstance | undefined;
   let reopened: PptxEditorInstance | undefined;
   try {
+    peers = recipe.collaborate ? await recipe.collaborate(fixture) : undefined;
+    editor = peers?.editor ?? (await open(fixture));
     const untouched = editor.save();
     if (!untouched) return { id, ok: false, failure: 'the untouched deck did not save' };
     editor.goToSlide(slide);
-    recipe.edit(tools(editor));
+    peers?.peer.goToSlide(slide);
+    await recipe.edit(
+      peers ? { ...tools(editor), peer: tools(peers.peer), link: peers.link } : tools(editor)
+    );
     const bytes = editor.save();
     if (!bytes) return { id, ok: false, failure: 'the edited deck did not save' };
     const before = readPptx(untouched);
@@ -367,16 +447,24 @@ export async function runFeatureEdit(id: string, recipe: FeatureEdit): Promise<F
       (p: string) => p === own.replace(/\/([^/]+)$/, '/_rels/$1.rels'),
       ...(recipe.parts ?? []).map((rule) => (p: string) => allows(rule, p)),
     ];
-    const collateral = differentParts(before.pkg, after.pkg).filter(
-      (p) => !allowed.some((ok) => ok(p))
-    );
+    // A part that the edit does not own is as committed: compared with the fixture itself, so
+    // a loss that a plain open and save would cause is caught too.
+    const collateral = [
+      ...new Set([
+        ...differentParts(before.pkg, after.pkg),
+        ...differentParts(original, after.pkg),
+      ]),
+    ]
+      .filter((p) => !allowed.some((ok) => ok(p)))
+      .sort();
     if (collateral.length)
       return { id, ok: false, failure: `the edit also changed ${collateral.join(', ')}`, bytes };
     return { id, ok: true, bytes, fingerprint: editFingerprint(after.pkg) };
   } catch (error) {
     return { id, ok: false, failure: error instanceof Error ? error.message : String(error) };
   } finally {
-    editor.destroy();
+    if (peers) peers.destroy();
+    else editor?.destroy();
     reopened?.destroy();
   }
 }

@@ -16,6 +16,7 @@ import { eastAsianThemeFontsDeck, eastAsianTypographyDeck, textScriptFixtures } 
 import { followUpFixtures } from './follow-ups.ts';
 import { lineEndsDashesFixtures } from './line-ends-dashes.ts';
 import { chartSizesDeck, chartsDeck, diagramsDeck } from './drawingml.ts';
+import { buildRoundTripDecks } from './round-trip.ts';
 
 const OUT = 'fixtures';
 const IN = 914_400;
@@ -850,4 +851,7 @@ writeFileSync(`${OUT}/charts.pptx`, buildPptx(chartsDeck()));
 writeFileSync(`${OUT}/chart-sizes.pptx`, buildPptx(chartSizesDeck()));
 // Diagrams with their saved drawings (ECMA-376 Part 1, 21.4).
 writeFileSync(`${OUT}/diagrams.pptx`, buildPptx(diagramsDeck()));
-console.log(`${Object.keys(fixtures).length + 6} fixtures written to ${OUT}/`);
+// Links, kept content, an SVG picture, and tab stops: the round-trip checks of the feature edits.
+const roundTrip = buildRoundTripDecks(image);
+for (const [name, bytes] of Object.entries(roundTrip)) writeFileSync(`${OUT}/${name}.pptx`, bytes);
+console.log(`${Object.keys(fixtures).length + 6 + Object.keys(roundTrip).length} fixtures written to ${OUT}/`);

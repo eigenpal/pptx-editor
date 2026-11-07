@@ -96,6 +96,7 @@ When a feature needs [`@pptx-editor.dev/pro`](https://www.npmjs.com/package/@ppt
 - XML parts are written again in a normalized form. Binary parts, such as pictures, media, and embedded fonts, keep their exact bytes.
 - Every edit goes through one document store. An edit that the editor cannot make is refused with a reason. It is never dropped without notice.
 - A full round trip means that the feature's own edit is still in the file after save and reopen, that the edit changes no other part, and that the saved copy opens with no repair prompt.
+- A preserved feature stays as it was through an edit next to it or of its box, a save, and a reopen. The saved copy opens with no repair prompt.
 - Full rendering means that every test presentation of the feature matches its reference PDF within the fidelity thresholds. The feature has no approximation of its own. The line model, glyph advances, and missing glyphs apply to all text.
 - Macros, OLE objects, audio, and video never run or play. The editor shows a poster or a labeled placeholder and keeps the object on save.
 
@@ -148,7 +149,7 @@ Each item below is a place where the renderer does not yet follow the specificat
 - **Missing glyphs.** When a font does not have a character, paint uses the system `sans-serif` font. Measurement uses an estimated width.
 - **East Asian, complex-script, and symbol fonts.** Each character takes the `a:ea`, `a:cs`, `a:sym`, or `a:latin` font of its slot. Which characters that both Latin and East Asian text use take `a:ea` follows a fixed list and the run's `lang` and `altLang`. A theme script font (`a:font`) applies only through `lang` or `altLang`. A character that the slot's face lacks uses the first loaded face that has it, East Asian faces first. Lines with Malgun Gothic and Arial text can be about 1 pt off their baseline. East Asian punctuation does not compress.
 - **Right-to-left text.** There is no bidirectional layout. `a:pPr/@rtl` is ignored.
-- **Tab stops.** Right, center, and decimal tab stops behave as left tab stops.
+- **Tab stops.** Right, center, and decimal tab stops in right-to-left text, or in text that does not wrap, are not measured.
 - **Anchoring and alignment variants.** `anchorCtr` is ignored. `anchor="just"` and `anchor="dist"` behave as top. `justLow` and `thaiDist` alignments behave as left.
 - **Upright East Asian text (`eaVert`).** East Asian characters draw upright. Vertical metrics and vertical glyph alternates are not used.
 - **Stacked text (`wordArtVert`).** Each letter advances by the font's line height. A second line goes to the left of the first.
