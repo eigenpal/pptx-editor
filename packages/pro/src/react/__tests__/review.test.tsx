@@ -205,6 +205,24 @@ describe('PptxEditorReview', () => {
     expect(value('Reply to Ada Lovelace')).toBe('For B');
   });
 
+  test('a save on a twin that a peer changed is refused: the box keeps the text and says so', async () => {
+    const editor = await mount([reviewModule()]);
+    await act(async () => void (await editor.load(await repeatedThreadDeck())));
+    const [a] = editor.snapshot().comments!;
+    const edit = screen.getAllByRole('button', { name: 'Edit comment by Ada Lovelace' })[0]!;
+    act(() => void fireEvent.click(edit));
+    const box = screen.getByRole('textbox', { name: 'Edit comment' });
+    act(() => void fireEvent.change(box, { target: { value: 'Mine' } }));
+    act(() => void editor.exec({ type: 'editComment', commentId: a!.id, text: 'Peer' }));
+    const field = screen.getByRole('textbox', { name: 'Edit comment' }) as HTMLTextAreaElement;
+    act(() => void fireEvent.keyDown(field, { key: 'Enter' }));
+    expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['Peer', 'B', 'C']);
+    expect(field.value).toBe('Mine');
+    expect(document.querySelector('.pptx-review__refused[role="status"]')!.textContent).toBe(
+      'This comment changed. Copy your text to keep it.'
+    );
+  });
+
   test('when one of three copies goes, an edit of a copy closes and saves nothing', async () => {
     const editor = await mount([reviewModule()]);
     await act(async () => void (await editor.load(await repeatedThreadDeck('same'))));

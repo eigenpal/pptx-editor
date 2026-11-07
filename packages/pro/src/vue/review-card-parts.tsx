@@ -107,7 +107,7 @@ export const ReviewCard = markPart(
         const item = entry.value;
         if (props.hidden || !item) return null;
         const pick = (): void => {
-          if (!item.isActive) pane.review.setActive(item.key);
+          if (!item.isActive) pane.review.setActive(item.key, { identity: item.identity });
         };
         const shared = {
           class: cx('pptx-review__card', pane.cardClassName(), props.className),

@@ -114,7 +114,7 @@ export const ReviewCard = markPart(function ReviewCard({
   const t = useReviewLabel();
   if (hidden || !entry) return null;
   const pick = (): void => {
-    if (!entry.isActive) review.setActive(entry.key);
+    if (!entry.isActive) review.setActive(entry.key, { identity: entry.identity });
   };
   const shared = {
     className: cx('pptx-review__card', cardClassName, className),

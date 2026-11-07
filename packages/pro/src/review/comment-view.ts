@@ -40,7 +40,8 @@ export interface ReviewItemView {
   readonly id: string;
   /**
    * The comment's `identity` (`SlideComment.identity` says what keeps it), which can stay where
-   * `id` changes. The pane keys its cards, its open fields, and the selected thread by it.
+   * `id` changes. The pane keys its cards, its open fields, and the selected thread by it. The
+   * actions send the item's author, date, and text as the command's `expect`.
    */
   readonly identity: string;
   /** Always `comment`: PresentationML has no tracked-change markup. */
@@ -89,6 +90,34 @@ export interface ReviewActivationOptions {
    * thread's marker does. Default `false`.
    */
   readonly announce?: boolean;
+  /**
+   * The `identity` of the thread as your view shows it. The pick is refused when the thread under
+   * `key` has another identity: the view is older than the snapshot.
+   */
+  readonly identity?: string;
+}
+
+/** What a field showed of a comment when it opened: the author, the date, and the text. */
+export interface CommentSeen {
+  readonly author: string;
+  readonly date?: string;
+  readonly text: string;
+}
+
+/** What `item` shows of its comment. */
+export const seenOf = (item: CommentSeen): CommentSeen => ({
+  author: item.author,
+  ...(item.date !== undefined ? { date: item.date } : {}),
+  text: item.text,
+});
+
+/**
+ * `item` as `seen` showed it: an action on it sends `seen` as the command's `expect`, so the
+ * editor refuses the write when the comment under the item's id is no longer the one shown.
+ */
+export function shownAs(item: ReviewItemView, seen: CommentSeen): ReviewItemView {
+  const { date: _date, ...rest } = item;
+  return { ...rest, ...seenOf(seen) };
 }
 
 /** The resolved look of one comment author. @public */
@@ -224,11 +253,18 @@ export function reviewActions(editor: PptxEditorInstance | null): ReviewActions 
   const run = (command: Parameters<PptxEditorInstance['exec']>[0]): boolean =>
     editor ? editor.exec(command).ok : false;
   const author = (name: string | undefined) => (name ? { author: name } : {});
+  // What the item showed of the comment that a command acts on. A reply item's thread actions
+  // act on its thread, which the item does not show.
+  const own = (item: ReviewItemView) => ({ expect: seenOf(item) });
+  const thread = (item: ReviewItemView) => (item.parentId === undefined ? own(item) : {});
   return {
     setActive: (key, options) => {
       if (!editor) return false;
-      if (key !== null && !(editor.snapshot().comments ?? []).some((t) => t.id === key))
-        return false;
+      if (key !== null) {
+        const hit = (editor.snapshot().comments ?? []).find((t) => t.id === key);
+        if (!hit || (options?.identity !== undefined && hit.identity !== options.identity))
+          return false;
+      }
       editor.selectComment(key);
       if (key !== null && options?.announce) requestPane(editor, 'comments');
       return true;
@@ -243,14 +279,22 @@ export function reviewActions(editor: PptxEditorInstance | null): ReviewActions 
       }),
     reply: (item, text, name) =>
       text.trim() !== '' &&
-      run({ type: 'replyToComment', commentId: item.parentId ?? item.id, text, ...author(name) }),
+      run({
+        type: 'replyToComment',
+        commentId: item.parentId ?? item.id,
+        text,
+        ...author(name),
+        ...thread(item),
+      }),
     edit: (item, text) =>
-      text.trim() !== '' && run({ type: 'editComment', commentId: item.id, text }),
-    remove: (item) => run({ type: 'deleteComment', commentId: item.id }),
+      text.trim() !== '' && run({ type: 'editComment', commentId: item.id, text, ...own(item) }),
+    remove: (item) => run({ type: 'deleteComment', commentId: item.id, ...own(item) }),
     resolve: (item) =>
-      item.resolved || run({ type: 'resolveComment', commentId: item.parentId ?? item.id }),
+      item.resolved ||
+      run({ type: 'resolveComment', commentId: item.parentId ?? item.id, ...thread(item) }),
     reopen: (item) =>
-      !item.resolved || run({ type: 'reopenComment', commentId: item.parentId ?? item.id }),
+      !item.resolved ||
+      run({ type: 'reopenComment', commentId: item.parentId ?? item.id, ...thread(item) }),
     setAuthor: (name) => editor?.setAuthor(name),
   };
 }

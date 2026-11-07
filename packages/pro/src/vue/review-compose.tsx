@@ -16,6 +16,9 @@ import {
   authorHooks,
   authorStyle,
   commentFieldKey,
+  seenOf,
+  shownAs,
+  type CommentSeen,
   type ReviewItemView,
 } from '../review/comment-view.ts';
 import { usePane, useReviewItem, useReviewLabel } from './review-context.ts';
@@ -228,10 +231,23 @@ export const ReviewReply = Object.assign(
       const id = useId()!;
       // Another comment in this card (the one answered is gone) drops the reply meant for it. An
       // edit or a resolve of the thread keeps the reply.
+      // The thread as it showed when the draft began: the editor refuses the reply when the
+      // comment under its id is no longer that one, and the draft stays with a notice.
+      let seen: CommentSeen | null = null;
+      const refused = ref(false);
       watch(
         () => entry.value?.identity ?? '',
-        () => (text.value = '')
+        () => {
+          text.value = '';
+          seen = null;
+          refused.value = false;
+        }
       );
+      const change = (value: string): void => {
+        if (!value) seen = null;
+        else if (!seen && entry.value) seen = seenOf(entry.value);
+        text.value = value;
+      };
       return () => {
         const item = entry.value;
         if (props.hidden || !item || !item.isActive || item.resolved || review.readOnly.value)
@@ -243,7 +259,12 @@ export const ReviewReply = Object.assign(
         const empty = text.value.trim() === '';
         const blocked = review.author.value === null;
         const post = (): void => {
-          if (!empty && review.reply(item, text.value)) text.value = '';
+          if (empty) return;
+          if (review.reply(seen ? shownAs(item, seen) : item, text.value)) {
+            text.value = '';
+            seen = null;
+            refused.value = false;
+          } else refused.value = true;
         };
         return (
           <form
@@ -269,20 +290,21 @@ export const ReviewReply = Object.assign(
               label={t('comments.replyTo', { author: name })}
               placeholder={t('comments.replyText')}
               describedBy={blocked ? `${id}-blocked` : `${id}-hint`}
-              onChange={(v: string) => (text.value = v)}
+              onChange={change}
               onPost={post}
               onCancel={() => {
-                if (text.value) text.value = '';
+                if (text.value) change('');
                 else review.setActive(null);
               }}
             />
             {keyHint(`${id}-hint`, t)}
+            {refused.value ? (
+              <span class="pptx-review__refused" role="status">
+                {t('comments.changed')}
+              </span>
+            ) : null}
             {text.value ? (
-              <button
-                type="button"
-                class="pptx-review__text-button"
-                onClick={() => (text.value = '')}
-              >
+              <button type="button" class="pptx-review__text-button" onClick={() => change('')}>
                 {t('comments.cancel')}
               </button>
             ) : null}
@@ -321,6 +343,10 @@ export const ReviewEditBox = defineComponent({
     // the same comment by a peer keeps the box and its text.
     const opened = props.item.identity;
     const moved = (): boolean => props.item.identity !== opened;
+    // The comment as it showed when the box opened: the editor refuses the save when the comment
+    // under its id is no longer that one, and the box keeps the text with a notice.
+    const seen = seenOf(props.item);
+    const refused = ref(false);
     watch(moved, (gone) => {
       if (gone) setEditing(null);
     });
@@ -329,7 +355,9 @@ export const ReviewEditBox = defineComponent({
       focusCard(props.item.parentId ?? props.item.key);
     };
     const save = (): void => {
-      if (!moved() && text.value.trim() !== '' && review.edit(props.item, text.value)) close();
+      if (moved() || text.value.trim() === '') return;
+      if (review.edit(shownAs(props.item, seen), text.value)) close();
+      else refused.value = true;
     };
     return () => (
       <form
@@ -350,6 +378,11 @@ export const ReviewEditBox = defineComponent({
           onCancel={close}
         />
         {keyHint(`${id}-hint`, t)}
+        {refused.value ? (
+          <span class="pptx-review__refused" role="status">
+            {t('comments.changed')}
+          </span>
+        ) : null}
         <div class="pptx-review__compose-actions">
           <button type="button" class="pptx-review__text-button" onClick={close}>
             {t('comments.cancel')}

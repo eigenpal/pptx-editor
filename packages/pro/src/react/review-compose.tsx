@@ -17,6 +17,9 @@ import {
   authorHooks,
   authorStyle,
   commentFieldKey,
+  seenOf,
+  shownAs,
+  type CommentSeen,
   type ReviewItemView,
 } from '../review/comment-view.ts';
 import { commentInitials } from '@pptx-editor.dev/core/editor';
@@ -217,17 +220,33 @@ export function ReviewReply({ className, hidden, children }: ReviewPartProps) {
   // or a resolve of the thread keeps the reply.
   const who = entry?.identity ?? '';
   const [openedFor, setOpenedFor] = useState(who);
+  // The thread as it showed when the draft began: the editor refuses the reply when the comment
+  // under its id is no longer that one, and the draft stays with a notice.
+  const [seen, setSeen] = useState<CommentSeen | null>(null);
+  const [refused, setRefused] = useState(false);
   if (who !== openedFor) {
     setOpenedFor(who);
     setText('');
+    setSeen(null);
+    setRefused(false);
   }
   if (hidden || !entry || !entry.isActive || entry.resolved || review.readOnly) return null;
   if (children) return <>{children}</>;
   const author = review.author ?? '';
   const name = entry.author || t('comments.unknownAuthor');
   const empty = text.trim() === '';
+  const change = (value: string): void => {
+    if (!value) setSeen(null);
+    else if (!seen) setSeen(seenOf(entry));
+    setText(value);
+  };
   const post = (): void => {
-    if (!empty && review.reply(entry, text)) setText('');
+    if (empty) return;
+    if (review.reply(seen ? shownAs(entry, seen) : entry, text)) {
+      setText('');
+      setSeen(null);
+      setRefused(false);
+    } else setRefused(true);
   };
   return (
     <form
@@ -253,16 +272,21 @@ export function ReviewReply({ className, hidden, children }: ReviewPartProps) {
         label={t('comments.replyTo', { author: name })}
         placeholder={t('comments.replyText')}
         describedBy={review.author === null ? `${id}-blocked` : `${id}-hint`}
-        onChange={setText}
+        onChange={change}
         onPost={post}
         onCancel={() => {
-          if (text) setText('');
+          if (text) change('');
           else review.setActive(null);
         }}
       />
       <KeyHint id={`${id}-hint`} />
+      {refused ? (
+        <span className="pptx-review__refused" role="status">
+          {t('comments.changed')}
+        </span>
+      ) : null}
       {text ? (
-        <button type="button" className="pptx-review__text-button" onClick={() => setText('')}>
+        <button type="button" className="pptx-review__text-button" onClick={() => change('')}>
           {t('comments.cancel')}
         </button>
       ) : null}
@@ -295,6 +319,10 @@ export function ReviewEditBox({ item }: { readonly item: ReviewItemView }) {
   // same comment by a peer keeps the box and its text.
   const opened = useRef(item.identity);
   const moved = item.identity !== opened.current;
+  // The comment as it showed when the box opened: the editor refuses the save when the comment
+  // under its id is no longer that one, and the box keeps the text with a notice.
+  const seen = useRef(seenOf(item));
+  const [refused, setRefused] = useState(false);
   useEffect(() => {
     if (moved) setEditing(null);
   }, [moved, setEditing]);
@@ -303,7 +331,9 @@ export function ReviewEditBox({ item }: { readonly item: ReviewItemView }) {
     focusCard(item.parentId ?? item.key);
   };
   const save = (): void => {
-    if (!moved && text.trim() !== '' && review.edit(item, text)) close();
+    if (moved || text.trim() === '') return;
+    if (review.edit(shownAs(item, seen.current), text)) close();
+    else setRefused(true);
   };
   return (
     <form
@@ -324,6 +354,11 @@ export function ReviewEditBox({ item }: { readonly item: ReviewItemView }) {
         onCancel={close}
       />
       <KeyHint id={`${id}-hint`} />
+      {refused ? (
+        <span className="pptx-review__refused" role="status">
+          {t('comments.changed')}
+        </span>
+      ) : null}
       <div className="pptx-review__compose-actions">
         <button type="button" className="pptx-review__text-button" onClick={close}>
           {t('comments.cancel')}

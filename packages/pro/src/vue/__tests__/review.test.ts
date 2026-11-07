@@ -222,6 +222,23 @@ describe('PptxEditorReview (Vue)', () => {
     expect(field('Reply to Ada Lovelace')!.value).toBe('For B');
   });
 
+  test('a save on a twin that a peer changed is refused: the box keeps the text and says so', async () => {
+    const editor = await mount([reviewModule()]);
+    expect((await editor.load(await repeatedThreadDeck())).ok).toBe(true);
+    await settle();
+    const [a] = editor.snapshot().comments!;
+    await click(button('Edit comment by Ada Lovelace'));
+    await type(field('Edit comment')!, 'Mine');
+    editor.exec({ type: 'editComment', commentId: a!.id, text: 'Peer' });
+    await settle();
+    await key(field('Edit comment')!, { key: 'Enter' });
+    expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['Peer', 'B', 'C']);
+    expect(field('Edit comment')!.value).toBe('Mine');
+    expect(document.querySelector('.pptx-review__refused[role="status"]')!.textContent).toBe(
+      'This comment changed. Copy your text to keep it.'
+    );
+  });
+
   test('when one of three copies goes, an edit of a copy closes and saves nothing', async () => {
     const editor = await mount([reviewModule()]);
     expect((await editor.load(await repeatedThreadDeck('same'))).ok).toBe(true);

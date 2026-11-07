@@ -66,6 +66,7 @@ export interface ReviewActionProps extends ReviewPartProps {
 // @public
 export interface ReviewActivationOptions {
     readonly announce?: boolean;
+    readonly identity?: string;
 }
 
 // @public
