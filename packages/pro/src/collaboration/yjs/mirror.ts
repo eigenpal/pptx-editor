@@ -73,6 +73,7 @@ import {
   type TextWrite,
 } from './text-identity.ts';
 import {
+  newParagraphRescue,
   type ParagraphRescue,
   roomListings,
   withoutEmptiedRescues,
@@ -818,7 +819,7 @@ export class PackageMirror {
       const readPart = (strandedBefore: ReadonlySet<string> = new Set()) => {
         cameBack = new Set();
         stranded = new Set();
-        this.#rescue = { rescued: new Set(), stranded: strandedBefore, listings };
+        this.#rescue = newParagraphRescue(strandedBefore, listings);
         const read = this.#readElement(entry.root, name, new Set(), 0, views);
         return read && rescueMoved(this.#room, name, read, readRecord, cameBack, stranded);
       };

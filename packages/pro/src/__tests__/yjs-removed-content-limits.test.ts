@@ -13,7 +13,11 @@ import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
 import { buildPptx, para, run, shape } from '../../../../scripts/fixtures/builder.ts';
 import { F, roomOf, type Room } from '../collaboration/yjs/schema.ts';
 import { IDENTITY } from '../collaboration/yjs/text-identity.ts';
-import { withRemovedRuns } from '../collaboration/yjs/removed-content.ts';
+import {
+  newParagraphRescue,
+  roomListings,
+  withRemovedRuns,
+} from '../collaboration/yjs/removed-content.ts';
 import { openFuzzPeers } from './fuzz-support.ts';
 import { IN, converged, selectIn } from './lineage-support.ts';
 
@@ -157,5 +161,71 @@ describe('a hostile room', () => {
     const forward = build(false);
     expect(forward.length).toBeGreaterThan(0);
     expect(build(true)).toEqual(forward);
+  });
+
+  test('many parents that name one removed paragraph with many fields share one read', () => {
+    const doc = new Y.Doc();
+    const room = roomOf(doc);
+    const bodies: Y.Map<unknown>[] = [];
+    doc.transact(() => {
+      const p = record(room, 'P', 'p');
+      for (let i = 0; i < 200_000; i += 1) p.set(`j${i}`, 0);
+      p.set('rw.7', []);
+      for (let i = 0; i < 2_000; i += 1) {
+        const body = record(room, `b${i}`, 'txBody');
+        body.set(`${IDENTITY.removedRun}P`, '');
+        bodies.push(body);
+      }
+    });
+    // One pass of a part read: every parent shares its budget and what it read of each record.
+    const rescue = newParagraphRescue(new Set(), roomListings(room)(PART));
+    const started = performance.now();
+    for (const body of bodies) withRemovedRuns(room, PART, body, [], () => null, rescue);
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
+});
+
+describe('a part with many removed paragraphs', () => {
+  test('2,500 removed paragraphs of 10 emptied runs each keep the typed paragraph', () => {
+    const doc = new Y.Doc();
+    const room = roomOf(doc);
+    let body!: Y.Map<unknown>;
+    const runsOf = new Map<string, string[]>();
+    doc.transact(() => {
+      body = record(room, 'body', 'txBody');
+      for (let i = 0; i <= 2_500; i += 1) {
+        // The paragraph a peer typed into sorts last.
+        const k = i === 2_500 ? 'zzz' : `p${String(i).padStart(6, '0')}`;
+        const runs = Array.from({ length: 10 }, (_, j) => `${k}r${j}`);
+        for (const [j, r] of runs.entries()) {
+          record(room, `${r}x`, 'x', [], k === 'zzz' && j === 0 ? 'typed' : '');
+          record(room, `${r}t`, 't', [`${r}x`]);
+          record(room, r, 'r', [`${r}t`]);
+        }
+        runsOf.set(k, runs);
+        record(room, k, 'p', runs).set('rw.7', []);
+        body.set(`${IDENTITY.removedRun}${k}`, '');
+      }
+    });
+    const read = (key: string) => ({
+      key,
+      ns: NS_A,
+      local: 'p',
+      children: runsOf.get(key)!.map((r, j) => ({
+        key: r,
+        ns: NS_A,
+        local: 'r',
+        children: [
+          {
+            key: `${r}t`,
+            ns: NS_A,
+            local: 't',
+            children: [{ key: `${r}x`, text: key === 'zzz' && j === 0 ? 'typed' : '' }],
+          },
+        ],
+      })),
+    });
+    const out = withRemovedRuns(room, PART, body, [], read);
+    expect(out.map((s) => s.key)).toEqual(['zzz']);
   });
 });

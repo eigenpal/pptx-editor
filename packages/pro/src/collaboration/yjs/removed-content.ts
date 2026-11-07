@@ -23,14 +23,16 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 //
 // Every replica must put back the same nodes. A read never stops a walk over the fields of a
 // `Y.Map` part way: their order differs between replicas. It sorts what it found and then
-// applies its limits, and it takes one step budget per parent (`MAX_READ_STEPS`).
+// applies its limits. One read of a part takes one step budget (`MAX_READ_STEPS`) in one order
+// on every replica: each record a read names costs a step for each of its fields, read once per
+// pass (`fieldsOf`), and each record it looks at costs a step.
 //
 // Everything read here is untrusted: a wrong value is ignored, and every walk is bounded.
 
 import * as Y from 'yjs';
 import type { ReplicaElementSpec, ReplicaTextSpec } from '@pptx-editor.dev/core/store';
 import { F, type Room } from './schema.ts';
-import { isRemovalField, isRemoved, LINEAGE, MAX_REMOVERS, MAX_SNAPSHOT } from './text-lineage.ts';
+import { isRemovalField, LINEAGE, MAX_REMOVERS, MAX_SNAPSHOT } from './text-lineage.ts';
 import { IDENTITY } from './text-identity.ts';
 
 /** The children of a removed node, and of its `a:t`, that a look for its text reads. */
@@ -38,24 +40,78 @@ const MAX_RUN_CHILDREN = 1_024;
 /** The removed runs or paragraphs that one read puts back, and that one look reads. */
 const MAX_REMOVED_RUNS = 1_024;
 /**
- * The steps that one read of a parent's removed runs or paragraphs takes (`withRemovedRuns`).
- * Each step looks at one record or one key; a read that runs out puts back no more. Every
- * replica takes the same steps in the same order, so every replica puts back the same nodes.
+ * The steps that one read of a part takes to put back removed runs and paragraphs
+ * (`withRemovedRuns`). Each step looks at one record, one field, or one key; a read that runs
+ * out puts back no more. Every replica takes the same steps in the same order, so every replica
+ * puts back the same nodes.
  */
-const MAX_READ_STEPS = 1 << 16;
+const MAX_READ_STEPS = 1 << 20;
 
 const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 
 type Spec = ReplicaElementSpec | ReplicaTextSpec;
 
-/** The step budget and the memos of one read (`MAX_READ_STEPS`). */
-interface Walk {
-  left: number;
-  readonly runs: Map<string, boolean>;
-  readonly seen: Map<string, ReadonlySet<string>>;
+/** What the fields of one record say, read once per pass (`fieldsOf`). */
+interface Fields {
+  /** A removal took the record: it has a removal snapshot of any writer. */
+  readonly removed: boolean;
+  /** Each node a write removed from the record (`rr.<key>`), with the sibling before it. */
+  readonly places: ReadonlyMap<string, string>;
+  /** The keys of `places`, sorted, the first `MAX_REMOVED_RUNS`. */
+  readonly removedRuns: readonly string[];
+  /** The removal snapshot fields (`rw.<client>`), sorted, the first `MAX_REMOVERS`. */
+  readonly removals: readonly string[];
 }
 
-const newWalk = (): Walk => ({ left: MAX_READ_STEPS, runs: new Map(), seen: new Map() });
+/** The step budget and the memos of one read of a part (`MAX_READ_STEPS`). */
+interface Walk {
+  left: number;
+  readonly fields: WeakMap<Y.Map<unknown>, Fields>;
+  readonly runs: Map<string, boolean>;
+  readonly paragraphs: Map<string, boolean>;
+  readonly seen: Map<string, ReadonlySet<string>>;
+  /** Each node put back, with the parent it shows in: it comes back in one parent only. */
+  readonly placed: Map<string, string>;
+}
+
+const newWalk = (): Walk => ({
+  left: MAX_READ_STEPS,
+  fields: new WeakMap(),
+  runs: new Map(),
+  paragraphs: new Map(),
+  seen: new Map(),
+  placed: new Map(),
+});
+
+/**
+ * What the fields of a record say, read once per pass. A record a read names (`charge`) costs
+ * a step for each of its fields; the read of a parent itself reads its own fields anyway.
+ */
+function fieldsOf(rec: Y.Map<unknown>, walk: Walk, charge: boolean): Fields {
+  const known = walk.fields.get(rec);
+  if (known) return known;
+  let removed = false;
+  let count = 0;
+  const places = new Map<string, string>();
+  const removals: string[] = [];
+  for (const [field, value] of rec.entries()) {
+    count += 1;
+    if (isRemovalField(field)) {
+      removed = true;
+      removals.push(field);
+    } else if (field.startsWith(IDENTITY.removedRun) && typeof value === 'string')
+      places.set(field.slice(IDENTITY.removedRun.length), value);
+  }
+  if (charge) step(walk, count);
+  const fields: Fields = {
+    removed,
+    places,
+    removedRuns: [...places.keys()].sort().slice(0, MAX_REMOVED_RUNS),
+    removals: removals.sort().slice(0, MAX_REMOVERS),
+  };
+  walk.fields.set(rec, fields);
+  return fields;
+}
 
 /** Takes `n` steps; false once the read ran out. */
 const step = (walk: Walk, n = 1): boolean => (walk.left -= n) >= 0;
@@ -68,13 +124,6 @@ function childKeys(rec: Y.Map<unknown>): string[] {
   for (const k of list.slice(0, MAX_RUN_CHILDREN) as unknown[])
     if (typeof k === 'string') out.add(k);
   return [...out];
-}
-
-/** The fields of a record that pass `pick`, in one order on every replica. */
-function sortedFields(rec: Y.Map<unknown>, pick: (field: string) => boolean): string[] {
-  const out: string[] = [];
-  for (const field of rec.keys()) if (pick(field)) out.push(field);
-  return out.sort();
 }
 
 /** Whether a run record holds a character in its `a:t` text. */
@@ -107,13 +156,6 @@ const specHoldsText = (run: ReplicaElementSpec): boolean =>
       (t.children ?? []).some((x) => 'text' in x && x.text.length > 0)
   );
 
-/** The keys of the runs that a write removed from a record (`rr.<key>`), sorted, capped. */
-function removedRunsOf(rec: Y.Map<unknown>): string[] {
-  return sortedFields(rec, (f) => f.startsWith(IDENTITY.removedRun))
-    .slice(0, MAX_REMOVED_RUNS)
-    .map((f) => f.slice(IDENTITY.removedRun.length));
-}
-
 /**
  * What the writes that removed a paragraph saw: its removal snapshots (`rw.<client>`,
  * `text-lineage.ts`), the first `MAX_REMOVERS` by writer of `MAX_SNAPSHOT` keys each (a longer
@@ -124,12 +166,13 @@ function removalSeen(key: string, rec: Y.Map<unknown>, walk: Walk): ReadonlySet<
   const known = walk.seen.get(key);
   if (known) return known;
   const out = new Set<string>();
-  for (const field of sortedFields(rec, isRemovalField).slice(0, MAX_REMOVERS)) {
+  const fields = fieldsOf(rec, walk, true);
+  for (const field of fields.removals) {
     const value: unknown = rec.get(field);
     if (!Array.isArray(value) || value.length > MAX_SNAPSHOT || !step(walk, value.length)) continue;
     for (const k of value as unknown[]) if (typeof k === 'string') out.add(k);
   }
-  for (const k of removedRunsOf(rec)) out.add(k);
+  for (const k of fields.removedRuns) out.add(k);
   walk.seen.set(key, out);
   return out;
 }
@@ -175,7 +218,15 @@ export interface ParagraphRescue {
   readonly stranded: ReadonlySet<string>;
   /** The part's listings (`roomListings`), shared by the reads of one pass. */
   readonly listings: Listings;
+  /** The step budget and the memos of the pass (`newParagraphRescue`). */
+  readonly walk: Walk;
 }
+
+/** The state of one read pass of a part: give each pass a new one. */
+export const newParagraphRescue = (
+  stranded: ReadonlySet<string>,
+  listings: Listings
+): ParagraphRescue => ({ rescued: new Set(), stranded, listings, walk: newWalk() });
 
 /** One paragraph's view of a `ParagraphRescue`, with the read's step budget. */
 interface Rescue {
@@ -250,21 +301,35 @@ function paragraphSpecHoldsText(
  * removed from it while a peer typed into it (that run comes back with it).
  */
 function paragraphHoldsText(room: Room, key: string, rec: Y.Map<unknown>, rescue: Rescue) {
+  const known = rescue.walk.paragraphs.get(key);
+  if (known !== undefined) return known;
   const self: unknown = rec.get(F.key);
-  const removed = new Set(removedRunsOf(rec));
+  const removed = new Set(fieldsOf(rec, rescue.walk, true).removedRuns);
   const seen = () => removalSeen(key, rec, rescue.walk);
-  for (const k of new Set([...childKeys(rec), ...removed])) {
+  const holds = [...new Set([...childKeys(rec), ...removed])].some((k) => {
     if (!step(rescue.walk)) return false;
     const c = room.nodes.get(k);
-    if (!(c instanceof Y.Map)) continue;
+    if (!(c instanceof Y.Map)) return false;
     const kind = peerChild(c as Y.Map<unknown>, k, self, seen, rescue);
     if (kind === 'br') return true;
     // A removed run counts as `withRemovedRuns` puts it back: not one a peer moved away.
-    const away = removed.has(k) && !isRemoved(c as Y.Map<unknown>);
-    if (kind === 'run' && !away && runHoldsText(room, k, c as Y.Map<unknown>, rescue.walk))
-      return true;
+    const away = removed.has(k) && !fieldsOf(c as Y.Map<unknown>, rescue.walk, true).removed;
+    return kind === 'run' && !away && runHoldsText(room, k, c as Y.Map<unknown>, rescue.walk);
+  });
+  rescue.walk.paragraphs.set(key, holds);
+  return holds;
+}
+
+/** The nodes of a spec, counted up to `limit`. */
+function sizeOf(spec: ReplicaElementSpec, limit: number): number {
+  let n = 0;
+  const stack: Spec[] = [spec];
+  while (stack.length > 0 && n < limit) {
+    const s = stack.pop()!;
+    n += 1;
+    if (!('text' in s)) for (const c of s.children ?? []) stack.push(c);
   }
-  return false;
+  return n;
 }
 
 /**
@@ -282,18 +347,10 @@ export function withRemovedRuns(
   paragraph: Y.Map<unknown>,
   children: readonly Spec[],
   read: (key: string) => ReplicaElementSpec | null,
-  rescue: ParagraphRescue = {
-    rescued: new Set(),
-    stranded: new Set(),
-    listings: roomListings(room)(partName),
-  }
+  rescue: ParagraphRescue = newParagraphRescue(new Set(), roomListings(room)(partName))
 ): readonly Spec[] {
-  const places = new Map<string, string>();
-  for (const field of paragraph.keys()) {
-    if (!field.startsWith(IDENTITY.removedRun)) continue;
-    const prev: unknown = paragraph.get(field);
-    if (typeof prev === 'string') places.set(field.slice(IDENTITY.removedRun.length), prev);
-  }
+  const walk = rescue.walk;
+  const places = fieldsOf(paragraph, walk, false).places;
   if (places.size === 0) return children;
   const shown = new Set(children.map((c) => c.key));
   const self: unknown = paragraph.get(F.key);
@@ -303,31 +360,42 @@ export function withRemovedRuns(
   const kind = body ? 'p' : 'r';
   const lead = body ? ['bodyPr', 'lstStyle'] : ['pPr'];
   const back = new Map<string, ReplicaElementSpec>();
-  const walk = newWalk();
+  // Each read of a node costs a step for each of its nodes.
+  const readOnce = (key: string): ReplicaElementSpec | null => {
+    const spec = read(key);
+    return spec && step(walk, sizeOf(spec, MAX_READ_STEPS)) ? spec : null;
+  };
+  const putBack = (key: string, spec: ReplicaElementSpec) => {
+    back.set(key, spec);
+    walk.placed.set(key, String(self));
+  };
   for (const key of [...places.keys()].sort()) {
     if (back.size >= MAX_REMOVED_RUNS || !step(walk)) break;
-    if (shown.has(key)) continue;
+    // A node comes back in one parent only, the first that the read reaches.
+    const placedIn = walk.placed.get(key);
+    if (shown.has(key) || (placedIn !== undefined && placedIn !== String(self))) continue;
     const rec = room.nodes.get(key);
     if (!(rec instanceof Y.Map) || rec.get(F.part) !== partName) continue;
     const shell = rec.get(F.shell) as { ns?: unknown; local?: unknown } | undefined;
     if (shell?.ns !== NS_A || shell.local !== kind) continue;
     // A run a peer moved out of this paragraph shows where it went.
-    if (!isRemoved(rec as Y.Map<unknown>) || movedAway(rec, key, self, rescue.listings)) continue;
+    if (!fieldsOf(rec as Y.Map<unknown>, walk, true).removed) continue;
+    if (movedAway(rec, key, self, rescue.listings)) continue;
     if (body) {
       // A paragraph is read only when its records hold a peer's text, and the read decides.
       const one = { stranded: rescue.stranded.has(key), listings: rescue.listings, walk };
       if (!paragraphHoldsText(room, key, rec as Y.Map<unknown>, one)) continue;
-      const spec = read(key);
+      const spec = readOnce(key);
       if (!spec || !paragraphSpecHoldsText(room, spec, rec as Y.Map<unknown>, one)) continue;
-      back.set(key, spec);
+      putBack(key, spec);
       rescue.rescued.add(key);
       continue;
     }
     // The lists of a run can lack the text when an undo took them; the read shows what a peer
     // typed there again (`undo-unlisted.ts`), so the read run decides.
     const listed = runHoldsText(room, key, rec as Y.Map<unknown>, walk);
-    const spec = read(key);
-    if (spec && (listed || specHoldsText(spec))) back.set(key, spec);
+    const spec = readOnce(key);
+    if (spec && (listed || specHoldsText(spec))) putBack(key, spec);
   }
   if (back.size === 0) return children;
   // Each run goes after the sibling it followed; a sibling that is gone too passes it on.
@@ -383,14 +451,12 @@ export function withoutEmptiedRescues(
   rescue: ParagraphRescue
 ): ReplicaElementSpec {
   if (rescue.rescued.size === 0) return spec;
+  // A budget of its own: the read may have spent the pass's budget.
+  const budget = newWalk();
   const keep = (c: Spec): boolean => {
     if ('text' in c || !rescue.rescued.has(c.key)) return true;
     const rec = room.nodes.get(c.key);
-    const one = {
-      stranded: rescue.stranded.has(c.key),
-      listings: rescue.listings,
-      walk: newWalk(),
-    };
+    const one = { stranded: rescue.stranded.has(c.key), listings: rescue.listings, walk: budget };
     return rec instanceof Y.Map && paragraphSpecHoldsText(room, c, rec as Y.Map<unknown>, one);
   };
   const walk = (s: ReplicaElementSpec): ReplicaElementSpec => {

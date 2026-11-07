@@ -267,6 +267,9 @@ export function createYjsCollaborationSession(
     // What the step must not take from a peer or put back twice (`undo-unlisted.ts`,
     // `undo-splits.ts`), set on the step before Yjs applies it.
     if (undo) {
+      // Yjs can skip the top step and apply an older one in the same call: no step that it
+      // can apply puts back the old entry of a run that a peer moved on (`undo-followed.ts`).
+      for (const item of stack.slice(0, -1)) checkFollowed(item);
       noteUndoneListings(
         room,
         top,
@@ -584,6 +587,15 @@ export function createYjsCollaborationSession(
         Y.YEvent<Y.Map<unknown>>
       >;
       const onTransaction = (transaction: Y.Transaction): void => {
+        // A room format that arrives after attach (a late provider sync, a peer that seeded
+        // the room at the same time) refuses the room as attach does: this replica stops
+        // applying the room and keeps its own presentation.
+        const schema = room.meta.get('schema');
+        if (schema !== SCHEMA_VERSION && transaction.changed.has(room.meta as never)) {
+          detach();
+          setStatus('error', 'schema-version-mismatch', `room schema ${String(schema)}`);
+          return;
+        }
         const origin: unknown = transaction.origin;
         // This replica's own undone listings change nothing until its undo, which rebuilds.
         if (
