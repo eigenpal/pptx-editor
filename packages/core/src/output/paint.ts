@@ -14,9 +14,6 @@ import {
   ARROW_MITER_LIMIT,
   drawingRenderers,
   hasCharacters,
-  isOpenPath,
-  lineEndReach,
-  multiply as multiplyMatrix,
   outsideDashArray,
   planStroke,
   strokeWidth,
@@ -35,7 +32,8 @@ import {
   type EffectSource,
 } from './paint-effects.ts';
 import { threeDColor } from './painter-math.ts';
-import { boundsOf, cornersUnder, grow, PX } from './effect-transforms.ts';
+import { boundsOf, PX } from './effect-transforms.ts';
+import { boxCorners, contentCorners } from './item-corners.ts';
 import {
   fillPaint,
   pictureImage,
@@ -734,64 +732,6 @@ function paintItem(
 /** The outline width that closes the antialiased seams between 3-D polygons: half a pixel. */
 const SEAM = PX / 2;
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
-
-/**
- * How far the outline can paint past the shape's geometry, in slide space: a picture's outline
- * lies outside it, a shape's is centered, a miter join reaches up to half the miter limit times
- * the width, and line ends reach further. Effect filter regions grow by this, so they never cut
- * the outline off.
- */
-function outlineReach(item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>): number {
-  const line = item.element.line;
-  if (!line || line.fill.type === 'none') return 0;
-  const width = Math.max(line.width, PX);
-  const join = line.join === 'miter' ? Math.max(2, line.miterLimit / 2) : 2;
-  const ends =
-    item.kind === 'shape' && item.geometry.paths.some((p) => p.stroke && isOpenPath(p.commands));
-  return Math.max(width * join, ends ? lineEndReach(line) : 0);
-}
-
-/**
- * The slide-space corners of a shape's box and geometry, with its outline. Geometry can reach
- * past the box (a callout tail, `a:custGeom`); a Bezier curve lies inside its control points.
- */
-function boxCorners(
-  item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>
-): { x: number; y: number }[] {
-  const { cx, cy } = item.element.xfrm;
-  const m = item.matrix;
-  const points = cornersUnder(m, cx, cy);
-  for (const path of item.geometry.paths)
-    for (const c of path.commands) {
-      if (c.op === 'Z') continue;
-      if (c.op === 'C') points.push(applyMatrix(m, c.x1, c.y1), applyMatrix(m, c.x2, c.y2));
-      else if (c.op === 'Q') points.push(applyMatrix(m, c.x1, c.y1));
-      points.push(applyMatrix(m, c.x, c.y));
-    }
-  const b = grow(boundsOf(points), outlineReach(item));
-  return [
-    { x: b.x, y: b.y },
-    { x: b.r, y: b.y },
-    { x: b.r, y: b.b },
-    { x: b.x, y: b.b },
-  ];
-}
-
-/** Slide-space corners of a shape's box, its outline, and its text frame (text can overflow the box). */
-function contentCorners(
-  item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>
-): { x: number; y: number }[] {
-  const out = boxCorners(item);
-  if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text)) {
-    const b = item.text.box;
-    const h = Math.max(b.height, item.text.contentHeight);
-    const frame: Matrix = [1, 0, 0, 1, b.x, b.y];
-    // Rotated text can extend either way: take the box as a square of its larger side.
-    const side = item.text.rotation % 180 !== 0 ? Math.max(b.width, h) : 0;
-    out.push(...cornersUnder(multiplyMatrix(item.textMatrix, frame), side || b.width, side || h));
-  }
-  return out;
-}
 
 /** The painted node of one item and the definitions it added. */
 interface PaintedItem {

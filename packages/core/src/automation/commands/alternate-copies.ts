@@ -240,8 +240,10 @@ export function withoutStaleCopies(base: PptxPackage, ops: readonly PptxOp[]): r
     const done = new Set<string>();
     for (const { copy, branch, wrapper } of list) {
       // Only an edit of the drawn copy makes the others out of date.
-      if (done.has(copy.id) || alternateBranch(wrapper, root) !== branch) continue;
-      done.add(copy.id);
+      // A copy in nested wrappers has one entry for each wrapper around it.
+      const key = `${copy.id} ${wrapper.id}`;
+      if (done.has(key) || alternateBranch(wrapper, root) !== branch) continue;
+      done.add(key);
       const deleted = !exists(copy.id);
       const id = drawingId(copy);
       if (id === undefined) continue;

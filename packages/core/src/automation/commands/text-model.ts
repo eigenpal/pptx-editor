@@ -134,7 +134,7 @@ function slotTable(p: Element, slideNumber?: number): SlotTable {
       out.push({ el, kind: 'break', start: at, end: at + 1, text: '\n', index });
       at += 1;
     } else if (isMathZone(el) && isSupportedMath(el)) {
-      out.push({ el, kind: 'math', start: at, end: at + 1, text: '\uFFFC' });
+      out.push({ el, kind: 'math', start: at, end: at + 1, text: '\uFFFC', index });
       at += 1;
     }
   }

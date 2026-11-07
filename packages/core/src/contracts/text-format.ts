@@ -108,7 +108,7 @@ export type BulletFormatRead =
  */
 export interface BulletFormatMixed {
   /** The list kind of each selected paragraph, each kind once, in selection order. */
-  readonly kinds: readonly ('bullet' | 'number' | 'none')[];
+  readonly kinds: readonly ('bullet' | 'number' | 'picture' | 'none')[];
   /** Percent of the text size, when every bullet and number has the same; otherwise null. */
   readonly sizePercent: number | null;
   /**
