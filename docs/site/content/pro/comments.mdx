@@ -217,7 +217,7 @@ export function askForReview(editor: PptxEditorInstance) {
 
 ## Read the threads
 
-`editor.snapshot().comments` lists the threads of the current slide. It is `null` without the review module. `activeComment` is the id of the selected thread. Each thread has `id`, `format` (`modern` or `legacy`), `author`, `initials`, `date`, `text`, `textEditable`, `resolved`, `anchor`, and `replies`. `textEditable` is `false` for a comment whose content `editComment` cannot write back, such as a mention.
+`editor.snapshot().comments` lists the threads of the current slide. It is `null` without the review module. `activeComment` is the id of the selected thread. Each thread has `id`, `identity`, `format` (`modern` or `legacy`), `author`, `initials`, `date`, `text`, `textEditable`, `resolved`, `anchor`, and `replies`. `textEditable` is `false` for a comment whose content `editComment` cannot write back, such as a mention. Pass `id` to the comment commands. Key your own UI state, such as an open reply field, by `identity`: a delete of another comment can change `id` when a file repeats a GUID, but it does not change `identity`.
 
 To read the threads of any slide, call `readCommentThreads` with a package and a slide part name:
 
