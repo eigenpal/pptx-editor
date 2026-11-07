@@ -670,12 +670,13 @@ export const pptxFeatures: PptxFeature[] = [
     id: 'objects.diagrams',
     name: 'Diagrams',
     category: 'objects',
-    editing: 'none',
+    editing: 'partial',
     rendering: 'partial',
     notes:
-      'A diagram draws from its saved drawing. A diagram with no saved drawing shows a placeholder. Diagrams are read-only.',
-    roundTrip: 'preserved',
+      'A diagram draws from its saved drawing. A diagram with no saved drawing shows a placeholder. You can type in a diagram shape. The edit writes the shape and its node in the data model. The addDiagramShape and deleteDiagramShape commands add and delete nodes. They work when the drawing is one line of shapes, with up to one level of children. After such an edit, the editor spaces the shapes evenly on the line. Text formatting, diagram colors, diagram styles, and layout changes are not editable. A shape that shows the text of more than one node is read-only.',
+    roundTrip: 'full',
     tier: 'community',
+    docsLink: '/docs/guides/diagrams',
   },
   {
     id: 'objects.media-ole',

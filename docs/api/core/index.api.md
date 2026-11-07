@@ -400,13 +400,13 @@ export type CanResult = {
 export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly ChromeMenuEntry[]>>;
 
 // @public
-export type CanvasMenuKind = 'shapes' | 'picture' | 'chart' | 'text' | 'table' | 'tableFrame' | 'slide';
+export type CanvasMenuKind = 'shapes' | 'picture' | 'chart' | 'diagram' | 'text' | 'table' | 'tableFrame' | 'slide';
 
 // @internal
-export function canvasMenuKind(snapshot: Pick<EditorSnapshot, 'selection' | 'image'> & Partial<Pick<EditorSnapshot, 'table' | 'chart'>>): CanvasMenuKind;
+export function canvasMenuKind(snapshot: Pick<EditorSnapshot, 'selection' | 'image'> & Partial<Pick<EditorSnapshot, 'table' | 'chart' | 'diagram'>>): CanvasMenuKind;
 
 // @internal
-export function canvasMenuLabelKey(kind: CanvasMenuKind): 'contextMenu.textLabel' | 'contextMenu.tableLabel' | 'contextMenu.shapeLabel' | 'contextMenu.pictureLabel' | 'contextMenu.chartLabel' | 'contextMenu.canvasLabel';
+export function canvasMenuLabelKey(kind: CanvasMenuKind): 'contextMenu.textLabel' | 'contextMenu.tableLabel' | 'contextMenu.shapeLabel' | 'contextMenu.pictureLabel' | 'contextMenu.chartLabel' | 'contextMenu.diagramLabel' | 'contextMenu.canvasLabel';
 
 // @internal
 export function canvasMenuPoint(owner: Element, at: {
@@ -659,7 +659,7 @@ export interface ChromeGroup {
 }
 
 // @public
-export type ChromeGroupId = 'history' | 'font' | 'text' | 'script' | 'paragraph' | 'list' | 'insert' | 'shape' | 'format' | 'arrange' | 'more' | 'find' | 'view' | 'file' | 'edit' | 'slide' | 'image' | 'section' | 'table' | 'chart';
+export type ChromeGroupId = 'history' | 'font' | 'text' | 'script' | 'paragraph' | 'list' | 'insert' | 'shape' | 'format' | 'arrange' | 'more' | 'find' | 'view' | 'file' | 'edit' | 'slide' | 'image' | 'section' | 'table' | 'chart' | 'diagram';
 
 // @internal
 export function chromeKeepsFocus(target: EventTarget | null): boolean;
@@ -738,7 +738,7 @@ export function chromeOptionChecked(value: unknown, option: string): boolean;
 export function chromeRowState(editor: PptxEditorInstance | null, slot: ChromeSlotId, value?: string, host?: Pick<ChromeActionHost, 'unavailable'>): ChromeCommandState;
 
 // @public
-export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.textEffects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | TableSlotId | ImageSlotId | ChartSlotId;
+export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.textEffects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | TableSlotId | ImageSlotId | ChartSlotId | DiagramSlotId;
 
 // @public
 export function chromeSlotIds(): ChromeSlotId[];
@@ -1158,6 +1158,10 @@ export const CONTEXT_MENU_NAMED_PARTS: {
     readonly ImageChange: MenuNamedRow;
     readonly ImageProperties: MenuNamedRow;
     readonly ChartEditData: MenuNamedRow;
+    readonly DiagramAddAfter: MenuNamedRow;
+    readonly DiagramAddBefore: MenuNamedRow;
+    readonly DiagramAddBelow: MenuNamedRow;
+    readonly DiagramDelete: MenuNamedRow;
     readonly FormatBackground: MenuNamedRow;
     readonly NewSlide: MenuNamedRow;
     readonly InsertRowAbove: MenuNamedRow;
@@ -1366,6 +1370,24 @@ export function deferFonts(origin: FontOrigin): MarkedFontResolver;
 
 // @public
 export function defineFontResolver<T extends FontResolver>(resolve: T): MarkedFontResolver<T>;
+
+// @public
+export type DiagramCommand = {
+    readonly type: 'addDiagramShape';
+    readonly position: DiagramShapePosition;
+    readonly nodeId?: string;
+    readonly node?: string;
+} | {
+    readonly type: 'deleteDiagramShape';
+    readonly nodeId?: string;
+    readonly node?: string;
+};
+
+// @public
+export type DiagramShapePosition = 'after' | 'before' | 'below';
+
+// @public
+export type DiagramSlotId = 'diagram.addAfter' | 'diagram.addBefore' | 'diagram.addBelow' | 'diagram.delete';
 
 // @internal
 export const DIALOG_FIELD_ATTRIBUTE = "data-pptx-field";
@@ -1632,6 +1654,8 @@ export interface Editor {
 export interface EditorCaret {
     // (undocumented)
     readonly cell?: TableCellAddress;
+    // (undocumented)
+    readonly diagramNode?: string;
     // (undocumented)
     readonly nodeId: string;
     // (undocumented)
@@ -2095,7 +2119,7 @@ export type EditorCommand = {
 /** Apply the copied formatting to the selection as one undo step (Ctrl/Cmd+Shift+V). */
 | {
     readonly type: 'pasteFormat';
-} | TextFormatCommand | PictureCommand | ChartCommand | FillCommand | AnimationCommand
+} | TextFormatCommand | PictureCommand | ChartCommand | DiagramCommand | FillCommand | AnimationCommand
 /**
 * Shape Effects: set or remove one effect of the selected shapes, connectors, and pictures.
 * A shape whose effects come from its theme style (`a:effectRef`) gets that style's effects
@@ -2257,6 +2281,7 @@ export type EditorSelection = {
     readonly anchor: TextPoint;
     readonly focus: TextPoint;
     readonly cell?: TableCellAddress;
+    readonly diagramNode?: string;
 } | {
     readonly kind: 'cells';
     readonly nodeId: string;
@@ -2278,6 +2303,7 @@ export interface EditorSnapshot {
     readonly currentSlide: number;
     readonly customShows?: readonly CustomShowSummary[];
     readonly dateTime?: DateTimeState | null;
+    readonly diagram?: SelectedDiagramState | null;
     // (undocumented)
     readonly embeddedFontFaces: number;
     // (undocumented)
@@ -4721,7 +4747,7 @@ export interface ReviewModuleContribution {
 export const RIBBON_TABS: readonly RibbonTab[];
 
 // @public
-export type RibbonContext = 'shape' | 'picture' | 'chart' | 'table';
+export type RibbonContext = 'shape' | 'picture' | 'chart' | 'diagram' | 'table';
 
 // @public
 export function ribbonContextActive(snapshot: RibbonSelection, context: RibbonContext): boolean;
@@ -4740,7 +4766,7 @@ export function ribbonInsertTab<T extends {
 }>(tabs: readonly T[]): string | null;
 
 // @public
-export type RibbonSelection = Pick<EditorSnapshot, 'selection' | 'image' | 'table'> & Partial<Pick<EditorSnapshot, 'chart'>>;
+export type RibbonSelection = Pick<EditorSnapshot, 'selection' | 'image' | 'table'> & Partial<Pick<EditorSnapshot, 'chart' | 'diagram'>>;
 
 // @internal
 export function ribbonShownTab<T extends {
@@ -4764,7 +4790,7 @@ export interface RibbonTab {
 export function ribbonTabGroups(tab: RibbonTab, groups?: readonly ChromeGroup[]): ChromeGroup[];
 
 // @public
-export type RibbonTabId = 'quickAccess' | 'home' | 'insert' | 'design' | 'slideShow' | 'view' | 'shapeFormat' | 'pictureFormat' | 'chartDesign' | 'tableDesign' | 'tableLayout';
+export type RibbonTabId = 'quickAccess' | 'home' | 'insert' | 'design' | 'slideShow' | 'view' | 'shapeFormat' | 'pictureFormat' | 'chartDesign' | 'diagramDesign' | 'tableDesign' | 'tableLayout';
 
 // @public
 export interface RibbonTabLayout {
@@ -4894,6 +4920,14 @@ export interface SelectedChartState {
     readonly editable: boolean;
     readonly nodeId: string;
     readonly reason?: string;
+}
+
+// @public
+export interface SelectedDiagramState {
+    readonly node: string | null;
+    readonly nodeId: string;
+    readonly reason?: string;
+    readonly structure: boolean;
 }
 
 // @public
@@ -6188,6 +6222,10 @@ export const TOOLBAR_NAMED_PARTS: {
     readonly ImageCropFit: "image.cropFit";
     readonly ImageProperties: "image.properties";
     readonly ChartEditData: "chart.editData";
+    readonly DiagramAddAfter: "diagram.addAfter";
+    readonly DiagramAddBefore: "diagram.addBefore";
+    readonly DiagramAddBelow: "diagram.addBelow";
+    readonly DiagramDelete: "diagram.delete";
     readonly TableInsert: "table.insert";
     readonly TableStyle: "table.style";
     readonly TableHeaderRow: "table.headerRow";
@@ -6270,10 +6308,10 @@ export interface ToolbarCommandState {
 export function toolbarCommandState(editor: Editor | null, id: ChromeSlotId): ToolbarCommandState;
 
 // @internal
-export type ToolbarContext = 'none' | 'text' | 'shape' | 'picture' | 'chart' | 'table' | 'tableFrame' | 'notes';
+export type ToolbarContext = 'none' | 'text' | 'shape' | 'picture' | 'chart' | 'diagram' | 'table' | 'tableFrame' | 'notes';
 
 // @internal
-export function toolbarContextOf(snapshot: Pick<EditorSnapshot, 'selection' | 'image' | 'table'> & Partial<Pick<EditorSnapshot, 'chart'>>): ToolbarContext;
+export function toolbarContextOf(snapshot: Pick<EditorSnapshot, 'selection' | 'image' | 'table'> & Partial<Pick<EditorSnapshot, 'chart' | 'diagram'>>): ToolbarContext;
 
 // @internal
 export interface ToolbarDropdownRow {

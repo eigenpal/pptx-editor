@@ -141,7 +141,8 @@
     "altText": "Edit alt text…",
     "paragraph": "Paragraph…",
     "font": "Font…",
-    "chartLabel": "Chart actions"
+    "chartLabel": "Chart actions",
+    "diagramLabel": "Diagram actions"
   },
   "mode": {
     "label": "Mode",
@@ -174,7 +175,8 @@
       "image": "Picture",
       "section": "Section",
       "table": "Table",
-      "chart": "Chart"
+      "chart": "Chart",
+      "diagram": "Diagram"
     },
     "smartGuides": "Smart guides",
     "find": "Find (Ctrl+F)",
@@ -1124,6 +1126,7 @@
     "placeholderTable": "Insert a table here",
     "placeholderPicture": "Insert a picture here",
     "tableCell": "Row {row}, column {column}",
+    "diagramShape": "Diagram shape {index} of {count}",
     "shapeSelected": "{kind} {name}, selected",
     "shapeSelectedWithAltText": "{kind} {name}, {description}, selected",
     "dragCanceled": "Drag canceled",
@@ -1186,6 +1189,15 @@
       "notNumber": "Each value must be a number.",
       "layout": "The cell references of the chart do not form one table, so you can change only names and values.",
       "workbook": "The embedded workbook cannot take this change. Give each series a different name, and keep the cells beside the data empty."
+    },
+    "diagram": {
+      "noDiagram": "Select one diagram.",
+      "noNode": "Put the cursor in a shape of the diagram.",
+      "noText": "This diagram shape shows text from more than one point, so you cannot edit its text here.",
+      "lastShape": "A diagram keeps at least one shape at its top level.",
+      "layoutUnsupported": "The editor cannot lay out this diagram again, so you cannot add or delete its shapes.",
+      "noChildren": "This diagram shows no shapes below its top level.",
+      "tooLarge": "The diagram has more shapes than the editor edits."
     }
   },
   "find": {
@@ -1533,7 +1545,8 @@
       "pictureFormat": "Picture Format",
       "chartDesign": "Chart Design",
       "tableDesign": "Table Design",
-      "tableLayout": "Table Layout"
+      "tableLayout": "Table Layout",
+      "diagramDesign": "Diagram Design"
     }
   },
   "statusBar": {
@@ -1638,5 +1651,11 @@
     "removeCategoryNamed": "Remove category {name}",
     "removeSeriesNamed": "Remove series {name}",
     "removeSeries": "Remove series"
+  },
+  "diagram": {
+    "addAfter": "Add shape after",
+    "addBefore": "Add shape before",
+    "addBelow": "Add shape below",
+    "delete": "Delete shape"
   }
 }

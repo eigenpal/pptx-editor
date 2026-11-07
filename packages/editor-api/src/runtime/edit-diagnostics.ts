@@ -355,6 +355,41 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'The cell references of the chart do not form one table. Change only names and values.',
   ],
   [
+    'errors.diagram.noDiagram',
+    'edit.diagram',
+    'Select one diagram frame, or pass the node id of a diagram on the current slide.',
+  ],
+  [
+    'errors.diagram.noNode',
+    'edit.diagram',
+    'Put the caret in a diagram shape, or pass the model id of a content node as `node`.',
+  ],
+  [
+    'errors.diagram.noText',
+    'edit.diagram-text',
+    'The diagram shape shows the text of more than one node. Edit the text of each node instead.',
+  ],
+  [
+    'errors.diagram.lastShape',
+    'edit.diagram-range',
+    'A diagram keeps at least one top-level node. Add a node before you delete this one.',
+  ],
+  [
+    'errors.diagram.layoutUnsupported',
+    'edit.diagram-unsupported',
+    'Only a diagram whose saved drawing is a line of blocks lays out again. Edit the text of its nodes instead.',
+  ],
+  [
+    'errors.diagram.noChildren',
+    'edit.diagram-unsupported',
+    'The diagram draws no level below this node. Add a node at the same level instead.',
+  ],
+  [
+    'errors.diagram.tooLarge',
+    'edit.diagram-range',
+    'A diagram data model holds up to 4096 points. Delete nodes before you add more.',
+  ],
+  [
     'errors.exportFailed',
     'image.failed',
     'The picture could not be made. Read the shape, then try again.',

@@ -132,6 +132,10 @@ const SLOT_UNION = {
   'table.distributeColumns': true,
   'table.cellMargins': true,
   'chart.editData': true,
+  'diagram.addAfter': true,
+  'diagram.addBefore': true,
+  'diagram.addBelow': true,
+  'diagram.delete': true,
 } as const satisfies Record<ChromeSlotId, true>;
 
 const en = JSON.parse(

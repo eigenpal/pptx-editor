@@ -19,6 +19,13 @@ import { PptxEditor } from '../../packages/editor-api/src/browser.ts';
 import { openPeers } from './collaboration-kit.ts';
 import { bytesText, CHART_DATA_PARTS, editChart, workbookText } from './chart-data-edits.ts';
 import {
+  caretInDiagram,
+  consistent,
+  diagramCommand,
+  DIAGRAM_PARTS,
+  topTexts,
+} from './diagram-edits.ts';
+import {
   added,
   all,
   has,
@@ -592,31 +599,28 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
       );
     },
   },
+  // The diagram's own edits: text typed in a shape, a shape added, and a shape deleted. Each
+  // writes the data model and the saved drawing; `diagram-edits.ts` makes them one at a time.
   'objects.diagrams': {
-    fixture: 'diagrams',
+    fixture: 'diagram-editing',
+    parts: DIAGRAM_PARTS,
     edit: (t) => {
-      t.selectText('Shape 2', 0, 0);
-      t.type('Edited: ');
-      t.run({
-        type: 'setTransform',
-        nodeId: t.node('Diagram 1'),
-        x: 1828800,
-        y: 1371600,
-        cx: 6400800,
-        cy: 4114800,
-        rot: 0,
-      });
+      caretInDiagram(t, 'Build');
+      t.type(' & review');
+      caretInDiagram(t, 'Test');
+      diagramCommand(t, { type: 'addDiagramShape', position: 'after' }, 'Launch');
+      caretInDiagram(t, 'Plan');
+      diagramCommand(t, { type: 'deleteDiagramShape' });
     },
-    check: (d) => {
-      const data = (xml: string) => /<a:graphic>.*<\/a:graphic>/.exec(xml)?.[0];
-      const xml = d.shapeXml(0, 'Diagram 1');
-      return all(
-        has(xml, '<a:off x="1828800" y="1371600"/>'),
-        data(xml) === data(shapeXmlOf(d.original, 0, 'Diagram 1'))
+    check: (d) =>
+      all(
+        topTexts(d, 1).join('|') === 'Build &amp; review|Test|Launch|Ship'
           ? undefined
-          : 'the diagram changed'
-      );
-    },
+          : `the top-level nodes are ${topTexts(d, 1).join('|')}`,
+        has(bytesText(d.pkg, '/ppt/diagrams/drawing1.xml'), 'Build &amp; review', 'Launch'),
+        lacks(bytesText(d.pkg, '/ppt/diagrams/data1.xml'), '<a:t>Plan</a:t>'),
+        consistent(d, 1)
+      ),
   },
   'review.comments': {
     fixture: 'slide-structure',

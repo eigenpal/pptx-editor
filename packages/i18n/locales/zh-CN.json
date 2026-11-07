@@ -141,7 +141,8 @@
     "altText": "编辑替代文字…",
     "paragraph": "段落…",
     "font": "字体…",
-    "chartLabel": "图表操作"
+    "chartLabel": "图表操作",
+    "diagramLabel": "图示操作"
   },
   "mode": {
     "label": "模式",
@@ -174,7 +175,8 @@
       "image": "图片",
       "section": "节",
       "table": "表格",
-      "chart": "图表"
+      "chart": "图表",
+      "diagram": "图示"
     },
     "smartGuides": "智能参考线",
     "find": "查找(Ctrl+F)",
@@ -1124,6 +1126,7 @@
     "placeholderTable": "在此处插入表格",
     "placeholderPicture": "在此处插入图片",
     "tableCell": "第 {row} 行，第 {column} 列",
+    "diagramShape": "图示形状 {index}/{count}",
     "shapeSelected": "已选择 {kind} {name}",
     "shapeSelectedWithAltText": "已选择 {kind} {name}，{description}",
     "dragCanceled": "已取消拖动",
@@ -1186,6 +1189,15 @@
       "notNumber": "每个值都必须是数字。",
       "layout": "此图表的单元格引用不构成一个表格，因此只能更改名称和值。",
       "workbook": "嵌入的工作簿无法接受此更改。请为每个系列指定不同的名称，并保持数据旁边的单元格为空。"
+    },
+    "diagram": {
+      "noDiagram": "请选择一个图示。",
+      "noNode": "请将光标放在图示的形状中。",
+      "noText": "此形状显示多个项目的文本，因此无法在此处编辑其文本。",
+      "lastShape": "图示至少要保留一个顶层形状。",
+      "layoutUnsupported": "编辑器无法重新排列此图示，因此无法添加或删除其形状。",
+      "noChildren": "此图示不显示顶层以下的形状。",
+      "tooLarge": "图示的形状数量超出编辑器可编辑的范围。"
     }
   },
   "find": {
@@ -1533,7 +1545,8 @@
       "pictureFormat": "图片格式",
       "chartDesign": "图表设计",
       "tableDesign": "表设计",
-      "tableLayout": "表布局"
+      "tableLayout": "表布局",
+      "diagramDesign": "图示设计"
     }
   },
   "statusBar": {
@@ -1638,5 +1651,11 @@
     "removeCategoryNamed": "删除类别 {name}",
     "removeSeriesNamed": "删除系列 {name}",
     "removeSeries": "删除系列"
+  },
+  "diagram": {
+    "addAfter": "在后面添加形状",
+    "addBefore": "在前面添加形状",
+    "addBelow": "在下方添加形状",
+    "delete": "删除形状"
   }
 }

@@ -19,6 +19,7 @@ The toolbar shows only the groups that act on the selection:
 | One or more shapes | `history`, `font`, `text`, `paragraph`, `insert`, `shape`, `format`, `arrange`, `more` |
 | Pictures only | `history`, `insert`, `image`, `arrange`, `more` |
 | One chart | `history`, `insert`, `chart`, `arrange`, `more` |
+| One diagram, or the caret in a diagram shape | `history`, `insert`, `diagram`, `arrange`, `more` |
 | Text in a table cell, or a range of cells | `history`, `font`, `text`, `paragraph`, `list`, `insert`, `format`, `table` |
 | A table, selected as an object | `history`, `font`, `text`, `paragraph`, `insert`, `format`, `arrange`, `more`, `table` |
 | The speaker notes field, while it has focus | `history`, `text.bold`, `text.italic`, `text.underline`, and `text.strike` (they format the notes), and `find` |
@@ -27,8 +28,8 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 
 - A `Toolbar.Slot` or named part for a slot of these groups changes that control. It shows while its group shows.
 - A `Toolbar.Slot` for a slot that no context shows, such as a slot marked with an asterisk, goes after the groups and shows for every selection.
-- An application group with `after` follows its anchor. When the selection does not show the anchor, the group follows the nearest shown group before the anchor, in this order: `history`, `font`, `text`, `script`, `paragraph`, `list`, `insert`, `image`, `chart`, `shape`, `format`, `arrange`, `more`, `slide`, `find`, `table`. With `contextual={false}`, it follows the order of that bar: its groups, then `image`, `chart`, and `table`.
-- Set `contextual={false}` to show every group for every selection. The controls that cannot run are disabled with the engine's reason, and the `image`, `chart`, and `table` groups join after the other groups. The bar then has no `slide` group, so a placed `slide.background` or `slide.layout` goes after the groups. The slots marked with an asterisk stay off the bar in both modes.
+- An application group with `after` follows its anchor. When the selection does not show the anchor, the group follows the nearest shown group before the anchor, in this order: `history`, `font`, `text`, `script`, `paragraph`, `list`, `insert`, `image`, `chart`, `diagram`, `shape`, `format`, `arrange`, `more`, `slide`, `find`, `table`. With `contextual={false}`, it follows the order of that bar: its groups, then `image`, `chart`, `diagram`, and `table`.
+- Set `contextual={false}` to show every group for every selection. The controls that cannot run are disabled with the engine's reason, and the `image`, `chart`, `diagram`, and `table` groups join after the other groups. The bar then has no `slide` group, so a placed `slide.background` or `slide.layout` goes after the groups. The slots marked with an asterisk stay off the bar in both modes.
 - A `preset={false}` bar shows the slots you place for every selection.
 
 | Group identifier | Slot identifiers |
@@ -52,6 +53,7 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 | `section` (contextual) | `section.add`, `section.rename`, `section.remove`, `section.removeAll`, `section.collapseAll`, `section.expandAll` |
 | `table` (contextual, shown in a table) | `table.insert`, `table.headerRow`, `table.totalRow`, `table.bandedRows`, `table.firstColumn`, `table.lastColumn`, `table.bandedColumns`, `table.style`, `table.cellFill`, `table.borderTarget`, `table.borderColor`, `table.borderStyle`, `table.borderWidth`, `table.select`, `table.delete`, `table.insertRowAbove`, `table.insertRowBelow`, `table.insertColumnLeft`, `table.insertColumnRight`, `table.mergeCells`, `table.splitCell`, `table.distributeRows`, `table.distributeColumns`, `table.cellMargins` |
 | `chart` (contextual, shown for one chart) | `chart.editData` (opens the **Chart Data** tab of the side panel) |
+| `diagram` (contextual, shown for one diagram) | `diagram.addAfter`, `diagram.addBefore`, `diagram.addBelow`, `diagram.delete` |
 | `image` (contextual) | `image.corrections`, `image.color`, `image.transparency`, `image.change`, `image.reset`, `image.styles`, `image.altText`, `image.crop`, `image.cropToShape`, `image.cropFit`, `image.properties` |
 
 ## Named parts
@@ -168,6 +170,10 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 | `Toolbar.ImageCropFit`           | `image.cropFit`           |
 | `Toolbar.ImageProperties`        | `image.properties`        |
 | `Toolbar.ChartEditData`          | `chart.editData`          |
+| `Toolbar.DiagramAddAfter`        | `diagram.addAfter`        |
+| `Toolbar.DiagramAddBefore`       | `diagram.addBefore`       |
+| `Toolbar.DiagramAddBelow`        | `diagram.addBelow`        |
+| `Toolbar.DiagramDelete`          | `diagram.delete`          |
 
 ### Pickers
 

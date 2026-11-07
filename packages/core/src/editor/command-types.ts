@@ -136,6 +136,9 @@ const COMMAND_TABLE = {
   setAltText: true,
   // Charts
   setChartData: true,
+  // Diagrams
+  addDiagramShape: true,
+  deleteDiagramShape: true,
   // Tables
   insertTable: true,
   insertRow: true,

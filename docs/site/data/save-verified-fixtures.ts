@@ -10,7 +10,8 @@
  * `hyperlinks`, `preserved-content`, and `svg-tab-stops`, 8 copies, no prompt; and again
  * `header-footer`, with its date and footer placeholders, 2 copies, no prompt;
  * `picture-bullets`, 2 copies, no prompt; `text-warp`, 2 copies, no prompt; and
- * `chart-data`, 2 copies, no prompt; and `three-d-effects`, 2 copies, no prompt.
+ * `chart-data`, 2 copies, no prompt; `three-d-effects`, 2 copies, no prompt; and
+ * `diagram-editing`, 2 copies, no prompt.
  */
 export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'alignment-anchor',
@@ -23,6 +24,7 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'charts',
   'colors',
   'custom-geometry',
+  'diagram-editing',
   'diagrams',
   'east-asian-line-breaking',
   'east-asian-theme-fonts',
@@ -78,7 +80,8 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
  * `presenting.animations-transitions`, with its new effects and transition,
  * `lists.bullets-numbering` and `text.hyperlinks`, with picture bullets and custom show and file
  * links, and the new `objects.charts` copy, which edits chart data, no prompt; and the new
- * `effects.3d-and-other` copy, which sets and clears bevels, cameras, and blur, no prompt.
+ * `effects.3d-and-other` copy, which sets and clears bevels, cameras, and blur, and the
+ * `objects.diagrams` copy, which types in, adds, and deletes diagram shapes, no prompt.
  */
 export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'collaboration.automation-api':
@@ -100,7 +103,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'lists.bullets-numbering':
     'sha256:37e710090974cae1ffd0a0fb047f4ee7ffeffd845c72ffd4acd6bdd4b49be27f',
   'objects.charts': 'sha256:82b50397e0ff8613b6198d351393aa7e6953924f39a5064b18e6a909b412e1d8',
-  'objects.diagrams': 'sha256:aeb9619902390e6835fb90efb2d8f3d942add7d2ef02639a7e1bfc133351f751',
+  'objects.diagrams': 'sha256:376fb84db5305fe825baeb1e64f7dc9cd7b0418fce156bda3238cf55498b3e8b',
   'objects.equations': 'sha256:24251ac84a6747362dda9cdf121e956733aaef472fa71667b7fe384ea1efa122',
   'objects.media-ole': 'sha256:1bbe774aba3c5a603055c432f37718cd2acbfbd8e24fa7fe2beff9a04b63d5b2',
   'paragraphs.alignment': 'sha256:c0670263a946c3b5caa6e64dc55753b44a30ad25a0b535766ec3b3d86a813360',
@@ -269,4 +272,25 @@ export const SAVE_VERIFIED_CHART_DATA_EDITS: Readonly<Record<string, string>> = 
     'sha256:2145c94758bf47dbaec941625f3e369d5defb336b6a2a0f4b7145d8bd73bec8e',
   'objects.charts: edit a scatter chart':
     'sha256:249994d1f46f9e9b5220abcd107011c0cd891a25e5eb1935d8ab74a66105ee10',
+};
+
+/**
+ * Diagram edits (`DIAGRAM_EDITS` in `scripts/fidelity/diagram-edits.ts`) whose copy opens with
+ * no repair prompt, with the fingerprint of that copy (`editFingerprint`). `bun
+ * scripts/fidelity/diagram-edits.ts --out <dir>` writes one copy per recipe. The rules of
+ * `SAVE_VERIFIED_FEATURE_EDITS` apply. The presentation application lays each diagram out again
+ * from its data model, and its PDF export of each copy shows the edit. Last checked on 7 November
+ * 2026: all 5 copies, no prompt.
+ */
+export const SAVE_VERIFIED_DIAGRAM_EDITS: Readonly<Record<string, string>> = {
+  'objects.diagrams: edit text':
+    'sha256:d8a4710823dda85160e1f901f237254c32eb69b5386b28be7a8f2fb77a317168',
+  'objects.diagrams: add a shape after':
+    'sha256:0eee1174b5af2ebe8c5e7d6896878aa0be405a37fc45c4a5b0a2df3423f8a02a',
+  'objects.diagrams: add a shape before':
+    'sha256:88ebaa63a57b7d22c58e99a80b16eff98c3971afb723e8281901e9e3f582e592',
+  'objects.diagrams: add a shape below':
+    'sha256:c6de8f98b490ff05f5ab03e1b4f54e24273b28ce507ac6284742b0d693d72183',
+  'objects.diagrams: delete a shape':
+    'sha256:4ef5c76978e775d4a1d8b8e0ca5b7ae0b13d423d415905242e6f1bebc1c66526',
 };
