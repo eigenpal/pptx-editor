@@ -168,7 +168,7 @@ Each part takes `className`, `asChild`, and `hidden`. The root also takes `t`, a
 | Field | Content |
 | --- | --- |
 | `items` | Each thread, then its replies, as `ReviewItemView` values |
-| `activeKey`, `setActive` | The selected thread, and a function that selects one |
+| `activeKey`, `setActive` | The selected thread, and a function that selects one. Pass `{ identity }` to refuse the pick when the thread under the key has another `identity`. |
 | `comment`, `reply`, `edit`, `remove` | Add, reply to, edit, and delete comments |
 | `resolve`, `reopen` | Change the state of a thread |
 | `author`, `setAuthor` | The name that signs new comments |
@@ -213,7 +213,7 @@ export function askForReview(editor: PptxEditorInstance) {
 | `resolveComment` | `commentId` | Marks the thread as resolved |
 | `reopenComment` | `commentId` | Marks the thread as open |
 
-Every command except `addComment` also takes `expect`: the `author`, `date`, and `text` of the comment as your view shows it. The editor then refuses the command with `errors.commentChanged` when the comment at `commentId` is not that comment. It compares the author and the date, and the text only for a comment whose GUID, author, and creation time another comment of the slide shares. So an edit that a collaborator makes to a comment does not refuse yours, unless the comment has such a twin. In this sample, `thread` is a thread of `editor.snapshot().comments`:
+Every command except `addComment` also takes `expect`: the `author`, `date`, and `text` of the comment as your view shows it. The editor then refuses the command with `errors.commentChanged` when the comment at `commentId` is not that comment. It compares the author and the date. A twin shares its GUID, author, and creation time with another comment of the slide, or, in the legacy format, its author and index, and its id holds its place among its twins. For such an id, the editor also compares the text, and it refuses the command when no twin is left. So an edit that a collaborator makes to a comment does not refuse yours, unless the comment has a twin. In this sample, `thread` is a thread of `editor.snapshot().comments`:
 
 ```ts
 const result = editor.exec({
@@ -227,13 +227,13 @@ if (!result.ok && result.reason === 'errors.commentChanged') {
 }
 ```
 
-The comments pane sends `expect` with each action. When the editor refuses a save or a reply, the field keeps its text and shows a notice.
+The comments pane sends `expect` with each action. When the editor refuses a save or a reply, the field keeps its text and shows the reason. After a notice that the comment changed, a second save or reply applies to the comment as it shows now.
 
 `addComment` and `replyToComment` also take `author`, `initials`, and `date`. They override the editor's author for that comment. The date is an ISO 8601 date and time. Without a date, the editor uses the current time in UTC. Each command is one undo step.
 
 ## Read the threads
 
-`editor.snapshot().comments` lists the threads of the current slide. It is `null` without the review module. `activeComment` is the id of the selected thread. Each thread has `id`, `identity`, `format` (`modern` or `legacy`), `author`, `initials`, `date`, `text`, `textEditable`, `resolved`, `anchor`, and `replies`. `textEditable` is `false` for a comment whose content `editComment` cannot write back, such as a mention. Pass `id` to the comment commands. Key your own UI state, such as an open reply field, by `identity`. When a file repeats a GUID, a delete of another comment can change `id`. Once shown, an `identity` never names another comment, also after the slide changes and comes back:
+`editor.snapshot().comments` lists the threads of the current slide. It is `null` without the review module. `activeComment` is the id of the selected thread. Each thread has `id`, `identity`, `format` (`modern` or `legacy`), `author`, `initials`, `date`, `text`, `textEditable`, `resolved`, `anchor`, and `replies`. `textEditable` is `false` for a comment whose content `editComment` cannot write back, such as a mention. Pass `id` to the comment commands. Key your own UI state, such as an open reply field, by `identity`. When a file repeats a GUID, a delete of another comment can change `id`. Once shown, an `identity` never names another comment, also after the slide changes and comes back, or the editor opens another deck:
 
 - A comment that never had a twin keeps its `identity` until it is deleted. A twin shares the GUID, author, and creation time of another comment of the slide.
 - Twins keep their `identity` when one change explains their group: an edit or a resolve that changes at most one text, or one twin more or less at one place.

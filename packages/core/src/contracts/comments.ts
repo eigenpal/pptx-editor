@@ -27,7 +27,7 @@ export interface SlideComment {
   /**
    * A token that names the comment in this editor's snapshots. Key UI state, such as an open
    * field, by it; pass `id` to the commands. Once shown, an identity never names another
-   * comment, also after the slide changes and comes back.
+   * comment, also after the slide changes and comes back, or the editor opens another deck.
    *
    * - A comment that never had a twin keeps its identity until it is deleted. A twin shares the
    *   GUID, author, and creation time of another comment of the slide.
@@ -81,10 +81,14 @@ export interface CommentAuthorInput {
 /**
  * What a host showed of a comment, for a command that acts on it: pass the comment's `author`,
  * `date`, and `text` as the snapshot gave them. The editor refuses the command
- * (`errors.commentChanged`) when the comment at `commentId` has another author or date. It
- * compares the text only for a twin: a comment whose GUID, author, and date another comment of
- * the slide shares. So a collaborator's edit of a comment without a twin never refuses yours.
- * @public
+ * (`errors.commentChanged`) when the comment at `commentId` has another author or date.
+ *
+ * A twin shares its GUID, author, and creation time with another comment of the slide, or, in
+ * the legacy format, its author and index. A twin's id holds its place among its twins
+ * (`~<n>`, or `-<n>` for a legacy comment). For an id with a place, the editor also compares
+ * the text, and it refuses the command when the comment has no twin left: the id may have named
+ * the twin that is gone. So a collaborator's edit of a comment without a twin never refuses
+ * yours. @public
  */
 export interface CommentExpect {
   /** The author's display name, as `SlideComment.author` gave it. */
