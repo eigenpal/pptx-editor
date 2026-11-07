@@ -12,7 +12,7 @@ const ECMA_NOTICE = ecmaFile.slice(ecmaFile.indexOf('COPYRIGHT NOTICE')).trim();
 export const VENDORED = {
   '@pptx-editor.dev/core': [
     "## Material Symbols\n\n`src/editor/icon-paths.ts` holds SVG path data from Material Symbols by Google, licensed under the Apache License, Version 2.0 (https://github.com/google/material-design-icons). The license text is in this package's `LICENSE` file.\n",
-    '## ECMA-376 preset geometries\n\nThe preset geometry table, which this package inlines from `@eigenpal/ooxml-core` (`drawingml-preset-geometry.generated.ts`) at build time, is generated from `presetShapeDefinitions.xml` in ECMA-376 Part 1, 5th edition (2016), published by Ecma International (https://ecma-international.org/publications-and-standards/standards/ecma-376/). It is used under the Ecma copyright notice below.\n\n```\n' +
+    '## ECMA-376 preset geometries\n\nThe preset geometry and text warp tables, which this package inlines from `@eigenpal/ooxml-core` (`drawingml-preset-geometry.generated.ts` and `drawingml-preset-text-warp.generated.ts`) at build time, are generated from `presetShapeDefinitions.xml` and `presetTextWarpDefinitions.xml` in ECMA-376 Part 1, 5th edition (2016), published by Ecma International (https://ecma-international.org/publications-and-standards/standards/ecma-376/). They are used under the Ecma copyright notice below.\n\n```\n' +
       ECMA_NOTICE +
       '\n```\n',
     HARFBUZZ_NOTICE,

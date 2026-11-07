@@ -36,14 +36,19 @@ import {
   themeFill,
   type ResolvedFill,
 } from './paint-props.ts';
+import { entryParts } from './picture-bullet.ts';
 import { layerKey, partContent, relsKey, sameKey } from './resolve-keys.ts';
 import { resolveFrameTable } from './table.ts';
+import { threeDOf } from './three-d.ts';
+import { readTextWarp } from './text-warp.ts';
 import {
   diagramParts,
   MAX_DIAGRAM_GROUP_DEPTH,
   MAX_DIAGRAM_SHAPES,
   MAX_SLIDE_DIAGRAM_SHAPES,
 } from './diagram.ts';
+import { textNodesOf } from './diagram-model.ts';
+import { readGeometry, readXfrm, ZERO_XFRM } from './shape-xfrm.ts';
 import { DEFAULT_COLOR_MAP, parseTheme, readColorMap, type Theme } from './theme.ts';
 import {
   fontRefEntry,
@@ -93,6 +98,10 @@ interface SlideScope {
   readonly diagramShapes: { count: number };
   /** The color map, the slide number, and the kinsoku rules as text: part of `textKey`. */
   readonly textContext: string;
+  /** The presentation, master, and layout parts, whose relationships picture bullets name. */
+  readonly presentationPart: string;
+  readonly masterPart?: string;
+  readonly layoutPart?: string;
 }
 
 /**
@@ -223,46 +232,6 @@ function findMasterPlaceholder(
   return index.byType.get(want) ?? index.byMasterType.get(want);
 }
 
-/** The largest offset or size the cascade reads from `a:xfrm`, in EMU (four slide widths). @internal */
-export const XFRM_BOUND = 51_206_400 * 4;
-
-function readXfrm(xfrm: Element | undefined): Xfrm | undefined {
-  if (!xfrm) return undefined;
-  const off = child(xfrm, 'a:off');
-  const ext = child(xfrm, 'a:ext');
-  if (!off && !ext) return undefined;
-  const bound = (v: number | undefined): number =>
-    Math.max(-XFRM_BOUND, Math.min(v ?? 0, XFRM_BOUND));
-  return {
-    x: bound(intAttr(off, 'x')),
-    y: bound(intAttr(off, 'y')),
-    cx: Math.max(0, bound(intAttr(ext, 'cx'))),
-    cy: Math.max(0, bound(intAttr(ext, 'cy'))),
-    rot: ((intAttr(xfrm, 'rot') ?? 0) / 60_000) % 360,
-    flipH: boolAttr(xfrm, 'flipH') ?? false,
-    flipV: boolAttr(xfrm, 'flipV') ?? false,
-  };
-}
-
-const ZERO_XFRM: Xfrm = { x: 0, y: 0, cx: 0, cy: 0, rot: 0, flipH: false, flipV: false };
-
-function readGeometry(spPr: Element | undefined): GeometrySpec | undefined {
-  const prst = child(spPr, 'a:prstGeom');
-  if (prst) {
-    const adjust = new Map<string, number>();
-    for (const gd of elements(child(prst, 'a:avLst'))) {
-      const name = attr(gd, 'name');
-      const fmla = attr(gd, 'fmla') ?? '';
-      const m = /^val\s+(-?\d+)$/.exec(fmla.trim());
-      if (name && m) adjust.set(name, Number(m[1]));
-    }
-    return { kind: 'preset', preset: attr(prst, 'prst') ?? 'rect', adjust };
-  }
-  const cust = child(spPr, 'a:custGeom');
-  if (cust) return { kind: 'custom', element: cust };
-  return undefined;
-}
-
 /** The namespace of a shape's own children: `p:` on a slide, `dsp:` in a diagram drawing. */
 function ownNs(el: Element | undefined): string {
   return el?.ns === NS.dsp ? NS.dsp : NS.p;
@@ -314,6 +283,7 @@ function readBodyProps(chain: readonly Element[]): BodyProps {
     if (child(chain[i], 'a:noAutofit')) break;
   }
   const anchor = pick('anchor');
+  const warp = readTextWarp(chain);
   return {
     lIns: num('lIns', 91_440),
     tIns: num('tIns', 45_720),
@@ -331,6 +301,7 @@ function readBodyProps(chain: readonly Element[]): BodyProps {
     spcCol: Math.max(0, num('spcCol', 0)),
     autofit,
     spcFirstLastPara: pick('spcFirstLastPara') === '1',
+    ...(warp ? { warp } : {}),
   };
 }
 
@@ -344,27 +315,43 @@ function txStyleFor(type: string | undefined, txStyles: Element | undefined): El
 
 function resolveText(
   el: Element,
+  partName: string,
   scope: SlideScope,
   ph: PlaceholderKey | undefined,
-  inherited: readonly Element[],
+  inherited: readonly (readonly [Element, string | undefined])[],
   fontRef: FontRef | undefined
 ): ResolvedTextBody | undefined {
   const txBody = ownChild(el, 'txBody');
   if (!txBody) return undefined;
   const bodyChain: Element[] = [];
   const lstChain: Element[] = [];
-  for (const source of inherited) {
+  // Each list style with its part, for the relationships of picture bullets.
+  const lists: (readonly [Element | undefined, string | undefined])[] = [];
+  for (const [source, part] of inherited) {
     const tb = ownChild(source, 'txBody');
     const bp = child(tb, 'a:bodyPr');
     if (bp) bodyChain.push(bp);
     const ls = child(tb, 'a:lstStyle');
     if (ls) lstChain.push(ls);
+    lists.push([ls, part]);
   }
   const ownBody = child(txBody, 'a:bodyPr');
   if (ownBody) bodyChain.push(ownBody);
   const ownList = child(txBody, 'a:lstStyle');
   if (ownList) lstChain.push(ownList);
   const masterStyle = txStyleFor(ph?.type, scope.txStyles);
+  const pictures = {
+    pkg: scope.pkg,
+    partOf: entryParts(
+      [
+        [scope.defaultTextStyle, scope.presentationPart],
+        [masterStyle, scope.masterPart],
+        ...lists,
+        [ownList, partName],
+      ],
+      partName
+    ),
+  };
   const refEntry = fontRefEntry(fontRef);
   const chainFor = (level: number): Element[] => [
     ...levelEntries(scope.defaultTextStyle, level),
@@ -404,6 +391,7 @@ function resolveText(
             ...(fontRef ? { fontRef } : {}),
             slideNumber: scope.slideNumber,
             ...(scope.kinsoku ? { kinsoku: scope.kinsoku } : {}),
+            pictures,
           })
         )
     );
@@ -430,18 +418,21 @@ function resolveShapeLike(
 ): ResolvedElement {
   const ph = placeholderOf(el);
   const inherited: Element[] = [];
+  // The inherited placeholders with their parts, for picture bullets.
+  const sources: (readonly [Element, string | undefined])[] = [];
   if (ph && layer === 'slide') {
     const layoutPh = findLayoutPlaceholder(ph, scope.layoutPlaceholders);
     const masterPh = findMasterPlaceholder(
       layoutPh ? (placeholderOf(layoutPh)?.type ?? ph.type) : ph.type,
       scope.masterPlaceholders
     );
-    if (masterPh) inherited.push(masterPh);
-    if (layoutPh) inherited.push(layoutPh);
+    if (masterPh) sources.push([masterPh, scope.masterPart]);
+    if (layoutPh) sources.push([layoutPh, scope.layoutPart]);
   } else if (ph && layer === 'layout') {
     const masterPh = findMasterPlaceholder(ph.type, scope.masterPlaceholders);
-    if (masterPh) inherited.push(masterPh);
+    if (masterPh) sources.push([masterPh, scope.masterPart]);
   }
+  for (const [source] of sources) inherited.push(source);
   const spPrOf = (e: Element): Element | undefined => ownChild(e, 'spPr');
   const chain = [...inherited, el];
   let xfrm: Xfrm | undefined;
@@ -477,11 +468,13 @@ function resolveShapeLike(
   const line = resolveLine(lnEl, styleLine, ctx, styleRefContext(lnRef, ctx));
   const effectRef = child(style, 'a:effectRef');
   const effIdx = intAttr(effectRef, 'idx') ?? 0;
-  const resolvedEffects = effects
+  const effectStyle = effIdx > 0 ? scope.theme.effectStyles[effIdx - 1] : undefined;
+  const styleCtx = styleRefContext(effectRef, ctx);
+  const listed = effects
     ? resolveEffects(effects, ctx)
-    : effIdx > 0
-      ? resolveEffects(scope.theme.effectStyles[effIdx - 1], styleRefContext(effectRef, ctx))
-      : undefined;
+    : effectStyle && resolveEffects(effectStyle, styleCtx);
+  const threeD = threeDOf(chain.map(spPrOf), effectStyle, ctx, styleCtx);
+  const resolvedEffects = threeD ? { unsupported: [], ...listed, threeD } : listed;
   const cNvPr = nonVisualProps(el);
   const drawingId = el.ns === NS.p ? attr(cNvPr, 'id') : undefined;
   const base = {
@@ -511,7 +504,7 @@ function resolveShapeLike(
   }
   const text =
     kind === 'shape'
-      ? resolveText(el, scope, ph, inherited, styleFontRef(style, scope))
+      ? resolveText(el, partName, scope, ph, sources, styleFontRef(style, scope))
       : undefined;
   // ECMA-376 Part 1, 19.3.1.13 cNvSpPr: txBox marks a text box.
   const textBox = kind === 'shape' && boolAttr(path(el, 'p:nvSpPr', 'p:cNvSpPr'), 'txBox') === true;
@@ -602,6 +595,7 @@ const UNSUPPORTED = Symbol('unsupported');
 interface DiagramBudget {
   shapes: number;
   overLimit: boolean;
+  readonly nodes: ReadonlyMap<string, string>;
 }
 
 /** Stop a diagram at a shape, depth, or slide limit, and remember why. */
@@ -636,7 +630,9 @@ function resolveDiagramElement(
       if (budget.shapes > MAX_DIAGRAM_SHAPES) return overLimit(budget);
       if (scope.diagramShapes.count > MAX_SLIDE_DIAGRAM_SHAPES) return overLimit(budget);
       if (!path(el, 'dsp:spPr', 'a:xfrm')) return UNSUPPORTED;
-      return resolveShapeLike(el, 'shape', layer, drawingPart, scope);
+      const shape = resolveShapeLike(el, 'shape', layer, drawingPart, scope);
+      const node = budget.nodes.get(attr(el, 'modelId') ?? '');
+      return node && shape.kind === 'shape' ? { ...shape, diagramNode: node } : shape;
     }
     case 'grpSp': {
       scope.diagramShapes.count += 1;
@@ -743,7 +739,9 @@ function resolveDiagram(
   const parts = diagramParts(scope.pkg, partName, graphicData);
   const tree = child(parts?.drawing, 'dsp:spTree');
   if (!parts || !tree) return { drawingFallback: 'no-drawing' };
-  const budget: DiagramBudget = { shapes: 0, overLimit: false };
+  // `nodes`: the node whose text each drawing shape shows, by the shape's `modelId`.
+  const nodes = textNodesOf(parts.dataModel);
+  const budget: DiagramBudget = { shapes: 0, overLimit: false, nodes };
   const shapes = resolveDiagramTree(tree, layer, parts.drawingPart, scope, 0, budget);
   if (!shapes) return { drawingFallback: budget.overLimit ? 'limit' : 'unsupported' };
   if (shapes.length === 0) return { drawingFallback: 'no-drawing' };
@@ -802,7 +800,7 @@ function resolveElement(
       // A table that concurrent deletes left with no column or row is not drawn: the save
       // leaves it out (`isEmptiedTable`).
       if (kind === 'table' && isEmptiedTable(el)) return undefined;
-      const table = kind === 'table' ? resolveFrameTable(el, scope) : undefined;
+      const table = kind === 'table' ? resolveFrameTable(el, { ...scope, partName }) : undefined;
       const cNvPr = nonVisualProps(el);
       const xfrm = readXfrm(child(el, 'p:xfrm')) ?? ZERO_XFRM;
       const poster =
@@ -937,6 +935,9 @@ export function resolveSlide(pkg: PptxPackage, index: number): ResolvedSlide | u
     masterPlaceholders: collectPlaceholders(pkg, ref.masterPart),
     diagramShapes: { count: 0 },
     textContext: JSON.stringify([[...colorMap], index + 1, kinsoku ?? null]),
+    presentationPart: info.presentationPart,
+    ...(ref.masterPart ? { masterPart: ref.masterPart } : {}),
+    ...(ref.layoutPart ? { layoutPart: ref.layoutPart } : {}),
   };
   const bg = resolveBackground([slide, layout, master], scope);
   const backgroundPart = [ref.partName, ref.layoutPart, ref.masterPart][bg.index] ?? ref.partName;

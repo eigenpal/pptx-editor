@@ -196,6 +196,9 @@ describe('shape effects', () => {
       reflection: 'none',
       glow: 0,
       softEdge: 0,
+      bevel: 'none',
+      rotation3d: 'none',
+      blur: 0,
     });
   });
 
@@ -212,7 +215,15 @@ describe('shape effects', () => {
     });
     expect(bad({ kind: 'glow', size: 1000 })).toMatchObject({ ok: false });
     expect(bad({ kind: 'glow', size: Number.NaN })).toMatchObject({ ok: false });
-    expect(bad({ kind: 'blur', size: 3 })).toMatchObject({ ok: false });
+    expect(bad({ kind: 'blur', size: -3 })).toMatchObject({ ok: false });
+    expect(bad({ kind: 'bevel', preset: 'round' })).toMatchObject({
+      ok: false,
+      reason: 'errors.unsupported',
+    });
+    expect(bad({ kind: 'rotation3d', preset: 'perspectiveHeroic' })).toMatchObject({
+      ok: false,
+      reason: 'errors.unsupported',
+    });
     expect(bad({ kind: 'glow', size: 5, color: 'red' })).toMatchObject({ ok: false });
     expect(slideXml(e)).not.toContain('effectLst');
   });

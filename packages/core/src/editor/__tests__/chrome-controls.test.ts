@@ -63,6 +63,7 @@ const SLOT_UNION = {
   'shape.lineDash': true,
   'shape.styles': true,
   'shape.effects': true,
+  'shape.textEffects': true,
   'shape.properties': true,
   'format.painter': true,
   'arrange.order': true,
@@ -130,6 +131,12 @@ const SLOT_UNION = {
   'table.distributeRows': true,
   'table.distributeColumns': true,
   'table.cellMargins': true,
+  'chart.editData': true,
+  'insert.equation': true,
+  'diagram.addAfter': true,
+  'diagram.addBefore': true,
+  'diagram.addBelow': true,
+  'diagram.delete': true,
 } as const satisfies Record<ChromeSlotId, true>;
 
 const en = JSON.parse(

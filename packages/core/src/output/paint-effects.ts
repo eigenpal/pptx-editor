@@ -12,9 +12,17 @@
 // and in the harness report: the blur kernel (`BLUR_SIGMA_PER_RADIUS`, measured).
 
 import { toCss, type ResolvedEffects } from '../cascade/index.ts';
-import { apply, type EffectCopySource, type EffectNode, type Matrix } from '../layout/index.ts';
+import {
+  apply,
+  multiply,
+  type EffectCopySource,
+  type EffectNode,
+  type Matrix,
+  type ThreeDFacet,
+} from '../layout/index.ts';
 import { blurSigma, boundsOf, effectMatrix, grow, PX, type Bounds } from './effect-transforms.ts';
 import { matrixAttr, num, svg, type Defs } from './svg.ts';
+import { finiteFacet } from './painter-math.ts';
 
 /** The filter region attributes for bounds in user space. */
 function region(b: Bounds): Record<string, string> {
@@ -98,18 +106,51 @@ function copyOf(doc: Document, source: EffectSource, m: Matrix): SVGElement {
   return svg(doc, 'use', { href: `#${source.contentId}`, transform: matrixAttr(m) });
 }
 
+/**
+ * The polygons of a 3-D paint (bevel strips, contour, extrusion sides) as paths. Each opaque one
+ * has a thin outline of its own color, so neighbors leave no antialiased seam between them.
+ */
+export function facetElements(
+  doc: Document,
+  facets: readonly ThreeDFacet[],
+  seam: number
+): SVGElement[] {
+  return facets.filter(finiteFacet).map((f) => {
+    const d = f.polygons
+      .filter((poly) => poly.length >= 3)
+      .map((poly) => poly.map((p, i) => `${i ? 'L' : 'M'}${num(p.x)} ${num(p.y)}`).join('') + 'Z')
+      .join('');
+    const color = toCss({ ...f.color, a: 1 });
+    const opacity = f.color.a < 1 ? num(f.color.a) : undefined;
+    return svg(doc, 'path', {
+      d,
+      fill: color,
+      'fill-opacity': opacity,
+      // A translucent face light has no seams to hide, and an outline would darken its edge.
+      ...(opacity === undefined
+        ? { stroke: color, 'stroke-width': num(seam), 'stroke-linejoin': 'round' }
+        : {}),
+    });
+  });
+}
+
 /** The outer shadow: a transformed, blurred, single-color copy of the content. */
 export function shadowCopy(
   defs: Defs,
   effects: ResolvedEffects | undefined,
-  source: EffectSource
+  source: EffectSource,
+  which: 'outerShadow' | 'secondShadow' = 'outerShadow'
 ): SVGElement | null {
-  const shadow = effects?.outerShadow;
+  const shadow = effects?.[which];
   if (!shadow) return null;
   const doc = defs.doc;
-  const m = effectMatrix(shadow, source.matrix, source.width, source.height);
+  const placed = effectMatrix(shadow, source.matrix, source.width, source.height);
+  // On a turned face, the shadow is placed on the face and turns with it.
+  const face = source.face;
+  const m = face ? multiply(face.front, placed) : placed;
+  const corners = face ? face.corners : source.corners;
   const sigma = blurSigma(shadow.blur);
-  const bounds = grow(boundsOf(source.corners.map((p) => apply(m, p.x, p.y))), 3 * sigma + PX);
+  const bounds = grow(boundsOf(corners.map((p) => apply(m, p.x, p.y))), 3 * sigma + PX);
   const id = defs.id('shadow');
   const prims = [
     sigma > 0
@@ -123,5 +164,8 @@ export function shadowCopy(
     svg(doc, 'feComposite', { in: 'sc', in2: 'sb', operator: 'in' }),
   ];
   const filter = defs.add(svg(doc, 'filter', { id, ...region(bounds) }, prims));
-  return svg(doc, 'g', { filter, 'data-effect': 'shadow' }, [copyOf(doc, source, m)]);
+  const copy = face
+    ? svg(doc, 'use', { href: `#${face.id}`, transform: matrixAttr(m) })
+    : copyOf(doc, source, m);
+  return svg(doc, 'g', { filter, 'data-effect': 'shadow' }, [copy]);
 }

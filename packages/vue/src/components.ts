@@ -89,6 +89,11 @@ const pptxEditorRootProps = {
    * once, when the editor is created.
    */
   autoCorrect: { type: Boolean, default: true },
+  /**
+   * The author of later comments and replies, as DOCX Editor's `author` prop. A change applies
+   * without a remount (`setAuthor`); existing comments keep their authors.
+   */
+  author: { type: String, default: undefined },
   /** Customize the dialogs the editor mounts. Set an entry to `false` to turn one off. */
   popups: { type: Object as PropType<PptxEditorPopups>, default: undefined },
   /** The chrome color mode: `'light'` (default), `'dark'`, or `'system'`. */
@@ -191,6 +196,7 @@ export const PptxEditorRoot = defineComponent({
         ...(props.fonts ? { fonts: props.fonts } : {}),
         ...(props.modules ? { modules: props.modules } : {}),
         ...(props.autoCorrect === false ? { autoCorrect: false } : {}),
+        ...(props.author ? { author: props.author } : {}),
         onFontError,
         translate: (key, params) => translateKeyOrText(t.value, key, params),
       });
@@ -224,6 +230,11 @@ export const PptxEditorRoot = defineComponent({
     watch(
       () => props.mode,
       (mode) => editor.value?.setMode(mode)
+    );
+    // A new author applies to later comments; the instance ignores the same name.
+    watch(
+      () => props.author,
+      (author) => editor.value?.setAuthor(author)
     );
     // A `modules` change after creation has no effect: say so in development, as React's root.
     // The check is by the identity of each module, so a new array of the same modules does not

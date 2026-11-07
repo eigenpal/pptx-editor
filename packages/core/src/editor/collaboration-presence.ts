@@ -78,6 +78,9 @@ export function toCollaborationSelection(
       : null;
   // A cell range shows as its table selected.
   if (selection.kind === 'cells') return { kind: 'shapes', part, shapes: [selection.nodeId] };
+  // Text in a diagram shape is in the diagram's own parts: peers see the diagram selected.
+  if (selection.diagramNode !== undefined)
+    return { kind: 'shapes', part, shapes: [selection.nodeId] };
   const xml = xmlPartOf(pkg, part);
   const shape = xml ? nodeById(xml, selection.nodeId) : undefined;
   if (shape?.type !== 'element') return null;

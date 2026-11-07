@@ -267,7 +267,7 @@ describe('clipboard', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  test('a hostile payload is refused, external links are dropped', async () => {
+  test('a hostile payload is refused, and a pasted web link passes the link check again', async () => {
     const e = await open();
     for (const bad of [
       null,
@@ -308,8 +308,20 @@ describe('clipboard', () => {
     const src = await open(linked);
     src.selectAll();
     const payload = src.copy()!;
-    expect(payload.relationships).toEqual([]);
+    expect(payload.relationships.map((r) => r.target)).toEqual(['https://example.com/']);
     expect(e.exec({ type: 'paste', payload }).ok).toBe(true);
-    expect(JSON.stringify(root(e))).not.toContain('hlinkClick');
+    const link = find(root(e), 'a:hlinkClick');
+    const rel = relationshipsOf(e.session!.store.package, part(e)).find(
+      (r) => r.id === attr(link, 'r:id')
+    );
+    expect([rel?.external, rel?.externalTarget]).toEqual([true, 'https://example.com/']);
+    // A link that fails the check is dropped with its `a:hlinkClick`.
+    const e2 = await open();
+    const hostile = {
+      ...payload,
+      relationships: [{ ...payload.relationships[0]!, target: 'javascript:alert(1)' }],
+    };
+    expect(e2.exec({ type: 'paste', payload: hostile }).ok).toBe(true);
+    expect(JSON.stringify(root(e2))).not.toContain('hlinkClick');
   });
 });

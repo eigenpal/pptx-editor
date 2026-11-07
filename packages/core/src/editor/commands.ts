@@ -68,6 +68,8 @@ import { deleteSlides, duplicateSlides, moveSlides } from '../automation/command
 import { applyHeaderFooter } from '../automation/commands/header-footer.ts';
 import { notesShown, setNotes } from '../automation/commands/notes-commands.ts';
 import { compilePictureCommand, isPictureCommand } from './picture-commands.ts';
+import { isViewCommand } from './view-settings.ts';
+import { compileObjectCommand, isObjectCommand } from './object-commands.ts';
 import { compileSlideCommand, isSlideCommand } from './slide-command-table.ts';
 import { compileShapeCommand, isShapeCommand } from './shape-command-table.ts';
 import { compileTextFormatCommand, isTextFormatCommand } from './text-format-commands.ts';
@@ -154,6 +156,8 @@ export interface CommandContext {
   readonly gestureBase?: PptxPackage;
   /** How many times in a row this payload has been pasted, counting this paste (1 = first). */
   readonly pasteRepeat?: number;
+  /** The author of new comments and replies when the command names none (`setAuthor`). */
+  readonly author?: string;
   /** The package to compile against instead of the store's: the preview of an armed format. */
   readonly base?: PptxPackage;
   /**
@@ -202,6 +206,7 @@ const CANVAS_INSERTS: ReadonlySet<EditorCommand['type']> = new Set([
   'insertLine',
   'insertImage',
   'insertTable',
+  'insertEquation',
   'paste',
 ]);
 
@@ -374,14 +379,7 @@ export function compile(
   ctx: CommandContext,
   command: EditorCommand
 ): { batch: OpBatch; effect: CommandEffect } {
-  if (
-    command.type === 'undo' ||
-    command.type === 'redo' ||
-    command.type === 'toggleSmartGuides' ||
-    command.type === 'setPresentationView' ||
-    command.type === 'setSectionsCollapsed' ||
-    command.type === 'setTableBorderPen'
-  )
+  if (command.type === 'undo' || command.type === 'redo' || isViewCommand(command))
     throw new Error('history and view commands do not compile');
   if (ctx.readOnly) throw new CommandRefusal('disabled.viewing');
   // In the Slide Sorter, the Insert commands are off: a new shape waits for the Normal view.
@@ -395,6 +393,7 @@ export function compile(
     return { batch, effect: compilePictureCommand(ctx, batch, slidePart(ctx), command) };
   if (isTextFormatCommand(command))
     return { batch, effect: compileTextFormatCommand(ctx, batch, command) };
+  if (isObjectCommand(command)) return { batch, effect: compileObjectCommand(ctx, batch, command) };
   const info = ctx.session.info;
   const { width: slideW, height: slideH } = info;
   switch (command.type) {
@@ -733,14 +732,10 @@ export function compile(
     case 'paste': {
       const part = slidePart(ctx);
       const p = command.payload as unknown as { document?: unknown; slidePart?: unknown };
-      const here = p?.document === ctx.session.id && p.slidePart === part;
+      const same = p?.document === ctx.session.id;
       // Each repeated paste onto the source slide moves 0.25 in further.
-      const out = pasteShapes(
-        batch,
-        part,
-        command.payload,
-        here ? 228_600 * (ctx.pasteRepeat ?? 1) : 0
-      );
+      const offset = same && p.slidePart === part ? 228_600 * (ctx.pasteRepeat ?? 1) : 0;
+      const out = pasteShapes(batch, part, command.payload, offset, same);
       if (!out.length) throw new CommandRefusal('errors.clipboard');
       writeCopiedTableMarkers(batch, part, out);
       return { batch, effect: { label: 'paste', selection: shapesSelection(out, undefined) } };

@@ -74,7 +74,8 @@
     "link": "リンク…",
     "alignOrDistribute": "配置または整列",
     "slideBackground": "スライドの背景…",
-    "columns": "段組み…"
+    "columns": "段組み…",
+    "equation": "数式…"
   },
   "contextMenu": {
     "railLabel": "スライドの操作",
@@ -140,7 +141,9 @@
     "cannotCopyFrame": "このバージョンでは、グラフ、図表、オブジェクトをコピーまたは切り取りできません",
     "altText": "代替テキストの編集…",
     "paragraph": "段落…",
-    "font": "フォント…"
+    "font": "フォント…",
+    "chartLabel": "グラフの操作",
+    "diagramLabel": "図の操作"
   },
   "mode": {
     "label": "モード",
@@ -172,7 +175,9 @@
       "slide": "スライド",
       "image": "画像",
       "section": "セクション",
-      "table": "表"
+      "table": "表",
+      "chart": "グラフ",
+      "diagram": "図"
     },
     "smartGuides": "スマート ガイド",
     "find": "検索 (Ctrl+F)",
@@ -400,6 +405,33 @@
     },
     "softEdges": "ぼかし",
     "softEdgeValue": "{value} pt",
+    "bevel": "面取り",
+    "bevels": {
+      "circle": "丸",
+      "relaxedInset": "緩やかな傾斜",
+      "cross": "十字",
+      "coolSlant": "クール スラント",
+      "angle": "角度",
+      "softRound": "ソフト ラウンド",
+      "convex": "凸型",
+      "slope": "スロープ",
+      "divot": "くぼみ",
+      "riblet": "リブレット",
+      "hardEdge": "ハード エッジ",
+      "artDeco": "アール デコ"
+    },
+    "rotation3d": "3-D 回転",
+    "rotations3d": {
+      "isometricLeftDown": "等角投影: 左下",
+      "isometricRightUp": "等角投影: 右上",
+      "isometricTopUp": "等角投影: 上",
+      "isometricOffAxis1Left": "軸外 1: 左",
+      "isometricOffAxis1Right": "軸外 1: 右",
+      "obliqueTopLeft": "斜投影: 左上",
+      "obliqueTopRight": "斜投影: 右上",
+      "obliqueBottomLeft": "斜投影: 左下",
+      "obliqueBottomRight": "斜投影: 右下"
+    },
     "rotate": "回転",
     "rotations": {
       "right90": "右へ 90 度回転",
@@ -412,12 +444,63 @@
     "selectionPane": "選択ウィンドウ",
     "shapeStyleSample": "Abc",
     "shapeEffects": "図形の効果",
+    "textEffects": "文字の効果",
+    "transform": "変形",
+    "noTransform": "変形なし",
+    "textWarpSections": {
+      "followPath": "パスに沿う",
+      "warp": "ワープ"
+    },
+    "textWarps": {
+      "textPlain": null,
+      "textStop": null,
+      "textTriangle": null,
+      "textTriangleInverted": null,
+      "textChevron": null,
+      "textChevronInverted": null,
+      "textRingInside": null,
+      "textRingOutside": null,
+      "textArchUp": null,
+      "textArchDown": null,
+      "textCircle": null,
+      "textButton": null,
+      "textArchUpPour": null,
+      "textArchDownPour": null,
+      "textCirclePour": null,
+      "textButtonPour": null,
+      "textCurveUp": null,
+      "textCurveDown": null,
+      "textCanUp": null,
+      "textCanDown": null,
+      "textWave1": null,
+      "textWave2": null,
+      "textDoubleWave1": null,
+      "textWave4": null,
+      "textInflate": null,
+      "textDeflate": null,
+      "textInflateBottom": null,
+      "textDeflateBottom": null,
+      "textInflateTop": null,
+      "textDeflateTop": null,
+      "textDeflateInflate": null,
+      "textDeflateInflateDeflate": null,
+      "textFadeRight": null,
+      "textFadeLeft": null,
+      "textFadeUp": null,
+      "textFadeDown": null,
+      "textSlantUp": null,
+      "textSlantDown": null,
+      "textCascadeUp": null,
+      "textCascadeDown": null
+    },
     "formatShape": "図形の書式設定",
     "noEffect": {
       "shadow": "影なし",
       "reflection": "反射なし",
       "glow": "光彩なし",
-      "softEdge": "ぼかしなし"
+      "softEdge": "ぼかしなし",
+      "bevel": "面取りなし",
+      "rotation3d": "回転なし"
     },
     "newSlide": "新しいスライド (Ctrl+M)",
     "slideLayout": "レイアウト",
@@ -427,7 +510,8 @@
     "views": {
       "normal": "標準",
       "slideSorter": "スライド一覧"
-    }
+    },
+    "equation": "数式"
   },
   "table": {
     "insert": "表",
@@ -755,7 +839,16 @@
     "noRoot": "このコントロールを使用するには、エディターのルート (PptxEditor.Root または PptxEditorRoot) 内に配置してください",
     "dialogSlot": "このコントロールはダイアログを開きます",
     "selectWord": "単語内をクリックするか、テキストを選択してください",
-    "mixedSize": "選択したテキストには複数のサイズが含まれています"
+    "mixedSize": "選択したテキストには複数のサイズが含まれています",
+    "noCommentAuthor": "コメントするには作成者を設定してください",
+    "commentNoStatus": "従来形式のコメントは解決済みにできません",
+    "commentNotEditable": "このコメントにはここで編集できない内容が含まれています",
+    "noCommentTarget": "コメントはスライドの最上位にある要素にのみ付けられます",
+    "animationsReadOnly": "このスライドの効果は、エディターが変更しないマークアップを使っています",
+    "noAnimation": "このスライドにその効果はありません",
+    "noAnimationChange": "効果または画面切り替えはすでにこの設定です",
+    "instantAnimation": "この効果は瞬時に行われるため、継続時間はありません",
+    "noChart": "グラフを選択してください"
   },
   "rail": {
     "ariaLabel": "スライド",
@@ -802,7 +895,9 @@
     "close": "パネルを閉じる",
     "tabs": {
       "format": "書式",
+      "chart": "グラフ",
       "selection": "選択",
+      "animations": "アニメーション",
       "comments": "コメント"
     },
     "format": {
@@ -842,7 +937,72 @@
     },
     "comments": {
       "emptyTitle": "コメントはありません",
-      "emptyBody": "コメントは保存時に保持されます。このバージョンでは、コメントの確認はできません。"
+      "emptyBody": "コメントは保存時に保持されます。"
+    },
+    "animations": {
+      "transition": "スライドの切り替え",
+      "transitionKind": "画面切り替え",
+      "kinds": {
+        "none": "なし",
+        "fade": "フェード",
+        "push": "プッシュ",
+        "wipe": "ワイプ",
+        "split": "スプリット",
+        "cut": "カット",
+        "other": "その他"
+      },
+      "duration": "継続時間",
+      "secondsUnit": "秒",
+      "advanceOnClick": "クリック時",
+      "advanceAfter": "切り替えまでの時間",
+      "advanceAutomatically": "自動で切り替え",
+      "applyToAll": "すべてのスライドに適用",
+      "effects": "効果",
+      "addEffect": "効果の追加",
+      "add": "追加",
+      "classes": {
+        "entrance": "開始",
+        "emphasis": "強調",
+        "exit": "終了",
+        "motionPath": "アニメーションの軌跡",
+        "other": "その他の効果"
+      },
+      "presets": {
+        "appear": "アピール",
+        "fade": "フェード",
+        "flyIn": "スライドイン",
+        "wipe": "ワイプ",
+        "zoom": "ズーム",
+        "pulse": "パルス",
+        "spin": "スピン",
+        "growShrink": "拡大/収縮",
+        "disappear": "クリア",
+        "fadeOut": "フェードアウト",
+        "flyOut": "スライドアウト",
+        "wipeOut": "ワイプアウト",
+        "zoomOut": "ズームアウト"
+      },
+      "listLabel": "このスライドの効果",
+      "emptyTitle": "効果はありません",
+      "emptyBody": "スライドの図形を選択して、効果を追加してください。",
+      "readOnly": "エディターはこれらの効果を表示しますが、変更しません。",
+      "noPlayback": "エディターは効果や画面切り替えを再生しません。",
+      "invalidTime": "許可された範囲の秒数を入力してください。",
+      "start": "開始",
+      "triggers": {
+        "onClick": "クリック時",
+        "withPrevious": "直前の動作と同時",
+        "afterPrevious": "直前の動作の後"
+      },
+      "delay": "遅延",
+      "moveEarlier": "前に移動",
+      "moveLater": "後に移動",
+      "remove": "効果の削除",
+      "onShapeClick": "{shape} のクリック時",
+      "paragraphs": "段落 {start} から {end}",
+      "unnamed": "見つからない図形",
+      "step": "クリック {step}",
+      "withSlide": "スライドと同時"
     }
   },
   "pageSetup": {
@@ -935,9 +1095,16 @@
     "kindWeb": "Web アドレス",
     "kindEmail": "電子メール",
     "kindSlide": "スライド",
+    "kindCustomShow": "目的別スライド ショー",
+    "kindFile": "他のファイル",
     "emailAddress": "電子メール アドレス",
     "emailSubject": "件名",
     "slide": "このプレゼンテーション内のスライド",
+    "customShow": "このプレゼンテーションの目的別スライド ショー",
+    "customShowName": "目的別スライド ショー: {name}",
+    "returnAfterShow": "ショーの後でこのスライドに戻る",
+    "filePath": "ファイル パス",
+    "filePlaceholder": "./report.pdf",
     "slideNumber": "スライド {number}",
     "firstSlide": "最初のスライド",
     "lastSlide": "最後のスライド",
@@ -965,6 +1132,7 @@
     "placeholderTable": "ここに表を挿入",
     "placeholderPicture": "ここに画像を挿入",
     "tableCell": "{row} 行、{column} 列",
+    "diagramShape": "図の図形 {index}/{count}",
     "shapeSelected": "{kind} {name} を選択しました",
     "shapeSelectedWithAltText": "{kind} {name}、{description} を選択しました",
     "dragCanceled": "ドラッグを取り消しました",
@@ -1009,8 +1177,40 @@
     "layoutNotFound": "プレゼンテーションにそのスライド レイアウトはありません。",
     "sectionNotFound": "プレゼンテーションにそのセクションはありません。",
     "slideNotFound": "プレゼンテーションにそのスライドはありません。",
+    "customShowNotFound": "この目的別スライド ショーはプレゼンテーションにありません。",
+    "unsafeFileLink": "./ または ../ で始まる相対パスを入力してください (例: ./report.pdf)。リンクできるのは文書、画像、サウンド、ビデオのファイルだけです。",
     "sectionName": "セクション名は 1 から 255 文字で指定してください。",
-    "view": "エディターにその表示はありません。"
+    "view": "エディターにその表示はありません。",
+    "commentText": "コメントは 1 ～ 10,000 文字で入力してください",
+    "commentAuthor": "作成者名が長すぎます",
+    "commentDate": "コメントの日付が無効です",
+    "noComment": "このコメントはもう存在しません",
+    "chartData": {
+      "noChart": "グラフを 1 つ選択してください。",
+      "noData": "このグラフにはデータ系列がありません。",
+      "combination": "このグラフは複数のグラフの種類を組み合わせています。",
+      "unsupportedType": "この種類のグラフのデータは編集できません。",
+      "filtered": "このグラフには非表示の系列があります。",
+      "multiLevel": "このグラフの項目は複数のレベルに分かれています。",
+      "mixedCategories": "このグラフの系列はそれぞれ異なる項目を使用しています。",
+      "tooLarge": "このグラフのデータは編集できる量を超えています。",
+      "empty": "グラフには少なくとも 1 つの系列と 1 つの項目が必要です。",
+      "invalidText": "名前またはラベルにグラフで使用できない文字が含まれています。",
+      "notNumber": "値はすべて数値にしてください。",
+      "layout": "このグラフのセル参照は 1 つの表になっていないため、名前と値のみ変更できます。",
+      "workbook": "埋め込まれたブックはこの変更を受け付けられません。系列ごとに異なる名前を付け、データの隣のセルを空にしてください。"
+    },
+    "diagram": {
+      "noDiagram": "図を 1 つ選択してください。",
+      "noNode": "図の図形内にカーソルを置いてください。",
+      "noText": "この図形は複数の項目のテキストを表示するため、ここでは編集できません。",
+      "lastShape": "図には最上位の図形が少なくとも 1 つ必要です。",
+      "layoutUnsupported": "この図はレイアウトし直せないため、図形を追加または削除できません。",
+      "noChildren": "この図は最上位より下の図形を表示しません。",
+      "tooLarge": "図の図形がエディターで編集できる数を超えています。"
+    },
+    "equationEmpty": "数式を入力してください。",
+    "equationSyntax": "この数式を読み取れません。かっことバックスラッシュの後の名前を確認してください。"
   },
   "find": {
     "label": "検索と置換",
@@ -1293,6 +1493,13 @@
     "font": "フォント",
     "customChar": "ユーザー設定: {char}",
     "textFont": "テキストのフォント",
+    "pictureStyle": "図",
+    "picture": "図",
+    "choosePicture": "図を選択…",
+    "pictureChosen": "図を選択しました",
+    "pictureType": "PNG、JPEG、または GIF の画像を選んでください。",
+    "pictureTooLarge": "画像が大きすぎます。50 MB 以下、2,500 万ピクセル以下の画像を選んでください。",
+    "pictureUnreadable": "画像を読み込めません。別のファイルを選んでください。",
     "errors": {
       "percent": "{field} は {min} から {max} % の数値で指定してください。",
       "whole": "{field} は {min} から {max} の整数で指定してください。",
@@ -1348,8 +1555,10 @@
       "view": "表示",
       "shapeFormat": "図形の書式",
       "pictureFormat": "図の形式",
+      "chartDesign": "グラフのデザイン",
       "tableDesign": "テーブル デザイン",
-      "tableLayout": "テーブル レイアウト"
+      "tableLayout": "テーブル レイアウト",
+      "diagramDesign": "図のデザイン"
     }
   },
   "statusBar": {
@@ -1423,5 +1632,92 @@
     "keyHint": "H キーでフォーカスのあるオブジェクトを表示または非表示にし、F2 キーで名前を変更します。",
     "emptyTitle": "オブジェクトがありません",
     "emptyBody": "このスライドの図形、画像、テキスト ボックスがここに表示されます。"
+  },
+  "comments": {
+    "label": "このスライドのコメント",
+    "new": "新しいコメント",
+    "text": "コメント",
+    "addComment": "コメントを追加…",
+    "replyText": "返信",
+    "editText": "コメントを編集",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "keyHint": "Enter で投稿、Shift+Enter で改行、Esc でキャンセルします。",
+    "noAuthor": "コメントするには作成者を設定してください。",
+    "pointsAt": "対象: {name}",
+    "on": "対象: {name}",
+    "resolved": "解決済み",
+    "unknownAuthor": "不明な作成者",
+    "reply": "返信",
+    "replyTo": "{author} さんに返信",
+    "edit": "編集",
+    "editOf": "{author} さんのコメントを編集",
+    "delete": "削除",
+    "deleteOf": "{author} さんのコメントを削除",
+    "resolve": "解決",
+    "resolveOf": "{author} さんのスレッドを解決",
+    "reopen": "再開",
+    "reopenOf": "{author} さんのスレッドを再開",
+    "thread": "{author} さんのコメント",
+    "replies": "{author} さんへの返信",
+    "emptyTitle": "このスライドにコメントはありません",
+    "emptyBody": "[新しいコメント] を選んでスレッドを始めます。"
+  },
+  "chartData": {
+    "editData": "データの編集…",
+    "categories": "項目",
+    "xValues": "X の値",
+    "seriesName": "系列 {number} の名前",
+    "categoryLabel": "項目 {number}",
+    "xValueLabel": "X の値 {number}",
+    "cellLabel": "{series}、{category}",
+    "newSeries": "系列 {number}",
+    "newCategory": "項目 {number}",
+    "addCategory": "項目を追加",
+    "addSeries": "系列を追加",
+    "help": "Enter キーを押すか、フィールドから移動すると適用されます。値なしにするには空欄にします。",
+    "workbookKept": "埋め込みブックは以前の値のままです。グラフには入力した値が表示されます。",
+    "workbookExternal": "このグラフはリンクされたブックのデータを使用しています。グラフには入力した値が表示され、リンクからの更新は停止します。",
+    "errors": {
+      "number": "数値を入力するか、セルを空のままにしてください。",
+      "xNumber": "X の値にはすべて数値を入力してください。",
+      "tooLong": "255 文字以内で入力してください。",
+      "limit": "グラフには 1 つ以上の系列と項目が必要で、系列は 255 個、項目は 4,000 個までです。"
+    },
+    "name": "名前",
+    "series": "系列",
+    "unnamed": "名前のない系列",
+    "emptyTitle": "グラフが選択されていません",
+    "emptyBody": "データを編集するには、スライド上のグラフを選択してください。",
+    "notEditableTitle": "このグラフのデータは読み取り専用です",
+    "removeCategoryNamed": "項目 {name} を削除",
+    "removeSeriesNamed": "系列 {name} を削除",
+    "removeSeries": "系列の削除"
+  },
+  "diagram": {
+    "addAfter": "後に図形を追加",
+    "addBefore": "前に図形を追加",
+    "addBelow": "下に図形を追加",
+    "delete": "図形を削除"
+  },
+  "equation": {
+    "close": "閉じる",
+    "insertTitle": "数式の挿入",
+    "editTitle": "数式の編集",
+    "gallery": "よく使う数式",
+    "linear": "線形形式",
+    "linearHelp": "分数は a/b、添え字は x^2 または x_i、根号は \\sqrt(x)、ギリシャ文字は \\alpha と入力します。",
+    "notEditable": "選択した数式には線形形式で書けない部分があります。OK を押すと新しい数式を挿入します。",
+    "insert": "挿入",
+    "galleryItems": {
+      "circleArea": "円の面積",
+      "quadratic": "二次方程式の解の公式",
+      "pythagoras": "三平方の定理",
+      "sum": "整数の和",
+      "integral": "定積分",
+      "limit": "極限",
+      "matrix": "行列",
+      "euler": "オイラーの等式"
+    }
   }
 }

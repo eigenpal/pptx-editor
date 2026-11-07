@@ -71,10 +71,13 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     fixtures: ['vertical-columns', 'vertical-east-asian', 'text-direction'],
     approximations: ['line-model', 'script-fonts', 'ea-vert', 'word-art-vert', 'other-vert'],
   },
-  'paragraphs.text-warp': { fixtures: ['preserved-content'], approximations: ['text-warp'] },
+  'paragraphs.text-warp': {
+    fixtures: ['text-warp', 'preserved-content'],
+    approximations: ['line-model', 'text-warp'],
+  },
   // --- Bullets & numbering -----------------------------------------------
   'lists.bullets-numbering': {
-    fixtures: ['bullets-numbering', 'bullets-gallery', 'rtl-text'],
+    fixtures: ['bullets-numbering', 'bullets-gallery', 'picture-bullets', 'rtl-text'],
     approximations: [
       'line-model',
       'aligned-bullets',
@@ -139,8 +142,8 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: ['fill-overlay', 'effects-not-drawn'],
   },
   'effects.3d-and-other': {
-    fixtures: ['effects', 'preserved-content'],
-    approximations: ['effects-not-drawn'],
+    fixtures: ['three-d-effects', 'three-d-turned-effects', 'effects', 'preserved-content'],
+    approximations: ['effects-not-drawn', 'three-d', 'preset-shadow', 'blur'],
   },
   // --- Pictures ----------------------------------------------------------
   'pictures.raster-svg': {
@@ -180,16 +183,19 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   'tables.sizes': { fixtures: ['tables', 'table-editing'] },
   // --- Charts, diagrams, media & OLE -------------------------------------
   'objects.charts': {
-    fixtures: ['charts', 'chart-sizes', 'preserve-unsupported', 'slide-structure'],
+    fixtures: ['charts', 'chart-sizes', 'chart-data', 'preserve-unsupported', 'slide-structure'],
   },
   'objects.diagrams': {
-    fixtures: ['diagrams'],
+    fixtures: ['diagrams', 'diagram-editing'],
     approximations: ['diagram-drawing', 'line-model'],
   },
   'objects.media-ole': {
     fixtures: ['preserve-unsupported', 'slide-structure', 'preserved-content'],
   },
-  'objects.equations': { fixtures: ['preserved-content'] },
+  'objects.equations': {
+    fixtures: ['equations', 'preserved-content'],
+    approximations: ['equations'],
+  },
   // --- Slides, layouts & notes -------------------------------------------
   'slides.structure': { fixtures: ['slide-structure', 'slide-layouts'] },
   'slides.hidden': { fixtures: ['slide-layouts'] },
@@ -213,7 +219,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   'presenting.slideshow': { fixtures: [] },
   'presenting.animations-transitions': { fixtures: ['preserved-content'] },
   // --- Comments & review -------------------------------------------------
-  'review.comments': { fixtures: ['slide-structure'] },
+  'review.comments': { fixtures: ['slide-structure', 'text-runs'] },
   // --- Collaboration & automation ----------------------------------------
   'collaboration.realtime': { fixtures: ['text-runs'] },
   'collaboration.automation-api': { fixtures: ['text-runs'] },

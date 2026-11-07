@@ -74,7 +74,8 @@
     "link": "Link…",
     "alignOrDistribute": "Align or distribute",
     "slideBackground": "Slide background…",
-    "columns": "Columns…"
+    "columns": "Columns…",
+    "equation": "Equation…"
   },
   "contextMenu": {
     "railLabel": "Slide actions",
@@ -140,7 +141,9 @@
     "cannotCopyFrame": "Charts, diagrams, and objects cannot be copied or cut in this version",
     "altText": "Edit alt text…",
     "paragraph": "Paragraph…",
-    "font": "Font…"
+    "font": "Font…",
+    "chartLabel": "Chart actions",
+    "diagramLabel": "Diagram actions"
   },
   "mode": {
     "label": "Mode",
@@ -172,7 +175,9 @@
       "slide": "Slide",
       "image": "Picture",
       "section": "Section",
-      "table": "Table"
+      "table": "Table",
+      "chart": "Chart",
+      "diagram": "Diagram"
     },
     "smartGuides": "Smart guides",
     "find": "Find (Ctrl+F)",
@@ -400,6 +405,33 @@
     },
     "softEdges": "Soft edges",
     "softEdgeValue": "{value} pt",
+    "bevel": "Bevel",
+    "bevels": {
+      "circle": "Circle",
+      "relaxedInset": "Relaxed inset",
+      "cross": "Cross",
+      "coolSlant": "Cool slant",
+      "angle": "Angle",
+      "softRound": "Soft round",
+      "convex": "Convex",
+      "slope": "Slope",
+      "divot": "Divot",
+      "riblet": "Riblet",
+      "hardEdge": "Hard edge",
+      "artDeco": "Art deco"
+    },
+    "rotation3d": "3-D rotation",
+    "rotations3d": {
+      "isometricLeftDown": "Isometric: left down",
+      "isometricRightUp": "Isometric: right up",
+      "isometricTopUp": "Isometric: top up",
+      "isometricOffAxis1Left": "Off axis 1: left",
+      "isometricOffAxis1Right": "Off axis 1: right",
+      "obliqueTopLeft": "Oblique: top left",
+      "obliqueTopRight": "Oblique: top right",
+      "obliqueBottomLeft": "Oblique: bottom left",
+      "obliqueBottomRight": "Oblique: bottom right"
+    },
     "rotate": "Rotate",
     "rotations": {
       "right90": "Rotate right 90°",
@@ -412,12 +444,63 @@
     "selectionPane": "Selection pane",
     "shapeStyleSample": "Abc",
     "shapeEffects": "Shape effects",
+    "textEffects": "Text effects",
+    "transform": "Transform",
+    "noTransform": "No transform",
+    "textWarpSections": {
+      "followPath": "Follow path",
+      "warp": "Warp"
+    },
+    "textWarps": {
+      "textPlain": "Plain",
+      "textStop": "Stop",
+      "textTriangle": "Triangle",
+      "textTriangleInverted": "Triangle, inverted",
+      "textChevron": "Chevron",
+      "textChevronInverted": "Chevron, inverted",
+      "textRingInside": "Ring inside",
+      "textRingOutside": "Ring outside",
+      "textArchUp": "Arch up",
+      "textArchDown": "Arch down",
+      "textCircle": "Circle",
+      "textButton": "Button",
+      "textArchUpPour": "Arch up, filled",
+      "textArchDownPour": "Arch down, filled",
+      "textCirclePour": "Circle, filled",
+      "textButtonPour": "Button, filled",
+      "textCurveUp": "Curve up",
+      "textCurveDown": "Curve down",
+      "textCanUp": "Can up",
+      "textCanDown": "Can down",
+      "textWave1": "Wave 1",
+      "textWave2": "Wave 2",
+      "textDoubleWave1": "Double wave 1",
+      "textWave4": "Double wave 2",
+      "textInflate": "Inflate",
+      "textDeflate": "Deflate",
+      "textInflateBottom": "Inflate bottom",
+      "textDeflateBottom": "Deflate bottom",
+      "textInflateTop": "Inflate top",
+      "textDeflateTop": "Deflate top",
+      "textDeflateInflate": "Deflate and inflate",
+      "textDeflateInflateDeflate": "Deflate, inflate, deflate",
+      "textFadeRight": "Fade right",
+      "textFadeLeft": "Fade left",
+      "textFadeUp": "Fade up",
+      "textFadeDown": "Fade down",
+      "textSlantUp": "Slant up",
+      "textSlantDown": "Slant down",
+      "textCascadeUp": "Cascade up",
+      "textCascadeDown": "Cascade down"
+    },
     "formatShape": "Format shape",
     "noEffect": {
       "shadow": "No shadow",
       "reflection": "No reflection",
       "glow": "No glow",
-      "softEdge": "No soft edges"
+      "softEdge": "No soft edges",
+      "bevel": "No bevel",
+      "rotation3d": "No rotation"
     },
     "newSlide": "New slide (Ctrl+M)",
     "slideLayout": "Layout",
@@ -427,7 +510,8 @@
     "views": {
       "normal": "Normal",
       "slideSorter": "Slide sorter"
-    }
+    },
+    "equation": "Equation"
   },
   "table": {
     "insert": "Table",
@@ -755,7 +839,16 @@
     "noRoot": "Put this control inside the editor root (PptxEditor.Root or PptxEditorRoot) to use it",
     "dialogSlot": "This control opens a dialog",
     "selectWord": "Click in a word or select text",
-    "mixedSize": "The selected text has more than one size"
+    "mixedSize": "The selected text has more than one size",
+    "noCommentAuthor": "Set an author to comment",
+    "commentNoStatus": "Legacy comments cannot be resolved",
+    "commentNotEditable": "This comment holds content that cannot be edited here",
+    "noCommentTarget": "Comments can point only at elements on the slide's top level",
+    "animationsReadOnly": "The effects of this slide use markup that the editor does not change",
+    "noAnimation": "This slide has no such effect",
+    "noAnimationChange": "The effect or transition already has these settings",
+    "instantAnimation": "This effect is instant, so it has no duration",
+    "noChart": "Select a chart"
   },
   "rail": {
     "ariaLabel": "Slides",
@@ -802,7 +895,9 @@
     "close": "Close panel",
     "tabs": {
       "format": "Format",
+      "chart": "Chart",
       "selection": "Selection",
+      "animations": "Animations",
       "comments": "Comments"
     },
     "format": {
@@ -842,7 +937,72 @@
     },
     "comments": {
       "emptyTitle": "No comments",
-      "emptyBody": "Comments are preserved when you save. Reviewing them is not available in this version."
+      "emptyBody": "Comments are kept when you save."
+    },
+    "animations": {
+      "transition": "Slide transition",
+      "transitionKind": "Transition",
+      "kinds": {
+        "none": "None",
+        "fade": "Fade",
+        "push": "Push",
+        "wipe": "Wipe",
+        "split": "Split",
+        "cut": "Cut",
+        "other": "Other"
+      },
+      "duration": "Duration",
+      "secondsUnit": "s",
+      "advanceOnClick": "Advance on click",
+      "advanceAfter": "Advance after",
+      "advanceAutomatically": "Advance automatically",
+      "applyToAll": "Apply to all slides",
+      "effects": "Effects",
+      "addEffect": "Add effect",
+      "add": "Add",
+      "classes": {
+        "entrance": "Entrance",
+        "emphasis": "Emphasis",
+        "exit": "Exit",
+        "motionPath": "Motion path",
+        "other": "Other effect"
+      },
+      "presets": {
+        "appear": "Appear",
+        "fade": "Fade",
+        "flyIn": "Fly in",
+        "wipe": "Wipe",
+        "zoom": "Zoom",
+        "pulse": "Pulse",
+        "spin": "Spin",
+        "growShrink": "Grow or shrink",
+        "disappear": "Disappear",
+        "fadeOut": "Fade out",
+        "flyOut": "Fly out",
+        "wipeOut": "Wipe out",
+        "zoomOut": "Zoom out"
+      },
+      "listLabel": "Effects of this slide",
+      "emptyTitle": "No effects",
+      "emptyBody": "Select a shape on the slide, then add an effect.",
+      "readOnly": "The editor shows these effects but does not change them.",
+      "noPlayback": "The editor does not play effects or transitions.",
+      "invalidTime": "Enter a number of seconds in the allowed range.",
+      "start": "Start",
+      "triggers": {
+        "onClick": "On click",
+        "withPrevious": "With previous",
+        "afterPrevious": "After previous"
+      },
+      "delay": "Delay",
+      "moveEarlier": "Move earlier",
+      "moveLater": "Move later",
+      "remove": "Remove effect",
+      "onShapeClick": "On click of {shape}",
+      "paragraphs": "Paragraphs {start} to {end}",
+      "unnamed": "Missing shape",
+      "step": "Click {step}",
+      "withSlide": "With the slide"
     }
   },
   "pageSetup": {
@@ -935,9 +1095,16 @@
     "kindWeb": "Web address",
     "kindEmail": "Email",
     "kindSlide": "Slide",
+    "kindCustomShow": "Custom show",
+    "kindFile": "Other file",
     "emailAddress": "Email address",
     "emailSubject": "Subject",
     "slide": "Slide in this presentation",
+    "customShow": "Custom show in this presentation",
+    "customShowName": "Custom show: {name}",
+    "returnAfterShow": "Return to this slide after the show",
+    "filePath": "File path",
+    "filePlaceholder": "./report.pdf",
     "slideNumber": "Slide {number}",
     "firstSlide": "First slide",
     "lastSlide": "Last slide",
@@ -965,6 +1132,7 @@
     "placeholderTable": "Insert a table here",
     "placeholderPicture": "Insert a picture here",
     "tableCell": "Row {row}, column {column}",
+    "diagramShape": "Diagram shape {index} of {count}",
     "shapeSelected": "{kind} {name}, selected",
     "shapeSelectedWithAltText": "{kind} {name}, {description}, selected",
     "dragCanceled": "Drag canceled",
@@ -1009,8 +1177,40 @@
     "layoutNotFound": "The presentation has no such slide layout.",
     "sectionNotFound": "The presentation has no such section.",
     "slideNotFound": "The presentation has no such slide.",
+    "customShowNotFound": "This presentation has no such custom show.",
+    "unsafeFileLink": "Type a relative path that starts with ./ or ../, such as ./report.pdf. Link only to a document, picture, sound, or video file.",
     "sectionName": "A section name needs 1 to 255 characters.",
-    "view": "The editor has no such view."
+    "view": "The editor has no such view.",
+    "commentText": "Comment text must have 1 to 10,000 characters",
+    "commentAuthor": "The author name is too long",
+    "commentDate": "The comment date is not valid",
+    "noComment": "This comment no longer exists",
+    "chartData": {
+      "noChart": "Select one chart.",
+      "noData": "The chart has no data series.",
+      "combination": "The chart combines more than one chart type.",
+      "unsupportedType": "The editor does not edit the data of this chart type.",
+      "filtered": "The chart hides some of its series.",
+      "multiLevel": "The chart has categories in more than one level.",
+      "mixedCategories": "The series of the chart use different categories.",
+      "tooLarge": "The chart has more data than the editor edits.",
+      "empty": "A chart needs at least one series and one category.",
+      "invalidText": "A name or label has characters that a chart cannot keep.",
+      "notNumber": "Each value must be a number.",
+      "layout": "The cell references of the chart do not form one table, so you can change only names and values.",
+      "workbook": "The embedded workbook cannot take this change. Give each series a different name, and keep the cells beside the data empty."
+    },
+    "diagram": {
+      "noDiagram": "Select one diagram.",
+      "noNode": "Put the cursor in a shape of the diagram.",
+      "noText": "This diagram shape shows text from more than one point, so you cannot edit its text here.",
+      "lastShape": "A diagram keeps at least one shape at its top level.",
+      "layoutUnsupported": "The editor cannot lay out this diagram again, so you cannot add or delete its shapes.",
+      "noChildren": "This diagram shows no shapes below its top level.",
+      "tooLarge": "The diagram has more shapes than the editor edits."
+    },
+    "equationEmpty": "Type an equation.",
+    "equationSyntax": "The editor cannot read this equation. Check the brackets and the names after a backslash."
   },
   "find": {
     "label": "Find and replace",
@@ -1293,6 +1493,13 @@
     "font": "Font",
     "customChar": "Custom: {char}",
     "textFont": "Text font",
+    "pictureStyle": "Picture",
+    "picture": "Picture",
+    "choosePicture": "Choose picture…",
+    "pictureChosen": "Picture chosen",
+    "pictureType": "Choose a PNG, JPEG, or GIF picture.",
+    "pictureTooLarge": "The picture is too large. Choose a picture of up to 50 MB and 25 million pixels.",
+    "pictureUnreadable": "The picture cannot be read. Choose another file.",
     "errors": {
       "percent": "{field} must be a number from {min} to {max} %.",
       "whole": "{field} must be a whole number from {min} to {max}.",
@@ -1348,8 +1555,10 @@
       "view": "View",
       "shapeFormat": "Shape Format",
       "pictureFormat": "Picture Format",
+      "chartDesign": "Chart Design",
       "tableDesign": "Table Design",
-      "tableLayout": "Table Layout"
+      "tableLayout": "Table Layout",
+      "diagramDesign": "Diagram Design"
     }
   },
   "statusBar": {
@@ -1423,5 +1632,92 @@
     "keyHint": "Press H to show or hide the focused object, and F2 to rename it.",
     "emptyTitle": "No objects",
     "emptyBody": "Shapes, pictures, and text boxes on this slide show here."
+  },
+  "comments": {
+    "label": "Comments on this slide",
+    "new": "New comment",
+    "text": "Comment",
+    "addComment": "Add a comment…",
+    "replyText": "Reply",
+    "editText": "Edit comment",
+    "save": "Save",
+    "cancel": "Cancel",
+    "keyHint": "Enter posts. Shift+Enter starts a new line. Escape cancels.",
+    "noAuthor": "Set an author to comment.",
+    "pointsAt": "Points at {name}",
+    "on": "On {name}",
+    "resolved": "Resolved",
+    "unknownAuthor": "Unknown author",
+    "reply": "Reply",
+    "replyTo": "Reply to {author}",
+    "edit": "Edit",
+    "editOf": "Edit comment by {author}",
+    "delete": "Delete",
+    "deleteOf": "Delete comment by {author}",
+    "resolve": "Resolve",
+    "resolveOf": "Resolve thread by {author}",
+    "reopen": "Reopen",
+    "reopenOf": "Reopen thread by {author}",
+    "thread": "Comment by {author}",
+    "replies": "Replies to {author}",
+    "emptyTitle": "No comments on this slide",
+    "emptyBody": "Select New comment to start a thread."
+  },
+  "chartData": {
+    "editData": "Edit data…",
+    "categories": "Categories",
+    "xValues": "X values",
+    "seriesName": "Name of series {number}",
+    "categoryLabel": "Category {number}",
+    "xValueLabel": "X value {number}",
+    "cellLabel": "{series}, {category}",
+    "newSeries": "Series {number}",
+    "newCategory": "Category {number}",
+    "addCategory": "Add category",
+    "addSeries": "Add series",
+    "help": "Press Enter or leave a field to apply it. Leave a value empty for no value.",
+    "workbookKept": "The embedded workbook keeps its old values. The chart shows the values you enter.",
+    "workbookExternal": "The chart gets its data from a linked workbook. The chart shows the values you enter and stops updating from the link.",
+    "errors": {
+      "number": "Enter a number, or leave the cell empty.",
+      "xNumber": "Enter a number for each X value.",
+      "tooLong": "Use 255 characters or fewer.",
+      "limit": "A chart keeps at least one series and one category, and up to 255 series and 4,000 categories."
+    },
+    "name": "Name",
+    "series": "Series",
+    "unnamed": "Unnamed series",
+    "emptyTitle": "No chart selected",
+    "emptyBody": "Select a chart on the slide to edit its data.",
+    "notEditableTitle": "This chart data is read-only",
+    "removeCategoryNamed": "Remove category {name}",
+    "removeSeriesNamed": "Remove series {name}",
+    "removeSeries": "Remove series"
+  },
+  "diagram": {
+    "addAfter": "Add shape after",
+    "addBefore": "Add shape before",
+    "addBelow": "Add shape below",
+    "delete": "Delete shape"
+  },
+  "equation": {
+    "close": "Close",
+    "insertTitle": "Insert equation",
+    "editTitle": "Edit equation",
+    "gallery": "Common equations",
+    "linear": "Linear form",
+    "linearHelp": "Type a/b for a fraction, x^2 or x_i for a script, \\sqrt(x) for a root, and \\alpha for a Greek letter.",
+    "notEditable": "The selected equation has parts that the linear form cannot write. OK inserts a new equation.",
+    "insert": "Insert",
+    "galleryItems": {
+      "circleArea": "Area of a circle",
+      "quadratic": "Quadratic formula",
+      "pythagoras": "Pythagorean theorem",
+      "sum": "Sum of integers",
+      "integral": "Definite integral",
+      "limit": "Limit",
+      "matrix": "Matrix",
+      "euler": "Euler identity"
+    }
   }
 }

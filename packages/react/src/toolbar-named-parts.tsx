@@ -96,6 +96,8 @@ export interface ToolbarNamedParts {
   readonly Shapes: ToolbarSlotPartComponent;
   /** `insert.image`. */
   readonly ImageInsert: ToolbarPartComponent;
+  /** `insert.equation`: opens the Equation dialog. */
+  readonly Equation: ToolbarPartComponent;
   /** `shape.fill`. */
   readonly ShapeFill: ToolbarColorSplitComponent;
   /** `shape.lineColor`. */
@@ -112,6 +114,8 @@ export interface ToolbarNamedParts {
   readonly ShapeStyles: ToolbarSlotPartComponent;
   /** `shape.effects`. */
   readonly ShapeEffects: ToolbarSlotPartComponent;
+  /** `shape.textEffects`. */
+  readonly TextEffects: ToolbarSlotPartComponent;
   /** `shape.properties`. */
   readonly FormatShape: ToolbarPartComponent;
   /** `format.painter`. */
@@ -198,6 +202,16 @@ export interface ToolbarNamedParts {
   readonly ImageCropFit: ToolbarPartComponent;
   /** `image.properties`. */
   readonly ImageProperties: ToolbarPartComponent;
+  /** `chart.editData`. */
+  readonly ChartEditData: ToolbarPartComponent;
+  /** `diagram.addAfter`. */
+  readonly DiagramAddAfter: ToolbarPartComponent;
+  /** `diagram.addBefore`. */
+  readonly DiagramAddBefore: ToolbarPartComponent;
+  /** `diagram.addBelow`. */
+  readonly DiagramAddBelow: ToolbarPartComponent;
+  /** `diagram.delete`. */
+  readonly DiagramDelete: ToolbarPartComponent;
   /** `table.insert`. */
   readonly TableInsert: ToolbarPartComponent;
   /** `table.style`. */

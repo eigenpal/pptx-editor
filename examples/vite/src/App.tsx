@@ -14,6 +14,7 @@ import {
 } from 'react';
 import type { EditorModule, PptxEditorInstance, SidePanelTab } from '@pptx-editor.dev/core/editor';
 import { drawingModule } from '@pptx-editor.dev/pro/drawing';
+import { PptxEditorReview, reviewModule } from '@pptx-editor.dev/pro/react';
 import {
   PptxEditor,
   Icon,
@@ -61,10 +62,16 @@ import {
   type UnsavedEdits,
 } from '../../shared/demo-files.ts';
 
-// Glow, inner shadow, reflection, and soft edge (EigenPal Pro License).
+// Glow, inner shadow, reflection, and soft edge, and the comments pane (EigenPal Pro License).
 const MODULES: readonly EditorModule[] = [
   drawingModule({ licenseKey: import.meta.env.VITE_PPTX_LICENSE }),
+  reviewModule({ licenseKey: import.meta.env.VITE_PPTX_LICENSE }),
 ];
+/** The Comments tab of the side panel: the Pro comments pane. */
+const REVIEW_PANES = { comments: <PptxEditorReview /> };
+
+/** The author of the comments that the demo adds. */
+const DEMO_AUTHOR = 'Demo author';
 
 const base = import.meta.env.BASE_URL;
 /** A phone opens with the notes closed, so the slide gets the room; one tap opens them. */
@@ -348,6 +355,7 @@ function Shell({
           </div>
           {panel ? (
             <PptxEditor.SidePanel
+              panes={REVIEW_PANES}
               tab={panelTab}
               onTabChange={setPanelTab}
               onClose={() => setPanel(false)}
@@ -437,6 +445,7 @@ export function App() {
       colorMode={theme}
       popups={popups}
       modules={MODULES}
+      author={DEMO_AUTHOR}
       fonts={fonts}
       fontFamilies={CATALOG_FAMILIES}
       onReady={(instance) => {

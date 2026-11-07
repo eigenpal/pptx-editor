@@ -74,7 +74,8 @@
     "link": "链接…",
     "alignOrDistribute": "对齐或分布",
     "slideBackground": "幻灯片背景…",
-    "columns": "分栏…"
+    "columns": "分栏…",
+    "equation": "公式…"
   },
   "contextMenu": {
     "railLabel": "幻灯片操作",
@@ -140,7 +141,9 @@
     "cannotCopyFrame": "此版本无法复制或剪切图表、示意图和对象",
     "altText": "编辑替代文字…",
     "paragraph": "段落…",
-    "font": "字体…"
+    "font": "字体…",
+    "chartLabel": "图表操作",
+    "diagramLabel": "图示操作"
   },
   "mode": {
     "label": "模式",
@@ -172,7 +175,9 @@
       "slide": "幻灯片",
       "image": "图片",
       "section": "节",
-      "table": "表格"
+      "table": "表格",
+      "chart": "图表",
+      "diagram": "图示"
     },
     "smartGuides": "智能参考线",
     "find": "查找(Ctrl+F)",
@@ -400,6 +405,33 @@
     },
     "softEdges": "柔化边缘",
     "softEdgeValue": "{value} pt",
+    "bevel": "棱台",
+    "bevels": {
+      "circle": "圆",
+      "relaxedInset": "松散嵌入",
+      "cross": "十字形",
+      "coolSlant": "冷色斜面",
+      "angle": "角度",
+      "softRound": "柔圆",
+      "convex": "凸起",
+      "slope": "斜面",
+      "divot": "角度凹陷",
+      "riblet": "回旋",
+      "hardEdge": "硬边缘",
+      "artDeco": "艺术装饰"
+    },
+    "rotation3d": "三维旋转",
+    "rotations3d": {
+      "isometricLeftDown": "等轴：左下",
+      "isometricRightUp": "等轴：右上",
+      "isometricTopUp": "等轴：顶部朝上",
+      "isometricOffAxis1Left": "离轴 1：左",
+      "isometricOffAxis1Right": "离轴 1：右",
+      "obliqueTopLeft": "倾斜：左上",
+      "obliqueTopRight": "倾斜：右上",
+      "obliqueBottomLeft": "倾斜：左下",
+      "obliqueBottomRight": "倾斜：右下"
+    },
     "rotate": "旋转",
     "rotations": {
       "right90": "向右旋转 90°",
@@ -412,12 +444,63 @@
     "selectionPane": "选择窗格",
     "shapeStyleSample": "Abc",
     "shapeEffects": "形状效果",
+    "textEffects": "文本效果",
+    "transform": "转换",
+    "noTransform": "无转换",
+    "textWarpSections": {
+      "followPath": "跟随路径",
+      "warp": "弯曲"
+    },
+    "textWarps": {
+      "textPlain": null,
+      "textStop": null,
+      "textTriangle": null,
+      "textTriangleInverted": null,
+      "textChevron": null,
+      "textChevronInverted": null,
+      "textRingInside": null,
+      "textRingOutside": null,
+      "textArchUp": null,
+      "textArchDown": null,
+      "textCircle": null,
+      "textButton": null,
+      "textArchUpPour": null,
+      "textArchDownPour": null,
+      "textCirclePour": null,
+      "textButtonPour": null,
+      "textCurveUp": null,
+      "textCurveDown": null,
+      "textCanUp": null,
+      "textCanDown": null,
+      "textWave1": null,
+      "textWave2": null,
+      "textDoubleWave1": null,
+      "textWave4": null,
+      "textInflate": null,
+      "textDeflate": null,
+      "textInflateBottom": null,
+      "textDeflateBottom": null,
+      "textInflateTop": null,
+      "textDeflateTop": null,
+      "textDeflateInflate": null,
+      "textDeflateInflateDeflate": null,
+      "textFadeRight": null,
+      "textFadeLeft": null,
+      "textFadeUp": null,
+      "textFadeDown": null,
+      "textSlantUp": null,
+      "textSlantDown": null,
+      "textCascadeUp": null,
+      "textCascadeDown": null
+    },
     "formatShape": "设置形状格式",
     "noEffect": {
       "shadow": "无阴影",
       "reflection": "无映像",
       "glow": "无发光",
-      "softEdge": "无柔化边缘"
+      "softEdge": "无柔化边缘",
+      "bevel": "无棱台",
+      "rotation3d": "无旋转"
     },
     "newSlide": "新建幻灯片(Ctrl+M)",
     "slideLayout": "版式",
@@ -427,7 +510,8 @@
     "views": {
       "normal": "普通",
       "slideSorter": "幻灯片浏览"
-    }
+    },
+    "equation": "公式"
   },
   "table": {
     "insert": "表格",
@@ -755,7 +839,16 @@
     "noRoot": "请将此控件放在编辑器根元素(PptxEditor.Root 或 PptxEditorRoot)内以使用它",
     "dialogSlot": "此控件会打开对话框",
     "selectWord": "请在某个词中单击或选择文本",
-    "mixedSize": "所选文本包含多种字号"
+    "mixedSize": "所选文本包含多种字号",
+    "noCommentAuthor": "请先设置作者再添加批注",
+    "commentNoStatus": "旧格式批注无法标记为已解决",
+    "commentNotEditable": "此批注包含无法在此编辑的内容",
+    "noCommentTarget": "批注只能指向幻灯片顶层的元素",
+    "animationsReadOnly": "此幻灯片的效果使用了编辑器不会更改的标记",
+    "noAnimation": "此幻灯片没有该效果",
+    "noAnimationChange": "效果或切换已经是这些设置",
+    "instantAnimation": "此效果是瞬时的，因此没有持续时间",
+    "noChart": "请选择一个图表"
   },
   "rail": {
     "ariaLabel": "幻灯片",
@@ -802,7 +895,9 @@
     "close": "关闭面板",
     "tabs": {
       "format": "格式",
+      "chart": "图表",
       "selection": "选择",
+      "animations": "动画",
       "comments": "批注"
     },
     "format": {
@@ -842,7 +937,72 @@
     },
     "comments": {
       "emptyTitle": "没有批注",
-      "emptyBody": "保存时会保留批注。此版本不支持审阅批注。"
+      "emptyBody": "保存时会保留批注。"
+    },
+    "animations": {
+      "transition": "幻灯片切换",
+      "transitionKind": "切换",
+      "kinds": {
+        "none": "无",
+        "fade": "淡入/淡出",
+        "push": "推入",
+        "wipe": "擦除",
+        "split": "分割",
+        "cut": "切出",
+        "other": "其他"
+      },
+      "duration": "持续时间",
+      "secondsUnit": "秒",
+      "advanceOnClick": "单击鼠标时",
+      "advanceAfter": "设置自动换片时间",
+      "advanceAutomatically": "自动换片",
+      "applyToAll": "应用到全部幻灯片",
+      "effects": "效果",
+      "addEffect": "添加效果",
+      "add": "添加",
+      "classes": {
+        "entrance": "进入",
+        "emphasis": "强调",
+        "exit": "退出",
+        "motionPath": "动作路径",
+        "other": "其他效果"
+      },
+      "presets": {
+        "appear": "出现",
+        "fade": "淡化",
+        "flyIn": "飞入",
+        "wipe": "擦除",
+        "zoom": "缩放",
+        "pulse": "脉冲",
+        "spin": "陀螺旋",
+        "growShrink": "放大/缩小",
+        "disappear": "消失",
+        "fadeOut": "淡出",
+        "flyOut": "飞出",
+        "wipeOut": "擦除退出",
+        "zoomOut": "缩放退出"
+      },
+      "listLabel": "此幻灯片的效果",
+      "emptyTitle": "没有效果",
+      "emptyBody": "在幻灯片上选择一个形状，然后添加效果。",
+      "readOnly": "编辑器显示这些效果，但不会更改它们。",
+      "noPlayback": "编辑器不播放效果或切换。",
+      "invalidTime": "请输入允许范围内的秒数。",
+      "start": "开始",
+      "triggers": {
+        "onClick": "单击时",
+        "withPrevious": "与上一动画同时",
+        "afterPrevious": "上一动画之后"
+      },
+      "delay": "延迟",
+      "moveEarlier": "向前移动",
+      "moveLater": "向后移动",
+      "remove": "删除效果",
+      "onShapeClick": "单击 {shape} 时",
+      "paragraphs": "段落 {start} 至 {end}",
+      "unnamed": "缺少的形状",
+      "step": "单击 {step}",
+      "withSlide": "与幻灯片同时"
     }
   },
   "pageSetup": {
@@ -935,9 +1095,16 @@
     "kindWeb": "网址",
     "kindEmail": "电子邮件",
     "kindSlide": "幻灯片",
+    "kindCustomShow": "自定义放映",
+    "kindFile": "其他文件",
     "emailAddress": "电子邮件地址",
     "emailSubject": "主题",
     "slide": "此演示文稿中的幻灯片",
+    "customShow": "此演示文稿中的自定义放映",
+    "customShowName": "自定义放映：{name}",
+    "returnAfterShow": "放映后返回此幻灯片",
+    "filePath": "文件路径",
+    "filePlaceholder": "./report.pdf",
     "slideNumber": "幻灯片 {number}",
     "firstSlide": "第一张幻灯片",
     "lastSlide": "最后一张幻灯片",
@@ -965,6 +1132,7 @@
     "placeholderTable": "在此处插入表格",
     "placeholderPicture": "在此处插入图片",
     "tableCell": "第 {row} 行，第 {column} 列",
+    "diagramShape": "图示形状 {index}/{count}",
     "shapeSelected": "已选择 {kind} {name}",
     "shapeSelectedWithAltText": "已选择 {kind} {name}，{description}",
     "dragCanceled": "已取消拖动",
@@ -1009,8 +1177,40 @@
     "layoutNotFound": "演示文稿中没有此幻灯片版式。",
     "sectionNotFound": "演示文稿中没有此节。",
     "slideNotFound": "演示文稿中没有此幻灯片。",
+    "customShowNotFound": "此演示文稿中没有该自定义放映。",
+    "unsafeFileLink": "请输入以 ./ 或 ../ 开头的相对路径，例如 ./report.pdf。只能链接到文档、图片、声音或视频文件。",
     "sectionName": "节名称需要 1 到 255 个字符。",
-    "view": "编辑器中没有此视图。"
+    "view": "编辑器中没有此视图。",
+    "commentText": "批注文本须为 1 至 10,000 个字符",
+    "commentAuthor": "作者名称过长",
+    "commentDate": "批注日期无效",
+    "noComment": "此批注已不存在",
+    "chartData": {
+      "noChart": "请选择一个图表。",
+      "noData": "此图表没有数据系列。",
+      "combination": "此图表组合了多种图表类型。",
+      "unsupportedType": "无法编辑此类图表的数据。",
+      "filtered": "此图表隐藏了部分系列。",
+      "multiLevel": "此图表的类别有多个级别。",
+      "mixedCategories": "此图表的各系列使用不同的类别。",
+      "tooLarge": "此图表的数据超出了可编辑的范围。",
+      "empty": "图表至少需要一个系列和一个类别。",
+      "invalidText": "名称或标签包含图表无法保留的字符。",
+      "notNumber": "每个值都必须是数字。",
+      "layout": "此图表的单元格引用不构成一个表格，因此只能更改名称和值。",
+      "workbook": "嵌入的工作簿无法接受此更改。请为每个系列指定不同的名称，并保持数据旁边的单元格为空。"
+    },
+    "diagram": {
+      "noDiagram": "请选择一个图示。",
+      "noNode": "请将光标放在图示的形状中。",
+      "noText": "此形状显示多个项目的文本，因此无法在此处编辑其文本。",
+      "lastShape": "图示至少要保留一个顶层形状。",
+      "layoutUnsupported": "编辑器无法重新排列此图示，因此无法添加或删除其形状。",
+      "noChildren": "此图示不显示顶层以下的形状。",
+      "tooLarge": "图示的形状数量超出编辑器可编辑的范围。"
+    },
+    "equationEmpty": "请输入公式。",
+    "equationSyntax": "无法读取此公式。请检查括号和反斜杠后的名称。"
   },
   "find": {
     "label": "查找和替换",
@@ -1293,6 +1493,13 @@
     "font": "字体",
     "customChar": "自定义：{char}",
     "textFont": "文本字体",
+    "pictureStyle": "图片",
+    "picture": "图片",
+    "choosePicture": "选择图片…",
+    "pictureChosen": "已选择图片",
+    "pictureType": "请选择 PNG、JPEG 或 GIF 图片。",
+    "pictureTooLarge": "图片太大。请选择不超过 50 MB 和 2500 万像素的图片。",
+    "pictureUnreadable": "无法读取图片。请选择其他文件。",
     "errors": {
       "percent": "{field}必须是 {min} 到 {max} % 之间的数字。",
       "whole": "{field}必须是 {min} 到 {max} 之间的整数。",
@@ -1348,8 +1555,10 @@
       "view": "视图",
       "shapeFormat": "形状格式",
       "pictureFormat": "图片格式",
+      "chartDesign": "图表设计",
       "tableDesign": "表设计",
-      "tableLayout": "表布局"
+      "tableLayout": "表布局",
+      "diagramDesign": "图示设计"
     }
   },
   "statusBar": {
@@ -1423,5 +1632,92 @@
     "keyHint": "按 H 显示或隐藏有焦点的对象，按 F2 重命名。",
     "emptyTitle": "没有对象",
     "emptyBody": "此幻灯片上的形状、图片和文本框显示在此处。"
+  },
+  "comments": {
+    "label": "此幻灯片的批注",
+    "new": "新建批注",
+    "text": "批注",
+    "addComment": "添加批注…",
+    "replyText": "回复",
+    "editText": "编辑批注",
+    "save": "保存",
+    "cancel": "取消",
+    "keyHint": "按 Enter 发布，按 Shift+Enter 换行，按 Esc 取消。",
+    "noAuthor": "请先设置作者再添加批注。",
+    "pointsAt": "指向 {name}",
+    "on": "指向 {name}",
+    "resolved": "已解决",
+    "unknownAuthor": "未知作者",
+    "reply": "回复",
+    "replyTo": "回复 {author}",
+    "edit": "编辑",
+    "editOf": "编辑 {author} 的批注",
+    "delete": "删除",
+    "deleteOf": "删除 {author} 的批注",
+    "resolve": "解决",
+    "resolveOf": "解决 {author} 的会话",
+    "reopen": "重新打开",
+    "reopenOf": "重新打开 {author} 的会话",
+    "thread": "{author} 的批注",
+    "replies": "对 {author} 的回复",
+    "emptyTitle": "此幻灯片没有批注",
+    "emptyBody": "选择“新建批注”开始一个会话。"
+  },
+  "chartData": {
+    "editData": "编辑数据…",
+    "categories": "类别",
+    "xValues": "X 值",
+    "seriesName": "系列 {number} 的名称",
+    "categoryLabel": "类别 {number}",
+    "xValueLabel": "X 值 {number}",
+    "cellLabel": "{series}，{category}",
+    "newSeries": "系列 {number}",
+    "newCategory": "类别 {number}",
+    "addCategory": "添加类别",
+    "addSeries": "添加系列",
+    "help": "按 Enter 或离开字段即可应用。留空表示无值。",
+    "workbookKept": "嵌入的工作簿保留原来的值。图表显示你输入的值。",
+    "workbookExternal": "此图表使用链接工作簿中的数据。图表显示你输入的值，并停止从链接更新。",
+    "errors": {
+      "number": "请输入数字，或将单元格留空。",
+      "xNumber": "请为每个 X 值输入数字。",
+      "tooLong": "请输入不超过 255 个字符。",
+      "limit": "图表至少保留一个系列和一个类别，最多 255 个系列和 4,000 个类别。"
+    },
+    "name": "名称",
+    "series": "系列",
+    "unnamed": "未命名系列",
+    "emptyTitle": "未选择图表",
+    "emptyBody": "选择幻灯片上的图表以编辑其数据。",
+    "notEditableTitle": "此图表数据为只读",
+    "removeCategoryNamed": "删除类别 {name}",
+    "removeSeriesNamed": "删除系列 {name}",
+    "removeSeries": "删除系列"
+  },
+  "diagram": {
+    "addAfter": "在后面添加形状",
+    "addBefore": "在前面添加形状",
+    "addBelow": "在下方添加形状",
+    "delete": "删除形状"
+  },
+  "equation": {
+    "close": "关闭",
+    "insertTitle": "插入公式",
+    "editTitle": "编辑公式",
+    "gallery": "常用公式",
+    "linear": "线性格式",
+    "linearHelp": "分数输入 a/b，上下标输入 x^2 或 x_i，根号输入 \\sqrt(x)，希腊字母输入 \\alpha。",
+    "notEditable": "所选公式中有线性格式无法表示的部分。按确定将插入新公式。",
+    "insert": "插入",
+    "galleryItems": {
+      "circleArea": "圆的面积",
+      "quadratic": "求根公式",
+      "pythagoras": "勾股定理",
+      "sum": "整数求和",
+      "integral": "定积分",
+      "limit": "极限",
+      "matrix": "矩阵",
+      "euler": "欧拉恒等式"
+    }
   }
 }

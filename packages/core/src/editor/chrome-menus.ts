@@ -153,6 +153,7 @@ export const CHROME_MENUS: readonly ChromeMenu[] = [
       item('insert.image', 'menu.picture'),
       item('insert.shape', 'menu.shape'),
       item('insert.line', 'menu.line'),
+      item('insert.equation', 'menu.equation'),
       SEPARATOR,
       item('text.link', 'menu.link', 'contextMenu.shortcuts.link'),
     ],
@@ -223,10 +224,11 @@ export const CHROME_MENUS: readonly ChromeMenu[] = [
 ];
 
 /**
- * What a canvas context menu opened on: shapes, pictures only, text being edited, a table cell
- * (a caret in a cell, or a cell range), or empty slide area. @public
+ * What a canvas context menu opened on: shapes, pictures only, one chart, text being edited, a
+ * table cell (a caret in a cell, or a cell range), or empty slide area. @public
  */
-export type CanvasMenuKind = 'shapes' | 'picture' | 'text' | 'table' | 'tableFrame' | 'slide';
+export type CanvasMenuKind =
+  'shapes' | 'picture' | 'chart' | 'diagram' | 'text' | 'table' | 'tableFrame' | 'slide';
 
 /**
  * The context menu kind for a snapshot: a table cell (a caret in a cell, or a cell range), text
@@ -234,12 +236,15 @@ export type CanvasMenuKind = 'shapes' | 'picture' | 'text' | 'table' | 'tableFra
  * slide. @internal
  */
 export function canvasMenuKind(
-  snapshot: Pick<EditorSnapshot, 'selection' | 'image'> & Partial<Pick<EditorSnapshot, 'table'>>
+  snapshot: Pick<EditorSnapshot, 'selection' | 'image'> &
+    Partial<Pick<EditorSnapshot, 'table' | 'chart' | 'diagram'>>
 ): CanvasMenuKind {
   const sel = snapshot.selection;
   if (sel.kind === 'cells' || (sel.kind === 'text' && sel.cell)) return 'table';
+  if (snapshot.diagram) return 'diagram';
   if (sel.kind === 'text') return 'text';
   if (sel.kind === 'shapes' && snapshot.table) return 'tableFrame';
+  if (sel.kind === 'shapes' && snapshot.chart) return 'chart';
   if (sel.kind === 'shapes') return snapshot.image ? 'picture' : 'shapes';
   return 'slide';
 }
@@ -390,6 +395,39 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     SEPARATOR,
     item('image.altText', 'contextMenu.altText'),
     item('image.properties'),
+  ],
+  // The chart menu: Edit Data first, then the shape rows without the format painter.
+  chart: [
+    item('chart.editData'),
+    SEPARATOR,
+    item('edit.cut', 'contextMenu.cut', 'contextMenu.shortcuts.cut'),
+    item('edit.copy', 'contextMenu.copy', 'contextMenu.shortcuts.copy'),
+    item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
+    item('more.duplicate', 'contextMenu.duplicate', 'contextMenu.shortcuts.duplicate'),
+    item('more.delete', 'contextMenu.delete', 'contextMenu.shortcuts.delete'),
+    SEPARATOR,
+    ...ORDER_ROWS,
+    SEPARATOR,
+    item('arrange.group', 'contextMenu.group', 'contextMenu.shortcuts.group'),
+    item('arrange.ungroup', 'contextMenu.ungroup', 'contextMenu.shortcuts.ungroup'),
+    SEPARATOR,
+    item('image.altText', 'contextMenu.altText'),
+  ],
+  // The diagram menu: the shape commands first, then the object rows.
+  diagram: [
+    item('diagram.addAfter'),
+    item('diagram.addBefore'),
+    item('diagram.addBelow'),
+    item('diagram.delete'),
+    SEPARATOR,
+    item('edit.cut', 'contextMenu.cut', 'contextMenu.shortcuts.cut'),
+    item('edit.copy', 'contextMenu.copy', 'contextMenu.shortcuts.copy'),
+    item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
+    item('more.duplicate', 'contextMenu.duplicate', 'contextMenu.shortcuts.duplicate'),
+    SEPARATOR,
+    ...ORDER_ROWS,
+    SEPARATOR,
+    item('image.altText', 'contextMenu.altText'),
   ],
   slide: [
     item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),

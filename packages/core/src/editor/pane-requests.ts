@@ -6,10 +6,26 @@
 // This module imports nothing: the refusal scan of the automation hosts follows imports.
 
 /** The tabs of the side panel, in order. @internal */
-export const SIDE_PANEL_TABS = ['format', 'selection', 'comments'] as const;
+export const SIDE_PANEL_TABS = ['format', 'chart', 'selection', 'animations', 'comments'] as const;
 
-/** A tab of the side panel: Format, Selection (the selection pane), or Comments. @public */
+/**
+ * A tab of the side panel: Format, Chart Data, Selection (the selection pane), Animations, or
+ * Comments. @public
+ */
 export type SidePanelTab = (typeof SIDE_PANEL_TABS)[number];
+
+/**
+ * The icon of each side panel tab (a name in `ICON_PATHS`). The tab row shows the icons, with the
+ * label of the selected tab beside its icon, so five tabs fit the panel in every locale; each tab
+ * keeps its full label as its accessible name and tooltip. @internal
+ */
+export const SIDE_PANEL_TAB_ICONS: Readonly<Record<SidePanelTab, string>> = {
+  format: 'tune',
+  chart: 'table_chart',
+  selection: 'list_alt',
+  animations: 'play_arrow',
+  comments: 'comment',
+};
 
 type PaneListener = (pane: SidePanelTab) => void;
 
@@ -79,7 +95,22 @@ export function takePaneRequest(editor: object | null | undefined): SidePanelTab
 
 /** Whether a slot is a pane slot, which follows the pane listeners. @internal */
 export function isPaneSlot(slot: string): boolean {
-  return slot === 'arrange.selectionPane' || slot === 'shape.properties';
+  return (
+    slot === 'arrange.selectionPane' || slot === 'shape.properties' || slot === 'chart.editData'
+  );
+}
+
+/**
+ * The tabs the side panel shows, in order: Chart Data only while a chart is selected, or while
+ * it is the open tab (it then says to select a chart). @internal
+ */
+export function visibleSidePanelTabs(
+  chartSelected: boolean,
+  open: SidePanelTab
+): readonly SidePanelTab[] {
+  return chartSelected || open === 'chart'
+    ? SIDE_PANEL_TABS
+    : SIDE_PANEL_TABS.filter((tab) => tab !== 'chart');
 }
 
 /** Whether a side panel or a host listens for pane requests of `editor`. @internal */

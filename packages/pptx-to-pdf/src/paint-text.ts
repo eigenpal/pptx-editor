@@ -22,6 +22,9 @@ import {
   pushGraphicsState,
   setFillingRgbColor,
   setFontAndSize,
+  setLineWidth,
+  setStrokingRgbColor,
+  stroke,
   setTextMatrix,
   setTextRenderingMode,
   showText,
@@ -29,10 +32,16 @@ import {
   TextRenderingMode,
 } from 'pdf-lib';
 import type { ResolvedFill } from '@pptx-editor.dev/core/cascade';
-import { hasCharacters, type GlyphRun, type TextLayout } from '@pptx-editor.dev/core/layout';
+import {
+  hasCharacters,
+  type GlyphRun,
+  type PathCommand,
+  type TextLayout,
+  type WarpedRun,
+} from '@pptx-editor.dev/core/layout';
 import { EmbeddedFace } from './fonts.ts';
-import { flatColor, gradientBox, ownFill, type FillScope } from './paint-fill.ts';
-import { clip, EMU_PER_PT, rgb, type PageOps } from './page-ops.ts';
+import { drawPicture, flatColor, gradientBox, ownFill, type FillScope } from './paint-fill.ts';
+import { clip, clipNonZero, EMU_PER_PT, rgb, tracePath, type PageOps } from './page-ops.ts';
 
 /** The embedded face for a layout face id, or null with a diagnostic. */
 function fontFor(faceId: string, family: string, p: PageOps): EmbeddedFace | null {
@@ -82,11 +91,21 @@ function enterFrame(layout: TextLayout, p: PageOps): void {
 /** Draw a text layout in its frame's space. `scope` resolves group fills. */
 export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope): Promise<void> {
   enterFrame(layout, p);
+  if (layout.warped) {
+    await drawWarped(layout, layout.warped, p, scope);
+    p.push(popGraphicsState());
+    return;
+  }
   let bounds: ReturnType<typeof textBounds> | undefined;
+  const markBounds: { box?: ReturnType<typeof textBounds> } = {};
   if (layout.upright !== 'none' && hasCharacters(layout))
     p.diag.add('text.upright', 'approximation', 'Upright vertical characters are drawn rotated.');
   for (const line of layout.lines) {
     for (const run of line.runs) {
+      if (run.picture) {
+        await drawBulletPicture(run, line.baseline, p);
+        continue;
+      }
       if (run.text.length === 0) continue;
       if (run.props.highlight && run.kind === 'text') {
         const x0 = run.x[0];
@@ -167,7 +186,131 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
       p.push(popGraphicsState());
       decorate();
     }
+    if (line.marks) drawMarks(layout, line, p, scope, markBounds);
   }
+  p.push(popGraphicsState());
+}
+
+/**
+ * Fill a path of a text body in a text fill: a gradient spans the body's laid-out bounds, as in
+ * the SVG paint. `bounds` keeps the bounds once measured.
+ */
+function fillTextPath(
+  layout: TextLayout,
+  fillValue: ResolvedFill,
+  commands: readonly PathCommand[],
+  p: PageOps,
+  scope: FillScope,
+  bounds: { box?: ReturnType<typeof textBounds> }
+): void {
+  if (commands.length === 0) return;
+  const own = ownFill(fillValue, scope).fill;
+  if (own.type === 'linear' || own.type === 'path') {
+    if (own.stops.length === 0) return;
+    const box = (bounds.box ??= textBounds(layout));
+    p.push(pushGraphicsState());
+    tracePath(commands, p);
+    p.push(clipNonZero(), endPath(), concatTransformationMatrix(1, 0, 0, 1, box.x, box.y));
+    gradientBox(own, box.w, box.h, p);
+    p.push(popGraphicsState());
+    return;
+  }
+  const color = flatColor(fillValue, scope, p, 'text');
+  if (!color) return;
+  p.push(pushGraphicsState());
+  p.alpha(color.a, 1);
+  p.push(setFillingRgbColor(...rgb(color)));
+  tracePath(commands, p);
+  p.push(fill(), popGraphicsState());
+}
+
+/**
+ * The marks of a line's equations (fraction rules, radical signs, stretched delimiters,
+ * braces), filled in the math run's fill, as in the SVG paint.
+ */
+function drawMarks(
+  layout: TextLayout,
+  line: TextLayout['lines'][number],
+  p: PageOps,
+  scope: FillScope,
+  bounds: { box?: ReturnType<typeof textBounds> }
+): void {
+  for (const mark of line.marks ?? []) {
+    const commands = mark.commands.map((c): PathCommand => {
+      if (c.op === 'Z') return c;
+      if (c.op === 'Q') return { ...c, y1: line.baseline - c.y1, y: line.baseline - c.y };
+      if (c.op === 'C')
+        return { ...c, y1: line.baseline - c.y1, y2: line.baseline - c.y2, y: line.baseline - c.y };
+      return { ...c, y: line.baseline - c.y };
+    });
+    fillTextPath(layout, mark.props.fill, commands, p, scope, bounds);
+  }
+}
+
+/**
+ * Warped text (`a:prstTxWarp`) as the paths layout mapped into the warp, as in the SVG paint
+ * (`core/src/output/paint-text.ts`, `paintWarped`): the highlight, then the glyphs in the run's
+ * fill (nonzero, as glyph outlines fill), their solid outline, then the underline. A picture
+ * bullet draws on the parallelogram that the warp gives it. Paths, not text, so the warped
+ * words are not in the PDF text layer.
+ */
+async function drawWarped(
+  layout: TextLayout,
+  warped: readonly WarpedRun[],
+  p: PageOps,
+  scope: FillScope
+): Promise<void> {
+  const bounds: { box?: ReturnType<typeof textBounds> } = {};
+  const paint = (fillValue: ResolvedFill, commands: readonly PathCommand[]): void =>
+    fillTextPath(layout, fillValue, commands, p, scope, bounds);
+  for (const w of warped) {
+    const run = layout.lines[w.line]?.runs[w.run];
+    if (!run) continue;
+    if (run.picture) {
+      if (w.picture) await drawWarpedPicture(run, w.picture, p);
+      continue;
+    }
+    if (run.props.highlight && w.highlight.length) {
+      p.push(pushGraphicsState(), setFillingRgbColor(...rgb(run.props.highlight)));
+      tracePath(w.highlight, p);
+      p.push(fill(), popGraphicsState());
+    }
+    paint(run.props.fill, w.glyphs);
+    // The outline strokes the warped glyphs over their fill, as the SVG paint does: a solid
+    // outline in its color, any other outline not at all.
+    const outline = run.props.outline;
+    if (outline && outline.fill.type === 'solid' && w.glyphs.length) {
+      p.push(pushGraphicsState(), setStrokingRgbColor(...rgb(outline.fill.color)));
+      p.push(setLineWidth(outline.width));
+      tracePath(w.glyphs, p);
+      p.push(stroke(), popGraphicsState());
+    }
+    paint(run.props.underlineFill ?? run.props.fill, w.underline);
+  }
+}
+
+/** A picture bullet of warped text, stretched over the parallelogram the warp gives it. */
+async function drawWarpedPicture(
+  run: GlyphRun,
+  box: NonNullable<WarpedRun['picture']>,
+  p: PageOps
+): Promise<void> {
+  const pic = run.picture;
+  const w = run.x[run.x.length - 1] - run.x[0];
+  if (!pic || !(w > 0) || !(pic.height > 0)) return;
+  const { origin, across, down } = box;
+  p.push(
+    pushGraphicsState(),
+    concatTransformationMatrix(
+      across[0] / w,
+      across[1] / w,
+      down[0] / pic.height,
+      down[1] / pic.height,
+      origin[0],
+      origin[1]
+    )
+  );
+  await drawPicture(pic.part, bulletFill(pic), w, pic.height, p);
   p.push(popGraphicsState());
 }
 
@@ -250,6 +393,38 @@ function drawDecorations(
   }
 }
 
+/**
+ * The picture of a picture bullet, standing on the baseline, stretched over its box as the SVG
+ * paint draws it. A picture that cannot be read draws nothing.
+ */
+async function drawBulletPicture(run: GlyphRun, baseline: number, p: PageOps): Promise<void> {
+  const pic = run.picture;
+  if (!pic) return;
+  const x = run.x[0];
+  const w = run.x[run.x.length - 1] - x;
+  if (!(w > 0) || !(pic.height > 0)) return;
+  p.push(pushGraphicsState(), concatTransformationMatrix(1, 0, 0, 1, x, baseline - pic.height));
+  await drawPicture(pic.part, bulletFill(pic), w, pic.height, p);
+  p.push(popGraphicsState());
+}
+
+/** The picture of a picture bullet as a stretched picture fill. */
+function bulletFill(
+  pic: NonNullable<GlyphRun['picture']>
+): Extract<ResolvedFill, { type: 'picture' }> {
+  const none = { l: 0, t: 0, r: 0, b: 0 };
+  return {
+    type: 'picture',
+    rId: pic.rId,
+    ...(pic.svgRId ? { svgRId: pic.svgRId } : {}),
+    srcRect: none,
+    mode: 'stretch',
+    fillRect: none,
+    effects: [],
+    rotWithShape: true,
+  };
+}
+
 /** The laid-out bounds of a text body in its frame, as the SVG paint's gradient text spans. */
 function textBounds(layout: TextLayout): { x: number; y: number; w: number; h: number } {
   let [x, y, r, b] = [Infinity, Infinity, -Infinity, -Infinity];
@@ -280,7 +455,15 @@ export function fillTextOutlines(
   strokeToo = false
 ): void {
   enterFrame(layout, p);
-  for (const line of layout.lines) {
+  // Warped text casts the warped glyphs.
+  for (const w of layout.warped ?? []) {
+    const run = layout.lines[w.line]?.runs[w.run];
+    if (!run || w.glyphs.length === 0) continue;
+    if (ownFill(run.props.fill, scope).fill.type === 'none') continue;
+    tracePath(w.glyphs, p);
+    p.push(strokeToo ? fillAndStroke() : fill());
+  }
+  for (const line of layout.warped ? [] : layout.lines) {
     for (const run of line.runs) {
       if (run.text.length === 0) continue;
       if (ownFill(run.props.fill, scope).fill.type === 'none') continue;

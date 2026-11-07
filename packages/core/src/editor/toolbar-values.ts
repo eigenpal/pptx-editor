@@ -13,6 +13,7 @@ import type {
   OrderMove,
   RotateChoice,
   ShapeEffectsValue,
+  TextEffectsValue,
   ShapeStyleChoice,
   ShapeStyleValue,
   TextAlign,
@@ -93,6 +94,7 @@ export interface ToolbarValueMap {
   'arrange.align': ObjectAlign | 'distributeHorizontal' | 'distributeVertical';
   'shape.styles': ShapeStyleValue | ShapeStyleChoice;
   'shape.effects': ShapeEffectsValue;
+  'shape.textEffects': TextEffectsValue;
   'arrange.rotate': RotateChoice;
   /** A layout id from `snapshot().layouts`. */
   'slide.add': string;

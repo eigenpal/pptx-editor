@@ -20,7 +20,7 @@ import {
 } from '../store/index.ts';
 import { OpBatch } from './commands/op-batch.ts';
 import { withoutEditorMarks } from './commands/table-edit-marks.ts';
-import { repairTablesForSave } from './commands/table-repair.ts';
+import { packageForSave } from './commands/save-repair.ts';
 import { createAutomationHost, type AutomationDocumentPort } from './host.ts';
 import type { AutomationImageTarget } from './plan-images.ts';
 import type { AutomationHost } from './protocol.ts';
@@ -74,7 +74,7 @@ export function storeAutomationPort(
       if (!r.ok) return { ok: false, reason: r.rejection.code };
       return { ok: true, changed: store.revision !== before };
     },
-    save: () => writePptx(repairTablesForSave(store.package)),
+    save: () => writePptx(packageForSave(store.package)),
     subscribe: (listener) => store.subscribe(() => listener()),
     measurer: () => options.measurer,
     collaborating: () => options.collaborating === true,

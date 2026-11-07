@@ -19,7 +19,7 @@ export const PACKAGES = [
     name: '@pptx-editor.dev/pro',
     root: 'packages/pro',
     slug: 'pro',
-    entries: ['index', 'drawing'],
+    entries: ['index', 'drawing', 'react', 'vue'],
   },
   {
     name: '@pptx-editor.dev/pptx-to-pdf',

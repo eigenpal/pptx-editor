@@ -98,6 +98,26 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'The shape already has those adjust values, so nothing changes.',
   ],
   [
+    'disabled.noAnimationChange',
+    'edit.no-change',
+    'The effect or the transition already has those settings, so nothing changes.',
+  ],
+  [
+    'disabled.animationsReadOnly',
+    'edit.animations-read-only',
+    'The slide keeps its effects in markup that the editor does not change. Edit them in the file.',
+  ],
+  [
+    'disabled.noAnimation',
+    'edit.no-animation',
+    'The slide has no main sequence effect with that id. Read the effect ids of the slide first.',
+  ],
+  [
+    'disabled.instantAnimation',
+    'edit.instant-animation',
+    'The effect is instant, so it has no duration. Change its delay instead.',
+  ],
+  [
     'disabled.noAdjustHandles',
     'edit.unsupported-element',
     'Only a preset shape with adjust handles has adjust values. Select such a shape.',
@@ -248,7 +268,47 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'edit.unsupported-element',
     'The object is of a kind this API cannot edit, for example a chart or an embedded object. Read it, or edit another object.',
   ],
+  [
+    'disabled.noCommentAuthor',
+    'edit.no-comment-author',
+    'A comment needs an author. Pass author, or set the author option of the editor.',
+  ],
+  [
+    'disabled.commentNoStatus',
+    'edit.comment-no-status',
+    'Legacy comments have no resolved state. Reply to the thread instead.',
+  ],
+  [
+    'disabled.commentNotEditable',
+    'edit.comment-not-editable',
+    'The comment holds content other than text, such as a mention. Reply instead of editing it.',
+  ],
+  [
+    'disabled.noCommentTarget',
+    'edit.no-comment-target',
+    'A comment can point only at an element on the top level of the current slide. Pass its id, or none.',
+  ],
   // Edit errors of the engine (`errors.*`): GeneralException, or InvalidArgument for a name.
+  [
+    'errors.commentText',
+    'edit.comment-text',
+    'Comment text has 1 to 10000 characters. Pass shorter text that is not empty.',
+  ],
+  [
+    'errors.commentAuthor',
+    'edit.comment-author',
+    'An author name has up to 255 characters. Pass a shorter name.',
+  ],
+  [
+    'errors.commentDate',
+    'edit.comment-date',
+    'A comment date is an ISO 8601 date and time, such as 2026-11-07T10:00:00Z. Pass one, or none.',
+  ],
+  [
+    'errors.noComment',
+    'edit.comment-not-found',
+    'The slide has no comment with this id. Read the comments of the slide again.',
+  ],
   [
     'errors.altTextLength',
     'edit.alt-text-length',
@@ -268,6 +328,106 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'errors.slideSizeRange',
     'edit.coordinate-range',
     'A slide side is from 1 to 56 inches (914400 to 51206400 EMU). Pass a size in that range.',
+  ],
+  [
+    'errors.chartData.noChart',
+    'edit.chart-data',
+    'Select one chart frame, or pass the node id of a chart on the current slide.',
+  ],
+  [
+    'errors.chartData.noData',
+    'edit.chart-data',
+    'The chart has no data series to edit. Edit a chart that plots at least one series.',
+  ],
+  [
+    'errors.chartData.combination',
+    'edit.chart-data-unsupported',
+    'The chart combines chart types, and its data is read-only. Edit a chart with one chart type.',
+  ],
+  [
+    'errors.chartData.unsupportedType',
+    'edit.chart-data-unsupported',
+    'Only bar, column, line, area, pie, doughnut, radar, and scatter chart data is editable.',
+  ],
+  [
+    'errors.chartData.filtered',
+    'edit.chart-data-unsupported',
+    'The chart hides some of its series, and its data is read-only.',
+  ],
+  [
+    'errors.chartData.multiLevel',
+    'edit.chart-data-unsupported',
+    'The chart has multi-level categories, and its data is read-only.',
+  ],
+  [
+    'errors.chartData.mixedCategories',
+    'edit.chart-data-unsupported',
+    'The series of the chart use different categories, and its data is read-only.',
+  ],
+  [
+    'errors.chartData.tooLarge',
+    'edit.chart-data-range',
+    'A chart edits up to 255 series and 4000 categories. Pass less data.',
+  ],
+  [
+    'errors.chartData.empty',
+    'edit.chart-data-range',
+    'A chart needs at least one series and one category. Keep one of each.',
+  ],
+  [
+    'errors.chartData.invalidText',
+    'edit.chart-data-text',
+    'A name or label holds characters that XML cannot keep, or is longer than 255 characters. Remove them.',
+  ],
+  [
+    'errors.chartData.notNumber',
+    'edit.chart-data-value',
+    'Each value must be a finite number or null. Pass numbers, and finite X values for a scatter chart.',
+  ],
+  [
+    'errors.chartData.workbook',
+    'edit.chart-data-layout',
+    'The embedded workbook cannot take the new table. Give each series a different name, and keep the cells beside the data empty.',
+  ],
+  [
+    'errors.chartData.layout',
+    'edit.chart-data-layout',
+    'The cell references of the chart do not form one table. Change only names and values.',
+  ],
+  [
+    'errors.diagram.noDiagram',
+    'edit.diagram',
+    'Select one diagram frame, or pass the node id of a diagram on the current slide.',
+  ],
+  [
+    'errors.diagram.noNode',
+    'edit.diagram',
+    'Put the caret in a diagram shape, or pass the model id of a content node as `node`.',
+  ],
+  [
+    'errors.diagram.noText',
+    'edit.diagram-text',
+    'The diagram shape shows the text of more than one node. Edit the text of each node instead.',
+  ],
+  [
+    'errors.diagram.lastShape',
+    'edit.diagram-range',
+    'A diagram keeps at least one top-level node. Add a node before you delete this one.',
+  ],
+  [
+    'errors.diagram.layoutUnsupported',
+    'edit.diagram-unsupported',
+    'Only a diagram whose saved drawing is a line of blocks lays out again. Edit the text of its nodes instead.',
+  ],
+  [
+    'errors.diagram.noChildren',
+    'edit.diagram-unsupported',
+    'The diagram draws no level below this node. Add a node at the same level instead.',
+  ],
+  [
+    'errors.diagram.tooLarge',
+    'edit.diagram-range',
+    'A diagram data model holds up to 4096 points. Delete nodes before you add more.',
   ],
   [
     'errors.exportFailed',
@@ -298,6 +458,11 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'errors.invalidText',
     'edit.invalid-text',
     'The text has no characters that a slide can hold, such as control characters only. Remove them.',
+  ],
+  [
+    'errors.customShowNotFound',
+    'edit.custom-show-not-found',
+    'The presentation has no custom show with this id. Read the custom shows of the deck again.',
   ],
   [
     'errors.layoutNotFound',
@@ -333,6 +498,11 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'errors.unsafeLink',
     'argument.not-accepted',
     'Use an http, https, mailto, tel, or ftp address of up to 2048 characters.',
+  ],
+  [
+    'errors.unsafeFileLink',
+    'argument.not-accepted',
+    'Use a relative path that starts with ./ or ../, with at most two ../ steps, to a document, picture, sound, or video file.',
   ],
   [
     'errors.unsupported',

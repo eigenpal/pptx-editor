@@ -53,6 +53,7 @@ const OFF_REASONS: Readonly<Record<string, string>> = {
   background: 'dialog.unavailable',
   imageAltText: 'dialog.unavailable',
   imageProperties: 'dialog.unavailable',
+  equation: 'dialog.unavailable',
   paragraph: 'dialog.unavailable',
   font: 'dialog.unavailable',
   bulletsAndNumbering: 'dialog.unavailable',
@@ -224,7 +225,7 @@ function LinkPopupHost({ store, views }: { store: HyperlinkPopupStore; views: nu
     <>
       {content}
       <span className="pptx-sr-only" role="status" aria-live="polite">
-        {linkPopupAnnouncement(state, t)}
+        {linkPopupAnnouncement(state, t, editor?.snapshot().customShows)}
       </span>
     </>
   );

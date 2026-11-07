@@ -18,7 +18,12 @@ import type {
   PptxEditorInstance,
   TextInputKind,
 } from '@pptx-editor.dev/core/editor';
+import { readCommentThreads } from '@pptx-editor.dev/core/editor';
 import { png, type ConvergenceFixture, type TextInputFixture } from './convergence-harness.ts';
+import { buildPptx } from '../../../../scripts/fixtures/builder.ts';
+import { chartDataDeck } from '../../../../scripts/fixtures/chart-data.ts';
+import { equationFixtures } from '../../../../scripts/fixtures/equations.ts';
+import { diagramEditingDeck } from '../../../../scripts/fixtures/diagram-editing.ts';
 
 const IN = 914_400;
 
@@ -27,6 +32,15 @@ function idOf(e: PptxEditorInstance, name: string): string {
   const found = e.snapshot().shapes?.find((s) => s.name === name);
   if (!found) throw new Error(`no element named ${name}`);
   return found.nodeId;
+}
+
+/** The data model id of the first node that the current slide's diagram shows. */
+function firstDiagramNode(e: PptxEditorInstance): string {
+  const frame = e.session!.layout(e.snapshot().currentSlide)?.items.find((i) => i.kind === 'frame');
+  const node = frame?.kind === 'frame' ? frame.drawing?.find((d) => d.kind === 'shape') : undefined;
+  const id = node?.element.kind === 'shape' ? node.element.diagramNode : undefined;
+  if (!id) throw new Error('no diagram node');
+  return id;
 }
 
 const TABLE = 'Table 5';
@@ -97,6 +111,24 @@ const onA = (command: ConvergenceFixture['command']): ConvergenceFixture => ({
 
 const sectionId = (e: PptxEditorInstance, i: number): string => e.snapshot().sections![i]!.id;
 
+const COMMENT_DATE = '2026-11-07T10:00:00.000';
+
+/** The first comment thread of the current slide, read without a review module. */
+function firstThread(e: PptxEditorInstance) {
+  const part = e.session!.info.slides[e.snapshot().currentSlide]!.partName;
+  const thread = readCommentThreads(e.session!.store.package, part)[0];
+  if (!thread) throw new Error('the slide has no comment thread');
+  return thread;
+}
+
+/** A threaded comment on shape `A` with one reply. */
+function withThread(e: PptxEditorInstance): void {
+  select('A')(e);
+  run(e, { type: 'addComment', text: 'Check the numbers', date: COMMENT_DATE });
+  const commentId = firstThread(e).id;
+  run(e, { type: 'replyToComment', commentId, text: 'Will do', date: COMMENT_DATE });
+}
+
 /** The fixtures, by command type. The gate checks that each builds a command of its key. */
 export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, ConvergenceFixture>> = {
   // History: undo and redo replicate the step they reverse.
@@ -160,6 +192,7 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
   },
   setVerticalAlign: onA(() => ({ type: 'setVerticalAlign', anchor: 'b' })),
   setAutofit: onA(() => ({ type: 'setAutofit', mode: 'shrink' })),
+  setTextWarp: onA(() => ({ type: 'setTextWarp', preset: 'textArchUp', adjust: {} })),
   setParagraphFormat: onA(() => ({
     type: 'setParagraphFormat',
     spaceBeforePt: 12,
@@ -354,6 +387,33 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
   deleteSlides: { command: () => ({ type: 'deleteSlides', indices: [1, 2] }) },
   moveSlides: { command: () => ({ type: 'moveSlides', indices: [0, 1], to: 1 }) },
   setSlideNumbers: { command: () => ({ type: 'setSlideNumbers', show: true }) },
+  setTransition: {
+    command: () => ({
+      type: 'setTransition',
+      kind: 'push',
+      durationMs: 1000,
+      advanceAfterMs: 3000,
+    }),
+  },
+  addAnimation: { arrange: select('B'), command: () => ({ type: 'addAnimation', preset: 'fade' }) },
+  removeAnimation: {
+    command: (e) => ({ type: 'removeAnimation', effectId: e.snapshot().animations!.effects[1].id }),
+  },
+  moveAnimation: {
+    command: (e) => ({
+      type: 'moveAnimation',
+      effectId: e.snapshot().animations!.effects[2].id,
+      to: 0,
+    }),
+  },
+  setAnimationTiming: {
+    command: (e) => ({
+      type: 'setAnimationTiming',
+      effectId: e.snapshot().animations!.effects[1].id,
+      trigger: 'afterPrevious',
+      delayMs: 250,
+    }),
+  },
   setFooter: { command: () => ({ type: 'setFooter', show: true, text: 'Quarterly results' }) },
   setDateTime: {
     command: () => ({ type: 'setDateTime', show: true, text: '11/7/2026' }),
@@ -466,6 +526,57 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
     command: () => ({ type: 'setAltText', description: 'A gray square', title: 'Square' }),
   },
 
+  // Charts: the chart part and its embedded workbook are written again in one transaction.
+  setChartData: {
+    deck: () => buildPptx(chartDataDeck()),
+    arrange: select('Chart 1'),
+    command: (e) => {
+      const read = e.chartData();
+      if (!read.ok) throw new Error(read.reason);
+      const { kind, categories, series } = read.data;
+      return {
+        type: 'setChartData',
+        data: {
+          kind,
+          categories: [...categories.slice(1), { label: 'Central' }],
+          series: [
+            ...series.map((s) => ({ ...s, values: [...s.values.slice(1), 1] })),
+            { name: 'Stretch', values: [1, 2, 3, 4] },
+          ],
+        },
+      };
+    },
+  },
+
+  // Equations: the math, and its plain-text fallback, in one Markup Compatibility wrapper.
+  insertEquation: {
+    command: () => ({ type: 'insertEquation', linear: 'x=(-b\\pm\\sqrt(b^2-4ac))/(2a)' }),
+  },
+  setEquation: {
+    deck: () => buildPptx({ slides: equationFixtures.equations! }),
+    arrange: (e) => {
+      e.selectSlide(1);
+      select('Equation 3')(e);
+    },
+    command: (e) => {
+      const equation = e.snapshot().equation;
+      if (!equation) throw new Error('no equation is selected');
+      return { type: 'setEquation', nodeId: equation.nodeId, linear: 'y=(a+1)/b' };
+    },
+  },
+
+  // Diagrams: the data model and the saved drawing are written again in one transaction.
+  addDiagramShape: {
+    deck: () => buildPptx(diagramEditingDeck()),
+    arrange: select('Diagram 1'),
+    command: () => ({ type: 'addDiagramShape', position: 'after' }),
+  },
+  deleteDiagramShape: {
+    deck: () => buildPptx(diagramEditingDeck()),
+    arrange: select('Diagram 1'),
+    command: (e) => ({ type: 'deleteDiagramShape', node: firstDiagramNode(e) }),
+  },
+
   // Tables.
   insertTable: { command: () => ({ type: 'insertTable', rows: 2, cols: 2 }) },
   insertRow: { arrange: atCell(0, 1), command: () => ({ type: 'insertRow', where: 'below' }) },
@@ -552,6 +663,41 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
       rows: [370_840, 2 * 370_840],
     }),
   },
+
+  // Comments: a threaded comment on a shape, then its reply, text, status, and delete. The
+  // author is the replica's identity.
+  addComment: {
+    arrange: select('A'),
+    command: () => ({ type: 'addComment', text: 'Check the numbers', date: COMMENT_DATE }),
+  },
+  replyToComment: {
+    arrange: withThread,
+    command: (e) => ({
+      type: 'replyToComment',
+      commentId: firstThread(e).id,
+      text: 'Done',
+      date: COMMENT_DATE,
+    }),
+  },
+  editComment: {
+    arrange: withThread,
+    command: (e) => ({ type: 'editComment', commentId: firstThread(e).replies[0]!.id, text: 'Ok' }),
+  },
+  deleteComment: {
+    arrange: withThread,
+    command: (e) => ({ type: 'deleteComment', commentId: firstThread(e).id }),
+  },
+  resolveComment: {
+    arrange: withThread,
+    command: (e) => ({ type: 'resolveComment', commentId: firstThread(e).id }),
+  },
+  reopenComment: {
+    arrange: (e) => {
+      withThread(e);
+      run(e, { type: 'resolveComment', commentId: firstThread(e).id });
+    },
+    command: (e) => ({ type: 'reopenComment', commentId: firstThread(e).id }),
+  },
 };
 
 /** A caret, or a selection when `end` is given, in the first paragraph of shape `name`. */
@@ -581,6 +727,7 @@ export const TEXT_INPUT_FIXTURES: Record<TextInputKind, TextInputFixture> = {
  */
 export const NO_WRITE_PROBES: Partial<Record<EditorCommandType, ConvergenceFixture>> = {
   toggleSmartGuides: { command: () => ({ type: 'toggleSmartGuides' }) },
+  showAnimationOrder: { command: () => ({ type: 'showAnimationOrder', show: true }) },
   setTableBorderPen: {
     command: () => ({
       type: 'setTableBorderPen',

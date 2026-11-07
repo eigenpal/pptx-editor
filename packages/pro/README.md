@@ -18,14 +18,15 @@
 
 Commercial capabilities for PPTX Editor, delivered as `EditorModule`s, in the same shape as DOCX Editor's `@docx-editor.dev/pro`:
 
-- `reviewModule()`: the review queue. It reads legacy comments (`p:cmLst`, ECMA-376 Part 1, 19.4) and their replies today.
+- `reviewModule()`: comments. It reads and edits the comment threads of each slide, threaded and legacy (`p:cmLst`, ECMA-376 Part 1, 19.4), and shows them as markers on the canvas.
+- `PptxEditorReview` from `@pptx-editor.dev/pro/react` or `@pptx-editor.dev/pro/vue`: the comments pane, a compound component with `useReview`, `useReviewOf`, `useReviewItem`, and `useReviewAuthor`. Give it to the **Comments** tab of the side panel (`panes` in React, the `#comments` slot in Vue).
 - `collaborationModule({ session })`: attaches a host-created collaboration session to each opened deck.
 - `createYjsCollaborationSession({ doc, documentId, identity, awareness })`: a session over a Y.Doc. It mirrors the deck into Yjs, as DOCX Editor does, so concurrent edits merge without a server sequencer.
   - **History:** while the session is attached, the editor's undo and redo revert only your own changes (`Y.UndoManager`), never a peer's, and return to the slide and selection of the undone change.
   - **Status:** `statusSnapshot()` and `subscribeStatus()` report the state and a typed `CollaborationFailureCode`, as in DOCX Editor. Call `setConnected()` from your provider's status event.
   - **Concurrent edits:** two peers that add or replace an element that a slide, shape, or paragraph holds once end with one element, and the other peer's copy stays hidden in the room until the winner undoes. Property elements merge. Concurrent splits of one run keep its text once, and a node moved into content that a peer removes at once goes back. The `collaboration.realtime` row in `docs/site/data/pptx-features.ts` states what is supported and its limits. A room from a pre-release build (room format 1) refuses to attach.
   - **Presence:** with a Yjs `awareness` (`y-protocols/awareness`), the editor publishes its selection, and the canvas shows each peer's selected shapes and text caret, with the peer's name and color. Your caret stays on its character while peers type before it.
-- `drawingModule()` from `@pptx-editor.dev/pro/drawing`: paints the shape and picture effects glow, inner shadow, reflection, and soft edge (ECMA-376 Part 1, 20.1.8). The free engine paints outer shadows. Without the module, a shape or picture paints without these four effects, and the editor chrome does not offer them: Shape Effects shows only the outer shadows, and Picture Styles shows only the frame styles. Removing an effect needs no module: when the selection has a reflection, glow, or soft edge, Shape Effects offers its No row, and No shadow also removes an inner shadow. The effect commands still write every effect, and save keeps it. PDF export (`@pptx-editor.dev/pptx-to-pdf`) always includes the module. It also draws charts from the values cached in their chart parts (ECMA-376 Part 1, 21.2); see [Charts](#charts).
+- `drawingModule()` from `@pptx-editor.dev/pro/drawing`: paints the shape and picture effects glow, inner shadow, reflection, soft edge, and blur (ECMA-376 Part 1, 20.1.8), and 3-D shapes: bevels, contours, extrusion, and camera rotation (20.1.5). The free engine paints outer and preset shadows. Without the module, a shape or picture paints without these effects, and the editor chrome does not offer them: Shape Effects shows only the outer shadows, and Picture Styles shows only the frame styles. Removing an effect needs no module: when the selection has a reflection, glow, soft edge, bevel, or turned camera, Shape Effects offers its No row, and No shadow also removes an inner shadow. The effect commands still write every effect, and save keeps it. PDF export (`@pptx-editor.dev/pptx-to-pdf`) always includes the module. It also draws charts from the values cached in their chart parts (ECMA-376 Part 1, 21.2); see [Charts](#charts).
 
 This package uses the EigenPal Pro License (`LICENSE.md`). Evaluation is permitted. Production use requires a commercial agreement.
 
@@ -120,7 +121,7 @@ Registering a module is the whole enablement story. Without modules, the free en
 
 ## Charts
 
-`@pptx-editor.dev/pro/drawing` draws bar and column charts (clustered, stacked, and percent stacked), line, area, scatter, pie, doughnut, and radar charts, with titles, legends, axes, gridlines, data labels, and number formats. 3-D, of-pie, stock, bubble, and surface charts, and charts with trendlines or error bars, keep the placeholder. A chart is not editable, and its part saves unchanged.
+`@pptx-editor.dev/pro/drawing` draws bar and column charts (clustered, stacked, and percent stacked), line, area, scatter, pie, doughnut, and radar charts, with titles, legends, axes, gridlines, data labels, and number formats. 3-D, of-pie, stock, bubble, and surface charts, and charts with trendlines or error bars, keep the placeholder. Drawing is the only part that needs the module: the free engine edits chart data. See [Charts](https://pptx-editor.dev/docs/guides/charts).
 
 ```ts
 import { createPptxEditor } from '@pptx-editor.dev/core/editor';

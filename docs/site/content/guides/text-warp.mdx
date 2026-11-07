@@ -1,0 +1,60 @@
+---
+title: 'Warp text'
+description: 'Set, change, and remove the preset text warp of shapes, and learn how warped text draws.'
+category: 'Guides'
+---
+
+A text warp bends the text of a shape into a preset form, such as an arch, a circle, or a wave (`a:prstTxWarp`, ECMA-376 Part 1, 20.1.9.19). Use the `setTextWarp` command, or the **Transform** gallery of `Toolbar.TextEffects`. For the feature status, see <FeatureBadge id="paragraphs.text-warp" />.
+
+## Set a warp
+
+This helper accepts an open `PptxEditorInstance` and arches the text of the selected shapes:
+
+```ts
+import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+export function archSelection(editor: PptxEditorInstance) {
+  const result = editor.exec({ type: 'setTextWarp', preset: 'textArchUp' });
+  if (!result.ok) throw new Error(result.reason);
+}
+```
+
+`preset` is a `TextWarpPreset`: one of the 41 `ST_TextShapeType` names, such as `textWave1`, `textInflate`, or `textCircle`. The command changes every selected shape that has a text body, as one undo step. It refuses with `disabled.noText` when no selected shape has text.
+
+## Set adjust values
+
+Most warps have adjust values, such as the height of a wave. Pass them by guide name in `adjust`, in guide units (1/100 000 of the size for a length, 1/60 000 of a degree for an angle):
+
+```ts
+editor.exec({ type: 'setTextWarp', preset: 'textWave1', adjust: { adj1: 15000 } });
+```
+
+The command rounds each value and keeps it in the range of the warp's adjust handle. An unknown guide name refuses with `errors.unsupported`. A warp that does not change keeps the adjust values that you do not pass. The gallery sets the default adjust values.
+
+## Remove a warp
+
+Pass `null` to draw the text flat again:
+
+```ts
+editor.exec({ type: 'setTextWarp', preset: null });
+```
+
+The command removes the shape's own warp. When the shape inherits a warp from its layout placeholder, the command writes `textNoShape` instead, which draws the text flat. The command refuses with `disabled.noEffectChange` when no selected shape draws warped text.
+
+## How warped text draws
+
+Text lays out flat in its text box first. Then each glyph outline maps into the warp's paths, as filled paths. The editor canvas and `@pptx-editor.dev/pptx-to-pdf` draw the same paths, so the warped words are not in the PDF text layer.
+
+- A warp with pairs of paths stretches the text between each pair.
+- A warp with one or three paths lays each line along a path at its font size.
+- The caret, the selection, and text editing use the flat layout.
+- Each character draws its font's own glyph, without shaping. Ligatures, contextual forms, and complex-script clusters draw as separate glyphs.
+- A picture bullet does not bend. It turns and stretches with the warp at its corners.
+- Vertical text, rotated text, diagram text, and text bodies with more than 2,000 characters draw flat. Text whose glyphs make too many path commands also draws flat.
+
+For the measured rules and their limits, see the text warp item of [PPTX fidelity](/docs/pptx-fidelity).
+
+## See also
+
+- [Customize the toolbar](/docs/customization/toolbar)
+- [PPTX fidelity](/docs/pptx-fidelity)

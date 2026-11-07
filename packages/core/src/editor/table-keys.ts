@@ -8,6 +8,7 @@ import type { EditorCommand, EditorSelection, TableCellAddress } from '../contra
 import { apply, invert, type SlideLayout } from '../layout/index.ts';
 import { caretAt, pointAt, textFrameMatrix } from './surface-geometry.ts';
 import { addressOf, cellItem, cellLayoutAt, tableItem, textItemOf } from './table-cells.ts';
+import { diagramTab, firstDiagramCaret } from './surface-diagram.ts';
 import { parentGroupOf } from '../automation/commands/placement.ts';
 import { comparePoints } from '../automation/commands/text-model.ts';
 import { moveCaret } from './text-input.ts';
@@ -43,13 +44,19 @@ function cellSelection(
   };
 }
 
-/** A caret at the end of a table's first cell: Enter, F2, or a typed key on a selected table. */
+/**
+ * A caret at the end of a table's first cell, or of a diagram's first node: Enter, F2, or a
+ * typed key on a selected table or diagram.
+ */
 export function firstCellCaret(
   layout: SlideLayout | undefined,
   nodeId: string
 ): EditorSelection | undefined {
   const first = tableItem(layout, nodeId)?.table.cells[0];
-  return first ? cellSelection(layout, nodeId, addressOf(first), 'end') : undefined;
+  // A diagram has no cells: the caret goes to the end of its first node.
+  return first
+    ? cellSelection(layout, nodeId, addressOf(first), 'end')
+    : firstDiagramCaret(layout, nodeId);
 }
 
 /** The grid step of an arrow key: [rows, columns]. */
@@ -129,6 +136,11 @@ export function tableKeyAction(
   other: boolean
 ): TableKeyAction | null {
   if (other) return null;
+  // Tab in a diagram's text moves to the next node, as Tab in a table moves to the next cell.
+  if (selection.kind === 'text' && selection.diagramNode !== undefined) {
+    const next = key === 'Tab' ? diagramTab(layout, selection, shift) : null;
+    return next ? { select: () => next } : null;
+  }
   if (selection.kind === 'cells') return cellsKeyAction(layout, selection, key, shift);
   if (selection.kind !== 'text' || !selection.cell) return null;
   const sel: TextSelection = selection;

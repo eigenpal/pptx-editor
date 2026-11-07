@@ -102,14 +102,16 @@ class Overlay extends Set<string> {
  * without having seen them: each goes to its old parent, if that parent is in the part, at its
  * old index, in schema order. A node removed after its move stays removed. A node inside
  * another rescued node goes with it, and no key is placed twice. The key of each node put back
- * is added to `placed`.
+ * is added to `placed`. A node with no place left adds the removed ancestor that did not see it
+ * to `stranded`: a removed paragraph then comes back with it (`withRemovedRuns`).
  */
 export function rescueMoved(
   room: Room,
   partName: string,
   spec: ReplicaElementSpec,
   read: ReadRecord,
-  placed?: Set<string>
+  placed?: Set<string>,
+  stranded?: Set<string>
 ): ReplicaElementSpec {
   const moves = room.doc.getMap(MOVES_KEY);
   if (moves.size === 0) return spec;
@@ -214,7 +216,10 @@ export function rescueMoved(
       if (after === undefined || into === undefined) rest.push(o);
       else round.push({ ...o, after, into });
     }
-    if (round.length === 0) break;
+    if (round.length === 0) {
+      for (const o of rest) stranded?.add(o.removed);
+      break;
+    }
     round.sort((x, y) => x.clock - y.clock || x.index - y.index || byKey(x.key, y.key));
     for (const o of round) {
       candidates.push({ ...o, from: o.into, seq: seq++ });

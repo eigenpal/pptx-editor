@@ -28,7 +28,10 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-async function mountRoot(popups?: PptxEditorPopups): Promise<PptxEditorInstance> {
+async function mountRoot(
+  popups?: PptxEditorPopups,
+  presentationLists?: string
+): Promise<PptxEditorInstance> {
   host = document.createElement('div');
   document.body.append(host);
   let ready: PptxEditorInstance | null = null;
@@ -50,6 +53,7 @@ async function mountRoot(popups?: PptxEditorPopups): Promise<PptxEditorInstance>
         shapes: shape({ id: 2, x: IN, y: IN, cx: 3 * IN, cy: IN, text: para(run('Hello')) }),
       },
     ],
+    ...(presentationLists ? { presentationLists } : {}),
   });
   expect((await editor!.load(bytes)).ok).toBe(true);
   await nextTick();
@@ -368,5 +372,65 @@ describe('PptxEditorHyperLink link kinds', () => {
     await nextTick();
     expect(panel()).toBe(null);
     expect(editor.snapshot().currentSlide).toBe(0);
+  });
+});
+
+describe('PptxEditorHyperLink custom show and file links', () => {
+  test('Link to writes a custom show link and a file link, and reads them back', async () => {
+    const editor = await mountRoot(
+      undefined,
+      '<p:custShowLst><p:custShow name="Short" id="3"><p:sldLst><p:sld r:id="rId101"/></p:sldLst></p:custShow></p:custShowLst>'
+    );
+    await linkAndCaret(editor);
+    await clickSlide(editor);
+    button('Edit link')!.click();
+    await nextTick();
+    const kind = () => document.querySelector<HTMLSelectElement>('.pptx-link__kind select')!;
+    const change = async (el: HTMLSelectElement, value: string): Promise<void> => {
+      el.value = value;
+      el.dispatchEvent(new Event('change'));
+      await nextTick();
+      await nextTick();
+    };
+    const apply = async (): Promise<void> => {
+      document.querySelector<HTMLButtonElement>('.pptx-link__apply')!.click();
+      await nextTick();
+    };
+    expect([...kind().options].map((o) => o.value)).toEqual([
+      'web',
+      'email',
+      'slide',
+      'customShow',
+      'file',
+    ]);
+    await change(kind(), 'customShow');
+    const show = document.querySelector<HTMLSelectElement>(
+      '.pptx-link select[aria-label="Custom show in this presentation"]'
+    )!;
+    expect([...show.options].map((o) => o.text)).toEqual(['Short']);
+    const back = document.querySelector<HTMLInputElement>('.pptx-link__return input')!;
+    expect(back.checked).toBe(true);
+    back.checked = false;
+    back.dispatchEvent(new Event('change'));
+    await nextTick();
+    await apply();
+    expect(editor.snapshot().format?.link).toBe('#custom-show-3');
+    // Reading mode names the show, with no Copy.
+    await clickSlide(editor);
+    expect(document.querySelector('.pptx-link__url')?.textContent).toBe('Custom show: Short');
+    expect(button('Copy link')).toBe(null);
+    button('Edit link')!.click();
+    await nextTick();
+    expect(kind().value).toBe('customShow');
+    await change(kind(), 'file');
+    const path = document.querySelector<HTMLInputElement>(
+      '.pptx-link input[aria-label="File path"]'
+    )!;
+    // A bare name stays a file link: the field adds ./.
+    path.value = 'docs/report.pdf';
+    path.dispatchEvent(new Event('input'));
+    await nextTick();
+    await apply();
+    expect(editor.snapshot().format?.link).toBe('./docs/report.pdf');
   });
 });

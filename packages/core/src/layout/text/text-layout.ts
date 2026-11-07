@@ -16,7 +16,10 @@ import {
   isIdeographic,
   isTrailingSpace,
 } from './line-break.ts';
+import { layoutMath, type MathBox } from './math-layout.ts';
 import type { ResolvedFace, TextMeasurer } from './measurer.ts';
+import type { WarpedRun } from './text-warp.ts';
+import type { PathCommand } from '@eigenpal/ooxml-core';
 import {
   autofitSizePt,
   baselineInLinePt,
@@ -49,6 +52,41 @@ export interface GlyphRun {
   readonly runIndex: number;
   /** Source offset of `text[0]` within the paragraph. */
   readonly start: number;
+  /**
+   * The picture of a picture bullet (`a:buBlip`). Such a run has no text, and `x` holds its
+   * left and right edge. The picture stands on the baseline.
+   */
+  readonly picture?: BulletPicture;
+}
+
+/** The picture of a picture bullet, as paint draws it. */
+export interface BulletPicture {
+  /** The part whose relationships resolve `rId` and `svgRId`. */
+  readonly part: string;
+  /** The relationship of the raster picture (`a:blip/@r:embed`). */
+  readonly rId: string;
+  /** The relationship of an `asvg:svgBlip` alternative, when present. */
+  readonly svgRId?: string;
+  /** The picture's height, EMU. */
+  readonly height: number;
+}
+
+/**
+ * The height of a picture bullet over its bullet size: measured on reference PDFs, where the
+ * picture is 0.7 times the bullet size high, whatever the text's face, and keeps its aspect.
+ */
+export const PICTURE_BULLET_SCALE = 0.7;
+
+/**
+ * A shape that an equation draws itself: a fraction rule, a radical sign, a stretched
+ * delimiter, a brace, or an arrow. Paint fills it (nonzero) with the run's fill.
+ */
+export interface LineMark {
+  /** The outline: x in EMU from the text box left, y in EMU up from the line's baseline. */
+  readonly commands: readonly PathCommand[];
+  readonly props: RunProps;
+  /** Index into the paragraph's runs: the math run. */
+  readonly runIndex: number;
 }
 
 /** One laid-out line. */
@@ -73,6 +111,11 @@ export interface Line {
    * the editor draws it dimmed while the caret is in the paragraph.
    */
   readonly pendingBullet?: GlyphRun;
+  /**
+   * The marks of the line's equations (`a14:m`). The glyphs of an equation are text runs of the
+   * line, each at its own size and rise; the equation is one object character in the source.
+   */
+  readonly marks?: readonly LineMark[];
 }
 
 /**
@@ -110,6 +153,12 @@ export interface TextLayout {
   readonly paragraphLengths: readonly number[];
   /** Families that were not available and were substituted. */
   readonly substitutions: readonly string[];
+  /**
+   * The glyphs of a warped text body (`a:prstTxWarp`) as paths in this frame, one entry for each
+   * run that draws. Paint fills these instead of drawing the runs as text; the lines keep the
+   * flat layout, for the caret and the selection.
+   */
+  readonly warped?: readonly WarpedRun[];
 }
 
 interface Segment {
@@ -122,6 +171,8 @@ interface Segment {
   readonly rise: number;
   readonly advances: Float64Array;
   readonly isBreak: boolean;
+  /** The laid-out equation of a math run, which is one unit as wide as the equation. */
+  readonly math?: MathBox;
 }
 
 /** The face for a run: its Latin font, or the font of `slot`, bold and italic. */
@@ -276,6 +327,23 @@ function buildSegments(
     const face = faceFor(props, measurer);
     const rise = (props.baseline / 100) * runSize * EMU_PER_PT;
     const spacing = (props.spacing / 100) * EMU_PER_PT;
+    if (run.kind === 'math' && run.math) {
+      const box = layoutMath(run.math, measurer, fontScale);
+      out.push({
+        runIndex,
+        start: offset,
+        text: run.text,
+        props,
+        face: box.face,
+        sizePt: box.sizePt,
+        rise: 0,
+        advances: Float64Array.of(box.width),
+        isBreak: false,
+        math: box,
+      });
+      offset += run.text.length;
+      return;
+    }
     if (run.kind === 'break') {
       if (face.substituted) substitutions.add(props.latin);
       out.push({
@@ -355,6 +423,47 @@ function buildSegments(
   return out;
 }
 
+/**
+ * The glyphs and marks of an equation at `x` on its line: each glyph piece is a text run with
+ * the equation's source offset, so the caret and the hit test treat it as one character.
+ */
+function placeMath(
+  box: MathBox,
+  x: number,
+  runIndex: number,
+  start: number,
+  runs: GlyphRun[],
+  marks: LineMark[]
+): void {
+  for (const g of box.glyphs)
+    runs.push({
+      kind: 'text',
+      text: g.text,
+      x: g.x.map((v) => v + x),
+      face: g.face,
+      sizePt: g.sizePt,
+      rise: g.y,
+      props: g.props,
+      runIndex,
+      start,
+    });
+  for (const m of box.marks) marks.push(moveMark({ ...m, runIndex }, x));
+}
+
+/** A mark moved right by `dx`. */
+function moveMark(mark: LineMark, dx: number): LineMark {
+  if (dx === 0) return mark;
+  return {
+    ...mark,
+    commands: mark.commands.map((c) => {
+      if (c.op === 'Z') return c;
+      if (c.op === 'Q') return { ...c, x1: c.x1 + dx, x: c.x + dx };
+      if (c.op === 'C') return { ...c, x1: c.x1 + dx, x2: c.x2 + dx, x: c.x + dx };
+      return { ...c, x: c.x + dx };
+    }),
+  };
+}
+
 interface Unit {
   readonly seg: number;
   readonly code: number;
@@ -423,7 +532,27 @@ export function layoutTextOn(
     // caret is there (`Line.pendingBullet`). Empty paragraphs consume no number.
     let marker: GlyphRun | null = null;
     const number = sourceLength > 0 ? numbering.next(p) : numbering.peek(p);
-    if (p.bullet) {
+    if (p.bullet?.type === 'picture') {
+      const sizePt =
+        'pct' in p.bullet.size
+          ? firstSize * p.bullet.size.pct
+          : autofitSizePt(p.bullet.size.pts / 100, fontScale);
+      const height = sizePt * PICTURE_BULLET_SCALE * EMU_PER_PT;
+      const x0 = p.marL + p.indent;
+      const { part, rId, svgRId, aspect } = p.bullet;
+      marker = {
+        kind: 'bullet',
+        text: '',
+        x: [x0, x0 + height * aspect],
+        face: faceFor(firstProps, measurer),
+        sizePt,
+        rise: 0,
+        props: firstProps,
+        runIndex: -1,
+        start: 0,
+        picture: { part, rId, ...(svgRId ? { svgRId } : {}), height },
+      };
+    } else if (p.bullet) {
       const raw =
         p.bullet.type === 'char' ? p.bullet.char : autonumberText(p.bullet.scheme, number ?? 1);
       const sizePt =
@@ -603,8 +732,19 @@ export function layoutTextOn(
       const lineMetrics = metrics ?? maxFace.metrics;
       const single = singleLinePt(maxSize, lineMetrics, basis);
       const heightPt = lineHeightInPt(single, p.lineSpacing, reduction);
-      const height = heightPt * EMU_PER_PT;
-      const baseline = baselineInLinePt(single, heightPt, lineMetrics) * EMU_PER_PT;
+      let height = heightPt * EMU_PER_PT;
+      let baseline = baselineInLinePt(single, heightPt, lineMetrics) * EMU_PER_PT;
+      // An equation that needs more room than the line has makes the line taller.
+      for (let i = range.start, last = -1; i < range.end; i += 1) {
+        if (units[i].seg === last) continue;
+        last = units[i].seg;
+        const box = segments[last].math;
+        if (!box) continue;
+        const above = Math.max(0, box.lineAscent - baseline);
+        const below = Math.max(0, box.lineDescent - (height - baseline));
+        height += above + below;
+        baseline += above;
+      }
 
       // Positions, then alignment. Positions include the left inset, so no later pass copies
       // the position arrays to add it.
@@ -639,10 +779,16 @@ export function layoutTextOn(
       const origin = left + shift + bp.lIns;
       let x = origin;
       const runs: GlyphRun[] = [];
+      const marks: LineMark[] = [];
       let cur: { seg: number; text: string; xs: number[]; start: number } | null = null;
       const flush = (): void => {
         if (!cur) return;
         const s = segments[cur.seg];
+        if (s.math) {
+          placeMath(s.math, cur.xs[0], s.runIndex, cur.start, runs, marks);
+          cur = null;
+          return;
+        }
         if (!s.isBreak && cur.text.length > 0) {
           cur.xs.push(x);
           runs.push({
@@ -695,6 +841,7 @@ export function layoutTextOn(
         ...(first && pending
           ? { pendingBullet: { ...pending, x: pending.x.map((v) => v + shift + bp.lIns) } }
           : {}),
+        ...(marks.length > 0 ? { marks } : {}),
       });
       y += height;
     });
@@ -729,6 +876,7 @@ export function layoutTextOn(
         baseline: placeBaseline(line.baseline - offset),
         caretX: line.caretX.map((v) => v + dx),
         runs: line.runs.map((r) => ({ ...r, x: r.x.map((v) => v + dx) })),
+        ...(line.marks ? { marks: line.marks.map((m) => moveMark(m, dx)) } : {}),
       });
     }
     contentHeight = Math.min(y, innerH);

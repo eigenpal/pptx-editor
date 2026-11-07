@@ -21,6 +21,7 @@ import { SLIDE_SLOT_COMMANDS } from './chrome-slide-groups.ts';
 import { TABLE_SLOT_COMMANDS, tableCommandForSlotValue } from './chrome-table.ts';
 import { isColorChoice } from '../automation/commands/style-commands.ts';
 import { imageSlotCommand } from './chrome-picture.ts';
+import { DIAGRAM_SLOT_COMMANDS } from './chrome-diagram.ts';
 import { LINE_DASHES } from './line-presets.ts';
 import { tableBorderPen } from './chrome-table.ts';
 import { TEXT_CASES } from '../automation/commands/font-format.ts';
@@ -63,6 +64,7 @@ const SLOT_COMMANDS: Partial<Record<ChromeSlotId, EditorCommand>> = {
   'image.crop': { type: 'toggleCrop' },
   ...SLIDE_SLOT_COMMANDS,
   ...TABLE_SLOT_COMMANDS,
+  ...DIAGRAM_SLOT_COMMANDS,
 };
 
 /** The fixed command behind a command slot, or null. @public */
@@ -144,6 +146,8 @@ export function commandForSlotValue(
         : null;
     case 'insert.shape':
       return typeof value === 'string' ? { type: 'insertShape', preset: value } : null;
+    case 'insert.equation':
+      return typeof value === 'string' ? { type: 'insertEquation', linear: value } : null;
     case 'shape.fill':
       return isColorChoice(value) || value === null ? { type: 'setShapeFill', color: value } : null;
     case 'shape.lineColor':

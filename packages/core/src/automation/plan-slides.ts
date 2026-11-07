@@ -19,7 +19,7 @@ import {
 } from './commands/slide-commands.ts';
 import { applyLayout as applyLayoutEdit } from './commands/slide-layouts.ts';
 import { normalizePresentation } from './commands/slide-sections.ts';
-import { repairTablesForSave } from './commands/table-repair.ts';
+import { packageForSave } from './commands/save-repair.ts';
 import { slideNumberOf } from './commands/text-model.ts';
 import { linkSpans, readText, type TextPlanContext } from './plan-text.ts';
 import type {
@@ -155,7 +155,7 @@ export function exportSlides(ctx: PlanContext, refs: readonly AutomationRef[]): 
     for (let i = slides.length - 1; i >= 0; i -= 1)
       if (!keep.has(slides[i]!.sldId)) deleteSlideEdit(copy, i);
   });
-  return { kind: 'base64', base64: toBase64(writePptx(repairTablesForSave(copy.pkg))) };
+  return { kind: 'base64', base64: toBase64(writePptx(packageForSave(copy.pkg))) };
 }
 
 /** The `a:hlinkClick` of a shape's own properties (`p:cNvPr`), if any. */
@@ -163,12 +163,12 @@ function shapeLink(el: Element): Element | undefined {
   return child(cNvPrOf(el), 'a:hlinkClick');
 }
 
-/** The address of a link relationship of `part`: its external target, or null. */
+/** The address of a link relationship of `part`: its URL or relative file path, or null. */
 function linkAddress(ctx: PlanContext, part: string): (rId: string | undefined) => string | null {
   const rels = relationshipsOf(ctx.batch.pkg, part);
   return (rId) => {
     const rel = rels.find((r) => r.id === rId);
-    return rel?.external ? (rel.externalTarget ?? null) : null;
+    return rel?.external ? (rel.externalTarget ?? rel.relativeTarget ?? null) : null;
   };
 }
 

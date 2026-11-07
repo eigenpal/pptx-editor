@@ -42,7 +42,8 @@ import {
   type StrokePlan,
 } from '@pptx-editor.dev/core/layout';
 import {
-  drawEffectsBehind,
+  drawGlow,
+  drawShadows,
   drawInnerShadow,
   drawReflection,
   effectDiagnostics,
@@ -57,6 +58,7 @@ import {
   type FillScope,
 } from './paint-fill.ts';
 import { drawTable } from './paint-table.ts';
+import { faceMatrix, fillFacets, threeDOf, turnsFace } from './paint-three-d.ts';
 import { drawText } from './paint-text.ts';
 import {
   clip,
@@ -304,10 +306,16 @@ async function drawItem(
   const own = ownFill(item.element.fill, local);
   const shown = own.fill.type !== 'picture' || (await canDrawPicture(own.sourcePart, own.fill, p));
   if (shown) effectDiagnostics(item, p, local);
+  // Bevels, contour, extrusion, and the camera's turn of the face, as the SVG paint draws them.
+  const threeD = threeDOf(item);
+  const turned = turnsFace(threeD);
   const drawContent = async (): Promise<void> => {
+    if (turned) p.push(pushGraphicsState(), concatTransformationMatrix(...threeD.front));
     p.push(pushGraphicsState());
     p.matrix(item.matrix);
+    if (threeD) fillFacets(threeD.under, p);
     await drawGeometry(item, p, local, groupScale);
+    if (threeD) fillFacets(threeD.over, p);
     p.push(popGraphicsState());
     // Over the geometry and under the text, in slide space.
     if (shown) await drawInnerShadow(item, p, local);
@@ -318,10 +326,20 @@ async function drawItem(
       await drawText(item.text, p, local);
       p.push(popGraphicsState());
     }
+    if (turned) p.push(popGraphicsState());
   };
-  // The reflection, shadows, and glow paint under the content, as in the SVG paint.
+  // A face turned edge-on paints only its extrusion: it has no area to paint or to copy.
+  if (threeD && !threeD.showsFace) {
+    fillFacets(threeD.behind, p);
+    return;
+  }
+  // The reflection, shadows, glow, and extrusion paint under the content, in the SVG paint's
+  // order; the shadows and the glow take the camera's turn of the face.
+  const face = faceMatrix(threeD);
   if (shown) await drawReflection(item, p, drawContent);
-  if (shown) await drawEffectsBehind(item, p, local);
+  if (shown) await drawShadows(item, p, local, face);
+  if (shown) await drawGlow(item, p, local, face);
+  if (threeD) fillFacets(threeD.behind, p);
   await drawContent();
 }
 

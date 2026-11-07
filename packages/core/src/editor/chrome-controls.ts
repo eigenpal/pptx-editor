@@ -15,9 +15,11 @@ import type {
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { warnChromeSlotRun, warnDialogSlotRun, warnInvalidSlotValue } from './dev-warnings.ts';
 import { ICON_PATHS } from './icon-paths.ts';
-import { IMAGE_CHROME_GROUP, imageSlotState } from './chrome-picture.ts';
+import { IMAGE_CHROME_GROUP, imageSlotState, type ImageSlotId } from './chrome-picture.ts';
 import { adapterActionState } from './chrome-adapter-state.ts';
-import type { ImageSlotId } from './chrome-picture.ts';
+import { EQUATION_PROBES, INSERT_GROUP, type EquationSlotId } from './chrome-insert.ts';
+import { CHART_CHROME_GROUP, chartSlotState, type ChartSlotId } from './chrome-chart.ts';
+import { DIAGRAM_CHROME_GROUP, type DiagramSlotId } from './chrome-diagram.ts';
 import { isNothingToDo } from '../automation/commands/op-batch.ts';
 import type { ToolbarSlotValue } from './toolbar-values.ts';
 import {
@@ -51,7 +53,6 @@ import {
 import {
   LINE_DASHES,
   LINE_ENDS,
-  LINE_KINDS,
   LINE_WIDTHS,
   commandForSlot,
   commandForSlotValue,
@@ -98,10 +99,10 @@ export type ChromeControlState =
    */
   | { readonly kind: 'panel' }
   /**
-   * Shows a tab of the side panel: Format or Selection. The slot sends `requestPane`, which a
-   * mounted side panel and the host answer.
+   * Shows a tab of the side panel: Format, Selection, or Chart Data. The slot sends
+   * `requestPane`, which a mounted side panel and the host answer.
    */
-  | { readonly kind: 'pane'; readonly pane: 'format' | 'selection' }
+  | { readonly kind: 'pane'; readonly pane: 'format' | 'selection' | 'chart' }
   /**
    * Opens a dialog of the `popups` registry by its key. With a probe command, the slot is on when
    * the engine takes it; the dialog runs the command.
@@ -124,7 +125,8 @@ export type ChromeDialogKey =
   | 'bulletsAndNumbering'
   | 'columns'
   | 'imageAltText'
-  | 'imageProperties';
+  | 'imageProperties'
+  | 'equation';
 
 /** How a control renders. @public */
 export type ChromeControlShape =
@@ -205,7 +207,9 @@ export type ChromeGroupId =
   | 'slide'
   | 'image'
   | 'section'
-  | 'table';
+  | 'table'
+  | 'chart'
+  | 'diagram';
 
 /** One toolbar group. @public */
 export interface ChromeGroup {
@@ -387,36 +391,7 @@ export const CHROME_GROUPS: readonly ChromeGroup[] = [
       LINE_SPACING_CONTROL,
     ],
   },
-  {
-    id: 'insert',
-    labelKey: 'toolbar.groups.insert',
-    controls: [
-      {
-        id: 'textBox',
-        labelKey: 'toolbar.textBox',
-        paths: icon('text_fields'),
-        state: { kind: 'command' },
-      },
-      {
-        // Lines and connectors; the chrome draws each option as the line it inserts.
-        id: 'line',
-        shape: 'dropdown',
-        labelKey: 'toolbar.line',
-        paths: null,
-        options: LINE_KINDS.map((k) => ({ value: k, labelKey: `toolbar.lines.${k}` as const })),
-        state: { kind: 'value' },
-      },
-      {
-        // A gallery of every preset in `SHAPE_GALLERY`, drawn from the spec geometry.
-        id: 'shape',
-        shape: 'gallery',
-        labelKey: 'toolbar.shape',
-        paths: icon('shapes'),
-        state: { kind: 'value' },
-      },
-      { id: 'image', labelKey: 'toolbar.image', paths: icon('image'), state: { kind: 'load' } },
-    ],
-  },
+  INSERT_GROUP,
   {
     id: 'shape',
     labelKey: 'toolbar.groups.shape',
@@ -680,6 +655,8 @@ export const CHROME_GROUPS: readonly ChromeGroup[] = [
   SECTION_GROUP,
   ...TABLE_GROUPS,
   IMAGE_CHROME_GROUP,
+  CHART_CHROME_GROUP,
+  DIAGRAM_CHROME_GROUP,
 ];
 
 // A group with no control left on the bar (`script`) is left out.
@@ -744,6 +721,7 @@ export type ChromeSlotId =
   | 'shape.lineDash'
   | 'shape.styles'
   | 'shape.effects'
+  | 'shape.textEffects'
   | 'shape.properties'
   | 'format.painter'
   | 'format.clear'
@@ -778,7 +756,10 @@ export type ChromeSlotId =
   | 'section.collapseAll'
   | 'section.expandAll'
   | TableSlotId
-  | ImageSlotId;
+  | ImageSlotId
+  | ChartSlotId
+  | DiagramSlotId
+  | EquationSlotId;
 
 /** Every slot id, derived from the registry. @public */
 export function chromeSlotIds(): ChromeSlotId[] {
@@ -824,6 +805,7 @@ const PROBES: Partial<Record<ChromeSlotId, unknown>> = {
   ...SHAPE_FORMAT_PROBES,
   'view.presentationView': 'normal',
   ...TABLE_PROBES,
+  ...EQUATION_PROBES,
 };
 
 /** The shared can-before-exec state of one control. @public */
@@ -839,7 +821,7 @@ export interface ToolbarCommandState {
 /** Enabled and active state of a slot: the ONE source of truth for both. @public */
 export function toolbarCommandState(editor: Editor | null, id: ChromeSlotId): ToolbarCommandState {
   if (!editor) return { id, enabled: false, disabledReason: 'disabled.noEditor', active: false };
-  const image = imageSlotState(editor, id);
+  const image = imageSlotState(editor, id) ?? chartSlotState(editor, id);
   if (image) return image;
   const snap = editor.snapshot();
   const f = snap.format;

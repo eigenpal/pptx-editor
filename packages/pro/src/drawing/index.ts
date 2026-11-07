@@ -9,8 +9,10 @@ Production use requires a commercial agreement: licensing@eigenpal.com
  * The free engine paints pictures, shapes with fills, gradients, patterns, lines and outer
  * shadows, text, tables, and groups. This module adds:
  *
- * - the shape and picture effects glow, inner shadow, reflection, and soft edge (ECMA-376
- *   Part 1, 20.1.8);
+ * - the shape and picture effects glow, inner shadow, reflection, soft edge, and blur
+ *   (ECMA-376 Part 1, 20.1.8);
+ * - 3-D shapes (ECMA-376 Part 1, 20.1.5): bevels, contours, and, under a turned camera, the
+ *   turned face and its extrusion;
  * - charts, drawn from the values cached in their chart parts (ECMA-376 Part 1, 21.2): bar and
  *   column charts (clustered, stacked, and percent stacked), line, area, scatter, pie, doughnut,
  *   and radar charts, with titles, legends, axes, gridlines, data labels, and number formats.
@@ -49,7 +51,8 @@ import { renderChartFrame } from './chart-projection.ts';
 import { drawingEffectsRenderer } from './effects-renderer.ts';
 
 /**
- * Install the drawing renderers (charts, glow, inner shadow, reflection, and soft edge) for
+ * Install the drawing renderers (charts, glow, inner shadow, reflection, soft edge, blur, and
+ * 3-D) for
  * every editor and export in this process, without an editor module: for headless rendering.
  * Installing again is harmless. A host without the EigenPal Pro License leaves this call out;
  * its charts then show placeholders, and its shapes and pictures paint without those effects.

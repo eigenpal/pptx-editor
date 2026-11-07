@@ -4,10 +4,9 @@
 // state moves, so `useSyncExternalStore` selectors only re-render when their slice changes.
 
 import { pickImageInto } from './chrome-actions.ts';
-import { slideLinkOf } from '../automation/commands/slide-links.ts';
 import { documentOpenFailure, OPEN_FAILED, openRejectionCode } from './loading.ts';
 import { prepareDeck } from './open-steps.ts';
-import { relationshipById, writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
+import { writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
 import { registerFontFaces, type FontFaceHandle } from '../output/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
 import type {
@@ -27,6 +26,7 @@ import { createOpeningLane } from './pptx-editor-opening.ts';
 import { commandCacheKey, compile, type CommandContext } from './commands.ts';
 import { clampSlide, type DocumentSession } from './document-session.ts';
 import { changedSlide, isHistoryMark, validSelection, type HistoryMark } from './history-marks.ts';
+import { markOf, markOptions } from './history-marks.ts';
 import { EditorHistoryGroups } from './history-groups.ts';
 import {
   CommandRefusal,
@@ -39,13 +39,14 @@ import {
   createNotesSource,
   createSubstitutionSource,
   createVersionSource,
+  linkTargetOf,
 } from './snapshot-sources.ts';
 import { createShapeListSource, elementIn } from './shape-list.ts';
-import { activeOf, createBackgroundSource } from './selection-state.ts';
-import { formatAt, geometryOf } from './selection-state.ts';
+import { activeOf, createBackgroundSource, formatAt, geometryOf } from './selection-state.ts';
+import { CommentState } from './comment-state.ts';
 import { FormatPainter } from './format-painter.ts';
 import { CropMode } from './crop-mode.ts';
-import { pictureStateAt, withAltText } from './picture-state.ts';
+import { chartDataAt, selectedObjectsAt, withAltText } from './picture-state.ts';
 import { isViewCommand, ViewSettings, type ViewCommand } from './view-settings.ts';
 import { PlaceholderPrompts } from './placeholder-prompts.ts';
 import { RemovalNotice } from './removal-notice.ts';
@@ -55,6 +56,7 @@ import { createShortcut, createSurfaceHost, type SurfaceHostBase } from './surfa
 import { setSurfaceRoot } from './surface-registry.ts';
 import { refit } from '../automation/commands/autofit.ts';
 import { withAutoCorrect } from './autocorrect.ts';
+import { typeDiagram } from './diagram-commands.ts';
 import { selectAllOf } from './shape-keys.ts';
 import { clampZoom } from './zoom.ts';
 import { snapTextSelection, type TextInputKind } from './text-input.ts';
@@ -63,7 +65,7 @@ import { CaretArm, armedCaretOf, caretSelection } from './caret-arm.ts';
 import { fontFamilyOf } from '../automation/commands/font-format.ts';
 import { createHostFonts, openOptionsOf } from './host-fonts.ts';
 import { selectionBody, snapCellAddress, textItemOf } from './table-cells.ts';
-import { repairTablesForSave } from '../automation/commands/table-repair.ts';
+import { packageForSave } from '../automation/commands/save-repair.ts';
 import { withoutStaleCopies } from '../automation/commands/alternate-copies.ts';
 import { firstCellCaret } from './table-keys.ts';
 import { createTableStateSource } from './table-state.ts';
@@ -71,8 +73,10 @@ import { createThemeColorSource } from './theme-palette.ts';
 import { createSlideSummaries, SlideSelection } from './slide-selection.ts';
 import { createLayoutSummaries } from '../automation/commands/slide-layouts.ts';
 import { createSectionSummaries } from '../automation/commands/slide-sections.ts';
+import { createCustomShowSummaries } from '../automation/commands/custom-show-links.ts';
 import { hasSlideNumber } from '../automation/commands/slide-numbers.ts';
 import { dateShown, footerText } from '../automation/commands/header-footer.ts';
+import { createAnimationsSource } from './animation-command-table.ts';
 import { frameLabelOf, ThumbnailPainter } from './thumbnails.ts';
 import { uniquePrefix } from './paint-ids.ts';
 import { createFind } from './find-session.ts';
@@ -108,8 +112,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   let cached: EditorSnapshot | null = null;
   // The typing burst, the drag, and the host handles that make one undo step each.
   const groups = new EditorHistoryGroups();
-  // Repeated pastes of one payload cascade; a payload parsed from the clipboard is cached by
-  // its text so the series survives re-reading it.
+  // Repeated pastes of one payload cascade; a parsed payload is cached by its clipboard text.
   let pasteSeries: { payload: unknown; count: number } = { payload: null, count: 0 };
   let lastRejection: EditorRejection | null = null;
   const removal = new RemovalNotice(); // `snapshot.lastRemoval`
@@ -123,6 +126,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   let destroyed = false;
   const listeners = new Set<() => void>();
   const modules = seam.resolveEditorModules(options.modules);
+  const comments = new CommentState(options.author, modules);
   const presence = new PresenceLink(modules);
   let detachModules = (): void => {};
   const idPrefix = uniquePrefix();
@@ -202,19 +206,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       insertions,
       ...views.snapshot(sectionSummaries(pkg).map((x) => x.id)),
       selection,
-      format: formatAt(arm.layout() ?? lay, selection, (rId, action) => {
-        const part = info?.slides[slide]?.partName;
-        const rel = pkg && part && rId ? relationshipById(pkg, part, rId) : undefined;
-        const slideLink = action
-          ? slideLinkOf(
-              action,
-              rel && !rel.external ? rel.target : undefined,
-              info?.slides.map((s) => s.partName) ?? []
-            )
-          : undefined;
-        // Any other action with an external target (a file link) shows that target.
-        return slideLink ?? (rel?.external ? rel.externalTarget : undefined);
-      }),
+      format: formatAt(arm.layout() ?? lay, selection, linkTargetOf(pkg, info, slide)),
       geometry: withAltText(
         geometryOf(lay, selection, (id) => elementIn(pkg, partAt(slide), id)),
         pkg,
@@ -233,16 +225,21 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       lastRejection,
       lastRemoval: removal.current,
       formatPainter: painter.mode,
-      image: pictureStateAt(pkg, partAt(slide), selection, cropping(), lay),
+      ...selectedObjectsAt(pkg, partAt(slide), selection, cropping(), lay),
       layouts: layoutSummaries(pkg),
       sections: sectionSummaries(pkg),
+      customShows: customShowSummaries(pkg),
       table: tableState(pkg, partAt(slide), lay, selection),
       shapes: shapeList(pkg, partAt(slide)),
+      animations: animationsOf(pkg, partAt(slide)),
+      ...comments.snapshot(pkg, partAt(slide)),
     };
     return cached;
   };
   const [slideSummaries, shapeList] = [createSlideSummaries(), createShapeListSource()];
+  const animationsOf = createAnimationsSource();
   const [layoutSummaries, sectionSummaries] = [createLayoutSummaries(), createSectionSummaries()];
+  const customShowSummaries = createCustomShowSummaries();
   const slideSel = new SlideSelection();
   const notesSource = createNotesSource();
   const notesFormatted = createNotesFormattedSource();
@@ -283,6 +280,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     ...(views.presentationView === 'slideSorter' ? { slideSorter: true } : {}),
     ...(probe ? { probe } : {}),
     ...(modules.collaboration ? { collaborating: true } : {}),
+    ...comments.context(),
     ...(command?.type === 'paste'
       ? {
           pasteRepeat: (command.payload === pasteSeries.payload ? pasteSeries.count : 0) + 1,
@@ -346,10 +344,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   const partAt = (index: number): string | undefined => session?.info.slides[index]?.partName;
 
   /** The history mark for an edit of `part`: the selection, when it is on that slide. */
-  const markFor = (part: string | undefined): HistoryMark => ({
-    part,
-    selection: part === partAt(slide) ? selection : { kind: 'none' },
-  });
+  const markFor = (part: string | undefined): HistoryMark => markOf(part, partAt(slide), selection);
 
   /**
    * Commit ops as one history entry (or a frame of the open one, for the same `historyGroup`),
@@ -365,8 +360,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     try {
       const r = session!.store.transact(withoutStaleCopies(session!.store.package, ops), {
         ...options,
-        selectionBefore: before,
-        ...(after ? { selectionAfter: after } : {}),
+        ...markOptions(before, after),
       });
       if (r.ok) ((lastRejection = null), removal.clear());
       return r;
@@ -517,17 +511,20 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     const deletes = kind === 'deleteBackward' || kind === 'deleteForward';
     const carried =
       deletes || (!typed && (kind === 'text' || kind === 'paragraph' || kind === 'lineBreak'));
-    const armed = typed ? arm.current() : null;
+    const armed = typed && sel.diagramNode === undefined ? arm.current() : null;
     const batch = session.batch(armed?.pkg);
     let at: TextPoint;
     let listed = false;
     try {
-      const txBody = selectionBody(batch, part, sel);
-      if (!txBody) throw new CommandRefusal('disabled.noText');
-      ({ at, list: listed } = typeText(batch, part, slide, txBody.id, item, sel, kind, data));
-      const caret = { part, nodeId: sel.nodeId, at, ...(sel.cell ? { cell: sel.cell } : {}) };
-      if (carried) for (const op of arm.carry(batch.pkg, caret)) batch.push(op);
-      refit(batch, slide, part, sel.nodeId, session.measurer);
+      const txBody = sel.diagramNode === undefined ? selectionBody(batch, part, sel) : undefined;
+      if (sel.diagramNode !== undefined) at = typeDiagram(batch, part, sel, item, kind, data);
+      else if (!txBody) throw new CommandRefusal('disabled.noText');
+      else {
+        ({ at, list: listed } = typeText(batch, part, slide, txBody.id, item, sel, kind, data));
+        const caret = { part, nodeId: sel.nodeId, at, ...(sel.cell ? { cell: sel.cell } : {}) };
+        if (carried) for (const op of arm.carry(batch.pkg, caret)) batch.push(op);
+        refit(batch, slide, part, sel.nodeId, session.measurer);
+      }
     } catch (e) {
       if (e instanceof CommandRefusal) return refuse(e.reason, e.detail);
       throw e;
@@ -828,7 +825,9 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     },
     fontFamilies,
     tableStyles: () => (session ? tableStyleList(session.store.package) : []),
+    chartData: (id) => chartDataAt(session?.store.package, partAt(slide), selection, id),
     setSelection: (next) => select(next),
+    ...comments.methods(emit),
     copy: clipboard.copy,
     selectAll,
     focus: () => surface?.focus(),
@@ -861,7 +860,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     // A deck still opening parses the rest first; a slide that does not parse refuses the deck.
     save: () =>
       session && !session.damage && opening.finish() && session && !session.damage
-        ? writePptx(repairTablesForSave(session.store.package))
+        ? writePptx(packageForSave(session.store.package))
         : null,
     setZoom(value) {
       if (value === 'fit') fitZoom = true;
@@ -932,6 +931,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
           part: () => partAt(slide),
           surface: () => surface,
           ...{ prompts, presence, painter, views, groups, gestureEdit },
+          commentMarkers: comments.markers(snapshot, instance),
         })
       );
       surface.render();

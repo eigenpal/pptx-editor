@@ -187,7 +187,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Link selected text to a web address, an email address with a subject, or a slide: a slide number, or the first, last, next, or previous slide. A click into a link shows its target with Copy, Edit, and Remove, and a slide link shows a button that goes to its slide. In the slide show, a slide link moves the show. A slide link follows its slide when slides move. Links to custom shows, other files, and programs are kept but not edited. URLs pass an allowlist. Hyperlink text color is approximate.',
+      'Link selected text to a web address, an email address with a subject, a slide, a custom show, or another file. A slide link goes to a slide number, or the first, last, next, or previous slide. A custom show link can return to its slide after the show. A file link takes a checked relative path, and the editor never opens it. A click into a link shows its target with Copy, Edit, and Remove, and a slide link shows a button that goes to its slide. In the slide show, a slide link moves the show; custom show and file links do nothing. A slide link follows its slide when slides move. Links to programs are kept but never written or run, as a security limit. URLs pass an allowlist. Hyperlink text color is approximate.',
     docsLink: '/docs/recipes/slide-email-links',
   },
   {
@@ -302,11 +302,12 @@ export const pptxFeatures: PptxFeature[] = [
     id: 'paragraphs.text-warp',
     name: 'Text warp',
     category: 'paragraphs',
-    editing: 'none',
-    rendering: 'none',
-    roundTrip: 'preserved',
+    editing: 'partial',
+    rendering: 'partial',
+    roundTrip: 'full',
     tier: 'community',
-    notes: 'Warped text draws flat.',
+    notes:
+      'Text effects > Transform sets or removes a preset warp. Adjust values are set by command only. Glyphs bend into the warp. The caret and the selection use flat text. Lines in some multi-band warps sit lower. Warped glyphs are not shaped, so ligatures and complex scripts lose their forms. Vertical, rotated, and diagram text draws flat.',
   },
 
   // --- Bullets & numbering ---------------------------------------------
@@ -319,7 +320,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Toggle bullets and numbering. The galleries set common bullet characters and a:buAutoNum numbering schemes, and the Bullets and Numbering dialog sets the size, color, start number, and a custom character and font. Enter continues the list, also on an empty item. At the start of a list item or across paragraphs, Tab demotes a level and Shift+Tab promotes one; elsewhere both keys type a tab. Backspace at the start of a list item removes its bullet and keeps its level. Typing 1., 1), *, or - and a space at the start of a paragraph starts a list (AutoCorrect). Where a symbol font is not installed, a Wingdings or Symbol bullet draws its Unicode twin (approximate). Picture bullets do not draw and cannot be set.',
+      'Toggle bullets and numbering. The galleries set common bullet characters and a:buAutoNum numbering schemes, and the Bullets and Numbering dialog sets the size, color, start number, and a custom character and font. Enter continues the list, also on an empty item. At the start of a list item or across paragraphs, Tab demotes a level and Shift+Tab promotes one; elsewhere both keys type a tab. Backspace at the start of a list item removes its bullet and keeps its level. Typing 1., 1), *, or - and a space at the start of a paragraph starts a list (AutoCorrect). Where a symbol font is not installed, a Wingdings or Symbol bullet draws its Unicode twin (approximate). The dialog sets a picture bullet from a PNG, JPEG, or GIF file. A picture bullet draws 0.7 times the bullet size high, on the baseline. A missing or unreadable bullet picture draws no bullet.',
   },
 
   // --- Shapes, groups & connectors -------------------------------------
@@ -397,7 +398,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'The side panel has a Selection tab that lists the objects of the slide as a tree. It selects objects, hidden ones too, shows or hides them with the eye button or the H key, renames them, and moves them forward or backward. The toolbar Selection pane button turns a mounted side panel to that tab, and a host can listen to show a closed panel. The commands also work inside mc:AlternateContent. There, other edits of a drawn choice remove the out-of-date copies in the other branches: an approximation.',
+      'The side panel has a Selection tab that lists the objects of the slide as a tree. It selects objects, hidden ones too, shows or hides them with the eye button or the H key, renames them, and moves them forward or backward. The toolbar Selection pane button turns a mounted side panel to that tab, and a host can listen to show a closed panel. The commands also work inside mc:AlternateContent. There, a move, a resize, a rotation, or a flip changes the copies in the other branches too. Other edits of a drawn choice remove the out-of-date copies in the other branches: an approximation.',
     docsLink: '/docs/customization/layout#open-the-selection-pane',
   },
   {
@@ -479,7 +480,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'The drawing module of @pptx-editor.dev/pro paints these effects and uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement. Without it, shapes and pictures paint without them. PDF export always paints them. With the module, the Shape Effects menu sets and clears each effect, glows in the six accent colors, and Picture Styles offers the reflection and soft edge styles. Without it, the chrome does not offer the choices that add these effects. It still offers No reflection, No glow, and No soft edges when the selection has that effect, and No shadow also removes an inner shadow. The commands still set and clear each effect. Save keeps them in every edition. No Preset, Bevel, or 3-D Rotation. Glow, inner shadow, and soft edge blurs are measured for small radii. The reflection blur is not measured.',
+      'The drawing module of @pptx-editor.dev/pro paints these effects and uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement. Without it, shapes and pictures paint without them. PDF export always paints them. With the module, the Shape Effects menu sets and clears each effect, glows in the six accent colors, and Picture Styles offers the reflection and soft edge styles. Without it, the chrome does not offer the choices that add these effects. It still offers No reflection, No glow, and No soft edges when the selection has that effect, and No shadow also removes an inner shadow. The commands still set and clear each effect. Save keeps them in every edition. The menu has no Preset gallery. Glow, inner shadow, and soft edge blurs are measured for small radii. The reflection blur is not measured.',
   },
   {
     id: 'effects.fill-overlay',
@@ -496,10 +497,12 @@ export const pptxFeatures: PptxFeature[] = [
     id: 'effects.3d-and-other',
     name: '3-D, preset shadows, blur, and text effects',
     category: 'effects',
-    editing: 'none',
-    rendering: 'none',
-    roundTrip: 'preserved',
-    tier: 'community',
+    editing: 'partial',
+    rendering: 'partial',
+    roundTrip: 'full',
+    tier: 'premium',
+    notes:
+      'The drawing module of @pptx-editor.dev/pro paints bevels, contours, extrusion, camera rotation, and blur. It uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement. Without it, these shapes paint flat in the editor, and save keeps their properties in every edition. PDF export always paints them, except blur. Preset shadows paint in every edition, with or without the module. The Shape Effects menu sets and clears 12 bevel presets and 9 3-D Rotation presets. A command sets and clears blur. No command sets a preset shadow. Bevel light is measured for the circle and angle presets only. Perspective cameras draw as parallel views. Bottom bevels are not drawn. Text effects are not drawn: 3-D text paints flat, and save keeps it. No command sets a text effect.',
   },
 
   // --- Pictures --------------------------------------------------------
@@ -655,24 +658,25 @@ export const pptxFeatures: PptxFeature[] = [
     id: 'objects.charts',
     name: 'Charts',
     category: 'objects',
-    editing: 'none',
+    editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'preserved',
+    roundTrip: 'full',
     tier: 'premium',
     notes:
-      'The drawing module of @pptx-editor.dev/pro draws charts from the values cached in the chart part, in the editor and in the PDF export. It draws bar and column charts (clustered, stacked, and percent stacked), line, area, scatter, pie, doughnut, and radar charts, with titles, legends, axes, gridlines, data labels, and number formats. 3-D, of-pie, stock, bubble, and surface charts, and charts with trendlines or error bars, show a labeled placeholder. Without the module, every chart shows the placeholder. Charts are not editable, and the chart part saves unchanged. The module uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.',
+      'The drawing module of @pptx-editor.dev/pro draws charts from the values cached in the chart part, in the editor and in the PDF export. It draws bar and column charts (clustered, stacked, and percent stacked), line, area, scatter, pie, doughnut, and radar charts, with titles, legends, axes, gridlines, data labels, and number formats. 3-D, of-pie, stock, bubble, and surface charts, and charts with trendlines or error bars, show a labeled placeholder. Without the module, every chart shows the placeholder. The Chart Data tab of the side panel and the setChartData command change series names, category labels, and values, and add or remove series and categories. They edit bar, column, line, area, pie, doughnut, radar, and scatter charts. Bubble, stock, surface, of-pie, and combination charts, and filtered or multi-level data, stay read-only. The embedded workbook gets the same cells. A workbook with formulas, filters, or merged cells keeps its old cells. A linked workbook is never opened, and its automatic update is turned off. Dates show as serial numbers. Other chart formatting is not editable. The module uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.',
     docsLink: '/docs/guides/charts',
   },
   {
     id: 'objects.diagrams',
     name: 'Diagrams',
     category: 'objects',
-    editing: 'none',
+    editing: 'partial',
     rendering: 'partial',
     notes:
-      'A diagram draws from its saved drawing. A diagram with no saved drawing shows a placeholder. Diagrams are read-only.',
-    roundTrip: 'preserved',
+      'A diagram draws from its saved drawing. A diagram with no saved drawing shows a placeholder. You can type in a diagram shape. The edit writes the shape and its node in the data model. The addDiagramShape and deleteDiagramShape commands add and delete nodes. They work when the drawing is one line of shapes, with up to one level of children. After such an edit, the editor spaces the shapes evenly on the line. Text formatting, diagram colors, diagram styles, and layout changes are not editable. A shape that shows the text of more than one node is read-only.',
+    roundTrip: 'full',
     tier: 'community',
+    docsLink: '/docs/guides/diagrams',
   },
   {
     id: 'objects.media-ole',
@@ -689,10 +693,14 @@ export const pptxFeatures: PptxFeature[] = [
     id: 'objects.equations',
     name: 'Equations',
     category: 'objects',
-    editing: 'none',
-    rendering: 'none',
-    roundTrip: 'preserved',
+    editing: 'partial',
+    rendering: 'partial',
+    roundTrip: 'full',
     tier: 'community',
+    notes:
+      'Equations draw with STIX Two Math. Baselines and positions can differ by up to 2.2 pt. N-ary operators, accents, and skewed fractions have no reference check. Insert Equation and Edit Equation take a linear form. Math that the linear form cannot write stays as it is, and you cannot edit it. You cannot type in an equation, and font commands do not change it. The plain-text fallback is removed on edit. ' +
+      SAVE_CHECKED,
+    docsLink: '/docs/guides/equations',
   },
 
   // --- Slides, layouts & notes -----------------------------------------
@@ -835,12 +843,13 @@ export const pptxFeatures: PptxFeature[] = [
     id: 'presenting.animations-transitions',
     name: 'Animations and transitions',
     category: 'presenting',
-    editing: 'none',
+    editing: 'partial',
     rendering: 'none',
-    roundTrip: 'preserved',
+    roundTrip: 'full',
     tier: 'community',
+    docsLink: '/docs/guides/animations',
     notes:
-      'Kept on save and not played. Deleting, cutting, or ungrouping shapes, deleting a table, and turning slide numbers off remove the animations of the removed shapes. Deleting a paragraph does not update a paragraph animation range (`p:pRg`).',
+      'You can add, reorder, time, and remove the entrance, emphasis, and exit effects of the main sequence, from 13 presets. You can set fade, push, wipe, split, and cut transitions with a duration and advance timing. Motion paths and interactive sequences are listed, and you cannot add them. Timing in markup-compatibility content is read-only. The editor does not play effects or transitions. Deleting, cutting, or ungrouping shapes, deleting a table, and turning slide numbers off remove the animations of the removed shapes. A paragraph animation range (`p:pRg`) follows its paragraphs when you add, delete, split, or join paragraphs. An effect whose paragraphs are all deleted goes too. Between paragraphs with the same text, an edit in the editor keeps each effect with its own paragraph. An automation edit that names no selection decides by the text, so an effect can stay with the wrong one of two identical paragraphs.',
   },
 
   // --- Comments & review -----------------------------------------------
@@ -848,12 +857,12 @@ export const pptxFeatures: PptxFeature[] = [
     id: 'review.comments',
     name: 'Comments',
     category: 'review',
-    editing: 'none',
+    editing: 'partial',
     rendering: 'none',
-    roundTrip: 'preserved',
+    roundTrip: 'full',
     tier: 'premium',
     notes:
-      'Comments are kept on save. The review module of @pptx-editor.dev/pro reads them and uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement. No review UI yet.',
+      'You can add, reply to, edit, and delete comments, and resolve or reopen threads, with editor commands or in the comments pane (PptxEditorReview from @pptx-editor.dev/pro/react or /vue). A new comment uses the threaded format, except in a deck that has only legacy comments; legacy comments stay in their own format. A comment points at the slide or at an element on the top level of the slide. Legacy comments have no resolved state, so you cannot resolve them. Mentions, reactions, and other content of threaded comments are kept but not shown, and the edit of a comment with such content is refused. The pane lists threads in file order, not by their position on the slide. The markers on the canvas are editing chrome: they do not print or export. Two peers who add comments at once keep both, and a save joins the author lists and comment lists that they made. The import of a slide with threaded comments from another presentation is refused. Each author keeps one color, from a hash of the name. The comments pane and the comment list of the snapshot need the review module of @pptx-editor.dev/pro, which uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.',
   },
 
   // --- Collaboration & automation --------------------------------------
@@ -866,7 +875,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'The Yjs session of @pptx-editor.dev/pro syncs edits and concurrent typing. Undo reverts your own changes and keeps what a peer wrote into an element you created: the attributes, children, and text that the peer wrote stay, without yours. Text a peer typed into a run whose format you undo stays, and a paragraph you add keeps what a peer typed in it. Text a peer typed into a shape, a table row, or a cell that you add goes with your undo and comes back with your redo. Two property elements written at once (a:pPr, a:rPr, a:tcPr, a:ln) merge; for a fill or effects, one version shows and the other comes back when the winner undoes. A first line width also writes a default line color, which can show instead of the line color that a peer sets at the same time. One attribute written by two peers at once keeps one value. Slides, pictures, links, shapes, tables, and comments that two peers add or copy at once keep separate ids; one notes slide or slide-number placeholder that two peers add first can still show twice. Two peers who format one run at once keep the text once with the format of one peer; when one of them changed the text of the run first, the text can show twice, and a piece the losing peer edited shows twice. Text that a peer types, deletes, or splits with Enter while a format of another peer moves it goes with the moved text. Two peers who press Enter in one paragraph at once keep the text of each paragraph once. A run that a peer deletes keeps the text another peer types into it at the same time; when such a run was also moved by an Enter and typed into at once, a later delete of it can still lose that text. Also, text typed into an empty table cell paragraph that a peer removes at the same time shows; other text typed into a paragraph that a peer removes at the same time is lost. Two peers who type at once into a table cell that holds no text body yet both keep their text in the cell, in the same order for every peer, and each undo removes only the text of its own peer. An undo or a redo after a peer formatted, split, or pressed Enter in the same text shows each character once, next to the characters around it, and two peers who undo their delete of one character show it once; a run that the split of the peer made keeps the format it copied, so the undo of a format can leave it on that run. Three peers whose undo, redo, and Enter meet over the same text show each character once, but such edits can rarely lose a character that a peer typed beside them. A format and an Enter of a peer at once inside the same range can show the text out of order, and an undo after it can show part of the text twice. Content moved into content that a peer deletes at once goes back to its old place in the file. Two peers who join neighboring paragraphs at once keep the text of all of them; when a third peer then types into the joined paragraph, an undo of one join can leave the text of the last paragraph in the first one. A paragraph that two peers move at once shows in one place, and a later delete of that place removes it for every peer. Text in a cell that a peer merges shows once in the merged cell, also when another peer types into that cell or inserts, deletes, splits, or merges rows and columns across it at the same time; some sequences of several such edits can still lose text. When peers delete every row of a merged cell at once, the merged text goes with the rows. After a vertical merge and a concurrent delete of one of its covered rows, the merged cell ends at its last row, and the next row shows on every replica and in the saved file. The canvas shows the selections of peers with name and color. No provider entries yet. The session uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.',
+      'The Yjs session of @pptx-editor.dev/pro syncs edits and concurrent typing. Undo reverts your own changes and keeps what a peer wrote into an element you created: the attributes, children, and text that the peer wrote stay, without yours. Text a peer typed into a run whose format you undo stays, and a paragraph you add keeps what a peer typed in it. Text a peer typed into a shape, a table row, or a cell that you add goes with your undo and comes back with your redo. Two property elements written at once (a:pPr, a:rPr, a:tcPr, a:ln) merge; for a fill or effects, one version shows and the other comes back when the winner undoes. A first line width also writes a default line color, which can show instead of the line color that a peer sets at the same time. One attribute written by two peers at once keeps one value. Slides, pictures, links, shapes, tables, and comments that two peers add or copy at once keep separate ids; one notes slide or slide-number placeholder that two peers add first can still show twice. Two peers who format one run at once keep the text once with the format of one peer; when one of them changed the text of the run first, the two formats do not count as one split, so the text can show twice, and a piece the losing peer edited shows twice. Text that a peer types, deletes, or splits with Enter while a format of another peer moves it goes with the moved text. Two peers who press Enter in one paragraph at once keep the text of each paragraph once. A run that a peer deletes keeps the text another peer types into it at the same time, also when an Enter moved the run and a peer typed into it at once. Text typed into a paragraph that a peer removes at the same time (a delete across paragraphs, a join) stays, in a shape, a table cell, or the notes: the paragraph shows again at its old place with only that text, and an undo of the removal puts the rest back. When the remover undoes before the typed text arrives, that text can show at another place in the paragraph. When a third peer joins that paragraph to its neighbor at the same time, the text shows in the joined paragraph. Each read of a slide has a step limit, so after about 25,000 removed paragraphs of 10 runs each on one slide, or about 100,000 of one run each, a removed paragraph can stay removed with that text. Two peers who type at once into a table cell that holds no text body yet both keep their text in the cell, in the same order for every peer, and each undo removes only the text of its own peer. An undo or a redo after a peer formatted, split, or pressed Enter in the same text shows each character once, next to the characters around it, and two peers who undo their delete of one character show it once; a run that the split of the peer made keeps the format it copied, so the undo of a format can leave it on that run. Three peers whose undo, redo, and Enter meet over the same text show each character once, but such edits can rarely lose a character that a peer typed beside them. A format and an Enter of a peer at once inside the same text keep the text in order, and so does an undo of either one, also after a peer moved the formatted text on with another Enter; an undo of the format and then of the Enter can show the text out of order. An undo of an Enter brings back text that a peer deleted from the new paragraph after the Enter. When a peer pressed Enter in the new paragraph of your Enter and then took back all of your later edit, an undo of your Enter can show part of the text twice. Content moved into content that a peer deletes at once goes back to its old place in the file. Two peers who join neighboring paragraphs at once keep the text of all of them, and an undo of one join puts the text back in its paragraphs, also after a third peer typed into the joined paragraph. A paragraph that two peers move at once shows in one place, and a later delete of that place removes it for every peer. Text in a cell that a peer merges shows once in the merged cell, also when another peer types into that cell or inserts, deletes, splits, or merges rows and columns across it at the same time; some sequences of several such edits can still lose text, for example a merge and deletes of two of its rows by two peers at once. When peers delete every row of a merged cell at once, the merged text goes with the rows. After a vertical merge and a concurrent delete of one of its covered rows, the merged cell ends at its last row, and the next row shows on every replica and in the saved file. The canvas shows the selections of peers with name and color. No provider entries yet. The session uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.',
   },
   {
     id: 'collaboration.automation-api',

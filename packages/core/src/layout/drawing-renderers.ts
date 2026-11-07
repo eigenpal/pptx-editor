@@ -1,9 +1,10 @@
 // Drawing renderers that a capability package installs, after DOCX Editor's
 // `packages/core/src/store/package/drawing-renderers.ts`.
 //
-// The engine paints shapes, pictures, fills, lines, text, and outer shadows on its own. A shape
-// or picture paints without the effects that no renderer paints: glow, inner shadow,
-// reflection, and soft edge come from the `effects` renderer (`@pptx-editor.dev/pro/drawing`).
+// The engine paints shapes, pictures, fills, lines, text, and outer and preset shadows on its
+// own. A shape or picture paints without the effects that no renderer paints: glow, inner
+// shadow, reflection, soft edge, blur, and 3-D (bevels, contours, extrusion, and camera
+// rotation) come from the `effects` renderer (`@pptx-editor.dev/pro/drawing`).
 // A chart keeps its labeled placeholder until a `chart` renderer is installed. Other capability
 // packages add their own keys to `DrawingRenderers`.
 //
@@ -15,9 +16,11 @@
 // same engine; install renderers before any document opens. Looking up a renderer is one
 // property read.
 
+import type { GeometryPath } from '@eigenpal/ooxml-core';
 import type {
   ResolvedChartPart,
   ResolvedEffects,
+  Rgba,
   ResolvedElement,
   ResolvedGraphicFrame,
 } from '../cascade/index.ts';
@@ -66,6 +69,15 @@ export interface EffectCopySource {
   readonly height: number;
   /** Slide-space corners of everything the content paints (box and text). */
   readonly corners: readonly { x: number; y: number }[];
+  /**
+   * A face that a 3-D camera turns: the id of the face before the turn, its corners, and the
+   * turn. A shadow is placed on the face, then turns with it.
+   */
+  readonly face?: {
+    readonly id: string;
+    readonly corners: readonly { x: number; y: number }[];
+    readonly front: Matrix;
+  };
 }
 
 /** Definitions and one node that the paint puts under the content. @internal */
@@ -75,8 +87,53 @@ export interface EffectCopyPaint {
 }
 
 /**
- * Glow, inner shadow, reflection, and soft edge (ECMA-376 Part 1, 20.1.8). The outer shadow is
- * the engine's.
+ * Flat polygons of a 3-D paint that share one color, filled together as one path with the
+ * nonzero rule. @internal
+ */
+export interface ThreeDFacet {
+  readonly polygons: readonly (readonly { readonly x: number; readonly y: number }[])[];
+  readonly color: Rgba;
+}
+
+/** What a 3-D renderer reads for one shape or picture. @internal */
+export interface ThreeDInput {
+  /** The element's effects; `effects.threeD` holds its 3-D properties. */
+  readonly effects: ResolvedEffects;
+  /** The geometry, in the element's local box. */
+  readonly paths: readonly GeometryPath[];
+  /** The element's local box to the slide. */
+  readonly matrix: Matrix;
+  readonly width: number;
+  readonly height: number;
+  /** The color the bevel and the extrusion shade: the solid fill, or a color of the fill. */
+  readonly color: Rgba;
+}
+
+/**
+ * Bevels, contours, and extrusions as flat polygons (ECMA-376 Part 1, 20.1.5). The SVG paint
+ * and the PDF writer fill the same polygons.
+ *
+ * @internal
+ */
+export interface ThreeDPaint {
+  /** The slide-space transform the camera gives the front face, applied before `matrix`. */
+  readonly front: Matrix;
+  /**
+   * False when the camera turns the face edge-on (`front` is singular): the face, its text, and
+   * the effects of the face do not paint, and only the extrusion shows.
+   */
+  readonly showsFace: boolean;
+  /** Extrusion sides, in slide space, painted under everything else of the element. */
+  readonly behind: readonly ThreeDFacet[];
+  /** The contour, in the local box, painted under the geometry. */
+  readonly under: readonly ThreeDFacet[];
+  /** Face light and bevel bands, in the local box, painted over the geometry and under text. */
+  readonly over: readonly ThreeDFacet[];
+}
+
+/**
+ * Glow, inner shadow, reflection, soft edge, and blur (ECMA-376 Part 1, 20.1.8), and bevels,
+ * contours, extrusion, and camera rotation (20.1.5). The outer shadow is the engine's.
  *
  * @internal
  */
@@ -87,11 +144,15 @@ export interface DrawingEffectsRenderer {
     bounds: EffectBounds,
     ids: EffectIds
   ) => EffectFilterPaint | null;
-  /** Glow, as a filter over the content. `bounds` hold the content. */
+  /**
+   * Glow, as a filter over the content. `bounds` hold the content. With `alone`, the filter
+   * paints the glow without the content, for a copy under a 3-D extrusion.
+   */
   readonly glow: (
     effects: ResolvedEffects,
     bounds: EffectBounds,
-    ids: EffectIds
+    ids: EffectIds,
+    alone?: boolean
   ) => EffectFilterPaint | null;
   /** The reflection, painted under the content. */
   readonly reflection: (
@@ -99,6 +160,14 @@ export interface DrawingEffectsRenderer {
     source: EffectCopySource,
     ids: EffectIds
   ) => EffectCopyPaint | null;
+  /** Blur (`a:blur`), as a filter over the content. `bounds` hold the content. */
+  readonly blur?: (
+    effects: ResolvedEffects,
+    bounds: EffectBounds,
+    ids: EffectIds
+  ) => EffectFilterPaint | null;
+  /** Bevels, contour, extrusion, and the camera (`a:scene3d`, `a:sp3d`). */
+  readonly threeD?: (input: ThreeDInput) => ThreeDPaint | null;
 }
 
 /** What a chart renderer reads for one chart frame. @internal */
@@ -160,6 +229,8 @@ function guardedRenderers(renderers: Partial<DrawingRenderers>): Partial<Drawing
             body: guard(effects.body, null),
             glow: guard(effects.glow, null),
             reflection: guard(effects.reflection, null),
+            ...(effects.blur ? { blur: guard(effects.blur, null) } : {}),
+            ...(effects.threeD ? { threeD: guard(effects.threeD, null) } : {}),
           }),
         }
       : {}),
@@ -237,7 +308,10 @@ export function drawingRenderersListenerCount(): number {
  * @public
  */
 export interface DrawingCapabilities {
-  /** Glow, inner shadow, reflection, and soft edge paint (`@pptx-editor.dev/pro/drawing`). */
+  /**
+   * Glow, inner shadow, reflection, soft edge, blur, and 3-D paint
+   * (`@pptx-editor.dev/pro/drawing`).
+   */
   readonly effects: boolean;
   /**
    * Charts draw from their cached values (`@pptx-editor.dev/pro/drawing`). Without it, a chart

@@ -146,6 +146,8 @@
   --doc-review-author-5: #c2185b;
   --doc-review-author-6: #2e4053;
   --doc-review-author-7: #2e7d32;
+  /* Ink for initials on a filled author avatar or badge: 5.1:1 or more on every slot above. */
+  --doc-review-avatar-ink: #ffffff;
   --doc-review-change-bar: #a4a4a4;
   --doc-review-change-bar-width: 1px;
   --doc-review-change-bar-simple: #ea3425;
@@ -508,7 +510,7 @@
   box-shadow: var(--doc-card-shadow);
   flex-wrap: nowrap;
   overflow-x: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
 }
 /* `overflow={false}`: the bar wraps to more rows instead of using a More menu. */
 .pptx-toolbar.pptx-toolbar--wrap {
@@ -813,7 +815,7 @@
   gap: 2px;
   min-width: 0;
   overflow-x: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
 }
 .pptx-ribbon__tab {
   position: relative;
@@ -1769,6 +1771,77 @@
   pointer-events: all;
   cursor: pointer;
 }
+/* Comment markers (comment-markers.ts), after DOCX Editor's review markers (the
+   `.docx-review__marker` and `.docx-review__badge` rules of
+   docx-editor/packages/core/src/styles/editor.css at adf0e178c). `icon`: the comment icon on a
+   small card; the picked thread's marker takes the primary color. `initials`: a speech bubble in
+   the author's color, with a ring in the surface color and the reply count; a resolved thread's
+   badge is quiet, with a check mark. */
+.pptx-surface__comment-marker {
+  pointer-events: all;
+  cursor: pointer;
+}
+.pptx-surface__comment-marker-box {
+  fill: var(--doc-surface);
+  stroke: var(--doc-border);
+  filter: drop-shadow(0 1px 2px var(--doc-shadow));
+}
+.pptx-surface__comment-marker[data-marker='icon'] .pptx-surface__comment-marker-icon {
+  fill: var(--doc-text-muted);
+}
+.pptx-surface__comment-marker[data-marker='icon']:hover .pptx-surface__comment-marker-box {
+  fill: var(--doc-bg-hover);
+}
+.pptx-surface__comment-marker[data-marker='icon']:hover .pptx-surface__comment-marker-icon {
+  fill: var(--doc-text);
+}
+.pptx-surface__comment-marker[data-marker='icon'].is-active .pptx-surface__comment-marker-box {
+  stroke: var(--doc-primary);
+}
+.pptx-surface__comment-marker[data-marker='icon'].is-active .pptx-surface__comment-marker-icon {
+  fill: var(--doc-primary);
+}
+.pptx-surface__comment-marker[data-marker='icon'].is-resolved .pptx-surface__comment-marker-icon {
+  fill: var(--doc-success);
+}
+.pptx-surface__comment-marker-ring {
+  fill: var(--doc-surface);
+  stroke: var(--doc-surface);
+  filter: drop-shadow(0 2px 3px var(--doc-shadow));
+}
+.pptx-surface__comment-marker-badge {
+  fill: var(--doc-review-author-current, var(--doc-review-author-0));
+  stroke: none;
+}
+.pptx-surface__comment-marker[data-marker='initials'] .pptx-surface__comment-marker-text {
+  fill: var(--doc-review-avatar-ink, #ffffff);
+  font-family: system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.pptx-surface__comment-marker[data-marker='initials'].is-resolved
+  .pptx-surface__comment-marker-badge {
+  fill: var(--doc-surface);
+  stroke: var(--doc-border);
+}
+.pptx-surface__comment-marker[data-marker='initials'] .pptx-surface__comment-marker-icon {
+  fill: var(--doc-text-muted);
+}
+.pptx-surface__comment-marker[data-marker='initials'].is-active .pptx-surface__comment-marker-ring {
+  stroke: var(--doc-primary);
+}
+.pptx-surface__comment-marker-count {
+  fill: var(--doc-surface);
+  stroke: var(--doc-border);
+}
+.pptx-surface__comment-marker-count-text {
+  fill: var(--doc-review-author-current, var(--doc-text));
+  font-family: system-ui, sans-serif;
+  font-weight: 600;
+}
+.pptx-editor.dark .pptx-surface__comment-marker-badge {
+  stroke: var(--doc-border);
+}
 .pptx-surface__placeholder-insert-box {
   fill: var(--doc-surface);
   fill-opacity: 0.9;
@@ -1830,6 +1903,16 @@
   fill: var(--pptx-remote-color, var(--doc-accent));
 }
 .pptx-surface__remote-label text {
+  fill: var(--doc-on-primary);
+  font-family: system-ui, sans-serif;
+  font-weight: 600;
+}
+.pptx-surface__animation-mark rect {
+  /* The selection blue with a light halo: it shows on a dark slide and on a light one. */
+  fill: var(--doc-primary);
+  stroke: var(--doc-selection-halo);
+}
+.pptx-surface__animation-mark text {
   fill: var(--doc-on-primary);
   font-family: system-ui, sans-serif;
   font-weight: 600;
@@ -2176,14 +2259,23 @@
   display: flex;
   flex: 1 1 auto;
   gap: 2px;
+  /* Icon tabs: every tab shows its icon, and the selected tab also its label, so five tabs fit
+     the panel in every locale without a scrolling row. */
+  min-width: 0;
   padding: 3px;
   border-radius: var(--doc-radius-control, 10px);
   background: var(--doc-bg-hover);
 }
 .pptx-tabs__tab {
-  flex: 1 1 auto;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 32px;
   height: 28px;
-  padding: 0 6px;
+  padding: 0 7px;
+  white-space: nowrap;
   border: 0;
   border-radius: var(--doc-radius-control, 7px);
   background: transparent;
@@ -2198,6 +2290,21 @@
     color 0.16s,
     box-shadow 0.16s;
 }
+.pptx-tabs__tab[aria-selected='true'] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pptx-tabs__tab > .pptx-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.pptx-tabs__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .pptx-tabs__tab:hover {
   color: var(--doc-text);
 }
@@ -2211,6 +2318,101 @@
   min-height: 0;
   padding: 6px 16px 24px;
   overflow-y: auto;
+}
+/* Animations tab: the transition, the Add effect menu, and the effects in play order. A row
+   is a button that selects its effect; the step number leads it. */
+.pptx-animations__select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--doc-border);
+  border-radius: var(--doc-radius-control, 8px);
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 13px;
+}
+.pptx-animations__add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+.pptx-animations__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pptx-animations__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+.pptx-animations__row:hover {
+  background: var(--doc-bg-hover);
+}
+.pptx-animations__row[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--doc-primary) 16%, transparent);
+}
+.pptx-animations__row:focus-visible {
+  outline: 2px solid var(--doc-primary);
+  outline-offset: -2px;
+}
+.pptx-animations__step {
+  display: grid;
+  flex: none;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--doc-accent);
+  color: var(--doc-on-primary);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pptx-animations__name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pptx-animations__detail {
+  overflow: hidden;
+  color: var(--doc-text-muted);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pptx-animations__actions {
+  display: flex;
+  gap: 2px;
+}
+.pptx-animations__note {
+  margin: 0 0 12px;
+  color: var(--doc-text-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.pptx-animations__error {
+  color: var(--doc-danger);
+  font-size: 11.5px;
+  line-height: 1.4;
 }
 /* Selection pane: Show all, Hide all, and the order buttons over a tree of the slide's
    elements, top first. A hidden element is muted and shows a closed eye. */
@@ -2320,6 +2522,382 @@
 .pptx-selection-pane__eye:disabled {
   cursor: default;
   opacity: 0.5;
+}
+/* Comments pane (`PptxEditorReview` of `@pptx-editor.dev/pro`), after DOCX Editor's review cards
+   (the `.docx-review__*` rules of docx-editor/packages/core/src/styles/editor.css at adf0e178c):
+   one card per thread with the author's color on its leading edge, the avatar, name, and date,
+   the actions in the head, the text, the replies under a hairline, and the reply line of the
+   picked thread. The picked card lifts; a resolved card is quiet. */
+.pptx-review {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--doc-text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.pptx-review__bar {
+  display: flex;
+}
+.pptx-review__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px 0 10px;
+  border: 1px solid var(--doc-border);
+  border-radius: 999px;
+  background: var(--doc-surface);
+  color: var(--doc-primary);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 120ms ease-out;
+}
+.pptx-review__add > .pptx-icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.pptx-review__add:hover:not(:disabled) {
+  background: var(--doc-bg-hover);
+}
+.pptx-review__add:disabled {
+  color: var(--doc-text-muted);
+  cursor: default;
+  opacity: 0.6;
+}
+.pptx-review__add:focus-visible,
+.pptx-review__text-button:focus-visible,
+.pptx-review__submit:focus-visible,
+.pptx-review__send:focus-visible,
+.pptx-review__action:focus-visible {
+  outline: 2px solid var(--doc-primary);
+  outline-offset: 1px;
+}
+.pptx-review__list,
+.pptx-review__replies {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pptx-review__list {
+  gap: 8px;
+}
+/* The chrome's reading of an author's color: the pane sets `--doc-review-author-current` on each
+   card, reply, and avatar, from the ramp that the slide markers use. Dark lifts the edge. */
+.pptx-review__card,
+.pptx-review__reply,
+.pptx-review__reply-avatar {
+  --doc-review-author-ink: var(--doc-review-author-current, var(--doc-review-author-0));
+}
+.pptx-editor.dark :is(.pptx-review__card, .pptx-review__reply, .pptx-review__reply-avatar) {
+  --doc-review-author-ink: color-mix(
+    in srgb,
+    var(--doc-review-author-current, var(--doc-review-author-0)) 55%,
+    white
+  );
+}
+.pptx-review__card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--doc-border);
+  /* Whose card this is, at a glance: the author's color on the leading edge. */
+  border-inline-start: 3px solid var(--doc-review-author-ink, var(--doc-border));
+  border-radius: 12px;
+  background: var(--doc-surface);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 6%);
+  color: var(--doc-text);
+  cursor: pointer;
+  transition:
+    box-shadow 120ms ease-out,
+    border-color 120ms ease-out;
+}
+.pptx-review__card:focus-visible {
+  outline: 2px solid var(--doc-primary);
+  outline-offset: 1px;
+}
+/* The picked card lifts, with the faint wash of the chrome's accent. Three sides, so the leading
+   edge keeps the author's color. */
+.pptx-review__card[data-active] {
+  border-top-color: var(--doc-border-dark);
+  border-inline-end-color: var(--doc-border-dark);
+  border-bottom-color: var(--doc-border-dark);
+  background: var(--doc-review-card-active-bg);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 12%);
+}
+.pptx-review__card[data-resolved]:not([data-active]) {
+  opacity: 0.55;
+}
+.pptx-review__card[data-draft] {
+  cursor: default;
+}
+.pptx-review__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.pptx-review__avatar {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
+  border-radius: 50%;
+  /* The full author color: white initials keep 4.5:1 or more in every slot. */
+  background: var(--doc-review-author-current, var(--doc-review-author-0));
+  color: var(--doc-review-avatar-ink, #ffffff);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.pptx-review__meta {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.pptx-review__author {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pptx-review__time {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  color: var(--doc-text-muted);
+  font-size: 12px;
+}
+.pptx-review__status {
+  color: var(--doc-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.pptx-review__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+.pptx-review__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--doc-text-muted);
+  cursor: pointer;
+}
+.pptx-review__action > .pptx-icon {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+.pptx-review__action:hover:not(:disabled) {
+  background: var(--doc-bg-hover);
+  color: var(--doc-text);
+}
+/* The destructive one reads as destructive on hover. */
+.pptx-review__action[data-action='delete']:hover:not(:disabled) {
+  background: var(--doc-destructive-hover-bg);
+  color: var(--doc-destructive);
+}
+/* Edit and Delete show on the one card or reply that the pointer is on, and on keyboard focus.
+   `visibility`, so hidden also means unclickable, while the space stays and the row holds still.
+   A focused card shows them, so the keyboard reaches them with Tab. */
+.pptx-review__action:is([data-action='delete'], [data-action='edit']) {
+  visibility: hidden;
+}
+.pptx-review__reply:is(:hover, :focus-within)
+  > .pptx-review__head
+  .pptx-review__action:is([data-action='delete'], [data-action='edit']),
+.pptx-review__card:hover:not(:has(.pptx-review__reply:hover))
+  > .pptx-review__head
+  .pptx-review__action:is([data-action='delete'], [data-action='edit']),
+.pptx-review__card:focus-within:not(:has(.pptx-review__reply:focus-within))
+  > .pptx-review__head
+  .pptx-review__action:is([data-action='delete'], [data-action='edit']),
+.pptx-review__action:is([data-action='delete'], [data-action='edit']):focus-visible {
+  visibility: visible;
+}
+/* A touch screen has no hover: the actions stay in view there. */
+@media (hover: none) {
+  .pptx-review__action:is([data-action='delete'], [data-action='edit']) {
+    visibility: visible;
+  }
+}
+.pptx-review__chip {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  max-width: 100%;
+  height: 22px;
+  padding: 0 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--doc-bg-hover);
+  color: var(--doc-text-muted);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pptx-review__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pptx-review__text {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  /* A comment keeps its own direction: a left-to-right remark in a right-to-left interface
+     keeps its closing punctuation at its end. */
+  unicode-bidi: plaintext;
+}
+/* Replies live inside the card they answer, under a hairline: one conversation, one card. */
+.pptx-review__replies {
+  gap: 10px;
+  margin: 2px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--doc-border);
+}
+.pptx-review__reply {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pptx-review__compose,
+.pptx-review__reply-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  cursor: default;
+}
+.pptx-review__compose {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 8px;
+}
+.pptx-review__reply-avatar {
+  width: 26px;
+  height: 26px;
+  font-size: 10px;
+}
+.pptx-review__input {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-height: 9em;
+  padding: 7px 14px;
+  border: 1px solid var(--doc-border);
+  border-radius: 18px;
+  background: var(--doc-surface);
+  color: inherit;
+  font: inherit;
+  line-height: 1.4;
+  resize: none;
+  /* The field grows with its text where the browser supports it. */
+  field-sizing: content;
+  unicode-bidi: plaintext;
+}
+.pptx-review__input:focus-visible {
+  outline: 1px solid var(--doc-border-dark);
+  outline-offset: -1px;
+}
+.pptx-review__input[aria-invalid='true'] {
+  border-color: var(--doc-danger);
+}
+.pptx-review__compose-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.pptx-review__text-button {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--doc-primary);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.pptx-review__text-button:hover {
+  background: var(--doc-bg-hover);
+}
+.pptx-review__submit {
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--doc-primary);
+  color: var(--doc-on-primary);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.pptx-review__submit:disabled {
+  background: var(--doc-bg-hover);
+  color: var(--doc-text-muted);
+  cursor: default;
+}
+/* The round send button of the reply line. */
+.pptx-review__send {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--doc-primary);
+  color: var(--doc-on-primary);
+  cursor: pointer;
+}
+.pptx-review__send > .pptx-icon {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+.pptx-review__send:disabled {
+  background: transparent;
+  color: var(--doc-text-subtle);
+  cursor: default;
+}
+.pptx-review__refused {
+  flex: 1 0 100%;
+  color: var(--doc-danger);
+  font-size: 11.5px;
+}
+.pptx-review__empty {
+  padding: 24px 12px;
+  color: var(--doc-text-muted);
+  text-align: center;
+}
+.pptx-review__empty-title {
+  margin: 0 0 4px;
+  color: var(--doc-text);
+  font-weight: 600;
+}
+.pptx-review__empty-body {
+  margin: 0;
+  font-size: 12px;
 }
 .pptx-panel__section {
   display: flex;
@@ -3778,6 +4356,24 @@ legend.pptx-dialog__label {
   stroke: currentColor;
   stroke-width: 1.6;
 }
+/* Text Effects: the trigger's letter and arc, and the Transform gallery, whose cells stroke
+   each warp's paths. */
+.pptx-text-effects-glyph {
+  fill: currentColor;
+}
+.pptx-text-effects-glyph__arc {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.pptx-warp-gallery__path {
+  fill: none;
+  stroke: var(--doc-text);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
 /* The loading screen (`PptxEditor.Loading` in React, `PptxEditorLoading` in Vue), after DOCX
    Editor's `DocxEditor.Loading`: a slide-shaped sheet with a spinner, at the slide size and
@@ -4020,4 +4616,105 @@ legend.pptx-dialog__label {
     fill: Highlight;
     fill-opacity: 0.4;
   }
+}
+
+/* Chart Data tab: the categories as a list of fields with a remove button each, then one
+   collapsible card per series with its name and a value field for each category. */
+.pptx-chart-pane__note {
+  margin: 0 0 8px;
+  color: var(--doc-text-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.pptx-chart-pane__error {
+  margin: 0;
+  color: var(--doc-danger);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+.pptx-chart-pane__error:empty {
+  display: none;
+}
+.pptx-chart-pane__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pptx-chart-pane__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 4px;
+}
+.pptx-chart-pane__field {
+  min-width: 0;
+}
+.pptx-chart-pane__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pptx-chart-pane__card {
+  border: 1px solid var(--doc-border);
+  border-radius: var(--doc-radius-control, 8px);
+  background: var(--doc-surface);
+}
+.pptx-chart-pane__summary {
+  overflow: hidden;
+  padding: 8px 10px;
+  color: var(--doc-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pptx-chart-pane__summary:focus-visible {
+  outline: 2px solid var(--doc-primary);
+  outline-offset: -2px;
+  border-radius: var(--doc-radius-control, 8px);
+}
+.pptx-chart-pane__card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+.pptx-chart-pane__remove {
+  align-self: flex-start;
+}
+
+/* The Equation dialog: a gallery of common equations in a grid of two columns (one on a phone),
+   each button with its name and its linear form, above the linear form field. */
+.pptx-dialog[data-pptx-dialog='equation'] {
+  width: min(560px, calc(100vw - 32px));
+}
+.pptx-equation-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.pptx-equation-gallery__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  height: auto;
+  padding: 6px 10px;
+  text-align: start;
+}
+.pptx-equation-gallery__item code {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85em;
+}
+.pptx-equation-gallery__item[aria-pressed='true'] {
+  border-color: var(--doc-primary);
+  background: var(--doc-primary-light);
 }

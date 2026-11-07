@@ -4,12 +4,13 @@
 // `BulletsAndNumberingDialog`. A Bulleted and a Numbered tab with the gallery, the size as a
 // percentage of the text, the color, and the start number. OK sends one `setBulletFormat`
 // command with only what changed, so the dialog is one undo step and a size or color change
-// keeps each paragraph's own bullet. The Bulleted tab also takes any character in any font. The
-// form model is core's (`bullets-dialog-fields.ts`). The host owns visibility.
+// keeps each paragraph's own bullet. The Bulleted tab also takes any character in any font, and
+// a picture (PNG, JPEG, or GIF) as a picture bullet. The form model is core's (`bullets-dialog-fields.ts`). The host owns visibility.
 
 import {
   defineComponent,
   h,
+  ref,
   useId,
   type CSSProperties,
   type ExtractPublicPropTypes,
@@ -17,7 +18,9 @@ import {
   type VNode,
 } from 'vue';
 import {
+  BULLET_PICTURE_ACCEPT,
   BULLET_TEXT_FONT,
+  bulletColorEnabled,
   bulletCommandOf,
   bulletFieldsEnabled,
   bulletFontMixed,
@@ -25,9 +28,11 @@ import {
   bulletStyleOptions,
   bulletsDialogError,
   bulletsFieldError,
+  chooseBulletPicture,
   customBulletPreview,
   editBulletGlyph,
   pickBulletStyle,
+  readBulletPicture,
   seedBulletFields,
   takeDialogSection,
   type BulletsDialogFields,
@@ -49,11 +54,12 @@ import {
   type FormDialogParts,
 } from './dialog-form.tsx';
 import { useFormDraft } from './form-draft.ts';
+import type { TranslationKey } from '@pptx-editor.dev/i18n';
 
 /**
  * The field names of the Bullets and Numbering dialog, for `BulletsAndNumberingDialog.Field`:
  * the fields of a whole tab (`bullet`, `number`), or one field, named as its input: `style`,
- * `char`, `font`, `sizePercent`, and `color` on the Bulleted tab; `numberStyle`,
+ * `char`, `font`, `picture`, `sizePercent`, and `color` on the Bulleted tab; `numberStyle`,
  * `numberSizePercent`, `numberColor`, and `startAt` on the Numbered tab. @public
  */
 export type BulletsAndNumberingDialogFieldName =
@@ -62,6 +68,7 @@ export type BulletsAndNumberingDialogFieldName =
   | 'style'
   | 'char'
   | 'font'
+  | 'picture'
   | 'sizePercent'
   | 'color'
   | 'numberStyle'
@@ -132,6 +139,9 @@ const BulletsAndNumberingDialogOpen = defineComponent({
     });
     const state = formDialogState({ draft, isEnabled: editable, onClose: () => props.onClose() });
     const set = draft.setValue;
+    const file = ref<HTMLInputElement | null>(null);
+    // Why the Picture field refused the last file the user picked.
+    const pictureProblem = ref<TranslationKey | null>(null);
     const fields = (kind: BulletsDialogTab, d: BulletsDialogFields, mixed: string): VNode => {
       // While a tab's style is None, its size, color, and start are dimmed.
       const off = !bulletFieldsEnabled({ ...d, kind });
@@ -181,6 +191,43 @@ const BulletsAndNumberingDialogOpen = defineComponent({
                     )
                   }
                 />,
+                // A picture file sets a picture bullet; the style row then shows Picture.
+                <div class="pptx-field" {...fieldPart('picture')}>
+                  <span>{t('bulletsAndNumberingDialog.picture')}</span>
+                  <span class="pptx-gradient__row">
+                    <button
+                      type="button"
+                      name="picture"
+                      class="pptx-button"
+                      onClick={() => file.value?.click()}
+                    >
+                      {t('bulletsAndNumberingDialog.choosePicture')}
+                    </button>
+                    <span role="status" class="pptx-dialog__muted">
+                      {pictureProblem.value
+                        ? t(pictureProblem.value)
+                        : d.picture
+                          ? t('bulletsAndNumberingDialog.pictureChosen')
+                          : ''}
+                    </span>
+                  </span>
+                  <input
+                    ref={file}
+                    type="file"
+                    accept={BULLET_PICTURE_ACCEPT}
+                    hidden
+                    onChange={(e: Event) => {
+                      const input = e.target as HTMLInputElement;
+                      const picked = input.files?.[0];
+                      input.value = '';
+                      void readBulletPicture(picked).then((read) => {
+                        if (!read) return;
+                        pictureProblem.value = read.ok ? null : read.reason;
+                        if (read.ok) draft.update((cur) => chooseBulletPicture(cur, read.picture));
+                      });
+                    }}
+                  />
+                </div>,
               ]
             : null}
           <NumberField
@@ -200,7 +247,8 @@ const BulletsAndNumberingDialogOpen = defineComponent({
             {...fieldPart(kind === 'bullet' ? 'color' : 'numberColor')}
             name={kind === 'bullet' ? 'color' : 'numberColor'}
             label={t('bulletsAndNumberingDialog.color')}
-            disabled={off}
+            // A picture bullet has no color.
+            disabled={!bulletColorEnabled({ ...d, kind })}
             value={d.color}
             seed={seed.color}
             onChange={(v: ColorPick) => set('color', v)}

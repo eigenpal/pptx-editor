@@ -48,6 +48,14 @@ export function boxMatrix(x: Xfrm, withFlip?: boolean, extraRotation?: number): 
 export function breakOpportunities(text: string, eaLineBreak?: boolean, latinLineBreak?: boolean, kinsoku?: KinsokuLists): Uint8Array;
 
 // @public
+export interface BulletPicture {
+    readonly height: number;
+    readonly part: string;
+    readonly rId: string;
+    readonly svgRId?: string;
+}
+
+// @public
 export interface CellLayout {
     // (undocumented)
     readonly cell: ResolvedTableCell;
@@ -145,9 +153,11 @@ export function drawingCapabilities(): DrawingCapabilities;
 
 // @internal
 export interface DrawingEffectsRenderer {
+    readonly blur?: (effects: ResolvedEffects, bounds: EffectBounds, ids: EffectIds) => EffectFilterPaint | null;
     readonly body: (effects: ResolvedEffects, bounds: EffectBounds, ids: EffectIds) => EffectFilterPaint | null;
-    readonly glow: (effects: ResolvedEffects, bounds: EffectBounds, ids: EffectIds) => EffectFilterPaint | null;
+    readonly glow: (effects: ResolvedEffects, bounds: EffectBounds, ids: EffectIds, alone?: boolean) => EffectFilterPaint | null;
     readonly reflection: (effects: ResolvedEffects, source: EffectCopySource, ids: EffectIds) => EffectCopyPaint | null;
+    readonly threeD?: (input: ThreeDInput) => ThreeDPaint | null;
 }
 
 // @internal
@@ -198,6 +208,14 @@ export interface EffectCopySource {
         x: number;
         y: number;
     }[];
+    readonly face?: {
+        readonly id: string;
+        readonly corners: readonly {
+            x: number;
+            y: number;
+        }[];
+        readonly front: Matrix;
+    };
     // (undocumented)
     readonly height: number;
     readonly matrix: Matrix;
@@ -423,6 +441,7 @@ export interface GlyphRun {
     readonly face: ResolvedFace;
     // (undocumented)
     readonly kind: 'text' | 'bullet';
+    readonly picture?: BulletPicture;
     // (undocumented)
     readonly props: RunProps;
     readonly rise: number;
@@ -561,6 +580,7 @@ export interface Line {
     readonly fontHeight: number;
     // (undocumented)
     readonly height: number;
+    readonly marks?: readonly LineMark[];
     // (undocumented)
     readonly paragraph: number;
     readonly pendingBullet?: GlyphRun;
@@ -599,6 +619,14 @@ export function lineHeightPt(sizePt: number, spacing: {
 } | {
     pts: number;
 }, reduction: number): number;
+
+// @public
+export interface LineMark {
+    readonly commands: readonly PathCommand[];
+    // (undocumented)
+    readonly props: RunProps;
+    readonly runIndex: number;
+}
 
 // @public
 export type MarkedFontResolver<T extends FontResolver = FontResolver> = T & FontResolverMark;
@@ -650,6 +678,9 @@ export type PathCommand = {
 } | {
     readonly op: 'Z';
 };
+
+// @public
+export const PICTURE_BULLET_SCALE = 0.7;
 
 // @internal
 export function placeBaseline(emu: number): number;
@@ -827,6 +858,7 @@ export interface TextLayout {
     readonly rotation: number;
     readonly substitutions: readonly string[];
     readonly upright: 'none' | 'eastAsian' | 'all';
+    readonly warped?: readonly WarpedRun[];
 }
 
 // @public
@@ -835,8 +867,56 @@ export interface TextMeasurer {
         readonly kerning?: boolean;
     }): Float64Array;
     fallbackFace?(face: ResolvedFace, codePoint: number, lang?: string): ResolvedFace | undefined;
+    glyphOutline?(face: ResolvedFace, codePoint: number): readonly PathCommand[] | undefined;
     // (undocumented)
     resolve(request: FontRequest): ResolvedFace;
+}
+
+// @internal
+export interface ThreeDFacet {
+    // (undocumented)
+    readonly color: Rgba;
+    // (undocumented)
+    readonly polygons: readonly (readonly {
+        readonly x: number;
+        readonly y: number;
+    }[])[];
+}
+
+// @internal
+export interface ThreeDInput {
+    readonly color: Rgba;
+    readonly effects: ResolvedEffects;
+    // (undocumented)
+    readonly height: number;
+    readonly matrix: Matrix;
+    readonly paths: readonly GeometryPath[];
+    // (undocumented)
+    readonly width: number;
+}
+
+// @internal
+export interface ThreeDPaint {
+    readonly behind: readonly ThreeDFacet[];
+    readonly front: Matrix;
+    readonly over: readonly ThreeDFacet[];
+    readonly showsFace: boolean;
+    readonly under: readonly ThreeDFacet[];
+}
+
+// @public
+export interface WarpedRun {
+    readonly glyphs: readonly PathCommand[];
+    readonly highlight: readonly PathCommand[];
+    readonly line: number;
+    readonly picture?: {
+        readonly origin: readonly [number, number];
+        readonly across: readonly [number, number];
+        readonly down: readonly [number, number];
+    };
+    // (undocumented)
+    readonly run: number;
+    readonly underline: readonly PathCommand[];
 }
 
 // @internal

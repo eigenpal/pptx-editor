@@ -5,6 +5,7 @@
 // The WASM module loads through a dynamic import so importing layout never adds top-level
 // await to a host's import graph. Call `initializeHarfBuzz()` once before measuring.
 
+import type { PathCommand } from '@eigenpal/ooxml-core';
 import { AdvanceCache } from './advance-cache.ts';
 import { os2LineExtents, withFaceLineMetrics } from './face-line-metrics.ts';
 import { isIdeographic } from './line-break.ts';
@@ -125,6 +126,13 @@ interface LoadedFace {
 const MAX_TEXT = 100_000;
 /** Advance arrays kept per measurer; the least recently used go first (`AdvanceCache`). */
 const CACHE_LIMIT = 20_000;
+/**
+ * Outline commands for one glyph: a real glyph has a few hundred at most. A glyph with more has
+ * no outline, so a text warp skips it.
+ */
+const MAX_OUTLINE_COMMANDS = 2_000;
+/** Outline commands kept in the outline cache, over all glyphs. */
+const MAX_CACHED_OUTLINE_COMMANDS = 1_000_000;
 
 /**
  * An sfnt table of face 0, read from the font bytes in JavaScript. `Face.referenceTable` makes
@@ -368,5 +376,55 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     return found ?? undefined;
   };
 
-  return { resolve, advances, fallbackFace, faces };
+  // Glyph outlines in em, y up, by face id and code point; bounded by entries and by commands.
+  const outlines = new Map<string, readonly PathCommand[] | null>();
+  let cachedCommands = 0;
+  let draw: InstanceType<HarfBuzzModule['DrawFuncs']> | null = null;
+  let sink: PathCommand[] = [];
+  let overflow = false;
+  let k = 1;
+  const glyphOutline = (face: ResolvedFace, cp: number): readonly PathCommand[] | undefined => {
+    const key = `${face.id}|${cp}`;
+    const hit = outlines.get(key);
+    if (hit !== undefined) return hit ?? undefined;
+    const entry = faces.find((f) => f.id === face.id);
+    const lf = entry ? load(entry) : null;
+    const glyph = lf?.font.nominalGlyph(cp);
+    let out: PathCommand[] | null = null;
+    if (lf && glyph) {
+      k = 1 / lf.upem;
+      // Drawing is synchronous, so one set of callbacks writes into the current sink.
+      if (!draw) {
+        draw = new module.DrawFuncs();
+        const add = (c: PathCommand): void => {
+          if (sink.length < MAX_OUTLINE_COMMANDS) sink.push(c);
+          else overflow = true;
+        };
+        draw.setMoveToFunc((x, y) => add({ op: 'M', x: x * k, y: y * k }));
+        draw.setLineToFunc((x, y) => add({ op: 'L', x: x * k, y: y * k }));
+        draw.setQuadraticToFunc((x1, y1, x, y) =>
+          add({ op: 'Q', x1: x1 * k, y1: y1 * k, x: x * k, y: y * k })
+        );
+        draw.setCubicToFunc((x1, y1, x2, y2, x, y) =>
+          add({ op: 'C', x1: x1 * k, y1: y1 * k, x2: x2 * k, y2: y2 * k, x: x * k, y: y * k })
+        );
+        draw.setClosePathFunc(() => add({ op: 'Z' }));
+      }
+      sink = [];
+      overflow = false;
+      lf.font.drawGlyph(glyph, draw);
+      out = overflow ? null : sink;
+      sink = [];
+    }
+    const commands = out?.length ?? 0;
+    if (outlines.size >= CACHE_LIMIT || cachedCommands + commands > MAX_CACHED_OUTLINE_COMMANDS) {
+      outlines.clear();
+      cachedCommands = 0;
+    }
+    cachedCommands += commands;
+    outlines.set(key, out);
+    return out ?? undefined;
+  };
+
+  return { resolve, advances, fallbackFace, glyphOutline, faces };
 }

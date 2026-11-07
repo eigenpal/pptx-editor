@@ -33,11 +33,20 @@ export function composableErrors({ reactApi, vueApi, contract }) {
 
 function main() {
   const read = (path) => readFileSync(join(root, path), 'utf8');
-  const errors = composableErrors({
-    reactApi: read('docs/api/react/index.api.md'),
-    vueApi: read('docs/api/vue/index.api.md'),
-    contract: JSON.parse(read('scripts/parity/parity.contract.json')),
-  });
+  const contract = JSON.parse(read('scripts/parity/parity.contract.json'));
+  // The adapters, and the Pro entries for them (`@pptx-editor.dev/pro/react` and `/vue`).
+  const errors = [
+    ...composableErrors({
+      reactApi: read('docs/api/react/index.api.md'),
+      vueApi: read('docs/api/vue/index.api.md'),
+      contract,
+    }),
+    ...composableErrors({
+      reactApi: read('docs/api/pro/react.api.md'),
+      vueApi: read('docs/api/pro/vue.api.md'),
+      contract: {},
+    }).map((error) => `pro: ${error}`),
+  ];
   if (errors.length) {
     console.error('✘ composable parity:\n');
     for (const error of errors) console.error(`  - ${error}`);

@@ -49,12 +49,13 @@
     // Vue composables are named `use*` and run in `setup()`, not in React components. The React
     // hook rules do not apply to the Vue adapter (DOCX Editor scopes them the same way).
     {
-      "files": ["packages/vue/**/*.{ts,tsx}"],
+      "files": ["packages/vue/**/*.{ts,tsx}", "packages/pro/src/vue/**/*.{ts,tsx}"],
       "rules": { "react/rules-of-hooks": "off", "react/exhaustive-deps": "off" }
     },
-    // The Vue adapter never imports React, and the React adapter never imports Vue.
+    // The Vue adapter never imports React, and the React adapter never imports Vue. The same holds
+    // for the Pro entries of each adapter.
     {
-      "files": ["packages/vue/src/**/*.{ts,tsx}"],
+      "files": ["packages/vue/src/**/*.{ts,tsx}", "packages/pro/src/vue/**/*.{ts,tsx}"],
       "rules": {
         "no-restricted-imports": [
           "error",
@@ -70,7 +71,7 @@
       }
     },
     {
-      "files": ["packages/react/src/**/*.{ts,tsx}"],
+      "files": ["packages/react/src/**/*.{ts,tsx}", "packages/pro/src/react/**/*.{ts,tsx}"],
       "rules": {
         "no-restricted-imports": [
           "error",

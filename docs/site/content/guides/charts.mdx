@@ -1,6 +1,6 @@
 ---
 title: 'Charts'
-description: 'Draw charts from the values cached in their chart parts, in the editor and in the PDF export.'
+description: 'Draw charts from the values cached in their chart parts, and edit the data that a chart plots.'
 category: 'Guides'
 ---
 
@@ -31,7 +31,85 @@ Right legends, top and bottom legends of one row, and radar labels keep their sp
 
 The module turns a chart into shapes and labels in the chart's frame. The engine lays them out with the same geometry and text measurement as every other shape. The editor and the PDF export draw that one layout, so the two agree.
 
-A chart is not editable. It selects, moves, and deletes as one object, and its chart part saves unchanged. The engine never reads an embedded workbook or an external data source.
+A chart selects, moves, and deletes as one object. Only its data is editable. See [Edit chart data](#edit-chart-data).
+
+## Edit chart data
+
+You can change the series names, the category labels, and the values of a chart. You can also add and remove series and categories. Data editing is part of the free engine and the React and Vue adapters. The Pro drawing module only draws the result.
+
+The data of bar, column, line, area, pie, doughnut, radar, and scatter charts is editable. In a scatter chart, the categories are the X values.
+
+### Use the Chart Data tab
+
+Select a chart. Then choose **Edit data…** on the chart toolbar group, on the **Chart Design** ribbon tab, or in the chart's context menu. The side panel opens on its **Chart Data** tab, beside the slide. The tab shows while a chart is selected:
+
+- **Categories** lists a field for each category label, or **X values** for a scatter chart. Each row has a remove button. **Add category** adds a category at the end.
+- **Series** shows a card for each series, with its name and a value field for each category. A card opens and closes with its title. **Add series** adds a series at the end, and **Remove series** removes the series of its card.
+- A field applies when you press Enter or leave it. Each applied field, add, or remove is one undo step, and the slide updates at once.
+- An empty value field is a blank value. Text that is not a number stays in the field with a reason, and Escape restores the chart's value.
+
+Every field has a label with its series and category, such as "Plan, North". The tab uses plain form fields, so Tab and Shift+Tab move through it.
+
+The controls send `requestPane(editor, 'chart')`. When your layout can hide the side panel, listen for the request and show the panel. See [Open the side panel from the toolbar](/docs/customization/layout#open-the-side-panel-from-the-toolbar).
+
+### Edit data from code
+
+`editor.chartData(nodeId?)` reads the data of the selected chart, or of a chart frame on the current slide. `setChartData` writes new data. `editor.snapshot().chart` tells you whether the selected chart is editable.
+
+This example renames the first series and adds a category to the selected chart:
+
+```ts
+const read = editor.chartData();
+if (!read.ok) throw new Error(read.reason); // a translation key
+
+const { kind, categories, series } = read.data;
+const result = editor.exec({
+  type: 'setChartData',
+  data: {
+    kind,
+    categories: [...categories, { label: 'Central' }],
+    series: series.map((s, i) => ({
+      ...s,
+      name: i === 0 ? 'Budget' : s.name,
+      values: [...s.values, 40],
+    })),
+  },
+});
+if (!result.ok) console.warn(result.reason);
+```
+
+The `source` of each series and category tells the engine where it came from. Keep `source` when you reorder or edit an item, so its formatting stays with it. Leave `source` out for a new item. A new series gets automatic formatting.
+
+### What changes on save
+
+One edit changes the chart part and the embedded workbook together:
+
+- The cached values and the point counts of each series.
+- The cell references (`c:f`) of the series names, categories, and values.
+- The data point formatting (`c:dPt`) and the data labels (`c:dLbl`). They move with their category, and those of a removed category go away.
+- The cells of the embedded workbook. A table in the workbook grows or shrinks with the data.
+
+`ChartData.workbook` says what an edit does to the workbook:
+
+| Value | What an edit does |
+| --- | --- |
+| `embedded` | The embedded workbook gets the new cells. |
+| `kept` | The workbook keeps its old cells. This happens when its data cells have formulas or merged cells, when the chart's references name no sheet of the workbook, or when a table holds series in rows, has a total row, has no header row, or has filters, sorting, or column formulas. |
+| `external` | The chart links to another file. The engine never opens it, and turns off its automatic update (`c:autoUpdate`). |
+| `none` | The chart has no workbook. |
+
+`workbook` describes the chart's data as it is now. An edit of an `embedded` workbook writes the workbook too, or is refused with `errors.chartData.workbook`. That happens when a series in a workbook table gets an empty name or the name of another series, or when a grown table would cover cells that hold content. So the chart and an `embedded` workbook never disagree.
+
+When the workbook is `kept` or `external`, the tab shows a note. An application that rebuilds the chart from its workbook can show the old values.
+
+### Limits
+
+- Bubble, stock, surface, of-pie, and combination charts stay read-only.
+- Charts with filtered series, multi-level categories, or series with different categories stay read-only.
+- When the cell references do not form one table, you can change only names, category labels, and values.
+- A chart edits up to 255 series and 4,000 categories. Names and labels have up to 255 characters.
+- Date categories show as serial numbers.
+- Chart formatting, such as colors, axes, and the chart type, is not editable.
 
 ## See also
 

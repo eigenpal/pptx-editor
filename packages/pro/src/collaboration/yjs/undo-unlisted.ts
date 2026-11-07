@@ -87,7 +87,8 @@ function entryOf(key: string, value: unknown, partName?: string): UndoneEntry | 
 export function noteUndoneListings(
   room: Room,
   step: StepRanges,
-  transact: (write: () => void) => void
+  transact: (write: () => void) => void,
+  moved: ReadonlySet<string> = new Set()
 ): void {
   const nodes: unknown = room.nodes;
   const listed = new Map<Y.Array<unknown>, Set<string>>();
@@ -109,6 +110,9 @@ export function noteUndoneListings(
     for (const k of item.content.getContent()) if (typeof k === 'string') keys.add(k);
   });
   if (listed.size === 0) return;
+  // A peer's run that a repair moved after this replica's Enter as part of the step
+  // (`followEnter` in `text-repair.ts`): the undo lists it at its old place again.
+  for (const keys of listed.values()) for (const k of moved) keys.delete(k);
   const undone = room.doc.getMap(UNDONE_KEY);
   const client = room.doc.clientID;
   const clock = Y.getState(room.doc.store, client);
@@ -398,13 +402,12 @@ export class UndoneListings {
     if (children instanceof Y.Array)
       for (const item of sequenceItems(children)) if (foreign(item)) return true;
     // A run a write removed from the node while a peer typed into it shows again with that
-    // text (`withRemovedRuns` in `text-identity.ts`), so it counts as content of the node.
-    let runs = 0;
-    for (const field of rec.keys()) {
-      if (!field.startsWith(IDENTITY.removedRun)) continue;
-      if ((runs += 1) > MAX_PLACED) break;
+    // text (`withRemovedRuns` in `removed-content.ts`), so it counts as content of the node.
+    // The fields in one order on every replica, so each looks at the same runs.
+    const runs: string[] = [];
+    for (const field of rec.keys()) if (field.startsWith(IDENTITY.removedRun)) runs.push(field);
+    for (const field of runs.sort().slice(0, MAX_PLACED))
       if (this.#holdsForeign(field.slice(IDENTITY.removedRun.length), e, depth + 1)) return true;
-    }
     return this.#shown(key).some((child) => this.#holdsForeign(child.key, child, depth + 1));
   }
 

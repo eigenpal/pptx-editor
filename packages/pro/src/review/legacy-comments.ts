@@ -6,7 +6,8 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // Legacy PresentationML comments (ECMA-376 Part 1, 19.4): `ppt/commentAuthors.xml` holds
 // `p:cmAuthor id name`, and each slide links to a `p:cmLst` part of `p:cm authorId dt idx`
 // with `p:text`. A reply names its parent in `p15:threadingInfo/p15:parentCm` (a `p15`
-// extension). Modern threaded comments (`p188:`) are not read yet.
+// extension). `reviewModule` reads both formats through `readCommentThreads` of the core
+// editor lane; this function stays for hosts that read only legacy comments.
 
 import {
   attr,

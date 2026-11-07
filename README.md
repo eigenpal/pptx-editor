@@ -15,7 +15,7 @@
   <a href="https://latest.pptx-editor.dev/"><img src="https://img.shields.io/badge/Live_Demo-C43E1C?style=flat-square&logo=vercel&logoColor=white" alt="Demo" /></a>
 </p>
 
-**PPTX Editor** is a WYSIWYG editor and headless rendering engine for `.pptx` presentations. Use it to edit, render, automate, and export slides on the client or the server. It uses the ECMA-376 (Office Open XML) format. Licensed packages add real-time collaboration, legacy comment reading, and PDF export. It is part of the EigenPal editor family, with [DOCX Editor](https://docx-editor.dev).
+**PPTX Editor** is a WYSIWYG editor and headless rendering engine for `.pptx` presentations. Use it to edit, render, automate, and export slides on the client or the server. It uses the ECMA-376 (Office Open XML) format. Licensed packages add real-time collaboration, comments, and PDF export. It is part of the EigenPal editor family, with [DOCX Editor](https://docx-editor.dev).
 
 [Live demo](https://latest.pptx-editor.dev/) | [Documentation](docs/site/content/index.mdx) | [Editor API](docs/site/content/editor-api/index.mdx) | [PPTX fidelity](docs/site/content/pptx-fidelity.mdx)
 
@@ -46,7 +46,7 @@ See the [React](#react) or [Vue](#vue) quick start.
 | [Light and dark themes](docs/site/content/customization/appearance.mdx) | Match the editor chrome to your app with one set of tokens. |
 | [React and Vue](#react) | Use either adapter with the same engine and styles. |
 | [Fonts](packages/core/README.md#fonts) | Use embedded fonts, metric-compatible substitutes, or your own fonts. |
-| [Review and collaboration](docs/site/content/pro/index.mdx) | Read legacy comments and edit together in real time. |
+| [Review and collaboration](docs/site/content/pro/index.mdx) | Comment on slides and edit together in real time. |
 | [PDF export](docs/site/content/export/pdf/index.mdx) | Convert presentations to PDF on Node.js. |
 
 ## Packages
@@ -57,7 +57,7 @@ See the [React](#react) or [Vue](#vue) quick start.
 | [`@pptx-editor.dev/vue`](https://www.npmjs.com/package/@pptx-editor.dev/vue) | Vue 3 editor components and composables. | [Vue adapter](docs/site/content/vue/index.mdx) |
 | [`@pptx-editor.dev/core`](https://www.npmjs.com/package/@pptx-editor.dev/core) | The engine: parse, layout, paint, edit, and save. | [Core engine](docs/site/content/core/index.mdx) |
 | [`@pptx-editor.dev/i18n`](https://www.npmjs.com/package/@pptx-editor.dev/i18n) | Interface strings. | [Language](docs/site/content/customization/language.mdx) |
-| [`@pptx-editor.dev/pro`](https://www.npmjs.com/package/@pptx-editor.dev/pro) | Legacy comment reading, drawing, and real-time collaboration modules. | [Pro modules](docs/site/content/pro/index.mdx) |
+| [`@pptx-editor.dev/pro`](https://www.npmjs.com/package/@pptx-editor.dev/pro) | Comments, drawing, and real-time collaboration modules, and the comments pane for React and Vue. | [Pro modules](docs/site/content/pro/index.mdx) |
 | [`@pptx-editor.dev/editor-api`](https://www.npmjs.com/package/@pptx-editor.dev/editor-api) | A supported subset of the Office.js presentation API for browser and server editing. | [Presentation automation](docs/site/content/editor-api/index.mdx) |
 | [`@pptx-editor.dev/pptx-to-pdf`](https://www.npmjs.com/package/@pptx-editor.dev/pptx-to-pdf) | Convert PPTX to PDF on Node.js. | [PDF export](docs/site/content/export/pdf/index.mdx) |
 
