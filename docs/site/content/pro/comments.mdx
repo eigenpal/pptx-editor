@@ -215,7 +215,14 @@ export function askForReview(editor: PptxEditorInstance) {
 
 Every command except `addComment` also takes `expect`: the `author`, `date`, `text`, and `identity` of the comment as your view shows it. The editor then refuses the command with `errors.commentChanged` when the comment at `commentId` is not that comment. It compares the author, the date, and the identity.
 
-A twin shares its GUID, author, and creation time with another comment of the slide, or, in the legacy format, its author and index. Its id holds its place among its twins. For such an id, the editor also compares the text. It refuses the command with `errors.noComment` when no twin is left, and with `errors.commentAmbiguous` when another twin has the same text. After a delete of a twin, an old id with a place can name no comment, or it can reach the remaining twin, so take ids from the current snapshot. So an edit that a collaborator makes to a comment does not refuse yours, unless the comment has a twin. In this sample, `thread` is a thread of `editor.snapshot().comments`:
+A twin shares its GUID, author, and creation time with another comment of the slide, or, in the legacy format, its author and index. Its id holds its place among its twins. For such an id, the editor also compares the text, and it refuses the command with `errors.noComment` when no twin is left. After a delete of a twin, an old id with a place can name no comment, or it can reach the remaining twin, so take ids from the current snapshot. So an edit that a collaborator makes to a comment does not refuse yours, unless the comment has a twin.
+
+An `expect` without `identity` can still fail for a twin, even with ids from the current snapshot:
+
+- When another twin has the same text, the editor cannot tell the two apart, and refuses with `errors.commentAmbiguous`.
+- When the id named another twin before, for example after a delete and an undo, the editor refuses with `errors.commentChanged` until your next call to `editor.snapshot()`.
+
+Pass `identity` to act on such a twin. In this sample, `thread` is a thread of `editor.snapshot().comments`:
 
 ```ts
 const result = editor.exec({
@@ -234,7 +241,7 @@ if (!result.ok && result.reason === 'errors.commentChanged') {
 }
 ```
 
-The comments pane sends `expect` with each action. When the editor refuses a new comment, a save, or a reply, the field keeps its text and shows the reason. After a notice that the comment changed, the edit box shows what the comment reads now, and a second save or reply applies to the comment as it shows now. A twin with the same text as another stays refused.
+The comments pane sends `expect` with each action. When the editor refuses a new comment, a save, or a reply, the field keeps its text and shows the reason. After a notice that the comment changed, the edit box shows what the comment reads now, and a second save or reply applies to the comment as it shows now. The pane sends the identity, so it acts on the copy of an exact duplicate that it shows.
 
 `addComment` and `replyToComment` also take `author`, `initials`, and `date`. They override the editor's author for that comment. The date is an ISO 8601 date and time. Without a date, the editor uses the current time in UTC. Each command is one undo step.
 

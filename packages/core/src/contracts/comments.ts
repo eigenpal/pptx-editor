@@ -85,15 +85,14 @@ export interface CommentAuthorInput {
  *
  * A twin shares its GUID, author, and creation time with another comment of the slide, or, in
  * the legacy format, its author and index. A twin's id holds its place among its twins
- * (`~<n>`, or `-<n>` for a legacy comment). For an id with a place, the editor also:
- * - compares the text (`errors.commentChanged`);
- * - refuses the command when the comment has no twin left (`errors.noComment`): the id may have
- *   named the twin that is gone;
- * - refuses it when another twin has the same text (`errors.commentAmbiguous`): text cannot tell
- *   the two apart.
+ * (`~<n>`, or `-<n>` for a legacy comment). For an id with a place, the editor also compares
+ * the text (`errors.commentChanged`), and refuses the command when the comment has no twin left
+ * (`errors.noComment`): the id may have named the twin that is gone.
  *
- * Without `identity`, the editor also refuses an id that named another comment in an earlier
- * snapshot. So a collaborator's edit of a comment without a twin never refuses yours. @public
+ * Without `identity`, an id with a place is also refused when another twin has the same text
+ * (`errors.commentAmbiguous`), and when it named another comment since the last snapshot
+ * (`errors.commentChanged`, until the next snapshot). With `identity`, the editor checks it
+ * instead. So a collaborator's edit of a comment without a twin never refuses yours. @public
  */
 export interface CommentExpect {
   /** The author's display name, as `SlideComment.author` gave it. */

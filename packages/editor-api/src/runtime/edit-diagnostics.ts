@@ -317,7 +317,7 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
   [
     'errors.commentAmbiguous',
     'edit.comment-ambiguous',
-    'Another comment of the slide has the same author, date, and text, so this id cannot name one of them for sure.',
+    'Another comment of the slide has the same author, date, and text. Pass the comment identity in expect to name one of them.',
   ],
   [
     'errors.altTextLength',
