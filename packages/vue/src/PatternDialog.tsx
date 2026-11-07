@@ -8,12 +8,14 @@ import {
   onMounted,
   ref,
   shallowRef,
+  useId,
   watch,
   type ExtractPublicPropTypes,
   type PropType,
 } from 'vue';
 import {
   dialogInitialFocus,
+  isDialogBackdropPoint,
   PATTERN_CHOICES,
   patternCss,
   patternDialogStart,
@@ -27,7 +29,7 @@ import { Swatch, SwatchGroup } from './ColorSwatches.tsx';
 const patternDialogProps = {
   /** Whether the dialog shows. */
   open: { type: Boolean, required: true as const },
-  /** The pattern the dialog starts from, or null for 50% in the theme's first accent. */
+  /** The pattern the dialog starts from, or null for a 50% pattern in `base` on white. */
   initial: { type: Object as PropType<PatternFill | null>, default: null },
   /** The foreground of a new pattern, as `#RRGGBB`. */
   base: { type: String, default: undefined },
@@ -49,6 +51,8 @@ export const PatternDialog = defineComponent({
   props: patternDialogProps,
   setup(props) {
     const { t } = useTranslation();
+    const titleId = useId();
+    let pressedOutside = false;
     const dialogEl = ref<HTMLDialogElement | null>(null);
     const p = shallowRef<PatternFill>(patternDialogStart(props.initial, props.base));
     const onClose = (): void => props.onClose();
@@ -59,8 +63,10 @@ export const PatternDialog = defineComponent({
       if (props.open) {
         p.value = patternDialogStart(props.initial, props.base);
         if (!el.open) el.showModal();
-        // The chosen pattern takes focus, as the first field of the dialog.
-        const chosen = el.querySelector<HTMLElement>('.pptx-swatch[aria-pressed="true"]');
+        // The chosen pattern takes focus, as the first field of the dialog. It is found by name:
+        // the pressed state in the DOM can still show the previous opening.
+        const name = CSS.escape(patternLabel(t, p.value.preset));
+        const chosen = el.querySelector<HTMLElement>(`.pptx-swatch[aria-label="${name}"]`);
         (chosen ?? dialogInitialFocus(el))?.focus({ preventScroll: true });
       } else if (el.open) el.close();
     };
@@ -84,7 +90,7 @@ export const PatternDialog = defineComponent({
       const cur = p.value;
       return [
         <div class="pptx-dialog__header">
-          <h2 id="pptx-pattern-title" class="pptx-dialog__title">
+          <h2 id={titleId} class="pptx-dialog__title">
             {t('pattern.title')}
           </h2>
           <ToolButton label={t('pattern.close')} icon="close" onClick={onClose} />
@@ -139,13 +145,18 @@ export const PatternDialog = defineComponent({
         ref={dialogEl}
         class="pptx-dialog pptx-pattern"
         data-pptx-dialog="pattern"
-        aria-labelledby="pptx-pattern-title"
+        aria-labelledby={titleId}
         onCancel={(e: Event) => {
           e.preventDefault();
           onClose();
         }}
+        onMousedown={(e: MouseEvent) => {
+          pressedOutside = isDialogBackdropPoint(e.currentTarget as HTMLElement, e);
+        }}
         onClick={(e: MouseEvent) => {
-          if (e.target === e.currentTarget) onClose();
+          // A press and a release on the backdrop close it; a drag out of a field does not.
+          if (pressedOutside && isDialogBackdropPoint(e.currentTarget as HTMLElement, e)) onClose();
+          pressedOutside = false;
         }}
       >
         {props.open ? body() : null}

@@ -5,6 +5,7 @@
 //
 // Every export is adapter glue, not a stable API: `@internal`.
 
+import { parseSlideLink } from '../automation/commands/slide-links.ts';
 import type { DocumentSession } from './document-session.ts';
 import type { PptxEditorInstance } from './pptx-editor.ts';
 import { SlideshowController, slideshowShortcut, type SlideshowState } from './slideshow.ts';
@@ -229,6 +230,21 @@ export function slideshowLinkUnder(
   const y = ((clientY - box.top) / box.height) * height;
   if (x < 0 || y < 0 || x > width || y > height) return null;
   return slideshowLinkAt(session, state.index, x, y);
+}
+
+/**
+ * Follow a link the show resolved (`slideshowLinkUnder`): a slide link moves the show, and any
+ * other link opens in a new tab. @internal
+ */
+export function followSlideshowLink(
+  controller: SlideshowController,
+  doc: Document,
+  href: string
+): void {
+  const target = parseSlideLink(href);
+  if (!target) return openSlideshowLink(doc, href);
+  if ('slide' in target) return controller.goTo(target.slide);
+  controller[target.jump]();
 }
 
 /** Open a link the show resolved through `sanitizeHref`, in a new tab without an opener. @internal */

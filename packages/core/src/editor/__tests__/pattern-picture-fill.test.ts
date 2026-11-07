@@ -19,7 +19,7 @@ import {
   type PptxPackage,
 } from '../../store/index.ts';
 import { PRESET_PATTERNS } from '../../output/preset-patterns.ts';
-import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
+import { createPptxEditor, fillWithPictureFile, type PptxEditorInstance } from '../index.ts';
 import {
   PATTERN_CHOICES,
   patternCss,
@@ -32,9 +32,10 @@ const box = (id: number, name: string): string =>
   `<p:spPr><a:xfrm><a:off x="914400" y="914400"/><a:ext cx="2743200" cy="1371600"/></a:xfrm>` +
   `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:sp>`;
 
-async function open(): Promise<PptxEditorInstance> {
+async function open(extra = ''): Promise<PptxEditorInstance> {
   const e = createPptxEditor({ fixedMeasurer: true, substitutes: false });
-  const deck = buildPptx({ slides: [{ layout: 'blank', shapes: box(2, 'Box') + box(3, 'Two') }] });
+  const shapes = box(2, 'Box') + box(3, 'Two') + extra;
+  const deck = buildPptx({ slides: [{ layout: 'blank', shapes }] });
   expect((await e.load(deck)).ok).toBe(true);
   return e;
 }
@@ -144,6 +145,39 @@ describe('setShapePicture', () => {
   });
 });
 
+describe('a pattern the dialog cannot edit', () => {
+  test('a preset name outside ECMA-376 reports as other, with no pattern', async () => {
+    const odd =
+      `<p:sp><p:nvSpPr><p:cNvPr id="4" name="Odd"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>` +
+      `<a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm>` +
+      `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:pattFill prst="zigzagBogus">` +
+      `<a:fgClr><a:srgbClr val="FF0000"/></a:fgClr><a:bgClr><a:srgbClr val="FFFFFF"/></a:bgClr>` +
+      `</a:pattFill></p:spPr></p:sp>`;
+    const e = await open(odd);
+    select(e, 'Odd');
+    expect(e.snapshot().geometry?.fill).toBe('other');
+    expect(e.snapshot().geometry?.pattern).toBeUndefined();
+  });
+});
+
+describe('fillWithPictureFile', () => {
+  test('fills the selection with a chosen file, without a mime', async () => {
+    const e = await open();
+    select(e, 'Box');
+    await fillWithPictureFile(e, new File([png() as Uint8Array<ArrayBuffer>], 'photo.png'));
+    expect(fillOf(reopen(e), 'Box')?.local).toBe('blipFill');
+  });
+
+  test('refuses the file when the selection moves while it loads', async () => {
+    const e = await open();
+    select(e, 'Box');
+    const done = fillWithPictureFile(e, new File([png() as Uint8Array<ArrayBuffer>], 'photo.png'));
+    select(e, 'Two');
+    await done;
+    expect([...pkgOf(e).parts.keys()].some((n) => n.startsWith('/ppt/media/'))).toBe(false);
+  });
+});
+
 describe('pattern and tiled picture backgrounds', () => {
   test('setSlideBackground writes a pattern and a tiled picture, and the state shows them', async () => {
     const e = await open();
@@ -157,7 +191,11 @@ describe('pattern and tiled picture backgrounds', () => {
     const picture = { kind: 'picture', bytes: png(), mime: 'image/png', tile: true } as const;
     expect(e.exec({ type: 'setSlideBackground', background: picture }).ok).toBe(true);
     expect(child(bgFill(reopen(e)), 'a:tile')).toBeDefined();
-    expect(e.snapshot().slideBackground.kind).toBe('picture');
+    expect(e.snapshot().slideBackground).toMatchObject({ kind: 'picture', tile: true });
+    // A stretched picture reports no `tile`, so the dialog's checkbox starts off.
+    const stretched = { kind: 'picture', bytes: png(), mime: 'image/png' } as const;
+    expect(e.exec({ type: 'setSlideBackground', background: stretched }).ok).toBe(true);
+    expect(e.snapshot().slideBackground.tile).toBeUndefined();
   });
 });
 

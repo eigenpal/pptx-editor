@@ -11,12 +11,14 @@ import {
   onMounted,
   ref,
   shallowRef,
+  useId,
   watch,
   type ExtractPublicPropTypes,
   type PropType,
 } from 'vue';
 import {
   dialogInitialFocus,
+  isDialogBackdropPoint,
   colorMenuSelection,
   SHAPE_GALLERY,
   CROP_SHAPE_GALLERY,
@@ -41,6 +43,7 @@ import {
   type ColorChoice,
   type GradientFill,
   type PatternFill,
+  pickPictureFill,
 } from '@pptx-editor.dev/core/editor';
 import { PatternDialog } from './PatternDialog.tsx';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
@@ -220,11 +223,8 @@ export type FillControlProps = ExtractPublicPropTypes<typeof slotPartProps>;
 
 /**
  * Fill color: one menu with the theme and standard colors, Transparent, gradient presets from
- * the theme colors, and a custom gradient dialog. @public
+ * the theme colors, a custom gradient dialog, a pattern dialog, and a picture. @public
  */
-/** The picture types a picture fill accepts. */
-const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/gif'];
-
 export const FillControl = defineComponent({
   name: 'FillControl',
   props: slotPartProps,
@@ -253,18 +253,6 @@ export const FillControl = defineComponent({
     };
     const currentPattern = useEditorState((s) => s.geometry?.pattern);
     const pattern = shallowRef<PatternFill | null | false>(false);
-    const file = ref<HTMLInputElement | null>(null);
-    const onFile = async (f: File | undefined): Promise<void> => {
-      if (!f || !PICTURE_TYPES.includes(f.type)) return;
-      let bytes: Uint8Array;
-      try {
-        bytes = new Uint8Array(await f.arrayBuffer());
-      } catch {
-        return; // An unreadable file fills nothing.
-      }
-      editor.value?.exec({ type: 'setShapePicture', bytes, mime: f.type });
-      focusText(editor.value, anchor.value);
-    };
     const done = (): void => {
       focusText(editor.value, anchor.value);
       open.value = false;
@@ -368,7 +356,7 @@ export const FillControl = defineComponent({
                   </MenuItem>
                   <MenuItem
                     onSelect={() => {
-                      file.value?.click();
+                      if (editor.value) pickPictureFill(editor.value);
                       open.value = false;
                     }}
                   >
@@ -379,34 +367,32 @@ export const FillControl = defineComponent({
             }}
           </Popover>
         ) : null}
-        <input
-          ref={file}
-          type="file"
-          accept={PICTURE_TYPES.join(',')}
-          hidden
-          onChange={(e: Event) => {
-            const input = e.target as HTMLInputElement;
-            void onFile(input.files?.[0]);
-            input.value = '';
-          }}
-        />
         <PatternDialog
           open={pattern.value !== false}
           initial={pattern.value || null}
           base={bases.value[4]?.color}
-          onClose={() => (pattern.value = false)}
+          onClose={() => {
+            pattern.value = false;
+            // Focus goes back where the fill menu was opened, not to the page.
+            focusText(editor.value, anchor.value);
+          }}
           onApply={(p: PatternFill) => {
             editor.value?.exec({ type: 'setShapePattern', pattern: p });
             pattern.value = false;
+            focusText(editor.value, anchor.value);
           }}
         />
         <GradientDialog
           open={dialog.value !== null}
           initial={dialog.value}
-          onClose={() => (dialog.value = null)}
+          onClose={() => {
+            dialog.value = null;
+            focusText(editor.value, anchor.value);
+          }}
           onApply={(g: GradientFill) => {
             applyGradient(g);
             dialog.value = null;
+            focusText(editor.value, anchor.value);
           }}
         />
       </span>
@@ -441,6 +427,8 @@ export const GradientDialog = defineComponent({
   setup(props) {
     const { t } = useTranslation();
     const dialogEl = ref<HTMLDialogElement | null>(null);
+    const titleId = useId();
+    let pressedOutside = false;
     const bar = ref<HTMLDivElement | null>(null);
     const g = shallowRef<GradientFill>(gradientDialogStart(props.initial));
     const selected = ref(0);
@@ -478,7 +466,7 @@ export const GradientDialog = defineComponent({
       const stop = cur.stops[Math.min(selected.value, cur.stops.length - 1)]!;
       return [
         <div class="pptx-dialog__header">
-          <h2 id="pptx-gradient-title" class="pptx-dialog__title">
+          <h2 id={titleId} class="pptx-dialog__title">
             {t('gradient.title')}
           </h2>
           <ToolButton label={t('gradient.close')} icon="close" onClick={onClose} />
@@ -614,13 +602,18 @@ export const GradientDialog = defineComponent({
         ref={dialogEl}
         class="pptx-dialog pptx-gradient"
         data-pptx-dialog="gradient"
-        aria-labelledby="pptx-gradient-title"
+        aria-labelledby={titleId}
         onCancel={(e: Event) => {
           e.preventDefault();
           onClose();
         }}
+        onMousedown={(e: MouseEvent) => {
+          pressedOutside = isDialogBackdropPoint(e.currentTarget as HTMLElement, e);
+        }}
         onClick={(e: MouseEvent) => {
-          if (e.target === e.currentTarget) onClose();
+          // A press and a release on the backdrop close it; a drag out of a field does not.
+          if (pressedOutside && isDialogBackdropPoint(e.currentTarget as HTMLElement, e)) onClose();
+          pressedOutside = false;
         }}
       >
         {props.open ? body() : null}

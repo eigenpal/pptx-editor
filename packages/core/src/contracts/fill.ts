@@ -87,12 +87,13 @@ export type FillCommand =
   | { readonly type: 'setShapePattern'; readonly pattern: PatternFill }
   /**
    * Shape fill: a PNG, JPEG, or GIF picture, stretched over the shape, or tiled at its own
-   * size when `tile` is true.
+   * size when `tile` is true. The type comes from the bytes; other bytes are refused.
    */
   | {
       readonly type: 'setShapePicture';
       readonly bytes: Uint8Array;
-      readonly mime: string;
+      /** The file's media type, for information only: the bytes decide the type. */
+      readonly mime?: string;
       readonly tile?: boolean;
     };
 
@@ -116,6 +117,8 @@ export interface SlideBackgroundState {
   readonly color?: string;
   readonly gradient?: GradientFill;
   readonly pattern?: PatternFill;
+  /** True for a picture that tiles at its own size instead of stretching over the slide. */
+  readonly tile?: boolean;
   /** True when the background comes from the layout or master, not the slide. */
   readonly inherited: boolean;
 }

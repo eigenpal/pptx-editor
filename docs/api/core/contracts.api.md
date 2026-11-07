@@ -466,7 +466,10 @@ export type EditorCommand = {
     readonly type: 'setLineDash';
     readonly dash: LineDash;
 }
-/** Link the selected text to a URL (`http`, `https`, `mailto`, `tel`, `ftp`); null unlinks. */
+/**
+* Link the selected text to a URL (`http`, `https`, `mailto`, `tel`, `ftp`), or to a slide:
+* `#slide-3`, `#next-slide`, `#previous-slide`, `#first-slide`, `#last-slide`. null unlinks.
+*/
 | {
     readonly type: 'setLink';
     readonly url: string | null;
@@ -723,12 +726,12 @@ export type FillCommand =
 }
 /**
 * Shape fill: a PNG, JPEG, or GIF picture, stretched over the shape, or tiled at its own
-* size when `tile` is true.
+* size when `tile` is true. The type comes from the bytes; other bytes are refused.
 */
 | {
     readonly type: 'setShapePicture';
     readonly bytes: Uint8Array;
-    readonly mime: string;
+    readonly mime?: string;
     readonly tile?: boolean;
 };
 
@@ -1300,6 +1303,7 @@ export interface SlideBackgroundState {
     readonly kind: 'solid' | 'gradient' | 'pattern' | 'picture' | 'none' | 'other';
     // (undocumented)
     readonly pattern?: PatternFill;
+    readonly tile?: boolean;
 }
 
 // @public

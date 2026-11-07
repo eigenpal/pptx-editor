@@ -2,9 +2,10 @@
 // Shape controls: the insert-shape gallery (previews drawn by the engine's own geometry), the
 // fill menu (theme colors, gradients, a pattern, and a picture), and the custom gradient dialog.
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   dialogInitialFocus,
+  isDialogBackdropPoint,
   SHAPE_GALLERY,
   CROP_SHAPE_GALLERY,
   DEFAULT_GRADIENT,
@@ -42,7 +43,12 @@ import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
 import { useSlot } from './slot.ts';
 import { useTriggerAttributes } from './slot-override.ts';
 import { ColorSwatches, Swatch, SwatchGroup, useThemeBases } from './ColorSwatches.tsx';
-import { colorMenuSelection, gradientCss, presetGradient } from '@pptx-editor.dev/core/editor';
+import {
+  colorMenuSelection,
+  gradientCss,
+  pickPictureFill,
+  presetGradient,
+} from '@pptx-editor.dev/core/editor';
 
 /** The props of `ShapeIcon`. @public */
 export interface ShapeIconProps {
@@ -182,9 +188,6 @@ export interface FillControlProps {
   control: ChromeControl;
 }
 
-/** The picture types a picture fill accepts. */
-const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/gif'];
-
 /**
  * Fill color: one menu with the theme and standard colors, Transparent, gradient presets from
  * the theme colors, a custom gradient dialog, a pattern dialog, and a picture. @public
@@ -197,18 +200,6 @@ export function FillControl({ slot, control }: FillControlProps) {
   const current = useEditorState((s) => s.geometry?.gradient);
   const currentPattern = useEditorState((s) => s.geometry?.pattern);
   const [pattern, setPattern] = useState<PatternFill | null | false>(false);
-  const file = useRef<HTMLInputElement>(null);
-  const onFile = async (f: File | undefined): Promise<void> => {
-    if (!f || !PICTURE_TYPES.includes(f.type)) return;
-    let bytes: Uint8Array;
-    try {
-      bytes = new Uint8Array(await f.arrayBuffer());
-    } catch {
-      return; // An unreadable file fills nothing.
-    }
-    editor?.exec({ type: 'setShapePicture', bytes, mime: f.type });
-    focusText(editor, anchor.current);
-  };
   // The solid fill of the selection, marked in the menu.
   const selected = useEditorState((s) => colorMenuSelection(slot, s));
   const bases = useThemeBases();
@@ -307,7 +298,7 @@ export function FillControl({ slot, control }: FillControlProps) {
           </MenuItem>
           <MenuItem
             onSelect={() => {
-              file.current?.click();
+              if (editor) pickPictureFill(editor);
               setOpen(false);
             }}
           >
@@ -315,33 +306,32 @@ export function FillControl({ slot, control }: FillControlProps) {
           </MenuItem>
         </Popover>
       ) : null}
-      <input
-        ref={file}
-        type="file"
-        accept={PICTURE_TYPES.join(',')}
-        hidden
-        onChange={(e) => {
-          void onFile(e.target.files?.[0]);
-          e.target.value = '';
-        }}
-      />
       <PatternDialog
         open={pattern !== false}
         initial={pattern || null}
         base={accent1}
-        onClose={() => setPattern(false)}
+        onClose={() => {
+          setPattern(false);
+          // Focus goes back where the fill menu was opened, not to the page.
+          focusText(editor, anchor.current);
+        }}
         onApply={(p) => {
           editor?.exec({ type: 'setShapePattern', pattern: p });
           setPattern(false);
+          focusText(editor, anchor.current);
         }}
       />
       <GradientDialog
         open={dialog !== null}
         initial={dialog}
-        onClose={() => setDialog(null)}
+        onClose={() => {
+          setDialog(null);
+          focusText(editor, anchor.current);
+        }}
         onApply={(g) => {
           applyGradient(g);
           setDialog(null);
+          focusText(editor, anchor.current);
         }}
       />
     </span>
@@ -364,6 +354,8 @@ export interface GradientDialogProps {
 export function GradientDialog({ open, initial, onClose, onApply }: GradientDialogProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const pressedOutside = useRef(false);
   const bar = useRef<HTMLDivElement>(null);
   const [g, setG] = useState<GradientFill>(initial ?? DEFAULT_GRADIENT);
   const [selected, setSelected] = useState(0);
@@ -411,19 +403,24 @@ export function GradientDialog({ open, initial, onClose, onApply }: GradientDial
       ref={ref}
       className="pptx-dialog pptx-gradient"
       data-pptx-dialog="gradient"
-      aria-labelledby="pptx-gradient-title"
+      aria-labelledby={titleId}
       onCancel={(e) => {
         e.preventDefault();
         onClose();
       }}
+      onMouseDown={(e) => {
+        pressedOutside.current = isDialogBackdropPoint(e.currentTarget, e);
+      }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        // A press and a release on the backdrop close it; a drag out of a field does not.
+        if (pressedOutside.current && isDialogBackdropPoint(e.currentTarget, e)) onClose();
+        pressedOutside.current = false;
       }}
     >
       {open ? (
         <>
           <div className="pptx-dialog__header">
-            <h2 id="pptx-gradient-title" className="pptx-dialog__title">
+            <h2 id={titleId} className="pptx-dialog__title">
               {t('gradient.title')}
             </h2>
             <ToolButton label={t('gradient.close')} icon="close" onClick={onClose} />

@@ -81,6 +81,7 @@ import { ParagraphDialogFields } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatCommand } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatRead } from '@pptx-editor.dev/core/editor';
 import { PatternFill } from '@pptx-editor.dev/core/editor';
+import { PatternPreset } from '@pptx-editor.dev/core/editor';
 import { platformShortcuts } from '@pptx-editor.dev/core/editor';
 import { PopoverAnchorRect } from '@pptx-editor.dev/core/editor';
 import { PptxEditorEvents } from '@pptx-editor.dev/core/editor';
@@ -972,6 +973,10 @@ export interface PatternDialogProps {
     readonly onClose: () => void;
     readonly open: boolean;
 }
+
+export { PatternFill }
+
+export { PatternPreset }
 
 export { platformShortcuts }
 

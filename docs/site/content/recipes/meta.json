@@ -1,4 +1,11 @@
 {
   "title": "Task recipes",
-  "pages": ["index", "replace-text", "slide-size", "shape-adjustments", "pattern-picture-fills"]
+  "pages": [
+    "index",
+    "replace-text",
+    "slide-size",
+    "shape-adjustments",
+    "pattern-picture-fills",
+    "slide-email-links"
+  ]
 }

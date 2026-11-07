@@ -322,7 +322,10 @@ export type EditorCommand =
   /** Outline width in points. */
   | { readonly type: 'setLineWidth'; readonly points: number }
   | { readonly type: 'setLineDash'; readonly dash: LineDash }
-  /** Link the selected text to a URL (`http`, `https`, `mailto`, `tel`, `ftp`); null unlinks. */
+  /**
+   * Link the selected text to a URL (`http`, `https`, `mailto`, `tel`, `ftp`), or to a slide:
+   * `#slide-3`, `#next-slide`, `#previous-slide`, `#first-slide`, `#last-slide`. null unlinks.
+   */
   | { readonly type: 'setLink'; readonly url: string | null }
   /** Remove character formatting from the selected text; links stay. */
   | { readonly type: 'clearFormatting' }

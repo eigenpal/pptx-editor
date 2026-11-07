@@ -37,17 +37,12 @@ import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
 
 export async function fillWithPicture(editor: PptxEditorInstance, file: File) {
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const result = editor.exec({
-    type: 'setShapePicture',
-    bytes,
-    mime: file.type,
-    tile: false,
-  });
+  const result = editor.exec({ type: 'setShapePicture', bytes, tile: false });
   if (!result.ok) throw new Error(result.reason);
 }
 ```
 
-The editor accepts PNG, JPEG, and GIF. It reads the type from the bytes, so a wrong `mime` does not matter. All selected shapes share one media part.
+The editor accepts PNG, JPEG, and GIF. It reads the type from the bytes, so `mime` is optional. All selected shapes share one media part.
 
 ## Set a pattern or a tiled picture as the background
 
@@ -69,11 +64,80 @@ editor.exec({
 - Only shapes take a fill. With no shape selected, the commands are refused with `disabled.noShapeFill`.
 - An unknown preset, a color that is not `#RRGGBB`, or bytes that are no PNG, JPEG, or GIF with a readable size are refused with `errors.unsupported`.
 - A picture fill does not set a crop, offset, scale, or transparency.
-- The selection state reports `geometry.fill` as `pattern` or `picture`, and `geometry.pattern` for a pattern. `slideBackground.kind` is `pattern` or `picture`.
+- The selection state reports `geometry.fill` as `pattern` or `picture`, and `geometry.pattern` for a pattern. `slideBackground.kind` is `pattern` or `picture`, and `slideBackground.tile` is `true` for a tiled picture.
 
 ## Let users pick a fill
 
-In the default editor, the fill color menu has **Pattern…** and **Picture…**. **Pattern…** opens a dialog with the 54 patterns, the foreground and background colors, and a preview. The **Format Background** dialog has a **Pattern** section and a **Tile the picture** option. To show the pattern dialog from your own control, render `PatternDialog` from the React or Vue package.
+In the default editor, the fill color menu has **Pattern…** and **Picture…**. **Pattern…** opens a dialog with the 54 patterns, the foreground and background colors, and a preview. The **Format Background** dialog has a **Pattern** section and a **Tile the picture** option.
+
+To open the pattern dialog from your own control, render `PatternDialog` inside the editor root, such as in the `children` of `<PptxEditor>`. The dialog starts from `initial`, or from a 50% pattern in `base` when `initial` is `null`:
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { useState } from 'react';
+import { PatternDialog, usePptxEditor, useEditorState } from '@pptx-editor.dev/react';
+
+export function PatternButton() {
+  const editor = usePptxEditor();
+  const shown = useEditorState((s) => s.geometry?.pattern ?? null);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        Pattern
+      </button>
+      <PatternDialog
+        open={open}
+        initial={shown}
+        base="#4472C4"
+        onClose={() => setOpen(false)}
+        onApply={(pattern) => {
+          editor?.exec({ type: 'setShapePattern', pattern });
+          setOpen(false);
+        }}
+      />
+    </>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { PatternDialog, usePptxEditor, useEditorState } from '@pptx-editor.dev/vue';
+import type { PatternFill } from '@pptx-editor.dev/vue';
+
+const editor = usePptxEditor();
+const shown = useEditorState((s) => s.geometry?.pattern ?? null);
+const open = ref(false);
+
+function apply(pattern: PatternFill) {
+  editor.value?.exec({ type: 'setShapePattern', pattern });
+  open.value = false;
+}
+</script>
+
+<template>
+  <button type="button" @click="open = true">Pattern</button>
+  <PatternDialog
+    :open="open"
+    :initial="shown"
+    base="#4472C4"
+    @close="open = false"
+    @apply="apply"
+  />
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+`onClose` runs on **Cancel**, Escape, and a click on the backdrop. `onApply` receives the chosen `PatternFill`.
 
 ## See also
 

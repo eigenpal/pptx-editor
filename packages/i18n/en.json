@@ -921,7 +921,20 @@
     "edit": "Edit link",
     "insert": "Insert link",
     "unsafe": "This link cannot be opened",
-    "announce": "Link: {url}. Press F6 for its actions."
+    "announce": "Link: {url}. Press F6 for its actions.",
+    "kind": "Link to",
+    "kindWeb": "Web address",
+    "kindEmail": "Email",
+    "kindSlide": "Slide",
+    "emailAddress": "Email address",
+    "emailSubject": "Subject",
+    "slide": "Slide in this presentation",
+    "slideNumber": "Slide {number}",
+    "firstSlide": "First slide",
+    "lastSlide": "Last slide",
+    "nextSlide": "Next slide",
+    "previousSlide": "Previous slide",
+    "goToSlide": "Go to slide"
   },
   "zoom": {
     "ariaLabel": "Zoom",

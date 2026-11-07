@@ -134,7 +134,8 @@ export function linkedAt(item: LayoutItem, point: TextPoint): boolean {
   let pos = 0;
   for (const r of p.runs) {
     const len = r.kind === 'break' ? 1 : r.text.length;
-    if (r.kind !== 'break' && at >= pos && at < pos + Math.max(1, len)) return !!r.props.hyperlink;
+    if (r.kind !== 'break' && at >= pos && at < pos + Math.max(1, len))
+      return !!(r.props.hyperlink || r.props.hyperlinkAction);
     pos += len;
   }
   return false;

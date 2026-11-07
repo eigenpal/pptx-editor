@@ -2913,9 +2913,9 @@ legend.pptx-dialog__label {
 .pptx-pattern {
   max-width: 420px;
 }
-/* Six rows of nine: the 54 presets. */
+/* Six rows of nine: the 54 presets. The cells shrink in a narrow viewport. */
 .pptx-pattern .pptx-swatches {
-  grid-template-columns: repeat(9, 36px);
+  grid-template-columns: repeat(9, minmax(24px, 36px));
   padding: 6px 0 8px;
 }
 .pptx-pattern__row {
@@ -3192,6 +3192,33 @@ legend.pptx-dialog__label {
 .pptx-link__url:focus-visible {
   background: var(--doc-bg-hover);
   text-decoration: underline;
+}
+/* A slide link is a button that shows its slide. */
+.pptx-link__slide {
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+/* The edit form: Link to, then the fields of that kind. */
+.pptx-link__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pptx-link__fields select {
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--doc-border);
+  border-radius: var(--doc-radius-control, 8px);
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 13px;
+}
+.pptx-link__fields select[aria-invalid='true'] {
+  border-color: var(--doc-danger);
 }
 .pptx-link__tools {
   display: flex;

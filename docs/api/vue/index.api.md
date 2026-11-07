@@ -89,6 +89,7 @@ import { ParagraphDialogFields } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatCommand } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatRead } from '@pptx-editor.dev/core/editor';
 import { PatternFill } from '@pptx-editor.dev/core/editor';
+import { PatternPreset } from '@pptx-editor.dev/core/editor';
 import { PopoverAnchorRect } from '@pptx-editor.dev/core/editor';
 import * as _pptx_editor_dev_core_contracts from '@pptx-editor.dev/core/contracts';
 import * as _pptx_editor_dev_core_editor from '@pptx-editor.dev/core/editor';
@@ -658,7 +659,7 @@ export { EditorRemoval }
 
 export { EditorSnapshot }
 
-// @public (undocumented)
+// @public
 export const FillControl: vue.DefineComponent<vue.ExtractPropTypes<{
     readonly slot: {
         readonly type: PropType<ChromeSlotId>;
@@ -2178,6 +2179,10 @@ export const PatternDialog: vue.DefineComponent<vue.ExtractPropTypes<{
 
 // @public
 export type PatternDialogProps = ExtractPublicPropTypes<typeof patternDialogProps>;
+
+export { PatternFill }
+
+export { PatternPreset }
 
 // @internal
 export const Popover: vue.DefineComponent<vue.ExtractPropTypes<{

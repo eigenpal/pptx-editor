@@ -705,6 +705,8 @@ export type {
   FontPickerGroupId,
   FontPickerRow,
   GradientFill,
+  PatternFill,
+  PatternPreset,
   ParagraphDialogFields,
   PptxEditorInstance,
   RibbonTabId,

@@ -112,7 +112,7 @@ const BackgroundDialogOpen = defineComponent({
     const custom = shallowRef<GradientFill | null>(null);
     const pattern = shallowRef<PatternFill | null>(null);
     // Tile a chosen picture at its own size; a change re-picks the chosen picture.
-    const tile = ref(false);
+    const tile = ref(current.value?.kind === 'picture' && current.value.tile === true);
     // Every pick and picture read counts up, so a picture that finishes reading after a later
     // pick is dropped. `picked` turns on with a real pick (Reset too), so OK applies even a value
     // equal to the opening one; setting the opening value itself back (by identity) turns it off.

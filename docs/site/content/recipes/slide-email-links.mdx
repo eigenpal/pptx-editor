@@ -1,0 +1,62 @@
+---
+title: 'Link to a slide or an email address'
+description: 'Link selected text to a slide of the presentation, a relative slide, or an email address.'
+category: 'Task recipes'
+---
+
+Use the `setLink` command to link the selected text to a slide or an email address. The command takes one `url` string for every kind of link, and each link is one undo step.
+
+## Link to a slide
+
+This helper accepts an open `PptxEditorInstance` with text selected, and links that text to slide 3:
+
+```ts
+import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+export function linkToSlide(editor: PptxEditorInstance, slideNumber: number) {
+  const result = editor.exec({ type: 'setLink', url: `#slide-${slideNumber}` });
+  if (!result.ok) throw new Error(result.reason);
+}
+
+// linkToSlide(editor, 3);
+```
+
+Slide numbers start at 1. The link follows its slide when slides move. When you delete the slide, the editor removes the link.
+
+To jump relative to the slide that shows, use one of these forms:
+
+| URL               | Goes to                             |
+| ----------------- | ----------------------------------- |
+| `#first-slide`    | The first slide                     |
+| `#last-slide`     | The last slide                      |
+| `#next-slide`     | The slide after the one that shows  |
+| `#previous-slide` | The slide before the one that shows |
+
+## Link to an email address
+
+Use a `mailto:` URL. Percent-encode the subject, so that its text cannot add other fields:
+
+```ts
+const subject = encodeURIComponent('Q3 plans');
+editor.exec({ type: 'setLink', url: `mailto:ana@example.com?subject=${subject}` });
+```
+
+## Read a link
+
+With a caret inside linked text, `editor.snapshot().format.link` returns the same URL forms: `#slide-3`, `#next-slide`, or the `mailto:` address.
+
+## What users see
+
+In the default editor, the link popup has a **Link to** choice: **Web address**, **Email**, or **Slide**. **Email** shows the address and subject fields. **Slide** lists the four relative jumps and each slide by number.
+
+A click into a slide link shows **Go to slide**, which shows that slide in the editor. **Copy** is hidden for slide links. In the slide show, a click on a slide link moves the show to that slide. A click on any other link opens it in a new tab.
+
+## Limits
+
+- `setLink` refuses a slide number past the end, `#slide-0`, and any other `#` form.
+- A link to a custom show, another file, or a program is kept on save. The link popup does not show or edit it.
+
+## See also
+
+- [Dialogs](/docs/customization/dialogs): build your own link panel with `useHyperlinkPopup()`.
+- [Undo history](/docs/guides/undo-history)

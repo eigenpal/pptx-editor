@@ -921,7 +921,20 @@
     "edit": "编辑链接",
     "insert": "插入链接",
     "unsafe": "无法打开此链接",
-    "announce": "链接：{url}。按 F6 查看其操作。"
+    "announce": "链接：{url}。按 F6 查看其操作。",
+    "kind": "链接到",
+    "kindWeb": "网址",
+    "kindEmail": "电子邮件",
+    "kindSlide": "幻灯片",
+    "emailAddress": "电子邮件地址",
+    "emailSubject": "主题",
+    "slide": "此演示文稿中的幻灯片",
+    "slideNumber": "幻灯片 {number}",
+    "firstSlide": "第一张幻灯片",
+    "lastSlide": "最后一张幻灯片",
+    "nextSlide": "下一张幻灯片",
+    "previousSlide": "上一张幻灯片",
+    "goToSlide": "转到幻灯片"
   },
   "zoom": {
     "ariaLabel": "缩放",

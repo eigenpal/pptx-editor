@@ -3,9 +3,10 @@
 // preview. The shape fill menu and the Background dialog open it. The gallery order, names, and
 // swatches come from core (`pattern-fields.ts`), so the Vue twin shows the same dialog.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   dialogInitialFocus,
+  isDialogBackdropPoint,
   PATTERN_CHOICES,
   patternCss,
   patternDialogStart,
@@ -20,7 +21,7 @@ import { Swatch, SwatchGroup } from './ColorSwatches.tsx';
 export interface PatternDialogProps {
   /** Whether the dialog shows. */
   readonly open: boolean;
-  /** The pattern the dialog starts from, or null for 50% in the theme's first accent. */
+  /** The pattern the dialog starts from, or null for a 50% pattern in `base` on white. */
   readonly initial: PatternFill | null;
   /** The foreground of a new pattern, as `#RRGGBB`. */
   readonly base?: string;
@@ -34,6 +35,8 @@ export interface PatternDialogProps {
 export function PatternDialog({ open, initial, base, onClose, onApply }: PatternDialogProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const pressedOutside = useRef(false);
   const [p, setP] = useState<PatternFill>(() => patternDialogStart(initial, base));
 
   useEffect(() => {
@@ -42,30 +45,37 @@ export function PatternDialog({ open, initial, base, onClose, onApply }: Pattern
     if (open) {
       setP(patternDialogStart(initial, base));
       if (!dialog.open) dialog.showModal();
-      // The chosen pattern takes focus, as the first field of the dialog.
-      const chosen = dialog.querySelector<HTMLElement>('.pptx-swatch[aria-pressed="true"]');
+      // The chosen pattern takes focus, as the first field of the dialog. It is found by name:
+      // the pressed state of this render can still show the previous opening.
+      const name = CSS.escape(patternLabel(t, patternDialogStart(initial, base).preset));
+      const chosen = dialog.querySelector<HTMLElement>(`.pptx-swatch[aria-label="${name}"]`);
       (chosen ?? dialogInitialFocus(dialog))?.focus({ preventScroll: true });
     } else if (dialog.open) dialog.close();
-  }, [open, initial, base]);
+  }, [open, initial, base, t]);
 
   return (
     <dialog
       ref={ref}
       className="pptx-dialog pptx-pattern"
       data-pptx-dialog="pattern"
-      aria-labelledby="pptx-pattern-title"
+      aria-labelledby={titleId}
       onCancel={(e) => {
         e.preventDefault();
         onClose();
       }}
+      onMouseDown={(e) => {
+        pressedOutside.current = isDialogBackdropPoint(e.currentTarget, e);
+      }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        // A press and a release on the backdrop close it; a drag out of a field does not.
+        if (pressedOutside.current && isDialogBackdropPoint(e.currentTarget, e)) onClose();
+        pressedOutside.current = false;
       }}
     >
       {open ? (
         <>
           <div className="pptx-dialog__header">
-            <h2 id="pptx-pattern-title" className="pptx-dialog__title">
+            <h2 id={titleId} className="pptx-dialog__title">
               {t('pattern.title')}
             </h2>
             <ToolButton label={t('pattern.close')} icon="close" onClick={onClose} />

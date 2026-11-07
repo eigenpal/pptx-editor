@@ -90,6 +90,8 @@ export interface RunProps {
   /** The run's alternate language (`altLang`), a BCP 47 tag. */
   readonly altLang?: string;
   readonly hyperlink?: string;
+  /** The run's link action (`a:hlinkClick/@action`), such as a jump to another slide. */
+  readonly hyperlinkAction?: string;
 }
 
 /** One inline item of a paragraph. */

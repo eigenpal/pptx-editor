@@ -921,7 +921,20 @@
     "edit": "リンクの編集",
     "insert": "リンクの挿入",
     "unsafe": "このリンクは開けません",
-    "announce": "リンク: {url}。F6 キーで操作を表示します。"
+    "announce": "リンク: {url}。F6 キーで操作を表示します。",
+    "kind": "リンク先",
+    "kindWeb": "Web アドレス",
+    "kindEmail": "電子メール",
+    "kindSlide": "スライド",
+    "emailAddress": "電子メール アドレス",
+    "emailSubject": "件名",
+    "slide": "このプレゼンテーション内のスライド",
+    "slideNumber": "スライド {number}",
+    "firstSlide": "最初のスライド",
+    "lastSlide": "最後のスライド",
+    "nextSlide": "次のスライド",
+    "previousSlide": "前のスライド",
+    "goToSlide": "スライドへ移動"
   },
   "zoom": {
     "ariaLabel": "ズーム",

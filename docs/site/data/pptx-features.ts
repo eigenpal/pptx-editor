@@ -183,7 +183,8 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'partial',
     tier: 'community',
     notes:
-      'Add a link to selected text. A click into a link shows its target with Copy, Edit, and Remove. Links to slides and email are not built. URLs pass an allowlist. Hyperlink text color is approximate.',
+      'Link selected text to a web address, an email address with a subject, or a slide: a slide number, or the first, last, next, or previous slide. A click into a link shows its target with Copy, Edit, and Remove, and a slide link shows Go to slide. In the slide show, a slide link moves the show. A slide link follows its slide when slides move. Links to custom shows, other files, and programs are kept but not edited. URLs pass an allowlist. Hyperlink text color is approximate.',
+    docsLink: '/docs/recipes/slide-email-links',
   },
   {
     id: 'text.input-method',

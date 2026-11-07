@@ -101,7 +101,7 @@ function BackgroundDialogOpen({
   const [custom, setCustom] = useState<GradientFill | null>(null);
   const [pattern, setPattern] = useState<PatternFill | null>(null);
   // Tile a chosen picture at its own size; a change re-picks the chosen picture.
-  const [tile, setTile] = useState(false);
+  const [tile, setTile] = useState(() => current?.kind === 'picture' && current.tile === true);
   // Every pick and picture read counts up, so a picture that finishes reading after a later
   // pick is dropped. `picked` turns on with a real pick (Reset too), so OK applies even a value
   // equal to the opening one; setting the opening value itself back (by identity) turns it off.

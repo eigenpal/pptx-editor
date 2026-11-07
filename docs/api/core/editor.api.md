@@ -1623,7 +1623,10 @@ export type EditorCommand = {
     readonly type: 'setLineDash';
     readonly dash: LineDash;
 }
-/** Link the selected text to a URL (`http`, `https`, `mailto`, `tel`, `ftp`); null unlinks. */
+/**
+* Link the selected text to a URL (`http`, `https`, `mailto`, `tel`, `ftp`), or to a slide:
+* `#slide-3`, `#next-slide`, `#previous-slide`, `#first-slide`, `#last-slide`. null unlinks.
+*/
 | {
     readonly type: 'setLink';
     readonly url: string | null;
@@ -1993,14 +1996,17 @@ export type FillCommand =
 }
 /**
 * Shape fill: a PNG, JPEG, or GIF picture, stretched over the shape, or tiled at its own
-* size when `tile` is true.
+* size when `tile` is true. The type comes from the bytes; other bytes are refused.
 */
 | {
     readonly type: 'setShapePicture';
     readonly bytes: Uint8Array;
-    readonly mime: string;
+    readonly mime?: string;
     readonly tile?: boolean;
 };
+
+// @internal
+export function fillWithPictureFile(editor: PptxEditorInstance, file: File): Promise<void>;
 
 // @internal
 export function filterFontFamilies(all: readonly string[], query: string): readonly string[];
@@ -2149,6 +2155,9 @@ export function followCurrentSlide(list: HTMLElement | null, item: string, focus
 
 // @internal
 export function followNotesArm(root: HTMLElement): void;
+
+// @internal
+export function followSlideshowLink(controller: SlideshowController, doc: Document, href: string): void;
 
 // @public
 export const FONT_RESOLVER_BRAND: unique symbol;
@@ -2929,13 +2938,22 @@ export type LineRule = 'single' | 'onePointFive' | 'double' | 'exact' | 'multipl
 export function lineSlotEnd(slot: string): boolean | undefined;
 
 // @internal
+export const LINK_KINDS: readonly LinkKind[];
+
+// @internal
 export function linkCaretAnchor(editor: object): HTMLElement | null;
+
+// @internal
+export type LinkKind = 'web' | 'email' | 'slide';
+
+// @public
+export function linkKindOf(url: string): LinkKind;
 
 // @internal
 export function linkPopupAnchor(request: LinkRequest, editor: object): HTMLElement | null;
 
 // @internal
-export function linkPopupAnnouncement(state: HyperlinkPopupState, t: (key: 'link.announce' | 'link.copied', params?: Record<string, string>) => string): string;
+export function linkPopupAnnouncement(state: HyperlinkPopupState, t: Translate): string;
 
 // @internal
 export function linkPopupReturnsFocus(editor?: object): boolean;
@@ -3049,6 +3067,15 @@ export type LocalFontsOutcome = {
     readonly ok: false;
     readonly reason: 'unsupported' | 'denied' | 'none';
 };
+
+// @public
+export function mailtoParts(url: string): {
+    address: string;
+    subject: string;
+};
+
+// @public
+export function mailtoUrl(address: string, subject: string): string;
 
 // @internal
 export function markDialogError(dialog: HTMLElement | null | undefined, error: DialogError | null, errorId: string): void;
@@ -3652,6 +3679,12 @@ export function pickBulletStyle(d: BulletsDialogFields, key: string): BulletsDia
 
 // @internal
 export function pickImageInto(editor: PptxEditorInstance, doc?: Document, target?: 'replaceImage'): void;
+
+// @internal
+export function pickPictureFill(editor: PptxEditorInstance, doc?: Document): void;
+
+// @internal
+export const PICTURE_FILL_TYPES = "image/png,image/jpeg,image/gif";
 
 // @public
 export type PictureCommand =
@@ -4616,6 +4649,7 @@ export interface SlideBackgroundState {
     readonly kind: 'solid' | 'gradient' | 'pattern' | 'picture' | 'none' | 'other';
     // (undocumented)
     readonly pattern?: PatternFill;
+    readonly tile?: boolean;
 }
 
 // @internal
@@ -4664,6 +4698,12 @@ export interface SlideLayoutSummary {
     readonly name: string;
     readonly type: SlideLayoutKind;
 }
+
+// @public
+export function slideLinkChoices(slideCount: number): readonly string[];
+
+// @public
+export function slideLinkLabel(t: Translate, url: string): string;
 
 // @internal
 export interface SlideListKeyContext {

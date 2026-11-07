@@ -4,17 +4,7 @@
 // only the autofit re-measurement (`refitShape`), which never refuses (its sizes are bounded
 // by `XFRM_BOUND`, and a missing `a:off` or `a:ext` is added).
 
-import {
-  attr,
-  child,
-  elements,
-  NS,
-  REL,
-  sanitizeHref,
-  type Element,
-  type NodeSpec,
-  type PptxPackage,
-} from '../store/index.ts';
+import { attr, child, elements, type Element, type PptxPackage } from '../store/index.ts';
 import type { LayoutItem } from '../layout/index.ts';
 import type { EditorCommand, EditorSelection, TransformItem } from '../contracts/index.ts';
 import { refit } from '../automation/commands/autofit.ts';
@@ -32,7 +22,8 @@ import {
   ungroupShapes,
 } from '../automation/commands/group-commands.ts';
 import { CommandRefusal, OpBatch } from '../automation/commands/op-batch.ts';
-import { addExternalRelationship, parentOf } from '../automation/commands/package-edits.ts';
+import { parentOf } from '../automation/commands/package-edits.ts';
+import { linkSpec } from '../automation/commands/slide-links.ts';
 import {
   boxOf,
   deltaToParent,
@@ -482,22 +473,7 @@ export function compile(
           : [];
       if (collapsed && linked.length === 0 && word.length === 0)
         throw new CommandRefusal('disabled.selectText');
-      let spec: NodeSpec | null = null;
-      if (command.url !== null) {
-        const raw = command.url.trim();
-        if (!raw || raw.length > 2048) throw new CommandRefusal('errors.unsafeLink');
-        // A bare host ("example.com") is a web address, as in Google Slides.
-        const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`;
-        const safe = sanitizeHref(withScheme);
-        if (!safe.ok || !/^[a-z][a-z0-9+.-]*:/i.test(safe.href))
-          throw new CommandRefusal('errors.unsafeLink');
-        const rId = addExternalRelationship(batch, part, REL.hyperlink, safe.href);
-        spec = {
-          ns: NS.a,
-          local: 'hlinkClick',
-          attrs: [{ ns: NS.r, local: 'id', prefix: 'r', value: rId }],
-        };
-      }
+      const spec = command.url === null ? null : linkSpec(batch, part, command.url);
       if (linked.length)
         for (const run of linked) setRunChild(batch, part, run, ['hlinkClick'], spec);
       else if (word.length)

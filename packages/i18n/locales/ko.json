@@ -921,7 +921,20 @@
     "edit": "링크 편집",
     "insert": "링크 삽입",
     "unsafe": "이 링크를 열 수 없습니다",
-    "announce": "링크: {url}. 작업을 보려면 F6 키를 누르세요."
+    "announce": "링크: {url}. 작업을 보려면 F6 키를 누르세요.",
+    "kind": "연결 대상",
+    "kindWeb": "웹 주소",
+    "kindEmail": "전자 메일",
+    "kindSlide": "슬라이드",
+    "emailAddress": "전자 메일 주소",
+    "emailSubject": "제목",
+    "slide": "이 프레젠테이션의 슬라이드",
+    "slideNumber": "슬라이드 {number}",
+    "firstSlide": "첫 번째 슬라이드",
+    "lastSlide": "마지막 슬라이드",
+    "nextSlide": "다음 슬라이드",
+    "previousSlide": "이전 슬라이드",
+    "goToSlide": "슬라이드로 이동"
   },
   "zoom": {
     "ariaLabel": "확대/축소",

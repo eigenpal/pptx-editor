@@ -390,6 +390,9 @@ export {
   isAdapterSlot,
   insertImageFile,
   pickImageInto,
+  pickPictureFill,
+  fillWithPictureFile,
+  PICTURE_FILL_TYPES,
   runChromeRow,
   runClipboardSlot,
   surfaceInputIn,
@@ -679,6 +682,7 @@ export {
   listenSlideshowStartKeys,
   observeSlideshowScreen,
   openSlideshowLink,
+  followSlideshowLink,
   slideshowLinkUnder,
   startSlideshowController,
   type SlideshowScreenSize,
@@ -743,6 +747,15 @@ export {
   type HyperlinkPopupRequest,
   type HyperlinkPopupState,
 } from './link-popup.ts';
+export {
+  LINK_KINDS,
+  linkKindOf,
+  mailtoParts,
+  mailtoUrl,
+  slideLinkChoices,
+  slideLinkLabel,
+  type LinkKind,
+} from './link-fields.ts';
 export type { FindStep, PptxFind, ReplaceAllResult } from './find-session.ts';
 export { findNotesMatch, onFindShown } from './find-session.ts';
 export {

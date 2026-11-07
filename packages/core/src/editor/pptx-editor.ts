@@ -3,6 +3,7 @@
 // Snapshot contract (same as docx-editor's facade): `snapshot()` returns the SAME object until
 // state moves, so `useSyncExternalStore` selectors only re-render when their slice changes.
 
+import { slideLinkOf } from '../automation/commands/slide-links.ts';
 import { documentOpenFailure, yieldToPaint } from './loading.ts';
 import { relationshipById, writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
 import { registerFontFaces, type FontFaceHandle } from '../output/index.ts';
@@ -202,9 +203,15 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       insertions,
       ...views.snapshot(sectionSummaries(pkg).map((x) => x.id)),
       selection,
-      format: formatAt(arm.layout() ?? lay, selection, (rId) => {
+      format: formatAt(arm.layout() ?? lay, selection, (rId, action) => {
         const part = info?.slides[slide]?.partName;
-        const rel = pkg && part ? relationshipById(pkg, part, rId) : undefined;
+        const rel = pkg && part && rId ? relationshipById(pkg, part, rId) : undefined;
+        if (action)
+          return slideLinkOf(
+            action,
+            rel && !rel.external ? rel.target : undefined,
+            info?.slides.map((s) => s.partName) ?? []
+          );
         return rel?.external ? rel.externalTarget : undefined;
       }),
       geometry: withAltText(

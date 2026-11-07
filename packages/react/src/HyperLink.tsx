@@ -27,11 +27,19 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   type ReactElement,
   type ReactNode,
 } from 'react';
 import {
+  LINK_KINDS,
+  linkKindOf,
   linkSelectionRect,
+  mailtoParts,
+  mailtoUrl,
+  slideLinkChoices,
+  slideLinkLabel,
+  type LinkKind,
   openHyperlinkPopup,
   requestLinkPopup,
   translateKeyOrText,
@@ -39,7 +47,7 @@ import {
   type HyperlinkPopupState,
 } from '@pptx-editor.dev/core/editor';
 import { Icon, Popover } from './chrome.tsx';
-import { usePptxEditor, useTranslation } from './context.ts';
+import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
 import { renderAsChild, type HostElementProps } from './slot-override.ts';
 
 /** What `useHyperlinkPopup` returns. @public */
@@ -270,9 +278,20 @@ function HyperLinkPreset({ children }: { children?: ReactNode }) {
 
 /** The target. A safe link opens in a new tab; any other shows as text. @public */
 function HyperLinkUrl({ className, asChild, hidden, children }: HyperLinkPartProps) {
-  const { state } = useHyperlinkPopup();
+  const { state, openTarget } = useHyperlinkPopup();
   const { t } = useTranslation();
   if (hidden || !state.url) return null;
+  const slide = slideLinkLabel(t, state.url);
+  if (slide) {
+    const props: HostElementProps = {
+      type: 'button',
+      className: join('pptx-link__url pptx-link__slide', className),
+      title: t('link.goToSlide'),
+      onMouseDown: guardMousedown,
+      onClick: () => void openTarget(),
+    };
+    return render(asChild, children, props, () => <button {...props}>{children ?? slide}</button>);
+  }
   const text = <bdi dir="ltr">{state.url}</bdi>;
   if (!state.href) {
     const props = {
@@ -327,7 +346,8 @@ function ActionPart(
 function HyperLinkCopy(props: HyperLinkActionProps) {
   const { state, copy } = useHyperlinkPopup();
   const { t } = useTranslation();
-  if (!state.href) return null;
+  // A slide link names a place in this deck: there is nothing to paste elsewhere.
+  if (!state.href || state.href.startsWith('#')) return null;
   const label = t(state.copied ? 'link.copied' : 'link.copy');
   return ActionPart(props, 'copy', label, 'content_copy', () => void copy(), {
     ...(state.copied ? { 'data-copied': '' } : {}),
@@ -351,37 +371,121 @@ function HyperLinkUnlink(props: HyperLinkActionProps) {
 }
 HyperLinkUnlink.pptxHyperLinkPart = 'Unlink' as const;
 
-/** The URL field. Enter applies. @public */
+const KIND_LABEL = {
+  web: 'link.kindWeb',
+  email: 'link.kindEmail',
+  slide: 'link.kindSlide',
+} as const;
+
+/**
+ * The link's target: **Link to** (a web address, an email address, or a slide of this
+ * presentation) and its fields. Each kind writes the one draft that Apply sends. Enter applies.
+ * @public
+ */
 function HyperLinkFields({ className, hidden }: HyperLinkPartProps) {
   const ctx = useContext(HyperlinkPopupContext);
   const { state, setUrl, commitEdit } = useHyperlinkPopup();
   const { t } = useTranslation();
-  const field = useRef<HTMLInputElement>(null);
-  // After the popover is placed: a browser does not focus into a hidden panel.
+  const slides = useEditorState((s) => s.slides.length);
+  const [kind, setKind] = useState<LinkKind>(() => linkKindOf(state.draft));
+  const [mail, setMail] = useState(() => mailtoParts(state.draft));
+  const field = useRef<HTMLInputElement & HTMLSelectElement>(null);
+  // After the popover is placed: a browser does not focus into a hidden panel. A new kind moves
+  // focus to its first field.
   useEffect(() => {
     field.current?.focus({ preventScroll: true });
-    field.current?.select();
-  }, []);
+    if (field.current instanceof HTMLInputElement) field.current.select();
+  }, [kind]);
   if (hidden) return null;
+  const invalid = {
+    'aria-invalid': state.error ? true : undefined,
+    'aria-describedby': state.error && ctx ? ctx.errorId : undefined,
+  } as const;
+  const onEnter = (e: { key: string; preventDefault(): void }): void => {
+    if (e.key !== 'Enter') return;
+    // The Enter that applies must not reach the element focus moves to next.
+    e.preventDefault();
+    commitEdit();
+  };
+  const setMailField = (next: { address: string; subject: string }): void => {
+    setMail(next);
+    setUrl(mailtoUrl(next.address, next.subject));
+  };
   return (
-    <input
-      ref={field}
-      className={join('pptx-font-picker__search pptx-link__field', className)}
-      type="url"
-      dir="ltr"
-      aria-label={t('link.label')}
-      placeholder={t('link.placeholder')}
-      value={state.draft}
-      aria-invalid={state.error ? true : undefined}
-      aria-describedby={state.error && ctx ? ctx.errorId : undefined}
-      onChange={(e) => setUrl(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key !== 'Enter') return;
-        // The Enter that applies must not reach the element focus moves to next.
-        e.preventDefault();
-        commitEdit();
-      }}
-    />
+    <div className={join('pptx-link__fields', className)}>
+      <label className="pptx-field pptx-link__kind">
+        {t('link.kind')}
+        <select
+          value={kind}
+          onChange={(e) => {
+            const next = e.target.value as LinkKind;
+            setKind(next);
+            setMail({ address: '', subject: '' });
+            setUrl(next === 'slide' ? '#next-slide' : '');
+          }}
+        >
+          {LINK_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {t(KIND_LABEL[k])}
+            </option>
+          ))}
+        </select>
+      </label>
+      {kind === 'web' ? (
+        <input
+          ref={field}
+          className="pptx-font-picker__search pptx-link__field"
+          type="url"
+          dir="ltr"
+          aria-label={t('link.label')}
+          placeholder={t('link.placeholder')}
+          value={state.draft}
+          {...invalid}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={onEnter}
+        />
+      ) : kind === 'email' ? (
+        <>
+          <input
+            ref={field}
+            className="pptx-font-picker__search pptx-link__field"
+            type="email"
+            dir="ltr"
+            aria-label={t('link.emailAddress')}
+            placeholder={t('link.emailAddress')}
+            value={mail.address}
+            {...invalid}
+            onChange={(e) => setMailField({ ...mail, address: e.target.value })}
+            onKeyDown={onEnter}
+          />
+          <input
+            className="pptx-font-picker__search pptx-link__field"
+            type="text"
+            aria-label={t('link.emailSubject')}
+            placeholder={t('link.emailSubject')}
+            value={mail.subject}
+            onChange={(e) => setMailField({ ...mail, subject: e.target.value })}
+            onKeyDown={onEnter}
+          />
+        </>
+      ) : (
+        <select
+          ref={field}
+          className="pptx-link__field"
+          aria-label={t('link.slide')}
+          value={state.draft}
+          {...invalid}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={onEnter}
+        >
+          {slideLinkChoices(slides).map((url) => (
+            <option key={url} value={url}>
+              {slideLinkLabel(t, url)}
+            </option>
+          ))}
+        </select>
+      )}
+    </div>
   );
 }
 HyperLinkFields.pptxHyperLinkPart = 'Fields' as const;

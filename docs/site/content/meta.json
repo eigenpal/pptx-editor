@@ -32,6 +32,7 @@
     "recipes/slide-size",
     "recipes/shape-adjustments",
     "recipes/pattern-picture-fills",
+    "recipes/slide-email-links",
     "---React---",
     "react/index",
     "react/composition",
