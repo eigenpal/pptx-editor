@@ -755,6 +755,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       canCache.dispose();
       session = r.session;
       fonts = r.faces;
+      comments.reset();
       const opened = session;
       detachModules();
       const detachSession = seam.attachEditorModules(modules, opened.store);

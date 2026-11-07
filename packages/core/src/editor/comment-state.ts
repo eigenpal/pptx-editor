@@ -78,6 +78,8 @@ export class CommentState {
   readonly #seen = new Map<string, readonly Seen[]>();
   /** A count for the new identities that `#carry` makes: each is shown once only. */
   #fresh = 0;
+  /** How many decks this editor opened before the current one (-1 before the first). */
+  #loads = -1;
 
   constructor(
     author: string | undefined,
@@ -107,6 +109,16 @@ export class CommentState {
     // The id names a thread of the last threads read, the ones its caller saw.
     this.#activeIdentity = this.#threads.find((t) => t.id === next)?.identity ?? null;
     return true;
+  }
+
+  /** Forget the threads and the pick of the last deck, when another deck opens. */
+  reset(): void {
+    this.#seen.clear();
+    this.#key = [];
+    this.#threads = NONE;
+    this.#active = null;
+    this.#activeIdentity = null;
+    this.#loads += 1;
   }
 
   /** The editor's `setAuthor` and `selectComment`: each calls `emit` when it changes state. */
@@ -198,7 +210,10 @@ export class CommentState {
         });
       members.forEach(({ c, node }, i) => {
         const from = safe ? map![i]! : -1;
-        const identity = !prior ? c.identity : from >= 0 ? was[from]!.identity : fresh(c);
+        // A later deck's first read marks its identities, so none names a comment of an
+        // earlier deck.
+        const first = this.#loads > 0 ? `${c.identity}~l${this.#loads}` : c.identity;
+        const identity = !prior ? first : from >= 0 ? was[from]!.identity : fresh(c);
         const wasTwin = from >= 0 && was[from]!.twin;
         shown.set(c, { identity, group, text: c.text, node, twin: twin || wasTwin });
       });

@@ -241,6 +241,50 @@ describe('comment identity', () => {
     expect(e.exec({ ...mine, expect: fresh }).ok).toBe(true);
   });
 
+  test('expect: an id with a place that outlived its twin is refused, also for a legacy repeat', async () => {
+    const e = await open(await threads((t) => as(t, 'A') + as(t, 'B')));
+    const [a, b] = e.snapshot().comments!;
+    const seenA = { author: a!.author, date: a!.date!, text: a!.text };
+    const seenB = { author: b!.author, date: b!.date!, text: b!.text };
+    expect(e.exec({ type: 'deleteComment', commentId: a!.id }).ok).toBe(true);
+    for (const expect_ of [seenA, seenB]) {
+      const edit = { type: 'editComment', commentId: a!.id, text: 'x', expect: expect_ } as const;
+      expect(e.can(edit)).toMatchObject({ ok: false, reason: 'errors.commentChanged' });
+      expect(e.exec({ type: 'deleteComment', commentId: a!.id, expect: expect_ }).ok).toBe(false);
+    }
+    expect(e.snapshot().comments!.map((t) => t.text)).toEqual(['B']);
+    const [left] = e.snapshot().comments!;
+    expect(left!.id).not.toBe(b!.id);
+    expect(e.exec({ type: 'editComment', commentId: left!.id, text: 'B2', expect: seenB }).ok).toBe(
+      true
+    );
+
+    const deck = patch(buildSlideStructureDeck(), /\/comments\/comment\d+\.xml$/, (xml) => {
+      const cm = /<p:cm [^>]*>(?:(?!<\/p:cm>).)*<p:text>Check[^<]*<\/p:text>.*?<\/p:cm>/s.exec(
+        xml
+      )![0];
+      return xml.replace(cm, cm + cm.replace(/<p:text>[^<]*/, '<p:text>Second'));
+    });
+    const l = await open(deck);
+    const [first] = l.snapshot().comments!;
+    const seen = { author: first!.author, date: first!.date!, text: first!.text };
+    expect(l.exec({ type: 'deleteComment', commentId: first!.id }).ok).toBe(true);
+    expect(
+      l.exec({ type: 'editComment', commentId: first!.id, text: 'x', expect: seen })
+    ).toMatchObject({ ok: false, reason: 'errors.commentChanged' });
+    expect(l.snapshot().comments!.map((t) => t.text)).toEqual(['Second']);
+  });
+
+  test('a deck that opens after another shows none of its identities', async () => {
+    const bytes = await threads((t) => as(t, 'A') + as(t, 'B'));
+    const e = await open(bytes);
+    const before = identities(e);
+    expect((await e.load(bytes)).ok).toBe(true);
+    const after = identities(e);
+    expect(after).toHaveLength(2);
+    for (const id of after) expect(before).not.toContain(id);
+  });
+
   test('expect: a peer edit of a comment without a twin never refuses your edit', async () => {
     const e = await open(await threads((t) => t));
     const [a] = e.snapshot().comments!;
