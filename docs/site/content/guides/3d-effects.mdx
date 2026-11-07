@@ -24,7 +24,7 @@ export function bevelSelection(editor: PptxEditorInstance) {
 }
 ```
 
-`preset` is a `BevelPreset`: one of the 12 `ST_BevelPresetType` names, such as `angle`, `softRound`, or `artDeco`. The bevel is 6 pt wide and 6 pt high. A shape with no scene gets a front camera and the three-point light. The command changes the bevel in place, so other 3-D properties of the shape stay.
+`preset` is a `BevelPreset`: one of the 12 `ST_BevelPresetType` names, such as `angle`, `softRound`, or `artDeco`. The bevel is 6 pt wide and 6 pt high. A shape with no scene of its own or from its layout or theme gets a front camera and the three-point light. A scene that the shape inherits stays. The command changes the bevel in place, so other 3-D properties of the shape stay.
 
 ## Turn the camera
 
@@ -69,7 +69,8 @@ A bevel that the shape inherits from its theme effect style goes with an own emp
 
 - A bevel draws as shaded strips along the outline. The light model is measured for the circle and angle bevels under the three-point light from the top. Other profiles, lights, and materials are approximate.
 - The face of the shape keeps its fill color.
-- A turned camera draws as a parallel projection, also for perspective presets. The face and its text turn about the center of the shape.
+- A turned camera draws as a parallel projection, also for perspective presets. The face and its text turn about the center of the shape. A face turned edge-on draws only its extrusion.
+- The outer shadow and the glow of a turned shape follow its face. The glow lies under the extrusion.
 - Bottom bevels and text in 3-D (`a:bodyPr/a:scene3d`) are not drawn.
 - Preset shadows (`a:prstShdw`) draw in every edition. No command sets them.
 

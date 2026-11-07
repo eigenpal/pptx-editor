@@ -17,6 +17,7 @@ export {
   blurSigma,
   circleGradientGeometry,
   effectMatrix,
+  finiteFacet,
   gradientPaintStops,
   linearGradientEnds,
   lumTransfer,

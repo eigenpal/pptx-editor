@@ -12,7 +12,8 @@ import {
   elements,
   intAttr,
   NS,
-  presentationInfo,
+  REL,
+  relTargetByType,
   specOf,
   xmlPartOf,
   type Element,
@@ -301,9 +302,7 @@ function themeEffects(batch: OpBatch, part: string, style: Element | undefined):
   const ref = child(style, 'a:effectRef');
   const idx = intAttr(ref, 'idx') ?? 0;
   if (idx < 1) return [];
-  const slide = presentationInfo(batch.pkg).slides.find((s) => s.partName === part);
-  const theme = slide ? parseTheme(xmlPartOf(batch.pkg, slide.themePart)) : undefined;
-  const effectStyle = theme?.effectStyles[idx - 1];
+  const effectStyle = themeEffectStyle(batch, part, idx);
   if (child(effectStyle, 'a:effectDag'))
     throw new CommandRefusal('errors.unsupported', 'effectDag');
   const list = child(effectStyle, 'a:effectLst');
@@ -432,17 +431,34 @@ function inheritedThreeD(batch: OpBatch, part: string, el: Element): InheritedTh
     );
   };
   let scene = spPrs.some((s) => turned(child(s, 'a:scene3d')));
+  let anyScene = spPrs.some((s) => child(s, 'a:scene3d') !== undefined);
   let bevel = spPrs.some((s) => child(child(s, 'a:sp3d'), 'a:bevelT') !== undefined);
   const style = chain.map((e) => child(e, 'p:style')).find((s) => s !== undefined);
   const idx = intAttr(child(style, 'a:effectRef'), 'idx') ?? 0;
   if (idx > 0) {
-    const slide = presentationInfo(batch.pkg).slides.find((s) => s.partName === part);
-    const theme = slide ? parseTheme(xmlPartOf(batch.pkg, slide.themePart)) : undefined;
-    const effectStyle = theme?.effectStyles[idx - 1];
+    const effectStyle = themeEffectStyle(batch, part, idx);
+    anyScene ||= child(effectStyle, 'a:scene3d') !== undefined;
     scene ||= turned(child(effectStyle, 'a:scene3d'));
     bevel ||= child(child(effectStyle, 'a:sp3d'), 'a:bevelT') !== undefined;
   }
-  return { scene, bevel };
+  return { scene, anyScene, bevel };
+}
+
+/**
+ * The theme part of a slide, layout, or master part: through the slide's layout, the layout's
+ * master, and the master's theme relationship.
+ */
+function themePartFor(batch: OpBatch, part: string): string | undefined {
+  const layout = relTargetByType(batch.pkg, part, REL.slideLayout) ?? part;
+  const master = relTargetByType(batch.pkg, layout, REL.slideMaster) ?? layout;
+  return relTargetByType(batch.pkg, master, REL.theme);
+}
+
+/** Effect style `idx` (1-based) of the theme that `part` uses, or undefined. */
+function themeEffectStyle(batch: OpBatch, part: string, idx: number): Element | undefined {
+  const themePart = themePartFor(batch, part);
+  const theme = themePart ? parseTheme(xmlPartOf(batch.pkg, themePart)) : undefined;
+  return theme?.effectStyles[idx - 1];
 }
 
 /** Set or remove one effect on the selected shapes, connectors, and pictures. */

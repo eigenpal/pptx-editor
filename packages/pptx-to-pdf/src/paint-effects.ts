@@ -444,11 +444,16 @@ async function drawLayers(
   }
 }
 
-/** The outer shadow and the glow of a shape or picture, painted before its content. */
-export async function drawEffectsBehind(
+/**
+ * The outer shadows of a shape or picture, painted before its content. `face` is the camera's
+ * turn of the face (`ThreeDPaint.front`): the shadow is placed on the face, then turns with it,
+ * as in the SVG paint.
+ */
+export async function drawShadows(
   item: Drawable,
   p: PageOps,
-  scope: FillScope
+  scope: FillScope,
+  face: Matrix
 ): Promise<void> {
   const effects = item.element.effects;
   if (!effects) return;
@@ -456,7 +461,7 @@ export async function drawEffectsBehind(
   // A preset shadow's second copy lies under its first.
   for (const shadow of [effects.secondShadow, effects.outerShadow]) {
     if (!shadow || shadow.color.a <= 0) continue;
-    const m = effectMatrix(shadow, item.matrix, w, h);
+    const m = multiply(face, effectMatrix(shadow, item.matrix, w, h));
     const sigma = blurSigma(shadow.blur);
     for (const cls of await silhouette(item, m, p, scope))
       await drawLayers(
@@ -466,7 +471,19 @@ export async function drawEffectsBehind(
         p
       );
   }
-  const glow = effects.glow;
+}
+
+/**
+ * The glow of a shape or picture: after its shadows, before its extrusion and its content, as in
+ * the SVG paint. `face` is the camera's turn of the face.
+ */
+export async function drawGlow(
+  item: Drawable,
+  p: PageOps,
+  scope: FillScope,
+  face: Matrix
+): Promise<void> {
+  const glow = item.element.effects?.glow;
   if (glow && glow.radius > 0 && glow.color.a > 0 && proEffects()) {
     // As the SVG glow (`glowSpread`): the silhouette grown by `spread` and blurred by σ. The
     // inside level is the profile at the edge, a·Φ(spread / σ).
@@ -477,7 +494,7 @@ export async function drawEffectsBehind(
       a * phi(spread / sigma),
       (d) => a * (1 - phi((d - spread) / sigma))
     );
-    for (const cls of await silhouette(item, [1, 0, 0, 1, 0, 0], p, scope))
+    for (const cls of await silhouette(item, face, p, scope))
       await drawLayers(cls.parts, glow.color, list, p);
   }
 }

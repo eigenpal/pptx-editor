@@ -105,14 +105,15 @@ export function isThreeDChoice(
 
 /**
  * Set or remove the top bevel of one shape. Returns false when removing changes nothing. An
- * inherited bevel (from a theme effect style) is removed with an own `a:sp3d` that has none.
+ * inherited bevel (from a theme effect style) is removed with an own `a:sp3d` that has none. A
+ * shape that inherits a scene keeps it: the bevel writes no scene of its own.
  */
 function setBevel(
   batch: OpBatch,
   part: string,
   spPr: Element,
   preset: BevelPreset | null,
-  inherited: boolean
+  inherited: InheritedThreeD
 ): boolean {
   let sp3d = child(spPr, 'a:sp3d');
   const bevel = child(sp3d, 'a:bevelT');
@@ -121,11 +122,11 @@ function setBevel(
       batch.push({ op: 'removeNode', part, node: bevel.id });
       return true;
     }
-    if (sp3d || !inherited) return false;
+    if (sp3d || !inherited.bevel) return false;
     insertAfter(batch, part, spPr, BEFORE_SP3D, specFromXml('<a:sp3d/>'));
     return true;
   }
-  sceneOf(batch, part, spPr);
+  if (!inherited.anyScene) sceneOf(batch, part, spPr);
   if (!sp3d) {
     const current = batch.element(part, spPr.id);
     sp3d = batch.element(
@@ -182,6 +183,8 @@ function setRotation(
 export interface InheritedThreeD {
   /** An `a:scene3d` with a turned camera that is not the shape's own. */
   readonly scene: boolean;
+  /** An `a:scene3d` of any camera that is not the shape's own. */
+  readonly anyScene: boolean;
   /** An `a:sp3d` with a top bevel that is not the shape's own. */
   readonly bevel: boolean;
 }
@@ -209,7 +212,7 @@ export function setThreeD(
     const from = inherited(el);
     const done =
       choice.kind === 'bevel'
-        ? setBevel(batch, part, spPr, choice.preset, from.bevel)
+        ? setBevel(batch, part, spPr, choice.preset, from)
         : setRotation(batch, part, spPr, choice.preset, from.scene);
     if (done) changed += 1;
   }

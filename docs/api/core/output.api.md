@@ -36,6 +36,9 @@ export function effectMatrix(e: EffectPlacement, shape: Matrix, w: number, h: nu
 // @internal
 export function elementsWithAttribute(root: Element, name: string): Element[];
 
+// @internal
+export function finiteFacet(f: ThreeDFacet): boolean;
+
 // @public
 export interface FontFaceHandle {
     // (undocumented)

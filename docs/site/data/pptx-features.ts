@@ -502,7 +502,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'premium',
     notes:
-      'The drawing module of @pptx-editor.dev/pro paints bevels, contours, extrusion, camera rotation, and blur. It uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement. Without it, these shapes paint flat in the editor, and save keeps their properties in every edition. PDF export always paints them, except blur. Preset shadows paint in every edition, with or without the module. The Shape Effects menu sets and clears 12 bevel presets and 9 3-D Rotation presets. A command sets and clears blur. No command sets a preset shadow. Bevel light is measured for the circle and angle presets only. Perspective cameras draw as parallel views. Bottom bevels and text in 3-D are not drawn.',
+      'The drawing module of @pptx-editor.dev/pro paints bevels, contours, extrusion, camera rotation, and blur. It uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement. Without it, these shapes paint flat in the editor, and save keeps their properties in every edition. PDF export always paints them, except blur. Preset shadows paint in every edition, with or without the module. The Shape Effects menu sets and clears 12 bevel presets and 9 3-D Rotation presets. A command sets and clears blur. No command sets a preset shadow. Bevel light is measured for the circle and angle presets only. Perspective cameras draw as parallel views. Bottom bevels are not drawn. Text effects are not drawn: 3-D text paints flat, and save keeps it. No command sets a text effect.',
   },
 
   // --- Pictures --------------------------------------------------------

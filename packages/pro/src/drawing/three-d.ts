@@ -32,6 +32,11 @@ const STRIPS = 8;
 const CURVE_STEPS = 12;
 /** The most outline points a 3-D paint takes: a resource limit. More draws the shape flat. */
 const MAX_POINTS = 4096;
+/**
+ * The most outline points that bevel strips, contours, and extrusion sides follow: a longer
+ * outline keeps every k-th point, so one shape paints at most about 10,000 polygons.
+ */
+const MAX_THREE_D_POINTS = 1024;
 
 /** The height of a bevel profile at `t` (0 at the outer edge, 1 at the inner edge), 0 to 1. */
 const PROFILES: Readonly<Record<BevelPresetType, (t: number) => number>> = {
@@ -115,6 +120,14 @@ export function outlines(paths: readonly GeometryPath[]): Pt[][] | null {
   return out;
 }
 
+/** The outlines with at most `MAX_THREE_D_POINTS` points in all: every k-th point of each. */
+function thinned(polys: readonly Pt[][]): Pt[][] {
+  const total = polys.reduce((n, p) => n + p.length, 0);
+  const k = Math.ceil(total / MAX_THREE_D_POINTS);
+  if (k <= 1) return [...polys];
+  return polys.map((p) => p.filter((_, i) => i % k === 0)).filter((p) => p.length >= 3);
+}
+
 function signedArea(poly: readonly Pt[]): number {
   let a = 0;
   for (let i = 0; i < poly.length; i += 1) {
@@ -158,8 +171,41 @@ function offset(poly: readonly Pt[], normals: readonly Pt[], d: number): Pt[] {
 
 /** A color under a light level and a white highlight, as an opaque fill. */
 function lit(c: Rgba, level: number, white: number): Rgba {
-  const ch = (v: number): number => Math.max(0, Math.min(255, v * level + 255 * white));
+  // A degenerate normal gives no light value: keep the color unshaded.
+  const k = Number.isFinite(level) ? level : 1;
+  const wh = Number.isFinite(white) ? white : 0;
+  const ch = (v: number): number => Math.max(0, Math.min(255, v * k + 255 * wh));
   return { r: ch(c.r), g: ch(c.g), b: ch(c.b), a: c.a };
+}
+
+/** The smallest outline area that a bevel shades, in EMU²: less is a line, with no inside. */
+const MIN_AREA = 1;
+
+type Quad = { readonly points: readonly Pt[]; readonly color: Rgba };
+
+const finite = (q: Quad): boolean =>
+  q.points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)) &&
+  [q.color.r, q.color.g, q.color.b, q.color.a].every(Number.isFinite);
+
+const colorKey = (c: Rgba): string =>
+  `${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${Math.round(c.a * 1000)}`;
+
+/**
+ * Neighboring polygons of one color as one facet, so a long outline paints a path for each run
+ * of a color, not for each polygon. Only neighbors merge: the paint order stays (far sides
+ * first, and inner bevel strips over outer ones). Polygons with values that are not finite are
+ * dropped.
+ */
+function merge(quads: readonly Quad[]): ThreeDFacet[] {
+  const out: { polygons: (readonly Pt[])[]; color: Rgba; key: string }[] = [];
+  for (const q of quads) {
+    if (!finite(q)) continue;
+    const key = colorKey(q.color);
+    const last = out[out.length - 1];
+    if (last?.key === key) last.polygons.push(q.points);
+    else out.push({ polygons: [q.points], color: q.color, key });
+  }
+  return out.map(({ polygons, color }) => ({ polygons, color }));
 }
 
 /** The strips of one bevel on one outline, in the local box. */
@@ -170,14 +216,16 @@ function bevelStrips(
   width: number,
   color: Rgba,
   light: Lighting
-): ThreeDFacet[] {
-  const normals = edgeNormals(poly);
+): Quad[] {
   const w = Math.min(bevel.w, width);
+  // A zero-width bevel or an outline with no inside (collinear points) has no strips.
+  if (!(w > 0) || !(Math.abs(signedArea(poly)) >= MIN_AREA)) return [];
+  const normals = edgeNormals(poly);
   const profile = PROFILES[bevel.preset];
   const rings = Array.from({ length: STRIPS + 1 }, (_, k) =>
     offset(poly, normals, (w * k) / STRIPS)
   );
-  const out: ThreeDFacet[] = [];
+  const out: Quad[] = [];
   for (let k = 0; k < STRIPS; k += 1) {
     const t0 = k / STRIPS;
     const t1 = (k + 1) / STRIPS;
@@ -204,12 +252,16 @@ function slideNormalsOf(poly: readonly Pt[], m: Matrix): Pt[] {
 
 const IDENTITY_MATRIX: Matrix = [1, 0, 0, 1, 0, 0];
 
+/** The smallest area scale of a turned face that still paints. */
+const MIN_DETERMINANT = 1e-6;
+
 /** Bevels, contour, and extrusion of a shape, or null when it draws flat. */
 export function threeDPaint(input: ThreeDInput): ThreeDPaint | null {
   const t: ResolvedThreeD | undefined = input.effects.threeD;
   if (!t) return null;
-  const polys = outlines(input.paths);
-  if (!polys || polys.length === 0) return null;
+  const full = outlines(input.paths);
+  if (!full || full.length === 0) return null;
+  const polys = thinned(full);
   const view = cameraView(t);
   const light = lightingOf(t);
   const m = input.matrix;
@@ -226,9 +278,9 @@ export function threeDPaint(input: ThreeDInput): ThreeDPaint | null {
         })()
       : IDENTITY_MATRIX;
   const color = { ...input.color, a: 1 };
-  const over: ThreeDFacet[] = [];
-  const under: ThreeDFacet[] = [];
-  const behind: ThreeDFacet[] = [];
+  const over: Quad[] = [];
+  const under: Quad[] = [];
+  const behind: Quad[] = [];
   const minSide = Math.max(0, Math.min(input.width, input.height) / 2);
   if (t.bevelTop)
     for (const p of polys)
@@ -247,7 +299,7 @@ export function threeDPaint(input: ThreeDInput): ThreeDPaint | null {
   const depth = t.extrusionH + (t.bevelBottom?.h ?? 0) + (t.bevelTop?.h ?? 0);
   if (depth > 0 && view.kind !== 'front') {
     const side = t.extrusionColor ? { ...t.extrusionColor, a: 1 } : color;
-    const faces: { facet: ThreeDFacet; z: number }[] = [];
+    const faces: { facet: Quad; z: number }[] = [];
     for (const p of polys) {
       const s = p.map((q) => apply(m, q.x, q.y));
       const normals = edgeNormals(s);
@@ -297,5 +349,13 @@ export function threeDPaint(input: ThreeDInput): ThreeDPaint | null {
   }
   if (over.length === 0 && under.length === 0 && behind.length === 0 && view.kind !== 'turn')
     return null;
-  return { front, behind, under, over };
+  // A face turned edge-on has no area: only the extrusion shows (a turn of 90 degrees).
+  const showsFace = Math.abs(front[0] * front[3] - front[1] * front[2]) >= MIN_DETERMINANT;
+  return {
+    front,
+    showsFace,
+    behind: merge(behind),
+    under: merge(under),
+    over: merge(over),
+  };
 }

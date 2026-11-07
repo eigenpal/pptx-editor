@@ -22,7 +22,7 @@ import { buildRoundTripDecks } from './round-trip.ts';
 import { pictureBulletsDeck } from './picture-bullets.ts';
 import { textWarpFixtures } from './text-warp.ts';
 import { equationFixtures } from './equations.ts';
-import { threeDFixtures } from './three-d.ts';
+import { THREE_D_EFFECT_STYLES, threeDFixtures } from './three-d.ts';
 
 const OUT = 'fixtures';
 const IN = 914_400;
@@ -841,7 +841,14 @@ for (const [name, slides] of Object.entries(fixtures)) {
   // Media only where a slide references it: an orphan part is not worth a repair prompt.
   const media = name === 'pictures' || name === 'picture-editing' || name === 'fills-lines' ? [{ name: 'image1.png', bytes: image, contentType: 'image/png' }] : [];
   const tableStyles = tableStylesFor[name];
-  const bytes = buildPptx({ slides, media, ...(tableStyles ? { tableStyles } : {}), ...slideSizeFor[name] });
+  const effectStyles = name === 'three-d-turned-effects' ? THREE_D_EFFECT_STYLES : undefined;
+  const bytes = buildPptx({
+    slides,
+    media,
+    ...(tableStyles ? { tableStyles } : {}),
+    ...(effectStyles ? { effectStyles } : {}),
+    ...slideSizeFor[name],
+  });
   writeFileSync(`${OUT}/${name}.pptx`, bytes);
 }
 // Sections, comments, a chart, and embedded objects: the slide add, duplicate, and delete checks.
