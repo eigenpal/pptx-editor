@@ -75,9 +75,9 @@ function region(b: EffectBounds): Record<string, string> {
 /**
  * The most a glow grows, or a soft edge shrinks, the outline: 100 pt, in EMU. The browser's
  * `feMorphology` costs time in proportion to its radius on every paint, so a radius of a few
- * inches stops the page for seconds. The largest glow (150 pt) and soft edge (100 pt) that a
- * presentation app offers stay under it. A larger glow draws as a 200 pt glow, and a larger soft
- * edge shrinks the outline by 100 pt and keeps its blur.
+ * inches stops the page for seconds. Glows of up to 200 pt and soft edges of up to 100 pt draw
+ * as stored. A larger glow draws as a 200 pt glow, and a larger soft edge shrinks the outline
+ * by 100 pt and keeps its blur.
  */
 const MAX_MORPH_SPREAD = 1_270_000;
 

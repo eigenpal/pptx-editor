@@ -164,6 +164,8 @@ Eager fonts (a value, a promise, or a zero-argument loader) hold the deck back u
 
 A string source is always a URL, fetched as you wrote it. Check a URL from user input first. When no bytes arrive for 10 seconds, the download stops and `error` is a `TimeoutError`. A slow download that keeps sending bytes finishes.
 
+The download also stops when the file is longer than 528 MiB, the longest file the editor opens. The hook checks the `Content-Length` header before the body arrives, and the byte count while it downloads. In both cases, `error` is a `RangeError`.
+
 ## Build your own chrome
 
 Use these hooks to connect your controls to the editor.
