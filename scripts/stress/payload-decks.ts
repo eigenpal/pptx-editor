@@ -19,6 +19,11 @@ import {
   svgMarkerBomb,
   svgDuplicateIdBomb,
   svgNestedMaskBomb,
+  svgDefsUseBomb,
+  svgSmilHrefBomb,
+  svgOpacityOverdraw,
+  svgUseHugePath,
+  svgFilterMorphology,
   svgBlurHuge,
   svgDeep,
   svgExternal,
@@ -216,6 +221,31 @@ export function payloadDecks(): HangDeck[] {
       id: 'svg-nested-mask-bomb',
       target: 'an SVG picture with ten levels of ten masked rectangles (10^10)',
       bytes: () => svgPictureDeck(svgNestedMaskBomb()),
+    },
+    {
+      id: 'svg-defs-use-bomb',
+      target: 'an SVG picture with a <use> chain of 10^9 copies in <defs> only',
+      bytes: () => svgPictureDeck(svgDefsUseBomb()),
+    },
+    {
+      id: 'svg-smil-href-bomb',
+      target: 'an SVG picture whose animation sets a <use> link to a 10^9 chain',
+      bytes: () => svgPictureDeck(svgSmilHrefBomb()),
+    },
+    {
+      id: 'svg-opacity-overdraw',
+      target: 'an SVG picture with 20000 copies of full-size rectangles drawn with opacity',
+      bytes: () => svgPictureDeck(svgOpacityOverdraw()),
+    },
+    {
+      id: 'svg-use-huge-path',
+      target: 'an SVG picture with 1000 copies of a path of 100000 full-size segments',
+      bytes: () => svgPictureDeck(svgUseHugePath()),
+    },
+    {
+      id: 'svg-filter-morphology',
+      target: 'an SVG picture with a morphology filter of radius 500 on 20 rectangles',
+      bytes: () => svgPictureDeck(svgFilterMorphology()),
     },
     {
       id: 'svg-use-cycle',

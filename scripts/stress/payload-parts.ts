@@ -264,6 +264,53 @@ export const svgNestedMaskBomb = (): Uint8Array => {
   return svgDoc(400, 300, `${body}</defs><rect width="400" height="300" mask="url(#k10)"/>`);
 };
 
+/** Nine levels of ten `<use>` copies in `<defs>` only: browsers build them though none draws. */
+export const svgDefsUseBomb = (): Uint8Array => {
+  let body = '<g id="a0"><rect width="400" height="300" fill="red" opacity="0.5"/></g>';
+  for (let i = 1; i <= 9; i += 1)
+    body += `<g id="a${i}">${`<use href="#a${i - 1}"/>`.repeat(10)}</g>`;
+  return svgDoc(400, 300, `<defs>${body}</defs>`);
+};
+
+/** An animation that sets a `<use>` link to a bomb once the picture loads. */
+export const svgSmilHrefBomb = (): Uint8Array => {
+  let body = '<g id="a0"><rect width="400" height="300" fill="red" opacity="0.5"/></g>';
+  for (let i = 1; i <= 9; i += 1)
+    body += `<g id="a${i}">${`<use href="#a${i - 1}"/>`.repeat(10)}</g>`;
+  return svgDoc(
+    400,
+    300,
+    `<defs>${body}<g id="small"/></defs><use href="#small"><set attributeName="href" to="#a9" begin="0s"/></use>`
+  );
+};
+
+/** 20,000 copies of two full-size rectangles, each copy drawn with opacity. */
+export const svgOpacityOverdraw = (): Uint8Array =>
+  svgDoc(
+    400,
+    300,
+    '<defs><g id="r"><rect width="400" height="300" fill="red"/><rect width="400" height="300" fill="blue"/></g></defs>' +
+      '<use href="#r" opacity="0.5"/>'.repeat(20_000)
+  );
+
+/** A path of 100,000 full-size segments, copied 1,000 times. */
+export const svgUseHugePath = (): Uint8Array =>
+  svgDoc(
+    400,
+    300,
+    `<defs><path id="p" d="M0 0${' L400 300 L0 300'.repeat(50_000)}" fill="none" stroke="black"/></defs>` +
+      '<use href="#p"/>'.repeat(1_000)
+  );
+
+/** A morphology filter of radius 500 on 20 full-size rectangles. */
+export const svgFilterMorphology = (): Uint8Array =>
+  svgDoc(
+    400,
+    300,
+    '<defs><filter id="f" x="0" y="0" width="1" height="1"><feMorphology operator="dilate" radius="500"/></filter></defs>' +
+      '<rect width="400" height="300" fill="blue" filter="url(#f)"/>'.repeat(20)
+  );
+
 /** A `<use>` that refers to its own ancestor. */
 export const svgUseCycle = (): Uint8Array =>
   svgDoc(
