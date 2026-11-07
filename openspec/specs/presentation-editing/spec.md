@@ -117,6 +117,25 @@ Copying and pasting shapes SHALL carry their pictures and refuse to carry extern
 - **WHEN** a picture is copied from one deck and pasted into another
 - **THEN** the second deck gains the image part, a relationship to it, and the picture renders
 
+### Requirement: Chart data editing
+
+An edit of chart data SHALL change the series names, category labels, values, point counts, and cell references of the chart part in one undo step. It SHALL write the same cells into an embedded workbook only when the workbook's structure allows it, and SHALL otherwise keep the workbook unchanged. It SHALL turn off the automatic update of a linked workbook, and SHALL never open it.
+
+#### Scenario: Add a category
+
+- **WHEN** a category is added to a column chart with an embedded workbook
+- **THEN** every series gains a cached point, its references cover the new row, and the workbook gains the same row
+
+#### Scenario: Remove a category with point formatting
+
+- **WHEN** a category is removed from a series with a formatted data point after it
+- **THEN** the formatted point moves to its new index, and the formatting of the removed point goes away
+
+#### Scenario: A workbook with formulas
+
+- **WHEN** the chart's embedded workbook has a formula in its data cells
+- **THEN** the chart part changes, and the workbook saves unchanged
+
 ### Requirement: Progressive open
 
 A long deck SHALL show its start slide and take input before its other slides parse, and SHALL parse them in background tasks that give way to input. Every read, edit, undo, search, and save before then SHALL give the result of a deck that parsed whole, and a save SHALL parse the rest first. A slide that does not parse SHALL refuse the deck (or, after edits, make it read-only), and SHALL never be saved. An editor with a collaboration module SHALL parse the whole deck before its first slide shows.

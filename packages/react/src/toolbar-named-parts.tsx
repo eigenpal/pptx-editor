@@ -200,6 +200,8 @@ export interface ToolbarNamedParts {
   readonly ImageCropFit: ToolbarPartComponent;
   /** `image.properties`. */
   readonly ImageProperties: ToolbarPartComponent;
+  /** `chart.editData`. */
+  readonly ChartEditData: ToolbarPartComponent;
   /** `table.insert`. */
   readonly TableInsert: ToolbarPartComponent;
   /** `table.style`. */

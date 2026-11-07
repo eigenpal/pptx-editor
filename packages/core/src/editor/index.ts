@@ -483,6 +483,25 @@ export {
   type AltTextDraftFields,
   type PicturePropertiesDraftFields,
 } from './picture-fields.ts';
+export {
+  chartDraftCell,
+  chartDraftCellErrors,
+  chartDraftCommand,
+  chartDraftFrom,
+  chartGridMove,
+  insertChartDraftColumn,
+  insertChartDraftRow,
+  removeChartDraftColumn,
+  removeChartDraftRow,
+  setChartDraftCell,
+  validateChartDraft,
+  type ChartDataDraft,
+  type ChartDataDraftFields,
+  type ChartDraftColumn,
+  type ChartDraftRow,
+  type ChartGridPosition,
+} from './chart-data-fields.ts';
+export { type ChartSlotId } from './chrome-chart.ts';
 export { type ImageSlotId } from './chrome-picture.ts';
 export {
   resetDevWarnings,

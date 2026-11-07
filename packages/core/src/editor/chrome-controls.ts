@@ -18,6 +18,7 @@ import { ICON_PATHS } from './icon-paths.ts';
 import { IMAGE_CHROME_GROUP, imageSlotState } from './chrome-picture.ts';
 import { adapterActionState } from './chrome-adapter-state.ts';
 import type { ImageSlotId } from './chrome-picture.ts';
+import { CHART_CHROME_GROUP, chartSlotState, type ChartSlotId } from './chrome-chart.ts';
 import { isNothingToDo } from '../automation/commands/op-batch.ts';
 import type { ToolbarSlotValue } from './toolbar-values.ts';
 import {
@@ -124,7 +125,8 @@ export type ChromeDialogKey =
   | 'bulletsAndNumbering'
   | 'columns'
   | 'imageAltText'
-  | 'imageProperties';
+  | 'imageProperties'
+  | 'chartData';
 
 /** How a control renders. @public */
 export type ChromeControlShape =
@@ -205,7 +207,8 @@ export type ChromeGroupId =
   | 'slide'
   | 'image'
   | 'section'
-  | 'table';
+  | 'table'
+  | 'chart';
 
 /** One toolbar group. @public */
 export interface ChromeGroup {
@@ -680,6 +683,7 @@ export const CHROME_GROUPS: readonly ChromeGroup[] = [
   SECTION_GROUP,
   ...TABLE_GROUPS,
   IMAGE_CHROME_GROUP,
+  CHART_CHROME_GROUP,
 ];
 
 // A group with no control left on the bar (`script`) is left out.
@@ -779,7 +783,8 @@ export type ChromeSlotId =
   | 'section.collapseAll'
   | 'section.expandAll'
   | TableSlotId
-  | ImageSlotId;
+  | ImageSlotId
+  | ChartSlotId;
 
 /** Every slot id, derived from the registry. @public */
 export function chromeSlotIds(): ChromeSlotId[] {
@@ -840,7 +845,7 @@ export interface ToolbarCommandState {
 /** Enabled and active state of a slot: the ONE source of truth for both. @public */
 export function toolbarCommandState(editor: Editor | null, id: ChromeSlotId): ToolbarCommandState {
   if (!editor) return { id, enabled: false, disabledReason: 'disabled.noEditor', active: false };
-  const image = imageSlotState(editor, id);
+  const image = imageSlotState(editor, id) ?? chartSlotState(editor, id);
   if (image) return image;
   const snap = editor.snapshot();
   const f = snap.format;

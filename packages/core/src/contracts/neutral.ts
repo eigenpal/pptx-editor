@@ -98,6 +98,10 @@ export type {
 } from './shape-format.ts';
 
 import type { PictureCommand, SelectedImageState, AltText } from './picture.ts';
+import type { ChartCommand, SelectedChartState } from './chart.ts';
+
+// Every chart data type is public: `chart.ts` holds nothing else.
+export type * from './chart.ts';
 import type { FillCommand, GradientFill, PatternFill, SlideBackground } from './fill.ts';
 import type { SlideBackgroundState } from './fill.ts';
 
@@ -436,6 +440,7 @@ export type EditorCommand =
   | { readonly type: 'pasteFormat' }
   | TextFormatCommand
   | PictureCommand
+  | ChartCommand
   | FillCommand
   | AnimationCommand
   /**
@@ -957,6 +962,11 @@ export interface EditorSnapshot {
    * show then. Optional: absent means the implementation does not report pictures.
    */
   readonly image?: SelectedImageState | null;
+  /**
+   * The selected chart, while exactly one chart frame is selected; the chart controls show
+   * then. Optional: absent means the implementation does not edit chart data.
+   */
+  readonly chart?: SelectedChartState | null;
   /**
    * The current slide's elements, top first, for the selection pane. Hidden elements are in
    * the list. Optional: absent means the implementation has no selection pane.

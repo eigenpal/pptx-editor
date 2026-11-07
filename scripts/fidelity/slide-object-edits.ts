@@ -17,6 +17,7 @@ import {
 } from '../../packages/core/src/store/index.ts';
 import { PptxEditor } from '../../packages/editor-api/src/browser.ts';
 import { openPeers } from './collaboration-kit.ts';
+import { bytesText, CHART_DATA_PARTS, editChart, workbookText } from './chart-data-edits.ts';
 import {
   added,
   all,
@@ -550,27 +551,44 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
       );
     },
   },
+  // The chart's own edit: values, a renamed series, a series and a category added and removed.
+  // `chart-data-edits.ts` makes each edit alone.
   'objects.charts': {
-    fixture: 'charts',
-    edit: (t) => {
-      t.selectText('Shape 2', 0, 0);
-      t.type('Edited: ');
-      t.run({
-        type: 'setTransform',
-        nodeId: t.node('Chart 1'),
-        x: 914400,
-        y: 1371600,
-        cx: 6400800,
-        cy: 4114800,
-        rot: 0,
-      });
-    },
+    fixture: 'chart-data',
+    parts: CHART_DATA_PARTS,
+    edit: (t) =>
+      editChart(t, (d) => ({
+        kind: d.kind,
+        categories: [d.categories[0]!, d.categories[2]!, d.categories[3]!, { label: 'Central' }],
+        series: [
+          { ...d.series[0]!, name: 'Budget', values: [40, 50, 30, 20] },
+          { ...d.series[1]!, values: [38, 47, 33, null] },
+          { name: 'Stretch', values: [5, 6, 7, 8] },
+        ],
+      })),
     check: (d) => {
-      const data = (xml: string) => /<a:graphic>.*<\/a:graphic>/.exec(xml)?.[0];
-      const xml = d.shapeXml(0, 'Chart 1');
+      const chart = bytesText(d.pkg, '/ppt/charts/chart1.xml');
+      const sheet = workbookText(d.pkg, 'Workbook1.xlsx', '/xl/worksheets/sheet1.xml');
+      const table = workbookText(d.pkg, 'Workbook1.xlsx', '/xl/tables/table1.xml');
       return all(
-        has(xml, '<a:off x="914400" y="1371600"/>', '<a:ext cx="6400800" cy="4114800"/>'),
-        data(xml) === data(shapeXmlOf(d.original, 0, 'Chart 1')) ? undefined : 'the chart changed'
+        has(
+          chart,
+          '<c:f>Sheet1!$A$2:$A$5</c:f><c:strCache><c:ptCount val="4"/>',
+          '<c:pt idx="3"><c:v>Central</c:v></c:pt>',
+          '<c:pt idx="0"><c:v>Budget</c:v></c:pt>',
+          '<c:f>Sheet1!$D$1</c:f>',
+          '<c:f>Sheet1!$D$2:$D$5</c:f>',
+          '<c:dPt><c:idx val="2"/>'
+        ),
+        lacks(chart, 'Forecast', 'South'),
+        has(
+          sheet,
+          '<c r="B1" t="inlineStr"><is><t>Budget</t></is></c>',
+          '<c r="A5" t="inlineStr"><is><t>Central</t></is></c>',
+          '<c r="D5"><v>8</v></c>'
+        ),
+        lacks(sheet, 'r="C5"'),
+        has(table, 'ref="A1:D5"', '<tableColumn id="4" name="Stretch"/>')
       );
     },
   },

@@ -45,7 +45,7 @@ import { createShapeListSource, elementIn } from './shape-list.ts';
 import { activeOf, createBackgroundSource, formatAt, geometryOf } from './selection-state.ts';
 import { FormatPainter } from './format-painter.ts';
 import { CropMode } from './crop-mode.ts';
-import { pictureStateAt, withAltText } from './picture-state.ts';
+import { chartDataAt, selectedObjectsAt, withAltText } from './picture-state.ts';
 import { isViewCommand, ViewSettings, type ViewCommand } from './view-settings.ts';
 import { PlaceholderPrompts } from './placeholder-prompts.ts';
 import { RemovalNotice } from './removal-notice.ts';
@@ -224,7 +224,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       lastRejection,
       lastRemoval: removal.current,
       formatPainter: painter.mode,
-      image: pictureStateAt(pkg, partAt(slide), selection, cropping(), lay),
+      ...selectedObjectsAt(pkg, partAt(slide), selection, cropping(), lay),
       layouts: layoutSummaries(pkg),
       sections: sectionSummaries(pkg),
       customShows: customShowSummaries(pkg),
@@ -823,6 +823,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     },
     fontFamilies,
     tableStyles: () => (session ? tableStyleList(session.store.package) : []),
+    chartData: (id) => chartDataAt(session?.store.package, partAt(slide), selection, id),
     setSelection: (next) => select(next),
     copy: clipboard.copy,
     selectAll,

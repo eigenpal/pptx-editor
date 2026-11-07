@@ -140,7 +140,8 @@
     "cannotCopyFrame": "このバージョンでは、グラフ、図表、オブジェクトをコピーまたは切り取りできません",
     "altText": "代替テキストの編集…",
     "paragraph": "段落…",
-    "font": "フォント…"
+    "font": "フォント…",
+    "chartLabel": "グラフの操作"
   },
   "mode": {
     "label": "モード",
@@ -172,7 +173,8 @@
       "slide": "スライド",
       "image": "画像",
       "section": "セクション",
-      "table": "表"
+      "table": "表",
+      "chart": "グラフ"
     },
     "smartGuides": "スマート ガイド",
     "find": "検索 (Ctrl+F)",
@@ -808,7 +810,8 @@
     "animationsReadOnly": "このスライドの効果は、エディターが変更しないマークアップを使っています",
     "noAnimation": "このスライドにその効果はありません",
     "noAnimationChange": "効果または画面切り替えはすでにこの設定です",
-    "instantAnimation": "この効果は瞬時に行われるため、継続時間はありません"
+    "instantAnimation": "この効果は瞬時に行われるため、継続時間はありません",
+    "noChart": "グラフを選択してください"
   },
   "rail": {
     "ariaLabel": "スライド",
@@ -1136,7 +1139,22 @@
     "customShowNotFound": "この目的別スライド ショーはプレゼンテーションにありません。",
     "unsafeFileLink": "./ または ../ で始まる相対パスを入力してください (例: ./report.pdf)。プログラムやスクリプトのファイルにはリンクできません。",
     "sectionName": "セクション名は 1 から 255 文字で指定してください。",
-    "view": "エディターにその表示はありません。"
+    "view": "エディターにその表示はありません。",
+    "chartData": {
+      "noChart": "グラフを 1 つ選択してください。",
+      "noData": "このグラフにはデータ系列がありません。",
+      "combination": "このグラフは複数のグラフの種類を組み合わせています。",
+      "unsupportedType": "この種類のグラフのデータは編集できません。",
+      "filtered": "このグラフには非表示の系列があります。",
+      "multiLevel": "このグラフの項目は複数のレベルに分かれています。",
+      "mixedCategories": "このグラフの系列はそれぞれ異なる項目を使用しています。",
+      "tooLarge": "このグラフのデータは編集できる量を超えています。",
+      "empty": "グラフには少なくとも 1 つの系列と 1 つの項目が必要です。",
+      "invalidText": "名前またはラベルにグラフで使用できない文字が含まれています。",
+      "notNumber": "値はすべて数値にしてください。",
+      "layout": "このグラフのセル参照は 1 つの表になっていないため、名前と値のみ変更できます。",
+      "workbook": "埋め込まれたブックはこの変更を受け付けられません。系列ごとに異なる名前を付け、データの隣のセルを空にしてください。"
+    }
   },
   "find": {
     "label": "検索と置換",
@@ -1478,6 +1496,7 @@
       "view": "表示",
       "shapeFormat": "図形の書式",
       "pictureFormat": "図の形式",
+      "chartDesign": "グラフのデザイン",
       "tableDesign": "テーブル デザイン",
       "tableLayout": "テーブル レイアウト"
     }
@@ -1553,5 +1572,33 @@
     "keyHint": "H キーでフォーカスのあるオブジェクトを表示または非表示にし、F2 キーで名前を変更します。",
     "emptyTitle": "オブジェクトがありません",
     "emptyBody": "このスライドの図形、画像、テキスト ボックスがここに表示されます。"
+  },
+  "chartData": {
+    "editData": "データの編集…",
+    "title": "グラフ データの編集",
+    "close": "閉じる",
+    "grid": "グラフ データ",
+    "categories": "項目",
+    "xValues": "X の値",
+    "seriesName": "系列 {number} の名前",
+    "categoryLabel": "項目 {number}",
+    "xValueLabel": "X の値 {number}",
+    "cellLabel": "{series}、{category}",
+    "newSeries": "系列 {number}",
+    "newCategory": "項目 {number}",
+    "addCategory": "項目を追加",
+    "removeCategory": "項目を削除",
+    "addSeries": "系列を追加",
+    "removeSeries": "系列を削除",
+    "help": "各セルに値を入力します。値がない場合はセルを空のままにします。矢印キーでセル間を移動します。",
+    "workbookKept": "埋め込みブックは以前の値のままです。グラフには入力した値が表示されます。",
+    "workbookExternal": "このグラフはリンクされたブックのデータを使用しています。グラフには入力した値が表示され、リンクからの更新は停止します。",
+    "notEditable": "このグラフのデータは編集できません。{reason}",
+    "errors": {
+      "number": "数値を入力するか、セルを空のままにしてください。",
+      "xNumber": "X の値にはすべて数値を入力してください。",
+      "tooLong": "255 文字以内で入力してください。",
+      "cell": "{cell}: {message}"
+    }
   }
 }

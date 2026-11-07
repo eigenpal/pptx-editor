@@ -656,12 +656,12 @@ export const pptxFeatures: PptxFeature[] = [
     id: 'objects.charts',
     name: 'Charts',
     category: 'objects',
-    editing: 'none',
+    editing: 'partial',
     rendering: 'partial',
-    roundTrip: 'preserved',
+    roundTrip: 'full',
     tier: 'premium',
     notes:
-      'The drawing module of @pptx-editor.dev/pro draws charts from the values cached in the chart part, in the editor and in the PDF export. It draws bar and column charts (clustered, stacked, and percent stacked), line, area, scatter, pie, doughnut, and radar charts, with titles, legends, axes, gridlines, data labels, and number formats. 3-D, of-pie, stock, bubble, and surface charts, and charts with trendlines or error bars, show a labeled placeholder. Without the module, every chart shows the placeholder. Charts are not editable, and the chart part saves unchanged. The module uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.',
+      'The drawing module of @pptx-editor.dev/pro draws charts from the values cached in the chart part, in the editor and in the PDF export. It draws bar and column charts (clustered, stacked, and percent stacked), line, area, scatter, pie, doughnut, and radar charts, with titles, legends, axes, gridlines, data labels, and number formats. 3-D, of-pie, stock, bubble, and surface charts, and charts with trendlines or error bars, show a labeled placeholder. Without the module, every chart shows the placeholder. The Edit Data dialog and the setChartData command change series names, category labels, and values, and add or remove series and categories. They edit bar, column, line, area, pie, doughnut, radar, and scatter charts. Bubble, stock, surface, of-pie, and combination charts, and filtered or multi-level data, stay read-only. The embedded workbook gets the same cells. A workbook with formulas, filters, or merged cells keeps its old cells. A linked workbook is never opened, and its automatic update is turned off. Dates show as serial numbers. Other chart formatting is not editable. The module uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.',
     docsLink: '/docs/guides/charts',
   },
   {

@@ -25,11 +25,12 @@ export type RibbonTabId =
   | 'view'
   | 'shapeFormat'
   | 'pictureFormat'
+  | 'chartDesign'
   | 'tableDesign'
   | 'tableLayout';
 
-/** What a contextual tab waits for: shapes, a picture, or a table in the selection. @public */
-export type RibbonContext = 'shape' | 'picture' | 'table';
+/** What a contextual tab waits for: shapes, a picture, a chart, or a table in the selection. @public */
+export type RibbonContext = 'shape' | 'picture' | 'chart' | 'table';
 
 /** Some controls of one registry group, in the given order. @public */
 export interface RibbonGroupPick {
@@ -128,6 +129,12 @@ export const RIBBON_TABS: readonly RibbonTab[] = [
     context: 'picture',
   },
   {
+    id: 'chartDesign',
+    labelKey: 'ribbon.tabs.chartDesign',
+    groups: ['chart', ARRANGE],
+    context: 'chart',
+  },
+  {
     id: 'tableDesign',
     labelKey: 'ribbon.tabs.tableDesign',
     groups: [
@@ -183,18 +190,21 @@ export interface RibbonTabLayout {
 }
 
 /** What a contextual tab reads from the snapshot. @public */
-export type RibbonSelection = Pick<EditorSnapshot, 'selection' | 'image' | 'table'>;
+export type RibbonSelection = Pick<EditorSnapshot, 'selection' | 'image' | 'table'> &
+  Partial<Pick<EditorSnapshot, 'chart'>>;
 
 /** Whether a contextual tab's context holds for `snapshot`. @public */
 export function ribbonContextActive(snapshot: RibbonSelection, context: RibbonContext): boolean {
   switch (context) {
     case 'shape':
       // Shapes are selected, or the text of a shape is being edited, as in the reference
-      // application. Pictures alone show Picture Format, and a table shows its two tabs.
+      // application. Pictures alone show Picture Format, a chart shows Chart Design, and a
+      // table shows its two tabs.
       return (
         (snapshot.selection.kind === 'shapes' || snapshot.selection.kind === 'text') &&
         snapshot.image == null &&
-        !snapshot.table
+        !snapshot.table &&
+        !snapshot.chart
       );
     case 'table':
       // The selection is in or on a table (`tableChromeVisible`).
@@ -202,6 +212,9 @@ export function ribbonContextActive(snapshot: RibbonSelection, context: RibbonCo
     case 'picture':
       // Every selected element is a picture.
       return snapshot.image != null;
+    case 'chart':
+      // Exactly one chart frame is selected.
+      return snapshot.chart != null;
   }
 }
 

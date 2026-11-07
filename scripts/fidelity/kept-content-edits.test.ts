@@ -21,11 +21,14 @@ describe('kept content survives structural edits', () => {
 
 describe('structural recipes', () => {
   test('cover every row that keeps content it does not edit', () => {
-    const preserved = pptxFeatures
-      .filter((f) => f.roundTrip === 'preserved')
-      .map((f) => f.id)
-      .sort();
-    expect([...KEPT_CONTENT_ROWS].sort()).toEqual(preserved);
+    // A row that now edits its content (charts edit their data) keeps its structural recipes:
+    // the content it does not edit (the chart's formatting) must still survive them.
+    const missing = pptxFeatures
+      .filter((f) => f.roundTrip === 'preserved' && !KEPT_CONTENT_ROWS.includes(f.id))
+      .map((f) => f.id);
+    expect(missing).toEqual([]);
+    const ids = new Set(pptxFeatures.map((f) => f.id));
+    expect(KEPT_CONTENT_ROWS.filter((id) => !ids.has(id))).toEqual([]);
   });
 
   test('every verified copy has a recipe', () => {

@@ -16,6 +16,7 @@ import { eastAsianThemeFontsDeck, eastAsianTypographyDeck, textScriptFixtures } 
 import { followUpFixtures } from './follow-ups.ts';
 import { lineEndsDashesFixtures } from './line-ends-dashes.ts';
 import { chartSizesDeck, chartsDeck, diagramsDeck } from './drawingml.ts';
+import { chartDataDeck } from './chart-data.ts';
 import { buildRoundTripDecks } from './round-trip.ts';
 import { pictureBulletsDeck } from './picture-bullets.ts';
 import { textWarpFixtures } from './text-warp.ts';
@@ -854,6 +855,8 @@ writeFileSync(`${OUT}/east-asian-typography.pptx`, buildPptx(eastAsianTypography
 writeFileSync(`${OUT}/charts.pptx`, buildPptx(chartsDeck()));
 // Legend-bearing charts at several text and frame sizes.
 writeFileSync(`${OUT}/chart-sizes.pptx`, buildPptx(chartSizesDeck()));
+// Charts with embedded workbooks, for the Edit Data dialog and `setChartData`.
+writeFileSync(`${OUT}/chart-data.pptx`, buildPptx(chartDataDeck()));
 // Diagrams with their saved drawings (ECMA-376 Part 1, 21.4).
 writeFileSync(`${OUT}/diagrams.pptx`, buildPptx(diagramsDeck()));
 // Links, kept content, an SVG picture, and tab stops: the round-trip checks of the feature edits.

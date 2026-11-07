@@ -72,6 +72,7 @@ export function canvasMenuLabelKey(
   | 'contextMenu.tableLabel'
   | 'contextMenu.shapeLabel'
   | 'contextMenu.pictureLabel'
+  | 'contextMenu.chartLabel'
   | 'contextMenu.canvasLabel' {
   if (kind === 'table' || kind === 'tableFrame') return 'contextMenu.tableLabel';
   return kind === 'text'
@@ -80,7 +81,9 @@ export function canvasMenuLabelKey(
       ? 'contextMenu.shapeLabel'
       : kind === 'picture'
         ? 'contextMenu.pictureLabel'
-        : 'contextMenu.canvasLabel';
+        : kind === 'chart'
+          ? 'contextMenu.chartLabel'
+          : 'contextMenu.canvasLabel';
 }
 
 /**
@@ -137,6 +140,7 @@ export const CONTEXT_MENU_NAMED_PARTS = {
   ImageAltText: row('image.altText'),
   ImageChange: row('image.change'),
   ImageProperties: row('image.properties'),
+  ChartEditData: row('chart.editData'),
   FormatBackground: row('slide.background'),
   NewSlide: row('slide.add'),
   InsertRowAbove: row('table.insertRowAbove'),

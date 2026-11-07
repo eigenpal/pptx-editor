@@ -140,7 +140,8 @@
     "cannotCopyFrame": "此版本无法复制或剪切图表、示意图和对象",
     "altText": "编辑替代文字…",
     "paragraph": "段落…",
-    "font": "字体…"
+    "font": "字体…",
+    "chartLabel": "图表操作"
   },
   "mode": {
     "label": "模式",
@@ -172,7 +173,8 @@
       "slide": "幻灯片",
       "image": "图片",
       "section": "节",
-      "table": "表格"
+      "table": "表格",
+      "chart": "图表"
     },
     "smartGuides": "智能参考线",
     "find": "查找(Ctrl+F)",
@@ -808,7 +810,8 @@
     "animationsReadOnly": "此幻灯片的效果使用了编辑器不会更改的标记",
     "noAnimation": "此幻灯片没有该效果",
     "noAnimationChange": "效果或切换已经是这些设置",
-    "instantAnimation": "此效果是瞬时的，因此没有持续时间"
+    "instantAnimation": "此效果是瞬时的，因此没有持续时间",
+    "noChart": "请选择一个图表"
   },
   "rail": {
     "ariaLabel": "幻灯片",
@@ -1136,7 +1139,22 @@
     "customShowNotFound": "此演示文稿中没有该自定义放映。",
     "unsafeFileLink": "请输入以 ./ 或 ../ 开头的相对路径，例如 ./report.pdf。不能链接程序和脚本文件。",
     "sectionName": "节名称需要 1 到 255 个字符。",
-    "view": "编辑器中没有此视图。"
+    "view": "编辑器中没有此视图。",
+    "chartData": {
+      "noChart": "请选择一个图表。",
+      "noData": "此图表没有数据系列。",
+      "combination": "此图表组合了多种图表类型。",
+      "unsupportedType": "无法编辑此类图表的数据。",
+      "filtered": "此图表隐藏了部分系列。",
+      "multiLevel": "此图表的类别有多个级别。",
+      "mixedCategories": "此图表的各系列使用不同的类别。",
+      "tooLarge": "此图表的数据超出了可编辑的范围。",
+      "empty": "图表至少需要一个系列和一个类别。",
+      "invalidText": "名称或标签包含图表无法保留的字符。",
+      "notNumber": "每个值都必须是数字。",
+      "layout": "此图表的单元格引用不构成一个表格，因此只能更改名称和值。",
+      "workbook": "嵌入的工作簿无法接受此更改。请为每个系列指定不同的名称，并保持数据旁边的单元格为空。"
+    }
   },
   "find": {
     "label": "查找和替换",
@@ -1478,6 +1496,7 @@
       "view": "视图",
       "shapeFormat": "形状格式",
       "pictureFormat": "图片格式",
+      "chartDesign": "图表设计",
       "tableDesign": "表设计",
       "tableLayout": "表布局"
     }
@@ -1553,5 +1572,33 @@
     "keyHint": "按 H 显示或隐藏有焦点的对象，按 F2 重命名。",
     "emptyTitle": "没有对象",
     "emptyBody": "此幻灯片上的形状、图片和文本框显示在此处。"
+  },
+  "chartData": {
+    "editData": "编辑数据…",
+    "title": "编辑图表数据",
+    "close": "关闭",
+    "grid": "图表数据",
+    "categories": "类别",
+    "xValues": "X 值",
+    "seriesName": "系列 {number} 的名称",
+    "categoryLabel": "类别 {number}",
+    "xValueLabel": "X 值 {number}",
+    "cellLabel": "{series}，{category}",
+    "newSeries": "系列 {number}",
+    "newCategory": "类别 {number}",
+    "addCategory": "添加类别",
+    "removeCategory": "删除类别",
+    "addSeries": "添加系列",
+    "removeSeries": "删除系列",
+    "help": "在每个单元格中输入值。没有值时请将单元格留空。使用箭头键在单元格之间移动。",
+    "workbookKept": "嵌入的工作簿保留原来的值。图表显示你输入的值。",
+    "workbookExternal": "此图表使用链接工作簿中的数据。图表显示你输入的值，并停止从链接更新。",
+    "notEditable": "无法编辑此图表的数据。{reason}",
+    "errors": {
+      "number": "请输入数字，或将单元格留空。",
+      "xNumber": "请为每个 X 值输入数字。",
+      "tooLong": "请输入不超过 255 个字符。",
+      "cell": "{cell}：{message}"
+    }
   }
 }

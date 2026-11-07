@@ -44,6 +44,8 @@ export const REACT_ONLY = {
   'chrome-actions.tsx':
     'The React chrome action host (dialogs, find bar, link popup); Vue holds it in composables.ts and popups.ts.',
   'context.ts': 'The React contexts and hooks; Vue holds them in composables.ts.',
+  'dialog-exports.ts':
+    'The dialog re-exports of the React entry, split out for the line cap; Vue exports its dialogs from index.ts.',
   'dialog-sections.ts':
     'A re-export of the core dialog-section requests; the Vue dialogs import them from core directly.',
   'Loading.tsx': 'The Vue twin is loading.ts.',

@@ -282,10 +282,11 @@ export function readZip(bytes: Uint8Array, limits: ZipLimits = DEFAULT_ZIP_LIMIT
  *  differ in that field and nowhere else. Save/reopen/save then stops being a fixed point,
  *  and any digest a caller takes over saved bytes stops being stable.
  *
- *  Mid-day on 1980-01-02 rather than the DOS epoch itself: the writer derives the year through
- *  the local-time `getFullYear`, so midnight on 1980-01-01 UTC lands in 1979 west of
- *  Greenwich and the year field underflows. */
-const FIXED_ENTRY_MTIME = new Date(Date.UTC(1980, 0, 2, 12));
+ *  The writer reads the DOS fields through the local-time getters (`getFullYear`, `getHours`),
+ *  so the time is built in local time too: every time zone then writes the same fields, and an
+ *  archive saved on one machine has the same bytes as on another. Mid-day on 1980-01-02 keeps
+ *  the year inside the DOS range. */
+const FIXED_ENTRY_MTIME = new Date(1980, 0, 2, 12);
 
 const startsWith = (d: Uint8Array, at: number, sig: readonly number[]): boolean =>
   d.length >= at + sig.length && sig.every((b, i) => d[at + i] === b);

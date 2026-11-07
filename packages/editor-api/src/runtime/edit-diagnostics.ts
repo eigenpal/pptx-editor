@@ -290,6 +290,71 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'A slide side is from 1 to 56 inches (914400 to 51206400 EMU). Pass a size in that range.',
   ],
   [
+    'errors.chartData.noChart',
+    'edit.chart-data',
+    'Select one chart frame, or pass the node id of a chart on the current slide.',
+  ],
+  [
+    'errors.chartData.noData',
+    'edit.chart-data',
+    'The chart has no data series to edit. Edit a chart that plots at least one series.',
+  ],
+  [
+    'errors.chartData.combination',
+    'edit.chart-data-unsupported',
+    'The chart combines chart types, and its data is read-only. Edit a chart with one chart type.',
+  ],
+  [
+    'errors.chartData.unsupportedType',
+    'edit.chart-data-unsupported',
+    'Only bar, column, line, area, pie, doughnut, radar, and scatter chart data is editable.',
+  ],
+  [
+    'errors.chartData.filtered',
+    'edit.chart-data-unsupported',
+    'The chart hides some of its series, and its data is read-only.',
+  ],
+  [
+    'errors.chartData.multiLevel',
+    'edit.chart-data-unsupported',
+    'The chart has multi-level categories, and its data is read-only.',
+  ],
+  [
+    'errors.chartData.mixedCategories',
+    'edit.chart-data-unsupported',
+    'The series of the chart use different categories, and its data is read-only.',
+  ],
+  [
+    'errors.chartData.tooLarge',
+    'edit.chart-data-range',
+    'A chart edits up to 255 series and 4000 categories. Pass less data.',
+  ],
+  [
+    'errors.chartData.empty',
+    'edit.chart-data-range',
+    'A chart needs at least one series and one category. Keep one of each.',
+  ],
+  [
+    'errors.chartData.invalidText',
+    'edit.chart-data-text',
+    'A name or label holds characters that XML cannot keep, or is longer than 255 characters. Remove them.',
+  ],
+  [
+    'errors.chartData.notNumber',
+    'edit.chart-data-value',
+    'Each value must be a finite number or null. Pass numbers, and finite X values for a scatter chart.',
+  ],
+  [
+    'errors.chartData.workbook',
+    'edit.chart-data-layout',
+    'The embedded workbook cannot take the new table. Give each series a different name, and keep the cells beside the data empty.',
+  ],
+  [
+    'errors.chartData.layout',
+    'edit.chart-data-layout',
+    'The cell references of the chart do not form one table. Change only names and values.',
+  ],
+  [
     'errors.exportFailed',
     'image.failed',
     'The picture could not be made. Read the shape, then try again.',

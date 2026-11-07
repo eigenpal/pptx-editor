@@ -9,7 +9,8 @@
  * 88 copies written at commit 79a5d22, no prompt. On 7 November 2026: `header-footer`,
  * `hyperlinks`, `preserved-content`, and `svg-tab-stops`, 8 copies, no prompt; and again
  * `header-footer`, with its date and footer placeholders, 2 copies, no prompt;
- * `picture-bullets`, 2 copies, no prompt; and `text-warp`, 2 copies, no prompt.
+ * `picture-bullets`, 2 copies, no prompt; `text-warp`, 2 copies, no prompt; and
+ * `chart-data`, 2 copies, no prompt.
  */
 export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'alignment-anchor',
@@ -17,6 +18,7 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'autofit',
   'bullets-gallery',
   'bullets-numbering',
+  'chart-data',
   'chart-sizes',
   'charts',
   'colors',
@@ -72,9 +74,9 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
  * fails when a recipe or an engine change gives a copy with another fingerprint: then open the new
  * copy, and record its fingerprint. Last checked on 7 November 2026: all 66 copies, written by
  * the recipes and fixtures as they are now, no prompt; the `text.clipboard` copy, no prompt; and again
- * `presenting.animations-transitions`, with its new effects and transition, and
+ * `presenting.animations-transitions`, with its new effects and transition,
  * `lists.bullets-numbering` and `text.hyperlinks`, with picture bullets and custom show and file
- * links, no prompt.
+ * links, and the new `objects.charts` copy, which edits chart data, no prompt.
  */
 export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'collaboration.automation-api':
@@ -95,7 +97,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
     'sha256:937f0feb9baa7944af5c51556bd358d06ad1bf770773841306d7a516c5c3b909',
   'lists.bullets-numbering':
     'sha256:37e710090974cae1ffd0a0fb047f4ee7ffeffd845c72ffd4acd6bdd4b49be27f',
-  'objects.charts': 'sha256:42f18731591c3a7d930e44bfbcc6ec53ac87e470e4733f21ccdfbc0df1bdfca1',
+  'objects.charts': 'sha256:82b50397e0ff8613b6198d351393aa7e6953924f39a5064b18e6a909b412e1d8',
   'objects.diagrams': 'sha256:aeb9619902390e6835fb90efb2d8f3d942add7d2ef02639a7e1bfc133351f751',
   'objects.equations': 'sha256:24251ac84a6747362dda9cdf121e956733aaef472fa71667b7fe384ea1efa122',
   'objects.media-ole': 'sha256:1bbe774aba3c5a603055c432f37718cd2acbfbd8e24fa7fe2beff9a04b63d5b2',
@@ -240,4 +242,29 @@ export const SAVE_VERIFIED_KEPT_CONTENT_EDITS: Readonly<Record<string, string>> 
     'sha256:af6f398bd04ec75e51b13c7f7b768e0c99923f040141e8829b4c0dc76be560cf',
   'themes.placeholder-inheritance: duplicate slide':
     'sha256:31dd35989a1ea1c0899c64cfdb075b51ce09424c235932cd82e630ae75d4a8d3',
+};
+
+/**
+ * Chart data edits (`CHART_DATA_EDITS` in `scripts/fidelity/chart-data-edits.ts`) whose copy opens
+ * with no repair prompt, with the fingerprint of that copy (`editFingerprint`). `bun
+ * scripts/fidelity/chart-data-edits.ts --out <dir>` writes one copy per recipe. The rules of
+ * `SAVE_VERIFIED_FEATURE_EDITS` apply. Each embedded workbook of these copies also opens in a
+ * spreadsheet application with no repair prompt. Last checked on 7 November 2026: all 7 copies
+ * and their 14 workbooks, no prompt.
+ */
+export const SAVE_VERIFIED_CHART_DATA_EDITS: Readonly<Record<string, string>> = {
+  'objects.charts: edit values':
+    'sha256:b74a14578f542418e6603bab49d5285c2d3282eef95477c72ec3bcc15e3de982',
+  'objects.charts: rename a series':
+    'sha256:1f443d27e53a53c66140d755f44af7049068929e5ce465c534f9c6f4a04af0d9',
+  'objects.charts: add a series':
+    'sha256:e752034e4404ed11ff5a367d00ff0f007d44f957f10bee49726f1ad03ba64f05',
+  'objects.charts: remove a series':
+    'sha256:81b98b243aabccfd58ccb5196f4ec8e5c9d6a73d58b4727720382619e03aa5bb',
+  'objects.charts: add a category':
+    'sha256:b721ccc1c35c34a0f605b33ee8a0aab620d44abe03b79a57ff525f539e7a7dd7',
+  'objects.charts: remove a category':
+    'sha256:2145c94758bf47dbaec941625f3e369d5defb336b6a2a0f4b7145d8bd73bec8e',
+  'objects.charts: edit a scatter chart':
+    'sha256:249994d1f46f9e9b5220abcd107011c0cd891a25e5eb1935d8ab74a66105ee10',
 };

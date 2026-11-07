@@ -61,6 +61,7 @@ import { Loading } from './Loading.tsx';
 import { PageSetupDialog } from './PageSetupDialog.tsx';
 import { BackgroundDialog } from './BackgroundDialog.tsx';
 import { ImageAltTextDialog } from './ImageAltTextDialog.tsx';
+import { ChartDataDialog } from './ChartDataDialog.tsx';
 import { ImagePropertiesDialog } from './ImagePropertiesDialog.tsx';
 import { ParagraphDialog } from './ParagraphDialog.tsx';
 import { FontDialog } from './FontDialog.tsx';
@@ -572,71 +573,7 @@ export {
   type NewSlideControlProps,
 } from './SlideControls.tsx';
 export { gradientCss } from '@pptx-editor.dev/core/editor';
-export {
-  PageSetupDialog,
-  usePageSetupDialog,
-  type PageSetupDialogFieldName,
-  type PageSetupDialogFields,
-  type PageSetupDialogProps,
-  type UsePageSetupDialogReturn,
-} from './PageSetupDialog.tsx';
-export {
-  BackgroundDialog,
-  useBackgroundDialog,
-  type BackgroundDialogFieldName,
-  type BackgroundDialogFields,
-  type BackgroundDialogProps,
-  type UseBackgroundDialogReturn,
-} from './BackgroundDialog.tsx';
-export {
-  ImageAltTextDialog,
-  useImageAltTextDialog,
-  type ImageAltTextDialogFieldName,
-  type ImageAltTextDialogFields,
-  type ImageAltTextDialogProps,
-  type UseImageAltTextDialogReturn,
-} from './ImageAltTextDialog.tsx';
-export {
-  ImagePropertiesDialog,
-  useImagePropertiesDialog,
-  type ImagePropertiesDialogFieldName,
-  type ImagePropertiesDialogFields,
-  type ImagePropertiesDialogProps,
-  type UseImagePropertiesDialogReturn,
-} from './ImagePropertiesDialog.tsx';
-export type {
-  DialogCustomizationProps,
-  DialogPartProps,
-  UseDialogReturn,
-} from './dialog-parts.tsx';
-export {
-  ParagraphDialog,
-  useParagraphDialog,
-  type ParagraphDialogFieldName,
-  type ParagraphDialogProps,
-  type UseParagraphDialogReturn,
-} from './ParagraphDialog.tsx';
-export {
-  FontDialog,
-  useFontDialog,
-  type FontDialogFieldName,
-  type FontDialogProps,
-  type UseFontDialogReturn,
-} from './FontDialog.tsx';
-export {
-  BulletsAndNumberingDialog,
-  useBulletsAndNumberingDialog,
-  type BulletsAndNumberingDialogFieldName,
-  type BulletsAndNumberingDialogProps,
-  type UseBulletsAndNumberingDialogReturn,
-} from './BulletsAndNumberingDialog.tsx';
-export {
-  ColumnsDialog,
-  useColumnsDialog,
-  type ColumnsDialogFieldName,
-  type ColumnsDialogProps,
-  type UseColumnsDialogReturn,
-} from './ColumnsDialog.tsx';
+export * from './dialog-exports.ts';
 export { useParagraphFormat, type UseParagraphFormatReturn } from './useParagraphFormat.ts';
 export { useFontFormat, type UseFontFormatReturn } from './useFontFormat.ts';
 export { useBulletFormat, type UseBulletFormatReturn } from './useBulletFormat.ts';
@@ -984,6 +921,7 @@ export const PptxEditor = Object.assign(PptxEditorDefault, {
   BackgroundDialog,
   ImageAltTextDialog,
   ImagePropertiesDialog,
+  ChartDataDialog,
   ParagraphDialog,
   FontDialog,
   BulletsAndNumberingDialog,

@@ -36,6 +36,7 @@ import {
   type BulletsAndNumberingDialogProps,
 } from './BulletsAndNumberingDialog.tsx';
 import { ColumnsDialog, type ColumnsDialogProps } from './ColumnsDialog.tsx';
+import { ChartDataDialog, type ChartDataDialogProps } from './ChartDataDialog.tsx';
 import { markReadingPopup } from '@pptx-editor.dev/core/editor';
 import { usePptxEditor } from './context.ts';
 import type { PptxEditorContextMenuProps } from './context-menu-parts.tsx';
@@ -170,6 +171,11 @@ export interface PptxEditorPopups {
    */
   imageProperties?: PptxEditorPopup<ImagePropertiesDialogProps>;
   /**
+   * The Edit Data dialog of the selected chart: its categories and series as a grid. `false`
+   * turns it off; `setChartData` keeps working from the API.
+   */
+  chartData?: PptxEditorPopup<ChartDataDialogProps>;
+  /**
    * The menu of a section header in the slide rail and in the slide sorter (Rename, Remove,
    * Move, Collapse all). A callback renders the host's menu, or `SectionContextMenu` with its
    * own options; `false` shows no menu. The section commands keep working from the API.
@@ -186,7 +192,8 @@ export type PptxEditorDialogKey =
   | 'bulletsAndNumbering'
   | 'columns'
   | 'imageAltText'
-  | 'imageProperties';
+  | 'imageProperties'
+  | 'chartData';
 
 /** What `useEditorDialog` returns. @public */
 export interface UseEditorDialogReturn {
@@ -349,6 +356,7 @@ function ActiveDialog({ host }: { host: DialogHost }): ReactNode {
     return renderEntry(popups?.imageAltText, ImageAltTextDialog, props);
   if (active === 'imageProperties')
     return renderEntry(popups?.imageProperties, ImagePropertiesDialog, props);
+  if (active === 'chartData') return renderEntry(popups?.chartData, ChartDataDialog, props);
   return null;
 }
 
