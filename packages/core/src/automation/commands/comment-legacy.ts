@@ -39,6 +39,7 @@ import {
   legacyAuthors,
   legacyKey,
   legacyKeyFields,
+  legacyText,
   LEGACY_POS_EMU,
   presentationTarget,
   slideCommentParts,
@@ -227,18 +228,32 @@ export function findLegacy(
   batch: OpBatch,
   slidePart: string,
   key: string
-): { part: string; cm: Element; thread: Element; placed: boolean; group: number } {
+): {
+  part: string;
+  cm: Element;
+  thread: Element;
+  placed: boolean;
+  group: number;
+  twinTexts: () => string[];
+} {
   const fields = legacyKeyFields(key);
   if (!fields) throw new CommandRefusal('errors.noComment');
   const wanted = `${fields.authorId}:${fields.idx}`;
   const matches = (root: Element | undefined): Element[] =>
     isP(root, 'cmLst') ? elements(root).filter((cm) => isP(cm, 'cm') && keyOf(cm) === wanted) : [];
   // Read first, so a list without the comment is not rewritten as an XML part.
-  const lists = slideCommentParts(batch.pkg, slidePart).legacy.map((part) => ({
+  const read = slideCommentParts(batch.pkg, slidePart).legacy.map((part) => ({
     part,
-    hits: matches(commentTree(batch.pkg, part)?.root).length,
+    found: matches(commentTree(batch.pkg, part)?.root),
   }));
+  const lists = read.map((l) => ({ part: l.part, hits: l.found.length }));
   const total = lists.reduce((n, l) => n + l.hits, 0);
+  // The texts of the other comments with this author and index, as the reader shows them.
+  const twinTexts = (): string[] =>
+    read
+      .flatMap((l) => l.found)
+      .filter((_, i) => i !== (fields.ordinal ?? 1) - 1)
+      .map(legacyText);
   if (fields.ordinal === undefined && total !== 1) throw new CommandRefusal('errors.noComment');
   let left = fields.ordinal ?? 1;
   for (const { part, hits } of lists) {
@@ -252,7 +267,14 @@ export function findLegacy(
     const all = elements(root).filter((c) => isP(c, 'cm'));
     const parent = parentKey(cm);
     const thread = (parent && all.find((c) => keyOf(c) === parent && !parentKey(c))) || cm;
-    return { part, cm, thread, placed: fields.ordinal !== undefined, group: total };
+    return {
+      part,
+      cm,
+      thread,
+      placed: fields.ordinal !== undefined,
+      group: total,
+      twinTexts,
+    };
   }
   throw new CommandRefusal('errors.noComment');
 }

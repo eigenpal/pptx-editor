@@ -249,7 +249,7 @@ describe('comment identity', () => {
     expect(e.exec({ type: 'deleteComment', commentId: a!.id }).ok).toBe(true);
     for (const expect_ of [seenA, seenB]) {
       const edit = { type: 'editComment', commentId: a!.id, text: 'x', expect: expect_ } as const;
-      expect(e.can(edit)).toMatchObject({ ok: false, reason: 'errors.commentChanged' });
+      expect(e.can(edit)).toMatchObject({ ok: false, reason: 'errors.noComment' });
       expect(e.exec({ type: 'deleteComment', commentId: a!.id, expect: expect_ }).ok).toBe(false);
     }
     expect(e.snapshot().comments!.map((t) => t.text)).toEqual(['B']);
@@ -271,8 +271,105 @@ describe('comment identity', () => {
     expect(l.exec({ type: 'deleteComment', commentId: first!.id }).ok).toBe(true);
     expect(
       l.exec({ type: 'editComment', commentId: first!.id, text: 'x', expect: seen })
-    ).toMatchObject({ ok: false, reason: 'errors.commentChanged' });
+    ).toMatchObject({ ok: false, reason: 'errors.noComment' });
     expect(l.snapshot().comments!.map((t) => t.text)).toEqual(['Second']);
+  });
+
+  test('after a twin delete, an old id with a place can fail or reach the remaining twin', async () => {
+    const e = await open(await threads((t) => as(t, 'A') + as(t, 'B')));
+    const [a, b] = e.snapshot().comments!;
+    expect(e.exec({ type: 'deleteComment', commentId: a!.id }).ok).toBe(true);
+    // B's old id names nothing; A's old id reaches B without expect, and is refused with it.
+    expect(e.exec({ type: 'editComment', commentId: b!.id, text: 'x' })).toMatchObject({
+      ok: false,
+      reason: 'errors.noComment',
+    });
+    const seen = { author: a!.author, date: a!.date!, text: a!.text };
+    expect(
+      e.exec({ type: 'editComment', commentId: a!.id, text: 'x', expect: seen })
+    ).toMatchObject({ ok: false, reason: 'errors.noComment' });
+    expect(e.exec({ type: 'editComment', commentId: a!.id, text: 'B2' }).ok).toBe(true);
+    expect(e.snapshot().comments!.map((t) => t.text)).toEqual(['B2']);
+  });
+
+  test('expect: twins that share a text are refused, as text cannot tell them apart', async () => {
+    const e = await open(await threads((t) => as(t, 'X') + as(t, 'X') + as(t, 'X')));
+    const [a, b] = e.snapshot().comments!;
+    const seen = { author: b!.author, date: b!.date!, text: b!.text, identity: b!.identity };
+    const commands = [
+      { type: 'replyToComment', commentId: b!.id, text: 'R', expect: seen },
+      { type: 'editComment', commentId: b!.id, text: 'Y', expect: seen },
+      { type: 'deleteComment', commentId: a!.id, expect: { ...seen, identity: a!.identity } },
+    ] as const;
+    for (const command of commands) {
+      expect(e.can(command)).toMatchObject({ ok: false, reason: 'errors.commentAmbiguous' });
+      expect(e.exec(command)).toMatchObject({ ok: false, reason: 'errors.commentAmbiguous' });
+    }
+    expect(e.snapshot().comments!.map((t) => [t.text, t.replies.length])).toEqual([
+      ['X', 0],
+      ['X', 0],
+      ['X', 0],
+    ]);
+  });
+
+  test('expect: an id that a twin took from a deleted twin is refused without the identity', async () => {
+    const e = await open(await threads((t) => as(t, 'A') + as(t, 'B') + as(t, 'C')));
+    e.setAuthor('Bob');
+    let [a, b] = e.snapshot().comments!;
+    const facts = (c: typeof a) => ({ author: c!.author, date: c!.date!, text: c!.text });
+    expect(e.exec({ type: 'replyToComment', commentId: b!.id, text: 'R' }).ok).toBe(true);
+    [a, b] = e.snapshot().comments!;
+    // A peer gives B the text of A, then deletes A: A's old id now reaches B.
+    expect(e.exec({ type: 'editComment', commentId: b!.id, text: 'A' }).ok).toBe(true);
+    expect(e.exec({ type: 'deleteComment', commentId: a!.id }).ok).toBe(true);
+    const stale = { type: 'deleteComment', commentId: a!.id, expect: facts(a) } as const;
+    expect(e.can(stale)).toMatchObject({ ok: false, reason: 'errors.commentChanged' });
+    expect(e.exec(stale)).toMatchObject({ ok: false, reason: 'errors.commentChanged' });
+    const withIdentity = { ...stale, expect: { ...facts(a), identity: a!.identity } };
+    expect(e.exec(withIdentity)).toMatchObject({ ok: false, reason: 'errors.commentChanged' });
+    expect(e.snapshot().comments!.map((t) => [t.text, t.replies.map((r) => r.text)])).toEqual([
+      ['A', ['R']],
+      ['C', []],
+    ]);
+    // The identity that the snapshot shows at the id lets the host act on B.
+    const [now] = e.snapshot().comments!;
+    const current = { ...facts(now), identity: now!.identity };
+    expect(e.exec({ type: 'editComment', commentId: now!.id, text: 'B', expect: current }).ok).toBe(
+      true
+    );
+  });
+
+  test('expect: an old id form with a place on a comment without a twin names no comment', async () => {
+    const e = await open(
+      await threads(
+        (t) =>
+          as(t, 'P') + as(t, 'Q').replace(/created="[^"]*"/, 'created="2026-11-08T10:00:00.000"')
+      )
+    );
+    const [p] = e.snapshot().comments!;
+    const seen = { author: p!.author, date: p!.date!, text: p!.text };
+    expect(
+      e.can({ type: 'editComment', commentId: `${p!.id}~1`, text: 'z', expect: seen })
+    ).toMatchObject({ ok: false, reason: 'errors.noComment' });
+  });
+
+  test('each refusal publishes its own rejection, and a reload clears the pick', async () => {
+    const bytes = await threads((t) => as(t, 'A') + as(t, 'B'));
+    const e = await open(bytes);
+    const [a] = e.snapshot().comments!;
+    const bad = {
+      type: 'editComment',
+      commentId: a!.id,
+      text: 'q',
+      expect: { author: a!.author, date: a!.date!, text: 'nope' },
+    } as const;
+    e.exec(bad);
+    const first = e.snapshot().lastRejection;
+    e.exec(bad);
+    expect(e.snapshot().lastRejection).not.toBe(first);
+    e.selectComment(a!.id);
+    expect((await e.load(bytes)).ok).toBe(true);
+    expect(e.snapshot().activeComment).toBeNull();
   });
 
   test('a deck that opens after another shows none of its identities', async () => {

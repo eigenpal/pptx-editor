@@ -80,15 +80,20 @@ export interface CommentAuthorInput {
 
 /**
  * What a host showed of a comment, for a command that acts on it: pass the comment's `author`,
- * `date`, and `text` as the snapshot gave them. The editor refuses the command
+ * `date`, `text`, and `identity` as the snapshot gave them. The editor refuses the command
  * (`errors.commentChanged`) when the comment at `commentId` has another author or date.
  *
  * A twin shares its GUID, author, and creation time with another comment of the slide, or, in
  * the legacy format, its author and index. A twin's id holds its place among its twins
- * (`~<n>`, or `-<n>` for a legacy comment). For an id with a place, the editor also compares
- * the text, and it refuses the command when the comment has no twin left: the id may have named
- * the twin that is gone. So a collaborator's edit of a comment without a twin never refuses
- * yours. @public
+ * (`~<n>`, or `-<n>` for a legacy comment). For an id with a place, the editor also:
+ * - compares the text (`errors.commentChanged`);
+ * - refuses the command when the comment has no twin left (`errors.noComment`): the id may have
+ *   named the twin that is gone;
+ * - refuses it when another twin has the same text (`errors.commentAmbiguous`): text cannot tell
+ *   the two apart.
+ *
+ * Without `identity`, the editor also refuses an id that named another comment in an earlier
+ * snapshot. So a collaborator's edit of a comment without a twin never refuses yours. @public
  */
 export interface CommentExpect {
   /** The author's display name, as `SlideComment.author` gave it. */
@@ -97,6 +102,12 @@ export interface CommentExpect {
   readonly date?: string;
   /** The text, as `SlideComment.text` gave it. */
   readonly text: string;
+  /**
+   * The `identity`, as the snapshot gave it. With it, the editor refuses the command when the
+   * snapshot shows another identity at `commentId`. This tells apart twins whose texts changed,
+   * where the text alone can name the wrong one.
+   */
+  readonly identity?: string;
 }
 
 /**

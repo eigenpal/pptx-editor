@@ -430,7 +430,8 @@ const bump = (map: Map<string, number>, key: string): number => {
   return n;
 };
 
-const modernText = (el: Element): string =>
+/** The text of a threaded comment or reply, as the reader shows it. */
+export const modernText = (el: Element): string =>
   bodyText(child(el, { ns: COMMENTS.p188, local: 'txBody' }));
 
 /** The threads and replies the reader shows: a thread with an id, a reply with an id. */
@@ -626,6 +627,9 @@ function legacyThreads(
   }
   return threads.map((t) => t.thread);
 }
+
+/** The text of a legacy comment, as the reader shows it. */
+export const legacyText = (cm: Element): string => textOfPlain(child(cm, 'p:text'));
 
 function textOfPlain(el: Element | undefined): string {
   let out = '';

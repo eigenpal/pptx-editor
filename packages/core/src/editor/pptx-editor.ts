@@ -280,7 +280,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     ...(views.presentationView === 'slideSorter' ? { slideSorter: true } : {}),
     ...(probe ? { probe } : {}),
     ...(modules.collaboration ? { collaborating: true } : {}),
-    ...comments.context(),
+    ...comments.context(session?.store.package),
     ...(command?.type === 'paste'
       ? {
           pasteRepeat: (command.payload === pasteSeries.payload ? pasteSeries.count : 0) + 1,

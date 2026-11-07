@@ -76,6 +76,9 @@ export class CommentState {
    * comes back carries its identities as an edit does.
    */
   readonly #seen = new Map<string, readonly Seen[]>();
+  /** The identity that each comment id last named, and the ids that named another before. */
+  readonly #named = new Map<string, string>();
+  readonly #moved = new Set<string>();
   /** A count for the new identities that `#carry` makes: each is shown once only. */
   #fresh = 0;
   /** How many decks this editor opened before the current one (-1 before the first). */
@@ -114,6 +117,8 @@ export class CommentState {
   /** Forget the threads and the pick of the last deck, when another deck opens. */
   reset(): void {
     this.#seen.clear();
+    this.#named.clear();
+    this.#moved.clear();
     this.#key = [];
     this.#threads = NONE;
     this.#active = null;
@@ -133,9 +138,30 @@ export class CommentState {
   }
 
   /** The context fields of a command: the author, when there is one. */
-  context(): { readonly author?: string } {
+  context(pkg: PptxPackage | undefined): {
+    readonly author?: string;
+    readonly commentAt: (commentId: string) => {
+      readonly identity?: string;
+      readonly moved: boolean;
+    };
+  } {
     const author = this.author;
-    return author ? { author } : {};
+    // The identity at an id, as the snapshot of the id's slide shows it, and whether the id
+    // named another comment before.
+    const commentAt = (commentId: string): { identity?: string; moved: boolean } => {
+      const slidePart = commentId.slice(0, commentId.indexOf('#'));
+      let identity: string | undefined;
+      for (const t of this.threads(pkg, slidePart)) {
+        if (t.id === commentId) identity = t.identity;
+        else identity = t.replies.find((r) => r.id === commentId)?.identity;
+        if (identity !== undefined) break;
+      }
+      return {
+        ...(identity !== undefined ? { identity } : {}),
+        moved: this.#moved.has(commentId),
+      };
+    };
+    return author ? { author, commentAt } : { commentAt };
   }
 
   /** The threads of `slidePart`, the same array while their parts are the same objects. */
@@ -219,6 +245,13 @@ export class CommentState {
       });
     }
     this.#seen.set(slidePart, [...shown.values()]);
+    // An id that names another comment than before (a twin took a deleted twin's place) is
+    // ambiguous for a host that read it earlier: `expect` then needs the identity.
+    for (const [c, { identity }] of shown) {
+      const before = this.#named.get(c.id);
+      if (before !== undefined && before !== identity) this.#moved.add(c.id);
+      this.#named.set(c.id, identity);
+    }
     const rename = (c: SlideComment): SlideComment => {
       const identity = shown.get(c)!.identity;
       return identity === c.identity ? c : { ...c, identity };

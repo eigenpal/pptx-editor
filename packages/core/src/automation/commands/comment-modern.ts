@@ -30,6 +30,7 @@ import { editable } from './slide-structure.ts';
 import {
   COMMENTS,
   commentTree,
+  modernText,
   findCommentAuthor,
   modernKeyParts,
   modernMark,
@@ -292,7 +293,14 @@ export function findModern(
   batch: OpBatch,
   slidePart: string,
   key: string
-): { part: string; thread: Element; reply?: Element; placed: boolean; group: number } {
+): {
+  part: string;
+  thread: Element;
+  reply?: Element;
+  placed: boolean;
+  group: number;
+  twinTexts: () => string[];
+} {
   const parsed = modernKeyParts(key);
   if (!parsed) throw new CommandRefusal('errors.noComment');
   const { guid, mark, ordinal } = parsed;
@@ -314,7 +322,13 @@ export function findModern(
     const index = hits.findIndex((h) => inGroup(h) && --left === 0);
     if (index < 0) continue;
     const hit = modernHits(editable(batch, part)?.root, guid)[index];
-    if (hit) return { part, ...hit, placed: ordinal !== undefined, group };
+    // The texts of the other comments of the group, as the reader shows them.
+    const twinTexts = (): string[] => {
+      const all = lists.flatMap((l) => l.hits.filter(inGroup));
+      const at = (ordinal ?? 1) - 1;
+      return all.filter((_, i) => i !== at).map((h) => modernText(h.reply ?? h.thread));
+    };
+    if (hit) return { part, ...hit, placed: ordinal !== undefined, group, twinTexts };
     break;
   }
   throw new CommandRefusal('errors.noComment');

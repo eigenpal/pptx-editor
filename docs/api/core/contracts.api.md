@@ -348,6 +348,7 @@ export type CommentCommand =
 export interface CommentExpect {
     readonly author: string;
     readonly date?: string;
+    readonly identity?: string;
     readonly text: string;
 }
 

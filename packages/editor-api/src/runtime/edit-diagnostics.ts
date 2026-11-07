@@ -315,6 +315,11 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'The comment at this id no longer matches expect. Read the comments of the slide again.',
   ],
   [
+    'errors.commentAmbiguous',
+    'edit.comment-ambiguous',
+    'Another comment of the slide has the same author, date, and text, so this id cannot name one of them for sure.',
+  ],
+  [
     'errors.altTextLength',
     'edit.alt-text-length',
     'Alternative text can have up to 4000 characters. Shorten it.',
