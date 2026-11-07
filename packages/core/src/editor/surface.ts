@@ -42,7 +42,7 @@ import { fitZoom, outsideVeil, scrollBoxIntoView } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
 import { selectionAnnouncement } from './surface-announce.ts';
 import { ShapeDrag, type Handle } from './surface-drag.ts';
-import { handleElements, memberOutline } from './surface-handles.ts';
+import { boxOutline, handleElements, memberOutline } from './surface-handles.ts';
 import {
   adjustAt,
   adjustDragLive,
@@ -51,6 +51,8 @@ import {
   type AdjustDrag,
 } from './surface-adjust.ts';
 import type { Relayout } from './drag-preview.ts';
+import * as paint from './surface-paint.ts';
+import { CursorLayer, NextFrame, PAINT_BUDGET, setAttr, setStyle } from './surface-paint.ts';
 
 const EMU_PER_PX = 9_525;
 
@@ -64,6 +66,8 @@ export interface SurfaceHost extends SurfaceInputHost {
   readonly selection: () => EditorSelection;
   readonly readOnly: () => boolean;
   readonly imageUrl: (part: string, rId: string) => string | undefined;
+  /** Changes when the slide paints differently with no edit (`DocumentSession.paintKey`). */
+  readonly paintKey?: () => string | undefined;
   readonly imageSize?: (part: string, rId: string) => { cx: number; cy: number } | undefined;
   readonly label: (key: string, params?: Record<string, string | number>) => string;
   /** The alt text of an element: pictures are named by it, and the live region says it. */
@@ -110,6 +114,10 @@ export class SlideSurface {
   readonly root: HTMLDivElement;
   readonly #stage: HTMLDivElement;
   readonly #overlay: SVGSVGElement;
+  /** The pointer's cursor, on a layer over the slide (surface-paint.ts). */
+  readonly #cursor: CursorLayer;
+  /** The frame that paints the items a paint budget left out (`PAINT_BUDGET`). */
+  readonly #paintRest: NextFrame;
   readonly #input: HTMLTextAreaElement;
   readonly #live: HTMLDivElement;
   readonly #resize: ResizeObserver;
@@ -177,7 +185,9 @@ export class SlideSurface {
     this.#live.className = 'pptx-sr-only';
     this.#live.setAttribute('aria-live', 'polite');
     // The input sits in the stage, on the caret, so an IME candidate window opens there.
-    this.#stage.append(this.#overlay, this.#input);
+    this.#cursor = new CursorLayer(doc);
+    this.#paintRest = new NextFrame(doc.defaultView as Window | null);
+    this.#stage.append(this.#cursor.element, this.#overlay, this.#input);
     this.root.append(this.#stage, this.#live);
     host.append(this.root);
     this.#stage.addEventListener('pointerdown', this.#onPointerDown);
@@ -225,6 +235,7 @@ export class SlideSurface {
     this.#resize.disconnect();
     this.host.removeEventListener('wheel', this.#onWheel);
     this.#unbindInput();
+    this.#paintRest.stop();
     this.root.remove();
   }
 
@@ -293,14 +304,17 @@ export class SlideSurface {
     this.#drag.speak(this.#live, said);
     const w = (layout.slide.width / EMU_PER_PX) * zoom;
     const h = (layout.slide.height / EMU_PER_PX) * zoom;
-    this.#stage.style.width = `${w}px`;
-    this.#stage.style.height = `${h}px`;
+    setStyle(this.#stage, 'width', `${w}px`);
+    setStyle(this.#stage, 'height', `${h}px`);
     if (keep) {
       const st = this.#stage.getBoundingClientRect();
       this.host.scrollLeft += st.left + keep.fx * st.width - keep.client.x;
       this.host.scrollTop += st.top + keep.fy * st.height - keep.client.y;
     }
     const painted = this.editor.paintLayout?.(layout) ?? layout;
+    const paintKey = this.editor.paintKey?.();
+    // Converted pictures, or new faces: paint every item again, the old ones standing in.
+    if (this.#painter?.invalidate(paintKey)) this.#paintKey = null;
     if (this.#paintKey !== painted) {
       this.#paintKey = painted;
       const opts = {
@@ -308,24 +322,25 @@ export class SlideSurface {
         ...(this.editor.altText ? { altText: this.editor.altText } : {}),
       };
       // One painter for the view: an edit paints the items it changed, not the whole slide.
-      if (!this.#painter?.paints(opts))
+      if (!this.#painter?.paints(opts)) {
         this.#painter = new SlidePainter(this.host.ownerDocument, opts);
-      this.#drag.beforeRepaint();
-      const svg = this.#painter.paint(painted);
-      svg.setAttribute('class', 'pptx-surface__slide');
-      const old = this.#stage.querySelector('.pptx-surface__slide');
-      if (old !== svg) {
-        if (old) old.replaceWith(svg);
-        else this.#stage.prepend(svg);
+        this.#painter.invalidate(paintKey);
       }
+      this.#drag.beforeRepaint();
+      const svg = this.#painter.paint(painted, PAINT_BUDGET);
+      // Items left out paint on the next frame, and the painter keeps what it has.
+      if (this.#painter.pending)
+        this.#paintRest.request(() => {
+          if (!this.#painter?.pending) return;
+          this.#paintKey = null;
+          this.render();
+        });
+      paint.placeSlide(this.#stage, svg);
       // A repaint during a drag (a peer's edit to another shape) keeps the preview.
       this.#drag.repainted(layout);
     }
-    for (const svg of [this.#stage.querySelector('.pptx-surface__slide'), this.#overlay]) {
-      svg?.setAttribute('width', String(w));
-      svg?.setAttribute('height', String(h));
-    }
-    this.#overlay.setAttribute('viewBox', `0 0 ${layout.slide.width} ${layout.slide.height}`);
+    paint.sizeAll([this.#stage.querySelector('.pptx-surface__slide'), this.#overlay], w, h);
+    setAttr(this.#overlay, 'viewBox', `0 0 ${layout.slide.width} ${layout.slide.height}`);
     this.#renderOverlay(this.#drag.overlayLayout(layout), zoom);
     if (this.#fitSlide !== `${layout.slide.width}x${layout.slide.height}`) this.#reportFit();
   }
@@ -345,7 +360,7 @@ export class SlideSurface {
     const scopeItem = scope ? itemById(layout, scope) : undefined;
     if (scopeItem) {
       // The entered group's box, dashed.
-      const g = this.#outline(doc, scopeItem, px);
+      const g = boxOutline(doc, scopeItem, px);
       g.firstElementChild?.setAttribute('class', 'pptx-surface__group-outline');
       g.firstElementChild?.setAttribute('stroke-dasharray', `${px * 2} ${px * 2}`);
       parts.push(g);
@@ -365,13 +380,10 @@ export class SlideSurface {
     }
     // A single line is edited by its two end points: no box, no rotation.
     const line = selected.length === 1 && isLineItem(selected[0]) ? lineEnds(selected[0]) : null;
-    for (const item of line ? [] : selected) {
-      // One shape of several: a thin line just outside it, under the common box's handles.
-      if (selected.length > 1) {
-        parts.push(memberOutline(doc, item, px));
-        continue;
-      }
-      const g = this.#outline(doc, item, px * (sel.kind === 'text' ? 1 : 1.5));
+    // One shape of several: a thin line just outside it, under the common box's handles.
+    if (selected.length > 1) parts.push(...selected.map((item) => memberOutline(doc, item, px)));
+    for (const item of line || selected.length > 1 ? [] : selected) {
+      const g = boxOutline(doc, item, px * (sel.kind === 'text' ? 1 : 1.5));
       if (sel.kind === 'text')
         g.firstElementChild?.setAttribute('stroke-dasharray', `${px * 4} ${px * 3}`);
       parts.push(g);
@@ -459,15 +471,35 @@ export class SlideSurface {
     if (key === this.#caretKey) return;
     this.#caretKey = key;
     if (this.#pressed) return;
-    const st = this.#stage.getBoundingClientRect();
-    const box = {
-      left: st.left + Math.min(caret.x1, caret.x2) * scale,
-      right: st.left + Math.max(caret.x1, caret.x2) * scale,
-      top: st.top + Math.min(caret.y1, caret.y2) * scale,
-      bottom: st.top + Math.max(caret.y1, caret.y2) * scale,
+    // Read the stage position at the next frame, where the browser lays out the page anyway. A
+    // read here would force a layout of the whole slide on every keystroke.
+    const pending = !this.#caretScroll;
+    this.#caretScroll = { caret, scale };
+    const view = this.host.ownerDocument.defaultView;
+    if (!pending) return;
+    const scroll = () => {
+      const next = this.#caretScroll;
+      this.#caretScroll = null;
+      if (!next || !this.root.isConnected) return;
+      const c = next.caret;
+      const st = this.#stage.getBoundingClientRect();
+      const box = {
+        left: st.left + Math.min(c.x1, c.x2) * next.scale,
+        right: st.left + Math.max(c.x1, c.x2) * next.scale,
+        top: st.top + Math.min(c.y1, c.y2) * next.scale,
+        bottom: st.top + Math.max(c.y1, c.y2) * next.scale,
+      };
+      scrollBoxIntoView(this.host, box, 32);
     };
-    scrollBoxIntoView(this.host, box, 32);
+    if (view?.requestAnimationFrame) view.requestAnimationFrame(scroll);
+    else scroll();
   }
+
+  /** The caret scroll that waits for the next frame (`#keepCaretInView`). */
+  #caretScroll: {
+    caret: { x1: number; y1: number; x2: number; y2: number };
+    scale: number;
+  } | null = null;
 
   /** A caret in the table cell under `p`, for a right-click; none in view mode. */
   #cellCaret(id: string, p: { x: number; y: number }) {
@@ -482,20 +514,6 @@ export class SlideSurface {
   #cropItem(layout: SlideLayout | undefined): LayoutItem | undefined {
     const id = this.editor.readOnly() ? null : this.editor.cropping?.();
     return id ? itemById(layout, id) : undefined;
-  }
-
-  /** An item's box outline in slide space. */
-  #outline(doc: Document, item: LayoutItem, width: number): SVGGElement {
-    const { cx, cy } = item.element.xfrm;
-    const g = doc.createElementNS(SVG_NS, 'g') as SVGGElement;
-    g.setAttribute('transform', `matrix(${item.matrix.join(' ')})`);
-    const rect = doc.createElementNS(SVG_NS, 'rect');
-    rect.setAttribute('class', 'pptx-surface__outline');
-    rect.setAttribute('width', String(cx));
-    rect.setAttribute('height', String(Math.max(cy, 1)));
-    rect.setAttribute('stroke-width', String(width));
-    g.append(rect);
-    return g;
   }
 
   /** Pointer position in slide EMU. */
@@ -724,7 +742,7 @@ export class SlideSurface {
   #updateCursor(p: { x: number; y: number }): void {
     // The format painter's brush comes from the stylesheet (`pptx-surface--painting`).
     if (this.editor.painting?.()) {
-      this.#stage.style.cursor = '';
+      this.#setCursor('', p);
       return;
     }
     const layout = this.editor.layout();
@@ -738,7 +756,7 @@ export class SlideSurface {
       (crop && onCropImage(crop, p)) ||
       (selectedItem && !this.editor.readOnly() && this.#onBorder(selectedItem, p))
     ) {
-      if (this.#stage.style.cursor !== 'move') this.#stage.style.cursor = 'move';
+      this.#setCursor('move', p);
       return;
     }
     const id = (scope ? this.#hit(p, scope) : undefined) ?? this.#hit(p);
@@ -755,7 +773,14 @@ export class SlideSurface {
               ? 'pointer'
               : 'default'
             : 'move';
-    if (this.#stage.style.cursor !== cursor) this.#stage.style.cursor = cursor;
+    this.#setCursor(cursor, p);
+  }
+
+  /** Show `cursor` at slide point `p`, also past the slide's edge (`CursorLayer.show`). */
+  #setCursor(cursor: string, p: { x: number; y: number }): void {
+    const slide = this.editor.layout()?.slide;
+    const outside = !slide || p.x < 0 || p.y < 0 || p.x > slide.width || p.y > slide.height;
+    this.#cursor.show(cursor, this.#stage.querySelector('.pptx-surface__slide'), outside);
   }
 
   /** The point is on linked text of `item`, where a viewer's click opens the link panel. */

@@ -335,6 +335,18 @@ export function materialize(spec: NodeSpec, parentKind: Element_2['kind'] | null
 }, depth?: number): Element_2;
 
 // @public
+export type MetafileFormat = 'emf' | 'wmf';
+
+// @public
+export function metafileFormat(bytes: Uint8Array): MetafileFormat | undefined;
+
+// @public
+export function metafileSizeEmu(bytes: Uint8Array): {
+    cx: number;
+    cy: number;
+} | undefined;
+
+// @public
 export interface NamespaceDecl {
     // (undocumented)
     readonly prefix: string;
@@ -414,6 +426,8 @@ export interface OpenTransaction {
     element(part: string, id: string): Element_2 | undefined;
     finish(): PptxPackage;
     nextId(part: string): number | undefined;
+    parentId(part: string, id: string): string | null | undefined;
+    peek(part: string, id: string): Element_2 | undefined;
 }
 
 // @internal

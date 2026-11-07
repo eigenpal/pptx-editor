@@ -24,9 +24,12 @@ export function slidePart(ctx: CommandContext): string {
   return ref.partName;
 }
 
-/** Selected shape ids (text selection counts as its shape). */
+/**
+ * Selected shape ids (text selection counts as its shape), each once: a command that edits a
+ * shape twice in one pass could write one bullet twice.
+ */
 export function selectedIds(selection: EditorSelection): string[] {
-  if (selection.kind === 'shapes') return [...selection.nodeIds];
+  if (selection.kind === 'shapes') return [...new Set(selection.nodeIds)];
   if (selection.kind === 'text' || selection.kind === 'cells') return [selection.nodeId];
   return [];
 }
@@ -74,6 +77,38 @@ export function listTarget(
   return { shapeId: t.shapeId, txBodyId: t.txBodyId, paragraphs };
 }
 
+/**
+ * The list targets that a check reads: at most {@link PROBE_TEXT_LIMIT} paragraphs in all for
+ * a probe, as `forParagraphs` does, and every one otherwise.
+ */
+export function probeLists(
+  batch: OpBatch,
+  part: string,
+  ctx: CommandContext,
+  targets: readonly Parameters<typeof listTarget>[2][]
+): ListTarget[] {
+  const lists = targets.map((t) => listTarget(batch, part, t));
+  if (!ctx.probe) return lists;
+  let left = PROBE_TEXT_LIMIT;
+  const out: ListTarget[] = [];
+  for (const t of lists) {
+    if (left <= 0) break;
+    out.push({ ...t, paragraphs: t.paragraphs.slice(0, left) });
+    left -= t.paragraphs.length;
+  }
+  return out;
+}
+
+/** `refitTargets` for the shapes `ids`. */
+export function refitIds(
+  batch: OpBatch,
+  ctx: CommandContext,
+  part: string,
+  ids: readonly string[]
+): void {
+  if (!ctx.probe) refitAll(batch, ctx.slide, part, ids, ctx.session.measurer);
+}
+
 /** Re-fit autofit text after an edit, unless the context only probes. */
 export function refitShape(
   batch: OpBatch,
@@ -99,6 +134,14 @@ export function refitTargets(
   refitAll(batch, ctx.slide, part, ids, ctx.session.measurer);
 }
 
+/**
+ * The runs or paragraphs that a probe (`can`) formats at most. Each toolbar button probes its
+ * command on every change, and a probe of every run of a 50,000-run text takes a second per
+ * button. No step on one run or paragraph refuses: a refusal comes from the targets, which the
+ * probe still checks in full. The command itself (`exec`) formats every run.
+ */
+export const PROBE_TEXT_LIMIT = 64;
+
 export function forRuns(
   batch: OpBatch,
   part: string,
@@ -108,8 +151,12 @@ export function forRuns(
 ): void {
   const targets = textTargets(batch, part, ctx.selection);
   const word = wordAtCaret && !ctx.caretArm;
+  let left = ctx.probe ? PROBE_TEXT_LIMIT : Infinity;
   for (const t of targets)
-    for (const run of runsForFormatting(batch, part, t.txBodyId, t.range, word)) apply(run);
+    for (const run of runsForFormatting(batch, part, t.txBodyId, t.range, word)) {
+      if (left-- <= 0) break;
+      apply(run);
+    }
   refitTargets(batch, ctx, part, targets);
 }
 
@@ -120,8 +167,11 @@ export function forParagraphs(
   apply: (pPrId: string) => void
 ): void {
   const targets = textTargets(batch, part, ctx.selection);
+  let left = ctx.probe ? PROBE_TEXT_LIMIT : Infinity;
   for (const t of targets)
-    for (const pId of paragraphsForFormatting(batch, part, t.txBodyId, t.range))
+    for (const pId of paragraphsForFormatting(batch, part, t.txBodyId, t.range)) {
+      if (left-- <= 0) break;
       apply(ensureParagraphProps(batch, part, pId));
+    }
   refitTargets(batch, ctx, part, targets);
 }

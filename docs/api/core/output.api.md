@@ -70,6 +70,12 @@ export function lumTransfer(bright: number, contrast: number): {
     readonly intercept: number;
 };
 
+// @internal
+export const MAX_METAFILE_RASTER_EDGE = 4096;
+
+// @internal
+export function metafilePng(bytes: Uint8Array, fonts?: readonly Uint8Array[], signal?: AbortSignal): Promise<Uint8Array | null | undefined>;
+
 // @public
 export interface PaintContext {
     // (undocumented)
@@ -114,8 +120,11 @@ export function serializeSvgElement(root: Element): string;
 // @internal
 export class SlidePainter {
     constructor(doc: Document, opts: PaintOptions);
-    paint(layout: SlideLayout): SVGSVGElement;
+    get idPrefix(): string;
+    invalidate(key: unknown): boolean;
+    paint(layout: SlideLayout, budget?: number): SVGSVGElement;
     paints(opts: PaintOptions): boolean;
+    get pending(): boolean;
 }
 
 // @internal

@@ -56,6 +56,8 @@ export function probableCause(r: SlideResult, diagnostics: readonly string[]): s
     causes.push('unrendered graphic frame (chart, diagrams, OLE)');
   if (diagnostics.some((d) => d.startsWith('unknown preset')))
     causes.push('unknown preset geometry');
+  if (diagnostics.some((d) => d.startsWith('picture not converted')))
+    causes.push('an EMF or WMF picture did not convert');
   const effects = tagged(diagnostics, 'effect not rendered: ');
   if (effects.length) causes.push(`effect not rendered (${effects.join(', ')})`);
   const lines = lineCauses(r);

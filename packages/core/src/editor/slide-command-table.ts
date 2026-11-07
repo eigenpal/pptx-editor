@@ -8,7 +8,7 @@ import { importSlides } from '../automation/commands/slide-import.ts';
 import { normalizePresentation } from '../automation/commands/slide-sections.ts';
 import { MAX_IMPORT_BYTES } from '../automation/plan-import.ts';
 import type { EditorCommand } from '../contracts/index.ts';
-import { refit } from '../automation/commands/autofit.ts';
+import { refitAll as refitEach } from '../automation/commands/autofit.ts';
 import type { CommandContext, CommandEffect } from './commands.ts';
 import { CommandRefusal, type OpBatch } from '../automation/commands/op-batch.ts';
 import { formatNotes } from '../automation/commands/notes-commands.ts';
@@ -174,7 +174,7 @@ export function compileSlideCommand(
   const refitAll = (index: number, ids: readonly string[]): void => {
     if (ctx.probe) return;
     const part = presentationInfo(batch.pkg).slides[index]!.partName;
-    for (const id of ids) refit(batch, index, part, id, ctx.session.measurer);
+    refitEach(batch, index, part, ids, ctx.session.measurer);
   };
   switch (command.type) {
     case 'applyLayout': {

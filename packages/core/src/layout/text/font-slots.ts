@@ -86,7 +86,18 @@ export interface SlotPiece {
 export function fontSlotPieces(
   text: string,
   props: Pick<RunProps, 'lang' | 'altLang' | 'sym'>
-): SlotPiece[] {
+): readonly SlotPiece[] {
+  // The `normAutofit` search lays out the same runs at each step: split each text once.
+  const kept = piecesOf.get(props);
+  if (kept?.text === text) return kept.pieces;
+  const pieces = splitSlots(text, props);
+  piecesOf.set(props, { text, pieces });
+  return pieces;
+}
+
+const piecesOf = new WeakMap<object, { text: string; pieces: readonly SlotPiece[] }>();
+
+function splitSlots(text: string, props: Pick<RunProps, 'lang' | 'altLang' | 'sym'>): SlotPiece[] {
   const eastAsianText =
     eastAsianScriptOf(props.lang) !== undefined || eastAsianScriptOf(props.altLang) !== undefined;
   const symbol = props.sym !== undefined;
@@ -109,27 +120,30 @@ export function fontSlotPieces(
     i += len;
   }
   // A space between two complex-script characters takes their slot; any other space is Latin.
-  for (let i = 0; i < text.length; i += 1) {
-    if (slots[i] !== null || isSpace(text.charCodeAt(i)) === false) continue;
-    let before: FontSlot | null = null;
-    for (let j = i - 1; j >= 0 && before === null; j -= 1)
-      if (!isSpace(text.charCodeAt(j))) before = slots[j];
-    let after: FontSlot | null = null;
-    for (let j = i + 1; j < text.length && after === null; j += 1)
-      if (!isSpace(text.charCodeAt(j))) after = slots[j];
-    // East Asian text takes the Latin space (reference PDF of `east-asian-theme-fonts`).
-    slots[i] = before === 'cs' && after === 'cs' ? 'cs' : 'latin';
+  // One pass each way finds the nearest slot before and after every run of spaces, so a long
+  // run of spaces costs its length once.
+  const after: (FontSlot | null)[] = new Array<FontSlot | null>(text.length).fill(null);
+  for (let i = text.length - 1, next: FontSlot | null = null; i >= 0; i -= 1) {
+    after[i] = next;
+    if (!isSpace(text.charCodeAt(i))) next = slots[i] ?? next;
+  }
+  for (let i = 0, before: FontSlot | null = null; i < text.length; i += 1) {
+    if (slots[i] === null && isSpace(text.charCodeAt(i)))
+      // East Asian text takes the Latin space (reference PDF of `east-asian-theme-fonts`).
+      slots[i] = before === 'cs' && after[i] === 'cs' ? 'cs' : 'latin';
+    else if (!isSpace(text.charCodeAt(i))) before = slots[i] ?? before;
   }
   const out: SlotPiece[] = [];
+  let pieceStart = 0;
+  let pieceSlot: FontSlot | null = null;
   for (let i = 0; i < text.length; i += 1) {
     const slot = slots[i];
-    if (slot === null) continue; // a low surrogate
-    const prev = out[out.length - 1];
-    if (prev && prev.slot === slot && prev.end === i) {
-      const end = i + ((text.codePointAt(i) ?? 0) > 0xffff ? 2 : 1);
-      out[out.length - 1] = { start: prev.start, end, slot };
-    } else out.push({ start: i, end: i + ((text.codePointAt(i) ?? 0) > 0xffff ? 2 : 1), slot });
+    if (slot === null || slot === pieceSlot) continue; // a low surrogate, or the same slot
+    if (pieceSlot !== null) out.push({ start: pieceStart, end: i, slot: pieceSlot });
+    pieceStart = i;
+    pieceSlot = slot;
   }
+  if (pieceSlot !== null) out.push({ start: pieceStart, end: text.length, slot: pieceSlot });
   return out;
 }
 

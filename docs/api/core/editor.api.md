@@ -1260,9 +1260,21 @@ export class DocumentSession {
         reason: 'xml';
     }>) => void) | null;
     // @internal
+    onPictures: (() => void) | null;
+    // @internal
     opening: ProgressiveOpen | null;
     // @internal
+    get paintGeneration(): string;
+    // @internal
+    paintKey(slide: string | undefined): string;
+    // @internal
     parsedAt: number;
+    // @internal
+    picture(target: string): DrawablePicture | undefined;
+    // @internal
+    readonly pictures: MetafilePictures;
+    picturesReady(index?: number, options?: PicturesWait): Promise<boolean>;
+    pictureStatus(index?: number): PictureStatus[];
     // @internal
     probeBatch(base?: PptxPackage): OpBatch;
     // @internal
@@ -2453,6 +2465,12 @@ export function fontNoticeFamilies(substituted: readonly {
     readonly metricCompatible: boolean;
 }[]): string[];
 
+// @internal
+export function fontNoticeList(families: readonly string[], t: (key: 'fonts.more', params: {
+    families: string;
+    count: number;
+}) => string): string;
+
 // @public
 export type FontOrigin = FontConfiguration | FontConfigurationFragment | MarkedFontResolver | Promise<FontConfiguration | FontConfigurationFragment | undefined> | undefined;
 
@@ -3571,6 +3589,11 @@ export class OpBatch {
     mintedOf(kind: MintedIdKind): Set<number>;
     // (undocumented)
     readonly ops: PptxOp[];
+    parentId(part: string, id: string): string | undefined;
+    parentKind(part: string, id: string): {
+        id: string;
+        kind: string;
+    } | undefined;
     get pkg(): PptxPackage;
     push(op: PptxOp): void;
     pushAll(ops: readonly PptxOp[]): void;
@@ -3945,6 +3968,18 @@ export function picturePropertiesDraftFrom(picture: (Pick<SelectedImageState, 'w
 
 // @internal
 export function picturePropertiesWithValue(fields: PicturePropertiesDraftFields, field: 'width' | 'height', value: number, initial: PicturePropertiesDraftFields): PicturePropertiesDraftFields;
+
+// @public
+export interface PictureStatus {
+    readonly part: string;
+    readonly state: 'ready' | 'pending' | 'failed' | 'timed-out';
+}
+
+// @public
+export interface PicturesWait {
+    readonly retry?: boolean;
+    readonly timeoutMs?: number;
+}
 
 // @internal
 export function placeInFixedFrame<T extends FixedPoint>(host: Element | null | undefined, size: FixedSize, place: (size: FixedSize, view: FixedView) => T): T;
@@ -4905,6 +4940,7 @@ export function slideDropMarker(drag: SlideDrag | null, index: number): SlideDra
 // @public
 export interface SlideImageOptions {
     readonly frameLabel?: (kind: string) => string;
+    readonly picturesTimeoutMs?: number;
     readonly width?: number;
 }
 

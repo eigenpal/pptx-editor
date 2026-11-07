@@ -80,15 +80,25 @@ export function unionBounds(items: readonly LayoutItem[]): {
 
 /** Find an item anywhere in the tree by node id. */
 export function findItem(items: readonly LayoutItem[], id: string): LayoutItem | undefined {
-  for (const item of items) {
-    if (item.element.nodeId === id) return item;
-    if (item.kind === 'group') {
-      const hit = findItem(item.children, id);
-      if (hit) return hit;
+  let byId = itemsById.get(items);
+  if (!byId) {
+    // One walk per item list: a command on thousands of selected shapes looks each one up.
+    // The first item with an id wins, as an in-order search finds it.
+    byId = new Map();
+    const stack: LayoutItem[] = [...items].reverse();
+    while (stack.length > 0) {
+      const item = stack.pop()!;
+      if (!byId.has(item.element.nodeId)) byId.set(item.element.nodeId, item);
+      if (item.kind === 'group')
+        for (let i = item.children.length - 1; i >= 0; i -= 1) stack.push(item.children[i]!);
     }
+    itemsById.set(items, byId);
   }
-  return undefined;
+  return byId.get(id);
 }
+
+/** The items of each laid-out item list by node id (`findItem`). Lists never change. */
+const itemsById = new WeakMap<readonly LayoutItem[], Map<string, LayoutItem>>();
 
 /** The items of a selection scope: the slide's top level, or a group's children. */
 export function scopeItems(

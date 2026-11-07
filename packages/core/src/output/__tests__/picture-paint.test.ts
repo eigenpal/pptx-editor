@@ -95,6 +95,42 @@ describe('picture paint', () => {
   });
 });
 
+describe('a picture the paint cannot draw', () => {
+  /** A slide with an ellipse whose picture fill names `rId`, and a picture of `rId`. */
+  function slide(rId: string): SVGSVGElement {
+    const blipFill = `<a:blipFill><a:blip r:embed="${rId}"/><a:stretch><a:fillRect/></a:stretch></a:blipFill>`;
+    const box = '<a:xfrm><a:off x="914400" y="914400"/><a:ext cx="1828800" cy="914400"/></a:xfrm>';
+    const r = readPptx(
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes:
+              '<p:sp><p:nvSpPr><p:cNvPr id="2" name="S"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>' +
+              `<p:spPr>${box}<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>${blipFill}</p:spPr></p:sp>` +
+              '<p:pic><p:nvPicPr><p:cNvPr id="3" name="P"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>' +
+              `${blipFill.replace(/a:blipFill/g, 'p:blipFill')}` +
+              `<p:spPr>${box}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`,
+          },
+        ],
+      })
+    );
+    if (!r.ok) throw new Error('open failed');
+    const layout = layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer());
+    // The image resolver has no image for the relationship: missing or damaged.
+    return paintSlide(doc, layout, { images: () => undefined, idPrefix: 't' });
+  }
+
+  test('a shape with a picture fill draws the picture placeholder in its geometry', () => {
+    const svg = slide('rIdNone');
+    const shape = svg.querySelector('[data-kind="shape"] path')!;
+    expect(shape.getAttribute('d')).toContain('C');
+    expect(shape.getAttribute('fill')).toBe('#e8e8e8');
+    const picture = svg.querySelector('[data-kind="picture"] rect')!;
+    expect(picture.getAttribute('fill')).toBe('#e8e8e8');
+  });
+});
+
 describe('picture accessibility', () => {
   /** Three pictures: P with a description, D decorative, N with a blank one; and a shape S. */
   function layout() {

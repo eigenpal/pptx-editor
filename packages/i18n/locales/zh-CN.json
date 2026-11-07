@@ -1036,6 +1036,7 @@
   },
   "fonts": {
     "notice": "此演示文稿中的部分字体不可用，因此显示为替代字体：{families}。",
+    "more": "{families} 及另外 {count} 种",
     "useLocal": "使用此计算机上的字体",
     "dismiss": "忽略",
     "localNone": "这些字体均未安装在此计算机上。",

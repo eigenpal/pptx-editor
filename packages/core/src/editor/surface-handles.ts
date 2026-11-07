@@ -113,3 +113,17 @@ export function memberOutline(doc: Document, item: LayoutItem, px: number): SVGG
   g.append(rect);
   return g;
 }
+
+/** An item's box outline in slide space, `width` wide. */
+export function boxOutline(doc: Document, item: LayoutItem, width: number): SVGGElement {
+  const { cx, cy } = item.element.xfrm;
+  const g = doc.createElementNS(SVG_NS, 'g') as SVGGElement;
+  g.setAttribute('transform', `matrix(${item.matrix.join(' ')})`);
+  const rect = doc.createElementNS(SVG_NS, 'rect');
+  rect.setAttribute('class', 'pptx-surface__outline');
+  rect.setAttribute('width', String(cx));
+  rect.setAttribute('height', String(Math.max(cy, 1)));
+  rect.setAttribute('stroke-width', String(width));
+  g.append(rect);
+  return g;
+}

@@ -116,17 +116,17 @@ function idOf(value: unknown): string {
 
 /**
  * A string that changes whenever slide `index` may render differently: its dependencies, or
- * the font generation (`DocumentSession.setHostFaces` re-measures every slide).
+ * its paint key (`DocumentSession.paintKey`: new faces, or its converted pictures).
  */
 export function renderKey(
   pkg: PptxPackage,
   index: number,
-  fontGeneration: number,
+  generation: number | string,
   parts?: string[]
 ): string | undefined {
   const deps = slideDependencies(pkg, index, parts);
   if (!deps) return undefined;
-  let key = `f${fontGeneration}`;
+  let key = `f${generation}`;
   for (const d of deps) key += `.${idOf(d)}`;
   return key;
 }

@@ -159,6 +159,23 @@ describe('font slots', () => {
     expect(fontSlotPieces('が', props()).map((p) => p.slot)).toEqual(['ea']);
   });
 
+  test('a long run of spaces takes the slot of its neighbors in one pass', () => {
+    const spaces = ' '.repeat(200_000);
+    const start = performance.now();
+    const pieces = fontSlotPieces(`نص${spaces}عربي a${spaces}`, props());
+    // A scan to the neighbors from each space took minutes for this length.
+    expect(performance.now() - start).toBeLessThan(1000);
+    expect(pieces.map((p) => p.slot)).toEqual(['cs', 'latin']);
+    expect(pieces[0]).toEqual({ start: 0, end: 200_006, slot: 'cs' });
+  });
+
+  test('the same run props with another text give the slots of that text', () => {
+    const shared = props();
+    expect(fontSlotPieces('ab', shared).map((p) => p.slot)).toEqual(['latin']);
+    expect(fontSlotPieces('日本', shared).map((p) => p.slot)).toEqual(['ea']);
+    expect(fontSlotPieces('ab', shared).map((p) => p.slot)).toEqual(['latin']);
+  });
+
   test('symbol characters stay Latin when the run names no a:sym face', () => {
     expect(fontSlotPieces('', props()).map((p) => p.slot)).toEqual(['latin']);
   });

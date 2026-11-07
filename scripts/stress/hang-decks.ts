@@ -2,53 +2,27 @@
 // aimed at a loop, a recursion, or a size that an untrusted file controls. `hang-check.ts`
 // opens, lays out, and paints each one with a time budget.
 
-import { zipSync, strFromU8, strToU8, unzipSync } from 'fflate';
+import { zipSync, strToU8, unzipSync } from 'fflate';
 import { buildPptx, cell, para, run, shape, solid, table } from '../fixtures/builder.ts';
+import {
+  IN,
+  LOREM,
+  MC_NS,
+  P_NS,
+  R_NS,
+  blipFill,
+  box,
+  one,
+  patched,
+  placeholder,
+  range,
+  SLIDE,
+  tableRows,
+  type HangDeck,
+} from './deck-parts.ts';
+import { uiScaleDecks } from './ui-scale-decks.ts';
 
-const IN = 914_400;
-const LOREM =
-  'Quarterly results show steady growth across every region, with margins ahead of plan. ';
-
-/** One deck of the set. */
-export interface HangDeck {
-  readonly id: string;
-  /** What the deck tries to break. */
-  readonly target: string;
-  readonly bytes: () => Uint8Array;
-  /** Open with a font origin that never answers, as a stalled font download does. */
-  readonly stalledFonts?: boolean;
-  /** This deck's slow mark in milliseconds, for a deck whose linear work is large. */
-  readonly slowMs?: number;
-}
-
-const one = (shapes: string, extra: Parameters<typeof buildPptx>[0] = { slides: [] }) =>
-  buildPptx({ ...extra, slides: [{ shapes }] });
-
-const box = (id: number, text: string, o: Partial<Parameters<typeof shape>[0]> = {}) =>
-  shape({ id, x: IN, y: IN, cx: 6 * IN, cy: 3 * IN, text, ...o });
-
-/** The parts of a built deck, to edit: read a part's text, set it, or add a one-byte part. */
-interface DeckParts {
-  get(name: string): string;
-  set(name: string, xml: string): void;
-  bin(name: string): void;
-}
-
-/** `bytes` with its parts edited by `edit`. */
-function patched(bytes: Uint8Array, edit: (parts: DeckParts) => void): Uint8Array {
-  const files = unzipSync(bytes);
-  edit({
-    get: (name) => strFromU8(files[name]!),
-    set: (name, xml) => void (files[name] = strToU8(xml)),
-    bin: (name) => void (files[name] = new Uint8Array([0])),
-  });
-  return zipSync(files);
-}
-
-const P_NS = 'http://schemas.openxmlformats.org/presentationml/2006/main';
-const MC_NS = 'http://schemas.openxmlformats.org/markup-compatibility/2006';
-const R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
-const range = (n: number): number[] => Array.from({ length: n }, (_, i) => i);
+export type { HangDeck } from './deck-parts.ts';
 
 /** `n` slide list entries, each with slide id `id(i)`, to its own one-byte part. */
 function slideIdDeck(n: number, id: (i: number) => string): Uint8Array {
@@ -71,13 +45,6 @@ function slideIdDeck(n: number, id: (i: number) => string): Uint8Array {
     f.set(pres, f.get(pres).replace('</p:sldIdLst>', `${ids}</p:sldIdLst>`));
   });
 }
-
-/** A placeholder shape of `type` with `idx`. */
-const placeholder = (id: number, type: string, idx: number): string =>
-  `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="P${id}"/><p:cNvSpPr/><p:nvPr><p:ph type="${type}" idx="${idx}"/></p:nvPr></p:nvSpPr>` +
-  '<p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="en-US"/><a:t>x</a:t></a:r></a:p></p:txBody></p:sp>';
-
-const SLIDE = 'ppt/slides/slide1.xml';
 
 const NOFIT = '<a:bodyPr wrap="square"><a:noAutofit/></a:bodyPr>';
 const NORM = '<a:bodyPr wrap="square"><a:normAutofit/></a:bodyPr>';
@@ -128,8 +95,6 @@ function pngHeader(w: number, h: number): Uint8Array {
   return b;
 }
 
-const blipFill = (extra: string) => `<a:blipFill><a:blip r:embed="rIdImg"/>${extra}</a:blipFill>`;
-
 function pictureShape(fill: string): string {
   return (
     `<p:sp><p:nvSpPr><p:cNvPr id="2" name="Tile"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>` +
@@ -167,12 +132,6 @@ const manyShapes = (n: number) =>
       fill: solid('4472C4'),
       text: para(run(String(i), 'sz="400"')),
     })
-  ).join('');
-
-const tableRows = (rows: number, cols: number, text = 'x') =>
-  Array.from(
-    { length: rows },
-    () => `<a:tr h="${IN / 10}">${Array.from({ length: cols }, () => cell(text)).join('')}</a:tr>`
   ).join('');
 
 const grid = (cols: number) => Array.from({ length: cols }, () => Math.floor((11 * IN) / cols));
@@ -719,4 +678,8 @@ export const HANG_DECKS: readonly HangDeck[] = [
     bytes: () =>
       buildPptx({ slides: [{ shapes: box(2, para(run('notes'))), notes: LOREM.repeat(5_800) }] }),
   },
+  // Sizes that the editor UI reads on every change: the toolbar state, the slide panel, the
+  // layout menu, the selection, and the live region. Each one must open and edit in the
+  // browser without a long freeze (`e2e/hang.bench.ts`).
+  ...uiScaleDecks(),
 ];

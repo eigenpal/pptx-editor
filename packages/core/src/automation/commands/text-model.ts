@@ -65,6 +65,8 @@ export interface Slot {
   readonly start: number;
   readonly end: number;
   readonly text: string;
+  /** The item's place among the paragraph's children. */
+  readonly index: number;
 }
 
 const A = NS.a;
@@ -89,10 +91,32 @@ export function paragraphsOf(txBody: Element): Element[] {
  * Inline items of a paragraph with offsets. Pass the slide number for a paragraph on a slide,
  * so a `slidenum` field is as long as the number layout shows.
  */
-export function slotsOf(p: Element, slideNumber?: number): Slot[] {
+export function slotsOf(p: Element, slideNumber?: number): readonly Slot[] {
+  // An element never changes once read, so its slots are found once: a caret probe reads the
+  // slots of its paragraph several times, and a paragraph can hold 50,000 runs.
+  return slotTable(p, slideNumber).slots;
+}
+
+/** The slots of a paragraph, and the child index after its last `a:pPr` (0 for none). */
+interface SlotTable {
+  readonly key: number;
+  readonly slots: readonly Slot[];
+  readonly afterProps: number;
+}
+
+const slotCache = new WeakMap<Element, SlotTable>();
+
+function slotTable(p: Element, slideNumber?: number): SlotTable {
+  const key = slideNumber ?? -1;
+  const kept = slotCache.get(p);
+  if (kept?.key === key) return kept;
   const out: Slot[] = [];
+  let afterProps = 0;
   let at = 0;
-  for (const el of elements(p)) {
+  for (let index = 0; index < p.children.length; index += 1) {
+    const el = p.children[index]!;
+    if (el.type !== 'element') continue;
+    if (el.local === 'pPr') afterProps = index + 1;
     if (el.kind === 'run' || el.kind === 'field') {
       const text = slotText(el, slideNumber);
       out.push({
@@ -101,14 +125,17 @@ export function slotsOf(p: Element, slideNumber?: number): Slot[] {
         start: at,
         end: at + text.length,
         text,
+        index,
       });
       at += text.length;
     } else if (el.kind === 'break') {
-      out.push({ el, kind: 'break', start: at, end: at + 1, text: '\n' });
+      out.push({ el, kind: 'break', start: at, end: at + 1, text: '\n', index });
       at += 1;
     }
   }
-  return out;
+  const table = { key, slots: out, afterProps };
+  slotCache.set(p, table);
+  return table;
 }
 
 export function paragraphLength(p: Element, slideNumber?: number): number {
@@ -174,17 +201,17 @@ function rPrSpecAt(p: Element, offset: number, slideNumber: number | undefined):
 
 /** Index in the paragraph's children where inline content at `offset` starts. */
 function childIndexForOffset(p: Element, offset: number, slideNumber: number | undefined): number {
-  // By element id, built once: a find for each child made a long paragraph quadratic.
-  const slots = new Map(slotsOf(p, slideNumber).map((s) => [s.el.id, s] as const));
-  let index = 0;
-  for (let i = 0; i < p.children.length; i += 1) {
-    const c = p.children[i];
-    if (c.type !== 'element') continue;
-    if (c.local === 'pPr') index = i + 1;
-    const slot = slots.get(c.id);
-    if (slot && slot.end <= offset) index = i + 1;
+  // After the last item that ends at `offset` or before, and after `a:pPr`. Slot ends never
+  // decrease, so those items come first: a binary search finds the last one.
+  const { slots, afterProps } = slotTable(p, slideNumber);
+  let lo = 0;
+  let hi = slots.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (slots[mid]!.end <= offset) lo = mid + 1;
+    else hi = mid;
   }
-  return index;
+  return Math.max(afterProps, lo > 0 ? slots[lo - 1]!.index + 1 : 0);
 }
 
 /**
@@ -202,7 +229,7 @@ export function splitRunAt(batch: OpBatch, part: string, pId: string, offset: nu
   const cut = offset - slot.start;
   batch.push({ op: 'setText', part, node: t.id, text: slot.text.slice(0, cut) });
   const rPr = child(slot.el, 'a:rPr');
-  const index = p.children.findIndex((c) => c.id === slot.el.id) + 1;
+  const index = slot.index + 1;
   batch.insert({
     op: 'insertNode',
     part,

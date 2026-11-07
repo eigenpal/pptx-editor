@@ -10,6 +10,7 @@ export {
 } from './paint.ts';
 export type { ImageSizePort, ImageUrlPort, PaintContext } from './paint-fill.ts';
 export { STORED_PIXELS_STYLE } from './paint-fill.ts';
+export { metafilePng, MAX_METAFILE_RASTER_EDGE } from './metafile-png.ts';
 // Internal: the pure rules that `pptx-to-pdf` and `pro/drawing` share with this paint.
 export {
   adjustForPathMode,

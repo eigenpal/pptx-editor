@@ -15,6 +15,8 @@ import {
   parseXmlPart,
   REL,
   specOf,
+  nodeIndex,
+  xmlPartOf,
   type Element,
   type NodeSpec,
 } from '../../store/index.ts';
@@ -320,42 +322,68 @@ export function insertImage(
  * duplicated with the shapes it glues to stays glued to their copies.
  */
 export function duplicateShapes(batch: OpBatch, part: string, ids: readonly string[]): string[] {
-  const out: string[] = [];
   const sources = ids.map((id) => batch.element(part, id));
   const { specs } = renumberShapes(
     sources.map((el) => specOf(el)),
     shapeIds(batch, spTreeOf(batch, part))
   );
-  for (const [i, el] of sources.entries()) {
-    const tree = parentOf(batch, part, el.id);
-    const index = tree.children.findIndex((c) => c.id === el.id) + 1;
-    const newId = batch.insert({
+  // Each copy goes right above its original. The places come from the slide before any insert,
+  // and the inserts run from the last place in each parent to the first, so every place stays
+  // valid and no insert reads the slide: Duplicate of thousands of shapes stays linear.
+  const xml = xmlPartOf(batch.pkg, part);
+  const index = xml ? nodeIndex(xml) : undefined;
+  const places = sources.map((el, i) => {
+    const loc = index?.get(el.id);
+    if (!loc || loc.parent === null) throw new CommandRefusal('errors.unsupported', el.id);
+    return { i, parent: loc.parent, at: loc.index + 1 };
+  });
+  places.sort((x, y) => (x.parent === y.parent ? y.at - x.at : x.parent < y.parent ? -1 : 1));
+  const out: string[] = new Array<string>(sources.length);
+  for (const { i, parent, at } of places)
+    out[i] = batch.insert({
       op: 'insertNode',
       part,
-      parent: tree.id,
-      index,
-      spec: specs[i],
+      parent,
+      index: at,
+      spec: shiftedCopy(sources[i]!, specs[i]!),
     });
-    const copy = batch.element(part, newId);
-    const host = transformHost(copy);
-    const off = host
-      ? child(el.kind === 'graphicFrame' ? child(copy, 'p:xfrm') : child(host, 'a:xfrm'), 'a:off')
-      : undefined;
-    if (off) {
-      const shift = (name: string): void =>
-        batch.push({
-          op: 'setAttribute',
-          part,
-          node: off.id,
-          name: { ns: '', local: name },
-          value: coordinate((Number(attr(off, name)) || 0) + 228_600, name),
-        });
-      shift('x');
-      shift('y');
-    }
-    out.push(newId);
-  }
   return out;
+}
+
+/** The offset a duplicate moves by: 0.25 in down and to the right. */
+const DUPLICATE_SHIFT = 228_600;
+
+/** `spec`, the copy of `el`, with its `a:off` moved by {@link DUPLICATE_SHIFT}. */
+function shiftedCopy(el: Element, spec: NodeSpec): NodeSpec {
+  const host = transformHost(el);
+  const xfrm = el.kind === 'graphicFrame' ? child(el, 'p:xfrm') : child(host, 'a:xfrm');
+  const off = child(xfrm, 'a:off');
+  if (!host || !xfrm || !off) return spec;
+  // The spec's children follow the element's children, so the same positions lead to `a:off`.
+  const chain = host === el ? [el, xfrm, off] : [el, host, xfrm, off];
+  const path = chain.slice(1).map((node, k) => chain[k]!.children.indexOf(node));
+  const moved = (name: string) => ({
+    ns: '',
+    local: name,
+    value: coordinate((Number(attr(off, name)) || 0) + DUPLICATE_SHIFT, name),
+  });
+  const shift = (s: NodeSpec): NodeSpec => ({
+    ...s,
+    attrs: [
+      ...(s.attrs ?? []).filter((a) => !(a.ns === '' && (a.local === 'x' || a.local === 'y'))),
+      moved('x'),
+      moved('y'),
+    ],
+  });
+  const walk = (s: NodeSpec, depth: number): NodeSpec => {
+    if (depth === path.length) return shift(s);
+    const kids = (s.children ?? []).slice();
+    const kid = kids[path[depth]!];
+    if (!kid || 'text' in kid) return s;
+    kids[path[depth]!] = walk(kid, depth + 1);
+    return { ...s, children: kids };
+  };
+  return walk(spec, 0);
 }
 
 /** Delete shapes, and the animation entries that name them (`removeShapes`). */
@@ -385,31 +413,101 @@ export function orderShapes(
   }
   for (const [parentId, selected] of byParent) {
     const shapes = stacked(batch.element(part, parentId));
-    if ([...selected].some((id) => !shapes.includes(id)))
+    const known = new Set(shapes);
+    if ([...selected].some((id) => !known.has(id)))
       throw new CommandRefusal('disabled.unsupportedElement');
     const next = reorder(shapes, selected, move);
-    // Put each shape in its final place from the top down; each move lands it right under the
-    // shape already placed above it, so the sibling list ends in `next` order.
-    for (let i = next.length - 1; i >= 0; i -= 1) {
-      const tree = batch.element(part, parentId);
-      const current = stacked(tree);
-      if (current[i] === next[i]) continue;
-      const above = next[i + 1];
-      const index =
-        above === undefined
-          ? tree.children.findIndex((c) => c.id === current[current.length - 1]) + 1
-          : tree.children.findIndex((c) => c.id === above);
-      const from = tree.children.findIndex((c) => c.id === next[i]);
-      // `moveNode` removes first, then inserts: an index after the old place shifts down by one.
-      batch.push({
-        op: 'moveNode',
-        part,
-        node: next[i],
-        parent: parentId,
-        index: from < index ? index - 1 : index,
-      });
+    if (move === 'front' || move === 'back') {
+      moveBlock(batch, part, parentId, shapes, next, selected.size, move === 'front');
+      continue;
     }
+    stepRuns(batch, part, parentId, shapes, selected, move === 'forward');
   }
+}
+
+/**
+ * Forward or Backward, in one pass. Each run of adjacent selected shapes trades places with the
+ * shape that is not selected right above it (Forward) or right under it (Backward): that one
+ * shape moves to the other end of the run. The runs go from the top down, so a move never
+ * shifts a run that waits below it, and its places in the first list stay true.
+ */
+function stepRuns(
+  batch: OpBatch,
+  part: string,
+  parentId: string,
+  shapes: readonly string[],
+  selected: ReadonlySet<string>,
+  forward: boolean
+): void {
+  const place = new Map(batch.element(part, parentId).children.map((c, i) => [c.id, i] as const));
+  let top = shapes.length - 1;
+  while (top >= 0) {
+    if (!selected.has(shapes[top]!)) {
+      top -= 1;
+      continue;
+    }
+    let bottom = top;
+    while (bottom > 0 && selected.has(shapes[bottom - 1]!)) bottom -= 1;
+    // `moveNode` removes first, then inserts.
+    const other = forward ? shapes[top + 1] : shapes[bottom - 1];
+    if (other !== undefined) {
+      const to = forward ? place.get(shapes[bottom]!)! : place.get(shapes[top]!)!;
+      batch.push({ op: 'moveNode', part, node: other, parent: parentId, index: to });
+    }
+    top = bottom - 1;
+  }
+}
+
+/**
+ * The number of selected shapes from which Back moves the other shapes up instead: each move
+ * down shifts the shapes that wait to move, and the store then updates their places again.
+ */
+const BACK_MOVES = 32;
+
+/**
+ * Front or Back, in one pass: `next` holds the `picked` selected shapes as a block at the top
+ * (`front`) or the bottom. The selected shapes already in their final place at that end stay.
+ */
+function moveBlock(
+  batch: OpBatch,
+  part: string,
+  parentId: string,
+  shapes: readonly string[],
+  next: readonly string[],
+  picked: number,
+  front: boolean
+): void {
+  const kids = batch.element(part, parentId).children.map((c) => c.id);
+  const n = shapes.length;
+  const at = (i: number) => (front ? n - 1 - i : i);
+  let kept = 0;
+  while (kept < n && shapes[at(kept)] === next[at(kept)]) kept += 1;
+  if (kept >= picked) return;
+  /** Move `ids` (bottom to top) up, to right under shape `under` (or over the last shape). */
+  const raise = (ids: readonly string[], under: string | undefined) => {
+    const top = under === undefined ? kids.indexOf(shapes[n - 1]!) + 1 : kids.indexOf(under);
+    // Top down: each shape comes from below the places that the earlier moves shifted, so the
+    // store reads its place without an update. `moveNode` removes first, then inserts.
+    for (let k = 0; k < ids.length; k += 1) {
+      const id = ids[ids.length - 1 - k]!;
+      batch.push({ op: 'moveNode', part, node: id, parent: parentId, index: top - 1 - k });
+    }
+  };
+  if (front) return raise(next.slice(n - picked, n - kept), shapes[n - kept]);
+  if (picked - kept <= BACK_MOVES) {
+    // Right over the kept run, or in the place of the bottom shape, which is not selected.
+    const to = kept > 0 ? kids.indexOf(shapes[kept - 1]!) + 1 : kids.indexOf(shapes[0]!);
+    for (const id of next.slice(kept, picked).reverse())
+      batch.push({ op: 'moveNode', part, node: id, parent: parentId, index: to });
+    return;
+  }
+  // Many selected shapes: raise the other shapes under the top selected one above it instead.
+  const top = shapes.indexOf(next[picked - 1]!);
+  const chosen = new Set(next.slice(0, picked));
+  raise(
+    shapes.slice(kept, top).filter((id) => !chosen.has(id)),
+    shapes[top + 1]
+  );
 }
 
 /** The ids of a tree's shapes, bottom to top; its `p:extLst` stays last and never moves. */

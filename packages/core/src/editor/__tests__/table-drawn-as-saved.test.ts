@@ -219,3 +219,38 @@ describe('a short row draws the cells that the save writes', () => {
     expect(drawn(e)).toEqual(['A|B', 'C|']);
   });
 });
+
+describe('a row with more cells than grid columns', () => {
+  // Two grid columns: the first row holds four cells with text, the second row two.
+  const bytes = deck(tr(cell('A'), cell('B'), cell('C'), cell('D')) + tr(cell('E'), cell('F')));
+
+  /** The table's laid-out width and the right edge of each drawn cell, in EMU. */
+  function boxes(e: PptxEditorInstance): { width: number; right: number[] } {
+    const item = e.session!.layout(0)!.items.find((i) => i.element.kind === 'graphicFrame')!;
+    const t = item.kind === 'frame' ? item.table! : undefined;
+    return { width: t!.width, right: t!.cells.map((c) => c.x + c.width) };
+  }
+
+  test('a table without a mark draws its grid and saves the extra cells as the file holds them', async () => {
+    const e = await open(bytes);
+    expect(drawn(e)).toEqual(['A|B', 'E|F']);
+    const before = boxes(e);
+    expect(before.width).toBe(2 * IN);
+    expect(before.right.every((x) => Number.isFinite(x) && x <= before.width)).toBe(true);
+    const again = await reopened(e);
+    expect(drawn(again)).toEqual(['A|B', 'E|F']);
+    expect(boxes(again)).toEqual(before);
+    // The save keeps the grid and every cell with text.
+    const tbl = find(rootOf(again), 'a:tbl')!;
+    expect(children(find(tbl, 'a:tblGrid'), 'a:gridCol')).toHaveLength(2);
+    const first = children(children(tbl, 'a:tr')[0], 'a:tc');
+    expect(first.map((tc) => textOf(tc))).toEqual(['A', 'B', 'C', 'D']);
+  });
+
+  test('a marked table draws and saves the grid columns that its repair adds', async () => {
+    const e = await open(bytes);
+    expect(e.session!.store.replaceParts([markedPart(bytes)]).ok).toBe(true);
+    expect(drawn(e)).toEqual(['A|B|C|D', 'E|F||']);
+    expect(drawn(await reopened(e))).toEqual(drawn(e));
+  });
+});

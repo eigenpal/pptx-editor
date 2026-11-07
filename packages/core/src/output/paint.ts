@@ -33,6 +33,7 @@ import {
   fillPaint,
   pictureImage,
   pictureRect,
+  pictureUrl,
   strokeAttrs,
   type ImageSizePort,
   type FillContext,
@@ -331,6 +332,9 @@ function withFillOrigin(
   return a === 1 && b === 0 && c === 0 && d === 1 ? { ...ctx, fillOrigin: { x: e, y: f } } : ctx;
 }
 
+/** The fill of the placeholder that a picture the paint cannot draw shows. */
+const PICTURE_PLACEHOLDER = '#e8e8e8';
+
 function paintGeometry(
   doc: Document,
   item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>,
@@ -347,11 +351,7 @@ function paintGeometry(
   const effects = item.geometry.paths.length <= MAX_OVERLAY_PATHS ? el.effects : undefined;
   if (item.kind === 'picture') {
     const fill = item.element.fill;
-    const url =
-      fill.type === 'picture'
-        ? (ctx.images(ctx.sourcePart, fill.svgRId ?? fill.rId) ??
-          ctx.images(ctx.sourcePart, fill.rId))
-        : undefined;
+    const url = fill.type === 'picture' ? pictureUrl(ctx, fill) : undefined;
     const d = item.geometry.paths.map(pathData).join('');
     if (url && fill.type === 'picture') {
       const image = pictureImage(doc, ctx.defs, fill, url, w, h);
@@ -376,7 +376,7 @@ function paintGeometry(
         svg(doc, 'rect', {
           width: num(w),
           height: num(h),
-          fill: '#e8e8e8',
+          fill: PICTURE_PLACEHOLDER,
           stroke: '#b0b0b0',
           'stroke-width': 9525,
         })
@@ -385,6 +385,9 @@ function paintGeometry(
       out.push(outsideOutline(doc, ctx, d, stroke, line, groupScale, w, h));
     return out;
   }
+  // A picture fill whose image does not resolve (a missing or damaged part) fills the geometry
+  // with the picture placeholder of a `p:pic`, so the shape does not disappear.
+  const lostPicture = el.fill.type === 'picture' && !pictureUrl(ctx, el.fill);
   for (const path of item.geometry.paths) {
     // Line ends and square dash caps belong to open, stroked paths only.
     const plan =
@@ -398,7 +401,11 @@ function paintGeometry(
       plan && plan.commands !== path.commands ? pathData({ ...path, commands: plan.commands }) : d;
     const extras = plan ? strokeExtras(doc, plan, stroke) : [];
     const fill =
-      path.fill === 'none' ? { paint: 'none', opacity: 1 } : paintFor(el.fill, d, path.fill);
+      path.fill === 'none'
+        ? { paint: 'none', opacity: 1 }
+        : lostPicture
+          ? { paint: PICTURE_PLACEHOLDER, opacity: 1 }
+          : paintFor(el.fill, d, path.fill);
     const overlay = fill.paint === 'none' ? null : overlayPath(doc, d, effects, paintFor);
     if (overlay) {
       // The overlay blends with this fill only (design D5 of `fill-fidelity`); the outline draws on top.
@@ -757,6 +764,27 @@ export class SlidePainter {
     this.#defs = new Defs(doc, opts.idPrefix);
   }
 
+  /** The prefix of the ids this painter writes. */
+  get idPrefix(): string {
+    return this.#opts.idPrefix;
+  }
+
+  #key: unknown = undefined;
+  /** Items painted before the last change of `invalidate`'s key: each paints again. */
+  #stale: Set<LayoutItem> | null = null;
+
+  /**
+   * Note `key`: what the picture depends on besides the layout, such as converted pictures or
+   * loaded faces. When it changed, every item paints again, and until it does, its earlier node
+   * stays on screen in its place. Answers whether the key changed.
+   */
+  invalidate(key: unknown): boolean {
+    if (key === this.#key) return false;
+    this.#key = key;
+    this.#stale = new Set(this.#items.keys());
+    return true;
+  }
+
   /** Whether this painter paints with `opts`: the same ports and id prefix. */
   paints(opts: PaintOptions): boolean {
     const a = this.#opts;
@@ -770,8 +798,23 @@ export class SlidePainter {
     );
   }
 
-  /** Paint `layout`, reusing the nodes of items painted before. Returns the same `<svg>`. */
-  paint(layout: SlideLayout): SVGSVGElement {
+  /**
+   * Whether the last `paint` left items out because they passed its budget: a later `paint` of
+   * the same layout adds them.
+   */
+  get pending(): boolean {
+    return this.#pending;
+  }
+
+  #pending = false;
+
+  /**
+   * Paint `layout`, reusing the nodes of items painted before. Returns the same `<svg>`. With a
+   * `budget`, it paints at most that many new items, in paint order, and keeps every item it
+   * painted before (`pending` tells when some are left): a slide of 24,000 shapes then goes on
+   * screen over several frames, and no frame blocks for seconds.
+   */
+  paint(layout: SlideLayout, budget = Infinity): SVGSVGElement {
     const doc = this.#doc;
     const { width, height } = layout.slide;
     const slide = `${layout.slide.partName} ${width}x${height}`;
@@ -786,6 +829,7 @@ export class SlidePainter {
       this.#root.appendChild(this.#content);
       this.#background = null;
       this.#items.clear();
+      this.#stale = null;
       this.#twice = [];
       this.#slide = slide;
     }
@@ -822,20 +866,52 @@ export class SlidePainter {
       const fresh = this.#defs.capture(() => paintItem(doc, item, ctx, this.#opts, 1));
       return { node: fresh.value, defs: fresh.defs };
     };
+    let left = budget;
+    this.#pending = false;
+    // The earlier nodes of the shapes that a budget leaves out (`itemKey`): each stays on
+    // screen in its place until its shape paints again (a font load or a theme edit makes
+    // every item new).
+    let earlier: Map<string, [LayoutItem, PaintedItem]> | null = null;
+    let current: Set<LayoutItem> | null = null;
     for (const item of layout.items) {
       let painted: PaintedItem;
+      const stale = this.#stale?.has(item) === true;
+      const kept = next.has(item) || stale ? undefined : this.#items.get(item);
+      if (!kept && left <= 0) {
+        this.#pending = true;
+        earlier ??= new Map([...this.#items].map(([i, p]) => [itemKey(i), [i, p]] as const));
+        current ??= new Set(layout.items);
+        const stand = earlier.get(itemKey(item));
+        // An item of the layout stands in only for itself, when it waits to paint again.
+        const own = stand?.[0] === item && stale;
+        if (stand && !next.has(stand[0]) && (own || !current.has(stand[0]))) {
+          next.set(stand[0], stand[1]);
+          if (stand[1].node) nodes.push(stand[1].node);
+        }
+        continue;
+      }
       if (next.has(item)) {
         // An item twice in one layout paints twice: one node cannot stand in two places.
         painted = paintFresh(item);
         this.#twice.push(painted);
+        left -= 1;
       } else {
-        painted = this.#items.get(item) ?? paintFresh(item);
+        painted = kept ?? paintFresh(item);
+        if (!kept) left -= 1;
         next.set(item, painted);
+        if (stale) {
+          // Painted again: its earlier node and definitions go.
+          this.#stale!.delete(item);
+          const old = this.#items.get(item);
+          if (old) drop(old);
+        }
       }
       if (painted.node) nodes.push(painted.node);
     }
     for (const [item, painted] of this.#items) if (!next.has(item)) drop(painted);
     this.#items = next;
+    // An item an edit replaced before it painted again waits no more.
+    if (this.#stale) for (const item of this.#stale) if (!next.has(item)) this.#stale.delete(item);
     // Put the nodes in paint order, moving only the ones out of place.
     nodes.forEach((node, i) => {
       const at = content.childNodes[i] ?? null;
@@ -845,6 +921,13 @@ export class SlidePainter {
     return root;
   }
 }
+
+/**
+ * An item's place in the document: its part, its layer, and its node id. Node ids are numbered
+ * per part, so a master shape and a slide shape can share one.
+ */
+const itemKey = (item: LayoutItem): string =>
+  `${item.element.partName}\u0000${item.element.layer}\u0000${item.element.nodeId}`;
 
 /** Paint a slide into a new `<svg>` sized by viewBox in EMU. The caller sets CSS size. */
 export function paintSlide(doc: Document, layout: SlideLayout, opts: PaintOptions): SVGSVGElement {

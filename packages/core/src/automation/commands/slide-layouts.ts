@@ -29,6 +29,7 @@ import {
 } from '../../store/index.ts';
 import {
   alternateBranch,
+  contentElements,
   isAlternateContent,
   resolveSlide,
   type Xfrm,
@@ -248,6 +249,30 @@ const inBranch = (branch: Element | undefined): Placeholder[] =>
     .filter((p): p is Placeholder => !!p);
 
 /**
+ * The placeholders the cascade reads in `branch`: a nested `mc:AlternateContent` reads as its
+ * own branch (`contentElements`), so a placeholder nested in it holds its place.
+ */
+const readIn = (branch: Element | undefined, root: Element | undefined): Placeholder[] =>
+  contentElements(branch, root)
+    .map(placeholderOf)
+    .filter((p): p is Placeholder => !!p);
+
+/** The deepest `mc:AlternateContent` nesting that the branch walk follows: the XML depth cap. */
+const MAX_NESTING = 256;
+
+/** Every `mc:Choice` and `mc:Fallback` of `wrapper`, and those of each one nested in them. */
+function branchesOf(wrapper: Element, depth = 0, out: Element[] = []): Element[] {
+  for (const b of elements(wrapper)) {
+    if (b.ns !== NS.mc || (b.local !== 'Choice' && b.local !== 'Fallback')) continue;
+    out.push(b);
+    if (depth < MAX_NESTING)
+      for (const inner of elements(b))
+        if (isAlternateContent(inner)) branchesOf(inner, depth + 1, out);
+  }
+  return out;
+}
+
+/**
  * The placeholders at the top of a shape tree, in tree order. With `unwrap`, a placeholder in
  * `mc:AlternateContent` counts as the cascade reads it (the layout's places).
  */
@@ -255,7 +280,7 @@ function placeholdersOf(tree: Element | undefined, root?: Element, unwrap = fals
   const out: Placeholder[] = [];
   for (const el of elements(tree)) {
     if (unwrap && isAlternateContent(el))
-      for (const p of inBranch(alternateBranch(el, root))) out.push(p);
+      for (const p of readIn(alternateBranch(el, root), root)) out.push(p);
     else {
       const p = placeholderOf(el);
       if (p) out.push(p);
@@ -277,15 +302,17 @@ interface Wrapped {
   readonly copies: readonly Placeholder[];
 }
 
-/** The slide placeholders in top-level `mc:AlternateContent`, in tree order. */
+/**
+ * The slide placeholders in top-level `mc:AlternateContent`, in tree order, nested
+ * `mc:AlternateContent` in its branches included.
+ */
 function wrappedPlaceholdersOf(tree: Element | undefined, root?: Element): Wrapped[] {
   const out: Wrapped[] = [];
   for (const wrapper of elements(tree)) {
     if (!isAlternateContent(wrapper)) continue;
-    const reads = inBranch(alternateBranch(wrapper, root));
-    const paired = elements(wrapper)
-      .filter((b) => b.ns === NS.mc && (b.local === 'Choice' || b.local === 'Fallback'))
-      .map((b) => pairCopies(reads, inBranch(b)));
+    const reads = readIn(alternateBranch(wrapper, root), root);
+    // A nested `mc:AlternateContent` holds copies in its own branches.
+    const paired = branchesOf(wrapper).map((b) => pairCopies(reads, inBranch(b)));
     reads.forEach((read, i) => {
       out.push({
         wrapper,
@@ -350,28 +377,90 @@ function contentOf(p: Placeholder): Content {
   return 'object';
 }
 
-/** Whether slide placeholder `s` may take layout place `t`. */
-function fits(s: Placeholder, content: Content, t: Placeholder): boolean {
-  if (FOOTER_PLACEHOLDERS.has(s.type) || FOOTER_PLACEHOLDERS.has(t.type)) return s.type === t.type;
-  if (content === 'empty') return family(s.type) === family(t.type);
-  if (TITLES.has(s.type)) return TITLES.has(t.type);
-  return ACCEPTS[content].has(t.type);
+/** Whether slide placeholder `s` may take a layout place of type `type`. */
+function fitsType(s: Placeholder, content: Content, type: string): boolean {
+  if (FOOTER_PLACEHOLDERS.has(s.type) || FOOTER_PLACEHOLDERS.has(type)) return s.type === type;
+  if (content === 'empty') return family(s.type) === family(type);
+  if (TITLES.has(s.type)) return TITLES.has(type);
+  return ACCEPTS[content].has(type);
 }
 
 /**
- * The first passes of the match, from the closest: the same `type` and `idx`, then title to
- * title, then the same `idx`. `reservedPlaces` uses them too.
+ * Finds layout places for slide placeholders, by rule. Every rule and `fitsType` read only a
+ * place's `type` and `idx`. So the first free place that a rule accepts is the earliest head
+ * among the place lists, by type, of one scope: all places, or the places with one `idx`. A
+ * deck with thousands of places matches in linear time, with the result of a scan of the
+ * layout in order.
  */
-const IDENTITY_RULES: readonly ((s: Placeholder, t: Placeholder) => boolean)[] = [
-  (s, t) => s.type === t.type && s.idx === t.idx,
-  (s, t) => TITLES.has(s.type) && TITLES.has(t.type),
-  (s, t) => s.idx !== undefined && s.idx !== '0' && s.idx === t.idx,
-];
+class PlaceFinder {
+  readonly #scopes = new Map<string, Map<string, { list: Placeholder[]; at: number }>>();
+  readonly #order = new Map<Placeholder, number>();
+
+  constructor(
+    layout: readonly Placeholder[],
+    private readonly taken: (t: Placeholder) => boolean
+  ) {
+    layout.forEach((t, i) => {
+      this.#order.set(t, i);
+      this.#add(ALL_PLACES, t);
+      this.#add(idxScope(t.idx), t);
+    });
+  }
+
+  #add(scope: string, t: Placeholder): void {
+    let byType = this.#scopes.get(scope);
+    if (!byType) this.#scopes.set(scope, (byType = new Map()));
+    let q = byType.get(t.type);
+    if (!q) byType.set(t.type, (q = { list: [], at: 0 }));
+    q.list.push(t);
+  }
+
+  /** The first free place of `scope` whose type `accepts` takes and that fits `s`. */
+  #first(
+    scope: string,
+    s: Placeholder,
+    content: Content,
+    accepts: (type: string) => boolean
+  ): Placeholder | undefined {
+    let best: Placeholder | undefined;
+    for (const [type, q] of this.#scopes.get(scope) ?? []) {
+      if (!accepts(type) || !fitsType(s, content, type)) continue;
+      // A place once taken stays taken, so the list start moves past it for good.
+      while (q.at < q.list.length && this.taken(q.list[q.at]!)) q.at += 1;
+      const head = q.list[q.at];
+      if (head && (!best || this.#order.get(head)! < this.#order.get(best)!)) best = head;
+    }
+    return best;
+  }
+
+  /**
+   * The identity rules, from the closest: the same `type` and `idx`, then title to title, then
+   * the same `idx`. `reservedPlaces` uses them too.
+   */
+  readonly identity: readonly ((s: Placeholder, c: Content) => Placeholder | undefined)[] = [
+    (s, c) => this.#first(idxScope(s.idx), s, c, (type) => type === s.type),
+    (s, c) =>
+      TITLES.has(s.type) ? this.#first(ALL_PLACES, s, c, (t) => TITLES.has(t)) : undefined,
+    (s, c) =>
+      s.idx !== undefined && s.idx !== '0'
+        ? this.#first(idxScope(s.idx), s, c, () => true)
+        : undefined,
+  ];
+
+  /** The first free place of the same type. */
+  sameType = (s: Placeholder, c: Content) => this.#first(ALL_PLACES, s, c, (t) => t === s.type);
+
+  /** The first free place that takes the content. */
+  any = (s: Placeholder, c: Content) => this.#first(ALL_PLACES, s, c, () => true);
+}
+
+const ALL_PLACES = '*';
+const idxScope = (idx: string | undefined): string => (idx === undefined ? '\u0000' : `#${idx}`);
 
 /**
  * Match slide placeholders to layout places. Each place takes at most one placeholder; slide
- * placeholders take places in tree order, in passes from the closest match: the
- * `IDENTITY_RULES`, then the same `type`, then any place that accepts the content (never a
+ * placeholders take places in tree order, in passes from the closest match: the identity rules
+ * of `PlaceFinder`, then the same `type`, then any place that accepts the content (never a
  * footer place). In the last two passes, placeholders with content choose before empty ones,
  * so an empty placeholder never takes the only place that content could go to. In the
  * identity passes, an empty placeholder and a filled one choose in tree order: this order is
@@ -384,26 +473,28 @@ export function mapPlaceholders(
   const out = new Map<Placeholder, Placeholder>();
   const used = new Set<Placeholder>();
   const content = new Map(slide.map((s) => [s, contentOf(s)]));
+  const find = new PlaceFinder(layout, (t) => used.has(t));
   const pass = (
-    rule: (s: Placeholder, t: Placeholder) => boolean,
+    pick: (s: Placeholder, c: Content) => Placeholder | undefined,
     which: (c: Content) => boolean = () => true
   ): void => {
     for (const s of slide) {
-      if (out.has(s) || !which(content.get(s)!)) continue;
-      const t = layout.find((l) => !used.has(l) && fits(s, content.get(s)!, l) && rule(s, l));
+      const c = content.get(s)!;
+      if (out.has(s) || !which(c)) continue;
+      const t = pick(s, c);
       if (t) {
         out.set(s, t);
         used.add(t);
       }
     }
   };
-  for (const rule of IDENTITY_RULES) pass(rule);
+  for (const rule of find.identity) pass(rule);
   const filled = (c: Content): boolean => c !== 'empty';
   const empty = (c: Content): boolean => c === 'empty';
-  pass((s, t) => s.type === t.type, filled);
-  pass(() => true, filled);
-  pass((s, t) => s.type === t.type, empty);
-  pass(() => true, empty);
+  pass(find.sameType, filled);
+  pass(find.any, filled);
+  pass(find.sameType, empty);
+  pass(find.any, empty);
   return out;
 }
 
@@ -475,7 +566,7 @@ function xfrmXml(x: Xfrm): string {
 
 /**
  * The layout places that slide placeholders in `mc:AlternateContent` hold: the first place by
- * the `IDENTITY_RULES` that `fits` the placeholder, with the footer rules of `mapPlaceholders`.
+ * the identity rules of `PlaceFinder` that fit the placeholder, with the footer rules of `mapPlaceholders`.
  */
 function reservedPlaces(
   wrapped: readonly Wrapped[],
@@ -483,11 +574,11 @@ function reservedPlaces(
 ): Map<Placeholder, Wrapped> {
   const out = new Map<Placeholder, Wrapped>();
   const done = new Set<Wrapped>();
-  for (const rule of IDENTITY_RULES)
+  const find = new PlaceFinder(places, (t) => out.has(t));
+  for (const rule of find.identity)
     for (const w of wrapped) {
       if (done.has(w)) continue;
-      const content = contentOf(w.read);
-      const t = places.find((l) => !out.has(l) && fits(w.read, content, l) && rule(w.read, l));
+      const t = rule(w.read, contentOf(w.read));
       if (t) {
         out.set(t, w);
         done.add(w);
