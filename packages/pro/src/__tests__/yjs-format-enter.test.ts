@@ -78,3 +78,63 @@ describe('a format and an Enter at once inside the same text', () => {
               expect(shown).toEqual(undos.includes('b') ? [TEXT] : split);
             });
 });
+
+// The step that a redo of the Enter pushes keeps the runs that followed it (`carryFollowed` in
+// `undo-followed.ts`), so a second undo takes them back too.
+describe('an undo, a redo, and an undo again of an Enter that a format followed', () => {
+  for (const ids of CLIENT_ORDERS)
+    for (const [from, to] of FORMATS)
+      for (const cut of [2, 5, 7])
+        test(`bold ${from}..${to}, Enter at ${cut} (client ids ${ids.join(', ')})`, async () => {
+          const { editors, relay } = await openFuzzPeers(deck(false), ids);
+          const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance];
+          selectIn(a, 0, from, to);
+          ok(a.exec({ type: 'toggleBold' }));
+          selectIn(b, 0, cut);
+          ok(b.input('paragraph'));
+          relay.flush();
+          const split = [TEXT.slice(0, cut), TEXT.slice(cut)];
+          const steps: ['undo' | 'redo', string[]][] = [
+            ['undo', [TEXT]],
+            ['redo', split],
+            ['undo', [TEXT]],
+          ];
+          for (const [type, shown] of steps) {
+            ok(b.exec({ type }));
+            relay.flush();
+            expect(converged(...editors)).toEqual(shown);
+          }
+        });
+});
+
+// After the format followed the Enter, the peer that formatted presses Enter inside the
+// formatted text: the run moves on. An undo of the first Enter leaves it where it went, so each
+// character shows once (`checkFollowed` in `undo-followed.ts`), and a redo cuts the text again.
+describe('a peer moves the followed run on before the Enter is undone', () => {
+  for (const ids of CLIENT_ORDERS)
+    for (const [from, to, cut] of [
+      [6, 10, 2],
+      [3, 8, 2],
+      [6, 10, 5],
+    ] as const)
+      test(`bold ${from}..${to}, Enter at ${cut}, then Enter at ${to - 1} (client ids ${ids.join(', ')})`, async () => {
+        const { editors, relay } = await openFuzzPeers(deck(false), ids);
+        const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance];
+        selectIn(a, 0, from, to);
+        ok(a.exec({ type: 'toggleBold' }));
+        selectIn(b, 0, cut);
+        ok(b.input('paragraph'));
+        relay.flush();
+        selectIn(a, 1, to - cut - 1);
+        ok(a.input('paragraph'));
+        relay.flush();
+        const moved = [TEXT.slice(0, cut), TEXT.slice(cut, to - 1), TEXT.slice(to - 1)];
+        expect(converged(...editors)).toEqual(moved);
+        ok(b.exec({ type: 'undo' }));
+        relay.flush();
+        expect(converged(...editors)).toEqual([TEXT.slice(0, to - 1), TEXT.slice(to - 1)]);
+        ok(b.exec({ type: 'redo' }));
+        relay.flush();
+        expect(converged(...editors).join('')).toBe(TEXT);
+      });
+});

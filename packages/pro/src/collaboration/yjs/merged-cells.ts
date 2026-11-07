@@ -18,7 +18,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // - A peer's merge covers the cell that another merge moved text into (two overlapping merges).
 // - A peer types into a cell that a merge covers while it was empty. The merge replaces the
 //   cell's empty paragraph with a copy, and the removed paragraph comes back with the peer's
-//   text (`withRemovedRuns` in `text-identity.ts`).
+//   text (`withRemovedRuns` in `removed-content.ts`).
 //
 // Such a paragraph goes to the end of the text body of the drawn cell over it, in reading order
 // of the cells it sat in. The grid is the one the editor draws (`tableGridOf`), so the canvas,
