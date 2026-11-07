@@ -318,7 +318,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       return (seam.canSessionHistory(modules, false) ?? session.store.canRedo) && mode === 'edit'
         ? { ok: true }
         : { ok: false, reason: mode === 'view' ? 'disabled.viewing' : 'disabled.nothingToRedo' };
-    return checkCommand(command, selection, mode === 'view', session, slide, (only) => {
+    const selected = (): readonly number[] => slideSel.indices(session?.info.slides ?? [], slide);
+    return checkCommand(command, selection, mode === 'view', session, slide, selected, (only) => {
       try {
         // A probe: the same compiler without autofit (it adds ops, never a refusal); ops drop.
         const ctx = { ...context(command, true), ...(only ? { selection: only } : {}) };

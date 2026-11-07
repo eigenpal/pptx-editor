@@ -80,7 +80,8 @@ const SLIDE_WIDE_COMMANDS: ReadonlySet<EditorCommand['type']> = new Set([
 /**
  * The quick `can` answer for a large shape selection (`LARGE_SELECTION`,
  * `LARGE_SELECTION_NODES`) on slide `slide` of `session`, or for a slide-wide command on a large
- * slide; null to check the command in full. A {@link STRUCTURE_COMMANDS} answer is cached
+ * slide or on more than `LARGE_SELECTION` slides (its `indices`, else `selectedSlides`); null to
+ * check the command in full. A {@link STRUCTURE_COMMANDS} answer is cached
  * without the selection, so it never takes the quick answer. @internal
  */
 export function largeSelectionAnswer(
@@ -88,15 +89,18 @@ export function largeSelectionAnswer(
   readOnly: boolean,
   session?: DocumentSession,
   slide = 0,
-  command?: EditorCommand
+  command?: EditorCommand,
+  selectedSlides?: () => readonly number[]
 ): CanResult | null {
   if (command && STRUCTURE_COMMANDS.has(command.type)) return null;
   const pkg = session?.store.package;
   const part = session?.info.slides[slide]?.partName;
   const quick: CanResult = readOnly ? { ok: false, reason: 'disabled.viewing' } : { ok: true };
   if (command && SLIDE_WIDE_COMMANDS.has(command.type)) {
-    // The slides the command names, else the current one.
-    const named = 'indices' in command ? command.indices : undefined;
+    // The slides the command names, else the selected ones. More than `LARGE_SELECTION` slides
+    // (Select All in a long deck) are large: a check edits every placeholder of each one.
+    const named = ('indices' in command ? command.indices : undefined) ?? selectedSlides?.();
+    if (named && named.length > LARGE_SELECTION) return quick;
     const large = (named ?? [slide]).some((i) => {
       const at = session?.info.slides[i]?.partName;
       const root = pkg && at ? xmlPartOf(pkg, at)?.root : undefined;
@@ -118,7 +122,8 @@ export function largeSelectionAnswer(
  * selection of more than {@link LARGE_SELECTION} shapes is checked on its first
  * {@link LARGE_SELECTION} shapes first: a refusal of the command or its arguments shows there,
  * at a fraction of the cost. A pass there is the answer, which `exec` can still refuse; a
- * refusal there checks the whole selection, so a refusal is exact. @internal
+ * refusal there checks the whole selection, so a refusal is exact. `selectedSlides` gives the
+ * slides a slide-wide command with no `indices` edits. @internal
  */
 export function checkCommand<
   S extends { readonly kind: string; readonly nodeIds?: readonly string[] },
@@ -128,9 +133,10 @@ export function checkCommand<
   readOnly: boolean,
   session: DocumentSession | undefined,
   slide: number,
+  selectedSlides: () => readonly number[],
   check: (only?: S) => CanResult
 ): CanResult {
-  const large = largeSelectionAnswer(selection, readOnly, session, slide, command);
+  const large = largeSelectionAnswer(selection, readOnly, session, slide, command, selectedSlides);
   if (large) return large;
   const ids = selection.kind === 'shapes' ? (selection.nodeIds ?? []) : [];
   if (ids.length > LARGE_SELECTION) {

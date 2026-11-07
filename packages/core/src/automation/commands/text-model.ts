@@ -242,6 +242,67 @@ export function splitRunAt(batch: OpBatch, part: string, pId: string, offset: nu
   });
 }
 
+/**
+ * The run that text typed at `offset` goes in: an empty run at the caret (a format armed for
+ * this text), then the run that ends at the caret, then the run that contains it.
+ */
+function hostRunAt(slots: readonly Slot[], offset: number): Slot | undefined {
+  return (
+    slots.find((s) => s.kind === 'run' && s.start === offset && s.end === offset) ??
+    slots.find((s) => s.kind === 'run' && offset > s.start && offset <= s.end) ??
+    slots.find((s) => s.kind === 'run' && offset === s.start && s.start === 0)
+  );
+}
+
+/**
+ * Put whole lines in as paragraphs before paragraph `at.paragraph`, with the caret at its start,
+ * as typing each line there and pressing Enter after it does: each new paragraph takes that
+ * paragraph's properties and paragraph mark, and its text takes the run properties that typed
+ * text takes there. U+000B in a line is a line break. One insert for each line, with no read of
+ * the text body in between, so 30,000 pasted lines cost what they insert. Returns the caret,
+ * still at the start of the same paragraph.
+ */
+export function insertLines(
+  batch: OpBatch,
+  part: string,
+  txBodyId: string,
+  at: TextPoint,
+  lines: readonly string[]
+): TextPoint {
+  const txBody = batch.element(part, txBodyId);
+  const p = paragraphsOf(txBody)[at.paragraph];
+  if (!p) throw new CommandRefusal('errors.unsupported', 'no paragraph');
+  const n = slideNumberOf(batch, part);
+  const pPr = child(p, 'a:pPr');
+  const end = child(p, 'a:endParaRPr');
+  // The run properties `insertText` gives text typed at the start of `p`.
+  const host = hostRunAt(slotsOf(p, n), 0);
+  const hostRPr = host && child(host.el, 'a:rPr');
+  const rPr = host && child(host.el, 'a:t') ? hostRPr && specOf(hostRPr) : rPrSpecAt(p, 0, n);
+  let index = txBody.children.findIndex((c) => c.id === p.id);
+  for (const line of lines) {
+    const inline: NodeSpec[] = [];
+    line.split('\u000B').forEach((piece, j) => {
+      if (j > 0) inline.push(aSpec('br', {}, [rPr ?? aSpec('rPr', { lang: 'en-US', dirty: '0' })]));
+      if (piece)
+        inline.push(aSpec('r', {}, [...(rPr ? [rPr] : []), aSpec('t', {}, [{ text: piece }])]));
+    });
+    batch.insert({
+      op: 'insertNode',
+      part,
+      parent: txBodyId,
+      index,
+      spec: aSpec('p', {}, [
+        ...(pPr ? [specOf(pPr)] : []),
+        ...inline,
+        ...(end ? [specOf(end)] : []),
+      ]),
+    });
+    index += 1;
+  }
+  return { paragraph: at.paragraph + lines.length, offset: 0 };
+}
+
 /** Insert text at a point. Returns the point after the insertion. */
 export function insertText(
   batch: OpBatch,
@@ -255,13 +316,7 @@ export function insertText(
   if (!p) throw new CommandRefusal('errors.unsupported', 'no paragraph');
   const n = slideNumberOf(batch, part);
   const offset = snapPoint(p, at.offset, n);
-  const slots = slotsOf(p, n);
-  // Prefer an empty run at the caret (a format armed for this text), then the run that ends
-  // at the caret, then the run that contains it.
-  const host =
-    slots.find((s) => s.kind === 'run' && s.start === offset && s.end === offset) ??
-    slots.find((s) => s.kind === 'run' && offset > s.start && offset <= s.end) ??
-    slots.find((s) => s.kind === 'run' && offset === s.start && s.start === 0);
+  const host = hostRunAt(slotsOf(p, n), offset);
   if (host) {
     const t = child(host.el, 'a:t');
     if (t) {
