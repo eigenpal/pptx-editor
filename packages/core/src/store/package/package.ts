@@ -17,7 +17,7 @@ import {
 import { parseXmlPart, type Element, type XmlPart, type TreeRejection } from './tree.ts';
 import { serializeXmlPart, canonicalFingerprint, bytesFingerprint } from './serialize.ts';
 import { attr, children, elements } from './query.ts';
-import { CONTENT_TYPE, NS, REL } from './namespaces.ts';
+import { NS, REL } from './namespaces.ts';
 import { repairPresentationRoot } from './presentation-repair.ts';
 import { markFileTimings, repairTimingRoot } from './timing.ts';
 import { sha256FontBytes } from '@eigenpal/ooxml-core';
@@ -58,8 +58,12 @@ const decoder = new TextDecoder('utf-8', { fatal: false });
 const PML = 'application/vnd.openxmlformats-officedocument.presentationml.';
 const PPT_MACRO = 'application/vnd.ms-powerpoint.';
 
-/** Content types of the parts the engine cannot work without. They must parse, or the deck is refused. */
-const REQUIRED_TYPES = new Set(
+/**
+ * The main part types of a presentation, a slide show, a template, and their macro-enabled
+ * forms (ECMA-376 Part 1, 13.3.6). The engine reads them all the same way; a macro part stays
+ * as inert bytes and is never run.
+ */
+const MAIN_TYPES = new Set(
   [
     `${PML}presentation.main+xml`,
     `${PML}slideshow.main+xml`,
@@ -67,6 +71,13 @@ const REQUIRED_TYPES = new Set(
     `${PPT_MACRO}presentation.macroEnabled.main+xml`,
     `${PPT_MACRO}slideshow.macroEnabled.main+xml`,
     `${PPT_MACRO}template.macroEnabled.main+xml`,
+  ].map(asciiFold)
+);
+
+/** Content types of the parts the engine cannot work without. They must parse, or the deck is refused. */
+const REQUIRED_TYPES = new Set(
+  [
+    ...MAIN_TYPES,
     `${PML}slide+xml`,
     `${PML}slideLayout+xml`,
     `${PML}slideMaster+xml`,
@@ -108,18 +119,46 @@ function roleByType(partName: string, contentType: string | undefined): PartRole
   return 'binary';
 }
 
-function partRole(partName: string, types: ContentTypeIndex): PartRole {
+/** The relationship types whose targets make up the deck: they must parse, whatever their type. */
+const STRUCTURAL_RELS = new Set<string>([
+  REL.officeDocument,
+  REL.slide,
+  REL.slideLayout,
+  REL.slideMaster,
+  REL.theme,
+  REL.notesSlide,
+  REL.notesMaster,
+]);
+
+/**
+ * The parts a structural relationship points to. A part's role follows what points to it as
+ * well as its content type: a slide with a generic content type is still a slide, and a part
+ * of a required type that no structural relationship reaches never refuses the deck.
+ */
+function structuralTargets(rels: ReadonlyMap<string, PackagePart>): Set<string> {
+  const pkg: PptxPackage = { parts: rels };
+  const out = new Set<string>();
+  for (const name of rels.keys()) {
+    const source = relsSource(name);
+    if (source === undefined) continue;
+    for (const rel of relationshipsOf(pkg, source))
+      if (rel.target !== undefined && STRUCTURAL_RELS.has(rel.type)) out.add(rel.target);
+  }
+  return out;
+}
+
+function partRole(partName: string, types: ContentTypeIndex, structural: Set<string>): PartRole {
   if (partName === CONTENT_TYPES_PART) return 'required';
   if (asciiFold(partName).endsWith('.rels')) {
     // Relationships are always parsed. Those of the package and of required parts must parse.
     const source = relsSource(partName);
     if (source === '/') return 'required';
     if (source === undefined) return 'optional';
-    return roleByType(source, lookupContentType(types, source)) === 'required'
-      ? 'required'
-      : 'optional';
+    return partRole(source, types, structural) === 'required' ? 'required' : 'optional';
   }
-  return roleByType(partName, lookupContentType(types, partName));
+  if (structural.has(partName)) return 'required';
+  const role = roleByType(partName, lookupContentType(types, partName));
+  return role === 'required' ? 'optional' : role;
 }
 
 /**
@@ -182,14 +221,24 @@ export function readPptxDeferred(
   if (!ct.ok)
     return { ok: false, error: { reason: 'xml', partName: CONTENT_TYPES_PART, detail: ct.reason } };
   const types = contentTypeIndex(ct.part);
+  // Relationships first: what points to a part decides whether it must parse.
+  const rels = new Map<string, PackagePart>();
+  const relsTrees = new Map<string, ReturnType<typeof parseXmlPart>>();
+  for (const [partName, data] of zip.entries) {
+    if (!asciiFold(partName).endsWith('.rels')) continue;
+    const tree = parseXmlPart(partName, decodeXml(data));
+    relsTrees.set(partName, tree);
+    if (tree.ok) rels.set(partName, { kind: 'xml', partName, xml: tree.part });
+  }
+  const structural = structuralTargets(rels);
   const parts = new Map<string, PackagePart>();
   for (const [partName, data] of zip.entries) {
-    const role = partRole(partName, types);
+    const role = partRole(partName, types, structural);
     if (role === 'binary') {
       parts.set(partName, { kind: 'binary', partName, bytes: data });
       continue;
     }
-    const kind = deferred ? deferrableKind(partName, types) : undefined;
+    const kind = deferred && structural.has(partName) ? deferrableKind(partName, types) : undefined;
     if (kind && deferred!.defer(partName)) {
       const finish = deferred!.finish;
       parts.set(
@@ -205,7 +254,10 @@ export function readPptxDeferred(
       );
       continue;
     }
-    const tree = partName === CONTENT_TYPES_PART ? ct : parseXmlPart(partName, decodeXml(data));
+    const tree =
+      partName === CONTENT_TYPES_PART
+        ? ct
+        : (relsTrees.get(partName) ?? parseXmlPart(partName, decodeXml(data)));
     if (tree.ok) {
       parts.set(partName, { kind: 'xml', partName, xml: tree.part });
       if (isSlideRoot(tree.part.root)) markFileTimings(tree.part.root);
@@ -214,7 +266,8 @@ export function readPptxDeferred(
   }
   const pkg: PptxPackage = { parts };
   const main = mainPresentationPart(pkg);
-  if (!main || contentTypeOf(pkg, main) !== CONTENT_TYPE.presentation)
+  const mainType = main ? contentTypeOf(pkg, main) : undefined;
+  if (!mainType || !MAIN_TYPES.has(asciiFold(mainType.trim())))
     return { ok: false, error: { reason: 'not-a-presentation' } };
   return { ok: true, pkg };
 }

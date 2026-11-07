@@ -397,10 +397,28 @@ export function introducedViolation(
   const found = violations(after, scope);
   if (found.length > 0) {
     const old = new Set(violations(before, scope).map((v) => v.key));
-    const fresh = found.find((v) => !old.has(v.key));
+    const fresh = found.find((v) => !old.has(v.key) && !copiesDangling(before, v));
     if (fresh) return fresh;
   }
   return removed.size > 0 ? danglingAfterRemoval(after, set, removed) : null;
+}
+
+/**
+ * Whether `v` is a relationship to a part that a relationship of `before` already names and
+ * that `before` lacks too: a copy of a slide with a missing picture or chart copies that
+ * relationship, and the copy is no worse than the file.
+ */
+function copiesDangling(before: PptxPackage, v: PartViolation): boolean {
+  if (v.rule !== 'relationship-target') return false;
+  const target = v.key.slice(v.key.lastIndexOf('\t') + 1);
+  for (const name of before.parts.keys()) {
+    const source = relsSource(name);
+    if (source === undefined || relsPartName(source) !== name) continue;
+    for (const rel of relationshipsOf(before, source))
+      if (!rel.external && rel.target && partNameKey(rel.target) === target)
+        return !exists(before, rel.target);
+  }
+  return false;
 }
 
 /** Every violation of a whole package, for tests and diagnostics. @internal */

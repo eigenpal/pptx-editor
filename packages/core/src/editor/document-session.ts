@@ -60,6 +60,7 @@ import { replicaBindingOf } from './replica-ids.ts';
 import { sameDependencies, slideDependencies } from './slide-dependencies.ts';
 import { carryFits } from '../automation/commands/table-fit.ts';
 import { refitEditedText } from './late-fit.ts';
+import { drawableImageMime } from './drawable-image.ts';
 import { within } from './within.ts';
 import {
   openingOrder,
@@ -798,8 +799,10 @@ export class DocumentSession {
     const pkg = this.store.package;
     const target = relTarget(pkg, sourcePart, rId);
     if (!target) return undefined;
-    const mime = imageMime(target);
     const bytes = binaryPartOf(pkg, target);
+    // The signature decides the type: a damaged, mislabeled, or oversized picture draws the
+    // placeholder (`drawable-image.ts`).
+    const mime = bytes ? drawableImageMime(bytes, imageMime(target)) : undefined;
     if (!mime || !bytes) return undefined;
     const key = `${target}\u0000${bytes.length}`;
     const hit = this.#urls.get(key);
