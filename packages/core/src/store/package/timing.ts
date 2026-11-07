@@ -38,7 +38,9 @@
 // each replica kept the list for the other shape's step, and the merge removes both steps. The
 // repair touches only a `p:timing` that the session changed (an edit, or a collaborator's
 // different copy): a `p:timing` exactly as the file wrote it saves unchanged, empty lists
-// included (`markFileTimings`, `carryFileTimings`). A `spid` that names no shape is not
+// included (`markFileTimings`, `carryFileTimings`). In a changed `p:timing`, a build entry that
+// repeats an earlier one (the same `spid` and `grpId`) goes too: two collaborators who each
+// animate one shape at the same time both add it. A `spid` that names no shape is not
 // repaired: only an edit that removes the shape removes its entries.
 
 import { MAX_XML_DEPTH } from '@eigenpal/ooxml-core';
@@ -76,10 +78,31 @@ function timingsOf(root: Element | undefined): Element[] {
  */
 const fileTimings = new WeakSet<Element>();
 
-/** Record the `p:timing` elements of a slide root that the reader built from a file. */
+/** The slide root's children that hold a transition: `p:transition`, or one in a wrapper. */
+function transitionsOf(root: Element): Element[] {
+  return elements(root).filter(
+    (c) =>
+      isP(c, 'transition') ||
+      (isAlternate(c) &&
+        elements(c).some((b) => isBranch(b) && elements(b).some((t) => isP(t, 'transition'))))
+  );
+}
+
+/**
+ * Record the `p:timing` elements of a slide root that the reader built from a file, and its
+ * transitions (see `repairTransitionRoot`).
+ */
 export function markFileTimings(root: Element): void {
   for (const t of timingsOf(root)) fileTimings.add(t);
+  for (const t of transitionsOf(root)) fileTimings.add(t);
 }
+
+/**
+ * Whether every transition of a slide root is as the file wrote it: the writer leaves such a
+ * slide's transitions as they are. @internal
+ */
+export const fileTransitionsOnly = (root: Element): boolean =>
+  transitionsOf(root).every((t) => fileTimings.has(t));
 
 /**
  * Keep the file mark of a slide's `p:timing` when a collaborator's copy of the part replaces
@@ -87,12 +110,14 @@ export function markFileTimings(root: Element): void {
  * place that equals the marked one keeps the mark.
  */
 export function carryFileTimings(before: Element, after: Element): void {
-  const old = timingsOf(before);
-  const next = timingsOf(after);
-  if (old.length !== next.length) return;
-  for (let i = 0; i < old.length; i += 1)
-    if (fileTimings.has(old[i]) && old[i] !== next[i] && sameTree(old[i], next[i], 0))
-      fileTimings.add(next[i]);
+  for (const of of [timingsOf, transitionsOf]) {
+    const old = of(before);
+    const next = of(after);
+    if (old.length !== next.length) continue;
+    for (let i = 0; i < old.length; i += 1)
+      if (fileTimings.has(old[i]) && old[i] !== next[i] && sameTree(old[i], next[i], 0))
+        fileTimings.add(next[i]);
+  }
 }
 
 /** Whether two trees hold the same XML, node ids and attribute order aside. */
@@ -158,6 +183,8 @@ export function repairTimingRoot(root: Element): Element {
   const timings = timingsOf(root);
   if (timings.every((t) => fileTimings.has(t))) return root;
   const remove = new Set(removalsIn(root, NONE, (t) => !fileTimings.has(t), true));
+  for (const t of timings)
+    if (!fileTimings.has(t)) for (const b of repeatedBuilds(t)) remove.add(b);
   const ranges = rangesPastText(
     root,
     timings.filter((t) => !fileTimings.has(t))
@@ -188,6 +215,25 @@ export function repairTimingRoot(root: Element): Element {
     return changed ? { ...el, children: kids } : el;
   };
   return strip(root, 0);
+}
+
+/**
+ * The build entries of a `p:timing` that repeat an earlier entry: the same element, `spid`, and
+ * `grpId`. Two collaborators who each add an effect to one shape at the same time both add its
+ * entry; the first stays.
+ */
+function repeatedBuilds(timing: Element): Element[] {
+  const seen = new Set<string>();
+  const out: Element[] = [];
+  for (const b of elements(child(timing, 'p:bldLst'))) {
+    const spid = attr(b, 'spid');
+    const grpId = attr(b, 'grpId');
+    if (spid === undefined || grpId === undefined) continue;
+    const key = `${b.ns} ${b.local} ${spid} ${grpId}`;
+    if (seen.has(key)) out.push(b);
+    else seen.add(key);
+  }
+  return out;
 }
 
 /**

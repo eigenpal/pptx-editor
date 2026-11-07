@@ -917,6 +917,7 @@
       "secondsUnit": "s",
       "advanceOnClick": "Advance on click",
       "advanceAfter": "Advance after",
+      "advanceAutomatically": "Advance automatically",
       "applyToAll": "Apply to all slides",
       "effects": "Effects",
       "addEffect": "Add effect",
@@ -948,6 +949,7 @@
       "emptyBody": "Select a shape on the slide, then add an effect.",
       "readOnly": "The editor shows these effects but does not change them.",
       "noPlayback": "The editor does not play effects or transitions.",
+      "invalidTime": "Enter a number of seconds in the allowed range.",
       "start": "Start",
       "triggers": {
         "onClick": "On click",

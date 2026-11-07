@@ -79,3 +79,29 @@ export function animationListParts(effects: readonly AnimationEffect[]): {
     other: effects.filter((e) => e.sequence !== 'main'),
   };
 }
+
+/**
+ * When an effect starts, for its row: the i18n key and its values. An effect of the main
+ * sequence plays at a click step, or with the slide start (step 0). An effect whose step the
+ * editor cannot read (in a read-only timing) shows its trigger. An effect of an interactive
+ * sequence plays on a click of its trigger shape; `shapeName` is empty for a shape with no
+ * name. @public
+ */
+export type AnimationStartLabel =
+  | { readonly key: 'panel.animations.withSlide' }
+  | { readonly key: 'panel.animations.step'; readonly step: number }
+  | { readonly key: 'panel.animations.onShapeClick'; readonly shapeName: string }
+  | { readonly key: `panel.animations.triggers.${AnimationTrigger}` };
+
+/** When an effect starts, for its row (see {@link AnimationStartLabel}). @public */
+export function animationStartLabel(
+  effect: Pick<AnimationEffect, 'sequence' | 'step' | 'trigger' | 'triggerShapeName'>
+): AnimationStartLabel {
+  if (effect.step !== null)
+    return effect.step === 0
+      ? { key: 'panel.animations.withSlide' }
+      : { key: 'panel.animations.step', step: effect.step };
+  if (effect.sequence === 'interactive')
+    return { key: 'panel.animations.onShapeClick', shapeName: effect.triggerShapeName ?? '' };
+  return { key: `panel.animations.triggers.${effect.trigger}` };
+}

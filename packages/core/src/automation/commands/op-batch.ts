@@ -49,7 +49,14 @@ export function isNothingToDo(reason: string): boolean {
 
 /** The kinds of number a replica mints in its stripe, each with its own record. @internal */
 export type MintedIdKind =
-  'rId' | 'part' | 'slideId' | 'shapeId' | 'creationId' | 'commentIdx' | 'timeNodeId';
+  | 'rId'
+  | 'part'
+  | 'slideId'
+  | 'shapeId'
+  | 'creationId'
+  | 'commentIdx'
+  | 'timeNodeId'
+  | 'buildGroupId';
 
 /** Numbers a replica minted in its stripe, by id kind. @internal */
 export type MintedIds = Map<MintedIdKind, Set<number>>;

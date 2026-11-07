@@ -16,8 +16,9 @@
 // commands edit the main sequence only when it has exactly this shape. A slide whose `p:timing`
 // is inside `mc:AlternateContent` is read-only: each branch would need the same edit.
 //
-// Every value is from the file and untrusted: numbers are read with bounds, the walks are
-// bounded in depth, and nothing here throws on a malformed tree.
+// Every value is from the file and untrusted: numbers are read with bounds, names index only
+// `Map` tables (never an object, whose prototype has keys of its own), the walks stop at the
+// reader's depth cap, and nothing here throws on a malformed tree.
 
 import type {
   AnimationClass,
@@ -25,11 +26,14 @@ import type {
   AnimationPreset,
   AnimationTrigger,
 } from '../../contracts/neutral.ts';
+import { MAX_XML_DEPTH } from '@eigenpal/ooxml-core';
 import { contentElements } from '../../cascade/alternate-content.ts';
 import { attr, child, elements, NS, type Element } from '../../store/index.ts';
 import { presetOf } from './animation-presets.ts';
+import { unsignedIntId } from './package-edits.ts';
 
-const MAX_DEPTH = 64;
+/** The walks go as deep as the reader builds a tree. */
+const MAX_DEPTH = MAX_XML_DEPTH;
 
 const isP = (el: Element | undefined, local: string): boolean =>
   !!el && el.ns === NS.p && el.local === local;
@@ -54,11 +58,16 @@ export const cTnOf = (node: Element): Element | undefined =>
 export const startDelayOf = (cTn: Element | undefined): string | undefined =>
   attr(child(child(cTn, 'p:stCondLst'), 'p:cond'), 'delay');
 
-const TRIGGERS: Readonly<Record<string, AnimationTrigger>> = {
-  clickEffect: 'onClick',
-  withEffect: 'withPrevious',
-  afterEffect: 'afterPrevious',
-};
+/** The trigger of each effect `nodeType`. A `Map`: the key is from the file. */
+const TRIGGERS: ReadonlyMap<string, AnimationTrigger> = new Map([
+  ['clickEffect', 'onClick'],
+  ['withEffect', 'withPrevious'],
+  ['afterEffect', 'afterPrevious'],
+]);
+
+/** The trigger of an effect `p:cTn`, from its `nodeType`, or undefined. */
+export const triggerOf = (cTn: Element | undefined): AnimationTrigger | undefined =>
+  TRIGGERS.get(attr(cTn, 'nodeType') ?? '');
 
 /** The `nodeType` that a trigger writes. */
 export const NODE_TYPES: Readonly<Record<AnimationTrigger, string>> = {
@@ -67,20 +76,19 @@ export const NODE_TYPES: Readonly<Record<AnimationTrigger, string>> = {
   afterPrevious: 'afterEffect',
 };
 
-const CLASSES: Readonly<Record<string, AnimationClass>> = {
-  entr: 'entrance',
-  emph: 'emphasis',
-  exit: 'exit',
-  path: 'motionPath',
-};
+/** The class of each `presetClass`. A `Map`: the key is from the file. */
+const CLASSES: ReadonlyMap<string, AnimationClass> = new Map([
+  ['entr', 'entrance'],
+  ['emph', 'emphasis'],
+  ['exit', 'exit'],
+  ['path', 'motionPath'],
+]);
 
 /** Whether a `p:par` is an effect: its `p:cTn` names a preset class or an effect node type. */
 export function isEffect(par: Element): boolean {
   if (!isP(par, 'par')) return false;
   const cTn = child(par, 'p:cTn');
-  return (
-    attr(cTn, 'presetClass') !== undefined || TRIGGERS[attr(cTn, 'nodeType') ?? ''] !== undefined
-  );
+  return attr(cTn, 'presetClass') !== undefined || triggerOf(cTn) !== undefined;
 }
 
 /** One effect of the main sequence, with the elements that hold it. */
@@ -130,9 +138,9 @@ function mainOf(rootList: Element): MainSequence | null | undefined {
     (s) => isP(s, 'seq') && attr(child(s, 'p:cTn'), 'nodeType') === 'mainSeq'
   );
   if (!seq) return undefined;
-  // The id goes into new markup (an automatic first step waits for it): digits only.
-  const raw = attr(child(seq, 'p:cTn'), 'id');
-  const id = raw !== undefined && /^\d{1,10}$/.test(raw) ? raw : undefined;
+  // The id goes into new markup (an automatic first step waits for it): an `xsd:unsignedInt`.
+  const num = unsignedIntId(attr(child(seq, 'p:cTn'), 'id'));
+  const id = num === undefined ? undefined : String(num);
   const list = listOf(seq);
   if (!list || id === undefined) return null;
   const clicks: MainSequence['clicks'][number][] = [];
@@ -147,7 +155,7 @@ function mainOf(rootList: Element): MainSequence | null | undefined {
       const own: MainEffect[] = [];
       for (const par of elements(effectList)) {
         const cTn = child(par, 'p:cTn');
-        const trigger = TRIGGERS[attr(cTn, 'nodeType') ?? ''];
+        const trigger = triggerOf(cTn);
         if (!isP(par, 'par') || !cTn || !trigger || attr(cTn, 'id') === undefined) return null;
         own.push({ par, cTn, trigger });
       }
@@ -158,6 +166,10 @@ function mainOf(rootList: Element): MainSequence | null | undefined {
   }
   return { seq, list, id, clicks, effects };
 }
+
+/** Whether a click step's start conditions include the slide start (`onBegin`). */
+export const startsWithSlide = (click: Element): boolean =>
+  elements(child(child(click, 'p:cTn'), 'p:stCondLst')).some((c) => attr(c, 'evt') === 'onBegin');
 
 /** The timing of a slide root, as the commands read it. */
 export function timingModel(root: Element | undefined): TimingModel {
@@ -289,7 +301,7 @@ export function readAnimations(root: Element | undefined): {
     const shape = shapes.get(shapeId);
     const presetClass = attr(cTn, 'presetClass');
     const presetId = smallInt(attr(cTn, 'presetID'));
-    const effectClass = CLASSES[presetClass ?? ''] ?? 'other';
+    const effectClass = CLASSES.get(presetClass ?? '') ?? 'other';
     const preset: AnimationPreset | null = presetOf(effectClass, presetId);
     const pRg = child(child(target, 'p:txEl'), 'p:pRg');
     const st = smallInt(attr(pRg, 'st'));
@@ -302,7 +314,7 @@ export function readAnimations(root: Element | undefined): {
       effectClass,
       preset,
       presetId,
-      trigger: TRIGGERS[attr(cTn, 'nodeType') ?? ''] ?? 'withPrevious',
+      trigger: triggerOf(cTn) ?? 'withPrevious',
       sequence,
       ...(triggerShapeId !== undefined
         ? { triggerShapeId, triggerShapeName: shapes.get(triggerShapeId)?.name ?? '' }
@@ -315,9 +327,11 @@ export function readAnimations(root: Element | undefined): {
     });
   };
   if (model.main) {
+    // A click step waits for a click unless it starts with the slide: its conditions, not the
+    // triggers of its effects, say when it plays.
     let step = 0;
     for (const click of model.main.clicks) {
-      if (click.groups[0]?.effects[0]?.trigger === 'onClick') step += 1;
+      if (!startsWithSlide(click.par)) step += 1;
       for (const group of click.groups)
         for (const e of group.effects) add(e.par, 'main', step, model.editable);
     }

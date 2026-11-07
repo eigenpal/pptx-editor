@@ -437,20 +437,28 @@ describe('transitions', () => {
   });
 
   test('a save keeps one transition, before the timing', async () => {
-    // Two collaborators who set a transition at the same time leave two, one after the timing.
+    // Two collaborators who set a transition at the same time leave two.
+    const { editor: a, peer: b, link, destroy } = await openPeers(deck(clickEntrances([2])));
+    try {
+      link.pause();
+      expect(a.exec({ type: 'setTransition', kind: 'fade' }).ok).toBe(true);
+      expect(b.exec({ type: 'setTransition', kind: 'push' }).ok).toBe(true);
+      link.flush();
+      const xml = slideXml(await open(a.save()!));
+      expect(xml.match(/<mc:AlternateContent/g)?.length).toBe(1);
+      expect(xml.indexOf('<mc:AlternateContent')).toBeLessThan(xml.indexOf('<p:timing>'));
+    } finally {
+      destroy();
+    }
+  });
+
+  test('a save leaves the transitions that the file wrote', async () => {
     const two =
       '<p:transition><p:fade/></p:transition>' +
       clickEntrances([2]) +
       '<p:transition><p:cut/></p:transition>';
     const e = await open(deck(two));
-    const saved = await open(e.save()!);
-    const xml = slideXml(saved);
-    expect(xml.match(/<p:transition>/g)?.length).toBe(1);
-    expect(xml).toContain('<p:fade/>');
-    expect(xml.indexOf('<p:transition>')).toBeLessThan(xml.indexOf('<p:timing>'));
-    // One transition in its place saves unchanged.
-    const one = await open(deck('<p:transition><p:fade/></p:transition>' + clickEntrances([2])));
-    expect(slideXml(await open(one.save()!))).toBe(slideXml(one));
+    expect(slideXml(await open(e.save()!))).toBe(slideXml(e));
   });
 
   test('refuses values out of range', async () => {

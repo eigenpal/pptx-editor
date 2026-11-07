@@ -5,10 +5,12 @@
 // hold one (ECMA-376 Part 3, §10.2.1). Two collaborators who each set the transition of one
 // slide at the same time both insert one, so the merge can hold two, and one after the timing.
 // The save keeps the first in document order, before the timing, and drops the others. A slide
-// with one transition in its place saves unchanged.
+// with one transition in its place saves unchanged, and so does a slide whose transitions are
+// all as the file wrote them (`fileTransitionsOnly`): the repair is for what the session wrote.
 
 import { NS } from './namespaces.ts';
 import { elements } from './query.ts';
+import { fileTransitionsOnly } from './timing.ts';
 import type { Element } from './tree.ts';
 
 const isP = (el: Element, local: string): boolean => el.ns === NS.p && el.local === local;
@@ -23,7 +25,7 @@ const holds = (el: Element, local: string): boolean =>
 export function repairTransitionRoot(root: Element): Element {
   const kids = elements(root);
   const transitions = kids.filter((c) => holds(c, 'transition'));
-  if (transitions.length === 0) return root;
+  if (transitions.length === 0 || fileTransitionsOnly(root)) return root;
   const timing = kids.findIndex((c) => holds(c, 'timing') || isP(c, 'extLst'));
   const first = kids.indexOf(transitions[0]);
   if (transitions.length === 1 && (timing < 0 || first < timing)) return root;

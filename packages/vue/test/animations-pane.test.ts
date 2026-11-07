@@ -87,6 +87,26 @@ describe('Animations pane', () => {
     expect(v).toContain('Appear');
   });
 
+  test('Vue renders the React error for a refused time', async () => {
+    const refuse = async (el: HTMLElement): Promise<string> => {
+      fireEvent.click(el.querySelector('.pptx-animations__row')!);
+      await flush();
+      const delay = el.querySelector<HTMLInputElement>('input[aria-label="Delay"]')!;
+      fireEvent.input(delay, { target: { value: '4000' } });
+      fireEvent.change(delay, { target: { value: '4000' } });
+      fireEvent.blur(delay);
+      await flush();
+      expect(delay.getAttribute('aria-invalid')).toBe('true');
+      // The error id comes from `useId`, which differs between the adapters.
+      return canon(el).replace(/\b(id|aria-describedby)="[^"]*"/g, '$1=""');
+    };
+    const r = await refuse(mountReact(await deck()));
+    cleanup();
+    const v = await refuse(await mountVue(await deck()));
+    expect(v).toEqual(r);
+    expect(v).toContain('role="alert"');
+  });
+
   for (const [name, mount] of [
     ['React', async (e: PptxEditorInstance) => mountReact(e)],
     ['Vue', mountVue],
