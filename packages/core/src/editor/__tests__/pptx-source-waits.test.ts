@@ -5,6 +5,7 @@ import { PPTX_ZIP_LIMITS } from '../../store/index.ts';
 import {
   fetchPptxSource,
   isAbortError,
+  SOURCE_BUFFER_BYTES,
   SOURCE_MAX_BYTES,
   watchEagerPptxFonts,
 } from '../pptx-source.ts';
@@ -58,16 +59,25 @@ describe('fetchPptxSource', () => {
   });
 
   test('a slow body that keeps sending bytes finishes past the stall limit', async () => {
+    // A byte each 20 ms against a stall limit of 300 ms: a busy machine stays far inside it.
+    const stall = 300;
     serve(async (c) => {
-      for (let i = 0; i < 8; i += 1) {
+      for (let i = 0; i < 20; i += 1) {
         c.enqueue(new Uint8Array([i]));
-        await sleep(STALL / 3);
+        await sleep(20);
       }
       c.close();
     });
-    const { ms, result } = await fetchWithStall();
-    expect(result).toEqual(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]));
-    expect(ms).toBeGreaterThan(STALL);
+    const { ms, result } = await settle(
+      fetchPptxSource(
+        'https://example.test/deck.pptx',
+        undefined,
+        new AbortController().signal,
+        stall
+      )
+    );
+    expect(result).toEqual(new Uint8Array(Array.from({ length: 20 }, (_, i) => i)));
+    expect(ms).toBeGreaterThan(stall);
   });
 
   test("the caller's abort ends a stalled body as an abort", async () => {
@@ -174,6 +184,27 @@ describe('fetchPptxSource', () => {
     expect(await fetched()).toEqual([1, 2, 3]);
     serveChunks([[1, 2], [3]]);
     expect(await fetched()).toEqual([1, 2, 3]);
+  });
+
+  test('a declared length past the buffer limit sets aside only the limit', async () => {
+    expect(SOURCE_BUFFER_BYTES).toBeLessThanOrEqual(64 * 1024 * 1024);
+    const run = (length: string) => {
+      serveChunks([[1, 2], [3], [4, 5]], length);
+      return fetchPptxSource(
+        'https://example.test/deck.pptx',
+        undefined,
+        new AbortController().signal,
+        STALL,
+        256,
+        2
+      );
+    };
+    // The first two bytes fill the buffer; the rest arrive in chunks past it.
+    expect([...(await run('5'))]).toEqual([1, 2, 3, 4, 5]);
+    // A server that declares the whole limit and sends five bytes.
+    const few = await run('256');
+    expect([...few]).toEqual([1, 2, 3, 4, 5]);
+    expect(few.buffer.byteLength).toBe(5);
   });
 
   test('an HTTP error fails at once', async () => {

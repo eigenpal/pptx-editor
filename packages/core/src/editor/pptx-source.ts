@@ -196,12 +196,19 @@ export const SOURCE_STALL_MS = 10_000;
 export const SOURCE_MAX_BYTES = PPTX_ZIP_LIMITS.maxTotalBytes + 16 * 1024 * 1024;
 
 /**
+ * The most bytes a download sets aside before they arrive, from its `Content-Length`. A server
+ * can declare any length, so a larger file goes on in chunks past this buffer. @internal
+ */
+export const SOURCE_BUFFER_BYTES = 64 * 1024 * 1024;
+
+/**
  * Fetch a URL source with the browser's `fetch`, as the caller wrote it. Rejects with a
  * `TimeoutError` when no response or no body bytes arrive for `stallMs`, with a `RangeError`
  * when the body is longer than `maxBytes`, and with the abort when `signal` aborts. The default
  * `maxBytes` is the longest file the editor opens (`SOURCE_MAX_BYTES`), so a server that never
  * stops sending cannot grow the page's memory without end. With a valid `Content-Length`, the
- * body goes into one buffer of that length, so the download holds the file once, not twice.
+ * body goes into one buffer of that length, up to `bufferBytes`, so a download of up to that
+ * length holds the file once, not twice.
  * A URL from user input needs the caller's own check first: this adds no allowlist. @internal
  */
 export async function fetchPptxSource(
@@ -209,7 +216,8 @@ export async function fetchPptxSource(
   init: RequestInit | undefined,
   signal: AbortSignal,
   stallMs = SOURCE_STALL_MS,
-  maxBytes = SOURCE_MAX_BYTES
+  maxBytes = SOURCE_MAX_BYTES,
+  bufferBytes = SOURCE_BUFFER_BYTES
 ): Promise<Uint8Array> {
   signal.throwIfAborted();
   const controller = new AbortController();
@@ -250,8 +258,8 @@ export async function fetchPptxSource(
     }
     const reader = response.body.getReader();
     // The declared length is a hint: an encoded body can decode to more or fewer bytes. Bytes
-    // past it go to chunks after the buffer.
-    const buffer = declared ? new Uint8Array(declared) : undefined;
+    // past it, or past `bufferBytes`, go to chunks after the buffer.
+    const buffer = declared ? new Uint8Array(Math.min(declared, bufferBytes)) : undefined;
     let filled = 0;
     const chunks: Uint8Array[] = [];
     let size = 0;

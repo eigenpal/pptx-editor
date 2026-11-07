@@ -2089,7 +2089,7 @@ export function exportSlidesPngZip(session: DocumentSession, options?: SlideImag
 export function exportSlideSvg(session: DocumentSession, index: number, options?: SlideImageOptions): string;
 
 // @internal
-export function fetchPptxSource(url: string | URL, init: RequestInit | undefined, signal: AbortSignal, stallMs?: number, maxBytes?: number): Promise<Uint8Array>;
+export function fetchPptxSource(url: string | URL, init: RequestInit | undefined, signal: AbortSignal, stallMs?: number, maxBytes?: number, bufferBytes?: number): Promise<Uint8Array>;
 
 // @internal
 export const fieldPart: (name: string) => {
