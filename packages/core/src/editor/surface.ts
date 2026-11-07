@@ -42,7 +42,7 @@ import { fitZoom, outsideVeil, scrollBoxIntoView } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
 import { selectionAnnouncement } from './surface-announce.ts';
 import { ShapeDrag, type Handle } from './surface-drag.ts';
-import { handleElements } from './surface-handles.ts';
+import { handleElements, memberOutline } from './surface-handles.ts';
 import {
   adjustAt,
   adjustDragLive,
@@ -366,6 +366,11 @@ export class SlideSurface {
     // A single line is edited by its two end points: no box, no rotation.
     const line = selected.length === 1 && isLineItem(selected[0]) ? lineEnds(selected[0]) : null;
     for (const item of line ? [] : selected) {
+      // One shape of several: a thin line just outside it, under the common box's handles.
+      if (selected.length > 1) {
+        parts.push(memberOutline(doc, item, px));
+        continue;
+      }
       const g = this.#outline(doc, item, px * (sel.kind === 'text' ? 1 : 1.5));
       if (sel.kind === 'text')
         g.firstElementChild?.setAttribute('stroke-dasharray', `${px * 4} ${px * 3}`);

@@ -84,3 +84,32 @@ export function handleElements(
   }
   return parts;
 }
+
+/** How far outside a shape's box the outline of one shape of several sits, in CSS pixels. */
+export const MEMBER_OUTSET = 1;
+
+/**
+ * The outline of one shape of a multiple selection, in slide units (`px` is one CSS pixel): a
+ * 1 px line `MEMBER_OUTSET` px outside the shape's box, so it never covers the shape's text or
+ * border, at any zoom. The common box of the selection carries the handles.
+ */
+export function memberOutline(doc: Document, item: LayoutItem, px: number): SVGGElement {
+  const { cx, cy } = item.element.xfrm;
+  const [a, b, c, d] = item.matrix;
+  // The item's own units: a shape in a scaled group has a scaled frame.
+  const sx = Math.hypot(a, b) || 1;
+  const sy = Math.hypot(c, d) || 1;
+  const ox = (px * MEMBER_OUTSET) / sx;
+  const oy = (px * MEMBER_OUTSET) / sy;
+  const g = doc.createElementNS(SVG_NS, 'g') as SVGGElement;
+  g.setAttribute('transform', `matrix(${item.matrix.join(' ')})`);
+  const rect = doc.createElementNS(SVG_NS, 'rect');
+  rect.setAttribute('class', 'pptx-surface__outline pptx-surface__outline--member');
+  rect.setAttribute('x', String(-ox));
+  rect.setAttribute('y', String(-oy));
+  rect.setAttribute('width', String(cx + 2 * ox));
+  rect.setAttribute('height', String(Math.max(cy, 1) + 2 * oy));
+  rect.setAttribute('stroke-width', String(px / Math.sqrt(sx * sy)));
+  g.append(rect);
+  return g;
+}

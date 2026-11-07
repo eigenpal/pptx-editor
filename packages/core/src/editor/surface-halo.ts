@@ -4,8 +4,13 @@
 // mark with a light halo stays visible on a dark slide and on a light one, as the handles are
 // (a light fill with a blue edge). A caret in text takes the text's color instead, and no halo.
 
-/** The overlay marks that get a halo, and how much wider than the mark the halo is. */
-const HALOED: readonly (readonly [string, number])[] = [
+/**
+ * The overlay marks that get a halo, how much wider than the mark the halo is, and the halo's
+ * modifier. The first match wins. The outline of one shape of several gets a narrow halo: it sits
+ * just outside the shape, and a shape that touches it keeps its text clear.
+ */
+const HALOED: readonly (readonly [string, number, string?])[] = [
+  ['pptx-surface__outline--member', 2, 'pptx-surface__halo--member'],
   ['pptx-surface__outline', 3],
   ['pptx-surface__group-outline', 3],
   ['pptx-surface__marquee', 3],
@@ -22,7 +27,7 @@ function haloOf(mark: Element): Element | null {
   const width = Number(mark.getAttribute('stroke-width') ?? '0');
   halo.setAttribute(
     'class',
-    `pptx-surface__halo ${kind[0].replace('pptx-surface__', 'pptx-surface__halo--')}`
+    `pptx-surface__halo ${kind[2] ?? kind[0].replace('pptx-surface__', 'pptx-surface__halo--')}`
   );
   halo.setAttribute('stroke-width', String(width * kind[1]));
   // A solid halo under a dashed mark makes dark and light dashes: both show on any slide.
