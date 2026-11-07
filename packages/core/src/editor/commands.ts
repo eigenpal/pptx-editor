@@ -733,14 +733,10 @@ export function compile(
     case 'paste': {
       const part = slidePart(ctx);
       const p = command.payload as unknown as { document?: unknown; slidePart?: unknown };
-      const here = p?.document === ctx.session.id && p.slidePart === part;
+      const same = p?.document === ctx.session.id;
       // Each repeated paste onto the source slide moves 0.25 in further.
-      const out = pasteShapes(
-        batch,
-        part,
-        command.payload,
-        here ? 228_600 * (ctx.pasteRepeat ?? 1) : 0
-      );
+      const offset = same && p.slidePart === part ? 228_600 * (ctx.pasteRepeat ?? 1) : 0;
+      const out = pasteShapes(batch, part, command.payload, offset, same);
       if (!out.length) throw new CommandRefusal('errors.clipboard');
       writeCopiedTableMarkers(batch, part, out);
       return { batch, effect: { label: 'paste', selection: shapesSelection(out, undefined) } };

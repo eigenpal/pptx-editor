@@ -47,6 +47,10 @@ import { attr, child, elements } from './query.ts';
 import type { Element, Node } from './tree.ts';
 
 const NONE: ReadonlySet<string> = new Set();
+const NO_TARGETS: ReadonlySet<Element> = new Set();
+/** The `spid` that a removed target element stands for: no attribute can hold it. */
+const GONE_SPID = '\u0000target';
+const GONE_TARGET: ReadonlySet<string> = new Set([GONE_SPID]);
 
 const isP = (el: Element, local: string): boolean => el.ns === NS.p && el.local === local;
 const isAlternate = (el: Element): boolean => el.ns === NS.mc && el.local === 'AlternateContent';
@@ -137,6 +141,15 @@ export function timingRemovals(root: Element, gone: ReadonlySet<string>): Elemen
 }
 
 /**
+ * The elements of a slide root to remove when the paragraphs that the target elements
+ * `targets` (`p:spTgt` with a `p:txEl`) animate are all gone, by the rules of
+ * `timingRemovals`: an effect cannot keep a target that names no paragraph. @internal
+ */
+export function paragraphTargetRemovals(root: Element, targets: ReadonlySet<Element>): Element[] {
+  return removalsIn(root, GONE_TARGET, () => true, false, targets);
+}
+
+/**
  * A slide root as the writer saves it: each `p:timing` that the session changed loses the time
  * node lists and build lists that are empty, by the rules of `timingRemovals` with no shape
  * gone. The root itself when nothing changes.
@@ -172,17 +185,19 @@ function removalsIn(
   root: Element,
   gone: ReadonlySet<string>,
   include: (timing: Element) => boolean,
-  repair: boolean
+  repair: boolean,
+  targets: ReadonlySet<Element> = NO_TARGETS
 ): Element[] {
   const out: Element[] = [];
   const own = child(root, 'p:timing');
-  if (own && include(own)) topmost(own, deadIn(own, gone, repair), out);
+  if (own && include(own)) topmost(own, deadIn(own, gone, repair, targets), out);
   for (const ac of elements(root).filter(isAlternate)) {
     const branches = elements(ac).filter(isBranch);
     const timings = branches.flatMap((b) => elements(b).filter((t) => isP(t, 'timing')));
     if (timings.length === 0) continue;
     const dead = new Set<Element>();
-    for (const t of timings) if (include(t)) for (const el of deadIn(t, gone, repair)) dead.add(el);
+    for (const t of timings)
+      if (include(t)) for (const el of deadIn(t, gone, repair, targets)) dead.add(el);
     if (dead.size === 0) continue;
     if (branches.every((b) => elements(b).every((c) => dead.has(c)))) out.push(ac);
     else for (const t of timings) topmost(t, dead, out);
@@ -250,7 +265,10 @@ interface TimeGraph {
   readonly waiters: Map<string, TimeNode[]>;
 }
 
-function readGraph(tnLst: Element | undefined): TimeGraph {
+function readGraph(
+  tnLst: Element | undefined,
+  targets: ReadonlySet<Element> = NO_TARGETS
+): TimeGraph {
   const graph: TimeGraph = { nodes: [], lists: [], waiters: new Map() };
   const { nodes, lists, waiters } = graph;
   // What a node's own content names: every element under it outside its time node lists.
@@ -258,6 +276,7 @@ function readGraph(tnLst: Element | undefined): TimeGraph {
     if (depth > MAX_XML_DEPTH) return;
     const spid = attr(el, 'spid');
     if (spid !== undefined) n.spids.push(spid);
+    if (targets.has(el)) n.spids.push(GONE_SPID);
     if (isP(el, 'tn')) {
       const val = attr(el, 'val');
       const at = val === undefined ? undefined : waiters.get(val);
@@ -363,10 +382,15 @@ function spidIn(el: Element, gone: ReadonlySet<string>, depth: number): boolean 
  * The elements of one `p:timing` (itself included) that go when the shapes in `gone` go, and
  * with `repair` the lists that are already empty.
  */
-function deadIn(timing: Element, gone: ReadonlySet<string>, repair: boolean): Set<Element> {
+function deadIn(
+  timing: Element,
+  gone: ReadonlySet<string>,
+  repair: boolean,
+  targets: ReadonlySet<Element> = NO_TARGETS
+): Set<Element> {
   const dead = new Set<Element>();
   const tnLst = child(timing, 'p:tnLst');
-  const graph = readGraph(tnLst);
+  const graph = readGraph(tnLst, targets);
   removeTimeNodes(graph, gone, repair, dead);
   const bldLst = child(timing, 'p:bldLst');
   const builds = elements(bldLst);

@@ -10,7 +10,7 @@ import { canonicalPackageFingerprint, readPptx } from '../../store/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 import type { NotesParagraph } from '../../contracts/index.ts';
 import { notesParagraphs } from '../../automation/commands/notes-commands.ts';
-import { diffHunks } from '../../automation/commands/text-diff.ts';
+import { diffHunks } from '../../store/package/text-diff.ts';
 
 async function open(): Promise<PptxEditorInstance> {
   const e = createPptxEditor({ fixedMeasurer: true, substitutes: false });

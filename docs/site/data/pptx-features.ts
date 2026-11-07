@@ -397,7 +397,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'The side panel has a Selection tab that lists the objects of the slide as a tree. It selects objects, hidden ones too, shows or hides them with the eye button or the H key, renames them, and moves them forward or backward. The toolbar Selection pane button turns a mounted side panel to that tab, and a host can listen to show a closed panel. The commands also work inside mc:AlternateContent. There, other edits of a drawn choice remove the out-of-date copies in the other branches: an approximation.',
+      'The side panel has a Selection tab that lists the objects of the slide as a tree. It selects objects, hidden ones too, shows or hides them with the eye button or the H key, renames them, and moves them forward or backward. The toolbar Selection pane button turns a mounted side panel to that tab, and a host can listen to show a closed panel. The commands also work inside mc:AlternateContent. There, a move, a resize, a rotation, or a flip changes the copies in the other branches too. Other edits of a drawn choice remove the out-of-date copies in the other branches: an approximation.',
     docsLink: '/docs/customization/layout#open-the-selection-pane',
   },
   {
@@ -840,7 +840,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'preserved',
     tier: 'community',
     notes:
-      'Kept on save and not played. Deleting, cutting, or ungrouping shapes, deleting a table, and turning slide numbers off remove the animations of the removed shapes. Deleting a paragraph does not update a paragraph animation range (`p:pRg`).',
+      'Kept on save and not played. Deleting, cutting, or ungrouping shapes, deleting a table, and turning slide numbers off remove the animations of the removed shapes. A paragraph animation range (`p:pRg`) follows its paragraphs when you add, delete, split, or join paragraphs. An effect whose paragraphs are all deleted goes too.',
   },
 
   // --- Comments & review -----------------------------------------------

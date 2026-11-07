@@ -468,15 +468,20 @@ export function renumberShapes(
   const key = (id: string | undefined): string | undefined =>
     id === undefined ? undefined : String(unsignedIntId(id) ?? id);
   const map = new Map<string, string>();
-  const collect = (n: NodeSpec, depth: number): void => {
+  // The copies of one object in the branches of an `mc:AlternateContent` share one id, so they
+  // keep one new id too.
+  const collect = (n: NodeSpec, depth: number, twins?: Map<string, number>): void => {
     if (depth > 64) return;
+    if (n.ns === NS.mc && n.local === 'AlternateContent') twins = new Map();
     if (isCNvPr(n)) {
       const old = key(idOf(n));
-      const id = take();
+      const twin = old === undefined ? undefined : twins?.get(old);
+      const id = twin ?? take();
       fresh.push(id);
+      if (old !== undefined && twin === undefined) twins?.set(old, id);
       if (old !== undefined && !map.has(old)) map.set(old, String(id));
     }
-    for (const c of n.children ?? []) if (!('text' in c)) collect(c, depth + 1);
+    for (const c of n.children ?? []) if (!('text' in c)) collect(c, depth + 1, twins);
   };
   for (const s of specs) collect(s, 0);
   let next = 0;

@@ -583,6 +583,8 @@ export interface ClipboardRelationship {
     readonly id: string;
     // (undocumented)
     readonly part: string;
+    readonly relationships?: readonly ClipboardRelationship[];
+    readonly target?: string;
     // (undocumented)
     readonly type: string;
 }
