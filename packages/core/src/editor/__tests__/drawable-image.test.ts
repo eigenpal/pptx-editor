@@ -145,6 +145,41 @@ test('an SVG picture with a marker inside marker content draws nothing', () => {
   expect(svg(svgDoc(linked))).toBeUndefined();
 });
 
+test('ordinary SVG pictures with text, fonts, and markers draw', () => {
+  // "data:" in text that is not a link.
+  const labelled = '<rect width="1" height="1" aria-label="Sales data: 2024" data-name="data:x"/>';
+  expect(svg(svgDoc(labelled))).toBe('image/svg+xml');
+  // A font in a data: URI.
+  const font = '<style>@font-face{font-family:X;src:url(data:font/woff2;base64,AAAA)}</style>';
+  expect(svg(svgDoc(`${font}<text>hi</text>`))).toBe('image/svg+xml');
+  // An arrowhead path that a class rule sets on the links, not on the arrowhead.
+  const arrow = '<defs><marker id="a"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>';
+  const links = '<style>.link{marker-end:url(#a)}</style><path class="link" d="M0 0 L100 100"/>';
+  expect(svg(svgDoc(arrow + links))).toBe('image/svg+xml');
+  // A map of 1,200 curves of 30 segments, and one line with an arrowhead.
+  const d = `M0 0 ${Array.from({ length: 30 }, (_, i) => `C${i} ${i} ${i} ${i} ${i} ${i}`).join(' ')}`;
+  const map = `<path d="${d}"/>`.repeat(1_200);
+  const line = '<line x1="0" y1="0" x2="5" y2="5" marker-end="url(#a)"/>';
+  expect(svg(svgDoc(arrow + line + map))).toBe('image/svg+xml');
+  // Markers that reach a long path count each segment once, not each number.
+  const dots = `<defs><marker id="m">${'<circle r="1"/>'.repeat(9)}</marker></defs>`;
+  const curve = `M0 0${' C1 1 2 2 3 3'.repeat(15_000)}`;
+  expect(svg(svgDoc(`${dots}<path d="${curve}" marker-mid="url(#m)"/>`))).toBe('image/svg+xml');
+});
+
+test('markers that reach marker content or copies of long paths draw nothing', () => {
+  const arrow = '<defs><marker id="a"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>';
+  // A selector that this check does not read reaches every element, also the arrowhead.
+  const sheet = '<style>svg path{marker-end:url(#a)}</style><path d="M0 0 L1 1"/>';
+  expect(svg(svgDoc(arrow + sheet))).toBeUndefined();
+  // A marker on a <use> reaches the path that it copies.
+  const dots = `<defs><marker id="m">${'<circle r="1"/>'.repeat(99)}</marker>`;
+  const long = `<path id="p" d="M0 0${' L1 1'.repeat(5_000)}"/></defs>`;
+  expect(svg(svgDoc(`${dots}${long}<g marker-mid="url(#m)"><use href="#p"/></g>`))).toBe(undefined);
+  // An HTML document in a style.
+  expect(svg(svgDoc('<style>rect{fill:url(data:text/html,x)}</style><rect/>'))).toBeUndefined();
+});
+
 test('an SVG picture with a plain document type declaration draws', () => {
   const doctype =
     '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" ' +
