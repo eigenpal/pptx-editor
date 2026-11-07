@@ -2,6 +2,7 @@
 // parts (presentation, its relationships, content types, the slide, its notes) in ONE
 // transaction. Speaker notes are in `notes-commands.ts`.
 
+import { patternXml, pictureFillXml, pictureType } from './fill-commands.ts';
 import {
   attr,
   child,
@@ -371,6 +372,15 @@ export function moveSlide(batch: OpBatch, from: number, to: number, section?: st
 
 export { find, relationshipsOf };
 
+function pictureBackground(
+  batch: OpBatch,
+  part: string,
+  p: Extract<SlideBackground, { kind: 'picture' }>
+): string {
+  const type = pictureType(p.bytes);
+  return pictureFillXml(addImagePart(batch, part, p.bytes, type), p.tile === true);
+}
+
 /** Set or remove the background of a slide (`p:cSld/p:bg`). */
 export function setSlideBackground(
   batch: OpBatch,
@@ -388,9 +398,11 @@ export function setSlideBackground(
       ? fillXml(background.color)
       : background.kind === 'gradient'
         ? gradientXml(background.gradient)
-        : background.kind === 'picture'
-          ? `<a:blipFill dpi="0" rotWithShape="1"><a:blip r:embed="${addImagePart(batch, part, background.bytes, background.mime)}"/><a:srcRect/><a:stretch><a:fillRect/></a:stretch></a:blipFill>`
-          : null;
+        : background.kind === 'pattern'
+          ? patternXml(background.pattern)
+          : background.kind === 'picture'
+            ? pictureBackground(batch, part, background)
+            : null;
   if (!fill) throw new CommandRefusal('errors.unsupported', 'background');
   // `p:bg` is the first child of `p:cSld`.
   batch.insert({

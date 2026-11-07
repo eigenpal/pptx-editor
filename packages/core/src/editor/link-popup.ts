@@ -26,6 +26,8 @@
 
 import type { Editor, EditorSelection } from '../contracts/index.ts';
 import { sanitizeHref } from '../store/index.ts';
+import type { Translate } from '@pptx-editor.dev/i18n';
+import { slideLinkIndex, slideLinkLabel } from './link-fields.ts';
 import { surfaceInputOf, surfaceRootOf } from './surface-registry.ts';
 
 /** What the link popup shows. @public */
@@ -72,9 +74,12 @@ export interface HyperlinkPopupController {
   commitEdit(): boolean;
   /** Remove the link, keeping its text. False when the engine refused. */
   unlink(): boolean;
-  /** Copy the safe target. False when there is none or the clipboard refused. */
+  /** Copy the safe target. False when there is none, it is a slide link, or the clipboard refused. */
   copy(): Promise<boolean>;
-  /** Open the safe target in a new tab, with no opener. False when there is none. */
+  /**
+   * Open the safe target in a new tab, with no opener; a slide link shows its slide in the
+   * editor instead. False when there is none.
+   */
   openTarget(): boolean;
   close(): void;
   /** Stop following the editor. */
@@ -211,7 +216,8 @@ export function createHyperlinkPopupController(
     async copy() {
       const href = state.href;
       const target = clipboard();
-      if (!href || !target) return false;
+      // A slide link names a place in this deck, not an address to paste elsewhere.
+      if (!href || !target || href.startsWith('#')) return false;
       try {
         await target.writeText(href);
       } catch {
@@ -222,6 +228,15 @@ export function createHyperlinkPopupController(
     },
     openTarget() {
       const href = state.href;
+      if (href?.startsWith('#')) {
+        // A slide link shows its slide in the editor.
+        const snap = editor.snapshot();
+        const index = slideLinkIndex(href, snap.currentSlide, snap.slides.length);
+        if (index === null) return false;
+        close();
+        editor.goToSlide(index);
+        return true;
+      }
       const doc =
         state.anchor?.ownerDocument ?? (typeof document === 'undefined' ? null : document);
       if (!href || !doc) return false;
@@ -354,12 +369,11 @@ export function listenLinkPanelKey(
 }
 
 /** What the root's polite live region says for a state: the open link, or the copy. @internal */
-export function linkPopupAnnouncement(
-  state: HyperlinkPopupState,
-  t: (key: 'link.announce' | 'link.copied', params?: Record<string, string>) => string
-): string {
+export function linkPopupAnnouncement(state: HyperlinkPopupState, t: Translate): string {
   if (state.mode !== 'reading') return '';
-  return state.copied ? t('link.copied') : t('link.announce', { url: state.url });
+  // A slide link says its slide ("Slide 3"), not its `#` form.
+  const url = slideLinkLabel(t, state.url) || state.url;
+  return state.copied ? t('link.copied') : t('link.announce', { url });
 }
 
 /** The mark a `popups.hyperlink` renderer carries when it shows reading mode too. */

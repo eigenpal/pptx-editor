@@ -198,7 +198,7 @@ class Collector {
         if (tabbed && run.text.includes('\t')) this.add('tab-stops');
         if (props.caps === 'small') this.add('small-caps');
         if (props.baseline !== 0) this.add('script-size');
-        if (props.hyperlink) this.add('hyperlink-text');
+        if (props.hyperlink || props.hyperlinkAction) this.add('hyperlink-text');
         if (!DRAWN_UNDERLINES.has(props.underline)) this.add('underline-styles');
         const fill = props.fill.type === 'group' ? this.group : props.fill;
         if (fill?.type === 'linear' || fill?.type === 'path') this.add('gradient-text');

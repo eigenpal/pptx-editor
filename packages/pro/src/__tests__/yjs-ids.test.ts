@@ -544,6 +544,22 @@ describe('every shape mint, on both peers at once', () => {
       converged(a, b, after);
     });
 
+  test('two peers fill one empty placeholder: two objects with two ids', async () => {
+    const content =
+      '<p:sp><p:nvSpPr><p:cNvPr id="3" name="Content Placeholder 2"/><p:cNvSpPr/>' +
+      '<p:nvPr><p:ph idx="1"/></p:nvPr></p:nvSpPr><p:spPr/>' +
+      '<p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody></p:sp>';
+    const withPlaceholder = (): Uint8Array =>
+      buildPptx({ slides: [{ layout: 'title', shapes: content }] });
+    const { a, b, sync } = await replicas(withPlaceholder);
+    sync.pause();
+    expect(a.exec({ type: 'insertTable', rows: 2, cols: 2 }).ok).toBe(true);
+    expect(b.exec({ type: 'insertTable', rows: 1, cols: 1 }).ok).toBe(true);
+    sync.flush();
+    // The tree's own id and the two tables; the placeholder is gone.
+    converged(a, b, 3);
+  });
+
   test('a peer that joins late mints in its own stripe while the others mint too', async () => {
     const { a, b, docs, sync } = await replicas(fourShapes);
     const late = new Y.Doc();

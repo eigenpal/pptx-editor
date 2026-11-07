@@ -221,13 +221,16 @@ export function resolveRunProps(
   const kernRaw = pick('kern');
   const kern = kernRaw !== undefined && /^\d{1,6}$/.test(kernRaw) ? Number(kernRaw) : undefined;
   const hlink = lastChild(chain, ['hlinkClick']);
-  const hyperlink = attr(hlink, 'r:id');
+  // A link names a relationship, or only an action (a jump to the next slide has no target).
+  const hyperlink = attr(hlink, 'r:id') || undefined;
+  const hyperlinkAction = attr(hlink, 'action') || undefined;
+  const linked = !!(hyperlink || hyperlinkAction);
   // Link text takes the theme's hyperlink color, unless the link asks for the text's own
   // color (`ahyp:hlinkClr val="tx"`, an `a:extLst` extension).
   const ownColor = elements(child(hlink, 'a:extLst')).some((ext) =>
     elements(ext).some((c) => c.local === 'hlinkClr' && attr(c, 'val') === 'tx')
   );
-  if (hyperlink && !ownColor) {
+  if (linked && !ownColor) {
     const color = schemeColor('hlink', ctx);
     if (color) fill = { type: 'solid', color };
   }
@@ -236,7 +239,7 @@ export function resolveRunProps(
     bold: (pick('b') ?? '0') === '1' || pick('b') === 'true',
     italic: (pick('i') ?? '0') === '1' || pick('i') === 'true',
     // Links are underlined unless the run says otherwise.
-    underline: pick('u') ?? (hyperlink ? 'sng' : 'none'),
+    underline: pick('u') ?? (linked ? 'sng' : 'none'),
     strike: pick('strike') ?? 'noStrike',
     caps: capRaw === 'all' || capRaw === 'small' ? capRaw : 'none',
     spacing: Number.isFinite(spc) ? Math.max(-400_000, Math.min(spc, 400_000)) : 0,
@@ -254,6 +257,7 @@ export function resolveRunProps(
     ...(lang ? { lang } : {}),
     ...(altLang ? { altLang } : {}),
     ...(hyperlink ? { hyperlink } : {}),
+    ...(hyperlinkAction ? { hyperlinkAction } : {}),
   };
 }
 

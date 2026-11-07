@@ -164,6 +164,7 @@ export function backgroundStatusKey(
   if (chosen === null) return 'background.layoutChosen';
   if (chosen === undefined) return 'background.ownFill';
   if (chosen.kind === 'picture') return 'background.imageChosen';
+  if (chosen.kind === 'pattern') return chosen === opening ? null : 'background.patternChosen';
   const customGradient =
     chosen.kind === 'gradient' &&
     chosen !== opening &&

@@ -277,6 +277,16 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
       ],
     },
   })),
+  setShapePattern: onA(() => ({
+    type: 'setShapePattern',
+    pattern: { preset: 'dkDnDiag', foreground: '#C00000', background: '#FFFFFF' },
+  })),
+  setShapePicture: onA(() => ({
+    type: 'setShapePicture',
+    bytes: png(4, 4, 120),
+    mime: 'image/png',
+    tile: true,
+  })),
   setLineColor: onA(() => ({ type: 'setLineColor', color: { theme: 'accent2', shift: -25 } })),
   setLineWidth: onA(() => ({ type: 'setLineWidth', points: 4 })),
   setLineDash: onA(() => ({ type: 'setLineDash', dash: 'dash' })),
@@ -293,6 +303,12 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
     style: { row: 'intenseEffect', color: 'accent2' },
   })),
 
+  // A new rounded rectangle (selected after the insert): its corner handle moves.
+  setAdjustments: {
+    arrange: (e) => void e.exec({ type: 'insertShape', preset: 'roundRect' }),
+    command: () => ({ type: 'setAdjustments', values: { adj: 40_000 } }),
+  },
+
   // Slides, notes, and sections.
   addSlide: { command: () => ({ type: 'addSlide' }) },
   duplicateSlide: { command: () => ({ type: 'duplicateSlide', index: 1 }) },
@@ -307,6 +323,10 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
       type: 'setSlideBackground',
       background: { kind: 'solid', color: '#F2F2F2' },
     }),
+  },
+  // 4:3 from the 16:9 coverage deck: every box on the slides, layouts, and masters scales.
+  setSlideSize: {
+    command: () => ({ type: 'setSlideSize', width: 9_144_000, height: 6_858_000 }),
   },
   applyLayout: {
     command: (e) => {

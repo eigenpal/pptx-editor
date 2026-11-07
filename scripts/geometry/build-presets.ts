@@ -54,7 +54,19 @@ for (const shape of root.children) {
   const rect = find('rect');
   // Adjust handles (ECMA-376 Part 1, 20.1.9.1 ahLst): each guide a handle moves, with its range.
   const handles: [string, string, string | null, string | null][] = [];
+  // Where each handle sits (`a:pos`), with the guides it moves: x and y, or radius and angle.
+  const places: [string, string, string, string | null, string | null][] = [];
   for (const h of find('ahLst')?.children ?? []) {
+    const pos = h.children.find((c) => c.name === 'pos');
+    const polar = h.name === 'ahPolar';
+    if (pos)
+      places.push([
+        polar ? 'polar' : 'xy',
+        pos.attrs.x,
+        pos.attrs.y,
+        (polar ? h.attrs.gdRefR : h.attrs.gdRefX) ?? null,
+        (polar ? h.attrs.gdRefAng : h.attrs.gdRefY) ?? null,
+      ]);
     const axes: [string, string, string, string][] =
       h.name === 'ahPolar'
         ? [
@@ -101,6 +113,7 @@ for (const shape of root.children) {
     ...(rect ? { rect: [rect.attrs.l, rect.attrs.t, rect.attrs.r, rect.attrs.b] } : {}),
     paths,
     ...(handles.length > 0 ? { ah: handles } : {}),
+    ...(places.length > 0 ? { hp: places } : {}),
   };
 }
 

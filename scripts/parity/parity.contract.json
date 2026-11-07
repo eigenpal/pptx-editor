@@ -39,7 +39,18 @@
     },
     "PptxEditorSidePanel": {
       "reactProps": "SidePanelProps",
-      "paired": ["className", "onClose", "paneWidth", "style"],
+      "paired": ["className", "onClose", "paneWidth", "style", "tab"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {
+        "onTabChange": ["tabChange", "update:tab"]
+      },
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PptxEditorSelectionPane": {
+      "reactProps": "SelectionPaneProps",
+      "paired": ["className"],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {},
       "reactRenderPropsAsVueSlots": {},
@@ -209,6 +220,15 @@
     "GradientDialog": {
       "reactProps": "GradientDialogProps",
       "paired": ["initial", "onApply", "onClose", "open"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {},
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "PatternDialog": {
+      "reactProps": "PatternDialogProps",
+      "paired": ["base", "initial", "onApply", "onClose", "open"],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {},
       "reactRenderPropsAsVueSlots": {},
@@ -931,6 +951,7 @@
     "paired": [
       "NotesPaneProps",
       "PaneProps",
+      "SelectionPaneProps",
       "SidePanelProps",
       "SlideRailProps",
       "SlideSorterProps",
@@ -1101,6 +1122,9 @@
       "FontPickerGroupId",
       "FontPickerRow",
       "GradientFill",
+      "PatternFill",
+      "PatternPreset",
+      "SidePanelTab",
       "ParagraphDialogFields",
       "PptxEditorInstance",
       "RibbonTabId",
@@ -1166,6 +1190,8 @@
       "FillControl",
       "GradientDialog",
       "GradientDialogProps",
+      "PatternDialog",
+      "PatternDialogProps",
       "LayoutControl",
       "LayoutGallery",
       "LayoutGalleryProps",
@@ -1190,6 +1216,8 @@
       "HyperlinkPopupState",
       "rejectionMessage",
       "requestFindBar",
+      "listenPaneRequests",
+      "requestPane",
       "useSlideshow",
       "PptxEditorContentProps",
       "PptxEditorViewportProps",
@@ -1263,6 +1291,7 @@
     "reactNamesAsVueNames": {
       "SlideRail": "PptxEditorSlideRail",
       "SidePanel": "PptxEditorSidePanel",
+      "SelectionPane": "PptxEditorSelectionPane",
       "ZoomPill": "PptxEditorZoomPill",
       "SlideSorter": "PptxEditorSlideSorter",
       "NotesPane": "PptxEditorNotesPane",

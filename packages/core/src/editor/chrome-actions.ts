@@ -20,6 +20,7 @@ import type { PptxEditorInstance } from './pptx-editor-types.ts';
 import { focusSurfaceOf, surfaceInputOf, surfaceRootOf } from './surface-registry.ts';
 import { warnNoAltTextPopup, warnNoLinkPopup } from './dev-warnings.ts';
 import { asCut } from './removal-notice.ts';
+import { focusTextAfterChrome } from './chrome-popover.ts';
 import { tablePaste } from './table-clipboard.ts';
 import type { ToolbarShownValue, ToolbarValueMap } from './toolbar-values.ts';
 import { canRenameSectionInPlace, runSectionSlot } from './section-renamers.ts';
@@ -439,6 +440,54 @@ export function pickImageInto(
   input.addEventListener('change', () => {
     const file = input.files?.[0];
     if (file) void insertImageFile(editor, file, target);
+  });
+  input.click();
+}
+
+/** The picture types a picture fill takes (`setShapePicture`): no SVG. @internal */
+export const PICTURE_FILL_TYPES = 'image/png,image/jpeg,image/gif';
+
+/**
+ * Fill the selected shapes with a picture file the user chose (the fill menu's Picture).
+ * A selection that moves while the file loads refuses it, so the wrong shapes never change.
+ * @internal
+ */
+export async function fillWithPictureFile(
+  editor: PptxEditorInstance,
+  file: File,
+  from?: Element | null
+): Promise<void> {
+  const before = selectionKey(editor);
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(await file.arrayBuffer());
+  } catch {
+    editor.reject('errors.unsupported');
+    return;
+  }
+  if (selectionKey(editor) !== before) {
+    editor.reject('disabled.selectionChanged');
+    return;
+  }
+  editor.exec({ type: 'setShapePicture', bytes, mime: file.type });
+  focusTextAfterChrome(editor, from);
+}
+
+/**
+ * Ask the user for a picture file and fill the selected shapes with it. Focus then goes back as
+ * after any chrome action (`from` is the control that opened the chooser). @internal
+ */
+export function pickPictureFill(
+  editor: PptxEditorInstance,
+  from?: Element | null,
+  doc: Document = from?.ownerDocument ?? document
+): void {
+  const input = doc.createElement('input');
+  input.type = 'file';
+  input.accept = PICTURE_FILL_TYPES;
+  input.addEventListener('change', () => {
+    const file = input.files?.[0];
+    if (file) void fillWithPictureFile(editor, file, from);
   });
   input.click();
 }

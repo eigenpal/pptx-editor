@@ -2,17 +2,27 @@
 // The Page setup dialog (File → Page setup…): slide size, appearance, and fonts. The host owns
 // visibility (`open` / `onClose`), as with DOCX Editor's `PageSetupDialog`. Built on the dialog
 // parts (`dialog-parts.tsx`): every element is a named part a host can restyle, replace, or
-// hide, and the appearance choice is a draft that OK applies and Cancel discards.
+// hide. The slide size and the appearance choice are a draft that OK applies and Cancel
+// discards. A new slide size is one `setSlideSize` command, so one undo step restores it.
 
 import { useMemo, useState, type ReactNode } from 'react';
 import {
-  pageSetupSizeName,
+  SLIDE_SIZE_CHOICES,
+  commitDialogCommand,
   radioGroupStep,
-  slideSizeInches,
+  seedSlideSizeFields,
+  slideSizeCommandOf,
+  slideSizeFieldError,
   translateDialogErrors,
+  withSlideDimension,
+  withSlideOrientation,
+  withSlideSizePreset,
+  type SlideOrientation,
+  type SlideSizeFields,
 } from '@pptx-editor.dev/core/editor';
 import { ToolButton } from './chrome.tsx';
-import { useEditorState, useTranslation } from './context.ts';
+import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
+import { CheckField, NumberField, SelectField } from './dialog-form.tsx';
 import {
   DialogFrame,
   applyOnEnter,
@@ -30,6 +40,8 @@ import {
 export interface PageSetupDialogFields {
   /** The chrome theme the appearance choice shows. */
   readonly theme: 'light' | 'dark';
+  /** The slide size: a preset, the width and height in inches, and whether content scales. */
+  readonly slideSize: SlideSizeFields;
 }
 
 /** The Page setup draft and its actions. @public */
@@ -54,6 +66,49 @@ const parts = createDialogParts<PageSetupDialogFieldName, UsePageSetupDialogRetu
   'PageSetupDialog'
 );
 const THEMES = ['light', 'dark'] as const;
+const ORIENTATIONS: readonly SlideOrientation[] = ['landscape', 'portrait'];
+
+/** A segmented radio group with the arrow keys of the WAI-ARIA radio group pattern. */
+function Segmented<T extends string>(props: {
+  readonly label: string;
+  readonly choices: readonly T[];
+  readonly value: T;
+  readonly disabled?: boolean;
+  readonly labelOf: (choice: T) => string;
+  readonly onChange: (choice: T) => void;
+}): ReactNode {
+  return (
+    <div
+      className="pptx-segmented"
+      role="radiogroup"
+      aria-label={props.label}
+      aria-disabled={props.disabled || undefined}
+      onKeyDown={(event) => {
+        if (props.disabled) return;
+        const next = radioGroupStep(props.choices, props.value, event.key);
+        if (!next) return;
+        event.preventDefault();
+        props.onChange(next);
+        event.currentTarget.querySelector<HTMLElement>(`[data-value="${next}"]`)?.focus();
+      }}
+    >
+      {props.choices.map((m) => (
+        <button
+          key={m}
+          type="button"
+          role="radio"
+          data-value={m}
+          disabled={props.disabled}
+          aria-checked={props.value === m}
+          tabIndex={props.value === m && !props.disabled ? 0 : -1}
+          onClick={() => props.onChange(m)}
+        >
+          {props.labelOf(m)}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function PageSetupDialogRoot(props: PageSetupDialogProps): ReactNode {
   return props.open ? <PageSetupDialogOpen {...props} /> : null;
@@ -69,21 +124,38 @@ function PageSetupDialogOpen({
   children,
 }: PageSetupDialogProps): ReactNode {
   const { t } = useTranslation();
+  const editor = usePptxEditor();
   const width = useEditorState((s) => s.slideWidth);
   const height = useEditorState((s) => s.slideHeight);
+  const editable = useEditorState((s) => s.status === 'ready' && s.mode === 'edit');
   const embedded = useEditorState((s) => s.embeddedFontFaces);
   const substituted = useEditorState((s) => s.substitutedFonts);
   // OK reports a change from the opening choice only, as the Vue twin: a host theme change
   // while the dialog is open is not reverted by an untouched OK.
   const [opening] = useState(theme);
+  // The slide size the dialog opened on: OK sends a size only when the fields moved from it.
+  const [opened] = useState(() => ({ width, height }));
+  const [seed] = useState(() => seedSlideSizeFields(width, height));
   const draft = useDialogDraft<PageSetupDialogFields>(() => ({
-    initial: { theme: opening },
+    initial: { theme: opening, slideSize: seed },
+    validate: (values) => {
+      const problem = slideSizeFieldError(seed, values.slideSize, opened);
+      return problem ? { slideSize: problem.key } : {};
+    },
     commit: (values) => {
+      const resized = commitDialogCommand(
+        editor,
+        slideSizeCommandOf(seed, values.slideSize, opened)
+      );
+      if (!resized.ok) return resized;
       if (values.theme !== opening) onThemeChange?.(values.theme);
       return { ok: true };
     },
   }));
+  const size = draft.values.slideSize;
+  const setSize = (next: SlideSizeFields): void => draft.setValue('slideSize', next);
   const translatedErrors = useMemo(() => translateDialogErrors(t, draft.errors), [t, draft.errors]);
+  const sizeError = translatedErrors.slideSize;
   const state: UsePageSetupDialogReturn = {
     values: draft.values,
     setValue: draft.setValue,
@@ -94,7 +166,6 @@ function PageSetupDialogOpen({
     },
     cancel: onClose,
   };
-  const size = slideSizeInches(width, height);
   useCloseOnNewDocument(onClose);
   return (
     <DialogFrame
@@ -123,10 +194,63 @@ function PageSetupDialogOpen({
                 className="pptx-dialog__section"
               >
                 <h3 className="pptx-dialog__label">{t('pageSetup.slideSize')}</h3>
-                <p className="pptx-dialog__value">
-                  {t(`pageSetup.slideSizeName.${pageSetupSizeName(width, height)}`)}
-                  <span className="pptx-dialog__muted">{t('pageSetup.slideSizeValue', size)}</span>
-                </p>
+                {editable ? null : (
+                  // Viewing mode: the size as text, as the fields cannot change it.
+                  <p className="pptx-dialog__value">
+                    {t(`pageSetup.slideSizeName.${seed.size}`)}
+                    <span className="pptx-dialog__muted">
+                      {t('pageSetup.slideSizeValue', { width: seed.width, height: seed.height })}
+                    </span>
+                  </p>
+                )}
+                <div className="pptx-dialog__rows" hidden={!editable}>
+                  <SelectField
+                    name="size"
+                    label={t('pageSetup.size')}
+                    disabled={!editable}
+                    value={size.size}
+                    options={SLIDE_SIZE_CHOICES.map(
+                      (c) => [c, t(`pageSetup.slideSizeName.${c}`)] as const
+                    )}
+                    onChange={(c) => setSize(withSlideSizePreset(size, c))}
+                  />
+                  <div className="pptx-dialog__grid">
+                    {(['width', 'height'] as const).map((field) => (
+                      <NumberField
+                        key={field}
+                        name={field}
+                        label={t(`pageSetup.${field}`)}
+                        unit={t('pageSetup.inches')}
+                        step="0.01"
+                        min="1"
+                        max="56"
+                        disabled={!editable}
+                        value={size[field]}
+                        onChange={(v) => setSize(withSlideDimension(size, field, v))}
+                      />
+                    ))}
+                  </div>
+                  <Segmented
+                    label={t('pageSetup.orientation')}
+                    choices={ORIENTATIONS}
+                    value={size.orientation}
+                    disabled={!editable}
+                    labelOf={(o) => t(`pageSetup.${o}`)}
+                    onChange={(o) => setSize(withSlideOrientation(size, o))}
+                  />
+                  <CheckField
+                    name="scaleContent"
+                    label={t('pageSetup.scaleContent')}
+                    value={size.scaleContent}
+                    disabled={!editable}
+                    onChange={(on) => setSize({ ...size, scaleContent: on })}
+                  />
+                  {sizeError ? (
+                    <p role="alert" className="pptx-dialog__error">
+                      {sizeError}
+                    </p>
+                  ) : null}
+                </div>
               </section>
               {onThemeChange ? (
                 <section
@@ -135,34 +259,13 @@ function PageSetupDialogOpen({
                   className="pptx-dialog__section"
                 >
                   <h3 className="pptx-dialog__label">{t('pageSetup.appearance')}</h3>
-                  <div
-                    className="pptx-segmented"
-                    role="radiogroup"
-                    aria-label={t('pageSetup.appearance')}
-                    onKeyDown={(event) => {
-                      const next = radioGroupStep(THEMES, draft.values.theme, event.key);
-                      if (!next) return;
-                      event.preventDefault();
-                      draft.setValue('theme', next);
-                      event.currentTarget
-                        .querySelector<HTMLElement>(`[data-value="${next}"]`)
-                        ?.focus();
-                    }}
-                  >
-                    {THEMES.map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        role="radio"
-                        data-value={m}
-                        aria-checked={draft.values.theme === m}
-                        tabIndex={draft.values.theme === m ? 0 : -1}
-                        onClick={() => draft.setValue('theme', m)}
-                      >
-                        {t(`pageSetup.${m}`)}
-                      </button>
-                    ))}
-                  </div>
+                  <Segmented
+                    label={t('pageSetup.appearance')}
+                    choices={THEMES}
+                    value={draft.values.theme}
+                    labelOf={(m) => t(`pageSetup.${m}`)}
+                    onChange={(m) => draft.setValue('theme', m)}
+                  />
                 </section>
               ) : null}
               <section

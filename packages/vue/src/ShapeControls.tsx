@@ -1,6 +1,7 @@
 /** @jsxImportSource vue */
 // Shape controls: the insert-shape gallery (previews drawn by the engine's own geometry), the
-// fill menu (theme colors and gradients), the custom gradient dialog, and the line menus. The Vue
+// fill menu (theme colors, gradients, a pattern, and a picture), the custom gradient dialog, and
+// the line menus. The Vue
 // twin of the React adapter's `ShapeControls.tsx`: the same markup, classes, ARIA, and keys, on
 // the same core rules (`insert-controls.ts`, `shape-gallery.ts`, `palette.ts`).
 
@@ -10,12 +11,14 @@ import {
   onMounted,
   ref,
   shallowRef,
+  useId,
   watch,
   type ExtractPublicPropTypes,
   type PropType,
 } from 'vue';
 import {
   dialogInitialFocus,
+  isDialogBackdropPoint,
   colorMenuSelection,
   SHAPE_GALLERY,
   CROP_SHAPE_GALLERY,
@@ -39,7 +42,10 @@ import {
   type ChromeSlotId,
   type ColorChoice,
   type GradientFill,
+  type PatternFill,
+  pickPictureFill,
 } from '@pptx-editor.dev/core/editor';
+import { PatternDialog } from './PatternDialog.tsx';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import {
   Icon,
@@ -217,7 +223,7 @@ export type FillControlProps = ExtractPublicPropTypes<typeof slotPartProps>;
 
 /**
  * Fill color: one menu with the theme and standard colors, Transparent, gradient presets from
- * the theme colors, and a custom gradient dialog. @public
+ * the theme colors, a custom gradient dialog, a pattern dialog, and a picture. @public
  */
 export const FillControl = defineComponent({
   name: 'FillControl',
@@ -245,6 +251,8 @@ export const FillControl = defineComponent({
     const applyGradient = (g: GradientFill): void => {
       editor.value?.exec({ type: 'setShapeGradient', gradient: g });
     };
+    const currentPattern = useEditorState((s) => s.geometry?.pattern);
+    const pattern = shallowRef<PatternFill | null | false>(false);
     const done = (): void => {
       focusText(editor.value, anchor.value);
       open.value = false;
@@ -337,18 +345,54 @@ export const FillControl = defineComponent({
                       ),
                     }}
                   </MenuItem>
+                  <div class="pptx-menu__sep" />
+                  <MenuItem
+                    onSelect={() => {
+                      pattern.value = currentPattern.value ?? null;
+                      open.value = false;
+                    }}
+                  >
+                    {{ default: () => t('toolbar.pattern') }}
+                  </MenuItem>
+                  <MenuItem
+                    onSelect={() => {
+                      if (editor.value) pickPictureFill(editor.value, anchor.value);
+                      open.value = false;
+                    }}
+                  >
+                    {{ default: () => t('toolbar.pictureFill') }}
+                  </MenuItem>
                 </>
               ),
             }}
           </Popover>
         ) : null}
+        <PatternDialog
+          open={pattern.value !== false}
+          initial={pattern.value || null}
+          base={bases.value[4]?.color}
+          onClose={() => {
+            pattern.value = false;
+            // Focus goes back where the fill menu was opened, not to the page.
+            focusText(editor.value, anchor.value);
+          }}
+          onApply={(p: PatternFill) => {
+            editor.value?.exec({ type: 'setShapePattern', pattern: p });
+            pattern.value = false;
+            focusText(editor.value, anchor.value);
+          }}
+        />
         <GradientDialog
           open={dialog.value !== null}
           initial={dialog.value}
-          onClose={() => (dialog.value = null)}
+          onClose={() => {
+            dialog.value = null;
+            focusText(editor.value, anchor.value);
+          }}
           onApply={(g: GradientFill) => {
             applyGradient(g);
             dialog.value = null;
+            focusText(editor.value, anchor.value);
           }}
         />
       </span>
@@ -383,6 +427,8 @@ export const GradientDialog = defineComponent({
   setup(props) {
     const { t } = useTranslation();
     const dialogEl = ref<HTMLDialogElement | null>(null);
+    const titleId = useId();
+    let pressedOutside = false;
     const bar = ref<HTMLDivElement | null>(null);
     const g = shallowRef<GradientFill>(gradientDialogStart(props.initial));
     const selected = ref(0);
@@ -420,7 +466,7 @@ export const GradientDialog = defineComponent({
       const stop = cur.stops[Math.min(selected.value, cur.stops.length - 1)]!;
       return [
         <div class="pptx-dialog__header">
-          <h2 id="pptx-gradient-title" class="pptx-dialog__title">
+          <h2 id={titleId} class="pptx-dialog__title">
             {t('gradient.title')}
           </h2>
           <ToolButton label={t('gradient.close')} icon="close" onClick={onClose} />
@@ -556,13 +602,18 @@ export const GradientDialog = defineComponent({
         ref={dialogEl}
         class="pptx-dialog pptx-gradient"
         data-pptx-dialog="gradient"
-        aria-labelledby="pptx-gradient-title"
+        aria-labelledby={titleId}
         onCancel={(e: Event) => {
           e.preventDefault();
           onClose();
         }}
+        onMousedown={(e: MouseEvent) => {
+          pressedOutside = isDialogBackdropPoint(e.currentTarget as HTMLElement, e);
+        }}
         onClick={(e: MouseEvent) => {
-          if (e.target === e.currentTarget) onClose();
+          // A press and a release on the backdrop close it; a drag out of a field does not.
+          if (pressedOutside && isDialogBackdropPoint(e.currentTarget as HTMLElement, e)) onClose();
+          pressedOutside = false;
         }}
       >
         {props.open ? body() : null}

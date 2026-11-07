@@ -5,6 +5,7 @@
 // A slide reads its background from the cascade (`resolveSlide`). A layout or a master reads it
 // with the same rule over its own chain: the first `p:bg` of the part, then of its master, wins.
 
+import { PATTERN_PRESETS } from './commands/fill-commands.ts';
 import {
   DEFAULT_COLOR_MAP,
   fillElementOf,
@@ -223,64 +224,6 @@ export function readBackground(ctx: PlanContext, ref: AutomationRef): Automation
   };
 }
 
-/** `ST_PresetPatternVal` (ECMA-376 Part 1, 20.1.10.51). */
-const PATTERNS: ReadonlySet<string> = new Set([
-  'pct5',
-  'pct10',
-  'pct20',
-  'pct25',
-  'pct30',
-  'pct40',
-  'pct50',
-  'pct60',
-  'pct70',
-  'pct75',
-  'pct80',
-  'pct90',
-  'horz',
-  'vert',
-  'ltHorz',
-  'ltVert',
-  'dkHorz',
-  'dkVert',
-  'narHorz',
-  'narVert',
-  'dashHorz',
-  'dashVert',
-  'cross',
-  'dnDiag',
-  'upDiag',
-  'ltDnDiag',
-  'ltUpDiag',
-  'dkDnDiag',
-  'dkUpDiag',
-  'wdDnDiag',
-  'wdUpDiag',
-  'dashDnDiag',
-  'dashUpDiag',
-  'diagCross',
-  'smCheck',
-  'lgCheck',
-  'smGrid',
-  'lgGrid',
-  'dotGrid',
-  'smConfetti',
-  'lgConfetti',
-  'horzBrick',
-  'diagBrick',
-  'solidDmnd',
-  'openDmnd',
-  'dotDmnd',
-  'plaid',
-  'sphere',
-  'weave',
-  'divot',
-  'shingle',
-  'wave',
-  'trellis',
-  'zigZag',
-]);
-
 /** The gradient shadings a write accepts. */
 const GRADIENTS: ReadonlySet<string> = new Set(['linear', 'circle', 'rect', 'shape']);
 
@@ -453,7 +396,7 @@ function setPattern(
   const now = fillRead(shown(ctx, owner));
   const own = ownFill(ctx, owner.part, 'pattFill');
   const pattern = write.pattern ?? now.pattern ?? 'pct5';
-  if (typeof pattern !== 'string' || !PATTERNS.has(pattern)) badArgument('pattern');
+  if (typeof pattern !== 'string' || !PATTERN_PRESETS.has(pattern)) badArgument('pattern');
   /** The color element of one side: the written color, the own one, or the shown one. */
   const side = (
     name: 'fgClr' | 'bgClr',

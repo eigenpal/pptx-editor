@@ -1,6 +1,6 @@
 /** @jsxImportSource vue */
 // The Format Background dialog (Format → Slide Background…): the Vue twin of the React
-// adapter's `BackgroundDialog`. A color, a gradient, or a picture for the current slide or
+// adapter's `BackgroundDialog`. A color, a gradient, a pattern, or a picture for the current slide or
 // every slide, or back to the layout's background. Built on the dialog parts
 // (`dialog-parts.ts`): the choices write a draft, OK applies it as one undo step, and Cancel
 // discards it. The draft rules live in core (`dialog-fields.ts`, `form-dialog-support.ts`), so
@@ -27,12 +27,16 @@ import {
   backgroundStatusKey,
   commitDialogCommand,
   gradientCss,
+  patternCss,
+  patternDialogStart,
   sameBackground,
   translateDialogErrors,
   validateBackgroundDraft,
   type GradientFill,
+  type PatternFill,
   type SlideBackground,
 } from '@pptx-editor.dev/core/editor';
+import { PatternDialog } from './PatternDialog.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
 import { ToolButton } from './chrome.tsx';
 import { ColorSwatches, Swatch, SwatchGroup, useThemeBases } from './ColorSwatches.tsx';
@@ -67,7 +71,7 @@ export interface UseBackgroundDialogReturn extends UseDialogReturn<BackgroundDia
  * The field names of the Background dialog, for `BackgroundDialog.Field`: one per fill kind
  * (`SlideBackground['kind']`), and Apply to all slides. @public
  */
-export type BackgroundDialogFieldName = 'solid' | 'gradient' | 'picture' | 'allSlides';
+export type BackgroundDialogFieldName = 'solid' | 'gradient' | 'pattern' | 'picture' | 'allSlides';
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif'];
 
@@ -106,6 +110,9 @@ const BackgroundDialogOpen = defineComponent({
     );
     const initial = backgroundDraftFrom(current.value);
     const custom = shallowRef<GradientFill | null>(null);
+    const pattern = shallowRef<PatternFill | null>(null);
+    // Tile a chosen picture at its own size; a change re-picks the chosen picture.
+    const tile = ref(current.value?.kind === 'picture' && current.value.tile === true);
     // Every pick and picture read counts up, so a picture that finishes reading after a later
     // pick is dropped. `picked` turns on with a real pick (Reset too), so OK applies even a value
     // equal to the opening one; setting the opening value itself back (by identity) turns it off.
@@ -156,7 +163,7 @@ const BackgroundDialogOpen = defineComponent({
       } catch {
         return; // An unreadable file picks nothing.
       }
-      if (at === picks) pick({ kind: 'picture', bytes, mime: f.type });
+      if (at === picks) pick({ kind: 'picture', bytes, mime: f.type, tile: tile.value });
     };
     const bases = useThemeBases();
     const errorId = useId();
@@ -237,6 +244,30 @@ const BackgroundDialogOpen = defineComponent({
                 </button>
               </div>
             </section>
+            <section data-pptx-part="field" data-pptx-field="pattern" class="pptx-dialog__section">
+              <h3 class="pptx-dialog__label">{t('background.pattern')}</h3>
+              <div class="pptx-gradient__row">
+                {chosen?.kind === 'pattern' ? (
+                  <span
+                    class="pptx-pattern__chip"
+                    aria-hidden="true"
+                    style={{ background: patternCss(chosen.pattern) }}
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  class="pptx-button"
+                  onClick={() => {
+                    pattern.value =
+                      chosen?.kind === 'pattern'
+                        ? chosen.pattern
+                        : patternDialogStart(current.value.pattern, bases.value[4]?.color);
+                  }}
+                >
+                  {t('background.choosePattern')}
+                </button>
+              </div>
+            </section>
             <section data-pptx-part="field" data-pptx-field="picture" class="pptx-dialog__section">
               <h3 class="pptx-dialog__label">{t('background.image')}</h3>
               <div class="pptx-gradient__row">
@@ -255,6 +286,18 @@ const BackgroundDialogOpen = defineComponent({
                   }}
                 />
               </div>
+              <label class="pptx-radio">
+                <input
+                  type="checkbox"
+                  checked={tile.value}
+                  onChange={(e: Event) => {
+                    const on = (e.target as HTMLInputElement).checked;
+                    tile.value = on;
+                    if (chosen?.kind === 'picture') pick({ ...chosen, tile: on });
+                  }}
+                />
+                {t('background.tile')}
+              </label>
             </section>
             <p role="status" class="pptx-dialog__muted pptx-dialog__status">
               {statusKey ? t(statusKey) : ''}
@@ -320,6 +363,17 @@ const BackgroundDialogOpen = defineComponent({
           {{
             default: () => [
               ...render(defaults, slots.default?.(), props.preset),
+              <PatternDialog
+                open={pattern.value !== null}
+                initial={pattern.value}
+                onClose={() => {
+                  pattern.value = null;
+                }}
+                onApply={(p: PatternFill) => {
+                  pick({ kind: 'pattern', pattern: p });
+                  pattern.value = null;
+                }}
+              />,
               <GradientDialog
                 open={custom.value !== null}
                 initial={custom.value}

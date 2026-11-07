@@ -303,3 +303,70 @@ describe('PptxEditorHyperLink', () => {
     expect(document.activeElement?.closest('.pptx-link-popup') !== null).toBe(true);
   });
 });
+
+describe('PptxEditorHyperLink link kinds', () => {
+  test('Link to writes an email link and a slide link; a slide link shows Go to slide', async () => {
+    const editor = await mountRoot();
+    await linkAndCaret(editor);
+    await clickSlide(editor);
+    button('Edit link')!.click();
+    await nextTick();
+    const kind = () => document.querySelector<HTMLSelectElement>('.pptx-link__kind select')!;
+    expect(kind().value).toBe('web');
+    const change = async (el: HTMLSelectElement, value: string): Promise<void> => {
+      el.value = value;
+      el.dispatchEvent(new Event('change'));
+      await nextTick();
+      await nextTick();
+    };
+    const type = async (el: HTMLInputElement, value: string): Promise<void> => {
+      el.value = value;
+      el.dispatchEvent(new Event('input'));
+      await nextTick();
+    };
+    const apply = async (): Promise<void> => {
+      document.querySelector<HTMLButtonElement>('.pptx-link__apply')!.click();
+      await nextTick();
+    };
+    const input = (label: string) =>
+      document.querySelector<HTMLInputElement>(`.pptx-link input[aria-label="${label}"]`)!;
+    // Email: focus stays on Link to, and the subject is percent-encoded into the one draft.
+    kind().focus();
+    await change(kind(), 'email');
+    expect(document.activeElement).toBe(kind());
+    await type(input('Email address'), 'ana@example.com');
+    await type(input('Subject'), 'Q3 & plans');
+    await apply();
+    expect(editor.snapshot().format?.link).toBe('mailto:ana@example.com?subject=Q3%20%26%20plans');
+    // Edit again: the form starts on Email with its fields.
+    await clickSlide(editor);
+    button('Edit link')!.click();
+    await nextTick();
+    expect(kind().value).toBe('email');
+    expect(input('Subject').value).toBe('Q3 & plans');
+    // Slide: the jumps and each slide by number.
+    await change(kind(), 'slide');
+    const slide = document.querySelector<HTMLSelectElement>(
+      '.pptx-link select[aria-label="Slide in this presentation"]'
+    )!;
+    expect([...slide.options].map((o) => o.text)).toEqual([
+      'First slide',
+      'Last slide',
+      'Next slide',
+      'Previous slide',
+      'Slide 1',
+    ]);
+    await change(slide, '#slide-1');
+    await apply();
+    expect(editor.snapshot().format?.link).toBe('#slide-1');
+    // Reading mode: Go to slide, and no Copy.
+    await clickSlide(editor);
+    const go = document.querySelector<HTMLButtonElement>('.pptx-link__slide')!;
+    expect([go.textContent, go.getAttribute('aria-label')]).toEqual(['Slide 1', 'Go to Slide 1']);
+    expect(button('Copy link')).toBe(null);
+    go.click();
+    await nextTick();
+    expect(panel()).toBe(null);
+    expect(editor.snapshot().currentSlide).toBe(0);
+  });
+});

@@ -1,0 +1,46 @@
+---
+title: 'Adjust a preset shape'
+description: 'Change the corner radius, arrowhead, or other adjust values of a preset shape.'
+category: 'Task recipes'
+---
+
+Use the `setAdjustments` command to change the adjust values of the selected preset shape, such as the corner radius of a rounded rectangle or the head of an arrow. The editor records the change as one undo step.
+
+## Round the corners of a rectangle
+
+This helper accepts an open `PptxEditorInstance` and the node id of a `roundRect` shape:
+
+```ts
+import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+export function roundCorners(editor: PptxEditorInstance, nodeId: string) {
+  editor.setSelection({ kind: 'shapes', nodeIds: [nodeId] });
+  // `adj` is the corner radius, in 1/100000 of the shorter side.
+  const result = editor.exec({
+    type: 'setAdjustments',
+    values: { adj: 40_000 },
+  });
+  if (!result.ok && !result.noop) throw new Error(result.reason);
+}
+```
+
+The keys are the guide names of the preset in ECMA-376, such as `adj`, `adj1`, and `adj2`. Each value uses the unit of its guide. A length is in 1/100000 of the side that the preset's formula names, most often the shorter side. An angle is in 1/60000 of a degree. Values that you leave out keep their current values.
+
+## Limits
+
+- The editor bounds each value to the range of its adjust handle at the shape's size.
+- Select exactly one shape. Otherwise the command is refused with `disabled.selectOne`.
+- A shape with no adjust values, such as a rectangle or a freeform, is refused with `disabled.noAdjustHandles`.
+- A name that the preset does not have is refused with `errors.unsupported`.
+- Values that are already set give a `noop` result with `disabled.noAdjustChange`.
+- In viewing mode, the command is refused with `disabled.viewing`.
+
+## Let users drag the handles
+
+When one preset shape with adjust values is selected, the default editor shows a yellow diamond at each adjust handle. Users drag a diamond to change the shape. One drag is one undo step. Escape, an undo, or a change of the selection ends the drag. The steps that the drag wrote stay as that one undo step. In viewing mode, the handles do not show.
+
+## See also
+
+- [Undo history](/docs/guides/undo-history)
+- [Office.js API](/docs/editor-api/office-js-api): `Adjustments` on a shape, for server-side automation
+- [PPTX fidelity](/docs/pptx-fidelity)

@@ -357,7 +357,10 @@ export type ChromeControlState =
 | {
     readonly kind: 'panel';
 }
-/** Opens a task pane: the Format pane or the selection pane. Neither is built yet. */
+/**
+* Shows a tab of the side panel: Format or Selection. The slot sends `requestPane`, which a
+* mounted side panel and the host answer.
+*/
 | {
     readonly kind: 'pane';
     readonly pane: 'format' | 'selection';
@@ -1623,7 +1626,10 @@ export type EditorCommand = {
     readonly type: 'setLineDash';
     readonly dash: LineDash;
 }
-/** Link the selected text to a URL (`http`, `https`, `mailto`, `tel`, `ftp`); null unlinks. */
+/**
+* Link the selected text to a URL (`http`, `https`, `mailto`, `tel`, `ftp`), or to a slide:
+* `#slide-3`, `#next-slide`, `#previous-slide`, `#first-slide`, `#last-slide`. null unlinks.
+*/
 | {
     readonly type: 'setLink';
     readonly url: string | null;
@@ -1651,6 +1657,18 @@ export type EditorCommand = {
     readonly type: 'setSlideBackground';
     readonly background: SlideBackground | null;
     readonly allSlides?: boolean;
+}
+/** Slide size in EMU, 1 to 56 in a side; `content: 'scale'` (default) fits the content. */
+| {
+    readonly type: 'setSlideSize';
+    readonly width: number;
+    readonly height: number;
+    readonly content?: 'scale' | 'keep';
+}
+/** Adjust values of one preset shape by guide name, in guide units (see `a:gd`). */
+| {
+    readonly type: 'setAdjustments';
+    readonly values: Readonly<Record<string, number>>;
 }
 /** Insert a line, an arrow, or an elbow or curved connector. */
 | {
@@ -1688,7 +1706,7 @@ export type EditorCommand = {
 /** Apply the copied formatting to the selection as one undo step (Ctrl/Cmd+Shift+V). */
 | {
     readonly type: 'pasteFormat';
-} | TextFormatCommand | PictureCommand
+} | TextFormatCommand | PictureCommand | FillCommand
 /**
 * Shape Effects: set or remove one effect of the selected shapes, connectors, and pictures.
 * A shape whose effects come from its theme style (`a:effectRef`) gets that style's effects
@@ -1972,6 +1990,27 @@ export const fieldPart: (name: string) => {
     readonly 'data-pptx-field': string;
 };
 
+// @public
+export type FillCommand =
+/** Shape fill: a preset pattern. */
+    {
+    readonly type: 'setShapePattern';
+    readonly pattern: PatternFill;
+}
+/**
+* Shape fill: a PNG, JPEG, or GIF picture, stretched over the shape, or tiled at its own
+* size when `tile` is true. The type comes from the bytes; other bytes are refused.
+*/
+| {
+    readonly type: 'setShapePicture';
+    readonly bytes: Uint8Array;
+    readonly mime?: string;
+    readonly tile?: boolean;
+};
+
+// @internal
+export function fillWithPictureFile(editor: PptxEditorInstance, file: File, from?: Element | null): Promise<void>;
+
 // @internal
 export function filterFontFamilies(all: readonly string[], query: string): readonly string[];
 
@@ -2119,6 +2158,9 @@ export function followCurrentSlide(list: HTMLElement | null, item: string, focus
 
 // @internal
 export function followNotesArm(root: HTMLElement): void;
+
+// @internal
+export function followSlideshowLink(controller: SlideshowController, doc: Document, href: string): void;
 
 // @public
 export const FONT_RESOLVER_BRAND: unique symbol;
@@ -2458,6 +2500,12 @@ export interface FontUrlSource {
 // @public
 export type FormatPainterMode = 'off' | 'once' | 'sticky';
 
+// @internal
+export function formatPanelSize(geometry: Pick<SelectionGeometry, 'cx' | 'cy' | 'lockAspectRatio'>, side: 'cx' | 'cy', value: number): {
+    cx: number;
+    cy: number;
+};
+
 // @public
 export function formattingBarChromeGroups(image?: SelectedImageState | null): readonly ChromeGroup[];
 
@@ -2551,6 +2599,9 @@ export function groupSlideSections(sections: readonly SlideSection[], slideCount
 
 // @internal
 export function handleMenuKey(panel: HTMLElement, key: string): boolean;
+
+// @internal
+export function hasPaneListener(editor: object | null | undefined): boolean;
 
 // @public
 export interface HistoryGroup {
@@ -2812,6 +2863,9 @@ export function isDialogBackdropPoint(dialog: Element, event: {
 // @public
 export function isFontResolver(value: unknown): value is MarkedFontResolver;
 
+// @internal
+export function isPaneSlot(slot: string): boolean;
+
 // @public
 export function isTableChromeSlot(slot: ChromeSlotId): slot is TableChromeSlotId;
 
@@ -2899,13 +2953,22 @@ export type LineRule = 'single' | 'onePointFive' | 'double' | 'exact' | 'multipl
 export function lineSlotEnd(slot: string): boolean | undefined;
 
 // @internal
+export const LINK_KINDS: readonly LinkKind[];
+
+// @internal
 export function linkCaretAnchor(editor: object): HTMLElement | null;
+
+// @internal
+export type LinkKind = 'web' | 'email' | 'slide';
+
+// @public
+export function linkKindOf(url: string): LinkKind;
 
 // @internal
 export function linkPopupAnchor(request: LinkRequest, editor: object): HTMLElement | null;
 
 // @internal
-export function linkPopupAnnouncement(state: HyperlinkPopupState, t: (key: 'link.announce' | 'link.copied', params?: Record<string, string>) => string): string;
+export function linkPopupAnnouncement(state: HyperlinkPopupState, t: Translate): string;
 
 // @internal
 export function linkPopupReturnsFocus(editor?: object): boolean;
@@ -2947,6 +3010,9 @@ export function listenLinkPanelKey(editor: object, reading: () => boolean, doc?:
 
 // @internal
 export function listenLinkRequests(editor: object, enabled: () => boolean, open: (anchor: HTMLElement | null) => void): () => void;
+
+// @public
+export function listenPaneRequests(editor: object, open: (pane: SidePanelTab) => void): () => void;
 
 // @internal
 export function listenPopoverDismiss(options: {
@@ -3019,6 +3085,21 @@ export type LocalFontsOutcome = {
     readonly ok: false;
     readonly reason: 'unsupported' | 'denied' | 'none';
 };
+
+// @public
+export interface MailtoParts {
+    // (undocumented)
+    readonly address: string;
+    readonly rest: string;
+    // (undocumented)
+    readonly subject: string;
+}
+
+// @public
+export function mailtoParts(url: string): MailtoParts;
+
+// @public
+export function mailtoUrl(address: string, subject: string, rest?: string): string;
 
 // @internal
 export function markDialogError(dialog: HTMLElement | null | undefined, error: DialogError | null, errorId: string): void;
@@ -3460,9 +3541,6 @@ export function openSlideshowLink(doc: Document, href: string): void;
 export type OrderMove = 'forward' | 'backward' | 'front' | 'back';
 
 // @internal
-export function pageSetupSizeName(width: number, height: number): 'widescreen' | 'standard' | 'custom';
-
-// @internal
 export function paintedNotesFindRange(root: HTMLElement): {
     start: number;
     end: number;
@@ -3499,6 +3577,9 @@ export function panelHistoryKey(e: ModifierKeys & {
     readonly target: unknown;
     preventDefault(): void;
 }, editor: Pick<PptxEditorInstance, 'exec'> | null | undefined): boolean;
+
+// @internal
+export function paneListenersVersion(): number;
 
 // @internal
 export function panelItems(panel: HTMLElement): HTMLElement[];
@@ -3598,10 +3679,39 @@ export const parseAmount: (text: string) => number;
 export function parseToolbarSize(draft: string | null): number | null;
 
 // @internal
+export const PATTERN_CHOICES: readonly PatternPreset[];
+
+// @internal
+export function patternCss(p: PatternFill, tile?: number): string;
+
+// @internal
+export function patternDialogStart(shown: PatternFill | null | undefined, base?: string): PatternFill;
+
+// @public
+export interface PatternFill {
+    readonly background: string;
+    readonly foreground: string;
+    // (undocumented)
+    readonly preset: PatternPreset;
+}
+
+// @internal
+export function patternLabel(t: Translate, preset: PatternPreset): string;
+
+// @public
+export type PatternPreset = 'pct5' | 'pct10' | 'pct20' | 'pct25' | 'pct30' | 'pct40' | 'pct50' | 'pct60' | 'pct70' | 'pct75' | 'pct80' | 'pct90' | 'horz' | 'vert' | 'ltHorz' | 'ltVert' | 'dkHorz' | 'dkVert' | 'narHorz' | 'narVert' | 'dashHorz' | 'dashVert' | 'cross' | 'dnDiag' | 'upDiag' | 'ltDnDiag' | 'ltUpDiag' | 'dkDnDiag' | 'dkUpDiag' | 'wdDnDiag' | 'wdUpDiag' | 'dashDnDiag' | 'dashUpDiag' | 'diagCross' | 'smCheck' | 'lgCheck' | 'smGrid' | 'lgGrid' | 'dotGrid' | 'smConfetti' | 'lgConfetti' | 'horzBrick' | 'diagBrick' | 'solidDmnd' | 'openDmnd' | 'dotDmnd' | 'plaid' | 'sphere' | 'weave' | 'divot' | 'shingle' | 'wave' | 'trellis' | 'zigZag';
+
+// @internal
 export function pickBulletStyle(d: BulletsDialogFields, key: string): BulletsDialogFields;
 
 // @internal
 export function pickImageInto(editor: PptxEditorInstance, doc?: Document, target?: 'replaceImage'): void;
+
+// @internal
+export function pickPictureFill(editor: PptxEditorInstance, from?: Element | null, doc?: Document): void;
+
+// @internal
+export const PICTURE_FILL_TYPES = "image/png,image/jpeg,image/gif";
 
 // @public
 export type PictureCommand =
@@ -4043,6 +4153,9 @@ export function requestDialogSection(editor: object, dialog: string, section: st
 // @internal
 export function requestLinkPopup(editor: unknown, anchor?: HTMLElement | null): void;
 
+// @public
+export function requestPane(editor: object, pane: SidePanelTab): boolean;
+
 // @internal
 export function requestSectionRenameIn(editor: object | null, sectionId: string): void;
 
@@ -4287,6 +4400,9 @@ export function seedFontFields(f: FontFormatRead | null): FontDialogFields;
 // @internal
 export function seedParagraphFields(format: ParagraphFormatRead | null): ParagraphDialogFields;
 
+// @internal
+export function seedSlideSizeFields(width: number, height: number): SlideSizeFields;
+
 // @public
 export interface SelectedImageState {
     readonly brightness: number;
@@ -4307,6 +4423,12 @@ export interface SelectedImageState {
     readonly transparency: number;
     readonly widthEmu: number;
 }
+
+// @internal
+export function selectFromPane(editor: PptxEditorInstance, row: SelectionPaneRow, extend: boolean): void;
+
+// @internal
+export const SELECTION_PANE_NAME_MAX = 255;
 
 // @public
 export interface SelectionFormat {
@@ -4368,6 +4490,7 @@ export interface SelectionGeometry {
     // (undocumented)
     readonly name: string;
     readonly nodeId: string;
+    readonly pattern?: PatternFill;
     // (undocumented)
     readonly rot: number;
     readonly shapeStyle?: ShapeStyleChoice;
@@ -4377,6 +4500,49 @@ export interface SelectionGeometry {
     // (undocumented)
     readonly y: number;
 }
+
+// @internal
+export function selectionPaneAllIds(shapes: readonly ShapeSummary[] | undefined): string[];
+
+// @internal
+export function selectionPaneAncestors(shapes: readonly ShapeSummary[] | undefined, ids: ReadonlySet<string>): string[];
+
+// @internal
+export function selectionPaneKey(rows: readonly SelectionPaneRow[], focused: string | null, key: string): {
+    readonly focus: string;
+} | {
+    readonly expand: string;
+    readonly open: boolean;
+} | {
+    readonly rename: string;
+} | {
+    readonly toggle: string;
+} | null;
+
+// @internal
+export interface SelectionPaneRow {
+    readonly branch: boolean;
+    readonly expanded: boolean;
+    // (undocumented)
+    readonly hidden: boolean;
+    // (undocumented)
+    readonly kind: ShapeSummary['kind'];
+    readonly level: number;
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly nodeId: string;
+    readonly parent: string | null;
+    readonly position: number;
+    // (undocumented)
+    readonly siblings: number;
+}
+
+// @internal
+export function selectionPaneRows(shapes: readonly ShapeSummary[] | undefined, expanded: ReadonlySet<string>): readonly SelectionPaneRow[];
+
+// @internal
+export function selectionPaneSelected(selection: EditorSelection): ReadonlySet<string>;
 
 // @internal
 export function selectNotes(root: HTMLElement, start: number, end?: number): void;
@@ -4525,6 +4691,12 @@ export function shownOpenFailure(snapshot: EditorSnapshot): DocumentOpenFailure 
 export function showsLoading(snapshot: EditorSnapshot): boolean;
 
 // @internal
+export const SIDE_PANEL_TABS: readonly ["format", "selection", "comments"];
+
+// @public
+export type SidePanelTab = (typeof SIDE_PANEL_TABS)[number];
+
+// @internal
 export const SIZE_ERROR_MS = 5000;
 
 // @internal
@@ -4539,6 +4711,15 @@ export const SLIDE_DRAG_IMAGE_CLASS = "pptx-slide-drag-image";
 // @internal
 export const SLIDE_DRAG_TYPE = "application/x-pptx-editor-slides";
 
+// @internal
+export const SLIDE_SIZE_CHOICES: readonly SlideSizePreset[];
+
+// @internal
+export const SLIDE_SIZE_PRESETS: Readonly<Record<Exclude<SlideSizePreset, 'custom'>, {
+    readonly width: number;
+    readonly height: number;
+}>>;
+
 // @public
 export type SlideBackground = {
     readonly kind: 'solid';
@@ -4547,9 +4728,13 @@ export type SlideBackground = {
     readonly kind: 'gradient';
     readonly gradient: GradientFill;
 } | {
+    readonly kind: 'pattern';
+    readonly pattern: PatternFill;
+} | {
     readonly kind: 'picture';
     readonly bytes: Uint8Array;
     readonly mime: string;
+    readonly tile?: boolean;
 };
 
 // @public
@@ -4559,7 +4744,10 @@ export interface SlideBackgroundState {
     // (undocumented)
     readonly gradient?: GradientFill;
     readonly inherited: boolean;
-    readonly kind: 'solid' | 'gradient' | 'picture' | 'none' | 'other';
+    readonly kind: 'solid' | 'gradient' | 'pattern' | 'picture' | 'none' | 'other';
+    // (undocumented)
+    readonly pattern?: PatternFill;
+    readonly tile?: boolean;
 }
 
 // @internal
@@ -4612,6 +4800,12 @@ export interface SlideLayoutSummary {
     readonly type: SlideLayoutKind;
 }
 
+// @public
+export function slideLinkChoices(slideCount: number): readonly string[];
+
+// @public
+export function slideLinkLabel(t: Translate, url: string): string;
+
 // @internal
 export interface SlideListKeyContext {
     // (undocumented)
@@ -4641,6 +4835,9 @@ export function slideMenuPoint(item: HTMLElement, at: {
     x: number;
     y: number;
 };
+
+// @public
+export type SlideOrientation = 'landscape' | 'portrait';
 
 // @public
 export type SlideRailOrientation = 'vertical' | 'horizontal';
@@ -4739,10 +4936,40 @@ export interface SlideshowState {
 }
 
 // @internal
-export function slideSizeInches(width: number, height: number): {
-    readonly width: string;
+export function slideSizeCommandOf(seed: SlideSizeFields, d: SlideSizeFields, current: SlideSizeEmu): EditorCommand | null;
+
+// @internal
+export interface SlideSizeEmu {
+    // (undocumented)
+    readonly height: number;
+    // (undocumented)
+    readonly width: number;
+}
+
+// @internal
+export function slideSizeFieldError(seed: SlideSizeFields, d: SlideSizeFields, current: SlideSizeEmu): {
+    readonly field: 'width' | 'height';
+    readonly key: 'errors.slideSizeRange';
+} | null;
+
+// @public
+export interface SlideSizeFields {
+    // (undocumented)
     readonly height: string;
-};
+    // (undocumented)
+    readonly orientation: SlideOrientation;
+    readonly scaleContent: boolean;
+    // (undocumented)
+    readonly size: SlideSizePreset;
+    // (undocumented)
+    readonly width: string;
+}
+
+// @public
+export type SlideSizePreset = 'widescreen' | 'standard' | 'a4' | 'letter' | 'custom';
+
+// @internal
+export function slideSizePresetOf(width: number, height: number): SlideSizePreset;
 
 // @internal
 export function slideSorterMounted(editor: PptxEditorInstance): boolean;
@@ -4870,6 +5097,9 @@ export function submenuPanelKey(panel: HTMLElement | null, event: ChromeKeyEvent
 
 // @internal
 export function subscribeNotesTargets(listen: () => void): () => void;
+
+// @internal
+export function subscribePaneListeners(watch: () => void): () => void;
 
 // @internal
 export function subscribeSectionRenamers(listen: () => void): () => void;
@@ -5165,6 +5395,9 @@ export type TableStyleOption = 'firstRow' | 'lastRow' | 'bandRow' | 'firstCol' |
 
 // @internal
 export function takeDialogSection(editor: object | null, dialog: string): string | undefined;
+
+// @internal
+export function takePaneRequest(editor: object | null | undefined): SidePanelTab | null;
 
 // @public
 export type TextAlign = 'l' | 'ctr' | 'r' | 'just';
@@ -5811,6 +6044,15 @@ export function withFontOrigin(current: EditorFontsOption | undefined, added: Fo
 
 // @internal
 export function withScript(d: FontDialogFields, which: 'superscript' | 'subscript', on: boolean): FontDialogFields;
+
+// @internal
+export function withSlideDimension(d: SlideSizeFields, field: 'width' | 'height', text: string): SlideSizeFields;
+
+// @internal
+export function withSlideOrientation(d: SlideSizeFields, orientation: SlideOrientation): SlideSizeFields;
+
+// @internal
+export function withSlideSizePreset(d: SlideSizeFields, size: SlideSizePreset): SlideSizeFields;
 
 // @internal
 export function withSpaceUnit(d: ParagraphDialogFields, seed: ParagraphDialogFields, side: 'spaceBefore' | 'spaceAfter', unit: SpacingUnit): ParagraphDialogFields;

@@ -29,7 +29,7 @@ import {
   listenSlideshowKeys,
   listenSlideshowStartKeys,
   observeSlideshowScreen,
-  openSlideshowLink,
+  followSlideshowLink,
   paintSlideshowSlide,
   slideshowLinkUnder,
   startSlideshowController,
@@ -220,7 +220,8 @@ const SlideshowScreen = defineComponent({
       if (e.button !== 0) return;
       const href = linkAt(e);
       const doc = (e.currentTarget as Element | null)?.ownerDocument ?? document;
-      if (href) openSlideshowLink(doc, href);
+      // A slide link moves the show; any other link opens in a new tab.
+      if (href) followSlideshowLink(controller, doc, href);
       else controller.next();
     };
 

@@ -3,6 +3,7 @@
 // that read the session, the selection, and the editor's parts, and the surface's key handler
 // (`createShortcut`).
 
+import { emptyPlaceholderType } from '../automation/commands/placeholder-fill.ts';
 import { parentGroupOf } from '../automation/commands/placement.ts';
 import type {
   CommandResult,
@@ -12,7 +13,7 @@ import type {
 } from '../contracts/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
 import { relayoutItem } from '../layout/item-layout.ts';
-import type { PptxPackage } from '../store/index.ts';
+import { elements, shapeTreeOf, type PptxPackage } from '../store/index.ts';
 import type { PresenceLink } from './collaboration-presence.ts';
 import type { DocumentSession } from './document-session.ts';
 import type { FormatPainter } from './format-painter.ts';
@@ -35,6 +36,7 @@ import { zoomKeyAction } from './zoom.ts';
 export type SurfaceHostBase = Pick<
   SurfaceHost,
   | 'idPrefix'
+  | 'pickImage'
   | 'layout'
   | 'label'
   | 'select'
@@ -75,6 +77,13 @@ export function createSurfaceHost(base: SurfaceHostBase, s: SurfaceHostState): S
     selection: () => s.selection(),
     readOnly: () => s.viewing(),
     imageUrl: (p, id) => s.session()?.imageUrl(p, id),
+    fillableType: (id) => {
+      const pkg = s.session()?.store.package;
+      const part = s.part();
+      if (!pkg || !part) return undefined;
+      const el = elements(shapeTreeOf(pkg, part)).find((c) => c.id === id);
+      return el ? emptyPlaceholderType(el) : undefined;
+    },
     imageSize: (p, id) => s.session()?.imageSize(p, id),
     altText: (p, id) => altTextAt(s.session()?.store.package, p, id),
     presence: () => s.presence.painted(s.session()?.store.package, s.part()),
@@ -86,6 +95,7 @@ export function createSurfaceHost(base: SurfaceHostBase, s: SurfaceHostState): S
       s.gestureEdit({ type: 'setTransforms', items }, gesture, base);
     },
     crop: (crop, gesture) => s.gestureEdit({ type: 'cropImage', crop }, gesture),
+    adjust: (values, gesture) => s.gestureEdit({ type: 'setAdjustments', values }, gesture),
     painting: () => s.painter.mode !== 'off',
     // A selection made with the pointer while the painter is on takes the copied format.
     pointerUp: () => void (s.painter.mode !== 'off' && base.run({ type: 'pasteFormat' })),

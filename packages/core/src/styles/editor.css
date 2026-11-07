@@ -468,6 +468,9 @@
   :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) input[type='radio']) {
   margin: 3px 3px 0 5px;
 }
+.pptx-editor :where(:is([class^='pptx-'], [class*=' pptx-']):not([class^='pptx-editor']) option) {
+  padding: 0 2px 1px;
+}
 .pptx-editor :focus-visible {
   outline: 2px solid var(--doc-focus-ring);
   outline-offset: 1px;
@@ -1657,6 +1660,12 @@
 .pptx-surface__handle--rot {
   cursor: grab;
 }
+/* Adjust handles (surface-adjust.ts): a yellow diamond, apart from the box handles. */
+.pptx-surface__handle--adjust {
+  fill: #ffd60a;
+  stroke: #5c4a00;
+  cursor: pointer;
+}
 /* Crop mode (surface-crop.ts): the image outside the frame, dimmed, and the crop handles. */
 .pptx-surface__crop-image {
   opacity: 0.4;
@@ -1725,6 +1734,30 @@
   stroke: var(--doc-primary);
 }
 .pptx-surface__table-handle:hover .pptx-surface__table-handle-icon {
+  fill: var(--doc-primary);
+}
+/* An empty placeholder: a dotted outline in a mid gray, which shows on light and dark slides,
+   and insert buttons in its middle. */
+.pptx-surface__placeholder-outline {
+  fill: none;
+  stroke: rgb(128 128 128 / 0.9);
+}
+.pptx-surface__placeholder-insert {
+  pointer-events: all;
+  cursor: pointer;
+}
+.pptx-surface__placeholder-insert-box {
+  fill: var(--doc-surface);
+  fill-opacity: 0.9;
+  stroke: var(--doc-border-dark);
+}
+.pptx-surface__placeholder-insert-icon {
+  fill: var(--doc-text-muted);
+}
+.pptx-surface__placeholder-insert:hover .pptx-surface__placeholder-insert-box {
+  stroke: var(--doc-primary);
+}
+.pptx-surface__placeholder-insert:hover .pptx-surface__placeholder-insert-icon {
   fill: var(--doc-primary);
 }
 .pptx-surface__table-line {
@@ -2122,6 +2155,115 @@
   min-height: 0;
   padding: 6px 16px 24px;
   overflow-y: auto;
+}
+/* Selection pane: Show all, Hide all, and the order buttons over a tree of the slide's
+   elements, top first. A hidden element is muted and shows a closed eye. */
+.pptx-selection-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pptx-selection-pane__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.pptx-selection-pane__order {
+  display: flex;
+  gap: 2px;
+  margin-inline-start: auto;
+}
+.pptx-selection-pane__hint {
+  margin: 0;
+  color: var(--doc-text-muted);
+  font-size: 11px;
+}
+.pptx-selection-pane__tree {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.pptx-selection-pane__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding-inline-end: 4px;
+  border-radius: 6px;
+  color: var(--doc-text);
+  font-size: 13px;
+  cursor: default;
+  user-select: none;
+}
+.pptx-selection-pane__row:hover {
+  background: var(--doc-bg-hover);
+}
+.pptx-selection-pane__row[aria-selected='true'] {
+  background: color-mix(in srgb, var(--doc-primary) 16%, transparent);
+}
+.pptx-selection-pane__row:focus-visible {
+  outline: 2px solid var(--doc-primary);
+  outline-offset: -2px;
+}
+.pptx-selection-pane__row[data-hidden] .pptx-selection-pane__name {
+  color: var(--doc-text-muted);
+}
+.pptx-selection-pane__twisty {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+.pptx-selection-pane__twisty .pptx-icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.pptx-selection-pane__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pptx-selection-pane__field {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--doc-primary);
+  border-radius: 4px;
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+}
+.pptx-selection-pane__eye {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--doc-text-muted);
+  cursor: pointer;
+}
+.pptx-selection-pane__eye .pptx-icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.pptx-selection-pane__eye:hover:not(:disabled) {
+  background: var(--doc-bg-hover);
+  color: var(--doc-text);
+}
+.pptx-selection-pane__eye:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 .pptx-panel__section {
   display: flex;
@@ -2950,6 +3092,39 @@ legend.pptx-dialog__label {
   border: 1px solid var(--doc-border);
   border-radius: 8px;
 }
+/* The pattern fill dialog (PatternDialog): 54 preset swatches, two colors, and a preview. */
+.pptx-pattern {
+  max-width: 420px;
+}
+/* Six rows of nine: the 54 presets. The cells shrink in a narrow viewport. */
+.pptx-pattern .pptx-swatches {
+  grid-template-columns: repeat(9, minmax(24px, 36px));
+  padding: 6px 0 8px;
+}
+.pptx-pattern__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 14px;
+}
+.pptx-pattern__row .pptx-field {
+  flex: 0 0 auto;
+}
+.pptx-pattern__row .pptx-dialog__section {
+  flex: 1 1 120px;
+}
+.pptx-pattern__preview {
+  height: 64px;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+}
+.pptx-pattern__chip {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--doc-border);
+  border-radius: 6px;
+}
 .pptx-gradient__bar {
   position: relative;
   height: 14px;
@@ -3200,6 +3375,33 @@ legend.pptx-dialog__label {
 .pptx-link__url:focus-visible {
   background: var(--doc-bg-hover);
   text-decoration: underline;
+}
+/* A slide link is a button that shows its slide. */
+.pptx-link__slide {
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+/* The edit form: Link to, then the fields of that kind. */
+.pptx-link__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pptx-link__fields select {
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--doc-border);
+  border-radius: var(--doc-radius-control, 8px);
+  background: var(--doc-surface);
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 13px;
+}
+.pptx-link__fields select[aria-invalid='true'] {
+  border-color: var(--doc-danger);
 }
 .pptx-link__tools {
   display: flex;
@@ -3713,6 +3915,8 @@ legend.pptx-dialog__label {
   .pptx-swatch,
   .pptx-toolbar__swatch,
   .pptx-gradient__preview,
+  .pptx-pattern__preview,
+  .pptx-pattern__chip,
   .pptx-gradient__bar,
   .pptx-gradient__handle,
   .pptx-style-gallery__swatch,
@@ -3721,6 +3925,8 @@ legend.pptx-dialog__label {
   }
   .pptx-swatch,
   .pptx-gradient__preview,
+  .pptx-pattern__preview,
+  .pptx-pattern__chip,
   .pptx-gradient__bar {
     border-color: CanvasText;
   }

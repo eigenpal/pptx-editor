@@ -15,6 +15,7 @@ import {
   type Element,
 } from '../store/index.ts';
 import { renameShape, setShapesVisible } from './commands/arrange-commands.ts';
+import { imageType } from './commands/fill-commands.ts';
 import { groupShapes, ungroupShapes } from './commands/group-commands.ts';
 import {
   addExternalRelationship,
@@ -439,15 +440,6 @@ function replaceFill(ctx: TextPlanContext, part: string, props: Element, xml: st
 
 /** The longest base64 text of a picture fill: the media part cap, with room for line breaks. */
 const MAX_BASE64 = Math.ceil(MAX_IMAGE_BYTES / 3) * 4 * 1.1;
-
-/** The image types a picture fill accepts, by their first bytes. */
-function imageType(bytes: Uint8Array): string | undefined {
-  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47)
-    return 'image/png';
-  if (bytes[0] === 0xff && bytes[1] === 0xd8) return 'image/jpeg';
-  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'image/gif';
-  return undefined;
-}
 
 /**
  * A new media part related to `part`, from base64 image bytes; returns the relationship id. The

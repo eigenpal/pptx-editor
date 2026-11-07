@@ -38,6 +38,7 @@ import type { PptxEditorPopups } from './popups.ts';
 import { DefaultWorkspace } from './SlideSorter.tsx';
 import { PptxEditorSlideRail } from './panes.tsx';
 import { PptxEditorNotesPane } from './NotesPane.tsx';
+import { PptxEditorSelectionPane } from './SelectionPane.tsx';
 import { PptxEditorFindBar } from './FindBar.tsx';
 import { PptxEditorEditNotice } from './EditNotice.tsx';
 import {
@@ -348,6 +349,9 @@ export {
   type ZoomPillProps,
 } from './panes.tsx';
 export { PptxEditorNotesPane, type NotesPaneProps } from './NotesPane.tsx';
+export { PptxEditorSelectionPane, type SelectionPaneProps } from './SelectionPane.tsx';
+// The toolbar's pane slots ask for a side panel tab; a host listens to show a closed panel.
+export { listenPaneRequests, requestPane } from '@pptx-editor.dev/core/editor';
 export { PptxEditorSlideSorter, type SlideSorterProps } from './SlideSorter.tsx';
 export { requestSectionRename } from './RailSections.tsx';
 export {
@@ -412,6 +416,7 @@ export {
   type ShapeGridProps,
   type ShapeIconProps,
 } from './ShapeControls.tsx';
+export { PatternDialog, type PatternDialogProps } from './PatternDialog.tsx';
 export { ShapeStyleGallery, type ShapeStyleGalleryProps } from './ShapeFormatControls.tsx';
 export { MenuTableGrid, type MenuTableGridProps } from './TableControls.tsx';
 export {
@@ -481,6 +486,9 @@ export type {
   FontPickerGroupId,
   FontPickerRow,
   GradientFill,
+  PatternFill,
+  PatternPreset,
+  SidePanelTab,
   ParagraphDialogFields,
   PptxEditorInstance,
   RibbonTabId,
@@ -722,6 +730,7 @@ export const PptxEditor = Object.assign(PptxEditorDefault, {
   NotesPane: PptxEditorNotesPane,
   ZoomPill: PptxEditorZoomPill,
   SidePanel: PptxEditorSidePanel,
+  SelectionPane: PptxEditorSelectionPane,
   FontNotice: PptxEditorFontNotice,
   EditNotice: PptxEditorEditNotice,
   OpenFailure: PptxEditorOpenFailure,

@@ -4,7 +4,7 @@
 // `Navigation` is: it mirrors that value into the root, and a toggle from the hook goes to its
 // `onOpenChange`.
 
-import { createContext, useCallback, useContext, useMemo, useRef } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, type CSSProperties } from 'react';
 import { warnOutsideRoot } from '@pptx-editor.dev/core/editor';
 
 /** The shared pane state. @internal */
@@ -60,4 +60,10 @@ export function useNotesPane(): UseNotesPaneReturn {
   );
   const toggle = useCallback(() => setOpen(!latest.current), [setOpen]);
   return useMemo(() => ({ open, setOpen, toggle }), [open, setOpen, toggle]);
+}
+
+/** A pane's inline style: its width from `paneWidth`, then the host's own styles. @internal */
+export function paneStyle(width: number | undefined, style: CSSProperties | undefined) {
+  if (width === undefined) return style;
+  return { width, ...style };
 }

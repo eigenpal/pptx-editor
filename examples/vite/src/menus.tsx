@@ -82,9 +82,11 @@ export function MenuBar({
   onExample,
   onExport,
   onExportSlides,
+  onSelectionPane,
 }: {
   onRename: () => void;
   onOpen: () => void;
+  onSelectionPane: () => void;
   onNew: () => void;
   onExample: () => void;
   onExport: () => void;
@@ -157,6 +159,15 @@ export function MenuBar({
         </PptxEditor.Menu.Group>
         <SlideNumbersRow />
       </PptxEditor.Menu.Insert>
+      {/* Arrange > Selection pane opens the side panel on its Selection tab. */}
+      <PptxEditor.Menu.Arrange>
+        <PptxEditor.Menu.Separator />
+        <PptxEditor.Menu.Row
+          label={t('toolbar.selectionPane')}
+          icon="view_sidebar"
+          onSelect={onSelectionPane}
+        />
+      </PptxEditor.Menu.Arrange>
       <PptxEditor.Menu.Entry id="help" label={t('menu.help')}>
         <PptxEditor.Menu.Row
           label={t('menu.about')}

@@ -147,6 +147,7 @@ export {
   type ProgressiveMount,
 } from './progressive-mount.ts';
 export { STANDARD_COLORS, gradientCss, presetGradient, swatchName } from './palette.ts';
+export { PATTERN_CHOICES, patternCss, patternDialogStart, patternLabel } from './pattern-fields.ts';
 export { focusEdge, handleMenuKey, panelItems } from './menu-keyboard.ts';
 export {
   POINTER_OPEN_ATTRIBUTE,
@@ -391,6 +392,9 @@ export {
   isAdapterSlot,
   insertImageFile,
   pickImageInto,
+  pickPictureFill,
+  fillWithPictureFile,
+  PICTURE_FILL_TYPES,
   runChromeRow,
   runClipboardSlot,
   surfaceInputIn,
@@ -432,14 +436,27 @@ export {
   backgroundDraftCommand,
   backgroundDraftFrom,
   commitDialogCommand,
-  pageSetupSizeName,
   radioGroupStep,
   sameBackground,
-  slideSizeInches,
   translateDialogErrors,
   validateBackgroundDraft,
   type BackgroundDraftFields,
 } from './dialog-fields.ts';
+export {
+  SLIDE_SIZE_CHOICES,
+  SLIDE_SIZE_PRESETS,
+  seedSlideSizeFields,
+  slideSizeCommandOf,
+  slideSizeFieldError,
+  slideSizePresetOf,
+  withSlideDimension,
+  withSlideOrientation,
+  withSlideSizePreset,
+  type SlideOrientation,
+  type SlideSizeEmu,
+  type SlideSizeFields,
+  type SlideSizePreset,
+} from './page-setup-fields.ts';
 export {
   MAX_ALT_TEXT,
   altTextDraftCommand,
@@ -667,6 +684,7 @@ export {
   listenSlideshowStartKeys,
   observeSlideshowScreen,
   openSlideshowLink,
+  followSlideshowLink,
   slideshowLinkUnder,
   startSlideshowController,
   type SlideshowScreenSize,
@@ -674,11 +692,33 @@ export {
 export {
   editNoticeTone,
   elementKindLabelKey,
+  formatPanelSize,
   elementRotates,
   TABLE_OPTION_ROWS,
   type ElementKindLabelKey,
   type TableOptionRow,
 } from './canvas-support.ts';
+export {
+  SELECTION_PANE_NAME_MAX,
+  SIDE_PANEL_TABS,
+  selectFromPane,
+  selectionPaneAncestors,
+  selectionPaneKey,
+  selectionPaneRows,
+  selectionPaneSelected,
+  selectionPaneAllIds,
+  type SelectionPaneRow,
+  type SidePanelTab,
+} from './selection-pane.ts';
+export {
+  hasPaneListener,
+  isPaneSlot,
+  listenPaneRequests,
+  paneListenersVersion,
+  requestPane,
+  subscribePaneListeners,
+  takePaneRequest,
+} from './pane-requests.ts';
 export {
   applyLocalFonts,
   dispatchFindRequest,
@@ -731,6 +771,16 @@ export {
   type HyperlinkPopupRequest,
   type HyperlinkPopupState,
 } from './link-popup.ts';
+export {
+  LINK_KINDS,
+  linkKindOf,
+  mailtoParts,
+  mailtoUrl,
+  slideLinkChoices,
+  slideLinkLabel,
+  type LinkKind,
+  type MailtoParts,
+} from './link-fields.ts';
 export type { FindStep, PptxFind, ReplaceAllResult } from './find-session.ts';
 export { findNotesMatch, onFindShown } from './find-session.ts';
 export {

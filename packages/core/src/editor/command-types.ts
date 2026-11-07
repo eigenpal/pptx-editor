@@ -75,12 +75,15 @@ const COMMAND_TABLE = {
   // Shape format
   setShapeFill: true,
   setShapeGradient: true,
+  setShapePattern: true,
+  setShapePicture: true,
   setLineColor: true,
   setLineWidth: true,
   setLineDash: true,
   setLineEnds: true,
   setShapeEffect: true,
   setShapeStyle: true,
+  setAdjustments: true,
   // Slides, notes, and sections
   addSlide: true,
   duplicateSlide: true,
@@ -91,6 +94,7 @@ const COMMAND_TABLE = {
   moveSlides: true,
   setSlideNumbers: true,
   setSlideBackground: true,
+  setSlideSize: true,
   applyLayout: true,
   resetSlides: true,
   setSlidesHidden: true,

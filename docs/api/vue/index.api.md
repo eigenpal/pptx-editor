@@ -75,6 +75,7 @@ import { HyperlinkPopupState } from '@pptx-editor.dev/core/editor';
 import { InjectionKey } from 'vue';
 import { isFontResolver } from '@pptx-editor.dev/core/editor';
 import { JSX } from 'vue/jsx-runtime';
+import { listenPaneRequests } from '@pptx-editor.dev/core/editor';
 import { loadFonts } from '@pptx-editor.dev/core/editor';
 import { LoadFontsRequest } from '@pptx-editor.dev/core/editor';
 import { LoadFontsResult } from '@pptx-editor.dev/core/editor';
@@ -88,6 +89,8 @@ import { MenuRowPartName } from '@pptx-editor.dev/core/editor';
 import { ParagraphDialogFields } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatCommand } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatRead } from '@pptx-editor.dev/core/editor';
+import { PatternFill } from '@pptx-editor.dev/core/editor';
+import { PatternPreset } from '@pptx-editor.dev/core/editor';
 import { PopoverAnchorRect } from '@pptx-editor.dev/core/editor';
 import * as _pptx_editor_dev_core_contracts from '@pptx-editor.dev/core/contracts';
 import * as _pptx_editor_dev_core_editor from '@pptx-editor.dev/core/editor';
@@ -99,16 +102,19 @@ import { PptxFontsSource } from '@pptx-editor.dev/core/editor';
 import { PptxSource } from '@pptx-editor.dev/core/editor';
 import { PropType } from 'vue';
 import { Ref } from 'vue';
+import { requestPane } from '@pptx-editor.dev/core/editor';
 import { ResolvedColorMode } from '@pptx-editor.dev/core/editor';
 import { RibbonTabId } from '@pptx-editor.dev/core/editor';
 import { ShallowRef } from 'vue';
 import { ShapeStyleChoice } from '@pptx-editor.dev/core/editor';
 import { ShapeStyleValue } from '@pptx-editor.dev/core/editor';
+import { SidePanelTab } from '@pptx-editor.dev/core/editor';
 import { SlideBackground } from '@pptx-editor.dev/core/editor';
 import { SlideLayoutSummary } from '@pptx-editor.dev/core/editor';
 import { SlideRailOrientation } from '@pptx-editor.dev/core/editor';
 import { SlideSection } from '@pptx-editor.dev/core/editor';
 import { SlideshowController } from '@pptx-editor.dev/core/editor';
+import { SlideSizeFields } from '@pptx-editor.dev/core/editor';
 import { SlotsType } from 'vue';
 import { TOOLBAR_NAMED_PARTS } from '@pptx-editor.dev/core/editor';
 import { ToolbarShownValue } from '@pptx-editor.dev/core/editor';
@@ -230,7 +236,7 @@ export const BackgroundDialog: {
 };
 
 // @public
-export type BackgroundDialogFieldName = 'solid' | 'gradient' | 'picture' | 'allSlides';
+export type BackgroundDialogFieldName = 'solid' | 'gradient' | 'pattern' | 'picture' | 'allSlides';
 
 // @public
 export interface BackgroundDialogFields {
@@ -1399,6 +1405,8 @@ export const LineMenuControl: vue.DefineComponent<vue.ExtractPropTypes<{
 // @public
 export type LineMenuControlProps = ExtractPublicPropTypes<typeof slotPartProps$1>;
 
+export { listenPaneRequests }
+
 export { loadFonts }
 
 export { LoadFontsRequest }
@@ -1997,6 +2005,7 @@ export type PageSetupDialogFieldName = 'slideSize' | 'theme' | 'fonts' | 'substi
 
 // @public
 export interface PageSetupDialogFields {
+    readonly slideSize: SlideSizeFields;
     readonly theme: 'light' | 'dark';
 }
 
@@ -2124,6 +2133,61 @@ export type ParagraphDialogProps = ExtractPublicPropTypes<typeof paragraphDialog
 export { ParagraphFormatCommand }
 
 export { ParagraphFormatRead }
+
+// @public
+export const PatternDialog: vue.DefineComponent<vue.ExtractPropTypes<{
+    readonly open: {
+        readonly type: BooleanConstructor;
+        readonly required: true;
+    };
+    readonly initial: {
+        readonly type: PropType<PatternFill | null>;
+        readonly default: null;
+    };
+    readonly base: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly onClose: {
+        readonly type: PropType<() => void>;
+        readonly required: true;
+    };
+    readonly onApply: {
+        readonly type: PropType<(pattern: PatternFill) => void>;
+        readonly required: true;
+    };
+}>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    readonly open: {
+        readonly type: BooleanConstructor;
+        readonly required: true;
+    };
+    readonly initial: {
+        readonly type: PropType<PatternFill | null>;
+        readonly default: null;
+    };
+    readonly base: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+    readonly onClose: {
+        readonly type: PropType<() => void>;
+        readonly required: true;
+    };
+    readonly onApply: {
+        readonly type: PropType<(pattern: PatternFill) => void>;
+        readonly required: true;
+    };
+}>> & Readonly<{}>, {
+    readonly base: string;
+    readonly initial: PatternFill | null;
+}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+// @public
+export type PatternDialogProps = ExtractPublicPropTypes<typeof patternDialogProps>;
+
+export { PatternFill }
+
+export { PatternPreset }
 
 // @internal
 export const Popover: vue.DefineComponent<vue.ExtractPropTypes<{
@@ -3349,7 +3413,14 @@ export const PptxEditor: {
             readonly type: PropType<vue.CSSProperties>;
             readonly default: undefined;
         };
-    }>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+        readonly tab: {
+            readonly type: PropType<_pptx_editor_dev_core_editor.SidePanelTab>;
+            readonly default: undefined;
+        };
+    }>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
+        tabChange: (_tab: _pptx_editor_dev_core_editor.SidePanelTab) => true;
+        'update:tab': (_tab: _pptx_editor_dev_core_editor.SidePanelTab) => true;
+    }, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
         readonly paneWidth: {
             readonly type: NumberConstructor;
             readonly default: undefined;
@@ -3366,11 +3437,34 @@ export const PptxEditor: {
             readonly type: PropType<vue.CSSProperties>;
             readonly default: undefined;
         };
-    }>> & Readonly<{}>, {
+        readonly tab: {
+            readonly type: PropType<_pptx_editor_dev_core_editor.SidePanelTab>;
+            readonly default: undefined;
+        };
+    }>> & Readonly<{
+        onTabChange?: ((_tab: "format" | "comments" | "selection") => any) | undefined;
+        "onUpdate:tab"?: ((_tab: "format" | "comments" | "selection") => any) | undefined;
+    }>, {
         readonly className: string;
         readonly style: vue.CSSProperties;
         readonly paneWidth: number;
         readonly onClose: () => void;
+        readonly tab: "format" | "comments" | "selection";
+    }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+    SelectionPane: vue.DefineComponent<vue.ExtractPropTypes<{
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+    }>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
+        [key: string]: any;
+    }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+        readonly className: {
+            readonly type: StringConstructor;
+            readonly default: undefined;
+        };
+    }>> & Readonly<{}>, {
+        readonly className: string;
     }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
     FontNotice: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly className: {
@@ -4528,8 +4622,8 @@ export const PptxEditor: {
                 readonly default: undefined;
             };
         }>> & Readonly<{
-            "onUpdate:tab"?: ((_tab: string) => any) | undefined;
             onTabChange?: ((_tab: string) => any) | undefined;
+            "onUpdate:tab"?: ((_tab: string) => any) | undefined;
         }>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
             [key: string]: any;
         }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
@@ -4570,8 +4664,8 @@ export const PptxEditor: {
                 readonly default: undefined;
             };
         }>> & Readonly<{
-            "onUpdate:tab"?: ((_tab: string) => any) | undefined;
             onTabChange?: ((_tab: string) => any) | undefined;
+            "onUpdate:tab"?: ((_tab: string) => any) | undefined;
         }>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
             [key: string]: any;
         }>, {}, {}, {}, {
@@ -4606,8 +4700,8 @@ export const PptxEditor: {
             readonly default: undefined;
         };
     }>> & Readonly<{
-        "onUpdate:tab"?: ((_tab: string) => any) | undefined;
         onTabChange?: ((_tab: string) => any) | undefined;
+        "onUpdate:tab"?: ((_tab: string) => any) | undefined;
     }>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
         [key: string]: any;
     }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
@@ -5735,8 +5829,8 @@ export const PptxEditorRibbon: {
             readonly default: undefined;
         };
     }>> & Readonly<{
-        "onUpdate:tab"?: ((_tab: string) => any) | undefined;
         onTabChange?: ((_tab: string) => any) | undefined;
+        "onUpdate:tab"?: ((_tab: string) => any) | undefined;
     }>, () => VNode<vue.RendererNode, vue.RendererElement, {
         [key: string]: any;
     }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
@@ -5777,8 +5871,8 @@ export const PptxEditorRibbon: {
             readonly default: undefined;
         };
     }>> & Readonly<{
-        "onUpdate:tab"?: ((_tab: string) => any) | undefined;
         onTabChange?: ((_tab: string) => any) | undefined;
+        "onUpdate:tab"?: ((_tab: string) => any) | undefined;
     }>, () => VNode<vue.RendererNode, vue.RendererElement, {
         [key: string]: any;
     }>, {}, {}, {}, {
@@ -5813,8 +5907,8 @@ export const PptxEditorRibbon: {
         readonly default: undefined;
     };
 }>> & Readonly<{
-    "onUpdate:tab"?: ((_tab: string) => any) | undefined;
     onTabChange?: ((_tab: string) => any) | undefined;
+    "onUpdate:tab"?: ((_tab: string) => any) | undefined;
 }>, () => VNode<vue.RendererNode, vue.RendererElement, {
     [key: string]: any;
 }>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
@@ -5989,6 +6083,23 @@ export const PptxEditorRoot: vue.DefineComponent<vue.ExtractPropTypes<{
 export type PptxEditorRootProps = ExtractPublicPropTypes<typeof pptxEditorRootProps>;
 
 // @public
+export const PptxEditorSelectionPane: vue.DefineComponent<vue.ExtractPropTypes<{
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+}>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
+    [key: string]: any;
+}>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    readonly className: {
+        readonly type: StringConstructor;
+        readonly default: undefined;
+    };
+}>> & Readonly<{}>, {
+    readonly className: string;
+}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+// @public
 export const PptxEditorSidePanel: vue.DefineComponent<vue.ExtractPropTypes<{
     readonly paneWidth: {
         readonly type: NumberConstructor;
@@ -6006,7 +6117,14 @@ export const PptxEditorSidePanel: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: PropType<CSSProperties>;
         readonly default: undefined;
     };
-}>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    readonly tab: {
+        readonly type: PropType<SidePanelTab>;
+        readonly default: undefined;
+    };
+}>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
+    tabChange: (_tab: SidePanelTab) => true;
+    'update:tab': (_tab: SidePanelTab) => true;
+}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
     readonly paneWidth: {
         readonly type: NumberConstructor;
         readonly default: undefined;
@@ -6023,11 +6141,19 @@ export const PptxEditorSidePanel: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: PropType<CSSProperties>;
         readonly default: undefined;
     };
-}>> & Readonly<{}>, {
+    readonly tab: {
+        readonly type: PropType<SidePanelTab>;
+        readonly default: undefined;
+    };
+}>> & Readonly<{
+    onTabChange?: ((_tab: "format" | "comments" | "selection") => any) | undefined;
+    "onUpdate:tab"?: ((_tab: "format" | "comments" | "selection") => any) | undefined;
+}>, {
     readonly className: string;
     readonly style: CSSProperties;
     readonly paneWidth: number;
     readonly onClose: () => void;
+    readonly tab: "format" | "comments" | "selection";
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 
 // @public
@@ -7014,6 +7140,8 @@ export function rejectionMessage(t: Translate, rejection: EditorRejection): stri
 // @public
 export function requestFindBar(editor: PptxEditorInstance | null, replace?: boolean): void;
 
+export { requestPane }
+
 // @public
 export function requestSectionRename(editor: PptxEditorInstance | null, sectionId: string): void;
 
@@ -7142,6 +7270,9 @@ export interface SectionMenuState {
 }
 
 // @public
+export type SelectionPaneProps = ExtractPublicPropTypes<typeof selectionPaneProps>;
+
+// @public
 export const ShapeGalleryControl: vue.DefineComponent<vue.ExtractPropTypes<{
     readonly slot: {
         readonly type: PropType<ChromeSlotId>;
@@ -7248,6 +7379,8 @@ export { ShapeStyleValue }
 
 // @public
 export type SidePanelProps = ExtractPublicPropTypes<typeof sidePanelProps>;
+
+export { SidePanelTab }
 
 export { SlideBackground }
 

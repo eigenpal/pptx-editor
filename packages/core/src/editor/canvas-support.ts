@@ -41,6 +41,25 @@ export function elementRotates(
   return table?.nodeId !== geometry.nodeId;
 }
 
+/**
+ * The size the Format panel writes for a typed width (`cx`) or height (`cy`), in EMU. With the
+ * aspect ratio locked (`noChangeAspect`), the other side follows, as a corner handle keeps it.
+ * A side of 0 has no ratio to keep. @internal
+ */
+export function formatPanelSize(
+  geometry: Pick<SelectionGeometry, 'cx' | 'cy' | 'lockAspectRatio'>,
+  side: 'cx' | 'cy',
+  value: number
+): { cx: number; cy: number } {
+  const v = Math.max(0, Math.round(value));
+  const { cx, cy } = geometry;
+  if (!geometry.lockAspectRatio || cx <= 0 || cy <= 0)
+    return side === 'cx' ? { cx: v, cy } : { cx, cy: v };
+  return side === 'cx'
+    ? { cx: v, cy: Math.round((v * cy) / cx) }
+    : { cx: Math.round((v * cx) / cy), cy: v };
+}
+
 /** One style option check box of the Format panel's Table section. @internal */
 export interface TableOptionRow {
   readonly option: TableStyleOption;

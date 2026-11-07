@@ -482,3 +482,56 @@ describe('PptxEditor.HyperLink', () => {
     expect(panel()?.getAttribute('data-mode')).toBe('reading');
   });
 });
+
+describe('PptxEditor.HyperLink link kinds', () => {
+  test('Link to writes an email link and a slide link; a slide link shows Go to slide', async () => {
+    const editor = await loaded((onReady) => (
+      <PptxEditorRoot onReady={onReady}>
+        <PptxEditorContent />
+      </PptxEditorRoot>
+    ));
+    linkAndCaret(editor);
+    await clickSlide(editor);
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Edit link' })));
+    const kind = () => screen.getByRole('combobox', { name: 'Link to' }) as HTMLSelectElement;
+    expect(kind().value).toBe('web');
+    // Email: focus stays on Link to, and the subject is percent-encoded into the one draft.
+    kind().focus();
+    act(() => void fireEvent.change(kind(), { target: { value: 'email' } }));
+    const address = screen.getByRole('textbox', { name: 'Email address' }) as HTMLInputElement;
+    expect(document.activeElement).toBe(kind());
+    act(() => void fireEvent.change(address, { target: { value: 'ana@example.com' } }));
+    const subject = screen.getByRole('textbox', { name: 'Subject' });
+    act(() => void fireEvent.change(subject, { target: { value: 'Q3 & plans' } }));
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Apply' })));
+    expect(editor.snapshot().format?.link).toBe('mailto:ana@example.com?subject=Q3%20%26%20plans');
+    // Edit again: the form starts on Email with its fields.
+    await clickSlide(editor);
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Edit link' })));
+    expect(kind().value).toBe('email');
+    expect((screen.getByRole('textbox', { name: 'Subject' }) as HTMLInputElement).value).toBe(
+      'Q3 & plans'
+    );
+    // Slide: the jumps and each slide by number.
+    act(() => void fireEvent.change(kind(), { target: { value: 'slide' } }));
+    const slide = screen.getByRole('combobox', { name: 'Slide in this presentation' });
+    expect([...(slide as HTMLSelectElement).options].map((o) => o.text)).toEqual([
+      'First slide',
+      'Last slide',
+      'Next slide',
+      'Previous slide',
+      'Slide 1',
+    ]);
+    act(() => void fireEvent.change(slide, { target: { value: '#slide-1' } }));
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Apply' })));
+    expect(editor.snapshot().format?.link).toBe('#slide-1');
+    // Reading mode: Go to slide, and no Copy.
+    await clickSlide(editor);
+    const go = screen.getByRole('button', { name: 'Go to Slide 1' });
+    expect(go.textContent).toBe('Slide 1');
+    expect(screen.queryByRole('button', { name: 'Copy link' })).toBe(null);
+    act(() => void fireEvent.click(go));
+    expect(panel()).toBe(null);
+    expect(editor.snapshot().currentSlide).toBe(0);
+  });
+});

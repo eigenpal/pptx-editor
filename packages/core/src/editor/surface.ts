@@ -11,6 +11,7 @@ export { caretAt, pointAt, textFrameMatrix };
 import { selectionRects } from './surface-text-selection.ts';
 import { cellsOverlay, TableGestures } from './surface-table.ts';
 import { TableChrome } from './surface-table-chrome.ts';
+import { PlaceholderChrome } from './surface-placeholder-chrome.ts';
 import { textItemOf } from './table-cells.ts';
 import { paragraphUnits, wordSelectionAt } from '../automation/commands/text-units.ts';
 import {
@@ -42,6 +43,13 @@ import { clampZoom, wheelZoomFactor } from './zoom.ts';
 import { selectionAnnouncement } from './surface-announce.ts';
 import { ShapeDrag, type Handle } from './surface-drag.ts';
 import { handleElements } from './surface-handles.ts';
+import {
+  adjustAt,
+  adjustDragLive,
+  adjustHandleElements,
+  startAdjustDrag,
+  type AdjustDrag,
+} from './surface-adjust.ts';
 import type { Relayout } from './drag-preview.ts';
 
 const EMU_PER_PX = 9_525;
@@ -80,10 +88,16 @@ export interface SurfaceHost extends SurfaceInputHost {
   cropping?(): string | null;
   /** One step of a crop drag; one gesture merges into one undo step. */
   crop?(crop: ImageCrop, gesture: string): void;
+  /** One step of an adjust handle drag (`setAdjustments`); one gesture is one undo step. */
+  adjust?(values: Readonly<Record<string, number>>, gesture: string): void;
   /** Whether an element's aspect ratio is locked: every resize handle keeps the ratio. */
   aspectLocked?(nodeId: string): boolean;
   /** Lay out a dragged item at a new box, for the drag preview (drag-preview.ts). */
   relayout?: Relayout;
+  /** Ask the user for a picture file and insert it (an empty placeholder's picture button). */
+  pickImage?(): void;
+  /** The placeholder type a new table or picture can fill on this slide (`emptyPlaceholderType`). */
+  fillableType?(nodeId: string): string | undefined;
 }
 
 /** Find a slide item by node id, inside groups too. */
@@ -102,12 +116,14 @@ export class SlideSurface {
   /** A shape drag: it previews while the pointer moves and writes on release (surface-drag.ts). */
   readonly #drag: ShapeDrag;
   #cropDrag: CropDrag | null = null;
+  #adjustDrag: AdjustDrag | null = null;
   #marquee: null | { start: { x: number; y: number }; at: { x: number; y: number } } = null;
   #textDrag: TextDrag | null = null;
   /** The last press selected a word or a paragraph, so the browser's `dblclick` keeps it. */
   #unitPress = false;
   readonly #table: TableGestures;
   readonly #tableChrome: TableChrome;
+  readonly #placeholderChrome: PlaceholderChrome;
   readonly #unbindInput: () => void;
   #zoomAnchor: { x: number; y: number } | null = null;
   #renderedZoom: number | null = null;
@@ -143,6 +159,7 @@ export class SlideSurface {
     this.#overlay.setAttribute('aria-hidden', 'true'); // Selection chrome: the live region says it.
     this.#table = new TableGestures(editor);
     this.#tableChrome = new TableChrome(editor);
+    this.#placeholderChrome = new PlaceholderChrome(editor);
     this.#input = doc.createElement('textarea');
     this.#input.className = 'pptx-surface__input';
     // The input receives keystrokes and IME composition for the engine; it is focusable and
@@ -303,7 +320,10 @@ export class SlideSurface {
     const ns = SVG_NS;
     const px = EMU_PER_PX / zoom;
     // The area outside the slide, dimmed over the parts of shapes that lie there.
-    const parts: Element[] = [outsideVeil(doc, layout.slide.width, layout.slide.height)];
+    const parts: Element[] = [
+      outsideVeil(doc, layout.slide.width, layout.slide.height),
+      ...this.#placeholderChrome.elements(doc, layout, px),
+    ];
     const sel = this.editor.selection();
     const ids = sel.kind === 'shapes' ? sel.nodeIds : sel.kind === 'none' ? [] : [sel.nodeId];
     const scope = selectionScope(layout.items, sel);
@@ -337,8 +357,14 @@ export class SlideSurface {
       parts.push(g);
     }
     // Handles show while text is edited too, so a text box can be resized without leaving it.
-    if (sel.kind !== 'none' && !crop && !this.editor.readOnly())
+    if (sel.kind !== 'none' && !crop && !this.editor.readOnly()) {
       parts.push(...handleElements(doc, selected, line, px));
+      // One selected preset shape also shows its adjust handles, over the box handles.
+      if (sel.kind === 'shapes' && selected.length === 1 && !line && this.editor.adjust)
+        parts.push(
+          ...adjustHandleElements(doc, selected[0], px, this.editor.label('canvas.adjustHandle'))
+        );
+    }
     parts.push(...presenceElements(doc, layout, this.editor.presence?.() ?? [], px));
     parts.push(...guideElements(doc, this.#drag.guides, px));
     if (this.#marquee) {
@@ -503,6 +529,12 @@ export class SlideSurface {
       e.preventDefault();
       return;
     }
+    // An empty placeholder's buttons insert a table or a picture that fills it.
+    if (!painting && this.#placeholderChrome.press(layout, target)) {
+      this.focus();
+      e.preventDefault();
+      return;
+    }
     // The table chrome: the select handle selects and drags the table; "+" inserts a row or column.
     const chrome = painting ? null : this.#tableChrome.press(layout, target);
     if (chrome) {
@@ -511,6 +543,14 @@ export class SlideSurface {
         this.#startDrag('move', [chrome.id], p);
       }
       this.focus();
+      e.preventDefault();
+      return;
+    }
+    const adjustHandle = target.getAttribute?.('data-adjust-handle');
+    if (adjustHandle !== null && adjustHandle !== undefined && !painting && sel.kind === 'shapes') {
+      const item = itemById(layout, sel.nodeIds[0] ?? '');
+      this.#adjustDrag = startAdjustDrag(item, Number(adjustHandle), `g${++this.#gestures}`);
+      this.root.focus({ preventScroll: true });
       e.preventDefault();
       return;
     }
@@ -701,7 +741,12 @@ export class SlideSurface {
     const layout = this.editor.layout();
     if (!layout) return;
     const p = this.#slidePoint(e);
-    const idle = !this.#drag.active && !this.#textDrag && !this.#marquee && !this.#cropDrag;
+    const idle =
+      !this.#drag.active &&
+      !this.#textDrag &&
+      !this.#marquee &&
+      !this.#cropDrag &&
+      !this.#adjustDrag;
     const free = idle && !this.#table.active;
     const inStage = free && e.target instanceof Node && this.#stage.contains(e.target);
     if (idle && this.#tableChrome.hover(layout, p, inStage ? this.#hit(p) : undefined))
@@ -730,6 +775,22 @@ export class SlideSurface {
       this.#renderOverlay(layout, this.editor.zoom());
       return;
     }
+    // A press that ended out of sight (a lost pointerup) ends a handle drag: a hover edits nothing.
+    if ((this.#adjustDrag || this.#cropDrag) && (e.buttons & 1) === 0) {
+      this.#adjustDrag = this.#cropDrag = null;
+      this.#pressed = false;
+      return;
+    }
+    const a = this.#adjustDrag;
+    if (a) {
+      // The drag edits the shape it started on. Escape, an undo, or a peer's edit that changes
+      // the selection or removes the shape ends it.
+      if (!adjustDragLive(a, this.editor.selection(), layout))
+        return void (this.#adjustDrag = null);
+      const values = adjustAt(a, p);
+      if (values) this.editor.adjust?.(values, a.gesture);
+      return;
+    }
     const c = this.#cropDrag;
     if (c) {
       if (Math.abs(p.x - c.start.x) + Math.abs(p.y - c.start.y) >= 2 * EMU_PER_PX)
@@ -752,9 +813,13 @@ export class SlideSurface {
     };
   }
 
-  /** End a shape drag with no edit (an undo or a redo). A drag that moved says so. */
+  /**
+   * End a drag (an undo or a redo). A shape drag ends with no edit, and says so when it moved. A
+   * crop or adjust handle drag keeps the steps it wrote, which the undo then reverts.
+   */
   cancelDrag(): void {
     this.#drag.cancel();
+    this.#adjustDrag = this.#cropDrag = null;
   }
 
   /** The snap distance in EMU, or null when Alt is down or View > Smart guides is off. */
@@ -766,6 +831,8 @@ export class SlideSurface {
   #onPointerUp = (e: PointerEvent): void => {
     const pressed = this.#pressed;
     this.#pressed = false;
+    // A release over an empty placeholder's Picture button asks for the file.
+    if (pressed) this.#placeholderChrome.release(this.#slidePoint(e));
     this.#endGesture(e);
     if (pressed) this.editor.pointerUp?.();
   };
@@ -786,6 +853,7 @@ export class SlideSurface {
 
   #endGesture(e: PointerEvent): void {
     this.#cropDrag = null;
+    this.#adjustDrag = null;
     this.#textDrag = null;
     // After a grid line drag, a caret that stayed in the table takes the keys again.
     if (this.#table.up()) this.focus();

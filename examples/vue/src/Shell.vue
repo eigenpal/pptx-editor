@@ -28,6 +28,8 @@ import {
   usePptxEditor,
   useSlideshow,
   useTranslation,
+  type SidePanelTab,
+  listenPaneRequests,
 } from '@pptx-editor.dev/vue';
 import {
   PPTX_MIME,
@@ -74,8 +76,23 @@ const slideRatio = useEditorState((s) => (s.slideWidth ? s.slideHeight / s.slide
 const show = useSlideshow();
 // Closed on a narrow window, so the slide keeps a usable zoom (demo-files.ts).
 const panel = shallowRef(panelStartsOpen());
+const panelTab = shallowRef<SidePanelTab>('format');
 const stopPanelWidth = followPanelWidth((open) => (panel.value = open));
 onBeforeUnmount(stopPanelWidth);
+// The toolbar's Selection Pane and Format Pane controls open the panel on their tab.
+watch(
+  editor,
+  (e, _old, onCleanup) => {
+    if (!e) return;
+    onCleanup(
+      listenPaneRequests(e, (pane) => {
+        panelTab.value = pane;
+        panel.value = true;
+      })
+    );
+  },
+  { immediate: true }
+);
 const dragging = shallowRef(false);
 // The slide thumbnails over the slide, on a narrow window only.
 const rail = shallowRef(false);
@@ -181,6 +198,12 @@ function onDrop(e: DragEvent): void {
         @example="emit('example')"
         @export="exportDeck"
         @export-slides="exportSlides"
+        @selection-pane="
+          () => {
+            panelTab = 'selection';
+            panel = true;
+          }
+        "
       />
       <div class="demo-topbar__actions">
         <!-- On a narrow window the slide thumbnails open over the slide (shell.css). -->
@@ -287,7 +310,11 @@ function onDrop(e: DragEvent): void {
           <PptxEditorOpenFailure />
           <PptxEditorStatusBar v-if="ribbon" />
         </div>
-        <PptxEditorSidePanel v-if="panel" :on-close="() => (panel = false)" />
+        <PptxEditorSidePanel
+          v-if="panel"
+          v-model:tab="panelTab"
+          :on-close="() => (panel = false)"
+        />
         <div v-if="dragging" class="demo-drop">{{ t('app.dropHint') }}</div>
       </div>
     </main>

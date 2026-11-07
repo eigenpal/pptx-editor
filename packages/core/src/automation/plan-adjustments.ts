@@ -4,7 +4,7 @@
 
 import { presetAdjustments, type PresetAdjustment } from '../layout/index.ts';
 import { attr, child, elements, intAttr, type Element } from '../store/index.ts';
-import { specFromXml } from './commands/shape-commands.ts';
+import { GUIDE_LIMIT, writeAdjustments } from './commands/adjust-commands.ts';
 import type { AutomationRef, AutomationValue } from './protocol.ts';
 import { resolvedShape } from './plan-reads.ts';
 import type { TextPlanContext } from './plan-text.ts';
@@ -20,8 +20,6 @@ import {
 /** Guide units per object-model unit: a length is a fraction, an angle is in degrees. */
 const LENGTH_UNIT = 100_000;
 const ANGLE_UNIT = 60_000;
-/** A guide value is a 32-bit integer (`ST_GeomGuideFormula` literals). */
-const GUIDE_LIMIT = 2_147_483_647;
 
 /** The adjust values a shape stores in its own `a:avLst` (`val` formulas only). */
 function storedValues(prstGeom: Element | undefined): Map<string, number> {
@@ -77,8 +75,8 @@ function presetOf(ctx: TextPlanContext, at: ShapeLocation): PresetOf {
   const xfrm = child(spPr, 'a:xfrm');
   const w = resolved?.xfrm.cx ?? intAttr(child(xfrm, 'a:ext'), 'cx') ?? 0;
   const h = resolved?.xfrm.cy ?? intAttr(child(xfrm, 'a:ext'), 'cy') ?? 0;
-  // An unknown name is refused here, so a preset and its guide names written below are always
-  // names of the preset table, never text from the file.
+  // An unknown preset is refused here, so the preset written below is a name of the preset
+  // table. Guide names that a layout gives are text from the file; the writer escapes them.
   const adjustments = presetAdjustments(preset, w, h, adjust);
   if (!adjustments) noPreset();
   return { preset, adjust, own, spPr, adjustments };
@@ -113,57 +111,8 @@ export function setAdjustment(
   if (Math.abs(guide) > GUIDE_LIMIT) badArgument('value');
   if (slot.min !== null && guide < slot.min) guide = Math.ceil(slot.min);
   if (slot.max !== null && guide > slot.max) guide = Math.floor(slot.max);
-  const part = at.part;
-  edit(() => {
-    let prstGeom = geometry.own;
-    if (!prstGeom) {
-      // CT_ShapeProperties: `a:xfrm`, then the geometry (ECMA-376 Part 1, 20.1.2.2.35).
-      const kids = ctx.batch.element(part, geometry.spPr.id).children;
-      const xfrm = kids.findIndex((n) => n.type === 'element' && n.local === 'xfrm');
-      const gds = [...geometry.adjust]
-        .map(([name, v]) => `<a:gd name="${name}" fmla="val ${Math.round(v)}"/>`)
-        .join('');
-      const id = ctx.batch.insert({
-        op: 'insertNode',
-        part,
-        parent: geometry.spPr.id,
-        index: xfrm + 1,
-        spec: specFromXml(
-          `<a:prstGeom prst="${geometry.preset}"><a:avLst>${gds}</a:avLst></a:prstGeom>`
-        ),
-      });
-      prstGeom = ctx.batch.element(part, id);
-    }
-    // CT_PresetGeometry2D holds one optional `a:avLst`.
-    let avLst = child(ctx.batch.element(part, prstGeom.id), 'a:avLst');
-    if (!avLst) {
-      const id = ctx.batch.insert({
-        op: 'insertNode',
-        part,
-        parent: prstGeom.id,
-        index: 0,
-        spec: specFromXml('<a:avLst/>'),
-      });
-      avLst = ctx.batch.element(part, id);
-    }
-    const fmla = `val ${guide}`;
-    const gd = elements(avLst).find((g) => g.local === 'gd' && attr(g, 'name') === slot.name);
-    if (gd)
-      ctx.batch.push({
-        op: 'setAttribute',
-        part,
-        node: gd.id,
-        name: { ns: '', local: 'fmla' },
-        value: fmla,
-      });
-    else
-      ctx.batch.insert({
-        op: 'insertNode',
-        part,
-        parent: avLst.id,
-        index: avLst.children.length,
-        spec: specFromXml(`<a:gd name="${slot.name}" fmla="${fmla}"/>`),
-      });
-  });
+  edit(() =>
+    writeAdjustments(ctx.batch, { part: at.part, ...geometry }, new Map([[slot.name, guide]]))
+  );
   return { kind: 'applied' };
 }

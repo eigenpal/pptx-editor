@@ -31,7 +31,6 @@ export const VUE_ONLY = {
   'rail-memo.ts':
     'The rail item vnode cache with the v-memo mark; React uses the core cache in panes.tsx.',
   'ribbon.ts': 'PptxEditorRibbon and RibbonTab; the React twin is Ribbon.tsx.',
-  'SidePanel.tsx': 'The side panel; React holds it in panes.tsx.',
   'status-bar.ts': 'PptxEditorStatusBar and its parts; the React twin is StatusBar.tsx.',
   'toolbar-bar.tsx': 'The toolbar bar and its overflow; React holds them in Toolbar.tsx.',
   'toolbar-controls.tsx':

@@ -16,6 +16,7 @@ import { deleteShapes } from '../automation/commands/shape-commands.ts';
 import { cellRangeOf, tableItem } from './table-cells.ts';
 import { refitTable } from '../automation/commands/table-fit.ts';
 import { insertTableFrame } from '../automation/commands/table-insert.ts';
+import { placeholderFor } from '../automation/commands/placeholder-fill.ts';
 import { markStructureEdit } from '../automation/commands/table-edit-marks.ts';
 import { repairTable } from '../automation/commands/table-repair.ts';
 import { paragraphLength, paragraphsOf } from '../automation/commands/text-model.ts';
@@ -189,10 +190,15 @@ function length(v: number, what: string): string {
   return String(Math.round(v));
 }
 
-/** A new table on the current slide (`automation/commands/table-insert.ts`). */
+/**
+ * A new table on the current slide (`automation/commands/table-insert.ts`). It fills the empty
+ * content or table placeholder that is selected or holds the caret, or else the first one.
+ */
 function insertTable(ctx: CommandContext, batch: OpBatch, rows: number, cols: number): string {
   const { width: slideW, height: slideH } = ctx.session.info;
-  return insertTableFrame(batch, slidePart(ctx), rows, cols, slideW, slideH);
+  const part = slidePart(ctx);
+  const into = placeholderFor(batch, part, ctx.slide, ctx.selection, 'table');
+  return insertTableFrame(batch, part, rows, cols, slideW, slideH, into);
 }
 
 /** The sum of the grid column widths, EMU. */

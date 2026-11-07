@@ -3,6 +3,8 @@
 // Snapshot contract (same as docx-editor's facade): `snapshot()` returns the SAME object until
 // state moves, so `useSyncExternalStore` selectors only re-render when their slice changes.
 
+import { pickImageInto } from './chrome-actions.ts';
+import { slideLinkOf } from '../automation/commands/slide-links.ts';
 import { documentOpenFailure, yieldToPaint } from './loading.ts';
 import { relationshipById, writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
 import { registerFontFaces, type FontFaceHandle } from '../output/index.ts';
@@ -202,10 +204,18 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       insertions,
       ...views.snapshot(sectionSummaries(pkg).map((x) => x.id)),
       selection,
-      format: formatAt(arm.layout() ?? lay, selection, (rId) => {
+      format: formatAt(arm.layout() ?? lay, selection, (rId, action) => {
         const part = info?.slides[slide]?.partName;
-        const rel = pkg && part ? relationshipById(pkg, part, rId) : undefined;
-        return rel?.external ? rel.externalTarget : undefined;
+        const rel = pkg && part && rId ? relationshipById(pkg, part, rId) : undefined;
+        const slideLink = action
+          ? slideLinkOf(
+              action,
+              rel && !rel.external ? rel.target : undefined,
+              info?.slides.map((s) => s.partName) ?? []
+            )
+          : undefined;
+        // Any other action with an external target (a file link) shows that target.
+        return slideLink ?? (rel?.external ? rel.externalTarget : undefined);
       }),
       geometry: withAltText(
         geometryOf(lay, selection, (id) => elementIn(pkg, partAt(slide), id)),
@@ -893,6 +903,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         },
         zoom: effectiveZoom,
         setZoom: (value) => instance.setZoom(value),
+        pickImage: () => pickImageInto(instance, element.ownerDocument),
       };
       surface = new SlideSurface(
         element,
@@ -956,6 +967,8 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       if (!r.ok) return void refuse('errors.unsupported', commitRefusalDetail(r.rejection));
     } catch (e) {
       const refusal = e instanceof CommandRefusal ? e : new CommandRefusal('errors.unsupported');
+      // A drag step that changes nothing (a pointer that moved within one value) is no error.
+      if (isNothingToDo(refusal.reason)) return;
       return void refuse(refusal.reason, refusal.detail);
     }
     emit();

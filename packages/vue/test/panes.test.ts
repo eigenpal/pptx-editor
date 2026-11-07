@@ -6,7 +6,7 @@
 
 import { afterEach, describe, expect, spyOn, test } from 'bun:test';
 import { createElement, type FunctionComponent, type ReactElement } from 'react';
-import { act, cleanup, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import {
   createApp,
   defineComponent,
@@ -235,16 +235,67 @@ describe('Vue panes match React', () => {
     ]) {
       const el = await mount();
       const tabs = () => [...el.querySelectorAll<HTMLElement>('[role="tab"]')];
-      expect(tabs().map((t) => t.tabIndex)).toEqual([0, -1]);
+      expect(tabs().map((t) => t.tabIndex)).toEqual([0, -1, -1]);
       tabs()[0]!.focus();
       key(tabs()[0]!, 'ArrowRight');
       await nextTick();
       await act(async () => undefined);
-      expect(tabs().map((t) => t.getAttribute('aria-selected'))).toEqual(['false', 'true']);
-      expect(tabs().map((t) => t.tabIndex)).toEqual([-1, 0]);
+      expect(tabs().map((t) => t.getAttribute('aria-selected'))).toEqual([
+        'false',
+        'true',
+        'false',
+      ]);
+      expect(tabs().map((t) => t.tabIndex)).toEqual([-1, 0, -1]);
       expect(document.activeElement).toBe(tabs()[1]!);
       cleanup();
     }
+  });
+
+  test('the Format tab locks the aspect ratio, and a locked width sizes the height', async () => {
+    const lockOf = (el: HTMLElement) =>
+      [...el.querySelectorAll<HTMLLabelElement>('label.pptx-radio')]
+        .find((l) => l.textContent === 'Lock aspect ratio')!
+        .querySelector('input')!;
+    const widthOf = (el: HTMLElement) =>
+      el.querySelector<HTMLInputElement>('input[aria-label="Width"]')!;
+    // A shape with no text: a text frame that fits its text would set its own height.
+    const select = async (): Promise<PptxEditorInstance> => {
+      const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+      const bytes = buildPptx({
+        slides: [{ layout: 'blank', shapes: shape({ id: 2, x: IN, y: IN, cx: 2 * IN, cy: IN }) }],
+      });
+      expect((await editor.load(bytes)).ok).toBe(true);
+      const id = editor.session!.layout(0)!.items[0]!.element.nodeId;
+      editor.setSelection({ kind: 'shapes', nodeIds: [id] });
+      return editor;
+    };
+    const inches = (editor: PptxEditorInstance) => {
+      const g = editor.snapshot().geometry!;
+      return [g.cx / IN, g.cy / IN];
+    };
+    // React: the 2 by 1 inch shape, locked, then 4 inches wide.
+    const r = await select();
+    const re = mountReact(createElement(SidePanel), r);
+    expect(lockOf(re).checked).toBe(false);
+    act(() => void fireEvent.click(lockOf(re)));
+    expect(r.snapshot().geometry?.lockAspectRatio).toBe(true);
+    expect(lockOf(re).checked).toBe(true);
+    act(() => void fireEvent.change(widthOf(re), { target: { value: '4' } }));
+    act(() => void fireEvent.keyDown(widthOf(re), { key: 'Enter' }));
+    expect(inches(r)).toEqual([4, 2]);
+    cleanup();
+    // Vue: the same steps.
+    const v = await select();
+    const ve = await mountVue(() => h(PptxEditorSidePanel), v);
+    expect(lockOf(ve).checked).toBe(false);
+    lockOf(ve).click();
+    await nextTick();
+    expect(v.snapshot().geometry?.lockAspectRatio).toBe(true);
+    widthOf(ve).value = '4';
+    widthOf(ve).dispatchEvent(new Event('input'));
+    key(widthOf(ve), 'Enter');
+    await nextTick();
+    expect(inches(v)).toEqual([4, 2]);
   });
 
   test('a sorter view turns the zoom pill off with the reason', async () => {

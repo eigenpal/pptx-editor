@@ -260,7 +260,7 @@ export function setShapesVisible(
 }
 
 /** The longest name the selection pane writes: 255 characters. */
-const MAX_NAME = 255;
+export const SHAPE_NAME_MAX = 255;
 
 /** Rename an element (`p:cNvPr/@name`). Control characters and empty names are refused. */
 export function renameShape(batch: OpBatch, part: string, id: string, name: string): void {
@@ -268,7 +268,7 @@ export function renameShape(batch: OpBatch, part: string, id: string, name: stri
   // No control characters, noncharacters, or lone surrogates: the store refuses those in text.
   if (
     !value ||
-    value.length > MAX_NAME ||
+    value.length > SHAPE_NAME_MAX ||
     /[\p{Cc}\uFFFE\uFFFF]/u.test(value) ||
     /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(value)
   )

@@ -472,6 +472,7 @@ export const CheckField = dialogControl(
       name: { type: String, required: true as const },
       label: { type: String, required: true as const },
       value: { type: [Boolean, String] as PropType<boolean | 'mixed'>, required: true as const },
+      disabled: { type: Boolean, default: false },
       className: { type: String, default: undefined },
       onChange: { type: Function as PropType<(on: boolean) => void>, required: true as const },
     },
@@ -490,6 +491,7 @@ export const CheckField = dialogControl(
             type="checkbox"
             name={props.name}
             checked={props.value === true}
+            disabled={props.disabled}
             onChange={(e: Event) => props.onChange((e.target as HTMLInputElement).checked)}
           />
           {props.label}

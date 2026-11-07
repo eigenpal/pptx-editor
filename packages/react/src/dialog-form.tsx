@@ -493,6 +493,7 @@ export function CheckField(
     readonly name: string;
     readonly label: string;
     readonly value: boolean | 'mixed';
+    readonly disabled?: boolean;
     readonly onChange: (on: boolean) => void;
   }
 ) {
@@ -507,6 +508,7 @@ export function CheckField(
         type="checkbox"
         name={props.name}
         checked={props.value === true}
+        disabled={props.disabled}
         onChange={(e) => props.onChange(e.target.checked)}
       />
       {props.label}

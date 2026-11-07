@@ -10,7 +10,11 @@ The toolbar shows the `table` group while the selection is in a table. Customize
 
 ## Insert a table
 
-`insertTable` adds a table to the current slide with the deck's default table style, Header Row, and Banded Rows. The table is two thirds of the slide wide and centered. The caret goes into the first cell.
+`insertTable` adds a table to the current slide with the deck's default table style, Header Row, and Banded Rows. The caret goes into the first cell. Where the table goes depends on the slide:
+
+- When the slide has an empty content or table placeholder, the table takes its place. It fills the placeholder that is selected or holds the caret, or else the first one on the slide. The table starts at the placeholder's top-left corner and is as wide as the placeholder. It keeps the placeholder's index, so a layout change moves it with the placeholder. One undo brings the empty placeholder back.
+- A placeholder with its own fill, line, or effect is passed over. The table fills the next empty placeholder, or goes to the middle of the slide when none is left.
+- Otherwise, the table is two thirds of the slide wide and centered.
 
 ```tsx
 import { MenuTableGrid, useEditorCommand } from '@pptx-editor.dev/react';

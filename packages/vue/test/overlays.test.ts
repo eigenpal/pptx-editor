@@ -124,7 +124,7 @@ function mountReact(editor: PptxEditorInstance, node: ReactNode): HTMLElement {
  * leaves out, and the reverse.
  */
 const canonical = (el: Element | null, skipChildren?: (el: Element) => boolean): string =>
-  canonicalDom(el, { self: true, dropEmptyClass: true, skipChildren });
+  canonicalDom(el, { self: true, dropEmptyClass: true, dropSelectValue: true, skipChildren });
 
 describe('PptxEditorFindBar', () => {
   test('renders the same bar as React when opened to replace, with the counter', async () => {

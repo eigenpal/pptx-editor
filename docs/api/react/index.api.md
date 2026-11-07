@@ -67,6 +67,7 @@ import { HyperlinkPopupLink } from '@pptx-editor.dev/core/editor';
 import { HyperlinkPopupMode } from '@pptx-editor.dev/core/editor';
 import { HyperlinkPopupState } from '@pptx-editor.dev/core/editor';
 import { isFontResolver } from '@pptx-editor.dev/core/editor';
+import { listenPaneRequests } from '@pptx-editor.dev/core/editor';
 import { loadFonts } from '@pptx-editor.dev/core/editor';
 import { LoadFontsRequest } from '@pptx-editor.dev/core/editor';
 import { LoadFontsResult } from '@pptx-editor.dev/core/editor';
@@ -80,6 +81,8 @@ import { MouseEvent as MouseEvent_2 } from 'react';
 import { ParagraphDialogFields } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatCommand } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatRead } from '@pptx-editor.dev/core/editor';
+import { PatternFill } from '@pptx-editor.dev/core/editor';
+import { PatternPreset } from '@pptx-editor.dev/core/editor';
 import { platformShortcuts } from '@pptx-editor.dev/core/editor';
 import { PopoverAnchorRect } from '@pptx-editor.dev/core/editor';
 import { PptxEditorEvents } from '@pptx-editor.dev/core/editor';
@@ -91,15 +94,18 @@ import { PptxSource } from '@pptx-editor.dev/core/editor';
 import * as react from 'react';
 import { ReactElement } from 'react';
 import { ReactNode } from 'react';
+import { requestPane } from '@pptx-editor.dev/core/editor';
 import { ResolvedColorMode } from '@pptx-editor.dev/core/editor';
 import { RibbonTabId } from '@pptx-editor.dev/core/editor';
 import { ShapeStyleChoice } from '@pptx-editor.dev/core/editor';
 import { ShapeStyleValue } from '@pptx-editor.dev/core/editor';
+import { SidePanelTab } from '@pptx-editor.dev/core/editor';
 import { SlideBackground } from '@pptx-editor.dev/core/editor';
 import { SlideLayoutSummary } from '@pptx-editor.dev/core/editor';
 import { SlideRailOrientation } from '@pptx-editor.dev/core/editor';
 import { SlideSection } from '@pptx-editor.dev/core/editor';
 import { SlideshowController } from '@pptx-editor.dev/core/editor';
+import { SlideSizeFields } from '@pptx-editor.dev/core/editor';
 import { ToolbarShownValue } from '@pptx-editor.dev/core/editor';
 import { ToolbarValueMap } from '@pptx-editor.dev/core/editor';
 import { Translate } from '@pptx-editor.dev/i18n';
@@ -121,7 +127,7 @@ export const BackgroundDialog: typeof BackgroundDialogRoot & {
 };
 
 // @public
-export type BackgroundDialogFieldName = 'solid' | 'gradient' | 'picture' | 'allSlides';
+export type BackgroundDialogFieldName = 'solid' | 'gradient' | 'pattern' | 'picture' | 'allSlides';
 
 // @public
 export interface BackgroundDialogFields {
@@ -653,6 +659,8 @@ export interface LineMenuControlProps {
     slot: ChromeSlotId;
 }
 
+export { listenPaneRequests }
+
 export { loadFonts }
 
 export { LoadFontsRequest }
@@ -908,6 +916,7 @@ export type PageSetupDialogFieldName = 'slideSize' | 'theme' | 'fonts' | 'substi
 
 // @public
 export interface PageSetupDialogFields {
+    readonly slideSize: SlideSizeFields;
     readonly theme: 'light' | 'dark';
 }
 
@@ -958,6 +967,22 @@ export { ParagraphFormatCommand }
 
 export { ParagraphFormatRead }
 
+// @public
+export function PatternDialog(input: PatternDialogProps): react.JSX.Element;
+
+// @public
+export interface PatternDialogProps {
+    readonly base?: string;
+    readonly initial: PatternFill | null;
+    readonly onApply: (pattern: PatternFill) => void;
+    readonly onClose: () => void;
+    readonly open: boolean;
+}
+
+export { PatternFill }
+
+export { PatternPreset }
+
 export { platformShortcuts }
 
 // @internal
@@ -991,6 +1016,7 @@ export const PptxEditor: react.ForwardRefExoticComponent<PptxEditorProps & react
     NotesPane: typeof NotesPane;
     ZoomPill: typeof ZoomPill;
     SidePanel: typeof SidePanel;
+    SelectionPane: typeof SelectionPane;
     FontNotice: (props: FontNoticeProps) => ReactNode;
     EditNotice: (props: EditNoticeProps) => ReactNode;
     OpenFailure: (props: PptxEditorOpenFailureProps) => ReactNode;
@@ -1283,6 +1309,8 @@ export function rejectionMessage(t: Translate, rejection: EditorRejection): stri
 // @public
 export function requestFindBar(editor: PptxEditorInstance | null, replace?: boolean): void;
 
+export { requestPane }
+
 // @public
 export function requestSectionRename(editor: PptxEditorInstance | null, sectionId: string): void;
 
@@ -1341,6 +1369,14 @@ export interface SectionMenuState {
 }
 
 // @public
+export function SelectionPane(props?: SelectionPaneProps): react.JSX.Element;
+
+// @public
+export interface SelectionPaneProps {
+    readonly className?: string;
+}
+
+// @public
 export function ShapeGalleryControl(input: ShapeGalleryControlProps): react.JSX.Element;
 
 // @public
@@ -1387,9 +1423,13 @@ export function SidePanel(input: SidePanelProps): react.JSX.Element;
 export interface SidePanelProps {
     readonly className?: string;
     readonly onClose?: () => void;
+    readonly onTabChange?: (tab: SidePanelTab) => void;
     readonly paneWidth?: number;
     readonly style?: CSSProperties;
+    readonly tab?: SidePanelTab;
 }
+
+export { SidePanelTab }
 
 export { SlideBackground }
 

@@ -12,7 +12,7 @@ import {
   type DragEvent,
   type ReactNode,
 } from 'react';
-import type { EditorModule, PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import type { EditorModule, PptxEditorInstance, SidePanelTab } from '@pptx-editor.dev/core/editor';
 import { drawingModule } from '@pptx-editor.dev/pro/drawing';
 import {
   PptxEditor,
@@ -23,6 +23,7 @@ import {
   usePptxEditor,
   useSlideshow,
   useTranslation,
+  listenPaneRequests,
 } from '@pptx-editor.dev/react';
 import { BrandLogo } from './BrandLogo.tsx';
 import { ThemeToggle } from './ThemeToggle.tsx';
@@ -109,7 +110,19 @@ function Shell({
   const show = useSlideshow();
   // Closed on a narrow window, so the slide keeps a usable zoom (demo-files.ts).
   const [panel, setPanel] = useState(panelStartsOpen);
+  const [panelTab, setPanelTab] = useState<SidePanelTab>('format');
   useEffect(() => followPanelWidth(setPanel), []);
+  // The toolbar's Selection Pane and Format Pane controls open the panel on their tab.
+  useEffect(
+    () =>
+      editor
+        ? listenPaneRequests(editor, (pane) => {
+            setPanelTab(pane);
+            setPanel(true);
+          })
+        : undefined,
+    [editor]
+  );
   const [dragging, setDragging] = useState(false);
   // The slide thumbnails over the slide, on a narrow window only.
   const [rail, setRail] = useState(false);
@@ -196,6 +209,10 @@ function Shell({
             );
           }}
           onOpen={() => fileInput.current?.click()}
+          onSelectionPane={() => {
+            setPanelTab('selection');
+            setPanel(true);
+          }}
           onNew={onNew}
           onExample={onExample}
           onExport={exportDeck}
@@ -323,7 +340,13 @@ function Shell({
             <PptxEditor.OpenFailure />
             {ribbon ? <PptxEditor.StatusBar /> : null}
           </div>
-          {panel ? <PptxEditor.SidePanel onClose={() => setPanel(false)} /> : null}
+          {panel ? (
+            <PptxEditor.SidePanel
+              tab={panelTab}
+              onTabChange={setPanelTab}
+              onClose={() => setPanel(false)}
+            />
+          ) : null}
           {dragging ? <div className="demo-drop">{t('app.dropHint')}</div> : null}
         </div>
       </main>

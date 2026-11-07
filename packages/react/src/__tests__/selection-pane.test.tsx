@@ -1,0 +1,247 @@
+import { afterEach, describe, expect, test } from 'bun:test';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { useEffect, useState } from 'react';
+import {
+  runToolbarCommand,
+  type PptxEditorInstance,
+  type SidePanelTab,
+} from '@pptx-editor.dev/core/editor';
+import { buildPptx, shape } from '../../../../scripts/fixtures/builder.ts';
+import { PptxEditorContent, PptxEditorRoot } from '../PptxEditorRoot.tsx';
+import { SelectionPane, SidePanel, Toolbar, listenPaneRequests, usePptxEditor } from '../index.ts';
+
+const IN = 914_400;
+const group =
+  '<p:grpSp><p:nvGrpSpPr><p:cNvPr id="10" name="Cards"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>' +
+  '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1828800" cy="914400"/><a:chOff x="0" y="0"/>' +
+  '<a:chExt cx="1828800" cy="914400"/></a:xfrm></p:grpSpPr>' +
+  shape({ id: 11, name: 'Card A', x: 0, y: 0, cx: IN, cy: IN }) +
+  '</p:grpSp>';
+
+afterEach(() => {
+  cleanup();
+  document.body.replaceChildren();
+});
+
+async function mount(ui: React.ReactNode): Promise<PptxEditorInstance> {
+  let editor: PptxEditorInstance | null = null;
+  render(
+    <PptxEditorRoot onReady={(e) => (editor = e)}>
+      <PptxEditorContent />
+      {ui}
+    </PptxEditorRoot>
+  );
+  const deck = buildPptx({
+    slides: [
+      {
+        shapes:
+          shape({ id: 2, name: 'One', x: IN, y: IN, cx: IN, cy: IN }) +
+          shape({ id: 3, name: 'Two', x: 2 * IN, y: IN, cx: IN, cy: IN }) +
+          group,
+      },
+      { shapes: shape({ id: 2, name: 'Other', x: IN, y: IN, cx: IN, cy: IN }) },
+    ],
+  });
+  await act(async () => void (await editor!.load(deck)));
+  return editor!;
+}
+
+const row = (name: string) => screen.getByRole('treeitem', { name: new RegExp(`^${name}`) });
+
+describe('PptxEditor.SelectionPane', () => {
+  test('lists the slide top first, selects, hides, renames, and shows all', async () => {
+    const editor = await mount(<SelectionPane />);
+    expect(screen.getAllByRole('treeitem').map((r) => r.getAttribute('aria-label'))).toEqual([
+      'Cards',
+      'Two',
+      'One',
+    ]);
+    // A press on a row selects its element and keeps focus in the pane.
+    act(() => void fireEvent.mouseDown(row('Two')));
+    const two = editor.snapshot().shapes!.find((s) => s.name === 'Two')!.nodeId;
+    expect(editor.snapshot().selection).toEqual({ kind: 'shapes', nodeIds: [two] });
+    expect(row('Two').getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(row('Two'));
+    // The eye hides the element; the row says so.
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Hide Two' })));
+    expect(row('Two').getAttribute('aria-label')).toBe('Two (hidden)');
+    expect(editor.snapshot().shapes!.find((s) => s.name === 'Two')!.hidden).toBe(true);
+    // F2 renames; Enter applies and gives focus back to the row.
+    act(() => void fireEvent.keyDown(row('One'), { key: 'F2' }));
+    const field = screen.getByRole('textbox', { name: 'Name' });
+    expect(document.activeElement).toBe(field);
+    act(() => void fireEvent.change(field, { target: { value: 'Headline' } }));
+    act(() => void fireEvent.keyDown(field, { key: 'Enter' }));
+    expect(row('Headline')).toBeDefined();
+    expect(document.activeElement).toBe(row('Headline'));
+    // Escape keeps the old name.
+    act(() => void fireEvent.keyDown(row('Headline'), { key: 'F2' }));
+    const again = screen.getByRole('textbox', { name: 'Name' });
+    act(() => void fireEvent.change(again, { target: { value: 'Other' } }));
+    act(() => void fireEvent.keyDown(again, { key: 'Escape' }));
+    expect(row('Headline')).toBeDefined();
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Show all' })));
+    expect(editor.snapshot().shapes!.every((s) => !s.hidden)).toBe(true);
+  });
+
+  test('a group opens with the arrow keys and for a selected child', async () => {
+    const editor = await mount(<SelectionPane />);
+    expect(row('Cards').getAttribute('aria-expanded')).toBe('false');
+    act(() => void fireEvent.keyDown(row('Cards'), { key: 'ArrowRight' }));
+    expect(row('Cards').getAttribute('aria-expanded')).toBe('true');
+    expect(row('Card A').getAttribute('aria-level')).toBe('2');
+    act(() => void fireEvent.keyDown(row('Cards'), { key: 'ArrowLeft' }));
+    expect(screen.queryByRole('treeitem', { name: 'Card A' })).toBe(null);
+    const cards = editor.snapshot().shapes!.find((s) => s.name === 'Cards')!;
+    act(() =>
+      editor.setSelection({
+        kind: 'shapes',
+        nodeIds: [cards.children![0]!.nodeId],
+        group: cards.nodeId,
+      })
+    );
+    expect(row('Card A').getAttribute('aria-selected')).toBe('true');
+  });
+
+  test('the side panel shows it on its Selection tab, as a controlled tab', async () => {
+    const picked: SidePanelTab[] = [];
+    function Host() {
+      const [tab, setTab] = useState<SidePanelTab>('selection');
+      return <SidePanel tab={tab} onTabChange={(t) => (picked.push(t), setTab(t))} />;
+    }
+    await mount(<Host />);
+    expect(screen.getByRole('tab', { name: 'Selection' }).getAttribute('aria-selected')).toBe(
+      'true'
+    );
+    expect(screen.getByRole('tree')).toBeDefined();
+    act(() => void fireEvent.click(screen.getByRole('tab', { name: 'Format' })));
+    expect(picked).toEqual(['format']);
+    expect(screen.queryByRole('tree')).toBe(null);
+  });
+  test('H shows or hides the focused row; Ctrl and Cmd keys pass by', async () => {
+    const editor = await mount(<SelectionPane />);
+    const hidden = () => editor.snapshot().shapes!.find((s) => s.name === 'Two')!.hidden;
+    expect(row('Two').getAttribute('aria-keyshortcuts')).toBe('H F2');
+    // The row's description names the key hint.
+    const hint = document.getElementById(row('Two').getAttribute('aria-describedby')!);
+    expect(hint?.textContent).toContain('Press H');
+    act(() => void fireEvent.keyDown(row('Two'), { key: 'h', ctrlKey: true }));
+    expect(hidden()).toBeFalsy();
+    act(() => void fireEvent.keyDown(row('Two'), { key: 'h' }));
+    expect(hidden()).toBe(true);
+    act(() => void fireEvent.keyDown(row('Two'), { key: 'H' }));
+    expect(hidden()).toBeFalsy();
+  });
+
+  test('Show all reaches a group child; a new slide closes the rename field', async () => {
+    const editor = await mount(<SelectionPane />);
+    const cards = () => editor.snapshot().shapes!.find((s) => s.name === 'Cards')!;
+    const kid = cards().children![0]!.nodeId;
+    act(() => void editor.exec({ type: 'setShapesVisible', nodeIds: [kid], visible: false }));
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Show all' })));
+    expect(cards().children![0]!.hidden).toBeFalsy();
+    // Hide all hides the top level only: showing the group again shows its children.
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Hide all' })));
+    expect(cards().hidden).toBe(true);
+    expect(cards().children![0]!.hidden).toBeFalsy();
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Show Cards' })));
+    expect(cards().hidden).toBeFalsy();
+    act(() => void fireEvent.keyDown(row('One'), { key: 'F2' }));
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBeDefined();
+    // Node ids repeat across slides: the field must not rename an element of the next slide.
+    act(() => editor.goToSlide(1));
+    expect(screen.queryByRole('textbox', { name: 'Name' })).toBe(null);
+    expect(screen.getAllByRole('treeitem').map((r) => r.getAttribute('aria-label'))).toEqual([
+      'Other',
+    ]);
+    expect(editor.snapshot().shapes![0]!.name).toBe('Other');
+  });
+
+  test('a rename of an element that a peer deleted changes nothing', async () => {
+    const editor = await mount(<SelectionPane />);
+    act(() => void fireEvent.keyDown(row('One'), { key: 'F2' }));
+    const field = screen.getByRole('textbox', { name: 'Name' });
+    act(() => void fireEvent.change(field, { target: { value: 'Gone' } }));
+    const one = editor.snapshot().shapes!.find((s) => s.name === 'One')!.nodeId;
+    act(() => {
+      editor.setSelection({ kind: 'shapes', nodeIds: [one] });
+      expect(editor.exec({ type: 'delete' }).ok).toBe(true);
+    });
+    // The row and its field go; nothing takes the typed name.
+    expect(field.isConnected).toBe(false);
+    expect(editor.snapshot().shapes!.map((s) => s.name)).toEqual(['Cards', 'Two']);
+  });
+
+  test('the toolbar Selection pane slot turns the side panel to its tab', async () => {
+    await mount(
+      <>
+        <Toolbar preset={false}>
+          <Toolbar.Slot slotId="arrange.selectionPane" />
+        </Toolbar>
+        <SidePanel />
+      </>
+    );
+    expect(screen.getByRole('tab', { name: 'Format' }).getAttribute('aria-selected')).toBe('true');
+    const button = screen.getByRole('button', { name: 'Selection pane' });
+    expect(button.getAttribute('aria-disabled')).toBe(null);
+    act(() => void fireEvent.click(button));
+    const selection = screen.getByRole('tab', { name: 'Selection' });
+    expect(selection.getAttribute('aria-selected')).toBe('true');
+    // The focus goes to the tab, so a keyboard user lands in the panel.
+    expect(document.activeElement).toBe(selection);
+  });
+
+  test('without a side panel, the slot is off and says why', async () => {
+    const editor = await mount(
+      <Toolbar preset={false}>
+        <Toolbar.Slot slotId="arrange.selectionPane" />
+      </Toolbar>
+    );
+    const button = screen.getByRole('button', { name: 'Selection pane' });
+    expect(button.getAttribute('aria-disabled')).toBe('true');
+    const reason = document.getElementById(button.getAttribute('aria-describedby')!);
+    expect(reason?.textContent).toBe('This editor shows no side panel for this pane');
+    expect(runToolbarCommand(editor, 'arrange.selectionPane')).toEqual({
+      ok: false,
+      reason: 'disabled.noSidePanel',
+    });
+    // A host listener turns it on at once.
+    let stop = (): void => {};
+    act(() => void (stop = listenPaneRequests(editor, () => {})));
+    expect(button.getAttribute('aria-disabled')).toBe(null);
+    act(() => stop());
+    expect(button.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  test('a host that opens a closed panel for a request lands the focus on the tab', async () => {
+    function Host() {
+      const editor = usePptxEditor();
+      const [open, setOpen] = useState(false);
+      const [tab, setTab] = useState<SidePanelTab>('format');
+      useEffect(
+        () =>
+          editor
+            ? listenPaneRequests(editor, (pane) => {
+                setTab(pane);
+                setOpen(true);
+              })
+            : undefined,
+        [editor]
+      );
+      return (
+        <>
+          <Toolbar preset={false}>
+            <Toolbar.Slot slotId="arrange.selectionPane" />
+          </Toolbar>
+          {open ? <SidePanel tab={tab} onTabChange={setTab} /> : null}
+        </>
+      );
+    }
+    await mount(<Host />);
+    expect(screen.queryByRole('tablist')).toBe(null);
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Selection pane' })));
+    const selection = screen.getByRole('tab', { name: 'Selection' });
+    expect(selection.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(selection);
+  });
+});

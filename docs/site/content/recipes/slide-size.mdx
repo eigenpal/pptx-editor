@@ -1,0 +1,53 @@
+---
+title: 'Change the slide size'
+description: 'Resize every slide and scale the content to fit, as one undo step.'
+category: 'Task recipes'
+---
+
+Use the `setSlideSize` command to change the size of every slide. The editor scales the content to fit and records the change as one undo step.
+
+## Switch to 4:3
+
+This helper accepts an open `PptxEditorInstance`. Sizes are in EMU (914400 per inch):
+
+```ts
+import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+export function setStandardSize(editor: PptxEditorInstance) {
+  const result = editor.exec({
+    type: 'setSlideSize',
+    width: 9_144_000, // 10 in
+    height: 6_858_000, // 7.5 in
+  });
+  if (!result.ok && !result.noop) throw new Error(result.reason);
+}
+```
+
+Each side must be from 914400 to 51206400 EMU (1 to 56 inches). A size out of that range is refused with `errors.slideSizeRange`. The current size gives a `noop` result.
+
+## Choose what happens to the content
+
+By default, `content` is `'scale'`. The editor then scales the content by the smaller of the width and height ratios and centers it on the new slide:
+
+- Boxes of shapes, pictures, groups, tables, charts, and diagrams on the slides, layouts, and masters.
+- Table column widths and row heights.
+- Text sizes, character spacing, spacing in points, indents, tab stops, and text and cell insets that the file sets, including the text styles of the masters and the presentation, and the text of charts.
+
+These values keep their size:
+
+- Line widths and effect distances.
+- Values that the file leaves to their defaults, such as the default text insets.
+- Diagram text. Diagram shapes scale, and their text keeps its size, as a diagram does when it is laid out again from its data.
+- The slide images of notes pages, and drawing guides.
+
+Set `content: 'keep'` to change only the size. Every box then stays where it is, so content can extend past a smaller slide.
+
+## Let users pick a size
+
+The default editor shows the slide size in **File** > **Page setup**. Users pick a preset (**Widescreen (16:9)**, **Standard (4:3)**, **A4 paper**, or **Letter paper**) or type a custom size, choose the orientation, and choose whether the content scales. In viewing mode, the dialog shows the size as text. For the dialog's fields, see [Dialogs reference](/docs/customization/reference/dialogs).
+
+## See also
+
+- [Undo history](/docs/guides/undo-history)
+- [Load and save presentations](/docs/guides/loading-and-saving)
+- [PPTX fidelity](/docs/pptx-fidelity)

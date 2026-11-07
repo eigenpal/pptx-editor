@@ -2,6 +2,7 @@
 // fidelity harness (no second renderer), fitted to the screen with black letterbox bars.
 // Hyperlinks open on click only, through `sanitizeHref`.
 
+import { slideLinkOf } from '../automation/commands/slide-links.ts';
 import { apply, invert, type LayoutItem } from '../layout/index.ts';
 import { paintSlide } from '../output/index.ts';
 import { relationshipsOf, sanitizeHref } from '../store/index.ts';
@@ -85,8 +86,9 @@ export function paintSlideshowSlide(
 
 /**
  * The hyperlink under a slide point (EMU), as a URL safe to open, or null. Only text links
- * (`a:hlinkClick` on a run) to external targets count; `sanitizeHref` withholds any scheme
- * other than http(s), mailto, tel, and ftp. @public
+ * (`a:hlinkClick` on a run) count. An external target passes `sanitizeHref`, which withholds
+ * any scheme other than http(s), mailto, tel, and ftp. A link to a slide of the deck comes back
+ * in its `#` form (`#slide-3`, `#next-slide`), for `followSlideshowLink`. @public
  */
 export function slideshowLinkAt(
   session: DocumentSession,
@@ -98,7 +100,14 @@ export function slideshowLinkAt(
   if (!layout) return null;
   const rId = linkIn(layout.items, x, y);
   if (!rId) return null;
-  const rel = relationshipsOf(session.store.package, rId.part).find((r) => r.id === rId.id);
+  const rel = rId.id
+    ? relationshipsOf(session.store.package, rId.part).find((r) => r.id === rId.id)
+    : undefined;
+  if (rId.action) {
+    const parts = session.info.slides.map((s) => s.partName);
+    const slide = slideLinkOf(rId.action, rel && !rel.external ? rel.target : undefined, parts);
+    if (slide) return slide;
+  }
   if (!rel?.external || !rel.externalTarget) return null;
   const safe = sanitizeHref(rel.externalTarget);
   return safe.ok && safe.href ? safe.href : null;
@@ -108,7 +117,7 @@ function linkIn(
   items: readonly LayoutItem[],
   x: number,
   y: number
-): { part: string; id: string } | null {
+): { part: string; id: string; action?: string } | null {
   // Top-most first: later items paint over earlier ones.
   for (let i = items.length - 1; i >= 0; i -= 1) {
     const item = items[i];
@@ -124,10 +133,11 @@ function linkIn(
     for (const line of item.text.lines) {
       if (p.y < line.top || p.y > line.top + line.height) continue;
       for (const run of line.runs) {
-        const id = run.props.hyperlink;
-        if (!id || run.kind !== 'text' || run.x.length === 0) continue;
+        const id = run.props.hyperlink ?? '';
+        const action = run.props.hyperlinkAction;
+        if ((!id && !action) || run.kind !== 'text' || run.x.length === 0) continue;
         if (p.x >= run.x[0] && p.x <= run.x[run.x.length - 1])
-          return { part: item.element.partName, id };
+          return { part: item.element.partName, id, ...(action ? { action } : {}) };
       }
     }
   }

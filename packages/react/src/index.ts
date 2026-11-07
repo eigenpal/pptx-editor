@@ -1,9 +1,7 @@
 /**
- * `@pptx-editor.dev/react` — the React adapter for PPTX Editor.
- *
- * Provider-first: `PptxEditor.Root` owns the engine instance; `.Viewport` scopes the styles;
- * `.Content` attaches the slide surface. Every piece of chrome is a hook consumer, and the
- * toolbar derives from the engine's `CHROME_GROUPS`.
+ * `@pptx-editor.dev/react`, the React adapter for PPTX Editor. `PptxEditor.Root` owns the engine
+ * instance, `.Viewport` scopes the styles, and `.Content` attaches the slide surface. Every piece
+ * of chrome is a hook consumer, and the toolbar derives from the engine's `CHROME_GROUPS`.
  *
  * @packageDocumentation
  * @public
@@ -34,6 +32,7 @@ import { ToolbarAction, ToolbarSeparator } from './toolbar-action.tsx';
 import { TOOLBAR_PARTS, type ToolbarNamedParts } from './toolbar-named-parts.tsx';
 import {
   NotesPane,
+  SelectionPane,
   SidePanel,
   SlideRail as SlideRailRoot,
   ZoomPill,
@@ -458,8 +457,12 @@ export {
   NotesPane,
   ZoomPill,
   SidePanel,
+  SelectionPane,
+  listenPaneRequests,
+  requestPane,
   type NotesPaneProps,
   type PaneProps,
+  type SelectionPaneProps,
   type SidePanelProps,
   type SlideRailProps,
   type ZoomPillProps,
@@ -554,6 +557,7 @@ export {
   type ShapeGridProps,
   type ShapeIconProps,
 } from './ShapeControls.tsx';
+export { PatternDialog, type PatternDialogProps } from './PatternDialog.tsx';
 export { SlideSorter, type SlideSorterProps } from './SlideSorter.tsx';
 export { requestSectionRename } from './RailSections.tsx';
 export {
@@ -634,15 +638,6 @@ export {
 export { useParagraphFormat, type UseParagraphFormatReturn } from './useParagraphFormat.ts';
 export { useFontFormat, type UseFontFormatReturn } from './useFontFormat.ts';
 export { useBulletFormat, type UseBulletFormatReturn } from './useBulletFormat.ts';
-// The hook's value types, next to the hook, as DOCX Editor exports them with `useParagraphFormat`.
-export type {
-  BulletFormat,
-  BulletFormatRead,
-  FontFormatCommand,
-  FontFormatRead,
-  ParagraphFormatCommand,
-  ParagraphFormatRead,
-} from '@pptx-editor.dev/core/editor';
 export { useFonts, type FontsInput, type UseFontsReturn } from './useFonts.ts';
 export { useFontFamily, type UseFontFamilyReturn } from './useFontFamily.ts';
 export { EditorFontError } from '@pptx-editor.dev/core/editor';
@@ -653,8 +648,7 @@ export type {
   FontSource,
   FontSourceSubstitution,
 } from '@pptx-editor.dev/core/contracts';
-// The font-composition surface, re-exported as DOCX Editor's adapters do, so the common path
-// (a fonts package and an adapter) never needs a core import.
+// The font-composition surface, re-exported so a fonts package and an adapter need no core import.
 export {
   MAX_RESOLVER_FAMILIES,
   DEFAULT_FONT,
@@ -678,10 +672,11 @@ export {
   type LoadFontsRequest,
   type LoadFontsResult,
 } from '@pptx-editor.dev/core/editor';
-// The core types that the adapter's own props, hooks, and parts use, re-exported as DOCX
-// Editor's adapters re-export `Editor`, `EditorCommand`, and `EditorSnapshot`, so a host types
-// its handlers with an import from this package only.
+// The core types of the adapter's props, hooks, and parts, re-exported as DOCX Editor's adapters
+// do, so a host types its handlers with an import from this package only.
 export type {
+  BulletFormat,
+  BulletFormatRead,
   BulletsDialogFields,
   CanvasMenuKind,
   ChromeControl,
@@ -700,15 +695,22 @@ export type {
   EditorRemoval,
   EditorSnapshot,
   FontDialogFields,
+  FontFormatCommand,
+  FontFormatRead,
   FontPickerGroup,
   FontPickerGroupId,
   FontPickerRow,
   GradientFill,
+  PatternFill,
+  PatternPreset,
   ParagraphDialogFields,
+  ParagraphFormatCommand,
+  ParagraphFormatRead,
   PptxEditorInstance,
   RibbonTabId,
   ShapeStyleChoice,
   ShapeStyleValue,
+  SidePanelTab,
   SlideBackground,
   SlideLayoutSummary,
   SlideRailOrientation,
@@ -974,6 +976,7 @@ export const PptxEditor = Object.assign(PptxEditorDefault, {
   NotesPane,
   ZoomPill,
   SidePanel,
+  SelectionPane,
   FontNotice,
   EditNotice,
   OpenFailure,

@@ -466,7 +466,10 @@ export type EditorCommand = {
     readonly type: 'setLineDash';
     readonly dash: LineDash;
 }
-/** Link the selected text to a URL (`http`, `https`, `mailto`, `tel`, `ftp`); null unlinks. */
+/**
+* Link the selected text to a URL (`http`, `https`, `mailto`, `tel`, `ftp`), or to a slide:
+* `#slide-3`, `#next-slide`, `#previous-slide`, `#first-slide`, `#last-slide`. null unlinks.
+*/
 | {
     readonly type: 'setLink';
     readonly url: string | null;
@@ -494,6 +497,18 @@ export type EditorCommand = {
     readonly type: 'setSlideBackground';
     readonly background: SlideBackground | null;
     readonly allSlides?: boolean;
+}
+/** Slide size in EMU, 1 to 56 in a side; `content: 'scale'` (default) fits the content. */
+| {
+    readonly type: 'setSlideSize';
+    readonly width: number;
+    readonly height: number;
+    readonly content?: 'scale' | 'keep';
+}
+/** Adjust values of one preset shape by guide name, in guide units (see `a:gd`). */
+| {
+    readonly type: 'setAdjustments';
+    readonly values: Readonly<Record<string, number>>;
 }
 /** Insert a line, an arrow, or an elbow or curved connector. */
 | {
@@ -531,7 +546,7 @@ export type EditorCommand = {
 /** Apply the copied formatting to the selection as one undo step (Ctrl/Cmd+Shift+V). */
 | {
     readonly type: 'pasteFormat';
-} | TextFormatCommand | PictureCommand
+} | TextFormatCommand | PictureCommand | FillCommand
 /**
 * Shape Effects: set or remove one effect of the selected shapes, connectors, and pictures.
 * A shape whose effects come from its theme style (`a:effectRef`) gets that style's effects
@@ -701,6 +716,24 @@ export interface EditorSnapshot {
     // (undocumented)
     readonly zoom: number;
 }
+
+// @public
+export type FillCommand =
+/** Shape fill: a preset pattern. */
+    {
+    readonly type: 'setShapePattern';
+    readonly pattern: PatternFill;
+}
+/**
+* Shape fill: a PNG, JPEG, or GIF picture, stretched over the shape, or tiled at its own
+* size when `tile` is true. The type comes from the bytes; other bytes are refused.
+*/
+| {
+    readonly type: 'setShapePicture';
+    readonly bytes: Uint8Array;
+    readonly mime?: string;
+    readonly tile?: boolean;
+};
 
 // @public
 export interface FindMatch {
@@ -983,6 +1016,17 @@ export interface ParagraphLineSpacing {
 }
 
 // @public
+export interface PatternFill {
+    readonly background: string;
+    readonly foreground: string;
+    // (undocumented)
+    readonly preset: PatternPreset;
+}
+
+// @public
+export type PatternPreset = 'pct5' | 'pct10' | 'pct20' | 'pct25' | 'pct30' | 'pct40' | 'pct50' | 'pct60' | 'pct70' | 'pct75' | 'pct80' | 'pct90' | 'horz' | 'vert' | 'ltHorz' | 'ltVert' | 'dkHorz' | 'dkVert' | 'narHorz' | 'narVert' | 'dashHorz' | 'dashVert' | 'cross' | 'dnDiag' | 'upDiag' | 'ltDnDiag' | 'ltUpDiag' | 'dkDnDiag' | 'dkUpDiag' | 'wdDnDiag' | 'wdUpDiag' | 'dashDnDiag' | 'dashUpDiag' | 'diagCross' | 'smCheck' | 'lgCheck' | 'smGrid' | 'lgGrid' | 'dotGrid' | 'smConfetti' | 'lgConfetti' | 'horzBrick' | 'diagBrick' | 'solidDmnd' | 'openDmnd' | 'dotDmnd' | 'plaid' | 'sphere' | 'weave' | 'divot' | 'shingle' | 'wave' | 'trellis' | 'zigZag';
+
+// @public
 export type PictureCommand =
 /**
 * Crop the selected picture (`a:srcRect`): to a crop rectangle, where the image stays in place
@@ -1155,6 +1199,7 @@ export interface SelectionGeometry {
     // (undocumented)
     readonly name: string;
     readonly nodeId: string;
+    readonly pattern?: PatternFill;
     // (undocumented)
     readonly rot: number;
     readonly shapeStyle?: ShapeStyleChoice;
@@ -1239,9 +1284,13 @@ export type SlideBackground = {
     readonly kind: 'gradient';
     readonly gradient: GradientFill;
 } | {
+    readonly kind: 'pattern';
+    readonly pattern: PatternFill;
+} | {
     readonly kind: 'picture';
     readonly bytes: Uint8Array;
     readonly mime: string;
+    readonly tile?: boolean;
 };
 
 // @public
@@ -1251,7 +1300,10 @@ export interface SlideBackgroundState {
     // (undocumented)
     readonly gradient?: GradientFill;
     readonly inherited: boolean;
-    readonly kind: 'solid' | 'gradient' | 'picture' | 'none' | 'other';
+    readonly kind: 'solid' | 'gradient' | 'pattern' | 'picture' | 'none' | 'other';
+    // (undocumented)
+    readonly pattern?: PatternFill;
+    readonly tile?: boolean;
 }
 
 // @public

@@ -23,7 +23,7 @@ import {
   listenSlideshowKeys,
   listenSlideshowStartKeys,
   observeSlideshowScreen,
-  openSlideshowLink,
+  followSlideshowLink,
   paintSlideshowSlide,
   slideshowLinkUnder,
   startSlideshowController,
@@ -189,7 +189,8 @@ function SlideshowScreen({
   const onClick = (e: ReactMouseEvent): void => {
     if (e.button !== 0) return;
     const href = linkAt(e);
-    if (href) openSlideshowLink(e.currentTarget.ownerDocument, href);
+    // A slide link moves the show; any other link opens in a new tab.
+    if (href) followSlideshowLink(controller, e.currentTarget.ownerDocument, href);
     else controller.next();
   };
 

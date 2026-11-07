@@ -686,6 +686,7 @@ export interface RunProps {
     readonly highlight?: Rgba;
     // (undocumented)
     readonly hyperlink?: string;
+    readonly hyperlinkAction?: string;
     // (undocumented)
     readonly italic: boolean;
     readonly kern?: number;
