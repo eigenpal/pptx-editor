@@ -12,6 +12,7 @@ import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import {
   BULLET_GALLERY,
   NUMBER_GALLERY,
+  bulletPictureProblem,
   galleryFormat,
   galleryKeyOf,
   isBulletChar,
@@ -133,18 +134,35 @@ export const BULLET_PICTURE_ACCEPT = 'image/png,image/jpeg,image/gif';
 /** The largest picture file the Picture field reads, as the command's media limit. */
 const MAX_PICTURE_FILE = 50 * 1024 * 1024;
 
+/** A picture file the user picked: its bytes, or why the Picture field refuses it. @internal */
+export type BulletPictureRead =
+  | { readonly ok: true; readonly picture: Uint8Array }
+  | { readonly ok: false; readonly reason: TranslationKey };
+
 /**
- * The bytes of a picture file the user picked, or null for no file, another type, a file over
- * 50 MB, or one that cannot be read. The command checks the bytes again. @internal
+ * Read a picture file the user picked, or null for no file. A file of another type, an empty
+ * or unreadable file, or a picture over 50 MB or 25 million pixels gives the reason to show.
+ * The bytes decide the type when the browser gives none. The command checks the bytes again.
+ * @internal
  */
-export async function readBulletPicture(file: Blob | undefined | null): Promise<Uint8Array | null> {
-  if (!file || !BULLET_PICTURE_ACCEPT.split(',').includes(file.type)) return null;
-  if (file.size === 0 || file.size > MAX_PICTURE_FILE) return null;
+export async function readBulletPicture(
+  file: Blob | undefined | null
+): Promise<BulletPictureRead | null> {
+  if (!file) return null;
+  const refuse = (reason: TranslationKey): BulletPictureRead => ({ ok: false, reason });
+  if (file.type && !BULLET_PICTURE_ACCEPT.split(',').includes(file.type))
+    return refuse('bulletsAndNumberingDialog.pictureType');
+  if (file.size > MAX_PICTURE_FILE) return refuse('bulletsAndNumberingDialog.pictureTooLarge');
+  let picture: Uint8Array;
   try {
-    return new Uint8Array(await file.arrayBuffer());
+    picture = new Uint8Array(await file.arrayBuffer());
   } catch {
-    return null;
+    return refuse('bulletsAndNumberingDialog.pictureUnreadable');
   }
+  const problem = bulletPictureProblem(picture);
+  if (problem === 'type') return refuse('bulletsAndNumberingDialog.pictureType');
+  if (problem === 'size') return refuse('bulletsAndNumberingDialog.pictureTooLarge');
+  return { ok: true, picture };
 }
 
 /** Whether the bullet color field applies: a picture bullet has no color. @internal */

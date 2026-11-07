@@ -336,6 +336,15 @@ export type BulletFormatRead = {
 export type BulletGalleryKey = 'none' | 'filledRound' | 'hollowRound' | 'filledSquare' | 'hollowSquare' | 'star' | 'arrow' | 'checkmark';
 
 // @internal
+export type BulletPictureRead = {
+    readonly ok: true;
+    readonly picture: Uint8Array;
+} | {
+    readonly ok: false;
+    readonly reason: TranslationKey;
+};
+
+// @internal
 export function bulletsDialogError(t: Translate, problem: BulletsFieldError, kind: BulletsDialogTab): DialogError;
 
 // @public
@@ -2380,6 +2389,9 @@ export const fieldPart: (name: string) => {
     readonly 'data-pptx-part': "field";
     readonly 'data-pptx-field': string;
 };
+
+// @internal
+export function fileDraftUrl(text: string): string;
 
 // @public
 export type FillCommand =
@@ -4566,7 +4578,7 @@ export function railRightToLeft(el: Element | null): boolean;
 export function railStepOfKey(key: string, orientation: SlideRailOrientation | undefined, list: HTMLElement | null): -1 | 0 | 1;
 
 // @internal
-export function readBulletPicture(file: Blob | undefined | null): Promise<Uint8Array | null>;
+export function readBulletPicture(file: Blob | undefined | null): Promise<BulletPictureRead | null>;
 
 // @public
 export type ReflectionPreset = 'tightTouching' | 'halfTouching' | 'fullTouching' | 'tight4pt' | 'half4pt' | 'full4pt' | 'tight8pt' | 'half8pt' | 'full8pt';

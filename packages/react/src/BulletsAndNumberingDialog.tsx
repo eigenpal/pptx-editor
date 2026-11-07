@@ -8,7 +8,7 @@
 // bullet. The form model is the engine's
 // (`bullets-dialog-fields.ts`), so the Vue twin can share it. The host owns visibility.
 
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
   BULLET_PICTURE_ACCEPT,
   bulletColorEnabled,
@@ -32,6 +32,7 @@ import {
   type BulletsDialogFields,
   type BulletsDialogTab,
 } from '@pptx-editor.dev/core/editor';
+import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
 import { ColorField } from './dialog-color.tsx';
 import {
@@ -107,6 +108,12 @@ function BulletsAndNumberingDialogRoot({
   const editable = useEditorState((s) => s.status === 'ready' && s.mode === 'edit');
   const [opened, setOpened] = useState<BulletFormatRead | null | undefined>(null);
   const file = useRef<HTMLInputElement>(null);
+  // Why the Picture field refused the last file the user picked.
+  const [pictureProblem, setPictureProblem] = useState<TranslationKey | null>(null);
+  // Each opening starts with no refusal, as the Vue twin mounts its form anew.
+  useEffect(() => {
+    if (open) setPictureProblem(null);
+  }, [open]);
   const { seed, draft, set, update, error, setError } = useDialogDraft(open, () => {
     setOpened(current);
     const tab = takeDialogSection(editor, 'bulletsAndNumbering');
@@ -198,7 +205,11 @@ function BulletsAndNumberingDialogRoot({
                   {t('bulletsAndNumberingDialog.choosePicture')}
                 </button>
                 <span role="status" className="pptx-dialog__muted">
-                  {draft.picture ? t('bulletsAndNumberingDialog.pictureChosen') : ''}
+                  {pictureProblem
+                    ? t(pictureProblem)
+                    : draft.picture
+                      ? t('bulletsAndNumberingDialog.pictureChosen')
+                      : ''}
                 </span>
               </span>
               <input
@@ -209,8 +220,10 @@ function BulletsAndNumberingDialogRoot({
                 onChange={(e) => {
                   const picked = e.target.files?.[0];
                   e.target.value = '';
-                  void readBulletPicture(picked).then((bytes) => {
-                    if (bytes) update((d) => chooseBulletPicture(d, bytes));
+                  void readBulletPicture(picked).then((read) => {
+                    if (!read) return;
+                    setPictureProblem(read.ok ? null : read.reason);
+                    if (read.ok) update((d) => chooseBulletPicture(d, read.picture));
                   });
                 }}
               />

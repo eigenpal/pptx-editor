@@ -1139,7 +1139,7 @@
     "sectionNotFound": "演示文稿中没有此节。",
     "slideNotFound": "演示文稿中没有此幻灯片。",
     "customShowNotFound": "此演示文稿中没有该自定义放映。",
-    "unsafeFileLink": "请输入以 ./ 或 ../ 开头的相对路径，例如 ./report.pdf。不能链接程序和脚本文件。",
+    "unsafeFileLink": "请输入以 ./ 或 ../ 开头的相对路径，例如 ./report.pdf。只能链接到文档、图片、声音或视频文件。",
     "sectionName": "节名称需要 1 到 255 个字符。",
     "view": "编辑器中没有此视图。",
     "chartData": {
@@ -1443,6 +1443,9 @@
     "picture": "图片",
     "choosePicture": "选择图片…",
     "pictureChosen": "已选择图片",
+    "pictureType": "请选择 PNG、JPEG 或 GIF 图片。",
+    "pictureTooLarge": "图片太大。请选择不超过 50 MB 和 2500 万像素的图片。",
+    "pictureUnreadable": "无法读取图片。请选择其他文件。",
     "errors": {
       "percent": "{field}必须是 {min} 到 {max} % 之间的数字。",
       "whole": "{field}必须是 {min} 到 {max} 之间的整数。",

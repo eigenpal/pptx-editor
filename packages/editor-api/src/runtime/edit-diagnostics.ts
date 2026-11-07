@@ -427,7 +427,7 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
   [
     'errors.unsafeFileLink',
     'argument.not-accepted',
-    'Use a relative path that starts with ./ or ../, with at most two ../ steps and no program or script file.',
+    'Use a relative path that starts with ./ or ../, with at most two ../ steps, to a document, picture, sound, or video file.',
   ],
   [
     'errors.unsupported',

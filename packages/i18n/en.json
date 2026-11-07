@@ -1139,7 +1139,7 @@
     "sectionNotFound": "The presentation has no such section.",
     "slideNotFound": "The presentation has no such slide.",
     "customShowNotFound": "This presentation has no such custom show.",
-    "unsafeFileLink": "Type a relative path that starts with ./ or ../, such as ./report.pdf. Program and script files cannot be linked.",
+    "unsafeFileLink": "Type a relative path that starts with ./ or ../, such as ./report.pdf. Link only to a document, picture, sound, or video file.",
     "sectionName": "A section name needs 1 to 255 characters.",
     "view": "The editor has no such view.",
     "chartData": {
@@ -1443,6 +1443,9 @@
     "picture": "Picture",
     "choosePicture": "Choose picture…",
     "pictureChosen": "Picture chosen",
+    "pictureType": "Choose a PNG, JPEG, or GIF picture.",
+    "pictureTooLarge": "The picture is too large. Choose a picture of up to 50 MB and 25 million pixels.",
+    "pictureUnreadable": "The picture cannot be read. Choose another file.",
     "errors": {
       "percent": "{field} must be a number from {min} to {max} %.",
       "whole": "{field} must be a whole number from {min} to {max}.",

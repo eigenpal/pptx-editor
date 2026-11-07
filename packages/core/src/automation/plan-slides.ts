@@ -163,12 +163,12 @@ function shapeLink(el: Element): Element | undefined {
   return child(cNvPrOf(el), 'a:hlinkClick');
 }
 
-/** The address of a link relationship of `part`: its external target, or null. */
+/** The address of a link relationship of `part`: its URL or relative file path, or null. */
 function linkAddress(ctx: PlanContext, part: string): (rId: string | undefined) => string | null {
   const rels = relationshipsOf(ctx.batch.pkg, part);
   return (rId) => {
     const rel = rels.find((r) => r.id === rId);
-    return rel?.external ? (rel.externalTarget ?? null) : null;
+    return rel?.external ? (rel.externalTarget ?? rel.relativeTarget ?? null) : null;
   };
 }
 

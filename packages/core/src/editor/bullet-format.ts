@@ -16,7 +16,8 @@ import { toHex, type ResolvedParagraph } from '../cascade/index.ts';
 import type { BulletFormat, BulletFormatMixed, BulletFormatRead } from '../contracts/index.ts';
 import type { BulletGalleryKey, NumberGalleryKey } from './toolbar-values.ts';
 import { isSymbolFont } from '../layout/index.ts';
-import { attr, NS, type Element, type NodeSpec } from '../store/index.ts';
+import { attr, imageSize, NS, type Element, type NodeSpec } from '../store/index.ts';
+import { MAX_BULLET_PICTURE_PIXELS } from '../cascade/picture-bullet.ts';
 import { FONT_NAME } from '../automation/commands/font-format.ts';
 import {
   paragraphLookup,
@@ -122,6 +123,27 @@ const FIELDS: Readonly<Record<string, readonly string[]>> = Object.assign(Object
 });
 /** The picture types a picture bullet takes. */
 const BULLET_PICTURE_TYPES: readonly string[] = ['image/png', 'image/jpeg', 'image/gif'];
+/**
+ * Why a picture cannot be a bullet, or null when it can: `type` for bytes that are not a PNG,
+ * JPEG, or GIF image with a size, `size` for a picture over 50 MB or 25 million pixels, which
+ * would never draw. @internal
+ */
+export function bulletPictureProblem(picture: unknown): 'type' | 'size' | null {
+  if (!(picture instanceof Uint8Array) || picture.length === 0) return 'type';
+  if (picture.length > MAX_IMAGE_BYTES) return 'size';
+  // `pictureType` reads the header, and refuses bytes with no size.
+  let type = '';
+  try {
+    type = pictureType(picture);
+  } catch {
+    return 'type';
+  }
+  if (!BULLET_PICTURE_TYPES.includes(type)) return 'type';
+  const size = imageSize(picture);
+  if (!size || size.width * size.height > MAX_BULLET_PICTURE_PIXELS) return 'size';
+  return null;
+}
+
 /** A format with no kind takes the size and the color only. */
 const KINDLESS_FIELDS: readonly string[] = ['kind', 'sizePercent', 'color'];
 
@@ -158,16 +180,7 @@ export function checkBulletFormat(style: BulletFormat | null): void {
     )
       bad('font');
   } else if (style.kind === 'picture') {
-    if (!(style.picture instanceof Uint8Array) || style.picture.length > MAX_IMAGE_BYTES)
-      bad('picture');
-    // The bytes must be a PNG, JPEG, or GIF image with a size (`pictureType` reads the header).
-    let type = '';
-    try {
-      type = pictureType(style.picture);
-    } catch {
-      bad('picture');
-    }
-    if (!BULLET_PICTURE_TYPES.includes(type)) bad('picture');
+    if (bulletPictureProblem(style.picture)) bad('picture');
   } else if (style.kind === 'number') {
     if (
       style.scheme !== undefined &&
