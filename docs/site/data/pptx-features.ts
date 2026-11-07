@@ -512,7 +512,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Insert, move, resize, rotate, and Change Picture. Change Picture fits the new image in the old frame; this rule is not measured. Change Picture takes PNG, JPEG, and GIF only, not SVG. An SVG picture whose `<use>` links and markers expand past 200,000 drawn elements, that nests a marker in marker content or a document in a `data:` URI, or that the XML limits refuse, draws its PNG fallback.',
+      'Insert, move, resize, rotate, and Change Picture. Change Picture fits the new image in the old frame; this rule is not measured. Change Picture takes PNG, JPEG, and GIF only, not SVG. An SVG picture whose links (`<use>`, masks, patterns, clip paths, filters, and markers) expand past 200,000 drawn elements, that holds a `<foreignObject>`, an `xml-stylesheet` instruction, or a `data:` URI of a document, or that the XML limits refuse, draws its PNG fallback.',
   },
   {
     id: 'pictures.adjustments',

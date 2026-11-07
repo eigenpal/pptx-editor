@@ -17,6 +17,8 @@ import {
   svgUseCycle,
   svgDataUriBomb,
   svgMarkerBomb,
+  svgDuplicateIdBomb,
+  svgNestedMaskBomb,
   svgBlurHuge,
   svgDeep,
   svgExternal,
@@ -204,6 +206,16 @@ export function payloadDecks(): HangDeck[] {
       id: 'svg-marker-bomb',
       target: 'an SVG picture with a 1000-element marker at 100000 vertices, and nested markers',
       bytes: () => svgPictureDeck(svgMarkerBomb()),
+    },
+    {
+      id: 'svg-duplicate-id-bomb',
+      target: 'an SVG picture with the <use> bomb and an empty element that repeats each id',
+      bytes: () => svgPictureDeck(svgDuplicateIdBomb()),
+    },
+    {
+      id: 'svg-nested-mask-bomb',
+      target: 'an SVG picture with ten levels of ten masked rectangles (10^10)',
+      bytes: () => svgPictureDeck(svgNestedMaskBomb()),
     },
     {
       id: 'svg-use-cycle',

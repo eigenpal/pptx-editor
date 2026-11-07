@@ -241,6 +241,29 @@ export const svgMarkerBomb = (): Uint8Array => {
   );
 };
 
+/**
+ * The `<use>` bomb with an empty element after each level that repeats its id: a check that
+ * keeps one element for each id can keep the empty one.
+ */
+export const svgDuplicateIdBomb = (): Uint8Array => {
+  let body = '<defs><rect id="l0" width="10" height="10" fill="#4472c4"/>';
+  for (let i = 1; i <= 10; i += 1)
+    body += `<g id="l${i}">${range(10)
+      .map((k) => `<use href="#l${i - 1}" xlink:href="#l${i - 1}" x="${k}"/>`)
+      .join('')}</g><g id="l${i}"/>`;
+  return svgDoc(400, 300, `${body}</defs><use href="#l10" xlink:href="#l10"/>`);
+};
+
+/** Ten levels of masks, each ten rectangles masked by the level below: 10^10 rectangles. */
+export const svgNestedMaskBomb = (): Uint8Array => {
+  let body = '<defs><mask id="k0"><rect width="400" height="300" fill="white"/></mask>';
+  for (let i = 1; i <= 10; i += 1)
+    body += `<mask id="k${i}">${range(10)
+      .map(() => `<rect width="400" height="300" fill="white" mask="url(#k${i - 1})"/>`)
+      .join('')}</mask>`;
+  return svgDoc(400, 300, `${body}</defs><rect width="400" height="300" mask="url(#k10)"/>`);
+};
+
 /** A `<use>` that refers to its own ancestor. */
 export const svgUseCycle = (): Uint8Array =>
   svgDoc(
