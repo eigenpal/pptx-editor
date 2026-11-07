@@ -1638,7 +1638,6 @@ export interface TransformItem {
     readonly flipV?: boolean;
     // (undocumented)
     readonly nodeId: string;
-    // (undocumented)
     readonly rot: number;
     // (undocumented)
     readonly x: number;

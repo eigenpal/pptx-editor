@@ -44,6 +44,9 @@ const PAGE_WIDE_APPROXIMATIONS = new Set(['line-model', 'glyph-advances', 'missi
 
 const NO_EVIDENCE: FeatureEvidence = { fixtures: [] };
 
+/** The round-trip values that claim the content survives a save. */
+const CLAIMS_ROUND_TRIP = new Set<FeatureStatus>(['full', 'preserved']);
+
 /** The evidence entry of a row. A missing entry fails its own test below. */
 const evidence = (row: PptxFeature): FeatureEvidence =>
   Object.hasOwn(FEATURE_EVIDENCE, row.id) ? FEATURE_EVIDENCE[row.id]! : NO_EVIDENCE;
@@ -214,10 +217,10 @@ describe('pptx-features: evidence for claims', () => {
     expect(owned).toEqual([]);
   });
 
-  test('round trip "full" needs fixtures whose saved copies opened with no repair prompt', () => {
+  test('round trip "full" or "preserved" needs fixtures whose saved copies opened with no repair prompt', () => {
     const verified = new Set(SAVE_VERIFIED_FIXTURES);
     const unproven = pptxFeatures
-      .filter((row) => row.roundTrip === 'full')
+      .filter((row) => CLAIMS_ROUND_TRIP.has(row.roundTrip))
       .flatMap((row) => {
         const { fixtures } = evidence(row);
         if (fixtures.length === 0) return [`${row.id}: no fixture`];
@@ -228,11 +231,13 @@ describe('pptx-features: evidence for claims', () => {
     expect(unproven).toEqual([]);
   });
 
-  test('round trip "full" needs the row\'s own edit on one of its fixtures, checked for a prompt', () => {
-    // feature-edits.test.ts runs each recipe: edit, save, reopen, and find the edit again.
+  test('round trip "full" or "preserved" needs an edit on one of the row\'s fixtures, checked for a prompt', () => {
+    // feature-edits.test.ts runs each recipe: edit, save, reopen, and find the edit again. For a
+    // "preserved" row, the edit is next to the kept content or of its box, and the check finds
+    // the content as it was.
     const verified = new Set(Object.keys(SAVE_VERIFIED_FEATURE_EDITS));
     const unproven = pptxFeatures
-      .filter((row) => row.roundTrip === 'full')
+      .filter((row) => CLAIMS_ROUND_TRIP.has(row.roundTrip))
       .flatMap((row) => {
         const recipe = FEATURE_EDITS[row.id];
         if (!recipe) return [`${row.id}: no recipe in FEATURE_EDITS`];

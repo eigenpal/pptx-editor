@@ -2,6 +2,8 @@
 // rule"). A recipe opens a fixture of its row, makes the row's own edit through the public
 // editor API, saves, and opens the saved copy again. The edit must be in the reopened copy, a
 // second save must give the same package, and only the parts the edit owns may change.
+// The recipes of the table, slide, theme, collaboration, and kept-content rows are in
+// `slide-object-edits.ts`.
 //
 // `feature-edits.test.ts` runs every recipe. `bun scripts/fidelity/feature-edits.ts --out <dir>`
 // writes each edited copy as `<row id>.pptx`, so the copies can be opened in other
@@ -15,24 +17,20 @@ import {
   elements,
   find,
   imagePartFor,
-  presentationInfo,
   textOf,
   xmlPartOf,
-  type PptxPackage,
 } from '../../packages/core/src/store/index.ts';
 import {
-  added,
   all,
   firstRun,
   has,
+  kept,
   lacks,
+  runsOf,
   MEDIA,
   nameOf,
-  NEW_SLIDES,
   paragraphOf,
   PNG,
-  PRESENTATION,
-  removed,
   runFeatureEdit,
   shapeElement,
   shapesIn,
@@ -41,6 +39,7 @@ import {
   slidePart,
   type FeatureEdit,
 } from './feature-edit-kit.ts';
+import { SLIDE_AND_OBJECT_EDITS } from './slide-object-edits.ts';
 
 /** The recipes, by row id. Rows without a recipe cannot claim a full round trip. */
 export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
@@ -116,6 +115,57 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
         : `text "${text.slice(0, 6)}"`;
     },
   },
+  'text.hyperlinks': {
+    fixture: 'hyperlinks',
+    edit: (t) => {
+      // Paragraph 0 is "Plain text to link. More plain text."
+      t.selectText('Links', 0, 5);
+      t.run({ type: 'setLink', url: 'https://example.com/new?a=1&b=2' });
+      t.selectText('Links', 6, 10);
+      t.run({ type: 'setLink', url: 'mailto:a@example.com?subject=Hi%20there' });
+      t.selectText('Links', 20, 24);
+      t.run({ type: 'setLink', url: '#slide-2' });
+      t.selectText('Links', 0, 16, 7);
+      t.run({ type: 'setLink', url: null });
+    },
+    check: (d) => {
+      const xml = d.shapeXml(0, 'Links');
+      const rels = d.partXml('/ppt/slides/_rels/slide1.xml.rels');
+      const target = (label: string): string | undefined => {
+        const rPr = runsOf(xml).find((r) => r.text === label)?.rPr ?? '';
+        const id = /r:id="([^"]+)"/.exec(rPr)?.[1];
+        const rel = id && new RegExp(`<Relationship [^>]*Id="${id}"[^>]*>`).exec(rels)?.[0];
+        return rel ? /Target="([^"]*)"/.exec(rel)?.[1] : undefined;
+      };
+      const slideJump = runsOf(xml).find((r) => r.text === 'More')?.rPr ?? '';
+      const paragraphs = (x: string) => x.match(/<a:p>.*?<\/a:p>/g) ?? [];
+      const before = paragraphs(shapeXmlOf(d.original, 0, 'Links'));
+      const after = paragraphs(xml);
+      return all(
+        target('Plain') === 'https://example.com/new?a=1&amp;b=2'
+          ? undefined
+          : `the web link targets ${target('Plain')}`,
+        target('text') === 'mailto:a@example.com?subject=Hi%20there'
+          ? undefined
+          : `the email link targets ${target('text')}`,
+        has(slideJump, 'action="ppaction://hlinksldjump"'),
+        target('More') === 'slide2.xml' ? undefined : `the slide link targets ${target('More')}`,
+        lacks(after[7] ?? '', 'hlinkClick'),
+        // The links the edit did not touch stay as they were: web, email, slide, the show jumps,
+        // the custom show, the file, and the shape link.
+        after.slice(1, 7).join('') === before.slice(1, 7).join('')
+          ? undefined
+          : 'a link the edit did not touch changed',
+        kept(d, 0, 'Linked shape'),
+        has(
+          rels,
+          'https://example.com/docs?q=1&amp;r=2',
+          'Target="notes.txt"',
+          'https://example.net/'
+        )
+      );
+    },
+  },
   'text.input-method': {
     fixture: 'text-runs',
     edit: (t) => {
@@ -140,6 +190,46 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
           : 'typed text is missing',
         has(d.shapeXml(0, 'Shape 2'), 'rtl="1"')
       ),
+  },
+  'text.find-replace': {
+    fixture: 'slide-layouts',
+    slide: 1,
+    edit: (t) => {
+      t.run({ type: 'replaceAll', query: 'Results', replacement: 'Outcomes & <totals>' });
+      t.run({ type: 'replaceAll', query: 'headline', replacement: 'lead' });
+    },
+    check: (d) => {
+      const notes = d.partXml('/ppt/notesSlides/notesSlide2.xml');
+      return all(
+        has(d.slideXml(1), 'Outcomes &amp; &lt;totals&gt;'),
+        lacks(d.slideXml(1), '>Results'),
+        // The replacement keeps the bold of the text it replaces.
+        /b="1"[^>]*\/?>(?:<\/a:rPr>)?<a:t>lead number<\/a:t>/.test(notes)
+          ? undefined
+          : 'the notes replacement lost its bold'
+      );
+    },
+    parts: [/^\/ppt\/notesSlides\/notesSlide2\.xml$/],
+  },
+  'text.format-painter': {
+    fixture: 'text-runs',
+    edit: (t) => {
+      // "Regular 18 Bold Italic …": copy the format of "Bold", paint "Regular".
+      t.selectText('Shape 2', 11, 15);
+      t.run({ type: 'copyFormat' });
+      t.selectText('Shape 2', 0, 7);
+      t.run({ type: 'pasteFormat' });
+      // The Format Painter button: copy "Italic", paint "18".
+      t.selectText('Shape 2', 16, 22);
+      t.run({ type: 'toggleFormatPainter' });
+      t.selectText('Shape 2', 8, 10);
+      t.run({ type: 'pasteFormat' });
+    },
+    check: (d) => {
+      const runs = runsOf(d.shapeXml(0, 'Shape 2'));
+      const rPr = (text: string) => runs.find((r) => r.text === text)?.rPr ?? '';
+      return all(has(rPr('Regular'), 'b="1"'), has(rPr('18'), 'i="1"'), lacks(rPr('18'), 'b="1"'));
+    },
   },
   'paragraphs.alignment': {
     fixture: 'alignment-anchor',
@@ -166,12 +256,30 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       ),
   },
   'paragraphs.indent-tabs': {
-    fixture: 'paragraph-format',
+    fixture: 'svg-tab-stops',
     edit: (t) => {
-      t.selectText('Shape 2', 0, 1, 1);
+      // The Paragraph dialog indents of a paragraph with tab stops, and Increase List Level.
+      t.selectText('Tab stops', 0, 1, 0);
+      t.run({ type: 'setParagraphFormat', indentLeftEmu: 228600, indentFirstLineEmu: 114300 });
+      t.selectText('Tab stops', 0, 1, 1);
       t.run({ type: 'indent', direction: 1 });
+      t.selectText('Tab stops', 0, 1, 3);
+      t.run({ type: 'setParagraphFormat', indentLeftEmu: 685800, indentFirstLineEmu: -342900 });
     },
-    check: (d) => has(paragraphOf(d.shapeXml(0, 'Shape 2'), 1), '<a:pPr lvl="1">'),
+    check: (d) => {
+      const xml = d.shapeXml(0, 'Tab stops');
+      const tabs = (x: string) => /<a:tabLst>.*?<\/a:tabLst>/.exec(x)?.[0];
+      const committed = tabs(shapeXmlOf(d.original, 0, 'Tab stops'));
+      return all(
+        has(paragraphOf(xml, 0), 'marL="228600"', 'indent="114300"'),
+        has(paragraphOf(xml, 1), 'lvl="1"'),
+        has(paragraphOf(xml, 3), 'marL="685800"', 'indent="-342900"'),
+        // The tab stops, which the editor does not edit, stay on every paragraph that has them.
+        [0, 1, 2].every((i) => tabs(paragraphOf(xml, i)) === committed)
+          ? undefined
+          : 'a tab stop list changed'
+      );
+    },
   },
   'paragraphs.autofit': {
     fixture: 'autofit',
@@ -234,6 +342,35 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
           '<a:ext cx="1828800" cy="914400"/>'
         )
       ),
+  },
+  'shapes.custom-geometry': {
+    fixture: 'custom-geometry',
+    edit: (t) => {
+      t.run({
+        type: 'setTransform',
+        nodeId: t.node('Freeform'),
+        x: 1371600,
+        y: 685800,
+        cx: 5486400,
+        cy: 2743200,
+        rot: 30,
+      });
+      t.select('Freeform');
+      t.run({ type: 'setShapeFill', color: '#70AD47' });
+      t.run({ type: 'flipObjects', axis: 'vertical' });
+    },
+    check: (d) => {
+      const geometry = (xml: string) => /<a:custGeom>.*?<\/a:custGeom>/.exec(xml)?.[0];
+      const xml = d.shapeXml(0, 'Freeform');
+      return all(
+        has(xml, '<a:off x="1371600" y="685800"/>', '<a:ext cx="5486400" cy="2743200"/>'),
+        // A vertical flip turns the 30° rotation into 330°.
+        has(xml, 'rot="19800000"', 'flipV="1"', 'val="70AD47"'),
+        geometry(xml) === geometry(shapeXmlOf(d.original, 0, 'Freeform'))
+          ? undefined
+          : 'the custom geometry changed'
+      );
+    },
   },
   'shapes.groups': {
     fixture: 'groups-transforms',
@@ -377,6 +514,83 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
         has(d.shapeXml(0, 'Shape 3'), '<a:schemeClr val="tx1"><a:lumMod val="75000"/>')
       ),
   },
+  'fills-lines.pattern-picture': {
+    fixture: 'fills-lines',
+    edit: (t) => {
+      t.select('Shape 2');
+      t.run({
+        type: 'setShapePattern',
+        pattern: { preset: 'dkDnDiag', foreground: '#1F4E79', background: '#DEEBF7' },
+      });
+      t.select('Shape 3');
+      t.run({ type: 'setShapePicture', bytes: t.png, mime: 'image/png' });
+      t.select('Shape 4');
+      t.run({ type: 'setShapePicture', bytes: t.png, mime: 'image/png', tile: true });
+    },
+    check: (d) =>
+      all(
+        has(
+          d.shapeXml(0, 'Shape 2'),
+          '<a:pattFill prst="dkDnDiag"><a:fgClr><a:srgbClr val="1F4E79"/>',
+          '<a:bgClr><a:srgbClr val="DEEBF7"/>'
+        ),
+        has(d.shapeXml(0, 'Shape 3'), '<a:blipFill', '<a:stretch>'),
+        has(d.shapeXml(0, 'Shape 4'), '<a:blipFill', '<a:tile'),
+        // The picture and pattern fills the edit did not touch stay as they were.
+        kept(d, 0, 'Shape 10', 'Shape 30', 'Shape 31')
+      ),
+    parts: MEDIA,
+  },
+  'effects.fill-overlay': {
+    fixture: 'fill-fidelity',
+    slide: 2,
+    edit: (t) => {
+      t.run({
+        type: 'setTransform',
+        nodeId: t.node('Shape 5'),
+        x: 457200,
+        y: 457200,
+        cx: 2286000,
+        cy: 1371600,
+        rot: 0,
+      });
+      t.select('Shape 6');
+      t.run({ type: 'setLineColor', color: '#C00000' });
+      t.run({ type: 'setLineWidth', points: 3 });
+    },
+    check: (d) => {
+      const overlay = (xml: string) => /<a:fillOverlay.*?<\/a:fillOverlay>/.exec(xml)?.[0];
+      const same = (name: string) =>
+        overlay(d.shapeXml(2, name)) === overlay(shapeXmlOf(d.original, 2, name))
+          ? undefined
+          : `the overlay of ${name} changed`;
+      return all(
+        has(d.shapeXml(2, 'Shape 5'), '<a:off x="457200" y="457200"/>'),
+        has(d.shapeXml(2, 'Shape 6'), 'val="C00000"', 'w="38100"'),
+        same('Shape 5'),
+        same('Shape 6'),
+        kept(d, 2, 'Shape 7')
+      );
+    },
+  },
+  'effects.3d-and-other': {
+    fixture: 'preserved-content',
+    edit: (t) => {
+      t.select('3-D shape');
+      t.run({ type: 'setShapeFill', color: '#5B9BD5' });
+      t.run({ type: 'nudge', dx: 91440, dy: 0 });
+    },
+    check: (d) => {
+      const threeD = (xml: string) => /<a:scene3d>.*<\/a:sp3d>/.exec(xml)?.[0];
+      const xml = d.shapeXml(0, '3-D shape');
+      return all(
+        has(xml, 'val="5B9BD5"'),
+        threeD(xml) === threeD(shapeXmlOf(d.original, 0, '3-D shape'))
+          ? undefined
+          : 'the 3-D scene or shape changed'
+      );
+    },
+  },
   'effects.outer-shadow': {
     fixture: 'effects',
     edit: (t) => {
@@ -408,26 +622,43 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       ),
   },
   'pictures.raster-svg': {
-    fixture: 'pictures',
+    fixture: 'svg-tab-stops',
     edit: (t) => {
-      t.select('Picture 0');
+      t.select('PNG picture');
       t.run({ type: 'replaceImage', bytes: t.png, mime: 'image/png' });
       t.run({ type: 'insertImage', bytes: t.png, mime: 'image/png', width: 2, height: 2 });
+      // Move, resize, and rotate the SVG picture.
+      t.run({
+        type: 'setTransform',
+        nodeId: t.node('SVG picture'),
+        x: 7315200,
+        y: 457200,
+        cx: 1828800,
+        cy: 1828800,
+        rot: 15,
+      });
     },
     check: (d) => {
       const pictures = shapesIn(xmlPartOf(d.pkg, slidePart(d.pkg, 0))!.root).filter(
         (s) => s.local === 'pic'
       );
-      const embed = /r:embed="([^"]+)"/.exec(d.shapeXml(0, 'Picture 0'))?.[1];
+      const embed = /r:embed="([^"]+)"/.exec(d.shapeXml(0, 'PNG picture'))?.[1];
       const target = embed && imagePartFor(d.pkg, slidePart(d.pkg, 0), embed);
       const part = target ? d.pkg.parts.get(target) : undefined;
       const replaced =
         part?.kind === 'binary' &&
         part.bytes.length === PNG.length &&
         part.bytes.every((b, i) => b === PNG[i]);
+      const fill = (xml: string) => /<p:blipFill>.*?<\/p:blipFill>/.exec(xml)?.[0];
+      const svg = d.shapeXml(0, 'SVG picture');
       return all(
-        pictures.length === 7 ? undefined : `${pictures.length} pictures`,
-        replaced ? undefined : `Picture 0 shows ${target}, not the new picture`
+        pictures.length === 3 ? undefined : `${pictures.length} pictures`,
+        replaced ? undefined : `the PNG picture shows ${target}, not the new picture`,
+        has(svg, 'rot="900000"', '<a:off x="7315200" y="457200"/>'),
+        // The SVG picture keeps its SVG part and its PNG fallback.
+        fill(svg) === fill(shapeXmlOf(d.original, 0, 'SVG picture'))
+          ? undefined
+          : 'the SVG picture fill changed'
       );
     },
     parts: MEDIA,
@@ -488,267 +719,7 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
         has(d.shapeXml(0, 'Picture 5'), 'decorative')
       ),
   },
-  'tables.render': {
-    fixture: 'tables',
-    edit: (t) => {
-      t.selectCell('Table 1', 0, 0);
-      t.run({ type: 'toggleTableStyleOption', option: 'bandRow' });
-      t.run({ type: 'toggleTableStyleOption', option: 'firstCol' });
-    },
-    check: (d) => {
-      const options = (xml: string) => /<a:tblPr[^>]*>/.exec(xml)?.[0] ?? '';
-      const before = options(shapeXmlOf(d.original, 0, 'Table 1'));
-      const after = options(d.shapeXml(0, 'Table 1'));
-      const flag = (tag: string, name: string) => tag.includes(`${name}="1"`);
-      return flag(after, 'bandRow') !== flag(before, 'bandRow') &&
-        flag(after, 'firstCol') !== flag(before, 'firstCol')
-        ? undefined
-        : `table options ${after}, were ${before}`;
-    },
-  },
-  'tables.cell-text': {
-    fixture: 'table-editing',
-    edit: (t) => {
-      t.selectCell('Table 1', 1, 1);
-      t.type('Cell & <text> ');
-    },
-    check: (d) => has(d.shapeXml(0, 'Table 1'), 'Cell &amp; &lt;text&gt; '),
-  },
-  'tables.structure': {
-    fixture: 'table-editing',
-    edit: (t) => {
-      t.selectCell('Table 1', 0, 0);
-      t.run({ type: 'insertRow', where: 'below' });
-      t.run({ type: 'insertColumn', where: 'right' });
-      t.run({ type: 'insertTable', rows: 2, cols: 3 });
-    },
-    check: (d) => {
-      const count = (xml: string, re: RegExp) => xml.match(re)?.length ?? 0;
-      const before = shapeXmlOf(d.original, 0, 'Table 1');
-      const after = d.shapeXml(0, 'Table 1');
-      return all(
-        count(d.slideXml(0), /<a:tbl>/g) === 2 ? undefined : 'no new table',
-        count(after, /<a:tr /g) === count(before, /<a:tr /g) + 1 ? undefined : 'no new row',
-        count(after, /<a:gridCol /g) === count(before, /<a:gridCol /g) + 1
-          ? undefined
-          : 'no new column'
-      );
-    },
-  },
-  'tables.merge-split': {
-    fixture: 'table-editing',
-    edit: (t) => {
-      const table = t.node('Table 1');
-      t.editor.setSelection({
-        kind: 'cells',
-        nodeId: table,
-        anchor: { row: 3, column: 0 },
-        focus: { row: 3, column: 1 },
-      });
-      t.run({ type: 'mergeCells' });
-      // The fixture merges rows 1 and 2 of columns 0 and 1: split that block into four cells.
-      t.selectCell('Table 1', 1, 0);
-      t.run({ type: 'splitCell', rows: 2, cols: 2 });
-    },
-    check: (d) => {
-      const rows = d.shapeXml(0, 'Table 1').split('<a:tr ');
-      return all(
-        has(rows[rows.length - 1], 'gridSpan="2"', 'hMerge="1"'),
-        lacks(rows[2] + rows[3], 'gridSpan=', 'rowSpan=', 'hMerge=', 'vMerge=')
-      );
-    },
-  },
-  'tables.styles': {
-    fixture: 'tables',
-    edit: (t) => {
-      t.selectCell('Table 1', 0, 0);
-      const current = t.editor.snapshot().table?.styleId;
-      const style = t.editor.tableStyles().find((s) => s.id !== current);
-      if (!style) throw new Error('no other table style');
-      t.run({ type: 'setTableStyle', styleId: style.id });
-    },
-    check: (d) => {
-      const styleOf = (xml: string) => /<a:tableStyleId>([^<]*)</.exec(xml)?.[1];
-      const before = styleOf(shapeXmlOf(d.original, 0, 'Table 1'));
-      const after = styleOf(d.shapeXml(0, 'Table 1'));
-      return after && after !== before ? undefined : `table style ${after}, was ${before}`;
-    },
-    parts: [/^\/ppt\/tableStyles\.xml$/],
-  },
-  'tables.cell-format': {
-    fixture: 'table-editing',
-    edit: (t) => {
-      t.selectCell('Table 1', 0, 1);
-      t.run({ type: 'setCellFill', color: '#92D050' });
-      t.run({ type: 'setCellMargins', margins: { left: 182880, top: 45720 } });
-      t.run({
-        type: 'setTableBorders',
-        scope: 'outside',
-        spec: { color: '#FF0000', width: 2, dash: 'solid' },
-      });
-    },
-    check: (d) =>
-      has(
-        d.shapeXml(0, 'Table 1'),
-        'val="92D050"',
-        'marL="182880"',
-        'marT="45720"',
-        'val="FF0000"'
-      ),
-  },
-  'tables.sizes': {
-    fixture: 'table-editing',
-    edit: (t) => {
-      t.selectCell('Table 1', 0, 0);
-      t.run({ type: 'setRowHeight', height: 640080 });
-      t.run({ type: 'setColumnWidth', width: 2011680 });
-    },
-    check: (d) => has(d.shapeXml(0, 'Table 1'), 'h="640080"', 'w="2011680"'),
-  },
-  'slides.structure': {
-    fixture: 'slide-structure',
-    edit: (t) => {
-      t.run({ type: 'duplicateSlide', index: 1 });
-      t.run({ type: 'moveSlide', from: 0, to: 3 });
-      t.run({ type: 'deleteSlide', index: 4 });
-      t.run({ type: 'addSlide' });
-    },
-    check: (d) => {
-      const titleOf = (pkg: PptxPackage, i: number) =>
-        textOf(find(xmlPartOf(pkg, slidePart(pkg, i))!.root, 'p:spTree')).match(
-          /^(Intro|Body) \d/
-        )?.[0] ?? '';
-      const titles = presentationInfo(d.pkg).slides.map((_, i) => titleOf(d.pkg, i));
-      const kept = titles.filter(Boolean).join(', ');
-      const expected = 'Intro 2, Intro 2, Body 1, Intro 1';
-      // The duplicate keeps every shape of its source.
-      const shapes = (i: number) =>
-        shapesIn(xmlPartOf(d.pkg, slidePart(d.pkg, i))!.root)
-          .map(nameOf)
-          .join(', ');
-      return all(
-        titles.length === 5 ? undefined : `${titles.length} slides`,
-        kept === expected ? undefined : `slide order ${kept}, expected ${expected}`,
-        shapes(0) === shapes(1) ? undefined : `the duplicate has ${shapes(1)}`
-      );
-    },
-    parts: [...NEW_SLIDES, removed(/^\/ppt\/(slides|notesSlides|comments|embeddings)\//)],
-  },
-  'slides.hidden': {
-    fixture: 'slide-layouts',
-    edit: (t) => t.run({ type: 'setSlidesHidden', indices: [1, 3], hidden: true }),
-    check: (d) =>
-      all(
-        has(d.slideXml(1), 'show="0"'),
-        has(d.slideXml(3), 'show="0"'),
-        lacks(d.slideXml(0), 'show="0"')
-      ),
-    parts: [/^\/ppt\/slides\/slide[24]\.xml$/],
-  },
-  'slides.placeholder-prompts': {
-    fixture: 'slide-layouts',
-    edit: (t) => {
-      const layout = t.editor.snapshot().layouts?.find((l) => /content/i.test(l.name));
-      if (!layout) throw new Error('the fixture has no content layout');
-      t.run({ type: 'addSlide', layoutId: layout.id });
-    },
-    check: (d) => {
-      const xml = d.slideXml(1);
-      return all(has(xml, '<p:ph'), /<a:t>/.test(xml) ? 'the new slide has text' : undefined);
-    },
-    parts: NEW_SLIDES,
-  },
-  'slides.notes': {
-    fixture: 'slide-layouts',
-    edit: (t) => {
-      t.run({ type: 'setNotes', index: 0, text: 'Notes & <kept>\nSecond line' });
-      t.run({ type: 'formatNotes', index: 0, start: 0, end: 5, format: 'bold', value: true });
-    },
-    check: (d) => {
-      const rels = d.partXml(slidePart(d.pkg, 0).replace(/\/([^/]+)$/, '/_rels/$1.rels'));
-      const target = /Target="\.\.\/notesSlides\/([^"]+)"/.exec(rels)?.[1];
-      if (!target) return 'slide 1 has no notes slide';
-      const part = `/ppt/notesSlides/${target}`;
-      const text = textOf(xmlPartOf(d.pkg, part)!.root);
-      return all(
-        text.includes('Notes & <kept>') && text.includes('Second line')
-          ? undefined
-          : `notes text "${text}"`,
-        has(d.partXml(part), 'b="1"/><a:t>Notes</a:t>')
-      );
-    },
-    parts: [
-      added(/^\/ppt\/notesSlides\//),
-      added(/^\/ppt\/notesMasters\//),
-      added(/^\/ppt\/theme\//),
-      /^\/\[Content_Types\]\.xml$/,
-      ...PRESENTATION,
-    ],
-  },
-  'slides.sections': {
-    fixture: 'slide-layouts',
-    edit: (t) => {
-      t.run({ type: 'addSection', name: 'Intro', index: 0 });
-      t.run({ type: 'addSection', name: 'Body & <rest>', index: 2 });
-    },
-    check: (d) =>
-      has(
-        d.partXml('/ppt/presentation.xml'),
-        'sectionLst',
-        'name="Intro"',
-        'name="Body &amp; &lt;rest&gt;"'
-      ),
-    parts: PRESENTATION,
-  },
-  'slides.size': {
-    fixture: 'slide-size',
-    // A4 to 16:9: the height ratio (6858000 / 7562850) is the smaller one, so every box
-    // scales by it and the content is centered across the width.
-    edit: (t) => t.run({ type: 'setSlideSize', width: 12_192_000, height: 6_858_000 }),
-    check: (d) => {
-      const s = 6_858_000 / 7_562_850;
-      const dx = Math.round((12_192_000 - 10_693_400 * s) / 2);
-      return all(
-        has(d.partXml('/ppt/presentation.xml'), '<p:sldSz cx="12192000" cy="6858000"/>'),
-        has(
-          d.shapeXml(0, 'Shape 2'),
-          `<a:off x="${dx}" y="${Math.round(7_242_810 * s)}"/>`,
-          `<a:ext cx="${Math.round(10_693_400 * s)}" cy="${Math.round(320_040 * s)}"/>`
-        )
-      );
-    },
-    parts: [
-      /^\/ppt\/presentation\.xml$/,
-      /^\/ppt\/slides\/slide\d+\.xml$/,
-      /^\/ppt\/slideLayouts\/slideLayout\d+\.xml$/,
-      /^\/ppt\/slideMasters\/slideMaster\d+\.xml$/,
-    ],
-  },
-  'themes.backgrounds': {
-    fixture: 'placeholders-background',
-    edit: (t) =>
-      t.run({
-        type: 'setSlideBackground',
-        background: { kind: 'solid', color: { theme: 'accent6', shift: 60 } },
-      }),
-    check: (d) => has(d.slideXml(0), '<p:bg><p:bgPr><a:solidFill><a:schemeClr val="accent6">'),
-  },
-  'themes.change-layout-theme': {
-    fixture: 'slide-layouts',
-    slide: 1,
-    edit: (t) => {
-      const s = t.editor.snapshot();
-      const current = s.slides[1]?.layoutId;
-      const other = s.layouts?.find((l) => l.id !== current);
-      if (!other) throw new Error('no other layout');
-      t.run({ type: 'applyLayout', layoutId: other.id, indices: [1] });
-    },
-    check: (d) => {
-      const after = presentationInfo(d.pkg).slides[1]?.layoutPart;
-      const before = presentationInfo(d.original).slides[1]?.layoutPart;
-      return after && after !== before ? undefined : `layout ${after}, was ${before}`;
-    },
-  },
+  ...SLIDE_AND_OBJECT_EDITS,
 };
 
 if (import.meta.main) {

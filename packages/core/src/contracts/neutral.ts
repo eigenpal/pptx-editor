@@ -310,6 +310,7 @@ export type EditorCommand =
       readonly y: number;
       readonly cx: number;
       readonly cy: number;
+      /** Rotation in degrees, clockwise. The file stores it in 60,000ths of a degree. */
       readonly rot: number;
     }
   | { readonly type: 'nudge'; readonly dx: number; readonly dy: number }
@@ -510,6 +511,7 @@ export interface TransformItem {
   readonly y: number;
   readonly cx: number;
   readonly cy: number;
+  /** Rotation in degrees, clockwise. The file stores it in 60,000ths of a degree. */
   readonly rot: number;
   /** Flips; absent keeps the current ones. A line's direction is its flips. */
   readonly flipH?: boolean;
