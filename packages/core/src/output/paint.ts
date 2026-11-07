@@ -770,6 +770,22 @@ export class SlidePainter {
   }
 
   /** Whether this painter paints with `opts`: the same ports and id prefix. */
+  #key: unknown = undefined;
+  /** Items painted before the last change of `invalidate`'s key: each paints again. */
+  #stale: Set<LayoutItem> | null = null;
+
+  /**
+   * Note `key`: what the picture depends on besides the layout, such as converted pictures or
+   * loaded faces. When it changed, every item paints again, and until it does, its earlier node
+   * stays on screen in its place. Answers whether the key changed.
+   */
+  invalidate(key: unknown): boolean {
+    if (key === this.#key) return false;
+    this.#key = key;
+    this.#stale = new Set(this.#items.keys());
+    return true;
+  }
+
   paints(opts: PaintOptions): boolean {
     const a = this.#opts;
     return (
@@ -858,13 +874,16 @@ export class SlidePainter {
     let current: Set<LayoutItem> | null = null;
     for (const item of layout.items) {
       let painted: PaintedItem;
-      const kept = next.has(item) ? undefined : this.#items.get(item);
+      const stale = this.#stale?.has(item) === true;
+      const kept = next.has(item) || stale ? undefined : this.#items.get(item);
       if (!kept && left <= 0) {
         this.#pending = true;
         earlier ??= new Map([...this.#items].map(([i, p]) => [itemKey(i), [i, p]] as const));
         current ??= new Set(layout.items);
         const stand = earlier.get(itemKey(item));
-        if (stand && !next.has(stand[0]) && !current.has(stand[0])) {
+        // An item of the layout stands in only for itself, when it waits to paint again.
+        const own = stand?.[0] === item && stale;
+        if (stand && !next.has(stand[0]) && (own || !current.has(stand[0]))) {
           next.set(stand[0], stand[1]);
           if (stand[1].node) nodes.push(stand[1].node);
         }
@@ -879,6 +898,12 @@ export class SlidePainter {
         painted = kept ?? paintFresh(item);
         if (!kept) left -= 1;
         next.set(item, painted);
+        if (stale) {
+          // Painted again: its earlier node and definitions go.
+          this.#stale!.delete(item);
+          const old = this.#items.get(item);
+          if (old) drop(old);
+        }
       }
       if (painted.node) nodes.push(painted.node);
     }

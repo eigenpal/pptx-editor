@@ -199,8 +199,8 @@ export function refitGroup(
       box.rot
     );
     setChildSpace(batch, part, id, u);
-    const parent = parentOf(batch, part, id);
-    id = parent.kind === 'grpSp' ? parent.id : null;
+    const parent = batch.parentKind(part, id);
+    id = parent?.kind === 'grpSp' ? parent.id : null;
   }
 }
 
@@ -220,8 +220,9 @@ export function setTransforms(
         ? { h: t.flipH ?? false, v: t.flipV ?? false }
         : undefined;
     setTransform(batch, part, t.nodeId, t.x, t.y, t.cx, t.cy, t.rot, flips);
-    const parent = parentOf(batch, part, t.nodeId);
-    if (parent.kind === 'grpSp') groups.add(parent.id);
+    // Read without holding the parent: the next transform then writes in place.
+    const parent = batch.parentKind(part, t.nodeId);
+    if (parent?.kind === 'grpSp') groups.add(parent.id);
   }
   for (const g of groups) refitGroup(batch, part, g, items);
 }

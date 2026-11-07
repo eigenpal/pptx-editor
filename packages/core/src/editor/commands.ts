@@ -292,10 +292,9 @@ function writeTransforms(
   // After every transform, from one resolve: a re-fit changes only its own shape.
   refitIds(batch, ctx, part, fit);
   // Autofit can change a height; refit the groups again so their bounds stay tight.
-  const groups = new Set(
-    items.map((t) => parentOf(batch, part, t.nodeId)).filter((p) => p.kind === 'grpSp')
-  );
-  for (const g of groups) refitGroup(batch, part, g.id, layout);
+  const parents = items.map((t) => batch.parentKind(part, t.nodeId));
+  const groups = new Set(parents.flatMap((p) => (p?.kind === 'grpSp' ? [p.id] : [])));
+  for (const g of groups) refitGroup(batch, part, g, layout);
 }
 
 /**

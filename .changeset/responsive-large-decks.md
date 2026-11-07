@@ -18,3 +18,6 @@ Large decks no longer freeze the editor. A slide of thousands of shapes opens an
 - A space after a long run of spaces or a long word no longer slows AutoCorrect.
 - The missing-fonts notice names up to four families. With five or more, it names three, then "and N more".
 - Bring to Front, Send to Back, Bring Forward, and Send Backward move thousands of shapes in one pass. Bullets, Numbering, Remove Bullet, and Bullet Format resolve the slide once for all selected shapes. Auto-fit, Columns, Text Direction, Paste Format, and a resize of many shapes re-fit them in one pass.
+- A resize of many shapes no longer copies the slide's shape list once per shape.
+- When fonts load or a picture converts, the slide and its thumbnail paint every shape again, and each earlier picture stays on screen until its shape paints.
+- A shape that is selected twice is edited once. A text command or a re-fit on a slide shape no longer reads a layout or master shape that has the same node id.

@@ -24,9 +24,12 @@ export function slidePart(ctx: CommandContext): string {
   return ref.partName;
 }
 
-/** Selected shape ids (text selection counts as its shape). */
+/**
+ * Selected shape ids (text selection counts as its shape), each once: a command that edits a
+ * shape twice in one pass could write one bullet twice.
+ */
 export function selectedIds(selection: EditorSelection): string[] {
-  if (selection.kind === 'shapes') return [...selection.nodeIds];
+  if (selection.kind === 'shapes') return [...new Set(selection.nodeIds)];
   if (selection.kind === 'text' || selection.kind === 'cells') return [selection.nodeId];
   return [];
 }

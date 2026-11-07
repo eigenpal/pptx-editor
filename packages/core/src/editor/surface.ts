@@ -136,7 +136,6 @@ export class SlideSurface {
   #zoomAnchor: { x: number; y: number } | null = null;
   #renderedZoom: number | null = null;
   #paintKey: unknown = null;
-  #slidePaintKey: string | undefined;
   /** Paints the slide, reusing the nodes of unchanged items (`SlidePainter`). */
   #painter: SlidePainter | null = null;
   /**
@@ -314,9 +313,8 @@ export class SlideSurface {
     }
     const painted = this.editor.paintLayout?.(layout) ?? layout;
     const paintKey = this.editor.paintKey?.();
-    // Converted pictures, or new faces: paint every item again.
-    if (paintKey !== this.#slidePaintKey)
-      [this.#slidePaintKey, this.#paintKey, this.#painter] = [paintKey, null, null];
+    // Converted pictures, or new faces: paint every item again, the old ones standing in.
+    if (this.#painter?.invalidate(paintKey)) this.#paintKey = null;
     if (this.#paintKey !== painted) {
       this.#paintKey = painted;
       const opts = {
@@ -324,8 +322,10 @@ export class SlideSurface {
         ...(this.editor.altText ? { altText: this.editor.altText } : {}),
       };
       // One painter for the view: an edit paints the items it changed, not the whole slide.
-      if (!this.#painter?.paints(opts))
+      if (!this.#painter?.paints(opts)) {
         this.#painter = new SlidePainter(this.host.ownerDocument, opts);
+        this.#painter.invalidate(paintKey);
+      }
       this.#drag.beforeRepaint();
       const svg = this.#painter.paint(painted, PAINT_BUDGET);
       // Items left out paint on the next frame, and the painter keeps what it has.

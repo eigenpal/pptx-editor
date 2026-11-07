@@ -89,6 +89,8 @@ function findBody(
   txBodyId: string
 ): readonly ResolvedParagraph[] | undefined {
   for (const el of elements) {
+    // Node ids repeat across parts: a layout or master shape can have the same one.
+    if (el.layer !== 'slide') continue;
     if (el.nodeId === nodeId && el.kind === 'shape') return el.text?.paragraphs;
     if (el.nodeId === nodeId && el.kind === 'graphicFrame')
       return el.table?.cells.find((c) => c.text.nodeId === txBodyId)?.text.paragraphs;
@@ -122,6 +124,7 @@ export function paragraphLookup(
   const cells = new Map<string, readonly ResolvedParagraph[]>();
   const walk = (elements: readonly ResolvedElement[]): void => {
     for (const el of elements) {
+      if (el.layer !== 'slide') continue;
       if (el.kind === 'shape') shapes.set(el.nodeId, el.text?.paragraphs ?? []);
       else if (el.kind === 'graphicFrame')
         for (const c of el.table?.cells ?? [])

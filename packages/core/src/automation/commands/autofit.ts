@@ -31,6 +31,8 @@ function findShape(
   sy = 1
 ): Found | undefined {
   for (const el of elements) {
+    // Node ids repeat across parts: a layout or master shape can have the same one.
+    if (el.layer !== 'slide') continue;
     if (el.nodeId === nodeId && el.kind === 'shape') return { shape: el, sx, sy };
     if (el.kind === 'group') {
       // As the layout places a child (`placeInGroup`): its box scales with the group.
@@ -53,6 +55,7 @@ function shapeTable(slide: ResolvedSlide): Map<string, Found> {
   const out = new Map<string, Found>();
   const walk = (elements: readonly ResolvedElement[], sx: number, sy: number): void => {
     for (const el of elements) {
+      if (el.layer !== 'slide') continue;
       if (el.kind === 'shape' && !out.has(el.nodeId)) out.set(el.nodeId, { shape: el, sx, sy });
       if (el.kind === 'group') {
         // As `findShape` scales a group child.
@@ -126,7 +129,7 @@ export function refitAll(
   nodeIds: Iterable<string>,
   measurer: TextMeasurer
 ): void {
-  const ids = [...nodeIds];
+  const ids = [...new Set(nodeIds)];
   if (ids.length === 0) return;
   const resolved = ids.length > 1 ? resolveSlide(batch.pkg, index) : undefined;
   for (const id of ids) refit(batch, index, part, id, measurer, resolved);

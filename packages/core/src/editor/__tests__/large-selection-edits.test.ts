@@ -130,11 +130,12 @@ function listDeck(listed: boolean): Uint8Array {
   });
 }
 
-/** The node ids of the deck's text shapes and table frame, group children in place of groups. */
+/** The ids of the slide's text shapes and table frame, group children in place of groups. */
 const targets = (e: PptxEditorInstance): string[] =>
   e
     .session!.layout(0)!
-    .items.flatMap((i) =>
+    .items.filter((i) => i.element.layer === 'slide')
+    .flatMap((i) =>
       i.kind === 'group' ? i.children.map((c) => c.element.nodeId) : [i.element.nodeId]
     );
 
@@ -147,6 +148,9 @@ for (const [command, listed] of [
   [{ type: 'toggleBullets' }, false],
   [{ type: 'toggleNumbering' }, false],
   [{ type: 'setAutofit', mode: 'shrink' }, false],
+  [{ type: 'setBulletFormat', format: { kind: 'bullet', char: '-' } }, false],
+  [{ type: 'setBulletFormat', format: { kind: 'number' } }, false],
+  [{ type: 'setBulletFormat', format: { kind: 'bullet', sizePercent: 120 } }, true],
 ] as const satisfies readonly (readonly [EditorCommand, boolean])[]) {
   test(`${command.type} on many shapes gives the result of each shape alone`, async () => {
     const together = await open(listDeck(listed));
@@ -162,3 +166,42 @@ for (const [command, listed] of [
     alone.destroy();
   });
 }
+
+test('a shape selected twice gets one bullet', async () => {
+  const e = await open(listDeck(false));
+  const [id] = targets(e);
+  e.setSelection({ kind: 'shapes', nodeIds: [id!, id!] });
+  expect(e.exec({ type: 'toggleBullets' }).ok).toBe(true);
+  const sp = elements(find(rootOf(e), 'p:spTree')!).find((c) => c.id === id)!;
+  for (const pPr of elements(find(sp, 'p:txBody')!).flatMap((p) => elements(p)))
+    if (pPr.local === 'pPr')
+      expect(elements(pPr).filter((c) => c.local === 'buChar')).toHaveLength(1);
+  e.destroy();
+});
+
+test('a slide shape with the node id of a layout shape edits and re-fits itself', async () => {
+  // The same tree in the layout and the slide: node ids are numbered per part, so they match.
+  const text = para(run('a'), bullet) + para(run('b'), bullet);
+  const box = shape({ id: 2, x: IN, y: IN, cx: IN, cy: IN, text });
+  const e = await open(
+    buildPptx({
+      layouts: [{ name: 'Deco', shapes: box }],
+      slides: [{ layoutName: 'Deco', shapes: box }],
+    })
+  );
+  const items = e.session!.layout(0)!.items;
+  const mine = items.find((i) => i.element.layer === 'slide')!;
+  expect(
+    items.some((i) => i.element.layer !== 'slide' && i.element.nodeId === mine.element.nodeId)
+  ).toBe(true);
+  e.setSelection({ kind: 'shapes', nodeIds: [mine.element.nodeId] });
+  expect(e.exec({ type: 'setBulletFormat', format: { kind: 'bullet', sizePercent: 120 } }).ok).toBe(
+    true
+  );
+  expect(xml(e)).toContain('<a:buSzPct val="120000"/>');
+  // Shape fit re-fits the slide shape, not the layout one.
+  expect(e.exec({ type: 'setAutofit', mode: 'shape' }).ok).toBe(true);
+  const fitted = e.session!.layout(0)!.items.find((i) => i.element.layer === 'slide')!;
+  expect(fitted.element.xfrm.cy).not.toBe(IN);
+  e.destroy();
+});

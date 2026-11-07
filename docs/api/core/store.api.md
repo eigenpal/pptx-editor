@@ -427,6 +427,7 @@ export interface OpenTransaction {
     finish(): PptxPackage;
     nextId(part: string): number | undefined;
     parentId(part: string, id: string): string | null | undefined;
+    peek(part: string, id: string): Element_2 | undefined;
 }
 
 // @internal

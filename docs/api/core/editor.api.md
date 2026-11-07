@@ -3559,6 +3559,10 @@ export class OpBatch {
     // (undocumented)
     readonly ops: PptxOp[];
     parentId(part: string, id: string): string | undefined;
+    parentKind(part: string, id: string): {
+        id: string;
+        kind: string;
+    } | undefined;
     get pkg(): PptxPackage;
     push(op: PptxOp): void;
     pushAll(ops: readonly PptxOp[]): void;

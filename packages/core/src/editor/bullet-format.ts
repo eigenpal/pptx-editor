@@ -19,8 +19,8 @@ import { isSymbolFont } from '../layout/index.ts';
 import { attr, type Element, type NodeSpec } from '../store/index.ts';
 import { FONT_NAME } from '../automation/commands/font-format.ts';
 import {
-  resolvedParagraphs,
-  setListKind,
+  paragraphLookup,
+  setListKinds,
   type ListTarget,
 } from '../automation/commands/list-commands.ts';
 import { CommandRefusal, type OpBatch } from '../automation/commands/op-batch.ts';
@@ -230,36 +230,65 @@ function fontSpec(font: string): NodeSpec {
 }
 
 /**
- * Apply a bullet format to the target paragraphs. `resolve` is false for a probe, which only
- * needs ops (`setListKind`).
+ * Apply a bullet format to the paragraphs of `targets`. The slide resolves once before the lists
+ * turn on and, for numbers, once after: the edits of one target never change how another one
+ * resolves. Answers whether any target shows a list, and the targets whose bullets changed.
+ * `resolve` is false for a probe, which only needs ops (`setListKinds`).
  */
-export function setBulletFormat(
+export function setBulletFormats(
   batch: OpBatch,
   part: string,
   slide: number,
-  target: ListTarget,
+  targets: readonly ListTarget[],
   style: BulletFormat | null,
   resolve = true
-): boolean {
+): { listed: boolean; changed: ListTarget[] } {
   checkBulletFormat(style);
   // No kind: only the size and color, of the paragraphs that show a list. Which ones do is
   // read also for a probe, so `can` and `exec` agree.
   const kind = style ? style.kind : 'none';
   const read = resolve || !kind;
-  const before = read ? resolvedParagraphs(batch, slide, target) : [];
+  const lookup = read ? paragraphLookup(batch, slide) : () => [];
   // A paragraph that already shows a list keeps its margins: only its bullet changes. One
-  // without a list, and None, go through Home > Bullets (`setListKind`).
-  const fresh =
-    style && read ? target.paragraphs.filter((i) => !before[i]?.bullet) : target.paragraphs;
-  if (kind && fresh.length)
-    setListKind(batch, part, slide, { ...target, paragraphs: fresh }, kind, resolve);
-  if (!style) return true;
-  if (!kind && fresh.length === target.paragraphs.length) return false;
+  // without a list, and None, go through Home > Bullets (`setListKinds`).
+  const plans = targets.map((target) => {
+    const before = lookup(target);
+    const fresh =
+      style && read ? target.paragraphs.filter((i) => !before[i]?.bullet) : target.paragraphs;
+    return { target, before, fresh };
+  });
+  const lists = kind
+    ? plans.filter((x) => x.fresh.length).map((x) => ({ ...x.target, paragraphs: x.fresh }))
+    : [];
+  setListKinds(batch, part, slide, lists, kind || 'none', resolve);
+  const changed = new Set(plans.filter((x) => kind && x.fresh.length).map((x) => x.target));
+  if (!style) return { listed: true, changed: [...changed] };
   // What a paragraph with no list shows once it has one: the scheme its placeholder inherits.
-  const after =
-    resolve && style.kind === 'number' && fresh.length
-      ? resolvedParagraphs(batch, slide, target)
-      : before;
+  const later =
+    resolve && style.kind === 'number' && lists.length ? paragraphLookup(batch, slide) : null;
+  let listed = false;
+  for (const { target, before, fresh } of plans) {
+    if (!kind && fresh.length === target.paragraphs.length) continue;
+    listed = true;
+    const at = batch.ops.length;
+    const after = later && fresh.length ? later(target) : before;
+    writeBulletStyle(batch, part, target, style, kind, before, after, fresh);
+    if (batch.ops.length !== at) changed.add(target);
+  }
+  return { listed, changed: [...changed] };
+}
+
+/** Write the bullet, its font, size, and color into the paragraphs of one target. */
+function writeBulletStyle(
+  batch: OpBatch,
+  part: string,
+  target: ListTarget,
+  style: BulletFormat,
+  kind: BulletFormat['kind'] | 'none',
+  before: readonly ResolvedParagraph[],
+  after: readonly ResolvedParagraph[],
+  fresh: readonly number[]
+): void {
   const all = paragraphsOf(batch.element(part, target.txBodyId));
   const isFresh = new Set(fresh);
   for (const i of kind ? target.paragraphs : target.paragraphs.filter((j) => !isFresh.has(j))) {
@@ -345,7 +374,6 @@ export function setBulletFormat(
       }
     }
   }
-  return true;
 }
 
 /** The bullet format of a resolved paragraph, as the gallery and dialog show it. */

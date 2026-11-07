@@ -174,6 +174,40 @@ test('while a budget repaints new items, each earlier node stays in its place', 
   editor.destroy();
 });
 
+test('a new key repaints the same items, each earlier node standing in until it does', async () => {
+  const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  expect((await editor.load(deck())).ok).toBe(true);
+  const opts: PaintOptions = { images: () => undefined, idPrefix: 'x' };
+  const painter = new SlidePainter(doc, opts);
+  const layout = editor.session!.layout(0)!;
+  const ids = layout.items.map((i) => i.element.nodeId);
+  const node = (id: string) => svg.querySelector(`[data-node-id="${id}"]`);
+  expect(painter.invalidate('a')).toBe(true);
+  const svg = painter.paint(layout);
+  const before = new Map(ids.map((id) => [id, node(id)]));
+  // The same key: nothing paints again.
+  expect(painter.invalidate('a')).toBe(false);
+  painter.paint(layout);
+  for (const id of ids) expect(node(id)).toBe(before.get(id)!);
+  // A new key (a converted picture): the same layout items paint again over several calls.
+  expect(painter.invalidate('b')).toBe(true);
+  painter.paint(layout, 5);
+  expect(painter.pending).toBe(true);
+  ids.forEach((id, i) => {
+    if (i < 5) expect(node(id)).not.toBe(before.get(id)!);
+    else expect(node(id)).toBe(before.get(id)!);
+  });
+  while (painter.pending) painter.paint(layout, 5);
+  for (const id of ids) expect(node(id)).not.toBe(before.get(id)!);
+  // Done: the next paint keeps every node.
+  const after = new Map(ids.map((id) => [id, node(id)]));
+  painter.paint(layout, 5);
+  expect(painter.pending).toBe(false);
+  for (const id of ids) expect(node(id)).toBe(after.get(id)!);
+  expect(normalized(svg)).toBe(normalized(paintSlide(doc, layout, opts)));
+  editor.destroy();
+});
+
 test('a stand-in is the earlier node of the same part and layer, not of a shared node id', async () => {
   const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
   expect((await editor.load(deck())).ok).toBe(true);

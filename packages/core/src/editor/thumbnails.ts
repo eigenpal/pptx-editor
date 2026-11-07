@@ -75,6 +75,8 @@ export class ThumbnailPainter {
   #layouts = new WeakMap<HTMLElement, { pkg: PptxPackage; id: string; key: string }>();
   /** The layout of each gallery container, to repaint it when its pictures convert. */
   #layoutBoxes = new Map<HTMLElement, string>();
+  /** The size of `#layoutBoxes` from which the next call drops the boxes no longer shown. */
+  #pruneAt = 64;
   /** Containers waiting for an idle repaint, with the slide index asked for last. */
   #pending = new Map<HTMLElement, number>();
   /** How many times each container was asked for: a disposer acts for the last ask only. */
@@ -162,7 +164,13 @@ export class ThumbnailPainter {
     const session = this.#host.session();
     const pkg = session?.store.package;
     if (!session || !pkg) return;
-    for (const box of this.#layoutBoxes.keys()) if (!box.isConnected) this.#layoutBoxes.delete(box);
+    // Drop detached boxes once the map doubles: a scan on each call would cost the size of the
+    // gallery each time, so painting a gallery of many layouts would grow with its square.
+    if (this.#layoutBoxes.size >= this.#pruneAt) {
+      for (const box of this.#layoutBoxes.keys())
+        if (!box.isConnected) this.#layoutBoxes.delete(box);
+      this.#pruneAt = Math.max(64, this.#layoutBoxes.size * 2);
+    }
     this.#layoutBoxes.set(container, layoutId);
     const was = this.#layouts.get(container);
     const key = session.paintKey(layoutId);
@@ -295,6 +303,8 @@ export class ThumbnailPainter {
       });
       this.#painters.set(container, painter);
     }
+    // Converted pictures, or new faces: every item paints again.
+    painter.invalidate(session.paintKey(part));
     const svg = painter.paint(lay, budget);
     if (svg.getAttribute('width') !== '100%') {
       svg.setAttribute('width', '100%');
