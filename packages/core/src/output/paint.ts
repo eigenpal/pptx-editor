@@ -910,6 +910,8 @@ export class SlidePainter {
     }
     for (const [item, painted] of this.#items) if (!next.has(item)) drop(painted);
     this.#items = next;
+    // An item an edit replaced before it painted again waits no more.
+    if (this.#stale) for (const item of this.#stale) if (!next.has(item)) this.#stale.delete(item);
     // Put the nodes in paint order, moving only the ones out of place.
     nodes.forEach((node, i) => {
       const at = content.childNodes[i] ?? null;

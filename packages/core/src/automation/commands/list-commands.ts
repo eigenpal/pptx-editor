@@ -190,11 +190,16 @@ function dropListOverrides(
   part: string,
   target: ListTarget,
   kind: ListKind
-): { pPrs: string[]; dropped: (string | undefined)[] } {
+): { pPrs: (string | undefined)[]; dropped: (string | undefined)[] } {
   const all = paragraphsOf(batch.element(part, target.txBodyId));
-  const pPrs = target.paragraphs.map((i) => ensureParagraphProps(batch, part, all[i].id));
+  // A paragraph with no `a:pPr` has no list override to drop: phase 2 adds one if it writes.
+  const pPrs = target.paragraphs.map((i) => child(all[i], 'a:pPr')?.id);
   const dropped: (string | undefined)[] = [];
   for (const pPrId of pPrs) {
+    if (pPrId === undefined) {
+      dropped.push(undefined);
+      continue;
+    }
     const pPr = batch.element(part, pPrId);
     const suppressed = !!child(pPr, 'a:buNone');
     removeBulletChildren(batch, part, pPrId);
@@ -221,36 +226,39 @@ function addList(
   target: ListTarget,
   kind: ListKind,
   resolve: boolean,
-  { pPrs, dropped }: { pPrs: string[]; dropped: (string | undefined)[] },
+  { pPrs, dropped }: { pPrs: (string | undefined)[]; dropped: (string | undefined)[] },
   inherited: readonly ResolvedParagraph[]
 ): void {
+  const all = paragraphsOf(batch.element(part, target.txBodyId));
   target.paragraphs.forEach((index, k) => {
-    const pPrId = pPrs[k];
+    // The paragraph's `a:pPr`, made at the first write: a paragraph left as it was gets none.
+    let made = pPrs[k];
+    const props = (): string => (made ??= ensureParagraphProps(batch, part, all[index].id));
     const bullet = inherited[index]?.bullet ?? null;
     if (kind === 'none') {
       if (bullet || !resolve) {
         // CT_TextParagraphProperties order: `a:buNone` after the spacing, color, and size.
-        const index = bulletIndex(batch, part, pPrId);
-        batch.insert({ op: 'insertNode', part, parent: pPrId, index, spec: aSpec('buNone') });
-        setPPrAttr(batch, part, pPrId, 'marL', '0');
-        setPPrAttr(batch, part, pPrId, 'indent', '0');
+        const index = bulletIndex(batch, part, props());
+        batch.insert({ op: 'insertNode', part, parent: props(), index, spec: aSpec('buNone') });
+        setPPrAttr(batch, part, props(), 'marL', '0');
+        setPPrAttr(batch, part, props(), 'indent', '0');
       }
       return;
     }
     const own = dropped[k];
     const at = inherited[index] && Math.round(inherited[index].marL + inherited[index].indent);
     if (bullet && own !== undefined && String(at) !== own) {
-      setPPrAttr(batch, part, pPrId, 'marL', own);
-      setPPrAttr(batch, part, pPrId, 'indent', '0');
+      setPPrAttr(batch, part, props(), 'marL', own);
+      setPPrAttr(batch, part, props(), 'indent', '0');
     }
     const wanted = kind === 'bullet' ? 'char' : 'autonum';
     if (bullet?.type === wanted) return;
-    insertBullet(batch, part, pPrId, kind);
+    insertBullet(batch, part, props(), kind);
     if (!bullet) {
       // No inherited list: an explicit hanging indent at this paragraph's level.
-      const level = levelOf(batch.element(part, pPrId));
-      setPPrAttr(batch, part, pPrId, 'marL', String(HANG + level * LEVEL_STEP));
-      setPPrAttr(batch, part, pPrId, 'indent', String(-HANG));
+      const level = levelOf(batch.element(part, props()));
+      setPPrAttr(batch, part, props(), 'marL', String(HANG + level * LEVEL_STEP));
+      setPPrAttr(batch, part, props(), 'indent', String(-HANG));
     }
   });
 }

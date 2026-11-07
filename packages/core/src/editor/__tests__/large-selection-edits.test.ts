@@ -213,7 +213,7 @@ test('Bullet Format None re-fits only the shapes whose bullets it changes', asyn
     '<a:xfrm><a:off x="914400" y="914400"/><a:ext cx="914400" cy="914400"/></a:xfrm>' +
     '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr>' +
     '<a:normAutofit fontScale="40000" lnSpcReduction="20000"/></a:bodyPr><a:lstStyle/>' +
-    '<a:p><a:pPr marL="0" indent="0"/><a:r><a:rPr lang="en-US"/><a:t>b</a:t></a:r></a:p>' +
+    '<a:p><a:r><a:rPr lang="en-US"/><a:t>b</a:t></a:r></a:p>' +
     '</p:txBody></p:sp>';
   const listed = shape({ id: 2, x: IN, y: IN, cx: IN, cy: IN, text: para(run('a'), bullet) });
   const e = await open(buildPptx({ slides: [{ shapes: listed + plain }] }));
