@@ -331,6 +331,19 @@ function withFillOrigin(
   return a === 1 && b === 0 && c === 0 && d === 1 ? { ...ctx, fillOrigin: { x: e, y: f } } : ctx;
 }
 
+/** The fill of the placeholder that a picture the paint cannot draw shows. */
+const PICTURE_PLACEHOLDER = '#e8e8e8';
+
+/** The image URL of a picture fill: its SVG image, else its bitmap. Undefined when neither resolves. */
+function pictureUrl(
+  ctx: PaintContext,
+  fill: Extract<ResolvedFill, { type: 'picture' }>
+): string | undefined {
+  return (
+    ctx.images(ctx.sourcePart, fill.svgRId ?? fill.rId) ?? ctx.images(ctx.sourcePart, fill.rId)
+  );
+}
+
 function paintGeometry(
   doc: Document,
   item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>,
@@ -347,11 +360,7 @@ function paintGeometry(
   const effects = item.geometry.paths.length <= MAX_OVERLAY_PATHS ? el.effects : undefined;
   if (item.kind === 'picture') {
     const fill = item.element.fill;
-    const url =
-      fill.type === 'picture'
-        ? (ctx.images(ctx.sourcePart, fill.svgRId ?? fill.rId) ??
-          ctx.images(ctx.sourcePart, fill.rId))
-        : undefined;
+    const url = fill.type === 'picture' ? pictureUrl(ctx, fill) : undefined;
     const d = item.geometry.paths.map(pathData).join('');
     if (url && fill.type === 'picture') {
       const image = pictureImage(doc, ctx.defs, fill, url, w, h);
@@ -376,7 +385,7 @@ function paintGeometry(
         svg(doc, 'rect', {
           width: num(w),
           height: num(h),
-          fill: '#e8e8e8',
+          fill: PICTURE_PLACEHOLDER,
           stroke: '#b0b0b0',
           'stroke-width': 9525,
         })
@@ -385,6 +394,9 @@ function paintGeometry(
       out.push(outsideOutline(doc, ctx, d, stroke, line, groupScale, w, h));
     return out;
   }
+  // A picture fill whose image does not resolve (a missing or damaged part) fills the geometry
+  // with the picture placeholder of a `p:pic`, so the shape does not disappear.
+  const lostPicture = el.fill.type === 'picture' && !pictureUrl(ctx, el.fill);
   for (const path of item.geometry.paths) {
     // Line ends and square dash caps belong to open, stroked paths only.
     const plan =
@@ -398,7 +410,11 @@ function paintGeometry(
       plan && plan.commands !== path.commands ? pathData({ ...path, commands: plan.commands }) : d;
     const extras = plan ? strokeExtras(doc, plan, stroke) : [];
     const fill =
-      path.fill === 'none' ? { paint: 'none', opacity: 1 } : paintFor(el.fill, d, path.fill);
+      path.fill === 'none'
+        ? { paint: 'none', opacity: 1 }
+        : lostPicture
+          ? { paint: PICTURE_PLACEHOLDER, opacity: 1 }
+          : paintFor(el.fill, d, path.fill);
     const overlay = fill.paint === 'none' ? null : overlayPath(doc, d, effects, paintFor);
     if (overlay) {
       // The overlay blends with this fill only (design D5 of `fill-fidelity`); the outline draws on top.

@@ -250,6 +250,8 @@ async function adopt(next: DocumentSession): Promise<void> {
   session?.dispose();
   session = next;
   faceFamilies = await registerFaces(session.faces);
+  // EMF and WMF pictures paint as their PNG, as in the editor once they have converted.
+  await session.picturesReady();
 }
 
 const api: HarnessApi = {

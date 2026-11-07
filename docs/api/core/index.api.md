@@ -1239,9 +1239,14 @@ export class DocumentSession {
         reason: 'xml';
     }>) => void) | null;
     // @internal
+    onPictures: (() => void) | null;
+    // @internal
     opening: ProgressiveOpen | null;
     // @internal
     parsedAt: number;
+    // @internal
+    picture(target: string): DrawablePicture | undefined;
+    picturesReady(): Promise<void>;
     // @internal
     probeBatch(base?: PptxPackage): OpBatch;
     // @internal

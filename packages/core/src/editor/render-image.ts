@@ -129,7 +129,7 @@ export async function renderImagePng(
   request: ImageRender
 ): Promise<Uint8Array> {
   if (typeof document === 'undefined') throw new CommandRefusal('errors.exportFailed', 'no DOM');
-  await document.fonts?.ready;
+  await Promise.all([document.fonts?.ready, session.picturesReady()]);
   const { svg, width, height } = paintPicture(session, index, request, document, () => true);
   const png = await drawPng(svg, width, height);
   return new Uint8Array(await png.arrayBuffer());
@@ -202,6 +202,7 @@ export async function renderImageWith(
 ): Promise<Uint8Array> {
   // The SVG and the fonts leave the engine for the host's rasterizer: only faces that may travel
   // go with them, as for the SVG export (`export-image.ts`).
+  await session.picturesReady();
   const { svg, width, height } = paintPicture(
     session,
     index,

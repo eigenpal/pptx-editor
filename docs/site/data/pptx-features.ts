@@ -552,10 +552,11 @@ export const pptxFeatures: PptxFeature[] = [
     name: 'EMF and WMF pictures',
     category: 'pictures',
     editing: 'none',
-    rendering: 'none',
+    rendering: 'partial',
     roundTrip: 'preserved',
     tier: 'community',
-    notes: 'A labeled placeholder shows in place of the picture.',
+    notes:
+      'The editor, image export, and PDF export draw each EMF and WMF picture as a PNG. The placeholder shows until the PNG is ready. The picture file stays unchanged.',
   },
 
   // --- Tables ----------------------------------------------------------

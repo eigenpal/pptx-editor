@@ -39,7 +39,7 @@ import {
   imageSize,
   imageSizeEmu,
 } from '../store/index.ts';
-import { partNameKey } from '@eigenpal/ooxml-core';
+import { metafileSizeEmu, partNameKey } from '@eigenpal/ooxml-core';
 import { resolveSlide } from '../cascade/index.ts';
 import {
   HARD_MAX_FONT_BYTES,
@@ -60,7 +60,7 @@ import { replicaBindingOf } from './replica-ids.ts';
 import { sameDependencies, slideDependencies } from './slide-dependencies.ts';
 import { carryFits } from '../automation/commands/table-fit.ts';
 import { refitEditedText } from './late-fit.ts';
-import { drawableImageMime } from './drawable-image.ts';
+import { MetafilePictures, type DrawablePicture } from './metafile-pictures.ts';
 import { within } from './within.ts';
 import {
   openingOrder,
@@ -500,6 +500,13 @@ export class DocumentSession {
   #bySlide = new Map<string, { readonly deps: readonly unknown[]; readonly layout: SlideLayout }>();
   #substitutions: { key: string; list: FontSubstitution[] } | null = null;
   #urls = new Map<string, string>();
+  /** EMF and WMF parts draw as PNG once converted, then `onPictures` repaints. */
+  #pictures = new MetafilePictures(
+    () => this.#faces.map((f) => f.bytes),
+    () => (this.#repaint(), this.onPictures?.())
+  );
+  /** Hears that converted pictures are ready to paint. The editor sets it. @internal */
+  onPictures: (() => void) | null = null;
   #usedPartNames = new Set<string>();
 
   /**
@@ -596,7 +603,7 @@ export class DocumentSession {
     return this.#faces;
   }
 
-  /** Bumped every time the face set changes. */
+  /** Bumped every time the face set changes or converted pictures are ready to paint. */
   get fontGeneration(): number {
     return this.#generation;
   }
@@ -685,9 +692,14 @@ export class DocumentSession {
     if (this.#fonts.fixed) carryFits(this.#measurer, built.measurer);
     this.#measurer = built.measurer;
     this.#faces = built.faces;
+    this.#substitutions = null;
+    this.#repaint();
+  }
+
+  /** New layouts and a new `fontGeneration`, so every view paints again. */
+  #repaint(): void {
     this.#layouts = new WeakMap();
     this.#bySlide.clear();
-    this.#substitutions = null;
     this.#generation += 1;
   }
 
@@ -799,35 +811,49 @@ export class DocumentSession {
     const pkg = this.store.package;
     const target = relTarget(pkg, sourcePart, rId);
     if (!target) return undefined;
-    const bytes = binaryPartOf(pkg, target);
-    // The signature decides the type: a damaged, mislabeled, or oversized picture draws the
-    // placeholder (`drawable-image.ts`).
-    const mime = bytes ? drawableImageMime(bytes, imageMime(target)) : undefined;
-    if (!mime || !bytes) return undefined;
-    const key = `${target}\u0000${bytes.length}`;
+    const picture = this.picture(target);
+    if (!picture) return undefined;
+    const key = `${target}\u0000${picture.bytes.length}`;
     const hit = this.#urls.get(key);
     if (hit) return hit;
     if (typeof URL === 'undefined' || typeof Blob === 'undefined') return undefined;
-    const url = URL.createObjectURL(new Blob([bytes.slice().buffer], { type: mime }));
+    const blob = new Blob([picture.bytes.slice().buffer], { type: picture.mime });
+    const url = URL.createObjectURL(blob);
     this.#urls.set(key, url);
     return url;
   };
 
   /**
+   * The bytes of the picture part `target` as they draw, from their signature: undefined for a
+   * damaged, mislabeled, or oversized picture (`drawable-image.ts`), which draws the
+   * placeholder. An EMF or WMF part draws as its PNG once converted. @internal
+   */
+  picture(target: string): DrawablePicture | undefined {
+    const bytes = binaryPartOf(this.store.package, target);
+    return bytes ? this.#pictures.drawable(bytes, imageMime(target)) : undefined;
+  }
+
+  /** Resolves when every EMF and WMF part converted or failed, so an export draws them. */
+  picturesReady(): Promise<void> {
+    const pkg = this.store.package;
+    return this.#pictures.convertAll([...pkg.parts.keys()].map((n) => binaryPartOf(pkg, n)));
+  }
+
+  /**
    * The natural size of an image relationship in EMU, from its header and resolution, at 72 DPI
    * when it states none: the size of a tiled picture. The stored pixels count, not a JPEG's
-   * EXIF orientation. Paint uses it for
-   * tiled pictures, and Crop > Fill and Fit for the aspect ratio. Undefined for an external
-   * target or an unreadable header.
+   * EXIF orientation. An EMF or WMF picture has the size of its frame. Paint uses it for tiled
+   * pictures, and Crop > Fill and Fit for the aspect ratio. Undefined for an external target or
+   * an unreadable header.
    */
   imageSize = (sourcePart: string, rId: string): { cx: number; cy: number } | undefined => {
     const pkg = this.store.package;
     const target = relTarget(pkg, sourcePart, rId);
     const bytes = target ? binaryPartOf(pkg, target) : undefined;
     const size = bytes ? imageSize(bytes) : null;
-    return size
-      ? imageSizeEmu({ ...size, dpiX: size.dpiX ?? TILE_DPI, dpiY: size.dpiY ?? TILE_DPI })
-      : undefined;
+    if (size)
+      return imageSizeEmu({ ...size, dpiX: size.dpiX ?? TILE_DPI, dpiY: size.dpiY ?? TILE_DPI });
+    return bytes ? metafileSizeEmu(bytes) : undefined; // An EMF or WMF picture frame.
   };
 
   /** The families whose packaged substitutes the session loads; null when it loads none. */
@@ -843,6 +869,7 @@ export class DocumentSession {
   /** Release blob URLs. */
   dispose(): void {
     this.#disposed = true;
+    this.#pictures.dispose();
     for (const url of this.#urls.values()) URL.revokeObjectURL(url);
     this.#urls.clear();
   }

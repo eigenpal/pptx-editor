@@ -44,8 +44,9 @@ import {
   circleGradientGeometry,
   gradientPaintStops,
   linearGradientEnds,
+  metafilePng,
 } from '@pptx-editor.dev/core/output';
-import { binaryPartOf, imageSize, relTarget } from '@pptx-editor.dev/core/store';
+import { binaryPartOf, imageSize, metafileFormat, relTarget } from '@pptx-editor.dev/core/store';
 import {
   clipEvenOdd,
   endPath,
@@ -406,11 +407,20 @@ async function imageFor(target: string, p: PageOps): Promise<PDFImage | null> {
   const cached = p.res.images.get(target);
   if (cached !== undefined) return cached;
   let image: PDFImage | null = null;
-  const bytes = binaryPartOf(p.res.pkg, target);
+  let bytes = binaryPartOf(p.res.pkg, target);
+  // An EMF or WMF picture draws as its PNG, converted as in the editor.
+  if (bytes && metafileFormat(bytes)) {
+    const fonts = [...p.res.faces.values()].map((f) => f.bytes);
+    bytes = (await metafilePng(bytes, fonts)) ?? bytes;
+  }
   const png = bytes ? isPng(bytes) : false;
   if (!bytes) p.diag.add('picture.missing', 'unsupported', 'A picture part is missing.');
   else if (!png && !isJpeg(bytes))
-    p.diag.add('picture.format', 'unsupported', 'Only PNG and JPEG pictures are drawn yet.');
+    p.diag.add(
+      'picture.format',
+      'unsupported',
+      'Only PNG, JPEG, EMF, and WMF pictures are drawn yet.'
+    );
   else {
     const size = imageSize(bytes);
     if (!size || size.width <= 0 || size.height <= 0)

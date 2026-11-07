@@ -12,6 +12,7 @@ import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { PNG } from 'pngjs';
 import { decodePDFRawStream, PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
 import { buildPptx, para, run, shape, solid } from '../../../../scripts/fixtures/builder.ts';
+import { emfRectangle, wmfRectangle } from '../../../../scripts/fixtures/picture-bytes.ts';
 import { apply } from '@pptx-editor.dev/core/layout';
 import { blurLayers, innerShadowOffset, layers, phi, rings } from '../paint-effects.ts';
 import { MAX_GRADIENT_STOPS } from '../paint-fill.ts';
@@ -776,6 +777,18 @@ describe('round 3 cases', () => {
       BEST
     );
     expect(codes(result)).toContain('effect.silhouette');
+  });
+
+  test('an EMF and a WMF picture draw as their PNG', async () => {
+    for (const [bytes, name, type] of [
+      [emfRectangle(), 'img.emf', 'image/x-emf'],
+      [wmfRectangle(), 'img.wmf', 'image/x-wmf'],
+    ] as const) {
+      const result = await exportPdf(pictureWith(bytes, name, type), BEST);
+      expect(codes(result)).not.toContain('picture.format');
+      const [page] = await pages(result);
+      expect(count(page.ops, OPS.paintImageXObject)).toBe(1);
+    }
   });
 
   test('a picture that is not drawn casts no shadow', async () => {

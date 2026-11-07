@@ -130,32 +130,61 @@ const STRUCTURAL_RELS = new Set<string>([
   REL.notesMaster,
 ]);
 
+/** What a structural relationship makes of its target: the main part, the deck, or notes. */
+type StructuralRole = 'main' | 'deck' | 'notes';
+
+const ROLE_RANK: Readonly<Record<StructuralRole, number>> = { notes: 1, deck: 2, main: 3 };
+
+/** Content types of the notes parts: neither shows a slide. */
+const NOTES_TYPES = new Set([`${PML}notesSlide+xml`, `${PML}notesMaster+xml`].map(asciiFold));
+/** Content types of the masters whose theme shows no slide. */
+const NOTES_MASTER_TYPES = new Set(
+  [`${PML}notesMaster+xml`, `${PML}handoutMaster+xml`].map(asciiFold)
+);
+
+/** Whether the content type of `partName` is one of `set`. */
+function typeIn(types: ContentTypeIndex, partName: string, set: ReadonlySet<string>): boolean {
+  const type = lookupContentType(types, partName);
+  return type !== undefined && set.has(asciiFold(type.trim()));
+}
+
 /**
- * The parts a structural relationship points to. A part's role follows what points to it as
- * well as its content type: a slide with a generic content type is still a slide, and a part
- * of a required type that no structural relationship reaches never refuses the deck.
+ * The parts a structural relationship points to, with the role it gives them. A part's role
+ * follows what points to it as well as its content type: a slide with a generic content type is
+ * still a slide, and a part of a required type that no structural relationship reaches never
+ * refuses the deck.
  *
- * Keys are folded part names (`partNameKey`), as OPC part names compare. A part that several
- * relationships reach keeps the strongest type: the main part first, notes last.
+ * Notes are not needed to show the slides. A part is notes when a notes relationship reaches it,
+ * when its content type is a notes type (so another relationship that names it, such as a
+ * hostile slide relationship, does not make a damaged notes part refuse the deck), or when it is
+ * the theme of a notes master or a handout master. Keys are folded part names (`partNameKey`),
+ * as OPC part names compare. A part that several relationships reach keeps the strongest role:
+ * the main part first, notes last.
  */
-function structuralTargets(rels: ReadonlyMap<string, PackagePart>): Map<string, string> {
+function structuralTargets(
+  rels: ReadonlyMap<string, PackagePart>,
+  types: ContentTypeIndex
+): Map<string, StructuralRole> {
   const pkg: PptxPackage = { parts: rels };
-  const out = new Map<string, string>();
-  const rank = (type: string | undefined): number =>
-    type === undefined
-      ? 0
-      : type === REL.officeDocument
-        ? 3
-        : type === REL.notesSlide || type === REL.notesMaster
-          ? 1
-          : 2;
+  const out = new Map<string, StructuralRole>();
   for (const name of rels.keys()) {
     const source = relsSource(name);
     if (source === undefined) continue;
+    const notesMaster = source !== '/' && typeIn(types, source, NOTES_MASTER_TYPES);
     for (const rel of relationshipsOf(pkg, source)) {
       if (rel.target === undefined || !STRUCTURAL_RELS.has(rel.type)) continue;
       const key = partNameKey(rel.target);
-      if (rank(rel.type) > rank(out.get(key))) out.set(key, rel.type);
+      const role: StructuralRole =
+        rel.type === REL.officeDocument
+          ? 'main'
+          : rel.type === REL.notesSlide ||
+              rel.type === REL.notesMaster ||
+              (rel.type === REL.theme && notesMaster) ||
+              typeIn(types, rel.target, NOTES_TYPES)
+            ? 'notes'
+            : 'deck';
+      const was = out.get(key);
+      if (!was || ROLE_RANK[role] > ROLE_RANK[was]) out.set(key, role);
     }
   }
   return out;
@@ -164,7 +193,7 @@ function structuralTargets(rels: ReadonlyMap<string, PackagePart>): Map<string, 
 function partRole(
   partName: string,
   types: ContentTypeIndex,
-  structural: ReadonlyMap<string, string>
+  structural: ReadonlyMap<string, StructuralRole>
 ): PartRole {
   if (partName === CONTENT_TYPES_PART) return 'required';
   if (asciiFold(partName).endsWith('.rels')) {
@@ -174,7 +203,7 @@ function partRole(
     if (source === undefined) return 'optional';
     // Those of the main part must parse too. Damaged relationships of a slide, a layout, or a
     // master stay as bytes: that part draws without them, and the deck still opens.
-    return structural.get(partNameKey(source)) === REL.officeDocument ? 'required' : 'optional';
+    return structural.get(partNameKey(source)) === 'main' ? 'required' : 'optional';
   }
   const contentType = lookupContentType(types, partName);
   const role = roleByType(partName, contentType);
@@ -187,7 +216,7 @@ function partRole(
   // parses, and stays as bytes when it does not.
   if (!xml) return asciiFold(partName).endsWith('.xml') ? 'optional' : role;
   // Speaker notes are not needed to show the slides: a damaged notes part stays as bytes.
-  if (via === REL.notesSlide || via === REL.notesMaster) return 'optional';
+  if (via === 'notes') return 'optional';
   return 'required';
 }
 
@@ -266,7 +295,7 @@ export function readPptxDeferred(
     relsTrees.set(partName, tree);
     if (tree.ok) rels.set(partName, { kind: 'xml', partName, xml: tree.part });
   }
-  const structural = structuralTargets(rels);
+  const structural = structuralTargets(rels, types);
   const parts = new Map<string, PackagePart>();
   for (const [partName, data] of zip.entries) {
     const role = partRole(partName, types, structural);

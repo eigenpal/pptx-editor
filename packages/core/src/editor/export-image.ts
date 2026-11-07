@@ -10,11 +10,10 @@
 //   editable. Other faces (preview-and-print deck fonts, host and local fonts) are referenced
 //   by family name, so a viewer with the font installed shows it.
 
-import { binaryPartOf, fontEmbeddingPermission, relTarget, writeZip } from '../store/index.ts';
+import { fontEmbeddingPermission, relTarget, writeZip } from '../store/index.ts';
 import { elementsWithAttribute, paintSlide } from '../output/index.ts';
 import type { RegisteredFace, SlideLayout } from '../layout/index.ts';
-import { imageMime, type DocumentSession } from './document-session.ts';
-import { drawableImageMime } from './drawable-image.ts';
+import type { DocumentSession } from './document-session.ts';
 import { toBase64 } from '../automation/commands/base64.ts';
 import { CommandRefusal } from '../automation/commands/op-batch.ts';
 import { uniquePrefix } from './paint-ids.ts';
@@ -126,11 +125,10 @@ export function paintLayout(
       const target = relTarget(pkg, source, rId);
       if (!target) return undefined;
       if (!pictures.has(target)) {
-        // The same check as the editor's paint: a damaged or oversized picture exports as
-        // the placeholder.
-        const bytes = binaryPartOf(pkg, target);
-        const mime = bytes ? drawableImageMime(bytes, imageMime(target)) : undefined;
-        pictures.set(target, mime && bytes ? `data:${mime};base64,${toBase64(bytes)}` : undefined);
+        // The same pictures as the editor's paint: a damaged or oversized picture, and a
+        // metafile that has not converted, export as the placeholder.
+        const pic = session.picture(target);
+        pictures.set(target, pic ? `data:${pic.mime};base64,${toBase64(pic.bytes)}` : undefined);
       }
       return pictures.get(target);
     },
@@ -161,7 +159,11 @@ export function paintLayout(
   return svg;
 }
 
-/** Slide `index` as a standalone SVG document. See the file comment for the fonts it holds. @public */
+/**
+ * Slide `index` as a standalone SVG document. See the file comment for the fonts it holds. An
+ * EMF or WMF picture exports as the placeholder until it has converted: await
+ * `session.picturesReady()` first. @public
+ */
 export function exportSlideSvg(
   session: DocumentSession,
   index: number,
@@ -198,7 +200,7 @@ export async function exportSlidePng(
   index: number,
   options: SlideImageOptions = {}
 ): Promise<Blob> {
-  await document.fonts?.ready;
+  await Promise.all([document.fonts?.ready, session.picturesReady()]);
   const { svg, width, height } = paintAlone(session, index, options, () => true);
   return drawPng(svg, width, height);
 }

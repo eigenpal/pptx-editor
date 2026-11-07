@@ -79,6 +79,10 @@ export function createOpeningLane(editor: OpeningEditor) {
     start(owner: DocumentSession): void {
       // A slide that does not parse, wherever it is read, refuses the deck at once.
       owner.onDamage = (rejection) => refuse(owner, rejection);
+      // An EMF or WMF picture that finished converting paints in place of its placeholder.
+      owner.onPictures = () => {
+        if (editor.session() === owner) editor.emit();
+      };
       if (owner.damage) refuse(owner, owner.damage);
       const open = owner.opening;
       if (!open) return;
