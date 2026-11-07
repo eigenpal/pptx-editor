@@ -25,6 +25,7 @@ import {
   slotsOf,
   splitParagraph,
 } from '../automation/commands/text-model.ts';
+import { cleanText } from '../automation/commands/text-units.ts';
 import { sanitizeNode } from './clipboard.ts';
 import type { RichParagraph, RichRun } from './clipboard-rich.ts';
 import type { CommandContext, CommandEffect } from './commands.ts';
@@ -57,6 +58,9 @@ const DROPPED = new Set([
   'extLst',
 ]);
 
+/** Text that XML 1.0 can hold: a control character, such as a NUL at the end of HTML, goes. */
+const xmlText = (text: string): string => cleanText(text).replace(/[\n\u000B]/g, ' ');
+
 /**
  * A checked node without links, relationships, or pictures: only DrawingML elements and
  * unqualified attributes, and text only in `a:t`.
@@ -65,12 +69,14 @@ function stripped(spec: NodeSpec): NodeSpec {
   return {
     ...spec,
     prefix: 'a',
-    attrs: (spec.attrs ?? []).filter((x) => x.ns === ''),
+    attrs: (spec.attrs ?? [])
+      .filter((x) => x.ns === '')
+      .map((x) => ({ ...x, value: xmlText(x.value) })),
     nsDecls: [],
     children: (spec.children ?? []).flatMap((c): (NodeSpec | { readonly text: string })[] =>
       'text' in c
         ? spec.local === 't'
-          ? [c]
+          ? [{ text: xmlText(c.text) }]
           : []
         : c.ns !== NS.a || DROPPED.has(c.local)
           ? []
@@ -261,13 +267,18 @@ export function pasteParagraphs(
   const n = slideNumberOf(batch, part);
   // The text after the caret moves to a paragraph of its own; it joins the last pasted one.
   splitParagraph(batch, part, txBodyId, at);
-  const first = paragraphsOf(batch.element(part, txBodyId))[at.paragraph]!;
+  const split = paragraphsOf(batch.element(part, txBodyId));
+  const first = split[at.paragraph]!;
   const firstPPr = child(first, 'a:pPr');
-  // A paste into an empty paragraph takes the first pasted paragraph's properties.
+  // A paste into an empty paragraph takes the first pasted paragraph's properties, and so does
+  // one at the start of a paragraph when more paragraphs follow. One pasted paragraph that joins
+  // the text after the caret keeps that text's paragraph properties.
   const sourcePPr = (specs[0]?.children ?? []).find(
     (c): c is NodeSpec => !('text' in c) && c.local === 'pPr'
   );
-  if (at.offset === 0 && paragraphLength(first, n) === 0 && sourcePPr) {
+  const after = split[at.paragraph + 1];
+  const tailEmpty = !after || paragraphLength(after, n) === 0;
+  if (paragraphLength(first, n) === 0 && (tailEmpty || specs.length > 1) && sourcePPr) {
     if (firstPPr) batch.push({ op: 'removeNode', part, node: firstPPr.id });
     batch.insert({ op: 'insertNode', part, parent: first.id, index: 0, spec: sourcePPr });
   }

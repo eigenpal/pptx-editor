@@ -489,12 +489,17 @@ interface Open {
   readonly block: boolean;
 }
 
+/** Control characters other than tab, line feed, and carriage return. */
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g;
+
 /**
  * Read clipboard HTML into paragraphs of formatted runs. Null when it holds no text. The HTML is
  * untrusted: it is cut at `MAX_HTML_CHARS`, and the paragraph and run counts are bounded.
  */
 export function richFromHtml(html: string): RichParagraph[] | null {
-  const source = fragmentOf(html.length > MAX_HTML_CHARS ? html.slice(0, MAX_HTML_CHARS) : html);
+  const cut = html.length > MAX_HTML_CHARS ? html.slice(0, MAX_HTML_CHARS) : html;
+  // Control characters are not text: some applications end their HTML with a NUL.
+  const source = fragmentOf(cut.replace(CONTROL, ''));
   const paragraphs: (RichParagraph & { fromList?: boolean })[] = [];
   let runs: RichRun[] = [];
   let para: {

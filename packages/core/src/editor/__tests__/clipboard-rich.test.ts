@@ -325,6 +325,23 @@ describe('the pasteText command', () => {
     expect(texts(shapes(e)[0]!)).toEqual(['Bye world', 'Second']);
   });
 
+  test('one paragraph at the start of text keeps that paragraph; an empty one takes its own', async () => {
+    const centered = paragraphSpecs([{ runs: [{ text: 'Bye ' }], align: 'ctr' }]);
+    const algn = (e: PptxEditorInstance) =>
+      attr(child(children(child(shapes(e)[0]!, 'p:txBody'), 'a:p')[0]!, 'a:pPr'), 'algn');
+    const e = await open();
+    caret(e, 0, 0);
+    expect(e.exec({ type: 'pasteText', paragraphs: centered }).ok).toBe(true);
+    expect(texts(shapes(e)[0]!)).toEqual(['Bye Hello world', 'Second']);
+    expect(algn(e)).toBeUndefined();
+    // The whole paragraph replaced: it takes the pasted paragraph's properties.
+    const f = await open();
+    caret(f, 0, 0, { paragraph: 0, offset: 11 });
+    expect(f.exec({ type: 'pasteText', paragraphs: centered }).ok).toBe(true);
+    expect(texts(shapes(f)[0]!)).toEqual(['Bye ', 'Second']);
+    expect(algn(f)).toBe('ctr');
+  });
+
   test('with shapes selected: a new text box holds the text, selected', async () => {
     const e = await open();
     e.setSelection({ kind: 'shapes', nodeIds: [shapes(e)[1]!.id] });
@@ -333,6 +350,19 @@ describe('the pasteText command', () => {
     expect(texts(box)).toEqual(['One', 'Two', 'Three']);
     expect(attr(child(find(box, 'p:nvSpPr')!, 'p:cNvSpPr'), 'txBox')).toBe('1');
     expect(e.snapshot().selection).toEqual({ kind: 'shapes', nodeIds: [box.id] });
+  });
+
+  test('characters XML cannot hold leave pasted text, so the paste goes in', async () => {
+    const e = await open();
+    caret(e, 1, 6);
+    // HTML from another application can end in a NUL; text can hold other control characters.
+    const html = paragraphSpecs(richFromHtml('<p>a&#xFFFE;b\u0001c</p>\u0000')!);
+    expect(e.exec({ type: 'pasteText', paragraphs: html }).ok).toBe(true);
+    const plain = paragraphSpecs(richFromText('x\u0002y\uFFFF'));
+    expect(e.exec({ type: 'pasteText', paragraphs: plain }).ok).toBe(true);
+    expect(texts(shapes(e)[0]!)).toEqual(['Hello world', 'Secondabcxy']);
+    const again = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    expect((await again.load(e.save()!)).ok).toBe(true);
   });
 
   test('refuses what is not paragraphs', async () => {
@@ -460,5 +490,21 @@ describe('the clipboard host', () => {
     const file = e.save()!;
     expect(e.exec({ type: 'pasteSlides', file, slides: [3] })).toMatchObject({ ok: false });
     expect(readSlidesClipboard('{"version":1,"slides":[-1],"file":"AA=="}')).toBeNull();
+  });
+
+  test('a slide copy of a deck that does not save refuses, and does not throw', async () => {
+    const e = await open();
+    const refused: string[] = [];
+    const editor = {
+      session: () => e.session,
+      selectedSlides: () => [0],
+      refuse: (r: string) => void refused.push(r),
+    } as unknown as ClipboardEditor;
+    const damaged = createClipboardHost(editor);
+    e.session!.damage = { reason: 'xml', partName: '/ppt/slides/slide1.xml' } as never;
+    const data: Record<string, string> = {};
+    expect(damaged.copyTo(transfer(data), false, true)).toBe(true);
+    expect(refused).toEqual(['errors.clipboard']);
+    expect(data).toEqual({});
   });
 });
