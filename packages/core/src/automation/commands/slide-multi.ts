@@ -4,7 +4,7 @@
 
 import { path, presentationInfo, xmlPartOf } from '../../store/index.ts';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
-import { deleteSlide, duplicateSlide } from './slide-commands.ts';
+import { deleteSlidesAt, duplicateSlidesAt } from './slide-commands.ts';
 import { blockIsInSection, placeBlock } from './slide-structure.ts';
 
 /** The selected slides as distinct indices in ascending order. Refuses an empty or bad set. */
@@ -43,26 +43,15 @@ export function deleteSlides(batch: OpBatch, indices: readonly number[]): number
   const selected = slideIndices(batch, indices);
   const count = presentationInfo(batch.pkg).slides.length;
   if (selected.length >= count) throw new CommandRefusal('disabled.lastSlide');
-  for (const index of [...selected].reverse()) deleteSlide(batch, index);
+  deleteSlidesAt(batch, [...selected].reverse());
   return Math.min(selected[0], count - selected.length - 1);
 }
 
 /** Duplicate the selected slides. The copies follow the last selected slide, in order. */
 export function duplicateSlides(batch: OpBatch, indices: readonly number[]): number[] {
   const selected = slideIndices(batch, indices);
-  const originals = selected.map((i) => presentationInfo(batch.pkg).slides[i].nodeId);
-  const copies: string[] = [];
-  for (const nodeId of originals) {
-    const index = presentationInfo(batch.pkg).slides.findIndex((s) => s.nodeId === nodeId);
-    const at = duplicateSlide(batch, index);
-    copies.push(presentationInfo(batch.pkg).slides[at].nodeId);
-  }
-  const rest = presentationInfo(batch.pkg)
-    .slides.map((s) => s.nodeId)
-    .filter((id) => !copies.includes(id));
-  const start = rest.indexOf(originals[originals.length - 1]) + 1;
-  reorderSlides(batch, [...rest.slice(0, start), ...copies, ...rest.slice(start)]);
-  placeBlock(batch, copies);
+  const copies = duplicateSlidesAt(batch, selected);
+  const start = selected[selected.length - 1]! + 1;
   return copies.map((_, i) => start + i);
 }
 

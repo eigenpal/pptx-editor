@@ -20,6 +20,7 @@ import {
   xmlPartOf,
   type Element,
   type PptxPackage,
+  type PresentationInfo,
   type SlideRef,
 } from '../../store/index.ts';
 import { partNameKey } from '@eigenpal/ooxml-core';
@@ -27,9 +28,11 @@ import { CommandRefusal, type OpBatch } from './op-batch.ts';
 import {
   addOverride,
   addRelationship,
+  addRelationships,
   freePartName,
-  removeOverride,
-  removeRelationship,
+  partNamer,
+  removeOverrides,
+  removeRelationships,
   stripedIds,
   unsignedIntId,
   xmlAttr,
@@ -38,8 +41,9 @@ import {
 import { addImagePart, specFromXml } from './shape-commands.ts';
 import {
   blockIsInSection,
-  dropFromSections,
-  freshCreationId,
+  dropSlidesFromSections,
+  creationIdsOf,
+  freshCreationIdAmong,
   ownedParts,
   PartCopier,
   placeBlock,
@@ -67,13 +71,13 @@ export function slideRef(pkg: PptxPackage, index: number): SlideRef {
 }
 
 /**
- * A slide id no slide uses. In a collaboration session, the first free id of the actor's
+ * Slide ids that no slide uses, one for each call. In a collaboration session, the free ids of the actor's
  * stripe, so two peers that add a slide at once do not share one. Otherwise one above the
  * largest, so the id of a deleted slide does not come back and an old reference to it (an
  * automation handle) cannot reach the new slide; when the largest id is at the top of the
  * range, the smallest free id. Refuses when the range is full.
  */
-function freeSlideId(list: Element, batch: OpBatch): number {
+function freeSlideIds(list: Element, batch: OpBatch): () => number {
   const used = new Set<number>();
   let max = MIN_SLIDE_ID - 1;
   for (const s of elements(list)) {
@@ -90,11 +94,20 @@ function freeSlideId(list: Element, batch: OpBatch): number {
       MIN_SLIDE_ID,
       MAX_SLIDE_ID,
       batch.mintedOf('slideId')
-    )();
+    );
   }
-  if (max < MAX_SLIDE_ID) return max + 1;
-  for (let id = MIN_SLIDE_ID; id <= MAX_SLIDE_ID; id += 1) if (!used.has(id)) return id;
-  throw new CommandRefusal('errors.tooLarge');
+  let low = MIN_SLIDE_ID;
+  return () => {
+    let id: number;
+    if (max < MAX_SLIDE_ID) id = ++max;
+    else {
+      while (low <= MAX_SLIDE_ID && used.has(low)) low += 1;
+      if (low > MAX_SLIDE_ID) throw new CommandRefusal('errors.tooLarge');
+      id = low;
+    }
+    used.add(id);
+    return id;
+  };
 }
 
 /** `CT_Presentation` children that come after `p:sldIdLst` (ECMA-376 Part 1, §19.2.1.26). */
@@ -138,34 +151,51 @@ function slideIdList(batch: OpBatch): Element | undefined {
  * Returns the new slide id.
  */
 export function registerSlide(batch: OpBatch, partName: string, position: number): string {
+  const presentation = presentationInfo(batch.pkg).presentationPart;
+  const [nodeId] = registerSlides(batch, [partName], position);
+  return attr(batch.element(presentation, nodeId!), 'id') ?? '';
+}
+
+/**
+ * Insert a `p:sldId` for each new slide part, in order, at `position` (a count of the deck's
+ * slides), and relate each to the presentation. The relationship ids and the slide ids are
+ * chosen in one pass over the presentation. Returns the node ids of the new entries.
+ */
+export function registerSlides(
+  batch: OpBatch,
+  partNames: readonly string[],
+  position: number
+): string[] {
   const info = presentationInfo(batch.pkg);
   const presentation = info.presentationPart;
-  const rId = addRelationship(batch, presentation, REL.slide, partName);
-  addOverride(batch, partName, CONTENT_TYPE.slide);
+  const rIds = addRelationships(batch, presentation, REL.slide, partNames);
+  for (const part of partNames) addOverride(batch, part, CONTENT_TYPE.slide);
   const list = path(xmlPartOf(batch.pkg, presentation)?.root, 'p:sldIdLst') ?? slideIdList(batch);
   if (!list) throw new CommandRefusal('errors.malformed');
-  const id = String(freeSlideId(list, batch));
+  const nextId = freeSlideIds(list, batch);
   // `position` counts the deck's slides. `p:sldIdLst` can also hold an entry that names no
   // slide after concurrent edits, so the new entry goes before the entry of the slide at `position`.
   const entries = elements(list);
   const before = info.slides[position]?.nodeId;
   const at = before === undefined ? -1 : entries.findIndex((e) => e.id === before);
-  batch.push({
-    op: 'insertNode',
-    part: presentation,
-    parent: list.id,
-    index: at >= 0 ? at : entries.length,
-    spec: {
-      ns: NS.p,
-      local: 'sldId',
-      prefix: 'p',
-      attrs: [
-        { ns: '', local: 'id', value: id },
-        { ns: NS.r, local: 'id', prefix: 'r', value: rId },
-      ],
-    },
-  });
-  return id;
+  const index = at >= 0 ? at : entries.length;
+  return partNames.map((_, i) =>
+    batch.insert({
+      op: 'insertNode',
+      part: presentation,
+      parent: list.id,
+      index: index + i,
+      spec: {
+        ns: NS.p,
+        local: 'sldId',
+        prefix: 'p',
+        attrs: [
+          { ns: '', local: 'id', value: String(nextId()) },
+          { ns: NS.r, local: 'id', prefix: 'r', value: rIds[i]! },
+        ],
+      },
+    })
+  );
 }
 
 /** Footer placeholders: a new slide gets them only through Header and Footer. */
@@ -226,24 +256,29 @@ export function addSlide(batch: OpBatch, after: number, layoutPart?: string): nu
   return after + 1;
 }
 
+/** What the copies of one command share: the deck before them, their names, their ids. */
+interface CopyRun {
+  readonly info: PresentationInfo;
+  /** A free part name for `prefix<n>suffix`. */
+  readonly name: (prefix: string, suffix: string) => string;
+  /** The `p14:creationId` values in use. */
+  readonly creationIds: Set<number>;
+}
+
 /**
- * Duplicate slide `index` (and its notes) right after it, in the same section. The copy gets
- * its own comments, charts, diagrams, and embedded objects, so editing one slide never
- * changes the other; pictures, media, and the layout stay shared. A slide holding parts the
- * engine cannot copy (threaded comments, embedded controls) is refused.
+ * Copy the parts of slide `ref` (the slide, its notes, and the parts it owns) under new names,
+ * with no entry in the slide list yet. Returns the new slide part.
  */
-export function duplicateSlide(batch: OpBatch, index: number): number {
-  const info = presentationInfo(batch.pkg);
-  const ref = slideRef(batch.pkg, index);
-  const partName = freePartName(batch, '/ppt/slides/slide', '.xml');
+function copySlideParts(batch: OpBatch, ref: SlideRef, run: CopyRun): string {
+  const partName = run.name('/ppt/slides/slide', '.xml');
   const sourceXml = xmlPartOf(batch.pkg, ref.partName);
   if (!sourceXml) throw new CommandRefusal('errors.malformed');
   batch.push({ op: 'addPart', part: partName, xml: serializeXmlPart(sourceXml) });
   writeCopiedTableMarkers(batch, partName);
   let notesName: string | undefined;
   if (ref.notesPart && xmlPartOf(batch.pkg, ref.notesPart))
-    notesName = freePartName(batch, '/ppt/notesSlides/notesSlide', '.xml');
-  const copier = new PartCopier(batch, info.presentationPart);
+    notesName = run.name('/ppt/notesSlides/notesSlide', '.xml');
+  const copier = new PartCopier(batch, run.info.presentationPart);
   batch.push({
     op: 'addPart',
     part: relsPartName(partName),
@@ -267,14 +302,53 @@ export function duplicateSlide(batch: OpBatch, index: number): number {
     addOverride(batch, notesName, CONTENT_TYPE.notesSlide);
   }
   copier.finish();
-  freshCreationId(
-    batch,
-    partName,
-    info.slides.map((s) => s.partName)
-  );
+  freshCreationIdAmong(batch, partName, run.creationIds);
+  return partName;
+}
+
+/**
+ * Duplicate slide `index` (and its notes) right after it, in the same section. The copy gets
+ * its own comments, charts, diagrams, and embedded objects, so editing one slide never
+ * changes the other; pictures, media, and the layout stay shared. A slide holding parts the
+ * engine cannot copy (threaded comments, embedded controls) is refused.
+ */
+export function duplicateSlide(batch: OpBatch, index: number): number {
+  const info = presentationInfo(batch.pkg);
+  const ref = slideRef(batch.pkg, index);
+  const partName = copySlideParts(batch, ref, {
+    info,
+    name: (prefix, suffix) => freePartName(batch, prefix, suffix),
+    creationIds: creationIdsOf(
+      batch,
+      info.slides.map((s) => s.partName)
+    ),
+  });
   const id = registerSlide(batch, partName, index + 1);
   placeInSection(batch, info.presentationPart, id, ref.sldId, 'after');
   return index + 1;
+}
+
+/**
+ * Duplicate the slides at `indices` (ascending), as `duplicateSlide` copies each one, and put
+ * the copies in order right after the last of them, in its section. The deck is read once and
+ * the slide list written once for all the copies, so a copy of every slide of a long deck
+ * costs what it copies. Returns the `p:sldId` node ids of the copies, in order.
+ */
+export function duplicateSlidesAt(batch: OpBatch, indices: readonly number[]): string[] {
+  const info = presentationInfo(batch.pkg);
+  const refs = indices.map((i) => slideRef(batch.pkg, i));
+  const run: CopyRun = {
+    info,
+    name: partNamer(batch),
+    creationIds: creationIdsOf(
+      batch,
+      info.slides.map((s) => s.partName)
+    ),
+  };
+  const parts = refs.map((ref) => copySlideParts(batch, ref, run));
+  const copies = registerSlides(batch, parts, indices[indices.length - 1]! + 1);
+  placeBlock(batch, copies);
+  return copies;
 }
 
 /** Elements that reference a relationship by id: hyperlink actions and custom show entries. */
@@ -301,6 +375,7 @@ function dropReferences(batch: OpBatch, removed: ReadonlySet<string>, presentati
   for (const source of [...batch.pkg.parts.keys()]) {
     if (removed.has(partNameKey(source)) || source.endsWith('.rels')) continue;
     const xml = xmlPartOf(batch.pkg, source);
+    const dropped: string[] = [];
     for (const rel of relationshipsOf(batch.pkg, source)) {
       if (rel.external || !rel.target || !removed.has(partNameKey(rel.target))) continue;
       const users = xml ? referencesTo(xml.root, rel.id) : [];
@@ -311,8 +386,9 @@ function dropReferences(batch: OpBatch, removed: ReadonlySet<string>, presentati
       );
       if (!known) continue;
       for (const u of users) batch.push({ op: 'removeNode', part: source, node: u.id });
-      removeRelationship(batch, source, rel.id);
+      dropped.push(rel.id);
     }
+    if (dropped.length) removeRelationships(batch, source, dropped);
   }
 }
 
@@ -322,24 +398,40 @@ function dropReferences(batch: OpBatch, removed: ReadonlySet<string>, presentati
  * stays.
  */
 export function deleteSlide(batch: OpBatch, index: number): void {
+  deleteSlidesAt(batch, [index]);
+}
+
+/**
+ * Delete the slides at `indices` (distinct), as `deleteSlide` deletes each one. Each pass over
+ * the package (references, content types, orphans) runs once for all of them, so deleting most
+ * slides of a long deck costs one pass, not one for each slide. At least one slide stays.
+ */
+export function deleteSlidesAt(batch: OpBatch, indices: readonly number[]): void {
   const info = presentationInfo(batch.pkg);
-  if (info.slides.length <= 1) throw new CommandRefusal('disabled.lastSlide');
-  const ref = slideRef(batch.pkg, index);
-  batch.push({ op: 'removeNode', part: info.presentationPart, node: ref.nodeId });
-  if (ref.sldId) dropFromSections(batch, info.presentationPart, ref.sldId);
-  const parts = [ref.partName, ref.notesPart].filter(
-    (p): p is string => !!p && batch.pkg.parts.has(p)
-  );
+  if (info.slides.length - new Set(indices).size < 1)
+    throw new CommandRefusal('disabled.lastSlide');
+  const refs = indices.map((i) => slideRef(batch.pkg, i));
+  for (const ref of refs)
+    batch.push({ op: 'removeNode', part: info.presentationPart, node: ref.nodeId });
+  const sldIds = refs.map((r) => r.sldId).filter((id) => id !== '');
+  if (sldIds.length) dropSlidesFromSections(batch, info.presentationPart, sldIds);
+  const parts = refs
+    .flatMap((ref) => [ref.partName, ref.notesPart])
+    .filter((p): p is string => !!p && batch.pkg.parts.has(p));
   const owned = ownedParts(batch.pkg, parts);
   // Custom shows name the slide through the presentation's relationship, so it goes last.
   dropReferences(batch, new Set(parts.map(partNameKey)), info.presentationPart);
-  removeRelationship(batch, info.presentationPart, ref.rId);
+  removeRelationships(
+    batch,
+    info.presentationPart,
+    refs.map((r) => r.rId)
+  );
   for (const part of parts) {
     batch.push({ op: 'removePart', part });
     if (batch.pkg.parts.has(relsPartName(part)))
       batch.push({ op: 'removePart', part: relsPartName(part) });
-    removeOverride(batch, part);
   }
+  removeOverrides(batch, parts);
   removeOrphans(batch, owned);
 }
 

@@ -30,7 +30,7 @@ import {
   MAX_MINTED_ID,
   MAX_UNSIGNED_INT,
   relativeTarget,
-  removeOverride,
+  removeOverrides,
   stripedIds,
   unsignedIntId,
   xmlAttr,
@@ -456,11 +456,12 @@ export function freshCreationIdAmong(
 /** Internal parts reachable from `roots` through non-structural relationships. */
 export function ownedParts(pkg: PptxPackage, roots: readonly string[]): Set<string> {
   const out = new Set<string>();
+  const rootSet = new Set(roots);
   const visit = (source: string, depth: number): void => {
     if (depth > MAX_DEPTH) return;
     for (const rel of relationshipsOf(pkg, source)) {
       if (rel.external || !rel.target || STRUCTURAL.has(rel.type)) continue;
-      if (out.has(rel.target) || roots.includes(rel.target) || out.size >= MAX_PARTS) continue;
+      if (out.has(rel.target) || rootSet.has(rel.target) || out.size >= MAX_PARTS) continue;
       out.add(rel.target);
       visit(rel.target, depth + 1);
     }
@@ -498,8 +499,8 @@ export function removeOrphans(batch: OpBatch, candidates: ReadonlySet<string>): 
       batch.push({ op: 'removePart', part });
       if (batch.pkg.parts.has(relsPartName(part)))
         batch.push({ op: 'removePart', part: relsPartName(part) });
-      removeOverride(batch, part);
     }
+    removeOverrides(batch, orphans);
   }
 }
 
@@ -529,8 +530,19 @@ const namesSlide = (entry: Element, sldId: string): boolean =>
 
 /** Remove a slide id from the section list (`p14:sectionLst`). */
 export function dropFromSections(batch: OpBatch, presentation: string, sldId: string): void {
+  dropSlidesFromSections(batch, presentation, [sldId]);
+}
+
+/** Remove slide ids from the section list, in one walk of it. */
+export function dropSlidesFromSections(
+  batch: OpBatch,
+  presentation: string,
+  sldIds: readonly string[]
+): void {
+  const gone = new Set(sldIds.map(canonicalSlideId));
   for (const el of sections(batch, presentation).ids)
-    if (namesSlide(el, sldId)) batch.push({ op: 'removeNode', part: presentation, node: el.id });
+    if (gone.has(canonicalSlideId(attr(el, 'id') ?? '')))
+      batch.push({ op: 'removeNode', part: presentation, node: el.id });
 }
 
 /**
@@ -551,7 +563,21 @@ export function placeInSection(
   neighbour: string,
   where: 'after' | 'before'
 ): void {
-  dropFromSections(batch, presentation, sldId);
+  placeRunInSection(batch, presentation, [sldId], neighbour, where);
+}
+
+/**
+ * Put slide ids, in order, into the section of `neighbour`, right after or before it, as
+ * `placeInSection` puts each one after the one before it. The section list is read once.
+ */
+function placeRunInSection(
+  batch: OpBatch,
+  presentation: string,
+  run: readonly string[],
+  neighbour: string,
+  where: 'after' | 'before'
+): void {
+  dropSlidesFromSections(batch, presentation, run);
   const { ids, lists } = sections(batch, presentation);
   if (lists.length === 0) return;
   const anchor = ids.find((el) => namesSlide(el, neighbour));
@@ -565,18 +591,20 @@ export function placeInSection(
     list = where === 'after' ? lists[lists.length - 1] : lists[0];
     index = where === 'after' ? list.children.length : 0;
   }
-  batch.push({
-    op: 'insertNode',
-    part: presentation,
-    parent: list.id,
-    index,
-    spec: {
-      ns: NS.p14,
-      local: 'sldId',
-      ...(list.prefix ? { prefix: list.prefix } : {}),
-      attrs: [{ ns: '', local: 'id', value: sldId }],
-    },
-  });
+  run.forEach((sldId, i) =>
+    batch.push({
+      op: 'insertNode',
+      part: presentation,
+      parent: list.id,
+      index: index + i,
+      spec: {
+        ns: NS.p14,
+        local: 'sldId',
+        ...(list.prefix ? { prefix: list.prefix } : {}),
+        attrs: [{ ns: '', local: 'id', value: sldId }],
+      },
+    })
+  );
 }
 
 /**
@@ -600,6 +628,10 @@ export function placeBlockInSection(
   const { lists } = sections(batch, presentation);
   if (section === undefined || lists.length === 0) {
     if (section !== undefined) throw new CommandRefusal('errors.unsupported', 'section');
+    // A deck without sections has nothing to place.
+    if (lists.length === 0) return;
+    if (before) return placeRunInSection(batch, presentation, block, before, 'after');
+    if (after) return placeRunInSection(batch, presentation, block, after, 'before');
     block.forEach((sldId, i) => {
       if (i > 0) placeInSection(batch, presentation, sldId, block[i - 1]!, 'after');
       else if (before) placeInSection(batch, presentation, sldId, before, 'after');
@@ -621,10 +653,10 @@ export function placeBlockInSection(
   const high = after === undefined ? lists.length : owner(after);
   if (target < low || (high >= 0 && target > high))
     throw new CommandRefusal('errors.unsupported', 'section');
+  if (target === low) return placeRunInSection(batch, presentation, block, before!, 'after');
+  if (target === high) return placeRunInSection(batch, presentation, block, after!, 'before');
   block.forEach((sldId, i) => {
     if (i > 0) placeInSection(batch, presentation, sldId, block[i - 1]!, 'after');
-    else if (target === low) placeInSection(batch, presentation, sldId, before!, 'after');
-    else if (target === high) placeInSection(batch, presentation, sldId, after!, 'before');
     else {
       // An empty section between the two: the block becomes its slides.
       dropFromSections(batch, presentation, sldId);

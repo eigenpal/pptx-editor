@@ -1,0 +1,178 @@
+// Commands on many selected slides (Select All in the slide list of a long deck): Delete and
+// Duplicate read the deck once and write the slide list once, so their cost grows with the
+// slides they change, not with its square. Their result is the result of one slide at a time:
+// the parts, notes, content types, relationships, and sections.
+
+import { expect, test } from 'bun:test';
+import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
+import {
+  attr,
+  elements,
+  find,
+  presentationInfo,
+  relationshipsOf,
+  textOf,
+  xmlPartOf,
+  type PptxPackage,
+} from '../../store/index.ts';
+import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
+
+const IN = 914_400;
+const P14 = 'http://schemas.microsoft.com/office/powerpoint/2010/main';
+
+/** `n` slides that say S0, S1, …, each with notes; with `sections`, two sections. */
+function deck(n: number, sections = false): Uint8Array {
+  const names = Array.from({ length: n }, (_, i) => `S${i}`);
+  const sldId = (i: number) => `<p14:sldId id="${256 + i}"/>`;
+  const half = Math.ceil(n / 2);
+  const ext = sections
+    ? `<p:extLst><p:ext uri="{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"><p14:sectionLst xmlns:p14="${P14}">` +
+      `<p14:section name="One" id="{00000000-0000-0000-0000-000000000001}"><p14:sldIdLst>${names
+        .slice(0, half)
+        .map((_, i) => sldId(i))
+        .join('')}</p14:sldIdLst></p14:section>` +
+      `<p14:section name="Two" id="{00000000-0000-0000-0000-000000000002}"><p14:sldIdLst>${names
+        .slice(half)
+        .map((_, i) => sldId(half + i))
+        .join('')}</p14:sldIdLst></p14:section>` +
+      '</p14:sectionLst></p:ext></p:extLst>'
+    : undefined;
+  return buildPptx({
+    slides: names.map((name) => ({
+      shapes: shape({ id: 2, name, x: IN, y: IN, cx: 4 * IN, cy: IN, text: para(run(name)) }),
+      notes: `Notes of ${name}`,
+    })),
+    ...(ext ? { presentationExt: ext } : {}),
+  });
+}
+
+async function open(bytes: Uint8Array): Promise<PptxEditorInstance> {
+  const e = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  expect((await e.load(bytes)).ok).toBe(true);
+  return e;
+}
+
+const pkgOf = (e: PptxEditorInstance): PptxPackage => e.session!.store.package;
+
+/** The slide texts in deck order, with the text of each slide's notes. */
+const slides = (e: PptxEditorInstance): string[] => {
+  const pkg = pkgOf(e);
+  return presentationInfo(pkg).slides.map((s) => {
+    const own = textOf(find(xmlPartOf(pkg, s.partName)!.root, 'p:txBody'));
+    const notes = s.notesPart ? textOf(find(xmlPartOf(pkg, s.notesPart)!.root, 'p:txBody')) : '';
+    return `${own}|${notes}`;
+  });
+};
+
+/** The slide ids of each section, as the slide texts. */
+const sections = (e: PptxEditorInstance): string[][] => {
+  const pkg = pkgOf(e);
+  const info = presentationInfo(pkg);
+  const text = new Map(
+    info.slides.map((s) => [s.sldId, textOf(find(xmlPartOf(pkg, s.partName)!.root, 'p:txBody'))])
+  );
+  const root = xmlPartOf(pkg, info.presentationPart)!.root;
+  const lists: string[][] = [];
+  const walk = (el: typeof root): void => {
+    if (el.local === 'sldIdLst' && el.ns === P14)
+      lists.push(elements(el).map((s) => text.get(attr(s, 'id') ?? '') ?? '?'));
+    for (const c of elements(el)) walk(c);
+  };
+  walk(root);
+  return lists;
+};
+
+/** Every slide and notes part has one content type override, and every slide one relationship. */
+function expectConsistent(e: PptxEditorInstance): void {
+  const pkg = pkgOf(e);
+  const info = presentationInfo(pkg);
+  const overrides = elements(xmlPartOf(pkg, '/[Content_Types].xml')!.root)
+    .filter((o) => o.local === 'Override')
+    .map((o) => (attr(o, 'PartName') ?? '').toLowerCase());
+  const parts = [...pkg.parts.keys()].filter((p) => /\/(slides|notesSlides)\/[^/]+\.xml$/.test(p));
+  expect(parts.length).toBe(info.slides.length * 2);
+  for (const p of parts) expect(overrides.filter((o) => o === p.toLowerCase())).toHaveLength(1);
+  const slideRels = relationshipsOf(pkg, info.presentationPart).filter((r) =>
+    r.type.endsWith('/slide')
+  );
+  expect(slideRels).toHaveLength(info.slides.length);
+  expect(new Set(info.slides.map((s) => s.sldId)).size).toBe(info.slides.length);
+}
+
+test('Delete of several slides drops their parts, notes, relationships, and section entries', async () => {
+  const e = await open(deck(6, true));
+  expect(e.exec({ type: 'deleteSlides', indices: [1, 3, 4] }).ok).toBe(true);
+  expect(slides(e)).toEqual(['S0|Notes of S0', 'S2|Notes of S2', 'S5|Notes of S5']);
+  expect(sections(e)).toEqual([['S0', 'S2'], ['S5']]);
+  expectConsistent(e);
+  const again = await open(e.save()!);
+  expect(slides(again)).toEqual(slides(e));
+  e.exec({ type: 'undo' });
+  expect(slides(e)).toHaveLength(6);
+  expect(sections(e)).toEqual([
+    ['S0', 'S1', 'S2'],
+    ['S3', 'S4', 'S5'],
+  ]);
+});
+
+test('Duplicate of several slides puts the copies, with notes, after the last one in its section', async () => {
+  const e = await open(deck(6, true));
+  expect(e.exec({ type: 'duplicateSlides', indices: [0, 2] }).ok).toBe(true);
+  expect(slides(e).map((s) => s.split('|')[0])).toEqual([
+    'S0',
+    'S1',
+    'S2',
+    'S0',
+    'S2',
+    'S3',
+    'S4',
+    'S5',
+  ]);
+  expect(slides(e)[3]).toBe('S0|Notes of S0');
+  expect(sections(e)).toEqual([
+    ['S0', 'S1', 'S2', 'S0', 'S2'],
+    ['S3', 'S4', 'S5'],
+  ]);
+  expectConsistent(e);
+  // Each copy has its own parts: the copies' notes name their own slide.
+  const pkg = pkgOf(e);
+  const info = presentationInfo(pkg);
+  for (const s of info.slides.slice(3, 5)) {
+    const back = relationshipsOf(pkg, s.notesPart!).find((r) => r.type.endsWith('/slide'));
+    expect(back?.target).toBe(s.partName);
+  }
+  const again = await open(e.save()!);
+  expect(slides(again)).toEqual(slides(e));
+  expect(sections(again)).toEqual(sections(e));
+});
+
+/** The fastest of three runs of `command` on a deck of `n` slides, in milliseconds. */
+async function fastest(
+  n: number,
+  command: (n: number) => Parameters<PptxEditorInstance['exec']>[0]
+) {
+  const bytes = deck(n);
+  let best = Infinity;
+  for (let k = 0; k < 3; k += 1) {
+    const e = await open(bytes);
+    const t0 = performance.now();
+    expect(e.exec(command(n)).ok).toBe(true);
+    best = Math.min(best, performance.now() - t0);
+    e.destroy();
+  }
+  return best;
+}
+
+const all = (from: number, n: number) => Array.from({ length: n - from }, (_, i) => from + i);
+
+test('Delete of every slide but one: four times the slides take less than eight times the time', async () => {
+  const small = await fastest(150, (n) => ({ type: 'deleteSlides', indices: all(1, n) }));
+  const large = await fastest(600, (n) => ({ type: 'deleteSlides', indices: all(1, n) }));
+  expect(large).toBeLessThan(small * 8);
+});
+
+test('Duplicate of every slide: four times the slides take less than eight times the time', async () => {
+  const small = await fastest(150, (n) => ({ type: 'duplicateSlides', indices: all(0, n) }));
+  const large = await fastest(600, (n) => ({ type: 'duplicateSlides', indices: all(0, n) }));
+  expect(large).toBeLessThan(small * 8);
+});
