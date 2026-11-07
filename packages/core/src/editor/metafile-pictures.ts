@@ -13,6 +13,18 @@ export interface DrawablePicture {
   readonly mime: string;
 }
 
+/**
+ * The state of one EMF or WMF picture part. `pending`: it converts or waits to, and draws as the
+ * placeholder (or its PNG from before a font change). `failed`: it cannot convert (damaged, or
+ * a content the converter does not draw). `timed-out`: two conversions ran out of time; the next
+ * `picturesReady` tries once more. @public
+ */
+export interface PictureStatus {
+  /** The picture's part name, such as `/ppt/media/image1.emf`. */
+  readonly part: string;
+  readonly state: 'ready' | 'pending' | 'failed' | 'timed-out';
+}
+
 /** How many metafiles convert at the same time. */
 const PARALLEL = 2;
 /** How long a wait for converted pictures lasts at most, in ms (`ready`). */
@@ -33,6 +45,11 @@ const OTHER_CONTENT = new Set<string>([
  * other layouts of a master are not followed. Each part is read once.
  */
 export function metafilesOf(pkg: PptxPackage, slides: readonly string[]): Uint8Array[] {
+  return metafilePartsOf(pkg, slides).bytes;
+}
+
+/** The metafile parts that `slides` can show (`metafilesOf`), with their part names. */
+export function metafilePartsOf(pkg: PptxPackage, slides: readonly string[]): ShownMetafiles {
   if (slides.length !== 1) return walkMetafiles(pkg, slides);
   // One slide at a time is what each paint asks: keep the answer for this revision of the deck.
   let bySlide = shownByPackage.get(pkg);
@@ -42,13 +59,18 @@ export function metafilesOf(pkg: PptxPackage, slides: readonly string[]): Uint8A
   return hit;
 }
 
-/** The metafiles of one slide, by package revision (`metafilesOf`). */
-const shownByPackage = new WeakMap<PptxPackage, Map<string, Uint8Array[]>>();
+interface ShownMetafiles {
+  readonly parts: readonly string[];
+  readonly bytes: Uint8Array[];
+}
 
-function walkMetafiles(pkg: PptxPackage, slides: readonly string[]): Uint8Array[] {
+/** The metafiles of one slide, by package revision (`metafilePartsOf`). */
+const shownByPackage = new WeakMap<PptxPackage, Map<string, ShownMetafiles>>();
+
+function walkMetafiles(pkg: PptxPackage, slides: readonly string[]): ShownMetafiles {
   const seen = new Set<string>(slides);
   const queue = [...slides];
-  const out: Uint8Array[] = [];
+  const out = { parts: [] as string[], bytes: [] as Uint8Array[] };
   for (let i = 0; i < queue.length; i += 1) {
     const source = queue[i]!;
     const master = relationshipsOf(pkg, source).some((r) => r.type === REL.theme);
@@ -60,7 +82,7 @@ function walkMetafiles(pkg: PptxPackage, slides: readonly string[]): Uint8Array[
       seen.add(target);
       const bytes = binaryPartOf(pkg, target);
       if (!bytes) queue.push(target);
-      else if (metafileFormat(bytes)) out.push(bytes);
+      else if (metafileFormat(bytes)) (out.parts.push(target), out.bytes.push(bytes));
     }
   }
   return out;
@@ -197,6 +219,14 @@ export class MetafilePictures {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /** The state of the metafile `bytes` (`PictureStatus`). */
+  statusOf(bytes: Uint8Array): PictureStatus['state'] {
+    const png = this.#done.get(bytes);
+    if (png) return 'ready';
+    if (png === null) return 'failed';
+    return this.#timedOut.has(bytes) ? 'timed-out' : 'pending';
   }
 
   /** A key that changes when the PNG of a metafile that slide part `slide` shows changes. */

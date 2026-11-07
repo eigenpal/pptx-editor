@@ -17,6 +17,7 @@ import type { DocumentSession } from './document-session.ts';
 import { toBase64 } from '../automation/commands/base64.ts';
 import { CommandRefusal } from '../automation/commands/op-batch.ts';
 import { uniquePrefix } from './paint-ids.ts';
+import { metafilePartsOf, type PictureStatus } from './metafile-pictures.ts';
 import { FONT_NAME } from './selection-state.ts';
 
 /** Options for a slide picture. @public */
@@ -194,6 +195,19 @@ async function decodeSvg(text: string): Promise<HTMLImageElement> {
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+/**
+ * The EMF and WMF pictures of slide `index`, or of every slide when you omit it, with the state
+ * of each: whether it draws, still converts, or did not convert. Empty for a slide that does not
+ * exist or shows none. Call it after `session.picturesReady()` resolves `false` to learn which
+ * picture draws as the placeholder, and why. @public
+ */
+export function pictureStatus(session: DocumentSession, index?: number): PictureStatus[] {
+  const slides = session.info.slides.map((s) => s.partName);
+  const shown = index === undefined ? slides : slides[index] ? [slides[index]] : [];
+  const { parts, bytes } = metafilePartsOf(session.store.package, shown);
+  return parts.map((part, i) => ({ part, state: session.pictures.statusOf(bytes[i]!) }));
 }
 
 /**

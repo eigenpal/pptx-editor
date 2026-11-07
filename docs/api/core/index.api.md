@@ -1250,6 +1250,8 @@ export class DocumentSession {
     parsedAt: number;
     // @internal
     picture(target: string): DrawablePicture | undefined;
+    // @internal
+    readonly pictures: MetafilePictures;
     picturesReady(index?: number, options?: {
         timeoutMs?: number;
     }): Promise<boolean>;
@@ -3925,6 +3927,16 @@ export function picturePropertiesDraftFrom(picture: (Pick<SelectedImageState, 'w
 
 // @internal
 export function picturePropertiesWithValue(fields: PicturePropertiesDraftFields, field: 'width' | 'height', value: number, initial: PicturePropertiesDraftFields): PicturePropertiesDraftFields;
+
+// @public
+export interface PictureStatus {
+    readonly part: string;
+    // (undocumented)
+    readonly state: 'ready' | 'pending' | 'failed' | 'timed-out';
+}
+
+// @public
+export function pictureStatus(session: DocumentSession, index?: number): PictureStatus[];
 
 // @internal
 export function placeInFixedFrame<T extends FixedPoint>(host: Element | null | undefined, size: FixedSize, place: (size: FixedSize, view: FixedView) => T): T;

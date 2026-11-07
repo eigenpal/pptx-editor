@@ -500,8 +500,8 @@ export class DocumentSession {
   #bySlide = new Map<string, { readonly deps: readonly unknown[]; readonly layout: SlideLayout }>();
   #substitutions: { key: string; list: FontSubstitution[] } | null = null;
   #pictureGeneration = 0;
-  /** EMF and WMF parts draw as PNG once converted, then `onPictures` repaints. */
-  #pictures = new MetafilePictures(
+  /** EMF and WMF parts draw as PNG once converted, then `onPictures` repaints. @internal */
+  readonly pictures = new MetafilePictures(
     () => this.#faces.map((f) => f.bytes),
     () => (this.#pictureGeneration++, this.onPictures?.())
   );
@@ -615,7 +615,7 @@ export class DocumentSession {
 
   /** Changes when slide part `slide` paints differently: new faces, or its pictures. @internal */
   paintKey(slide: string | undefined): string {
-    return `${this.#generation}.${this.#pictures.stateOf(this.store.package, slide)}`;
+    return `${this.#generation}.${this.pictures.stateOf(this.store.package, slide)}`;
   }
 
   get fontReport(): FontReport {
@@ -706,7 +706,7 @@ export class DocumentSession {
     this.#bySlide.clear();
     this.#substitutions = null;
     this.#generation += 1;
-    this.#pictures.fontsChanged(); // Metafile text draws with the faces.
+    this.pictures.fontsChanged(); // Metafile text draws with the faces.
   }
 
   /**
@@ -817,14 +817,14 @@ export class DocumentSession {
     const pkg = this.store.package;
     const target = relTarget(pkg, sourcePart, rId);
     const bytes = target ? binaryPartOf(pkg, target) : undefined;
-    const picture = bytes && this.#pictures.drawable(bytes, imageMime(target!));
-    return picture ? this.#pictures.url(target!, picture) : undefined;
+    const picture = bytes && this.pictures.drawable(bytes, imageMime(target!));
+    return picture ? this.pictures.url(target!, picture) : undefined;
   };
 
   /** The bytes of the picture part `target` as they draw (`MetafilePictures.drawable`). @internal */
   picture(target: string): DrawablePicture | undefined {
     const bytes = binaryPartOf(this.store.package, target);
-    return bytes ? this.#pictures.drawable(bytes, imageMime(target)) : undefined;
+    return bytes ? this.pictures.drawable(bytes, imageMime(target)) : undefined;
   }
 
   /**
@@ -837,7 +837,7 @@ export class DocumentSession {
     const slides = this.info.slides.map((s) => s.partName);
     const shown = index === undefined ? slides : slides[index] ? [slides[index]] : null;
     if (!shown) return Promise.resolve(false);
-    return this.#pictures.ready(metafilesOf(this.store.package, shown), options.timeoutMs);
+    return this.pictures.ready(metafilesOf(this.store.package, shown), options.timeoutMs);
   }
 
   /**
@@ -870,7 +870,7 @@ export class DocumentSession {
   /** Release blob URLs. */
   dispose(): void {
     this.#disposed = true;
-    this.#pictures.dispose();
+    this.pictures.dispose();
   }
 }
 

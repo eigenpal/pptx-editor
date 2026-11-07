@@ -47,6 +47,7 @@ Use the same session for either format:
 import {
   exportSlideSvg,
   exportSlidesPngZip,
+  pictureStatus,
   type PptxEditorInstance,
 } from '@pptx-editor.dev/core/editor';
 
@@ -58,7 +59,8 @@ export async function slideAssets(editor: PptxEditorInstance) {
   // EMF and WMF pictures convert in the background. Wait for this slide's.
   if (!(await session.picturesReady(slide))) {
     // A picture that did not convert exports as a placeholder.
-    console.warn('Some pictures export as placeholders.');
+    const missing = pictureStatus(session, slide).filter((p) => p.state !== 'ready');
+    console.warn('Pictures that export as placeholders:', missing);
   }
   const svg = exportSlideSvg(session, slide);
   const zip = await exportSlidesPngZip(session, { width: 1280 });
@@ -75,7 +77,8 @@ The editor converts EMF and WMF pictures to PNG in the background. A picture sho
 - `exportSlideSvg()` is synchronous. Await `session.picturesReady(index)` before you call it.
 - PNG and ZIP export wait for the pictures of each slide for up to 30 seconds. Set `picturesTimeoutMs` to change that limit for each slide.
 - `session.picturesReady(index?, { timeoutMs })` resolves `true` when every picture draws. Omit `index` to wait for every slide.
-- It resolves `false` when a picture cannot convert, when the slide does not exist, or after `timeoutMs` (default 30000). Pass `Infinity` to wait until each picture converted or failed. A picture fails after two tries of 10 seconds each. The next wait for it tries once more.
+- It resolves `false` when a picture cannot convert, when the slide does not exist, or after `timeoutMs` (default 30000). Pass `Infinity` to wait until each picture converted or failed. A picture is `timed-out` after two tries of 10 seconds each. The next wait for it tries once more.
+- `pictureStatus(session, index?)` lists the pictures with their states: `ready`, `pending`, `failed`, or `timed-out`. Use it to learn which picture exports as the placeholder.
 
 A picture that is not ready exports as the placeholder. After a font change, it exports as its last converted version until the new one is ready.
 

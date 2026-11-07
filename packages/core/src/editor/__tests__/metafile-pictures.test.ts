@@ -6,7 +6,7 @@ import { GlobalWindow } from 'happy-dom';
 import { buildPptx } from '../../../../../scripts/fixtures/builder.ts';
 import { emfRectangle, wmfRectangle } from '../../../../../scripts/fixtures/picture-bytes.ts';
 import { readPptx } from '../../store/index.ts';
-import { paintLayout } from '../export-image.ts';
+import { paintLayout, pictureStatus } from '../export-image.ts';
 import { createPptxEditor } from '../index.ts';
 import { MetafilePictures, metafilesOf } from '../metafile-pictures.ts';
 import { metafilePng } from '../../output/metafile-png.ts';
@@ -101,6 +101,13 @@ test('picturesReady waits for the pictures of one slide, or of every slide', asy
   await session.picturesReady(0);
   expect(session.picture('/ppt/media/image1.emf')).toBeDefined();
   expect(session.picture('/ppt/media/image4.emf')).toBeUndefined();
+  // Which picture draws, and which one still converts.
+  expect(pictureStatus(session, 0).every((p) => p.state === 'ready')).toBe(true);
+  expect(pictureStatus(session, 1)).toContainEqual({
+    part: '/ppt/media/image4.emf',
+    state: 'pending',
+  });
+  expect(pictureStatus(session, 9)).toEqual([]);
   expect(await session.picturesReady(-1)).toBe(false);
   expect(await session.picturesReady(9)).toBe(false);
   expect(await session.picturesReady()).toBe(true);
@@ -272,6 +279,21 @@ test('a paint does not convert again a picture that ran out of time twice', asyn
   await pictures.ready([bytes], 0);
   await Bun.sleep(0);
   expect(calls).toBe(6);
+  pictures.dispose();
+});
+
+test('the status of a picture tells a failed one from one that ran out of time', async () => {
+  const [damaged, slow] = [emfRectangle(3000, 1500), emfRectangle()];
+  const convert = async (bytes: Uint8Array) => (bytes === damaged ? null : undefined);
+  const pictures = new MetafilePictures(
+    () => [],
+    () => {},
+    convert
+  );
+  expect(pictures.statusOf(damaged)).toBe('pending');
+  expect(await pictures.ready([damaged, slow])).toBe(false);
+  expect(pictures.statusOf(damaged)).toBe('failed');
+  expect(pictures.statusOf(slow)).toBe('timed-out');
   pictures.dispose();
 });
 
