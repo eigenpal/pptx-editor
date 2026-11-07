@@ -176,13 +176,27 @@ describe('the placeholder chrome', () => {
       )!;
       return c.press(layoutOf(e), button.firstElementChild!);
     };
-    // The Picture press selects the placeholder; the click that follows asks for the file.
+    const centerOf = (insert: string) => {
+      const parts = c.elements(doc, layoutOf(e), PX);
+      const g = parts.find((p) => p.getAttribute('data-placeholder-insert') === `${id}|${insert}`)!;
+      const [x, y] = g
+        .getAttribute('transform')!
+        .match(/[-\d.]+/g)!
+        .map(Number);
+      return { x: x! + 14 * PX, y: y! + 14 * PX };
+    };
+    // The Picture press selects the placeholder; a release over the button asks for the file.
+    const center = centerOf('picture');
     expect(press('picture')).toBe(true);
     expect(picked).toEqual([]);
-    expect(c.click()).toBe(true);
+    expect(c.release(center)).toBe(true);
     expect(picked).toEqual([JSON.stringify({ kind: 'shapes', nodeIds: [id] })]);
-    // A second click, with no press before it, asks for nothing.
-    expect(c.click()).toBe(false);
+    // A release with no press before it asks for nothing; so does a drag off the button.
+    expect(c.release(center)).toBe(false);
+    expect(press('picture')).toBe(true);
+    expect(c.release({ x: 0, y: 0 })).toBe(false);
+    expect(picked).toHaveLength(1);
+    e.setSelection({ kind: 'none' });
     expect(press('table')).toBe(true);
     expect(commands).toEqual([{ type: 'insertTable', rows: 3, cols: 3 }]);
     expect(tree(e).map((el) => el.local)).toEqual(['sp', 'graphicFrame']);

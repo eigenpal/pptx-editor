@@ -164,20 +164,25 @@ export function removeFilledPlaceholder(
       name: { ns: '', local: name },
       value: shapeId,
     });
-  const walk = (el: Element, depth: number): void => {
+  // Shape ids are unsigned integers: "0005" names shape 5.
+  const old = Number(into.shapeId);
+  const names = (v: string | undefined) => v !== undefined && v !== '' && Number(v) === old;
+  // Only animations (`p:timing`, also in `mc:AlternateContent` copies) and connector ends name
+  // a shape by id here; other `spid` attributes (`p:oleObj`) mean something else.
+  const walk = (el: Element, depth: number, timing: boolean): void => {
     if (depth > 64) return;
     for (const c of elements(el)) {
-      if (c.local === 'bldP' && attr(c, 'spid') === into.shapeId) {
+      const inTiming = timing || c.local === 'timing';
+      if (inTiming && c.local === 'bldP' && names(attr(c, 'spid'))) {
         batch.push({ op: 'removeNode', part, node: c.id });
         continue;
       }
-      if (attr(c, 'spid') === into.shapeId) set(c, 'spid');
-      if ((c.local === 'stCxn' || c.local === 'endCxn') && attr(c, 'id') === into.shapeId)
-        set(c, 'id');
-      walk(c, depth + 1);
+      if (inTiming && names(attr(c, 'spid'))) set(c, 'spid');
+      if ((c.local === 'stCxn' || c.local === 'endCxn') && names(attr(c, 'id'))) set(c, 'id');
+      walk(c, depth + 1, inTiming);
     }
   };
-  if (root && into.shapeId) walk(root, 0);
+  if (root && into.shapeId) walk(root, 0, false);
   removeShapes(batch, part, [into.nodeId]);
 }
 

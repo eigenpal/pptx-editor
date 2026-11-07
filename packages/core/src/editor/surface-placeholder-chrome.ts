@@ -38,6 +38,7 @@ export interface PlaceholderChromeHost {
 }
 
 type Insert = 'table' | 'picture';
+type Box = { readonly x: number; readonly y: number; readonly cx: number; readonly cy: number };
 
 /** An empty placeholder of the slide, top level and not turned: the chrome draws on its box. */
 interface Empty {
@@ -63,8 +64,12 @@ function emptyPlaceholders(layout: SlideLayout): Empty[] {
 }
 
 export class PlaceholderChrome {
-  /** The Picture button just pressed: the click that follows asks for the file. */
-  #pending: { readonly id: string; readonly at: number } | null = null;
+  /** The Picture button just pressed: a release over it asks for the file (`release`). */
+  #pending: { readonly id: string; readonly box: Box } | null = null;
+  /** The boxes of the buttons last drawn, slide units, by `id|insert`. */
+  #boxes = new Map<string, Box>();
+  /** When the file chooser last opened: a double-click opens it once. */
+  #picked = 0;
 
   constructor(private readonly host: PlaceholderChromeHost) {}
 
@@ -74,6 +79,7 @@ export class PlaceholderChrome {
     const sel = this.host.selection();
     const editing = sel.kind === 'text' ? sel.nodeId : null;
     const parts: Element[] = [];
+    this.#boxes.clear();
     for (const { item } of emptyPlaceholders(layout)) {
       const id = item.element.nodeId;
       // The placeholder being typed in shows the caret and its own outline instead.
@@ -101,6 +107,8 @@ export class PlaceholderChrome {
       const top = y + cy / 2 - (BUTTON_PX * px) / 2;
       for (const insert of inserts) {
         parts.push(this.#draw(doc, id, insert, left, top, px));
+        const size = BUTTON_PX * px;
+        this.#boxes.set(`${id}|${insert}`, { x: left, y: top, cx: size, cy: size });
         left += (BUTTON_PX + GAP_PX) * px;
       }
     }
@@ -152,9 +160,9 @@ export class PlaceholderChrome {
 
   /**
    * A press on `target`: an insert button selects its placeholder, and the Table button inserts
-   * a table that fills it. The Picture button asks for the file on the click that follows
-   * (`click`): a touch or pen press does not let a page open the file chooser. Returns whether
-   * the press was on a button.
+   * a table that fills it. The Picture button asks for the file on the release (`release`): a
+   * touch or pen press does not let a page open the file chooser. Returns whether the press was
+   * on a button.
    */
   press(_layout: SlideLayout, target: Element): boolean {
     this.#pending = null;
@@ -165,24 +173,34 @@ export class PlaceholderChrome {
     this.host.select({ kind: 'shapes', nodeIds: [button.id] });
     if (button.insert === 'table')
       this.host.run({ type: 'insertTable', rows: TABLE_SIZE, cols: TABLE_SIZE });
-    else this.#pending = { id: button.id, at: Date.now() };
+    else {
+      const box = this.#boxes.get(`${button.id}|picture`);
+      if (box) this.#pending = { id: button.id, box };
+    }
     return true;
   }
 
   /**
-   * The click after a press on a Picture button asks for a picture, which fills the placeholder.
-   * The overlay paints again after the press selects, so the click names no button: the press
-   * is remembered for a moment instead.
+   * The release of a press on a Picture button, at slide point `p`: over the button, it asks for
+   * a picture that fills the placeholder. The overlay paints again after the press selects, so
+   * the release is matched by the button's box, not by its element. A release elsewhere (a drag
+   * off the button) asks for nothing.
    */
-  click(): boolean {
+  release(p: { readonly x: number; readonly y: number }): boolean {
     const pending = this.#pending;
     this.#pending = null;
-    if (!pending || Date.now() - pending.at > 2000 || this.host.readOnly()) return false;
+    if (!pending || this.host.readOnly()) return false;
+    const { x, y, cx, cy } = pending.box;
+    if (p.x < x || p.x > x + cx || p.y < y || p.y > y + cy) return false;
     const sel = this.host.selection();
     // A selection that moved since the press is not this button's.
     if (sel.kind !== 'shapes' || sel.nodeIds.length !== 1 || sel.nodeIds[0] !== pending.id)
       return false;
     if (!this.host.fillableType?.(pending.id)) return false;
+    // The second release of a double-click does not open a second chooser.
+    const now = Date.now();
+    if (now - this.#picked < 800) return true;
+    this.#picked = now;
     this.host.pickImage?.();
     return true;
   }

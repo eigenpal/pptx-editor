@@ -160,4 +160,22 @@ describe('a new table fills an empty content placeholder', () => {
     const root = xmlPartOf(e.session!.store.package, part)!.root;
     expect(attr(find(root, 'p:spTgt'), 'spid')).toBe(id);
   });
+
+  test('a connector glued to the placeholder stays glued to the table', async () => {
+    const connector =
+      '<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="9" name="Connector 8"/><p:cNvCxnSpPr>' +
+      '<a:stCxn id="3" idx="0"/></p:cNvCxnSpPr><p:nvPr/></p:nvCxnSpPr><p:spPr><a:xfrm>' +
+      '<a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm>' +
+      '<a:prstGeom prst="line"><a:avLst/></a:prstGeom></p:spPr></p:cxnSp>';
+    const e = await open(title + placeholder(3, '1') + connector);
+    expect(e.exec({ type: 'insertTable', rows: 1, cols: 1 }).ok).toBe(true);
+    const part = e.session!.info.slides[0]!.partName;
+    const root = xmlPartOf(e.session!.store.package, part)!.root;
+    const frame = tree(e).find((el) => el.local === 'graphicFrame')!;
+    expect(attr(find(root, 'a:stCxn'), 'id')).toBe(attr(find(frame, 'p:cNvPr'), 'id'));
+    // Undo glues it to the placeholder again.
+    expect(e.exec({ type: 'undo' }).ok).toBe(true);
+    const back = xmlPartOf(e.session!.store.package, part)!.root;
+    expect(attr(find(back, 'a:stCxn'), 'id')).toBe('3');
+  });
 });

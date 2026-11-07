@@ -180,9 +180,6 @@ export class SlideSurface {
     host.append(this.root);
     this.#stage.addEventListener('pointerdown', this.#onPointerDown);
     this.#stage.addEventListener('dblclick', this.#onDoubleClick);
-    this.#stage.addEventListener('click', (e) => {
-      if (this.#placeholderChrome.click()) e.preventDefault();
-    });
     this.#stage.addEventListener('contextmenu', (e) =>
       selectForContextMenu(e, editor, this.#hit.bind(this), this.#slidePoint.bind(this), (id, p) =>
         this.#cellCaret(id, p)
@@ -834,6 +831,8 @@ export class SlideSurface {
   #onPointerUp = (e: PointerEvent): void => {
     const pressed = this.#pressed;
     this.#pressed = false;
+    // A release over an empty placeholder's Picture button asks for the file.
+    if (pressed) this.#placeholderChrome.release(this.#slidePoint(e));
     this.#endGesture(e);
     if (pressed) this.editor.pointerUp?.();
   };
