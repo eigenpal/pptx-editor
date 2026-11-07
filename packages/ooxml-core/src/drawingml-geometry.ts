@@ -673,7 +673,19 @@ export function presetAdjustments(
     ? MIRRORED_PRESETS[preset]!
     : preset;
   if (!Object.prototype.hasOwnProperty.call(PRESET_SHAPES, name)) return undefined;
-  const def = PRESET_SHAPES[name]!;
+  return definitionAdjustments(PRESET_SHAPES[name]!, w, h, adjust);
+}
+
+/**
+ * The adjust values of a definition in `a:avLst` order, each with its handle range, as
+ * `presetAdjustments` gives them. The text warps share it. @internal
+ */
+export function definitionAdjustments(
+  def: PresetShapeDefinition,
+  w: number,
+  h: number,
+  adjust: ReadonlyMap<string, number>
+): PresetAdjustment[] {
   const sized = w > 0 && h > 0;
   const vars = builtins(sized ? w : 0, sized ? h : 0);
   defineGuides(vars, def.av, adjust);

@@ -357,6 +357,27 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
         has(d.shapeXml(0, 'Shape 3'), 'numCol="3"', 'spcCol="91440"')
       ),
   },
+  'paragraphs.text-warp': {
+    fixture: 'text-warp',
+    edit: (t) => {
+      t.select('textArchDown 3');
+      t.run({ type: 'setTextWarp', preset: 'textWave1', adjust: { adj1: 15000 } });
+      t.select('textArchUp 2');
+      t.run({ type: 'setTextWarp', preset: null });
+    },
+    check: (d) =>
+      all(
+        has(
+          d.shapeXml(0, 'textArchDown 3'),
+          '<a:bodyPr wrap="none" rtlCol="0" anchor="t"><a:prstTxWarp prst="textWave1"><a:avLst><a:gd name="adj1" fmla="val 15000"/></a:avLst></a:prstTxWarp><a:noAutofit/></a:bodyPr>'
+        ),
+        has(
+          d.shapeXml(0, 'textArchUp 2'),
+          '<a:bodyPr wrap="none" rtlCol="0" anchor="t"><a:noAutofit/>'
+        ),
+        lacks(d.shapeXml(0, 'textArchUp 2'), 'prstTxWarp')
+      ),
+  },
   'lists.bullets-numbering': {
     fixture: 'bullets-numbering',
     edit: (t) => {

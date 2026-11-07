@@ -38,6 +38,7 @@ const COMMAND_TABLE = {
   clearFormatting: true,
   setVerticalAlign: true,
   setAutofit: true,
+  setTextWarp: true,
   setParagraphFormat: true,
   toggleSuperscript: true,
   toggleSubscript: true,

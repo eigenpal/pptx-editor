@@ -112,6 +112,8 @@ export interface ToolbarNamedParts {
   readonly ShapeStyles: ToolbarSlotPartComponent;
   /** `shape.effects`. */
   readonly ShapeEffects: ToolbarSlotPartComponent;
+  /** `shape.textEffects`. */
+  readonly TextEffects: ToolbarSlotPartComponent;
   /** `shape.properties`. */
   readonly FormatShape: ToolbarPartComponent;
   /** `format.painter`. */

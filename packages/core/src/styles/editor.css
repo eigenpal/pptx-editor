@@ -3878,6 +3878,24 @@ legend.pptx-dialog__label {
   stroke: currentColor;
   stroke-width: 1.6;
 }
+/* Text Effects: the trigger's letter and arc, and the Transform gallery, whose cells stroke
+   each warp's paths. */
+.pptx-text-effects-glyph {
+  fill: currentColor;
+}
+.pptx-text-effects-glyph__arc {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.pptx-warp-gallery__path {
+  fill: none;
+  stroke: var(--doc-text);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
 /* The loading screen (`PptxEditor.Loading` in React, `PptxEditorLoading` in Vue), after DOCX
    Editor's `DocxEditor.Loading`: a slide-shaped sheet with a spinner, at the slide size and

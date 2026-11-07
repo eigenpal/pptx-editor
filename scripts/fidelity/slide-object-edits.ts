@@ -408,33 +408,6 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
       ),
   },
   // --- Kept content: an edit next to it, or of its box, keeps it as it was ---------------------
-  'paragraphs.text-warp': {
-    fixture: 'preserved-content',
-    edit: (t) => {
-      t.selectText('Warped text', 0, 0);
-      t.type('New ');
-      t.run({
-        type: 'setTransform',
-        nodeId: t.node('Warped text'),
-        x: 457200,
-        y: 1188720,
-        cx: 5029200,
-        cy: 1463040,
-        rot: 0,
-      });
-    },
-    check: (d) => {
-      const warp = (xml: string) => /<a:prstTxWarp.*?<\/a:prstTxWarp>/.exec(xml)?.[0];
-      const xml = d.shapeXml(0, 'Warped text');
-      return all(
-        textOf(shapeElement(d.pkg, 0, 'Warped text')).startsWith('New ') ? undefined : 'no text',
-        has(xml, '<a:off x="457200" y="1188720"/>'),
-        warp(xml) === warp(shapeXmlOf(d.original, 0, 'Warped text'))
-          ? undefined
-          : 'the warp changed'
-      );
-    },
-  },
   'pictures.emf-wmf': {
     fixture: 'preserved-content',
     edit: (t) => {

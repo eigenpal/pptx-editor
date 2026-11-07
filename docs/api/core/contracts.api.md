@@ -661,6 +661,12 @@ export type EditorCommand = {
 | {
     readonly type: 'setAutofit';
     readonly mode: TextFitting;
+}
+/** The selected shapes' text warp, with adjust values by guide name; null removes it. */
+| {
+    readonly type: 'setTextWarp';
+    readonly preset: TextWarpPreset | null;
+    readonly adjust?: Readonly<Record<string, number>>;
 } | {
     readonly type: 'setTransforms';
     readonly items: readonly TransformItem[];
@@ -1357,6 +1363,7 @@ export interface SelectionGeometry {
     readonly rot: number;
     readonly shapeStyle?: ShapeStyleChoice;
     readonly textFitting?: TextFitting;
+    readonly textWarp?: TextWarpPreset;
     // (undocumented)
     readonly x: number;
     // (undocumented)
@@ -1704,6 +1711,9 @@ export interface TextColumns {
 }
 
 // @public
+export type TextEffectsValue = `transform.${Exclude<TextWarpPreset, 'textNoShape'> | 'none'}`;
+
+// @public
 export type TextFitting = 'none' | 'shrink' | 'shape';
 
 // @public
@@ -1776,6 +1786,9 @@ export interface TextPoint {
     // (undocumented)
     readonly paragraph: number;
 }
+
+// @public
+export type TextWarpPreset = 'textNoShape' | 'textPlain' | 'textStop' | 'textTriangle' | 'textTriangleInverted' | 'textChevron' | 'textChevronInverted' | 'textRingInside' | 'textRingOutside' | 'textArchUp' | 'textArchDown' | 'textCircle' | 'textButton' | 'textArchUpPour' | 'textArchDownPour' | 'textCirclePour' | 'textButtonPour' | 'textCurveUp' | 'textCurveDown' | 'textCanUp' | 'textCanDown' | 'textWave1' | 'textWave2' | 'textDoubleWave1' | 'textWave4' | 'textInflate' | 'textDeflate' | 'textInflateBottom' | 'textDeflateBottom' | 'textInflateTop' | 'textDeflateTop' | 'textDeflateInflate' | 'textDeflateInflateDeflate' | 'textFadeRight' | 'textFadeLeft' | 'textFadeUp' | 'textFadeDown' | 'textSlantUp' | 'textSlantDown' | 'textCascadeUp' | 'textCascadeDown';
 
 // @public
 export interface ThemeColorChoice {

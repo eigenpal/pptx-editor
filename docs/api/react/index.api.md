@@ -1732,6 +1732,7 @@ export interface ToolbarNamedParts {
     readonly TableTotalRow: ToolbarPartComponent;
     readonly TextBox: ToolbarPartComponent;
     readonly TextDirection: ToolbarSlotPartComponent;
+    readonly TextEffects: ToolbarSlotPartComponent;
     readonly Underline: ToolbarPartComponent;
     readonly Undo: ToolbarPartComponent;
     readonly UngroupObjects: ToolbarPartComponent;

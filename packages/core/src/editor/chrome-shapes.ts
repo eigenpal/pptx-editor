@@ -1,5 +1,6 @@
 // The Shape Format chrome: Quick Styles (the theme styles gallery), Shape Effects (one menu with
-// Shadow, Reflection, Glow, and Soft Edges, on Shape Format), and
+// Shadow, Reflection, Glow, and Soft Edges, on Shape Format), Text Effects (the Transform
+// gallery of text warps), and
 // Format Shape in the `shape` group, and the Arrange rows that rotate, flip, distribute, and open
 // the selection pane. Slot names follow the Names rule of `editor-ui-parity`: an existing PPTX
 // group for the idea (`shape.*`, `arrange.*`), never a ribbon tab or group name.
@@ -26,6 +27,11 @@ import {
   SOFT_EDGE_SIZES,
 } from '../automation/commands/effect-commands.ts';
 import { ICON_PATHS } from './icon-paths.ts';
+import {
+  TEXT_EFFECTS_CONTROL,
+  textEffectsCommand,
+  textEffectsValue,
+} from './chrome-text-effects.ts';
 import { applyTransforms, parseHex, toHex } from '../cascade/index.ts';
 import { NS, type Element } from '../store/index.ts';
 
@@ -162,6 +168,8 @@ export const SHAPE_FORMAT_CONTROLS: readonly ChromeControl[] = [
     ],
     state: { kind: 'value' },
   },
+  // Text Effects: the Transform gallery of text warps (`chrome-text-effects.ts`).
+  TEXT_EFFECTS_CONTROL,
   {
     // Format Shape: the Format pane, after DOCX Editor's `image.properties`.
     id: 'properties',
@@ -250,6 +258,8 @@ export function shapeFormatSlotCommand(
     }
     case 'shape.effects':
       return shapeEffectCommand(value);
+    case 'shape.textEffects':
+      return textEffectsCommand(value);
     case 'arrange.rotate':
       switch (value as RotateChoice) {
         case 'right90':
@@ -273,6 +283,7 @@ export const SHAPE_FORMAT_PROBES: Partial<Record<ChromeSlotId, unknown>> = {
   'shape.styles': 'coloredFill.accent1',
   // A preset, not `none`: removing an effect a shape lacks is a no-op refusal.
   'shape.effects': 'shadow.outerBottomRight',
+  'shape.textEffects': 'transform.textArchUp',
   'arrange.rotate': 'right90',
 };
 
@@ -285,6 +296,7 @@ export function shapeFormatSlotValue(slot: ChromeSlotId, snap: EditorSnapshot): 
   const g = snap.geometry;
   if (slot === 'shape.styles')
     return g?.shapeStyle ? `${g.shapeStyle.row}.${g.shapeStyle.color}` : undefined;
+  if (slot === 'shape.textEffects') return textEffectsValue(snap);
   if (slot !== 'shape.effects' || !g?.effects) return undefined;
   const fx = g.effects;
   const size = (n: number): string => (n ? String(n) : 'none');

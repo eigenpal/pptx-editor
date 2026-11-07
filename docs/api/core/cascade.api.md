@@ -77,6 +77,7 @@ export interface BodyProps {
     readonly upright: boolean;
     // (undocumented)
     readonly vert: string;
+    readonly warp?: TextWarp;
     // (undocumented)
     readonly wrap: 'square' | 'none';
 }
@@ -781,6 +782,14 @@ export function tableStyleList(pkg: PptxPackage): readonly {
     name: string;
     builtIn?: true;
 }[];
+
+// @public
+export interface TextWarp {
+    // (undocumented)
+    readonly adjust: ReadonlyMap<string, number>;
+    // (undocumented)
+    readonly preset: string;
+}
 
 // @public
 export interface Theme {

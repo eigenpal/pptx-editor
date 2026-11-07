@@ -63,6 +63,7 @@ const SLOT_UNION = {
   'shape.lineDash': true,
   'shape.styles': true,
   'shape.effects': true,
+  'shape.textEffects': true,
   'shape.properties': true,
   'format.painter': true,
   'arrange.order': true,

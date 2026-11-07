@@ -17,6 +17,7 @@ import {
   isTrailingSpace,
 } from './line-break.ts';
 import type { ResolvedFace, TextMeasurer } from './measurer.ts';
+import type { WarpedRun } from './text-warp.ts';
 import {
   autofitSizePt,
   baselineInLinePt,
@@ -133,6 +134,12 @@ export interface TextLayout {
   readonly paragraphLengths: readonly number[];
   /** Families that were not available and were substituted. */
   readonly substitutions: readonly string[];
+  /**
+   * The glyphs of a warped text body (`a:prstTxWarp`) as paths in this frame, one entry for each
+   * run that draws. Paint fills these instead of drawing the runs as text; the lines keep the
+   * flat layout, for the caret and the selection.
+   */
+  readonly warped?: readonly WarpedRun[];
 }
 
 interface Segment {

@@ -20,3 +20,4 @@ export * from './caret-word.ts';
 export * from './drawingml-color.ts';
 export * from './drawingml-geometry.ts';
 export * from './drawingml-handles.ts';
+export * from './drawingml-text-warp.ts';

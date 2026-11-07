@@ -4,7 +4,13 @@
 // from the face metrics, not by CSS text decoration, so they match the measured geometry.
 
 import { toCss, type ResolvedFill } from '../cascade/index.ts';
-import { isIdeographic, type GlyphRun, type TextLayout } from '../layout/index.ts';
+import {
+  isIdeographic,
+  type GlyphRun,
+  type PathCommand,
+  type TextLayout,
+  type WarpedRun,
+} from '../layout/index.ts';
 import { fillPaint, STORED_PIXELS_STYLE, type PaintContext } from './paint-fill.ts';
 import { num, svg } from './svg.ts';
 
@@ -157,6 +163,70 @@ function bulletPicture(
   });
 }
 
+/** SVG path data for commands in EMU, written in points. */
+function pointPathData(commands: readonly PathCommand[]): string {
+  const p = (v: number): string => num(v / EMU_PER_PT);
+  let d = '';
+  for (const c of commands) {
+    if (c.op === 'Z') d += 'Z';
+    else if (c.op === 'M' || c.op === 'L') d += `${c.op}${p(c.x)} ${p(c.y)}`;
+    else if (c.op === 'Q') d += `Q${p(c.x1)} ${p(c.y1)} ${p(c.x)} ${p(c.y)}`;
+    else if (c.op === 'C') d += `C${p(c.x1)} ${p(c.y1)} ${p(c.x2)} ${p(c.y2)} ${p(c.x)} ${p(c.y)}`;
+  }
+  return d;
+}
+
+/**
+ * Paint warped text (`a:prstTxWarp`): each run's glyphs as one filled path that layout mapped
+ * into the warp, with its highlight behind and its underline over it, in the run's fills.
+ */
+function paintWarped(
+  doc: Document,
+  layout: TextLayout,
+  warped: readonly WarpedRun[],
+  group: SVGElement,
+  bounds: TextBounds,
+  ctx: PaintContext
+): void {
+  for (const w of warped) {
+    const run = layout.lines[w.line]?.runs[w.run];
+    if (!run) continue;
+    const fill = textFill(run.props.fill, bounds, ctx);
+    if (w.highlight.length && run.props.highlight)
+      group.appendChild(
+        svg(doc, 'path', {
+          d: pointPathData(w.highlight),
+          fill: toCss({ ...run.props.highlight, a: 1 }),
+        })
+      );
+    if (fill.paint === 'none' && !run.props.outline) continue;
+    const outline = run.props.outline;
+    group.appendChild(
+      svg(doc, 'path', {
+        d: pointPathData(w.glyphs),
+        fill: fill.paint,
+        'fill-opacity': fill.opacity < 1 ? num(fill.opacity) : undefined,
+        stroke:
+          outline && outline.fill.type === 'solid'
+            ? toCss({ ...outline.fill.color, a: 1 })
+            : undefined,
+        'stroke-width': outline ? num(outline.width / EMU_PER_PT) : undefined,
+        'data-run': run.kind === 'bullet' ? 'bullet' : String(run.runIndex),
+      })
+    );
+    if (w.underline.length) {
+      const under = run.props.underlineFill ? textFill(run.props.underlineFill, bounds, ctx) : fill;
+      group.appendChild(
+        svg(doc, 'path', {
+          d: pointPathData(w.underline),
+          fill: under.paint,
+          'fill-opacity': under.opacity < 1 ? num(under.opacity) : undefined,
+        })
+      );
+    }
+  }
+}
+
 /** Paint a text layout into a group in the text frame's coordinates. */
 export function paintText(doc: Document, layout: TextLayout, ctx: PaintContext): SVGElement {
   const box = layout.box;
@@ -172,6 +242,10 @@ export function paintText(doc: Document, layout: TextLayout, ctx: PaintContext):
   outer.appendChild(group);
   const pt = (emu: number): string => num(emu / EMU_PER_PT);
   const bounds = textBounds(layout);
+  if (layout.warped) {
+    paintWarped(doc, layout, layout.warped, group, bounds, ctx);
+    return outer;
+  }
   for (const line of layout.lines) {
     for (const run of line.runs) {
       if (run.picture) {

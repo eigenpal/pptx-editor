@@ -8,8 +8,8 @@
  * (CONTRIBUTING.md, "Fidelity harness"). Last checked on 6 November 2026: all 44 fixtures,
  * 88 copies written at commit 79a5d22, no prompt. On 7 November 2026: `header-footer`,
  * `hyperlinks`, `preserved-content`, and `svg-tab-stops`, 8 copies, no prompt; and again
- * `header-footer`, with its date and footer placeholders, 2 copies, no prompt; and
- * `picture-bullets`, 2 copies, no prompt.
+ * `header-footer`, with its date and footer placeholders, 2 copies, no prompt;
+ * `picture-bullets`, 2 copies, no prompt; and `text-warp`, 2 copies, no prompt.
  */
 export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'alignment-anchor',
@@ -59,6 +59,7 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
   'tables',
   'text-direction',
   'text-runs',
+  'text-warp',
   'vertical-columns',
   'vertical-east-asian',
 ];
@@ -105,7 +106,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'paragraphs.spacing': 'sha256:b8efc95910eacf7d2a73468df0b0dd532d4cf553cde1dcd745260d2617238204',
   'paragraphs.text-direction-columns':
     'sha256:69312ada59aa7f6baa42d6a5c87700963a38f4a0c3b49b7d9c8d51bd5bdfac31',
-  'paragraphs.text-warp': 'sha256:86747641df24f181e08533ae23665665b0558b5d8b05a15a7119540c03edc5a8',
+  'paragraphs.text-warp': 'sha256:f2e48a000435c153a7e2e154a5e71e30e54bcc06bfc475cd78bf71e2c2b5ddb2',
   'pictures.adjustments': 'sha256:e53fe2ca52eb226ff0bfbea3e088063e03298857805bc50859eff19ea382eb2b',
   'pictures.alt-text': 'sha256:0a7c5b5893063a0064b613c44b95813a1f520270c6920decdc414803d45aa6b5',
   'pictures.crop': 'sha256:534571051b0a2130475c373fdbabb78236d32f5558a5c8106fdc616c44c2bf36',
@@ -175,14 +176,6 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
  * round trip in `SAVE_VERIFIED_FEATURE_EDITS`, so its duplicate-slide copy is no longer listed.
  */
 export const SAVE_VERIFIED_KEPT_CONTENT_EDITS: Readonly<Record<string, string>> = {
-  'paragraphs.text-warp: duplicate slide':
-    'sha256:c94c33372ad368532f3e7b50ee56133ff4b414094edfcd7772adfafb31bb2bae',
-  'paragraphs.text-warp: paste on a new slide':
-    'sha256:92cb11585ce0dd8f7bf27c02a5a63a15f2f80b62514a686fcb83a66b6c6d6d3b',
-  'paragraphs.text-warp: paste into another deck':
-    'sha256:92cb11585ce0dd8f7bf27c02a5a63a15f2f80b62514a686fcb83a66b6c6d6d3b',
-  'paragraphs.text-warp: group':
-    'sha256:99ed3aba76214a2028b261f492ad810e321846738d2d540bdbec36b3c20a78e5',
   'shapes.custom-geometry: duplicate slide':
     'sha256:02ce251d16a85cfc638440adbf1bbb8cec92c582bf2b575f5b3e4a3a250b9712',
   'shapes.custom-geometry: paste on a new slide':

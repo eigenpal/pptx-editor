@@ -78,7 +78,7 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'table-cell-effects', title: 'Table cell effects', perSlide: false },
   { id: 'coincident-borders', title: 'Coincident cell borders', perSlide: true },
   { id: 'inconsistent-merges', title: 'Inconsistent cell merges', perSlide: false },
-  { id: 'text-warp', title: 'Text warp', perSlide: false },
+  { id: 'text-warp', title: 'Text warp', perSlide: true },
   { id: 'diagram-drawing', title: 'Diagram drawings', perSlide: true },
 ] satisfies Approximation[]);
 
@@ -177,6 +177,7 @@ class Collector {
     if (bp.vert === 'wordArtVert') this.add('word-art-vert');
     if (bp.vert === 'mongolianVert' || bp.vert === 'wordArtVertRtl') this.add('other-vert');
     if (bp.anchorCtr || bp.anchor === 'just' || bp.anchor === 'dist') this.add('anchoring');
+    if (bp.warp) this.add('text-warp');
 
     for (const p of body.paragraphs) {
       if (p.runs.length === 0) continue;
