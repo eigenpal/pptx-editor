@@ -16,8 +16,8 @@
 // The two are the same as types (`() => X` is assignable to `(request) => X`), so the mark,
 // not the arity, picks the path.
 
-import { ZIP_HARD_LIMITS } from '@eigenpal/ooxml-core';
 import type { FontConfiguration } from '../contracts/index.ts';
+import { PPTX_ZIP_LIMITS } from '../store/index.ts';
 import {
   composeFontConfiguration,
   type FontConfigurationBase,
@@ -189,19 +189,27 @@ export function watchEagerPptxFonts(
 export const SOURCE_STALL_MS = 10_000;
 
 /**
+ * The longest URL source the editor downloads, in bytes: the most that the editor reads from an
+ * archive (`PPTX_ZIP_LIMITS`), and room for the archive's own headers. A longer file cannot
+ * open, so its download stops early. @internal
+ */
+export const SOURCE_MAX_BYTES = PPTX_ZIP_LIMITS.maxTotalBytes + 16 * 1024 * 1024;
+
+/**
  * Fetch a URL source with the browser's `fetch`, as the caller wrote it. Rejects with a
  * `TimeoutError` when no response or no body bytes arrive for `stallMs`, with a `RangeError`
  * when the body is longer than `maxBytes`, and with the abort when `signal` aborts. The default
- * `maxBytes` is the largest archive the engine ever reads, so a server that never stops sending
- * cannot grow the page's memory without end. A URL from user input needs the caller's own check first: this adds
- * no allowlist. @internal
+ * `maxBytes` is the longest file the editor opens (`SOURCE_MAX_BYTES`), so a server that never
+ * stops sending cannot grow the page's memory without end. With a valid `Content-Length`, the
+ * body goes into one buffer of that length, so the download holds the file once, not twice.
+ * A URL from user input needs the caller's own check first: this adds no allowlist. @internal
  */
 export async function fetchPptxSource(
   url: string | URL,
   init: RequestInit | undefined,
   signal: AbortSignal,
   stallMs = SOURCE_STALL_MS,
-  maxBytes = ZIP_HARD_LIMITS.maxTotalBytes
+  maxBytes = SOURCE_MAX_BYTES
 ): Promise<Uint8Array> {
   signal.throwIfAborted();
   const controller = new AbortController();
@@ -232,14 +240,19 @@ export async function fetchPptxSource(
     if (!response.ok)
       throw new Error(`could not open the presentation: ${response.status} ${response.statusText}`);
     const tooLarge = () => new RangeError(`the presentation is larger than ${maxBytes} bytes`);
-    const declared = Number(response.headers.get('content-length'));
-    if (declared > maxBytes) throw tooLarge();
+    const header = response.headers.get('content-length')?.trim();
+    const declared = header && /^\d+$/.test(header) ? Number(header) : undefined;
+    if (declared !== undefined && declared > maxBytes) throw tooLarge();
     if (!response.body) {
       const whole = new Uint8Array(await Promise.race([response.arrayBuffer(), aborted]));
       if (whole.byteLength > maxBytes) throw tooLarge();
       return whole;
     }
     const reader = response.body.getReader();
+    // The declared length is a hint: an encoded body can decode to more or fewer bytes. Bytes
+    // past it go to chunks after the buffer.
+    const buffer = declared ? new Uint8Array(declared) : undefined;
+    let filled = 0;
     const chunks: Uint8Array[] = [];
     let size = 0;
     try {
@@ -247,16 +260,23 @@ export async function fetchPptxSource(
         arm();
         const next = await Promise.race([reader.read(), aborted]);
         if (next.done) break;
-        chunks.push(next.value);
-        size += next.value.byteLength;
+        const chunk = next.value;
+        size += chunk.byteLength;
         if (size > maxBytes) throw tooLarge();
+        if (buffer && chunks.length === 0 && filled + chunk.byteLength <= buffer.byteLength) {
+          buffer.set(chunk, filled);
+          filled += chunk.byteLength;
+        } else chunks.push(chunk);
       }
     } catch (cause) {
       void reader.cancel(cause).catch(() => undefined);
       throw cause;
     }
+    if (buffer && chunks.length === 0)
+      return filled === buffer.byteLength ? buffer : buffer.slice(0, filled);
     const bytes = new Uint8Array(size);
-    let at = 0;
+    if (buffer) bytes.set(buffer.subarray(0, filled));
+    let at = filled;
     for (const chunk of chunks) (bytes.set(chunk, at), (at += chunk.byteLength));
     return bytes;
   } finally {

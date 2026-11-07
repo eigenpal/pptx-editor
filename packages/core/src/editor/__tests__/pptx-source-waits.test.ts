@@ -1,7 +1,13 @@
 // The waits of `usePptxSource`: a URL that stops sending bytes fails, a slow download that keeps
 // sending bytes finishes, and eager fonts that never settle hold the deck only for the wait.
 import { afterEach, describe, expect, test } from 'bun:test';
-import { fetchPptxSource, isAbortError, watchEagerPptxFonts } from '../pptx-source.ts';
+import { PPTX_ZIP_LIMITS } from '../../store/index.ts';
+import {
+  fetchPptxSource,
+  isAbortError,
+  SOURCE_MAX_BYTES,
+  watchEagerPptxFonts,
+} from '../pptx-source.ts';
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -108,6 +114,66 @@ describe('fetchPptxSource', () => {
     );
     const { result } = await settle(run);
     expect((result as Error).name).toBe('RangeError');
+  });
+
+  /** Serve `parts` as the body chunks, with `length` as the `Content-Length` when given. */
+  const serveChunks = (parts: readonly number[][], length?: string): void => {
+    globalThis.fetch = (async () => {
+      const body = new ReadableStream<Uint8Array>({
+        start: (c) => {
+          for (const p of parts) c.enqueue(new Uint8Array(p));
+          c.close();
+        },
+      });
+      const response = new Response(body);
+      // A test `Response` computes no length for a stream: set the header as a server does.
+      if (length !== undefined) response.headers.set('content-length', length);
+      return response;
+    }) as unknown as typeof fetch;
+  };
+  const fetched = async (): Promise<number[]> => [
+    ...(await fetchPptxSource(
+      'https://example.test/deck.pptx',
+      undefined,
+      new AbortController().signal,
+      STALL,
+      256
+    )),
+  ];
+
+  test('the default limit is the longest file the editor opens, not the engine ceiling', async () => {
+    expect(SOURCE_MAX_BYTES).toBeGreaterThanOrEqual(PPTX_ZIP_LIMITS.maxTotalBytes);
+    expect(SOURCE_MAX_BYTES).toBeLessThan(PPTX_ZIP_LIMITS.maxTotalBytes * 1.1);
+    // The body is empty: only the declared length can refuse it.
+    serveChunks([], String(SOURCE_MAX_BYTES + 1));
+    const { result } = await settle(
+      fetchPptxSource('https://example.test/deck.pptx', undefined, new AbortController().signal)
+    );
+    expect((result as Error).name).toBe('RangeError');
+  });
+
+  test('a body of the declared length arrives in one buffer of that length', async () => {
+    serveChunks([[1, 2], [3], [4, 5]], '5');
+    const bytes = await fetchPptxSource(
+      'https://example.test/deck.pptx',
+      undefined,
+      new AbortController().signal,
+      STALL,
+      256
+    );
+    expect([...bytes]).toEqual([1, 2, 3, 4, 5]);
+    expect(bytes.buffer.byteLength).toBe(5);
+  });
+
+  test('a body longer or shorter than the declared length, or with none, arrives whole', async () => {
+    serveChunks([[1, 2], [3], [4, 5]], '3');
+    expect(await fetched()).toEqual([1, 2, 3, 4, 5]);
+    serveChunks([[1, 2], [3]], '8');
+    expect(await fetched()).toEqual([1, 2, 3]);
+    serveChunks([[1, 2], [3]], 'abc');
+    expect(await fetched()).toEqual([1, 2, 3]);
+    serveChunks([[1, 2], [3]]);
+    expect(await fetched()).toEqual([1, 2, 3]);
   });
 
   test('an HTTP error fails at once', async () => {
