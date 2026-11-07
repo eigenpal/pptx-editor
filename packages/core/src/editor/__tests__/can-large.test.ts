@@ -1,6 +1,6 @@
 // `can` answers within a frame on large targets: an arrange command on more than 250 shapes, a
 // Duplicate of shapes with more than 20,000 XML nodes, and Apply Layout or Reset Slide on a slide
-// of more than 20,000 XML nodes check only the editing mode. Other commands on more than 250
+// of more than 20,000 XML nodes or on more than 250 slides check only the editing mode. Other commands on more than 250
 // shapes check the first 250 first, and a refusal there checks them all. A text format check reads at most 64 runs, but the
 // command formats every run. Formatting answers hold through a typing burst.
 
@@ -85,6 +85,31 @@ test('Apply Layout checks only the mode on a slide of many nodes', async () => {
   editor.selectSlide(1);
   expect(editor.can(unknown)).toEqual({ ok: true });
   editor.destroy();
+});
+
+test('Apply Layout and Reset Slide check only the mode for more than 250 named slides', async () => {
+  const count = LARGE_SELECTION + 1;
+  const editor = await open(Array.from({ length: count }, () => shapes(1)));
+  const all = Array.from({ length: count }, (_, i) => i);
+  const unknown = { type: 'applyLayout', layoutId: 'no-such-layout', indices: all } as const;
+  expect(editor.can(unknown)).toEqual({ ok: true });
+  expect(editor.exec(unknown).ok).toBe(false);
+  expect(editor.can({ type: 'resetSlides', indices: all })).toEqual({ ok: true });
+  // 250 slides still check in full.
+  expect(editor.can({ ...unknown, indices: all.slice(0, LARGE_SELECTION) }).ok).toBe(false);
+  // With no indices, the command edits the selected slides: all of them after Select All.
+  const selected = { type: 'applyLayout', layoutId: 'no-such-layout' } as const;
+  expect(editor.can(selected).ok).toBe(false);
+  editor.selectSlide(0);
+  editor.selectSlide(count - 1, 'range');
+  expect(editor.can(selected)).toEqual({ ok: true });
+  editor.destroy();
+  const viewer = await open(
+    Array.from({ length: count }, () => shapes(1)),
+    'view'
+  );
+  expect(viewer.can(unknown)).toEqual({ ok: false, reason: 'disabled.viewing' });
+  viewer.destroy();
 });
 
 test('a text format check of a long text box is quick, and the command formats every run', async () => {

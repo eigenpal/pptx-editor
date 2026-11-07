@@ -67,6 +67,7 @@
     "bench:hang:browser": "playwright test --config e2e/bench.config.ts e2e/hang.bench.ts",
     "bench:network:browser": "playwright test --config e2e/bench.config.ts e2e/network.bench.ts",
     "bench:memory:browser": "playwright test --config e2e/memory.config.ts",
+    "bench:interaction:browser": "playwright test --config e2e/bench.config.ts e2e/interaction-hang.bench.ts",
     "fidelity": "bun scripts/fidelity/run.ts",
     "fidelity:corpus": "bun scripts/fidelity/run.ts --set corpus",
     "fidelity:census": "bun scripts/fidelity/census.ts",

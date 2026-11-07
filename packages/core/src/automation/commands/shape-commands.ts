@@ -41,12 +41,27 @@ import {
 
 const WRAP = `xmlns:a="${NS.a}" xmlns:p="${NS.p}" xmlns:r="${NS.r}"`;
 
+/**
+ * Fragments parsed lately, by their XML. A command that writes one fragment to every cell of a
+ * large table (a border, a fill) parses it once. A spec is read-only, so callers share it.
+ */
+const parsedFragments = new Map<string, NodeSpec>();
+const MAX_FRAGMENTS = 64;
+const MAX_FRAGMENT_CHARS = 4_096;
+
 /** Parse an XML fragment (with a, p, r prefixes bound) into a node spec. */
 export function specFromXml(xml: string): NodeSpec {
+  const known = parsedFragments.get(xml);
+  if (known) return known;
   const r = parseXmlPart('/fragment.xml', `<w ${WRAP}>${xml}</w>`);
   const first = r.ok ? elements(r.part.root)[0] : undefined;
   if (!first) throw new CommandRefusal('errors.unsupported', 'template');
-  return specOf(first);
+  const spec = specOf(first);
+  if (xml.length <= MAX_FRAGMENT_CHARS) {
+    if (parsedFragments.size >= MAX_FRAGMENTS) parsedFragments.clear();
+    parsedFragments.set(xml, spec);
+  }
+  return spec;
 }
 
 const int = (v: number): string => String(Math.round(v));

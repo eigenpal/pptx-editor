@@ -174,6 +174,15 @@ const validIndex = (index: number, length: number): boolean =>
   Number.isInteger(index) && index >= 0 && index <= length;
 
 /**
+ * The OPC-equivalent part names (`partNameKey`) of a package's part map, handed from the
+ * transaction that made it to the next transaction on it. A command that reads the package
+ * between ops closes a transaction each time; the next one then adds parts without reading
+ * every part name again. The first transaction on a map takes its names, and later ones read
+ * them again, so no two transactions share one set.
+ */
+const handedKeys = new WeakMap<object, Set<string>>();
+
+/**
  * One transaction against a base package. Parts are copied on first write, and each XML part
  * gets one {@link WorkingTree} that carries its id index across every op.
  */
@@ -186,6 +195,8 @@ class Transaction {
 
   constructor(base: PptxPackage) {
     this.#base = base;
+    this.#keys = handedKeys.get(base.parts) ?? null;
+    if (this.#keys) handedKeys.delete(base.parts);
   }
 
   /** The writable part map: it records changes over the base, never a copy of every part. */
@@ -365,7 +376,9 @@ class Transaction {
     for (const [name, tree] of this.#trees)
       if (tree.changed)
         this.#partsForWrite().set(name, { kind: 'xml', partName: name, xml: tree.result() });
-    return this.#parts ? { parts: this.#parts.seal() } : this.#base;
+    const pkg = this.#parts ? { parts: this.#parts.seal() } : this.#base;
+    if (this.#keys) handedKeys.set(pkg.parts, this.#keys);
+    return pkg;
   }
 }
 
