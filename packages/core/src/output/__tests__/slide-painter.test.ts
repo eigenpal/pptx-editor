@@ -5,6 +5,7 @@ import { afterAll, expect, test } from 'bun:test';
 import { GlobalWindow } from 'happy-dom';
 import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { createPptxEditor } from '../../editor/index.ts';
+import type { LayoutItem } from '../../layout/index.ts';
 import { paintSlide, SlidePainter, type PaintOptions } from '../paint.ts';
 
 const win = new GlobalWindow();
@@ -170,5 +171,26 @@ test('while a budget repaints new items, each earlier node stays in its place', 
   for (const id of ids)
     expect(svg.querySelector(`[data-node-id="${id}"]`)).not.toBe(before.get(id)!);
   expect(normalized(svg)).toBe(normalized(paintSlide(doc, fresh, opts)));
+  editor.destroy();
+});
+
+test('a stand-in is the earlier node of the same part and layer, not of a shared node id', async () => {
+  const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  expect((await editor.load(deck())).ok).toBe(true);
+  const layout = editor.session!.layout(0)!;
+  const first = layout.items[0]!;
+  // Node ids are numbered per part: a master shape can share the id of a slide shape.
+  const master = {
+    ...first,
+    element: { ...first.element, partName: '/ppt/slideMasters/slideMaster1.xml' },
+  } as LayoutItem;
+  const items: LayoutItem[] = [master, ...layout.items];
+  const painter = new SlidePainter(doc, { images: () => undefined, idPrefix: 'x' });
+  const svg = painter.paint({ ...layout, items });
+  const content = () => [...svg.querySelectorAll('[data-kind="content"] > *')];
+  const before = content();
+  expect(before.length).toBe(items.length);
+  painter.paint({ ...layout, items: items.map((i) => ({ ...i })) }, 0);
+  expect(content()).toEqual(before);
   editor.destroy();
 });

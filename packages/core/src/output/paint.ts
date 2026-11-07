@@ -844,7 +844,7 @@ export class SlidePainter {
     };
     let left = budget;
     this.#pending = false;
-    // The earlier nodes of the shapes that a budget leaves out, by node id: each stays on
+    // The earlier nodes of the shapes that a budget leaves out (`itemKey`): each stays on
     // screen in its place until its shape paints again (a font load or a theme edit makes
     // every item new).
     let earlier: Map<string, [LayoutItem, PaintedItem]> | null = null;
@@ -854,9 +854,9 @@ export class SlidePainter {
       const kept = next.has(item) ? undefined : this.#items.get(item);
       if (!kept && left <= 0) {
         this.#pending = true;
-        earlier ??= new Map([...this.#items].map(([i, p]) => [i.element.nodeId, [i, p]] as const));
+        earlier ??= new Map([...this.#items].map(([i, p]) => [itemKey(i), [i, p]] as const));
         current ??= new Set(layout.items);
-        const stand = earlier.get(item.element.nodeId);
+        const stand = earlier.get(itemKey(item));
         if (stand && !next.has(stand[0]) && !current.has(stand[0])) {
           next.set(stand[0], stand[1]);
           if (stand[1].node) nodes.push(stand[1].node);
@@ -886,6 +886,13 @@ export class SlidePainter {
     return root;
   }
 }
+
+/**
+ * An item's place in the document: its part, its layer, and its node id. Node ids are numbered
+ * per part, so a master shape and a slide shape can share one.
+ */
+const itemKey = (item: LayoutItem): string =>
+  `${item.element.partName}\u0000${item.element.layer}\u0000${item.element.nodeId}`;
 
 /** Paint a slide into a new `<svg>` sized by viewBox in EMU. The caller sets CSS size. */
 export function paintSlide(doc: Document, layout: SlideLayout, opts: PaintOptions): SVGSVGElement {

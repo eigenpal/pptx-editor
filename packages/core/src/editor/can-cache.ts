@@ -52,8 +52,8 @@ export const LARGE_SELECTION_NODES = 20_000;
 const COPYING_COMMANDS: ReadonlySet<EditorCommand['type']> = new Set(['duplicate']);
 
 /**
- * Commands that edit every placeholder of a slide, whatever the selection: a check of one on a
- * slide of more than {@link LARGE_SELECTION_NODES} nodes is large too.
+ * Commands that edit every placeholder of a slide, whatever the selection: a check of one that
+ * names a slide of more than {@link LARGE_SELECTION_NODES} nodes is large too.
  */
 const SLIDE_WIDE_COMMANDS: ReadonlySet<EditorCommand['type']> = new Set([
   'applyLayout',
@@ -78,8 +78,14 @@ export function largeSelectionAnswer(
   const part = session?.info.slides[slide]?.partName;
   const quick: CanResult = readOnly ? { ok: false, reason: 'disabled.viewing' } : { ok: true };
   if (command && SLIDE_WIDE_COMMANDS.has(command.type)) {
-    const root = pkg && part ? xmlPartOf(pkg, part)?.root : undefined;
-    return root && holdsManyNodes(pkg, part, [root.id]) ? quick : null;
+    // The slides the command names, else the current one.
+    const named = 'indices' in command ? command.indices : undefined;
+    const large = (named ?? [slide]).some((i) => {
+      const at = session?.info.slides[i]?.partName;
+      const root = pkg && at ? xmlPartOf(pkg, at)?.root : undefined;
+      return !!root && holdsManyNodes(pkg, at, [root.id]);
+    });
+    return large ? quick : null;
   }
   if (selection.kind !== 'shapes') return null;
   const ids = selection.nodeIds ?? [];
