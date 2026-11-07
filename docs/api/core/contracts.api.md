@@ -36,6 +36,13 @@ export type BulletFormat = {
 };
 
 // @public
+export interface BulletFormatMixed {
+    readonly kinds: readonly ('bullet' | 'number' | 'none')[];
+    readonly sizePercent: number | null;
+    readonly startAt?: number | null;
+}
+
+// @public
 export type BulletFormatRead = {
     readonly kind: 'bullet';
     readonly char: string;
@@ -1201,6 +1208,7 @@ export interface SelectionFormat {
     // (undocumented)
     readonly bold: boolean;
     readonly bulletFormat?: BulletFormatRead | null;
+    readonly bulletFormatMixed?: BulletFormatMixed;
     // (undocumented)
     readonly bullets: boolean;
     // (undocumented)

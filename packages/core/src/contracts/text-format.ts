@@ -86,6 +86,22 @@ export type BulletFormatRead =
     };
 
 /**
+ * What the selected paragraphs share when their bullet formats differ, so the Bullets and
+ * Numbering dialog opens on their list's tab and shows the values they have in common. @public
+ */
+export interface BulletFormatMixed {
+  /** The list kind of each selected paragraph, each kind once, in selection order. */
+  readonly kinds: readonly ('bullet' | 'number' | 'none')[];
+  /** Percent of the text size, when every bullet and number has the same; otherwise null. */
+  readonly sizePercent: number | null;
+  /**
+   * The first number, when every numbered paragraph has the same; otherwise null. Absent when no
+   * paragraph is numbered.
+   */
+  readonly startAt?: number | null;
+}
+
+/**
  * The orientation of a shape's text (Home > Text Direction), in the words of Office.js's
  * the Office.js `ShapeTextOrientation` enum:`horizontal`, rotated 90° (`vertical`, file
  * `vert`) or 270° (`vertical270`), stacked letters (`wordArtVertical`), upright East Asian text

@@ -32,6 +32,7 @@ import type {
 import type {
   TextFormatCommand,
   BulletFormatRead,
+  BulletFormatMixed,
   TextOrientation,
   TextColumns,
   FontFormatRead,
@@ -43,6 +44,7 @@ export type {
   AutonumberScheme,
   BulletFormat,
   BulletFormatRead,
+  BulletFormatMixed,
   TextOrientation,
   TextColumns,
   TextCase,
@@ -629,6 +631,8 @@ export interface SelectionFormat {
    * differ (so no gallery row is checked).
    */
   readonly bulletFormat?: BulletFormatRead | null;
+  /** What the selected paragraphs share, when `bulletFormat` is absent because they differ. */
+  readonly bulletFormatMixed?: BulletFormatMixed;
 }
 
 /** The selected element's geometry, for the Format panel. EMU and degrees. @public */

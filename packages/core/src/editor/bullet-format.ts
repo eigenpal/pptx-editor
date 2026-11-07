@@ -13,7 +13,7 @@
 
 import { isValidXmlText } from '@eigenpal/ooxml-core';
 import { toHex, type ResolvedParagraph } from '../cascade/index.ts';
-import type { BulletFormat, BulletFormatRead } from '../contracts/index.ts';
+import type { BulletFormat, BulletFormatMixed, BulletFormatRead } from '../contracts/index.ts';
 import type { BulletGalleryKey, NumberGalleryKey } from './toolbar-values.ts';
 import { isSymbolFont } from '../layout/index.ts';
 import { attr, type Element, type NodeSpec } from '../store/index.ts';
@@ -366,6 +366,21 @@ export function bulletFormatOf(p: ResolvedParagraph): BulletFormatRead | null {
       ...color,
     };
   return { kind: 'number', scheme: b.scheme, startAt: b.startAt, sizePercent, ...color };
+}
+
+/** What the bullet formats of paragraphs that differ share: their kinds, size, and start. */
+export function bulletFormatMixedOf(
+  reads: readonly (BulletFormatRead | null)[]
+): BulletFormatMixed {
+  const one = <T>(values: readonly T[]): T | null =>
+    values.length > 0 && values.every((v) => v === values[0]) ? values[0]! : null;
+  const lists = reads.filter((r): r is BulletFormatRead => r !== null);
+  const starts = lists.flatMap((r) => (r.kind === 'number' ? [r.startAt] : []));
+  return {
+    kinds: [...new Set(reads.map((r) => r?.kind ?? 'none'))],
+    sizePercent: one(lists.map((r) => r.sizePercent)),
+    ...(starts.length ? { startAt: one(starts) } : {}),
+  };
 }
 
 /**

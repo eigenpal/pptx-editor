@@ -92,6 +92,7 @@ export {
 // The composable's value types, next to it, as DOCX Editor exports them with `useParagraphFormat`.
 export type {
   BulletFormat,
+  BulletFormatMixed,
   BulletFormatRead,
   FontFormatCommand,
   FontFormatRead,

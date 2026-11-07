@@ -174,6 +174,13 @@ export type BulletFormat = {
 };
 
 // @public
+export interface BulletFormatMixed {
+    readonly kinds: readonly ('bullet' | 'number' | 'none')[];
+    readonly sizePercent: number | null;
+    readonly startAt?: number | null;
+}
+
+// @public
 export type BulletFormatRead = {
     readonly kind: 'bullet';
     readonly char: string;
@@ -4496,7 +4503,7 @@ export function sectionMenuPoint(owner: HTMLElement): {
 export function sectionOfSlide(sections: readonly SlideSection[] | null, index: number): SlideSection | undefined;
 
 // @internal
-export function seedBulletFields(read: BulletFormatRead | null | undefined, tab?: BulletsDialogTab): BulletsDialogFields;
+export function seedBulletFields(read: BulletFormatRead | null | undefined, tab?: BulletsDialogTab, mixed?: BulletFormatMixed): BulletsDialogFields;
 
 // @internal
 export function seedColumnsFields(c: TextColumns | undefined): ColumnsDialogFields;
@@ -4544,6 +4551,7 @@ export interface SelectionFormat {
     // (undocumented)
     readonly bold: boolean;
     readonly bulletFormat?: BulletFormatRead | null;
+    readonly bulletFormatMixed?: BulletFormatMixed;
     // (undocumented)
     readonly bullets: boolean;
     // (undocumented)

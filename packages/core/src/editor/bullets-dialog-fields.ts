@@ -7,7 +7,7 @@
 // the user changed: a size or color change alone keeps each paragraph's own bullet. The
 // Bulleted tab also takes any character in any font, as Customize… does.
 
-import type { BulletFormat, BulletFormatRead } from '../contracts/index.ts';
+import type { BulletFormat, BulletFormatMixed, BulletFormatRead } from '../contracts/index.ts';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import {
   BULLET_GALLERY,
@@ -51,24 +51,30 @@ export interface BulletsDialogFields {
 }
 
 /**
- * Open the form on the selection: `undefined` when the paragraphs differ, null when they have
- * no list. `tab` is the tab a menu row asks for (the Numbering gallery opens Numbered). @internal
+ * Open the form on the selection: `undefined` when the paragraphs differ, with `mixed`, what
+ * they share; null when they have no list. The form opens on the tab of the paragraphs' list.
+ * `tab` is the tab a menu row asks for (the Numbering gallery opens Numbered): it applies when
+ * the paragraphs have no list, or both kinds. @internal
  */
 export function seedBulletFields(
   read: BulletFormatRead | null | undefined,
-  tab?: BulletsDialogTab
+  tab?: BulletsDialogTab,
+  mixed?: BulletFormatMixed
 ): BulletsDialogFields {
-  if (read === undefined)
+  if (read === undefined) {
+    const lists = mixed?.kinds.filter((k) => k !== 'none') ?? [];
+    const start = mixed && mixed.startAt === undefined ? 1 : mixed?.startAt;
     return {
-      kind: tab ?? 'bullet',
+      kind: lists.length === 1 ? lists[0]! : (tab ?? lists[0] ?? 'bullet'),
       bullet: '',
       char: '',
       font: '',
       number: '',
-      sizePercent: '',
+      sizePercent: mixed?.sizePercent == null ? '' : String(mixed.sizePercent),
       color: 'keep',
-      startAt: '',
+      startAt: start == null ? '' : String(start),
     };
+  }
   if (read === null)
     return {
       kind: tab ?? 'bullet',
@@ -81,7 +87,7 @@ export function seedBulletFields(
     };
   const key = (gallery: readonly ListGalleryItem[]) => galleryKeyOf(gallery, read) ?? CURRENT_STYLE;
   return {
-    kind: tab ?? read.kind,
+    kind: read.kind,
     bullet: read.kind === 'bullet' ? key(BULLET_GALLERY) : 'none',
     ...(read.kind === 'bullet' ? { char: read.char, font: read.font ?? '' } : FIRST_BULLET),
     number: read.kind === 'number' ? key(NUMBER_GALLERY) : 'none',

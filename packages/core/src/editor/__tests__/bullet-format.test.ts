@@ -16,12 +16,14 @@ import {
 import { resolveSlide } from '../../cascade/index.ts';
 import { createFixedMeasurer, layoutSlide, type TextMeasurer } from '../../layout/index.ts';
 import {
+  bulletCommandOf,
   colorChange,
   colorChoiceOf,
   colorPickOf,
   colorPicks,
   createPptxEditor,
   runToolbarCommand,
+  seedBulletFields,
   toolbarCommandState,
   type PptxEditorInstance,
 } from '../index.ts';
@@ -519,5 +521,116 @@ describe('color field picks', () => {
     expect(colorChange('keep', 'accent2')).toEqual({ theme: 'accent2' });
     expect(colorPicks('auto', 'accent1:40').at(-1)).toBe('accent1:40');
     expect(colorPicks('auto', 'accent1')).not.toContain('accent1:40');
+  });
+});
+
+describe('Bullets and Numbering dialog over a whole list', () => {
+  // A list whose levels each take their own bullet from the list style, as a master's body
+  // style gives them: "•", "–", and "•" again.
+  const LEVELS = [
+    '<a:lvl1pPr marL="228600" indent="-228600"><a:buFont typeface="Arial"/><a:buChar char="•"/></a:lvl1pPr>',
+    '<a:lvl2pPr marL="685800" indent="-228600"><a:buFont typeface="Arial"/><a:buChar char="–"/></a:lvl2pPr>',
+    '<a:lvl3pPr marL="1143000" indent="-228600"><a:buFont typeface="Courier New"/><a:buChar char="•"/></a:lvl3pPr>',
+  ].join('');
+  const level = (text: string, lvl: number, own = '') =>
+    para(run(text), `<a:pPr lvl="${lvl}">${own}</a:pPr>`);
+  const list = (text: string) =>
+    buildPptx({
+      slides: [
+        {
+          shapes: shape({
+            id: 2,
+            name: 'T',
+            x: IN,
+            y: IN,
+            cx: 6 * IN,
+            cy: 3 * IN,
+            text,
+            lstStyle: LEVELS,
+          }),
+        },
+      ],
+    });
+  const opened = (e: PptxEditorInstance, tab?: 'bullet' | 'number') => {
+    const f = e.snapshot().format;
+    return seedBulletFields(f?.bulletFormat, tab, f?.bulletFormatMixed);
+  };
+  const reads = (e: PptxEditorInstance, count: number) =>
+    Array.from({ length: count }, (_, i) => {
+      select(e, i);
+      return e.snapshot().format?.bulletFormat;
+    });
+
+  test('bullets that differ by level open on Bulleted, with their shared size', async () => {
+    const e = await open(list(level('one', 0) + level('two', 1) + level('three', 2)));
+    select(e, 0, 2);
+    expect(e.snapshot().format?.bulletFormat).toBeUndefined();
+    // Also from the Numbering gallery's row: the paragraphs are bulleted, none numbered.
+    for (const tab of [undefined, 'bullet', 'number'] as const) {
+      const seed = opened(e, tab);
+      expect(seed.kind).toBe('bullet');
+      expect([seed.bullet, seed.sizePercent, seed.startAt]).toEqual(['', '100', '1']);
+    }
+  });
+
+  test('OK with no change sends nothing; a size change keeps each level its own bullet', async () => {
+    const e = await open(list(level('one', 0) + level('two', 1) + level('three', 2)));
+    select(e, 0, 2);
+    const seed = opened(e, 'number');
+    expect(bulletCommandOf(seed, seed)).toBeUndefined();
+    expect(bulletCommandOf(seed, { ...seed, kind: 'number' })).toBeUndefined();
+    const format = bulletCommandOf(seed, { ...seed, sizePercent: '150' });
+    expect(format).toEqual({ sizePercent: 150 });
+    expect(e.exec({ type: 'setBulletFormat', format: format! }).ok).toBe(true);
+    expect(reads(e, 3)).toEqual([
+      { kind: 'bullet', char: '•', font: 'Arial', sizePercent: 150 },
+      { kind: 'bullet', char: '–', font: 'Arial', sizePercent: 150 },
+      { kind: 'bullet', char: '•', font: 'Courier New', sizePercent: 150 },
+    ]);
+  });
+
+  test('numbers that differ open on Numbered, with their shared start', async () => {
+    const num = (type: string) =>
+      `<a:buFont typeface="+mj-lt"/><a:buAutoNum type="${type}" startAt="3"/>`;
+    const e = await open(
+      list(level('one', 0, num('arabicPeriod')) + level('two', 1, num('alphaLcParenR')))
+    );
+    select(e, 0, 1);
+    const seed = opened(e, 'bullet');
+    expect([seed.kind, seed.number, seed.sizePercent, seed.startAt]).toEqual([
+      'number',
+      '',
+      '100',
+      '3',
+    ]);
+  });
+
+  test('bullets mixed with numbers open on the tab the row asks for, or the first list', async () => {
+    const big = '<a:buSzPct val="150000"/><a:buFont typeface="+mj-lt"/>';
+    const e = await open(
+      list(level('one', 0) + level('two', 0, `${big}<a:buAutoNum type="arabicPeriod"/>`))
+    );
+    select(e, 0, 1);
+    expect(e.snapshot().format?.bulletFormatMixed).toEqual({
+      kinds: ['bullet', 'number'],
+      sizePercent: null,
+      startAt: 1,
+    });
+    expect(opened(e).kind).toBe('bullet');
+    const seed = opened(e, 'number');
+    expect([seed.kind, seed.sizePercent, seed.startAt]).toEqual(['number', '', '1']);
+  });
+
+  test('one bulleted paragraph opens on Bulleted, also from the Numbering row', async () => {
+    const e = await open(list(level('one', 1)));
+    select(e);
+    const seed = opened(e, 'number');
+    expect([seed.kind, seed.bullet, seed.char, seed.sizePercent]).toEqual([
+      'bullet',
+      'current',
+      '–',
+      '100',
+    ]);
+    expect(bulletCommandOf(seed, seed)).toBeUndefined();
   });
 });

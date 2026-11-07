@@ -676,6 +676,7 @@ export {
 // do, so a host types its handlers with an import from this package only.
 export type {
   BulletFormat,
+  BulletFormatMixed,
   BulletFormatRead,
   BulletsDialogFields,
   CanvasMenuKind,

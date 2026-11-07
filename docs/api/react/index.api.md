@@ -5,6 +5,7 @@
 ```ts
 
 import { BulletFormat } from '@pptx-editor.dev/core/editor';
+import { BulletFormatMixed } from '@pptx-editor.dev/core/editor';
 import { BulletFormatRead } from '@pptx-editor.dev/core/editor';
 import { BulletsDialogFields } from '@pptx-editor.dev/core/editor';
 import { CanvasMenuKind } from '@pptx-editor.dev/core/editor';
@@ -142,6 +143,8 @@ export interface BackgroundDialogProps extends DialogCustomizationProps {
 }
 
 export { BulletFormat }
+
+export { BulletFormatMixed }
 
 export { BulletFormatRead }
 
