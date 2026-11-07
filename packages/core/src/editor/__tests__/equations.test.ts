@@ -72,6 +72,53 @@ describe('equations draw from their math', () => {
   });
 });
 
+describe('lines that hold equations', () => {
+  /** Each line of shape `name`: its box, and the ink of its runs and marks (EMU, y down). */
+  function inkLines(e: PptxEditorInstance, name: string) {
+    const item = e
+      .session!.layout(0)!
+      .items.find((i) => i.kind === 'shape' && i.element.name === name);
+    if (!item || item.kind !== 'shape' || !item.text) throw new Error(name);
+    return item.text.lines.map((l) => {
+      let top = Infinity;
+      let bottom = -Infinity;
+      for (const r of l.runs) {
+        // The fixed measurer draws each glyph as a box from the baseline up to 0.7 em.
+        const em = r.sizePt * 12_700;
+        top = Math.min(top, l.baseline - r.rise - 0.7 * em);
+        bottom = Math.max(bottom, l.baseline - r.rise);
+      }
+      for (const m of l.marks ?? [])
+        for (const c of m.commands)
+          if (c.op !== 'Z') {
+            top = Math.min(top, l.baseline - c.y);
+            bottom = Math.max(bottom, l.baseline - c.y);
+          }
+      return { top: l.top, bottom: l.top + l.height, inkTop: top, inkBottom: bottom };
+    });
+  }
+
+  test('each line holds the ink of its equation, so stacked lines do not overlap', async () => {
+    const e = await open(buildPptx({ slides: equationFixtures['equation-lines']! }));
+    // Two display fractions, then text, a fraction, and text.
+    for (const name of ['Stack 3', 'Stack 4']) {
+      const lines = inkLines(e, name);
+      // Baselines round to whole points: the ink may pass its line by up to half a point.
+      const half = 6_350;
+      for (const l of lines) {
+        expect(l.inkTop).toBeGreaterThanOrEqual(l.top - half);
+        expect(l.inkBottom).toBeLessThanOrEqual(l.bottom + half);
+      }
+      for (let i = 1; i < lines.length; i += 1) {
+        const gap = lines[i]!.inkTop - lines[i - 1]!.inkBottom;
+        // No overlap, and no space added past the ink: within one 18 pt text line.
+        expect(gap).toBeGreaterThanOrEqual(-half);
+        expect(gap).toBeLessThan(18 * 12_700);
+      }
+    }
+  });
+});
+
 describe('Insert > Equation', () => {
   test('writes the math, a plain-text fallback, and selects the new text box', async () => {
     const e = await open(blankDeck());

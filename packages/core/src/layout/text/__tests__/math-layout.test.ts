@@ -83,6 +83,71 @@ describe('math layout', () => {
     expect(b.lineAscent).toBeLessThan(sup.y + sup.face.metrics.ascent * EM);
   });
 
+  /** The layout of `m:oMath` content `inner`, in OMML. */
+  const omml = (inner: string) => {
+    const M = 'http://schemas.openxmlformats.org/officeDocument/2006/math';
+    const xml =
+      `<a14:m xmlns:a14="${A14}" xmlns:a="${A}"><m:oMathPara xmlns:m="${M}"><m:oMath>` +
+      `${inner}</m:oMath></m:oMathPara></a14:m>`;
+    const r = parseXmlPart('/z.xml', xml);
+    if (!r.ok) throw new Error('parse');
+    return layoutMath(
+      readMathZone(r.part.root, () => props)!,
+      measurer,
+      1
+    );
+  };
+  const mr = (t: string, nor = false) =>
+    `<m:r>${nor ? '<m:rPr><m:nor/></m:rPr>' : ''}<a:rPr/><m:t>${t}</m:t></m:r>`;
+  const sizes = (b: ReturnType<typeof omml>) => b.glyphs.map((g) => [g.text, g.sizePt]);
+
+  test('normal text keeps its size in the scripts of a math base, also nested', () => {
+    // v with a normal-text subscript, x with a normal-text superscript.
+    const sub = omml(
+      `<m:sSub><m:e>${mr('v')}</m:e><m:sub>${mr('max', true)}</m:sub></m:sSub>` +
+        `<m:sSup><m:e>${mr('x')}</m:e><m:sup>${mr('n', true)}</m:sup></m:sSup>`
+    );
+    expect(sizes(sub)).toEqual([
+      ['𝑣', 18],
+      ['max', 18],
+      ['𝑥', 18],
+      ['n', 18],
+    ]);
+    // x^(y^z): math text shrinks at each level; normal text at the second level does not.
+    const nested = (z: string) =>
+      omml(
+        `<m:sSup><m:e>${mr('x')}</m:e><m:sup><m:sSup><m:e>${mr('y')}</m:e>` +
+          `<m:sup>${z}</m:sup></m:sSup></m:sup></m:sSup>`
+      );
+    expect(sizes(nested(mr('z')))).toEqual([
+      ['𝑥', 18],
+      ['𝑦', 13],
+      ['𝑧', 11],
+    ]);
+    expect(sizes(nested(mr('z', true)))).toEqual([
+      ['𝑥', 18],
+      ['𝑦', 13],
+      ['z', 18],
+    ]);
+  });
+
+  test('a normal-text radical degree keeps its size', () => {
+    const b = omml(`<m:rad><m:deg>${mr('3', true)}</m:deg><m:e>${mr('x')}</m:e></m:rad>`);
+    expect(sizes(b)).toEqual([
+      ['3', 18],
+      ['𝑥', 18],
+    ]);
+  });
+
+  test('the line holds the ink below the baseline, not the face descent', () => {
+    // A subscript lowers its ink; the line descent is that ink, and no more.
+    const b = omml(`<m:sSub><m:e>${mr('x')}</m:e><m:sub>${mr('i')}</m:sub></m:sSub>`);
+    const sub = b.glyphs[1]!;
+    expect(sub.y).toBeLessThan(0);
+    expect(b.lineDescent).toBeCloseTo(b.descent, 0);
+    expect(b.lineDescent).toBeLessThan(sub.face.metrics.descent * sub.sizePt * 12_700 - sub.y);
+  });
+
   test('a fraction stacks its parts around one rule, centered', () => {
     const b = box('a/(b+c)');
     expect(b.marks).toHaveLength(1);

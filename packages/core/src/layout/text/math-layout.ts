@@ -249,12 +249,16 @@ function inkOf(measurer: TextMeasurer, face: ResolvedFace, cp: number): readonly
     if (Number.isFinite(lo)) out = [lo, hi];
   }
   if (!out) {
-    // An estimate when the measurer has no outline: by the plain character's shape.
+    // An estimate when the measurer has no outline: by the plain character's shape, and at
+    // least the face's ascent and descent. The line grows by ink only (`layoutMath`), so a glyph
+    // with no outline (a fallback face draws it, an East Asian character for example) must not
+    // pass the line's top or bottom.
     const ch = String.fromCodePoint(cp).normalize('NFKD').charAt(0);
+    const { ascent, descent } = face.metrics;
     if (cp === 32) out = [0, 0];
-    else if (DESCENDERS.test(ch)) out = [-0.21, 0.46];
-    else if (SHORT.test(ch)) out = [0, 0.46];
-    else out = [0, 0.68];
+    else if (DESCENDERS.test(ch)) out = [Math.min(-0.21, -descent), Math.max(0.46, ascent)];
+    else if (SHORT.test(ch)) out = [Math.min(0, -descent), Math.max(0.46, ascent)];
+    else out = [Math.min(0, -descent), Math.max(0.68, ascent)];
   }
   if (cache.size < 4096) cache.set(key, out);
   return out;
@@ -295,10 +299,12 @@ const plainProps = (props: RunProps): RunProps =>
 /** The atoms of a math run: letters and digits together, each operator alone. */
 function runItems(run: MathRun, env: Env): Item[] {
   const props = plainProps(run.props);
-  // Normal text (`m:nor`, 22.1.2.73) is not math text, so the script sizes of math layout do not
-  // apply to it: it keeps the run's own size at every script level. Its place (the shift of a
-  // superscript, for example) still follows the construct. The reference PDF of the
-  // `preserved-content` fixture draws a normal-text superscript at the run's size.
+  // Normal text (`m:nor`) keeps the run's own size at every script level: the script sizes
+  // apply to math text only. Its place (the shift of a superscript, for example) still follows
+  // the construct. The rule comes from the reference PDFs, not from the standard's text: the
+  // `equation-lines` fixture, slide 2, draws normal text at the run's size in a subscript and a
+  // superscript of a math base, in a nested script, and in a radical degree, in STIX Two Math
+  // and in Liberation Serif, as `preserved-content`, slide 1, does.
   const size = sizePt(props, env, run.normal ? 0 : env.level);
   if (run.normal) {
     const face = env.measurer.resolve({
@@ -847,9 +853,15 @@ export function layoutMath(zone: MathZone, measurer: TextMeasurer, fontScale: nu
   const box = lines.length === 1 ? lines[0]! : stackRows(lines, C.eqArrRow, em, C.axis * em);
   const base = mathFace(measurer, zone.props.latin, false, false).face;
   // The line already holds the base runs' face (`face`, `sizePt`). Past that, the equation
-  // needs room for its ink only: the glyph outlines (`box`) and the marks. A raised script
-  // whose ink stays inside the line does not make the line taller, also when its face's ascent
-  // would pass the line (reference PDFs of `preserved-content`, slide 1, and `equations`).
+  // needs room for its ink only, above and below: the glyph outlines (`box`) and the marks. A
+  // raised script whose ink stays inside the line does not make the line taller, also when its
+  // face's ascent would pass the line, and a line after an equation starts where the ink ends,
+  // with no gap added. Measured on the reference PDFs of `equations`, `equation-lines`, and
+  // `preserved-content`, slide 1: stacked equations and text lines above and below them come
+  // within 0.2 pt, where the faces' ascent and descent put the next line 3 to 18 pt too low.
+  // A partial fit: the reference sometimes draws a numerator or a superscript lower, closer to
+  // the base, than this layout does (`equation-lines`, slide 1), and makes a line of an
+  // equation at more than single spacing taller than the spacing gives. Neither is modeled.
   let lineAscent = Math.max(0, box.asc);
   let lineDescent = Math.max(0, box.desc);
   for (const m of box.marks)
