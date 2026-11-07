@@ -68,9 +68,11 @@ A keystroke costs about the same in a deck of 5,000 slides as in a deck of 50.
 - The slide summaries, the font list, and the font notice update from the parts that the edit changed.
 - The slide rail renders again only the items whose slide changed. The other items keep their elements and their names.
 - A thumbnail out of view in the rail takes no layout or paint (`content-visibility: auto`). The rail can paint thumbnails in idle time without delaying the next key.
+- The rail and the slide sorter keep at most 200 thumbnails painted. Past that, the thumbnails painted longest ago that are out of view become empty again, and paint again when they scroll into view. Memory stays level when you scroll a long rail from end to end.
+- The text measurements that the editor keeps are limited in count and in size. Typing in a long paragraph does not keep a copy of each version of the paragraph.
 - The canvas reads its fit zoom again only when the slide size or the canvas size changes.
 
-`bun run bench:edit` and `bun run bench:open:browser` measure these costs on synthetic decks of up to 5,000 slides.
+`bun run bench:edit` and `bun run bench:open:browser` measure these costs on synthetic decks of up to 5,000 slides. `bun run bench:memory:browser` measures memory across repeated opens, editing, and long decks.
 
 ## Collaboration and fonts
 
