@@ -3,9 +3,12 @@
 // is injected, as for text. All lengths are EMU, with y up from the math baseline.
 //
 // The rules follow TeX's math layout: atoms with classes and the spaces between them, script
-// sizes (73 % and 60 %, rounded to half a point), cramped styles under radicals and in
-// subscripts, and shifts that keep a minimum gap. The constants are measured on the reference
-// PDF of the `equations` fixture (STIX Two Math, 18 pt). Where a run's font is not available,
+// sizes (73 % and 60 %, rounded down to half a point), cramped styles under radicals and in
+// subscripts, and shifts that keep a minimum gap. The model of scripts (`math-scripts.ts`), ink
+// (`math-ink.ts`), and line extent (`math-line-extent.ts`) is DOCX Editor's equation layout
+// (eigenpal/docx-editor, packages/core/src/layout/equation-*.ts at adf0e178c, Apache-2.0), with
+// its script sizes; each module names the constants that the reference PDFs change. The
+// constants are measured on the reference PDF of the `equations` fixture (STIX Two Math, 18 pt). Where a run's font is not available,
 // the runs draw in STIX Two Math or Latin Modern Math when the host has them, else in the serif
 // text face, with italic letters instead of math alphanumerics. The known approximation
 // `equations` lists what differs.
@@ -34,6 +37,9 @@ import {
   rect,
   stroke,
 } from './math-marks.ts';
+import { mathLineExtent } from './math-line-extent.ts';
+import { mathInkOf } from './math-ink.ts';
+import { scriptShifts } from './math-scripts.ts';
 import type { ResolvedFace, TextMeasurer } from './measurer.ts';
 
 const EMU_PER_PT = 12_700;
@@ -98,6 +104,8 @@ export interface MathGlyphs {
   readonly face: ResolvedFace;
   readonly sizePt: number;
   readonly props: RunProps;
+  /** The script level of the piece: 0 for the base, 1 for a script, 2 for a script of a script. */
+  readonly level: 0 | 1 | 2;
 }
 
 /** A filled mark: a rule, the radical sign, a delimiter, a brace, or an arrow. */
@@ -118,8 +126,8 @@ export interface MathBox {
   readonly face: ResolvedFace;
   readonly sizePt: number;
   /**
-   * The room the equation needs above and below the baseline in a line: the ink of its glyphs
-   * and its marks. A line grows to hold it.
+   * The room the equation needs above and below the baseline in a line: the extent that its
+   * glyphs and marks claim (`mathLineExtent`). A line grows to hold it.
    */
   readonly lineAscent: number;
   readonly lineDescent: number;
@@ -169,11 +177,16 @@ function place(into: Box, box: Box, dx: number, dy: number): void {
 
 const nextLevel = (level: 0 | 1 | 2): 0 | 1 | 2 => (level === 0 ? 1 : 2);
 
-/** The size in points of `props` at a script level. */
+/**
+ * The size in points of `props` at a script level. A reduced size rounds down to whole half
+ * points, as in DOCX Editor (`scaledSizePt`): 60 % of 18 pt is 10.5 pt. The reference PDF of
+ * `equation-lines`, slide 2, puts each line of nested scripts 0.12 to 0.14 pt nearer to
+ * this layout, horizontally, than with 11 pt.
+ */
 function sizePt(props: RunProps, env: Env, level = env.level): number {
   const base = autofitSizePt(props.size / 100, env.fontScale);
   if (level === 0) return base;
-  return Math.max(1, Math.round(base * LEVEL_SCALE[level] * 2) / 2);
+  return Math.max(1, Math.floor(base * LEVEL_SCALE[level] * 2 + 1e-9) / 2);
 }
 
 const emOf = (props: RunProps, env: Env, level = env.level): number =>
@@ -217,53 +230,6 @@ function mathFace(
   return choice;
 }
 
-/** Ink extents in em: [lowest, highest], y up. */
-const inkCache = new WeakMap<TextMeasurer, Map<string, readonly [number, number]>>();
-const DESCENDERS = /[gjpqyβγζημξρφχψ,;]/u;
-const SHORT = /[a-zα-ω=+−\-×·∘<>~*]/u;
-
-function inkOf(measurer: TextMeasurer, face: ResolvedFace, cp: number): readonly [number, number] {
-  let cache = inkCache.get(measurer);
-  if (!cache) inkCache.set(measurer, (cache = new Map()));
-  const key = `${face.id}\u0000${cp}`;
-  const hit = cache.get(key);
-  if (hit) return hit;
-  let out: readonly [number, number] | undefined;
-  const outline = measurer.glyphOutline?.(face, cp);
-  if (outline && outline.length > 0) {
-    let lo = Infinity;
-    let hi = -Infinity;
-    for (const c of outline) {
-      if (c.op === 'Z') continue;
-      lo = Math.min(lo, c.y);
-      hi = Math.max(hi, c.y);
-      if (c.op === 'Q' || c.op === 'C') {
-        lo = Math.min(lo, c.y1);
-        hi = Math.max(hi, c.y1);
-      }
-      if (c.op === 'C') {
-        lo = Math.min(lo, c.y2);
-        hi = Math.max(hi, c.y2);
-      }
-    }
-    if (Number.isFinite(lo)) out = [lo, hi];
-  }
-  if (!out) {
-    // An estimate when the measurer has no outline: by the plain character's shape, and at
-    // least the face's ascent and descent. The line grows by ink only (`layoutMath`), so a glyph
-    // with no outline (a fallback face draws it, an East Asian character for example) must not
-    // pass the line's top or bottom.
-    const ch = String.fromCodePoint(cp).normalize('NFKD').charAt(0);
-    const { ascent, descent } = face.metrics;
-    if (cp === 32) out = [0, 0];
-    else if (DESCENDERS.test(ch)) out = [Math.min(-0.21, -descent), Math.max(0.46, ascent)];
-    else if (SHORT.test(ch)) out = [Math.min(0, -descent), Math.max(0.46, ascent)];
-    else out = [Math.min(0, -descent), Math.max(0.68, ascent)];
-  }
-  if (cache.size < 4096) cache.set(key, out);
-  return out;
-}
-
 /** One piece of text in one face as a box. */
 function textBox(text: string, face: ResolvedFace, size: number, props: RunProps, env: Env): Box {
   const em = size * EMU_PER_PT;
@@ -273,9 +239,9 @@ function textBox(text: string, face: ResolvedFace, size: number, props: RunProps
   let lo = 0;
   let hi = 0;
   for (const ch of text) {
-    const [a, b] = inkOf(env.measurer, face, ch.codePointAt(0) ?? 32);
-    lo = Math.min(lo, a);
-    hi = Math.max(hi, b);
+    const ink = mathInkOf(env.measurer, face, ch.codePointAt(0) ?? 32);
+    lo = Math.min(lo, ink.lo);
+    hi = Math.max(hi, ink.hi);
   }
   // A character outside the BMP (a math alphanumeric) is a piece of its own: an SVG `x` list
   // positions each character, not each UTF-16 unit.
@@ -284,7 +250,15 @@ function textBox(text: string, face: ResolvedFace, size: number, props: RunProps
     const astral = (text.codePointAt(i) ?? 0) > 0xffff;
     let j = i + (astral ? 2 : 1);
     if (!astral) while (j < text.length && (text.codePointAt(j) ?? 0) <= 0xffff) j += 1;
-    glyphs.push({ text: text.slice(i, j), x: x.slice(i, j + 1), y: 0, face, sizePt: size, props });
+    glyphs.push({
+      text: text.slice(i, j),
+      x: x.slice(i, j + 1),
+      y: 0,
+      face,
+      sizePt: size,
+      props,
+      level: env.level,
+    });
     i = j;
   }
   return { w: x[x.length - 1]!, asc: hi * em, desc: -lo * em, glyphs, marks: [] };
@@ -457,7 +431,13 @@ function fraction(node: Extract<MathNode, { kind: 'frac' }>, env: Env): Box {
   const n = rowBox(node.num, childEnv(env));
   const d = rowBox(node.den, childEnv(env, { cramped: true }));
   const w = Math.max(n.w, d.w);
-  // A stack with no bar (`noBar`) keeps the places of a fraction with one.
+  // A stack with no bar (`noBar`) keeps the places of a fraction with one. Each part sits at
+  // least a fixed shift from the baseline, and further when its ink would come closer to the
+  // rule than the minimum gap, as in DOCX Editor (`equation-layout.ts`). The shifts and gaps
+  // are measured on the reference PDF of `equations`: with DOCX Editor's inline constants
+  // (1200/2048 and 1030/2048 em, gaps and rule 133/2048 em, axis 585/2048 em), the lines under
+  // a nested fraction move up to 2 pt from the reference (`equation-lines`, slide 1: 2.91 pt,
+  // against 0.91 pt).
   const gap = (env.display ? C.gapDisplay : C.gapText) * em;
   const u = Math.max((env.display ? C.numDisplay : C.numText) * em, a + t / 2 + gap + n.desc);
   const v = Math.max((env.display ? C.denDisplay : C.denText) * em, d.asc + gap + t / 2 - a);
@@ -474,25 +454,24 @@ function scripts(node: Extract<MathNode, { kind: 'script' }>, env: Env): Box {
   const level = nextLevel(env.level);
   const sup = node.sup ? rowBox(node.sup, childEnv(env, { level })) : undefined;
   const sub = node.sub ? rowBox(node.sub, childEnv(env, { level, cramped: true })) : undefined;
-  let u = 0;
-  let v = 0;
-  if (sup && sub) {
-    u = Math.max(C.supWithSub * em, base.asc - 0.35 * em);
-    v = Math.max(C.subWithSup * em, base.desc + 0.05 * em);
-    const gap = u - sup.desc - (sub.asc - v);
-    if (gap < 4 * C.rule * em) v += 4 * C.rule * em - gap;
-  } else if (sup) {
-    u = Math.max(
-      (env.cramped ? C.supCramped : C.sup) * em,
-      base.asc - 0.3 * em,
-      sup.desc + 0.1 * em
-    );
-  } else if (sub) {
-    v = Math.max(C.sub * em, base.desc + 0.05 * em, sub.asc - 0.36 * em);
-  }
   const out = emptyBox();
   const scriptW = Math.max(sup?.w ?? 0, sub?.w ?? 0);
   if (node.type === 'pre') {
+    // Scripts before the base (`m:sPre`): measured on the reference PDF of `equations`.
+    let u = 0;
+    let v = 0;
+    if (sup && sub) {
+      u = Math.max(C.supWithSub * em, base.asc - 0.35 * em);
+      v = Math.max(C.subWithSup * em, base.desc + 0.05 * em);
+      const gap = u - sup.desc - (sub.asc - v);
+      if (gap < 4 * C.rule * em) v += 4 * C.rule * em - gap;
+    } else if (sup)
+      u = Math.max(
+        (env.cramped ? C.supCramped : C.sup) * em,
+        base.asc - 0.3 * em,
+        sup.desc + 0.1 * em
+      );
+    else if (sub) v = Math.max(C.sub * em, base.desc + 0.05 * em, sub.asc - 0.36 * em);
     u = Math.max(C.preSup * em, u);
     v = Math.max(C.preSub * em, sub && sup ? v * 0.7 : v);
     if (sup) place(out, sup, scriptW - sup.w, u);
@@ -501,6 +480,7 @@ function scripts(node: Extract<MathNode, { kind: 'script' }>, env: Env): Box {
     out.w = scriptW + base.w;
     return out;
   }
+  const { u, v } = scriptShifts(base, sup, sub, em, env.cramped);
   place(out, base, 0, 0);
   if (sup) place(out, sup, base.w, u);
   if (sub) place(out, sub, base.w, -v);
@@ -635,7 +615,7 @@ function accent(node: Extract<MathNode, { kind: 'acc' }>, env: Env): Box {
   }
   const { face } = mathFace(env.measurer, props.latin, false, false);
   const mark = textBox(glyph, face, sizePt(props, env), props, env);
-  const [lo] = inkOf(env.measurer, face, glyph.codePointAt(0) ?? 32);
+  const { lo } = mathInkOf(env.measurer, face, glyph.codePointAt(0) ?? 32);
   // Italic bases lean right: the accent sits a little right of the center.
   place(out, mark, (base.w - mark.w) / 2 + 0.04 * em, top - lo * emOf(props, env));
   out.w = Math.max(base.w, mark.w);
@@ -852,34 +832,27 @@ export function layoutMath(zone: MathZone, measurer: TextMeasurer, fontScale: nu
   const lines = zone.lines.map((line) => rowBox(line, env));
   const box = lines.length === 1 ? lines[0]! : stackRows(lines, C.eqArrRow, em, C.axis * em);
   const base = mathFace(measurer, zone.props.latin, false, false).face;
-  // The line already holds the base runs' face (`face`, `sizePt`). Past that, the equation
-  // needs room for its ink only, above and below: the glyph outlines (`box`) and the marks. A
-  // raised script whose ink stays inside the line does not make the line taller, also when its
-  // face's ascent would pass the line, and a line after an equation starts where the ink ends,
-  // with no gap added. Measured on the reference PDFs of `equations`, `equation-lines`, and
-  // `preserved-content`, slide 1: stacked equations and text lines above and below them come
-  // within 0.2 pt, where the faces' ascent and descent put the next line 3 to 18 pt too low.
-  // A partial fit: the reference sometimes draws a numerator or a superscript lower, closer to
-  // the base, than this layout does (`equation-lines`, slide 1), and makes a line of an
-  // equation at more than single spacing taller than the spacing gives. Neither is modeled.
-  let lineAscent = Math.max(0, box.asc);
-  let lineDescent = Math.max(0, box.desc);
-  for (const m of box.marks)
-    for (const c of m.commands)
-      if (c.op !== 'Z') {
-        lineAscent = Math.max(lineAscent, c.y);
-        lineDescent = Math.max(lineDescent, -c.y);
-      }
+  const size = sizePt(zone.props, env);
+  // The line already holds the base runs' face (`face`, `sizePt`). Each other part claims its
+  // own extent on the line (`math-line-extent.ts`): a glyph its ink, and a mark its outline.
+  // Measured on the reference PDFs of `equations`, `equation-lines`, and `preserved-content`,
+  // slide 1, at single spacing: stacked superscript lines come within 0.12 pt, and a text line
+  // below an equation within 0.1 pt (`E = mc²`, normal-text scripts, `preserved-content`) to
+  // 1 pt (0.91 pt below a nested fraction, 0.99 pt below two superscript lines). Below a display
+  // fraction alone on its line, the text line is 9 pt low: the reference draws that fraction
+  // 8 pt shorter, with 2.5 pt between the numerator and the rule where this layout leaves 7.75
+  // pt. With each face's ascent and descent instead of the ink, the next line is 3 to 18 pt low.
+  const extent = mathLineExtent(box.glyphs, box.marks, size, measurer);
   const out: MathBox = {
-    lineAscent,
-    lineDescent,
+    lineAscent: extent.ascent,
+    lineDescent: extent.descent,
     width: box.w,
     ascent: box.asc,
     descent: box.desc,
     glyphs: box.glyphs,
     marks: box.marks,
     face: base,
-    sizePt: sizePt(zone.props, env),
+    sizePt: size,
   };
   byScale.set(fontScale, out);
   return out;

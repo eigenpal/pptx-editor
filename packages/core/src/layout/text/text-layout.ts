@@ -749,17 +749,35 @@ export function layoutTextOn(
       const heightPt = lineHeightInPt(single, p.lineSpacing, reduction);
       let height = heightPt * EMU_PER_PT;
       let baseline = baselineInLinePt(single, heightPt, lineMetrics) * EMU_PER_PT;
-      // An equation that needs more room than the line has makes the line taller.
+      // An equation that needs more room than the line has makes the line taller. Above single
+      // spacing, the equation grows the single line, and the spacing then adds its share of the
+      // text band on top, as DOCX Editor's `equationSpacingBand` does: the line keeps the
+      // equation's own extent. The extra goes above and below the baseline as on a text line.
+      // At 150 % (`equation-lines`, slide 1), the first line of stacked display fractions comes
+      // 8.2 pt above the reference and the line pitch 3 pt over it, against 14.2 pt and 5 pt when
+      // the equation fills the extra space. At single spacing and below, the equation fills the
+      // line's own space first (the reference PDFs of `equations` and `preserved-content`).
+      const raised = heightPt > single + 1e-9;
+      const singleBase = baselineInLinePt(single, single, lineMetrics) * EMU_PER_PT;
+      let growAbove = 0;
+      let growBelow = 0;
       for (let i = range.start, last = -1; i < range.end; i += 1) {
         if (units[i].seg === last) continue;
         last = units[i].seg;
         const box = segments[last].math;
         if (!box) continue;
+        if (raised) {
+          growAbove = Math.max(growAbove, box.lineAscent - singleBase);
+          growBelow = Math.max(growBelow, box.lineDescent - (single * EMU_PER_PT - singleBase));
+          continue;
+        }
         const above = Math.max(0, box.lineAscent - baseline);
         const below = Math.max(0, box.lineDescent - (height - baseline));
         height += above + below;
         baseline += above;
       }
+      height += growAbove + growBelow;
+      baseline += growAbove;
 
       // Positions, then alignment. Positions include the left inset, so no later pass copies
       // the position arrays to add it.

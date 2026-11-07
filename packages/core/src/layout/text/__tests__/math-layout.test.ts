@@ -122,7 +122,7 @@ describe('math layout', () => {
     expect(sizes(nested(mr('z')))).toEqual([
       ['𝑥', 18],
       ['𝑦', 13],
-      ['𝑧', 11],
+      ['𝑧', 10.5],
     ]);
     expect(sizes(nested(mr('z', true)))).toEqual([
       ['𝑥', 18],
@@ -173,7 +173,7 @@ describe('math layout', () => {
     const b = box('\\sqrt[3](x)');
     expect(b.marks).toHaveLength(2);
     expect(b.glyphs.map((g) => [g.text, g.sizePt])).toEqual([
-      ['3', 11],
+      ['3', 10.5],
       ['𝑥', 18],
     ]);
   });
