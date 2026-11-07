@@ -407,8 +407,74 @@ function fragmentOf(html: string): string {
   const start = html.indexOf('<!--StartFragment-->');
   const end = html.lastIndexOf('<!--EndFragment-->');
   if (start >= 0 && end > start) return html.slice(start + 20, end);
-  const body = /<body[^>]*>/i.exec(html);
-  return body ? html.slice(body.index + body[0].length) : html;
+  const body = html.search(/<body[\s>]/i);
+  const open = body < 0 ? -1 : html.indexOf('>', body);
+  return open < 0 ? html : html.slice(open + 1);
+}
+
+/** How far after a bullet span's start tag its character is looked for. */
+const BULLET_LOOKAHEAD = 256;
+
+/** A token of HTML: text, or a start or end tag with its attribute source. */
+type HtmlToken =
+  | { readonly kind: 'text'; readonly text: string }
+  | {
+      readonly kind: 'tag';
+      readonly close: boolean;
+      readonly name: string;
+      readonly attrs: string;
+      /** The index after the tag's `>`. */
+      readonly end: number;
+    };
+
+const isLetter = (c: number): boolean => (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
+const isNameChar = (c: number): boolean =>
+  isLetter(c) || (c >= 48 && c <= 57) || c === 58 || c === 45;
+
+/**
+ * The tokens of HTML, in one pass: comments are skipped, and a `<` that does not start a tag is
+ * text. A tag or comment that the HTML does not close ends the HTML, as in a browser, so the
+ * scan stays linear for any input.
+ */
+function* htmlTokens(source: string): Generator<HtmlToken> {
+  let i = 0;
+  const n = source.length;
+  while (i < n) {
+    const lt = source.indexOf('<', i);
+    if (lt < 0) {
+      yield { kind: 'text', text: source.slice(i) };
+      return;
+    }
+    if (lt > i) yield { kind: 'text', text: source.slice(i, lt) };
+    if (source.startsWith('<!--', lt)) {
+      const end = source.indexOf('-->', lt + 4);
+      if (end < 0) return;
+      i = end + 3;
+      continue;
+    }
+    const close = source.charCodeAt(lt + 1) === 47; // '/'
+    const nameStart = lt + (close ? 2 : 1);
+    if (!isLetter(source.charCodeAt(nameStart))) {
+      yield { kind: 'text', text: '<' };
+      i = lt + 1;
+      continue;
+    }
+    let j = nameStart + 1;
+    while (j < n && isNameChar(source.charCodeAt(j))) j += 1;
+    const name = source.slice(nameStart, j);
+    const attrsStart = j;
+    let quote = 0;
+    for (; j < n; j += 1) {
+      const c = source.charCodeAt(j);
+      if (quote) {
+        if (c === quote) quote = 0;
+      } else if (c === 34 || c === 39) quote = c;
+      else if (c === 62) break; // '>'
+    }
+    if (j >= n) return;
+    yield { kind: 'tag', close, name, attrs: source.slice(attrsStart, j), end: j + 1 };
+    i = j + 1;
+  }
 }
 
 interface ListFrame {
@@ -440,6 +506,8 @@ export function richFromHtml(html: string): RichParagraph[] | null {
     fromList?: boolean;
   } = {};
   let runCount = 0;
+  /** The paragraph holds a no-break space: `<p>&nbsp;</p>` is an empty paragraph, kept. */
+  let spaced = false;
   let pre = 0;
   const stack: Open[] = [];
   const lists: ListFrame[] = [];
@@ -448,7 +516,14 @@ export function richFromHtml(html: string): RichParagraph[] | null {
     if (paragraphs.length >= MAX_PARAGRAPHS) return;
     // Spaces at the paragraph's edges are not shown in HTML.
     const trimmed = trimEdges(runs);
-    if (trimmed.length || force || para.bullet) paragraphs.push({ runs: trimmed, ...para });
+    // A break at a block's end shows no line: `<p><br></p>` is an empty paragraph.
+    if (trimmed[trimmed.length - 1]?.br) {
+      trimmed.pop();
+      force = true;
+    }
+    if (trimmed.length || force || spaced || para.bullet)
+      paragraphs.push({ runs: trimmed, ...para });
+    spaced = false;
     runs = [];
     para = {};
   };
@@ -456,6 +531,7 @@ export function richFromHtml(html: string): RichParagraph[] | null {
     if (runCount >= MAX_RUNS) return;
     let text = decodeEntities(raw);
     text = pre ? text.replace(/\r\n?/g, '\n') : text.replace(/[\t\n\r\f ]+/g, ' ');
+    if (text.includes('\u00A0')) spaced = true;
     text = text.replace(/\u00A0/g, ' ');
     if (!text) return;
     // Collapsed spaces: one space between runs.
@@ -472,19 +548,15 @@ export function richFromHtml(html: string): RichParagraph[] | null {
       }
     });
   };
-  // Tokens: comments, tags, and text.
-  const re =
-    /<!--[\s\S]*?(?:-->|$)|<(\/?)([a-zA-Z][a-zA-Z0-9:-]*)((?:"[^"]*"|'[^']*'|[^'">])*)>|([^<]+)|</g;
   let skipping: string | null = null;
   let skipDepth = 0;
-  for (let m = re.exec(source); m; m = re.exec(source)) {
-    const [all, close, rawTag, rawAttrs, text] = m;
-    if (all.startsWith('<!--')) continue;
-    if (text !== undefined || all === '<') {
-      if (!skipping) addText(text ?? '<');
+  for (const token of htmlTokens(source)) {
+    if (token.kind === 'text') {
+      if (!skipping) addText(token.text);
       continue;
     }
-    const tag = rawTag!.toLowerCase().replace(/^\w+:/, '');
+    const { close, end: tagEnd, attrs: rawAttrs } = token;
+    const tag = token.name.toLowerCase().replace(/^\w+:/, '');
     if (skipping) {
       if (tag === skipping) skipDepth += close ? -1 : 1;
       if (skipDepth === 0) skipping = null;
@@ -500,13 +572,13 @@ export function richFromHtml(html: string): RichParagraph[] | null {
       continue;
     }
     if (SKIPPED.has(tag)) {
-      if (!/\/\s*$/.test(rawAttrs ?? '')) {
+      if (!rawAttrs.trimEnd().endsWith('/')) {
         skipping = tag;
         skipDepth = 1;
       }
       continue;
     }
-    const attrs = attributesOf(rawAttrs ?? '');
+    const attrs = attributesOf(rawAttrs);
     if (tag === 'br') {
       if (runCount < MAX_RUNS) runs.push({ text: '', br: true, ...runStyle(style()) });
       runCount += 1;
@@ -520,9 +592,10 @@ export function richFromHtml(html: string): RichParagraph[] | null {
     const css = cssDeclarations(attrs.get('style') ?? '');
     // A bullet span holds the bullet's own character: it marks the paragraph, it is not text.
     if (tag === 'span' && css.has('mso-special-format')) {
-      const end = source.indexOf('</span>', re.lastIndex);
-      const inner =
-        end < 0 ? '' : decodeEntities(source.slice(re.lastIndex, end).replace(/<[^>]*>/g, ''));
+      // The bullet's character is near: a bounded look, so many bullet spans stay linear.
+      const near = source.slice(tagEnd, tagEnd + BULLET_LOOKAHEAD);
+      const end = near.indexOf('</span>');
+      const inner = end < 0 ? '' : decodeEntities(near.slice(0, end).replace(/<[^<>]*>/g, ''));
       const bullet = specialBullet(css, inner);
       if (bullet) para = { ...para, bullet };
       skipping = 'span';
@@ -740,7 +813,10 @@ export function richHtml(paragraphs: readonly RichParagraph[]): string {
         })
         .join('');
       const tag = p.bullet && p.bullet.kind !== 'none' ? 'div' : 'p';
-      return `<${tag}${cls} style="${blockCss.join(';')}">${bullet}${runs || '<br>'}</${tag}>`;
+      // A block's last break shows no line in HTML: a paragraph that ends in a break, or is
+      // empty, takes one more.
+      const end = !runs || p.runs[p.runs.length - 1]?.br ? '<br>' : '';
+      return `<${tag}${cls} style="${blockCss.join(';')}">${bullet}${runs}${end}</${tag}>`;
     })
     .join('');
   return `<meta charset="utf-8"><!--StartFragment-->${body}<!--EndFragment-->`;

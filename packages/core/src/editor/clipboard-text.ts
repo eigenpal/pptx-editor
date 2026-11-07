@@ -57,14 +57,43 @@ const DROPPED = new Set([
   'extLst',
 ]);
 
-/** A checked node without links, relationships, or pictures. */
+/**
+ * A checked node without links, relationships, or pictures: only DrawingML elements and
+ * unqualified attributes, and text only in `a:t`.
+ */
 function stripped(spec: NodeSpec): NodeSpec {
   return {
     ...spec,
-    attrs: (spec.attrs ?? []).filter((x) => x.ns !== NS.r),
+    prefix: 'a',
+    attrs: (spec.attrs ?? []).filter((x) => x.ns === ''),
+    nsDecls: [],
     children: (spec.children ?? []).flatMap((c): (NodeSpec | { readonly text: string })[] =>
-      'text' in c ? [c] : c.ns === NS.a && DROPPED.has(c.local) ? [] : [stripped(c)]
+      'text' in c
+        ? spec.local === 't'
+          ? [c]
+          : []
+        : c.ns !== NS.a || DROPPED.has(c.local)
+          ? []
+          : [stripped(c)]
     ),
+  };
+}
+
+/** The children each inline element of a paragraph may hold. */
+const INLINE_CHILDREN: Readonly<Record<string, ReadonlySet<string>>> = {
+  r: new Set(['rPr', 't']),
+  fld: new Set(['rPr', 't']),
+  br: new Set(['rPr']),
+};
+
+/** An inline element with only the children it may hold. */
+function inline(spec: NodeSpec): NodeSpec {
+  const clean = stripped(spec);
+  const allowed = INLINE_CHILDREN[spec.local];
+  if (!allowed) return clean;
+  return {
+    ...clean,
+    children: (clean.children ?? []).filter((c) => !('text' in c) && allowed.has(c.local)),
   };
 }
 
@@ -81,10 +110,11 @@ export function cleanParagraphs(raw: unknown): NodeSpec[] | null {
     if (!spec || spec.ns !== NS.a || spec.local !== 'p') return null;
     const kids = (spec.children ?? []).flatMap((c): NodeSpec[] => {
       if ('text' in c || c.ns !== NS.a) return [];
-      if (c.local === 'fld') return [{ ...stripped(c), local: 'r', attrs: [] }];
-      return INLINE.has(c.local) ? [stripped(c)] : [];
+      if (c.local === 'fld') return [{ ...inline(c), local: 'r', attrs: [] }];
+      if (c.local === 'pPr' || c.local === 'endParaRPr') return [stripped(c)];
+      return INLINE.has(c.local) ? [inline(c)] : [];
     });
-    out.push({ ...spec, attrs: [], children: kids });
+    out.push({ ...spec, attrs: [], nsDecls: [], children: kids });
   }
   return out;
 }

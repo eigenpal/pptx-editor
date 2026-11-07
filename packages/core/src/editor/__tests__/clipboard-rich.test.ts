@@ -119,6 +119,15 @@ describe('HTML from other applications', () => {
     expect(decodeEntities('&#0;&#xD800;&#x1F600;&bogus;')).toBe('😀&bogus;');
   });
 
+  test('tags, quotes, and bullet spans that never close read in linear time', () => {
+    const started = performance.now();
+    for (const unit of ['<a ', '<a "', '<body', '<span style="mso-special-format:bullet">x'])
+      richFromHtml(unit.repeat(200_000));
+    expect(performance.now() - started).toBeLessThan(2_000);
+    // A tag that never closes ends the HTML, as in a browser.
+    expect(richFromHtml('<p>kept</p><b class="x')!.map((p) => p.runs[0]!.text)).toEqual(['kept']);
+  });
+
   test('style declarations split outside quotes', () => {
     const css = cssDeclarations(`mso-special-format:"numbullet3\\,1;x";font-family:'A;B'`);
     expect(css.get('mso-special-format')).toBe('"numbullet3\\,1;x"');
@@ -151,6 +160,23 @@ describe('copied text as HTML', () => {
     expect(p[1]).toMatchObject({ level: 1, bullet: { kind: 'char', char: '•' } });
     expect(p[2]!.bullet).toEqual({ kind: 'number', scheme: 'alphaUcParenR', startAt: 2 });
   });
+
+  test('empty paragraphs and a closing line break read back as they were', () => {
+    const sent = [
+      { runs: [{ text: 'a' }] },
+      { runs: [] },
+      { runs: [{ text: 'b' }, { text: '', br: true as const }] },
+    ];
+    const p = richFromHtml(richHtml(sent))!;
+    expect(p.map((x) => x.runs.map((r) => (r.br ? '|' : r.text)).join(''))).toEqual([
+      'a',
+      '',
+      'b|',
+    ]);
+    // Web HTML: an empty paragraph is `<p><br></p>`, and a block's last break shows no line.
+    const web = richFromHtml('<p>x<br></p><p><br></p><p>&nbsp;</p><div>y</div>')!;
+    expect(web.map((x) => x.runs.length)).toEqual([1, 0, 0, 1]);
+  });
 });
 
 describe('pasted paragraphs are untrusted', () => {
@@ -182,6 +208,40 @@ describe('pasted paragraphs are untrusted', () => {
     expect(json).not.toContain('thing');
     expect(p[0]!.children!.map((c) => ('local' in c ? c.local : ''))).toEqual(['pPr', 'r', 'r']);
     expect(cleanParagraphs([{ ns: A, local: 'sp' }])).toBeNull();
+  });
+
+  test('runs, breaks, and properties keep only the children their schema allows', () => {
+    const A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+    const el = (local: string, kids: unknown[] = []) => ({
+      ns: A,
+      local,
+      prefix: 'x',
+      children: kids,
+    });
+    const p = cleanParagraphs([
+      el('p', [
+        el('fld', [el('rPr'), el('pPr'), el('t', [{ text: '7' }])]),
+        el('r', [
+          el('rPr', [{ text: 'stray' }, { ns: 'urn:other', local: 'x' }]),
+          el('p'),
+          el('t'),
+        ]),
+        el('br', [el('t', [{ text: 'no' }])]),
+      ]),
+    ])!;
+    const kids = p[0]!.children!.filter((c) => !('text' in c)) as {
+      local: string;
+      prefix?: string;
+      children?: unknown[];
+    }[];
+    const locals = (n: { children?: unknown[] }) =>
+      (n.children ?? []).map((c) => (c as { local?: string }).local ?? 'text');
+    expect(kids.map((k) => k.local)).toEqual(['r', 'r', 'br']);
+    expect(locals(kids[0]!)).toEqual(['rPr', 't']);
+    expect(locals(kids[1]!)).toEqual(['rPr', 't']);
+    expect(locals(kids[1]!.children![0] as { children?: unknown[] })).toEqual([]);
+    expect(locals(kids[2]!)).toEqual([]);
+    expect(kids.every((k) => k.prefix === 'a')).toBe(true);
     expect(cleanParagraphs('nope')).toBeNull();
   });
 });
