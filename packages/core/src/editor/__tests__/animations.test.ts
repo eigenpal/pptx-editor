@@ -7,7 +7,6 @@ import { clickEntrances } from '../../../../../scripts/fixtures/timing.ts';
 import { presentationInfo, serializeXmlPart, xmlPartOf } from '../../store/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 import { animationMarks } from '../surface-animation-marks.ts';
-import { openPeers } from '../../../../../scripts/fidelity/collaboration-kit.ts';
 
 const IN = 914_400;
 const MC = 'http://schemas.openxmlformats.org/markup-compatibility/2006';
@@ -436,22 +435,6 @@ describe('transitions', () => {
     });
   });
 
-  test('a save keeps one transition, before the timing', async () => {
-    // Two collaborators who set a transition at the same time leave two.
-    const { editor: a, peer: b, link, destroy } = await openPeers(deck(clickEntrances([2])));
-    try {
-      link.pause();
-      expect(a.exec({ type: 'setTransition', kind: 'fade' }).ok).toBe(true);
-      expect(b.exec({ type: 'setTransition', kind: 'push' }).ok).toBe(true);
-      link.flush();
-      const xml = slideXml(await open(a.save()!));
-      expect(xml.match(/<mc:AlternateContent/g)?.length).toBe(1);
-      expect(xml.indexOf('<mc:AlternateContent')).toBeLessThan(xml.indexOf('<p:timing>'));
-    } finally {
-      destroy();
-    }
-  });
-
   test('a save leaves the transitions that the file wrote', async () => {
     const two =
       '<p:transition><p:fade/></p:transition>' +
@@ -489,32 +472,5 @@ describe('order marks', () => {
       { nodeId: node(e, 'A'), label: '0, 1' },
       { nodeId: node(e, 'B'), label: '1' },
     ]);
-  });
-});
-
-describe('collaboration', () => {
-  test('concurrent effect edits converge with unique time node ids', async () => {
-    const { editor: a, peer: b, link, destroy } = await openPeers(deck(clickEntrances([2, 3])));
-    try {
-      link.pause();
-      select(a, 'C');
-      expect(a.exec({ type: 'addAnimation', preset: 'fade', trigger: 'withPrevious' }).ok).toBe(
-        true
-      );
-      expect(b.exec({ type: 'removeAnimation', effectId: effects(b)[0].id }).ok).toBe(true);
-      select(b, 'A');
-      expect(b.exec({ type: 'addAnimation', preset: 'spin', trigger: 'afterPrevious' }).ok).toBe(
-        true
-      );
-      link.flush();
-      const xml = slideXml(a);
-      expect(xml).toBe(slideXml(b));
-      const ids = [...xml.matchAll(/<p:cTn [^>]*?id="(\d+)"/g)].map((m) => m[1]);
-      expect(new Set(ids).size).toBe(ids.length);
-      expect(effects(a).map((x) => x.preset)).toContain('spin');
-      expect(effects(a).map((x) => x.preset)).toContain('fade');
-    } finally {
-      destroy();
-    }
   });
 });

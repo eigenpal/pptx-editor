@@ -1,11 +1,10 @@
-// The animation and transition commands with hostile file values, unusual timing trees, and
-// concurrent edits: names from the file index no object prototype, wrappers keep their markup,
-// and the edits of two collaborators merge without lost removals or repeated build entries.
+// The animation and transition commands with hostile file values and unusual timing trees:
+// names from the file index no object prototype, and wrappers keep their
+// markup. The collaboration cases are in `packages/pro/src/__tests__/yjs-animations.test.ts`.
 
 import { describe, expect, test } from 'bun:test';
 import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
-import { clickEntrances, timingWriter } from '../../../../../scripts/fixtures/timing.ts';
-import { openPeers } from '../../../../../scripts/fidelity/collaboration-kit.ts';
+import { timingWriter } from '../../../../../scripts/fixtures/timing.ts';
 import { presentationInfo, serializeXmlPart, xmlPartOf } from '../../store/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 
@@ -176,66 +175,6 @@ describe('transitions', () => {
     const f = await open(deck('<p:transition spd="fast"><p:fade/></p:transition>'));
     expect(f.exec({ type: 'setTransition', durationMs: 1000 }).ok).toBe(true);
     expect(slideXml(f)).toContain('<p:transition spd="slow"><p:fade/></p:transition>');
-  });
-});
-
-describe('collaboration', () => {
-  const pair = async () => openPeers(deck(clickEntrances([2, 3])));
-  const savedXml = async (e: PptxEditorInstance) => slideXml(await open(e.save()!));
-
-  test('removals of two different effects both stay', async () => {
-    const { editor: a, peer: b, link, destroy } = await pair();
-    try {
-      link.pause();
-      expect(a.exec({ type: 'removeAnimation', effectId: effects(a)[0].id }).ok).toBe(true);
-      expect(b.exec({ type: 'removeAnimation', effectId: effects(b)[1].id }).ok).toBe(true);
-      link.flush();
-      expect(slideXml(a)).toBe(slideXml(b));
-      expect(effects(a)).toEqual([]);
-      const saved = await savedXml(a);
-      expect(saved).not.toContain('p:timing');
-    } finally {
-      destroy();
-    }
-  });
-
-  test('a removal wins over a move of the same effect', async () => {
-    const { editor: a, peer: b, link, destroy } = await pair();
-    try {
-      link.pause();
-      expect(a.exec({ type: 'moveAnimation', effectId: effects(a)[1].id, to: 0 }).ok).toBe(true);
-      expect(b.exec({ type: 'removeAnimation', effectId: effects(b)[1].id }).ok).toBe(true);
-      link.flush();
-      expect(slideXml(a)).toBe(slideXml(b));
-      expect(effects(a).map((x) => x.shapeName)).toEqual(['A']);
-      expect(await savedXml(a)).not.toContain('spid="3"');
-    } finally {
-      destroy();
-    }
-  });
-
-  test('two effects added to one shape take two build groups', async () => {
-    const { editor: a, peer: b, link, destroy } = await pair();
-    try {
-      link.pause();
-      select(a, 'A');
-      expect(a.exec({ type: 'addAnimation', preset: 'pulse' }).ok).toBe(true);
-      select(b, 'A');
-      expect(b.exec({ type: 'addAnimation', preset: 'spin' }).ok).toBe(true);
-      link.flush();
-      expect(effects(a).map((x) => x.preset)).toEqual(['appear', 'appear', 'pulse', 'spin']);
-      const saved = await savedXml(a);
-      const groups = [...saved.matchAll(/<p:cTn [^>]*grpId="(\d+)"[^>]*presetClass="emph"/g)];
-      expect(new Set(groups.map((m) => m[1])).size).toBe(2);
-      const builds = saved.match(/<p:bldP [^>]*>/g) ?? [];
-      const keys = builds.map((x) => /spid="\d+"/.exec(x)![0] + /grpId="\d+"/.exec(x)![0]);
-      expect(keys.filter((k) => k.startsWith('spid="2"'))).toHaveLength(3);
-      expect(new Set(keys).size).toBe(keys.length);
-      const all = ids(saved);
-      expect(new Set(all).size).toBe(all.length);
-    } finally {
-      destroy();
-    }
   });
 });
 
