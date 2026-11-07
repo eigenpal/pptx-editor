@@ -12,7 +12,7 @@ Users copy and paste with the keyboard shortcuts, the **Edit** menu, and the con
 | --- | --- |
 | Text | Plain text, HTML with the formatting the slide shows, and the runs with their own formatting for this editor |
 | Shapes | This editor's shape format, the shapes' text as plain text, and HTML: the formatted text when every shape is a text box with no fill, otherwise a PNG picture of the shapes |
-| Slides in the slide list or the slide sorter | The presentation file with the indexes of the copied slides |
+| Slides in the slide list or the slide sorter (keyboard shortcuts only) | The presentation file with the indexes of the copied slides |
 | A table cell range | Tab-separated text and this editor's cells format (see [Tables](/docs/guides/tables)) |
 
 The picture of copied shapes states its resolution, so an application that sizes pictures by resolution pastes it at the size of the shapes. The editor draws the picture when Cmd or Ctrl goes down and when a context menu opens. If the picture is not ready when the copy runs, the editor writes it to the clipboard after the copy, in browsers that support `navigator.clipboard.write`.
@@ -30,7 +30,7 @@ A paste uses the first format it finds, in this order:
 
 When you edit text, pasted text replaces the selection or goes in at the caret. With no text selected, it goes in a new text box in the middle of the slide, and the new text box is selected. To paste without formatting, use the browser's paste-as-plain-text command, such as Cmd+Shift+V in Chrome.
 
-Shapes copied in another application paste as a picture: browsers give web pages a picture of the shapes, not their shape format. A paste works when the focus is on the slide, in the slide list, or on a toolbar button, so a paste after a click on another slide in the slide list puts the shapes on that slide.
+Shapes copied in another application paste as a picture: browsers give web pages a picture of the shapes, not their shape format. A paste works when the focus is on the slide, in the slide list, or on a toolbar button, so a paste after a click on another slide in the slide list puts the shapes on that slide. With text selected and the focus on a toolbar button, plain text goes in at the caret.
 
 Pasted content is untrusted input. HTML is read by a bounded tokenizer: nothing in it runs or loads, and only text and its formatting are kept. A pasted file goes through the same limits as an opened file.
 

@@ -13,7 +13,7 @@
 /** What the binding asks of the editor: the surface's own clipboard handlers. */
 export interface EditorClipboardHost {
   copy(data: DataTransfer, cut: boolean, slideList?: boolean): boolean;
-  paste(data: DataTransfer, slideList?: boolean): boolean;
+  paste(data: DataTransfer, slideList?: boolean, chrome?: boolean): boolean;
   warmCopy?(): void;
 }
 
@@ -61,7 +61,7 @@ export function bindEditorClipboard(surface: HTMLElement, host: EditorClipboardH
     const slideList = e.target instanceof Element && !!e.target.closest(SLIDE_LISTS);
     const done =
       e.type === 'paste'
-        ? host.paste(e.clipboardData, slideList)
+        ? host.paste(e.clipboardData, slideList, true)
         : host.copy(e.clipboardData, e.type === 'cut', slideList);
     if (done) e.preventDefault();
   };

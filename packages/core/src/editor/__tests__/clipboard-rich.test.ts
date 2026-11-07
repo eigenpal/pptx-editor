@@ -464,6 +464,8 @@ describe('the clipboard host', () => {
     expect(plain.ran[0]).toMatchObject({ type: 'pasteText' });
     const typing = await host((e) => caret(e, 0, 0));
     expect(typing.clip.pasteFrom(transfer({ 'text/plain': 'a' }))).toBe(false);
+    // From a toolbar button there is no text field: the text goes in at the caret.
+    expect(typing.clip.pasteFrom(transfer({ 'text/plain': 'a' }), false, true)).toBe(true);
   });
 
   test('copied shapes paste as shapes; text boxes leave as HTML text', async () => {

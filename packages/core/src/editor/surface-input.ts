@@ -19,9 +19,9 @@ export interface SurfaceInputHost {
   copy(data: DataTransfer, cut: boolean, slideList?: boolean): boolean;
   /**
    * Paste from a paste event; false leaves the event to the browser. `slideList`: the event
-   * comes from the slide list.
+   * comes from the slide list; `chrome`: from outside the slide (`editor-clipboard.ts`).
    */
-  paste(data: DataTransfer, slideList?: boolean): boolean;
+  paste(data: DataTransfer, slideList?: boolean, chrome?: boolean): boolean;
   /** A copy may come next (Cmd or Ctrl went down, a menu opened): get ready for it. */
   warmCopy?(): void;
   /**

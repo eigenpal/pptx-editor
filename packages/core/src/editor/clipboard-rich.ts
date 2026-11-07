@@ -831,7 +831,8 @@ export function richHtml(paragraphs: readonly RichParagraph[]): string {
 /**
  * DrawingML paragraphs for the `pasteText` command, from clipboard HTML or plain text: HTML
  * keeps its formatting as a paste from another application does. Use it to paste text from your
- * own code. Returns an empty array when there is no text. @public
+ * own code. HTML is read up to 4 MB and 5,000 paragraphs; nothing in it runs or loads. Returns
+ * an empty array when there is no text. @public
  */
 export function textClipboardParagraphs(source: {
   readonly html?: string;
