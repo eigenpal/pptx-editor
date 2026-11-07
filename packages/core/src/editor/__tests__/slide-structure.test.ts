@@ -19,11 +19,12 @@ import {
   presentationInfo,
   readPptx,
   relationshipsOf,
+  serializeXmlPart,
   xmlPartOf,
   type Element,
   type PptxPackage,
 } from '../../store/index.ts';
-import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
+import { createPptxEditor, readCommentThreads, type PptxEditorInstance } from '../index.ts';
 import { treeOf } from '../../automation/commands/slide-structure.ts';
 
 const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
@@ -282,7 +283,40 @@ describe('duplicateSlide copies the parts a slide owns', () => {
     reopened(e);
   });
 
-  test('threaded comments are refused, never shared', async () => {
+  test('threaded comments are copied with new ids, and a save points them at their slide', async () => {
+    const e = await open(buildPptx({ slides: [{ shapes: '' }] }));
+    const date = '2026-11-07T10:00:00Z';
+    const add = { type: 'addComment', text: 'Note', author: 'Ada', date } as const;
+    expect(e.exec(add).ok).toBe(true);
+    const first = e.session!.info.slides[0]!.partName;
+    const reply = readCommentThreads(e.session!.store.package, first)[0]!.id;
+    const answer = { type: 'replyToComment', commentId: reply, text: 'Ok', author: 'Ben' } as const;
+    expect(e.exec(answer).ok).toBe(true);
+    expect(e.exec({ type: 'duplicateSlide', index: 0 }).ok).toBe(true);
+    const saved = readPptx(e.save()!);
+    if (!saved.ok) throw new Error('the saved deck does not read');
+    const [a, b] = presentationInfo(saved.pkg).slides;
+    const one = readCommentThreads(saved.pkg, a!.partName);
+    const two = readCommentThreads(saved.pkg, b!.partName);
+    expect(two.map((t) => [t.text, t.author, t.replies.map((r) => r.text)])).toEqual([
+      ['Note', 'Ada', ['Ok']],
+    ]);
+    // New GUIDs for the copy's threads and replies.
+    expect(two[0]!.id.split('#')[1]).not.toBe(one[0]!.id.split('#')[1]);
+    expect(two[0]!.replies[0]!.id.split('#')[1]).not.toBe(one[0]!.replies[0]!.id.split('#')[1]);
+    // Each list names its own slide by id and creation id.
+    for (const ref of [a!, b!]) {
+      const slideXml = serializeXmlPart(xmlPartOf(saved.pkg, ref.partName)!);
+      const cId = /<p14:creationId [^>]*val="(\d+)"/.exec(slideXml)![1];
+      const rel = relationshipsOf(saved.pkg, ref.partName).find((r) =>
+        r.type.endsWith('2018/10/relationships/comments')
+      )!;
+      const list = serializeXmlPart(xmlPartOf(saved.pkg, rel.target!)!);
+      expect(list).toContain(`<pc:sldMk cId="${cId}" sldId="${ref.sldId}"/>`);
+    }
+  });
+
+  test('a threaded comment list is copied, never shared', async () => {
     const options = slideStructureDeck(new Uint8Array([1]), new Uint8Array([2]));
     const modern = 'http://schemas.microsoft.com/office/2018/10/relationships/comments';
     const bytes = buildPptx({
@@ -304,9 +338,13 @@ describe('duplicateSlide copies the parts a slide owns', () => {
       presentationExt: undefined,
     });
     const e = await open(bytes);
-    const r = e.exec({ type: 'duplicateSlide', index: 0 });
-    expect(r).toMatchObject({ ok: false, reason: 'disabled.slideNotCopyable' });
-    expect(e.snapshot().slides.length).toBe(1);
+    expect(e.exec({ type: 'duplicateSlide', index: 0 }).ok).toBe(true);
+    const pkg = e.session!.store.package;
+    const [a, b] = presentationInfo(pkg).slides;
+    const target = (ref: typeof a) =>
+      relationshipsOf(pkg, ref!.partName).find((r) => r.type === modern)?.target;
+    expect(target(b)).toBeDefined();
+    expect(target(b)).not.toBe(target(a));
   });
 });
 

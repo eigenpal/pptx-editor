@@ -15,7 +15,6 @@ import { ChromeGroupId } from '@pptx-editor.dev/core/editor';
 import { ChromeMenuId } from '@pptx-editor.dev/core/editor';
 import { ChromeSlotId } from '@pptx-editor.dev/core/editor';
 import { ChromeTranslate } from '@pptx-editor.dev/core/editor';
-import { ClipboardDrawingReader } from '@pptx-editor.dev/core/editor';
 import { ColorMode } from '@pptx-editor.dev/core/editor';
 import { ColumnsDialogFields } from '@pptx-editor.dev/core/editor';
 import { CommandResult } from '@pptx-editor.dev/core/editor';
@@ -381,8 +380,6 @@ export { ChromeMenuId }
 export { ChromeSlotId }
 
 export { ChromeTranslate }
-
-export { ClipboardDrawingReader }
 
 export { ColorMode }
 
@@ -2329,8 +2326,8 @@ export const PptxEditor: {
             readonly type: BooleanConstructor;
             readonly default: true;
         };
-        readonly readClipboardDrawing: {
-            readonly type: PropType<ClipboardDrawingReader>;
+        readonly author: {
+            readonly type: StringConstructor;
             readonly default: undefined;
         };
         readonly popups: {
@@ -2395,7 +2392,7 @@ export const PptxEditor: {
         readonly fontFamilies: readonly string[];
         readonly modules: readonly EditorModule[];
         readonly autoCorrect: boolean;
-        readonly readClipboardDrawing: ClipboardDrawingReader;
+        readonly author: string;
         readonly popups: PptxEditorPopups;
         readonly colorMode: ColorMode;
         readonly hyperlinkPopup: boolean;
@@ -2436,8 +2433,8 @@ export const PptxEditor: {
             readonly type: BooleanConstructor;
             readonly default: true;
         };
-        readonly readClipboardDrawing: {
-            readonly type: PropType<ClipboardDrawingReader>;
+        readonly author: {
+            readonly type: StringConstructor;
             readonly default: undefined;
         };
         readonly popups: {
@@ -2498,7 +2495,7 @@ export const PptxEditor: {
         readonly fontFamilies: readonly string[];
         readonly modules: readonly EditorModule[];
         readonly autoCorrect: boolean;
-        readonly readClipboardDrawing: ClipboardDrawingReader;
+        readonly author: string;
         readonly popups: PptxEditorPopups;
         readonly colorMode: ColorMode;
         readonly hyperlinkPopup: boolean;
@@ -2533,8 +2530,8 @@ export const PptxEditor: {
         readonly type: BooleanConstructor;
         readonly default: true;
     };
-    readonly readClipboardDrawing: {
-        readonly type: PropType<ClipboardDrawingReader>;
+    readonly author: {
+        readonly type: StringConstructor;
         readonly default: undefined;
     };
     readonly popups: {
@@ -2599,7 +2596,7 @@ export const PptxEditor: {
     readonly fontFamilies: readonly string[];
     readonly modules: readonly EditorModule[];
     readonly autoCorrect: boolean;
-    readonly readClipboardDrawing: ClipboardDrawingReader;
+    readonly author: string;
     readonly popups: PptxEditorPopups;
     readonly colorMode: ColorMode;
     readonly hyperlinkPopup: boolean;
@@ -2638,8 +2635,8 @@ export const PptxEditor: {
             readonly type: BooleanConstructor;
             readonly default: true;
         };
-        readonly readClipboardDrawing: {
-            readonly type: PropType<ClipboardDrawingReader>;
+        readonly author: {
+            readonly type: StringConstructor;
             readonly default: undefined;
         };
         readonly popups: {
@@ -2687,8 +2684,8 @@ export const PptxEditor: {
             readonly type: BooleanConstructor;
             readonly default: true;
         };
-        readonly readClipboardDrawing: {
-            readonly type: PropType<ClipboardDrawingReader>;
+        readonly author: {
+            readonly type: StringConstructor;
             readonly default: undefined;
         };
         readonly popups: {
@@ -2711,7 +2708,7 @@ export const PptxEditor: {
         readonly fontFamilies: readonly string[];
         readonly modules: readonly EditorModule[];
         readonly autoCorrect: boolean;
-        readonly readClipboardDrawing: ClipboardDrawingReader;
+        readonly author: string;
         readonly popups: PptxEditorPopups;
         readonly colorMode: ColorMode;
     }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
@@ -3472,15 +3469,21 @@ export const PptxEditor: {
             readonly default: undefined;
         };
     }>> & Readonly<{
-        onTabChange?: ((_tab: "format" | "chart" | "comments" | "animations" | "selection") => any) | undefined;
-        "onUpdate:tab"?: ((_tab: "format" | "chart" | "comments" | "animations" | "selection") => any) | undefined;
+        onTabChange?: ((_tab: "comments" | "format" | "chart" | "animations" | "selection") => any) | undefined;
+        "onUpdate:tab"?: ((_tab: "comments" | "format" | "chart" | "animations" | "selection") => any) | undefined;
     }>, {
         readonly className: string;
         readonly style: vue.CSSProperties;
         readonly paneWidth: number;
         readonly onClose: () => void;
-        readonly tab: "format" | "chart" | "comments" | "animations" | "selection";
-    }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+        readonly tab: "comments" | "format" | "chart" | "animations" | "selection";
+    }, SlotsType<{
+        comments?: (() => VNodeChild) | undefined;
+        format?: (() => VNodeChild) | undefined;
+        chart?: (() => VNodeChild) | undefined;
+        animations?: (() => VNodeChild) | undefined;
+        selection?: (() => VNodeChild) | undefined;
+    }>, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
     SelectionPane: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly className: {
             readonly type: StringConstructor;
@@ -6058,8 +6061,8 @@ export const PptxEditorRoot: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: BooleanConstructor;
         readonly default: true;
     };
-    readonly readClipboardDrawing: {
-        readonly type: PropType<ClipboardDrawingReader>;
+    readonly author: {
+        readonly type: StringConstructor;
         readonly default: undefined;
     };
     readonly popups: {
@@ -6107,8 +6110,8 @@ export const PptxEditorRoot: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: BooleanConstructor;
         readonly default: true;
     };
-    readonly readClipboardDrawing: {
-        readonly type: PropType<ClipboardDrawingReader>;
+    readonly author: {
+        readonly type: StringConstructor;
         readonly default: undefined;
     };
     readonly popups: {
@@ -6131,7 +6134,7 @@ export const PptxEditorRoot: vue.DefineComponent<vue.ExtractPropTypes<{
     readonly fontFamilies: readonly string[];
     readonly modules: readonly EditorModule[];
     readonly autoCorrect: boolean;
-    readonly readClipboardDrawing: ClipboardDrawingReader;
+    readonly author: string;
     readonly popups: PptxEditorPopups;
     readonly colorMode: ColorMode;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
@@ -6203,15 +6206,21 @@ export const PptxEditorSidePanel: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly default: undefined;
     };
 }>> & Readonly<{
-    onTabChange?: ((_tab: "format" | "chart" | "comments" | "animations" | "selection") => any) | undefined;
-    "onUpdate:tab"?: ((_tab: "format" | "chart" | "comments" | "animations" | "selection") => any) | undefined;
+    onTabChange?: ((_tab: "comments" | "format" | "chart" | "animations" | "selection") => any) | undefined;
+    "onUpdate:tab"?: ((_tab: "comments" | "format" | "chart" | "animations" | "selection") => any) | undefined;
 }>, {
     readonly className: string;
     readonly style: CSSProperties;
     readonly paneWidth: number;
     readonly onClose: () => void;
-    readonly tab: "format" | "chart" | "comments" | "animations" | "selection";
-}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+    readonly tab: "comments" | "format" | "chart" | "animations" | "selection";
+}, SlotsType<{
+    comments?: (() => VNodeChild) | undefined;
+    format?: (() => VNodeChild) | undefined;
+    chart?: (() => VNodeChild) | undefined;
+    animations?: (() => VNodeChild) | undefined;
+    selection?: (() => VNodeChild) | undefined;
+}>, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 
 // @public
 export const PptxEditorSlideRail: {

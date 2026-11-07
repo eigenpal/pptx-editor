@@ -838,6 +838,10 @@
     "dialogSlot": "此控件会打开对话框",
     "selectWord": "请在某个词中单击或选择文本",
     "mixedSize": "所选文本包含多种字号",
+    "noCommentAuthor": "请先设置作者再添加批注",
+    "commentNoStatus": "旧格式批注无法标记为已解决",
+    "commentNotEditable": "此批注包含无法在此编辑的内容",
+    "noCommentTarget": "批注只能指向幻灯片顶层的元素",
     "animationsReadOnly": "此幻灯片的效果使用了编辑器不会更改的标记",
     "noAnimation": "此幻灯片没有该效果",
     "noAnimationChange": "效果或切换已经是这些设置",
@@ -931,7 +935,7 @@
     },
     "comments": {
       "emptyTitle": "没有批注",
-      "emptyBody": "保存时会保留批注。此版本不支持审阅批注。"
+      "emptyBody": "保存时会保留批注。"
     },
     "animations": {
       "transition": "幻灯片切换",
@@ -1175,6 +1179,10 @@
     "unsafeFileLink": "请输入以 ./ 或 ../ 开头的相对路径，例如 ./report.pdf。只能链接到文档、图片、声音或视频文件。",
     "sectionName": "节名称需要 1 到 255 个字符。",
     "view": "编辑器中没有此视图。",
+    "commentText": "批注文本须为 1 至 10,000 个字符",
+    "commentAuthor": "作者名称过长",
+    "commentDate": "批注日期无效",
+    "noComment": "此批注已不存在",
     "chartData": {
       "noChart": "请选择一个图表。",
       "noData": "此图表没有数据系列。",
@@ -1620,6 +1628,36 @@
     "keyHint": "按 H 显示或隐藏有焦点的对象，按 F2 重命名。",
     "emptyTitle": "没有对象",
     "emptyBody": "此幻灯片上的形状、图片和文本框显示在此处。"
+  },
+  "comments": {
+    "label": "此幻灯片的批注",
+    "new": "新建批注",
+    "text": "批注",
+    "addComment": "添加批注…",
+    "replyText": "回复",
+    "editText": "编辑批注",
+    "save": "保存",
+    "cancel": "取消",
+    "keyHint": "按 Enter 发布，按 Shift+Enter 换行，按 Esc 取消。",
+    "noAuthor": "请先设置作者再添加批注。",
+    "pointsAt": "指向 {name}",
+    "on": "指向 {name}",
+    "resolved": "已解决",
+    "unknownAuthor": "未知作者",
+    "reply": "回复",
+    "replyTo": "回复 {author}",
+    "edit": "编辑",
+    "editOf": "编辑 {author} 的批注",
+    "delete": "删除",
+    "deleteOf": "删除 {author} 的批注",
+    "resolve": "解决",
+    "resolveOf": "解决 {author} 的会话",
+    "reopen": "重新打开",
+    "reopenOf": "重新打开 {author} 的会话",
+    "thread": "{author} 的批注",
+    "replies": "对 {author} 的回复",
+    "emptyTitle": "此幻灯片没有批注",
+    "emptyBody": "选择“新建批注”开始一个会话。"
   },
   "chartData": {
     "editData": "编辑数据…",

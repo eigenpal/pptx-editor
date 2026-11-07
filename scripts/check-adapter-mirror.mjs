@@ -15,6 +15,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REACT_SRC = join(ROOT, 'packages/react/src');
 const VUE_SRC = join(ROOT, 'packages/vue/src');
+const PRO_REACT_SRC = join(ROOT, 'packages/pro/src/react');
+const PRO_VUE_SRC = join(ROOT, 'packages/pro/src/vue');
 
 const SKIP = [/(^|\/)__tests__\//];
 
@@ -104,7 +106,15 @@ export function mirrorErrors({ reactFiles, vueFiles, vueOnly = VUE_ONLY, reactOn
 function main() {
   const reactFiles = walk(REACT_SRC);
   const vueFiles = walk(VUE_SRC);
-  const errors = mirrorErrors({ reactFiles, vueFiles });
+  // The Pro entries for the adapters mirror each other with no exceptions.
+  const proReact = walk(PRO_REACT_SRC);
+  const proVue = walk(PRO_VUE_SRC);
+  const errors = [
+    ...mirrorErrors({ reactFiles, vueFiles }),
+    ...mirrorErrors({ reactFiles: proReact, vueFiles: proVue, vueOnly: {}, reactOnly: {} }).map(
+      (error) => `pro: ${error}`
+    ),
+  ];
   if (errors.length) {
     console.error('✘ adapter mirror:\n');
     for (const error of errors) console.error(`  - ${error}`);
@@ -116,7 +126,7 @@ function main() {
   const vueOnly = Object.keys(VUE_ONLY).length;
   const reactOnly = Object.keys(REACT_ONLY).length;
   console.log(
-    `✓ adapter mirror: ${vueFiles.length} Vue and ${reactFiles.length} React files (${vueOnly} Vue-only and ${reactOnly} React-only, each with a reason).`
+    `✓ adapter mirror: ${vueFiles.length} Vue and ${reactFiles.length} React files, and ${proVue.length} and ${proReact.length} in Pro (${vueOnly} Vue-only and ${reactOnly} React-only, each with a reason).`
   );
 }
 

@@ -1,7 +1,7 @@
 {
   "name": "@pptx-editor.dev/pro",
   "version": "0.2.0",
-  "description": "Commercial capabilities for PPTX Editor, as EditorModules: the review module (comments and suggestions), realtime collaboration, and advanced drawing rendering (charts, glow, inner shadow, reflection, and soft edge).",
+  "description": "Commercial capabilities for PPTX Editor, as EditorModules: the review module with the comments pane and review hooks for React and Vue, realtime collaboration, and advanced drawing rendering (charts, glow, inner shadow, reflection, and soft edge).",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -13,6 +13,14 @@
       "types": "./dist/drawing.d.ts",
       "import": "./dist/drawing.js"
     },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
+    },
+    "./vue": {
+      "types": "./dist/vue.d.ts",
+      "import": "./dist/vue.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -23,16 +31,38 @@
     "!dist/metafile-*.json"
   ],
   "scripts": {
-    "build": "tsup",
-    "typecheck": "bun check",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup",
+    "typecheck": "bun check && bun check -p tsconfig.vue.json",
     "api:extract": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/pro --local",
     "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/pro"
   },
   "peerDependencies": {
-    "@pptx-editor.dev/core": "~0.2.0"
+    "@pptx-editor.dev/core": "~0.2.0",
+    "@pptx-editor.dev/react": "~0.2.0",
+    "@pptx-editor.dev/vue": "~0.2.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "vue": "^3.5.0"
+  },
+  "peerDependenciesMeta": {
+    "@pptx-editor.dev/react": {
+      "optional": true
+    },
+    "@pptx-editor.dev/vue": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
   },
   "devDependencies": {
-    "@pptx-editor.dev/core": "workspace:*"
+    "@pptx-editor.dev/core": "workspace:*",
+    "@pptx-editor.dev/i18n": "workspace:*",
+    "@pptx-editor.dev/react": "workspace:*",
+    "@pptx-editor.dev/vue": "workspace:*",
+    "vue": "3.5.44"
   },
   "license": "LicenseRef-EigenPal-Pro-Evaluation-1.0",
   "dependencies": {

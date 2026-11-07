@@ -14,6 +14,8 @@ import {
   type ExtractPublicPropTypes,
   type PropType,
   type StyleValue,
+  type SlotsType,
+  type VNodeChild,
 } from 'vue';
 import {
   elementKindLabelKey,
@@ -21,6 +23,7 @@ import {
   formatPanelSize,
   listenPaneRequests,
   takePaneRequest,
+  SIDE_PANEL_TAB_ICONS,
   TABLE_OPTION_ROWS,
   visibleSidePanelTabs,
   type SidePanelTab,
@@ -29,7 +32,7 @@ import {
   radioGroupStep,
 } from '@pptx-editor.dev/core/editor';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
-import { ToolButton, keepFocus } from './chrome.tsx';
+import { Icon, ToolButton, keepFocus } from './chrome.tsx';
 import { useEditorDialog } from './popups.ts';
 import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
 import { PptxEditorSelectionPane } from './SelectionPane.tsx';
@@ -284,6 +287,20 @@ const sidePanelProps = {
   tab: { type: String as PropType<SidePanelTab>, default: undefined },
 } as const;
 
+/** A tab's packaged pane. The Comments tab has none: a review pane fills its slot. */
+function packagedPane(tab: SidePanelTab, t: (key: TranslationKey) => string): VNodeChild {
+  if (tab === 'format') return <FormatTab />;
+  if (tab === 'chart') return <ChartDataPane />;
+  if (tab === 'selection') return <PptxEditorSelectionPane />;
+  if (tab === 'animations') return <AnimationsPane />;
+  return (
+    <div class="pptx-empty">
+      <p class="pptx-empty__title">{t('panel.comments.emptyTitle')}</p>
+      <p class="pptx-empty__body">{t('panel.comments.emptyBody')}</p>
+    </div>
+  );
+}
+
 /**
  * Props of `PptxEditorSidePanel`, the twin of React's `SidePanelProps`. `onClose` shows a close
  * button that calls it; `className` (or a host `class`) and `style` go on the panel, and a
@@ -299,11 +316,15 @@ export const PptxEditorSidePanel = defineComponent({
   name: 'PptxEditorSidePanel',
   inheritAttrs: false,
   props: sidePanelProps,
+  // One named slot per tab (`#comments`, `#format`, ...): its content replaces the tab's
+  // packaged pane, the twin of React's `panes`. The Comments tab has no packaged pane: put the
+  // comments pane of `@pptx-editor.dev/pro/vue` in `#comments`.
+  slots: Object as SlotsType<{ [K in SidePanelTab]?: () => VNodeChild }>,
   emits: {
     tabChange: (_tab: SidePanelTab) => true,
     'update:tab': (_tab: SidePanelTab) => true,
   },
-  setup(props, { attrs, emit }) {
+  setup(props, { attrs, emit, slots }) {
     const { t } = useTranslation();
     const editor = usePptxEditor();
     const own = ref<SidePanelTab>(props.tab ?? 'format');
@@ -319,8 +340,15 @@ export const PptxEditorSidePanel = defineComponent({
     // The toolbar's Selection pane and Format shape slots ask for a tab (`requestPane`). The
     // focus goes to that tab, so a keyboard user lands in the panel.
     const root = ref<HTMLElement | null>(null);
+    // A request (a comment marker, the Selection pane control) lands the focus in the panel: on
+    // the pane's current item when it marks one (`aria-current`), else on the tab.
     const focusTab = (pane: SidePanelTab): void =>
-      void nextTick(() => root.value?.querySelector<HTMLElement>(`[data-tab="${pane}"]`)?.focus());
+      void nextTick(() => {
+        const current = root.value?.querySelector<HTMLElement>(
+          '.pptx-panel__body [aria-current="true"]'
+        );
+        (current ?? root.value?.querySelector<HTMLElement>(`[data-tab="${pane}"]`))?.focus();
+      });
     watch(
       editor,
       (e, _old, onCleanup) => {
@@ -381,10 +409,19 @@ export const PptxEditorSidePanel = defineComponent({
                   class="pptx-tabs__tab"
                   data-tab={id}
                   aria-selected={tab.value === id}
+                  // The row shows icons; the selected tab also shows its label. Each tab keeps
+                  // its label as its name and tooltip.
+                  aria-label={t(`panel.tabs.${id}`)}
+                  data-pptx-tooltip={t(`panel.tabs.${id}`)}
                   tabindex={tab.value === id ? 0 : -1}
                   onClick={() => setTab(id)}
                 >
-                  {t(`panel.tabs.${id}`)}
+                  <Icon name={SIDE_PANEL_TAB_ICONS[id]} />
+                  {tab.value === id ? (
+                    <span class="pptx-tabs__label" aria-hidden="true">
+                      {t(`panel.tabs.${id}`)}
+                    </span>
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -397,16 +434,7 @@ export const PptxEditorSidePanel = defineComponent({
             role="tabpanel"
             onKeydown={(e: KeyboardEvent) => panelHistoryKey(e, editor.value)}
           >
-            {tab.value === 'format' ? <FormatTab /> : null}
-            {tab.value === 'chart' ? <ChartDataPane /> : null}
-            {tab.value === 'selection' ? <PptxEditorSelectionPane /> : null}
-            {tab.value === 'animations' ? <AnimationsPane /> : null}
-            {tab.value === 'comments' ? (
-              <div class="pptx-empty">
-                <p class="pptx-empty__title">{t('panel.comments.emptyTitle')}</p>
-                <p class="pptx-empty__body">{t('panel.comments.emptyBody')}</p>
-              </div>
-            ) : null}
+            {slots[tab.value]?.() ?? packagedPane(tab.value, t)}
           </div>
         </aside>
       );

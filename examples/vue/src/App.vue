@@ -7,6 +7,7 @@ import { computed, h, onBeforeUnmount, onMounted, shallowRef, watch, watchEffect
 import { PageSetupDialog, PptxEditorRoot, type PptxEditorPopups } from '@pptx-editor.dev/vue';
 import type { EditorModule, PptxEditorInstance } from '@pptx-editor.dev/core/editor';
 import { drawingModule } from '@pptx-editor.dev/pro/drawing';
+import { reviewModule } from '@pptx-editor.dev/pro/vue';
 import {
   BLANK,
   EXAMPLES,
@@ -25,10 +26,13 @@ import { CATALOG_FAMILIES, useDemoFonts } from './fonts.ts';
 import DiscardDialog from './DiscardDialog.vue';
 import Shell from './Shell.vue';
 
-// Glow, inner shadow, reflection, and soft edge (EigenPal Pro License).
+// Glow, inner shadow, reflection, and soft edge, and the comments pane (EigenPal Pro License).
 const MODULES: readonly EditorModule[] = [
   drawingModule({ licenseKey: import.meta.env.VITE_PPTX_LICENSE }),
+  reviewModule({ licenseKey: import.meta.env.VITE_PPTX_LICENSE }),
 ];
+/** The author of the comments that the demo adds. */
+const DEMO_AUTHOR = 'Demo author';
 
 const base = import.meta.env.BASE_URL;
 const initial = initialExample(location.search);
@@ -118,6 +122,7 @@ function onReady(instance: PptxEditorInstance): void {
     :color-mode="theme"
     :popups="popups"
     :modules="MODULES"
+    :author="DEMO_AUTHOR"
     :fonts="fonts"
     :font-families="CATALOG_FAMILIES"
     @ready="onReady"

@@ -71,12 +71,15 @@ export interface SurfaceHostState {
   readonly groups: EditorHistoryGroups;
   /** One drag step: the steps of one gesture are one undo step. */
   gestureEdit(command: EditorCommand, gesture: string, base?: PptxPackage): void;
+  /** The comment threads that show markers on the slide. */
+  readonly commentMarkers?: SurfaceHost['commentMarkers'];
 }
 
 export function createSurfaceHost(base: SurfaceHostBase, s: SurfaceHostState): SurfaceHost {
   const animations = createAnimationsSource();
   return {
     ...base,
+    ...(s.commentMarkers ? { commentMarkers: s.commentMarkers } : {}),
     paintLayout: (l) => s.prompts.paint(s.session(), l, s.selection(), s.viewing()) ?? l,
     selection: () => s.selection(),
     readOnly: () => s.viewing(),

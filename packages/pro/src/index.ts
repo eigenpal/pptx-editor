@@ -22,7 +22,13 @@ Production use requires a commercial agreement: licensing@eigenpal.com
  * @packageDocumentation
  */
 
-export { reviewModule, type ReviewModuleOptions } from './review/review-module.ts';
+export {
+  reviewModule,
+  type CommentMarkerStyle,
+  type ReviewModuleOptions,
+  type ReviewPaneOpening,
+  type ReviewPaneOptions,
+} from './review/review-module.ts';
 export { legacyComments } from './review/legacy-comments.ts';
 export {
   collaborationModule,

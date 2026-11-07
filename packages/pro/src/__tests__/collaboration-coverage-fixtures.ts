@@ -18,6 +18,7 @@ import type {
   PptxEditorInstance,
   TextInputKind,
 } from '@pptx-editor.dev/core/editor';
+import { readCommentThreads } from '@pptx-editor.dev/core/editor';
 import { png, type ConvergenceFixture, type TextInputFixture } from './convergence-harness.ts';
 import { buildPptx } from '../../../../scripts/fixtures/builder.ts';
 import { chartDataDeck } from '../../../../scripts/fixtures/chart-data.ts';
@@ -108,6 +109,24 @@ const onA = (command: ConvergenceFixture['command']): ConvergenceFixture => ({
 });
 
 const sectionId = (e: PptxEditorInstance, i: number): string => e.snapshot().sections![i]!.id;
+
+const COMMENT_DATE = '2026-11-07T10:00:00.000';
+
+/** The first comment thread of the current slide, read without a review module. */
+function firstThread(e: PptxEditorInstance) {
+  const part = e.session!.info.slides[e.snapshot().currentSlide]!.partName;
+  const thread = readCommentThreads(e.session!.store.package, part)[0];
+  if (!thread) throw new Error('the slide has no comment thread');
+  return thread;
+}
+
+/** A threaded comment on shape `A` with one reply. */
+function withThread(e: PptxEditorInstance): void {
+  select('A')(e);
+  run(e, { type: 'addComment', text: 'Check the numbers', date: COMMENT_DATE });
+  const commentId = firstThread(e).id;
+  run(e, { type: 'replyToComment', commentId, text: 'Will do', date: COMMENT_DATE });
+}
 
 /** The fixtures, by command type. The gate checks that each builds a command of its key. */
 export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, ConvergenceFixture>> = {
@@ -625,6 +644,41 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
       columns: [IN, 1.5 * IN, IN / 2],
       rows: [370_840, 2 * 370_840],
     }),
+  },
+
+  // Comments: a threaded comment on a shape, then its reply, text, status, and delete. The
+  // author is the replica's identity.
+  addComment: {
+    arrange: select('A'),
+    command: () => ({ type: 'addComment', text: 'Check the numbers', date: COMMENT_DATE }),
+  },
+  replyToComment: {
+    arrange: withThread,
+    command: (e) => ({
+      type: 'replyToComment',
+      commentId: firstThread(e).id,
+      text: 'Done',
+      date: COMMENT_DATE,
+    }),
+  },
+  editComment: {
+    arrange: withThread,
+    command: (e) => ({ type: 'editComment', commentId: firstThread(e).replies[0]!.id, text: 'Ok' }),
+  },
+  deleteComment: {
+    arrange: withThread,
+    command: (e) => ({ type: 'deleteComment', commentId: firstThread(e).id }),
+  },
+  resolveComment: {
+    arrange: withThread,
+    command: (e) => ({ type: 'resolveComment', commentId: firstThread(e).id }),
+  },
+  reopenComment: {
+    arrange: (e) => {
+      withThread(e);
+      run(e, { type: 'resolveComment', commentId: firstThread(e).id });
+    },
+    command: (e) => ({ type: 'reopenComment', commentId: firstThread(e).id }),
   },
 };
 

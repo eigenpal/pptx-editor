@@ -39,7 +39,7 @@ import {
 } from './ContextMenu.tsx';
 import { TranslationContext, useTranslation } from './context.ts';
 import { ToolbarContext } from './headless-hooks.tsx';
-import { useCanvasMenuRegistry } from './popups.tsx';
+import { useCanvasMenuRegistry, type PptxEditorPopups } from './popups.tsx';
 import { MenuEntries } from './menu-rows.tsx';
 import { defineMenuRowParts, menuSlotRowOf } from './menu-parts.tsx';
 
@@ -244,4 +244,30 @@ function OpenContextMenu({
       <MenuCloseContext.Provider value={target.close}>{content}</MenuCloseContext.Provider>
     </ContextMenu>
   );
+}
+
+/**
+ * The `popups` the sugar passes to the root: the host's entries, with `contextMenu` and
+ * `hyperlinkPopup` mapped onto the same entries. A host entry wins. @internal
+ */
+export function sugarPopups(
+  popups: PptxEditorPopups | undefined,
+  hyperlinkPopup: boolean | undefined,
+  contextMenu: boolean | PptxEditorContextMenuProps | undefined,
+  /** The menu the entry renders: `PptxEditor.ContextMenu`. */
+  Menu: (props: PptxEditorContextMenuProps) => ReactNode
+): PptxEditorPopups | undefined {
+  const linkOff = hyperlinkPopup === false && popups?.hyperlink === undefined;
+  const menuEntry =
+    popups?.contextMenu !== undefined || contextMenu === undefined || contextMenu === true
+      ? undefined
+      : contextMenu === false
+        ? (false as const)
+        : (props: PptxEditorContextMenuProps) => <Menu {...props} {...contextMenu} />;
+  if (!linkOff && menuEntry === undefined) return popups;
+  return {
+    ...popups,
+    ...(linkOff ? { hyperlink: false as const } : {}),
+    ...(menuEntry !== undefined ? { contextMenu: menuEntry } : {}),
+  };
 }

@@ -84,6 +84,7 @@ import {
 import {
   CONTEXT_MENU_ROW_PARTS,
   PptxEditorContextMenu as ContextMenuRoot,
+  sugarPopups,
   type PptxEditorContextMenuProps,
 } from './context-menu-parts.tsx';
 import type { ContextMenuPartName, MenuRowPartName } from '@pptx-editor.dev/core/editor';
@@ -714,6 +715,8 @@ export interface PptxEditorProps {
   readonly autoCorrect?: boolean;
   /** Reads copied shapes from the system clipboard, as on `PptxEditor.Root`. Read at mount. */
   readonly readClipboardDrawing?: ClipboardDrawingReader;
+  /** The author of later comments and replies, as on `PptxEditor.Root`. */
+  readonly author?: string;
   /**
    * The notice for a file that does not open (`PptxEditor.OpenFailure`). An object is
    * `PptxEditorOpenFailureProps`, passed straight through. `false` removes the notice, for a host that
@@ -790,6 +793,14 @@ function sugarPopups(
     ...(menuEntry !== undefined ? { contextMenu: menuEntry } : {}),
   };
 }
+/** The props an object value gives, or none for `true`. */
+const partProps = <P extends object>(value: boolean | P | undefined): P =>
+  typeof value === 'object' ? value : ({} as P);
+
+const OPEN_FAILURE_ACTION_NAMES = {
+  actions: 'renderOpenFailureActions',
+  off: 'openFailure={false}',
+} as const;
 
 /**
  * The complete default editor: toolbar, slide rail, canvas, speaker notes, zoom pill, and the
@@ -814,6 +825,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
     modules,
     autoCorrect,
     readClipboardDrawing,
+    author,
     openFailure = true,
     renderOpenFailureActions,
     toolbar = true,
@@ -833,7 +845,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
   );
   // Memoized, so stable props give the root the same `popups` at each render.
   const rootPopups = useMemo(
-    () => sugarPopups(popups, hyperlinkPopup, contextMenu),
+    () => sugarPopups(popups, hyperlinkPopup, contextMenu, PptxEditorContextMenu),
     [popups, hyperlinkPopup, contextMenu]
   );
   const dock =
@@ -862,6 +874,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
       ...(modules ? { modules } : {}),
       ...(autoCorrect === false ? { autoCorrect } : {}),
       ...(readClipboardDrawing ? { readClipboardDrawing } : {}),
+      ...(author ? { author } : {}),
     },
     createElement(
       PptxEditorViewport,

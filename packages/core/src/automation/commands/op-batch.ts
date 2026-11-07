@@ -56,7 +56,8 @@ export type MintedIdKind =
   | 'creationId'
   | 'commentIdx'
   | 'timeNodeId'
-  | 'buildGroupId';
+  | 'buildGroupId'
+  | 'commentAuthor';
 
 /** Numbers a replica minted in its stripe, by id kind. @internal */
 export type MintedIds = Map<MintedIdKind, Set<number>>;

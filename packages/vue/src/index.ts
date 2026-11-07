@@ -524,6 +524,8 @@ const pptxEditorProps = {
     type: Function as PropType<ClipboardDrawingReader>,
     default: undefined,
   },
+  /** The author of later comments and replies, as on `PptxEditorRoot`. */
+  author: { type: String, default: undefined },
   /** Customize the dialogs the editor mounts, as on `PptxEditorRoot`. */
   popups: { type: Object as PropType<PptxEditorPopups>, default: undefined },
   /** The chrome color mode, as on `PptxEditorRoot`. */
@@ -678,6 +680,7 @@ const PptxEditorDefault = defineComponent({
           ...(props.readClipboardDrawing
             ? { readClipboardDrawing: props.readClipboardDrawing }
             : {}),
+          ...(props.author ? { author: props.author } : {}),
           // Forwarded only with a listener, so the root still warns when nobody listens.
           ...(instance?.vnode.props?.onFontError
             ? { onFontError: (error: EditorFontError) => emit('fontError', error) }

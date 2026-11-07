@@ -66,6 +66,11 @@ export interface PptxEditorOptions extends Omit<OpenOptions, 'fonts'> {
    * shapes as editable shapes. Without a package, or without this option, the picture pastes.
    */
   readonly readClipboardDrawing?: ClipboardDrawingReader;
+  /**
+   * The author of new comments and replies, as in DOCX Editor. Without it, a collaboration
+   * session's identity name applies, and without that the comment commands need `author`.
+   */
+  readonly author?: string;
 }
 
 /**
@@ -115,6 +120,16 @@ export interface PptxEditorInstance extends Editor {
   readonly session: DocumentSession | null;
   /** Set the selection programmatically (shape ids or a text range). */
   setSelection(selection: EditorSelection): void;
+  /**
+   * Replace the author of new comments and replies (the `author` option). Existing comments
+   * keep their authors. `undefined` removes it.
+   */
+  setAuthor(author: string | undefined): void;
+  /**
+   * Pick a comment thread of the current slide (`EditorSnapshot.activeComment`), as a press on
+   * its marker does, or `null` for none. A comments pane shows the picked thread.
+   */
+  selectComment(id: string | null): void;
   /** Families the font picker offers: standard, configured, embedded, and the deck's own. */
   fontFamilies(): readonly string[];
   /**

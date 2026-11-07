@@ -838,6 +838,10 @@
     "dialogSlot": "This control opens a dialog",
     "selectWord": "Click in a word or select text",
     "mixedSize": "The selected text has more than one size",
+    "noCommentAuthor": "Set an author to comment",
+    "commentNoStatus": "Legacy comments cannot be resolved",
+    "commentNotEditable": "This comment holds content that cannot be edited here",
+    "noCommentTarget": "Comments can point only at elements on the slide's top level",
     "animationsReadOnly": "The effects of this slide use markup that the editor does not change",
     "noAnimation": "This slide has no such effect",
     "noAnimationChange": "The effect or transition already has these settings",
@@ -931,7 +935,7 @@
     },
     "comments": {
       "emptyTitle": "No comments",
-      "emptyBody": "Comments are preserved when you save. Reviewing them is not available in this version."
+      "emptyBody": "Comments are kept when you save."
     },
     "animations": {
       "transition": "Slide transition",
@@ -1175,6 +1179,10 @@
     "unsafeFileLink": "Type a relative path that starts with ./ or ../, such as ./report.pdf. Link only to a document, picture, sound, or video file.",
     "sectionName": "A section name needs 1 to 255 characters.",
     "view": "The editor has no such view.",
+    "commentText": "Comment text must have 1 to 10,000 characters",
+    "commentAuthor": "The author name is too long",
+    "commentDate": "The comment date is not valid",
+    "noComment": "This comment no longer exists",
     "chartData": {
       "noChart": "Select one chart.",
       "noData": "The chart has no data series.",
@@ -1620,6 +1628,36 @@
     "keyHint": "Press H to show or hide the focused object, and F2 to rename it.",
     "emptyTitle": "No objects",
     "emptyBody": "Shapes, pictures, and text boxes on this slide show here."
+  },
+  "comments": {
+    "label": "Comments on this slide",
+    "new": "New comment",
+    "text": "Comment",
+    "addComment": "Add a comment…",
+    "replyText": "Reply",
+    "editText": "Edit comment",
+    "save": "Save",
+    "cancel": "Cancel",
+    "keyHint": "Enter posts. Shift+Enter starts a new line. Escape cancels.",
+    "noAuthor": "Set an author to comment.",
+    "pointsAt": "Points at {name}",
+    "on": "On {name}",
+    "resolved": "Resolved",
+    "unknownAuthor": "Unknown author",
+    "reply": "Reply",
+    "replyTo": "Reply to {author}",
+    "edit": "Edit",
+    "editOf": "Edit comment by {author}",
+    "delete": "Delete",
+    "deleteOf": "Delete comment by {author}",
+    "resolve": "Resolve",
+    "resolveOf": "Resolve thread by {author}",
+    "reopen": "Reopen",
+    "reopenOf": "Reopen thread by {author}",
+    "thread": "Comment by {author}",
+    "replies": "Replies to {author}",
+    "emptyTitle": "No comments on this slide",
+    "emptyBody": "Select New comment to start a thread."
   },
   "chartData": {
     "editData": "Edit data…",

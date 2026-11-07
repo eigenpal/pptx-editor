@@ -17,6 +17,7 @@ import type {
   PptxPackage,
   StoreChange,
 } from '../store/index.ts';
+import type { ReviewPaneOptions } from '../contracts/index.ts';
 import { bindReplicaIds } from './replica-ids.ts';
 
 // --- Collaboration --------------------------------------------------------------------------
@@ -336,6 +337,8 @@ export interface ReviewModuleContribution {
   readonly displayModes: readonly ReviewDisplayMode[];
   /** The review queue derivation. */
   readonly collectReviewItems: CollectReviewItems;
+  /** The comment view settings: how a comment marker looks and what a press on it opens. */
+  readonly pane?: ReviewPaneOptions;
 }
 
 // --- Registration ---------------------------------------------------------------------------

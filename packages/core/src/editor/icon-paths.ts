@@ -13,7 +13,8 @@
 // `imagesmode`, `style`, `frame_person`, `list_alt`, `table_chart`, and `accessibility_new` from the official
 // Material Symbols; the table icons (`table`, `table_rows`, `view_column`, `border_*`, `padding`,
 // `height`, `fit_width`, `delete_sweep`, `open_with`) from DOCX Editor's `generated-icon-paths.ts`, also
-// official Material Symbols
+// official Material Symbols; `add_comment`, `send`, and `refresh` from DOCX Editor's review icons
+// (packages/pro/src/react/review-icons.tsx at adf0e178c), also official Material Symbols
 // SVGs (google/material-design-icons, `symbols/web/<name>/materialsymbolsoutlined/<name>_24px.svg`).
 // Never hand-draw or edit a path here: every entry must be an official Material Symbol.
 
@@ -102,6 +103,15 @@ export const ICON_PATHS: Readonly<Record<string, readonly string[]>> = {
   ],
   settings: [
     'm370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z',
+  ],
+  add_comment: [
+    'M440-400h80v-120h120v-80H520v-120h-80v120H320v80h120v120ZM80-80v-720q0-33 23.5-56.5T160-880h640q33 0 56.5 23.5T880-800v480q0 33-23.5 56.5T800-240H240L80-80Zm126-240h594v-480H160v525l46-45Zm-46 0v-480 480Z',
+  ],
+  send: [
+    'M120-160v-640l760 320-760 320Zm80-120 474-200-474-200v140l240 60-240 60v140Zm0 0v-400 400Z',
+  ],
+  refresh: [
+    'M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z',
   ],
   comment: [
     'M240-400h480v-80H240v80Zm0-120h480v-80H240v80Zm0-120h480v-80H240v80ZM80-80v-720q0-33 23.5-56.5T160-880h640q33 0 56.5 23.5T880-800v480q0 33-23.5 56.5T800-240H240L80-80Zm126-240h594v-480H160v525l46-45Zm-46 0v-480 480Z',

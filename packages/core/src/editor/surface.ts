@@ -12,6 +12,7 @@ import { selectionRects } from './surface-text-selection.ts';
 import { cellsOverlay, TableGestures } from './surface-table.ts';
 import { TableChrome } from './surface-table-chrome.ts';
 import { PlaceholderChrome } from './surface-placeholder-chrome.ts';
+import { CommentMarkers, type CommentMarkerHost } from './comment-markers.ts';
 import { textItemOf } from './table-cells.ts';
 import { paragraphUnits, wordSelectionAt } from '../automation/commands/text-units.ts';
 import {
@@ -106,6 +107,8 @@ export interface SurfaceHost extends SurfaceInputHost {
   pickImage?(): void;
   /** The placeholder type a new table or picture can fill on this slide (`emptyPlaceholderType`). */
   fillableType?(nodeId: string): string | undefined;
+  /** The comment threads that show markers on the slide (`comment-markers.ts`). */
+  readonly commentMarkers?: CommentMarkerHost;
 }
 
 /** Find a slide item by node id, inside groups too. */
@@ -136,6 +139,7 @@ export class SlideSurface {
   readonly #table: TableGestures;
   readonly #tableChrome: TableChrome;
   readonly #placeholderChrome: PlaceholderChrome;
+  readonly #commentMarkers: CommentMarkers;
   readonly #unbindInput: () => void;
   #zoomAnchor: { x: number; y: number } | null = null;
   #renderedZoom: number | null = null;
@@ -174,6 +178,7 @@ export class SlideSurface {
     this.#table = new TableGestures(editor);
     this.#tableChrome = new TableChrome(editor);
     this.#placeholderChrome = new PlaceholderChrome(editor);
+    this.#commentMarkers = new CommentMarkers(editor.commentMarkers);
     this.#input = doc.createElement('textarea');
     this.#input.className = 'pptx-surface__input';
     // The input receives keystrokes and IME composition for the engine; it is focusable and
@@ -403,6 +408,7 @@ export class SlideSurface {
     }
     parts.push(...animationMarkElements(doc, layout, this.editor.animationMarks?.() ?? [], px));
     parts.push(...presenceElements(doc, layout, this.editor.presence?.() ?? [], px));
+    parts.push(...this.#commentMarkers.elements(doc, layout, px));
     parts.push(...guideElements(doc, this.#drag.guides, px));
     if (this.#marquee) {
       const { start: a, at: b } = this.#marquee;
@@ -575,6 +581,11 @@ export class SlideSurface {
     if (crop && (cropHandle || onCropImage(crop, p))) {
       this.#cropDrag = startCropDrag(crop, cropHandle ?? 'move', p, `g${++this.#gestures}`);
       this.root.focus({ preventScroll: true });
+      e.preventDefault();
+      return;
+    }
+    // A comment marker shows its thread in the comments pane.
+    if (!painting && this.#commentMarkers.press(target)) {
       e.preventDefault();
       return;
     }
