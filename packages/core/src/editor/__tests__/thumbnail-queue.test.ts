@@ -317,3 +317,38 @@ describe('thumbnails of a long deck', () => {
     list.remove();
   });
 });
+
+test('a layout preview repaints when its converted pictures change', async () => {
+  const editor = await open(2);
+  const session = editor.session!;
+  let key = 'a';
+  // The session, with the picture key a converted EMF or WMF picture changes.
+  const shown = new Proxy(session, {
+    get: (target, name) => (name === 'paintKey' ? () => key : Reflect.get(target, name, target)),
+  });
+  const painter = new ThumbnailPainter({
+    session: () => shown,
+    idPrefix: 't',
+    frameLabel: (kind) => kind,
+    layoutPreview: () => session.layout(0),
+  });
+  const id = editor.snapshot().layouts![0]!.id;
+  const box = doc.createElement('div') as unknown as HTMLElement;
+  doc.body.append(box as unknown as Node);
+  painter.renderLayout(id, box);
+  const first = box.firstElementChild;
+  expect(first?.localName).toBe('svg');
+  painter.picturesChanged();
+  expect(box.firstElementChild).toBe(first);
+  key = 'b';
+  painter.picturesChanged();
+  expect(box.firstElementChild?.localName).toBe('svg');
+  expect(box.firstElementChild).not.toBe(first);
+  // A container that left the page is forgotten.
+  box.remove();
+  key = 'c';
+  const second = box.firstElementChild;
+  painter.picturesChanged();
+  expect(box.firstElementChild).toBe(second);
+  editor.destroy();
+});

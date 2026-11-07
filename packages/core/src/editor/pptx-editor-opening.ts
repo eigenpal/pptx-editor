@@ -19,6 +19,8 @@ export interface OpeningEditor {
   session(): DocumentSession | null;
   /** Publish a snapshot: the pending slide count moved. */
   emit(): void;
+  /** EMF or WMF pictures of the current session converted: repaint, and publish. */
+  picturesChanged(): void;
   /** Refuse the deck of `owner`: a deferred part did not parse. */
   refuse(owner: DocumentSession, rejection: XmlRejection): void;
   /** `owner`'s faces changed: register them for paint and publish. */
@@ -79,6 +81,10 @@ export function createOpeningLane(editor: OpeningEditor) {
     start(owner: DocumentSession): void {
       // A slide that does not parse, wherever it is read, refuses the deck at once.
       owner.onDamage = (rejection) => refuse(owner, rejection);
+      // An EMF or WMF picture that finished converting paints in place of its placeholder.
+      owner.onPictures = () => {
+        if (editor.session() === owner) editor.picturesChanged();
+      };
       if (owner.damage) refuse(owner, owner.damage);
       const open = owner.opening;
       if (!open) return;

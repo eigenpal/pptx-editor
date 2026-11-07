@@ -174,3 +174,128 @@ describe('hostile packages', () => {
     editor.destroy();
   });
 });
+
+describe('damaged notes parts and notes themes', () => {
+  const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const NOTES = '/ppt/notesSlides/notesSlide1.xml';
+  const DAMAGED = new TextEncoder().encode('<p:notes><broken');
+
+  /** A deck with speaker notes, its entries changed by `edit`. */
+  function notesDeck(edit: (entries: Map<string, Uint8Array>) => void): Uint8Array {
+    const zip = readZip(
+      buildPptx({ slides: [{ shapes: shape({ id: 2, x: 0, y: 0, cx: 1, cy: 1 }), notes: 'N' }] })
+    );
+    if (!zip.ok) throw new Error('zip');
+    const entries = new Map(zip.entries);
+    edit(entries);
+    return writeZip(entries);
+  }
+
+  /** Add relationship XML to the `.rels` part `name`. */
+  function addRel(entries: Map<string, Uint8Array>, name: string, rel: string): void {
+    const xml = new TextDecoder().decode(entries.get(name));
+    entries.set(
+      name,
+      new TextEncoder().encode(xml.replace('</Relationships>', `${rel}</Relationships>`))
+    );
+  }
+
+  test.each(['slideLayout', 'slideMaster', 'theme', 'slide'])(
+    'a damaged notes part that a slide relationship of type %s also names drops the notes',
+    (type) => {
+      const bytes = notesDeck((entries) => {
+        entries.set(NOTES, DAMAGED);
+        addRel(
+          entries,
+          '/ppt/slides/_rels/slide1.xml.rels',
+          `<Relationship Id="rIdHostile" Type="${R}/${type}" Target="../notesSlides/notesSlide1.xml"/>`
+        );
+      });
+      const r = readPptx(bytes);
+      if (!r.ok) throw new Error(`refused: ${r.error.reason}`);
+      expect(presentationInfo(r.pkg).slides).toHaveLength(1);
+      // The damaged part stays as its bytes, so the save keeps it.
+      const part = r.pkg.parts.get(NOTES);
+      expect(part?.kind).toBe('binary');
+    }
+  );
+
+  test('a damaged theme of the notes master drops nothing the slides need', () => {
+    const bytes = notesDeck((entries) => {
+      entries.set('/ppt/theme/theme2.xml', new TextEncoder().encode('<a:theme><broken'));
+    });
+    expect(slides(bytes)).toBe(1);
+  });
+
+  test('a damaged theme of the handout master drops nothing the slides need', () => {
+    const PML_NS = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+    const bytes = notesDeck((entries) => {
+      entries.set(
+        '/ppt/handoutMasters/handoutMaster1.xml',
+        new TextEncoder().encode(`<p:handoutMaster xmlns:p="${PML_NS}"><p:cSld/></p:handoutMaster>`)
+      );
+      entries.set(
+        '/ppt/handoutMasters/_rels/handoutMaster1.xml.rels',
+        new TextEncoder().encode(
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+            `<Relationship Id="rId1" Type="${R}/theme" Target="../theme/theme3.xml"/></Relationships>`
+        )
+      );
+      entries.set('/ppt/theme/theme3.xml', new TextEncoder().encode('<a:theme><broken'));
+      addRel(
+        entries,
+        '/ppt/_rels/presentation.xml.rels',
+        `<Relationship Id="rIdHandout" Type="${R}/handoutMaster" Target="handoutMasters/handoutMaster1.xml"/>`
+      );
+      const types = new TextDecoder().decode(entries.get(CT));
+      entries.set(
+        CT,
+        new TextEncoder().encode(
+          types.replace(
+            '</Types>',
+            `<Override PartName="/ppt/handoutMasters/handoutMaster1.xml" ContentType="${PML}handoutMaster+xml"/>` +
+              '<Override PartName="/ppt/theme/theme3.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/></Types>'
+          )
+        )
+      );
+    });
+    expect(slides(bytes)).toBe(1);
+  });
+
+  test('a damaged theme of a notes master with a generic content type drops nothing', () => {
+    const bytes = notesDeck((entries) => {
+      entries.set('/ppt/theme/theme2.xml', new TextEncoder().encode('<a:theme><broken'));
+      const types = new TextDecoder().decode(entries.get(CT));
+      const generic = types.replace(`${PML}notesMaster+xml`, 'application/xml');
+      expect(generic).not.toBe(types);
+      entries.set(CT, new TextEncoder().encode(generic));
+    });
+    expect(slides(bytes)).toBe(1);
+  });
+
+  test('a damaged theme of the slide master still refuses the deck', () => {
+    const bytes = notesDeck((entries) => {
+      entries.set('/ppt/theme/theme1.xml', new TextEncoder().encode('<a:theme><broken'));
+    });
+    expect(readPptx(bytes).ok).toBe(false);
+  });
+
+  test.each([
+    ['slide', '/ppt/slides/slide1.xml', 'notesSlide'],
+    ['slide master', '/ppt/slideMasters/slideMaster1.xml', 'notesMaster'],
+    ['slide layout', '/ppt/slideLayouts/slideLayout1.xml', 'notesSlide'],
+    ['slide master theme', '/ppt/theme/theme1.xml', 'notesSlide'],
+  ])('a damaged %s with a notes content type still refuses the deck', (_, part, notesType) => {
+    const bytes = notesDeck((entries) => {
+      entries.set(part, new TextEncoder().encode('<p:sld><broken'));
+      const types = new TextDecoder().decode(entries.get(CT));
+      const retyped = types.replace(
+        new RegExp(`(PartName="${part}" ContentType=")[^"]*"`),
+        `$1${PML}${notesType}+xml"`
+      );
+      expect(retyped).not.toBe(types);
+      entries.set(CT, new TextEncoder().encode(retyped));
+    });
+    expect(readPptx(bytes).ok).toBe(false);
+  });
+});

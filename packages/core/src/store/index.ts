@@ -33,3 +33,4 @@ export {
   type EmbeddingPermission,
 } from './fonts/index.ts';
 export { imageSize, imageSizeEmu, type ImageSize } from '@eigenpal/ooxml-core';
+export { metafileFormat, metafileSizeEmu, type MetafileFormat } from '@eigenpal/ooxml-core';

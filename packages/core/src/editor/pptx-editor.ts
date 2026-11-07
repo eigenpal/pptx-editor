@@ -141,7 +141,6 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
 
   const effectiveZoom = (): number => (fitZoom ? fitValue : zoom);
   const layout = (): SlideLayout | undefined => (session ? session.layout(slide) : undefined);
-
   // `can` compiles the command; toolbars ask for every slot on every change, so answers are
   // cached until the state a command compiles against moves: the package, the slide, the
   // selection, or the mode. Zoom, hover, and fit changes keep them. New Slide and Add Section
@@ -721,6 +720,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   const opening = createOpeningLane({
     session: () => session,
     emit,
+    picturesChanged: () => (thumbnails.picturesChanged(), emit()),
     refuse: (owner, rejection) => void refuseOpen(openRejectionCode(rejection), owner),
     facesChanged: refreshFaces,
     requestFamilies: (families) => hostFonts.request(families),

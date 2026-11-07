@@ -44,8 +44,9 @@ import {
   circleGradientGeometry,
   gradientPaintStops,
   linearGradientEnds,
+  metafilePng,
 } from '@pptx-editor.dev/core/output';
-import { binaryPartOf, imageSize, relTarget } from '@pptx-editor.dev/core/store';
+import { binaryPartOf, imageSize, metafileFormat, relTarget } from '@pptx-editor.dev/core/store';
 import {
   clipEvenOdd,
   endPath,
@@ -56,6 +57,7 @@ import {
   type PageOps,
   type StopFunctions,
 } from './page-ops.ts';
+import { fontEmbeddingDecision } from './pdf-font-embedding.ts';
 
 /**
  * The largest picture this writer decodes. `pdf-lib` decodes every PNG pixel, so a small file
@@ -406,11 +408,37 @@ async function imageFor(target: string, p: PageOps): Promise<PDFImage | null> {
   const cached = p.res.images.get(target);
   if (cached !== undefined) return cached;
   let image: PDFImage | null = null;
-  const bytes = binaryPartOf(p.res.pkg, target);
+  let bytes = binaryPartOf(p.res.pkg, target);
+  // An EMF or WMF picture draws as its PNG, converted as in the editor.
+  const metafile = bytes !== undefined && metafileFormat(bytes) !== undefined;
+  if (bytes && metafile) {
+    // Metafile text draws only with fonts that their embedding permission lets the PDF carry.
+    const fonts = (p.res.metafileFonts ??= [...p.res.faces.values()]
+      .filter((f) => {
+        const face = {
+          identity: f.id,
+          bytes: f.bytes,
+          faceIndex: 0,
+          request: { family: f.family },
+        };
+        return fontEmbeddingDecision(face).kind !== 'refuse';
+      })
+      .map((f) => f.bytes));
+    let png = await metafilePng(bytes, fonts, p.res.work.signal);
+    // When the export's signal or deadline stopped the conversion, the export fails.
+    p.res.work.check();
+    // A picture that the converter's own time limit stopped tries once more (a busy machine),
+    // then reports `picture.metafile`.
+    if (png === undefined) png = await metafilePng(bytes, fonts, p.res.work.signal);
+    p.res.work.check();
+    bytes = png ?? undefined;
+  }
   const png = bytes ? isPng(bytes) : false;
-  if (!bytes) p.diag.add('picture.missing', 'unsupported', 'A picture part is missing.');
+  if (!bytes && metafile)
+    p.diag.add('picture.metafile', 'unsupported', 'An EMF or WMF picture does not convert.');
+  else if (!bytes) p.diag.add('picture.missing', 'unsupported', 'A picture part is missing.');
   else if (!png && !isJpeg(bytes))
-    p.diag.add('picture.format', 'unsupported', 'Only PNG and JPEG pictures are drawn yet.');
+    p.diag.add('picture.format', 'unsupported', 'A picture is not PNG, JPEG, EMF, or WMF.');
   else {
     const size = imageSize(bytes);
     if (!size || size.width <= 0 || size.height <= 0)

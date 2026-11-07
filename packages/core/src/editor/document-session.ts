@@ -39,7 +39,7 @@ import {
   imageSize,
   imageSizeEmu,
 } from '../store/index.ts';
-import { partNameKey } from '@eigenpal/ooxml-core';
+import { metafileSizeEmu, partNameKey } from '@eigenpal/ooxml-core';
 import { resolveSlide } from '../cascade/index.ts';
 import {
   HARD_MAX_FONT_BYTES,
@@ -60,7 +60,8 @@ import { replicaBindingOf } from './replica-ids.ts';
 import { sameDependencies, slideDependencies } from './slide-dependencies.ts';
 import { carryFits } from '../automation/commands/table-fit.ts';
 import { refitEditedText } from './late-fit.ts';
-import { drawableImageMime } from './drawable-image.ts';
+import { MetafilePictures, type DrawablePicture } from './metafile-pictures.ts';
+import type { PicturesWait, PictureStatus } from './metafile-pictures.ts';
 import { within } from './within.ts';
 import {
   openingOrder,
@@ -499,7 +500,14 @@ export class DocumentSession {
   /** The last layout of each slide part, with what it was made from (`slideDependencies`). */
   #bySlide = new Map<string, { readonly deps: readonly unknown[]; readonly layout: SlideLayout }>();
   #substitutions: { key: string; list: FontSubstitution[] } | null = null;
-  #urls = new Map<string, string>();
+  #pictureGeneration = 0;
+  /** EMF and WMF parts draw as PNG once converted, then `onPictures` repaints. @internal */
+  readonly pictures = new MetafilePictures(
+    () => this.#faces.map((f) => f.bytes),
+    () => (this.#pictureGeneration++, this.onPictures?.())
+  );
+  /** Hears that converted pictures are ready to paint. The editor sets it. @internal */
+  onPictures: (() => void) | null = null;
   #usedPartNames = new Set<string>();
 
   /**
@@ -601,6 +609,16 @@ export class DocumentSession {
     return this.#generation;
   }
 
+  /** Changes when the same slides paint differently: new faces, or converted pictures. @internal */
+  get paintGeneration(): string {
+    return `${this.#generation}.${this.#pictureGeneration}`;
+  }
+
+  /** Changes when slide part `slide` paints differently: new faces, or its pictures. @internal */
+  paintKey(slide: string | undefined): string {
+    return `${this.#generation}.${this.pictures.stateOf(this.store.package, slide)}`;
+  }
+
   get fontReport(): FontReport {
     return {
       embeddedFaces: this.#fonts.embedded.length,
@@ -689,6 +707,7 @@ export class DocumentSession {
     this.#bySlide.clear();
     this.#substitutions = null;
     this.#generation += 1;
+    this.pictures.fontsChanged(); // Metafile text draws with the faces.
   }
 
   /**
@@ -798,36 +817,46 @@ export class DocumentSession {
   imageUrl = (sourcePart: string, rId: string): string | undefined => {
     const pkg = this.store.package;
     const target = relTarget(pkg, sourcePart, rId);
-    if (!target) return undefined;
-    const bytes = binaryPartOf(pkg, target);
-    // The signature decides the type: a damaged, mislabeled, or oversized picture draws the
-    // placeholder (`drawable-image.ts`).
-    const mime = bytes ? drawableImageMime(bytes, imageMime(target)) : undefined;
-    if (!mime || !bytes) return undefined;
-    const key = `${target}\u0000${bytes.length}`;
-    const hit = this.#urls.get(key);
-    if (hit) return hit;
-    if (typeof URL === 'undefined' || typeof Blob === 'undefined') return undefined;
-    const url = URL.createObjectURL(new Blob([bytes.slice().buffer], { type: mime }));
-    this.#urls.set(key, url);
-    return url;
+    const bytes = target ? binaryPartOf(pkg, target) : undefined;
+    const picture = bytes && this.pictures.drawable(bytes, imageMime(target!));
+    return picture ? this.pictures.url(target!, picture) : undefined;
   };
+
+  /** The bytes of the picture part `target` as they draw (`MetafilePictures.drawable`). @internal */
+  picture(target: string): DrawablePicture | undefined {
+    const bytes = binaryPartOf(this.store.package, target);
+    return bytes ? this.pictures.drawable(bytes, imageMime(target)) : undefined;
+  }
+
+  /**
+   * Waits until the EMF and WMF pictures of slide `index`, or of every slide when you omit it,
+   * have converted. Resolves `true` when all draw, also as a PNG from before a font change, and
+   * `false` when one cannot convert, for a slide that does not exist, or after the wait.
+   */
+  picturesReady(index?: number, options: PicturesWait = {}): Promise<boolean> {
+    return this.pictures.readySlides(this.store.package, this.info.slides, index, options);
+  }
+
+  /** The EMF and WMF pictures of slide `index`, or of every slide, each with its state. */
+  pictureStatus(index?: number): PictureStatus[] {
+    return this.pictures.statusOfSlides(this.store.package, this.info.slides, index);
+  }
 
   /**
    * The natural size of an image relationship in EMU, from its header and resolution, at 72 DPI
    * when it states none: the size of a tiled picture. The stored pixels count, not a JPEG's
-   * EXIF orientation. Paint uses it for
-   * tiled pictures, and Crop > Fill and Fit for the aspect ratio. Undefined for an external
-   * target or an unreadable header.
+   * EXIF orientation. An EMF or WMF picture has the size of its frame. Paint uses it for tiled
+   * pictures, and Crop > Fill and Fit for the aspect ratio. Undefined for an external target or
+   * an unreadable header.
    */
   imageSize = (sourcePart: string, rId: string): { cx: number; cy: number } | undefined => {
     const pkg = this.store.package;
     const target = relTarget(pkg, sourcePart, rId);
     const bytes = target ? binaryPartOf(pkg, target) : undefined;
     const size = bytes ? imageSize(bytes) : null;
-    return size
-      ? imageSizeEmu({ ...size, dpiX: size.dpiX ?? TILE_DPI, dpiY: size.dpiY ?? TILE_DPI })
-      : undefined;
+    if (size)
+      return imageSizeEmu({ ...size, dpiX: size.dpiX ?? TILE_DPI, dpiY: size.dpiY ?? TILE_DPI });
+    return bytes ? metafileSizeEmu(bytes) : undefined; // An EMF or WMF picture frame.
   };
 
   /** The families whose packaged substitutes the session loads; null when it loads none. */
@@ -843,8 +872,7 @@ export class DocumentSession {
   /** Release blob URLs. */
   dispose(): void {
     this.#disposed = true;
-    for (const url of this.#urls.values()) URL.revokeObjectURL(url);
-    this.#urls.clear();
+    this.pictures.dispose();
   }
 }
 

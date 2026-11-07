@@ -156,31 +156,27 @@ export function aspectLocked(el: Element | undefined): boolean {
  * An element and its copies in the other branches of the `mc:AlternateContent` it sits in.
  * The editor shows the copy of `alternateBranch` (`cascade/alternate-content.ts`); another
  * consumer can show another copy (ECMA-376 Part 3, Markup Compatibility), so a hide, a rename,
- * or a lock goes to every copy (matched by kind and `p:cNvPr/@id`).
+ * or a lock goes to every copy (matched by kind and `p:cNvPr/@id`). In nested
+ * `mc:AlternateContent`, the copies in the branches of each enclosing one count too.
  */
 function withCopies(batch: OpBatch, part: string, el: Element): Element[] {
   const out = [el];
-  let branch: Element | undefined;
-  for (let p = parentOf(batch, part, el.id), depth = 0; depth < 32; depth += 1) {
-    if (p.ns === NS.mc && (p.local === 'Fallback' || p.local === 'Choice')) branch = p;
-    if (p.kind === 'spTree' || branch) break;
-    p = parentOf(batch, part, p.id);
-  }
-  if (!branch) return out;
-  const wrapper = parentOf(batch, part, branch.id);
   const id = attr(drawingProps(el), 'id');
-  const find = (node: Element, depth: number): Element | undefined => {
+  const find = (node: Element, depth: number): void => {
     for (const c of elements(node)) {
-      if (c.kind === el.kind && attr(drawingProps(c), 'id') === id) return c;
-      const inner = depth < 32 ? find(c, depth + 1) : undefined;
-      if (inner) return inner;
+      if (c.kind === el.kind && attr(drawingProps(c), 'id') === id) out.push(c);
+      else if (depth < 32) find(c, depth + 1);
     }
-    return undefined;
   };
-  for (const other of elements(wrapper)) {
-    if (other.id === branch.id || other.ns !== NS.mc) continue;
-    const copy = find(other, 0);
-    if (copy) out.push(copy);
+  for (let p = parentOf(batch, part, el.id), depth = 0; depth < 32; depth += 1) {
+    if (p.kind === 'spTree') break;
+    if (p.ns === NS.mc && (p.local === 'Fallback' || p.local === 'Choice')) {
+      const branch = p;
+      p = parentOf(batch, part, branch.id);
+      for (const other of elements(p))
+        if (other.id !== branch.id && other.ns === NS.mc) find(other, 0);
+    }
+    p = parentOf(batch, part, p.id);
   }
   return out;
 }

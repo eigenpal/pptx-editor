@@ -250,6 +250,8 @@ async function adopt(next: DocumentSession): Promise<void> {
   session?.dispose();
   session = next;
   faceFamilies = await registerFaces(session.faces);
+  // EMF and WMF pictures paint as their PNG, as in the editor once they have converted.
+  await session.picturesReady();
 }
 
 const api: HarnessApi = {
@@ -296,13 +298,17 @@ const api: HarnessApi = {
     if (!session) throw new Error('no document');
     const layout = session.layout(index);
     if (!layout) throw new Error(`no slide ${index}`);
+    // A picture that did not convert paints as the placeholder: the slide's report says so.
+    const pictures = await session.picturesReady(index);
     const svg = paintAt(layout, `s${index}`);
     document.getElementById('slide')!.replaceChildren(svg);
     await loaded([svg]);
     const fonts = new Set<string>();
     collectFonts(layout.items, fonts);
     return {
-      diagnostics: layout.diagnostics,
+      diagnostics: pictures
+        ? layout.diagnostics
+        : [...layout.diagnostics, 'picture not converted: emf-wmf'],
       fonts: [...fonts].sort(),
       markup: await markupOf(svg),
     };

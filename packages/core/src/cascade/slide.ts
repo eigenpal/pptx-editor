@@ -9,6 +9,7 @@ import {
   child,
   elements,
   imageSize,
+  metafileFormat,
   intAttr,
   isEmptiedTable,
   NS,
@@ -535,11 +536,13 @@ const OLE_POSTER_MAX_PIXELS = 25_000_000;
 
 /**
  * Whether a picture relationship names an internal package part whose bytes are a PNG, JPEG,
- * GIF, or BMP image of a sane size. An external target (`TargetMode="External"`) is never
- * fetched, so it fails, as do a missing part and any other content (an EMF or WMF poster).
+ * GIF, or BMP image of a sane size, or an EMF or WMF picture (its PNG has a bounded size,
+ * `output/metafile-png.ts`). An external target (`TargetMode="External"`) is never fetched, so
+ * it fails, as do a missing part and any other content.
  */
 function drawableImage(pkg: PptxPackage, sourcePart: string, rId: string): boolean {
   const bytes = binaryPartOf(pkg, relTarget(pkg, sourcePart, rId));
+  if (bytes && metafileFormat(bytes)) return true;
   const size = bytes ? imageSize(bytes) : null;
   return (
     !!size && size.width > 0 && size.height > 0 && size.width * size.height <= OLE_POSTER_MAX_PIXELS

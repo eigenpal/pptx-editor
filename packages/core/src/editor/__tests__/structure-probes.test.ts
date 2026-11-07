@@ -343,7 +343,7 @@ describe('slide summaries after an edit', () => {
       const session = editor.session!;
       const pkg = session.store.package;
       return presentationInfo(pkg).slides.map(
-        (_, i) => renderKey(pkg, i, session.fontGeneration) ?? ''
+        (s, i) => renderKey(pkg, i, session.paintKey(s.partName)) ?? ''
       );
     };
     editor.snapshot();

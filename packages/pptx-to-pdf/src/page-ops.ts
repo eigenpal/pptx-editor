@@ -86,6 +86,8 @@ export interface PaintResources {
   readonly faces: ReadonlyMap<string, RegisteredFace>;
   /** Embedded faces by face id; `null` when the face may not be embedded. */
   readonly fonts: Map<string, EmbeddedFace | null>;
+  /** The font files that EMF and WMF text draws with, read once per document. */
+  metafileFonts?: readonly Uint8Array[];
   /** Embedded pictures by part name; `null` when the part cannot be drawn. */
   readonly images: Map<string, PDFImage | null>;
   /**

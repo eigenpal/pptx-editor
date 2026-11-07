@@ -29,6 +29,7 @@ import {
 } from '../../store/index.ts';
 import {
   alternateBranch,
+  contentElements,
   isAlternateContent,
   resolveSlide,
   type Xfrm,
@@ -248,6 +249,30 @@ const inBranch = (branch: Element | undefined): Placeholder[] =>
     .filter((p): p is Placeholder => !!p);
 
 /**
+ * The placeholders the cascade reads in `branch`: a nested `mc:AlternateContent` reads as its
+ * own branch (`contentElements`), so a placeholder nested in it holds its place.
+ */
+const readIn = (branch: Element | undefined, root: Element | undefined): Placeholder[] =>
+  contentElements(branch, root)
+    .map(placeholderOf)
+    .filter((p): p is Placeholder => !!p);
+
+/** The deepest `mc:AlternateContent` nesting that the branch walk follows: the XML depth cap. */
+const MAX_NESTING = 256;
+
+/** Every `mc:Choice` and `mc:Fallback` of `wrapper`, and those of each one nested in them. */
+function branchesOf(wrapper: Element, depth = 0, out: Element[] = []): Element[] {
+  for (const b of elements(wrapper)) {
+    if (b.ns !== NS.mc || (b.local !== 'Choice' && b.local !== 'Fallback')) continue;
+    out.push(b);
+    if (depth < MAX_NESTING)
+      for (const inner of elements(b))
+        if (isAlternateContent(inner)) branchesOf(inner, depth + 1, out);
+  }
+  return out;
+}
+
+/**
  * The placeholders at the top of a shape tree, in tree order. With `unwrap`, a placeholder in
  * `mc:AlternateContent` counts as the cascade reads it (the layout's places).
  */
@@ -255,7 +280,7 @@ function placeholdersOf(tree: Element | undefined, root?: Element, unwrap = fals
   const out: Placeholder[] = [];
   for (const el of elements(tree)) {
     if (unwrap && isAlternateContent(el))
-      for (const p of inBranch(alternateBranch(el, root))) out.push(p);
+      for (const p of readIn(alternateBranch(el, root), root)) out.push(p);
     else {
       const p = placeholderOf(el);
       if (p) out.push(p);
@@ -277,15 +302,17 @@ interface Wrapped {
   readonly copies: readonly Placeholder[];
 }
 
-/** The slide placeholders in top-level `mc:AlternateContent`, in tree order. */
+/**
+ * The slide placeholders in top-level `mc:AlternateContent`, in tree order, nested
+ * `mc:AlternateContent` in its branches included.
+ */
 function wrappedPlaceholdersOf(tree: Element | undefined, root?: Element): Wrapped[] {
   const out: Wrapped[] = [];
   for (const wrapper of elements(tree)) {
     if (!isAlternateContent(wrapper)) continue;
-    const reads = inBranch(alternateBranch(wrapper, root));
-    const paired = elements(wrapper)
-      .filter((b) => b.ns === NS.mc && (b.local === 'Choice' || b.local === 'Fallback'))
-      .map((b) => pairCopies(reads, inBranch(b)));
+    const reads = readIn(alternateBranch(wrapper, root), root);
+    // A nested `mc:AlternateContent` holds copies in its own branches.
+    const paired = branchesOf(wrapper).map((b) => pairCopies(reads, inBranch(b)));
     reads.forEach((read, i) => {
       out.push({
         wrapper,
