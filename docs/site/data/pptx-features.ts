@@ -816,7 +816,8 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'none',
     tier: 'community',
-    notes: 'Keyboard navigation only. No presenter view.',
+    notes:
+      'Keyboard navigation only. No presenter view. The show writes nothing to the file, so round trip does not apply.',
   },
   {
     id: 'presenting.animations-transitions',
@@ -876,6 +877,7 @@ export const pptxFeatures: PptxFeature[] = [
     rendering: 'partial',
     roundTrip: 'none',
     tier: 'community',
+    notes: 'The export writes image files, not the presentation, so round trip does not apply.',
   },
   {
     id: 'export.pdf',
@@ -886,7 +888,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'none',
     tier: 'premium',
     notes:
-      '@pptx-editor.dev/pptx-to-pdf uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement. The PDF export draws shapes, solid and gradient fills, cropped PNG and JPEG pictures, tables, shadows, glow, inner shadows, reflections, and searchable text. It exports in one call or from a reusable session, and leaves hidden slides out. The React and Vue demos export through a server function: Export > Presentation as PDF. It draws dashes and line ends with the same geometry as the editor. Approximations, each with a diagnostic code: shadow and glow blur, opaque silhouettes, inner shadows, soft edges, reflection blur, gradient lines, gradients with more than 64 stops, fills past the shape box, tiled pictures, picture color effects, compound lines, underline styles other than single and double, and some text styles; SVG pictures draw from their PNG fallback. The border of a picture is drawn outside the picture. With the optional @docx-editor.dev/fonts-cjk installed, East Asian text in a missing font draws with Noto Sans CJK JP. Not drawn yet: pattern fills, picture fills on text, text outlines, other picture formats, diagrams, OLE objects with no picture, and other graphic frames, and table frames with no grid. Charts draw through the drawing module of @pptx-editor.dev/pro, which the export always installs; chart types outside that module show a placeholder with the frame.chart code. The export fidelity is not measured yet, so rendering stays planned.',
+      '@pptx-editor.dev/pptx-to-pdf uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement. The PDF export draws shapes, solid and gradient fills, cropped PNG and JPEG pictures, tables, shadows, glow, inner shadows, reflections, and searchable text. It exports in one call or from a reusable session, and leaves hidden slides out. The React and Vue demos export through a server function: Export > Presentation as PDF. It draws dashes and line ends with the same geometry as the editor. Approximations, each with a diagnostic code: shadow and glow blur, opaque silhouettes, inner shadows, soft edges, reflection blur, gradient lines, gradients with more than 64 stops, fills past the shape box, tiled pictures, picture color effects, compound lines, underline styles other than single and double, and some text styles; SVG pictures draw from their PNG fallback. The border of a picture is drawn outside the picture. With the optional @docx-editor.dev/fonts-cjk installed, East Asian text in a missing font draws with Noto Sans CJK JP. Not drawn yet: pattern fills, picture fills on text, text outlines, other picture formats, diagrams, OLE objects with no picture, and other graphic frames, and table frames with no grid. Charts draw through the drawing module of @pptx-editor.dev/pro, which the export always installs; chart types outside that module show a placeholder with the frame.chart code. The export fidelity is not measured yet, so rendering stays planned. The export writes a PDF, not the presentation, so round trip does not apply.',
   },
 ];
 
