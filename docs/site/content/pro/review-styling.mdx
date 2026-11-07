@@ -1,0 +1,117 @@
+---
+title: 'Review colors and styling'
+description: 'Color comments by author, choose the comment markers, and style the comments pane with CSS tokens.'
+category: 'Pro'
+---
+
+Each comment author gets one color in the [comments pane](/docs/pro/comments) and on the canvas markers. The color comes from slots `--doc-review-author-0` through `--doc-review-author-7`. The slot is a hash of the author's name, so an author keeps one color on every slide, in every session, and for every collaborator.
+
+## Change the author colors
+
+Override the tokens under `.pptx-editor`, and load your stylesheet after `editor.css`:
+
+```css
+.pptx-editor {
+  --doc-review-author-0: #7c3aed;
+  --doc-review-author-1: #0e7490;
+  --doc-review-avatar-ink: #ffffff;
+}
+```
+
+| Token | Use |
+| --- | --- |
+| `--doc-review-author-0` through `--doc-review-author-7` | The author palette |
+| `--doc-review-avatar-ink` | The initials on a filled avatar or marker badge |
+| `--doc-review-author-current` | The author color of one card, reply, or marker |
+
+The default palette keeps a contrast ratio of at least 5.1:1 between each slot and `--doc-review-avatar-ink`. Keep that ratio when you change either token.
+
+## Style one author
+
+Cards, replies, and markers set `--doc-review-author-current` to their author's slot, and avatars inherit it. Cards and replies also carry `data-review-author` and `data-review-author-slot`:
+
+```css
+.pptx-editor .pptx-review__card[data-review-author='Ada Lovelace'] {
+  --doc-review-author-current: #7c3aed;
+}
+```
+
+Author names come from the file, so any sender can use any name. Use these selectors for display only, never to prove identity.
+
+## Read an author's color in your own UI
+
+`useReviewAuthor(name)` returns `{ author, slot, color }`, or `undefined` for an empty name. `color` is a CSS value such as `var(--doc-review-author-3)`. In Vue, the composable takes a ref or a getter and returns a computed ref.
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { useReviewAuthor } from '@pptx-editor.dev/pro/react';
+
+export function AuthorChip({ name }: { name: string }) {
+  const info = useReviewAuthor(name);
+  return <span style={{ borderColor: info?.color }}>{name}</span>;
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { useReviewAuthor } from '@pptx-editor.dev/pro/vue';
+
+const props = defineProps<{ name: string }>();
+const info = useReviewAuthor(() => props.name);
+</script>
+
+<template>
+  <span :style="{ borderColor: info?.color }">{{ name }}</span>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+Render the chip inside `.pptx-editor`, or add that class to an ancestor, so the palette tokens resolve.
+
+## Choose the comment markers
+
+Set `pane.commentMarkers` on `reviewModule`. The default is `icon`:
+
+```ts
+import { reviewModule } from '@pptx-editor.dev/pro';
+
+const modules = [reviewModule({ pane: { commentMarkers: 'initials' } })];
+```
+
+Each marker is a `.pptx-surface__comment-marker` SVG group with `data-marker` set to `icon` or `initials`. A selected marker has `is-active`, and a marker of a resolved thread has `is-resolved`.
+
+## Style the pane
+
+Add classes with `className` on `PptxEditorReview` and `card.className` for each card. The packaged parts use these classes:
+
+| Class | Element |
+| --- | --- |
+| `pptx-review` | The pane |
+| `pptx-review__add` | The **New comment** button |
+| `pptx-review__card` | A thread. The selected thread has `data-active`, and a resolved thread has `data-resolved`. |
+| `pptx-review__avatar`, `pptx-review__author`, `pptx-review__time` | The head of a comment |
+| `pptx-review__summary` | The comment text |
+| `pptx-review__action` | An action button. `data-action` names the action. |
+| `pptx-review__replies`, `pptx-review__reply` | The replies of a thread |
+| `pptx-review__reply-line` | The reply line |
+| `pptx-review__compose`, `pptx-review__input` | A compose or edit box, and its field |
+
+The pane also reads the editor's theme tokens, such as `--doc-primary`, so a theme change applies to it. See [Appearance](/docs/customization/appearance).
+
+## Limits
+
+- Two authors can share a slot. Eight slots serve any number of authors.
+- The palette holds the same values in the light and dark themes. Add a rule under `.pptx-editor.dark` when you change them for the dark theme.
+- Comment markers do not print or export, so marker styles do not change a PDF.
+
+## See also
+
+- [Comments](/docs/pro/comments)
+- [Appearance](/docs/customization/appearance)

@@ -4,8 +4,9 @@
 // commands.
 // The Vue twin is `packages/vue/src/SidePanel.tsx`.
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
+  SIDE_PANEL_TAB_ICONS,
   TABLE_OPTION_ROWS,
   elementKindLabelKey,
   elementRotates,
@@ -19,7 +20,7 @@ import {
   type SidePanelTab,
 } from '@pptx-editor.dev/core/editor';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
-import { ToolButton, keepFocus } from './chrome.tsx';
+import { Icon, ToolButton, keepFocus } from './chrome.tsx';
 import { useEditorDialog } from './popups.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
 import { paneStyle } from './pane-state.ts';
@@ -242,6 +243,21 @@ function FormatTab() {
   );
 }
 
+/** A tab's packaged pane. The Comments tab has none: a review pane fills it (`panes`). */
+function PackagedPane({ tab }: { readonly tab: SidePanelTab }) {
+  const { t } = useTranslation();
+  if (tab === 'format') return <FormatTab />;
+  if (tab === 'chart') return <ChartDataPane />;
+  if (tab === 'selection') return <SelectionPane />;
+  if (tab === 'animations') return <AnimationsPane />;
+  return (
+    <div className="pptx-empty">
+      <p className="pptx-empty__title">{t('panel.comments.emptyTitle')}</p>
+      <p className="pptx-empty__body">{t('panel.comments.emptyBody')}</p>
+    </div>
+  );
+}
+
 /** Props of `SidePanel`. The host shows or hides the panel by rendering it. @public */
 export interface SidePanelProps {
   /** Shows a close button that calls it. */
@@ -256,9 +272,15 @@ export interface SidePanelProps {
   readonly tab?: SidePanelTab;
   /** Called with the tab the user picks. */
   readonly onTabChange?: (tab: SidePanelTab) => void;
+  /**
+   * Content that replaces a tab's packaged pane, by tab. The **Comments** tab has no packaged
+   * pane: pass the comments pane of `@pptx-editor.dev/pro/react` as `panes.comments`. Without
+   * it, the tab says that comments are kept when you save.
+   */
+  readonly panes?: Partial<Record<SidePanelTab, ReactNode>>;
 }
 
-/** The side panel: Format · Chart Data · Selection · Animations · Comments. @public */
+/** The side panel: Format · Chart Data · Selection · Animations · Comments. `panes` fills a tab. @public */
 export function SidePanel({
   onClose,
   className,
@@ -266,6 +288,7 @@ export function SidePanel({
   style,
   tab: shown,
   onTabChange,
+  panes,
 }: SidePanelProps) {
   const { t } = useTranslation();
   const editor = usePptxEditor();
@@ -302,8 +325,14 @@ export function SidePanel({
     latest.current(pane);
     setAsked({ pane });
   }, [editor]);
+  // A request (a comment marker, the Selection pane control) lands the focus in the panel: on the
+  // pane's current item when it marks one (`aria-current`), else on the tab.
   useEffect(() => {
-    if (asked) root.current?.querySelector<HTMLElement>(`[data-tab="${asked.pane}"]`)?.focus();
+    if (!asked) return;
+    const current = root.current?.querySelector<HTMLElement>(
+      '.pptx-panel__body [aria-current="true"]'
+    );
+    (current ?? root.current?.querySelector<HTMLElement>(`[data-tab="${asked.pane}"]`))?.focus();
   }, [asked]);
   return (
     <aside
@@ -334,10 +363,19 @@ export function SidePanel({
               className="pptx-tabs__tab"
               data-tab={id}
               aria-selected={tab === id}
+              // The row shows icons; the selected tab also shows its label. Each tab keeps its
+              // label as its name and tooltip.
+              aria-label={t(`panel.tabs.${id}`)}
+              data-pptx-tooltip={t(`panel.tabs.${id}`)}
               tabIndex={tab === id ? 0 : -1}
               onClick={() => setTab(id)}
             >
-              {t(`panel.tabs.${id}`)}
+              <Icon name={SIDE_PANEL_TAB_ICONS[id]} />
+              {tab === id ? (
+                <span className="pptx-tabs__label" aria-hidden="true">
+                  {t(`panel.tabs.${id}`)}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
@@ -348,16 +386,7 @@ export function SidePanel({
         role="tabpanel"
         onKeyDown={(e) => panelHistoryKey(e, editor)}
       >
-        {tab === 'format' ? <FormatTab /> : null}
-        {tab === 'chart' ? <ChartDataPane /> : null}
-        {tab === 'selection' ? <SelectionPane /> : null}
-        {tab === 'animations' ? <AnimationsPane /> : null}
-        {tab === 'comments' ? (
-          <div className="pptx-empty">
-            <p className="pptx-empty__title">{t('panel.comments.emptyTitle')}</p>
-            <p className="pptx-empty__body">{t('panel.comments.emptyBody')}</p>
-          </div>
-        ) : null}
+        {panes?.[tab] !== undefined ? panes[tab] : <PackagedPane tab={tab} />}
       </div>
     </aside>
   );

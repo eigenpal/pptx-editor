@@ -853,12 +853,12 @@ export const pptxFeatures: PptxFeature[] = [
     id: 'review.comments',
     name: 'Comments',
     category: 'review',
-    editing: 'none',
+    editing: 'partial',
     rendering: 'none',
-    roundTrip: 'preserved',
+    roundTrip: 'full',
     tier: 'premium',
     notes:
-      'Comments are kept on save. The review module of @pptx-editor.dev/pro reads them and uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement. No review UI yet.',
+      'You can add, reply to, edit, and delete comments, and resolve or reopen threads, with editor commands or in the comments pane (PptxEditorReview from @pptx-editor.dev/pro/react or /vue). A new comment uses the threaded format, except in a deck that has only legacy comments; legacy comments stay in their own format. A comment points at the slide or at an element on the top level of the slide. Legacy comments have no resolved state, so you cannot resolve them. Mentions, reactions, and other content of threaded comments are kept but not shown, and the edit of a comment with such content is refused. The pane lists threads in file order, not by their position on the slide. The markers on the canvas are editing chrome: they do not print or export. Two peers who add comments at once keep both, and a save joins the author lists and comment lists that they made. The import of a slide with threaded comments from another presentation is refused. Each author keeps one color, from a hash of the name. The comments pane and the comment list of the snapshot need the review module of @pptx-editor.dev/pro, which uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.',
   },
 
   // --- Collaboration & automation --------------------------------------

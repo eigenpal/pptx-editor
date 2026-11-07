@@ -80,8 +80,9 @@ export const SAVE_VERIFIED_FIXTURES: readonly string[] = [
  * `presenting.animations-transitions`, with its new effects and transition,
  * `lists.bullets-numbering` and `text.hyperlinks`, with picture bullets and custom show and file
  * links, and the new `objects.charts` copy, which edits chart data, no prompt; and the new
- * `effects.3d-and-other` copy, which sets and clears bevels, cameras, and blur, and the
- * `objects.diagrams` copy, which types in, adds, and deletes diagram shapes, no prompt.
+ * `effects.3d-and-other` copy, which sets and clears bevels, cameras, and blur, the
+ * `objects.diagrams` copy, which types in, adds, and deletes diagram shapes, and
+ * `review.comments` and `slides.structure`, with comment parts saved as XML trees, no prompt.
  */
 export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'collaboration.automation-api':
@@ -123,7 +124,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
     'sha256:043e5036d5b63116d9ff5d107948c943d23bb309adca4f8a9eaee82137daf636',
   'presenting.animations-transitions':
     'sha256:11fee431d75edb3255ee2e5fe61cfae95b23496c194e581df535033fe80c243d',
-  'review.comments': 'sha256:f67938b2e1691f8c4005435cbaaaa5d30685c21acf3d82dd96d8418fa651bae1',
+  'review.comments': 'sha256:2823b6a3277894e25e5d9ae6519d032e276acc6416ed89f2188ba1387ce7629a',
   'shapes.arrange': 'sha256:4701cd3ccd6930d3b7f250b7bb632460e869c08904ce4f132c7272c5764ad5f3',
   'shapes.connectors': 'sha256:e734d6ef3ed3218480c862dff622121acdee1f26ca896d8f5c6b4a8895dfbe23',
   'shapes.custom-geometry':
@@ -144,7 +145,7 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'slides.sections': 'sha256:e708cc676d8f24ca4ee0156233256430664540625fa2dcf43f90df180188cfd3',
   'slides.size': 'sha256:cc819a1b4ad52d1d80284fa75ef418f773bf33f1fe4f6321b002241c4873addc',
   'slides.sorter': 'sha256:82573bad16e9f1b281f31d9feebcd029c3f850b5ab0d266fe65569827f05e567',
-  'slides.structure': 'sha256:4c94fe29b0f69573b04eb4a5cee860216e25d65ca035e5b963dac749828ad02d',
+  'slides.structure': 'sha256:a87a205b99be3115c5d45bb1e0f9c1249e96392c6561d7ac126cd966cc2a1e98',
   'tables.cell-format': 'sha256:7d0f4cf1b2a0be903a54f7aa0cb2a9652540899a0c74ca077e913606af3c9133',
   'tables.cell-text': 'sha256:ac550e68680e930832758db43b0de7b44479aa8f518ee84928d769d8c4df06a2',
   'tables.merge-split': 'sha256:c2666f07264d1dda79fda8fb69a5d1f4a423d2030a3e0b5e53d4bcb306487af0',
@@ -179,8 +180,8 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
  * `scripts/fidelity/kept-content-edits.ts`) whose copy opens with no repair prompt, with the
  * fingerprint of that copy (`editFingerprint`). `bun scripts/fidelity/kept-content-edits.ts --out
  * <dir>` writes one copy per recipe. The rules of `SAVE_VERIFIED_FEATURE_EDITS` apply. Last
- * checked on 7 November 2026: all 37 copies, no prompt. The animation row now proves a full
- * round trip in `SAVE_VERIFIED_FEATURE_EDITS`, so its duplicate-slide copy is no longer listed.
+ * checked on 7 November 2026: all 37 copies, no prompt. The animation and comment rows now
+ * prove a full round trip elsewhere, so their duplicate-slide copies are no longer listed.
  */
 export const SAVE_VERIFIED_KEPT_CONTENT_EDITS: Readonly<Record<string, string>> = {
   'shapes.custom-geometry: duplicate slide':
@@ -243,10 +244,26 @@ export const SAVE_VERIFIED_KEPT_CONTENT_EDITS: Readonly<Record<string, string>> 
     'sha256:fe28abbe16211ae3cd2448e3b86bbe1f4b26bd45e99f927aa20cccc48c2f9d29',
   'objects.equations: paste into another deck':
     'sha256:fe28abbe16211ae3cd2448e3b86bbe1f4b26bd45e99f927aa20cccc48c2f9d29',
-  'review.comments: duplicate slide':
-    'sha256:af6f398bd04ec75e51b13c7f7b768e0c99923f040141e8829b4c0dc76be560cf',
   'themes.placeholder-inheritance: duplicate slide':
     'sha256:31dd35989a1ea1c0899c64cfdb075b51ce09424c235932cd82e630ae75d4a8d3',
+};
+
+/**
+ * Comment edits (`COMMENT_EDITS` in `scripts/fidelity/comment-edits.ts`) whose copy opens with no
+ * repair prompt, with the fingerprint of that copy (`commentFingerprint`). `bun
+ * scripts/fidelity/comment-edits.ts --out <dir>` writes one copy per recipe. The rules of
+ * `SAVE_VERIFIED_FEATURE_EDITS` apply. Last checked on 7 November 2026: all 4 copies, and the
+ * `slide-structure` copies of `SAVE_VERIFIED_FIXTURES`, no prompt.
+ */
+export const SAVE_VERIFIED_COMMENT_EDITS: Readonly<Record<string, string>> = {
+  'review.comments: legacy':
+    'sha256:64183420e8f55b8733283cd7539dd9d667929833e5637fbdec2e62451ee6347d',
+  'review.comments: duplicate slide':
+    'sha256:38b70874f013aa43ce7cce68fc5ee1fe1abb2fed76076a574d26c3d468f8825a',
+  'review.comments: duplicate threads':
+    'sha256:536faea983a8f5292a63f709167171463ecf7486d38eaf01772618babaf39a2b',
+  'review.comments: collaboration':
+    'sha256:bb86cb89a50181a666fac29b3c8f5cafc5c5d14d752b6a04537a8c11c1c70551',
 };
 
 /**

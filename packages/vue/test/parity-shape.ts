@@ -132,8 +132,11 @@ export async function vueAdapterShape(contract?: ParityContract): Promise<VueAda
       },
     },
     PptxEditorNotesPane: { component: vue.PptxEditorNotesPane },
+    // Each key of React's `panes` is a Vue named slot of the same name; the probe opens the
+    // Comments tab, so the `#comments` slot renders.
     PptxEditorSidePanel: {
       component: vue.PptxEditorSidePanel,
+      props: { tab: 'comments' },
       values: { paneWidth: { props: { paneWidth: 321 }, shows: (s) => hasWidth(s, 321) } },
     },
     PptxEditorSelectionPane: { component: vue.PptxEditorSelectionPane },

@@ -53,6 +53,15 @@ export function markOptions(
   };
 }
 
+/** The history mark for an edit of `part`: `selection` when `part` is the shown slide `shown`. */
+export function markOf(
+  part: string | undefined,
+  shown: string | undefined,
+  selection: EditorSelection
+): HistoryMark {
+  return { part, selection: part === shown ? selection : { kind: 'none' } };
+}
+
 /** A history entry's selection state, as the facade stores it. */
 export function isHistoryMark(v: unknown): v is HistoryMark {
   return typeof v === 'object' && v !== null && 'selection' in v && 'part' in v;

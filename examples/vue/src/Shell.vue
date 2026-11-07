@@ -31,6 +31,7 @@ import {
   type SidePanelTab,
   listenPaneRequests,
 } from '@pptx-editor.dev/vue';
+import { PptxEditorReview } from '@pptx-editor.dev/pro/vue';
 import {
   PPTX_MIME,
   dismissPanelOverlay,
@@ -314,11 +315,9 @@ function onDrop(e: DragEvent): void {
           <PptxEditorOpenFailure />
           <PptxEditorStatusBar v-if="ribbon" />
         </div>
-        <PptxEditorSidePanel
-          v-if="panel"
-          v-model:tab="panelTab"
-          :on-close="() => (panel = false)"
-        />
+        <PptxEditorSidePanel v-if="panel" v-model:tab="panelTab" :on-close="() => (panel = false)">
+          <template #comments><PptxEditorReview /></template>
+        </PptxEditorSidePanel>
         <div v-if="dragging" class="demo-drop">{{ t('app.dropHint') }}</div>
       </div>
     </main>

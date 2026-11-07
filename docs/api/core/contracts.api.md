@@ -275,6 +275,87 @@ export type CommandResult = {
 };
 
 // @public
+export type CommentAnchor = {
+    readonly kind: 'slide';
+} | {
+    readonly kind: 'point';
+    readonly x: number;
+    readonly y: number;
+} | {
+    readonly kind: 'shape';
+    readonly nodeId: string;
+};
+
+// @public
+export interface CommentAuthorInput {
+    readonly author?: string;
+    readonly date?: string;
+    readonly initials?: string;
+}
+
+// @public
+export type CommentCommand =
+/**
+* Add a thread on the current slide. With `nodeId`, it points at that element; without it, at
+* the selected element when one element is selected, else at the slide.
+*/
+({
+    readonly type: 'addComment';
+    readonly text: string;
+    readonly nodeId?: string;
+} & CommentAuthorInput)
+/** Reply to the thread of `commentId` (a thread or one of its replies). */
+| ({
+    readonly type: 'replyToComment';
+    readonly commentId: string;
+    readonly text: string;
+} & CommentAuthorInput)
+/** Replace the text of a comment or a reply. */
+| {
+    readonly type: 'editComment';
+    readonly commentId: string;
+    readonly text: string;
+}
+/** Delete a reply, or a whole thread when `commentId` is a thread. */
+| {
+    readonly type: 'deleteComment';
+    readonly commentId: string;
+}
+/** Mark a thread resolved. Refused for the legacy format (`disabled.commentNoStatus`). */
+| {
+    readonly type: 'resolveComment';
+    readonly commentId: string;
+}
+/** Mark a resolved thread active again. */
+| {
+    readonly type: 'reopenComment';
+    readonly commentId: string;
+};
+
+// @public
+export type CommentFormat = 'modern' | 'legacy';
+
+// @public
+export type CommentMarkerStyle = 'initials' | 'icon';
+
+// @public
+export interface CommentSnapshot {
+    readonly activeComment?: string | null;
+    readonly commentAuthor?: string | null;
+    readonly comments?: readonly CommentThread[] | null;
+}
+
+// @public
+export interface CommentThread extends SlideComment {
+    // (undocumented)
+    readonly anchor: CommentAnchor;
+    // (undocumented)
+    readonly format: CommentFormat;
+    readonly replies: readonly SlideComment[];
+    readonly resolved: boolean;
+}
+
+// @public
 export interface CustomShowSummary {
     readonly id: number;
     readonly name: string;
@@ -341,7 +422,7 @@ export interface Editor {
 }
 
 // @public
-export type EditorCommand = {
+export type EditorCommand = CommentCommand | {
     readonly type: 'undo';
 } | {
     readonly type: 'redo';
@@ -871,7 +952,7 @@ export type EditorSelection = {
 };
 
 // @public (undocumented)
-export interface EditorSnapshot {
+export interface EditorSnapshot extends CommentSnapshot {
     readonly animationOrder?: boolean;
     readonly animations?: SlideAnimations;
     // (undocumented)
@@ -1342,6 +1423,15 @@ export interface RenderThumbnailOptions {
 }
 
 // @public
+export type ReviewPaneOpening = 'auto' | 'manual';
+
+// @public
+export interface ReviewPaneOptions {
+    readonly commentMarkers?: CommentMarkerStyle;
+    readonly opening?: ReviewPaneOpening;
+}
+
+// @public
 export type RotateChoice = 'right90' | 'left90' | 'flipVertical' | 'flipHorizontal';
 
 // @public
@@ -1575,6 +1665,15 @@ export interface SlideBackgroundState {
     // (undocumented)
     readonly pattern?: PatternFill;
     readonly tile?: boolean;
+}
+
+// @public
+export interface SlideComment {
+    readonly author: string;
+    readonly date?: string;
+    readonly id: string;
+    readonly initials: string;
+    readonly text: string;
 }
 
 // @public

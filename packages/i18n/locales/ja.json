@@ -838,6 +838,10 @@
     "dialogSlot": "このコントロールはダイアログを開きます",
     "selectWord": "単語内をクリックするか、テキストを選択してください",
     "mixedSize": "選択したテキストには複数のサイズが含まれています",
+    "noCommentAuthor": "コメントするには作成者を設定してください",
+    "commentNoStatus": "従来形式のコメントは解決済みにできません",
+    "commentNotEditable": "このコメントにはここで編集できない内容が含まれています",
+    "noCommentTarget": "コメントはスライドの最上位にある要素にのみ付けられます",
     "animationsReadOnly": "このスライドの効果は、エディターが変更しないマークアップを使っています",
     "noAnimation": "このスライドにその効果はありません",
     "noAnimationChange": "効果または画面切り替えはすでにこの設定です",
@@ -931,7 +935,7 @@
     },
     "comments": {
       "emptyTitle": "コメントはありません",
-      "emptyBody": "コメントは保存時に保持されます。このバージョンでは、コメントの確認はできません。"
+      "emptyBody": "コメントは保存時に保持されます。"
     },
     "animations": {
       "transition": "スライドの切り替え",
@@ -1175,6 +1179,10 @@
     "unsafeFileLink": "./ または ../ で始まる相対パスを入力してください (例: ./report.pdf)。リンクできるのは文書、画像、サウンド、ビデオのファイルだけです。",
     "sectionName": "セクション名は 1 から 255 文字で指定してください。",
     "view": "エディターにその表示はありません。",
+    "commentText": "コメントは 1 ～ 10,000 文字で入力してください",
+    "commentAuthor": "作成者名が長すぎます",
+    "commentDate": "コメントの日付が無効です",
+    "noComment": "このコメントはもう存在しません",
     "chartData": {
       "noChart": "グラフを 1 つ選択してください。",
       "noData": "このグラフにはデータ系列がありません。",
@@ -1620,6 +1628,36 @@
     "keyHint": "H キーでフォーカスのあるオブジェクトを表示または非表示にし、F2 キーで名前を変更します。",
     "emptyTitle": "オブジェクトがありません",
     "emptyBody": "このスライドの図形、画像、テキスト ボックスがここに表示されます。"
+  },
+  "comments": {
+    "label": "このスライドのコメント",
+    "new": "新しいコメント",
+    "text": "コメント",
+    "addComment": "コメントを追加…",
+    "replyText": "返信",
+    "editText": "コメントを編集",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "keyHint": "Enter で投稿、Shift+Enter で改行、Esc でキャンセルします。",
+    "noAuthor": "コメントするには作成者を設定してください。",
+    "pointsAt": "対象: {name}",
+    "on": "対象: {name}",
+    "resolved": "解決済み",
+    "unknownAuthor": "不明な作成者",
+    "reply": "返信",
+    "replyTo": "{author} さんに返信",
+    "edit": "編集",
+    "editOf": "{author} さんのコメントを編集",
+    "delete": "削除",
+    "deleteOf": "{author} さんのコメントを削除",
+    "resolve": "解決",
+    "resolveOf": "{author} さんのスレッドを解決",
+    "reopen": "再開",
+    "reopenOf": "{author} さんのスレッドを再開",
+    "thread": "{author} さんのコメント",
+    "replies": "{author} さんへの返信",
+    "emptyTitle": "このスライドにコメントはありません",
+    "emptyBody": "[新しいコメント] を選んでスレッドを始めます。"
   },
   "chartData": {
     "editData": "データの編集…",

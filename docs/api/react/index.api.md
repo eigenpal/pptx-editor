@@ -1201,6 +1201,7 @@ export interface PptxEditorPopups {
 
 // @public
 export interface PptxEditorProps {
+    readonly author?: string;
     readonly autoCorrect?: boolean;
     readonly children?: ReactNode;
     readonly className?: string;
@@ -1243,6 +1244,7 @@ export const PptxEditorRoot: react.ForwardRefExoticComponent<PptxEditorRootProps
 
 // @public
 export interface PptxEditorRootProps {
+    readonly author?: string;
     readonly autoCorrect?: boolean;
     readonly children?: ReactNode;
     readonly colorMode?: ColorMode;
@@ -1428,6 +1430,7 @@ export interface SidePanelProps {
     readonly className?: string;
     readonly onClose?: () => void;
     readonly onTabChange?: (tab: SidePanelTab) => void;
+    readonly panes?: Partial<Record<SidePanelTab, ReactNode>>;
     readonly paneWidth?: number;
     readonly style?: CSSProperties;
     readonly tab?: SidePanelTab;

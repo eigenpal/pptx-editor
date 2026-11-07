@@ -88,8 +88,21 @@ const REQUIRED_TYPES = new Set(
   ].map(asciiFold)
 );
 
-/** Content types the engine reads but can do without. A part that does not parse is kept as bytes. */
-const OPTIONAL_TYPES = new Set([`${PML}tableStyles+xml`, `${PML}handoutMaster+xml`].map(asciiFold));
+/**
+ * Content types the engine reads but can do without. A part that does not parse is kept as bytes.
+ * The comment lists and author lists of both comment formats are trees, so the comment commands
+ * edit them node by node, and two collaborators who edit one list at once keep both edits.
+ */
+const OPTIONAL_TYPES = new Set(
+  [
+    `${PML}tableStyles+xml`,
+    `${PML}handoutMaster+xml`,
+    `${PML}comments+xml`,
+    `${PML}commentAuthors+xml`,
+    `${PPT_MACRO}comments+xml`,
+    `${PPT_MACRO}authors+xml`,
+  ].map(asciiFold)
+);
 
 /**
  * How the reader treats a part.

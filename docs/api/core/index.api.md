@@ -1039,6 +1039,7 @@ export interface CommandContext {
         superscript?: boolean;
         subscript?: boolean;
     };
+    readonly author?: string;
     readonly base?: PptxPackage;
     readonly caretArm?: boolean;
     readonly collaborating?: boolean;
@@ -1097,6 +1098,99 @@ export type CommandResult = {
 
 // @internal
 export function commandRowReason(editor: PptxEditorInstance | null, command: EditorCommand | null): string | null;
+
+// @public
+export const COMMENT_AUTHOR_SLOTS = 8;
+
+// @public
+export type CommentAnchor = {
+    readonly kind: 'slide';
+} | {
+    readonly kind: 'point';
+    readonly x: number;
+    readonly y: number;
+} | {
+    readonly kind: 'shape';
+    readonly nodeId: string;
+};
+
+// @public
+export interface CommentAuthorInput {
+    readonly author?: string;
+    readonly date?: string;
+    readonly initials?: string;
+}
+
+// @public
+export function commentAuthorSlot(author: string): number;
+
+// @public
+export type CommentCommand =
+/**
+* Add a thread on the current slide. With `nodeId`, it points at that element; without it, at
+* the selected element when one element is selected, else at the slide.
+*/
+({
+    readonly type: 'addComment';
+    readonly text: string;
+    readonly nodeId?: string;
+} & CommentAuthorInput)
+/** Reply to the thread of `commentId` (a thread or one of its replies). */
+| ({
+    readonly type: 'replyToComment';
+    readonly commentId: string;
+    readonly text: string;
+} & CommentAuthorInput)
+/** Replace the text of a comment or a reply. */
+| {
+    readonly type: 'editComment';
+    readonly commentId: string;
+    readonly text: string;
+}
+/** Delete a reply, or a whole thread when `commentId` is a thread. */
+| {
+    readonly type: 'deleteComment';
+    readonly commentId: string;
+}
+/** Mark a thread resolved. Refused for the legacy format (`disabled.commentNoStatus`). */
+| {
+    readonly type: 'resolveComment';
+    readonly commentId: string;
+}
+/** Mark a resolved thread active again. */
+| {
+    readonly type: 'reopenComment';
+    readonly commentId: string;
+};
+
+// @public
+export type CommentFormat = 'modern' | 'legacy';
+
+// @public
+export function commentInitials(comment: {
+    readonly initials: string;
+    readonly author: string;
+}): string;
+
+// @public
+export type CommentMarkerStyle = 'initials' | 'icon';
+
+// @public
+export interface CommentSnapshot {
+    readonly activeComment?: string | null;
+    readonly commentAuthor?: string | null;
+    readonly comments?: readonly CommentThread[] | null;
+}
+
+// @public
+export interface CommentThread extends SlideComment {
+    // (undocumented)
+    readonly anchor: CommentAnchor;
+    // (undocumented)
+    readonly format: CommentFormat;
+    readonly replies: readonly SlideComment[];
+    readonly resolved: boolean;
+}
 
 // @internal
 export function commitDialogCommand(editor: Pick<Editor, 'exec'> | null, command: EditorCommand | null): DialogCommitResult;
@@ -1680,7 +1774,7 @@ export interface EditorCollaborationSession {
 }
 
 // @public
-export type EditorCommand = {
+export type EditorCommand = CommentCommand | {
     readonly type: 'undo';
 } | {
     readonly type: 'redo';
@@ -2278,7 +2372,7 @@ export type EditorSelection = {
 };
 
 // @public (undocumented)
-export interface EditorSnapshot {
+export interface EditorSnapshot extends CommentSnapshot {
     readonly animationOrder?: boolean;
     readonly animations?: SlideAnimations;
     // (undocumented)
@@ -4448,7 +4542,9 @@ export interface PptxEditorInstance extends Editor {
     // @internal
     reject(reason: string, detail?: string): CommandResult;
     renderLayoutThumbnail(layoutId: string, container: HTMLElement): void;
+    selectComment(id: string | null): void;
     readonly session: DocumentSession | null;
+    setAuthor(author: string | undefined): void;
     setFontFamilies(families: readonly string[]): void;
     setFonts(fonts: PptxEditorOptions['fonts']): Promise<void>;
     setSelection(selection: EditorSelection): void;
@@ -4457,6 +4553,7 @@ export interface PptxEditorInstance extends Editor {
 
 // @public
 export interface PptxEditorOptions extends Omit<OpenOptions, 'fonts'> {
+    readonly author?: string;
     readonly autoCorrect?: boolean;
     // (undocumented)
     readonly document?: Uint8Array;
@@ -4588,6 +4685,9 @@ export function railStepOfKey(key: string, orientation: SlideRailOrientation | u
 
 // @internal
 export function readBulletPicture(file: Blob | undefined | null): Promise<BulletPictureRead | null>;
+
+// @public
+export function readCommentThreads(pkg: PptxPackage, slidePart: string): readonly CommentThread[];
 
 // @public
 export type ReflectionPreset = 'tightTouching' | 'halfTouching' | 'fullTouching' | 'tight4pt' | 'half4pt' | 'full4pt' | 'tight8pt' | 'half8pt' | 'full8pt';
@@ -4728,6 +4828,16 @@ export interface ReviewModelInput {
 export interface ReviewModuleContribution {
     readonly collectReviewItems: CollectReviewItems;
     readonly displayModes: readonly ReviewDisplayMode[];
+    readonly pane?: ReviewPaneOptions;
+}
+
+// @public
+export type ReviewPaneOpening = 'auto' | 'manual';
+
+// @public
+export interface ReviewPaneOptions {
+    readonly commentMarkers?: CommentMarkerStyle;
+    readonly opening?: ReviewPaneOpening;
 }
 
 // @public
@@ -5225,6 +5335,9 @@ export function shownOpenFailure(snapshot: EditorSnapshot): DocumentOpenFailure 
 export function showsLoading(snapshot: EditorSnapshot): boolean;
 
 // @internal
+export const SIDE_PANEL_TAB_ICONS: Readonly<Record<SidePanelTab, string>>;
+
+// @internal
 export const SIDE_PANEL_TABS: readonly ["format", "chart", "selection", "animations", "comments"];
 
 // @public
@@ -5298,6 +5411,15 @@ export function slideClickMode(e: {
     metaKey: boolean;
     ctrlKey: boolean;
 }): 'range' | 'toggle' | 'replace';
+
+// @public
+export interface SlideComment {
+    readonly author: string;
+    readonly date?: string;
+    readonly id: string;
+    readonly initials: string;
+    readonly text: string;
+}
 
 // @internal
 export interface SlideDrag {

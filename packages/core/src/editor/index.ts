@@ -10,6 +10,8 @@ export type {
   PptxEditorInstance,
   PptxEditorOptions,
 } from './pptx-editor-types.ts';
+export { readCommentThreads } from './comment-state.ts';
+export { COMMENT_AUTHOR_SLOTS, commentAuthorSlot, commentInitials } from './comment-authors.ts';
 export {
   CHROME_GROUPS,
   chromeControlForSlot,
@@ -731,6 +733,7 @@ export {
 export {
   SELECTION_PANE_NAME_MAX,
   SIDE_PANEL_TABS,
+  SIDE_PANEL_TAB_ICONS,
   selectFromPane,
   selectionPaneAncestors,
   selectionPaneKey,

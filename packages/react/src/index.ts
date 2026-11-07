@@ -83,6 +83,7 @@ import {
 import {
   CONTEXT_MENU_ROW_PARTS,
   PptxEditorContextMenu as ContextMenuRoot,
+  sugarPopups,
   type PptxEditorContextMenuProps,
 } from './context-menu-parts.tsx';
 import type { ContextMenuPartName, MenuRowPartName } from '@pptx-editor.dev/core/editor';
@@ -709,6 +710,8 @@ export interface PptxEditorProps {
   readonly modules?: readonly EditorModule[];
   /** AutoCorrect while typing, as on `PptxEditor.Root`. Read at mount. */
   readonly autoCorrect?: boolean;
+  /** The author of later comments and replies, as on `PptxEditor.Root`. */
+  readonly author?: string;
   /**
    * The notice for a file that does not open (`PptxEditor.OpenFailure`). An object is
    * `PptxEditorOpenFailureProps`, passed straight through. `false` removes the notice, for a host that
@@ -765,31 +768,6 @@ export interface PptxEditorProps {
 const partProps = <P extends object>(value: boolean | P | undefined): P =>
   typeof value === 'object' ? value : ({} as P);
 
-/**
- * The `popups` the sugar passes to the root: the host's entries, with `contextMenu` and
- * `hyperlinkPopup` mapped onto the same entries. A host entry wins.
- */
-function sugarPopups(
-  popups: PptxEditorPopups | undefined,
-  hyperlinkPopup: boolean | undefined,
-  contextMenu: boolean | PptxEditorContextMenuProps | undefined
-): PptxEditorPopups | undefined {
-  const linkOff = hyperlinkPopup === false && popups?.hyperlink === undefined;
-  const menuEntry =
-    popups?.contextMenu !== undefined || contextMenu === undefined || contextMenu === true
-      ? undefined
-      : contextMenu === false
-        ? (false as const)
-        : (props: PptxEditorContextMenuProps) =>
-            createElement(PptxEditorContextMenu, { ...props, ...contextMenu });
-  if (!linkOff && menuEntry === undefined) return popups;
-  return {
-    ...popups,
-    ...(linkOff ? { hyperlink: false as const } : {}),
-    ...(menuEntry !== undefined ? { contextMenu: menuEntry } : {}),
-  };
-}
-
 const OPEN_FAILURE_ACTION_NAMES = {
   actions: 'renderOpenFailureActions',
   off: 'openFailure={false}',
@@ -817,6 +795,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
     fontFamilies,
     modules,
     autoCorrect,
+    author,
     openFailure = true,
     renderOpenFailureActions,
     toolbar = true,
@@ -836,7 +815,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
   );
   // Memoized, so stable props give the root the same `popups` at each render.
   const rootPopups = useMemo(
-    () => sugarPopups(popups, hyperlinkPopup, contextMenu),
+    () => sugarPopups(popups, hyperlinkPopup, contextMenu, PptxEditorContextMenu),
     [popups, hyperlinkPopup, contextMenu]
   );
   const dock =
@@ -864,6 +843,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
       ...(fontFamilies ? { fontFamilies } : {}),
       ...(modules ? { modules } : {}),
       ...(autoCorrect === false ? { autoCorrect } : {}),
+      ...(author ? { author } : {}),
     },
     createElement(
       PptxEditorViewport,

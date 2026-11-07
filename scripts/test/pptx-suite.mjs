@@ -10,7 +10,12 @@
 export const WORKSPACE_SCOPES = ['@pptx-editor.dev/', '@eigenpal/'];
 
 /** The adapter tests: the only files that run with a global DOM. */
-export const DOM_TEST_ROOTS = ['packages/react/', 'packages/vue/'];
+export const DOM_TEST_ROOTS = [
+  'packages/react/',
+  'packages/vue/',
+  'packages/pro/src/react/',
+  'packages/pro/src/vue/',
+];
 
 /** Registers happy-dom before an adapter test module is evaluated. */
 export const DOM_PRELOAD = './scripts/test/preload-dom.ts';

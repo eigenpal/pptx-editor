@@ -14,6 +14,19 @@ export const SIDE_PANEL_TABS = ['format', 'chart', 'selection', 'animations', 'c
  */
 export type SidePanelTab = (typeof SIDE_PANEL_TABS)[number];
 
+/**
+ * The icon of each side panel tab (a name in `ICON_PATHS`). The tab row shows the icons, with the
+ * label of the selected tab beside its icon, so five tabs fit the panel in every locale; each tab
+ * keeps its full label as its accessible name and tooltip. @internal
+ */
+export const SIDE_PANEL_TAB_ICONS: Readonly<Record<SidePanelTab, string>> = {
+  format: 'tune',
+  chart: 'table_chart',
+  selection: 'list_alt',
+  animations: 'play_arrow',
+  comments: 'comment',
+};
+
 type PaneListener = (pane: SidePanelTab) => void;
 
 /** For each editor: the functions that answer a pane request. */

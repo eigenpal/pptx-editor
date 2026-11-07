@@ -145,7 +145,7 @@ describe('PptxEditorSelectionPane', () => {
     );
     const tabOf = (name: string) =>
       [...document.querySelectorAll<HTMLElement>('[role="tab"]')].find(
-        (t) => t.textContent === name
+        (t) => t.getAttribute('aria-label') === name
       )!;
     expect(tabOf('Selection').getAttribute('aria-selected')).toBe('true');
     expect(document.querySelector('[role="tree"]') !== null).toBe(true);

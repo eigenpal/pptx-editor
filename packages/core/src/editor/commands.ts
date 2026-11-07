@@ -68,10 +68,8 @@ import { deleteSlides, duplicateSlides, moveSlides } from '../automation/command
 import { applyHeaderFooter } from '../automation/commands/header-footer.ts';
 import { notesShown, setNotes } from '../automation/commands/notes-commands.ts';
 import { compilePictureCommand, isPictureCommand } from './picture-commands.ts';
-import { compileAnimationCommand, isAnimationCommand } from './animation-command-table.ts';
 import { isViewCommand } from './view-settings.ts';
-import { compileChartCommand } from './chart-commands.ts';
-import { compileDiagramCommand } from './diagram-commands.ts';
+import { compileObjectCommand, isObjectCommand } from './object-commands.ts';
 import { compileSlideCommand, isSlideCommand } from './slide-command-table.ts';
 import { compileShapeCommand, isShapeCommand } from './shape-command-table.ts';
 import { compileTextFormatCommand, isTextFormatCommand } from './text-format-commands.ts';
@@ -158,6 +156,8 @@ export interface CommandContext {
   readonly gestureBase?: PptxPackage;
   /** How many times in a row this payload has been pasted, counting this paste (1 = first). */
   readonly pasteRepeat?: number;
+  /** The author of new comments and replies when the command names none (`setAuthor`). */
+  readonly author?: string;
   /** The package to compile against instead of the store's: the preview of an armed format. */
   readonly base?: PptxPackage;
   /**
@@ -392,12 +392,7 @@ export function compile(
     return { batch, effect: compilePictureCommand(ctx, batch, slidePart(ctx), command) };
   if (isTextFormatCommand(command))
     return { batch, effect: compileTextFormatCommand(ctx, batch, command) };
-  if (isAnimationCommand(command))
-    return { batch, effect: compileAnimationCommand(ctx, batch, command) };
-  if (command.type === 'setChartData')
-    return { batch, effect: compileChartCommand(ctx, batch, command) };
-  if (command.type === 'addDiagramShape' || command.type === 'deleteDiagramShape')
-    return { batch, effect: compileDiagramCommand(ctx, batch, command) };
+  if (isObjectCommand(command)) return { batch, effect: compileObjectCommand(ctx, batch, command) };
   const info = ctx.session.info;
   const { width: slideW, height: slideH } = info;
   switch (command.type) {

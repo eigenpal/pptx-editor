@@ -268,7 +268,47 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'edit.unsupported-element',
     'The object is of a kind this API cannot edit, for example a chart or an embedded object. Read it, or edit another object.',
   ],
+  [
+    'disabled.noCommentAuthor',
+    'edit.no-comment-author',
+    'A comment needs an author. Pass author, or set the author option of the editor.',
+  ],
+  [
+    'disabled.commentNoStatus',
+    'edit.comment-no-status',
+    'Legacy comments have no resolved state. Reply to the thread instead.',
+  ],
+  [
+    'disabled.commentNotEditable',
+    'edit.comment-not-editable',
+    'The comment holds content other than text, such as a mention. Reply instead of editing it.',
+  ],
+  [
+    'disabled.noCommentTarget',
+    'edit.no-comment-target',
+    'A comment can point only at an element on the top level of the current slide. Pass its id, or none.',
+  ],
   // Edit errors of the engine (`errors.*`): GeneralException, or InvalidArgument for a name.
+  [
+    'errors.commentText',
+    'edit.comment-text',
+    'Comment text has 1 to 10000 characters. Pass shorter text that is not empty.',
+  ],
+  [
+    'errors.commentAuthor',
+    'edit.comment-author',
+    'An author name has up to 255 characters. Pass a shorter name.',
+  ],
+  [
+    'errors.commentDate',
+    'edit.comment-date',
+    'A comment date is an ISO 8601 date and time, such as 2026-11-07T10:00:00Z. Pass one, or none.',
+  ],
+  [
+    'errors.noComment',
+    'edit.comment-not-found',
+    'The slide has no comment with this id. Read the comments of the slide again.',
+  ],
   [
     'errors.altTextLength',
     'edit.alt-text-length',

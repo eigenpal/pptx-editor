@@ -4,7 +4,6 @@
 // state moves, so `useSyncExternalStore` selectors only re-render when their slice changes.
 
 import { pickImageInto } from './chrome-actions.ts';
-import { runLinkOf } from './link-read.ts';
 import { documentOpenFailure, OPEN_FAILED, openRejectionCode } from './loading.ts';
 import { prepareDeck } from './open-steps.ts';
 import { writePptx, type PptxOp, type PptxPackage } from '../store/index.ts';
@@ -27,7 +26,7 @@ import { createOpeningLane } from './pptx-editor-opening.ts';
 import { commandCacheKey, compile, type CommandContext } from './commands.ts';
 import { clampSlide, type DocumentSession } from './document-session.ts';
 import { changedSlide, isHistoryMark, validSelection, type HistoryMark } from './history-marks.ts';
-import { markOptions } from './history-marks.ts';
+import { markOf, markOptions } from './history-marks.ts';
 import { EditorHistoryGroups } from './history-groups.ts';
 import {
   CommandRefusal,
@@ -40,9 +39,11 @@ import {
   createNotesSource,
   createSubstitutionSource,
   createVersionSource,
+  linkTargetOf,
 } from './snapshot-sources.ts';
 import { createShapeListSource, elementIn } from './shape-list.ts';
 import { activeOf, createBackgroundSource, formatAt, geometryOf } from './selection-state.ts';
+import { CommentState } from './comment-state.ts';
 import { FormatPainter } from './format-painter.ts';
 import { CropMode } from './crop-mode.ts';
 import { chartDataAt, selectedObjectsAt, withAltText } from './picture-state.ts';
@@ -64,7 +65,7 @@ import { CaretArm, armedCaretOf, caretSelection } from './caret-arm.ts';
 import { fontFamilyOf } from '../automation/commands/font-format.ts';
 import { createHostFonts, openOptionsOf } from './host-fonts.ts';
 import { selectionBody, snapCellAddress, textItemOf } from './table-cells.ts';
-import { repairTablesForSave } from '../automation/commands/table-repair.ts';
+import { packageForSave } from '../automation/commands/save-repair.ts';
 import { withoutStaleCopies } from '../automation/commands/alternate-copies.ts';
 import { firstCellCaret } from './table-keys.ts';
 import { createTableStateSource } from './table-state.ts';
@@ -125,6 +126,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   let destroyed = false;
   const listeners = new Set<() => void>();
   const modules = seam.resolveEditorModules(options.modules);
+  const comments = new CommentState(options.author, modules);
   const presence = new PresenceLink(modules);
   let detachModules = (): void => {};
   const idPrefix = uniquePrefix();
@@ -204,9 +206,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       insertions,
       ...views.snapshot(sectionSummaries(pkg).map((x) => x.id)),
       selection,
-      format: formatAt(arm.layout() ?? lay, selection, (rId, action) =>
-        runLinkOf(pkg, partAt(slide), info?.slides.map((s) => s.partName) ?? [], rId, action)
-      ),
+      format: formatAt(arm.layout() ?? lay, selection, linkTargetOf(pkg, info, slide)),
       geometry: withAltText(
         geometryOf(lay, selection, (id) => elementIn(pkg, partAt(slide), id)),
         pkg,
@@ -232,6 +232,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       table: tableState(pkg, partAt(slide), lay, selection),
       shapes: shapeList(pkg, partAt(slide)),
       animations: animationsOf(pkg, partAt(slide)),
+      ...comments.snapshot(pkg, partAt(slide)),
     };
     return cached;
   };
@@ -279,6 +280,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     ...(views.presentationView === 'slideSorter' ? { slideSorter: true } : {}),
     ...(probe ? { probe } : {}),
     ...(modules.collaboration ? { collaborating: true } : {}),
+    ...comments.context(),
     ...(command?.type === 'paste'
       ? {
           pasteRepeat: (command.payload === pasteSeries.payload ? pasteSeries.count : 0) + 1,
@@ -342,10 +344,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
   const partAt = (index: number): string | undefined => session?.info.slides[index]?.partName;
 
   /** The history mark for an edit of `part`: the selection, when it is on that slide. */
-  const markFor = (part: string | undefined): HistoryMark => ({
-    part,
-    selection: part === partAt(slide) ? selection : { kind: 'none' },
-  });
+  const markFor = (part: string | undefined): HistoryMark => markOf(part, partAt(slide), selection);
 
   /**
    * Commit ops as one history entry (or a frame of the open one, for the same `historyGroup`),
@@ -828,6 +827,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     tableStyles: () => (session ? tableStyleList(session.store.package) : []),
     chartData: (id) => chartDataAt(session?.store.package, partAt(slide), selection, id),
     setSelection: (next) => select(next),
+    ...comments.methods(emit),
     copy: clipboard.copy,
     selectAll,
     focus: () => surface?.focus(),
@@ -860,7 +860,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     // A deck still opening parses the rest first; a slide that does not parse refuses the deck.
     save: () =>
       session && !session.damage && opening.finish() && session && !session.damage
-        ? writePptx(repairTablesForSave(session.store.package))
+        ? writePptx(packageForSave(session.store.package))
         : null,
     setZoom(value) {
       if (value === 'fit') fitZoom = true;
@@ -931,6 +931,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
           part: () => partAt(slide),
           surface: () => surface,
           ...{ prompts, presence, painter, views, groups, gestureEdit },
+          commentMarkers: comments.markers(snapshot, instance),
         })
       );
       surface.render();

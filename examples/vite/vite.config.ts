@@ -21,6 +21,8 @@ export default defineConfig({
       { find: /^@pptx-editor\.dev\/react$/, replacement: pkg('react/src/index.ts') },
       { find: /^@pptx-editor\.dev\/i18n$/, replacement: pkg('i18n/src/index.ts') },
       { find: /^@pptx-editor\.dev\/pro\/drawing$/, replacement: pkg('pro/src/drawing/index.ts') },
+      { find: /^@pptx-editor\.dev\/pro\/react$/, replacement: pkg('pro/src/react/index.ts') },
+      { find: /^@pptx-editor\.dev\/pro$/, replacement: pkg('pro/src/index.ts') },
       // The development server's PDF export (`pdfExportPlugin`) runs the converter from source.
       { find: /^@pptx-editor\.dev\/pptx-to-pdf$/, replacement: pkg('pptx-to-pdf/src/index.ts') },
     ],

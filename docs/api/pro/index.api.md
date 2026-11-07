@@ -6,11 +6,14 @@
 
 import { CollaborationFailureCode } from '@pptx-editor.dev/core/editor';
 import { CollaborationIdentity } from '@pptx-editor.dev/core/editor';
+import { CommentMarkerStyle } from '@pptx-editor.dev/core/editor';
 import { EditorCollaborationSession } from '@pptx-editor.dev/core/editor';
 import { EditorModule } from '@pptx-editor.dev/core/editor';
 import { PptxPackage } from '@pptx-editor.dev/core/store';
 import { ReviewDisplayMode } from '@pptx-editor.dev/core/editor';
 import { ReviewItem } from '@pptx-editor.dev/core/editor';
+import { ReviewPaneOpening } from '@pptx-editor.dev/core/editor';
+import { ReviewPaneOptions } from '@pptx-editor.dev/core/editor';
 import * as Y from 'yjs';
 
 // @public
@@ -39,6 +42,8 @@ export class CollaborationSchemaError extends Error {
     readonly detail?: string | undefined;
 }
 
+export { CommentMarkerStyle }
+
 // @public
 export function createYjsCollaborationSession(options: YjsCollaborationSessionOptions): YjsCollaborationSession;
 
@@ -56,7 +61,12 @@ export function reviewModule(options?: ReviewModuleOptions): EditorModule;
 // @public
 export interface ReviewModuleOptions extends ProLicenseOptions {
     readonly displayModes?: readonly ReviewDisplayMode[];
+    readonly pane?: ReviewPaneOptions;
 }
+
+export { ReviewPaneOpening }
+
+export { ReviewPaneOptions }
 
 // @public
 export interface YjsCollaborationSession extends EditorCollaborationSession {

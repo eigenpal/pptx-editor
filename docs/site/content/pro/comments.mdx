@@ -1,58 +1,254 @@
 ---
 title: 'Comments'
-description: 'Read legacy presentation comments and build a host-owned comment list.'
+description: 'Show, add, reply to, edit, resolve, and delete slide comments.'
 category: 'Pro'
 ---
 
-Use `legacyComments()` to read legacy PresentationML comments and their replies. The function returns plain `ReviewItem` values from a parsed package. For the feature status, see <FeatureBadge id="review.comments" />.
+Register `reviewModule()` to read and edit the comment threads of each slide. Render `PptxEditorReview` from `@pptx-editor.dev/pro/react` or `@pptx-editor.dev/pro/vue` to show them in a comments pane. The editor saves comments in the format that the deck already uses. For the feature status, see <FeatureBadge id="review.comments" />.
 
-## Read comments from a file
+## Show the comments pane
 
-This Node.js example reads `deck.pptx` without mounting an editor:
+Pass the review module and the name of the current user to the editor root. The `author` value signs new comments and replies. Then give the pane to the **Comments** tab of the side panel:
 
-```ts
-import { readFile } from 'node:fs/promises';
-import { readPptx } from '@pptx-editor.dev/core/store';
-import { legacyComments } from '@pptx-editor.dev/pro';
+<FrameworkTabs>
+<Framework value="react">
 
-const opened = readPptx(await readFile('deck.pptx'));
-if (!opened.ok) throw new Error('Cannot open the presentation');
-const comments = legacyComments(opened.pkg);
-for (const comment of comments) {
-  console.log(comment.slidePart, comment.author, comment.text);
+```tsx
+import { PptxEditor } from '@pptx-editor.dev/react';
+import { PptxEditorReview, reviewModule } from '@pptx-editor.dev/pro/react';
+import '@pptx-editor.dev/core/styles/editor.css';
+
+const MODULES = [reviewModule()];
+const PANES = { comments: <PptxEditorReview /> };
+
+export function Presentation({ bytes, user }: { bytes: Uint8Array; user: string }) {
+  return (
+    <PptxEditor.Root document={bytes} modules={MODULES} author={user}>
+      <PptxEditor.Viewport style={{ display: 'flex', height: '100vh' }}>
+        <PptxEditor.Content />
+        <PptxEditor.SidePanel tab="comments" panes={PANES} />
+      </PptxEditor.Viewport>
+    </PptxEditor.Root>
+  );
 }
 ```
 
-Use application access controls before showing these values. Comment text and author names come from an untrusted file. Render them as text, such as React expressions or Vue interpolation.
+</Framework>
+<Framework value="vue">
 
-## Understand the returned values
+```vue
+<script setup lang="ts">
+import {
+  PptxEditorContent,
+  PptxEditorRoot,
+  PptxEditorSidePanel,
+  PptxEditorViewport,
+} from '@pptx-editor.dev/vue';
+import { PptxEditorReview, reviewModule } from '@pptx-editor.dev/pro/vue';
+import '@pptx-editor.dev/core/styles/editor.css';
 
-| Field       | Meaning                                 |
-| ----------- | --------------------------------------- |
-| `id`        | Identifier within one package revision  |
-| `kind`      | `comment` for a legacy comment          |
-| `slidePart` | Slide part that owns the comment        |
-| `author`    | Optional author display name            |
-| `date`      | Optional date string stored in the file |
-| `text`      | Comment text                            |
-| `parentId`  | Parent identifier for a reply           |
+defineProps<{ bytes: Uint8Array; user: string }>();
+const modules = [reviewModule()];
+</script>
 
-Group replies by `parentId`. Preserve file order when presenting comments on the same slide. Do not treat these identifiers as permanent identifiers across unrelated files.
+<template>
+  <PptxEditorRoot :document="bytes" :modules="modules" :author="user">
+    <PptxEditorViewport style="display: flex; height: 100vh">
+      <PptxEditorContent />
+      <PptxEditorSidePanel tab="comments">
+        <template #comments><PptxEditorReview /></template>
+      </PptxEditorSidePanel>
+    </PptxEditorViewport>
+  </PptxEditorRoot>
+</template>
+```
 
-## Register the review module
+</Framework>
+</FrameworkTabs>
 
-Pass `reviewModule()` in the editor’s module array to register its legacy comment collector:
+The pane lists the threads of the current slide. Users add a comment to the slide or to the selected element, reply, edit, delete, and resolve or reopen a thread. In a comment field, Enter posts, Shift+Enter starts a new line, and Escape cancels.
+
+A marker on the canvas shows each thread. A click on a marker selects its thread and turns the side panel to the **Comments** tab. The markers are pointer shortcuts: keyboard and screen reader users reach the same threads in the pane. Comment markers are editing chrome. They do not print or export.
+
+Without the review module, `PptxEditorReview` and the packaged **Comments** tab say that comments are kept when you save. The packaged `PptxEditor` component has no side panel, so compose the editor to show the pane. For the other parts of a composed layout, see [Layout](/docs/customization/layout).
+
+A change of `author` applies to later comments without a remount. Existing comments keep their authors. Without `author`, a collaboration session signs comments with the name of its identity. With no name at all, the pane shows **Set an author to comment.**, and the editor refuses to add a comment with `disabled.noCommentAuthor`.
+
+## Configure the pane and the markers
+
+Pass `pane` options to `reviewModule`:
 
 ```ts
 import { reviewModule } from '@pptx-editor.dev/pro';
 
-const modules = [reviewModule()];
+const modules = [reviewModule({ pane: { opening: 'manual', commentMarkers: 'initials' } })];
 ```
 
-The package reads `p:cmLst` comments and `p15` reply references. It does not read modern `p188` threaded comments. It provides no comment creation, editing, resolution, or review UI. Unknown comment content remains in the package during save.
+| Option | Values | Effect |
+| --- | --- | --- |
+| `pane.opening` | `'auto'` (default), `'manual'` | With `auto`, a click on a marker turns the side panel to the **Comments** tab. With `manual`, the click only selects the thread. |
+| `pane.commentMarkers` | `'icon'` (default), `'initials'` | `icon` draws a comment icon on a small card, with a check mark on a resolved thread. `initials` draws a speech bubble in the author's color, with the author's initials and the reply count. |
+
+`reviewModule` throws a `TypeError` for an unknown value.
+
+## Customize the pane
+
+`PptxEditorReview` is a compound component. Change it one step at a time, and stop at the first step that does what you need:
+
+1. Restyle the packaged parts with `className`, `card.className`, and the `data-*` attributes. See [Review colors and styling](/docs/pro/review-styling).
+2. Change the icon of an action with its `icon` prop.
+3. Put a part's behavior on your own element with `asChild`.
+4. Replace a part with your own child, or remove it with `hidden`. Set `preset={false}` to render only the root parts that you pass.
+5. Build your own pane with `useReview`.
+
+This pane hides the **Delete** action, shows only open threads, and labels the **New comment** button **Ask a question**:
+
+<FrameworkTabs>
+<Framework value="react">
+
+```tsx
+import { PptxEditorReview } from '@pptx-editor.dev/pro/react';
+
+export function OpenThreads() {
+  return (
+    <PptxEditorReview filter={(item) => !item.resolved} card={{ className: 'deck-card' }}>
+      <PptxEditorReview.AddComment>Ask a question</PptxEditorReview.AddComment>
+      <PptxEditorReview.Delete hidden />
+    </PptxEditorReview>
+  );
+}
+```
+
+</Framework>
+<Framework value="vue">
+
+```vue
+<script setup lang="ts">
+import { PptxEditorReview } from '@pptx-editor.dev/pro/vue';
+import type { ReviewItemView } from '@pptx-editor.dev/pro/vue';
+
+const open = (item: ReviewItemView) => !item.resolved;
+</script>
+
+<template>
+  <PptxEditorReview :filter="open" :card="{ className: 'deck-card' }">
+    <PptxEditorReview.AddComment>Ask a question</PptxEditorReview.AddComment>
+    <PptxEditorReview.Delete hidden />
+  </PptxEditorReview>
+</template>
+```
+
+</Framework>
+</FrameworkTabs>
+
+Root parts (`List`, `AddComment`, and `Draft`) replace the packaged ones when you pass them as direct children. Other children become the card template of the list. To render each thread yourself, pass a function child in React or the `#card` scoped slot in Vue. It receives one `ReviewItemView`.
+
+| Part | Default |
+| --- | --- |
+| `List` | The threads of the slide, one card each, or `Empty` when there is none |
+| `AddComment` | The **New comment** button |
+| `Draft` | The compose box of a new comment. `nodeId` sets its target. |
+| `Empty` | The text for a slide with no comments |
+| `Card` | One thread: its head, text, replies, and reply line |
+| `Avatar`, `Author`, `Time` | The head of a comment |
+| `Anchor` | The name of the element that the thread points at |
+| `Summary` | The comment text, or its edit box |
+| `Resolve`, `Reopen`, `Edit`, `Delete` | The actions of a comment. Each takes `icon`. |
+| `Replies` | The replies of a thread |
+| `Reply` | The reply line of the selected open thread |
+
+Each part takes `className`, `asChild`, and `hidden`. The root also takes `t`, a label resolver. A key that it does not resolve falls back to the bundled catalog.
+
+## Build your own pane
+
+`useReview()` returns the comments of the current slide and the actions on them. Call it inside the editor root. Outside a root, call `useReviewOf(editor)` with your own instance. In Vue, the data fields are computed refs.
+
+| Field | Content |
+| --- | --- |
+| `items` | Each thread, then its replies, as `ReviewItemView` values |
+| `activeKey`, `setActive` | The selected thread, and a function that selects one |
+| `comment`, `reply`, `edit`, `remove` | Add, reply to, edit, and delete comments |
+| `resolve`, `reopen` | Change the state of a thread |
+| `author`, `setAuthor` | The name that signs new comments |
+| `commentTarget` | The element that a new comment points at, or `null` for the slide |
+| `readOnly`, `ready` | Whether the pane cannot edit, and whether a deck is open |
+
+Each action returns `true` when the editor applies the change. Inside a card, `useReviewItem()` returns its `ReviewItemView`. `useReviewAuthor(name)` returns the color slot of an author.
+
+## Edit comments with commands
+
+Run comment commands on an open `PptxEditorInstance`. This helper adds a comment to the selected element, or to the slide when nothing is selected, and then replies to it:
+
+```ts
+import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+export function askForReview(editor: PptxEditorInstance) {
+  const added = editor.exec({
+    type: 'addComment',
+    text: 'Check the totals',
+    author: 'Ada Lovelace',
+  });
+  if (!added.ok) throw new Error(added.reason);
+  const thread = editor.snapshot().comments?.at(-1);
+  if (!thread) return;
+  const reply = editor.exec({
+    type: 'replyToComment',
+    commentId: thread.id,
+    text: 'Done',
+  });
+  if (!reply.ok) throw new Error(reply.reason);
+}
+```
+
+| Command | Fields | Result |
+| --- | --- | --- |
+| `addComment` | `text`, optional `nodeId` | A new thread on the current slide |
+| `replyToComment` | `commentId`, `text` | A reply at the end of the thread |
+| `editComment` | `commentId`, `text` | New text for a comment or a reply |
+| `deleteComment` | `commentId` | Deletes a reply, or a thread with all of its replies |
+| `resolveComment` | `commentId` | Marks the thread as resolved |
+| `reopenComment` | `commentId` | Marks the thread as open |
+
+`addComment` and `replyToComment` also take `author`, `initials`, and `date`. They override the editor's author for that comment. The date is an ISO 8601 date and time. Without a date, the editor uses the current time in UTC. Each command is one undo step.
+
+## Read the threads
+
+`editor.snapshot().comments` lists the threads of the current slide. It is `null` without the review module. `activeComment` is the id of the selected thread. Each thread has `id`, `format` (`modern` or `legacy`), `author`, `initials`, `date`, `text`, `resolved`, `anchor`, and `replies`.
+
+To read the threads of any slide, call `readCommentThreads` with a package and a slide part name:
+
+```ts
+import { readFile } from 'node:fs/promises';
+import { readCommentThreads } from '@pptx-editor.dev/core/editor';
+import { presentationInfo, readPptx } from '@pptx-editor.dev/core/store';
+
+const opened = readPptx(await readFile('deck.pptx'));
+if (!opened.ok) throw new Error('Cannot open the presentation');
+for (const slide of presentationInfo(opened.pkg).slides) {
+  for (const thread of readCommentThreads(opened.pkg, slide.partName)) {
+    console.log(slide.partName, thread.author, thread.text, thread.replies.length);
+  }
+}
+```
+
+Comment text and author names come from an untrusted file. Render them as text, such as React expressions or Vue interpolation. Use your application's access controls before you show them.
+
+## Understand the formats
+
+A deck can store threaded comments or legacy comments (ECMA-376 Part 1, 19.4). The editor adds threaded comments to a deck that has none or that already uses them. In a deck with only legacy comments, new comments are legacy comments. Legacy comments have no resolved state, so `resolveComment` and `reopenComment` are refused with `disabled.commentNoStatus`.
+
+The editor writes the author list, the comment lists, their relationships, and their content types. A new author gets a new id. Two collaborators who add comments at the same time keep both comments, and the save joins the lists that they made.
+
+## Limits
+
+- A comment points at the slide or at an element on the top level of the slide. Other targets are refused with `disabled.noCommentTarget`.
+- Mentions, reactions, and other content of threaded comments are kept but not shown. An edit of a comment with such content is refused with `disabled.commentNotEditable`.
+- The pane lists threads in file order, not by their position on the slide. It shows the threads of the current slide only.
+- The import of a slide with threaded comments from another presentation is refused.
 
 ## See also
 
 - [Pro modules](/docs/pro)
-- [PPTX fidelity](/docs/pptx-fidelity)
+- [Review colors and styling](/docs/pro/review-styling)
 - [Collaboration](/docs/pro/collaboration)
+- [PPTX fidelity](/docs/pptx-fidelity)

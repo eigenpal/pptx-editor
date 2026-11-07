@@ -160,6 +160,13 @@ const COMMAND_TABLE = {
   distributeColumns: true,
   pasteCells: true,
   setTableGrid: true,
+  // Comments
+  addComment: true,
+  replyToComment: true,
+  editComment: true,
+  deleteComment: true,
+  resolveComment: true,
+  reopenComment: true,
 } as const satisfies Record<EditorCommandType, true>;
 
 /** Every `EditorCommand['type']`, checked against the union by the compiler. @internal */

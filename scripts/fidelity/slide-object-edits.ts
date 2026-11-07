@@ -18,6 +18,7 @@ import {
 import { PptxEditor } from '../../packages/editor-api/src/browser.ts';
 import { openPeers } from './collaboration-kit.ts';
 import { bytesText, CHART_DATA_PARTS, editChart, workbookText } from './chart-data-edits.ts';
+import { REVIEW_COMMENTS_EDIT } from './comment-edits.ts';
 import {
   caretInDiagram,
   consistent,
@@ -622,18 +623,7 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
         consistent(d, 1)
       ),
   },
-  'review.comments': {
-    fixture: 'slide-structure',
-    edit: (t) => {
-      t.selectText('Title', 0, 0);
-      t.type('Edited: ');
-    },
-    check: (d) =>
-      all(
-        textOf(shapeElement(d.pkg, 0, 'Title')).startsWith('Edited: ') ? undefined : 'no text',
-        has(d.partXml('/ppt/slides/_rels/slide1.xml.rels'), 'Target="../comments/comment1.xml"')
-      ),
-  },
+  'review.comments': REVIEW_COMMENTS_EDIT,
   'slides.header-footer': {
     fixture: 'header-footer',
     slide: 1,

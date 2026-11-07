@@ -358,7 +358,7 @@ describe('the room format names structure marks', () => {
     const [a] = editors as [PptxEditorInstance, PptxEditorInstance];
     mergeFirstColumn(a, 0, 1);
     sync.flush();
-    expect(SCHEMA_VERSION).toBe(6);
+    expect(SCHEMA_VERSION).toBe(7);
     expect(isStructureEdited(frameOf(a))).toBe(true);
   });
 

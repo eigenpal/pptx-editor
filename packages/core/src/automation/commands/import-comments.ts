@@ -19,7 +19,7 @@ import {
 } from '../../store/index.ts';
 import { partNameKey } from '@eigenpal/ooxml-core';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
-import { addOverride, addRelationship, freePartName } from './package-edits.ts';
+import { addOverride, addRelationship, freePartName, stripedIds } from './package-edits.ts';
 import { editable, renumberComments, treeOf } from './slide-structure.ts';
 
 const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
@@ -104,6 +104,7 @@ export function mergeImportedComments(
     throw new CommandRefusal('errors.malformed', 'commentAuthors');
 
   const byKey = new Map<string, string>();
+  const used = new Set<number>();
   let top = -1;
   let colors = -1;
   for (const a of elements(list)) {
@@ -112,12 +113,18 @@ export function mergeImportedComments(
     const raw = attr(a, 'id') ?? '';
     const id = /^\d{1,10}$/.test(raw) ? Number(raw) : NaN;
     if (!(id <= MAX_AUTHOR_ID)) continue;
+    used.add(id);
     top = Math.max(top, id);
     colors = Math.max(colors, Number(attr(a, 'clrIdx')) || 0);
     const key = keyOf({ name: attr(a, 'name') ?? '', initials: attr(a, 'initials') ?? '' });
     if (!byKey.has(key)) byKey.set(key, String(id));
   }
 
+  // In a collaboration session a new author takes an id of the actor's stripe: the author list is
+  // an XML tree that merges, so two peers who import at once must not add two authors with one id.
+  const striped = batch.allocationActor
+    ? stripedIds(batch.allocationActor, used, 0, MAX_AUTHOR_ID, batch.mintedOf('commentAuthor'))
+    : undefined;
   // Source author id → destination author id.
   const ids = new Map<string, string>();
   const added: PptxOp[] = [];
@@ -130,7 +137,7 @@ export function mergeImportedComments(
     if (id === undefined) {
       if (added.length >= MAX_AUTHORS || top >= MAX_AUTHOR_ID)
         throw new CommandRefusal('errors.tooLarge', 'comment authors');
-      top += 1;
+      top = striped ? striped() : top + 1;
       colors += 1;
       id = String(top);
       byKey.set(keyOf(author), id);

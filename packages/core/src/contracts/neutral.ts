@@ -32,6 +32,8 @@ import type {
   SlideSection,
 } from './deck.ts';
 export type * from './deck.ts';
+import type { CommentCommand, CommentSnapshot } from './comments.ts';
+export type * from './comments.ts';
 
 import type {
   ObjectAxis,
@@ -150,6 +152,7 @@ export type OrderMove = 'forward' | 'backward' | 'front' | 'back';
 
 /** Every editing command. Each compiles to store ops or is refused with a reason. @public */
 export type EditorCommand =
+  | CommentCommand
   | { readonly type: 'undo' }
   | { readonly type: 'redo' }
   | { readonly type: 'toggleBold' }
@@ -786,7 +789,7 @@ export interface EditorFontSubstitution {
 /** How a click in the slide rail changes the slide selection. @public */
 export type SlideSelectMode = 'replace' | 'toggle' | 'range';
 
-export interface EditorSnapshot {
+export interface EditorSnapshot extends CommentSnapshot {
   readonly status: 'empty' | 'loading' | 'ready' | 'error';
   readonly error?: string;
   /**

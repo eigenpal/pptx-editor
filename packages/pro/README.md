@@ -18,7 +18,8 @@
 
 Commercial capabilities for PPTX Editor, delivered as `EditorModule`s, in the same shape as DOCX Editor's `@docx-editor.dev/pro`:
 
-- `reviewModule()`: the review queue. It reads legacy comments (`p:cmLst`, ECMA-376 Part 1, 19.4) and their replies today.
+- `reviewModule()`: comments. It reads and edits the comment threads of each slide, threaded and legacy (`p:cmLst`, ECMA-376 Part 1, 19.4), and shows them as markers on the canvas.
+- `PptxEditorReview` from `@pptx-editor.dev/pro/react` or `@pptx-editor.dev/pro/vue`: the comments pane, a compound component with `useReview`, `useReviewOf`, `useReviewItem`, and `useReviewAuthor`. Give it to the **Comments** tab of the side panel (`panes` in React, the `#comments` slot in Vue).
 - `collaborationModule({ session })`: attaches a host-created collaboration session to each opened deck.
 - `createYjsCollaborationSession({ doc, documentId, identity, awareness })`: a session over a Y.Doc. It mirrors the deck into Yjs, as DOCX Editor does, so concurrent edits merge without a server sequencer.
   - **History:** while the session is attached, the editor's undo and redo revert only your own changes (`Y.UndoManager`), never a peer's, and return to the slide and selection of the undone change.
