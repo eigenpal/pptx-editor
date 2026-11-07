@@ -9,7 +9,6 @@ import { fillPaint, type PaintContext } from './paint-fill.ts';
 import { num, svg } from './svg.ts';
 
 const EMU_PER_PT = 12_700;
-
 /** The laid-out bounds of a text body, in points. */
 interface TextBounds {
   readonly x: number;
@@ -260,20 +259,57 @@ export function paintText(
         text.textContent = content;
         return text;
       };
+      // Upright characters in a rotated line turn back around their advance box centers.
+      const m = run.face.metrics;
+      const cy = baseline - ((m.ascent - m.descent) / 2) * run.sizePt * EMU_PER_PT;
+      // A stretch of upright characters paints as one `<text>` in a frame turned back by 90°:
+      // there, the turn around each center (cx, cy) is a move to (-cy, baseline + cx - cy).
+      // Each character has its own position, so `text-anchor` centers each one by itself.
+      // The pixels are those of one turned `<text>` per character, at a fraction of the
+      // elements. Only characters of one UTF-16 unit stack: a position list counts
+      // characters, which a surrogate pair would shift.
+      // The stack waiting to paint: characters `from` to `to`, none when `from` is -1.
+      let from = -1;
+      let to = -1;
+      const flush = (): void => {
+        if (from < 0) return;
+        const xs: string[] = [];
+        const ys: string[] = [];
+        for (let i = from; i < to; i += 1) {
+          xs.push(pt(-cy));
+          ys.push(pt(baseline + (run.x[i] + run.x[i + 1]) / 2 - cy));
+        }
+        group.appendChild(
+          svg(doc, 'g', { transform: 'rotate(-90)' }, [
+            makeText(run.text.slice(from, to), {
+              x: xs.join(' '),
+              y: ys.join(' '),
+              'text-anchor': 'middle',
+            }),
+          ])
+        );
+        from = -1;
+      };
       for (const piece of uprightPieces(run.text, layout.upright)) {
-        if (!piece.upright) {
-          const xs = run.x.slice(piece.start, piece.end).map(pt).join(' ');
-          group.appendChild(
-            makeText(run.text.slice(piece.start, piece.end), { x: xs, y: pt(baseline) })
-          );
+        const content = run.text.slice(piece.start, piece.end);
+        // A space draws nothing, so it can join a stack in any direction.
+        const stacks =
+          !/[\uD800-\uDFFF]/.test(content) &&
+          (piece.upright || (from >= 0 && /^ +$/.test(content)));
+        if (stacks) {
+          if (from < 0) from = piece.start;
+          to = piece.end;
           continue;
         }
-        // An upright character in a rotated line: turn it back around its advance box center.
-        const m = run.face.metrics;
+        flush();
+        if (!piece.upright) {
+          const xs = run.x.slice(piece.start, piece.end).map(pt).join(' ');
+          group.appendChild(makeText(content, { x: xs, y: pt(baseline) }));
+          continue;
+        }
         const cx = (run.x[piece.start] + run.x[piece.end]) / 2;
-        const cy = baseline - ((m.ascent - m.descent) / 2) * run.sizePt * EMU_PER_PT;
         group.appendChild(
-          makeText(run.text.slice(piece.start, piece.end), {
+          makeText(content, {
             x: pt(cx),
             y: pt(baseline),
             'text-anchor': 'middle',
@@ -281,6 +317,7 @@ export function paintText(
           })
         );
       }
+      flush();
       if (run.kind === 'text') {
         const under = run.props.underlineFill
           ? textFill(run.props.underlineFill, bounds, ctx)

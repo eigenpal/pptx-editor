@@ -20,6 +20,7 @@ import {
   tableRows,
   type HangDeck,
 } from './deck-parts.ts';
+import { payloadDecks } from './payload-decks.ts';
 import { uiScaleDecks } from './ui-scale-decks.ts';
 
 export type { HangDeck } from './deck-parts.ts';
@@ -686,4 +687,6 @@ export const HANG_DECKS: readonly HangDeck[] = [
   // layout menu, the selection, and the live region. Each one must open and edit in the
   // browser without a long freeze (`e2e/hang.bench.ts`).
   ...uiScaleDecks(),
+  // Adversarial payloads: pictures, SVG, metafiles, effects, charts, text, and package parts.
+  ...payloadDecks(),
 ];

@@ -1,9 +1,11 @@
 // Which picture bytes the browser gets to draw. A picture part is untrusted input: its name can
 // lie about its format, its bytes can be empty or damaged, and its header can claim a size
-// that would exhaust memory. A picture that fails these checks paints the placeholder.
+// that would exhaust memory. An SVG picture can expand past any size (`svg-picture.ts`). A
+// picture that fails these checks paints its raster alternative or the placeholder.
 
 import { DEFAULT_IMAGE_RESOURCE_LIMITS } from '@eigenpal/ooxml-core';
 import { imageSize } from '../store/index.ts';
+import { svgDrawable } from './svg-picture.ts';
 
 const LIMITS = DEFAULT_IMAGE_RESOURCE_LIMITS;
 
@@ -28,7 +30,8 @@ export function drawableImageMime(
   named: string | undefined
 ): string | undefined {
   if (bytes.length === 0 || bytes.length > LIMITS.maxEncodedBytes) return undefined;
-  if (named === 'image/svg+xml') return startsAsMarkup(bytes) ? named : undefined;
+  if (named === 'image/svg+xml')
+    return startsAsMarkup(bytes) && svgDrawable(bytes) ? named : undefined;
   const size = imageSize(bytes);
   if (!size || size.width <= 0 || size.height <= 0) return undefined;
   if (size.width > LIMITS.maxDimension || size.height > LIMITS.maxDimension) return undefined;

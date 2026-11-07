@@ -7,18 +7,21 @@
 //
 // - HANG: the deck is not ready, and not refused, within the budget, or the page stops
 //   answering.
-// - FREEZE: one main-thread task is longer than the freeze mark: the page does not answer
-//   input for that long.
+// - FREEZE: one main-thread task, or one gap between frames, is longer than the freeze mark:
+//   the page does not answer input, or does not draw, for that long. A frame gap with no long
+//   task is the browser's own work: decoding pictures or running filters.
 // - SLOW: the open is longer than the slow mark.
+// - FETCH: the page requested a URL outside the demo's own origin. A deck never makes the
+//   editor fetch: external relationships and references inside pictures stay unfetched.
 //
 // Each deck opens in a fresh browser context, so one deck's heap never counts in the next.
 //
 // Usage:
 //   bun run bench:hang:browser
 //   HANG_ONLY=id,id HANG_BUDGET_MS=20000 HANG_FREEZE_MS=1000 bun run bench:hang:browser
-//   HANG_STRICT=1 bun run bench:hang:browser     (fails on any HANG or FREEZE)
+//   HANG_STRICT=1 bun run bench:hang:browser     (fails on any HANG, FREEZE, or FETCH)
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, type Browser, type Page } from '@playwright/test';
 import type { HangDeck } from '../scripts/stress/deck-parts.ts';
@@ -28,28 +31,51 @@ const BUDGET_MS = Number(process.env.HANG_BUDGET_MS ?? 20_000);
 const FREEZE_MS = Number(process.env.HANG_FREEZE_MS ?? 1_000);
 const SLOW_MS = Number(process.env.HANG_SLOW_MS ?? 3_000);
 const ONLY = process.env.HANG_ONLY?.split(',').filter(Boolean);
+const DECK_DIR = join(import.meta.dirname, '..', 'test-results', 'hang-decks');
 
 interface Row {
   id: string;
-  verdict: 'ok' | 'SLOW' | 'FREEZE' | 'HANG';
+  verdict: 'ok' | 'SLOW' | 'FREEZE' | 'HANG' | 'FETCH';
   openMs: number;
   longestTaskMs: number;
+  /** The longest time between two animation frames. */
+  longestFrameMs: number;
   blockingMs: number;
   heapMB: number;
   domNodes: number;
   status: string;
   refused?: string;
+  /** Requests outside the demo's origin, after the deck opened. */
+  fetched?: string[];
 }
 
 type Probe = {
-  __pptxEditor?: { snapshot(): { status: string; pendingSlides?: number; error?: unknown } };
+  __pptxEditor?: {
+    snapshot(): { status: string; pendingSlides?: number; error?: unknown };
+    subscribe(listener: () => void): () => void;
+  };
   __tasks: number[];
+  /** Gaps between animation frames over 50 ms. */
+  __frames: number[];
+  /** Whether the editor left the open deck: the new open started. */
+  __left?: boolean;
 };
 
-/** Record every main-thread task over 50 ms (`longtask`), from the page's first script. */
+/**
+ * Record every main-thread task over 50 ms (`longtask`), and every gap between animation
+ * frames over 50 ms, from the page's first script.
+ */
 const OBSERVE_TASKS = () => {
   const w = window as unknown as Probe;
   w.__tasks = [];
+  w.__frames = [];
+  let last = performance.now();
+  const frame = (t: number) => {
+    if (t - last > 50) w.__frames.push(t - last);
+    last = t;
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
   try {
     new PerformanceObserver((list) => {
       for (const e of list.getEntries()) w.__tasks.push(e.duration);
@@ -74,6 +100,13 @@ async function measure(browser: Browser, deck: HangDeck): Promise<Row> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page: Page = await context.newPage();
   await page.addInitScript(OBSERVE_TASKS);
+  const fetched: string[] = [];
+  let watching = false;
+  page.on('request', (request) => {
+    const url = request.url();
+    const own = /^(blob|data):/.test(url) || new URL(url).origin === new URL(page.url()).origin;
+    if (watching && !own) fetched.push(url);
+  });
   const cdp = await context.newCDPSession(page);
   await cdp.send('Performance.enable');
   const row: Row = {
@@ -81,6 +114,7 @@ async function measure(browser: Browser, deck: HangDeck): Promise<Row> {
     verdict: 'ok',
     openMs: 0,
     longestTaskMs: 0,
+    longestFrameMs: 0,
     blockingMs: 0,
     heapMB: 0,
     domNodes: 0,
@@ -93,20 +127,32 @@ async function measure(browser: Browser, deck: HangDeck): Promise<Row> {
       undefined,
       { timeout: 30_000 }
     );
-    await page.evaluate(() => ((window as unknown as Probe).__tasks = []));
-    const t0 = Date.now();
-    await page.locator('input[type=file][accept*=".pptx"]').setInputFiles({
-      name: `${deck.id}.pptx`,
-      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      buffer: Buffer.from(deck.bytes()),
+    // The deck goes in as a file: a buffer over 50 MB cannot pass to the browser. It is built
+    // before the clock starts, so the build never counts as open time.
+    const file = join(DECK_DIR, `${deck.id}.pptx`);
+    writeFileSync(file, deck.bytes());
+    // The old deck is ready too: a settled open is one that left it first.
+    await page.evaluate(() => {
+      const w = window as unknown as Probe;
+      w.__tasks = [];
+      w.__frames = [];
+      w.__left = false;
+      w.__pptxEditor?.subscribe(() => {
+        if (w.__pptxEditor?.snapshot().status !== 'ready') w.__left = true;
+      });
     });
+    const t0 = Date.now();
+    watching = true;
+    await page.locator('input[type=file][accept*=".pptx"]').setInputFiles(file);
     // Ready: the deck opened with no slide still opening, or the editor refused it.
     const settled = await within(
       page
         .waitForFunction(
           () => {
-            const s = (window as unknown as Probe).__pptxEditor?.snapshot();
-            return !!s && (s.status === 'error' || (s.status === 'ready' && !s.pendingSlides));
+            const w = window as unknown as Probe;
+            const s = w.__pptxEditor?.snapshot();
+            if (!s || !w.__left) return false;
+            return s.status === 'error' || (s.status === 'ready' && !s.pendingSlides);
           },
           undefined,
           { timeout: BUDGET_MS, polling: 100 }
@@ -126,6 +172,7 @@ async function measure(browser: Browser, deck: HangDeck): Promise<Row> {
           const s = w.__pptxEditor?.snapshot();
           return {
             tasks: w.__tasks,
+            frames: w.__frames,
             status: s?.status ?? '',
             refused: s?.error ? JSON.stringify(s.error) : undefined,
           };
@@ -141,6 +188,7 @@ async function measure(browser: Browser, deck: HangDeck): Promise<Row> {
     row.status = answered.status;
     if (answered.refused) row.refused = answered.refused;
     row.longestTaskMs = Math.round(Math.max(0, ...answered.tasks));
+    row.longestFrameMs = Math.round(Math.max(0, ...answered.frames));
     row.blockingMs = Math.round(answered.tasks.reduce((sum, d) => sum + Math.max(0, d - 50), 0));
     const { metrics } = (await within(cdp.send('Performance.getMetrics'), 5_000, {
       metrics: [],
@@ -148,12 +196,16 @@ async function measure(browser: Browser, deck: HangDeck): Promise<Row> {
     const metric = (name: string) => metrics.find((m) => m.name === name)?.value ?? 0;
     row.heapMB = Math.round(metric('JSHeapUsedSize') / 1e6);
     row.domNodes = metric('Nodes');
-    if (row.verdict === 'ok' && row.longestTaskMs > FREEZE_MS) row.verdict = 'FREEZE';
+    if (fetched.length) row.fetched = fetched;
+    if (row.verdict === 'ok' && Math.max(row.longestTaskMs, row.longestFrameMs) > FREEZE_MS)
+      row.verdict = 'FREEZE';
+    if (row.verdict === 'ok' && fetched.length) row.verdict = 'FETCH';
     const slow = Math.max(SLOW_MS, deck.slowMs ?? 0);
     if (row.verdict === 'ok' && row.openMs > slow) row.verdict = 'SLOW';
     return row;
   } finally {
     await within(context.close(), 10_000, undefined);
+    rmSync(join(DECK_DIR, `${deck.id}.pptx`), { force: true });
   }
 }
 
@@ -162,25 +214,31 @@ test('hang bench', async ({ browser, browserName }) => {
   const decks = HANG_DECKS.filter((d) => !d.stalledFonts && (!ONLY || ONLY.includes(d.id)));
   test.setTimeout(decks.length * (BUDGET_MS + 60_000));
   const rows: Row[] = [];
+  mkdirSync(DECK_DIR, { recursive: true });
   for (const deck of decks) {
     const row = await measure(browser, deck);
     rows.push(row);
     console.log(
       `${row.verdict.padEnd(6)} ${String(row.openMs).padStart(6)} ms open  ` +
         `${String(row.longestTaskMs).padStart(6)} ms longest  ` +
+        `${String(row.longestFrameMs).padStart(6)} ms frame gap  ` +
         `${String(row.blockingMs).padStart(6)} ms blocking  ${String(row.heapMB).padStart(5)} MB  ` +
-        `${String(row.domNodes).padStart(7)} nodes  ${row.id}${row.refused ? ` (refused ${row.refused})` : ''}`
+        `${String(row.domNodes).padStart(7)} nodes  ${row.id}${row.refused ? ` (refused ${row.refused})` : ''}` +
+        (row.fetched ? ` (fetched ${row.fetched.slice(0, 3).join(', ')})` : '')
     );
   }
   const dir = join(import.meta.dirname, '..', 'test-results');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'hang-bench.json'), `${JSON.stringify(rows, null, 2)}\n`);
-  const bad = rows.filter((r) => r.verdict === 'HANG' || r.verdict === 'FREEZE');
+  const bad = rows.filter(
+    (r) => r.verdict === 'HANG' || r.verdict === 'FREEZE' || r.verdict === 'FETCH'
+  );
   console.log(
-    `\n${rows.length - bad.length}/${rows.length} without a hang or freeze; ` +
+    `\n${rows.length - bad.length}/${rows.length} without a hang, freeze, or fetch; ` +
       `budget ${BUDGET_MS} ms, freeze mark ${FREEZE_MS} ms, slow mark ${SLOW_MS} ms`
   );
   if (process.env.HANG_STRICT) {
-    if (bad.length) throw new Error(`Hangs or freezes: ${bad.map((r) => r.id).join(', ')}`);
+    if (bad.length)
+      throw new Error(`Hangs, freezes, or fetches: ${bad.map((r) => r.id).join(', ')}`);
   }
 });
