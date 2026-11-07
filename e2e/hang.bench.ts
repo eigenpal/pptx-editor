@@ -1,5 +1,5 @@
-// Browser hang bench: opens each adversarial deck of `scripts/stress/hang-decks.ts` and
-// `scripts/stress/ui-scale-decks.ts` in the demo (React chrome, real rail, real canvas) and
+// Browser hang bench: opens each adversarial deck of `scripts/stress/hang-decks.ts` (with the
+// decks of `scripts/stress/ui-scale-decks.ts`) in the demo (React chrome, real rail, real canvas) and
 // measures what a person feels: how long the open takes, the longest main-thread task, the
 // total blocking time, and the heap and DOM size after the open. The happy-dom check
 // (`bun run stress:hang`) finds algorithmic hangs; this bench finds the browser's own costs:
@@ -23,7 +23,6 @@ import { join } from 'node:path';
 import { test, type Browser, type Page } from '@playwright/test';
 import type { HangDeck } from '../scripts/stress/deck-parts.ts';
 import { HANG_DECKS } from '../scripts/stress/hang-decks.ts';
-import { uiScaleDecks } from '../scripts/stress/ui-scale-decks.ts';
 
 const BUDGET_MS = Number(process.env.HANG_BUDGET_MS ?? 20_000);
 const FREEZE_MS = Number(process.env.HANG_FREEZE_MS ?? 1_000);
@@ -160,9 +159,7 @@ async function measure(browser: Browser, deck: HangDeck): Promise<Row> {
 
 test('hang bench', async ({ browser, browserName }) => {
   test.skip(browserName !== 'chromium', 'The bench reads Chrome DevTools protocol metrics.');
-  const decks = [...HANG_DECKS, ...uiScaleDecks()].filter(
-    (d) => !d.stalledFonts && (!ONLY || ONLY.includes(d.id))
-  );
+  const decks = HANG_DECKS.filter((d) => !d.stalledFonts && (!ONLY || ONLY.includes(d.id)));
   test.setTimeout(decks.length * (BUDGET_MS + 60_000));
   const rows: Row[] = [];
   for (const deck of decks) {
