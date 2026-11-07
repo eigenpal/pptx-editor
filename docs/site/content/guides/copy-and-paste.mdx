@@ -80,7 +80,7 @@ declare global {
 }
 ```
 
-Pass the reader to the editor. In a browser build, `window.desktop` is undefined, and pictures paste as before:
+Pass the reader to the editor. In a browser build, `window.desktop` is undefined, and pictures paste as before. These samples read `window`, so render them on the client only:
 
 <FrameworkTabs>
 <Framework value="react">

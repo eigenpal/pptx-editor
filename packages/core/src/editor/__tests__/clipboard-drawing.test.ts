@@ -379,6 +379,19 @@ describe('the host reader', () => {
     expect(ran).toHaveLength(1);
   });
 
+  test('a later paste of text wins over a paste still reading', async () => {
+    let release = (): void => undefined;
+    const { ran, clip } = await host(
+      () => new Promise((done) => (release = () => done(drawingPackage(textShape(2, 'Hello')))))
+    );
+    clip.pasteFrom(transfer({}, [file()]));
+    await new Promise((r) => setTimeout(r, 5));
+    expect(clip.pasteFrom(transfer({ 'text/plain': 'later' }))).toBe(true);
+    release();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ran.map((c) => c.type)).toEqual(['pasteText']);
+  });
+
   test('a reader that never answers pastes the picture after 2 seconds', async () => {
     const { ran, clip } = await host(() => new Promise<null>(() => undefined));
     expect(clip.pasteFrom(transfer({}, [file()]))).toBe(true);

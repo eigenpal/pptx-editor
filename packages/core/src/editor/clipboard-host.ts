@@ -100,7 +100,7 @@ export function createClipboardHost(editor: ClipboardEditor) {
   /** Counts copies of any kind, so a late picture never replaces a later copy of text or slides. */
   let copies = 0;
   const pictures = createPictureCache();
-  /** Counts host reads of the DrawingML package, so a later paste wins over a slow one. */
+  /** Counts pastes, so a later paste wins over a host read still running for an earlier one. */
   let reads = 0;
 
   /** The key of the selected shapes' picture: the deck, its revision, the slide, the shapes. */
@@ -226,7 +226,7 @@ export function createClipboardHost(editor: ClipboardEditor) {
    */
   const pasteDrawing = async (file: File, read: ClipboardDrawingReader): Promise<void> => {
     const at = place();
-    const mine = (reads += 1);
+    const mine = reads;
     let payload: ClipboardPayload | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -342,6 +342,8 @@ export function createClipboardHost(editor: ClipboardEditor) {
      */
     pasteFrom(data: DataTransfer, slideList = false, chrome = false): boolean {
       if (editor.readOnly()) return false;
+      // A host read still running belongs to an earlier paste: this paste wins over it.
+      reads += 1;
       // Copied cells or tab-separated text fill cells; one copied cell goes in at the caret.
       const table = tablePasteFrom(data, editor.selection());
       if (table && 'cells' in table)
