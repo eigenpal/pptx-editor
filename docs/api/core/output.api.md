@@ -123,7 +123,6 @@ export class SlidePainter {
     get idPrefix(): string;
     invalidate(key: unknown): boolean;
     paint(layout: SlideLayout, budget?: number): SVGSVGElement;
-    // (undocumented)
     paints(opts: PaintOptions): boolean;
     get pending(): boolean;
 }

@@ -769,7 +769,6 @@ export class SlidePainter {
     return this.#opts.idPrefix;
   }
 
-  /** Whether this painter paints with `opts`: the same ports and id prefix. */
   #key: unknown = undefined;
   /** Items painted before the last change of `invalidate`'s key: each paints again. */
   #stale: Set<LayoutItem> | null = null;
@@ -786,6 +785,7 @@ export class SlidePainter {
     return true;
   }
 
+  /** Whether this painter paints with `opts`: the same ports and id prefix. */
   paints(opts: PaintOptions): boolean {
     const a = this.#opts;
     return (
@@ -829,6 +829,7 @@ export class SlidePainter {
       this.#root.appendChild(this.#content);
       this.#background = null;
       this.#items.clear();
+      this.#stale = null;
       this.#twice = [];
       this.#slide = slide;
     }

@@ -257,11 +257,13 @@ export function setBulletFormats(
       style && read ? target.paragraphs.filter((i) => !before[i]?.bullet) : target.paragraphs;
     return { target, before, fresh };
   });
-  const lists = kind
-    ? plans.filter((x) => x.fresh.length).map((x) => ({ ...x.target, paragraphs: x.fresh }))
-    : [];
-  setListKinds(batch, part, slide, lists, kind || 'none', resolve);
-  const changed = new Set(plans.filter((x) => kind && x.fresh.length).map((x) => x.target));
+  // Each list's target: a shape the lists wrote into re-fits.
+  const targetOf = new Map<ListTarget, ListTarget>();
+  for (const x of kind ? plans : [])
+    if (x.fresh.length) targetOf.set({ ...x.target, paragraphs: x.fresh }, x.target);
+  const lists = [...targetOf.keys()];
+  const wrote = setListKinds(batch, part, slide, lists, kind || 'none', resolve);
+  const changed = new Set(wrote.map((l) => targetOf.get(l)!));
   if (!style) return { listed: true, changed: [...changed] };
   // What a paragraph with no list shows once it has one: the scheme its placeholder inherits.
   const later =

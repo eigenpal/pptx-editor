@@ -154,6 +154,7 @@ export function setListKind(
 /**
  * `setListKind` for each of `targets`, with one resolve of the slide between the two phases:
  * the edits of one target change only its own paragraphs, never how another one resolves.
+ * Answers the targets it wrote into.
  */
 export function setListKinds(
   batch: OpBatch,
@@ -162,10 +163,21 @@ export function setListKinds(
   targets: readonly ListTarget[],
   kind: ListKind,
   resolve = true
-): void {
-  const dropped = targets.map((t) => dropListOverrides(batch, part, t, kind));
+): ListTarget[] {
+  if (targets.length === 0) return [];
+  const wrote = new Set<ListTarget>();
+  const step = <T>(t: ListTarget, run: () => T): T => {
+    const at = batch.ops.length;
+    const out = run();
+    if (batch.ops.length !== at) wrote.add(t);
+    return out;
+  };
+  const dropped = targets.map((t) => step(t, () => dropListOverrides(batch, part, t, kind)));
   const lookup = resolve ? paragraphLookup(batch, slide) : () => [];
-  targets.forEach((t, i) => addList(batch, part, t, kind, resolve, dropped[i]!, lookup(t)));
+  targets.forEach((t, i) =>
+    step(t, () => addList(batch, part, t, kind, resolve, dropped[i]!, lookup(t)))
+  );
+  return targets.filter((t) => wrote.has(t));
 }
 
 /**

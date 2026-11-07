@@ -92,7 +92,7 @@ export function refit(
       ? shapeTable(resolved).get(nodeId)
       : findShape(slide.elements, nodeId);
   // A table frame: its size follows its rows, which grow to fit cell text.
-  if (!found) return void refitTable(batch, index, part, nodeId, measurer);
+  if (!found) return void refitTable(batch, index, part, nodeId, measurer, resolved);
   const { shape, sx, sy } = found;
   if (!shape.text || shape.layer !== 'slide') return;
   noteFit(measurer, part, nodeId);

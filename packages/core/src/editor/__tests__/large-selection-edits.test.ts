@@ -205,3 +205,50 @@ test('a slide shape with the node id of a layout shape edits and re-fits itself'
   expect(fitted.element.xfrm.cy).not.toBe(IN);
   e.destroy();
 });
+
+test('Bullet Format None re-fits only the shapes whose bullets it changes', async () => {
+  // Shape B has no list and a fit scale of its own, which a re-fit would recompute.
+  const plain =
+    '<p:sp><p:nvSpPr><p:cNvPr id="3" name="B"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>' +
+    '<a:xfrm><a:off x="914400" y="914400"/><a:ext cx="914400" cy="914400"/></a:xfrm>' +
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr>' +
+    '<a:normAutofit fontScale="40000" lnSpcReduction="20000"/></a:bodyPr><a:lstStyle/>' +
+    '<a:p><a:pPr marL="0" indent="0"/><a:r><a:rPr lang="en-US"/><a:t>b</a:t></a:r></a:p>' +
+    '</p:txBody></p:sp>';
+  const listed = shape({ id: 2, x: IN, y: IN, cx: IN, cy: IN, text: para(run('a'), bullet) });
+  const e = await open(buildPptx({ slides: [{ shapes: listed + plain }] }));
+  e.setSelection({ kind: 'shapes', nodeIds: targets(e) });
+  expect(e.exec({ type: 'setBulletFormat', format: null }).ok).toBe(true);
+  expect(xml(e)).toContain('fontScale="40000"');
+  expect(xml(e)).not.toContain('<a:buChar');
+  e.destroy();
+});
+
+test('a slide table with the node id of a layout table re-fits itself', async () => {
+  const cell = `<a:tc><a:txBody><a:bodyPr/><a:lstStyle/>${para(run('x'))}</a:txBody><a:tcPr/></a:tc>`;
+  const frame = table({
+    id: 2,
+    x: IN,
+    y: IN,
+    cx: IN,
+    cy: 370_840,
+    columns: [IN],
+    tblPr: '<a:tblPr/>',
+    rows: `<a:tr h="370840">${cell}</a:tr>`,
+  });
+  const e = await open(
+    buildPptx({
+      layouts: [{ name: 'Deco', shapes: frame }],
+      slides: [{ layoutName: 'Deco', shapes: frame }],
+    })
+  );
+  const items = e.session!.layout(0)!.items;
+  const mine = items.find((i) => i.element.layer === 'slide')!;
+  const id = mine.element.nodeId;
+  expect(items.some((i) => i.element.layer !== 'slide' && i.element.nodeId === id)).toBe(true);
+  e.setSelection({ kind: 'shapes', nodeIds: [id] });
+  expect(e.exec({ type: 'setFontSize', points: 60 }).ok).toBe(true);
+  const grown = e.session!.layout(0)!.items.find((i) => i.element.layer === 'slide')!;
+  expect(grown.element.xfrm.cy).toBeGreaterThan(370_840);
+  e.destroy();
+});

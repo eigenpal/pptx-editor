@@ -9,7 +9,7 @@ import { attr, child, elements, REL, type Element, type PptxPackage } from '../s
 import type { LayoutItem } from '../layout/index.ts';
 import type { EditorCommand, EditorSelection, TransformItem } from '../contracts/index.ts';
 import { refit } from '../automation/commands/autofit.ts';
-import { refitTable, resizeTable } from '../automation/commands/table-fit.ts';
+import { resizeTable } from '../automation/commands/table-fit.ts';
 import { tblOf } from '../automation/commands/table-model.ts';
 import { writeCopiedTableMarkers } from '../automation/commands/table-repair.ts';
 import { pasteShapes } from './clipboard.ts';
@@ -286,7 +286,7 @@ function writeTransforms(
         ctx.gestureBase ?? start,
         ctx.session.measurer
       );
-      if (!ctx.probe) refitTable(batch, ctx.slide, part, t.nodeId, ctx.session.measurer);
+      fit.push(t.nodeId);
     } else if (sized.has(t) && child(batch.element(part, t.nodeId), 'p:txBody')) fit.push(t.nodeId);
   }
   // After every transform, from one resolve: a re-fit changes only its own shape.
