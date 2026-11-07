@@ -18,7 +18,11 @@ import {
   type NodeSpec,
   type PptxPackage,
 } from '../../store/index.ts';
-import type { ClipboardPayload, ClipboardRelationship } from '../../contracts/index.ts';
+import type {
+  ClipboardNode,
+  ClipboardPayload,
+  ClipboardRelationship,
+} from '../../contracts/index.ts';
 import { OpBatch } from '../../automation/commands/op-batch.ts';
 import { freePartName, renumberShapes } from '../../automation/commands/package-edits.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
@@ -309,6 +313,90 @@ describe('the checks of an untrusted payload', () => {
       const bad = { ...payload, shapes: [{ ns: MC, local: 'AlternateContent', children }] };
       const e = await open(fixture('slide-structure'));
       expect(e.exec({ type: 'paste', payload: bad as ClipboardPayload }).ok).toBe(false);
+    }
+  });
+});
+
+describe('more checks of an untrusted payload', () => {
+  test('a diagram part full of near matches pastes in linear time', async () => {
+    const payload = await copied('diagrams', 'Diagram 1');
+    const data = payload.relationships.find((r) => r.type === `${R}diagramData`)!;
+    const xml = Buffer.from(data.base64, 'base64').toString();
+    const noise = `<!--${'<dataModelExt '.repeat(40_000)}-->`;
+    const heavy = xml.replace(/(<dgm:dataModel[^>]*>)/, `$1${noise}`);
+    expect(heavy).not.toBe(xml);
+    const relationships = payload.relationships.map((r) =>
+      r === data ? { ...r, base64: Buffer.from(heavy).toString('base64') } : r
+    );
+    const e = await open(fixture('slide-structure'));
+    const start = performance.now();
+    expect(e.exec({ type: 'paste', payload: { ...payload, relationships } }).ok).toBe(true);
+    expect(performance.now() - start).toBeLessThan(3_000);
+  });
+
+  test('refuse a part named .rels or .xml that is not XML, and an odd embedding name', async () => {
+    const payload = await copied('charts', 'Chart 1');
+    const png =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==';
+    for (const part of ['/ppt/media/evil.rels', '/ppt/media/evil.xml']) {
+      const image = { id: 'rId7', type: `${R}image`, part, contentType: 'image/png', base64: png };
+      const chart = { ...payload.relationships[0]!, relationships: [image] };
+      const e = await open(fixture('slide-structure'));
+      expect(e.exec({ type: 'paste', payload: { ...payload, relationships: [chart] } }).ok).toBe(
+        false
+      );
+    }
+    const ole = await copied('preserved-content', 'Embedded workbook');
+    const relationships = ole.relationships.map((r) =>
+      r.type === `${R}package` ? { ...r, part: '/ppt/embeddings/x.rels' } : r
+    );
+    const e = await open(fixture('slide-structure'));
+    expect(e.exec({ type: 'paste', payload: { ...ole, relationships } }).ok).toBe(false);
+  });
+
+  test('refuse an mc:AlternateContent whose branch holds no shape', async () => {
+    const payload = await copied('charts', 'Shape 2');
+    const children = [
+      {
+        ns: MC,
+        local: 'Choice',
+        attrs: [{ ns: '', local: 'Requires', value: 'zz' }],
+        nsDecls: [{ prefix: 'zz', uri: 'urn:zz' }],
+        children: [],
+      },
+      { ns: MC, local: 'Fallback', children: [payload.shapes[0]!] },
+    ];
+    const bad = { ...payload, shapes: [{ ns: MC, local: 'AlternateContent', children }] };
+    const e = await open(fixture('slide-structure'));
+    expect(e.exec({ type: 'paste', payload: bad as ClipboardPayload }).ok).toBe(false);
+  });
+
+  test('a pasted link keeps a show jump and loses a program action', async () => {
+    const payload = await copied('charts', 'Shape 2');
+    // The link sits on the shape's non-visual properties (`p:cNvPr/a:hlinkClick`).
+    const withLink = (action: string): ClipboardPayload => {
+      const link = {
+        ns: NS.a,
+        local: 'hlinkClick',
+        attrs: [
+          { ns: NS.r, local: 'id', prefix: 'r', value: '' },
+          { ns: '', local: 'action', value: action },
+        ],
+      };
+      const add = (n: ClipboardNode): ClipboardNode =>
+        n.local === 'cNvPr'
+          ? { ...n, children: [...(n.children ?? []), link] }
+          : { ...n, children: n.children?.map((c) => ('text' in c ? c : add(c))) };
+      return { ...payload, shapes: [add(payload.shapes[0]!)] };
+    };
+    for (const [action, kept] of [
+      ['ppaction://hlinkshowjump?jump=nextslide', true],
+      ['ppaction://program', false],
+    ] as const) {
+      const e = await open(fixture('slide-structure'));
+      expect(e.exec({ type: 'paste', payload: withLink(action) }).ok).toBe(true);
+      const xml = JSON.stringify(xmlPartOf(pkgOf(e), partOf(e, 0))!.root);
+      expect(xml.includes(action)).toBe(kept);
     }
   });
 });
