@@ -21,6 +21,7 @@ import {
   elements,
   NS,
   nodeIndex,
+  parseXmlPart,
   normalizePartName,
   presentationInfo,
   REL,
@@ -112,47 +113,59 @@ const CARRIED = new Set([
   'http://schemas.microsoft.com/office/2007/relationships/media',
 ]);
 
-/** How a carried part graph is named on paste, and the content types it may have. */
+/**
+ * How a carried part graph is named on paste, the content types it may have, and, for an XML
+ * part, the local name of its root element, which paste checks.
+ */
 interface GraphRule {
   readonly stem: string;
   readonly types: RegExp;
+  readonly root?: string;
 }
 const DML = 'application\\/vnd\\.openxmlformats-officedocument\\.drawingml\\.';
 const xmlType = (pattern: string): RegExp => new RegExp(`^${pattern}\\+xml$`);
-/** An embedded package or OLE object: any `application/*` type, kept as bytes and never run. */
-const EMBEDDED = /^application\/[A-Za-z0-9.+-]{1,200}$/;
+/**
+ * The content types of an embedded object or package: the OLE object type, the OOXML
+ * documents and their binary forerunners without macros, and plain bytes. A type that can hold
+ * macros, or that names a part of a package, is refused.
+ */
+const EMBEDDED =
+  /^application\/(?:vnd\.openxmlformats-officedocument\.(?:oleObject|spreadsheetml\.sheet|wordprocessingml\.document|presentationml\.presentation)|vnd\.ms-excel|msword|vnd\.ms-powerpoint|octet-stream)$/;
+const xml = (stem: string, types: RegExp, root: string): GraphRule => ({ stem, types, root });
 /** The relationship types whose targets travel as part graphs (charts, diagrams, OLE). */
-const GRAPHS: ReadonlyMap<string, GraphRule> = new Map([
-  [`${R}chart`, { stem: '/ppt/charts/chart', types: xmlType(`${DML}chart`) }],
+const GRAPHS: ReadonlyMap<string, GraphRule> = new Map<string, GraphRule>([
+  [`${R}chart`, xml('/ppt/charts/chart', xmlType(`${DML}chart`), 'chartSpace')],
   [
     `${MS2011}chartStyle`,
-    { stem: '/ppt/charts/style', types: /^application\/vnd\.ms-office\.chartstyle\+xml$/ },
+    xml('/ppt/charts/style', /^application\/vnd\.ms-office\.chartstyle\+xml$/, 'chartStyle'),
   ],
   [
     `${MS2011}chartColorStyle`,
-    { stem: '/ppt/charts/colors', types: /^application\/vnd\.ms-office\.chartcolorstyle\+xml$/ },
+    xml('/ppt/charts/colors', /^application\/vnd\.ms-office\.chartcolorstyle\+xml$/, 'colorStyle'),
   ],
-  [`${R}chartUserShapes`, { stem: '/ppt/drawings/drawing', types: xmlType(`${DML}chartshapes`) }],
+  [`${R}chartUserShapes`, xml('/ppt/drawings/drawing', xmlType(`${DML}chartshapes`), 'userShapes')],
   [
     `${R}themeOverride`,
-    {
-      stem: '/ppt/theme/themeOverride',
-      types: xmlType('application\\/vnd\\.openxmlformats-officedocument\\.themeOverride'),
-    },
+    xml(
+      '/ppt/theme/themeOverride',
+      xmlType('application\\/vnd\\.openxmlformats-officedocument\\.themeOverride'),
+      'themeOverride'
+    ),
   ],
-  [`${R}diagramData`, { stem: '/ppt/diagrams/data', types: xmlType(`${DML}diagramData`) }],
-  [`${R}diagramLayout`, { stem: '/ppt/diagrams/layout', types: xmlType(`${DML}diagramLayout`) }],
+  [`${R}diagramData`, xml('/ppt/diagrams/data', xmlType(`${DML}diagramData`), 'dataModel')],
+  [`${R}diagramLayout`, xml('/ppt/diagrams/layout', xmlType(`${DML}diagramLayout`), 'layoutDef')],
   [
     `${R}diagramQuickStyle`,
-    { stem: '/ppt/diagrams/quickStyle', types: xmlType(`${DML}diagramStyle`) },
+    xml('/ppt/diagrams/quickStyle', xmlType(`${DML}diagramStyle`), 'styleDef'),
   ],
-  [`${R}diagramColors`, { stem: '/ppt/diagrams/colors', types: xmlType(`${DML}diagramColors`) }],
+  [`${R}diagramColors`, xml('/ppt/diagrams/colors', xmlType(`${DML}diagramColors`), 'colorsDef')],
   [
     REL.diagramDrawing,
-    {
-      stem: '/ppt/diagrams/drawing',
-      types: /^application\/vnd\.ms-office\.drawingml\.diagramDrawing\+xml$/,
-    },
+    xml(
+      '/ppt/diagrams/drawing',
+      /^application\/vnd\.ms-office\.drawingml\.diagramDrawing\+xml$/,
+      'drawing'
+    ),
   ],
   [`${R}oleObject`, { stem: '/ppt/embeddings/oleObject', types: EMBEDDED }],
   [`${R}package`, { stem: '/ppt/embeddings/package', types: EMBEDDED }],
@@ -294,10 +307,12 @@ export function copySelection(
   const ids = [...selected.nodeIds].sort((a, b) => order.indexOf(a) - order.indexOf(b));
   const batch = new OpBatch(pkg);
   try {
-    const shapes = new Map<string, Element>();
+    // Each selected shape, or its `mc:AlternateContent` first and the drawn copy alone after it.
+    const shapes = new Map<string, readonly Element[]>();
     for (const id of ids) {
-      const el = withAlternates(pkg, slidePart, batch.element(slidePart, id));
-      if (!shapes.has(el.id)) shapes.set(el.id, el);
+      const drawn = batch.element(slidePart, id);
+      const el = withAlternates(pkg, slidePart, drawn);
+      if (!shapes.has(el.id)) shapes.set(el.id, el === drawn ? [drawn] : [el, drawn]);
     }
     return copyShapes(pkg, slidePart, [...shapes.values()], document);
   } catch (e) {
@@ -307,21 +322,24 @@ export function copySelection(
 }
 
 /**
- * Serialize shapes of one slide. A shape whose chart, diagram, or embedded object cannot travel
- * (an external or unknown relationship in its part graph, or a part past the limits) is left
- * out; null when nothing is left.
+ * Serialize shapes of one slide. Each entry is a shape, or the forms to try in order (an
+ * `mc:AlternateContent`, then its drawn copy alone). A shape whose chart, diagram, or embedded
+ * object cannot travel (an external or unknown relationship in its part graph, or a part past
+ * the limits) is left out. In an `mc:AlternateContent`, every relationship other than a link
+ * must travel, because a branch that loses one is not valid. Null when nothing is left.
  */
 export function copyShapes(
   pkg: PptxPackage,
   slidePart: string,
-  shapes: readonly Element[],
+  shapes: readonly (Element | readonly Element[])[],
   document: string
 ): ClipboardPayload | null {
   const rels = new Map(relationshipsOf(pkg, slidePart).map((r) => [r.id, r]));
   const carried = new Map<string, ClipboardRelationship>();
   const kept: ClipboardNode[] = [];
   const carrier = new Carrier(pkg);
-  for (const shape of shapes) {
+  const take = (shape: Element): boolean => {
+    const strict = isAlternateContent(shape);
     const pending: ClipboardRelationship[] = [];
     const ids = relIds(shape, new Set());
     // A diagram's saved drawing is a relationship of the slide that its data part names.
@@ -336,9 +354,13 @@ export function copyShapes(
     let ok = true;
     for (const id of ids) {
       const rel = rels.get(id);
-      if (!rel || carried.has(id) || pending.some((p) => p.id === id)) continue;
+      if (!rel) {
+        if (strict && id !== '') ok = false;
+        continue;
+      }
+      if (carried.has(id) || pending.some((p) => p.id === id)) continue;
       const c = carrier.carry(rel, false);
-      if (c === null) ok = false;
+      if (c === null || (c === undefined && strict && rel.type !== REL.hyperlink)) ok = false;
       if (!c) continue;
       pending.push(c);
     }
@@ -348,11 +370,14 @@ export function copyShapes(
     if (!saved) {
       carrier.bytes = before.bytes;
       carrier.parts = before.parts;
-      continue;
+      return false;
     }
     for (const r of pending) carried.set(r.id, r);
     kept.push(withoutStructureMarks(specOf(saved)));
-  }
+    return true;
+  };
+  for (const entry of shapes)
+    for (const form of Array.isArray(entry) ? entry : [entry]) if (take(form)) break;
   if (kept.length === 0) return null;
   return { version: 1, document, slidePart, shapes: kept, relationships: [...carried.values()] };
 }
@@ -507,6 +532,12 @@ function cleanRelationship(
   if (budget.bytes > MAX_BYTES || budget.parts > MAX_PARTS) return null;
   const carried = { id, type, extension, contentType, bytes, part: norm.partName };
   if (!graph) return { kind: 'media', ...carried };
+  // An XML part must parse within the reader's limits and have the root its type names.
+  if (graph.root) {
+    if (extension !== 'xml') return null;
+    const tree = parseXmlPart(norm.partName, decodeXml(bytes));
+    if (!tree.ok || tree.part.root.local !== graph.root) return null;
+  }
   if (relationships !== undefined && !Array.isArray(relationships)) return null;
   const out: CleanRelationship[] = [];
   const seen = new Set<string>();
@@ -522,6 +553,45 @@ function cleanRelationship(
   return { kind: 'graph', ...carried, stem, relationships: out };
 }
 
+/** The text of an XML part's bytes: UTF-16 with its byte order mark, otherwise UTF-8. */
+function decodeXml(bytes: Uint8Array): string {
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes);
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(bytes);
+  const text = new TextDecoder('utf-8').decode(bytes);
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
+/**
+ * Whether an untrusted `mc:AlternateContent` is one this editor pastes (ECMA-376 Part 3,
+ * 10.2.1): only `mc:Choice` branches, then at most one `mc:Fallback`, each holding shapes. Each
+ * prefix that a Choice requires is declared on the Choice or the wrapper.
+ */
+function validAlternate(spec: NodeSpec): boolean {
+  const branches: NodeSpec[] = [];
+  for (const c of spec.children ?? []) {
+    if ('text' in c) {
+      if (c.text.trim() !== '') return false;
+      continue;
+    }
+    branches.push(c);
+  }
+  if (branches.length === 0) return false;
+  const declared = new Set((spec.nsDecls ?? []).map((d) => d.prefix));
+  return branches.every((b, i) => {
+    if (b.ns !== NS.mc) return false;
+    if (b.local === 'Fallback' && i !== branches.length - 1) return false;
+    if (b.local !== 'Fallback' && b.local !== 'Choice') return false;
+    const shapes = (b.children ?? []).every((c) =>
+      'text' in c ? c.text.trim() === '' : c.ns === NS.p && SHAPES.has(c.local)
+    );
+    if (!shapes || b.local === 'Fallback') return shapes;
+    const own = new Set((b.nsDecls ?? []).map((d) => d.prefix));
+    const requires = b.attrs?.find((a) => a.ns === '' && a.local === 'Requires')?.value ?? '';
+    const prefixes = requires.split(/\s+/).filter(Boolean);
+    return prefixes.length > 0 && prefixes.every((p) => own.has(p) || declared.has(p));
+  });
+}
+
 /** Validate an untrusted payload; null when it is not a shape clipboard this editor accepts. */
 export function parsePayload(
   v: unknown
@@ -535,7 +605,8 @@ export function parsePayload(
   for (const s of v.shapes) {
     const spec = sanitizeNode(s, 0, budget);
     const alternate = spec?.ns === NS.mc && spec.local === 'AlternateContent';
-    if (!spec || (!alternate && (spec.ns !== NS.p || !SHAPES.has(spec.local)))) return null;
+    if (!spec || (alternate ? !validAlternate(spec) : spec.ns !== NS.p || !SHAPES.has(spec.local)))
+      return null;
     shapes.push(spec);
   }
   const rels: CleanRelationship[] = [];
@@ -580,14 +651,22 @@ function partFor(batch: OpBatch, rel: CarriedPart): string {
  * the diagram never shows the drawing of another diagram.
  */
 function withDrawingId(bytes: Uint8Array, slideIds: ReadonlyMap<string, string>): Uint8Array {
-  const text = new TextDecoder('utf-8').decode(bytes);
+  // One character per byte (`latin1` decodes as windows-1252, one code point per byte), so the
+  // match gives byte offsets, and every byte outside the edit stays as it was in any 8-bit
+  // encoding. A UTF-16 part has no match and stays as it is.
+  const text = new TextDecoder('latin1').decode(bytes);
   const ext = /(<(?:[A-Za-z_][\w.-]*:)?dataModelExt\b[^>]*?\brelId=)("[^"]*"|'[^']*')/.exec(text);
   if (!ext) return bytes;
-  const id = slideIds.get(ext[2]!.slice(1, -1)) ?? '';
+  // A relationship id is ASCII (`rIdN`), so it takes one byte per character.
+  const id = xmlAttr(slideIds.get(ext[2]!.slice(1, -1)) ?? '', 'relationship');
   const at = ext.index + ext[1]!.length;
-  return new TextEncoder().encode(
-    `${text.slice(0, at)}"${xmlAttr(id, 'relationship')}"${text.slice(at + ext[2]!.length)}`
-  );
+  const out = new Uint8Array(bytes.length - ext[2]!.length + id.length + 2);
+  out.set(bytes.subarray(0, at), 0);
+  out[at] = 0x22;
+  for (let i = 0; i < id.length; i += 1) out[at + 1 + i] = id.charCodeAt(i);
+  out[at + 1 + id.length] = 0x22;
+  out.set(bytes.subarray(at + ext[2]!.length), at + id.length + 2);
+  return out;
 }
 
 /**
