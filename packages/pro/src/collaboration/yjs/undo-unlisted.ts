@@ -402,13 +402,12 @@ export class UndoneListings {
     if (children instanceof Y.Array)
       for (const item of sequenceItems(children)) if (foreign(item)) return true;
     // A run a write removed from the node while a peer typed into it shows again with that
-    // text (`withRemovedRuns` in `text-identity.ts`), so it counts as content of the node.
-    let runs = 0;
-    for (const field of rec.keys()) {
-      if (!field.startsWith(IDENTITY.removedRun)) continue;
-      if ((runs += 1) > MAX_PLACED) break;
+    // text (`withRemovedRuns` in `removed-content.ts`), so it counts as content of the node.
+    // The fields in one order on every replica, so each looks at the same runs.
+    const runs: string[] = [];
+    for (const field of rec.keys()) if (field.startsWith(IDENTITY.removedRun)) runs.push(field);
+    for (const field of runs.sort().slice(0, MAX_PLACED))
       if (this.#holdsForeign(field.slice(IDENTITY.removedRun.length), e, depth + 1)) return true;
-    }
     return this.#shown(key).some((child) => this.#holdsForeign(child.key, child, depth + 1));
   }
 

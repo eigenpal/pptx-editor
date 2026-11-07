@@ -63,6 +63,12 @@ import { RESTORED_KEY, followsIn } from './text-identity.ts';
 import { repairCopies, repairFollows } from './text-repair.ts';
 import { nodeRecordDeleteFilter } from './undo-delete-filter.ts';
 import {
+  carryFollowed,
+  checkFollowed,
+  type FollowedRun,
+  tieFollowedRuns,
+} from './undo-followed.ts';
+import {
   dropRestoredTwins,
   noteRestored,
   repairRestored,
@@ -105,9 +111,6 @@ export interface YjsCollaborationSession extends EditorCollaborationSession {
 }
 
 let sessionCounter = 0;
-
-/** The meta field of a history step: the peer runs a repair moved as part of it. */
-const FOLLOWED = 'followed';
 
 /** Call every listener; one that throws does not stop the others or reach the caller. */
 function notify<A extends unknown[]>(listeners: Set<(...args: A) => void>, ...args: A): void {
@@ -268,7 +271,7 @@ export function createYjsCollaborationSession(
         room,
         top,
         (write) => doc.transact(write, UNDONE_ORIGIN),
-        top.meta.get(FOLLOWED) as Set<string> | undefined
+        checkFollowed(top)
       );
       top.deletions = withoutLoserRestores(room, top);
     } else {
@@ -485,6 +488,7 @@ export function createYjsCollaborationSession(
         const current = undoManager.currStackItem as { meta: Map<string, unknown> } | null;
         if ((undoManager.undoing || undoManager.redoing) && current) {
           event.stackItem.meta.set('attrs', current.meta.get('attrs') ?? []);
+          carryFollowed(current, event.stackItem);
           return;
         }
         const writes = (event.stackItem.meta.get('attrs') as AttributeWrite[] | undefined) ?? [];
@@ -552,7 +556,7 @@ export function createYjsCollaborationSession(
           package: port.package(),
         };
         const moved: [Y.ID, Y.ID, number][] = [];
-        const runs: [Y.ID, Y.ID, Y.ID, string][] = [];
+        const runs: FollowedRun[] = [];
         doc.transact(() => {
           for (const [part, keys] of fresh)
             repairCopies(
@@ -562,25 +566,12 @@ export function createYjsCollaborationSession(
               deleted,
               view,
               (from, to, length) => moved.push([from, to, length]),
-              (anchor, gone, added, run) => runs.push([anchor, gone, added, run])
+              (run) => runs.push(run)
             );
           repairFollows(room, follows, deleted);
         }, TEXT_REPAIR_ORIGIN);
-        const one = (id: Y.ID) => {
-          const set = Y.createDeleteSet();
-          set.clients.set(id.client, [{ clock: id.clock, len: 1 }] as never);
-          return set;
-        };
         // A peer's run that followed this replica's Enter goes back with an undo of the Enter.
-        for (const [anchor, gone, added, run] of runs)
-          for (const item of [...undoManager.undoStack, ...undoManager.redoStack]) {
-            if (!Y.isDeleted(item.insertions, anchor)) continue;
-            item.insertions = Y.mergeDeleteSets([item.insertions, one(added)]);
-            item.deletions = Y.mergeDeleteSets([item.deletions, one(gone)]);
-            const followed = item.meta.get(FOLLOWED) as Set<string> | undefined;
-            if (followed) followed.add(run);
-            else item.meta.set(FOLLOWED, new Set([run]));
-          }
+        tieFollowedRuns([...undoManager.undoStack, ...undoManager.redoStack], runs);
         for (const [from, to, length] of moved)
           for (const item of [...undoManager.undoStack, ...undoManager.redoStack]) {
             if (!Y.isDeleted(item.insertions, from)) continue;

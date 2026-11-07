@@ -91,7 +91,23 @@ Undo and redo operate on the local participant’s changes through the collabora
 
 Authenticate users before connecting them to a room. Authorize document access and enforce write permissions in your provider or server. A `documentId` is an identifier, not an access token. Use encrypted transport and disconnect participants when access ends.
 
-A room with an unsupported schema is refused. Do not reset a populated room to bypass that refusal.
+## Upgrade the room format
+
+The room records the format version of the session that seeded it. A release of `@pptx-editor.dev/pro` can change that format, and its release notes say so. A session refuses a room with another format version. The session status becomes `error` with the reason code `schema-version-mismatch`. The session does not join or change the room, and the editor keeps its own presentation.
+
+Update every participant of a room to the same release at the same time. To tell a participant to save local work and load a compatible version, check the reason code. This example uses the `session` from [Create one session per editor](#create-one-session-per-editor):
+
+```ts
+const unsubscribe = session.subscribeStatus(() => {
+  const { status, reason } = session.statusSnapshot();
+  if (status === 'error' && reason?.code === 'schema-version-mismatch') {
+    // Ask the participant to save local changes and reload the app.
+  }
+});
+// Call unsubscribe() when your UI unmounts.
+```
+
+Do not reset a populated room to bypass that refusal.
 
 ## See also
 

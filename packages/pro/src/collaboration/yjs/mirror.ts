@@ -67,19 +67,22 @@ import {
   copyOf,
   idKey,
   isTextBody,
-  listingsOf,
   markCopies,
   markRemoved,
   rootOf,
-  type ParagraphRescue,
   type TextWrite,
+} from './text-identity.ts';
+import {
+  type ParagraphRescue,
+  roomListings,
   withoutEmptiedRescues,
   withRemovedRuns,
-} from './text-identity.ts';
+} from './removed-content.ts';
 import { noteTidiedListings, UNDONE_KEY, UndoneListings } from './undo-unlisted.ts';
 import {
   indexTree,
   rescuedParents,
+  type RescuedIn,
   shownParentsOnly,
   shownParentKey,
   shownPlaceKept,
@@ -150,7 +153,9 @@ export class PackageMirror {
    * showed them in (`rescuedParents`). A write never lists them there: they stay listed where
    * the room has them, so an undo of the removal that sent them shows them there again.
    */
-  readonly #rescuedIn = new Map<string, ReadonlyMap<string, string>>();
+  readonly #rescuedIn = new Map<string, RescuedIn>();
+  /** The parts whose last local write changed a parent of a rescued run, or its parent. */
+  readonly #touchedRescue = new Set<string>();
   #reading = new Set<string>();
   /** Per part, the listings its last read skipped, by parent key (`dropHiddenListings`). */
   readonly #hiddenListings = new Map<string, Map<string, SkippedListings>>();
@@ -309,6 +314,7 @@ export class PackageMirror {
   /** Write one local change. Call inside a local transaction. */
   writeChange(before: PptxPackage, after: PptxPackage, parts: readonly string[]): void {
     for (const name of parts) {
+      this.#touchedRescue.delete(name);
       const next = after.parts.get(name);
       if (!next) {
         this.#room.parts.delete(name);
@@ -381,12 +387,13 @@ export class PackageMirror {
 
   /**
    * The parts among `names` whose last read showed a node only for a peer's content after an
-   * undo (`undo-unlisted.ts`), or only by the move rescue. A local write can take that content,
-   * and the store keeps the node, so such a part is read again.
+   * undo (`undo-unlisted.ts`), or whose last write changed a parent that shows a node only by
+   * the move rescue. A local write can take that content, and the store keeps the node, so
+   * such a part is read again.
    */
   showingUnlisted(names: readonly string[]): string[] {
     return names.filter(
-      (n) => (this.#unlisted.get(n)?.size ?? 0) > 0 || (this.#rescuedIn.get(n)?.size ?? 0) > 0
+      (n) => (this.#unlisted.get(n)?.size ?? 0) > 0 || this.#touchedRescue.has(n)
     );
   }
 
@@ -428,6 +435,8 @@ export class PackageMirror {
     let key = ids.keyOf.get(node.id);
     let record = key === undefined ? undefined : this.#room.nodes.get(key);
     if (key !== undefined && record instanceof Y.Map && before.get(node.id) === node) return key;
+    if (key !== undefined && this.#rescuedIn.get(partName)?.watch.has(key))
+      this.#touchedRescue.add(partName);
     const created = key === undefined || !(record instanceof Y.Map);
     if (key === undefined || !(record instanceof Y.Map)) {
       key = this.#mint();
@@ -516,7 +525,7 @@ export class PackageMirror {
     // A node that the read shows only for a peer's content after an undo is never listed, and
     // a run that the move rescue shows here is not listed here.
     const undone = this.#unlisted.get(partName);
-    const rescuedIn = this.#rescuedIn.get(partName);
+    const rescuedIn = this.#rescuedIn.get(partName)?.inParent;
     const unlisted =
       rescuedIn && rescuedIn.size > 0
         ? { has: (k: string) => undone?.has(k) === true || rescuedIn.get(k) === key }
@@ -777,7 +786,9 @@ export class PackageMirror {
     for (const name of names)
       [this.#hiddenListings, this.#mergedBodies].forEach((m) => m.delete(name));
     const nextUnlisted = new Map<string, ReadonlySet<string>>();
-    const nextRescuedIn = new Map<string, ReadonlyMap<string, string>>();
+    const nextRescuedIn = new Map<string, RescuedIn>();
+    // Which records list each key, built once for the pass on first use (`removed-content.ts`).
+    const listingsOfPart = roomListings(this.#room);
     for (const name of names) {
       const entry = partEntryOf(this.#room.parts.get(name));
       if (!entry) {
@@ -803,7 +814,7 @@ export class PackageMirror {
         this.#readElement(key, name, seen, depth, views);
       let cameBack = new Set<string>();
       let stranded = new Set<string>();
-      const listings = listingsOf(this.#room, name);
+      const listings = listingsOfPart(name);
       const readPart = (strandedBefore: ReadonlySet<string> = new Set()) => {
         cameBack = new Set();
         stranded = new Set();

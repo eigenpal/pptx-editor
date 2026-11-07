@@ -33,7 +33,7 @@ import * as Y from 'yjs';
  * format refuses the room and keeps its own deck (`schema-version-mismatch`).
  *
  * - 6: a read puts back a paragraph that a write removed from any text body while a peer typed
- *   into it, with that text (`withRemovedRuns` in `text-identity.ts`), counts a move mark only
+ *   into it, with that text (`withRemovedRuns` in `removed-content.ts`), counts a move mark only
  *   while another record lists the node, and shows a run that the move rescue put back without
  *   any write listing it there. A replica of format 5 shows no such paragraph, so it would
  *   show other text.

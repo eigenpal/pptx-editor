@@ -33,6 +33,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // repair never writes a key it does not find in a list.
 
 import * as Y from 'yjs';
+import type { FollowedRun } from './undo-followed.ts';
 import type { Element, Node, NodeId, PptxPackage } from '@pptx-editor.dev/core/store';
 import { F, type Room } from './schema.ts';
 import { LINEAGE } from './text-lineage.ts';
@@ -73,11 +74,10 @@ export interface RepairView {
 export type MovedText = (from: Y.ID, to: Y.ID, length: number) => void;
 
 /**
- * A peer's run that a repair moved after this replica's Enter (`followEnter`): the first
- * character of the Enter's copy, the list entry the move deleted, and the one it inserted. The
- * move belongs to the Enter's step, so an undo of the Enter takes the run back.
+ * A peer's run that a repair moved after this replica's Enter (`followEnter`). The move
+ * belongs to the Enter's step, so an undo of the Enter takes the run back (`undo-followed.ts`).
  */
-export type MovedRun = (anchor: Y.ID, deleted: Y.ID, inserted: Y.ID, run: string) => void;
+export type MovedRun = (run: FollowedRun) => void;
 
 interface CopyEntry {
   readonly key: string;
@@ -394,7 +394,14 @@ function followEnter(ctx: Repair): void {
       to.insert(to.toArray().indexOf(anchor) + 1, [pp.run]);
       lastAfter.set(at.run, pp.run);
       if (deleted)
-        movedRun?.(Y.createID(q.copy.client, q.copy.clock), deleted, Y.createID(me, clock), pp.run);
+        movedRun?.({
+          anchor: Y.createID(q.copy.client, q.copy.clock),
+          gone: deleted,
+          added: Y.createID(me, clock),
+          run: pp.run,
+          from,
+          to,
+        });
       break;
     }
   }

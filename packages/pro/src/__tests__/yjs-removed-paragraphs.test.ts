@@ -6,7 +6,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // A peer removes a paragraph (a delete across paragraphs, a join) while another peer types
 // into it. The removal deletes the characters its writer saw; what the peer typed at the same
 // time stays, and the paragraph shows again at its old place with that text only
-// (`withRemovedRuns` in `text-identity.ts`). Every client order, and with three peers every
+// (`withRemovedRuns` in `removed-content.ts`). Every client order, and with three peers every
 // delivery order of the two edits.
 
 import { describe, expect, test } from 'bun:test';
@@ -27,7 +27,11 @@ const deck = (body: string) =>
     ],
   });
 const END = '<a:endParaRPr lang="en-US"/>';
-const three = () => deck(para(run('AB') + END) + para(run('CDEF') + END) + para(run('GH') + END));
+const THREE = para(run('AB') + END) + para(run('CDEF') + END) + para(run('GH') + END);
+const three = () => deck(THREE);
+const MC = 'http://schemas.openxmlformats.org/markup-compatibility/2006';
+const P14 = 'http://schemas.microsoft.com/office/powerpoint/2010/main';
+const box = (text: string) => shape({ id: 3, name: 'Box', x: IN, y: IN, cx: 3 * IN, cy: IN, text });
 
 const CLIENT_ORDERS = [
   [1_001, 2_002, 3_003],
@@ -184,7 +188,53 @@ const CASES: readonly Case[] = [
     },
     expected: ['AH', 'x', 'y'],
   },
+  {
+    // The drawn copy of a shape in `mc:AlternateContent` (ECMA-376 Part 3, 10.2.1). An edit
+    // removes the stale `mc:Fallback` copy, and an undo of the edit puts it back.
+    name: 'a delete across paragraphs in a shape in mc:AlternateContent keeps typed text',
+    deck: () =>
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes:
+              `<mc:AlternateContent xmlns:mc="${MC}">` +
+              `<mc:Choice xmlns:p14="${P14}" Requires="p14">${box(THREE)}</mc:Choice>` +
+              `<mc:Fallback>${box(para(run('stale')))}</mc:Fallback></mc:AlternateContent>`,
+          },
+        ],
+      }),
+    remove: (e) => {
+      selectAcross(e, 0, 1, 2, 1);
+      ok(e.input('deleteBackward'));
+    },
+    type: (e) => {
+      selectIn(e, 1, 2);
+      ok(e.input('text', 'x'));
+    },
+    expected: ['AH', 'x'],
+    undone: ['AB', 'CDxEF', 'GH', 'stale'],
+  },
 ];
+
+describe('notes text that a peer removes at the same time stays', () => {
+  const notes = (e: PptxEditorInstance) => e.snapshot().notes;
+  for (const ids of CLIENT_ORDERS)
+    test(`a notes edit that removes paragraphs keeps text typed into them (${order(ids)})`, async () => {
+      const bytes = buildPptx({
+        slides: [{ layout: 'blank', shapes: box(para(run('T'))), notesXml: THREE }],
+      });
+      const { editors, relay } = await openFuzzPeers(bytes, ids);
+      const [a, b] = editors as [PptxEditorInstance, PptxEditorInstance];
+      ok(a.exec({ type: 'setNotes', index: 0, text: 'AH' }));
+      ok(b.exec({ type: 'setNotes', index: 0, text: 'AB\nCDxEF\nGH' }));
+      savedAlike(editors, relay);
+      expect(editors.map(notes)).toEqual(editors.map(() => 'AH\nx'));
+      ok(a.exec({ type: 'undo' }));
+      savedAlike(editors, relay);
+      expect(editors.map(notes)).toEqual(editors.map(() => 'AB\nCDxEF\nGH'));
+    });
+});
 
 describe('text typed into a paragraph that a peer removes at the same time stays', () => {
   for (const c of CASES)

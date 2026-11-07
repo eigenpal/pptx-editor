@@ -151,6 +151,19 @@ describe('an undo of either join after the merge', () => {
       savedAlike([a, b, c], relay, ['AB', 'CDEFGH', 'IJKLx']);
     });
 
+    test(`a third peer deletes across the rescued text, then deletes it all (${order(ids)})`, async () => {
+      const { a, b, c, relay } = await concurrentJoins(ids);
+      relay.flush();
+      // Each write changes the paragraph that shows the rescued runs, so the writer reads the
+      // part again (`showingUnlisted`) and shows what every peer shows.
+      selectIn(c, 0, 6, 10);
+      expect(c.input('deleteBackward').ok).toBe(true);
+      savedAlike([a, b, c], relay, ['ABCDEFKL']);
+      selectIn(c, 0, 0, 8);
+      expect(c.input('deleteBackward').ok).toBe(true);
+      savedAlike([a, b, c], relay, ['']);
+    });
+
     test(`both joiners undo at once, then both redo (${order(ids)})`, async () => {
       const { a, b, c, relay } = await concurrentJoins(ids);
       relay.flush();

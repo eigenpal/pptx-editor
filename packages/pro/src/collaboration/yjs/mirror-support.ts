@@ -226,26 +226,39 @@ export function syncText(text: Y.Text, value: string, created: boolean): TextWri
   };
 }
 
+/** The inline nodes that the move rescue put back in one part (`rescuedParents`). */
+export interface RescuedIn {
+  /** Each node, with the parent the read shows it in. */
+  readonly inParent: ReadonlyMap<string, string>;
+  /** Each parent that shows one, and that parent's parent: a write there can take the node. */
+  readonly watch: ReadonlySet<string>;
+}
+
 /**
  * Each inline node (a run, a line break, a field) that the move rescue put back (`placed` of
  * `rescueMoved`), with the parent the read shows it in.
  */
-export function rescuedParents(
-  spec: ReplicaElementSpec,
-  placed: ReadonlySet<string>
-): Map<string, string> {
-  const out = new Map<string, string>();
-  if (placed.size === 0) return out;
+export function rescuedParents(spec: ReplicaElementSpec, placed: ReadonlySet<string>): RescuedIn {
+  const inParent = new Map<string, string>();
+  const watch = new Set<string>();
+  if (placed.size === 0) return { inParent, watch };
+  const up = new Map<string, string>();
   const stack: ReplicaElementSpec[] = [spec];
   while (stack.length > 0) {
     const s = stack.pop()!;
     for (const c of s.children ?? []) {
       if ('text' in c) continue;
-      if (placed.has(c.key) && c.ns === NS_A && INLINE.has(c.local)) out.set(c.key, s.key);
+      up.set(c.key, s.key);
+      if (placed.has(c.key) && c.ns === NS_A && INLINE.has(c.local)) inParent.set(c.key, s.key);
       stack.push(c);
     }
   }
-  return out;
+  for (const parent of inParent.values()) {
+    watch.add(parent);
+    const grand = up.get(parent);
+    if (grand !== undefined) watch.add(grand);
+  }
+  return { inParent, watch };
 }
 
 const INLINE = new Set(['r', 'br', 'fld']);
