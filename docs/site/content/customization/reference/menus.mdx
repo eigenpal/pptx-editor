@@ -82,6 +82,8 @@ The built-in menu bar places **Insert > New slide** (`slide.add` as a direct row
 
 Cut and Copy write the system clipboard through the canvas's copy event, so Ctrl+V pastes what the menu copied. Where the browser refuses, shapes fall back to the editor's own clipboard. Paste of shapes from a menu row pastes the editor's last copy, because a browser lets a page read the system clipboard only from Ctrl+V. Paste into text reads the system clipboard where the browser allows it.
 
+Copied shapes carry their pictures, media, charts, diagrams, and embedded objects. A paste gives each chart, diagram, and embedded object new parts, in the same presentation or in another one. An object with a copy in each branch of `mc:AlternateContent`, such as an equation, goes with all of its copies. A web link passes the link check again on paste. A link to a slide stays only in the presentation that it came from.
+
 ### Layout rows
 
 `slide.add` adds a slide with the picked layout. `slide.layout` changes the layout of the selected slides and marks the current one. The built-in **Insert > New slide** row and the **New slide** rows of the context menus add a slide at once. A `Menu.Item slotId="slide.add"` placed directly in `Menu.Insert` replaces that row and runs as it does. Set `direct={false}` for the gallery, or put the row in a `Menu.Group` to keep both rows.

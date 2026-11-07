@@ -160,3 +160,87 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'themes.placeholder-inheritance':
     'sha256:3d08c7e8f4ca1472bc6496a8f634a11e1855636683ece38413cf371775e20be4',
 };
+
+/**
+ * Structural edits of kept content (`KEPT_CONTENT_EDITS` in
+ * `scripts/fidelity/kept-content-edits.ts`) whose copy opens with no repair prompt, with the
+ * fingerprint of that copy (`editFingerprint`). `bun scripts/fidelity/kept-content-edits.ts --out
+ * <dir>` writes one copy per recipe. The rules of `SAVE_VERIFIED_FEATURE_EDITS` apply. Last
+ * checked on 7 November 2026: all 37 copies, no prompt.
+ */
+export const SAVE_VERIFIED_KEPT_CONTENT_EDITS: Readonly<Record<string, string>> = {
+  'paragraphs.text-warp: duplicate slide':
+    'sha256:c94c33372ad368532f3e7b50ee56133ff4b414094edfcd7772adfafb31bb2bae',
+  'paragraphs.text-warp: paste on a new slide':
+    'sha256:92cb11585ce0dd8f7bf27c02a5a63a15f2f80b62514a686fcb83a66b6c6d6d3b',
+  'paragraphs.text-warp: paste into another deck':
+    'sha256:92cb11585ce0dd8f7bf27c02a5a63a15f2f80b62514a686fcb83a66b6c6d6d3b',
+  'paragraphs.text-warp: group':
+    'sha256:99ed3aba76214a2028b261f492ad810e321846738d2d540bdbec36b3c20a78e5',
+  'shapes.custom-geometry: duplicate slide':
+    'sha256:02ce251d16a85cfc638440adbf1bbb8cec92c582bf2b575f5b3e4a3a250b9712',
+  'shapes.custom-geometry: paste on a new slide':
+    'sha256:ed71ac210577fbece88d29bd8b17f96c2ee0115c13f26f6050f03dcdf0a6b9ed',
+  'shapes.custom-geometry: paste into another deck':
+    'sha256:ed71ac210577fbece88d29bd8b17f96c2ee0115c13f26f6050f03dcdf0a6b9ed',
+  'effects.fill-overlay: duplicate slide':
+    'sha256:f721f7c7d2766bed4c203597bd7761b68ba48b5cbdc666819555b7b6137e4b7d',
+  'effects.fill-overlay: paste on a new slide':
+    'sha256:7f35039e5f7e6d25f4e7cbaece3b0b48fa294ef4fe93064eb22f33292b3c7cf8',
+  'effects.fill-overlay: paste into another deck':
+    'sha256:7f35039e5f7e6d25f4e7cbaece3b0b48fa294ef4fe93064eb22f33292b3c7cf8',
+  'effects.fill-overlay: group':
+    'sha256:95d1c938a434285872bd5fd529cbee1fc0c953afba04b4e19e800b64736edd8d',
+  'effects.3d-and-other: duplicate slide':
+    'sha256:c94c33372ad368532f3e7b50ee56133ff4b414094edfcd7772adfafb31bb2bae',
+  'effects.3d-and-other: paste on a new slide':
+    'sha256:a2880f93ecc8d212720b17382fbd32302aeab5707e0d478aa9a7e4392eaba416',
+  'effects.3d-and-other: paste into another deck':
+    'sha256:a2880f93ecc8d212720b17382fbd32302aeab5707e0d478aa9a7e4392eaba416',
+  'effects.3d-and-other: group':
+    'sha256:d26375a04dfa05343b2a9841ffe5922492958405fccec095150e09e11df5f240',
+  'pictures.emf-wmf: duplicate slide':
+    'sha256:c94c33372ad368532f3e7b50ee56133ff4b414094edfcd7772adfafb31bb2bae',
+  'pictures.emf-wmf: paste on a new slide':
+    'sha256:6c3733d72b712fd5ec4684d56ded87f97b93cab8d3ea8f6c816a20333b53bc24',
+  'pictures.emf-wmf: paste into another deck':
+    'sha256:6c3733d72b712fd5ec4684d56ded87f97b93cab8d3ea8f6c816a20333b53bc24',
+  'pictures.emf-wmf: group':
+    'sha256:5ec05cd5e84f0601e2507e92f273ddd1ea1b948cbb49c88ef8b00e8b3ed0b70a',
+  'objects.charts: duplicate slide':
+    'sha256:977244faafd42525ffcb576a4d92ca819994adb9b342dab99246949a3811ec33',
+  'objects.charts: paste on a new slide':
+    'sha256:34165a3d642dac6ab3a35045c8a50326e7971276839e22d2df9a700fc95a293e',
+  'objects.charts: paste into another deck':
+    'sha256:34165a3d642dac6ab3a35045c8a50326e7971276839e22d2df9a700fc95a293e',
+  'objects.charts: group':
+    'sha256:a2b8b462f8e242ec8082cf70a2c3a6a416fef831b6d9327061baa37523355a6c',
+  'objects.diagrams: duplicate slide':
+    'sha256:ebba58655e8431d3d979e488f181abfcc76b90be01c40fe7a74089899fc064fd',
+  'objects.diagrams: paste on a new slide':
+    'sha256:21602a13e18c1edfe7ee858e42ccfa3c3f30077b30f7b6e8a95559d8cf69e4ff',
+  'objects.diagrams: paste into another deck':
+    'sha256:21602a13e18c1edfe7ee858e42ccfa3c3f30077b30f7b6e8a95559d8cf69e4ff',
+  'objects.diagrams: group':
+    'sha256:24b86ac67a2769552684b1f291df64d9ad956706c76d9d6f0d0790b05d92deae',
+  'objects.media-ole: duplicate slide':
+    'sha256:c94c33372ad368532f3e7b50ee56133ff4b414094edfcd7772adfafb31bb2bae',
+  'objects.media-ole: paste on a new slide':
+    'sha256:911bba4af59888e1c9693fb835de131740cce0965943fa7ac1389510c59c35c8',
+  'objects.media-ole: paste into another deck':
+    'sha256:911bba4af59888e1c9693fb835de131740cce0965943fa7ac1389510c59c35c8',
+  'objects.media-ole: group':
+    'sha256:2be7e4da1df23208d258a7625354883a6f9b00bb48e3acb424c3cd5cab35247a',
+  'objects.equations: duplicate slide':
+    'sha256:c94c33372ad368532f3e7b50ee56133ff4b414094edfcd7772adfafb31bb2bae',
+  'objects.equations: paste on a new slide':
+    'sha256:fe28abbe16211ae3cd2448e3b86bbe1f4b26bd45e99f927aa20cccc48c2f9d29',
+  'objects.equations: paste into another deck':
+    'sha256:fe28abbe16211ae3cd2448e3b86bbe1f4b26bd45e99f927aa20cccc48c2f9d29',
+  'presenting.animations-transitions: duplicate slide':
+    'sha256:c94c33372ad368532f3e7b50ee56133ff4b414094edfcd7772adfafb31bb2bae',
+  'review.comments: duplicate slide':
+    'sha256:af6f398bd04ec75e51b13c7f7b768e0c99923f040141e8829b4c0dc76be560cf',
+  'themes.placeholder-inheritance: duplicate slide':
+    'sha256:31dd35989a1ea1c0899c64cfdb075b51ce09424c235932cd82e630ae75d4a8d3',
+};
