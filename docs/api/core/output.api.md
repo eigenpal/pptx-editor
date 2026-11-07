@@ -40,7 +40,6 @@ export function elementsWithAttribute(root: Element, name: string): Element[];
 export interface FontFaceHandle {
     // (undocumented)
     dispose(): void;
-    // (undocumented)
     readonly ready: Promise<void>;
 }
 
@@ -112,6 +111,7 @@ export function registerFontFaces(doc: Document, faces: readonly RegisteredFace[
 // @public
 export interface RegisterFontFacesOptions {
     readonly family?: (face: RegisteredFace) => string;
+    readonly waitMs?: number;
 }
 
 // @internal
