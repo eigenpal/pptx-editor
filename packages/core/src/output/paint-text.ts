@@ -127,22 +127,98 @@ export function uprightPieces(
   return out;
 }
 
-/** Paint a text layout into a group in the text frame's coordinates. */
-export function paintText(doc: Document, layout: TextLayout, ctx: PaintContext): SVGElement {
+/**
+ * The text style of a body: no kerning and no ligatures, since each character sits at its
+ * measured place. Every property is inherited, so the runs take it from the body.
+ */
+const TEXT_STYLE =
+  'font-kerning:none;font-variant-ligatures:none;font-feature-settings:"liga" 0,"clig" 0,"dlig" 0,"calt" 0';
+
+/**
+ * Whether a box can show: `corners` are its four corners in the text frame's space, in EMU.
+ * Paint skips a line that cannot show (`PaintOptions.view`).
+ */
+export type Shows = (corners: readonly { x: number; y: number }[]) => boolean;
+
+/**
+ * The corners of `line` in the text frame's space, padded on every side by the line's height
+ * and its largest font size, so a glyph that reaches past its line box (a tall accent, a
+ * superscript, an italic overhang) still counts.
+ */
+function lineCorners(
+  layout: TextLayout,
+  line: TextLayout['lines'][number]
+): { x: number; y: number }[] {
+  let left = Infinity;
+  let right = -Infinity;
+  let size = 0;
+  for (const run of line.runs) {
+    if (!run.x.length) continue;
+    left = Math.min(left, run.x[0], run.x[run.x.length - 1]);
+    right = Math.max(right, run.x[0], run.x[run.x.length - 1]);
+    size = Math.max(size, run.sizePt * EMU_PER_PT);
+  }
+  const pad = Math.max(line.height, size) * 2;
   const box = layout.box;
-  const outer = svg(doc, 'g', {
-    transform:
-      layout.rotation !== 0
-        ? `translate(${num(box.x)} ${num(box.y)}) rotate(${num(layout.rotation)} ${num(box.width / 2)} ${num(box.height / 2)})`
-        : `translate(${num(box.x)} ${num(box.y)})`,
+  const x0 = box.x + left - pad;
+  const x1 = box.x + right + pad;
+  const y0 = box.y + line.top - pad;
+  const y1 = box.y + line.top + line.height + pad;
+  const corners = [
+    { x: x0, y: y0 },
+    { x: x1, y: y0 },
+    { x: x1, y: y1 },
+    { x: x0, y: y1 },
+  ];
+  if (layout.rotation === 0) return corners;
+  // As the paint: rotated about the box center.
+  const a = (layout.rotation * Math.PI) / 180;
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  return corners.map(({ x, y }) => ({
+    x: cx + (x - cx) * cos - (y - cy) * sin,
+    y: cy + (x - cx) * sin + (y - cy) * cos,
+  }));
+}
+
+/** Whether any line of `layout` can show. */
+export function textShows(layout: TextLayout, shows: Shows): boolean {
+  return layout.lines.some((line) => shows(lineCorners(layout, line)));
+}
+
+/**
+ * Paint a text layout into one group in the text frame's coordinates, or under `frame` (an
+ * SVG transform from the frame to the parent's space). With `shows`, a line that cannot show
+ * is left out: a text that overflows its slide by thousands of lines paints the lines in view
+ * only.
+ */
+export function paintText(
+  doc: Document,
+  layout: TextLayout,
+  ctx: PaintContext,
+  shows?: Shows,
+  frame?: string
+): SVGElement {
+  const box = layout.box;
+  // One group places the body (the frame's transform, then the box, then its rotation) and
+  // scales points to EMU: browsers clamp very large font sizes, so text paints in points. The
+  // text style is inherited: one declaration for the body, not one for each run, so a slide of
+  // thousands of runs does not parse it thousands of times.
+  const place =
+    layout.rotation !== 0
+      ? `translate(${num(box.x)} ${num(box.y)}) rotate(${num(layout.rotation)} ${num(box.width / 2)} ${num(box.height / 2)})`
+      : `translate(${num(box.x)} ${num(box.y)})`;
+  const group = svg(doc, 'g', {
+    transform: `${frame ? `${frame} ` : ''}${place} scale(${EMU_PER_PT})`,
     'data-pptx-text': '1',
   });
-  // Browsers clamp very large font sizes, so text paints in points under a scale transform.
-  const group = svg(doc, 'g', { transform: `scale(${EMU_PER_PT})` });
-  outer.appendChild(group);
+  group.setAttribute('style', TEXT_STYLE);
   const pt = (emu: number): string => num(emu / EMU_PER_PT);
   const bounds = textBounds(layout);
   for (const line of layout.lines) {
+    if (shows && !shows(lineCorners(layout, line))) continue;
     for (const run of line.runs) {
       if (run.text.length === 0) continue;
       const fill = textFill(run.props.fill, bounds, ctx);
@@ -178,10 +254,9 @@ export function paintText(doc: Document, layout: TextLayout, ctx: PaintContext):
           'xml:space': 'preserve',
           'data-run': run.kind === 'bullet' ? 'bullet' : String(run.runIndex),
         });
-        text.setAttribute(
-          'style',
-          'white-space:pre;font-kerning:none;font-variant-ligatures:none;font-feature-settings:"liga" 0,"clig" 0,"dlig" 0,"calt" 0'
-        );
+        // Kept on each run: inherited from the body, the browser's PDF splits a spaced run
+        // into pieces (measured on the `font-effects` fixture).
+        text.setAttribute('style', 'white-space:pre');
         text.textContent = content;
         return text;
       };
@@ -214,5 +289,5 @@ export function paintText(doc: Document, layout: TextLayout, ctx: PaintContext):
       }
     }
   }
-  return outer;
+  return group;
 }

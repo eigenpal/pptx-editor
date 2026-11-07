@@ -313,8 +313,9 @@ export class SlideSurface {
     }
     const painted = this.editor.paintLayout?.(layout) ?? layout;
     const paintKey = this.editor.paintKey?.();
-    // Converted pictures, or new faces: paint every item again, the old ones standing in.
+    // Converted pictures, new faces, or a wider view: paint again, the old nodes standing in.
     if (this.#painter?.invalidate(paintKey)) this.#paintKey = null;
+    if (this.#painter?.view(this.#view(layout))) this.#paintKey = null;
     if (this.#paintKey !== painted) {
       this.#paintKey = painted;
       const opts = {
@@ -862,7 +863,15 @@ export class SlideSurface {
       images: this.editor.imageUrl,
       ...(this.editor.imageSize ? { imageSize: this.editor.imageSize } : {}),
       idPrefix: `${this.editor.idPrefix}s${layout.slide.index}`,
+      view: this.#view(layout),
     };
+  }
+
+  /** What the surface can show at this zoom (`surfaceView`). */
+  #view(layout: SlideLayout) {
+    const win = this.host.ownerDocument.defaultView;
+    const px = Math.max(win?.innerWidth ?? 0, win?.innerHeight ?? 0);
+    return paint.surfaceView(layout.slide, px, this.editor.zoom(), EMU_PER_PX);
   }
 
   /**

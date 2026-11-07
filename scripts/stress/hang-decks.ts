@@ -230,7 +230,11 @@ export const HANG_DECKS: readonly HangDeck[] = [
       one(
         box(
           2,
-          para(run('、「'.repeat(50_000), 'lang="ja-JP"'), '<a:pPr eaLnBrk="1" hangingPunct="1"/>'),
+          // Not `run()`: its `lang="en-US"` and a second `lang` are not well-formed XML.
+          para(
+            `<a:r><a:rPr lang="ja-JP" altLang="en-US"/><a:t>${'、「'.repeat(50_000)}</a:t></a:r>`,
+            '<a:pPr eaLnBrk="1" hangingPunct="1"/>'
+          ),
           { bodyPr: NOFIT }
         )
       ),

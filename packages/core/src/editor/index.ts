@@ -157,6 +157,7 @@ export {
   type MountedSections,
   type ProgressiveMount,
 } from './progressive-mount.ts';
+export { clampSlide } from './progressive-open.ts';
 export { STANDARD_COLORS, gradientCss, presetGradient, swatchName } from './palette.ts';
 export { PATTERN_CHOICES, patternCss, patternDialogStart, patternLabel } from './pattern-fields.ts';
 export { focusEdge, handleMenuKey, panelItems } from './menu-keyboard.ts';

@@ -18,7 +18,7 @@ import {
   type PptxPackage,
   type XmlPart,
 } from '../index.ts';
-import { nodeIndexFlattenCount } from '../store/node-index.ts';
+import { nodeIndexFlattenCount, nodeIndexTestRecorder } from '../store/node-index.ts';
 import { openTransaction } from '../store/ops.ts';
 import { workingTreeTestRecorder } from '../store/working-tree.ts';
 
@@ -309,4 +309,31 @@ test('elements held between random ops, revisions, and the base never change', (
     expect(show(part.root)).toBe(show(xmlPartOf(step, PART)!.root));
     expect(stale(part)).toEqual([]);
   }
+});
+
+test('an insert near the root of a large part, never committed, walks no index', () => {
+  // A toolbar's `can` probe of Insert Text Box on a slide of 20,000 shapes.
+  const pkg = pkgOf(2, 10_000);
+  const root = xmlPartOf(pkg, PART)!.root;
+  const spec = { ns: NS.p, local: 'k', prefix: 'p', attrs: [] };
+  const recorder = nodeIndexTestRecorder();
+  recorder.reset();
+  const tx = openTransaction(pkg);
+  for (let i = 0; i < 3; i += 1)
+    expect(tx.apply({ op: 'insertNode', part: PART, parent: root.id, index: 2, spec })).toBeNull();
+  expect(recorder.completeBuilds).toBe(0);
+  // A commit hands an exact index to the new root.
+  const done = tx.finish();
+  expect(stale(xmlPartOf(done, PART)!)).toEqual([]);
+  expect(xmlPartOf(done, PART)!.root.children.length).toBe(5);
+});
+
+test('a lookup deep in a part without an index builds the index once', () => {
+  const pkg = pkgOf(2, 5_000);
+  const deep = (xmlPartOf(pkg, PART)!.root.children[1] as Element).children[4_999]!;
+  const recorder = nodeIndexTestRecorder();
+  recorder.reset();
+  const tx = openTransaction(pkg);
+  for (let i = 0; i < 100; i += 1) expect(tx.element(PART, deep.id)).toBe(deep as Element);
+  expect(recorder.completeBuilds).toBe(1);
 });

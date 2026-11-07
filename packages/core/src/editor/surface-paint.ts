@@ -3,6 +3,35 @@
 // written only when they change. Each one keeps an interaction on a slide of thousands of shapes
 // within a frame or two.
 
+import type { ViewRect } from '../output/index.ts';
+
+/**
+ * The part of slide space the editing surface can show (`PaintOptions.view`): the slide, and
+ * past each edge as far as a window of `windowPx` CSS pixels (its larger side) reaches at
+ * `zoom`. The surface does not clip the slide, but the window does: nothing past that reach
+ * is ever on screen. The margin is a power of two times the slide's larger side, so zooming
+ * changes the view, and repaints the text, only when the reach passes the next power. A
+ * slide whose text overflows by thousands of lines then paints only the lines that can show.
+ * @internal
+ */
+export function surfaceView(
+  slide: { readonly width: number; readonly height: number },
+  windowPx: number,
+  zoom: number,
+  emuPerPx: number
+): ViewRect {
+  const { width: slideWidth, height: slideHeight } = slide;
+  const side = Math.max(slideWidth, slideHeight, 1);
+  const reach = zoom > 0 && windowPx > 0 ? (windowPx * emuPerPx) / zoom : side;
+  const margin = side * 2 ** Math.max(0, Math.ceil(Math.log2(reach / side)));
+  return {
+    x: -margin,
+    y: -margin,
+    width: slideWidth + 2 * margin,
+    height: slideHeight + 2 * margin,
+  };
+}
+
 /**
  * The new items that one frame paints. A slide with more goes on screen over several frames
  * (`SlidePainter.paint`), so opening a slide of 24,000 shapes never blocks for seconds. Until a
