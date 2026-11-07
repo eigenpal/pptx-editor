@@ -29,7 +29,21 @@ import {
   unionBounds,
   type Box,
 } from '../automation/commands/placement.ts';
-import { snapContext, snapMove, snapResize, type SnapContext } from './surface-guides.ts';
+import {
+  byDrawingId,
+  connectorRoute,
+  gluedSite,
+  isConnector,
+  sitesNear,
+  type RouteEnd,
+} from '../automation/commands/connectors.ts';
+import {
+  snapContext,
+  snapMove,
+  snapResize,
+  type DragGuide,
+  type SnapContext,
+} from './surface-guides.ts';
 import type { SnapGuide } from './snapping.ts';
 import { resizeOne, scaleMany } from './surface-resize.ts';
 import { clampTableResize } from './surface-table.ts';
@@ -72,6 +86,8 @@ export interface Drag {
   pending: readonly TransformItem[] | null;
   /** Each previewed shape laid out at its new box (drag-preview.ts). */
   shown: ReadonlyMap<string, LayoutItem>;
+  /** The slide's items when the drag started: connector ends glue to them. */
+  readonly slideItems: readonly LayoutItem[];
 }
 
 /** A drag of the items `ids` by `handle`, or null when none of them is on the slide. */
@@ -96,6 +112,7 @@ export function startDrag(
     snap: layout ? snapContext(layout, ids) : { targets: [], slide: { width: 0, height: 0 } },
     pending: null,
     shown: new Map(),
+    slideItems: layout?.items ?? [],
   };
 }
 
@@ -105,6 +122,8 @@ export interface StepInput {
   /** The snap distance in EMU, or null when snapping is off. */
   readonly snapTo: number | null;
   readonly aspectLocked: (nodeId: string) => boolean;
+  /** How near a connection site a connector end glues to it, in EMU; null or absent: never. */
+  readonly glueTo?: number | null;
 }
 
 /** The boxes after the pointer moved to `p`, and the smart guides they snapped to. */
@@ -112,7 +131,7 @@ export function dragStep(
   d: Drag,
   p: { x: number; y: number },
   input: StepInput
-): { items: TransformItem[]; guides: readonly SnapGuide[] } {
+): { items: TransformItem[]; guides: readonly DragGuide[] } {
   let dx = p.x - d.start.x;
   let dy = p.y - d.start.y;
   let guides: readonly SnapGuide[] = [];
@@ -125,6 +144,8 @@ export function dragStep(
     });
     return { items, guides };
   }
+  if ((d.handle === 'start' || d.handle === 'end') && isConnector(d.items[0].item))
+    return moveConnectorEnd(d, d.handle, p, input);
   if (d.handle === 'start' || d.handle === 'end')
     return { items: [moveLineEnd(d, p, input.shift)], guides };
   const [hx, hy] = HANDLE_POS[d.handle];
@@ -169,6 +190,53 @@ function moveLineEnd(d: Drag, p: { x: number; y: number }, snap: boolean): Trans
     : lineTransform(item, fixed, moved);
 }
 
+/**
+ * A connector with one end at the pointer. Near a shape, the shape's connection sites show,
+ * and the end glues to the nearest one within `glueTo`. An elbow or a curve with a glued end
+ * routes from site to site (`connectorRoute`); else the connector stretches as a line does.
+ */
+function moveConnectorEnd(
+  d: Drag,
+  which: 'start' | 'end',
+  p: { x: number; y: number },
+  input: StepInput
+): { items: TransformItem[]; guides: readonly DragGuide[] } {
+  const { item } = d.items[0];
+  const other = which === 'start' ? 'end' : 'start';
+  const near =
+    input.glueTo != null
+      ? sitesNear(d.slideItems, p, input.glueTo, new Set([item.element.nodeId]))
+      : { shown: [], snap: null };
+  const site = near.snap;
+  const fixed = gluedSite(item, other, byDrawingId(d.slideItems));
+  const ends = lineEnds(item)!;
+  const free: RouteEnd = site
+    ? { p: site, dir: { x: site.dx, y: site.dy } }
+    : { p: input.shift ? angleSnapped(ends[other], p) : p };
+  const kept: RouteEnd = fixed
+    ? { p: fixed, dir: { x: fixed.dx, y: fixed.dy } }
+    : { p: ends[other] };
+  const t = which === 'start' ? connectorRoute(item, free, kept) : connectorRoute(item, kept, free);
+  const glue = site ? { nodeId: site.nodeId, index: site.index } : null;
+  const guides: DragGuide[] = near.shown.map((s) => ({
+    kind: 'site',
+    x: s.x,
+    y: s.y,
+    glued: s === site,
+  }));
+  return { items: [{ ...t, connector: { ...t.connector, [which]: glue } }], guides };
+}
+
+/** `p` on the nearest 45° line through `from` (Shift). */
+function angleSnapped(
+  from: { x: number; y: number },
+  p: { x: number; y: number }
+): { x: number; y: number } {
+  const len = Math.hypot(p.x - from.x, p.y - from.y);
+  const angle = Math.round(Math.atan2(p.y - from.y, p.x - from.x) / (Math.PI / 4)) * (Math.PI / 4);
+  return { x: from.x + Math.cos(angle) * len, y: from.y + Math.sin(angle) * len };
+}
+
 /** What a shape drag asks of the surface. */
 export interface DragHost {
   label(key: string): string;
@@ -203,7 +271,7 @@ export class ShapeDrag {
   readonly #preview = new PaintedPreview();
   /** A cancel the live region says in place of the selection (`over`), until it changes. */
   #announce: { text: string; over?: string; state: 'new' | 'wait' | 'shown' } | null = null;
-  #guides: readonly SnapGuide[] = [];
+  #guides: readonly DragGuide[] = [];
 
   constructor(
     readonly host: DragHost,
@@ -230,7 +298,7 @@ export class ShapeDrag {
   }
 
   /** The smart guides of the last pointer move. */
-  get guides(): readonly SnapGuide[] {
+  get guides(): readonly DragGuide[] {
     return this.#guides;
   }
 

@@ -20,6 +20,8 @@ import type { DateTimeState, HeaderFooterTargets } from './header-footer.ts';
 export type { DateTimeState, HeaderFooterTargets } from './header-footer.ts';
 import type { FindMatch, FindOptions } from './find.ts';
 export type { FindMatch, FindOptions } from './find.ts';
+import type { ConnectorRoute } from './connectors.ts';
+export type { ConnectionTarget, ConnectorRoute } from './connectors.ts';
 
 import type {
   ObjectAxis,
@@ -32,6 +34,7 @@ import type {
 import type {
   TextFormatCommand,
   BulletFormatRead,
+  BulletFormatMixed,
   TextOrientation,
   TextColumns,
   FontFormatRead,
@@ -43,6 +46,7 @@ export type {
   AutonumberScheme,
   BulletFormat,
   BulletFormatRead,
+  BulletFormatMixed,
   TextOrientation,
   TextColumns,
   TextCase,
@@ -167,6 +171,12 @@ export type EditorCommand =
    */
   | { readonly type: 'addSlide'; readonly layoutId?: string }
   | { readonly type: 'duplicateSlide'; readonly index: number }
+  /**
+   * Paste copied slides after the current slide. `file` is a presentation (`.pptx` bytes),
+   * read with the limits of any opened file, and `slides` are its slide indexes in order. The
+   * slides go on this presentation's layouts of the same type (destination theme).
+   */
+  | { readonly type: 'pasteSlides'; readonly file: Uint8Array; readonly slides: readonly number[] }
   | { readonly type: 'deleteSlide'; readonly index: number }
   /**
    * Move slide `from` to position `to`. It joins the section of the slide before it, or
@@ -526,6 +536,8 @@ export interface TransformItem {
   /** Flips; absent keeps the current ones. A line's direction is its flips. */
   readonly flipH?: boolean;
   readonly flipV?: boolean;
+  /** A connector's route and glued ends (`p:cxnSp` only). Absent keeps them. */
+  readonly connector?: ConnectorRoute;
 }
 
 /** The command type names. @public */
@@ -623,6 +635,8 @@ export interface SelectionFormat {
    * differ (so no gallery row is checked).
    */
   readonly bulletFormat?: BulletFormatRead | null;
+  /** What the selected paragraphs share, when `bulletFormat` is absent because they differ. */
+  readonly bulletFormatMixed?: BulletFormatMixed;
 }
 
 /** The selected element's geometry, for the Format panel. EMU and degrees. @public */

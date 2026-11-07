@@ -155,7 +155,7 @@ The Font dialog has two tabs, Font and Character Spacing, and reads the selected
 
 ### Bullets and numbering fields
 
-The dialog has a Bulleted tab and a Numbered tab, and opens on the tab of the gallery it came from. OK sends one `setBulletFormat` command for the selected paragraphs. A tab and each field on it are `Field` parts.
+The dialog has a Bulleted tab and a Numbered tab. It opens on the tab of the selected paragraphs' list, also when each level has its own bullet. When the paragraphs have no list, or have both kinds, it opens on the tab of the gallery it came from. A field that the paragraphs disagree on shows "Mixed". OK sends one `setBulletFormat` command for the selected paragraphs, with only the fields that changed. A tab and each field on it are `Field` parts.
 
 | Tab | Fields | Value |
 | --- | --- | --- |

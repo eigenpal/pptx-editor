@@ -36,6 +36,13 @@ export type BulletFormat = {
 };
 
 // @public
+export interface BulletFormatMixed {
+    readonly kinds: readonly ('bullet' | 'number' | 'none')[];
+    readonly sizePercent: number | null;
+    readonly startAt?: number | null;
+}
+
+// @public
 export type BulletFormatRead = {
     readonly kind: 'bullet';
     readonly char: string;
@@ -125,6 +132,20 @@ export type CommandResult = {
     readonly detail?: string;
     readonly noop?: boolean;
 };
+
+// @public
+export interface ConnectionTarget {
+    readonly index: number;
+    readonly nodeId: string;
+}
+
+// @public
+export interface ConnectorRoute {
+    readonly adjust?: Readonly<Record<string, number>>;
+    readonly end?: ConnectionTarget | null;
+    readonly preset?: string;
+    readonly start?: ConnectionTarget | null;
+}
 
 // @public
 export interface DateTimeState {
@@ -254,6 +275,16 @@ export type EditorCommand = {
 } | {
     readonly type: 'duplicateSlide';
     readonly index: number;
+}
+/**
+* Paste copied slides after the current slide. `file` is a presentation (`.pptx` bytes),
+* read with the limits of any opened file, and `slides` are its slide indexes in order. The
+* slides go on this presentation's layouts of the same type (destination theme).
+*/
+| {
+    readonly type: 'pasteSlides';
+    readonly file: Uint8Array;
+    readonly slides: readonly number[];
 } | {
     readonly type: 'deleteSlide';
     readonly index: number;
@@ -1191,6 +1222,7 @@ export interface SelectionFormat {
     // (undocumented)
     readonly bold: boolean;
     readonly bulletFormat?: BulletFormatRead | null;
+    readonly bulletFormatMixed?: BulletFormatMixed;
     // (undocumented)
     readonly bullets: boolean;
     // (undocumented)
@@ -1640,6 +1672,16 @@ export type TextFormatCommand =
 | {
     readonly type: 'setBulletFormat';
     readonly format: BulletFormat | null;
+}
+/**
+* Paste formatted text: DrawingML paragraphs (`a:p`, as `ClipboardNode`s) replace the selected
+* text, or, with no text selected, go in a new text box in the middle of the slide. The
+* paragraphs are checked as untrusted input: runs, breaks, and their formatting are kept, and
+* links, pictures, and relationship references are left out. A field becomes plain text.
+*/
+| {
+    readonly type: 'pasteText';
+    readonly paragraphs: readonly ClipboardNode[];
 };
 
 // @public
@@ -1674,6 +1716,7 @@ export interface ThemeSwatch {
 
 // @public
 export interface TransformItem {
+    readonly connector?: ConnectorRoute;
     // (undocumented)
     readonly cx: number;
     // (undocumented)

@@ -273,6 +273,50 @@ describe('the React and Vue form dialogs', () => {
     );
   });
 
+  test('Bullets: a list whose levels differ opens on Bulleted, in both adapters', async () => {
+    const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    const level = (lvl: number, char: string) =>
+      `<a:lvl${lvl}pPr marL="${lvl * 457200}" indent="-228600"><a:buFont typeface="Arial"/>` +
+      `<a:buChar char="${char}"/></a:lvl${lvl}pPr>`;
+    const bytes = buildPptx({
+      slides: [
+        {
+          layout: 'blank',
+          shapes: shape({
+            id: 2,
+            x: IN,
+            y: IN,
+            cx: 4 * IN,
+            cy: 2 * IN,
+            lstStyle: level(1, '•') + level(2, '–'),
+            text: para(run('one')) + para(run('two'), '<a:pPr lvl="1"/>'),
+          }),
+        },
+      ],
+    });
+    expect((await editor.load(bytes)).ok).toBe(true);
+    selectText(editor);
+    // The Numbering gallery's row asks for Numbered; the paragraphs are all bulleted.
+    requestDialogSection(editor, 'bulletsAndNumbering', 'number');
+    const react = canon(
+      mountReact(createElement(RBulletsDialog, { open: true, onClose: () => {} }), editor)
+    );
+    cleanup();
+    requestDialogSection(editor, 'bulletsAndNumbering', 'number');
+    const vue = canon(
+      await mountVue(() => h(BulletsAndNumberingDialog, { open: true, onClose: () => {} }), editor)
+    );
+    expect(vue).toEqual(react);
+    const dialog = dialogOf('bulletsAndNumbering');
+    expect(dialog.querySelector('[role="tab"][aria-selected="true"]')!.textContent).toBe(
+      'Bulleted'
+    );
+    expect([field(dialog, 'sizePercent').value, field(dialog, 'startAt').value]).toEqual([
+      '100',
+      '1',
+    ]);
+  });
+
   test('closed, a dialog renders nothing; the same mount opened renders it', async () => {
     const editor = await deck();
     selectShape(editor);

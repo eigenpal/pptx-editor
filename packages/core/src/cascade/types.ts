@@ -188,12 +188,27 @@ interface ResolvedBase {
   readonly xfrm: Xfrm;
   readonly hidden: boolean;
   readonly placeholder?: { readonly type: string; readonly idx?: string };
+  /**
+   * The drawing id (`p:cNvPr/@id`) of a PresentationML shape, picture, connector, or frame:
+   * the id that connector ends (`a:stCxn`, `a:endCxn`) name.
+   */
+  readonly drawingId?: string;
+}
+
+/** One end of a connector glued to a shape (`CT_Connection`, ECMA-376 Part 1, 20.1.2.2.4). */
+export interface ConnectionRef {
+  /** The drawing id (`p:cNvPr/@id`) of the shape. */
+  readonly id: string;
+  /** The index of the connection site in the shape's geometry (`a:cxnLst`). */
+  readonly idx: number;
 }
 
 /** `p:sp` or `p:cxnSp`. */
 export interface ResolvedShape extends ResolvedBase {
   readonly kind: 'shape' | 'connector';
   readonly geometry: GeometrySpec;
+  /** A connector's glued ends (`p:cNvCxnSpPr/a:stCxn` and `a:endCxn`). */
+  readonly connections?: { readonly start?: ConnectionRef; readonly end?: ConnectionRef };
   readonly fill: ResolvedFill;
   readonly line?: ResolvedLine;
   readonly effects?: ResolvedEffects;

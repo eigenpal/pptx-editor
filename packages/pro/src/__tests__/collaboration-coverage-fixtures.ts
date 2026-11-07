@@ -257,6 +257,34 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
       return { type: 'paste', payload };
     },
   },
+  // Formatted text pasted with no text selected: a new text box.
+  pasteText: {
+    command: () => ({
+      type: 'pasteText',
+      paragraphs: [
+        {
+          ns: 'http://schemas.openxmlformats.org/drawingml/2006/main',
+          local: 'p',
+          prefix: 'a',
+          children: [
+            {
+              ns: 'http://schemas.openxmlformats.org/drawingml/2006/main',
+              local: 'r',
+              prefix: 'a',
+              children: [
+                {
+                  ns: 'http://schemas.openxmlformats.org/drawingml/2006/main',
+                  local: 't',
+                  prefix: 'a',
+                  children: [{ text: 'Pasted' }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }),
+  },
   setLockAspectRatio: onA(() => ({ type: 'setLockAspectRatio', lock: true })),
   setShapesVisible: {
     command: (e) => ({ type: 'setShapesVisible', nodeIds: [idOf(e, 'B')], visible: false }),
@@ -315,6 +343,14 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
   deleteSlide: { command: () => ({ type: 'deleteSlide', index: 2 }) },
   moveSlide: { command: () => ({ type: 'moveSlide', from: 0, to: 2 }) },
   duplicateSlides: { command: () => ({ type: 'duplicateSlides', indices: [0, 1] }) },
+  // Slides copied from the deck itself, as a slide-list copy writes them.
+  pasteSlides: {
+    command: (e) => {
+      const file = e.save();
+      if (!file) throw new Error('nothing to save');
+      return { type: 'pasteSlides', file, slides: [0, 1] };
+    },
+  },
   deleteSlides: { command: () => ({ type: 'deleteSlides', indices: [1, 2] }) },
   moveSlides: { command: () => ({ type: 'moveSlides', indices: [0, 1], to: 1 }) },
   setSlideNumbers: { command: () => ({ type: 'setSlideNumbers', show: true }) },

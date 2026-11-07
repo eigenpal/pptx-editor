@@ -24,6 +24,7 @@ import {
 } from '../automation/commands/paragraph-format.ts';
 import { setColumns, setTextDirection } from './text-body-commands.ts';
 import { setBulletFormats } from './bullet-format.ts';
+import { compilePasteText } from './clipboard-text.ts';
 import {
   applyFontFormat,
   baselineValue,
@@ -50,6 +51,7 @@ const TYPES: ReadonlySet<string> = new Set([
   'setTextDirection',
   'setColumns',
   'setFontFormat',
+  'pasteText',
 ]);
 
 export function isTextFormatCommand(command: EditorCommand): command is TextFormatCommand {
@@ -63,6 +65,8 @@ export function compileTextFormatCommand(
   command: TextFormatCommand
 ): CommandEffect {
   switch (command.type) {
+    case 'pasteText':
+      return compilePasteText(ctx, batch, command);
     case 'setParagraphFormat': {
       checkParagraphFormat(command);
       const part = slidePart(ctx);

@@ -1,0 +1,534 @@
+// Formatted text and pictures on the clipboard: HTML from other applications in
+// (`clipboard-rich.ts`), the `pasteText` command (`clipboard-text.ts`), the picture of copied
+// shapes (`clipboard-picture.ts`), and what the clipboard host reads and writes.
+
+import { describe, expect, test } from 'bun:test';
+import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
+import {
+  attr,
+  child,
+  children,
+  elements,
+  find,
+  textOf,
+  xmlPartOf,
+  type Element,
+} from '../../store/index.ts';
+import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
+import {
+  cssDeclarations,
+  decodeEntities,
+  paragraphSpecs,
+  richFromHtml,
+  richFromText,
+  richHtml,
+  textClipboardParagraphs,
+} from '../clipboard-rich.ts';
+import { cleanParagraphs, TEXT_MIME } from '../clipboard-text.ts';
+import { pngResolution, withPngResolution } from '../clipboard-picture.ts';
+import { createClipboardHost, type ClipboardEditor } from '../clipboard-host.ts';
+import { CLIPBOARD_MIME } from '../clipboard.ts';
+import { readSlidesClipboard, SLIDES_MIME } from '../slide-clipboard.ts';
+import type { EditorCommand } from '../../contracts/index.ts';
+
+const IN = 914_400;
+
+/** HTML as presentation applications write a bulleted and numbered list (abridged). */
+const LIST_HTML = `<html><head><meta http-equiv=Content-Type content="text/html; charset=utf-8"></head>
+<body>
+<!--StartFragment-->
+<div style='line-height:90%;margin-top:10.0pt;margin-left:.25in;text-indent:-.25in;
+text-align:left'><span style='font-size:28.0pt'><span style='mso-special-format:bullet;
+font-family:"Liberation Sans"'>&#8226;</span></span><span style='font-size:28.0pt;
+font-family:Carlito;mso-ascii-font-family:Carlito;mso-ascii-theme-font:minor-latin;color:black;
+mso-style-textfill-type:solid;mso-style-textfill-fill-themecolor:text1'>First level bullet
+from the master body style</span></div>
+<div class=O1 style='margin-left:.75in;text-indent:-.25in'><span style='font-size:24.0pt'><span
+style='mso-special-format:bullet;font-family:"Liberation Sans"'>&#8226;</span></span><span
+style='font-size:24.0pt;font-family:Carlito;color:black'>Second
+level</span></div>
+<div style='margin-left:.38in;text-indent:-.38in'><span style='font-size:28.0pt'><span
+style='mso-special-format:"numbullet15\\,1";color:#2E7D32;font-family:"Liberation Sans"'>I)</span></span><span
+style='font-size:28.0pt;font-family:Carlito;color:black'>Roman
+with color</span></div>
+<p style='margin-left:0in;text-indent:0in;text-align:center'><span
+style='font-size:28.0pt;font-family:Carlito;color:black'>No
+bullet</span></p>
+<!--EndFragment-->
+</body></html>`;
+
+describe('HTML from other applications', () => {
+  test('a presentation list keeps its bullets, levels, numbers, sizes, and theme formatting', () => {
+    const p = richFromHtml(LIST_HTML)!;
+    expect(p.map((x) => x.runs.map((r) => r.text).join(''))).toEqual([
+      'First level bullet from the master body style',
+      'Second level',
+      'Roman with color',
+      'No bullet',
+    ]);
+    expect(p[0]!.bullet).toEqual({ kind: 'char', char: '•', font: 'Liberation Sans' });
+    expect(p[0]!.runs[0]).toMatchObject({ size: 28, scheme: 'tx1', fontTheme: 'minor' });
+    expect(p[0]!.marL).toBe(IN / 4);
+    expect(p[0]!.indent).toBe(-IN / 4);
+    expect(p[1]!.level).toBe(1);
+    expect(p[1]!.runs[0]).toMatchObject({ size: 24, color: '000000', font: 'Carlito' });
+    expect(p[2]!.bullet).toEqual({ kind: 'number', scheme: 'romanUcParenR', startAt: 1 });
+    // A paragraph without a bullet mark has none, where the slide's list style gives one.
+    expect(p[3]!.bullet).toEqual({ kind: 'none' });
+    expect(p[3]!.align).toBe('ctr');
+  });
+
+  test('web HTML: inline formatting, lists, breaks, entities, and collapsed spaces', () => {
+    const p = richFromHtml(
+      '<p>Hello   <b>bold</b> <i>it&amp;alic</i><br>next<sup>2</sup></p>' +
+        '<ul><li>one</li><li style="color:rgb(255, 0, 0)">two<ul><li>deep</li></ul></li></ul>' +
+        '<ol start="3"><li>three</li></ol><h2>Title</h2>'
+    )!;
+    expect(p[0]!.runs).toEqual([
+      { text: 'Hello ' },
+      { text: 'bold', bold: true },
+      { text: ' ' },
+      { text: 'it&alic', italic: true },
+      { text: '', br: true },
+      { text: 'next' },
+      { text: '2', baseline: 30000 },
+    ]);
+    expect(p[1]).toMatchObject({ level: 0, bullet: { kind: 'char', char: '•' } });
+    expect(p[2]!.runs[0]).toMatchObject({ text: 'two', color: 'FF0000' });
+    expect(p[3]).toMatchObject({ level: 1, runs: [{ text: 'deep' }] });
+    expect(p[4]).toMatchObject({ bullet: { kind: 'number', scheme: 'arabicPeriod', startAt: 3 } });
+    expect(p[5]!.runs[0]).toMatchObject({ text: 'Title', bold: true });
+    // Web lists mark only their items: other paragraphs keep the slide's own bullet.
+    expect(p[0]!.bullet).toBeUndefined();
+  });
+
+  test('scripts, styles, and pictures are not text; a page without text is null', () => {
+    expect(richFromHtml('<script>alert(1)</script><style>p{}</style><img src="x.png">')).toBeNull();
+    const p = richFromHtml('<svg><text>no</text></svg><p onclick="x()">yes</p>')!;
+    expect(p.map((x) => x.runs.map((r) => r.text).join(''))).toEqual(['yes']);
+  });
+
+  test('broken and hostile HTML ends, with bounded output', () => {
+    expect(richFromHtml('<p>open <b>never closed')!.length).toBe(1);
+    expect(richFromHtml('</p></b>text<')!.map((x) => x.runs.map((r) => r.text).join(''))).toEqual([
+      'text<',
+    ]);
+    const deep = '<span>'.repeat(100_000) + 'x';
+    expect(richFromHtml(deep)![0]!.runs[0]!.text).toBe('x');
+    const many = '<p>x</p>'.repeat(20_000);
+    expect(richFromHtml(many)!.length).toBe(5_000);
+    expect(decodeEntities('&#0;&#xD800;&#x1F600;&bogus;')).toBe('😀&bogus;');
+  });
+
+  test('tags, quotes, and bullet spans that never close read in linear time', () => {
+    const started = performance.now();
+    for (const unit of ['<a ', '<a "', '<body', '<span style="mso-special-format:bullet">x'])
+      richFromHtml(unit.repeat(200_000));
+    expect(performance.now() - started).toBeLessThan(2_000);
+    // A tag that never closes ends the HTML, as in a browser.
+    expect(richFromHtml('<p>kept</p><b class="x')!.map((p) => p.runs[0]!.text)).toEqual(['kept']);
+  });
+
+  test('style declarations split outside quotes', () => {
+    const css = cssDeclarations(`mso-special-format:"numbullet3\\,1;x";font-family:'A;B'`);
+    expect(css.get('mso-special-format')).toBe('"numbullet3\\,1;x"');
+    expect(css.get('font-family')).toBe("'A;B'");
+  });
+
+  test('plain text: line feeds start paragraphs, U+000B breaks a line', () => {
+    expect(richFromText('a\r\nb\u000Bc')).toEqual([
+      { runs: [{ text: 'a' }] },
+      { runs: [{ text: 'b' }, { text: '', br: true }, { text: 'c' }] },
+    ]);
+  });
+});
+
+describe('copied text as HTML', () => {
+  test('HTML from the editor reads back as the same paragraphs', () => {
+    const html = richHtml([
+      {
+        runs: [{ text: 'A <b>', bold: true, size: 20, color: '1F4E79', font: 'Open Sans' }],
+        align: 'ctr',
+      },
+      { runs: [{ text: 'item' }], level: 1, bullet: { kind: 'char', char: '•' } },
+      { runs: [{ text: 'n' }], bullet: { kind: 'number', scheme: 'alphaUcParenR', startAt: 2 } },
+    ]);
+    const p = richFromHtml(html)!;
+    expect(p[0]).toMatchObject({
+      align: 'ctr',
+      runs: [{ text: 'A <b>', bold: true, size: 20, color: '1F4E79', font: 'Open Sans' }],
+    });
+    expect(p[1]).toMatchObject({ level: 1, bullet: { kind: 'char', char: '•' } });
+    expect(p[2]!.bullet).toEqual({ kind: 'number', scheme: 'alphaUcParenR', startAt: 2 });
+  });
+
+  test('empty paragraphs and a closing line break read back as they were', () => {
+    const sent = [
+      { runs: [{ text: 'a' }] },
+      { runs: [] },
+      { runs: [{ text: 'b' }, { text: '', br: true as const }] },
+    ];
+    const p = richFromHtml(richHtml(sent))!;
+    expect(p.map((x) => x.runs.map((r) => (r.br ? '|' : r.text)).join(''))).toEqual([
+      'a',
+      '',
+      'b|',
+    ]);
+    // Web HTML: an empty paragraph is `<p><br></p>`, and a block's last break shows no line.
+    const web = richFromHtml('<p>x<br></p><p><br></p><p>&nbsp;</p><div>y</div>')!;
+    expect(web.map((x) => x.runs.length)).toEqual([1, 0, 0, 1]);
+  });
+});
+
+describe('pasted paragraphs are untrusted', () => {
+  test('links, pictures, and relationship ids are left out; a field becomes text', () => {
+    const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+    const A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+    const el = (local: string, kids: unknown[] = [], attrs: unknown[] = []) => ({
+      ns: A,
+      local,
+      prefix: 'a',
+      attrs,
+      children: kids,
+    });
+    const p = cleanParagraphs([
+      el('p', [
+        el('pPr', [el('buBlip', [el('blip', [], [{ ns: R, local: 'embed', value: 'rId9' }])])]),
+        el('r', [
+          el('rPr', [el('hlinkClick', [], [{ ns: R, local: 'id', value: 'rId3' }])]),
+          el('t', [{ text: 'x' }]),
+        ]),
+        el('fld', [el('t', [{ text: '7' }])], [{ ns: '', local: 'type', value: 'slidenum' }]),
+        { ns: 'urn:other', local: 'thing', children: [] },
+      ]),
+    ])!;
+    const json = JSON.stringify(p);
+    expect(json).not.toContain('hlinkClick');
+    expect(json).not.toContain('buBlip');
+    expect(json).not.toContain('rId');
+    expect(json).not.toContain('thing');
+    expect(p[0]!.children!.map((c) => ('local' in c ? c.local : ''))).toEqual(['pPr', 'r', 'r']);
+    expect(cleanParagraphs([{ ns: A, local: 'sp' }])).toBeNull();
+  });
+
+  test('runs, breaks, and properties keep only the children their schema allows', () => {
+    const A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+    const el = (local: string, kids: unknown[] = []) => ({
+      ns: A,
+      local,
+      prefix: 'x',
+      children: kids,
+    });
+    const p = cleanParagraphs([
+      el('p', [
+        el('fld', [el('rPr'), el('pPr'), el('t', [{ text: '7' }])]),
+        el('r', [
+          el('rPr', [{ text: 'stray' }, { ns: 'urn:other', local: 'x' }]),
+          el('p'),
+          el('t'),
+        ]),
+        el('br', [el('t', [{ text: 'no' }])]),
+      ]),
+    ])!;
+    const kids = p[0]!.children!.filter((c) => !('text' in c)) as {
+      local: string;
+      prefix?: string;
+      children?: unknown[];
+    }[];
+    const locals = (n: { children?: unknown[] }) =>
+      (n.children ?? []).map((c) => (c as { local?: string }).local ?? 'text');
+    expect(kids.map((k) => k.local)).toEqual(['r', 'r', 'br']);
+    expect(locals(kids[0]!)).toEqual(['rPr', 't']);
+    expect(locals(kids[1]!)).toEqual(['rPr', 't']);
+    expect(locals(kids[1]!.children![0] as { children?: unknown[] })).toEqual([]);
+    expect(locals(kids[2]!)).toEqual([]);
+    expect(kids.every((k) => k.prefix === 'a')).toBe(true);
+    expect(cleanParagraphs('nope')).toBeNull();
+  });
+});
+
+function deck(): Uint8Array {
+  return buildPptx({
+    slides: [
+      {
+        shapes:
+          shape({
+            id: 2,
+            x: IN,
+            y: IN,
+            cx: 4 * IN,
+            cy: IN,
+            text: para(run('Hello world')) + para(run('Second')),
+          }) + shape({ id: 3, x: IN, y: 4 * IN, cx: IN, cy: IN }),
+      },
+    ],
+  });
+}
+
+async function open(): Promise<PptxEditorInstance> {
+  const e = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  expect((await e.load(deck())).ok).toBe(true);
+  return e;
+}
+
+const tree = (e: PptxEditorInstance): Element =>
+  find(xmlPartOf(e.session!.store.package, e.session!.info.slides[0]!.partName)!.root, 'p:spTree')!;
+const shapes = (e: PptxEditorInstance): Element[] =>
+  elements(tree(e)).filter((c) => c.local === 'sp');
+const texts = (sp: Element): string[] =>
+  children(child(sp, 'p:txBody'), 'a:p').map((p) =>
+    children(p, 'a:r')
+      .map((r) => textOf(child(r, 'a:t')))
+      .join('')
+  );
+const caret = (
+  e: PptxEditorInstance,
+  paragraph: number,
+  offset: number,
+  to = { paragraph, offset }
+) =>
+  e.setSelection({
+    kind: 'text',
+    nodeId: shapes(e)[0]!.id,
+    anchor: { paragraph, offset },
+    focus: to,
+  });
+
+describe('the pasteText command', () => {
+  const pasted = paragraphSpecs([
+    { runs: [{ text: 'One', bold: true }] },
+    { runs: [{ text: 'Two' }], level: 1 },
+    { runs: [{ text: 'Three', color: 'C00000' }] },
+  ]);
+
+  test('at a caret: the first paragraph joins the caret, the last one runs into the rest', async () => {
+    const e = await open();
+    caret(e, 0, 6);
+    expect(e.exec({ type: 'pasteText', paragraphs: pasted }).ok).toBe(true);
+    expect(texts(shapes(e)[0]!)).toEqual(['Hello One', 'Two', 'Threeworld', 'Second']);
+    const sel = e.snapshot().selection;
+    expect(sel.kind === 'text' && sel.focus).toEqual({ paragraph: 2, offset: 5 });
+    const ps = children(child(shapes(e)[0]!, 'p:txBody'), 'a:p');
+    expect(attr(child(children(ps[0]!, 'a:r')[1]!, 'a:rPr'), 'b')).toBe('1');
+    expect(attr(child(ps[1]!, 'a:pPr'), 'lvl')).toBe('1');
+    // The text after the caret keeps its paragraph's properties, not the pasted level.
+    expect(attr(child(ps[2]!, 'a:pPr'), 'lvl')).toBeUndefined();
+    // One undo step.
+    e.exec({ type: 'undo' });
+    expect(texts(shapes(e)[0]!)).toEqual(['Hello world', 'Second']);
+  });
+
+  test('over a selection: the selected text goes; one paragraph stays in its paragraph', async () => {
+    const e = await open();
+    caret(e, 0, 0, { paragraph: 0, offset: 5 });
+    const one = paragraphSpecs([{ runs: [{ text: 'Bye' }] }]);
+    expect(e.exec({ type: 'pasteText', paragraphs: one }).ok).toBe(true);
+    expect(texts(shapes(e)[0]!)).toEqual(['Bye world', 'Second']);
+  });
+
+  test('one paragraph at the start of text keeps that paragraph; an empty one takes its own', async () => {
+    const centered = paragraphSpecs([{ runs: [{ text: 'Bye ' }], align: 'ctr' }]);
+    const algn = (e: PptxEditorInstance) =>
+      attr(child(children(child(shapes(e)[0]!, 'p:txBody'), 'a:p')[0]!, 'a:pPr'), 'algn');
+    const e = await open();
+    caret(e, 0, 0);
+    expect(e.exec({ type: 'pasteText', paragraphs: centered }).ok).toBe(true);
+    expect(texts(shapes(e)[0]!)).toEqual(['Bye Hello world', 'Second']);
+    expect(algn(e)).toBeUndefined();
+    // The whole paragraph replaced: it takes the pasted paragraph's properties.
+    const f = await open();
+    caret(f, 0, 0, { paragraph: 0, offset: 11 });
+    expect(f.exec({ type: 'pasteText', paragraphs: centered }).ok).toBe(true);
+    expect(texts(shapes(f)[0]!)).toEqual(['Bye ', 'Second']);
+    expect(algn(f)).toBe('ctr');
+  });
+
+  test('with shapes selected: a new text box holds the text, selected', async () => {
+    const e = await open();
+    e.setSelection({ kind: 'shapes', nodeIds: [shapes(e)[1]!.id] });
+    expect(e.exec({ type: 'pasteText', paragraphs: pasted }).ok).toBe(true);
+    const box = shapes(e)[2]!;
+    expect(texts(box)).toEqual(['One', 'Two', 'Three']);
+    expect(attr(child(find(box, 'p:nvSpPr')!, 'p:cNvSpPr'), 'txBox')).toBe('1');
+    expect(e.snapshot().selection).toEqual({ kind: 'shapes', nodeIds: [box.id] });
+  });
+
+  test('characters XML cannot hold leave pasted text, so the paste goes in', async () => {
+    const e = await open();
+    caret(e, 1, 6);
+    // HTML from another application can end in a NUL; text can hold other control characters.
+    const html = paragraphSpecs(richFromHtml('<p>a&#xFFFE;b\u0001c</p>\u0000')!);
+    expect(e.exec({ type: 'pasteText', paragraphs: html }).ok).toBe(true);
+    const plain = paragraphSpecs(richFromText('x\u0002y\uFFFF'));
+    expect(e.exec({ type: 'pasteText', paragraphs: plain }).ok).toBe(true);
+    expect(texts(shapes(e)[0]!)).toEqual(['Hello world', 'Secondabcxy']);
+    const again = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    expect((await again.load(e.save()!)).ok).toBe(true);
+  });
+
+  test('textClipboardParagraphs builds the paragraphs from HTML or plain text', async () => {
+    const e = await open();
+    e.setSelection({ kind: 'none' });
+    const html = textClipboardParagraphs({ html: '<p><b>Summary</b></p><ul><li>Up</li></ul>' });
+    expect(e.exec({ type: 'pasteText', paragraphs: html }).ok).toBe(true);
+    expect(texts(shapes(e)[2]!)).toEqual(['Summary', 'Up']);
+    expect(textClipboardParagraphs({ text: 'a\nb' })).toHaveLength(2);
+    expect(textClipboardParagraphs({})).toEqual([]);
+  });
+
+  test('refuses what is not paragraphs', async () => {
+    const e = await open();
+    const r = e.exec({ type: 'pasteText', paragraphs: [{ ns: 'x', local: 'p' }] });
+    expect(r).toMatchObject({ ok: false, reason: 'errors.clipboard' });
+  });
+});
+
+describe('picture resolution', () => {
+  // A 1 × 1 PNG.
+  const PNG = Uint8Array.from(
+    atob(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+    ),
+    (c) => c.charCodeAt(0)
+  );
+
+  test('a PNG states the resolution written to it', () => {
+    expect(pngResolution(PNG)).toBeUndefined();
+    const out = withPngResolution(PNG, 144);
+    expect(pngResolution(out)).toBeCloseTo(144, 0);
+    expect(out.length).toBe(PNG.length + 21);
+    expect(withPngResolution(new Uint8Array([1, 2, 3]), 144)).toEqual(new Uint8Array([1, 2, 3]));
+  });
+});
+
+/** A clipboard event's data, as a browser gives it. */
+function transfer(data: Record<string, string>, files: File[] = []): DataTransfer {
+  return {
+    getData: (t: string) => data[t] ?? '',
+    setData: (t: string, v: string) => void (data[t] = v),
+    get types() {
+      return Object.keys(data);
+    },
+    items: files.map((f) => ({ kind: 'file', type: f.type, getAsFile: () => f })),
+    files,
+  } as unknown as DataTransfer;
+}
+
+/** A clipboard host on an editor, recording the commands it runs. */
+async function host(select?: (e: PptxEditorInstance) => void) {
+  const e = await open();
+  select?.(e);
+  const ran: EditorCommand[] = [];
+  const editor: ClipboardEditor = {
+    session: () => e.session,
+    slide: () => 0,
+    selection: () => e.snapshot().selection,
+    layout: () => e.session!.layout(0),
+    readOnly: () => false,
+    emit: () => undefined,
+    deleteText: () => undefined,
+    cutShapes: () => undefined,
+    insertText: () => undefined,
+    refuse: () => undefined,
+    exec: (command) => void ran.push(command),
+    selectedSlides: () => e.snapshot().selectedSlides,
+  };
+  return { e, ran, clip: createClipboardHost(editor) };
+}
+
+describe('the clipboard host', () => {
+  test('copied text carries its runs, HTML, and plain text, and pastes back formatted', async () => {
+    const { e, ran, clip } = await host((e) => caret(e, 0, 0, { paragraph: 1, offset: 3 }));
+    const data: Record<string, string> = {};
+    expect(clip.copyTo(transfer(data), false)).toBe(true);
+    expect(data['text/plain']).toBe('Hello world\nSec');
+    expect(data['text/html']).toContain('Hello world');
+    const own = JSON.parse(data[TEXT_MIME]!) as { paragraphs: unknown[] };
+    expect(own.paragraphs).toHaveLength(2);
+    e.setSelection({ kind: 'none' });
+    expect(clip.pasteFrom(transfer(data))).toBe(true);
+    expect(ran[0]).toMatchObject({ type: 'pasteText' });
+  });
+
+  test('HTML text pastes as formatted text; a picture alone pastes as a picture', async () => {
+    const { ran, clip } = await host();
+    expect(clip.pasteFrom(transfer({ 'text/html': LIST_HTML, 'text/plain': 'x' }))).toBe(true);
+    expect(ran[0]).toMatchObject({ type: 'pasteText' });
+    const png = new File([new Uint8Array([137, 80, 78, 71])], 'image.png', { type: 'image/png' });
+    expect(clip.pasteFrom(transfer({ 'text/html': '<img src="data:,">' }, [png]))).toBe(true);
+  });
+
+  test('plain text with nothing selected goes in a text box; in text editing it types', async () => {
+    const plain = await host();
+    expect(plain.clip.pasteFrom(transfer({ 'text/plain': 'a\nb' }))).toBe(true);
+    expect(plain.ran[0]).toMatchObject({ type: 'pasteText' });
+    const typing = await host((e) => caret(e, 0, 0));
+    expect(typing.clip.pasteFrom(transfer({ 'text/plain': 'a' }))).toBe(false);
+    // From a toolbar button there is no text field: the text goes in at the caret.
+    expect(typing.clip.pasteFrom(transfer({ 'text/plain': 'a' }), false, true)).toBe(true);
+  });
+
+  test('copied shapes paste as shapes; text boxes leave as HTML text', async () => {
+    const { e, ran, clip } = await host((e) =>
+      e.setSelection({ kind: 'shapes', nodeIds: [shapes(e)[1]!.id] })
+    );
+    const data: Record<string, string> = {};
+    expect(clip.copyTo(transfer(data), false)).toBe(true);
+    expect(data[CLIPBOARD_MIME]).toBeTruthy();
+    e.setSelection({ kind: 'none' });
+    expect(clip.pasteFrom(transfer(data))).toBe(true);
+    expect(ran[0]).toMatchObject({ type: 'paste' });
+  });
+
+  test('slides copied in the slide list paste after the current slide, in another editor too', async () => {
+    const { ran, clip } = await host();
+    const data: Record<string, string> = {};
+    expect(clip.copyTo(transfer(data), false, true)).toBe(true);
+    expect(Object.keys(data)).toEqual([SLIDES_MIME]);
+    expect(clip.pasteFrom(transfer(data))).toBe(true);
+    const command = ran[0]!;
+    expect(command).toMatchObject({ type: 'pasteSlides', slides: [0] });
+    const other = await open();
+    expect(other.exec(command).ok).toBe(true);
+    expect(other.session!.info.slides).toHaveLength(2);
+    expect(other.snapshot().currentSlide).toBe(1);
+    other.exec({ type: 'undo' });
+    expect(other.session!.info.slides).toHaveLength(1);
+  });
+
+  test('slides paste into edited text only from the slide list', async () => {
+    const { ran, clip } = await host((e) => caret(e, 0, 0));
+    const data: Record<string, string> = {};
+    expect(clip.copyTo(transfer(data), false, true)).toBe(true);
+    // On the slide, the browser keeps the paste: the edited text takes no slides.
+    expect(clip.pasteFrom(transfer(data))).toBe(false);
+    expect(ran).toEqual([]);
+    expect(clip.pasteFrom(transfer(data), true)).toBe(true);
+    expect(ran[0]).toMatchObject({ type: 'pasteSlides', slides: [0] });
+  });
+
+  test('pasteSlides refuses a file that is not a presentation and indexes it does not have', async () => {
+    const e = await open();
+    const bad = e.exec({ type: 'pasteSlides', file: new Uint8Array([1, 2, 3]), slides: [0] });
+    expect(bad).toMatchObject({ ok: false, reason: 'errors.clipboard' });
+    const file = e.save()!;
+    expect(e.exec({ type: 'pasteSlides', file, slides: [3] })).toMatchObject({ ok: false });
+    expect(readSlidesClipboard('{"version":1,"slides":[-1],"file":"AA=="}')).toBeNull();
+  });
+
+  test('a slide copy of a deck that does not save refuses, and does not throw', async () => {
+    const e = await open();
+    const refused: string[] = [];
+    const editor = {
+      session: () => e.session,
+      selectedSlides: () => [0],
+      refuse: (r: string) => void refused.push(r),
+    } as unknown as ClipboardEditor;
+    const damaged = createClipboardHost(editor);
+    e.session!.damage = { reason: 'xml', partName: '/ppt/slides/slide1.xml' } as never;
+    const data: Record<string, string> = {};
+    expect(damaged.copyTo(transfer(data), false, true)).toBe(true);
+    expect(refused).toEqual(['errors.clipboard']);
+    expect(data).toEqual({});
+  });
+});

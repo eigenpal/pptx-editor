@@ -69,6 +69,8 @@ const COMMAND_TABLE = {
   group: true,
   ungroup: true,
   paste: true,
+  pasteText: true,
+  pasteSlides: true,
   setLockAspectRatio: true,
   setShapesVisible: true,
   renameShape: true,

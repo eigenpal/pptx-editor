@@ -42,7 +42,7 @@ import { fitZoom, outsideVeil, scrollBoxIntoView } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
 import { selectionAnnouncement } from './surface-announce.ts';
 import { ShapeDrag, type Handle } from './surface-drag.ts';
-import { handleElements } from './surface-handles.ts';
+import { boxOutline, handleElements, memberOutline } from './surface-handles.ts';
 import {
   adjustAt,
   adjustDragLive,
@@ -360,7 +360,7 @@ export class SlideSurface {
     const scopeItem = scope ? itemById(layout, scope) : undefined;
     if (scopeItem) {
       // The entered group's box, dashed.
-      const g = this.#outline(doc, scopeItem, px);
+      const g = boxOutline(doc, scopeItem, px);
       g.firstElementChild?.setAttribute('class', 'pptx-surface__group-outline');
       g.firstElementChild?.setAttribute('stroke-dasharray', `${px * 2} ${px * 2}`);
       parts.push(g);
@@ -380,8 +380,10 @@ export class SlideSurface {
     }
     // A single line is edited by its two end points: no box, no rotation.
     const line = selected.length === 1 && isLineItem(selected[0]) ? lineEnds(selected[0]) : null;
-    for (const item of line ? [] : selected) {
-      const g = this.#outline(doc, item, px * (sel.kind === 'text' ? 1 : 1.5));
+    // One shape of several: a thin line just outside it, under the common box's handles.
+    if (selected.length > 1) parts.push(...selected.map((item) => memberOutline(doc, item, px)));
+    for (const item of line || selected.length > 1 ? [] : selected) {
+      const g = boxOutline(doc, item, px * (sel.kind === 'text' ? 1 : 1.5));
       if (sel.kind === 'text')
         g.firstElementChild?.setAttribute('stroke-dasharray', `${px * 4} ${px * 3}`);
       parts.push(g);
@@ -512,20 +514,6 @@ export class SlideSurface {
   #cropItem(layout: SlideLayout | undefined): LayoutItem | undefined {
     const id = this.editor.readOnly() ? null : this.editor.cropping?.();
     return id ? itemById(layout, id) : undefined;
-  }
-
-  /** An item's box outline in slide space. */
-  #outline(doc: Document, item: LayoutItem, width: number): SVGGElement {
-    const { cx, cy } = item.element.xfrm;
-    const g = doc.createElementNS(SVG_NS, 'g') as SVGGElement;
-    g.setAttribute('transform', `matrix(${item.matrix.join(' ')})`);
-    const rect = doc.createElementNS(SVG_NS, 'rect');
-    rect.setAttribute('class', 'pptx-surface__outline');
-    rect.setAttribute('width', String(cx));
-    rect.setAttribute('height', String(Math.max(cy, 1)));
-    rect.setAttribute('stroke-width', String(width));
-    g.append(rect);
-    return g;
   }
 
   /** Pointer position in slide EMU. */
@@ -864,6 +852,7 @@ export class SlideSurface {
     this.#drag.move(layout, p, 2 * EMU_PER_PX, {
       shift: e.shiftKey,
       snapTo: this.#snapTo(e),
+      glueTo: e.altKey ? null : (2 * SNAP_PX * EMU_PER_PX) / this.editor.zoom(),
       aspectLocked: (id) => !!this.editor.aspectLocked?.(id),
     });
   };

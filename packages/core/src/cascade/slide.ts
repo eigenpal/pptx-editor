@@ -55,12 +55,14 @@ import {
 import type {
   Autofit,
   BodyProps,
+  ConnectionRef,
   DiagramFallback,
   GeometrySpec,
   KinsokuRules,
   Layer,
   ResolvedElement,
   ResolvedPicture,
+  ResolvedShape,
   ResolvedSlide,
   ResolvedTextBody,
   Xfrm,
@@ -481,11 +483,13 @@ function resolveShapeLike(
       ? resolveEffects(scope.theme.effectStyles[effIdx - 1], styleRefContext(effectRef, ctx))
       : undefined;
   const cNvPr = nonVisualProps(el);
+  const drawingId = el.ns === NS.p ? attr(cNvPr, 'id') : undefined;
   const base = {
     nodeId: el.id,
     partName,
     layer,
     name: attr(cNvPr, 'name') ?? '',
+    ...(drawingId !== undefined ? { drawingId } : {}),
     xfrm: xfrm ?? ZERO_XFRM,
     hidden: boolAttr(cNvPr, 'hidden') ?? false,
     ...(ph ? { placeholder: ph } : {}),
@@ -513,14 +517,32 @@ function resolveShapeLike(
   const textBox = kind === 'shape' && boolAttr(path(el, 'p:nvSpPr', 'p:cNvSpPr'), 'txBox') === true;
   // A diagram shape names its own text rectangle (`dsp:txXfrm`).
   const textXfrm = el.ns === NS.dsp ? readXfrm(child(el, 'dsp:txXfrm')) : undefined;
+  const connections = kind === 'connector' ? connectionsOf(el) : undefined;
   return {
     ...base,
     kind,
     fill,
+    ...(connections ? { connections } : {}),
     ...(text ? { text } : {}),
     ...(textBox ? { textBox } : {}),
     ...(text && textXfrm ? { textXfrm } : {}),
   };
+}
+
+/** A connector's glued ends (`p:nvCxnSpPr/p:cNvCxnSpPr/a:stCxn` and `a:endCxn`). */
+function connectionsOf(el: Element): ResolvedShape['connections'] {
+  const props = path(el, 'p:nvCxnSpPr', 'p:cNvCxnSpPr');
+  const end = (name: string): ConnectionRef | undefined => {
+    const c = child(props, name);
+    const id = attr(c, 'id');
+    const idx = intAttr(c, 'idx');
+    return id !== undefined && idx !== undefined && idx >= 0 ? { id, idx } : undefined;
+  };
+  const start = end('a:stCxn');
+  const finish = end('a:endCxn');
+  return start || finish
+    ? { ...(start ? { start } : {}), ...(finish ? { end: finish } : {}) }
+    : undefined;
 }
 
 function frameKind(uri: string): 'chart' | 'diagram' | 'table' | 'ole' | 'unknown' {
@@ -795,12 +817,14 @@ function resolveElement(
         kind === 'chart'
           ? resolveChartPart(scope.pkg, partName, graphicData, scope.ctx, scope.theme)
           : undefined;
+      const frameId = attr(cNvPr, 'id');
       return {
         kind: 'graphicFrame',
         nodeId: el.id,
         partName,
         layer,
         name: attr(cNvPr, 'name') ?? '',
+        ...(frameId !== undefined ? { drawingId: frameId } : {}),
         xfrm,
         hidden: boolAttr(cNvPr, 'hidden') ?? false,
         uri,

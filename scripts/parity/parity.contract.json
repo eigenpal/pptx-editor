@@ -962,6 +962,7 @@
       "ZoomPillProps",
       "requestSectionRename",
       "BulletFormat",
+      "BulletFormatMixed",
       "BulletFormatRead",
       "FontFormatCommand",
       "FontFormatRead",

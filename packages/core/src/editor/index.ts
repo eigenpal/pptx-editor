@@ -3,6 +3,7 @@
 
 export * from './document-session.ts';
 export { createPptxEditor } from './pptx-editor.ts';
+export { textClipboardParagraphs } from './clipboard-rich.ts';
 export { createBrowserAutomationHost } from './automation-host.ts';
 export type {
   FontMeasurementState,

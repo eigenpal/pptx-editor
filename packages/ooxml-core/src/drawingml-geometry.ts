@@ -621,9 +621,16 @@ export function customGeometryDefinition(cust: DrawingGeometryElement): PresetSh
       cmds,
     };
   });
+  const cxn: (readonly [string, string, string])[] = [];
+  for (const c of drawingChildren(drawingChild(cust, 'cxnLst'), 'cxn')) {
+    const pos = drawingChild(c, 'pos');
+    if (pos)
+      cxn.push([c.attribute('ang') ?? '0', pos.attribute('x') ?? '0', pos.attribute('y') ?? '0']);
+  }
   return {
     av: guides(drawingChild(cust, 'avLst')),
     gd: guides(drawingChild(cust, 'gdLst')),
+    ...(cxn.length > 0 ? { cxn } : {}),
     ...(rect
       ? {
           rect: [
@@ -714,4 +721,64 @@ export function presetGuides(
   defineGuides(vars, def.av, adjust);
   defineGuides(vars, def.gd);
   return { def, vars, mirrored };
+}
+
+/** One connection site of a geometry, in shape-local EMU. */
+export interface ConnectionSite {
+  /** The site's x, shape-local EMU. */
+  readonly x: number;
+  /** The site's y, shape-local EMU. */
+  readonly y: number;
+  /** The angle a connector leaves the site at, in degrees clockwise from the +x axis. */
+  readonly angle: number;
+}
+
+/** The most connection sites read for one geometry. */
+const MAX_CONNECTION_SITES = 1024;
+
+/**
+ * The connection sites of a geometry definition (`a:cxnLst`, ECMA-376 Part 1, 20.1.9.10) at a
+ * size (EMU), in list order: the index of a site is the `idx` of `a:stCxn` and `a:endCxn`. A
+ * definition with no `a:cxnLst` has no sites.
+ */
+export function geometryConnectionSites(
+  def: PresetShapeDefinition,
+  w: number,
+  h: number,
+  adjust?: ReadonlyMap<string, number>
+): ConnectionSite[] {
+  if (!def.cxn || def.cxn.length === 0) return [];
+  const vars = builtins(w, h);
+  defineGuides(vars, def.av, adjust);
+  defineGuides(vars, def.gd);
+  const value = (t: string): number => {
+    const v = vars.get(t) ?? Number(t);
+    return Number.isFinite(v) ? v : 0;
+  };
+  return def.cxn.slice(0, MAX_CONNECTION_SITES).map(([ang, x, y]) => ({
+    x: value(x),
+    y: value(y),
+    angle: value(ang) / ANGLE,
+  }));
+}
+
+/**
+ * The connection sites of the preset named by `a:prstGeom/@prst` at a size (EMU), with its
+ * adjust values. An unknown name has no sites.
+ */
+export function presetConnectionSites(
+  name: string,
+  w: number,
+  h: number,
+  adjust: ReadonlyMap<string, number>
+): ConnectionSite[] {
+  const mirror = own(MIRRORED_PRESETS, name) ? MIRRORED_PRESETS[name] : undefined;
+  if (mirror)
+    return geometryConnectionSites(PRESET_SHAPES[mirror], w, h, adjust).map((s) => ({
+      x: s.x,
+      y: h - s.y,
+      angle: -s.angle,
+    }));
+  const def = own(PRESET_SHAPES, name) ? PRESET_SHAPES[name] : undefined;
+  return def ? geometryConnectionSites(def, w, h, adjust) : [];
 }

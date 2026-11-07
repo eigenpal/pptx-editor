@@ -39,7 +39,7 @@ import { effectsStateOf, shapeStyleOf } from '../automation/commands/effect-comm
 import { aspectLocked } from '../automation/commands/arrange-commands.ts';
 import { paragraphFormatRead } from '../automation/commands/paragraph-format.ts';
 import { fontFormatRead } from '../automation/commands/font-format.ts';
-import { bulletFormatOf } from './bullet-format.ts';
+import { bulletFormatMixedOf, bulletFormatOf } from './bullet-format.ts';
 import { textDirectionOf } from './text-body-commands.ts';
 
 const EMPTY_FORMAT = null;
@@ -245,15 +245,15 @@ export function formatAt(
 
 /**
  * The bullet format of the selected paragraphs: absent when they differ, so no gallery row is
- * checked and the dialog opens mixed.
+ * checked, with what they share, so the dialog opens on their list's tab.
  */
 function bulletField(
   selected: readonly ResolvedParagraph[]
-): Pick<SelectionFormat, 'bulletFormat'> {
-  const first = selected[0] ? bulletFormatOf(selected[0]) : null;
-  const key = JSON.stringify(first);
-  for (const p of selected.slice(1)) if (JSON.stringify(bulletFormatOf(p)) !== key) return {};
-  return { bulletFormat: first };
+): Pick<SelectionFormat, 'bulletFormat' | 'bulletFormatMixed'> {
+  const reads = selected.map(bulletFormatOf);
+  const key = JSON.stringify(reads[0] ?? null);
+  if (reads.every((r) => JSON.stringify(r) === key)) return { bulletFormat: reads[0] ?? null };
+  return { bulletFormatMixed: bulletFormatMixedOf(reads) };
 }
 
 /**

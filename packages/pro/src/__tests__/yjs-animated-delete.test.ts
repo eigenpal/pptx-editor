@@ -259,12 +259,32 @@ describe('deleting an animated shape on two replicas', () => {
     l.pause();
     on(a, 'B');
     expect(a.exec({ type: 'delete' }).ok).toBe(true);
-    on(b, 'Line');
+    // The connector moves with A, so it stays glued to A; it lets go of B, which stays.
+    on(b, 'Line', 'A');
     expect(b.exec({ type: 'nudge', dx: IN / 4, dy: 0 }).ok).toBe(true);
     l.flush();
     const root = expectConvergedAndSaved(a, b);
     const ends = elements(find(root, 'p:cNvCxnSpPr')).map((e) => `${e.local}:${attr(e, 'id')}`);
     expect(ends).toEqual(['stCxn:2']);
+  });
+
+  test('two peers move the two shapes an elbow connector glues at once', async () => {
+    const cxn =
+      '<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="7" name="Line"/><p:cNvCxnSpPr><a:stCxn id="2" idx="3"/>' +
+      '<a:endCxn id="3" idx="1"/></p:cNvCxnSpPr><p:nvPr/></p:nvCxnSpPr><p:spPr><a:xfrm>' +
+      `<a:off x="${3 * IN}" y="${IN + IN / 2}"/><a:ext cx="${IN}" cy="0"/></a:xfrm>` +
+      '<a:prstGeom prst="bentConnector3"><a:avLst/></a:prstGeom></p:spPr></p:cxnSp>';
+    const { a, b, l } = await pair(deck([2, 3], cxn));
+    l.pause();
+    // Each move routes the connector again: both replicas end with one of the two routes.
+    on(a, 'A');
+    expect(a.exec({ type: 'nudge', dx: 0, dy: IN }).ok).toBe(true);
+    on(b, 'B');
+    expect(b.exec({ type: 'nudge', dx: 0, dy: -IN }).ok).toBe(true);
+    l.flush();
+    const root = expectConvergedAndSaved(a, b);
+    const ends = elements(find(root, 'p:cNvCxnSpPr')).map((e) => `${e.local}:${attr(e, 'id')}`);
+    expect(ends).toEqual(['stCxn:2', 'endCxn:3']);
   });
 
   test('a p:timing that no one changed saves as the file wrote it on both replicas', async () => {

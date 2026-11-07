@@ -81,6 +81,12 @@ for (const shape of root.children) {
       if (h.attrs[ref])
         handles.push([h.attrs[ref], axis, h.attrs[min] ?? null, h.attrs[max] ?? null]);
   }
+  // Connection sites (ECMA-376 Part 1, 20.1.9.10 cxnLst): the angle, then the position.
+  const sites: [string, string, string][] = [];
+  for (const c of find('cxnLst')?.children ?? []) {
+    const pos = c.children.find((x) => x.name === 'pos');
+    if (pos) sites.push([c.attrs.ang, pos.attrs.x, pos.attrs.y]);
+  }
   const paths = (find('pathLst')?.children ?? []).map((p) => {
     const cmds = p.children.map((c) => {
       const pts = c.children.filter((x) => x.name === 'pt').map((pt) => [pt.attrs.x, pt.attrs.y]);
@@ -114,6 +120,7 @@ for (const shape of root.children) {
     paths,
     ...(handles.length > 0 ? { ah: handles } : {}),
     ...(places.length > 0 ? { hp: places } : {}),
+    ...(sites.length > 0 ? { cxn: sites } : {}),
   };
 }
 

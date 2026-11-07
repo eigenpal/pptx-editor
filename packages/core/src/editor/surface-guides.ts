@@ -108,7 +108,18 @@ export function snapResize(
 }
 
 /** The guides as overlay elements, one device pixel wide (`px` is one CSS pixel in EMU). */
-export function guideElements(doc: Document, guides: readonly SnapGuide[], px: number): Element[] {
+/** A connection site near a dragged connector end; `glued` when the end is on it. */
+export interface SiteMark {
+  readonly kind: 'site';
+  readonly x: number;
+  readonly y: number;
+  readonly glued: boolean;
+}
+
+/** What a drag draws over the slide: smart guides and connection sites. */
+export type DragGuide = SnapGuide | SiteMark;
+
+export function guideElements(doc: Document, guides: readonly DragGuide[], px: number): Element[] {
   const width = String(px / (doc.defaultView?.devicePixelRatio || 1));
   const line = (cls: string, x1: number, y1: number, x2: number, y2: number): Element => {
     const node = doc.createElementNS(SVG_NS, 'line');
@@ -125,6 +136,20 @@ export function guideElements(doc: Document, guides: readonly SnapGuide[], px: n
     axis === 'x' ? [along, across] : [across, along];
   const out: Element[] = [];
   for (const g of guides) {
+    if (g.kind === 'site') {
+      // A connection site: a small ring, filled when the dragged end glues to it.
+      const node = doc.createElementNS(SVG_NS, 'circle');
+      node.setAttribute(
+        'class',
+        `pptx-surface__site${g.glued ? ' pptx-surface__site--glued' : ''}`
+      );
+      node.setAttribute('cx', String(g.x));
+      node.setAttribute('cy', String(g.y));
+      node.setAttribute('r', String(px * (g.glued ? 5 : 4)));
+      node.setAttribute('stroke-width', String(px));
+      out.push(node);
+      continue;
+    }
     if (g.kind === 'align') {
       // Dashed; the equal-gap bars stay solid.
       const node = line(

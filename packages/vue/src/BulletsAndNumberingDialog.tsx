@@ -110,12 +110,14 @@ const BulletsAndNumberingDialogOpen = defineComponent({
     const idBase = useId();
     // Undefined: the selected paragraphs differ; null: they have no list.
     const current = useEditorState((s) => s.format?.bulletFormat);
+    const shared = useEditorState((s) => s.format?.bulletFormatMixed);
     const editable = useEditorState((s) => s.status === 'ready' && s.mode === 'edit');
     const opened = current.value;
     const section = takeDialogSection(editor.value, 'bulletsAndNumbering');
     const seed = seedBulletFields(
       opened,
-      section === 'bullet' || section === 'number' ? section : undefined
+      section === 'bullet' || section === 'number' ? section : undefined,
+      shared.value
     );
     const draft = useFormDraft<BulletsDialogFields>({
       seed,

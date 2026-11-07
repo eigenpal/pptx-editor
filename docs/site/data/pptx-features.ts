@@ -224,6 +224,17 @@ export const pptxFeatures: PptxFeature[] = [
     notes: 'Searches slide text and speaker notes.',
   },
   {
+    id: 'text.clipboard',
+    name: 'Copy and paste',
+    category: 'text',
+    editing: 'full',
+    rendering: 'none',
+    roundTrip: 'full',
+    tier: 'community',
+    notes:
+      'Copy and paste text, shapes, and slides in the editor and between editors. Text from other applications pastes as HTML with its formatting, list levels, and bullets; a picture pastes at the size its resolution gives. Copied text leaves as HTML, and copied shapes as a picture, or as text for text boxes. Shapes copied in another application paste as a picture: browsers cannot read their shape format.',
+  },
+  {
     id: 'text.format-painter',
     name: 'Format painter',
     category: 'text',
@@ -353,7 +364,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Connectors do not reroute or snap to shapes. Deleting a shape unglues the connector ends attached to it.',
+      'Drag a connector end near a shape to glue it to a connection site. Glued connectors follow a shape that moves or resizes, and elbow and curved connectors route again. A connector that moves on its own lets go of its ends. Deleting a shape unglues the connector ends attached to it.',
   },
   {
     id: 'shapes.arrange',

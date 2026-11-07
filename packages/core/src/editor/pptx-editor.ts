@@ -659,11 +659,10 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     emit,
     deleteText: () => void textInput('deleteBackward'),
     cutShapes: () => removal.cut(() => exec({ type: 'delete' })),
-    clearCells: () => void exec({ type: 'delete' }),
-    pasteCells: (texts) => void exec({ type: 'pasteCells', texts }),
     insertText: (text) => void textInput('text', text),
     refuse: (reason) => void refuse(reason),
-    paste: (payload) => void exec({ type: 'paste', payload }),
+    exec: (command) => void exec(command),
+    selectedSlides: () => slideSel.indices(session?.info.slides ?? [], slide),
   });
 
   /**
@@ -904,6 +903,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         select,
         copy: clipboard.copyTo,
         paste: clipboard.pasteFrom,
+        warmCopy: clipboard.warm,
         cropping,
         textInput,
         shortcut,

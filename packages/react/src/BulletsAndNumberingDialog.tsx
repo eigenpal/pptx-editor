@@ -97,12 +97,17 @@ function BulletsAndNumberingDialogRoot({
   const idBase = useId();
   // Undefined: the selected paragraphs differ; null: they have no list.
   const current = useEditorState((s) => s.format?.bulletFormat);
+  const shared = useEditorState((s) => s.format?.bulletFormatMixed);
   const editable = useEditorState((s) => s.status === 'ready' && s.mode === 'edit');
   const [opened, setOpened] = useState<BulletFormatRead | null | undefined>(null);
   const { seed, draft, set, update, error, setError } = useDialogDraft(open, () => {
     setOpened(current);
     const tab = takeDialogSection(editor, 'bulletsAndNumbering');
-    return seedBulletFields(current, tab === 'bullet' || tab === 'number' ? tab : undefined);
+    return seedBulletFields(
+      current,
+      tab === 'bullet' || tab === 'number' ? tab : undefined,
+      shared
+    );
   });
   const apply = (): void => {
     if (!draft || !seed) return;

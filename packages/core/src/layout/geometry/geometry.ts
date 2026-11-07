@@ -8,6 +8,9 @@ import {
   customGeometryDefinition,
   evaluateGeometry as evaluateGeometryDefinition,
   evaluatePresetGeometry,
+  geometryConnectionSites,
+  presetConnectionSites,
+  type ConnectionSite,
   type DrawingGeometryElement,
   type EvaluatedGeometry,
   type PresetShapeDefinition,
@@ -21,6 +24,7 @@ export {
   presetAdjustments,
   presetHandles,
   presetNames,
+  type ConnectionSite,
   type EvaluatedGeometry,
   type PresetAdjustment,
   type PresetHandle,
@@ -40,16 +44,29 @@ function geometryElement(el: Element): DrawingGeometryElement {
 
 const customCache = new WeakMap<Element, PresetShapeDefinition>();
 
+function customDefinition(element: Element): PresetShapeDefinition {
+  let def = customCache.get(element);
+  if (!def) {
+    def = customGeometryDefinition(geometryElement(element));
+    customCache.set(element, def);
+  }
+  return def;
+}
+
 /** Evaluate a geometry spec at a size (EMU). */
 export function evaluateGeometry(spec: GeometrySpec, w: number, h: number): EvaluatedGeometry {
   if (spec.kind === 'paths') return { paths: spec.paths, textRect: { l: 0, t: 0, r: w, b: h } };
-  if (spec.kind === 'custom') {
-    let def = customCache.get(spec.element);
-    if (!def) {
-      def = customGeometryDefinition(geometryElement(spec.element));
-      customCache.set(spec.element, def);
-    }
-    return evaluateGeometryDefinition(def, w, h);
-  }
+  if (spec.kind === 'custom')
+    return evaluateGeometryDefinition(customDefinition(spec.element), w, h);
   return evaluatePresetGeometry(spec.preset, w, h, spec.adjust);
+}
+
+/**
+ * The connection sites of a geometry spec at a size (EMU), in `a:cxnLst` order. Evaluated
+ * paths have none.
+ */
+export function connectionSites(spec: GeometrySpec, w: number, h: number): ConnectionSite[] {
+  if (spec.kind === 'paths') return [];
+  if (spec.kind === 'custom') return geometryConnectionSites(customDefinition(spec.element), w, h);
+  return presetConnectionSites(spec.preset, w, h, spec.adjust);
 }

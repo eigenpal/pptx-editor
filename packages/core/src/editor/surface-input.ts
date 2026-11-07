@@ -6,15 +6,24 @@
 
 import type { EditorCommand, EditorExecOptions, HistoryGroup } from '../contracts/index.ts';
 import type { TextInputKind } from './text-input.ts';
+import { bindEditorClipboard } from './editor-clipboard.ts';
 
 /** What the input wiring asks of the editor. */
 export interface SurfaceInputHost {
   textInput(kind: TextInputKind, data?: string): void;
   shortcut(key: string, event: KeyboardEvent): boolean;
-  /** Fill a copy or cut; false leaves the event to the browser. */
-  copy(data: DataTransfer, cut: boolean): boolean;
-  /** Paste from a paste event; false leaves the event to the browser. */
-  paste(data: DataTransfer): boolean;
+  /**
+   * Fill a copy or cut; false leaves the event to the browser. `slideList`: the event comes
+   * from the slide list, and copies the selected slides.
+   */
+  copy(data: DataTransfer, cut: boolean, slideList?: boolean): boolean;
+  /**
+   * Paste from a paste event; false leaves the event to the browser. `slideList`: the event
+   * comes from the slide list; `chrome`: from outside the slide (`editor-clipboard.ts`).
+   */
+  paste(data: DataTransfer, slideList?: boolean, chrome?: boolean): boolean;
+  /** A copy may come next (Cmd or Ctrl went down, a menu opened): get ready for it. */
+  warmCopy?(): void;
   /**
    * Run a command the browser asked for (Edit menu undo, format shortcuts). The steps of one
    * pointer gesture pass one `historyGroup`.
@@ -138,6 +147,7 @@ export function bindSurfaceInput(
   };
   const onKeyDown = (e: KeyboardEvent): void => {
     if (isCompositionKey(e)) return;
+    if ((e.key === 'Meta' || e.key === 'Control') && !e.repeat) host.warmCopy?.();
     if (host.shortcut(e.key, e)) {
       e.preventDefault();
       e.stopPropagation();
@@ -164,7 +174,13 @@ export function bindSurfaceInput(
   root.addEventListener('copy', onCopy);
   root.addEventListener('cut', onCut);
   root.addEventListener('paste', onPaste);
+  const onContextMenu = (): void => host.warmCopy?.();
+  root.addEventListener('contextmenu', onContextMenu);
+  // Copy and paste with the focus elsewhere in the editor (the slide list, the toolbar).
+  const unbindOutside = bindEditorClipboard(root, host);
   return () => {
+    unbindOutside();
+    root.removeEventListener('contextmenu', onContextMenu);
     input.removeEventListener('beforeinput', onBeforeInput);
     input.removeEventListener('input', onInput);
     input.removeEventListener('compositionstart', onCompositionStart);

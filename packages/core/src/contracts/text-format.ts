@@ -3,6 +3,7 @@
 // Split from `index.ts`, which re-exports them, for the line cap.
 
 import type { ColorChoice } from './neutral.ts';
+import type { ClipboardNode } from './clipboard.ts';
 
 /**
  * Numbering schemes the editor sets: the `ST_TextAutonumberScheme` values that layout numbers
@@ -83,6 +84,22 @@ export type BulletFormatRead =
       readonly sizePercent: number;
       readonly color?: string;
     };
+
+/**
+ * What the selected paragraphs share when their bullet formats differ, so the Bullets and
+ * Numbering dialog opens on their list's tab and shows the values they have in common. @public
+ */
+export interface BulletFormatMixed {
+  /** The list kind of each selected paragraph, each kind once, in selection order. */
+  readonly kinds: readonly ('bullet' | 'number' | 'none')[];
+  /** Percent of the text size, when every bullet and number has the same; otherwise null. */
+  readonly sizePercent: number | null;
+  /**
+   * The first number, when every numbered paragraph has the same; otherwise null. Absent when no
+   * paragraph is numbered.
+   */
+  readonly startAt?: number | null;
+}
 
 /**
  * The orientation of a shape's text (Home > Text Direction), in the words of Office.js's
@@ -352,4 +369,11 @@ export type TextFormatCommand =
    * format of the selected paragraphs (Office.js `ParagraphFormat.bulletFormat`).
    * `null` is the gallery's None: the list turns off.
    */
-  | { readonly type: 'setBulletFormat'; readonly format: BulletFormat | null };
+  | { readonly type: 'setBulletFormat'; readonly format: BulletFormat | null }
+  /**
+   * Paste formatted text: DrawingML paragraphs (`a:p`, as `ClipboardNode`s) replace the selected
+   * text, or, with no text selected, go in a new text box in the middle of the slide. The
+   * paragraphs are checked as untrusted input: runs, breaks, and their formatting are kept, and
+   * links, pictures, and relationship references are left out. A field becomes plain text.
+   */
+  | { readonly type: 'pasteText'; readonly paragraphs: readonly ClipboardNode[] };

@@ -233,8 +233,11 @@
   --doc-caret: #202124;
   --doc-caret-contrast: #ffffff;
   /* Marks drawn over the slide contrast with the slide, not with the chrome, so the dark block
-     keeps these: the caret, and the halo under selection outlines and the fill of handles. */
+     keeps these: the caret, the selection marks, and the halo under them and the fill of
+     handles. The marks have their own color, not `--doc-primary`: a host that sets a dark or
+     a light primary for its buttons keeps a selection that never reads as a shape border. */
   --doc-slide-caret: #202124;
+  --doc-selection-mark: #1a73e8;
   --doc-selection-halo: #ffffff;
   /* The slide's edge against the workspace: a dark slide on dark chrome still shows its box. */
   --doc-slide-edge: rgba(60, 64, 67, 0.12);
@@ -1618,7 +1621,7 @@
 }
 .pptx-surface__outline {
   fill: none;
-  stroke: var(--doc-primary);
+  stroke: var(--doc-selection-mark);
 }
 /* The halo under a selection mark (surface-halo.ts): a light edge in every chrome theme, so
    the mark shows on a dark slide and on a light one. */
@@ -1638,12 +1641,12 @@
 }
 /* Drag selection. */
 .pptx-surface__marquee {
-  fill: color-mix(in srgb, var(--doc-primary) 8%, transparent);
-  stroke: var(--doc-primary);
+  fill: color-mix(in srgb, var(--doc-selection-mark) 8%, transparent);
+  stroke: var(--doc-selection-mark);
 }
 .pptx-surface__handle {
   fill: var(--doc-selection-halo);
-  stroke: var(--doc-primary);
+  stroke: var(--doc-selection-mark);
   pointer-events: all;
   cursor: pointer;
 }
@@ -1702,6 +1705,15 @@
   stroke: var(--doc-smart-guide);
   shape-rendering: crispEdges;
   pointer-events: none;
+}
+/* Connection sites near a dragged connector end (surface-guides.ts); the glued one is filled. */
+.pptx-surface__site {
+  fill: var(--doc-selection-halo);
+  stroke: var(--doc-primary);
+  pointer-events: none;
+}
+.pptx-surface__site--glued {
+  fill: var(--doc-primary);
 }
 .pptx-surface__caret {
   stroke: var(--doc-slide-caret);
@@ -3986,8 +3998,12 @@ legend.pptx-dialog__label {
   /* The selection marks on the slide. */
   .pptx-surface__outline,
   .pptx-surface__marquee,
-  .pptx-surface__handle {
+  .pptx-surface__handle,
+  .pptx-surface__site {
     stroke: Highlight;
+  }
+  .pptx-surface__site--glued {
+    fill: Highlight;
   }
   .pptx-surface__handle {
     fill: Canvas;
