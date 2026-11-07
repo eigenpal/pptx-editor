@@ -118,8 +118,8 @@ export interface MathBox {
   readonly face: ResolvedFace;
   readonly sizePt: number;
   /**
-   * The room the equation needs above and below the baseline in a line: each glyph piece with
-   * its face's ascent and descent, and each mark. A line grows to hold it.
+   * The room the equation needs above and below the baseline in a line: the ink of its glyphs
+   * and its marks. A line grows to hold it.
    */
   readonly lineAscent: number;
   readonly lineDescent: number;
@@ -295,7 +295,11 @@ const plainProps = (props: RunProps): RunProps =>
 /** The atoms of a math run: letters and digits together, each operator alone. */
 function runItems(run: MathRun, env: Env): Item[] {
   const props = plainProps(run.props);
-  const size = sizePt(props, env);
+  // Normal text (`m:nor`, 22.1.2.73) is not math text, so the script sizes of math layout do not
+  // apply to it: it keeps the run's own size at every script level. Its place (the shift of a
+  // superscript, for example) still follows the construct. The reference PDF of the
+  // `preserved-content` fixture draws a normal-text superscript at the run's size.
+  const size = sizePt(props, env, run.normal ? 0 : env.level);
   if (run.normal) {
     const face = env.measurer.resolve({
       family: props.latin,
@@ -842,13 +846,12 @@ export function layoutMath(zone: MathZone, measurer: TextMeasurer, fontScale: nu
   const lines = zone.lines.map((line) => rowBox(line, env));
   const box = lines.length === 1 ? lines[0]! : stackRows(lines, C.eqArrRow, em, C.axis * em);
   const base = mathFace(measurer, zone.props.latin, false, false).face;
-  let lineAscent = 0;
-  let lineDescent = 0;
-  for (const g of box.glyphs) {
-    const em = g.sizePt * EMU_PER_PT;
-    lineAscent = Math.max(lineAscent, g.y + g.face.metrics.ascent * em);
-    lineDescent = Math.max(lineDescent, g.face.metrics.descent * em - g.y);
-  }
+  // The line already holds the base runs' face (`face`, `sizePt`). Past that, the equation
+  // needs room for its ink only: the glyph outlines (`box`) and the marks. A raised script
+  // whose ink stays inside the line does not make the line taller, also when its face's ascent
+  // would pass the line (reference PDFs of `preserved-content`, slide 1, and `equations`).
+  let lineAscent = Math.max(0, box.asc);
+  let lineDescent = Math.max(0, box.desc);
   for (const m of box.marks)
     for (const c of m.commands)
       if (c.op !== 'Z') {

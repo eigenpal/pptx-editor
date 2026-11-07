@@ -57,6 +57,32 @@ describe('math layout', () => {
     expect(sup!.x[0]).toBeCloseTo(base!.x[1]!, 0);
   });
 
+  test('normal text keeps its size in a script, and only ink makes the line taller', () => {
+    const M = 'http://schemas.openxmlformats.org/officeDocument/2006/math';
+    const run = (t: string, nor: boolean) =>
+      `<m:r>${nor ? '<m:rPr><m:nor/></m:rPr>' : ''}<a:rPr/><m:t>${t}</m:t></m:r>`;
+    const xml =
+      `<a14:m xmlns:a14="${A14}" xmlns:a="${A}"><m:oMathPara xmlns:m="${M}"><m:oMath>` +
+      `<m:sSup><m:e>${run('c', true)}</m:e><m:sup>${run('2', true)}</m:sup></m:sSup>` +
+      `</m:oMath></m:oMathPara></a14:m>`;
+    const r = parseXmlPart('/z.xml', xml);
+    if (!r.ok) throw new Error('parse');
+    const b = layoutMath(
+      readMathZone(r.part.root, () => props)!,
+      measurer,
+      1
+    );
+    expect(b.glyphs.map((g) => [g.text, g.sizePt])).toEqual([
+      ['c', 18],
+      ['2', 18],
+    ]);
+    const sup = b.glyphs[1]!;
+    expect(sup.y).toBeGreaterThan(0.3 * EM);
+    // The line holds the ink of the raised digit, not its face's ascent.
+    expect(b.lineAscent).toBeCloseTo(b.ascent, 0);
+    expect(b.lineAscent).toBeLessThan(sup.y + sup.face.metrics.ascent * EM);
+  });
+
   test('a fraction stacks its parts around one rule, centered', () => {
     const b = box('a/(b+c)');
     expect(b.marks).toHaveLength(1);
