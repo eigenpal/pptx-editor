@@ -137,17 +137,126 @@ describe('comment identity', () => {
     expect(all[4]!.identity).toContain('%7E1~');
   });
 
-  test('legacy comments that repeat an author and index get their own identities', async () => {
+  test('legacy comments that repeat an author and index get their own ids and identities', async () => {
     const deck = patch(buildSlideStructureDeck(), /\/comments\/comment\d+\.xml$/, (xml) => {
       const cm = /<p:cm [^>]*>(?:(?!<\/p:cm>).)*<p:text>Check[^<]*<\/p:text>.*?<\/p:cm>/s.exec(
         xml
       )![0];
-      return xml.replace(cm, cm + cm);
+      return xml.replace(cm, cm + cm.replace(/<p:text>[^<]*/, '<p:text>Second'));
     });
     const e = await open(deck);
-    const threads = e.snapshot().comments!;
-    expect(threads).toHaveLength(2);
-    expect(threads[0]!.id).toBe(threads[1]!.id);
-    expect(threads[0]!.identity).not.toBe(threads[1]!.identity);
+    const [first, second] = e.snapshot().comments!;
+    expect(first!.id).not.toBe(second!.id);
+    expect(first!.identity).not.toBe(second!.identity);
+    e.selectComment(second!.id);
+    expect(e.snapshot().comments!.find((t) => t.id === e.snapshot().activeComment)!.text).toBe(
+      'Second'
+    );
+    expect(e.exec({ type: 'editComment', commentId: second!.id, text: 'Edited' }).ok).toBe(true);
+    expect(e.snapshot().comments!.map((t) => t.text)).toEqual([
+      'Check the chart numbers.',
+      'Edited',
+    ]);
+    // The plain key names no comment while the author and index repeat.
+    const plain = second!.id.replace(/-\d+$/, '');
+    expect(e.exec({ type: 'editComment', commentId: plain, text: 'x' }).ok).toBe(false);
+  });
+
+  test('a delete and an undo in one read give the twins new identities', async () => {
+    const e = await open(await threads((t) => as(t, 'A') + as(t, 'B') + as(t, 'C')));
+    const c = e.snapshot().comments![2]!;
+    expect(e.exec({ type: 'deleteComment', commentId: c.id }).ok).toBe(true);
+    const s1 = e.snapshot().comments!;
+    expect(e.exec({ type: 'undo' }).ok).toBe(true);
+    expect(e.exec({ type: 'deleteComment', commentId: s1[0]!.id }).ok).toBe(true);
+    const s2 = e.snapshot().comments!;
+    expect(s2.map((t) => t.text)).toEqual(['B', 'C']);
+    for (const t of s2) expect(s1.map((x) => x.identity)).not.toContain(t.identity);
+  });
+
+  test('an undo of a history group closes the fields of the twins, and never moves them', async () => {
+    const e = await open(await threads((t) => as(t, 'x') + as(t, 'y')));
+    const [a, b] = e.snapshot().comments!;
+    const g = e.beginHistoryGroup();
+    expect(e.exec({ type: 'deleteComment', commentId: a!.id }, { historyGroup: g }).ok).toBe(true);
+    const b1 = e.snapshot().comments![0]!;
+    expect(b1.identity).toBe(b!.identity);
+    expect(
+      e.exec({ type: 'editComment', commentId: b1.id, text: 'x' }, { historyGroup: g }).ok
+    ).toBe(true);
+    g.end();
+    const [picked] = e.snapshot().comments!;
+    e.selectComment(picked!.id);
+    expect(e.snapshot().activeComment).toBe(picked!.id);
+    expect(e.exec({ type: 'undo' }).ok).toBe(true);
+    const s2 = e.snapshot();
+    expect(s2.comments!.map((t) => t.text)).toEqual(['x', 'y']);
+    expect(s2.comments!.some((t) => t.identity === picked!.identity)).toBe(false);
+    expect(s2.activeComment).toBeNull();
+  });
+
+  test('a slide that comes back keeps the identities it showed', async () => {
+    const e0 = createPptxEditor({
+      fixedMeasurer: true,
+      substitutes: false,
+      modules: [review],
+      author: 'Ada Lovelace',
+    });
+    const sh = shape({ id: 2, name: 'Title', x: 0, y: 0, cx: 914_400, cy: 914_400 });
+    expect((await e0.load(buildPptx({ slides: [{ shapes: sh }, { shapes: sh }] }))).ok).toBe(true);
+    expect(e0.exec({ type: 'addComment', text: 'A', date: DATE }).ok).toBe(true);
+    const bytes = patch(e0.save()!, /\/comments\/modernComment/, (xml) => {
+      const t = /<p188:cm [^>]*>.*?<\/p188:cm>/s.exec(xml)![0];
+      return xml.replace(t, as(t, 'x') + as(t, 'y'));
+    });
+    e0.destroy();
+    const e = await open(bytes);
+    const [a, b] = e.snapshot().comments!;
+    expect(e.exec({ type: 'editComment', commentId: a!.id, text: 'y' }).ok).toBe(true);
+    e.snapshot();
+    expect(e.exec({ type: 'editComment', commentId: b!.id, text: 'x' }).ok).toBe(true);
+    const before = identities(e);
+    expect(before).toEqual([a!.identity, b!.identity]);
+    e.goToSlide(1);
+    e.snapshot();
+    e.goToSlide(0);
+    expect(identities(e)).toEqual(before);
+  });
+
+  test('expect: a twin whose text changed refuses the write, and can() agrees', async () => {
+    const e = await open(await threads((t) => as(t, 'A') + as(t, 'B')));
+    const [a] = e.snapshot().comments!;
+    const seen = { author: a!.author, date: a!.date!, text: a!.text };
+    expect(e.exec({ type: 'editComment', commentId: a!.id, text: 'Peer' }).ok).toBe(true);
+    const mine = { type: 'editComment', commentId: a!.id, text: 'Mine', expect: seen } as const;
+    expect(e.can(mine)).toMatchObject({ ok: false, reason: 'errors.commentChanged' });
+    expect(e.exec(mine)).toMatchObject({ ok: false, reason: 'errors.commentChanged' });
+    for (const type of ['deleteComment', 'resolveComment'] as const)
+      expect(e.exec({ type, commentId: a!.id, expect: seen }).ok).toBe(false);
+    expect(e.exec({ type: 'replyToComment', commentId: a!.id, text: 'R', expect: seen }).ok).toBe(
+      false
+    );
+    expect(e.snapshot().comments!.map((t) => t.text)).toEqual(['Peer', 'B']);
+    const fresh = { ...seen, text: 'Peer' };
+    expect(e.exec({ ...mine, expect: fresh }).ok).toBe(true);
+  });
+
+  test('expect: a peer edit of a comment without a twin never refuses your edit', async () => {
+    const e = await open(await threads((t) => t));
+    const [a] = e.snapshot().comments!;
+    const seen = { author: a!.author, date: a!.date!, text: a!.text };
+    expect(e.exec({ type: 'editComment', commentId: a!.id, text: 'Peer' }).ok).toBe(true);
+    expect(e.exec({ type: 'editComment', commentId: a!.id, text: 'Mine', expect: seen }).ok).toBe(
+      true
+    );
+    expect(identities(e)).toEqual([a!.identity]);
+    // Another author or date is another comment.
+    for (const other of [
+      { ...seen, author: 'Grace' },
+      { author: seen.author, text: seen.text },
+    ])
+      expect(
+        e.exec({ type: 'editComment', commentId: a!.id, text: 'x', expect: other })
+      ).toMatchObject({ ok: false, reason: 'errors.commentChanged' });
   });
 });

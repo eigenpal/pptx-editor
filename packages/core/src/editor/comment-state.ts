@@ -9,6 +9,7 @@ import type { CommentMarkerHost } from './comment-markers.ts';
 import { requestPane } from './pane-requests.ts';
 import {
   COMMENTS,
+  commentNodes,
   identityGroup,
   presentationTarget,
   readSlideComments,
@@ -18,6 +19,51 @@ import type { EditorModuleRegistry } from './modules.ts';
 
 const NONE: readonly CommentThread[] = Object.freeze([]);
 
+/** A comment as a read showed it: its identity, twin group, text, and list node. */
+interface Seen {
+  readonly identity: string;
+  readonly group: string;
+  readonly text: string;
+  readonly node: string | undefined;
+  /** Whether it has been in a group of twins. */
+  readonly twin: boolean;
+}
+
+/**
+ * For each comment of `now`, the place in `was` of the same comment, or -1 for a new one: when
+ * one change explains the group (see `CommentState#carry`), else null.
+ */
+function oneChange(
+  was: readonly { readonly text: string }[],
+  now: readonly { readonly c: { readonly text: string } }[]
+): number[] | null {
+  const a = was.length;
+  const b = now.length;
+  if (a === 0) return now.map(() => -1);
+  if (a === b) {
+    let changed = 0;
+    for (let i = 0; i < a; i += 1) if (was[i]!.text !== now[i]!.c.text) changed += 1;
+    return changed <= 1 ? now.map((_, i) => i) : null;
+  }
+  if (Math.abs(a - b) !== 1) return null;
+  // The longer list less one entry at `at` is the shorter one: `at` must be the only place.
+  const long = a > b ? was.map((w) => w.text) : now.map((n) => n.c.text);
+  const short = a > b ? now.map((n) => n.c.text) : was.map((w) => w.text);
+  let prefix = 0;
+  while (prefix < short.length && long[prefix] === short[prefix]) prefix += 1;
+  let suffix = 0;
+  while (
+    suffix < short.length &&
+    long[long.length - 1 - suffix] === short[short.length - 1 - suffix]
+  )
+    suffix += 1;
+  const low = long.length - 1 - suffix;
+  if (prefix !== low) return null;
+  const at = prefix;
+  if (a > b) return now.map((_, j) => (j < at ? j : j + 1));
+  return now.map((_, j) => (j === at ? -1 : j < at ? j : j - 1));
+}
+
 export class CommentState {
   #author: string | undefined;
   #active: string | null = null;
@@ -25,11 +71,12 @@ export class CommentState {
   #activeIdentity: string | null = null;
   #key: readonly unknown[] = [];
   #threads: readonly CommentThread[] = NONE;
-  /** The slide part of `#threads`. */
-  #slide: string | undefined;
-  /** The identities that named a comment of this deck that is gone: never shown again. */
-  readonly #retired = new Set<string>();
-  /** A count for the fresh identities that `#carry` makes. */
+  /**
+   * What the last read of each slide part showed: one entry per slide part, so a slide that
+   * comes back carries its identities as an edit does.
+   */
+  readonly #seen = new Map<string, readonly Seen[]>();
+  /** A count for the new identities that `#carry` makes: each is shown once only. */
   #fresh = 0;
 
   constructor(
@@ -98,88 +145,69 @@ export class CommentState {
       return this.#threads;
     this.#key = key;
     const read = legacy.length || modern.length ? readSlideComments(pkg, slidePart) : NONE;
-    const threads = this.#carry(read, this.#slide === slidePart ? this.#threads : NONE);
-    this.#slide = slidePart;
+    const threads = this.#carry(read, slidePart);
     this.#threads = threads.length ? Object.freeze(threads) : NONE;
     return this.#threads;
   }
 
   /**
-   * `read` with the identities of `before` carried over. The file alone tells twins (comments with
-   * one GUID, author, and date) apart only by their text and place, so an edit of a twin, or a
-   * delete of another, changes the identity that the reader gives it. Per group of twins:
-   * - With as many comments as before, each keeps the identity of the one in its place: an
-   *   edit or a resolve changes no count.
-   * - With more or fewer, each text that counts the same as before keeps its identities in
-   *   order, and a text that comes or goes alone is a new or a deleted comment.
-   * - When that does not tell which twin is which (one of two twins with the same text is
-   *   gone), every twin of the group takes a new identity, so no open field or pick moves to
-   *   another comment.
-   * An identity that is gone is never shown again.
+   * `read` with the identities that the slide's last threads showed, carried over where one
+   * change explains a group of twins (comments with one GUID, author, and date; a comment
+   * without a twin is a group of one):
+   * - The same count, with at most one text changed: an edit, a resolve, or a reply elsewhere.
+   * - One comment more or less, the other texts the same and in order, at one place only.
+   * Each carried twin must also be the same list node as before; a comment that never had a
+   * twin needs no node. In every other case the whole group takes new identities, so open fields
+   * close and the pick ends. A comment the slide did not show before takes a new identity too,
+   * except on the first read of the slide. So a shown identity never names another comment.
    */
-  #carry(
-    read: readonly CommentThread[],
-    before: readonly CommentThread[]
-  ): readonly CommentThread[] {
-    if (read.length === 0 && before.length === 0) return read;
-    const flat = (threads: readonly CommentThread[]) =>
-      threads.flatMap((t) => [t as SlideComment, ...t.replies]);
-    const old = new Map<string, SlideComment[]>();
-    for (const c of flat(before)) {
-      const group = identityGroup(c.identity);
-      old.set(group, [...(old.get(group) ?? []), c]);
+  #carry(read: readonly CommentThread[], slidePart: string): readonly CommentThread[] {
+    const prior = this.#seen.get(slidePart);
+    const items: { c: SlideComment; group: string; node: string | undefined }[] = [];
+    for (const t of read) {
+      items.push({ c: t, group: identityGroup(t.identity), node: commentNodes.get(t) });
+      for (const r of t.replies)
+        items.push({ c: r, group: identityGroup(r.identity), node: commentNodes.get(r) });
     }
-    const now = new Map<string, SlideComment[]>();
-    for (const c of flat(read)) {
-      const group = identityGroup(c.identity);
-      now.set(group, [...(now.get(group) ?? []), c]);
-    }
-    const shown = new Map<SlideComment, string>();
-    const used = new Set<string>();
+    const shown = new Map<SlideComment, Seen>();
     const fresh = (c: SlideComment): string => `${c.identity}~g${(this.#fresh += 1)}`;
+    const now = new Map<string, typeof items>();
+    for (const item of items) {
+      const list = now.get(item.group);
+      if (list) list.push(item);
+      else now.set(item.group, [item]);
+    }
+    const old = new Map<string, Seen[]>();
+    for (const seen of prior ?? []) {
+      const list = old.get(seen.group);
+      if (list) list.push(seen);
+      else old.set(seen.group, [seen]);
+    }
     for (const [group, members] of now) {
       const was = old.get(group) ?? [];
-      const take = new Map<SlideComment, string>();
-      if (was.length === members.length) members.forEach((c, i) => take.set(c, was[i]!.identity));
-      else {
-        const byText = (list: readonly SlideComment[]) => {
-          const m = new Map<string, SlideComment[]>();
-          for (const c of list) m.set(c.text, [...(m.get(c.text) ?? []), c]);
-          return m;
-        };
-        const prev = byText(was);
-        const next = byText(members);
-        const texts = new Set([...prev.keys(), ...next.keys()]);
-        const clear = [...texts].every((t) => {
-          const a = prev.get(t)?.length ?? 0;
-          const b = next.get(t)?.length ?? 0;
-          return a === b || a === 0 || b === 0;
+      const twin = members.length > 1 || was.length > 1;
+      const map = prior ? oneChange(was, members) : null;
+      const safe =
+        map !== null &&
+        map.every((from, i) => {
+          if (from < 0) return true;
+          const before = was[from]!;
+          // A comment that never had a twin is the only one of its group: no node to check.
+          if (!before.twin && was.length === 1 && members.length === 1) return true;
+          return before.node !== undefined && before.node === members[i]!.node;
         });
-        if (!clear) {
-          for (const c of members) shown.set(c, fresh(c));
-          continue;
-        }
-        for (const [t, list] of next) {
-          const from = prev.get(t);
-          if (from?.length === list.length) list.forEach((c, i) => take.set(c, from[i]!.identity));
-        }
-      }
-      for (const c of members) {
-        const carried = take.get(c);
-        shown.set(c, carried ?? c.identity);
-      }
+      members.forEach(({ c, node }, i) => {
+        const from = safe ? map![i]! : -1;
+        const identity = !prior ? c.identity : from >= 0 ? was[from]!.identity : fresh(c);
+        const wasTwin = from >= 0 && was[from]!.twin;
+        shown.set(c, { identity, group, text: c.text, node, twin: twin || wasTwin });
+      });
     }
-    // A gone identity retires; one that a carry or a retire makes unsafe takes a fresh one.
-    const keep = new Set(shown.values());
-    for (const c of flat(before)) if (!keep.has(c.identity)) this.#retired.add(c.identity);
-    for (const [c, id] of shown) {
-      const safe = !used.has(id) && !(this.#retired.has(id) && id === c.identity);
-      const final = safe ? id : fresh(c);
-      used.add(final);
-      shown.set(c, final);
-    }
-    const rename = (c: SlideComment): SlideComment =>
-      shown.get(c) === c.identity ? c : { ...c, identity: shown.get(c)! };
+    this.#seen.set(slidePart, [...shown.values()]);
+    const rename = (c: SlideComment): SlideComment => {
+      const identity = shown.get(c)!.identity;
+      return identity === c.identity ? c : { ...c, identity };
+    };
     return read.map((t) => {
       const head = rename(t) as CommentThread;
       const replies = t.replies.map(rename);

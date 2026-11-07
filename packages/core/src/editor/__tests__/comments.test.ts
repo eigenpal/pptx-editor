@@ -142,9 +142,14 @@ describe('threaded comments', () => {
     expect(slideXml).toContain('{6950BFC3-D8DA-4A85-94F7-54DA5524770B}');
     expect(slideXml).toContain('p14:creationId');
 
-    // The reopened deck reads the same threads.
+    // The reopened deck reads the same threads. An identity names a comment in one editor only.
     const again = await open(e.save()!);
-    expect(again.snapshot().comments).toEqual(e.snapshot().comments);
+    const content = (p: PptxEditorInstance) =>
+      p.snapshot().comments!.map(({ identity: _t, replies, ...t }) => ({
+        ...t,
+        replies: replies.map(({ identity: _r, ...r }) => r),
+      }));
+    expect(content(again)).toEqual(content(e));
 
     expect(e.exec({ type: 'reopenComment', commentId: thread!.id }).ok).toBe(true);
     expect(e.snapshot().comments![0]!.resolved).toBe(false);
