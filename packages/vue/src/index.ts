@@ -472,6 +472,7 @@ export type {
   ChromeGroupId,
   ChromeMenuId,
   ChromeSlotId,
+  ClipboardDrawingReader,
   ColumnsDialogFields,
   CommandResult,
   DocumentOpenFailure,

@@ -25,6 +25,7 @@ import {
   type ZipLimits,
 } from '../store/index.ts';
 import { toBase64 } from '../automation/commands/base64.ts';
+import { parsePayload } from './clipboard.ts';
 
 /**
  * The system clipboard types that hold a DrawingML clipboard package, by platform. A desktop
@@ -49,17 +50,33 @@ const LIMITS: ZipLimits = Object.freeze({
   maxRatio: 200,
 });
 const MAX_DEPTH = 32;
+/** The largest `ST_Coordinate` and `ST_PositiveCoordinate`. */
+const MAX_SIZE = 27_273_042_316_900;
+/** The most picture bytes that travel, as the shape clipboard carries. */
+const MAX_MEDIA = 64 * 1024 * 1024;
 
-/** Each DrawingML shape and the names of its non-visual parts. */
-const KINDS: Readonly<Record<string, { readonly nv: string; readonly cnv: string }>> = {
-  sp: { nv: 'nvSpPr', cnv: 'cNvSpPr' },
-  pic: { nv: 'nvPicPr', cnv: 'cNvPicPr' },
-  cxnSp: { nv: 'nvCxnSpPr', cnv: 'cNvCxnSpPr' },
-  grpSp: { nv: 'nvGrpSpPr', cnv: 'cNvGrpSpPr' },
-  graphicFrame: { nv: 'nvGraphicFramePr', cnv: 'cNvGraphicFramePr' },
+/**
+ * Each DrawingML shape: the names of its non-visual parts, and the PresentationML children it
+ * gets, in schema order (ECMA-376 Part 1, 19.3.1). The DrawingML order differs: `a:sp` puts
+ * its text before its style, and `a:graphicFrame` its graphic before its transform. `need`
+ * lists the children a shape cannot go without; `spPr` and `grpSpPr` are made empty instead.
+ */
+const KINDS: Readonly<
+  Record<string, { nv: string; cnv: string; order: readonly string[]; need: readonly string[] }>
+> = {
+  sp: { nv: 'nvSpPr', cnv: 'cNvSpPr', order: ['spPr', 'style', 'txBody'], need: [] },
+  pic: { nv: 'nvPicPr', cnv: 'cNvPicPr', order: ['blipFill', 'spPr', 'style'], need: ['blipFill'] },
+  cxnSp: { nv: 'nvCxnSpPr', cnv: 'cNvCxnSpPr', order: ['spPr', 'style'], need: [] },
+  grpSp: { nv: 'nvGrpSpPr', cnv: 'cNvGrpSpPr', order: ['grpSpPr'], need: [] },
+  graphicFrame: {
+    nv: 'nvGraphicFramePr',
+    cnv: 'cNvGraphicFramePr',
+    order: ['xfrm', 'graphic'],
+    need: ['xfrm', 'graphic'],
+  },
 };
-/** Shape properties that keep their content and move to the PresentationML namespace. */
-const PROPERTIES = new Set(['spPr', 'grpSpPr', 'style', 'blipFill', 'xfrm']);
+/** Children made empty when a shape has none: the schema requires them. */
+const EMPTY_WHEN_MISSING = new Set(['spPr', 'grpSpPr']);
 
 type Child = NodeSpec | { readonly text: string };
 const elements = (s: NodeSpec): NodeSpec[] =>
@@ -101,25 +118,33 @@ function convert(shape: NodeSpec, depth: number): NodeSpec | null {
   const kind = shape.ns === NS.a ? KINDS[shape.local] : undefined;
   if (!kind || depth > MAX_DEPTH) return null;
   if (shape.local === 'graphicFrame' && !holdsTable(shape)) return null;
-  const out: NodeSpec[] = [];
-  for (const c of elements(shape)) {
-    if (isA(c, kind.nv)) {
-      const nv = nonVisual(c, kind.nv, kind.cnv);
-      if (!nv) return null;
-      out.push(nv);
-    } else if (c.ns === NS.a && PROPERTIES.has(c.local)) out.push(inP(c));
-    else if (isA(c, 'txSp')) {
-      // The text of a DrawingML shape: its body is the PresentationML `p:txBody`.
-      const body = elements(c).find((k) => isA(k, 'txBody'));
-      if (body) out.push(inP(body));
-    } else if (isA(c, 'graphic')) out.push(c);
-    else if (shape.local === 'grpSp' && c.ns === NS.a && KINDS[c.local]) {
-      const member = convert(c, depth + 1);
+  const source = elements(shape);
+  const nvSource = source.find((c) => isA(c, kind.nv));
+  const nv = nvSource && nonVisual(nvSource, kind.nv, kind.cnv);
+  if (!nv) return null;
+  const out: NodeSpec[] = [nv];
+  for (const local of kind.order) {
+    let found: NodeSpec | undefined;
+    if (local === 'txBody') {
+      // The text of a DrawingML shape: the body in its `a:txSp` is the PresentationML body.
+      const txSp = source.find((c) => isA(c, 'txSp'));
+      const body = txSp && elements(txSp).find((k) => isA(k, 'txBody'));
+      found = body && inP(body);
+    } else if (local === 'graphic') found = source.find((c) => isA(c, 'graphic'));
+    else {
+      const el = source.find((c) => isA(c, local));
+      found = el ? inP(el) : EMPTY_WHEN_MISSING.has(local) ? pEl(local) : undefined;
+    }
+    if (found) out.push(found);
+    else if (kind.need.includes(local)) return null;
+  }
+  // A group's members follow its properties, in their order. Anything else (an extension
+  // list, a group's own text, an unknown element) stays behind.
+  if (shape.local === 'grpSp')
+    for (const c of source) {
+      const member = c.ns === NS.a && KINDS[c.local] ? convert(c, depth + 1) : null;
       if (member) out.push(member);
     }
-    // Anything else (an extension list, an unknown element) stays behind.
-  }
-  if (out[0]?.local !== kind.nv) return null;
   return pEl(shape.local, out);
 }
 
@@ -146,9 +171,9 @@ function placed(shape: NodeSpec, at: (v: number, axis: 'x' | 'y') => number, by:
           const v = Number(a.value);
           if (a.ns !== '' || !Number.isFinite(v)) return a;
           if (a.local === 'x' || a.local === 'y')
-            return { ...a, value: `${Math.round(at(v, a.local))}` };
-          if (a.local === 'cx') return { ...a, value: `${Math.round(v * by[0]!)}` };
-          if (a.local === 'cy') return { ...a, value: `${Math.round(v * by[1]!)}` };
+            return { ...a, value: clamp(at(v, a.local), -MAX_SIZE) };
+          if (a.local === 'cx') return { ...a, value: clamp(v * by[0]!, 0) };
+          if (a.local === 'cy') return { ...a, value: clamp(v * by[1]!, 0) };
           return a;
         }),
       };
@@ -168,6 +193,10 @@ function placed(shape: NodeSpec, at: (v: number, axis: 'x' | 'y') => number, by:
   };
 }
 
+/** A scaled position or size, within `ST_Coordinate` from `min`. */
+const clamp = (v: number, min: number): string =>
+  `${Math.min(Math.max(min, Math.round(v)), MAX_SIZE)}`;
+
 /** The relationship ids a subtree uses (`r:*` attributes). */
 function relIds(spec: NodeSpec, out: Set<string>, depth = 0): Set<string> {
   if (depth > 2 * MAX_DEPTH) return out;
@@ -182,13 +211,16 @@ function relIds(spec: NodeSpec, out: Set<string>, depth = 0): Set<string> {
  * {@link DRAWING_CLIPBOARD_TYPES}, which presentation applications write for copied shapes.
  * Shapes, pictures, connectors, groups, and tables convert; charts, diagrams, and embedded
  * objects need parts that do not travel and stay behind. Returns null when the bytes are not
- * such a package or hold no shape that converts. The bytes are untrusted: the package reads
- * within size limits, and the paste validates the payload again. @public
+ * such a package, hold no shape that converts, or exceed the limits of a paste. The bytes are
+ * untrusted: the package reads within size limits, and the paste validates the payload
+ * again. @public
  */
 export function drawingClipboardPayload(bytes: Uint8Array): ClipboardPayload | null {
-  if (!(bytes instanceof Uint8Array) || bytes.length === 0 || bytes.length > MAX_PACKAGE)
+  // A view from another realm (a frame, a bridge) is no `instanceof Uint8Array` here.
+  if (!ArrayBuffer.isView(bytes) || bytes.byteLength === 0 || bytes.byteLength > MAX_PACKAGE)
     return null;
-  const zip = readZip(bytes, LIMITS);
+  const view = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const zip = readZip(view, LIMITS);
   if (!zip.ok) return null;
   const parts = new Map<string, PackagePart>();
   const xml = (partName: string): boolean => {
@@ -234,18 +266,29 @@ export function drawingClipboardPayload(bytes: Uint8Array): ClipboardPayload | n
   const used = new Set<string>();
   for (const s of shapes) relIds(s, used);
   const relationships: ClipboardRelationship[] = [];
+  let media = 0;
   for (const rel of relationshipsOf(pkg, main.target)) {
     if (!used.has(rel.id) || rel.external || rel.type !== IMAGE_REL || !rel.target) continue;
-    const media = zip.entries.get(rel.target);
+    const picture = zip.entries.get(rel.target);
     const contentType = contentTypeOf(pkg, rel.target);
-    if (!media || !contentType?.startsWith('image/')) continue;
+    if (!picture || !contentType?.startsWith('image/')) continue;
+    if ((media += picture.length) > MAX_MEDIA) return null;
     relationships.push({
       id: rel.id,
       type: rel.type,
       part: rel.target,
       contentType,
-      base64: toBase64(media),
+      base64: toBase64(picture),
     });
   }
-  return { version: 1, document: 'drawing-clipboard', slidePart: '', shapes, relationships };
+  const payload: ClipboardPayload = {
+    version: 1,
+    document: 'drawing-clipboard',
+    slidePart: '',
+    shapes,
+    relationships,
+  };
+  // The checks of a paste (shape count, depth, size): a payload it refuses is no payload, so
+  // the host pastes the picture instead.
+  return parsePayload(payload) ? payload : null;
 }

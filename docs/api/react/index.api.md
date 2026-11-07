@@ -186,6 +186,8 @@ export { ChromeSlotId }
 
 export { ChromeTranslate }
 
+export { ClipboardDrawingReader }
+
 export { ColorMode }
 
 // @public

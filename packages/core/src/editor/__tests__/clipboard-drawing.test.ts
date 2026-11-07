@@ -36,13 +36,22 @@ const PNG = Uint8Array.from(
 const xfrm = (x: number, y: number, cx: number, cy: number): string =>
   `<a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm>`;
 
-/** A text shape as the package holds it: DrawingML, with its text in `a:txSp`. */
+/** A shape style, as shapes drawn in presentation applications have. */
+const STYLE =
+  `<a:style><a:lnRef idx="2"><a:schemeClr val="accent1"/></a:lnRef><a:fillRef idx="1">` +
+  `<a:schemeClr val="accent1"/></a:fillRef><a:effectRef idx="0"><a:schemeClr val="accent1"/>` +
+  `</a:effectRef><a:fontRef idx="minor"><a:schemeClr val="lt1"/></a:fontRef></a:style>`;
+
+/**
+ * A text shape as the package holds it: DrawingML, in its schema order (`nvSpPr`, `spPr`,
+ * `txSp`, `style`), with its text in `a:txSp`.
+ */
 const textShape = (id: number, text: string, x = 457200, y = 457200): string =>
   `<a:sp><a:nvSpPr><a:cNvPr id="${id}" name="Shape ${id}"/><a:cNvSpPr/></a:nvSpPr>` +
   `<a:spPr>${xfrm(x, y, 2743200, 1828800)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>` +
   `<a:solidFill><a:schemeClr val="accent1"/></a:solidFill></a:spPr>` +
   `<a:txSp><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="en-US" b="1"/>` +
-  `<a:t>${text}</a:t></a:r></a:p></a:txBody><a:useSpRect/></a:txSp>` +
+  `<a:t>${text}</a:t></a:r></a:p></a:txBody><a:useSpRect/></a:txSp>${STYLE}` +
   `<a:extLst><a:ext uri="{00000000-0000-0000-0000-000000000000}"/></a:extLst></a:sp>`;
 
 /**
@@ -109,7 +118,8 @@ const group =
   `<a:grpSp><a:nvGrpSpPr><a:cNvPr id="2" name="Group 1"/><a:cNvGrpSpPr/></a:nvGrpSpPr>` +
   `<a:grpSpPr><a:xfrm rot="900000"><a:off x="457200" y="457200"/><a:ext cx="2743200" ` +
   `cy="1828800"/><a:chOff x="0" y="0"/><a:chExt cx="2743200" cy="1828800"/></a:xfrm>` +
-  `</a:grpSpPr>${textShape(3, 'in group', 0, 0)}${textShape(4, 'second', 914400, 914400)}</a:grpSp>`;
+  `</a:grpSpPr><a:txSp><a:txBody><a:bodyPr/><a:p/></a:txBody><a:useSpRect/></a:txSp>` +
+  `${textShape(3, 'in group', 0, 0)}${textShape(4, 'second', 914400, 914400)}</a:grpSp>`;
 const connector =
   `<a:cxnSp><a:nvCxnSpPr><a:cNvPr id="6" name="Connector 6"/><a:cNvCxnSpPr>` +
   `<a:stCxn id="3" idx="1"/></a:cNvCxnSpPr></a:nvCxnSpPr><a:spPr>${xfrm(0, 0, 914400, 0)}` +
@@ -122,11 +132,12 @@ const chart =
   `</a:graphicData></a:graphic></a:graphicFrame>`;
 const table =
   `<a:graphicFrame><a:nvGraphicFramePr><a:cNvPr id="8" name="Table 8"/><a:cNvGraphicFramePr/>` +
-  `</a:nvGraphicFramePr>${xfrm(0, 0, 914400, 370840)}<a:graphic><a:graphicData ` +
+  `</a:nvGraphicFramePr><a:graphic><a:graphicData ` +
   `uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr/><a:tblGrid>` +
   `<a:gridCol w="914400"/></a:tblGrid><a:tr h="370840"><a:tc><a:txBody><a:bodyPr/>` +
   `<a:lstStyle/><a:p><a:r><a:rPr lang="en-US"/><a:t>cell</a:t></a:r></a:p></a:txBody>` +
-  `<a:tcPr/></a:tc></a:tr></a:tbl></a:graphicData></a:graphic></a:graphicFrame>`;
+  `<a:tcPr/></a:tc></a:tr></a:tbl></a:graphicData></a:graphic>${xfrm(0, 0, 914400, 370840)}` +
+  `</a:graphicFrame>`;
 
 async function open(): Promise<PptxEditorInstance> {
   const e = createPptxEditor({ fixedMeasurer: true, substitutes: false });
@@ -164,6 +175,8 @@ describe('a DrawingML clipboard package', () => {
     expect(child(child(sp!, 'p:nvSpPr')!, 'p:nvPr')).toBeDefined();
     expect(find(sp!, 'a:txSp')).toBeUndefined();
     expect(child(sp!, 'p:extLst')).toBeUndefined();
+    // Schema order: the style goes before the text, unlike in the package.
+    expect(elements(sp!).map((c) => c.local)).toEqual(['nvSpPr', 'spPr', 'style', 'txBody']);
     expect(e.snapshot().selection).toMatchObject({ kind: 'shapes' });
   });
 
@@ -171,6 +184,8 @@ describe('a DrawingML clipboard package', () => {
     const e = await paste(drawingPackage(group));
     const [grp] = top(e);
     expect(grp?.local).toBe('grpSp');
+    // The group's own text has no place in a PresentationML group.
+    expect(elements(grp!).map((c) => c.local)).toEqual(['nvGrpSpPr', 'grpSpPr', 'sp', 'sp']);
     const members = elements(grp!).filter((c) => c.local === 'sp');
     expect(members.map((m) => textOf(child(m, 'p:txBody')!))).toEqual(['in group', 'second']);
     expect(attr(find(child(grp!, 'p:grpSpPr')!, 'a:xfrm')!, 'rot')).toBe('900000');
@@ -223,6 +238,25 @@ describe('a DrawingML clipboard package', () => {
     expect(json).toContain('{"ns":"","local":"cx","value":"1371600"}');
   });
 
+  test('scaled positions and sizes stay within the coordinate range', () => {
+    const payload = drawingClipboardPayload(
+      drawingPackage(textShape(2, 'x'), { ext: [1e14, 1828800], chExt: [1, 1828800] })
+    )!;
+    const json = JSON.stringify(payload.shapes[0]);
+    expect(json).toContain('{"ns":"","local":"cx","value":"27273042316900"}');
+  });
+
+  test('a package past the limits of a paste gives nothing, so the picture pastes', () => {
+    expect(drawingClipboardPayload(drawingPackage(textShape(2, 'x').repeat(501)))).toBeNull();
+  });
+
+  test('a view of the bytes from another buffer reads the same', () => {
+    const bytes = drawingPackage(textShape(2, 'x'));
+    const padded = new Uint8Array(bytes.length + 8);
+    padded.set(bytes, 4);
+    expect(drawingClipboardPayload(padded.subarray(4, 4 + bytes.length))).not.toBeNull();
+  });
+
   test('bytes that are not such a package give nothing', () => {
     expect(drawingClipboardPayload(new Uint8Array())).toBeNull();
     expect(drawingClipboardPayload(PNG)).toBeNull();
@@ -249,10 +283,11 @@ function transfer(data: Record<string, string>, files: File[] = []): DataTransfe
 
 async function host(readDrawing?: ClipboardEditor['readDrawing']) {
   const e = await open();
+  const at = { slide: 0 };
   const ran: EditorCommand[] = [];
   const editor: ClipboardEditor = {
     session: () => e.session,
-    slide: () => 0,
+    slide: () => at.slide,
     selection: () => e.snapshot().selection,
     layout: () => e.session!.layout(0),
     readOnly: () => false,
@@ -265,7 +300,7 @@ async function host(readDrawing?: ClipboardEditor['readDrawing']) {
     selectedSlides: () => [],
     ...(readDrawing ? { readDrawing } : {}),
   };
-  return { ran, clip: createClipboardHost(editor) };
+  return { e, at, ran, clip: createClipboardHost(editor) };
 }
 
 const until = async (done: () => boolean): Promise<void> => {
@@ -303,4 +338,52 @@ describe('the host reader', () => {
     expect(ran[0]).toMatchObject({ type: 'pasteText' });
     expect(asked).toBe(0);
   });
+
+  test('a paste into edited text does not ask the reader', async () => {
+    let asked = 0;
+    const { e, clip } = await host(() => (asked++, null));
+    expect((await e.exec({ type: 'insertTextBox' })).ok).toBe(true);
+    expect(e.snapshot().selection.kind).toBe('text');
+    clip.pasteFrom(transfer({}, [file()]));
+    expect(asked).toBe(0);
+  });
+
+  test('a paste that ends on another slide pastes nothing', async () => {
+    let release = (): void => undefined;
+    const { at, ran, clip } = await host(
+      () => new Promise((done) => (release = () => done(drawingPackage(textShape(2, 'Hello')))))
+    );
+    expect(clip.pasteFrom(transfer({}, [file()]))).toBe(true);
+    await new Promise((r) => setTimeout(r, 5));
+    at.slide = 1;
+    release();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ran).toEqual([]);
+  });
+
+  test('a later paste wins over a paste still reading', async () => {
+    const releases: (() => void)[] = [];
+    const { ran, clip } = await host(
+      () =>
+        new Promise((done) =>
+          releases.push(() => done(drawingPackage(textShape(2, `n${releases.length}`))))
+        )
+    );
+    clip.pasteFrom(transfer({}, [file()]));
+    clip.pasteFrom(transfer({}, [file()]));
+    await until(() => releases.length === 2);
+    releases[1]!();
+    releases[0]!();
+    await until(() => ran.length > 0);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ran).toHaveLength(1);
+  });
+
+  test('a reader that never answers pastes the picture after 2 seconds', async () => {
+    const { ran, clip } = await host(() => new Promise<null>(() => undefined));
+    expect(clip.pasteFrom(transfer({}, [file()]))).toBe(true);
+    await new Promise((r) => setTimeout(r, 2100));
+    await until(() => ran.length > 0);
+    expect(ran[0]).toMatchObject({ type: 'insertImage' });
+  }, 5000);
 });

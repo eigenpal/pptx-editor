@@ -38,17 +38,18 @@ Pasted content is untrusted input. HTML is read by a bounded tokenizer: nothing 
 
 Presentation applications write copied shapes to the system clipboard as a DrawingML package and as a picture. A browser gives a web page only the picture. If your app runs the editor in a desktop wrapper that can read the system clipboard, such as Electron, pass a `readClipboardDrawing` function. When a paste holds a picture, the editor calls it and pastes the package's shapes as editable shapes, at the positions they had on the source slide.
 
-The package is in the clipboard type that `DRAWING_CLIPBOARD_TYPES` names: `com.microsoft.Art--GVML-ClipFormat` on macOS and `Art::GVML ClipFormat` on Windows. In Electron, read it in the main process and expose it to the page. This main process handler reads only those two types:
+`DRAWING_CLIPBOARD_TYPES` names the clipboard type of the package: `com.microsoft.Art--GVML-ClipFormat` on macOS and `Art::GVML ClipFormat` on Windows. In Electron, read the package in the main process, which knows the platform:
 
 ```ts
 // main.ts (Electron main process)
 import { clipboard, ipcMain } from 'electron';
 
-const DRAWING_TYPES = new Set(['com.microsoft.Art--GVML-ClipFormat', 'Art::GVML ClipFormat']);
+// The values of DRAWING_CLIPBOARD_TYPES in @pptx-editor.dev/core.
+const DRAWING_TYPE =
+  process.platform === 'darwin' ? 'com.microsoft.Art--GVML-ClipFormat' : 'Art::GVML ClipFormat';
 
-ipcMain.handle('read-clipboard-drawing', (_event, type: string) => {
-  if (!DRAWING_TYPES.has(type)) return null;
-  const bytes = clipboard.readBuffer(type);
+ipcMain.handle('read-clipboard-drawing', () => {
+  const bytes = clipboard.readBuffer(DRAWING_TYPE);
   return bytes.length ? new Uint8Array(bytes) : null;
 });
 ```
@@ -60,33 +61,37 @@ The preload script exposes the handler to the page:
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('desktop', {
-  readClipboardDrawing: (type: string): Promise<Uint8Array | null> =>
-    ipcRenderer.invoke('read-clipboard-drawing', type),
+  readClipboardDrawing: (): Promise<Uint8Array | null> =>
+    ipcRenderer.invoke('read-clipboard-drawing'),
 });
 ```
 
-The page passes a reader to the editor. The reader can return the bytes, `null`, or a promise of either:
+Declare the exposed API once for the page:
+
+```ts
+// desktop.d.ts
+import type { ClipboardDrawingReader } from '@pptx-editor.dev/core';
+
+declare global {
+  interface Window {
+    // Undefined in a browser build.
+    desktop?: { readClipboardDrawing: ClipboardDrawingReader };
+  }
+}
+```
+
+Pass the reader to the editor. In a browser build, `window.desktop` is undefined, and pictures paste as before:
 
 <FrameworkTabs>
 <Framework value="react">
 
 ```tsx
 import { PptxEditor } from '@pptx-editor.dev/react';
-import { DRAWING_CLIPBOARD_TYPES } from '@pptx-editor.dev/core';
-
-declare global {
-  interface Window {
-    desktop: { readClipboardDrawing(type: string): Promise<Uint8Array | null> };
-  }
-}
-
-const type = navigator.userAgent.includes('Mac')
-  ? DRAWING_CLIPBOARD_TYPES.macos
-  : DRAWING_CLIPBOARD_TYPES.windows;
-const readDrawing = () => window.desktop.readClipboardDrawing(type);
 
 export function Editor({ bytes }: { bytes: Uint8Array }) {
-  return <PptxEditor document={bytes} readClipboardDrawing={readDrawing} />;
+  return (
+    <PptxEditor document={bytes} readClipboardDrawing={window.desktop?.readClipboardDrawing} />
+  );
 }
 ```
 
@@ -96,19 +101,9 @@ export function Editor({ bytes }: { bytes: Uint8Array }) {
 ```vue
 <script setup lang="ts">
 import { PptxEditor } from '@pptx-editor.dev/vue';
-import { DRAWING_CLIPBOARD_TYPES } from '@pptx-editor.dev/core';
 
 defineProps<{ bytes: Uint8Array }>();
-
-const desktop = (
-  window as unknown as {
-    desktop: { readClipboardDrawing(type: string): Promise<Uint8Array | null> };
-  }
-).desktop;
-const type = navigator.userAgent.includes('Mac')
-  ? DRAWING_CLIPBOARD_TYPES.macos
-  : DRAWING_CLIPBOARD_TYPES.windows;
-const readDrawing = () => desktop.readClipboardDrawing(type);
+const readDrawing = window.desktop?.readClipboardDrawing;
 </script>
 
 <template>
@@ -119,7 +114,9 @@ const readDrawing = () => desktop.readClipboardDrawing(type);
 </Framework>
 </FrameworkTabs>
 
-The editor reads the prop once, when it is created. Shapes, pictures, connectors, groups, and tables paste as editable content. Theme colors and theme fonts follow the theme of the slide you paste on. Charts, diagrams, and embedded objects need parts that the package does not carry, so they are left out. When the reader returns `null`, throws, or returns bytes that hold no shape the editor pastes, the picture pastes.
+The editor reads the prop once, when it is created. The reader returns the package bytes, `null`, or a promise of either. Shapes, pictures, connectors, groups, and tables paste as editable content. Theme colors and theme fonts follow the theme of the slide you paste on. Charts, diagrams, and embedded objects need parts that the package does not carry, so they are left out.
+
+The picture pastes when the reader returns `null`, throws, takes longer than 2 seconds, or returns bytes that hold no shape the editor pastes. A paste into text you edit, and a paste with HTML text, do not call the reader.
 
 To paste a package from your own code, convert it with `drawingClipboardPayload` and run `paste`:
 
@@ -128,8 +125,9 @@ import { drawingClipboardPayload, type Editor } from '@pptx-editor.dev/core';
 
 function pasteDrawing(editor: Editor, bytes: Uint8Array) {
   const payload = drawingClipboardPayload(bytes);
-  // Null: the bytes are not a DrawingML clipboard package with shapes.
-  return payload ? editor.exec({ type: 'paste', payload }) : null;
+  // Null: the bytes are not a DrawingML clipboard package with shapes the editor pastes.
+  if (!payload) return { ok: false, reason: 'errors.clipboard' } as const;
+  return editor.exec({ type: 'paste', payload });
 }
 ```
 

@@ -86,6 +86,8 @@ export type ClipboardDrawingReader = () =>
 
 /** Picture types a paste inserts. */
 const PICTURE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/bmp', 'image/webp']);
+/** How long a paste waits for the host's DrawingML package before it pastes the picture. */
+const READ_DRAWING_MS = 2000;
 /** The largest picture a paste reads, as the picture command's media limit. */
 const MAX_PICTURE = 50 * 1024 * 1024;
 
@@ -98,6 +100,8 @@ export function createClipboardHost(editor: ClipboardEditor) {
   /** Counts copies of any kind, so a late picture never replaces a later copy of text or slides. */
   let copies = 0;
   const pictures = createPictureCache();
+  /** Counts host reads of the DrawingML package, so a later paste wins over a slow one. */
+  let reads = 0;
 
   /** The key of the selected shapes' picture: the deck, its revision, the slide, the shapes. */
   const pictureKey = (): string | null => {
@@ -217,17 +221,26 @@ export function createClipboardHost(editor: ClipboardEditor) {
 
   /**
    * Paste the shapes of the host's DrawingML package, or the picture when the host reads no
-   * package, or one that holds no shape this editor pastes.
+   * package, one that holds no shape this editor pastes, or none within `READ_DRAWING_MS`.
+   * A later paste wins over one still reading.
    */
   const pasteDrawing = async (file: File, read: ClipboardDrawingReader): Promise<void> => {
     const at = place();
+    const mine = (reads += 1);
     let payload: ClipboardPayload | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const bytes = await read();
+      const late = new Promise<null>(
+        (done) => (timer = setTimeout(() => done(null), READ_DRAWING_MS))
+      );
+      const bytes = await Promise.race([Promise.resolve().then(read), late]);
       payload = bytes ? drawingClipboardPayload(bytes) : null;
     } catch {
       // A host read that fails pastes the picture.
+    } finally {
+      clearTimeout(timer);
     }
+    if (mine !== reads) return;
     if (!payload) return pastePicture(file, at);
     if (place() === at) editor.exec({ type: 'paste', payload });
   };
