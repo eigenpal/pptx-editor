@@ -148,7 +148,12 @@ export class MetafilePictures {
   /** Stops the conversions with the current fonts: a font change or `dispose()` aborts it. */
   #abort = new AbortController();
   /** The blob URL of each picture part name, with the bytes it draws. */
-  #urls = new Map<string, { readonly drawn: Uint8Array; readonly url: string }>();
+  #urls = new Map<
+    string,
+    { readonly drawn: Uint8Array; readonly url: string; readonly viewers: Set<string> }
+  >();
+  /** The URL name that each part that shows a picture part draws it with (`url`). */
+  #viewing = new Map<string, string>();
   #disposed = false;
   readonly #fonts: () => readonly Uint8Array[];
   readonly #changed: () => void;
@@ -219,25 +224,41 @@ export class MetafilePictures {
     source: string
   ): ShownPicture | undefined {
     const picture = this.drawable(bytes, named);
-    return picture && this.scaled.shown(picture, partPictureScale(pkg, source), source);
+    const factor = this.scaled.steady(source, partPictureScale(pkg, source));
+    return picture && this.scaled.shown(picture, factor, source);
   }
 
   /**
    * A blob URL for `picture`, the drawable bytes of the part `part`, at the size that `size`
-   * names (`ScaledPictures`; empty for the stored size). New bytes for the part at that size (a
-   * new PNG, or a replaced picture) revoke the URL of the old ones; `dispose()` revokes the
-   * rest. Undefined with no `Blob`.
+   * names (`ScaledPictures`; empty for the stored size), as part `viewer` shows it. New bytes
+   * for the part at that size (a new PNG, or a replaced picture) revoke the URL of the old ones.
+   * A size that no part shows any more is revoked; `dispose()` revokes the rest. Undefined with
+   * no `Blob`.
    */
-  url(part: string, picture: DrawablePicture, size = ''): string | undefined {
+  url(part: string, picture: DrawablePicture, size = '', viewer = ''): string | undefined {
     const name = size ? `${part}#${size}` : part;
-    const hit = this.#urls.get(name);
-    if (hit?.drawn === picture.bytes) return hit.url;
-    if (this.#disposed || typeof URL === 'undefined' || typeof Blob === 'undefined') return;
-    if (hit) URL.revokeObjectURL(hit.url);
-    const blob = new Blob([picture.bytes.slice().buffer], { type: picture.mime });
-    const url = URL.createObjectURL(blob);
-    this.#urls.set(name, { drawn: picture.bytes, url });
-    return url;
+    let hit = this.#urls.get(name);
+    if (hit?.drawn !== picture.bytes) {
+      if (this.#disposed || typeof URL === 'undefined' || typeof Blob === 'undefined') return;
+      if (hit) URL.revokeObjectURL(hit.url);
+      const blob = new Blob([picture.bytes.slice().buffer], { type: picture.mime });
+      const url = URL.createObjectURL(blob);
+      hit = { drawn: picture.bytes, url, viewers: hit?.viewers ?? new Set() };
+      this.#urls.set(name, hit);
+    }
+    const seat = `${part}\n${viewer}`;
+    const before = this.#viewing.get(seat);
+    if (before !== name) {
+      this.#viewing.set(seat, name);
+      hit.viewers.add(seat);
+      const old = before === undefined ? undefined : this.#urls.get(before);
+      old?.viewers.delete(seat);
+      if (old && old.viewers.size === 0) {
+        URL.revokeObjectURL(old.url);
+        this.#urls.delete(before!);
+      }
+    }
+    return hit.url;
   }
 
   /** Convert the metafile `bytes` once. Resolves when its PNG is ready or it did not convert. */
@@ -379,6 +400,7 @@ export class MetafilePictures {
     this.#hiddenTimeouts.clear();
     for (const { url } of this.#urls.values()) URL.revokeObjectURL(url);
     this.#urls.clear();
+    this.#viewing.clear();
     this.#abort.abort();
     if (this.#repaint) clearTimeout(this.#repaint);
     this.#queue = [];

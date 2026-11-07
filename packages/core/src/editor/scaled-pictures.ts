@@ -18,6 +18,12 @@ export const PART_PIXEL_BUDGET = DEFAULT_IMAGE_RESOURCE_LIMITS.maxDecodedBytes /
 const PARALLEL = 2;
 /** How often scaled pictures repaint at most while others still scale, in ms. */
 const REPAINT_INTERVAL_MS = 250;
+/**
+ * How far, as a ratio, a part's factor can move before its pictures scale again: inserting or
+ * deleting one picture of many does not scale every other one again. The pictures of a part
+ * hold at most 1.25² times the budget.
+ */
+const STEADY = 1.25;
 
 const scaleByPackage = new WeakMap<PptxPackage, Map<string, number>>();
 
@@ -160,6 +166,10 @@ export class ScaledPictures {
   #running = 0;
   /** For each part that shows pictures, how many of its scaled pictures are ready. */
   #serials = new Map<string, number>();
+  /** The size key of the last scaled bytes of each picture: they draw while another size scales. */
+  #latest = new WeakMap<Uint8Array, string>();
+  /** The factor that each part over the budget draws its pictures with (`steady`). */
+  #factors = new Map<string, number>();
   #repaint: ReturnType<typeof setTimeout> | null = null;
   #disposed = false;
   readonly #changed: () => void;
@@ -187,7 +197,8 @@ export class ScaledPictures {
   /**
    * How `picture` draws when part `source` shows it and scales its pictures by `factor`
    * (`partPictureScale`): as it is for a factor of 1, an SVG picture, or a runtime that cannot
-   * scale; scaled once that is ready; undefined while it scales or when it did not scale, so the
+   * scale; scaled once that is ready. While it scales to a new size, it draws at the last size
+   * that is ready. Undefined while it scales for the first time or when it did not scale, so the
    * placeholder paints.
    */
   shown(picture: DrawablePicture, factor: number, source: string): ShownPicture | undefined {
@@ -201,6 +212,11 @@ export class ScaledPictures {
     const done = this.#done.get(picture.bytes)?.get(key);
     if (done) return { picture: { bytes: done, mime: picture.mime }, key };
     if (done === null || this.#disposed) return undefined;
+    const latest = this.#latest.get(picture.bytes);
+    const last = latest === undefined ? undefined : this.#done.get(picture.bytes)?.get(latest);
+    const before = last
+      ? { picture: { bytes: last, mime: picture.mime }, key: latest! }
+      : undefined;
     let pending = this.#pending.get(picture.bytes);
     if (!pending) this.#pending.set(picture.bytes, (pending = new Map()));
     const job = pending.get(key);
@@ -211,7 +227,23 @@ export class ScaledPictures {
       this.#queue.push(next);
       this.#pump();
     }
-    return undefined;
+    return before;
+  }
+
+  /**
+   * The factor that part `source` draws its pictures with, for its factor `raw` now
+   * (`partPictureScale`): the factor from before while `raw` is within `STEADY` of it, so an
+   * edit of the part's pictures does not scale all of them again.
+   */
+  steady(source: string, raw: number): number {
+    if (raw >= 1) {
+      this.#factors.delete(source);
+      return 1;
+    }
+    const last = this.#factors.get(source);
+    if (last !== undefined && raw * STEADY >= last && raw <= last * STEADY) return last;
+    this.#factors.set(source, raw);
+    return raw;
   }
 
   /** Stop: no picture scales any more, and `changed` stays quiet. */
@@ -238,6 +270,12 @@ export class ScaledPictures {
     let done = this.#done.get(job.picture.bytes);
     if (!done) this.#done.set(job.picture.bytes, (done = new Map()));
     done.set(job.key, bytes);
+    if (bytes) {
+      // Keep this size and the one before it: other sizes are no longer drawn.
+      const before = this.#latest.get(job.picture.bytes);
+      for (const key of done.keys()) if (key !== job.key && key !== before) done.delete(key);
+      this.#latest.set(job.picture.bytes, job.key);
+    }
     this.#pending.get(job.picture.bytes)?.delete(job.key);
     for (const s of job.sources) this.#serials.set(s, (this.#serials.get(s) ?? 0) + 1);
     this.#pump();

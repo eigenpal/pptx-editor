@@ -252,3 +252,92 @@ test('the editor draws a slide over the budget scaled, and exports the stored pi
   expect(session.picture('/ppt/media/p0.png')?.bytes.length).toBe(34);
   editor.destroy();
 });
+
+test('a part keeps its factor while its pictures change a little', () => {
+  const scaled = new ScaledPictures(() => {});
+  expect(scaled.steady(SLIDE, 0.5)).toBe(0.5);
+  // Within 25% of the factor before: the pictures keep their size.
+  expect(scaled.steady(SLIDE, 0.45)).toBe(0.5);
+  expect(scaled.steady(SLIDE, 0.6)).toBe(0.5);
+  // Further: they scale again, to the new factor.
+  expect(scaled.steady(SLIDE, 0.39)).toBe(0.39);
+  // Within the budget: the stored size, and no factor to keep.
+  expect(scaled.steady(SLIDE, 1)).toBe(1);
+  expect(scaled.steady(SLIDE, 0.9)).toBe(0.9);
+  expect(scaled.steady('/ppt/slides/slide2.xml', 0.45)).toBe(0.45);
+});
+
+test('a picture draws at its last scaled size while a new size scales', async () => {
+  const finish: ((b: Uint8Array | null) => void)[] = [];
+  const scaled = new ScaledPictures(
+    () => {},
+    () => new Promise((r) => finish.push(r)),
+    () => true
+  );
+  const picture: DrawablePicture = { bytes: png(8000, 8000), mime: 'image/png' };
+  scaled.shown(picture, 0.5, SLIDE);
+  const first = new Uint8Array([1]);
+  finish[0]!(first);
+  await wait(10);
+  expect(scaled.shown(picture, 0.25, SLIDE)).toEqual({
+    picture: { bytes: first, mime: 'image/png' },
+    key: '4000x4000',
+  });
+  const second = new Uint8Array([2]);
+  finish[1]!(second);
+  await wait(10);
+  expect(scaled.shown(picture, 0.25, SLIDE)?.picture.bytes).toBe(second);
+  // The size before stays ready.
+  expect(scaled.shown(picture, 0.5, SLIDE)?.picture.bytes).toBe(first);
+});
+
+test('pictures keep their URLs when a picture is inserted, and old sizes are revoked', async () => {
+  globals.createImageBitmap = async () => ({ close() {} });
+  let serial = 0;
+  globals.OffscreenCanvas = class {
+    getContext() {
+      return { drawImage() {} };
+    }
+    async convertToBlob() {
+      return new Blob([png(10, 10, (serial += 1)).slice().buffer], { type: 'image/png' });
+    }
+  };
+  const revoked: string[] = [];
+  const revoke = URL.revokeObjectURL;
+  URL.revokeObjectURL = (url: string) => (revoked.push(url), revoke(url));
+  try {
+    const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+    expect((await editor.load(deck(3))).ok).toBe(true);
+    const session = editor.session!;
+    const ids = ['rIdP0', 'rIdP1', 'rIdP2'];
+    const urls = () => ids.map((rId) => session.imageUrl(SLIDE, rId));
+    urls();
+    await wait(50);
+    const before = urls();
+    expect(before.every((u) => u?.startsWith('blob:'))).toBe(true);
+    const insert = (seed: number) =>
+      editor.exec({
+        type: 'insertImage',
+        bytes: png(8000, 8000, seed),
+        mime: 'image/png',
+        width: 8000,
+        height: 8000,
+      });
+    // One more picture moves the factor less than 25%: nothing scales again.
+    expect(insert(50).ok).toBe(true);
+    expect(urls()).toEqual(before);
+    await wait(50);
+    expect(urls()).toEqual(before);
+    expect(revoked).toEqual([]);
+    // One more moves it further: each picture scales again, and draws its old URL meanwhile.
+    expect(insert(51).ok).toBe(true);
+    expect(urls()).toEqual(before);
+    await wait(50);
+    const after = urls();
+    expect(after.every((u, i) => u?.startsWith('blob:') && u !== before[i])).toBe(true);
+    for (const url of before) expect(revoked).toContain(url!);
+    editor.destroy();
+  } finally {
+    URL.revokeObjectURL = revoke;
+  }
+});
