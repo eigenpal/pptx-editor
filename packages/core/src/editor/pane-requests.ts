@@ -94,10 +94,16 @@ export function takePaneRequest(editor: object | null | undefined): SidePanelTab
   return last && Date.now() - last.at < RECENT_MS ? last.pane : null;
 }
 
-/** Whether a slot is a pane slot, which follows the pane listeners. @internal */
+/**
+ * Whether a slot is a pane slot, which follows the pane listeners and the comment draft
+ * openers (`review.addComment`). @internal
+ */
 export function isPaneSlot(slot: string): boolean {
   return (
-    slot === 'arrange.selectionPane' || slot === 'shape.properties' || slot === 'chart.editData'
+    slot === 'arrange.selectionPane' ||
+    slot === 'shape.properties' ||
+    slot === 'chart.editData' ||
+    slot === 'review.addComment'
   );
 }
 
