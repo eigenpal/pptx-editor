@@ -154,6 +154,7 @@ export async function vueAdapterShape(contract?: ParityContract): Promise<VueAda
       component: vue.BulletsAndNumberingDialog,
       props: { open: true, onClose: () => {} },
     },
+    EquationDialog: { component: vue.EquationDialog, props: { open: true, onClose: () => {} } },
     ColumnsDialog: { component: vue.ColumnsDialog, props: { open: true, onClose: () => {} } },
     FontDialog: { component: vue.FontDialog, props: { open: true, onClose: () => {} } },
     ParagraphDialog: { component: vue.ParagraphDialog, props: { open: true, onClose: () => {} } },

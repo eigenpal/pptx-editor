@@ -29,11 +29,12 @@ import {
 } from './picture-commands.ts';
 import { pictureStyleOf } from './picture-presets.ts';
 import { chartStateAt } from './chart-commands.ts';
+import { equationStateAt } from './equation-state.ts';
 import { diagramStateAt } from './diagram-commands.ts';
 
 export { chartDataAt } from './chart-commands.ts';
 
-/** The selected picture and the selected chart, as the snapshot reports them. */
+/** The selected picture, chart, and equation, as the snapshot reports them. */
 export function selectedObjectsAt(
   pkg: PptxPackage | undefined,
   part: string | undefined,
@@ -43,11 +44,13 @@ export function selectedObjectsAt(
 ): {
   image: SelectedImageState | null;
   chart: ReturnType<typeof chartStateAt>;
+  equation: ReturnType<typeof equationStateAt>;
   diagram: ReturnType<typeof diagramStateAt>;
 } {
   return {
     image: pictureStateAt(pkg, part, selection, cropping, layout),
     chart: chartStateAt(pkg, part, selection),
+    equation: equationStateAt(pkg, part, selection),
     diagram: diagramStateAt(pkg, part, selection),
   };
 }

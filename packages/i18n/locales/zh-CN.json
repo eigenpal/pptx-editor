@@ -74,7 +74,8 @@
     "link": "链接…",
     "alignOrDistribute": "对齐或分布",
     "slideBackground": "幻灯片背景…",
-    "columns": "分栏…"
+    "columns": "分栏…",
+    "equation": "公式…"
   },
   "contextMenu": {
     "railLabel": "幻灯片操作",
@@ -509,7 +510,8 @@
     "views": {
       "normal": "普通",
       "slideSorter": "幻灯片浏览"
-    }
+    },
+    "equation": "公式"
   },
   "table": {
     "insert": "表格",
@@ -1206,7 +1208,9 @@
       "layoutUnsupported": "编辑器无法重新排列此图示，因此无法添加或删除其形状。",
       "noChildren": "此图示不显示顶层以下的形状。",
       "tooLarge": "图示的形状数量超出编辑器可编辑的范围。"
-    }
+    },
+    "equationEmpty": "请输入公式。",
+    "equationSyntax": "无法读取此公式。请检查括号和反斜杠后的名称。"
   },
   "find": {
     "label": "查找和替换",
@@ -1695,5 +1699,25 @@
     "addBefore": "在前面添加形状",
     "addBelow": "在下方添加形状",
     "delete": "删除形状"
+  },
+  "equation": {
+    "close": "关闭",
+    "insertTitle": "插入公式",
+    "editTitle": "编辑公式",
+    "gallery": "常用公式",
+    "linear": "线性格式",
+    "linearHelp": "分数输入 a/b，上下标输入 x^2 或 x_i，根号输入 \\sqrt(x)，希腊字母输入 \\alpha。",
+    "notEditable": "所选公式中有线性格式无法表示的部分。按确定将插入新公式。",
+    "insert": "插入",
+    "galleryItems": {
+      "circleArea": "圆的面积",
+      "quadratic": "求根公式",
+      "pythagoras": "勾股定理",
+      "sum": "整数求和",
+      "integral": "定积分",
+      "limit": "极限",
+      "matrix": "矩阵",
+      "euler": "欧拉恒等式"
+    }
   }
 }

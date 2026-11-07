@@ -101,6 +101,12 @@ describe('local fonts', () => {
         italic: false,
         file: join(FIXTURE_FONTS_DIR, 'NotoSansSymbols2-Regular.ttf'),
       },
+      {
+        family: 'STIX Two Math',
+        bold: false,
+        italic: false,
+        file: join(FIXTURE_FONTS_DIR, 'STIXTwoMath-Regular.otf'),
+      },
     ]);
   });
 

@@ -60,6 +60,7 @@ import { Loading } from './Loading.tsx';
 import { PageSetupDialog } from './PageSetupDialog.tsx';
 import { BackgroundDialog } from './BackgroundDialog.tsx';
 import { ImageAltTextDialog } from './ImageAltTextDialog.tsx';
+import { EquationDialog } from './EquationDialog.tsx';
 import { ImagePropertiesDialog } from './ImagePropertiesDialog.tsx';
 import { ParagraphDialog } from './ParagraphDialog.tsx';
 import { FontDialog } from './FontDialog.tsx';
@@ -902,6 +903,7 @@ export const PptxEditor = Object.assign(PptxEditorDefault, {
   BackgroundDialog,
   ImageAltTextDialog,
   ImagePropertiesDialog,
+  EquationDialog,
   ParagraphDialog,
   FontDialog,
   BulletsAndNumberingDialog,

@@ -109,6 +109,8 @@ export type {
 
 import type { PictureCommand, SelectedImageState, AltText } from './picture.ts';
 import type { ChartCommand, SelectedChartState } from './chart.ts';
+import type { EquationCommand, SelectedEquationState } from './equation.ts';
+export type { EquationCommand, SelectedEquationState } from './equation.ts';
 import type { DiagramCommand, SelectedDiagramState } from './diagram.ts';
 
 // Every chart and diagram type is public: `chart.ts` and `diagram.ts` hold nothing else.
@@ -454,6 +456,7 @@ export type EditorCommand =
   | TextFormatCommand
   | PictureCommand
   | ChartCommand
+  | EquationCommand
   | DiagramCommand
   | FillCommand
   | AnimationCommand
@@ -922,6 +925,8 @@ export interface EditorSnapshot extends CommentSnapshot {
    * then. Optional: absent means the implementation does not edit chart data.
    */
   readonly chart?: SelectedChartState | null;
+  /** The selected equation, while one text box with one equation is selected. */
+  readonly equation?: SelectedEquationState | null;
   /** The selected diagram, or the diagram that holds the caret. Absent: no diagram editing. */
   readonly diagram?: SelectedDiagramState | null;
   /**

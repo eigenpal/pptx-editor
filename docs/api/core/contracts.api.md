@@ -839,7 +839,7 @@ export type EditorCommand = CommentCommand | {
 /** Apply the copied formatting to the selection as one undo step (Ctrl/Cmd+Shift+V). */
 | {
     readonly type: 'pasteFormat';
-} | TextFormatCommand | PictureCommand | ChartCommand | DiagramCommand | FillCommand | AnimationCommand
+} | TextFormatCommand | PictureCommand | ChartCommand | EquationCommand | DiagramCommand | FillCommand | AnimationCommand
 /**
 * Shape Effects: set or remove one effect of the selected shapes, connectors, and pictures.
 * A shape whose effects come from its theme style (`a:effectRef`) gets that style's effects
@@ -968,6 +968,7 @@ export interface EditorSnapshot extends CommentSnapshot {
     readonly diagram?: SelectedDiagramState | null;
     // (undocumented)
     readonly embeddedFontFaces: number;
+    readonly equation?: SelectedEquationState | null;
     // (undocumented)
     readonly error?: string;
     // (undocumented)
@@ -1017,6 +1018,27 @@ export interface EditorSnapshot extends CommentSnapshot {
     // (undocumented)
     readonly zoom: number;
 }
+
+// @public
+export type EquationCommand =
+/**
+* Insert > Equation: a new text box centered on the slide, with the equation of `linear`.
+* `font` names the font of its math runs; default `Cambria Math`. The text box is selected.
+*/
+    {
+    readonly type: 'insertEquation';
+    readonly linear: string;
+    readonly font?: string;
+}
+/**
+* Replace the math of an equation (`SelectedEquationState.nodeId`) with the equation of
+* `linear`. The equation keeps its alignment and the font, size, and color of its first run.
+*/
+| {
+    readonly type: 'setEquation';
+    readonly nodeId: string;
+    readonly linear: string;
+};
 
 // @public
 export type FillCommand =
@@ -1450,6 +1472,12 @@ export interface SelectedDiagramState {
     readonly nodeId: string;
     readonly reason?: string;
     readonly structure: boolean;
+}
+
+// @public
+export interface SelectedEquationState {
+    readonly linear: string | null;
+    readonly nodeId: string;
 }
 
 // @public

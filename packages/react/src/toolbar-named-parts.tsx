@@ -96,6 +96,8 @@ export interface ToolbarNamedParts {
   readonly Shapes: ToolbarSlotPartComponent;
   /** `insert.image`. */
   readonly ImageInsert: ToolbarPartComponent;
+  /** `insert.equation`: opens the Equation dialog. */
+  readonly Equation: ToolbarPartComponent;
   /** `shape.fill`. */
   readonly ShapeFill: ToolbarColorSplitComponent;
   /** `shape.lineColor`. */

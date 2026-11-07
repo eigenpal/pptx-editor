@@ -89,7 +89,7 @@ export function paragraphUnits(p: ResolvedParagraph | undefined): ParagraphUnits
     }
     flush();
     const len = run.kind === 'break' ? 1 : run.text.length;
-    segs.push({ start: at, end: at + len, word: run.kind === 'field' });
+    segs.push({ start: at, end: at + len, word: run.kind === 'field' || run.kind === 'math' });
     at += len;
     stops.add(at);
   }

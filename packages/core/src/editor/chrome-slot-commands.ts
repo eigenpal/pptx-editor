@@ -146,6 +146,8 @@ export function commandForSlotValue(
         : null;
     case 'insert.shape':
       return typeof value === 'string' ? { type: 'insertShape', preset: value } : null;
+    case 'insert.equation':
+      return typeof value === 'string' ? { type: 'insertEquation', linear: value } : null;
     case 'shape.fill':
       return isColorChoice(value) || value === null ? { type: 'setShapeFill', color: value } : null;
     case 'shape.lineColor':

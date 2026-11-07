@@ -693,10 +693,14 @@ export const pptxFeatures: PptxFeature[] = [
     id: 'objects.equations',
     name: 'Equations',
     category: 'objects',
-    editing: 'none',
-    rendering: 'none',
-    roundTrip: 'preserved',
+    editing: 'partial',
+    rendering: 'partial',
+    roundTrip: 'full',
     tier: 'community',
+    notes:
+      'Equations draw with STIX Two Math. Baselines and positions can differ by up to 2.2 pt. N-ary operators, accents, and skewed fractions have no reference check. Insert Equation and Edit Equation take a linear form. Math that the linear form cannot write stays as it is, and you cannot edit it. You cannot type in an equation, and font commands do not change it. The plain-text fallback is removed on edit. ' +
+      SAVE_CHECKED,
+    docsLink: '/docs/guides/equations',
   },
 
   // --- Slides, layouts & notes -----------------------------------------

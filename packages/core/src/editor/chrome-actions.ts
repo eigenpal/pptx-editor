@@ -54,6 +54,7 @@ export const SLOT_POPUP_KEYS: Readonly<Partial<Record<ChromeSlotId, string>>> = 
   'slide.background': 'background',
   'image.altText': 'imageAltText',
   'image.properties': 'imageProperties',
+  'insert.equation': 'equation',
   'paragraph.dialog': 'paragraph',
   'text.dialog': 'font',
 };

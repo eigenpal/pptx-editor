@@ -74,7 +74,8 @@
     "link": "リンク…",
     "alignOrDistribute": "配置または整列",
     "slideBackground": "スライドの背景…",
-    "columns": "段組み…"
+    "columns": "段組み…",
+    "equation": "数式…"
   },
   "contextMenu": {
     "railLabel": "スライドの操作",
@@ -509,7 +510,8 @@
     "views": {
       "normal": "標準",
       "slideSorter": "スライド一覧"
-    }
+    },
+    "equation": "数式"
   },
   "table": {
     "insert": "表",
@@ -1206,7 +1208,9 @@
       "layoutUnsupported": "この図はレイアウトし直せないため、図形を追加または削除できません。",
       "noChildren": "この図は最上位より下の図形を表示しません。",
       "tooLarge": "図の図形がエディターで編集できる数を超えています。"
-    }
+    },
+    "equationEmpty": "数式を入力してください。",
+    "equationSyntax": "この数式を読み取れません。かっことバックスラッシュの後の名前を確認してください。"
   },
   "find": {
     "label": "検索と置換",
@@ -1695,5 +1699,25 @@
     "addBefore": "前に図形を追加",
     "addBelow": "下に図形を追加",
     "delete": "図形を削除"
+  },
+  "equation": {
+    "close": "閉じる",
+    "insertTitle": "数式の挿入",
+    "editTitle": "数式の編集",
+    "gallery": "よく使う数式",
+    "linear": "線形形式",
+    "linearHelp": "分数は a/b、添え字は x^2 または x_i、根号は \\sqrt(x)、ギリシャ文字は \\alpha と入力します。",
+    "notEditable": "選択した数式には線形形式で書けない部分があります。OK を押すと新しい数式を挿入します。",
+    "insert": "挿入",
+    "galleryItems": {
+      "circleArea": "円の面積",
+      "quadratic": "二次方程式の解の公式",
+      "pythagoras": "三平方の定理",
+      "sum": "整数の和",
+      "integral": "定積分",
+      "limit": "極限",
+      "matrix": "行列",
+      "euler": "オイラーの等式"
+    }
   }
 }

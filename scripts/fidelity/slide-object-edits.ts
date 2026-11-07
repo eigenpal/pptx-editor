@@ -10,7 +10,6 @@ import {
   find,
   presentationInfo,
   readPptx,
-  serializeXmlPart,
   textOf,
   xmlPartOf,
   type PptxPackage,
@@ -452,23 +451,39 @@ export const SLIDE_AND_OBJECT_EDITS: Readonly<Record<string, FeatureEdit>> = {
     },
   },
   'objects.equations': {
-    fixture: 'preserved-content',
+    fixture: 'equations',
+    slide: 1,
     edit: (t) => {
-      t.selectText('Animated text', 0, 0);
-      t.type('Edited. ');
+      // Insert Equation from a linear form, then Edit Equation on a fraction of the deck.
+      t.run({ type: 'insertEquation', linear: 'A=\\pi r^2' });
+      t.select('Equation 3');
+      const state = t.editor.snapshot().equation;
+      if (!state) throw new Error('no equation is selected');
+      t.run({ type: 'setEquation', nodeId: state.nodeId, linear: 'y=(a+1)/b' });
     },
     check: (d) => {
-      const equation = (pkg: PptxPackage) =>
-        /<mc:AlternateContent.*?<\/mc:AlternateContent>/.exec(
-          serializeXmlPart(xmlPartOf(pkg, slidePart(pkg, 0))!)
-        )?.[0];
+      // The Markup Compatibility wrapper of the equation named `name`.
+      const wrapper = (name: string) =>
+        d
+          .slideXml(1)
+          .split('<mc:AlternateContent')
+          .find((piece) => piece.includes(`name="${name}"`)) ?? '';
+      const inserted = wrapper('Equation 9');
+      const edited = wrapper('Equation 3');
       return all(
-        textOf(find(shapeElement(d.pkg, 0, 'Animated text'), 'p:txBody')).startsWith('Edited. ')
-          ? undefined
-          : 'no text',
-        equation(d.pkg) === equation(d.original) ? undefined : 'the equation changed',
-        // The picture that the equation's fallback shows.
-        keptRels(d, 0, 'rIdImg')
+        has(
+          inserted,
+          'Requires="a14"',
+          '<m:t>π</m:t>',
+          '<m:sSup><m:e>',
+          'typeface="Cambria Math"',
+          '<mc:Fallback>',
+          '<a:t>A=πr^2</a:t>'
+        ),
+        has(edited, '<m:f><m:num>', '<m:t>1</m:t>', '<m:den>'),
+        // The fallback showed the old equation, so the edit removes it.
+        lacks(edited, '<mc:Fallback>'),
+        kept(d, 1, 'Equation 4', 'Equation 5', 'Equation 6', 'Equation 7', 'Equation 8')
       );
     },
   },

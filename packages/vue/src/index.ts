@@ -61,6 +61,7 @@ import { ToolbarControl } from './toolbar.ts';
 import { PageSetupDialog } from './PageSetupDialog.ts';
 import { ImageAltTextDialog } from './ImageAltTextDialog.ts';
 import { ImagePropertiesDialog } from './ImagePropertiesDialog.ts';
+import { EquationDialog } from './EquationDialog.ts';
 import { BackgroundDialog } from './BackgroundDialog.tsx';
 import { ParagraphDialog } from './ParagraphDialog.tsx';
 import { FontDialog } from './FontDialog.tsx';
@@ -233,6 +234,14 @@ export {
   type ImagePropertiesDialogProps,
   type UseImagePropertiesDialogReturn,
 } from './ImagePropertiesDialog.ts';
+export {
+  EquationDialog,
+  useEquationDialog,
+  type EquationDialogFieldName,
+  type EquationDialogFields,
+  type EquationDialogProps,
+  type UseEquationDialogReturn,
+} from './EquationDialog.ts';
 export {
   BackgroundDialog,
   useBackgroundDialog,
@@ -743,6 +752,7 @@ export const PptxEditor = Object.assign(PptxEditorDefault, {
   BackgroundDialog,
   ImageAltTextDialog,
   ImagePropertiesDialog,
+  EquationDialog,
   ParagraphDialog,
   FontDialog,
   BulletsAndNumberingDialog,

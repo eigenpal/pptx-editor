@@ -25,6 +25,7 @@ import {
   resolveLine,
   type ResolvedFill,
 } from './paint-props.ts';
+import { isMathZone, readMathZone } from './math.ts';
 import { pictureBulletImage, type PictureBulletSource } from './picture-bullet.ts';
 import { slotLanguage } from './script-fonts.ts';
 import { collectionScriptFont, resolveThemeFont, type Theme } from './theme.ts';
@@ -312,6 +313,9 @@ function percentAttr(raw: string | undefined): number | undefined {
   return m[2] ? v / 100 : v / 100_000;
 }
 
+/** The text of a math run: one object character, so the caret steps over the equation. */
+const OBJECT_CHAR = '\uFFFC';
+
 const ALIGNS = new Set(['l', 'ctr', 'r', 'just', 'dist', 'justLow', 'thaiDist']);
 
 /** Inputs for resolving one paragraph. */
@@ -376,8 +380,25 @@ export function resolveParagraph(input: ParagraphInputs): ResolvedParagraph {
     if (def) runBase.push(def);
   }
   const runs: ResolvedRun[] = [];
+  let mathAlign: ResolvedParagraph['align'] | undefined;
   for (const item of elements(paragraph)) {
-    if (item.kind === 'run' || item.kind === 'field') {
+    if (isMathZone(item)) {
+      const zone = readMathZone(item, (rPr) =>
+        resolveRunProps(rPr ? [...runBase, rPr] : runBase, ctx, theme, fontRef)
+      );
+      if (!zone) continue;
+      // Display math aligns its paragraph by `m:jc` (ECMA-376 Part 1, 22.1.2.51).
+      if (zone.display)
+        mathAlign ??=
+          zone.justification === 'left' ? 'l' : zone.justification === 'right' ? 'r' : 'ctr';
+      runs.push({
+        kind: 'math',
+        nodeId: item.id,
+        text: OBJECT_CHAR,
+        props: zone.props,
+        math: zone,
+      });
+    } else if (item.kind === 'run' || item.kind === 'field') {
       const rPr = child(item, 'a:rPr');
       const t = child(item, 'a:t');
       const fieldType = item.kind === 'field' ? attr(item, 'type') : undefined;
@@ -412,7 +433,7 @@ export function resolveParagraph(input: ParagraphInputs): ResolvedParagraph {
   return {
     nodeId: paragraph.id,
     level,
-    align: (ALIGNS.has(align) ? align : 'l') as ResolvedParagraph['align'],
+    align: mathAlign ?? ((ALIGNS.has(align) ? align : 'l') as ResolvedParagraph['align']),
     marL: clampEmu(numberAttr(chain, 'marL'), 0),
     marR: clampEmu(numberAttr(chain, 'marR'), 0),
     indent: clampEmu(numberAttr(chain, 'indent'), 0),

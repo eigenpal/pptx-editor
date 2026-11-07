@@ -135,7 +135,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
   pdfjs: '6.4.299',
   chromium: 'chromium-headless-shell 1248',
   fonts:
-    '@docx-editor.dev/fonts 2.34.0, @docx-editor.dev/fonts-cjk 2.34.0, fixtures/fonts 86f1cf126005',
+    '@docx-editor.dev/fonts 2.34.0, @docx-editor.dev/fonts-cjk 2.34.0, fixtures/fonts f68672445aef',
   deckLines: {
     'alignment-anchor': 19,
     'arrange-flip-hidden': 3,
@@ -153,6 +153,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'east-asian-theme-fonts': 16,
     'east-asian-typography': 77,
     effects: 4,
+    equations: 11,
     'fill-fidelity': 0,
     'fills-lines': 0,
     'follow-ups': 0,
@@ -194,6 +195,10 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
   slides: {
     'east-asian-line-breaking/4': ['pixels'],
     'east-asian-typography/2': ['extra-text'],
+    'equations/1': ['line-breaks', 'baseline'],
+    'equations/2': ['baseline'],
+    'equations/3': ['baseline'],
+    'equations/4': ['line-position'],
     'fill-fidelity/3': ['pixels'],
     'fill-fidelity/4': ['pixels'],
     'fill-fidelity/6': ['pixels'],
@@ -205,7 +210,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'picture-editing/1': ['pixels'],
     'picture-editing/2': ['pixels'],
     'pictures/1': ['pixels'],
-    'preserved-content/1': ['pixels', 'line-breaks'],
+    'preserved-content/1': ['pixels', 'line-position'],
     'rtl-text/1': ['pixels'],
     'rtl-text/2': ['pixels'],
     'rtl-text/3': ['pixels'],

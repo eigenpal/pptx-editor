@@ -40,6 +40,7 @@ import { chromeActionHostKey } from './composables.ts';
 import { PageSetupDialog, type PageSetupDialogProps } from './PageSetupDialog.ts';
 import { ImageAltTextDialog, type ImageAltTextDialogProps } from './ImageAltTextDialog.ts';
 import { ImagePropertiesDialog, type ImagePropertiesDialogProps } from './ImagePropertiesDialog.ts';
+import { EquationDialog, type EquationDialogProps } from './EquationDialog.ts';
 import { BackgroundDialog, type BackgroundDialogProps } from './BackgroundDialog.tsx';
 import { ParagraphDialog, type ParagraphDialogProps } from './ParagraphDialog.tsx';
 import { FontDialog, type FontDialogProps } from './FontDialog.tsx';
@@ -148,6 +149,12 @@ export interface PptxEditorPopups {
   imageAltText?: PptxEditorPopup<ImageAltTextDialogProps>;
   /** The Format Picture dialog of the selected picture, as DOCX Editor's `imageProperties`. */
   imageProperties?: PptxEditorPopup<ImagePropertiesDialogProps>;
+  /**
+   * Insert > Equation: a gallery and the linear form of an equation, which inserts an equation
+   * or edits the selected one. `false` turns it off; `insertEquation` and `setEquation` keep
+   * working from the API.
+   */
+  equation?: PptxEditorPopup<EquationDialogProps>;
   /** Format > Paragraph: alignment, indents, spacing before and after, and line spacing. */
   paragraph?: PptxEditorPopup<ParagraphDialogProps>;
   /** Format > Font: font, effects, offset, character spacing, and kerning. */
@@ -222,6 +229,7 @@ const PACKAGED: Readonly<Partial<Record<PptxEditorDialogKey, Component>>> = {
   background: BackgroundDialog,
   imageAltText: ImageAltTextDialog,
   imageProperties: ImagePropertiesDialog,
+  equation: EquationDialog,
   paragraph: ParagraphDialog,
   font: FontDialog,
   bulletsAndNumbering: BulletsAndNumberingDialog,

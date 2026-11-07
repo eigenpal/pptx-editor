@@ -74,7 +74,8 @@
     "link": "Link…",
     "alignOrDistribute": "Align or distribute",
     "slideBackground": "Slide background…",
-    "columns": "Columns…"
+    "columns": "Columns…",
+    "equation": "Equation…"
   },
   "contextMenu": {
     "railLabel": "Slide actions",
@@ -509,7 +510,8 @@
     "views": {
       "normal": "Normal",
       "slideSorter": "Slide sorter"
-    }
+    },
+    "equation": "Equation"
   },
   "table": {
     "insert": "Table",
@@ -1206,7 +1208,9 @@
       "layoutUnsupported": "The editor cannot lay out this diagram again, so you cannot add or delete its shapes.",
       "noChildren": "This diagram shows no shapes below its top level.",
       "tooLarge": "The diagram has more shapes than the editor edits."
-    }
+    },
+    "equationEmpty": "Type an equation.",
+    "equationSyntax": "The editor cannot read this equation. Check the brackets and the names after a backslash."
   },
   "find": {
     "label": "Find and replace",
@@ -1695,5 +1699,25 @@
     "addBefore": "Add shape before",
     "addBelow": "Add shape below",
     "delete": "Delete shape"
+  },
+  "equation": {
+    "close": "Close",
+    "insertTitle": "Insert equation",
+    "editTitle": "Edit equation",
+    "gallery": "Common equations",
+    "linear": "Linear form",
+    "linearHelp": "Type a/b for a fraction, x^2 or x_i for a script, \\sqrt(x) for a root, and \\alpha for a Greek letter.",
+    "notEditable": "The selected equation has parts that the linear form cannot write. OK inserts a new equation.",
+    "insert": "Insert",
+    "galleryItems": {
+      "circleArea": "Area of a circle",
+      "quadratic": "Quadratic formula",
+      "pythagoras": "Pythagorean theorem",
+      "sum": "Sum of integers",
+      "integral": "Definite integral",
+      "limit": "Limit",
+      "matrix": "Matrix",
+      "euler": "Euler identity"
+    }
   }
 }

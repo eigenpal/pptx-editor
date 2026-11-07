@@ -261,6 +261,17 @@
       "reactClassNameAsVueClass": {},
       "vueExclusive": {}
     },
+    "EquationDialog": {
+      "reactProps": "EquationDialogProps",
+      "paired": ["className", "onClose", "open", "preset", "style"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
     "ColumnsDialog": {
       "reactProps": "ColumnsDialogProps",
       "paired": ["className", "onClose", "open", "preset", "style"],
@@ -995,6 +1006,10 @@
       "BulletsAndNumberingDialog",
       "BulletsAndNumberingDialogFieldName",
       "BulletsAndNumberingDialogProps",
+      "EquationDialog",
+      "EquationDialogFieldName",
+      "EquationDialogFields",
+      "EquationDialogProps",
       "ColumnsDialog",
       "ColumnsDialogFieldName",
       "ColumnsDialogProps",
@@ -1007,11 +1022,13 @@
       "UseBackgroundDialogReturn",
       "UseBulletsAndNumberingDialogReturn",
       "UseColumnsDialogReturn",
+      "UseEquationDialogReturn",
       "UseFontDialogReturn",
       "UseParagraphDialogReturn",
       "useBackgroundDialog",
       "useBulletsAndNumberingDialog",
       "useColumnsDialog",
+      "useEquationDialog",
       "useFontDialog",
       "useParagraphDialog",
       "PptxEditor",

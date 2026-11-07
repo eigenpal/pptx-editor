@@ -1,0 +1,77 @@
+---
+title: 'Equations'
+description: 'Insert and edit equations from a linear form, and learn how equations draw and save.'
+category: 'Guides'
+---
+
+An equation is Office Math (`a14:m`, ECMA-376 Part 1, 22.1) in a text box. The editor draws equations on the canvas and in the PDF export, and you can insert and edit them from a short text syntax, the linear form. For the feature status, see <FeatureBadge id="objects.equations" />.
+
+## Insert an equation
+
+This helper accepts an open `PptxEditorInstance` and inserts the quadratic formula on the current slide:
+
+```ts
+import type { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+
+export function insertQuadratic(editor: PptxEditorInstance) {
+  const result = editor.exec({
+    type: 'insertEquation',
+    linear: 'x=(-b\\pm\\sqrt(b^2-4ac))/(2a)',
+  });
+  if (!result.ok) throw new Error(result.reason); // a translation key
+}
+```
+
+The command adds a text box in the center of the slide and selects it. The math runs use `Cambria Math`. Pass `font` to name another font. The command refuses with `errors.unsupported` when the editor cannot read the linear form.
+
+In the React and Vue adapters, choose **Equation** in the **Insert** toolbar group, on the **Insert** ribbon tab, or in the **Insert** menu. The Equation dialog shows a gallery of common equations and a field for the linear form. **Insert** adds the equation as one undo step.
+
+## Edit an equation
+
+Select the text box of an equation. `editor.snapshot().equation` then gives the `nodeId` of the equation and its linear form. `setEquation` replaces the math:
+
+```ts
+const equation = editor.snapshot().equation;
+if (equation?.linear != null) {
+  editor.exec({ type: 'setEquation', nodeId: equation.nodeId, linear: 'y=(a+1)/b' });
+}
+```
+
+The equation keeps its alignment and the font, size, and color of its first run. With an equation selected, the Equation dialog opens on its linear form, and **OK** applies the change. To insert another equation, clear the selection first.
+
+`linear` is `null` when the equation has a construct, a run property, or a character that the linear form does not cover. You cannot change the math of such an equation. You can still move, resize, and format its text box.
+
+## Write the linear form
+
+| Write | To get |
+| --- | --- |
+| `a/b`, `(a+b)/(2c)` | A fraction. Parentheses around an operand group it and do not draw. |
+| `x^2`, `x_i`, `x_i^2`, `e^(i\pi)` | Superscripts and subscripts. |
+| `\sqrt(x)`, `\sqrt[3](x)` | Square roots and other roots. |
+| `\sum_(k=1)^n k`, `\prod`, `\int_0^1`, `\oint` | Sums, products, and integrals with limits. |
+| `sin x`, `log x`, `lim_(n\to\infty)` | Function names. `lim`, `max`, and `min` put their `_` limit under the name. |
+| `\hat(x)`, `\dot(x)`, `\ddot(x)`, `\vec(v)`, `\tilde(x)`, `\bar(z)` | Accents and bars. |
+| `\matrix(a&b@c&d)` | A matrix. `&` separates cells, and `@` separates rows. |
+| `\alpha`, `\Omega`, `\pm`, `\times`, `\le`, `\ne`, `\to`, `\infty` | Greek letters and symbols. |
+
+Parentheses and brackets that are not operands draw as delimiters that grow with their content. Braces group and do not draw. Spaces separate names and do not draw. The linear form can have up to 1,000 characters and 24 levels of nesting.
+
+## How equations draw
+
+Equations lay out with the rules of TeX: the spacing of operators and relations, smaller scripts, and fraction and radical shifts. Rules, radical signs, and delimiters draw as filled outlines. The editor canvas and `@pptx-editor.dev/pptx-to-pdf` draw the same layout.
+
+- When the run font is not available, the equation draws in STIX Two Math or Latin Modern Math if the host has one of them. Otherwise, it draws in Liberation Serif with italic letters.
+- An equation with a construct that the layout does not read draws the fallback of its text box.
+- Font and color commands on the text box do not change the math runs. They keep the format that the equation has.
+- In a text box, an equation is one character. The caret moves over it, and Backspace after it removes it. You cannot type in an equation.
+
+For the measured rules and their limits, see the equations item of [PPTX fidelity](/docs/pptx-fidelity).
+
+## How equations save
+
+An equation saves in a Markup Compatibility wrapper (`mc:AlternateContent`). Its `mc:Choice` holds the math. A new equation also has an `mc:Fallback` copy with the equation as plain text, for applications that cannot read Office Math. When you edit an equation, the editor removes the fallback copy, because it shows the old equation.
+
+## See also
+
+- [Open a dialog from your control](/docs/customization/dialogs#open-a-dialog-from-your-control)
+- [PPTX fidelity](/docs/pptx-fidelity)

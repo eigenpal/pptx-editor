@@ -56,6 +56,8 @@ const COMMAND_TABLE = {
   insertShape: true,
   insertLine: true,
   insertImage: true,
+  insertEquation: true,
+  setEquation: true,
   // Arrange
   order: true,
   alignObjects: true,
@@ -199,4 +201,5 @@ export const INSERT_COMMAND_TYPES: ReadonlySet<EditorCommandType> = new Set([
   'insertTextBox',
   'insertImage',
   'insertTable',
+  'insertEquation',
 ]);

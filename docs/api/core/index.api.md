@@ -645,7 +645,7 @@ export type ChromeControlState =
 export type ChromeControlToggle = 'pressed' | 'choice';
 
 // @public
-export type ChromeDialogKey = 'pageSetup' | 'background' | 'paragraph' | 'font' | 'bulletsAndNumbering' | 'columns' | 'imageAltText' | 'imageProperties';
+export type ChromeDialogKey = 'pageSetup' | 'background' | 'paragraph' | 'font' | 'bulletsAndNumbering' | 'columns' | 'imageAltText' | 'imageProperties' | 'equation';
 
 // @public
 export interface ChromeGroup {
@@ -738,7 +738,7 @@ export function chromeOptionChecked(value: unknown, option: string): boolean;
 export function chromeRowState(editor: PptxEditorInstance | null, slot: ChromeSlotId, value?: string, host?: Pick<ChromeActionHost, 'unavailable'>): ChromeCommandState;
 
 // @public
-export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.textEffects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | TableSlotId | ImageSlotId | ChartSlotId | DiagramSlotId;
+export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.textEffects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | TableSlotId | ImageSlotId | ChartSlotId | DiagramSlotId | EquationSlotId;
 
 // @public
 export function chromeSlotIds(): ChromeSlotId[];
@@ -2201,7 +2201,7 @@ export type EditorCommand = CommentCommand | {
 /** Apply the copied formatting to the selection as one undo step (Ctrl/Cmd+Shift+V). */
 | {
     readonly type: 'pasteFormat';
-} | TextFormatCommand | PictureCommand | ChartCommand | DiagramCommand | FillCommand | AnimationCommand
+} | TextFormatCommand | PictureCommand | ChartCommand | EquationCommand | DiagramCommand | FillCommand | AnimationCommand
 /**
 * Shape Effects: set or remove one effect of the selected shapes, connectors, and pictures.
 * A shape whose effects come from its theme style (`a:effectRef`) gets that style's effects
@@ -2388,6 +2388,7 @@ export interface EditorSnapshot extends CommentSnapshot {
     readonly diagram?: SelectedDiagramState | null;
     // (undocumented)
     readonly embeddedFontFaces: number;
+    readonly equation?: SelectedEquationState | null;
     // (undocumented)
     readonly error?: string;
     // (undocumented)
@@ -2467,6 +2468,57 @@ export const EMPTY_EDITOR_SNAPSHOT: EditorSnapshot;
 
 // @internal
 export function enterSlideshowScreen(el: HTMLElement): () => void;
+
+// @internal
+export const EQUATION_GALLERY: readonly EquationGalleryItem[];
+
+// @public
+export type EquationCommand =
+/**
+* Insert > Equation: a new text box centered on the slide, with the equation of `linear`.
+* `font` names the font of its math runs; default `Cambria Math`. The text box is selected.
+*/
+    {
+    readonly type: 'insertEquation';
+    readonly linear: string;
+    readonly font?: string;
+}
+/**
+* Replace the math of an equation (`SelectedEquationState.nodeId`) with the equation of
+* `linear`. The equation keeps its alignment and the font, size, and color of its first run.
+*/
+| {
+    readonly type: 'setEquation';
+    readonly nodeId: string;
+    readonly linear: string;
+};
+
+// @internal
+export function equationDialogEdits(selected: SelectedEquationState | null | undefined): boolean;
+
+// @internal
+export function equationDraftCommand(fields: EquationDraftFields, selected: SelectedEquationState | null | undefined): EditorCommand | null;
+
+// @internal
+export interface EquationDraftFields {
+    readonly linear: string;
+}
+
+// @internal
+export function equationDraftFrom(selected: SelectedEquationState | null | undefined): EquationDraftFields;
+
+// @internal
+export interface EquationGalleryItem {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly labelKey: TranslationKey;
+    // (undocumented)
+    readonly linear: string;
+}
+
+// @public
+export type EquationSlotId = 'insert.equation';
 
 // @internal
 export class ExecutionFontLimitError extends RangeError {
@@ -3644,6 +3696,9 @@ export function markReadingPopup<F extends object>(renderer: F): F;
 export const MAX_ALT_TEXT = 4000;
 
 // @public
+export const MAX_LINEAR_LENGTH = 1000;
+
+// @public
 export const MAX_RESOLVER_FAMILIES = 64;
 
 // @internal
@@ -3675,6 +3730,7 @@ export const MENU_NAMED_PARTS: {
     readonly TextBox: MenuNamedRow;
     readonly TableInsert: MenuNamedRow;
     readonly ImageInsert: MenuNamedRow;
+    readonly Equation: MenuNamedRow;
     readonly Shapes: MenuNamedRow;
     readonly Line: MenuNamedRow;
     readonly Link: MenuNamedRow;
@@ -5028,6 +5084,12 @@ export interface SelectedDiagramState {
 }
 
 // @public
+export interface SelectedEquationState {
+    readonly linear: string | null;
+    readonly nodeId: string;
+}
+
+// @public
 export interface SelectedImageState {
     readonly brightness: number;
     readonly canCrop: boolean;
@@ -6278,6 +6340,7 @@ export const TOOLBAR_NAMED_PARTS: {
     readonly Line: "insert.line";
     readonly Shapes: "insert.shape";
     readonly ImageInsert: "insert.image";
+    readonly Equation: "insert.equation";
     readonly ShapeFill: "shape.fill";
     readonly LineColor: "shape.lineColor";
     readonly LineWidth: "shape.lineWidth";
@@ -6670,6 +6733,9 @@ export function validateAltTextDraft(fields: AltTextDraftFields): DialogErrors<A
 
 // @internal
 export function validateBackgroundDraft(fields: BackgroundDraftFields, initial: BackgroundDraftFields, picked?: boolean): DialogErrors<BackgroundDraftFields>;
+
+// @internal
+export function validateEquationDraft(fields: EquationDraftFields): DialogErrors<EquationDraftFields>;
 
 // @internal
 export function validatePicturePropertiesDraft(f: PicturePropertiesDraftFields, initial?: PicturePropertiesDraftFields): DialogErrors<PicturePropertiesDraftFields>;
