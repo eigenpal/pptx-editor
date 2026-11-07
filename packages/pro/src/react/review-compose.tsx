@@ -17,6 +17,7 @@ import {
   authorHooks,
   authorStyle,
   commentFieldKey,
+  itemIdentity,
   type ReviewItemView,
 } from '../review/comment-view.ts';
 import { commentInitials } from '@pptx-editor.dev/core/editor';
@@ -213,6 +214,13 @@ export function ReviewReply({ className, hidden, children }: ReviewPartProps) {
   // Held here, so the draft stays while the reply line shows.
   const [text, setText] = useState('');
   const id = useId();
+  // Another comment under this card's key drops the reply meant for the one before.
+  const who = entry ? itemIdentity(entry) : '';
+  const [openedFor, setOpenedFor] = useState(who);
+  if (who !== openedFor) {
+    setOpenedFor(who);
+    setText('');
+  }
   if (hidden || !entry || !entry.isActive || entry.resolved || review.readOnly) return null;
   if (children) return <>{children}</>;
   const author = review.author ?? '';
@@ -283,12 +291,18 @@ export function ReviewEditBox({ item }: { readonly item: ReviewItemView }) {
   const t = useReviewLabel();
   const [text, setText] = useState(item.text);
   const id = useId();
+  // Another comment under this key (the one opened is gone): close and save nothing.
+  const opened = useRef(itemIdentity(item));
+  const moved = itemIdentity(item) !== opened.current;
+  useEffect(() => {
+    if (moved) setEditing(null);
+  }, [moved, setEditing]);
   const close = (): void => {
     setEditing(null);
     focusCard(item.parentId ?? item.key);
   };
   const save = (): void => {
-    if (text.trim() !== '' && review.edit(item, text)) close();
+    if (!moved && text.trim() !== '' && review.edit(item, text)) close();
   };
   return (
     <form

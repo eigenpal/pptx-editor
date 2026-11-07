@@ -8,7 +8,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // Shift+Enter starts a new line, and Escape cancels. A refused write keeps the text.
 /** @jsxImportSource vue */
 
-import { defineComponent, onMounted, ref, useId, type PropType } from 'vue';
+import { defineComponent, onMounted, ref, useId, watch, type PropType } from 'vue';
 import { Icon } from '@pptx-editor.dev/vue';
 import { commentInitials } from '@pptx-editor.dev/core/editor';
 import {
@@ -16,6 +16,7 @@ import {
   authorHooks,
   authorStyle,
   commentFieldKey,
+  itemIdentity,
   type ReviewItemView,
 } from '../review/comment-view.ts';
 import { usePane, useReviewItem, useReviewLabel } from './review-context.ts';
@@ -226,6 +227,11 @@ export const ReviewReply = Object.assign(
       // Held here, so the draft stays while the reply line shows.
       const text = ref('');
       const id = useId()!;
+      // Another comment under this card's key drops the reply meant for the one before.
+      watch(
+        () => (entry.value ? itemIdentity(entry.value) : ''),
+        () => (text.value = '')
+      );
       return () => {
         const item = entry.value;
         if (props.hidden || !item || !item.isActive || item.resolved || review.readOnly.value)
@@ -311,12 +317,18 @@ export const ReviewEditBox = defineComponent({
     const t = useReviewLabel();
     const text = ref(props.item.text);
     const id = useId()!;
+    // Another comment under this key (the one opened is gone): close and save nothing.
+    const opened = itemIdentity(props.item);
+    const moved = (): boolean => itemIdentity(props.item) !== opened;
+    watch(moved, (gone) => {
+      if (gone) setEditing(null);
+    });
     const close = (): void => {
       setEditing(null);
       focusCard(props.item.parentId ?? props.item.key);
     };
     const save = (): void => {
-      if (text.value.trim() !== '' && review.edit(props.item, text.value)) close();
+      if (!moved() && text.value.trim() !== '' && review.edit(props.item, text.value)) close();
     };
     return () => (
       <form

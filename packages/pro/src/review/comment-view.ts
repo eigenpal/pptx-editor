@@ -149,6 +149,15 @@ export function liveDraftTarget(
   return target && shapes?.some((s) => s.nodeId === target.nodeId) ? target : null;
 }
 
+/**
+ * What a field that edits or answers `item` remembers of it when it opens: the author, the date,
+ * and the text. When the comment under the field's key no longer matches (a peer deleted it, and
+ * a repeat of its id took the key), the field closes and saves nothing.
+ */
+export function itemIdentity(item: ReviewItemView): string {
+  return [item.author, item.date ?? '', item.text].join('\u0000');
+}
+
 /** The items of the snapshot's threads: each thread, then its replies. */
 export function reviewItems(
   editor: PptxEditorInstance | null,

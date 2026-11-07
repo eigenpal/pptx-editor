@@ -19,6 +19,7 @@ import {
 } from '@pptx-editor.dev/vue';
 import { buildPptx, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { PptxEditorReview, reviewModule, useReview, type UseReviewReturn } from '../index.ts';
+import { repeatedThreadDeck } from '../../__tests__/repeat-deck.ts';
 
 const IN = 914_400;
 
@@ -156,6 +157,28 @@ describe('PptxEditorReview (Vue)', () => {
     } finally {
       stop();
     }
+  });
+
+  test('a field whose comment is gone closes and saves nothing', async () => {
+    const editor = await mount([reviewModule()]);
+    expect((await editor.load(await repeatedThreadDeck())).ok).toBe(true);
+    await settle();
+    const [a] = editor.snapshot().comments!;
+    editor.selectComment(a!.id);
+    await settle();
+    await type(field('Reply to Ada Lovelace')!, 'For A');
+    await click(button('Edit comment by Ada Lovelace'));
+    await type(field('Edit comment')!, 'A edited');
+    // A peer deletes A: B, a repeat with A's author and date, takes A's id and card.
+    editor.exec({ type: 'deleteComment', commentId: a!.id });
+    await settle();
+    expect(editor.snapshot().comments!.map((t) => [t.id === a!.id, t.text])).toEqual([
+      [true, 'B'],
+      [false, 'C'],
+    ]);
+    expect(field('Edit comment')).toBeNull();
+    expect(field('Reply to Ada Lovelace')!.value).toBe('');
+    expect(editor.snapshot().comments![0]!.replies).toEqual([]);
   });
 
   test('parts: hidden removes a part, a card class reaches each card, filter picks threads', async () => {

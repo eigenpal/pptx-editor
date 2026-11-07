@@ -20,6 +20,7 @@ import {
 } from '@pptx-editor.dev/react';
 import { buildPptx, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { PptxEditorReview, reviewModule, useReview, useReviewAuthor } from '../index.ts';
+import { repeatedThreadDeck } from '../../__tests__/repeat-deck.ts';
 
 const IN = 914_400;
 
@@ -132,6 +133,29 @@ describe('PptxEditorReview', () => {
     } finally {
       stop();
     }
+  });
+
+  test('a field whose comment is gone closes and saves nothing', async () => {
+    const editor = await mount([reviewModule()]);
+    await act(async () => void (await editor.load(await repeatedThreadDeck())));
+    const [a] = editor.snapshot().comments!;
+    act(() => editor.selectComment(a!.id));
+    const reply = screen.getByRole('textbox', { name: 'Reply to Ada Lovelace' });
+    act(() => void fireEvent.change(reply, { target: { value: 'For A' } }));
+    const edit = screen.getAllByRole('button', { name: 'Edit comment by Ada Lovelace' })[0]!;
+    act(() => void fireEvent.click(edit));
+    const box = screen.getByRole('textbox', { name: 'Edit comment' });
+    act(() => void fireEvent.change(box, { target: { value: 'A edited' } }));
+    // A peer deletes A: B, a repeat with A's author and date, takes A's id and card.
+    act(() => void editor.exec({ type: 'deleteComment', commentId: a!.id }));
+    expect(editor.snapshot().comments!.map((t) => [t.id === a!.id, t.text])).toEqual([
+      [true, 'B'],
+      [false, 'C'],
+    ]);
+    expect(screen.queryByRole('textbox', { name: 'Edit comment' })).toBeNull();
+    const left = screen.getByRole('textbox', { name: 'Reply to Ada Lovelace' });
+    expect((left as HTMLTextAreaElement).value).toBe('');
+    expect(editor.snapshot().comments![0]!.replies).toEqual([]);
   });
 
   test('parts: hidden removes a part, a card class reaches each card, filter picks threads', async () => {
