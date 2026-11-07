@@ -110,7 +110,8 @@ export function splitCommentId(
   commentId: unknown
 ): { readonly slidePart: string; readonly key: string } {
   if (typeof commentId !== 'string') throw new CommandRefusal('errors.noComment');
-  const hash = commentId.lastIndexOf('#');
+  // A part name holds no `#`, so the first one ends it; a comment key from a file can hold more.
+  const hash = commentId.indexOf('#');
   const slidePart = commentId.slice(0, hash);
   const key = commentId.slice(hash + 1);
   if (

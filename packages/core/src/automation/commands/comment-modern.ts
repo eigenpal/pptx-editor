@@ -32,6 +32,7 @@ import {
   commentTree,
   findCommentAuthor,
   modernKeyParts,
+  modernMark,
   modernTextEditable,
   presentationTarget,
   slideCommentParts,
@@ -274,40 +275,44 @@ function modernHits(root: Element | undefined, wanted: string): ModernHit[] {
     for (const list of elements(cm))
       if (is(list, 'replyLst'))
         for (const r of elements(list))
-          if (is(r, 'reply') && attr(r, 'id')?.toUpperCase() === wanted)
+          // A reply without an id is not shown either.
+          if (is(r, 'reply') && attr(r, 'id') && attr(r, 'id')!.toUpperCase() === wanted)
             out.push({ thread: cm, reply: r });
   }
   return out;
 }
 
 /**
- * A threaded comment or reply of a slide by its id key: the GUID, with `~<n>` for the n-th use of
- * a GUID that the slide repeats (`modernId`). Returns its list, its thread, and the reply.
+ * A threaded comment or reply of a slide by its id key (`modernId`): the GUID of a comment that
+ * the slide holds once, or the GUID, mark, and ordinal of a repeat. Returns its list, its thread,
+ * and the reply.
  */
 export function findModern(
   batch: OpBatch,
   slidePart: string,
   key: string
 ): { part: string; thread: Element; reply?: Element } {
-  const lists = slideCommentParts(batch.pkg, slidePart).modern;
-  const at = (guid: string, ordinal: number) => {
-    let left = ordinal;
-    for (const part of lists) {
-      // Read first, so a list without the comment is not rewritten as an XML part.
-      const count = modernHits(commentTree(batch.pkg, part)?.root, guid).length;
-      if (count < left) {
-        left -= count;
-        continue;
-      }
-      const hit = modernHits(editable(batch, part)?.root, guid)[left - 1];
-      return hit ? { part, ...hit } : undefined;
-    }
-    return undefined;
-  };
-  const { guid, ordinal } = modernKeyParts(key);
-  const found = ordinal > 0 ? at(guid, ordinal) : undefined;
-  if (!found) throw new CommandRefusal('errors.noComment');
-  return found;
+  const parsed = modernKeyParts(key);
+  if (!parsed) throw new CommandRefusal('errors.noComment');
+  const { guid, mark, ordinal } = parsed;
+  const markOf = (hit: ModernHit): string => modernMark(hit.reply ?? hit.thread);
+  // Read first, so a list without the comment is not rewritten as an XML part.
+  const lists = slideCommentParts(batch.pkg, slidePart).modern.map((part) => ({
+    part,
+    hits: modernHits(commentTree(batch.pkg, part)?.root, guid),
+  }));
+  const total = lists.reduce((n, l) => n + l.hits.length, 0);
+  // A plain GUID names a comment only while the slide holds that GUID once.
+  if (mark === undefined && total !== 1) throw new CommandRefusal('errors.noComment');
+  let left = ordinal;
+  for (const { part, hits } of lists) {
+    const index = hits.findIndex((h) => (mark === undefined || markOf(h) === mark) && --left === 0);
+    if (index < 0) continue;
+    const hit = modernHits(editable(batch, part)?.root, guid)[index];
+    if (hit) return { part, ...hit };
+    break;
+  }
+  throw new CommandRefusal('errors.noComment');
 }
 
 /** Add a reply to the thread `thread` of list `part`. Returns its GUID. */

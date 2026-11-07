@@ -127,6 +127,84 @@ async function threadedDeck(): Promise<Uint8Array> {
   );
 }
 
+/** A threaded deck whose one thread `edit` rewrites. */
+async function oneThread(edit: (thread: string, guid: string) => string): Promise<Uint8Array> {
+  const e = await open(coverageDeck());
+  expect(e.exec({ type: 'addComment', text: 'A', date: DATE }).ok).toBe(true);
+  const saved = e.save()!;
+  e.destroy();
+  return patch(
+    saved,
+    (n) => /\/comments\/modernComment/.test(n),
+    (xml) => {
+      const thread = /<p188:cm [^>]*>.*?<\/p188:cm>/s.exec(xml)![0];
+      const guid = / id="([^"]+)"/.exec(thread)![1]!;
+      return xml.replace(thread, edit(thread, guid));
+    }
+  );
+}
+
+const texts = (e: PptxEditorInstance) => e.snapshot().comments!.map((c) => c.text);
+
+describe('comment ids from a file', () => {
+  test('a delete of one repeat moves no id onto another comment', async () => {
+    // Three threads with one GUID, each created at another time.
+    const at = (thread: string, text: string, minute: string) =>
+      thread
+        .replace('>A<', `>${text}<`)
+        .replace(/ created="[^"]*"/, ` created="2026-11-07T10:${minute}:00.000"`);
+    const e = await open(
+      await oneThread((t) => at(t, 'A', '01') + at(t, 'B', '02') + at(t, 'C', '03'))
+    );
+    const [a, b, c] = e.snapshot().comments!;
+    expect(new Set([a!.id, b!.id, c!.id]).size).toBe(3);
+    expect(e.exec({ type: 'deleteComment', commentId: a!.id }).ok).toBe(true);
+    expect(e.snapshot().comments!.map((t) => t.id)).toEqual([b!.id, c!.id]);
+    expect(e.exec({ type: 'editComment', commentId: b!.id, text: 'B edited' }).ok).toBe(true);
+    expect(texts(e)).toEqual(['B edited', 'C']);
+    // The last repeat left keeps its id, and the plain GUID never names it.
+    expect(e.exec({ type: 'deleteComment', commentId: c!.id }).ok).toBe(true);
+    expect(e.exec({ type: 'editComment', commentId: b!.id, text: 'B again' }).ok).toBe(true);
+    expect(texts(e)).toEqual(['B again']);
+  });
+
+  test('a file id that holds # stays reachable', async () => {
+    const e = await open(await oneThread((t, g) => t.replace(g, 'X#Y')));
+    const [thread] = e.snapshot().comments!;
+    const [item] = reviewItems(e, e.snapshot());
+    expect(item!.editable).toBe(
+      e.can({ type: 'editComment', commentId: thread!.id, text: 'x' }).ok
+    );
+    expect(e.exec({ type: 'editComment', commentId: thread!.id, text: 'Edited' }).ok).toBe(true);
+    expect(e.exec({ type: 'replyToComment', commentId: thread!.id, text: 'R' }).ok).toBe(true);
+    expect(e.exec({ type: 'deleteComment', commentId: thread!.id }).ok).toBe(true);
+    expect(e.snapshot().comments).toEqual([]);
+  });
+
+  test('only the canonical key names a comment; a reply without an id is not reachable', async () => {
+    const e = await open(
+      await oneThread((t) => {
+        const head = /^<p188:cm [^>]*>/.exec(t)![0];
+        const author = / authorId="[^"]*"/.exec(head)![0];
+        const reply =
+          `<p188:replyLst><p188:reply${author} id=""><p188:txBody><a:bodyPr/><a:p><a:r>` +
+          '<a:t>Hidden</a:t></a:r></a:p></p188:txBody></p188:reply></p188:replyLst>';
+        return t.replace('<p188:txBody>', `${reply}<p188:txBody>`);
+      })
+    );
+    const [thread] = e.snapshot().comments!;
+    expect(thread!.replies).toEqual([]);
+    const slide = thread!.id.slice(0, thread!.id.indexOf('#'));
+    for (const alias of ['~1', '~01', '~000001', '~00000000~1', '~00000000~01'])
+      expect(
+        e.exec({ type: 'editComment', commentId: `${thread!.id}${alias}`, text: 'x' }).ok
+      ).toBe(false);
+    for (const key of ['', '~1', '~00000000~1'])
+      expect(e.exec({ type: 'deleteComment', commentId: `${slide}#${key}` }).ok).toBe(false);
+    expect(texts(e)).toEqual(['A']);
+  });
+});
+
 describe('review items', () => {
   test('editable and resolvable agree with editor.can on a threaded deck', async () => {
     const e = await open(await threadedDeck());
@@ -139,9 +217,12 @@ describe('review items', () => {
       expect(by('Resolved').resolvable).toBe(true);
       // A repeated GUID gets its own id, and the commands reach the copy.
       expect(new Set(items.map((i) => i.id)).size).toBe(items.length);
-      expect(by('Copy').id).toBe(`${by('Repeated').id}~2`);
+      // Repeats take their mark (author and creation time) and an ordinal among equal marks.
+      expect(by('Repeated').id).toMatch(/~[0-9A-F]{8}~1$/);
+      expect(by('Copy').id).toBe(by('Repeated').id.replace(/~1$/, '~2'));
       expect(by('Copy').editable).toBe(true);
-      expect(by('Tilde').id).toBe(`${by('Repeated').id}~2~1`);
+      const [guid, mark] = by('Repeated').id.split('#')[1]!.split('~');
+      expect(by('Tilde').id.split('#')[1]).toBe(`${guid}~2~${mark}~1`);
       expect(items.some((i) => i.text === 'Hidden' || i.text === 'No id')).toBe(false);
       expect(
         e.exec({ type: 'editComment', commentId: by('Copy').id, text: 'Copy edited' }).ok

@@ -213,20 +213,44 @@ export const legacyId = (slidePart: string, authorId: string, idx: string): stri
   `${slidePart}#${legacyKey(authorId, idx)}`;
 
 /**
- * The comment id of a threaded comment or reply: its GUID. A GUID that the slide already used
- * (a file can repeat one) takes its ordinal, `~2` for the second, so each id stays unique. A
- * file id that holds `~` (no GUID does) always takes its ordinal, `X~2~1`, so it never reads as
- * the second use of `X`. `modernKeyParts` reads the key back.
+ * The mark of a threaded comment or reply: its author id and creation time, as 8 hex digits
+ * (FNV-1a). A delete or an edit of another comment never changes it.
  */
-export const modernId = (slidePart: string, guid: string, ordinal = 1): string => {
-  const upper = guid.toUpperCase();
-  return `${slidePart}#${upper}${ordinal > 1 || upper.includes('~') ? `~${ordinal}` : ''}`;
-};
+export function modernMark(el: Element): string {
+  const text = `${(attr(el, 'authorId') ?? '').toUpperCase()}\u0000${attr(el, 'created') ?? ''}`;
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1)
+    hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193) >>> 0;
+  return hash.toString(16).toUpperCase().padStart(8, '0');
+}
 
-/** The GUID and the ordinal of a threaded comment id key (`modernId`). */
-export function modernKeyParts(key: string): { readonly guid: string; readonly ordinal: number } {
-  const m = /^(.*)~(\d{1,6})$/.exec(key.toUpperCase());
-  return m ? { guid: m[1]!, ordinal: Number(m[2]) } : { guid: key.toUpperCase(), ordinal: 1 };
+/**
+ * The comment id of a threaded comment or reply: its GUID. A GUID that the slide repeats (a file
+ * can) or that holds `~` (no GUID does) also takes the comment's mark (`modernMark`) and its
+ * ordinal among the repeats with that mark: `G~<mark>~1`. A delete of another repeat then moves
+ * no id onto another comment. `modernKeyParts` reads the key back.
+ */
+export const modernId = (
+  slidePart: string,
+  guid: string,
+  marked?: { readonly mark: string; readonly ordinal: number }
+): string =>
+  `${slidePart}#${guid.toUpperCase()}${marked ? `~${marked.mark}~${marked.ordinal}` : ''}`;
+
+/** The parts of a threaded comment id key (`modernId`), or undefined for a key that is not one. */
+export interface ModernKey {
+  readonly guid: string;
+  /** The mark of a repeated GUID, absent for a GUID that the slide holds once. */
+  readonly mark?: string;
+  readonly ordinal: number;
+}
+
+/** The parts of a threaded comment id key, in its canonical form only. */
+export function modernKeyParts(key: string): ModernKey | undefined {
+  const upper = key.toUpperCase();
+  const m = /^(.+)~([0-9A-F]{8})~([1-9]\d{0,5})$/.exec(upper);
+  if (m) return { guid: m[1]!, mark: m[2]!, ordinal: Number(m[3]) };
+  return upper && !upper.includes('~') ? { guid: upper, ordinal: 1 } : undefined;
 }
 
 /** The first descendant with this namespace and local name, at most `depth` levels down. */
@@ -350,21 +374,46 @@ function pointOf(pos: Element | undefined, scale: number): CommentAnchor {
 
 const optionalDate = (date: string | undefined) => (date !== undefined ? { date } : {});
 
-/** How many times the slide's threaded comments used each GUID so far, upper case. */
-type GuidCount = Map<string, number>;
+/**
+ * The ids of a slide's threaded comments: how many comments use each GUID (upper case), and how
+ * many with each GUID and mark the reader has met so far.
+ */
+interface GuidCount {
+  readonly uses: Map<string, number>;
+  readonly seen: Map<string, number>;
+}
+
+/** The threads and replies the reader shows: a thread with an id, a reply with an id. */
+function eachModern(root: Element | undefined, visit: (el: Element) => void): void {
+  if (root?.ns !== COMMENTS.p188 || root.local !== 'cmLst') return;
+  for (const cm of elements(root)) {
+    if (cm.ns !== COMMENTS.p188 || cm.local !== 'cm' || !attr(cm, 'id')) continue;
+    visit(cm);
+    for (const list of elements(cm))
+      if (list.ns === COMMENTS.p188 && list.local === 'replyLst')
+        for (const r of elements(list))
+          if (r.ns === COMMENTS.p188 && r.local === 'reply' && attr(r, 'id')) visit(r);
+  }
+}
 
 function modernComment(
   slidePart: string,
   el: Element,
   authors: Map<string, CommentAuthor>,
-  seen: GuidCount
+  count: GuidCount
 ): SlideComment {
   const author = authors.get(attr(el, 'authorId')?.toUpperCase() ?? '');
   const guid = (attr(el, 'id') ?? '').toUpperCase();
-  const ordinal = (seen.get(guid) ?? 0) + 1;
-  seen.set(guid, ordinal);
+  let marked: { mark: string; ordinal: number } | undefined;
+  if ((count.uses.get(guid) ?? 0) > 1 || guid.includes('~')) {
+    const mark = modernMark(el);
+    const key = `${guid}\u0000${mark}`;
+    const ordinal = (count.seen.get(key) ?? 0) + 1;
+    count.seen.set(key, ordinal);
+    marked = { mark, ordinal };
+  }
   return {
-    id: modernId(slidePart, guid, ordinal),
+    id: modernId(slidePart, guid, marked),
     author: author?.name ?? '',
     initials: author?.initials ?? '',
     ...optionalDate(attr(el, 'created')),
@@ -379,7 +428,7 @@ function modernThreads(
   slidePart: string,
   listPart: string,
   keys: ReturnType<typeof shapeKeys>,
-  seen: GuidCount
+  count: GuidCount
 ): CommentThread[] {
   const root = commentTree(pkg, listPart)?.root;
   if (root?.ns !== COMMENTS.p188 || root.local !== 'cmLst') return [];
@@ -387,15 +436,15 @@ function modernThreads(
   const out: CommentThread[] = [];
   for (const cm of elements(root)) {
     if (cm.ns !== COMMENTS.p188 || cm.local !== 'cm' || !attr(cm, 'id')) continue;
-    // The thread before its replies: `findModern` counts a repeated GUID in this order.
-    const head = modernComment(slidePart, cm, authors, seen);
+    // The thread before its replies: `findModern` counts repeats in this order.
+    const head = modernComment(slidePart, cm, authors, count);
     // Every reply list: two collaborators who give a thread its first reply at once give it two
     // until a save joins them.
     const replies = elements(cm)
       .filter((l) => l.ns === COMMENTS.p188 && l.local === 'replyLst')
       .flatMap((l) => elements(l))
       .filter((r) => r.ns === COMMENTS.p188 && r.local === 'reply' && attr(r, 'id'))
-      .map((r) => modernComment(slidePart, r, authors, seen));
+      .map((r) => modernComment(slidePart, r, authors, count));
     const status = attr(cm, 'status');
     out.push({
       ...head,
@@ -476,9 +525,14 @@ export function readSlideComments(pkg: PptxPackage, slidePart: string): CommentT
   const { legacy, modern } = slideCommentParts(pkg, slidePart);
   if (legacy.length === 0 && modern.length === 0) return [];
   const keys = shapeKeys(xmlPartOf(pkg, slidePart)?.root);
-  const seen: GuidCount = new Map();
+  const count: GuidCount = { uses: new Map(), seen: new Map() };
+  for (const part of modern)
+    eachModern(commentTree(pkg, part)?.root, (el) => {
+      const guid = (attr(el, 'id') ?? '').toUpperCase();
+      count.uses.set(guid, (count.uses.get(guid) ?? 0) + 1);
+    });
   return [
     ...legacy.flatMap((part) => legacyThreads(pkg, slidePart, part)),
-    ...modern.flatMap((part) => modernThreads(pkg, slidePart, part, keys, seen)),
+    ...modern.flatMap((part) => modernThreads(pkg, slidePart, part, keys, count)),
   ];
 }
