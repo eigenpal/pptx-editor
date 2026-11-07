@@ -67,6 +67,8 @@ describe('canvas context menu', () => {
     screen.getByRole('menu', { name: 'Shape actions' });
     const front = screen.getByRole('menuitem', { name: 'Bring to front' });
     expect(front.getAttribute('aria-disabled')).toBeNull();
+    // Without the pro comments pane, the menu has no New comment row.
+    expect(document.querySelector('[role="menu"] [data-slot="review.addComment"]')).toBeNull();
     fireEvent.click(front);
     expect(screen.queryByRole('menu') === null).toBe(true);
     expect(editor.snapshot().canUndo).toBe(true);

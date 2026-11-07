@@ -8,8 +8,10 @@
 // The menu bar includes rows whose commands the engine provides.
 
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
-import type { EditorSnapshot } from '../contracts/index.ts';
+import type { Editor, EditorSnapshot } from '../contracts/index.ts';
 import { chromeControlForSlot, chromeSlotIsToggle, type ChromeSlotId } from './chrome-controls.ts';
+import { commentRowShown } from './chrome-review.ts';
+import { tidySeparators } from './chrome-forms.ts';
 import { ICON_PATHS } from './icon-paths.ts';
 
 /** A row that runs one chrome slot. @public */
@@ -279,14 +281,24 @@ const TABLE_DELETE: ChromeMenuEntry = {
 };
 
 /**
+ * New comment, after the clipboard rows of the text, shape, picture, and table menus. It shows
+ * only while a comments pane can open a draft (`canvasMenuRows`).
+ */
+const NEW_COMMENT = item('review.addComment');
+
+/**
  * The canvas context menus, one per kind of target, in a fixed order. Rows the selection
- * cannot run stay in the menu, disabled with the engine's reason. @public
+ * cannot run stay in the menu, disabled with the engine's reason. The New comment row
+ * (`review.addComment`) is the exception: without a comments pane, `canvasMenuRows` leaves it
+ * out. @public
  */
 export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly ChromeMenuEntry[]>> = {
   text: [
     item('edit.cut', 'contextMenu.cut', 'contextMenu.shortcuts.cut'),
     item('edit.copy', 'contextMenu.copy', 'contextMenu.shortcuts.copy'),
     item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
+    SEPARATOR,
+    NEW_COMMENT,
     SEPARATOR,
     item('text.bold', 'contextMenu.bold', 'contextMenu.shortcuts.bold'),
     item('text.italic', 'contextMenu.italic', 'contextMenu.shortcuts.italic'),
@@ -303,6 +315,8 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
     item('more.duplicate', 'contextMenu.duplicate', 'contextMenu.shortcuts.duplicate'),
     item('more.delete', 'contextMenu.delete', 'contextMenu.shortcuts.delete'),
+    SEPARATOR,
+    NEW_COMMENT,
     SEPARATOR,
     ...ORDER_ROWS,
     SEPARATOR,
@@ -321,6 +335,8 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     item('edit.cut', 'contextMenu.cut', 'contextMenu.shortcuts.cut'),
     item('edit.copy', 'contextMenu.copy', 'contextMenu.shortcuts.copy'),
     item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
+    SEPARATOR,
+    NEW_COMMENT,
     SEPARATOR,
     TABLE_INSERT,
     TABLE_DELETE,
@@ -367,6 +383,8 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     item('more.duplicate', 'contextMenu.duplicate', 'contextMenu.shortcuts.duplicate'),
     item('more.delete', 'contextMenu.delete', 'contextMenu.shortcuts.delete'),
     SEPARATOR,
+    NEW_COMMENT,
+    SEPARATOR,
     TABLE_INSERT,
     SEPARATOR,
     ...ORDER_ROWS,
@@ -385,6 +403,8 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     item('image.change'),
     item('more.duplicate', 'contextMenu.duplicate', 'contextMenu.shortcuts.duplicate'),
     item('more.delete', 'contextMenu.delete', 'contextMenu.shortcuts.delete'),
+    SEPARATOR,
+    NEW_COMMENT,
     SEPARATOR,
     ...ORDER_ROWS,
     SEPARATOR,
@@ -437,6 +457,20 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     { ...item('slide.add', 'contextMenu.newSlide'), direct: true },
   ],
 };
+
+/**
+ * The rows of a canvas context menu as `editor` shows them: without the New comment row while no
+ * comments pane can open a draft (`commentRowShown`), so core without the pro review pane shows
+ * no dead row. Separators left alone go with it. @internal
+ */
+export function canvasMenuRows(
+  entries: readonly ChromeMenuEntry[],
+  editor: Editor | null | undefined
+): readonly ChromeMenuEntry[] {
+  if (commentRowShown(editor)) return entries;
+  const kept = entries.filter((e) => e.kind !== 'item' || e.slot !== 'review.addComment');
+  return kept.length === entries.length ? entries : tidySeparators(kept);
+}
 
 /** The key that names a menu row for host overrides: the slot, and its value if any. @internal */
 export function chromeMenuRowKey(entry: Pick<ChromeMenuItemEntry, 'slot' | 'value'>): string {

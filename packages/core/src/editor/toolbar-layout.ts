@@ -106,6 +106,7 @@ export const TOOLBAR_NAMED_PARTS = {
   DiagramAddBefore: 'diagram.addBefore',
   DiagramAddBelow: 'diagram.addBelow',
   DiagramDelete: 'diagram.delete',
+  AddComment: 'review.addComment',
   // The table group: DOCX Editor's names where it has the part (`TableInsert`,
   // `TableCellFill`, `TableBorderTarget`), and the same `Table` prefix for PPTX-only ideas.
   TableInsert: 'table.insert',

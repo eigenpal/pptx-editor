@@ -1676,6 +1676,7 @@ export interface ToolbarGroupProps {
 
 // @public
 export interface ToolbarNamedParts {
+    readonly AddComment: ToolbarPartComponent;
     readonly AddSection: ToolbarPartComponent;
     readonly Alignment: ToolbarSlotPartComponent;
     readonly AlignObjects: ToolbarSlotPartComponent;

@@ -177,7 +177,8 @@
       "section": "セクション",
       "table": "表",
       "chart": "グラフ",
-      "diagram": "図"
+      "diagram": "図",
+      "review": "校閲"
     },
     "smartGuides": "スマート ガイド",
     "find": "検索 (Ctrl+F)",
@@ -511,7 +512,8 @@
       "normal": "標準",
       "slideSorter": "スライド一覧"
     },
-    "equation": "数式"
+    "equation": "数式",
+    "newComment": "新しいコメント"
   },
   "table": {
     "insert": "表",
@@ -848,7 +850,8 @@
     "noAnimation": "このスライドにその効果はありません",
     "noAnimationChange": "効果または画面切り替えはすでにこの設定です",
     "instantAnimation": "この効果は瞬時に行われるため、継続時間はありません",
-    "noChart": "グラフを選択してください"
+    "noChart": "グラフを選択してください",
+    "noCommentPane": "このエディターにはコメント ウィンドウがありません"
   },
   "rail": {
     "ariaLabel": "スライド",

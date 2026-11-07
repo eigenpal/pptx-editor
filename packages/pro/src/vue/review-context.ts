@@ -26,6 +26,7 @@ import {
   reviewAuthorInfo,
   reviewActions,
   type ReviewAuthorInfo,
+  type ReviewCommentTarget,
   type ReviewItemView,
 } from '../review/comment-view.ts';
 import type { UseReviewReturn } from './useReview.ts';
@@ -39,6 +40,11 @@ export interface ReviewPaneValue {
   readonly review: UseReviewReturn;
   readonly byId: ComputedRef<ReadonlyMap<string, ReviewItemView>>;
   readonly drafting: Ref<boolean>;
+  /**
+   * The element a draft from the canvas menus' New comment row points at, or null: the draft then
+   * points at the selected element.
+   */
+  readonly draftTarget: Ref<ReviewCommentTarget | null>;
   readonly beginDraft: () => void;
   readonly endDraft: () => void;
   readonly editing: Ref<string | null>;
@@ -106,6 +112,7 @@ const INERT_PANE: ReviewPaneValue = {
   },
   byId: computed(() => new Map()),
   drafting: shallowRef(false),
+  draftTarget: shallowRef(null),
   beginDraft: () => {},
   endDraft: () => {},
   editing: shallowRef(null),

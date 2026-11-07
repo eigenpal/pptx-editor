@@ -177,7 +177,8 @@
       "section": "Section",
       "table": "Table",
       "chart": "Chart",
-      "diagram": "Diagram"
+      "diagram": "Diagram",
+      "review": "Review"
     },
     "smartGuides": "Smart guides",
     "find": "Find (Ctrl+F)",
@@ -511,7 +512,8 @@
       "normal": "Normal",
       "slideSorter": "Slide sorter"
     },
-    "equation": "Equation"
+    "equation": "Equation",
+    "newComment": "New comment"
   },
   "table": {
     "insert": "Table",
@@ -848,7 +850,8 @@
     "noAnimation": "This slide has no such effect",
     "noAnimationChange": "The effect or transition already has these settings",
     "instantAnimation": "This effect is instant, so it has no duration",
-    "noChart": "Select a chart"
+    "noChart": "Select a chart",
+    "noCommentPane": "This editor shows no comments pane"
   },
   "rail": {
     "ariaLabel": "Slides",

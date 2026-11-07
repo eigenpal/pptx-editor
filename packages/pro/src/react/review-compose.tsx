@@ -133,18 +133,20 @@ ReviewAddComment.pptxReviewPart = 'AddComment' as const;
  * the slide; the box names the element. Without an author, it says so and Comment is off. @public
  */
 export function ReviewDraft({ className, hidden, nodeId }: ReviewDraftProps) {
-  const { drafting, endDraft, review } = usePane();
+  const { drafting, draftTarget, endDraft, review } = usePane();
   const t = useReviewLabel();
   const [text, setText] = useState('');
   const id = useId();
   if (hidden || !drafting) return null;
   const author = review.author ?? '';
-  const target = nodeId ? null : review.commentTarget;
+  // `nodeId`, else the element of a draft from a menu, else the selected element.
+  const pinned = nodeId ?? draftTarget?.nodeId;
+  const target = nodeId ? null : (draftTarget ?? review.commentTarget);
   const blocked = review.author === null;
   const empty = text.trim() === '';
   const post = (): void => {
     if (empty || blocked || review.readOnly) return;
-    if (review.comment(text, undefined, nodeId ? { nodeId } : undefined)) {
+    if (review.comment(text, undefined, pinned ? { nodeId: pinned } : undefined)) {
       setText('');
       endDraft();
     }

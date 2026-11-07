@@ -148,6 +148,7 @@ export const CONTEXT_MENU_NAMED_PARTS = {
   DiagramAddBefore: row('diagram.addBefore'),
   DiagramAddBelow: row('diagram.addBelow'),
   DiagramDelete: row('diagram.delete'),
+  AddComment: row('review.addComment'),
   FormatBackground: row('slide.background'),
   NewSlide: row('slide.add'),
   InsertRowAbove: row('table.insertRowAbove'),

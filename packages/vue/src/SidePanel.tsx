@@ -341,9 +341,12 @@ export const PptxEditorSidePanel = defineComponent({
     // focus goes to that tab, so a keyboard user lands in the panel.
     const root = ref<HTMLElement | null>(null);
     // A request (a comment marker, the Selection pane control) lands the focus in the panel: on
-    // the pane's current item when it marks one (`aria-current`), else on the tab.
+    // the pane's current item when it marks one (`aria-current`), else on the tab. Focus that a
+    // pane already took for the request (a new comment draft) stays.
     const focusTab = (pane: SidePanelTab): void =>
       void nextTick(() => {
+        const body = root.value?.querySelector('.pptx-panel__body');
+        if (body?.contains(body.ownerDocument.activeElement)) return;
         const current = root.value?.querySelector<HTMLElement>(
           '.pptx-panel__body [aria-current="true"]'
         );

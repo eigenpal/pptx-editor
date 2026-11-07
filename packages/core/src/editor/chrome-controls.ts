@@ -20,6 +20,12 @@ import { adapterActionState } from './chrome-adapter-state.ts';
 import { EQUATION_PROBES, INSERT_GROUP, type EquationSlotId } from './chrome-insert.ts';
 import { CHART_CHROME_GROUP, chartSlotState, type ChartSlotId } from './chrome-chart.ts';
 import { DIAGRAM_CHROME_GROUP, type DiagramSlotId } from './chrome-diagram.ts';
+import {
+  REVIEW_CHROME_GROUP,
+  addCommentState,
+  runAddComment,
+  type ReviewSlotId,
+} from './chrome-review.ts';
 import { isNothingToDo } from '../automation/commands/op-batch.ts';
 import type { ToolbarSlotValue } from './toolbar-values.ts';
 import {
@@ -209,7 +215,8 @@ export type ChromeGroupId =
   | 'section'
   | 'table'
   | 'chart'
-  | 'diagram';
+  | 'diagram'
+  | 'review';
 
 /** One toolbar group. @public */
 export interface ChromeGroup {
@@ -657,6 +664,7 @@ export const CHROME_GROUPS: readonly ChromeGroup[] = [
   IMAGE_CHROME_GROUP,
   CHART_CHROME_GROUP,
   DIAGRAM_CHROME_GROUP,
+  REVIEW_CHROME_GROUP,
 ];
 
 // A group with no control left on the bar (`script`) is left out.
@@ -759,7 +767,8 @@ export type ChromeSlotId =
   | ImageSlotId
   | ChartSlotId
   | DiagramSlotId
-  | EquationSlotId;
+  | EquationSlotId
+  | ReviewSlotId;
 
 /** Every slot id, derived from the registry. @public */
 export function chromeSlotIds(): ChromeSlotId[] {
@@ -821,6 +830,7 @@ export interface ToolbarCommandState {
 /** Enabled and active state of a slot: the ONE source of truth for both. @public */
 export function toolbarCommandState(editor: Editor | null, id: ChromeSlotId): ToolbarCommandState {
   if (!editor) return { id, enabled: false, disabledReason: 'disabled.noEditor', active: false };
+  if (id === 'review.addComment') return addCommentState(editor);
   const image = imageSlotState(editor, id) ?? chartSlotState(editor, id);
   if (image) return image;
   const snap = editor.snapshot();
@@ -934,6 +944,8 @@ export function runToolbarCommand<K extends ChromeSlotId>(
   options?: EditorExecOptions
 ) {
   if (!editor) return { ok: false as const, reason: 'disabled.noEditor' };
+  // New comment opens the comments pane's draft; the posted comment is the command.
+  if (id === 'review.addComment') return runAddComment(editor);
   // A dialog slot run with no value, or a dialog row's value ("Line spacing options…"): say how
   // to open the dialog instead of running nothing or a refused command.
   const control = chromeControlForSlot(id);

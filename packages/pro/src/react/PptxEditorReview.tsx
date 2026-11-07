@@ -31,8 +31,14 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { useEditorState } from '@pptx-editor.dev/react';
-import type { ReviewItemView } from '../review/comment-view.ts';
+import { registerCommentDraft } from '@pptx-editor.dev/core/editor';
+import { useEditorState, usePptxEditor } from '@pptx-editor.dev/react';
+import {
+  commentTarget,
+  reviewReadOnly,
+  type ReviewCommentTarget,
+  type ReviewItemView,
+} from '../review/comment-view.ts';
 import { useReview } from './useReview.ts';
 import {
   ReviewContext,
@@ -142,9 +148,12 @@ function rootChildren(children: ReviewProps['children']): {
  */
 function ReviewRoot({ className, hidden, t, card, children, preset = true, filter }: ReviewProps) {
   const review = useReview();
+  const editor = usePptxEditor();
   const label = useReviewLabelFrom(t);
   const noModule = useEditorState((s) => s.status === 'ready' && s.comments == null);
   const [drafting, setDrafting] = useState(false);
+  // The element a draft from a menu points at: the one the right-click selected.
+  const [draftTarget, setDraftTarget] = useState<ReviewCommentTarget | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const root = useRef<HTMLElement>(null);
 
@@ -163,6 +172,20 @@ function ReviewRoot({ className, hidden, t, card, children, preset = true, filte
     setDrafting(false);
     setEditing(null);
   }, [slide, review.readOnly]);
+  // The canvas menus' New comment row opens a draft here, on the selected element.
+  useEffect(() => {
+    if (!editor || noModule) return undefined;
+    return registerCommentDraft(editor, () => {
+      const snap = editor.snapshot();
+      if (reviewReadOnly(snap)) return;
+      setDraftTarget(commentTarget(snap.selection, snap.shapes));
+      setDrafting(true);
+      // A draft that was already open takes the focus again.
+      requestAnimationFrame(() =>
+        root.current?.querySelector<HTMLElement>('[data-draft] [data-comment-field]')?.focus()
+      );
+    });
+  }, [editor, noModule]);
 
   const focusCard = useCallback((key: string) => {
     requestAnimationFrame(() => {
@@ -171,9 +194,13 @@ function ReviewRoot({ className, hidden, t, card, children, preset = true, filte
       (card ?? el?.querySelector<HTMLElement>('[data-review-add]'))?.focus();
     });
   }, []);
-  const beginDraft = useCallback(() => setDrafting(true), []);
+  const beginDraft = useCallback(() => {
+    setDraftTarget(null);
+    setDrafting(true);
+  }, []);
   const endDraft = useCallback(() => {
     setDrafting(false);
+    setDraftTarget(null);
     requestAnimationFrame(() =>
       root.current?.querySelector<HTMLElement>('[data-review-add]')?.focus()
     );
@@ -194,13 +221,26 @@ function ReviewRoot({ className, hidden, t, card, children, preset = true, filte
       review: items === review.items ? review : { ...review, items },
       byId,
       drafting,
+      draftTarget,
       beginDraft,
       endDraft,
       editing,
       setEditing,
       focusCard,
     }),
-    [t, card?.className, review, items, byId, drafting, beginDraft, endDraft, editing, focusCard]
+    [
+      t,
+      card?.className,
+      review,
+      items,
+      byId,
+      drafting,
+      draftTarget,
+      beginDraft,
+      endDraft,
+      editing,
+      focusCard,
+    ]
   );
 
   if (hidden) return null;

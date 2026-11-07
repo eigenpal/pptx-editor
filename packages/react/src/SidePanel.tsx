@@ -326,9 +326,12 @@ export function SidePanel({
     setAsked({ pane });
   }, [editor]);
   // A request (a comment marker, the Selection pane control) lands the focus in the panel: on the
-  // pane's current item when it marks one (`aria-current`), else on the tab.
+  // pane's current item when it marks one (`aria-current`), else on the tab. Focus that a pane
+  // already took for the request (a new comment draft) stays.
   useEffect(() => {
     if (!asked) return;
+    const body = root.current?.querySelector('.pptx-panel__body');
+    if (body?.contains(body.ownerDocument.activeElement)) return;
     const current = root.current?.querySelector<HTMLElement>(
       '.pptx-panel__body [aria-current="true"]'
     );

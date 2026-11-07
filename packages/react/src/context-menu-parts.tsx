@@ -28,6 +28,7 @@ import {
   CONTEXT_MENU_NAMED_PARTS,
   arrangeMenuRows,
   canvasMenuLabelKey,
+  canvasMenuRows,
   warnMenuPart,
   type CanvasMenuKind,
 } from '@pptx-editor.dev/core/editor';
@@ -37,7 +38,7 @@ import {
   MenuSeparator,
   type ContextMenuPoint,
 } from './ContextMenu.tsx';
-import { TranslationContext, useTranslation } from './context.ts';
+import { TranslationContext, usePptxEditor, useTranslation } from './context.ts';
 import { ToolbarContext } from './headless-hooks.tsx';
 import { useCanvasMenuRegistry, type PptxEditorPopups } from './popups.tsx';
 import { MenuEntries } from './menu-rows.tsx';
@@ -210,6 +211,7 @@ function OpenContextMenu({
   children,
 }: PptxEditorContextMenuProps & { readonly target: ContextMenuRequest }): ReactNode {
   const { t } = useTranslation();
+  const editor = usePptxEditor();
   // `disabled` turning on closes an open menu.
   useEffect(() => {
     if (disabled) target.close();
@@ -225,7 +227,8 @@ function OpenContextMenu({
     } = arrangeMenuRows(CANVAS_CONTEXT_MENUS[target.kind], flatten(children), menuSlotRowOf);
     content = (
       <>
-        <MenuEntries entries={shown} overrides={overrides} />
+        {/* New comment shows only while a comments pane can open a draft. */}
+        <MenuEntries entries={canvasMenuRows(shown, editor)} overrides={overrides} />
         {extras.length ? <MenuSeparator /> : null}
         {extras}
       </>

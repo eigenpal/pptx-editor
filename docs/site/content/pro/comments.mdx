@@ -68,6 +68,8 @@ const modules = [reviewModule()];
 
 The pane lists the threads of the current slide. Users add a comment to the slide or to the selected element, reply, edit, delete, and resolve or reopen a thread. In a comment field, Enter posts, Shift+Enter starts a new line, and Escape cancels.
 
+Right-click text, a shape, a picture, or a table on the slide and pick **New comment** to start a comment on that element. The row shows while the pane is mounted, or while a side panel or your host can show the **Comments** tab on request (`listenPaneRequests`). It opens the tab when it is closed and focuses the new draft. In view mode, the row is disabled. Your own control runs the same action with `useEditorCommand('review.addComment')`.
+
 A marker on the canvas shows each thread. A click on a marker selects its thread and turns the side panel to the **Comments** tab. The markers are pointer shortcuts: keyboard and screen reader users reach the same threads in the pane. Comment markers are editing chrome. They do not print or export.
 
 Without the review module, `PptxEditorReview` and the packaged **Comments** tab say that comments are kept when you save. The packaged `PptxEditor` component has no side panel, so compose the editor to show the pane. For the other parts of a composed layout, see [Layout](/docs/customization/layout).
@@ -175,6 +177,8 @@ Each part takes `className`, `asChild`, and `hidden`. The root also takes `t`, a
 
 Each action returns `true` when the editor applies the change. Inside a card, `useReviewItem()` returns its `ReviewItemView`. `useReviewAuthor(name)` returns the color slot of an author.
 
+To open your own draft from the **New comment** row, call `registerCommentDraft(editor, open)` from `@pptx-editor.dev/core/editor` when your pane mounts, and call the function that it returns when the pane unmounts. The row calls the `open` function of the latest registration.
+
 ## Edit comments with commands
 
 Run comment commands on an open `PptxEditorInstance`. This helper adds a comment to the selected element, or to the slide when nothing is selected, and then replies to it:
@@ -213,7 +217,7 @@ export function askForReview(editor: PptxEditorInstance) {
 
 ## Read the threads
 
-`editor.snapshot().comments` lists the threads of the current slide. It is `null` without the review module. `activeComment` is the id of the selected thread. Each thread has `id`, `format` (`modern` or `legacy`), `author`, `initials`, `date`, `text`, `resolved`, `anchor`, and `replies`.
+`editor.snapshot().comments` lists the threads of the current slide. It is `null` without the review module. `activeComment` is the id of the selected thread. Each thread has `id`, `format` (`modern` or `legacy`), `author`, `initials`, `date`, `text`, `textEditable`, `resolved`, `anchor`, and `replies`. `textEditable` is `false` for a comment whose content `editComment` cannot write back, such as a mention.
 
 To read the threads of any slide, call `readCommentThreads` with a package and a slide part name:
 

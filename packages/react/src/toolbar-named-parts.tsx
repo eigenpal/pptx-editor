@@ -212,6 +212,8 @@ export interface ToolbarNamedParts {
   readonly DiagramAddBelow: ToolbarPartComponent;
   /** `diagram.delete`. */
   readonly DiagramDelete: ToolbarPartComponent;
+  /** `review.addComment`. */
+  readonly AddComment: ToolbarPartComponent;
   /** `table.insert`. */
   readonly TableInsert: ToolbarPartComponent;
   /** `table.style`. */

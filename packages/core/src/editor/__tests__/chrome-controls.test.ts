@@ -137,6 +137,7 @@ const SLOT_UNION = {
   'diagram.addBefore': true,
   'diagram.addBelow': true,
   'diagram.delete': true,
+  'review.addComment': true,
 } as const satisfies Record<ChromeSlotId, true>;
 
 const en = JSON.parse(

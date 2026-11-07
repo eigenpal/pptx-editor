@@ -345,6 +345,7 @@ export {
   CANVAS_CONTEXT_MENUS,
   CHROME_MENUS,
   canvasMenuKind,
+  canvasMenuRows,
   chromeMenuRowKey,
   resolveChromeMenuRow,
   type CanvasMenuKind,
@@ -508,6 +509,7 @@ export {
 export { type EquationSlotId } from './chrome-insert.ts';
 export { type DiagramSlotId } from './chrome-diagram.ts';
 export { type ImageSlotId } from './chrome-picture.ts';
+export { commentRowShown, type ReviewSlotId } from './chrome-review.ts';
 export {
   resetDevWarnings,
   warnAsChildChild,
@@ -769,10 +771,13 @@ export {
   type AnimationStartLabel,
 } from './animation-pane.ts';
 export {
+  canRequestCommentDraft,
   hasPaneListener,
   isPaneSlot,
   listenPaneRequests,
   paneListenersVersion,
+  registerCommentDraft,
+  requestCommentDraft,
   requestPane,
   visibleSidePanelTabs,
   subscribePaneListeners,

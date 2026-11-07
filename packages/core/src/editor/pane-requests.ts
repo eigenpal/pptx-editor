@@ -2,6 +2,7 @@
 // (Selection pane) and `shape.properties` (Format shape) send them. The host owns the side
 // panel, so the side panel and the host listen: the panel turns to the tab, and the host shows
 // the panel. While nothing listens, the slots are off with the `disabled.noSidePanel` reason.
+// The comment draft requests at the end follow the same pattern.
 //
 // This module imports nothing: the refusal scan of the automation hosts follows imports.
 
@@ -127,4 +128,63 @@ export function subscribePaneListeners(watch: () => void): () => void {
 /** A number that changes when a listener starts or stops. @internal */
 export function paneListenersVersion(): number {
   return version;
+}
+
+// A new comment draft: the New comment row of the canvas context menus (`review.addComment`)
+// asks a comments pane to open one. A mounted pane registers its opener. A request while no pane
+// is mounted asks for the Comments tab and waits, as a pane request does, for the pane that a
+// side panel or the host then mounts.
+
+/** For each editor: the openers of the mounted comments panes, the latest last. */
+const draftOpeners = new WeakMap<object, (() => void)[]>();
+/** The time of each editor's draft request that no pane has taken yet. */
+const waitingDrafts = new WeakMap<object, number>();
+
+/**
+ * Register the function that opens a new comment draft for `editor`. A mounted comments pane
+ * registers one; the New comment row of the canvas context menus calls the latest. A request
+ * made at most a second before, while no pane was mounted, reaches the opener now: the host
+ * showed the pane for it. Returns the function that unregisters. @public
+ */
+export function registerCommentDraft(editor: object, open: () => void): () => void {
+  let list = draftOpeners.get(editor);
+  if (!list) draftOpeners.set(editor, (list = []));
+  const own = (): void => open();
+  list.push(own);
+  changed();
+  const at = waitingDrafts.get(editor);
+  if (at !== undefined) {
+    waitingDrafts.delete(editor);
+    if (Date.now() - at < RECENT_MS) own();
+  }
+  return () => {
+    const i = list.indexOf(own);
+    if (i < 0) return;
+    list.splice(i, 1);
+    changed();
+  };
+}
+
+/**
+ * Whether a draft request can reach a comments pane: one is mounted, or a side panel or host
+ * listens for pane requests and can show the **Comments** tab. @internal
+ */
+export function canRequestCommentDraft(editor: object | null | undefined): boolean {
+  return !!editor && (!!draftOpeners.get(editor)?.length || hasPaneListener(editor));
+}
+
+/**
+ * Ask for a new comment draft. A mounted comments pane opens it. Otherwise the request asks for
+ * the **Comments** tab (`requestPane`), and the pane that mounts within a second opens it.
+ * Returns false when nothing can answer. @public
+ */
+export function requestCommentDraft(editor: object): boolean {
+  const open = draftOpeners.get(editor)?.at(-1);
+  if (open) {
+    open();
+    return true;
+  }
+  if (!hasPaneListener(editor)) return false;
+  waitingDrafts.set(editor, Date.now());
+  return requestPane(editor, 'comments');
 }

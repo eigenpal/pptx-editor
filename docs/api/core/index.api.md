@@ -388,6 +388,9 @@ export function canQueryLocalFonts(): boolean;
 // @internal
 export function canRenameSectionInPlace(editor: object | null): boolean;
 
+// @internal
+export function canRequestCommentDraft(editor: object | null | undefined): boolean;
+
 // @public
 export type CanResult = {
     readonly ok: true;
@@ -416,6 +419,9 @@ export function canvasMenuPoint(owner: Element, at: {
     x: number;
     y: number;
 };
+
+// @internal
+export function canvasMenuRows(entries: readonly ChromeMenuEntry[], editor: Editor | null | undefined): readonly ChromeMenuEntry[];
 
 // @public
 export type CapsStyle = 'none' | 'small' | 'all';
@@ -659,7 +665,7 @@ export interface ChromeGroup {
 }
 
 // @public
-export type ChromeGroupId = 'history' | 'font' | 'text' | 'script' | 'paragraph' | 'list' | 'insert' | 'shape' | 'format' | 'arrange' | 'more' | 'find' | 'view' | 'file' | 'edit' | 'slide' | 'image' | 'section' | 'table' | 'chart' | 'diagram';
+export type ChromeGroupId = 'history' | 'font' | 'text' | 'script' | 'paragraph' | 'list' | 'insert' | 'shape' | 'format' | 'arrange' | 'more' | 'find' | 'view' | 'file' | 'edit' | 'slide' | 'image' | 'section' | 'table' | 'chart' | 'diagram' | 'review';
 
 // @internal
 export function chromeKeepsFocus(target: EventTarget | null): boolean;
@@ -738,7 +744,7 @@ export function chromeOptionChecked(value: unknown, option: string): boolean;
 export function chromeRowState(editor: PptxEditorInstance | null, slot: ChromeSlotId, value?: string, host?: Pick<ChromeActionHost, 'unavailable'>): ChromeCommandState;
 
 // @public
-export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.textEffects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | TableSlotId | ImageSlotId | ChartSlotId | DiagramSlotId | EquationSlotId;
+export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.textEffects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | TableSlotId | ImageSlotId | ChartSlotId | DiagramSlotId | EquationSlotId | ReviewSlotId;
 
 // @public
 export function chromeSlotIds(): ChromeSlotId[];
@@ -1178,6 +1184,9 @@ export function commentInitials(comment: {
 // @public
 export type CommentMarkerStyle = 'initials' | 'icon';
 
+// @internal
+export function commentRowShown(editor: Editor | null | undefined): boolean;
+
 // @public
 export interface CommentSnapshot {
     readonly activeComment?: string | null;
@@ -1256,6 +1265,7 @@ export const CONTEXT_MENU_NAMED_PARTS: {
     readonly DiagramAddBefore: MenuNamedRow;
     readonly DiagramAddBelow: MenuNamedRow;
     readonly DiagramDelete: MenuNamedRow;
+    readonly AddComment: MenuNamedRow;
     readonly FormatBackground: MenuNamedRow;
     readonly NewSlide: MenuNamedRow;
     readonly InsertRowAbove: MenuNamedRow;
@@ -4767,6 +4777,9 @@ export function refocusAfterCollapse(list: HTMLElement | null, was: HTMLElement 
 // @internal
 export function refocusAfterSorterHides(list: HTMLElement, editor: PptxEditorInstance | null): void;
 
+// @public
+export function registerCommentDraft(editor: object, open: () => void): () => void;
+
 // @internal
 export function registerSectionRenamer(editor: object, take: (sectionId: string) => void): () => void;
 
@@ -4808,6 +4821,9 @@ export type ReplaceAllResult = {
 
 // @internal
 export function reportFontError(error: EditorFontError, handler: ((error: EditorFontError) => void) | undefined): void;
+
+// @public
+export function requestCommentDraft(editor: object): boolean;
 
 // @internal
 export function requestDialogSection(editor: object, dialog: string, section: string): void;
@@ -4908,6 +4924,9 @@ export interface ReviewPaneOptions {
     readonly commentMarkers?: CommentMarkerStyle;
     readonly opening?: ReviewPaneOpening;
 }
+
+// @public
+export type ReviewSlotId = 'review.addComment';
 
 // @public
 export const RIBBON_TABS: readonly RibbonTab[];
@@ -5494,6 +5513,7 @@ export interface SlideComment {
     readonly id: string;
     readonly initials: string;
     readonly text: string;
+    readonly textEditable: boolean;
 }
 
 // @internal
@@ -6411,6 +6431,7 @@ export const TOOLBAR_NAMED_PARTS: {
     readonly DiagramAddBefore: "diagram.addBefore";
     readonly DiagramAddBelow: "diagram.addBelow";
     readonly DiagramDelete: "diagram.delete";
+    readonly AddComment: "review.addComment";
     readonly TableInsert: "table.insert";
     readonly TableStyle: "table.style";
     readonly TableHeaderRow: "table.headerRow";

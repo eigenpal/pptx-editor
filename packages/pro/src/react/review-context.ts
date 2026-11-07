@@ -14,6 +14,7 @@ import {
   reviewAuthorInfo,
   reviewActions,
   type ReviewAuthorInfo,
+  type ReviewCommentTarget,
   type ReviewItemView,
 } from '../review/comment-view.ts';
 import type { UseReviewReturn } from './useReview.ts';
@@ -31,6 +32,11 @@ export interface ReviewPaneValue {
   readonly byId: ReadonlyMap<string, ReviewItemView>;
   /** Whether the compose box of a new comment is open. */
   readonly drafting: boolean;
+  /**
+   * The element a draft from the canvas menus' New comment row points at, or null: the draft then
+   * points at the selected element.
+   */
+  readonly draftTarget: ReviewCommentTarget | null;
   /** Open the compose box. */
   readonly beginDraft: () => void;
   /** Close it, posted or not. */
@@ -85,6 +91,7 @@ const INERT_PANE: ReviewPaneValue = {
   review: INERT_REVIEW,
   byId: new Map(),
   drafting: false,
+  draftTarget: null,
   beginDraft: () => {},
   endDraft: () => {},
   editing: null,

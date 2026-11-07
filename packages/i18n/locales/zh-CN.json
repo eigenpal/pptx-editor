@@ -177,7 +177,8 @@
       "section": "节",
       "table": "表格",
       "chart": "图表",
-      "diagram": "图示"
+      "diagram": "图示",
+      "review": "审阅"
     },
     "smartGuides": "智能参考线",
     "find": "查找(Ctrl+F)",
@@ -511,7 +512,8 @@
       "normal": "普通",
       "slideSorter": "幻灯片浏览"
     },
-    "equation": "公式"
+    "equation": "公式",
+    "newComment": "新建批注"
   },
   "table": {
     "insert": "表格",
@@ -848,7 +850,8 @@
     "noAnimation": "此幻灯片没有该效果",
     "noAnimationChange": "效果或切换已经是这些设置",
     "instantAnimation": "此效果是瞬时的，因此没有持续时间",
-    "noChart": "请选择一个图表"
+    "noChart": "请选择一个图表",
+    "noCommentPane": "此编辑器没有批注窗格"
   },
   "rail": {
     "ariaLabel": "幻灯片",

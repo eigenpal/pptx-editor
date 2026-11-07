@@ -33,6 +33,7 @@ import {
   CONTEXT_MENU_NAMED_PARTS,
   arrangeMenuRows,
   canvasMenuLabelKey,
+  canvasMenuRows,
   warnMenuPart,
   type CanvasMenuKind,
   type ContextMenuPartName,
@@ -50,6 +51,7 @@ import {
   type MenuRowPartComponent,
 } from './menu-parts.tsx';
 import { useCanvasMenuRegistry } from './popups.ts';
+import { usePptxEditor } from './composables.ts';
 
 /**
  * The named rows of the canvas context menu (`PptxEditorContextMenu.Cut`, …), the twin of
@@ -148,6 +150,7 @@ const ContextMenuRoot = defineComponent({
   setup(props, { attrs, slots, emit }) {
     const placedHost = useToolbarContext().t;
     const { t } = useChromeTranslateScope(() => props.t);
+    const editor = usePptxEditor();
     const target = useContextMenuRequest();
     const registry = target ? null : useCanvasMenuRegistry();
     if (registry) {
@@ -209,7 +212,8 @@ const ContextMenuRoot = defineComponent({
         const renders = new Map<string, (() => VNode) | null>();
         for (const [key, child] of overrides) renders.set(key, child ? () => child : null);
         return [
-          <MenuEntries entries={entries} overrides={renders} />,
+          // New comment shows only while a comments pane can open a draft.
+          <MenuEntries entries={canvasMenuRows(entries, editor.value)} overrides={renders} />,
           extras.length ? <MenuSeparator /> : null,
           ...extras,
         ];

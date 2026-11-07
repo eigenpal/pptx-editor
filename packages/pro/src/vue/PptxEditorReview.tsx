@@ -15,6 +15,7 @@ import {
   defineComponent,
   isVNode,
   nextTick,
+  onBeforeUnmount,
   provide,
   ref,
   shallowRef,
@@ -25,8 +26,14 @@ import {
   type VNode,
   type VNodeChild,
 } from 'vue';
-import { useEditorState } from '@pptx-editor.dev/vue';
-import type { ReviewItemView } from '../review/comment-view.ts';
+import { registerCommentDraft } from '@pptx-editor.dev/core/editor';
+import { useEditorState, usePptxEditor } from '@pptx-editor.dev/vue';
+import {
+  commentTarget,
+  reviewReadOnly,
+  type ReviewCommentTarget,
+  type ReviewItemView,
+} from '../review/comment-view.ts';
 import { useReview, type UseReviewReturn } from './useReview.ts';
 import {
   ReviewItemScope,
@@ -186,8 +193,11 @@ const ReviewRoot = defineComponent({
     const noModule = useEditorState((s) => s.status === 'ready' && s.comments == null);
     const slide = useEditorState((s) => s.slides[s.currentSlide]?.id ?? '');
     const drafting = ref(false);
+    // The element a draft from a menu points at: the one the right-click selected.
+    const draftTarget = shallowRef<ReviewCommentTarget | null>(null);
     const editing = shallowRef<string | null>(null);
     const root = ref<HTMLElement | null>(null);
+    const editor = usePptxEditor();
 
     // `filter` picks threads; a reply follows its thread.
     const items = computed(() => {
@@ -205,6 +215,30 @@ const ReviewRoot = defineComponent({
       drafting.value = false;
       editing.value = null;
     });
+    // The canvas menus' New comment row opens a draft here, on the selected element.
+    let unregister: (() => void) | null = null;
+    watch(
+      [editor, noModule],
+      ([e, off]) => {
+        unregister?.();
+        unregister = null;
+        if (!e || off) return;
+        unregister = registerCommentDraft(e, () => {
+          const snap = e.snapshot();
+          if (reviewReadOnly(snap)) return;
+          draftTarget.value = commentTarget(snap.selection, snap.shapes);
+          drafting.value = true;
+          // A draft that was already open takes the focus again.
+          void nextTick(() =>
+            requestAnimationFrame(() =>
+              root.value?.querySelector<HTMLElement>('[data-draft] [data-comment-field]')?.focus()
+            )
+          );
+        });
+      },
+      { immediate: true }
+    );
+    onBeforeUnmount(() => unregister?.());
     const focusCard = (key: string): void =>
       void nextTick(() =>
         requestAnimationFrame(() => {
@@ -228,9 +262,14 @@ const ReviewRoot = defineComponent({
       review,
       byId: computed(() => new Map(items.value.map((i) => [i.id, i] as const))),
       drafting,
-      beginDraft: () => (drafting.value = true),
+      draftTarget,
+      beginDraft: () => {
+        draftTarget.value = null;
+        drafting.value = true;
+      },
       endDraft: () => {
         drafting.value = false;
+        draftTarget.value = null;
         void nextTick(() =>
           requestAnimationFrame(() =>
             root.value?.querySelector<HTMLElement>('[data-review-add]')?.focus()

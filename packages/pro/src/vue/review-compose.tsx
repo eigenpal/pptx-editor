@@ -138,19 +138,21 @@ export const ReviewDraft = Object.assign(
       nodeId: { type: String, default: undefined },
     },
     setup(props) {
-      const { drafting, endDraft, review } = usePane();
+      const { drafting, draftTarget, endDraft, review } = usePane();
       const t = useReviewLabel();
       const text = ref('');
       const id = useId()!;
       return () => {
         if (props.hidden || !drafting.value) return null;
         const author = review.author.value ?? '';
-        const target = props.nodeId ? null : review.commentTarget.value;
+        // `nodeId`, else the element of a draft from a menu, else the selected element.
+        const pinned = props.nodeId ?? draftTarget.value?.nodeId;
+        const target = props.nodeId ? null : (draftTarget.value ?? review.commentTarget.value);
         const blocked = review.author.value === null;
         const empty = text.value.trim() === '';
         const post = (): void => {
           if (empty || blocked || review.readOnly.value) return;
-          const at = props.nodeId ? { nodeId: props.nodeId } : undefined;
+          const at = pinned ? { nodeId: pinned } : undefined;
           if (review.comment(text.value, undefined, at)) {
             text.value = '';
             endDraft();
