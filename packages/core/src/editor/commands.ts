@@ -158,7 +158,7 @@ export interface CommandContext {
   readonly pasteRepeat?: number;
   /** The author of new comments and replies when the command names none (`setAuthor`). */
   readonly author?: string;
-  /** The snapshot's `identity` at a comment id, and whether the id named another one before. */
+  /** The `identity` at a comment id, and whether it named another one before. @internal */
   readonly commentAt?: (id: string) => { readonly identity?: string; readonly moved: boolean };
   /** The package to compile against instead of the store's: the preview of an armed format. */
   readonly base?: PptxPackage;

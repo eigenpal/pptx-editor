@@ -277,7 +277,7 @@ describe('PptxEditorReview (Vue)', () => {
     expect(document.body.textContent).toContain('Set an author to comment.');
   });
 
-  test('a twin that shares its text is refused each time, and the notice says why', async () => {
+  test('the pane edits the copy of an exact duplicate that it shows, and says a refusal once', async () => {
     const editor = await mount([reviewModule()], () =>
       h('div', [h(PptxEditorReview), h(PptxEditorEditNotice)])
     );
@@ -287,15 +287,17 @@ describe('PptxEditorReview (Vue)', () => {
       (el) => el.getAttribute('aria-label') === 'Edit comment by Ada Lovelace'
     );
     await click(edits[1]);
-    await type(field('Edit comment')!, 'Mine');
-    for (let i = 0; i < 2; i += 1) await key(field('Edit comment')!, { key: 'Enter' });
-    expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['A', 'A', 'A']);
-    expect(field('Edit comment')!.value).toBe('Mine');
+    await type(field('Edit comment')!, '\u0001');
+    await key(field('Edit comment')!, { key: 'Enter' });
     expect(document.querySelector('.pptx-review__notice')!.textContent).toBe(
-      'Another comment here has the same author, date, and text, so this one cannot be changed here. Copy your text to keep it.'
+      'Comment text must have 1 to 10,000 characters'
     );
     // The field shows the refusal: the edit notice does not repeat it.
     expect(document.querySelector('.pptx-edit-notice')).toBeNull();
+    // The identity names the copy, which text alone cannot.
+    await type(field('Edit comment')!, 'Mine');
+    await key(field('Edit comment')!, { key: 'Enter' });
+    expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['A', 'Mine', 'A']);
   });
 
   test('the draft shows its refusal, and a reply notice goes with the pick', async () => {

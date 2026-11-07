@@ -295,11 +295,11 @@ describe('comment identity', () => {
   test('expect: twins that share a text are refused, as text cannot tell them apart', async () => {
     const e = await open(await threads((t) => as(t, 'X') + as(t, 'X') + as(t, 'X')));
     const [a, b] = e.snapshot().comments!;
-    const seen = { author: b!.author, date: b!.date!, text: b!.text, identity: b!.identity };
+    const seen = { author: b!.author, date: b!.date!, text: b!.text };
     const commands = [
       { type: 'replyToComment', commentId: b!.id, text: 'R', expect: seen },
       { type: 'editComment', commentId: b!.id, text: 'Y', expect: seen },
-      { type: 'deleteComment', commentId: a!.id, expect: { ...seen, identity: a!.identity } },
+      { type: 'deleteComment', commentId: a!.id, expect: seen },
     ] as const;
     for (const command of commands) {
       expect(e.can(command)).toMatchObject({ ok: false, reason: 'errors.commentAmbiguous' });
@@ -370,6 +370,93 @@ describe('comment identity', () => {
     e.selectComment(a!.id);
     expect((await e.load(bytes)).ok).toBe(true);
     expect(e.snapshot().activeComment).toBeNull();
+  });
+
+  test('a delete and an undo leave no refusal behind, for a comment, a twin, or a reply', async () => {
+    const facts = (c: { author: string; date?: string; text: string }) => ({
+      author: c.author,
+      ...(c.date !== undefined ? { date: c.date } : {}),
+      text: c.text,
+    });
+    const one = await open(await threads((t) => as(t, 'P')));
+    one.setAuthor('Bob');
+    const [p] = one.snapshot().comments!;
+    expect(one.exec({ type: 'replyToComment', commentId: p!.id, text: 'R' }).ok).toBe(true);
+    for (const pick of [
+      () => one.snapshot().comments![0]!,
+      () => one.snapshot().comments![0]!.replies[0]!,
+    ]) {
+      expect(one.exec({ type: 'deleteComment', commentId: pick().id }).ok).toBe(true);
+      one.snapshot();
+      expect(one.exec({ type: 'undo' }).ok).toBe(true);
+      const back = pick();
+      expect(
+        one.exec({ type: 'editComment', commentId: back.id, text: 'x', expect: facts(back) }).ok
+      ).toBe(true);
+    }
+    const twins = await open(await threads((t) => as(t, 'A') + as(t, 'B') + as(t, 'C')));
+    const [a] = twins.snapshot().comments!;
+    expect(twins.exec({ type: 'deleteComment', commentId: a!.id }).ok).toBe(true);
+    twins.snapshot();
+    expect(twins.exec({ type: 'undo' }).ok).toBe(true);
+    for (const c of twins.snapshot().comments!)
+      expect(
+        twins.can({ type: 'editComment', commentId: c.id, text: 'z', expect: facts(c) }).ok
+      ).toBe(true);
+  });
+
+  test('expect with the identity reaches an exact duplicate; without it, text cannot', async () => {
+    const e = await open(await threads((t) => as(t, 'Dup') + as(t, 'Dup')));
+    const [, b] = e.snapshot().comments!;
+    const seen = { author: b!.author, date: b!.date!, text: b!.text };
+    const full = { ...seen, identity: b!.identity };
+    expect(e.can({ type: 'deleteComment', commentId: b!.id, expect: seen })).toMatchObject({
+      ok: false,
+      reason: 'errors.commentAmbiguous',
+    });
+    e.setAuthor('Bob');
+    for (const command of [
+      { type: 'replyToComment', commentId: b!.id, text: 'R', expect: full },
+      { type: 'resolveComment', commentId: b!.id, expect: full },
+      { type: 'editComment', commentId: b!.id, text: 'Fixed', expect: full },
+    ] as const)
+      expect(e.exec(command).ok).toBe(true);
+    expect(e.snapshot().comments!.map((t) => [t.text, t.resolved, t.replies.length])).toEqual([
+      ['Dup', false, 0],
+      ['Fixed', true, 1],
+    ]);
+  });
+
+  test('a check on another slide keeps the threads of the slide shown', async () => {
+    const e0 = createPptxEditor({
+      fixedMeasurer: true,
+      substitutes: false,
+      modules: [review],
+      author: 'Ada Lovelace',
+    });
+    const sh = shape({ id: 2, name: 'Title', x: 0, y: 0, cx: 914_400, cy: 914_400 });
+    expect((await e0.load(buildPptx({ slides: [{ shapes: sh }, { shapes: sh }] }))).ok).toBe(true);
+    expect(e0.exec({ type: 'addComment', text: 'One', date: DATE }).ok).toBe(true);
+    e0.goToSlide(1);
+    expect(e0.exec({ type: 'addComment', text: 'Two', date: DATE }).ok).toBe(true);
+    const e = await open(e0.save()!);
+    e0.destroy();
+    e.goToSlide(1);
+    const [two] = e.snapshot().comments!;
+    e.goToSlide(0);
+    const shown = e.snapshot().comments;
+    const expect_ = {
+      author: two!.author,
+      date: two!.date!,
+      text: two!.text,
+      identity: two!.identity,
+    };
+    expect(e.can({ type: 'editComment', commentId: two!.id, text: 'x', expect: expect_ }).ok).toBe(
+      true
+    );
+    // A zoom change makes a new snapshot, which reads the threads of the slide from the cache.
+    e.setZoom(2);
+    expect(e.snapshot().comments).toBe(shown);
   });
 
   test('a deck that opens after another shows none of its identities', async () => {

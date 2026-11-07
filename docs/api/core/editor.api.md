@@ -1055,6 +1055,7 @@ export interface CommandContext {
     readonly base?: PptxPackage;
     readonly caretArm?: boolean;
     readonly collaborating?: boolean;
+    // @internal
     readonly commentAt?: (id: string) => {
         readonly identity?: string;
         readonly moved: boolean;

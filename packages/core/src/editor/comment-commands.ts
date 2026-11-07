@@ -97,14 +97,18 @@ function checkExpect(
   const now = facts();
   if (now.author !== e.author || now.date !== e.date || (found.placed && now.text !== e.text))
     throw new CommandRefusal('errors.commentChanged');
-  // A twin with the same text: nothing in the file tells the two apart.
-  if (found.placed && found.twinTexts().includes(now.text))
-    throw new CommandRefusal('errors.commentAmbiguous');
-  // The identity tells twins apart that text cannot. Without it, an id that named another
-  // comment before may still be the host's old id for that one.
   const at = ctx.commentAt?.(commentId);
-  if (e.identity !== undefined ? at?.identity !== e.identity : at?.moved)
-    throw new CommandRefusal('errors.commentChanged');
+  // The identity names one list node, so it tells apart twins that text cannot.
+  if (e.identity !== undefined) {
+    if (at?.identity !== e.identity) throw new CommandRefusal('errors.commentChanged');
+    return;
+  }
+  if (!found.placed) return;
+  // Without the identity: a twin with the same text, which nothing in the file tells apart.
+  if (found.twinTexts().includes(now.text)) throw new CommandRefusal('errors.commentAmbiguous');
+  // An id that a twin took from another since the last snapshot may be the host's old id for
+  // that one. The next snapshot shows it at its new identity, and ends the refusal.
+  if (at?.moved) throw new CommandRefusal('errors.commentChanged');
 }
 
 /** A thread id key: `cm-…` is a legacy comment, a GUID a threaded one. */

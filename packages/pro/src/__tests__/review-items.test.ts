@@ -19,7 +19,13 @@ import {
   writePptx,
   type PackagePart,
 } from '@pptx-editor.dev/core/store';
-import { fieldNotice, fieldNoticeText, reviewItems } from '../review/comment-view.ts';
+import {
+  fieldNotice,
+  fieldNoticeText,
+  reviewActions,
+  reviewItems,
+  seenOf,
+} from '../review/comment-view.ts';
 import { reviewModule } from '../index.ts';
 import { coverageDeck } from './convergence-harness.ts';
 
@@ -58,15 +64,20 @@ function patch(
   return writePptx(r.pkg);
 }
 
-/** Each item's `editable` and `resolvable` next to what `editor.can` answers. */
+/**
+ * Each item's `editable` and `resolvable` next to what `editor.can` answers, for the commands as
+ * the pane sends them: with `expect`.
+ */
 function agreement(e: PptxEditorInstance) {
   const items = reviewItems(e, e.snapshot());
   expect(items.length).toBeGreaterThan(0);
   for (const item of items) {
-    const edit = e.can({ type: 'editComment', commentId: item.id, text: 'x' }).ok;
+    const expect_ = seenOf(item);
+    const edit = e.can({ type: 'editComment', commentId: item.id, text: 'x', expect: expect_ }).ok;
     const status = e.can({
       type: item.resolved ? 'reopenComment' : 'resolveComment',
       commentId: item.parentId ?? item.id,
+      ...(item.parentId === undefined ? { expect: expect_ } : {}),
     }).ok;
     expect({ id: item.id, editable: item.editable, resolvable: item.resolvable }).toEqual({
       id: item.id,
@@ -305,6 +316,38 @@ describe('review items', () => {
       expect(asked).toBe(0);
     } finally {
       e.destroy();
+    }
+  });
+
+  test('editable agrees with editor.can on exact duplicates, and the pane acts on them', async () => {
+    const modern = await open(await oneThread((t) => t + t));
+    const legacy = await open(
+      patch(
+        new Uint8Array(readFileSync(join(FIXTURES, 'slide-structure.pptx'))),
+        (n) => n === '/ppt/comments/comment1.xml',
+        (xml) => {
+          const cm = /<p:cm [^>]*>(?:(?!<\/p:cm>).)*<p:text>Check[^<]*<\/p:text>.*?<\/p:cm>/s.exec(
+            xml
+          )![0];
+          return xml.replace(cm, cm + cm);
+        }
+      )
+    );
+    try {
+      for (const e of [modern, legacy]) {
+        const items = agreement(e).filter((i) => i.parentId === undefined);
+        expect(items.every((i) => i.editable)).toBe(true);
+        const before = e.snapshot().comments!.length;
+        const actions = reviewActions(e);
+        expect(actions.edit(items[1]!, 'Fixed')).toBe(true);
+        const fixed = reviewItems(e, e.snapshot()).filter((i) => i.parentId === undefined);
+        expect(fixed.map((i) => i.text)).toContain('Fixed');
+        expect(actions.remove(fixed.find((i) => i.text === 'Fixed')!)).toBe(true);
+        expect(e.snapshot().comments!.length).toBe(before - 1);
+      }
+    } finally {
+      modern.destroy();
+      legacy.destroy();
     }
   });
 

@@ -76,9 +76,14 @@ export class CommentState {
    * comes back carries its identities as an edit does.
    */
   readonly #seen = new Map<string, readonly Seen[]>();
-  /** The identity that each comment id last named, and the ids that named another before. */
+  /**
+   * The identity that each comment id last named, and the ids that named another comment
+   * before, until a snapshot shows them at their new identity.
+   */
   readonly #named = new Map<string, string>();
   readonly #moved = new Set<string>();
+  /** The slide part of `#threads`. */
+  #slide: string | undefined;
   /** A count for the new identities that `#carry` makes: each is shown once only. */
   #fresh = 0;
   /** How many decks this editor opened before the current one (-1 before the first). */
@@ -119,6 +124,7 @@ export class CommentState {
     this.#seen.clear();
     this.#named.clear();
     this.#moved.clear();
+    this.#slide = undefined;
     this.#key = [];
     this.#threads = NONE;
     this.#active = null;
@@ -150,8 +156,14 @@ export class CommentState {
     // named another comment before.
     const commentAt = (commentId: string): { identity?: string; moved: boolean } => {
       const slidePart = commentId.slice(0, commentId.indexOf('#'));
+      // Another slide's threads are read on their own, so the cached ones of the slide shown
+      // stay, and the pane does not render again.
+      const threads =
+        !pkg || slidePart === this.#slide
+          ? this.threads(pkg, slidePart)
+          : this.#read(pkg, slidePart);
       let identity: string | undefined;
-      for (const t of this.threads(pkg, slidePart)) {
+      for (const t of threads) {
         if (t.id === commentId) identity = t.identity;
         else identity = t.replies.find((r) => r.id === commentId)?.identity;
         if (identity !== undefined) break;
@@ -182,10 +194,17 @@ export class CommentState {
     if (key.length === this.#key.length && key.every((k, i) => k === this.#key[i]))
       return this.#threads;
     this.#key = key;
+    this.#slide = slidePart;
+    this.#threads = this.#read(pkg, slidePart);
+    return this.#threads;
+  }
+
+  /** The threads of `slidePart`, read now, with their identities carried. */
+  #read(pkg: PptxPackage, slidePart: string): readonly CommentThread[] {
+    const { legacy, modern } = slideCommentParts(pkg, slidePart);
     const read = legacy.length || modern.length ? readSlideComments(pkg, slidePart) : NONE;
     const threads = this.#carry(read, slidePart);
-    this.#threads = threads.length ? Object.freeze(threads) : NONE;
-    return this.#threads;
+    return threads.length ? Object.freeze(threads) : NONE;
   }
 
   /**
@@ -278,6 +297,8 @@ export class CommentState {
     const commentAuthor = this.author ?? null;
     if (!this.modules.review) return { comments: null, activeComment: null, commentAuthor };
     const comments = this.threads(pkg, slidePart);
+    // The snapshot shows each moved id at its new identity: the host reads it from here on.
+    for (const id of this.#moved) if (id.startsWith(`${slidePart}#`)) this.#moved.delete(id);
     return { comments, activeComment: this.#pickedIn(comments), commentAuthor };
   }
 
