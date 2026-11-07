@@ -2885,6 +2885,13 @@
   color: var(--doc-danger);
   font-size: 11.5px;
 }
+/* What a changed comment reads now, under the notice that a second save replaces it. */
+.pptx-review__current {
+  display: block;
+  color: var(--doc-text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 /* A field's notice is a live region that stays mounted: while empty it takes no space. */
 .pptx-review__notice:empty {
   position: absolute;

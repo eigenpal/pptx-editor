@@ -24,6 +24,7 @@ import {
   editRemovalMessage,
   focusSurfaceOf,
   linkPopupShowsRejection,
+  fieldShowsRejection,
   REMOVAL_NOTICE_MS,
   removalNoticeShows,
   type EditorRejection,
@@ -76,8 +77,11 @@ export const PptxEditorEditNotice = defineComponent({
         })
       );
     const linkEntry = usePopupEntry('hyperlink');
+    // A field that shows its own refusal (a comment field) is not repeated either.
     const covered = computed(
-      () => linkEntry() !== false && linkPopupShowsRejection(linkPopup.value, rejection.value)
+      () =>
+        (linkEntry() !== false && linkPopupShowsRejection(linkPopup.value, rejection.value)) ||
+        fieldShowsRejection(rejection.value)
     );
     watch(
       covered,

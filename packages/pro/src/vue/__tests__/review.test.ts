@@ -13,6 +13,7 @@ import {
 } from '@pptx-editor.dev/core/editor';
 import {
   PptxEditorContent,
+  PptxEditorEditNotice,
   PptxEditorRoot,
   PptxEditorSidePanel,
   PptxEditorViewport,
@@ -236,7 +237,10 @@ describe('PptxEditorReview (Vue)', () => {
     expect(field('Edit comment')!.value).toBe('Mine');
     const notice = document.querySelector('.pptx-review__notice')!;
     expect(notice.getAttribute('role')).toBe('status');
-    expect(notice.textContent).toBe('This comment changed. Copy your text to keep it.');
+    expect(notice.firstElementChild!.textContent).toBe(
+      'This comment changed. Save again to replace it.'
+    );
+    expect(notice.querySelector('.pptx-review__current')!.textContent).toBe('It now reads: Peer');
     expect(field('Edit comment')!.getAttribute('aria-describedby')).toContain(notice.id);
     // A second, deliberate save replaces the comment as it shows now.
     await key(field('Edit comment')!, { key: 'Enter' });
@@ -271,6 +275,51 @@ describe('PptxEditorReview (Vue)', () => {
     expect(field('Reply to Ada Lovelace')!.value).toBe('Hello');
     expect(document.querySelector('.pptx-review__notice')!.textContent).toBe('');
     expect(document.body.textContent).toContain('Set an author to comment.');
+  });
+
+  test('a twin that shares its text is refused each time, and the notice says why', async () => {
+    const editor = await mount([reviewModule()], () =>
+      h('div', [h(PptxEditorReview), h(PptxEditorEditNotice)])
+    );
+    expect((await editor.load(await repeatedThreadDeck('same'))).ok).toBe(true);
+    await settle();
+    const edits = [...document.querySelectorAll<HTMLButtonElement>('button')].filter(
+      (el) => el.getAttribute('aria-label') === 'Edit comment by Ada Lovelace'
+    );
+    await click(edits[1]);
+    await type(field('Edit comment')!, 'Mine');
+    for (let i = 0; i < 2; i += 1) await key(field('Edit comment')!, { key: 'Enter' });
+    expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['A', 'A', 'A']);
+    expect(field('Edit comment')!.value).toBe('Mine');
+    expect(document.querySelector('.pptx-review__notice')!.textContent).toBe(
+      'Another comment here has the same author, date, and text, so this one cannot be changed here. Copy your text to keep it.'
+    );
+    // The field shows the refusal: the edit notice does not repeat it.
+    expect(document.querySelector('.pptx-edit-notice')).toBeNull();
+  });
+
+  test('the draft shows its refusal, and a reply notice goes with the pick', async () => {
+    const editor = await mount([reviewModule()]);
+    await click(button('New comment'));
+    await type(field('Add a comment…')!, '\u0001');
+    await key(field('Add a comment…')!, { key: 'Enter' });
+    expect(document.querySelector('.pptx-review__notice')!.textContent).toBe(
+      'Comment text must have 1 to 10,000 characters'
+    );
+    await key(field('Add a comment…')!, { key: 'Escape' });
+    await post('First');
+    const [thread] = editor.snapshot().comments!;
+    editor.selectComment(thread!.id);
+    await settle();
+    await type(field('Reply to Ada Lovelace')!, '\u0001');
+    await key(field('Reply to Ada Lovelace')!, { key: 'Enter' });
+    const notice = () => document.querySelector('.pptx-review__reply-line .pptx-review__notice');
+    expect(notice()!.textContent).not.toBe('');
+    editor.selectComment(null);
+    await settle();
+    editor.selectComment(thread!.id);
+    await settle();
+    expect(notice()!.textContent).toBe('');
   });
 
   test('when one of three copies goes, an edit of a copy closes and saves nothing', async () => {

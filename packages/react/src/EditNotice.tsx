@@ -13,6 +13,7 @@ import {
   editRemovalMessage,
   focusSurfaceOf,
   linkPopupShowsRejection,
+  fieldShowsRejection,
   REMOVAL_NOTICE_MS,
   removalNoticeShows,
 } from '@pptx-editor.dev/core/editor';
@@ -79,8 +80,10 @@ function EditNoticeRoot({ className }: Omit<EditNoticeProps, 't'>) {
     linkStore?.getState ?? NO_STATE,
     linkStore?.getState ?? NO_STATE
   );
+  // A field that shows its own refusal (a comment field) is not repeated either.
   const covered =
-    usePopupEntry('hyperlink') !== false && linkPopupShowsRejection(linkPopup, rejection);
+    (usePopupEntry('hyperlink') !== false && linkPopupShowsRejection(linkPopup, rejection)) ||
+    fieldShowsRejection(rejection);
   useEffect(() => {
     if (covered) setDismissed(rejection);
   }, [covered, rejection]);

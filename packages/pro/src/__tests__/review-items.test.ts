@@ -19,7 +19,7 @@ import {
   writePptx,
   type PackagePart,
 } from '@pptx-editor.dev/core/store';
-import { reviewItems } from '../review/comment-view.ts';
+import { fieldNotice, fieldNoticeText, reviewItems } from '../review/comment-view.ts';
 import { reviewModule } from '../index.ts';
 import { coverageDeck } from './convergence-harness.ts';
 
@@ -237,6 +237,22 @@ describe('comment ids from a file', () => {
     for (const key of ['', '~1', '~00000000~1'])
       expect(e.exec({ type: 'deleteComment', commentId: `${slide}#${key}` }).ok).toBe(false);
     expect(texts(e)).toEqual(['A']);
+  });
+});
+
+describe('field notices', () => {
+  const t = (key: string, params?: Readonly<Record<string, string | number>>) =>
+    `${key}${params ? JSON.stringify(params) : ''}`;
+  test('word a changed comment by field, and pass the detail of any other reason', () => {
+    const changed = { reason: 'errors.commentChanged' };
+    expect(fieldNoticeText(t, fieldNotice(changed, 'edit', null)!)).toBe('comments.changed');
+    expect(fieldNoticeText(t, fieldNotice(changed, 'reply', null)!)).toBe('comments.threadChanged');
+    const twin = fieldNotice({ reason: 'errors.commentAmbiguous' }, 'edit', null)!;
+    expect(fieldNoticeText(t, twin)).toBe('comments.ambiguous');
+    const other = fieldNotice({ reason: 'errors.unsupported', detail: 'x' }, 'draft', null)!;
+    expect(fieldNoticeText(t, other)).toContain('"x"');
+    expect(fieldNotice(changed, 'edit', other)!.serial).toBe(2);
+    expect(fieldNotice(undefined, 'edit', other)).toBeNull();
   });
 });
 

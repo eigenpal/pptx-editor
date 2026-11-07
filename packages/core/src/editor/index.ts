@@ -788,6 +788,8 @@ export {
   dispatchFindRequest,
   editNoticeShows,
   linkPopupShowsRejection,
+  claimRejection,
+  fieldShowsRejection,
   editRejectionMessage,
   editRemovalMessage,
   REMOVAL_NOTICE_MS,

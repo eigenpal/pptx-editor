@@ -781,6 +781,9 @@ export type ChromeTranslate = (key: string, params?: TranslationParams) => strin
 export function churnWarning(root: string, prop: 'document' | 'fonts'): () => void;
 
 // @internal
+export function claimRejection(rejection: EditorRejection): void;
+
+// @internal
 export function clampSlide(index: number | undefined, count: number): number;
 
 // @internal
@@ -1052,6 +1055,10 @@ export interface CommandContext {
     readonly base?: PptxPackage;
     readonly caretArm?: boolean;
     readonly collaborating?: boolean;
+    readonly commentAt?: (id: string) => {
+        readonly identity?: string;
+        readonly moved: boolean;
+    };
     // @internal
     readonly gestureBase?: PptxPackage;
     readonly pasteRepeat?: number;
@@ -1181,6 +1188,7 @@ export type CommentCommand =
 export interface CommentExpect {
     readonly author: string;
     readonly date?: string;
+    readonly identity?: string;
     readonly text: string;
 }
 
@@ -2578,6 +2586,9 @@ export const fieldPart: (name: string) => {
     readonly 'data-pptx-part': "field";
     readonly 'data-pptx-field': string;
 };
+
+// @internal
+export function fieldShowsRejection(rejection: EditorRejection | null | undefined): boolean;
 
 // @internal
 export function fileDraftUrl(text: string): string;

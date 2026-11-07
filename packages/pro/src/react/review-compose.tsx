@@ -11,7 +11,6 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 /** @jsxImportSource react */
 
 import { useContext, useEffect, useId, useRef, useState } from 'react';
-import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { Icon, usePptxEditor } from '@pptx-editor.dev/react';
 import {
   COMMENT_TEXT_MAX,
@@ -19,6 +18,7 @@ import {
   authorStyle,
   commentFieldKey,
   fieldNotice,
+  fieldNoticeText,
   refusalOf,
   seenOf,
   shownAs,
@@ -84,11 +84,24 @@ function CommentField(props: {
  * The notice of a field after a refusal. The live region stays mounted, so each refusal reads,
  * also the same one again.
  */
-function Notice({ id, notice }: { readonly id: string; readonly notice: FieldNotice | null }) {
+function Notice({
+  id,
+  notice,
+  current,
+}: {
+  readonly id: string;
+  readonly notice: FieldNotice | null;
+  /** The comment's text now, which a second save replaces. */
+  readonly current?: string;
+}) {
   const t = useReviewLabel();
+  const changed = notice?.rejection.reason === 'errors.commentChanged';
   return (
     <span id={id} className="pptx-review__refused pptx-review__notice" role="status">
-      {notice ? <span key={notice.serial}>{t(notice.key as TranslationKey)}</span> : null}
+      {notice ? <span key={notice.serial}>{fieldNoticeText(t, notice)}</span> : null}
+      {notice && changed && current !== undefined ? (
+        <span className="pptx-review__current">{t('comments.nowReads', { text: current })}</span>
+      ) : null}
     </span>
   );
 }
@@ -154,9 +167,12 @@ ReviewAddComment.pptxReviewPart = 'AddComment' as const;
  */
 export function ReviewDraft({ className, hidden, nodeId }: ReviewDraftProps) {
   const { drafting, draftTarget, endDraft, review } = usePane();
+  const editor = usePptxEditor();
   const t = useReviewLabel();
   const [text, setText] = useState('');
+  const [notice, setNotice] = useState<FieldNotice | null>(null);
   const id = useId();
+  if (!drafting && notice) setNotice(null);
   if (hidden || !drafting) return null;
   const author = review.author ?? '';
   // `nodeId`, else the element of a draft from a menu, else the selected element.
@@ -166,13 +182,18 @@ export function ReviewDraft({ className, hidden, nodeId }: ReviewDraftProps) {
   const empty = text.trim() === '';
   const post = (): void => {
     if (empty || blocked || review.readOnly) return;
-    if (review.comment(text, undefined, pinned ? { nodeId: pinned } : undefined)) {
+    const refused = refusalOf(editor, () =>
+      review.comment(text, undefined, pinned ? { nodeId: pinned } : undefined)
+    );
+    if (refused === null) {
       setText('');
+      setNotice(null);
       endDraft();
-    }
+    } else setNotice(fieldNotice(refused, 'draft', notice));
   };
   const cancel = (): void => {
     setText('');
+    setNotice(null);
     endDraft();
   };
   return (
@@ -196,13 +217,17 @@ export function ReviewDraft({ className, hidden, nodeId }: ReviewDraftProps) {
           id={id}
           value={text}
           label={t('comments.addComment')}
-          describedBy={blocked ? `${id}-blocked` : `${id}-hint`}
+          describedBy={`${blocked ? `${id}-blocked` : `${id}-hint`} ${id}-notice`}
           autoFocus
-          onChange={setText}
+          onChange={(value) => {
+            setText(value);
+            setNotice(null);
+          }}
           onPost={post}
           onCancel={cancel}
         />
         <KeyHint id={`${id}-hint`} />
+        <Notice id={`${id}-notice`} notice={notice} />
         {blocked ? (
           <span id={`${id}-blocked`} className="pptx-review__refused">
             {t('comments.noAuthor')}
@@ -248,6 +273,8 @@ export function ReviewReply({ className, hidden, children }: ReviewPartProps) {
     setSeen(null);
     setNotice(null);
   }
+  // A notice belongs to one visit of the reply line: it goes when the thread is deselected.
+  if (notice && !entry?.isActive) setNotice(null);
   if (hidden || !entry || !entry.isActive || entry.resolved || review.readOnly) return null;
   if (children) return <>{children}</>;
   const author = review.author ?? '';
@@ -261,16 +288,18 @@ export function ReviewReply({ className, hidden, children }: ReviewPartProps) {
   };
   const post = (): void => {
     if (empty || review.author === null) return;
-    const reason = refusalOf(editor, () => review.reply(seen ? shownAs(entry, seen) : entry, text));
-    if (reason === null) {
+    const refused = refusalOf(editor, () =>
+      review.reply(seen ? shownAs(entry, seen) : entry, text)
+    );
+    if (refused === null) {
       setText('');
       setSeen(null);
       setNotice(null);
       return;
     }
     // The thread changed: the next post answers it as it shows now, by the user's choice.
-    if (reason === 'errors.commentChanged') setSeen(seenOf(entry));
-    setNotice(fieldNotice(reason, (notice?.serial ?? 0) + 1));
+    if (refused?.reason === 'errors.commentChanged') setSeen(seenOf(entry));
+    setNotice(fieldNotice(refused, 'reply', notice));
   };
   return (
     <form
@@ -353,11 +382,12 @@ export function ReviewEditBox({ item }: { readonly item: ReviewItemView }) {
   };
   const save = (): void => {
     if (moved || text.trim() === '') return;
-    const reason = refusalOf(editor, () => review.edit(shownAs(item, seen.current), text));
-    if (reason === null) return close();
-    // The comment changed: the next save replaces it as it shows now, by the user's choice.
-    if (reason === 'errors.commentChanged') seen.current = seenOf(item);
-    setNotice(fieldNotice(reason, (notice?.serial ?? 0) + 1));
+    const refused = refusalOf(editor, () => review.edit(shownAs(item, seen.current), text));
+    if (refused === null) return close();
+    // The comment changed: the next save replaces it as it shows now, by the user's choice. A
+    // twin that text cannot tell apart stays refused.
+    if (refused?.reason === 'errors.commentChanged') seen.current = seenOf(item);
+    setNotice(fieldNotice(refused, 'edit', notice));
   };
   return (
     <form
@@ -381,7 +411,7 @@ export function ReviewEditBox({ item }: { readonly item: ReviewItemView }) {
         onCancel={close}
       />
       <KeyHint id={`${id}-hint`} />
-      <Notice id={`${id}-notice`} notice={notice} />
+      <Notice id={`${id}-notice`} notice={notice} current={item.text} />
       <div className="pptx-review__compose-actions">
         <button type="button" className="pptx-review__text-button" onClick={close}>
           {t('comments.cancel')}

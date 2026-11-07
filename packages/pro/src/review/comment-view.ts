@@ -9,10 +9,14 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // edits are engine commands (`addComment`, `replyToComment`, `editComment`, `deleteComment`,
 // `resolveComment`, `reopenComment`).
 
+import type { Translate, TranslationKey } from '@pptx-editor.dev/i18n';
 import {
+  claimRejection,
   commentAuthorSlot,
   commentInitials,
+  editRejectionMessage,
   requestPane,
+  type EditorRejection,
   type CommentAnchor,
   type CommentFormat,
   type CommentThread,
@@ -97,37 +101,66 @@ export interface ReviewActivationOptions {
   readonly identity?: string;
 }
 
-/** What a field showed of a comment when it opened: the author, the date, and the text. */
+/**
+ * What a field showed of a comment when it opened: the author, the date, the text, and the
+ * identity.
+ */
 export interface CommentSeen {
   readonly author: string;
   readonly date?: string;
   readonly text: string;
+  readonly identity?: string;
 }
 
 /**
- * Run `act`, a comment action. Null when the editor applied it; else the reason that the editor
- * published for the refusal (`lastRejection`), or an empty string when it published none.
+ * Run `act`, a comment action. Null when the editor applied it; else the refusal that the editor
+ * published (`lastRejection`), which the field then shows instead of the edit notice, or
+ * undefined when it published none.
  */
-export function refusalOf(editor: PptxEditorInstance | null, act: () => boolean): string | null {
+export function refusalOf(
+  editor: PptxEditorInstance | null,
+  act: () => boolean
+): EditorRejection | null | undefined {
   const before = editor?.snapshot().lastRejection ?? null;
   if (act()) return null;
   const after = editor?.snapshot().lastRejection ?? null;
-  return after && after !== before ? after.reason : '';
+  if (!after || after === before) return undefined;
+  claimRejection(after);
+  return after;
 }
+
+/** The field whose action the editor refused: its notice words a changed comment for it. */
+export type FieldKind = 'draft' | 'reply' | 'edit';
 
 /**
  * What a comment field says after a refusal, with a serial so that a repeated refusal reads
  * again in the live region.
  */
 export interface FieldNotice {
-  readonly key: string;
+  readonly rejection: EditorRejection;
+  readonly kind: FieldKind;
   readonly serial: number;
 }
 
-/** The notice of `reason`: the comment changed, or the editor's own text of the reason. */
-export function fieldNotice(reason: string, serial: number): FieldNotice | null {
-  if (!reason) return null;
-  return { key: reason === 'errors.commentChanged' ? 'comments.changed' : reason, serial };
+/** The notice of `rejection`, after `previous`; null for none. */
+export function fieldNotice(
+  rejection: EditorRejection | null | undefined,
+  kind: FieldKind,
+  previous: FieldNotice | null
+): FieldNotice | null {
+  return rejection ? { rejection, kind, serial: (previous?.serial ?? 0) + 1 } : null;
+}
+
+/** The text of `notice`: the comment changed, a twin that text cannot tell apart, or the reason. */
+export function fieldNoticeText(
+  t: (key: TranslationKey, params?: Readonly<Record<string, string | number>>) => string,
+  notice: FieldNotice
+): string {
+  const { reason } = notice.rejection;
+  if (reason === 'errors.commentChanged')
+    return t(notice.kind === 'reply' ? 'comments.threadChanged' : 'comments.changed');
+  if (reason === 'errors.commentAmbiguous') return t('comments.ambiguous');
+  return editRejectionMessage(t as Translate, notice.rejection);
 }
 
 /** What `item` shows of its comment. */
@@ -135,6 +168,7 @@ export const seenOf = (item: CommentSeen): CommentSeen => ({
   author: item.author,
   ...(item.date !== undefined ? { date: item.date } : {}),
   text: item.text,
+  ...(item.identity !== undefined ? { identity: item.identity } : {}),
 });
 
 /**
@@ -143,7 +177,7 @@ export const seenOf = (item: CommentSeen): CommentSeen => ({
  */
 export function shownAs(item: ReviewItemView, seen: CommentSeen): ReviewItemView {
   const { date: _date, ...rest } = item;
-  return { ...rest, ...seenOf(seen) };
+  return { ...rest, ...seenOf(seen), identity: seen.identity ?? item.identity };
 }
 
 /** The resolved look of one comment author. @public */
