@@ -83,6 +83,8 @@ export function createClipboardHost(editor: ClipboardEditor) {
   /** The picture of the last copy, to know it again in pasted HTML. */
   let lastPicture: ShapesPicture | null = null;
   let lastParsed: { raw: string; payload: unknown } = { raw: '', payload: null };
+  /** Counts copies of any kind, so a late picture never replaces a later copy of text or slides. */
+  let copies = 0;
   const pictures = createPictureCache();
 
   /** The key of the selected shapes' picture: the deck, its revision, the slide, the shapes. */
@@ -176,9 +178,10 @@ export function createClipboardHost(editor: ClipboardEditor) {
   ): void => {
     const clip = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
     if (!clip?.write || typeof ClipboardItem === 'undefined') return;
+    const mine = copies;
     const html = drawing.then((picture) => {
       // A later copy replaced this one: leave the clipboard to it.
-      if (!picture || lastCopied !== payload) throw new Error('stale');
+      if (!picture || mine !== copies || lastCopied !== payload) throw new Error('stale');
       lastPicture = picture;
       return new Blob([pictureHtml(picture, text)], { type: 'text/html' });
     });
@@ -240,6 +243,7 @@ export function createClipboardHost(editor: ClipboardEditor) {
     warm,
     /** Fill a clipboard event with the slides selected in the slide list. */
     copySlidesTo(data: DataTransfer, cut: boolean): boolean {
+      copies += 1;
       const session = editor.session();
       const slides = editor.selectedSlides();
       if (!session || !slides.length) return false;
@@ -252,6 +256,7 @@ export function createClipboardHost(editor: ClipboardEditor) {
     /** Fill a clipboard event: with the selected slides when it comes from the slide list. */
     copyTo(data: DataTransfer, cut: boolean, slideList = false): boolean {
       if (slideList) return this.copySlidesTo(data, cut);
+      copies += 1;
       const selection = editor.selection();
       // A cell range: its text as tab-separated text and as this editor's cells format.
       if (copyCellsTo(data, editor.layout(), selection)) {

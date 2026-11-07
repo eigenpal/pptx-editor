@@ -7,8 +7,8 @@
 // In the slide list, Copy and Cut take the selected slides, and Paste puts copied slides after
 // the current slide.
 //
-// Events from a field (a dialog's input, the notes, the find bar, a section name) keep their
-// browser behavior, and so does an event outside the editor's own element.
+// Events from a field (a dialog's input, the notes, the find bar, a section name), a dialog, or a
+// menu keep their browser behavior, and so does an event outside the editor's own element.
 
 /** What the binding asks of the editor: the surface's own clipboard handlers. */
 export interface EditorClipboardHost {
@@ -23,10 +23,14 @@ const SLIDE_LISTS = '.pptx-rail, .pptx-sorter';
 /** The element an editor's chrome and slide share. */
 const EDITOR_ROOT = '.pptx-editor';
 
-/** Whether an element takes text input of its own. */
+/**
+ * Whether an element takes text input of its own, or is in a dialog or menu (a slide show, a
+ * popover, a link editor): a copy or paste there is not the slide's.
+ */
 function isField(el: Element): boolean {
   return !!el.closest(
-    'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"], dialog'
+    'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"], ' +
+      'dialog, [role="dialog"], [role="alertdialog"], [role="menu"]'
   );
 }
 
