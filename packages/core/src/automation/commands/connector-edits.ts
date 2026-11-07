@@ -63,7 +63,10 @@ function writeEnd(
     if (
       el.id === cxn.id ||
       !GLUE_TARGETS.has(el.kind) ||
+      // `ST_DrawingElementId` is an unsigned int; the id is from the file and goes in XML.
       id === undefined ||
+      !/^\d{1,10}$/.test(id) ||
+      Number(id) > MAX_UNSIGNED_INT ||
       !Number.isInteger(target.index) ||
       target.index < 0 ||
       target.index > MAX_UNSIGNED_INT

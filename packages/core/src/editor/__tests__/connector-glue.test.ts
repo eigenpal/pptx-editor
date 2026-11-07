@@ -376,3 +376,30 @@ describe('glued connectors follow their shapes', () => {
     );
   });
 });
+
+describe('a glued end from untrusted ids', () => {
+  test('a shape id that is not an unsigned int never goes in the connector XML', async () => {
+    const b = shape({ id: 3, name: 'B', x: 6 * IN, y: 3 * IN, cx: 2 * IN, cy: IN });
+    const c = connector({
+      id: 4,
+      prst: 'straightConnector1',
+      x: IN,
+      y: 5 * IN,
+      cx: 2 * IN,
+      cy: IN,
+    });
+    const crafted = b.replace('id="3"', 'id="3&quot; foo=&quot;x"');
+    const e = await open(buildPptx({ slides: [{ layout: 'blank', shapes: crafted + c }] }));
+    const item = named(e, 'C4');
+    const start = lineEnds(item)!.start;
+    const d = startDrag(e.session!.layout(0), 'start', [item.element.nodeId], start, 'g')!;
+    const step = dragStep(
+      d,
+      { x: 5.96 * IN, y: 3.47 * IN },
+      { shift: false, snapTo: null, glueTo: 0.1 * IN, aspectLocked: () => false }
+    );
+    e.exec({ type: 'setTransforms', items: step.items });
+    expect(slideXml(e)).not.toContain('foo="x"');
+    expect(slideXml(e)).not.toContain('Cxn id=');
+  });
+});
