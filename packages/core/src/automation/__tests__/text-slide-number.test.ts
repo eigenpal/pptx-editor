@@ -63,7 +63,7 @@ test('a text edit on a slide added in the same batch reads its slide number', ()
   expect(slideNumberOf(batch, presentationInfo(batch.pkg).slides[11]!.partName)).toBe(12);
 });
 
-/** The fastest of three runs of 1,000 line breaks on a slide with `extra` other shapes, in ms. */
+/** The fastest of five runs of 1,000 line breaks on a slide with `extra` other shapes, in ms. */
 function breaksMs(extra: number): number {
   let shapes = shape({ id: 2, name: 'Body', x: IN, y: IN, cx: IN, cy: IN, text: para(run('ab')) });
   for (let i = 0; i < extra; i += 1)
@@ -72,7 +72,7 @@ function breaksMs(extra: number): number {
   if (!read.ok) throw new Error('deck does not read');
   const part = presentationInfo(read.pkg).slides[0]!.partName;
   let best = Infinity;
-  for (let k = 0; k < 3; k += 1) {
+  for (let k = 0; k < 5; k += 1) {
     const batch = new OpBatch(read.pkg);
     const body = txBodyOf(batch, part);
     const t0 = performance.now();
@@ -84,9 +84,10 @@ function breaksMs(extra: number): number {
 }
 
 // Each line break reads its slide's number. A read of `batch.pkg` closes the open transaction,
-// and the next op opens one on a copy of the slide part, so the cost grew with the slide.
-test('line breaks beside 10,000 shapes cost less than three times what they cost beside 100', () => {
+// and the next op opens one on a copy of the slide part, so the cost grew with the slide: 15
+// times as long beside 30,000 shapes as beside 100. A limit of 5 leaves room for a busy machine.
+test('line breaks beside 30,000 shapes cost less than five times what they cost beside 100', () => {
   const small = breaksMs(100);
-  const large = breaksMs(10_000);
-  expect(large).toBeLessThan(small * 3);
+  const large = breaksMs(30_000);
+  expect(large).toBeLessThan(small * 5);
 });
