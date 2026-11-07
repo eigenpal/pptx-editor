@@ -483,7 +483,9 @@ describe('the clipboard host', () => {
   test('slides copied in the slide list paste after the current slide, in another editor too', async () => {
     const { ran, clip } = await host();
     const data: Record<string, string> = {};
-    expect(clip.copyTo(transfer(data), false, true)).toBe(true);
+    // The surface calls the copy unbound, as the facade hands it over.
+    const { copyTo } = clip;
+    expect(copyTo(transfer(data), false, true)).toBe(true);
     expect(Object.keys(data)).toEqual([SLIDES_MIME]);
     expect(clip.pasteFrom(transfer(data))).toBe(true);
     const command = ran[0]!;
