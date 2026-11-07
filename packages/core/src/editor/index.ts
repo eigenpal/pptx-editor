@@ -690,6 +690,7 @@ export {
 export {
   editNoticeTone,
   elementKindLabelKey,
+  formatPanelSize,
   elementRotates,
   TABLE_OPTION_ROWS,
   type ElementKindLabelKey,

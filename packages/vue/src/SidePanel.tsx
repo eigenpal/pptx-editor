@@ -15,6 +15,7 @@ import {
 import {
   elementKindLabelKey,
   elementRotates,
+  formatPanelSize,
   TABLE_OPTION_ROWS,
   SIDE_PANEL_TABS,
   type SidePanelTab,
@@ -183,7 +184,12 @@ const FormatTab = defineComponent({
           value={inches(g[key])}
           unit={unit}
           disabled={readOnly.value}
-          onCommit={(v: number) => move({ [key]: inch(v) })}
+          // A locked aspect ratio sizes both sides from one.
+          onCommit={(v: number) =>
+            move(
+              key === 'cx' || key === 'cy' ? formatPanelSize(g, key, inch(v)) : { [key]: inch(v) }
+            )
+          }
         />
       );
       return [
@@ -197,6 +203,20 @@ const FormatTab = defineComponent({
             {field('cx', 'panel.format.width')}
             {field('cy', 'panel.format.height')}
           </div>
+          <label class="pptx-radio">
+            <input
+              type="checkbox"
+              checked={g.lockAspectRatio === true}
+              disabled={readOnly.value}
+              onChange={(e: Event) =>
+                editor.value?.exec({
+                  type: 'setLockAspectRatio',
+                  lock: (e.currentTarget as HTMLInputElement).checked,
+                })
+              }
+            />
+            {t('imageProperties.lockAspect')}
+          </label>
         </div>,
         <div class="pptx-panel__section">
           <h3 class="pptx-panel__title">{t('panel.format.position')}</h3>

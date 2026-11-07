@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-// The slide rail, speaker notes, zoom pill, and side panel. Each is a hook consumer over the
+// The slide rail, speaker notes, and zoom pill (the side panel is in `SidePanel.tsx`). Each is a hook consumer over the
 // editor; none holds document state of its own.
 
 import type { ChromeTranslate } from '@pptx-editor.dev/core/editor';
@@ -30,8 +30,6 @@ import {
   followCurrentSlide,
   groupSlideSections,
   keepCurrentSlideInView,
-  panelHistoryKey,
-  radioGroupStep,
   railDragAxis,
   railKeyDown,
   railOrientationChrome,
@@ -48,16 +46,9 @@ import {
   stepCommand,
   zoomStep,
   zoomLimitReason,
-  elementKindLabelKey,
-  elementRotates,
-  TABLE_OPTION_ROWS,
-  SIDE_PANEL_TABS,
-  platformShortcuts,
-  type SidePanelTab,
   type SlideRailOrientation,
   type SlideSummary,
 } from '@pptx-editor.dev/core/editor';
-import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { Icon, MenuItem, Popover, ToolButton, keepFocus, useAriaDisabled } from './chrome.tsx';
 import { useEditorDialog } from './popups.tsx';
 import { RailMenuHost, useSlideStep, type RailMenuState } from './RailContextMenu.tsx';
@@ -79,9 +70,10 @@ import {
   useSlideSections,
 } from './RailSections.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
-import { SelectionPane } from './SelectionPane.tsx';
+import { paneStyle } from './pane-state.ts';
 
 export { SelectionPane, type SelectionPaneProps } from './SelectionPane.tsx';
+export { SidePanel, type SidePanelProps } from './SidePanel.tsx';
 
 /** The side panel's tabs, in order. */
 
@@ -265,12 +257,6 @@ function stripStyle(style: CSSProperties | undefined): CSSProperties | undefined
   if (!style || style.width === undefined) return style;
   const { width: _width, ...rest } = style;
   return rest;
-}
-
-/** A pane's inline style: its width from `paneWidth`, then the host's own styles. */
-function paneStyle(width: number | undefined, style: CSSProperties | undefined) {
-  if (width === undefined) return style;
-  return { width, ...style };
 }
 
 /**
@@ -697,294 +683,5 @@ export function ZoomPill({ className }: ZoomPillProps = {}) {
         </Popover>
       ) : null}
     </div>
-  );
-}
-
-const EMU_PER_INCH = 914_400;
-const inches = (emu: number): string => (emu / EMU_PER_INCH).toFixed(2);
-
-/** A number field that commits on Enter or blur and shows the document value otherwise. */
-function NumberField({
-  label,
-  value,
-  unit,
-  disabled,
-  onCommit,
-}: {
-  label: string;
-  value: string;
-  unit: string;
-  disabled: boolean;
-  onCommit: (value: number) => void;
-}) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const commit = (): void => {
-    // An empty field keeps the value: `Number('')` is 0, which would move the shape.
-    const n = draft === null || draft.trim() === '' ? NaN : Number(draft.replace(',', '.'));
-    if (Number.isFinite(n) && draft !== value) onCommit(n);
-    setDraft(null);
-  };
-  return (
-    <label className="pptx-field">
-      {label}
-      <span className="pptx-field__control">
-        <input
-          inputMode="decimal"
-          aria-label={label}
-          value={draft ?? value}
-          disabled={disabled}
-          // Uncommitted typing keeps Ctrl/Cmd+Z for the field's own undo (`panelHistoryKey`).
-          data-draft={draft !== null}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            // Enter commits and keeps the focus here, so the next key still reaches the panel.
-            if (e.key === 'Enter') commit();
-            if (e.key === 'Escape') setDraft(null);
-          }}
-        />
-        <span className="pptx-field__unit">{unit}</span>
-      </span>
-    </label>
-  );
-}
-
-/** Position, size, rotation, and text fitting of the selected element. */
-function FormatTab() {
-  const { t } = useTranslation();
-  const editor = usePptxEditor();
-  const geometry = useEditorState((s) => s.geometry);
-  const table = useEditorState((s) => s.table);
-  const readOnly = useEditorState((s) => s.mode === 'view');
-  const selected = useEditorState((s) =>
-    s.selection.kind === 'shapes' ? s.selection.nodeIds.length : 0
-  );
-  const background = useEditorDialog('background');
-  if (!geometry)
-    return selected > 1 ? (
-      <div className="pptx-empty">
-        <p className="pptx-empty__title">{t('panel.format.multipleTitle', { count: selected })}</p>
-        <p className="pptx-empty__body">{platformShortcuts(t('panel.format.multipleBody'))}</p>
-      </div>
-    ) : (
-      <>
-        <div className="pptx-panel__section">
-          <h3 className="pptx-panel__title">{t('panel.format.slide')}</h3>
-          {background.isAvailable ? (
-            <button
-              type="button"
-              className="pptx-button"
-              disabled={readOnly}
-              onClick={(e) => background.open(e.currentTarget)}
-            >
-              {t('menu.background')}
-            </button>
-          ) : null}
-        </div>
-        <div className="pptx-empty">
-          <p className="pptx-empty__title">{t('panel.format.emptyTitle')}</p>
-          <p className="pptx-empty__body">{t('panel.format.emptyBody')}</p>
-        </div>
-      </>
-    );
-  const g = geometry;
-  const move = (patch: Partial<Record<'x' | 'y' | 'cx' | 'cy' | 'rot', number>>): void => {
-    editor?.exec({
-      type: 'setTransform',
-      nodeId: g.nodeId,
-      x: patch.x ?? g.x,
-      y: patch.y ?? g.y,
-      cx: Math.max(0, patch.cx ?? g.cx),
-      cy: Math.max(0, patch.cy ?? g.cy),
-      rot: patch.rot ?? g.rot,
-    });
-  };
-  const inch = (v: number): number => Math.round(v * EMU_PER_INCH);
-  const unit = t('panel.format.inchUnit');
-  const field = (key: 'x' | 'y' | 'cx' | 'cy', labelKey: TranslationKey) => (
-    <NumberField
-      label={t(labelKey)}
-      value={inches(g[key])}
-      unit={unit}
-      disabled={readOnly}
-      onCommit={(v) => move({ [key]: inch(v) })}
-    />
-  );
-  return (
-    <>
-      <div className="pptx-panel__section">
-        <h3 className="pptx-panel__title">{t('panel.format.element')}</h3>
-        <span className="pptx-chip">{t(elementKindLabelKey(g, table))}</span>
-      </div>
-      <div className="pptx-panel__section">
-        <h3 className="pptx-panel__title">{t('panel.format.size')}</h3>
-        <div className="pptx-panel__grid">
-          {field('cx', 'panel.format.width')}
-          {field('cy', 'panel.format.height')}
-        </div>
-      </div>
-      <div className="pptx-panel__section">
-        <h3 className="pptx-panel__title">{t('panel.format.position')}</h3>
-        <div className="pptx-panel__grid">
-          {field('x', 'panel.format.x')}
-          {field('y', 'panel.format.y')}
-        </div>
-      </div>
-      {elementRotates(g, table) ? (
-        <div className="pptx-panel__section">
-          <h3 className="pptx-panel__title">{t('panel.format.rotation')}</h3>
-          <div className="pptx-panel__grid">
-            <NumberField
-              label={t('panel.format.angle')}
-              value={String(Math.round(g.rot * 10) / 10)}
-              unit="°"
-              disabled={readOnly}
-              onCommit={(v) => move({ rot: ((v % 360) + 360) % 360 })}
-            />
-          </div>
-        </div>
-      ) : null}
-      {table ? (
-        <div className="pptx-panel__section">
-          <h3 className="pptx-panel__title">{t('panel.format.table')}</h3>
-          <div className="pptx-panel__grid">
-            <NumberField
-              label={t('panel.format.rowHeight')}
-              value={inches(table.rowHeight)}
-              unit={unit}
-              disabled={readOnly}
-              onCommit={(v) => editor?.exec({ type: 'setRowHeight', height: inch(v) })}
-            />
-            <NumberField
-              label={t('panel.format.columnWidth')}
-              value={inches(table.columnWidth)}
-              unit={unit}
-              disabled={readOnly}
-              onCommit={(v) => editor?.exec({ type: 'setColumnWidth', width: inch(v) })}
-            />
-          </div>
-          <div className="pptx-radios" role="group" aria-label={t('panel.format.styleOptions')}>
-            {TABLE_OPTION_ROWS.map(({ option, labelKey }) => (
-              <label key={option} className="pptx-radio">
-                <input
-                  type="checkbox"
-                  checked={table.options.includes(option)}
-                  disabled={readOnly}
-                  onChange={() => editor?.exec({ type: 'toggleTableStyleOption', option })}
-                />
-                {t(labelKey)}
-              </label>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {g.textFitting ? (
-        <div className="pptx-panel__section">
-          <h3 className="pptx-panel__title">{t('panel.format.textFitting')}</h3>
-          <div className="pptx-radios" role="radiogroup" aria-label={t('panel.format.textFitting')}>
-            {(['none', 'shrink', 'shape'] as const).map((mode) => (
-              <label key={mode} className="pptx-radio">
-                <input
-                  type="radio"
-                  name="pptx-text-fitting"
-                  checked={g.textFitting === mode}
-                  disabled={readOnly}
-                  onChange={() => editor?.exec({ type: 'setAutofit', mode })}
-                />
-                {t(`panel.format.fitting.${mode}`)}
-              </label>
-            ))}
-          </div>
-        </div>
-      ) : null}
-    </>
-  );
-}
-
-/** Props of `SidePanel`. The host shows or hides the panel by rendering it. @public */
-export interface SidePanelProps {
-  /** Shows a close button that calls it. */
-  readonly onClose?: () => void;
-  /** A class name added to the panel. */
-  readonly className?: string;
-  /** The panel's width in CSS pixels. */
-  readonly paneWidth?: number;
-  /** Inline styles for the panel; a `width` here wins over `paneWidth`. */
-  readonly style?: CSSProperties;
-  /** The tab that shows. Set it with `onTabChange` to control the tab; omit it to start on Format. */
-  readonly tab?: SidePanelTab;
-  /** Called with the tab the user picks. */
-  readonly onTabChange?: (tab: SidePanelTab) => void;
-}
-
-/** The side panel: Format · Selection · Comments. @public */
-export function SidePanel({
-  onClose,
-  className,
-  paneWidth,
-  style,
-  tab: shown,
-  onTabChange,
-}: SidePanelProps) {
-  const { t } = useTranslation();
-  const editor = usePptxEditor();
-  const [own, setOwn] = useState<SidePanelTab>(shown ?? 'format');
-  const tab = shown ?? own;
-  const setTab = (next: SidePanelTab): void => {
-    setOwn(next);
-    onTabChange?.(next);
-  };
-  return (
-    <aside
-      className={['pptx-panel', className].filter(Boolean).join(' ')}
-      aria-label={t('panel.ariaLabel')}
-      style={paneStyle(paneWidth, style)}
-      onMouseDown={keepFocus}
-    >
-      <div className="pptx-panel__head">
-        <div
-          className="pptx-tabs"
-          role="tablist"
-          // One Tab stop: the selected tab; the arrow keys move between tabs.
-          onKeyDown={(e) => {
-            const next = radioGroupStep(SIDE_PANEL_TABS, tab, e.key);
-            if (!next) return;
-            e.preventDefault();
-            setTab(next);
-            e.currentTarget.querySelector<HTMLElement>(`[data-tab="${next}"]`)?.focus();
-          }}
-        >
-          {SIDE_PANEL_TABS.map((id) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              className="pptx-tabs__tab"
-              data-tab={id}
-              aria-selected={tab === id}
-              tabIndex={tab === id ? 0 : -1}
-              onClick={() => setTab(id)}
-            >
-              {t(`panel.tabs.${id}`)}
-            </button>
-          ))}
-        </div>
-        {onClose ? <ToolButton label={t('panel.close')} icon="close" onClick={onClose} /> : null}
-      </div>
-      <div
-        className="pptx-panel__body"
-        role="tabpanel"
-        onKeyDown={(e) => panelHistoryKey(e, editor)}
-      >
-        {tab === 'format' ? <FormatTab /> : null}
-        {tab === 'selection' ? <SelectionPane /> : null}
-        {tab === 'comments' ? (
-          <div className="pptx-empty">
-            <p className="pptx-empty__title">{t('panel.comments.emptyTitle')}</p>
-            <p className="pptx-empty__body">{t('panel.comments.emptyBody')}</p>
-          </div>
-        ) : null}
-      </div>
-    </aside>
   );
 }

@@ -2497,6 +2497,12 @@ export interface FontUrlSource {
 // @public
 export type FormatPainterMode = 'off' | 'once' | 'sticky';
 
+// @internal
+export function formatPanelSize(geometry: Pick<SelectionGeometry, 'cx' | 'cy' | 'lockAspectRatio'>, side: 'cx' | 'cy', value: number): {
+    cx: number;
+    cy: number;
+};
+
 // @public
 export function formattingBarChromeGroups(image?: SelectedImageState | null): readonly ChromeGroup[];
 

@@ -371,7 +371,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'The Rotate control flips and turns 90° on the slide, also inside groups. Every resize handle of one object keeps a locked ratio; a resize of several objects ignores it. The default editor has no lock control; `setLockAspectRatio` sets the lock.',
+      'The Rotate control flips and turns 90° on the slide, also inside groups. Every resize handle of one object keeps a locked ratio; a resize of several objects ignores it. The Format tab of the side panel has a Lock aspect ratio check box, and a typed width or height of a locked object sizes the other side too. `setLockAspectRatio` sets the lock.',
   },
   {
     id: 'shapes.selection-pane',
