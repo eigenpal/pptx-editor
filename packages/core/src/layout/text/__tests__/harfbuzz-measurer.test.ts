@@ -86,6 +86,23 @@ describe('the advance cache', () => {
     expect(cache.get('k0')).toBeUndefined();
     expect(cache.get('k999')).toBe(999);
   });
+
+  test('holds at most its weight limit, as typing in a long paragraph adds heavy entries', () => {
+    const cache = new AdvanceCache<number>(20_000, 10_000);
+    cache.set('hot', 0, 10);
+    // Each keystroke measures the paragraph again: 3000 entries of about 2000 characters.
+    for (let i = 0; i < 3000; i += 1) {
+      cache.set(`p${i}`, i, 2000 + i);
+      expect(cache.weight).toBeLessThanOrEqual(10_000);
+      expect(cache.get('hot')).toBe(0);
+    }
+    expect(cache.get('p2999')).toBe(2999);
+    expect(cache.get('p0')).toBeUndefined();
+    // An entry heavier than half the limit is not kept.
+    cache.set('huge', 1, 6000);
+    expect(cache.get('huge')).toBeUndefined();
+    expect(cache.get('p2999')).toBe(2999);
+  });
 });
 
 describe('face matching', () => {

@@ -125,6 +125,12 @@ interface LoadedFace {
 const MAX_TEXT = 100_000;
 /** Advance arrays kept per measurer; the least recently used go first (`AdvanceCache`). */
 const CACHE_LIMIT = 20_000;
+/**
+ * The characters of the advance arrays kept per measurer: about 10 MB with their keys. Each
+ * keystroke in a paragraph measures its run again, so a count limit alone would keep
+ * `CACHE_LIMIT` copies of a long paragraph.
+ */
+const CACHE_CHARS = 1_000_000;
 
 /**
  * An sfnt table of face 0, read from the font bytes in JavaScript. `Face.referenceTable` makes
@@ -186,7 +192,7 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
   const faces: RegisteredFace[] = sources.map((s, i) => ({ ...s, id: `${prefix}${i}` }));
   const loaded = new Map<string, LoadedFace>();
   const resolved = new Map<string, ResolvedFace>();
-  const cache = new AdvanceCache<Float64Array>(CACHE_LIMIT);
+  const cache = new AdvanceCache<Float64Array>(CACHE_LIMIT, CACHE_CHARS);
   // One shaping buffer, reset before each use. Shaping is synchronous, so it is never shared.
   let buffer: InstanceType<HarfBuzzModule['Buffer']> | null = null;
 
@@ -325,7 +331,7 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
         out[cluster] += isIdeographic(text.codePointAt(cluster) ?? 0) ? 1 : 0.5;
       else out[cluster] += positions[g].xAdvance / lf.upem;
     }
-    cache.set(key, out);
+    cache.set(key, out, text.length);
     return out;
   };
 
