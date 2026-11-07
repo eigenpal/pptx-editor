@@ -185,6 +185,39 @@ describe('PptxEditorReview', () => {
     expect(editor.snapshot().comments![0]!.text).toBe('Mine');
   });
 
+  test('a delete of a twin keeps the fields and the pick of another twin', async () => {
+    const editor = await mount([reviewModule()]);
+    await act(async () => void (await editor.load(await repeatedThreadDeck())));
+    const [a, b] = editor.snapshot().comments!;
+    act(() => editor.selectComment(b!.id));
+    const reply = screen.getByRole('textbox', { name: 'Reply to Ada Lovelace' });
+    act(() => void fireEvent.change(reply, { target: { value: 'For B' } }));
+    const edit = screen.getAllByRole('button', { name: 'Edit comment by Ada Lovelace' })[1]!;
+    act(() => void fireEvent.click(edit));
+    const box = screen.getByRole('textbox', { name: 'Edit comment' });
+    act(() => void fireEvent.change(box, { target: { value: 'B edited' } }));
+    act(() => void editor.exec({ type: 'deleteComment', commentId: a!.id }));
+    expect(editor.snapshot().comments![0]).toMatchObject({ text: 'B', identity: b!.identity });
+    expect(editor.snapshot().activeComment).toBe(editor.snapshot().comments![0]!.id);
+    const value = (name: string): string =>
+      (screen.getByRole('textbox', { name }) as HTMLTextAreaElement).value;
+    expect(value('Edit comment')).toBe('B edited');
+    expect(value('Reply to Ada Lovelace')).toBe('For B');
+  });
+
+  test('when one of three copies goes, an edit of a copy closes and saves nothing', async () => {
+    const editor = await mount([reviewModule()]);
+    await act(async () => void (await editor.load(await repeatedThreadDeck('same'))));
+    const [first] = editor.snapshot().comments!;
+    const edit = screen.getAllByRole('button', { name: 'Edit comment by Ada Lovelace' })[0]!;
+    act(() => void fireEvent.click(edit));
+    const box = screen.getByRole('textbox', { name: 'Edit comment' });
+    act(() => void fireEvent.change(box, { target: { value: 'Mine' } }));
+    act(() => void editor.exec({ type: 'deleteComment', commentId: first!.id }));
+    expect(screen.queryByRole('textbox', { name: 'Edit comment' })).toBeNull();
+    expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['A', 'A']);
+  });
+
   test('a delete that changes a thread id keeps its card, its pick, and its fields', async () => {
     const editor = await mount([reviewModule()]);
     await act(async () => void (await editor.load(await repeatedThreadDeck('pair'))));

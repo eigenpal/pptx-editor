@@ -201,6 +201,40 @@ describe('PptxEditorReview (Vue)', () => {
     expect(editor.snapshot().comments![0]!.text).toBe('Mine');
   });
 
+  test('a delete of a twin keeps the fields and the pick of another twin', async () => {
+    const editor = await mount([reviewModule()]);
+    expect((await editor.load(await repeatedThreadDeck())).ok).toBe(true);
+    await settle();
+    const [a, b] = editor.snapshot().comments!;
+    editor.selectComment(b!.id);
+    await settle();
+    await type(field('Reply to Ada Lovelace')!, 'For B');
+    const edits = [...document.querySelectorAll<HTMLButtonElement>('button')].filter(
+      (el) => el.getAttribute('aria-label') === 'Edit comment by Ada Lovelace'
+    );
+    await click(edits[1]);
+    await type(field('Edit comment')!, 'B edited');
+    editor.exec({ type: 'deleteComment', commentId: a!.id });
+    await settle();
+    expect(editor.snapshot().comments![0]).toMatchObject({ text: 'B', identity: b!.identity });
+    expect(editor.snapshot().activeComment).toBe(editor.snapshot().comments![0]!.id);
+    expect(field('Edit comment')!.value).toBe('B edited');
+    expect(field('Reply to Ada Lovelace')!.value).toBe('For B');
+  });
+
+  test('when one of three copies goes, an edit of a copy closes and saves nothing', async () => {
+    const editor = await mount([reviewModule()]);
+    expect((await editor.load(await repeatedThreadDeck('same'))).ok).toBe(true);
+    await settle();
+    const [first] = editor.snapshot().comments!;
+    await click(button('Edit comment by Ada Lovelace'));
+    await type(field('Edit comment')!, 'Mine');
+    editor.exec({ type: 'deleteComment', commentId: first!.id });
+    await settle();
+    expect(field('Edit comment')).toBeNull();
+    expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['A', 'A']);
+  });
+
   test('a delete that changes a thread id keeps its card, its pick, and its fields', async () => {
     const editor = await mount([reviewModule()]);
     expect((await editor.load(await repeatedThreadDeck('pair'))).ok).toBe(true);

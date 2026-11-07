@@ -22,9 +22,11 @@ const IN = 914_400;
 /**
  * A one-slide deck with threads that share a GUID. `twins`: "A" and "B" share an author and a
  * date, and "C" is later; B takes A's id when A is deleted. `pair`: only "A" and "B", with B
- * later; when A is deleted, B's id loses its mark.
+ * later; when A is deleted, B's id loses its mark. `same`: three copies of "A", one text.
  */
-export async function repeatedThreadDeck(kind: 'twins' | 'pair' = 'twins'): Promise<Uint8Array> {
+export async function repeatedThreadDeck(
+  kind: 'twins' | 'pair' | 'same' = 'twins'
+): Promise<Uint8Array> {
   const editor = createPptxEditor({
     fixedMeasurer: true,
     substitutes: false,
@@ -53,7 +55,9 @@ export async function repeatedThreadDeck(kind: 'twins' | 'pair' = 'twins'): Prom
     const more =
       kind === 'twins'
         ? copy('B') + copy('C', '2026-11-07T11:00:00.000')
-        : copy('B', '2026-11-07T10:30:00.000');
+        : kind === 'pair'
+          ? copy('B', '2026-11-07T10:30:00.000')
+          : copy('A') + copy('A');
     const parsed = parseXmlPart(name, xml.replace(thread, thread + more));
     if (!parsed.ok) throw new Error('the patched list does not parse');
     parts.set(name, { kind: 'xml', partName: name, xml: parsed.part });
