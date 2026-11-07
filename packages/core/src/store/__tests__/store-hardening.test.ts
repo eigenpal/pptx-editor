@@ -372,15 +372,15 @@ describe('P3: one id index per transaction', () => {
     return { part: result.ok ? xmlPartOf(result.pkg, SLIDE)! : null, work: work() };
   };
   /**
-   * One part: the transaction indexes it once and copies the index once, when it opens it. The
-   * copy writes each entry once; `editWrites` are the writes the edits make after it.
+   * One part: the transaction indexes it once and never copies the index. `editWrites` are the
+   * writes the edits make; the commit layers them over the index it opened.
    */
   const openedOnce = (edits: { subtreeVisits: number; editWrites: number }) => ({
     completeBuilds: 1,
     completeVisits: slideIndex.size,
     opens: 1,
     subtreeVisits: edits.subtreeVisits,
-    indexWrites: slideIndex.size + edits.editWrites,
+    indexWrites: edits.editWrites,
   });
   /** The number of nodes from `id` up to the root, both included. */
   const pathLength = (id: NodeId): number => {
@@ -389,13 +389,16 @@ describe('P3: one id index per transaction', () => {
     return length;
   };
 
-  test('1,000 ops on a 60,000-node slide index and copy it once, then write their paths', () => {
+  test('1,000 ops on a 60,000-node slide index it once, then write their paths', () => {
     expect(slideIndex.size).toBeGreaterThan(60_000);
     const names = idsOf('cNvPr');
-    // An attribute edit adds no node to the kept index and removes none. It writes the entries
-    // from the edited node up to the root, which the edit copied: 6 for a `p:cNvPr`.
+    // An attribute edit adds no node to the kept index and removes none. The first one writes
+    // the entries from the edited node up to the root, which it copied: 6 for a `p:cNvPr`. The
+    // transaction owns those copies, so each later edit copies its path up to its shape (3) and
+    // writes into the owned `p:spTree` in place.
     const path = pathLength(names[0]);
     expect(path).toBe(6);
+    const writes = (n: number): number => path + (n - 1) * (path - 3);
     const ops: PptxOp[] = names.slice(0, 1000).map((node, i) => ({
       op: 'setAttribute',
       part: SLIDE,
@@ -405,10 +408,10 @@ describe('P3: one id index per transaction', () => {
     }));
     // 10 ops first, so a per-op rebuild fails in well under a second.
     expect(counted(ops.slice(0, 10)).work).toEqual(
-      openedOnce({ subtreeVisits: 0, editWrites: 10 * path })
+      openedOnce({ subtreeVisits: 0, editWrites: writes(10) })
     );
     const { part, work: thousand } = counted(ops);
-    expect(thousand).toEqual(openedOnce({ subtreeVisits: 0, editWrites: 1000 * path }));
+    expect(thousand).toEqual(openedOnce({ subtreeVisits: 0, editWrites: writes(1000) }));
     if (!part) return;
     // The committed root takes over the kept index: reading it builds nothing.
     resetWork();
@@ -428,7 +431,7 @@ describe('P3: one id index per transaction', () => {
     const store = new PptxDocumentStore(coldPackage());
     resetWork();
     expect(store.transact(ops).ok).toBe(true);
-    expect(work()).toEqual(openedOnce({ subtreeVisits: 0, editWrites: 1000 * path }));
+    expect(work()).toEqual(openedOnce({ subtreeVisits: 0, editWrites: writes(1000) }));
   });
 
   test('inserts, moves, removals, and text edits on a 60,000-node slide keep that one index', () => {
@@ -450,20 +453,27 @@ describe('P3: one id index per transaction', () => {
     ]);
     // The edits visit only the subtrees that come or go: the new shape and its text (2), the
     // moved shape out and back in (2 × 12), the old and the new text (2), the removed shape (12).
-    // Each edit writes those nodes, the siblings whose position changed, and its path to the
-    // root (3 from `p:spTree`, 8 from `a:t`). These are today's exact counts: a cheaper edit
-    // lowers them, and then the formulas change.
+    // The first edit writes those nodes and its path to the root (3 from `p:spTree`). The
+    // transaction owns that copy of `p:spTree` and above, so later edits write into it in place:
+    // a later edit writes no path above `p:spTree`, and 5 entries from `a:t` up to its shape.
+    // The siblings after an insert or a removal learn their new places once, when one of them
+    // is read next or when the transaction ends. These are today's exact counts: a cheaper
+    // edit lowers them, and then the formulas change.
     expect(shape).toBe(12);
     const subtreeVisits = 2 + 2 * shape + 2 + shape;
-    // Insert at 0: the new shape and its text, every shape shifted, the path.
-    const insert = 2 + SHAPES + 3;
-    // Move out of position 2 (the shapes after it shift back), then in at 0 (all shift on).
-    const move = shape + (SHAPES - 2) + 3 + shape + SHAPES + 3;
-    // Text: the old and the new text node, the path.
-    const text = 1 + 1 + 8;
-    // Remove at position 4: the shapes after it shift back.
-    const remove = shape + (SHAPES - 4) + 3;
-    const editWrites = insert + move + text + remove;
+    // Insert at 0: the new shape and its text, the path. The shapes after it shift later.
+    const insert = 2 + 3;
+    // Move: reading the moved shape updates every shape from the insert place on (all 5001),
+    // then out (its subtree) and in at 0 (its subtree), both in place in `p:spTree`.
+    const move = SHAPES + 1 + shape + shape;
+    // Text: its path reads the shapes from the move's insert place on (all 5001), then the two
+    // text nodes, the path up to its shape.
+    const text = SHAPES + 1 + 1 + 1 + 5;
+    // Remove at position 4: its subtree, in place in `p:spTree`.
+    const remove = shape;
+    // The end: the shapes after the removed one learn their places.
+    const end = SHAPES - 4;
+    const editWrites = insert + move + text + remove + end;
     expect(done).toEqual(openedOnce({ subtreeVisits, editWrites }));
     expect(part && staleEntries(part)).toEqual([]);
   });

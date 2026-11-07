@@ -150,12 +150,15 @@ export function corrections(
 function capitalized(word: string, prefix: string, trigger: string): boolean {
   if (word === 'i') return I_TRIGGERS.has(trigger);
   if (DAYS.has(word)) return true;
-  const head = prefix.replace(/\s+$/u, '');
+  // `trimEnd` removes what `\s` matches, without a regex retry from each space.
+  const head = prefix.trimEnd();
   if (head === '') return true;
   if (!/[.!?]$/u.test(head) || head === prefix) return false;
   // An abbreviation (`e.g.`, `approx.`), a lone initial, or a number (`Step 3.`) does not end
   // a sentence.
-  const last = /(\S+)$/u.exec(head)?.[1] ?? '';
+  let from = head.length;
+  while (from > 0 && !/\s/u.test(head[from - 1]!)) from -= 1;
+  const last = head.slice(from);
   if (/^(?:\p{L}\.)+$/u.test(last) || /^\d+[.)]$/u.test(last)) return false;
   return !ABBREVIATIONS.has(last.slice(0, -1).toLowerCase());
 }

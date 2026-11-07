@@ -98,18 +98,29 @@ describe('P1: layouts and thumbnails are keyed by the parts a slide reads', () =
     const boxes = [0, 1, 2].map(() => doc.createElement('div') as unknown as HTMLElement);
     boxes.forEach((box, i) => editor.renderThumbnail(i, box));
     const first = boxes.map((b) => b.firstElementChild);
+    const shown = boxes.map((b) => b.textContent);
+    const nodes = boxes.map((b) => [...b.querySelectorAll('[data-kind]')]);
     expect(first.every((svg) => svg?.localName === 'svg')).toBe(true);
 
     caretIn(editor, 1, 'Body');
     editor.input('text', 'x');
     boxes.forEach((box, i) => editor.renderThumbnail(i, box));
     // Nothing repaints during the edit: slide 1 waits for an idle time.
-    expect(boxes.map((b) => b.firstElementChild)).toEqual(first);
+    expect(boxes.map((b) => b.textContent)).toEqual(shown);
 
     await wait(400);
-    expect(boxes[0]!.firstElementChild).toBe(first[0]!);
-    expect(boxes[1]!.firstElementChild).not.toBe(first[1]!);
-    expect(boxes[2]!.firstElementChild).toBe(first[2]!);
+    // Slide 1 repaints the shape that changed, in the same picture; the others keep theirs.
+    expect(boxes.map((b) => b.firstElementChild)).toEqual(first);
+    expect(boxes[1]!.textContent).not.toBe(shown[1]);
+    expect(boxes[1]!.textContent).toContain('x');
+    expect(boxes[0]!.textContent).toBe(shown[0]!);
+    expect(boxes[2]!.textContent).toBe(shown[2]!);
+    for (const i of [0, 2])
+      expect([...boxes[i]!.querySelectorAll('[data-kind]')]).toEqual(nodes[i]!);
+    const kept = [...boxes[1]!.querySelectorAll('[data-kind]')].filter((n) =>
+      nodes[1]!.includes(n)
+    );
+    expect(kept.length).toBeGreaterThan(0);
     editor.destroy();
   });
 

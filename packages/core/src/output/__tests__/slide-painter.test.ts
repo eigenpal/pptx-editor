@@ -103,3 +103,39 @@ test('a removed shape leaves no node and no definitions behind', async () => {
   expect(normalized(svg)).toBe(normalized(paintSlide(doc, next, opts)));
   editor.destroy();
 });
+
+test('a budget paints a slide over several calls, in paint order, as one paint would', async () => {
+  const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
+  expect((await editor.load(deck())).ok).toBe(true);
+  const opts: PaintOptions = { images: () => undefined, idPrefix: 'x' };
+  const painter = new SlidePainter(doc, opts);
+  const layout = editor.session!.layout(0)!;
+  const ids = layout.items.map((i) => i.element.nodeId);
+  const shown = (svg: Element) =>
+    [...svg.querySelectorAll('[data-kind="content"] > [data-node-id]')].map((n) =>
+      n.getAttribute('data-node-id')
+    );
+  const svg = painter.paint(layout, 5);
+  expect(painter.pending).toBe(true);
+  expect(shown(svg)).toEqual(ids.slice(0, 5));
+  // An edit while items wait: the painted items stay, and new ones still wait for the budget.
+  editor.setSelection({
+    kind: 'text',
+    nodeId: ids[8]!,
+    anchor: { paragraph: 0, offset: 0 },
+    focus: { paragraph: 0, offset: 0 },
+  });
+  editor.input('text', 'z');
+  const next = editor.session!.layout(0)!;
+  const kept = new Map(
+    ids.slice(0, 5).map((id) => [id, svg.querySelector(`[data-node-id="${id}"]`)])
+  );
+  expect(painter.paint(next, 5)).toBe(svg);
+  expect(shown(svg)).toEqual(ids.slice(0, 10));
+  for (const [id, node] of kept) expect(svg.querySelector(`[data-node-id="${id}"]`)).toBe(node);
+  painter.paint(next, 5);
+  expect(painter.pending).toBe(false);
+  expect(shown(svg)).toEqual(ids);
+  expect(normalized(svg)).toBe(normalized(paintSlide(doc, next, opts)));
+  editor.destroy();
+});

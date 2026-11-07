@@ -240,7 +240,8 @@ export function groupShapes(
   for (const id of ids)
     if (isPlaceholder(batch.element(part, id)))
       throw new CommandRefusal('disabled.groupPlaceholder');
-  const ordered = shapesOf(parent).filter((s) => ids.includes(s.id));
+  const wanted = new Set(ids);
+  const ordered = shapesOf(parent).filter((s) => wanted.has(s.id));
   if (ordered.length !== new Set(ids).size) throw new CommandRefusal('disabled.unsupportedElement');
   // Materialize inherited transforms so the shapes keep their place inside the group.
   const boxes = ordered.map((s) => {
@@ -252,7 +253,7 @@ export function groupShapes(
   const id = nextShapeId(batch, spTreeOf(batch, part));
   const i = (v: number): string => coordinate(v, 'group');
   const size = (v: number): string => positiveCoordinate(v, 'group');
-  const at = parent.children.findIndex((c) => c.id === ordered[ordered.length - 1].id) + 1;
+  const at = parent.children.findIndex((c) => c.id === ordered[ordered.length - 1]!.id) + 1;
   const group = batch.insert({
     op: 'insertNode',
     part,
@@ -264,10 +265,11 @@ export function groupShapes(
         `<a:chOff x="${i(u.x)}" y="${i(u.y)}"/><a:chExt cx="${size(u.cx)}" cy="${size(u.cy)}"/></a:xfrm></p:grpSpPr></p:grpSp>`
     ),
   });
-  for (const s of ordered) {
-    const g = batch.element(part, group);
-    batch.push({ op: 'moveNode', part, node: s.id, parent: group, index: g.children.length });
-  }
+  // The shapes go in from the top down, each one under those already in: the group keeps their
+  // order, and each move leaves the places of the shapes still to move as they were.
+  const first = batch.element(part, group).children.length;
+  for (let k = ordered.length - 1; k >= 0; k -= 1)
+    batch.push({ op: 'moveNode', part, node: ordered[k]!.id, parent: group, index: first });
   if (parent.kind === 'grpSp') refitGroup(batch, part, parent.id, items);
   return group;
 }

@@ -114,8 +114,10 @@ export function serializeSvgElement(root: Element): string;
 // @internal
 export class SlidePainter {
     constructor(doc: Document, opts: PaintOptions);
-    paint(layout: SlideLayout): SVGSVGElement;
+    get idPrefix(): string;
+    paint(layout: SlideLayout, budget?: number): SVGSVGElement;
     paints(opts: PaintOptions): boolean;
+    get pending(): boolean;
 }
 
 // @internal

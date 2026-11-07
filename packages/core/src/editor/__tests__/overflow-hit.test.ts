@@ -195,7 +195,9 @@ describe('overflowing text', () => {
       const { e, stage, hover } = await attached();
       const p = pointIn(itemOf(e, 'Bottom'), 0, 2);
       hover(p.x, p.y);
-      expect(stage.style.cursor).toBe('text');
+      // The layer over the slide shows the cursor (`.pptx-surface__hit`).
+      const hit = stage.querySelector('.pptx-surface__hit') as HTMLElement;
+      expect(hit.style.cursor).toBe('text');
       e.destroy();
     } finally {
       if (!had) delete g.Node;

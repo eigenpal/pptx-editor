@@ -1036,6 +1036,7 @@
   },
   "fonts": {
     "notice": "이 프레젠테이션의 일부 글꼴을 사용할 수 없어 대체 글꼴로 표시합니다: {families}.",
+    "more": "{families} 외 {count}개",
     "useLocal": "이 컴퓨터의 글꼴 사용",
     "dismiss": "닫기",
     "localNone": "이 컴퓨터에 설치된 글꼴이 없습니다.",

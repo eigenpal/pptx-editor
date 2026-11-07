@@ -471,6 +471,25 @@ export function fontNoticeFamilies(
   return substituted.filter((f) => !f.metricCompatible).map((f) => f.family);
 }
 
+/** How many families the font notice names before it gives a count of the others. */
+const FONT_NOTICE_NAMED = 3;
+
+/**
+ * The families as the font notice names them: all of them up to four, else the first three
+ * and a count of the others, so a deck with hundreds of missing fonts keeps a short notice.
+ * @internal
+ */
+export function fontNoticeList(
+  families: readonly string[],
+  t: (key: 'fonts.more', params: { families: string; count: number }) => string
+): string {
+  if (families.length <= FONT_NOTICE_NAMED + 1) return families.join(', ');
+  return t('fonts.more', {
+    families: families.slice(0, FONT_NOTICE_NAMED).join(', '),
+    count: families.length - FONT_NOTICE_NAMED,
+  });
+}
+
 /**
  * Add the fonts installed on this computer for `families`, after the host's own fonts, and
  * return the translation key of the outcome. @internal

@@ -180,6 +180,14 @@ export class OpBatch {
     return `n${before}`;
   }
 
+  /** The parent id of node `id` in a part, or undefined for the root or a missing node. */
+  parentId(part: string, id: string): string | undefined {
+    // From the open transaction: reading `pkg` would close it before each lookup.
+    if (this.#tx) return this.#tx.parentId(part, id) ?? undefined;
+    const xml = xmlPartOf(this.#pkg, part);
+    return (xml ? nodeIndex(xml).get(id)?.parent : undefined) ?? undefined;
+  }
+
   /** The current element for an id in a part. */
   element(part: string, id: string): Element {
     // From the open transaction: reading `pkg` would close it before each op.

@@ -757,6 +757,11 @@ export class SlidePainter {
     this.#defs = new Defs(doc, opts.idPrefix);
   }
 
+  /** The prefix of the ids this painter writes. */
+  get idPrefix(): string {
+    return this.#opts.idPrefix;
+  }
+
   /** Whether this painter paints with `opts`: the same ports and id prefix. */
   paints(opts: PaintOptions): boolean {
     const a = this.#opts;
@@ -770,8 +775,23 @@ export class SlidePainter {
     );
   }
 
-  /** Paint `layout`, reusing the nodes of items painted before. Returns the same `<svg>`. */
-  paint(layout: SlideLayout): SVGSVGElement {
+  /**
+   * Whether the last `paint` left items out because they passed its budget: a later `paint` of
+   * the same layout adds them.
+   */
+  get pending(): boolean {
+    return this.#pending;
+  }
+
+  #pending = false;
+
+  /**
+   * Paint `layout`, reusing the nodes of items painted before. Returns the same `<svg>`. With a
+   * `budget`, it paints at most that many new items, in paint order, and keeps every item it
+   * painted before (`pending` tells when some are left): a slide of 24,000 shapes then goes on
+   * screen over several frames, and no frame blocks for seconds.
+   */
+  paint(layout: SlideLayout, budget = Infinity): SVGSVGElement {
     const doc = this.#doc;
     const { width, height } = layout.slide;
     const slide = `${layout.slide.partName} ${width}x${height}`;
@@ -822,14 +842,23 @@ export class SlidePainter {
       const fresh = this.#defs.capture(() => paintItem(doc, item, ctx, this.#opts, 1));
       return { node: fresh.value, defs: fresh.defs };
     };
+    let left = budget;
+    this.#pending = false;
     for (const item of layout.items) {
       let painted: PaintedItem;
+      const kept = next.has(item) ? undefined : this.#items.get(item);
+      if (!kept && left <= 0) {
+        this.#pending = true;
+        continue;
+      }
       if (next.has(item)) {
         // An item twice in one layout paints twice: one node cannot stand in two places.
         painted = paintFresh(item);
         this.#twice.push(painted);
+        left -= 1;
       } else {
-        painted = this.#items.get(item) ?? paintFresh(item);
+        painted = kept ?? paintFresh(item);
+        if (!kept) left -= 1;
         next.set(item, painted);
       }
       if (painted.node) nodes.push(painted.node);

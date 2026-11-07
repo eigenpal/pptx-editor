@@ -10,7 +10,15 @@
 // to an unrelated shape. Only ids that the edit removed count: a reference that a file already
 // left dangling stays as the file wrote it.
 
-import { attr, find, NS, timingRemovals, xmlPartOf, type Element } from '../../store/index.ts';
+import {
+  attr,
+  find,
+  nodeIndex,
+  NS,
+  timingRemovals,
+  xmlPartOf,
+  type Element,
+} from '../../store/index.ts';
 import type { OpBatch } from './op-batch.ts';
 
 const MAX_DEPTH = 64;
@@ -56,7 +64,7 @@ function drawingOf(batch: OpBatch, part: string): Drawing {
 export function removeShapes(batch: OpBatch, part: string, ids: readonly string[]): void {
   if (ids.length === 0) return;
   const before = drawingOf(batch, part).ids;
-  for (const id of ids) batch.push({ op: 'removeNode', part, node: id });
+  for (const id of lastFirst(batch, part, ids)) batch.push({ op: 'removeNode', part, node: id });
   const root = xmlPartOf(batch.pkg, part)?.root;
   if (!root) return;
   const now = drawingOf(batch, part);
@@ -65,4 +73,22 @@ export function removeShapes(batch: OpBatch, part: string, ids: readonly string[
   for (const end of now.ends)
     if (gone.has(attr(end, 'id') ?? '')) batch.push({ op: 'removeNode', part, node: end.id });
   for (const el of timingRemovals(root, gone)) batch.push({ op: 'removeNode', part, node: el.id });
+}
+
+/**
+ * `ids` in removal order. Shapes of one parent go from the last place to the first: a removal
+ * then leaves the places of the shapes still to remove as they were, and removing thousands of
+ * shapes stays linear. Shapes of several parents keep their order.
+ */
+function lastFirst(batch: OpBatch, part: string, ids: readonly string[]): readonly string[] {
+  const xml = xmlPartOf(batch.pkg, part);
+  if (!xml || ids.length < 2) return ids;
+  const index = nodeIndex(xml);
+  const locs = ids.map((id) => index.get(id));
+  const parent = locs[0]?.parent;
+  if (locs.some((l) => !l || l.parent !== parent)) return ids;
+  return ids
+    .map((id, i) => ({ id, at: locs[i]!.index }))
+    .sort((a, b) => b.at - a.at)
+    .map((x) => x.id);
 }

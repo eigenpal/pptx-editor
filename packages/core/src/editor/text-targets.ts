@@ -99,6 +99,14 @@ export function refitTargets(
   refitAll(batch, ctx.slide, part, ids, ctx.session.measurer);
 }
 
+/**
+ * The runs or paragraphs that a probe (`can`) formats at most. Each toolbar button probes its
+ * command on every change, and a probe of every run of a 50,000-run text takes a second per
+ * button. No step on one run or paragraph refuses: a refusal comes from the targets, which the
+ * probe still checks in full. The command itself (`exec`) formats every run.
+ */
+export const PROBE_TEXT_LIMIT = 64;
+
 export function forRuns(
   batch: OpBatch,
   part: string,
@@ -108,8 +116,12 @@ export function forRuns(
 ): void {
   const targets = textTargets(batch, part, ctx.selection);
   const word = wordAtCaret && !ctx.caretArm;
+  let left = ctx.probe ? PROBE_TEXT_LIMIT : Infinity;
   for (const t of targets)
-    for (const run of runsForFormatting(batch, part, t.txBodyId, t.range, word)) apply(run);
+    for (const run of runsForFormatting(batch, part, t.txBodyId, t.range, word)) {
+      if (left-- <= 0) break;
+      apply(run);
+    }
   refitTargets(batch, ctx, part, targets);
 }
 
@@ -120,8 +132,11 @@ export function forParagraphs(
   apply: (pPrId: string) => void
 ): void {
   const targets = textTargets(batch, part, ctx.selection);
+  let left = ctx.probe ? PROBE_TEXT_LIMIT : Infinity;
   for (const t of targets)
-    for (const pId of paragraphsForFormatting(batch, part, t.txBodyId, t.range))
+    for (const pId of paragraphsForFormatting(batch, part, t.txBodyId, t.range)) {
+      if (left-- <= 0) break;
       apply(ensureParagraphProps(batch, part, pId));
+    }
   refitTargets(batch, ctx, part, targets);
 }

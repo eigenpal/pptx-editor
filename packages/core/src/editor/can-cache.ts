@@ -10,7 +10,14 @@
 
 import type { CanResult, EditorCommand } from '../contracts/index.ts';
 import { newSlideLayout } from '../automation/commands/slide-layouts.ts';
-import { changedPartNames, presentationInfo, type PptxPackage } from '../store/index.ts';
+import {
+  changedPartNames,
+  nodeIndex,
+  presentationInfo,
+  xmlPartOf,
+  type Node,
+  type PptxPackage,
+} from '../store/index.ts';
 import type { DocumentSession } from './document-session.ts';
 import { replicaBindingOf } from './replica-ids.ts';
 
@@ -23,6 +30,133 @@ export const STRUCTURE_COMMANDS: ReadonlySet<EditorCommand['type']> = new Set([
   'addSlide',
   'addSection',
 ]);
+
+/**
+ * The size from which a shape selection is large: `can` then checks only the mode, not each
+ * command, because a check builds the whole edit (a Duplicate of every selected shape). The
+ * toolbar asks about every command on every change, and must answer within a frame. A
+ * command chosen for a large selection makes the full check when it runs (`exec`) and shows
+ * its reason when it cannot apply.
+ */
+export const LARGE_SELECTION = 250;
+
+/**
+ * The number of XML nodes from which the selected shapes are large, as more than
+ * {@link LARGE_SELECTION} shapes are: one text box of 50,000 runs holds 150,000 nodes, and a
+ * check of Duplicate copies them all.
+ */
+export const LARGE_SELECTION_NODES = 20_000;
+
+/**
+ * Commands that edit every placeholder of a slide, whatever the selection: a check of one on a
+ * slide of more than {@link LARGE_SELECTION_NODES} nodes is large too.
+ */
+const SLIDE_WIDE_COMMANDS: ReadonlySet<EditorCommand['type']> = new Set([
+  'applyLayout',
+  'resetSlides',
+]);
+
+/**
+ * The quick `can` answer for a large shape selection (`LARGE_SELECTION`,
+ * `LARGE_SELECTION_NODES`) on slide `slide` of `session`, or for a slide-wide command on a large
+ * slide; null to check the command in full. @internal
+ */
+export function largeSelectionAnswer(
+  selection: { readonly kind: string; readonly nodeIds?: readonly string[] },
+  readOnly: boolean,
+  session?: DocumentSession,
+  slide = 0,
+  command?: EditorCommand
+): CanResult | null {
+  const pkg = session?.store.package;
+  const part = session?.info.slides[slide]?.partName;
+  const quick: CanResult = readOnly ? { ok: false, reason: 'disabled.viewing' } : { ok: true };
+  if (command && SLIDE_WIDE_COMMANDS.has(command.type)) {
+    const root = pkg && part ? xmlPartOf(pkg, part)?.root : undefined;
+    return root && holdsManyNodes(pkg, part, [root.id]) ? quick : null;
+  }
+  if (selection.kind !== 'shapes') return null;
+  const ids = selection.nodeIds ?? [];
+  if (ids.length <= LARGE_SELECTION && !holdsManyNodes(pkg, part, ids)) return null;
+  return quick;
+}
+
+/** The last answer of `holdsManyNodes` per package: the toolbar asks it once per command. */
+const lastCounts = new WeakMap<
+  PptxPackage,
+  { part: string; ids: readonly string[]; many: boolean }
+>();
+
+/** Whether the shapes `ids` of `part` hold more than {@link LARGE_SELECTION_NODES} nodes. */
+function holdsManyNodes(
+  pkg: PptxPackage | undefined,
+  part: string | undefined,
+  ids: readonly string[]
+): boolean {
+  if (!pkg || !part) return false;
+  const last = lastCounts.get(pkg);
+  if (last?.part === part && last.ids === ids) return last.many;
+  const xml = xmlPartOf(pkg, part);
+  const index = xml ? nodeIndex(xml) : undefined;
+  let left = LARGE_SELECTION_NODES;
+  const stack: Node[] = [];
+  for (const id of ids) {
+    const node = index?.get(id)?.node;
+    if (node) stack.push(node);
+  }
+  // The walk stops at the limit, so it costs at most that many visits.
+  while (stack.length > 0 && left > 0) {
+    const node = stack.pop()!;
+    left -= 1;
+    if (node.type === 'element') for (const kid of node.children) stack.push(kid);
+  }
+  const many = left <= 0;
+  lastCounts.set(pkg, { part, ids, many });
+  return many;
+}
+
+/** How long after the last keystroke the toolbar's formatting answers are exact again. */
+export const TYPING_SETTLE_MS = 300;
+
+/**
+ * Formatting commands whose `can` answer depends on the text box and the mode, not on the text
+ * typed into it: a typing burst keeps their answers (`CanCache.typed`). A link reads the caret
+ * position, so Insert Link is not one of them. @internal
+ */
+export const TYPING_STABLE_COMMANDS: ReadonlySet<EditorCommand['type']> = new Set([
+  'toggleBold',
+  'toggleItalic',
+  'toggleUnderline',
+  'toggleStrike',
+  'setFontFamily',
+  'setFontSize',
+  'setTextColor',
+  'setHighlight',
+  'clearFormatting',
+  'toggleFormatPainter',
+  'setAlign',
+  'setLineSpacing',
+  'toggleBullets',
+  'toggleNumbering',
+  'setBulletFormat',
+  'indent',
+]);
+
+/**
+ * The text box a text selection is in, as a key for `CanCache.typed`: the shape, the table cell,
+ * and whether the selection is a caret. Null for any other selection. @internal
+ */
+export function typingBox(selection: {
+  kind: string;
+  nodeId?: string;
+  cell?: unknown;
+  anchor?: unknown;
+  focus?: unknown;
+}): string | undefined {
+  if (selection.kind !== 'text') return undefined;
+  const caret = JSON.stringify(selection.anchor) === JSON.stringify(selection.focus);
+  return JSON.stringify([selection.nodeId, selection.cell ?? null, caret]);
+}
 
 /** `can` answers and one derived value, both reset when `state()` changes. @internal */
 export class CanCache<Active> {
@@ -50,8 +184,70 @@ export class CanCache<Active> {
     this.#active = null;
   }
 
-  /** The cached answer for `key`, or `compute()` cached. */
-  answer(key: string, compute: () => CanResult, structural = false): CanResult {
+  /**
+   * Note a keystroke in the text of `box` (`typingBox`). Until typing stops for
+   * {@link TYPING_SETTLE_MS}, the answers of {@link TYPING_STABLE_COMMANDS} in that text box
+   * stay as they were: they do not change while the text grows, and a probe of each one costs
+   * as much as the text box is long. When typing stops, `settled` runs, so the toolbar asks
+   * again and gets exact answers.
+   */
+  typed(box: string, settled: () => void): void {
+    if (this.#typingBox !== box) this.#typing.clear();
+    this.#typingBox = box;
+    if (this.#settle) clearTimeout(this.#settle);
+    this.#settle = setTimeout(() => {
+      this.#settle = null;
+      this.#typingBox = null;
+      this.#typing.clear();
+      settled();
+    }, TYPING_SETTLE_MS);
+  }
+
+  readonly #typing = new Map<string, CanResult>();
+  #typingBox: string | null = null;
+  #settle: ReturnType<typeof setTimeout> | null = null;
+
+  /** Stop the typing burst without a `settled` call (the editor is destroyed). */
+  dispose(): void {
+    if (this.#settle) clearTimeout(this.#settle);
+    this.#settle = null;
+    this.#typingBox = null;
+    this.#typing.clear();
+  }
+
+  /**
+   * The answer for `command`, cached under `key`: a {@link STRUCTURE_COMMANDS} answer under the
+   * structure key, a {@link TYPING_STABLE_COMMANDS} answer through a typing burst in its text box.
+   */
+  ask(
+    command: EditorCommand,
+    key: string,
+    at: {
+      readonly pkg: PptxPackage | undefined;
+      readonly slide: number;
+      readonly mode: string;
+      readonly selection: Parameters<typeof typingBox>[0];
+    },
+    compute: () => CanResult
+  ): CanResult {
+    if (STRUCTURE_COMMANDS.has(command.type))
+      return this.answer(`${key}@${structureSlideKey(command, at.pkg, at.slide)}`, compute, true);
+    const box = TYPING_STABLE_COMMANDS.has(command.type) ? typingBox(at.selection) : undefined;
+    return this.answer(key, compute, false, box === undefined ? undefined : `${at.mode}${box}`);
+  }
+
+  /**
+   * The cached answer for `key`, or `compute()` cached. With `box`, the text box that the
+   * selection is in, a {@link TYPING_STABLE_COMMANDS} answer holds through a typing burst.
+   */
+  answer(key: string, compute: () => CanResult, structural = false, box?: string): CanResult {
+    if (box !== undefined && box === this.#typingBox) {
+      const hit = this.#typing.get(key);
+      if (hit) return hit;
+      const result = this.answer(key, compute, structural);
+      this.#typing.set(key, result);
+      return result;
+    }
     this.sync();
     const answers = structural ? this.#structuralAnswers() : this.#answers;
     const hit = answers.get(key);

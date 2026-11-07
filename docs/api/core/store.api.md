@@ -414,6 +414,7 @@ export interface OpenTransaction {
     element(part: string, id: string): Element_2 | undefined;
     finish(): PptxPackage;
     nextId(part: string): number | undefined;
+    parentId(part: string, id: string): string | null | undefined;
 }
 
 // @internal

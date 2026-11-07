@@ -7,7 +7,6 @@ import {
   CONTENT_TYPES_PART,
   elements,
   find,
-  nodeIndex,
   NS,
   REL,
   relsPartName,
@@ -518,8 +517,7 @@ export function spTreeOf(batch: OpBatch, slidePart: string): Element {
 
 /** The parent element of a node (a shape's tree or group). */
 export function parentOf(batch: OpBatch, part: string, id: string): Element {
-  const xml = xmlPartOf(batch.pkg, part);
-  const parentId = xml ? nodeIndex(xml).get(id)?.parent : undefined;
+  const parentId = batch.parentId(part, id);
   if (!parentId) throw new CommandRefusal('errors.unsupported', `missing node ${id}`);
   return batch.element(part, parentId);
 }

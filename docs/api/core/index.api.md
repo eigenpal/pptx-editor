@@ -2422,6 +2422,12 @@ export function fontNoticeFamilies(substituted: readonly {
     readonly metricCompatible: boolean;
 }[]): string[];
 
+// @internal
+export function fontNoticeList(families: readonly string[], t: (key: 'fonts.more', params: {
+    families: string;
+    count: number;
+}) => string): string;
+
 // @public
 export type FontOrigin = FontConfiguration | FontConfigurationFragment | MarkedFontResolver | Promise<FontConfiguration | FontConfigurationFragment | undefined> | undefined;
 
@@ -3540,6 +3546,7 @@ export class OpBatch {
     mintedOf(kind: MintedIdKind): Set<number>;
     // (undocumented)
     readonly ops: PptxOp[];
+    parentId(part: string, id: string): string | undefined;
     get pkg(): PptxPackage;
     push(op: PptxOp): void;
     pushAll(ops: readonly PptxOp[]): void;

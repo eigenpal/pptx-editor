@@ -743,6 +743,7 @@ export {
   findBarView,
   focusAfterFindBar,
   fontNoticeFamilies,
+  fontNoticeList,
   linkPopupAnchor,
   linkSelectionRect,
   linkPopupReturnsFocus,

@@ -246,6 +246,19 @@ function glyphFallbackPieces(
   return out;
 }
 
+/**
+ * The break opportunities of a paragraph's display text. They do not depend on the font scale,
+ * so the `normAutofit` search, which lays out one paragraph at each step, finds them once.
+ */
+const breaksOf = new WeakMap<ResolvedParagraph, { text: string; breaks: Uint8Array }>();
+function paragraphBreaks(p: ResolvedParagraph, text: string): Uint8Array {
+  const kept = breaksOf.get(p);
+  if (kept?.text === text) return kept.breaks;
+  const breaks = breakOpportunities(text, p.eaLineBreak, p.latinLineBreak, p.kinsoku);
+  breaksOf.set(p, { text, breaks });
+  return breaks;
+}
+
 function buildSegments(
   p: ResolvedParagraph,
   measurer: TextMeasurer,
@@ -454,14 +467,11 @@ export function layoutTextOn(
 
     // Flatten to units.
     const units: Unit[] = [];
-    let text = '';
     segments.forEach((s, si) => {
-      for (let i = 0; i < s.text.length; i += 1) {
+      for (let i = 0; i < s.text.length; i += 1)
         units.push({ seg: si, code: s.text.charCodeAt(i), advance: s.advances[i] });
-        text += s.text[i];
-      }
     });
-    const breaks = breakOpportunities(text, p.eaLineBreak, p.latinLineBreak, p.kinsoku);
+    const breaks = paragraphBreaks(p, segments.map((s) => s.text).join(''));
 
     const bullet = sourceLength > 0 ? marker : null;
     const pending = sourceLength > 0 ? null : marker;
@@ -547,6 +557,8 @@ export function layoutTextOn(
       lineRanges.push({ start: units.length, end: units.length, forced: false });
 
     lineRanges.forEach((range, li) => {
+      // A fit check reads only the content height: past the box, the rest cannot make it fit.
+      if (y > overflowAt) return;
       const first = li === 0;
       let maxSize = 0;
       let maxFace: ResolvedFace | null = null;

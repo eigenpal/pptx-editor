@@ -1849,14 +1849,22 @@
   text-decoration: underline;
   box-shadow: 0 0 0 1px var(--doc-surface);
 }
-/* The slide takes the stage's cursor (surface.ts `#updateCursor`): resize on a table's grid
-   lines, text over text, move on shapes; never the browser's own cursor over SVG text. */
+/* The layer over the slide shows the pointer's cursor (surface.ts `#updateCursor`): resize on
+   a table's grid lines, text over text, move on shapes. The slide under it never shows the
+   browser's own cursor over SVG text. */
+.pptx-surface__hit {
+  position: absolute;
+  inset: 0;
+}
+.pptx-surface__stage .pptx-surface__slide {
+  cursor: default;
+}
 .pptx-surface__stage [data-layer='slide'] {
   cursor: inherit;
 }
 /* While the format painter is on, the whole slide shows its brush (surface.ts). */
-.pptx-surface--painting .pptx-surface__stage,
-.pptx-surface--painting .pptx-surface__stage [data-layer='slide'] {
+.pptx-surface--painting .pptx-surface__hit,
+.pptx-surface--painting .pptx-surface__stage .pptx-surface__slide {
   cursor: var(--doc-cursor-format-paint);
 }
 
