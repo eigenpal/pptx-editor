@@ -192,7 +192,9 @@ class Collector {
       if (p.bullet?.type === 'char' && isSymbolFont(p.bullet.font ?? ''))
         this.add('symbol-bullets');
       if (p.runs[p.runs.length - 1].kind === 'break') this.add('trailing-break');
-      const tabbed = p.tabs.some((t) => t.align !== 'l');
+      // Centered, right, and decimal stops are measured in wrapped left-to-right text
+      // (`svg-tab-stops`); right-to-left and unwrapped text are not.
+      const tabbed = p.tabs.some((t) => t.align !== 'l') && (p.rtl || bp.wrap !== 'square');
       for (const run of p.runs) {
         const props = run.props;
         if (tabbed && run.text.includes('\t')) this.add('tab-stops');

@@ -127,6 +127,12 @@ export type CommandResult = {
 };
 
 // @public
+export interface DateTimeState {
+    readonly fixed: boolean;
+    readonly text: string;
+}
+
+// @public
 export interface DocumentOpenFailure {
     readonly code: string;
     readonly reason: DocumentOpenFailureReason;
@@ -265,13 +271,44 @@ export type EditorCommand = {
     readonly section?: string;
 }
 /**
-* Insert > Slide numbers: show or hide the slide number on every slide, through the layout's
-* slide-number placeholder. The change applies to all slides, as Header and Footer > Apply to All.
+* Insert > Slide numbers: show or hide the slide number, through the slide-number placeholder
+* of each slide's layout or master. Takes the `HeaderFooterTargets` options; by default, every
+* slide. Refused, also to hide, when no target slide can have a slide number.
 */
-| {
+| ({
     readonly type: 'setSlideNumbers';
     readonly show: boolean;
-}
+} & HeaderFooterTargets)
+/**
+* Insert > Footer: show or hide the footer, through the footer placeholder (`p:ph type="ftr"`)
+* of each slide's layout or master. With `text`, every slide that shows the footer shows
+* `text`. Without `text`, a slide keeps its footer text, and a slide without a footer takes the
+* text that the other slides show. A slide that has a footer keeps its box and format. Refused
+* when no target slide's layout or master has a footer placeholder, for blank or multi-line
+* text, and without `text` when no slide shows a footer (`disabled.noFooterText`). Text is one
+* line of 1,024 characters at most.
+*/
+| ({
+    readonly type: 'setFooter';
+    readonly show: boolean;
+    readonly text?: string;
+} & HeaderFooterTargets)
+/**
+* Insert > Date and time: show or hide the date, through the date placeholder
+* (`p:ph type="dt"`) of each slide's layout or master. With `text`, every slide that shows the
+* date shows `text`: a `datetime1` field, which a presentation application can update when it
+* opens the file, or fixed text with `fixed: true`. Without `text`, a slide keeps its date, and
+* a slide without one takes the date that the other slides show, else today's date
+* (month/day/year) as a field; with `fixed: true`, the dates become fixed text. A slide that has
+* a date keeps its box and format. Refused when no target slide's layout or master has a date
+* placeholder, and for blank or multi-line text.
+*/
+| ({
+    readonly type: 'setDateTime';
+    readonly show: boolean;
+    readonly text?: string;
+    readonly fixed?: boolean;
+} & HeaderFooterTargets)
 /** Delete the selected slides (`EditorSnapshot.selectedSlides`) as one undo step. */
 | {
     readonly type: 'deleteSlides';
@@ -666,12 +703,14 @@ export interface EditorSnapshot {
     readonly collapsedSections?: readonly string[];
     // (undocumented)
     readonly currentSlide: number;
+    readonly dateTime?: DateTimeState | null;
     // (undocumented)
     readonly embeddedFontFaces: number;
     // (undocumented)
     readonly error?: string;
     // (undocumented)
     readonly fitZoom: boolean;
+    readonly footer?: string | null;
     // (undocumented)
     readonly format: SelectionFormat | null;
     readonly formatPainter?: FormatPainterMode;
@@ -871,6 +910,12 @@ export interface GradientFill {
         readonly pos: number;
         readonly color: string;
     }[];
+}
+
+// @public
+export interface HeaderFooterTargets {
+    readonly hideOnTitleSlides?: boolean;
+    readonly indices?: readonly number[];
 }
 
 // @public
@@ -1638,7 +1683,6 @@ export interface TransformItem {
     readonly flipV?: boolean;
     // (undocumented)
     readonly nodeId: string;
-    // (undocumented)
     readonly rot: number;
     // (undocumented)
     readonly x: number;

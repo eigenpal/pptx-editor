@@ -181,6 +181,24 @@
         540
       ]
     },
+    "header-footer": {
+      "deck": "464362c1f6e52644ff4ec788909a332fc3819934b79955bb45396f8cfb4774f1",
+      "pdf": "12215a02bad53bfd2ca336ae23eeafeb9adab1d6ca58dd93fc489ee3c4e22ef7",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "hyperlinks": {
+      "deck": "aaa6a846fdcfe12a006688e1d49b1b338e0206da367496f3567b5cdcf260abb5",
+      "pdf": "5a79315b39486ff1099502a611d4de0b67327e846c09f6a9f876381ac7b1a570",
+      "pages": 3,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
     "line-ends-dashes": {
       "deck": "00bc1d248ff0c943aac2d7f0733918ac15f85b18866fa104bc9425e6190f2f90",
       "pdf": "37c53a21dc703a10785958400a788ddc02b55e4b4a17b681dce126d52dab8954",
@@ -262,6 +280,15 @@
         540
       ]
     },
+    "preserved-content": {
+      "deck": "bf1928552a6832c3bcbffda35bd0d4304d2d700acda0345f7c9ab3d2fecd07e9",
+      "pdf": "c85227a3eda941f156584327e0411aeffaaec33d6087cf89daeba564b74b6bb1",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
     "preset-shapes": {
       "deck": "af8838cc2bb8aeb6cfc6d2361c0b4b4825fa04234103e8e5f1fe1fdcbf3e7731",
       "pdf": "e8876cae5f1c6c097beae50260fb82835a3d439aec235716eee63ce6a62f1666",
@@ -337,6 +364,15 @@
     "spacing": {
       "deck": "5f7182e198f272bf2ad4ef97a65686b395bd2817bf5139840e566784c7a1eb93",
       "pdf": "acac140b8d021334a541b74fa86638387faa50ef4bc0b6297e544d4f9a972975",
+      "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "svg-tab-stops": {
+      "deck": "0fbd381f18ad025a59d6e1cf5c417f96ebc44394a77332a77bc5e312795e9ccb",
+      "pdf": "f9fe2ad6857431fa88089c07756f4ed77fdc22ba6abb547c8c3cfcad2add0b8d",
       "pages": 1,
       "pageSizePt": [
         960,

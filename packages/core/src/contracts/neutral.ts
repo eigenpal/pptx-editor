@@ -14,6 +14,12 @@ export type {
 export type { EditorExecOptions, HistoryGroup, HistoryGroupOptions } from './history-group.ts';
 import type { EditorRejection, EditorRemoval } from './notices.ts';
 export type { EditorRejection, EditorRemoval } from './notices.ts';
+import type { ClipboardPayload } from './clipboard.ts';
+export type { ClipboardNode, ClipboardPayload, ClipboardRelationship } from './clipboard.ts';
+import type { DateTimeState, HeaderFooterTargets } from './header-footer.ts';
+export type { DateTimeState, HeaderFooterTargets } from './header-footer.ts';
+import type { FindMatch, FindOptions } from './find.ts';
+export type { FindMatch, FindOptions } from './find.ts';
 
 import type {
   ObjectAxis,
@@ -175,10 +181,41 @@ export type EditorCommand =
       readonly section?: string;
     }
   /**
-   * Insert > Slide numbers: show or hide the slide number on every slide, through the layout's
-   * slide-number placeholder. The change applies to all slides, as Header and Footer > Apply to All.
+   * Insert > Slide numbers: show or hide the slide number, through the slide-number placeholder
+   * of each slide's layout or master. Takes the `HeaderFooterTargets` options; by default, every
+   * slide. Refused, also to hide, when no target slide can have a slide number.
    */
-  | { readonly type: 'setSlideNumbers'; readonly show: boolean }
+  | ({ readonly type: 'setSlideNumbers'; readonly show: boolean } & HeaderFooterTargets)
+  /**
+   * Insert > Footer: show or hide the footer, through the footer placeholder (`p:ph type="ftr"`)
+   * of each slide's layout or master. With `text`, every slide that shows the footer shows
+   * `text`. Without `text`, a slide keeps its footer text, and a slide without a footer takes the
+   * text that the other slides show. A slide that has a footer keeps its box and format. Refused
+   * when no target slide's layout or master has a footer placeholder, for blank or multi-line
+   * text, and without `text` when no slide shows a footer (`disabled.noFooterText`). Text is one
+   * line of 1,024 characters at most.
+   */
+  | ({
+      readonly type: 'setFooter';
+      readonly show: boolean;
+      readonly text?: string;
+    } & HeaderFooterTargets)
+  /**
+   * Insert > Date and time: show or hide the date, through the date placeholder
+   * (`p:ph type="dt"`) of each slide's layout or master. With `text`, every slide that shows the
+   * date shows `text`: a `datetime1` field, which a presentation application can update when it
+   * opens the file, or fixed text with `fixed: true`. Without `text`, a slide keeps its date, and
+   * a slide without one takes the date that the other slides show, else today's date
+   * (month/day/year) as a field; with `fixed: true`, the dates become fixed text. A slide that has
+   * a date keeps its box and format. Refused when no target slide's layout or master has a date
+   * placeholder, and for blank or multi-line text.
+   */
+  | ({
+      readonly type: 'setDateTime';
+      readonly show: boolean;
+      readonly text?: string;
+      readonly fixed?: boolean;
+    } & HeaderFooterTargets)
   /** Delete the selected slides (`EditorSnapshot.selectedSlides`) as one undo step. */
   | { readonly type: 'deleteSlides'; readonly indices: readonly number[] }
   /** Duplicate the selected slides; the copies follow the last one, in order. */
@@ -310,6 +347,7 @@ export type EditorCommand =
       readonly y: number;
       readonly cx: number;
       readonly cy: number;
+      /** Rotation in degrees, clockwise. The file stores it in 60,000ths of a degree. */
       readonly rot: number;
     }
   | { readonly type: 'nudge'; readonly dx: number; readonly dy: number }
@@ -414,33 +452,6 @@ export type EditorCommand =
  */
 export type FormatPainterMode = 'off' | 'once' | 'sticky';
 
-/** How find compares text. @public */
-export interface FindOptions {
-  /** Match upper and lower case exactly. */
-  readonly matchCase?: boolean;
-  /** Match whole words only: no letter, digit, or underscore touches either end. */
-  readonly wholeWord?: boolean;
-}
-
-/** One match of a find. Offsets are UTF-16 offsets in the paragraph. @public */
-export interface FindMatch {
-  /** The slide index. */
-  readonly slide: number;
-  /** `slide` for text on the slide (shapes, groups, table cells); `notes` for speaker notes. */
-  readonly where: 'slide' | 'notes';
-  /** The part that holds the text: the slide part, or the slide's notes part. */
-  readonly part: string;
-  /** The element the text belongs to: a `p:sp`, or the `p:graphicFrame` of a table. */
-  readonly nodeId: string;
-  /** The text body: a shape's `p:txBody` or a table cell's `a:txBody`. */
-  readonly txBodyId: string;
-  readonly paragraph: number;
-  readonly start: number;
-  readonly end: number;
-  /** The text the match covers. */
-  readonly text: string;
-}
-
 /**
  * A theme color as the color menus name it: the color map's names, so `bg1` is the
  * color the slide's `p:clrMap` maps to Background 1. @public
@@ -510,40 +521,11 @@ export interface TransformItem {
   readonly y: number;
   readonly cx: number;
   readonly cy: number;
+  /** Rotation in degrees, clockwise. The file stores it in 60,000ths of a degree. */
   readonly rot: number;
   /** Flips; absent keeps the current ones. A line's direction is its flips. */
   readonly flipH?: boolean;
   readonly flipV?: boolean;
-}
-
-/** A serialized element, structurally the store's `NodeSpec`. @public */
-export interface ClipboardNode {
-  readonly ns: string;
-  readonly local: string;
-  readonly prefix?: string;
-  readonly attrs?: readonly { ns: string; local: string; prefix?: string; value: string }[];
-  readonly nsDecls?: readonly { prefix: string; uri: string }[];
-  readonly children?: readonly (ClipboardNode | { readonly text: string })[];
-}
-
-/** A relationship a copied shape uses, with the bytes of its target. @public */
-export interface ClipboardRelationship {
-  readonly id: string;
-  readonly type: string;
-  readonly part: string;
-  readonly contentType: string;
-  readonly base64: string;
-}
-
-/** The clipboard format for shapes (`application/x-pptx-editor+json`). @public */
-export interface ClipboardPayload {
-  readonly version: 1;
-  /** The session the shapes came from; pasting into it reuses its parts. */
-  readonly document: string;
-  /** The slide part the shapes came from; pasting onto it offsets them. */
-  readonly slidePart: string;
-  readonly shapes: readonly ClipboardNode[];
-  readonly relationships: readonly ClipboardRelationship[];
 }
 
 /** The command type names. @public */
@@ -894,6 +876,19 @@ export interface EditorSnapshot {
   readonly selectedSlides: readonly number[];
   /** Whether the current slide shows its slide number (Insert > Slide numbers). */
   readonly slideNumbers: boolean;
+  /**
+   * The footer text (Insert > Footer): the current slide's, else that of the first slide with a
+   * footer. Null when no slide shows one. Unlike `slideNumbers`, which reads the current slide,
+   * it reads the deck, as the command acts on the deck. It reads only the slides that are open: while
+   * `pendingSlides` is above 0, a slide that waits can have a footer. Optional, so that snapshots
+   * from hosts without it stay valid: absent reads as null.
+   */
+  readonly footer?: string | null;
+  /**
+   * The date (Insert > Date and time), read as `footer` is: its text, and whether it is fixed text
+   * or a field. Null when no open slide shows one. Absent reads as null.
+   */
+  readonly dateTime?: DateTimeState | null;
   /** The current slide's background. */
   readonly slideBackground: SlideBackgroundState;
   /** Slide size in EMU. */

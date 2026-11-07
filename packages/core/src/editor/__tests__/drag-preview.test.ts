@@ -473,7 +473,8 @@ describe('a shape drag', () => {
   });
 
   test('a resize and a rotation by their handles write once on release', async () => {
-    const { e, press, move, release, handle } = await attached();
+    const { e, host, press, move, release, handle } = await attached();
+    const rotating = () => !!host.querySelector('.pptx-surface--rotating');
     e.setSelection({ kind: 'shapes', nodeIds: [idOf(e, 'B')] });
     press(9 * IN, 2 * IN, handle('se'));
     move(9.5 * IN, 2.25 * IN);
@@ -484,14 +485,32 @@ describe('a shape drag', () => {
 
     const top = itemOf(e, 'B');
     const c = apply(top.matrix, IN, 0.75 * IN);
+    expect(rotating()).toBe(false);
     press(c.x, c.y - IN, handle('rot'));
+    // The rotate pointer stays while the drag runs, off the handle too.
+    expect(rotating()).toBe(true);
     move(c.x + IN, c.y);
     expect(itemOf(e, 'B').element.xfrm.rot).toBe(0);
     release(c.x + IN, c.y);
+    expect(rotating()).toBe(false);
     expect(itemOf(e, 'B').element.xfrm.rot).toBeCloseTo(90, 5);
     e.exec({ type: 'undo' });
     e.exec({ type: 'undo' });
     expect(itemOf(e, 'B').element.xfrm).toMatchObject({ cx: IN, cy: IN, rot: 0 });
+    e.destroy();
+  });
+
+  test('Escape during a rotation drag ends the rotate pointer', async () => {
+    const { e, host, press, move, escape, handle } = await attached();
+    const rotating = () => !!host.querySelector('.pptx-surface--rotating');
+    e.setSelection({ kind: 'shapes', nodeIds: [idOf(e, 'B')] });
+    const c = apply(itemOf(e, 'B').matrix, IN / 2, IN / 2);
+    press(c.x, c.y - IN, handle('rot'));
+    move(c.x + IN, c.y);
+    expect(rotating()).toBe(true);
+    escape();
+    expect(rotating()).toBe(false);
+    expect(itemOf(e, 'B').element.xfrm.rot).toBe(0);
     e.destroy();
   });
 });

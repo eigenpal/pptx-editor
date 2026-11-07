@@ -224,6 +224,11 @@ export class ShapeDrag {
     return this.#drag !== null;
   }
 
+  /** The drag turns its shape by the rotation handle. */
+  get rotating(): boolean {
+    return this.#drag?.handle === 'rot';
+  }
+
   /** The smart guides of the last pointer move. */
   get guides(): readonly SnapGuide[] {
     return this.#guides;
