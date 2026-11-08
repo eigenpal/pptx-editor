@@ -9,7 +9,14 @@ import { paintPieces } from './paint-clusters.ts';
 import { lineFaceMetrics } from './face-line-metrics.ts';
 import type { ResolvedParagraph, ResolvedTextBody, RunProps } from '../../cascade/index.ts';
 import { complexScriptOf, slotLanguage } from '../../cascade/script-fonts.ts';
-import { anchorOffset, ROTATED_VERT, shiftLines } from './anchor.ts';
+import {
+  anchorOffset,
+  columnLines,
+  frameInsets,
+  ROTATED_VERT,
+  shiftLines,
+  STACKED_LETTER_EM,
+} from './anchor.ts';
 import { AutonumberCounters, autonumberText, symbolBulletText } from './autonumber.ts';
 import { bidiCaretX, markerRuns, placeBidiLine, wholeMarker, type BidiLine } from './bidi-line.ts';
 import { lineBidiOf, shiftLineBidi, type LineBidi } from './line-visual-order.ts';
@@ -356,8 +363,8 @@ function buildSegments(
       for (let i = 0; i < em.length; i += 1) {
         const lowSurrogate =
           piece.text.charCodeAt(i) >= 0xdc00 && piece.text.charCodeAt(i) <= 0xdfff;
-        // `wordArtVert` stacks upright letters: each takes the face's line height, not its width.
-        const unit = stacked && em[i] > 0 ? face.metrics.ascent + face.metrics.descent : em[i];
+        // Stacked text: each upright letter advances by `STACKED_LETTER_EM`, not its width.
+        const unit = stacked && em[i] > 0 ? STACKED_LETTER_EM : em[i];
         adv[i] = unit * sizePt * EMU_PER_PT + (lowSurrogate ? 0 : spacing);
       }
       out.push({
@@ -490,7 +497,7 @@ export function layoutTextOn(
   basis: LineBasis,
   untilOverflow = false
 ): TextLayout {
-  const bp = body.body;
+  const bp = frameInsets(body.body);
   const vert = bp.vert;
   const rotated = ROTATED_VERT.has(vert);
   const rotation = (vert === 'vert270' ? 270 : rotated ? 90 : 0) + bp.rot;
@@ -511,7 +518,7 @@ export function layoutTextOn(
   const numbering = new AutonumberCounters();
   const overflowAt = untilOverflow && columns <= 1 ? outerH + 1 - bp.tIns - bp.bIns : Infinity;
   let overflowed = false;
-  const stackedVert = vert === 'wordArtVert';
+  const stackedVert = vert === 'wordArtVert' || vert === 'wordArtVertRtl';
 
   body.paragraphs.forEach((p, pi) => {
     if (overflowed) return;
@@ -973,7 +980,8 @@ export function layoutTextOn(
 
   // Vertical anchoring moves lines down; their position arrays stay as they are.
   const dy = bp.tIns + anchorOffset(bp.anchor, innerH, contentHeight);
-  const finalLines = dy === 0 ? placed : shiftLines(placed, dy);
+  const shifted = dy === 0 ? placed : shiftLines(placed, dy);
+  const finalLines = rotated ? columnLines(shifted, vert, outerH) : shifted;
   const frame = {
     x: rect.x + (rect.width - outerW) / 2,
     y: rect.y + (rect.height - outerH) / 2,
@@ -983,7 +991,7 @@ export function layoutTextOn(
   return {
     box: frame,
     rotation,
-    upright: vert === 'eaVert' ? 'eastAsian' : vert === 'wordArtVert' ? 'all' : 'none',
+    upright: vert === 'eaVert' ? 'eastAsian' : stackedVert ? 'all' : 'none',
     lines: finalLines,
     contentHeight: needed + bp.tIns + bp.bIns,
     paragraphLengths,

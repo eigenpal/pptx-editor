@@ -485,11 +485,22 @@ export function paintText(
         text.textContent = content;
         return text;
       };
-      // Upright characters in a rotated line turn back around their advance box centers.
+      // Upright characters in a rotated line turn back around their advance box centers, on
+      // the axis `cy` across the line. An East Asian character (`eaVert`) centers on the line
+      // box and centers its em box in its advance: the ideographic em box ends 0.12 em below
+      // the baseline (OpenType `BASE`, the default `ideo` baseline), so the baseline is
+      // 0.38 em below the center. A stacked letter centers on the axis that the layout puts
+      // in `baseline`, and its baseline sits at the face's ascent share of its square cell.
+      // Reference PDF of `vertical-east-asian`: the characters are within 0.25 pt.
       const m = run.face.metrics;
-      const cy = baseline - ((m.ascent - m.descent) / 2) * run.sizePt * EMU_PER_PT;
+      const em = run.sizePt * EMU_PER_PT;
+      const stacked = layout.upright === 'all';
+      const cy = stacked ? baseline : line.top + line.height / 2 - run.rise;
+      const share = m.ascent / Math.max(0.01, m.ascent + m.descent);
+      const drop = (i: number): number =>
+        stacked ? (share - 0.5) * (run.x[i + 1] - run.x[i]) : 0.38 * em;
       // A stretch of upright characters paints as one `<text>` in a frame turned back by 90°:
-      // there, the turn around each center (cx, cy) is a move to (-cy, baseline + cx - cy).
+      // there, the turn around each center (cx, cy) is a move to (-cy, cx + drop).
       // Each character has its own position, so `text-anchor` centers each one by itself.
       // The pixels are those of one turned `<text>` per character, at a fraction of the
       // elements. Only characters of one UTF-16 unit stack: a position list counts
@@ -503,7 +514,7 @@ export function paintText(
         const ys: string[] = [];
         for (let i = from; i < to; i += 1) {
           xs.push(pt(-cy));
-          ys.push(pt(baseline + (run.x[i] + run.x[i + 1]) / 2 - cy));
+          ys.push(pt((run.x[i] + run.x[i + 1]) / 2 + drop(i)));
         }
         group.appendChild(
           svg(doc, 'g', { transform: 'rotate(-90)' }, [
@@ -548,7 +559,7 @@ export function paintText(
         group.appendChild(
           makeText(content, {
             x: pt(cx),
-            y: pt(baseline),
+            y: pt(cy + drop(piece.start)),
             'text-anchor': 'middle',
             transform: `rotate(-90 ${pt(cx)} ${pt(cy)})`,
           })

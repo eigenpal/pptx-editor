@@ -187,6 +187,32 @@ describe('the line metrics of several faces', () => {
   });
 });
 
+describe('rotated frames', () => {
+  const insets = 'lIns="10000" tIns="20000" rIns="30000" bIns="40000"';
+  test('vert and vert270 keep each inset on its side of the shape', () => {
+    // text-direction/1: a `vert` line starts at the top inset, its text top at the right one.
+    const vert = lay(`<a:p>${r('abc')}</a:p>`, `<a:bodyPr vert="vert" ${insets}/>`);
+    expect(vert.lines[0].top).toBe(30_000);
+    expect(vert.lines[0].runs[0].x[0]).toBe(20_000);
+    const up = lay(`<a:p>${r('abc')}</a:p>`, `<a:bodyPr vert="vert270" ${insets}/>`);
+    expect(up.lines[0].top).toBe(10_000);
+    expect(up.lines[0].runs[0].x[0]).toBe(40_000);
+  });
+
+  test('stacked columns start at the left for wordArtVert and at the right for the Rtl type', () => {
+    const cell = 1.425 * 18 * 12_700;
+    const ltr = lay(`<a:p>${r('ab')}</a:p>`, `<a:bodyPr vert="wordArtVert" ${insets}/>`);
+    const rtl = lay(`<a:p>${r('ab')}</a:p>`, `<a:bodyPr vert="wordArtVertRtl" ${insets}/>`);
+    expect(ltr.upright).toBe('all');
+    expect(rtl.upright).toBe('all');
+    const [a, b] = ltr.lines[0].runs[0].x;
+    expect(b - a).toBeCloseTo(cell, 6);
+    // The frame turns clockwise: its top is the right edge of the shape (box width 6000000).
+    expect(ltr.lines[0].baseline).toBeCloseTo(6_000_000 - 10_000 - cell / 2, 6);
+    expect(rtl.lines[0].baseline).toBeCloseTo(30_000 + cell / 2, 6);
+  });
+});
+
 describe('symbol font bullets', () => {
   /** A measurer that has no Wingdings: the face for it is a substitute. */
   const noWingdings = (): TextMeasurer => {

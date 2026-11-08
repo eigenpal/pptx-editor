@@ -71,7 +71,7 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'tab-stops', title: 'Tab stops', perSlide: true },
   { id: 'anchoring', title: 'Anchoring and alignment variants', perSlide: true },
   { id: 'ea-vert', title: 'Upright East Asian text (`eaVert`)', perSlide: true },
-  { id: 'word-art-vert', title: 'Stacked text (`wordArtVert`)', perSlide: true },
+  { id: 'word-art-vert', title: 'Stacked text (`wordArtVert`, `wordArtVertRtl`)', perSlide: true },
   { id: 'other-vert', title: 'Other vertical text types', perSlide: true },
   { id: 'script-size', title: 'Superscript and subscript', perSlide: true },
   { id: 'aligned-bullets', title: 'Bullets on aligned lines', perSlide: true },
@@ -89,7 +89,14 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
 ] satisfies Approximation[]);
 
 const CONTENT_PLACEHOLDERS = new Set(['pic', 'tbl', 'chart', 'clipArt', 'dgm', 'media']);
-const ROTATED_TEXT = new Set(['vert', 'vert270', 'eaVert', 'wordArtVert', 'mongolianVert']);
+const ROTATED_TEXT = new Set([
+  'vert',
+  'vert270',
+  'eaVert',
+  'wordArtVert',
+  'wordArtVertRtl',
+  'mongolianVert',
+]);
 const DRAWN_UNDERLINES = new Set(['none', 'sng', 'dbl']);
 const RECOLOR_EFFECTS = new Set(['grayscale', 'duotone', 'biLevel']);
 
@@ -184,8 +191,8 @@ class Collector {
     if (!body) return;
     const bp = body.body;
     if (bp.vert === 'eaVert') this.add('ea-vert');
-    if (bp.vert === 'wordArtVert') this.add('word-art-vert');
-    if (bp.vert === 'mongolianVert' || bp.vert === 'wordArtVertRtl') this.add('other-vert');
+    if (bp.vert === 'wordArtVert' || bp.vert === 'wordArtVertRtl') this.add('word-art-vert');
+    if (bp.vert === 'mongolianVert') this.add('other-vert');
     if (bp.anchorCtr || bp.anchor === 'just' || bp.anchor === 'dist') this.add('anchoring');
     if (bp.warp) this.add('text-warp');
 
