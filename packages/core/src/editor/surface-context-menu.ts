@@ -97,3 +97,25 @@ export function selectForContextMenu(
   const next = contextMenuSelection(selection, id, inScope ? scope : undefined, cell);
   if (next) editor.select(next);
 }
+
+/**
+ * Bind the presses and right-clicks of the slide `stage`, and of the canvas `root` around it.
+ * The canvas acts as the slide: a drag there selects the shapes it encloses, a click clears the
+ * selection, and a right-click opens the slide menu. The host scrolls, so the root has no scroll
+ * bar to press. @internal
+ */
+export function bindPresses(
+  root: HTMLElement,
+  stage: HTMLElement,
+  press: (e: PointerEvent) => void,
+  menu: (e: MouseEvent) => void
+): void {
+  stage.addEventListener('pointerdown', press);
+  stage.addEventListener('contextmenu', menu);
+  root.addEventListener('pointerdown', (e) => {
+    if (e.target === root) press(e);
+  });
+  root.addEventListener('contextmenu', (e) => {
+    if (e.target === root) menu(e);
+  });
+}

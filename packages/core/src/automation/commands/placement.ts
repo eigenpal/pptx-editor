@@ -78,16 +78,20 @@ export function unionBounds(items: readonly LayoutItem[]): {
   return { x, y, r, b };
 }
 
-/** Find an item anywhere in the tree by node id. */
+/**
+ * Find a slide item anywhere in the tree by node id. Node ids are unique in one part only, so a
+ * layout or master shape can have the node id of a slide shape. Selections and edits name slide
+ * shapes, so layout and master items never match: a slide shape that is gone finds nothing.
+ */
 export function findItem(items: readonly LayoutItem[], id: string): LayoutItem | undefined {
   let byId = itemsById.get(items);
   if (!byId) {
     // One walk per item list: a command on thousands of selected shapes looks each one up.
-    // The first item with an id wins, as an in-order search finds it.
     byId = new Map();
     const stack: LayoutItem[] = [...items].reverse();
     while (stack.length > 0) {
       const item = stack.pop()!;
+      if (item.element.layer !== 'slide') continue;
       if (!byId.has(item.element.nodeId)) byId.set(item.element.nodeId, item);
       if (item.kind === 'group')
         for (let i = item.children.length - 1; i >= 0; i -= 1) stack.push(item.children[i]!);
@@ -165,7 +169,8 @@ export function rotationAfterDrag(
 /** The id of the group that directly contains an item, if any. */
 export function parentGroupOf(items: readonly LayoutItem[], id: string): string | undefined {
   for (const item of items) {
-    if (item.kind !== 'group') continue;
+    // Only a slide group holds a selected shape; a layout group can reuse the same node ids.
+    if (item.kind !== 'group' || item.element.layer !== 'slide') continue;
     if (item.children.some((c) => c.element.nodeId === id)) return item.element.nodeId;
     const hit = parentGroupOf(item.children, id);
     if (hit) return hit;

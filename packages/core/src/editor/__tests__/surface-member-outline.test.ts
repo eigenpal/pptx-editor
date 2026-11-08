@@ -86,7 +86,13 @@ describe('a multiple selection on the slide', () => {
       expect(num(outline, 'stroke-width')).toBeCloseTo(px);
       expect(num(outline, 'x')).toBeLessThan(0);
     }
-    expect(overlay.querySelectorAll('.pptx-surface__group-outline').length).toBe(1);
+    const common = overlay.querySelectorAll('.pptx-surface__group-outline');
+    expect(common.length).toBe(1);
+    // The common box paints first, so each shape's outline shows over it where they meet.
+    const painted = [
+      ...overlay.querySelectorAll('.pptx-surface__group-outline, .pptx-surface__outline'),
+    ];
+    expect(painted[0]).toBe(common[0]!);
     expect(overlay.querySelectorAll('.pptx-surface__handle').length).toBe(8);
     // One shape alone keeps its outline on its box, under its own handles.
     e.setSelection({ kind: 'shapes', nodeIds: [ids[0]!] });

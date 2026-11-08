@@ -33,6 +33,8 @@ const MAX_SIDE = 8192;
 function branchTo(items: readonly LayoutItem[], nodeId: string, depth = 0): LayoutItem[] {
   if (depth > 32) return [];
   for (const item of items) {
+    // A layout or master shape can have the node id of a slide shape: ids are unique per part.
+    if (item.element.layer !== 'slide') continue;
     if (item.element.nodeId === nodeId) return [item];
     if (item.kind !== 'group') continue;
     const inner = branchTo(item.children, nodeId, depth + 1);

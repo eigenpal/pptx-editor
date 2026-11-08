@@ -100,7 +100,8 @@ export function emptyPlaceholderOf(
   preferred?: string
 ): EmptyPlaceholder | undefined {
   const resolved = resolveSlide(batch.pkg, slideIndex)?.elements;
-  const boxOf = (id: string) => resolved?.find((r) => r.nodeId === id)?.xfrm;
+  // A layout or master element can reuse a slide element's node id: only the slide's counts.
+  const boxOf = (id: string) => resolved?.find((r) => r.layer === 'slide' && r.nodeId === id)?.xfrm;
   const candidates = elements(spTreeOf(batch, part)).filter((el) => {
     const type = emptyPlaceholderType(el);
     if (type === undefined || !types.has(type)) return false;

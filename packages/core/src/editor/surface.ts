@@ -34,7 +34,7 @@ import {
   lineEnds,
 } from '../automation/commands/placement.ts';
 import { bindSurfaceInput, type SurfaceInputHost } from './surface-input.ts';
-import { selectForContextMenu } from './surface-context-menu.ts';
+import { bindPresses, selectForContextMenu } from './surface-context-menu.ts';
 import { guideElements, SNAP_PX } from './surface-guides.ts';
 import { cropAt, cropOverlay, onCropImage, startCropDrag } from './surface-crop.ts';
 import type { CropDrag, CropHandle } from './surface-crop.ts';
@@ -45,7 +45,7 @@ import { CaretScroll, fitZoom, outsideVeil } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
 import { selectionAnnouncement } from './surface-announce.ts';
 import { ShapeDrag, type Handle } from './surface-drag.ts';
-import { boxOutline, handleElements, memberOutline } from './surface-handles.ts';
+import { boxOutline, commonOutline, handleElements, memberOutline } from './surface-handles.ts';
 import {
   adjustAt,
   adjustDragLive,
@@ -204,13 +204,12 @@ export class SlideSurface {
     this.#stage.append(this.#cursor.element, this.#overlay, this.#input);
     this.root.append(this.#stage, this.#live);
     host.append(this.root);
-    this.#stage.addEventListener('pointerdown', this.#onPointerDown);
-    this.#stage.addEventListener('dblclick', this.#onDoubleClick);
-    this.#stage.addEventListener('contextmenu', (e) =>
+    bindPresses(this.root, this.#stage, this.#onPointerDown, (e) =>
       selectForContextMenu(e, editor, this.#hit.bind(this), this.#slidePoint.bind(this), (id, p) =>
         this.#cellCaret(id, p)
       )
     );
+    this.#stage.addEventListener('dblclick', this.#onDoubleClick);
     doc.addEventListener('pointermove', this.#onPointerMove);
     doc.addEventListener('pointerup', this.#onPointerUp);
     doc.addEventListener('pointercancel', this.#onPointerCancel);
@@ -396,8 +395,13 @@ export class SlideSurface {
     }
     // A single line is edited by its two end points: no box, no rotation.
     const line = selected.length === 1 && isLineItem(selected[0]) ? lineEnds(selected[0]) : null;
-    // One shape of several: a thin line just outside it, under the common box's handles.
-    if (selected.length > 1) parts.push(...selected.map((item) => memberOutline(doc, item, px)));
+    // Several shapes: the dashed common box, then over it a thin line just outside each shape,
+    // so each shape's outline stays whole. The common box's handles paint over both.
+    if (selected.length > 1) {
+      if (sel.kind !== 'none' && !crop && !this.editor.readOnly())
+        parts.push(commonOutline(doc, selected, px));
+      parts.push(...selected.map((item) => memberOutline(doc, item, px)));
+    }
     for (const item of line || selected.length > 1 ? [] : selected) {
       const g = boxOutline(doc, item, px * (sel.kind === 'text' ? 1 : 1.5));
       if (sel.kind === 'text')
@@ -781,6 +785,8 @@ export class SlideSurface {
     const slide = this.editor.layout()?.slide;
     const outside = !slide || p.x < 0 || p.y < 0 || p.x > slide.width || p.y > slide.height;
     this.#cursor.show(cursor, this.#stage.querySelector('.pptx-surface__slide'), outside);
+    // Past the slide's edge, the canvas around the slide shows it too.
+    setStyle(this.root, 'cursor', outside ? cursor : '');
   }
 
   /** The point is on linked text of `item`, where a viewer's click opens the link panel. */
@@ -799,7 +805,10 @@ export class SlideSurface {
       !this.#cropDrag &&
       !this.#adjustDrag;
     const free = idle && !this.#table.active;
-    const inStage = free && e.target instanceof Node && this.#stage.contains(e.target);
+    const inStage =
+      free &&
+      e.target instanceof Node &&
+      (e.target === this.root || this.#stage.contains(e.target));
     if (idle && this.#tableChrome.hover(layout, p, inStage ? this.#hit(p) : undefined))
       this.#renderOverlay(layout, this.editor.zoom());
     if (inStage) this.#updateCursor(p);
