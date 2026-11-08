@@ -84,8 +84,14 @@ function bandStrokes(
   return out;
 }
 
-/** The most points that the offset bands of one path take; a longer path draws masked bands. */
+/** The most points of one path that offset bands flatten; a longer path draws masked bands. */
 export const MAX_OFFSET_POINTS = 4096;
+
+/**
+ * The most points that all offset bands of one path write, round corners included; past it the
+ * path draws masked bands. A file cannot make one outline write megabytes of path data.
+ */
+export const MAX_OFFSET_BAND_POINTS = 16_384;
 
 /** The segments that flatten one curve, for offset bands. */
 const CURVE_STEPS = 16;
@@ -194,14 +200,22 @@ function windingArea(lines: readonly Polyline[]): number {
 /**
  * `line` offset by `k` to the left of its direction (to the right for a negative `k`). A corner
  * takes the line's join on its outer side, as the stroke's own edge does, and the meeting point of
- * the two offset segments on its inner side.
+ * the two offset segments on its inner side. Null when it takes more than `budget.left` points;
+ * otherwise its points are taken from the budget.
  */
-function offsetLine(line: Polyline, k: number, join: string, miterLimit: number): Polyline {
+function offsetLine(
+  line: Polyline,
+  k: number,
+  join: string,
+  miterLimit: number,
+  budget: { left: number }
+): Polyline | null {
   const { points, closed } = line;
   const n = points.length;
   const out: Point[] = [];
   const at = (p: Point, nv: Point): Point => ({ x: p.x + nv.x * k, y: p.y + nv.y * k });
   for (let i = 0; i < n; i += 1) {
+    if (out.length > budget.left) return null;
     const p = points[i];
     const prev = i > 0 ? points[i - 1] : closed ? points[n - 1] : undefined;
     const next = i < n - 1 ? points[i + 1] : closed ? points[0] : undefined;
@@ -242,6 +256,8 @@ function offsetLine(line: Polyline, k: number, join: string, miterLimit: number)
       out.push(at(p, { x: Math.cos(a), y: Math.sin(a) }));
     }
   }
+  if (out.length > budget.left) return null;
+  budget.left -= out.length;
   return { points: out, closed };
 }
 
@@ -270,7 +286,7 @@ export interface CompoundBandLine {
  * at the band's width with miter joins, every band edge is vector geometry. The outer side is the
  * outside of a closed path (by its winding) and the left of an open path's direction. `join` is
  * the line's join (`round`, `bevel`, or `miter`). Null for a single line or an unknown type, or
- * past `MAX_OFFSET_POINTS`. The SVG paint and `pptx-to-pdf` share it.
+ * past `MAX_OFFSET_POINTS` or `MAX_OFFSET_BAND_POINTS`. The SVG paint and `pptx-to-pdf` share it.
  * @internal
  */
 export function compoundBandLines(
@@ -285,16 +301,24 @@ export function compoundBandLines(
   if (!lines || lines.length === 0) return null;
   const side = windingArea(lines) < 0 ? -1 : 1;
   const out: CompoundBandLine[] = [];
+  const budget = { left: MAX_OFFSET_BAND_POINTS };
+  const fractions = COMPOUND_BANDS[cmpd];
   let p = 0;
-  COMPOUND_BANDS[cmpd].forEach((f, i) => {
+  for (let i = 0; i < fractions.length; i += 1) {
     const p0 = p;
-    p += f;
-    if (i % 2 === 1) return; // a gap
+    p += fractions[i];
+    if (i % 2 === 1) continue; // a gap
     const o0 = (0.5 - p0) * width;
     const o1 = (0.5 - p) * width;
     const k = (side * (o0 + o1)) / 2;
-    out.push({ width: o0 - o1, lines: lines.map((line) => offsetLine(line, k, join, miterLimit)) });
-  });
+    const offset: Polyline[] = [];
+    for (const line of lines) {
+      const moved = offsetLine(line, k, join, miterLimit, budget);
+      if (!moved) return null;
+      offset.push(moved);
+    }
+    out.push({ width: o0 - o1, lines: offset });
+  }
   return out;
 }
 

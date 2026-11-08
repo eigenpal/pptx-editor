@@ -80,6 +80,16 @@ describe('pattern fills', () => {
     expect(found[0].content).toContain('0 0 m\n8 0 l\n8 1 l\n0 1 l\nh');
   });
 
+  test('a pattern on several slides is written once per document', async () => {
+    const slide = {
+      layout: 'blank' as const,
+      shapes: shape({ id: 2, x: IN, y: IN, cx: IN, cy: IN, fill: patt('pct50') }),
+    };
+    const result = await exportPdf(buildPptx({ slides: [slide, slide, slide] }));
+    expect(result.pageCount).toBe(3);
+    expect(await patterns(result.bytes)).toHaveLength(1);
+  });
+
   test('a pattern line is still reported as not drawn', async () => {
     const result = await exportPdf(
       buildPptx({

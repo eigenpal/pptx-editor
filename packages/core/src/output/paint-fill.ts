@@ -11,7 +11,14 @@ import {
   type ResolvedLine,
   type BlipEffect,
 } from '../cascade/index.ts';
-import { dashArray, invert, strokeCap, strokeWidth, type Matrix } from '../layout/index.ts';
+import {
+  dashArray,
+  invert,
+  multiply,
+  strokeCap,
+  strokeWidth,
+  type Matrix,
+} from '../layout/index.ts';
 import { ALIGN_POINTS, lumTransfer } from './effect-transforms.ts';
 import { circleGradient, linearGradient, rectGradient, shapeGradient } from './paint-gradient.ts';
 import { PATTERN_PIXEL, patternBitmap } from './preset-patterns.ts';
@@ -360,12 +367,16 @@ function invertedAttr(r: Matrix): string | undefined {
  * How to draw a pattern fill of a box that the slide turns, flips, or scales: in slide space,
  * under a `transform` that undoes the box's matrix. A browser that prints a pattern under a turned
  * transform resamples its tiles; in slide space they print pixel for pixel. `matrix` is the box's
- * matrix as `matrixAttr` writes it: map the fill path through it. Undefined for a box that maps to
- * the slide by a translation, or that cannot be inverted.
+ * matrix as `matrixAttr` writes it, after `outer` (the turned face of a 3-D camera, which an
+ * enclosing group applies): map the fill path through it. Undefined for a box that maps to the
+ * slide by a translation, or that cannot be inverted.
  */
-export function slideSpaceFill(m: Matrix): { matrix: Matrix; transform: string } | undefined {
-  const r = roundedMatrix(m);
-  if (r[0] === 1 && r[1] === 0 && r[2] === 0 && r[3] === 1) return undefined;
+export function slideSpaceFill(
+  m: Matrix,
+  outer?: Matrix
+): { matrix: Matrix; transform: string } | undefined {
+  const r = outer ? multiply(roundedMatrix(outer), roundedMatrix(m)) : roundedMatrix(m);
+  if (!outer && r[0] === 1 && r[1] === 0 && r[2] === 0 && r[3] === 1) return undefined;
   const transform = invertedAttr(r);
   return transform ? { matrix: r, transform } : undefined;
 }

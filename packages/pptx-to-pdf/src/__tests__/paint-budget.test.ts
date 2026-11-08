@@ -44,6 +44,7 @@ async function pageOf(work: Work): Promise<PageOps> {
       fonts: new Map(),
       images: new Map(),
       gradients: new Map(),
+      patterns: new Map(),
     },
     new SlideDiagnostics(0, 0)
   );

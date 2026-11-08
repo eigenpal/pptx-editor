@@ -102,7 +102,7 @@ Each diagnostic has a fixed `code`. Handle an unknown code by its `severity`. Th
 | `picture.svg-fallback` | `information` | An SVG picture is drawn from its PNG fallback, the raster copy that the file stores beside it. |  |
 | `picture.tile` | `approximation` | A tiled picture is drawn stretched. |  |
 | `picture.color-effects` | `approximation` | Picture color effects are not applied. | `image-effects` |
-| `line.compound` | `approximation` | A dashed compound line, or a compound table border, is drawn as one line. |  |
+| `line.compound` | `approximation` | A dashed compound line, a compound table border, or a compound line whose bands pass the point limit is drawn as one line. |  |
 | `effect.shadow-blur`, `effect.inner-shadow-blur`, `effect.glow` | `approximation` | The blur is drawn as layered rings. |  |
 | `effect.inner-shadow` | `approximation` | An inner shadow starts at the fill, so an outline wider than 1 pt, an unfilled outline, and overlapping paths are shaded differently. |  |
 | `effect.silhouette` | `approximation` | A shadow or glow uses an opaque silhouette: picture and fill transparency do not shape it. |  |
