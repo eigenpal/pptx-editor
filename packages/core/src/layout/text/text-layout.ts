@@ -750,14 +750,15 @@ export function layoutTextOn(
       let height = heightPt * EMU_PER_PT;
       let baseline = baselineInLinePt(single, heightPt, lineMetrics) * EMU_PER_PT;
       // An equation that needs more room than the line has makes the line taller. Above single
-      // spacing, the equation grows the single line, and the spacing then adds its share of the
-      // text band on top, as DOCX Editor's `equationSpacingBand` does: the line keeps the
-      // equation's own extent. The extra goes above and below the baseline as on a text line.
-      // At 150 % (`equation-lines`, slide 1), the first line of stacked display fractions comes
-      // 8.2 pt above the reference and the line pitch 3 pt over it, against 14.2 pt and 5 pt when
-      // the equation fills the extra space. At single spacing and below, the equation fills the
+      // percent spacing (`a:spcPct`), the equation grows the single line, and the spacing then
+      // adds its share of the text band on top, as DOCX Editor's `equationSpacingBand` does for
+      // its `auto` rule: the line keeps the equation's own extent. The extra goes above and
+      // below the baseline as on a text line. At 150 % (`equation-lines`, slide 1), the first
+      // line of stacked display fractions comes 8.2 pt above the reference and the line pitch
+      // 3 pt over it, against 14.2 pt and 5 pt when the equation fills the extra space. At
+      // single spacing and below, and at exact spacing (`a:spcPts`), the equation fills the
       // line's own space first (the reference PDFs of `equations` and `preserved-content`).
-      const raised = heightPt > single + 1e-9;
+      const raised = 'pct' in p.lineSpacing && heightPt > single + 1e-9;
       const singleBase = baselineInLinePt(single, single, lineMetrics) * EMU_PER_PT;
       let growAbove = 0;
       let growBelow = 0;

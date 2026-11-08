@@ -129,6 +129,45 @@ describe('lines that hold equations', () => {
   });
 });
 
+describe('equation lines at exact spacing', () => {
+  /** Text, two display fractions, and text at 18 pt, with exact line spacing `pts` (1/100 pt). */
+  async function spaced(pts: number) {
+    const A14 = 'http://schemas.microsoft.com/office/drawing/2010/main';
+    const M = 'http://schemas.openxmlformats.org/officeDocument/2006/math';
+    const pPr = `<a:pPr><a:lnSpc><a:spcPts val="${pts}"/></a:lnSpc></a:pPr>`;
+    const run = '<a:rPr lang="en-US" sz="1800"/>';
+    const frac =
+      `<m:f><m:num><m:r>${run}<m:t>a</m:t></m:r></m:num>` +
+      `<m:den><m:r>${run}<m:t>b</m:t></m:r></m:den></m:f>`;
+    const math = `<a:p>${pPr}<a14:m><m:oMathPara xmlns:m="${M}"><m:oMath>${frac}</m:oMath></m:oMathPara></a14:m></a:p>`;
+    const text = `<a:p>${pPr}<a:r>${run}<a:t>Text</a:t></a:r></a:p>`;
+    const shape =
+      `<p:sp xmlns:a14="${A14}"><p:nvSpPr><p:cNvPr id="3" name="Eq"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>` +
+      '<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="3657600" cy="3657600"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>' +
+      `<p:txBody><a:bodyPr anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/>${text}${math}${math}${text}</p:txBody></p:sp>`;
+    const e = await open(buildPptx({ slides: [{ shapes: shape }] }));
+    const item = e.session!.layout(0)!.items.find((i) => i.kind === 'shape');
+    if (!item || item.kind !== 'shape' || !item.text) throw new Error('Eq');
+    return item.text.lines.map((l) => l.height / 12_700);
+  }
+
+  test('a line taller than the equation keeps its exact height', async () => {
+    for (const h of await spaced(6000)) expect(h).toBeCloseTo(60, 1);
+  });
+
+  test('a line shorter than the equation grows by what the equation needs past it', async () => {
+    const [first, eq1, eq2, last] = await spaced(4000);
+    expect(first).toBeCloseTo(40, 1);
+    expect(last).toBeCloseTo(40, 1);
+    // The equation fills the line's own 40 pt first: the line grows by 2 pt, not by the
+    // single-line box plus the exact height.
+    for (const h of [eq1!, eq2!]) {
+      expect(h).toBeGreaterThan(40);
+      expect(h).toBeLessThan(45);
+    }
+  });
+});
+
 describe('Insert > Equation', () => {
   test('writes the math, a plain-text fallback, and selects the new text box', async () => {
     const e = await open(blankDeck());
