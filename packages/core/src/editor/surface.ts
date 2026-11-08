@@ -43,7 +43,7 @@ import { hitItem, inText, onBorder } from './surface-hit.ts';
 import { diagramPress } from './surface-diagram.ts';
 import { CaretScroll, fitZoom, outsideVeil } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
-import { selectionAnnouncement, canvasName } from './surface-announce.ts';
+import { canvasName, selectionAnnouncement, type CanvasNameHost } from './surface-announce.ts';
 import { ShapeDrag, type Handle } from './surface-drag.ts';
 import { boxOutline, commonOutline, handleElements, memberOutline } from './surface-handles.ts';
 import {
@@ -60,7 +60,7 @@ import { CursorLayer, NextFrame, PAINT_BUDGET, setAttr, setStyle } from './surfa
 const EMU_PER_PX = 9_525;
 
 /** What the surface asks of the editor. Input and clipboard calls are in `SurfaceInputHost`. */
-export interface SurfaceHost extends SurfaceInputHost {
+export interface SurfaceHost extends SurfaceInputHost, CanvasNameHost {
   /** Unique to the editor instance: SVG ids of two editors on one page never collide. */
   readonly idPrefix: string;
   readonly layout: () => SlideLayout | undefined;
@@ -87,10 +87,6 @@ export interface SurfaceHost extends SurfaceInputHost {
   /** Set the zoom; `fit` follows the window. */
   setZoom(zoom: number | 'fit'): void;
   slideCount(): number;
-  /** In the slide master view, the template on the canvas: its kind and name. */
-  template?(
-    index: number
-  ): { readonly template: 'master' | 'layout'; readonly name: string } | undefined;
   /** Whether drags snap to smart guides (View > Smart guides). */
   smartGuides(): boolean;
   /** True while the format painter is on: the pointer shows the brush, and clicks never drag. */

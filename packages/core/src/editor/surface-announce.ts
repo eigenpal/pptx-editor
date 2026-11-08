@@ -19,6 +19,7 @@ export interface AnnouncementHost {
 export interface CanvasNameHost {
   readonly label: (key: string, params?: Record<string, string | number>) => string;
   slideCount(): number;
+  /** In the slide master view, the template on the canvas: its kind and name. */
   template?(
     index: number
   ): { readonly template: 'master' | 'layout'; readonly name: string } | undefined;
