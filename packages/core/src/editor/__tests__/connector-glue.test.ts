@@ -641,6 +641,33 @@ describe('elbow segment drags', () => {
     await win.happyDOM.close();
   });
 
+  test('no segment handle sits under an end point of a narrow curve', async () => {
+    const { GlobalWindow } = await import('happy-dom');
+    const win = new GlobalWindow();
+    const px = 9525;
+    const narrow = connector({
+      id: 4,
+      prst: 'curvedConnector3',
+      x: IN,
+      y: IN,
+      cx: 0.6 * IN,
+      cy: 3 * IN,
+    });
+    const e = await open(deck(narrow));
+    const item = named(e, 'C4');
+    const ends = lineEnds(item)!;
+    const doc = win.document as unknown as Document;
+    const hits = handleElements(doc, [item], ends, px, 'Move').filter((n) =>
+      n.getAttribute('class')?.includes('handle-hit')
+    );
+    for (const h of hits) {
+      const at = { x: Number(h.getAttribute('cx')), y: Number(h.getAttribute('cy')) };
+      for (const end of [ends.start, ends.end])
+        expect(Math.hypot(at.x - end.x, at.y - end.y)).toBeGreaterThanOrEqual(16 * px);
+    }
+    await win.happyDOM.close();
+  });
+
   test('a curve shows its segment handles on the drawn curve', async () => {
     const { GlobalWindow } = await import('happy-dom');
     const win = new GlobalWindow();

@@ -132,7 +132,9 @@ function segmentHandles(doc: Document, item: LayoutItem, px: number, label: stri
   const drawn = curve ? drawnPoints(item) : [];
   const hits: Element[] = [];
   const diamonds: Element[] = [];
-  const placed: Point[] = [];
+  // The end points count as placed: a handle near one would hide under its circle.
+  const ends = [corners[0], corners[corners.length - 1]];
+  const placed: Point[] = ends.map((q) => apply(item.parentMatrix, q.x, q.y));
   for (let i = 0; i < corners.length - 1; i += 1) {
     const a = apply(item.parentMatrix, corners[i].x, corners[i].y);
     const b = apply(item.parentMatrix, corners[i + 1].x, corners[i + 1].y);
@@ -141,7 +143,7 @@ function segmentHandles(doc: Document, item: LayoutItem, px: number, label: stri
     if (!segmentMovable(item, corners, i)) continue;
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     const m = nearest(drawn, mid) ?? mid;
-    // Two handles this near would cover each other (on a curve they can meet): keep the first.
+    // Handles this near would cover each other (on a curve they can meet): keep the first.
     if (placed.some((q) => Math.hypot(q.x - m.x, q.y - m.y) < HANDLE_GAP * px)) continue;
     placed.push(m);
     const r = px * 5;

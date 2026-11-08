@@ -535,8 +535,12 @@ export function moveElbowSegment(
     const reach = Math.hypot(d.x, d.y);
     const lines = [a, ...corners.filter((_, i) => i !== index && i !== index + 1)];
     const off = (q: Point): number => Math.abs(q[across] - value);
-    const nearest = lines.sort((u, v) => off(u) - off(v))[0];
-    if (off(nearest) <= reach) value = nearest[across];
+    // The nearest line in reach where the route still fits a preset.
+    const fits = lines
+      .filter((q) => off(q) <= reach)
+      .sort((u, v) => off(u) - off(v))
+      .find((q) => q === a || drawable(segmentRoute(item, corners, index, q[across])));
+    if (fits) value = fits[across];
   }
   const route = segmentRoute(item, corners, index, value);
   // Back on its first route (a straight elbow back in line too): nothing to write.
