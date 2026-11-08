@@ -1,7 +1,8 @@
-// The unit of a text press and its drag, as DOCX Editor's `surface-pointer.ts` granularity: a
-// first press selects by character, a second by word, a third by paragraph, a fourth by
-// character again, and a drag after it extends by that unit from the first range. A drag
-// after a double-click then takes whole words, and after a triple-click whole paragraphs.
+// The unit of a text press and its drag, as DOCX Editor's
+// `packages/core/src/editor/surface-pointer.ts` granularity: a first press selects by character, a
+// second by word, a third by paragraph, a fourth by character again, and a drag after it extends by
+// that unit from the first range. A drag after a double-click then takes whole words, and after a
+// triple-click whole paragraphs. DOCX Editor commit adf0e178.
 
 import type { EditorSelection, TextPoint } from '../contracts/index.ts';
 import type { LayoutItem } from '../layout/index.ts';

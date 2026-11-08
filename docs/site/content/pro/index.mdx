@@ -1,10 +1,10 @@
 ---
 title: 'Pro modules'
-description: 'Add collaboration, legacy comment reading, and advanced drawing through editor modules.'
+description: 'Add collaboration, comments, and advanced drawing through editor modules.'
 category: 'Pro'
 ---
 
-`@pptx-editor.dev/pro` provides collaboration, legacy comment reading, and advanced drawing modules. Use the same modules with React, Vue, or the core editor. The package uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.
+`@pptx-editor.dev/pro` provides collaboration, comments, and advanced drawing modules. Use the same modules with React, Vue, or the core editor. The package uses the EigenPal Pro License. Evaluation is permitted. Production use requires a commercial agreement.
 
 ## Install the package
 
@@ -79,11 +79,11 @@ The editor reads `modules` during creation. Changing the array does not reconfig
 
 | Module | Entry point | Guide |
 | --- | --- | --- |
-| `reviewModule()` | `@pptx-editor.dev/pro` | [Comments](/docs/pro/comments) |
+| `reviewModule()` | `@pptx-editor.dev/pro`, `@pptx-editor.dev/pro/react`, `@pptx-editor.dev/pro/vue` | [Comments](/docs/pro/comments) |
 | `collaborationModule({ session })` | `@pptx-editor.dev/pro` | [Collaboration](/docs/pro/collaboration) |
 | `drawingModule()` | `@pptx-editor.dev/pro/drawing` | [Drawing](/docs/pro/drawing) |
 
-Pro has no `/react` or `/vue` entry. The adapters receive framework-neutral modules. The review module reads legacy comments. It does not add a review pane or comment editing controls. PresentationML has no tracked-change markup for text revisions.
+The modules are framework neutral. The `@pptx-editor.dev/pro/react` and `@pptx-editor.dev/pro/vue` entries add the comments pane, `PptxEditorReview`, and its hooks, and export `reviewModule` too. The review module draws the comment markers on the canvas. PresentationML has no tracked-change markup for text revisions.
 
 ## Configure licensing
 

@@ -1,5 +1,6 @@
 // Ids that two replicas of one collaboration room can mint at the same time: the PPTX-only part,
-// beside DOCX Editor's `actor-scoped-ids.ts` (copied with the omissions its header lists).
+// beside DOCX Editor's `packages/core/src/store/package/actor-scoped-ids.ts` (copied with the
+// omissions its header lists). DOCX Editor commit adf0e178.
 //
 // Each replica picks "one past the highest" from its own state, and the state-based merge
 // then joins both parts, so two peers that add a slide, a picture, a link, or a shape at once
@@ -89,8 +90,9 @@ const PART_NUMBER = /(\d{1,10})\.[^./]*$/;
 /**
  * Adds to `minted` every number in the actor's stripe that `pkg` holds: shape ids
  * (`p:cNvPr/@id`), slide ids (`p:sldId/@id`), relationship ids (`rIdN`), part-name numbers,
- * and slide creation ids (`p14:creationId/@val`), each read as `xsd:unsignedInt`
- * (`unsignedIntId`). Comment indexes need no seed: a new index starts after the author's
+ * slide creation ids (`p14:creationId/@val`), time node ids (`p:cTn/@id`), and build group ids
+ * (`p:cTn/@grpId`, `p:bldP/@grpId`), each read as
+ * `xsd:unsignedInt` (`unsignedIntId`). Comment indexes need no seed: a new index starts after the author's
  * `p:cmAuthor/@lastIdx`, which never goes down when a comment is deleted.
  *
  * A number from the file that falls in this replica's stripe is then never minted, also after
@@ -119,6 +121,13 @@ export function seedMintedIds(minted: MintedIds, pkg: PptxPackage, actor: string
           break;
         case 'sldId':
           add('slideId', unsignedIntId(attr(el, 'id')));
+          break;
+        case 'cTn':
+          add('timeNodeId', unsignedIntId(attr(el, 'id')));
+          add('buildGroupId', unsignedIntId(attr(el, 'grpId')));
+          break;
+        case 'bldP':
+          add('buildGroupId', unsignedIntId(attr(el, 'grpId')));
           break;
         case 'creationId':
           add('creationId', unsignedIntId(attr(el, 'val')));

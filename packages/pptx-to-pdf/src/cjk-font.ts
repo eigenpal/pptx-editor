@@ -4,7 +4,7 @@ Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // The East Asian fallback face of PDF export: Noto Sans CJK JP from the optional
-// `@docx-editor.dev/fonts-cjk`. `isPackageNotFound` and `importCjkFace` are copied from
+// `@docx-editor.dev/fonts-cjk`. `isPackageNotFound` and `importCjkFace` are adapted from
 // docx-editor/packages/docx-to-pdf/src/font-provisioning.ts (EigenPal, commit 12a57e37c).
 // When the package is installed and a deck holds East Asian text, the export measures and
 // draws that text with the face wherever the deck's own East Asian font is missing (the

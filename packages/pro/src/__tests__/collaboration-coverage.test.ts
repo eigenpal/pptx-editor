@@ -5,10 +5,11 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 */
 
 // The collaboration coverage gate (AGENTS.md "Collaboration verification"; DOCX Editor's
-// `canonical-primitive-journal-coverage.test.ts`). Every editing command has a two-peer
-// convergence fixture, or a reasoned entry in `COLLABORATION_UNCOVERED` with a probe that proves
-// it writes nothing. Every kind of text input has a fixture. Then every fixture runs through two
-// editors on linked Y.Docs. CONTRIBUTING.md, "Add a collaboration fixture", gives the steps.
+// `packages/core/src/store/__tests__/canonical-primitive-journal-coverage.test.ts`). Every editing
+// command has a two-peer convergence fixture, or a reasoned entry in `COLLABORATION_UNCOVERED` with
+// a probe that proves it writes nothing. Every kind of text input has a fixture. Then every fixture
+// runs through two editors on linked Y.Docs. CONTRIBUTING.md, "Add a collaboration fixture", gives
+// the steps. DOCX Editor commit adf0e178.
 
 import { describe, expect, test } from 'bun:test';
 import type { EditorCommandType } from '@pptx-editor.dev/core/editor';

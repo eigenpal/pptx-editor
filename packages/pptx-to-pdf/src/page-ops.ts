@@ -171,9 +171,10 @@ export class PageOps {
   }
 
   /**
-   * Add `ref` to the page resources under a new name from a counter of this page, as DOCX
-   * Editor's `vector-gradient.ts` does. `pdf-lib`'s own helpers (`uniqueKey`) copy every name on
-   * each call, so a page with many effects would cost the square of its resource count.
+   * Add `ref` to the page resources under a new name from a counter of this page, as DOCX Editor's
+   * `packages/docx-to-pdf/src/vector-gradient.ts` does. `pdf-lib`'s own helpers (`uniqueKey`) copy
+   * every name on each call, so a page with many effects would cost the square of its resource
+   * count. DOCX Editor commit adf0e178.
    */
   name(kind: keyof typeof PREFIX, ref: PDFRef): PDFName {
     const { Resources } = this.page.node.normalizedEntries();

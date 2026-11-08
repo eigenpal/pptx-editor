@@ -12,7 +12,8 @@ import {
   elements,
   intAttr,
   NS,
-  presentationInfo,
+  REL,
+  relTargetByType,
   specOf,
   xmlPartOf,
   type Element,
@@ -32,6 +33,13 @@ import type {
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
 import { specFromXml } from './shape-commands.ts';
 import { colorXml, isColorChoice } from './style-commands.ts';
+import {
+  bevelStateOf,
+  isThreeDChoice,
+  rotationStateOf,
+  setThreeD,
+  type InheritedThreeD,
+} from './three-d-commands.ts';
 
 /** CT_EffectList children, in schema order. */
 const EFFECT_ORDER = [
@@ -63,6 +71,9 @@ const OWNED: Record<ShapeEffectChoice['kind'], ReadonlySet<string>> = {
   reflection: new Set(['reflection']),
   glow: new Set(['glow']),
   softEdge: new Set(['softEdge']),
+  blur: new Set(['blur']),
+  bevel: new Set<string>(),
+  rotation3d: new Set<string>(),
 };
 /** The largest effect radius the chrome writes, in points (the Format pane's limits). */
 const MAX_EFFECT_POINTS = 150;
@@ -239,6 +250,13 @@ function effectSpec(choice: ShapeEffectChoice, current: Element | undefined): No
     case 'softEdge':
       if (choice.size === null) return null;
       return specFromXml(`<a:softEdge rad="${radius(choice.size)}"/>`);
+    case 'blur':
+      if (choice.size === null) return null;
+      return specFromXml(`<a:blur rad="${radius(choice.size)}"/>`);
+    case 'bevel':
+    case 'rotation3d':
+      // `setThreeD` writes them.
+      throw new CommandRefusal('errors.unsupported', 'effect');
   }
 }
 
@@ -284,9 +302,7 @@ function themeEffects(batch: OpBatch, part: string, style: Element | undefined):
   const ref = child(style, 'a:effectRef');
   const idx = intAttr(ref, 'idx') ?? 0;
   if (idx < 1) return [];
-  const slide = presentationInfo(batch.pkg).slides.find((s) => s.partName === part);
-  const theme = slide ? parseTheme(xmlPartOf(batch.pkg, slide.themePart)) : undefined;
-  const effectStyle = theme?.effectStyles[idx - 1];
+  const effectStyle = themeEffectStyle(batch, part, idx);
   if (child(effectStyle, 'a:effectDag'))
     throw new CommandRefusal('errors.unsupported', 'effectDag');
   const list = child(effectStyle, 'a:effectLst');
@@ -395,6 +411,56 @@ function morph(batch: OpBatch, part: string, el: Element, spec: NodeSpec): void 
   for (const o of old.slice(kids.length)) batch.push({ op: 'removeNode', part, node: o.id });
 }
 
+/**
+ * The 3-D properties an element inherits: from the placeholders it inherits from, else from the
+ * theme effect style of its nearest `p:style` (CT_EffectStyleItem holds `a:scene3d` and
+ * `a:sp3d`), as `resolveSlide` reads them.
+ */
+function inheritedThreeD(batch: OpBatch, part: string, el: Element): InheritedThreeD {
+  const chain = [el, ...inheritedPlaceholders(batch.pkg, part, el)];
+  const spPrs = chain.slice(1).map((e) => child(e, 'p:spPr'));
+  // Only a turned camera has a rotation to remove.
+  const turned = (scene: Element | undefined): boolean => {
+    const camera = child(scene, 'a:camera');
+    const rot = child(camera, 'a:rot');
+    const angles = ['lat', 'lon', 'rev'].map((n) => intAttr(rot, n) ?? 0);
+    return (
+      scene !== undefined &&
+      (!/^(orthographicFront|perspectiveFront)$/.test(attr(camera, 'prst') ?? '') ||
+        angles.some((a) => a % 21_600_000 !== 0))
+    );
+  };
+  let scene = spPrs.some((s) => turned(child(s, 'a:scene3d')));
+  let anyScene = spPrs.some((s) => child(s, 'a:scene3d') !== undefined);
+  let bevel = spPrs.some((s) => child(child(s, 'a:sp3d'), 'a:bevelT') !== undefined);
+  const style = chain.map((e) => child(e, 'p:style')).find((s) => s !== undefined);
+  const idx = intAttr(child(style, 'a:effectRef'), 'idx') ?? 0;
+  if (idx > 0) {
+    const effectStyle = themeEffectStyle(batch, part, idx);
+    anyScene ||= child(effectStyle, 'a:scene3d') !== undefined;
+    scene ||= turned(child(effectStyle, 'a:scene3d'));
+    bevel ||= child(child(effectStyle, 'a:sp3d'), 'a:bevelT') !== undefined;
+  }
+  return { scene, anyScene, bevel };
+}
+
+/**
+ * The theme part of a slide, layout, or master part: through the slide's layout, the layout's
+ * master, and the master's theme relationship.
+ */
+function themePartFor(batch: OpBatch, part: string): string | undefined {
+  const layout = relTargetByType(batch.pkg, part, REL.slideLayout) ?? part;
+  const master = relTargetByType(batch.pkg, layout, REL.slideMaster) ?? layout;
+  return relTargetByType(batch.pkg, master, REL.theme);
+}
+
+/** Effect style `idx` (1-based) of the theme that `part` uses, or undefined. */
+function themeEffectStyle(batch: OpBatch, part: string, idx: number): Element | undefined {
+  const themePart = themePartFor(batch, part);
+  const theme = themePart ? parseTheme(xmlPartOf(batch.pkg, themePart)) : undefined;
+  return theme?.effectStyles[idx - 1];
+}
+
 /** Set or remove one effect on the selected shapes, connectors, and pictures. */
 export function setShapeEffect(
   batch: OpBatch,
@@ -405,6 +471,12 @@ export function setShapeEffect(
   const kind = choice?.kind;
   const owned = Object.prototype.hasOwnProperty.call(OWNED, kind) ? OWNED[kind] : undefined;
   if (!owned) throw new CommandRefusal('errors.unsupported', 'effect');
+  if (isThreeDChoice(choice)) {
+    setThreeD(batch, part, effectTargets(batch, part, ids), choice, (el) =>
+      inheritedThreeD(batch, part, el)
+    );
+    return;
+  }
   let changed = 0;
   for (const el of effectTargets(batch, part, ids)) {
     const spPr = child(el, 'p:spPr');
@@ -664,5 +736,8 @@ export function effectsStateOf(fx: ResolvedEffects | undefined, el?: Element): S
     ...(hex ? { glowColor: hex } : {}),
     ...(accent ? { glowAccent: accent } : {}),
     softEdge: fx?.softEdge ? points(fx.softEdge.radius) : 0,
+    bevel: bevelStateOf(fx),
+    rotation3d: rotationStateOf(fx),
+    blur: fx?.blur ? points(fx.blur.radius) : 0,
   };
 }

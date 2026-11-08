@@ -1,9 +1,10 @@
-// The popups registry: the Vue twin of the React adapter's `popups.tsx`, after DOCX Editor's
-// Vue adapter (docx-editor/packages/vue/src/editor/popup-config.ts, dialog-host.ts).
-// `PptxEditorRoot` mounts the editor's dialogs; a host changes one through `popups`: a render
-// callback replaces the packaged dialog, and `false` turns off automatic rendering. Every
-// opener calls `useEditorDialog(key).open()`, focus returns to the opener on close, and a
-// dialog closes when the editor opens another document.
+// The popups registry: the Vue twin of the React adapter's `popups.tsx`, after DOCX Editor's Vue
+// adapter (docx-editor/packages/vue/src/editor/popup-config.ts,
+// packages/vue/src/editor/dialog-host.ts). `PptxEditorRoot` mounts the editor's dialogs; a host
+// changes one through `popups`: a render callback replaces the packaged dialog, and `false` turns
+// off automatic rendering. Every opener calls `useEditorDialog(key).open()`, focus returns to the
+// opener on close, and a dialog closes when the editor opens another document. DOCX Editor commit
+// adf0e178.
 
 import { markReadingPopup } from '@pptx-editor.dev/core/editor';
 import {
@@ -40,6 +41,7 @@ import { chromeActionHostKey } from './composables.ts';
 import { PageSetupDialog, type PageSetupDialogProps } from './PageSetupDialog.ts';
 import { ImageAltTextDialog, type ImageAltTextDialogProps } from './ImageAltTextDialog.ts';
 import { ImagePropertiesDialog, type ImagePropertiesDialogProps } from './ImagePropertiesDialog.ts';
+import { EquationDialog, type EquationDialogProps } from './EquationDialog.ts';
 import { BackgroundDialog, type BackgroundDialogProps } from './BackgroundDialog.tsx';
 import { ParagraphDialog, type ParagraphDialogProps } from './ParagraphDialog.tsx';
 import { FontDialog, type FontDialogProps } from './FontDialog.tsx';
@@ -148,6 +150,12 @@ export interface PptxEditorPopups {
   imageAltText?: PptxEditorPopup<ImageAltTextDialogProps>;
   /** The Format Picture dialog of the selected picture, as DOCX Editor's `imageProperties`. */
   imageProperties?: PptxEditorPopup<ImagePropertiesDialogProps>;
+  /**
+   * Insert > Equation: a gallery and the linear form of an equation, which inserts an equation
+   * or edits the selected one. `false` turns it off; `insertEquation` and `setEquation` keep
+   * working from the API.
+   */
+  equation?: PptxEditorPopup<EquationDialogProps>;
   /** Format > Paragraph: alignment, indents, spacing before and after, and line spacing. */
   paragraph?: PptxEditorPopup<ParagraphDialogProps>;
   /** Format > Font: font, effects, offset, character spacing, and kerning. */
@@ -222,6 +230,7 @@ const PACKAGED: Readonly<Partial<Record<PptxEditorDialogKey, Component>>> = {
   background: BackgroundDialog,
   imageAltText: ImageAltTextDialog,
   imageProperties: ImagePropertiesDialog,
+  equation: EquationDialog,
   paragraph: ParagraphDialog,
   font: FontDialog,
   bulletsAndNumbering: BulletsAndNumberingDialog,

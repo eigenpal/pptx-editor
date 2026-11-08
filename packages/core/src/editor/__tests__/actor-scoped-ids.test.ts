@@ -1,4 +1,4 @@
-// Copied from DOCX Editor: packages/core/src/store/__tests__/actor-scoped-ids.test.ts at a59ace33
+// Adapted from DOCX Editor: packages/core/src/store/__tests__/actor-scoped-ids.test.ts at a59ace33
 // (the format-neutral cases only: stripes, dense ids, and the striped ceiling). The cases that
 // drive DOCX Editor's WordprocessingML minters are left out; PPTX Editor's mint sites are
 // tested in `replica-ids.test.ts` and in `packages/pro/src/__tests__/yjs-ids.test.ts`.

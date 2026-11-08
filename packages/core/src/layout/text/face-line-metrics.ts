@@ -23,7 +23,7 @@
 // This follows DOCX Editor's `packages/core/src/layout/symbol-face-metrics.ts`. The values are
 // read with the rule above from the faces that the reference PDFs use (the regular face of each
 // family): typo values for Aptos and Aptos Narrow (bit 7 set), win values for every other entry. Format
-// neutral: no PresentationML names.
+// neutral: no PresentationML names. DOCX Editor commit adf0e178.
 
 import type { FaceMetrics } from './measurer.ts';
 

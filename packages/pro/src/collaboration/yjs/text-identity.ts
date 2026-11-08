@@ -3,9 +3,10 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// The identity of text that a split moves (openspec change `collaboration-text-lineage`,
-// "Character identity"). After DOCX Editor's `split-text-sources.ts` and its paragraph text
-// design ("Moved text keeps an identity"), adapted to PPTX Editor's run records.
+// The identity of text that a split moves (openspec change `collaboration-text-lineage`, "Character
+// identity"). After DOCX Editor's `packages/pro/src/collaboration/document/split-text-sources.ts`
+// and its paragraph text design ("Moved text keeps an identity"), adapted to PPTX Editor's run
+// records. DOCX Editor commit adf0e178.
 //
 // A split (`splitRunAt` in `packages/core/src/automation/commands/text-model.ts`, alone for a format or
 // before an Enter moves the new run into a new paragraph) deletes the text after the cut from
@@ -24,29 +25,18 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // it stands for (`RESTORED_KEY`), so the identity of a copy survives undo and redo: a copy whose
 // characters came back still resolves to the characters first typed.
 //
-// Removed runs. A run that a write removes from a paragraph loses the characters its writer saw
-// (they are deleted from its `Y.Text`), and the paragraph records the run's place (`rr.<key>`:
-// the key of the sibling before it). A peer that typed into the run at the same time typed
-// characters the removal did not see: a paragraph read puts such a run back at its place, with
-// those characters only (`withRemovedRuns`). An empty paragraph that a write removes from the
-// text body of a table cell (`a:txBody`) records its place on the body the same way (a cell
-// merge removes the empty paragraph of the cell it keeps): its text is all a peer's, typed at
-// the same time, so a body read puts it back when it holds text. A shape's text body
-// (`p:txBody`) does not: there an undo of a paragraph join refills the paragraph it removed.
+// Removed runs and paragraphs. A run that a write removes from a paragraph, or a paragraph
+// that a write removes from a text body, loses the characters its writer saw, and the parent
+// records its place (`rr.<key>`: the key of the sibling before it, `markRemoved`). A read puts
+// it back while it holds a peer's text (`removed-content.ts`). The place stays: a peer's undo
+// can unlist the node again without a write that records it, so no write can tell that the
+// place is no longer needed.
 //
 // Everything read here is untrusted: a wrong value is ignored, and every walk is bounded.
 
 import * as Y from 'yjs';
-import type {
-  Element,
-  Node,
-  NodeId,
-  ReplicaElementSpec,
-  ReplicaTextSpec,
-} from '@pptx-editor.dev/core/store';
+import type { Element, Node, NodeId } from '@pptx-editor.dev/core/store';
 import { F, type Room } from './schema.ts';
-import { isRemoved, LINEAGE } from './text-lineage.ts';
-import { holdsText } from './merged-cells.ts';
 
 /** The record fields this module writes. */
 export const IDENTITY = Object.freeze({
@@ -79,16 +69,16 @@ export const COPIES_KEY = 'pptx-copies-v1';
 const MAX_COPY = 1 << 20;
 /** The typists one `cs` mark lists; a longer mark (only a hostile one) is ignored. */
 const MAX_SEEN = 4_096;
-/** The fields of one record that a read of its `cf.` marks looks at. */
+/** The `cf.` marks of one record that a read looks at, the first ones in field order. */
 const MAX_FIELDS = 1_024;
 /** The longest chain of copies of copies an identity read follows. */
 export const MAX_CHAIN = 32;
-/** The children of a removed run, and of its `a:t`, that a look for its text reads. */
-const MAX_RUN_CHILDREN = 1_024;
-/** The removed runs one paragraph read looks at. */
-const MAX_REMOVED_RUNS = 1_024;
-
 const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+const NS_P = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+
+/** Whether an element is a text body: `a:txBody` (a table cell) or `p:txBody` (a shape). */
+export const isTextBody = (el: { readonly ns: string; readonly local: string }): boolean =>
+  el.local === 'txBody' && (el.ns === NS_A || el.ns === NS_P);
 
 /** A Yjs item id as a map key. */
 export const idKey = (client: number, clock: number): string => `${client}:${clock}`;
@@ -162,10 +152,13 @@ const follows = new WeakMap<object, Copy | null>();
 export function followsOf(rec: unknown): Copy[] {
   const out: Copy[] = [];
   if (!(rec instanceof Y.Map)) return out;
-  let looks = 0;
-  for (const [field, value] of (rec as Y.Map<unknown>).entries()) {
-    if (++looks > MAX_FIELDS) break;
-    if (!field.startsWith(IDENTITY.followed) || !Array.isArray(value)) continue;
+  // The fields in one order on every replica, so each reads the same marks.
+  const fields: string[] = [];
+  for (const field of (rec as Y.Map<unknown>).keys())
+    if (field.startsWith(IDENTITY.followed)) fields.push(field);
+  for (const field of fields.sort().slice(0, MAX_FIELDS)) {
+    const value: unknown = (rec as Y.Map<unknown>).get(field);
+    if (!Array.isArray(value)) continue;
     let copy = follows.get(value);
     if (copy === undefined) follows.set(value, (copy = parseCopy(value, false)));
     if (copy) out.push(copy);
@@ -563,9 +556,7 @@ export function markRemoved(
     const key = keyOf.get(node.id);
     const parent = keyOf.get(from.id);
     const parentRec = parent === undefined ? undefined : room.nodes.get(parent);
-    const place =
-      (isA(node, 'r') && isA(from, 'p')) ||
-      (isA(node, 'p') && isA(from, 'txBody') && !holdsText(node));
+    const place = (isA(node, 'r') && isA(from, 'p')) || (isA(node, 'p') && isTextBody(from));
     if (place && key !== undefined && parentRec instanceof Y.Map)
       parentRec.set(`${IDENTITY.removedRun}${key}`, prev);
     // The characters this writer saw go; a peer's characters typed at the same time stay.
@@ -590,152 +581,4 @@ export function markRemoved(
     }
   }
   return deleted;
-}
-
-type Spec = ReplicaElementSpec | ReplicaTextSpec;
-
-/** Whether a run record holds a character in its `a:t` text. */
-function runHoldsText(room: Room, rec: Y.Map<unknown>): boolean {
-  const childrenOf = (r: Y.Map<unknown>): string[] => {
-    const list = r.get(F.children);
-    return list instanceof Y.Array
-      ? (list.toArray() as unknown[]).filter((k): k is string => typeof k === 'string')
-      : [];
-  };
-  for (const tKey of childrenOf(rec).slice(0, MAX_RUN_CHILDREN)) {
-    const t = room.nodes.get(tKey);
-    if (!(t instanceof Y.Map)) continue;
-    const shell = t.get(F.shell) as { ns?: unknown; local?: unknown } | undefined;
-    if (shell?.ns !== NS_A || shell.local !== 't') continue;
-    for (const xKey of childrenOf(t as Y.Map<unknown>).slice(0, MAX_RUN_CHILDREN)) {
-      const x = room.nodes.get(xKey);
-      const text = x instanceof Y.Map ? x.get(F.text) : undefined;
-      if (text instanceof Y.Text && text.length > 0) return true;
-    }
-  }
-  return false;
-}
-
-/** Whether a run as read holds a character in its `a:t`. */
-const specHoldsText = (run: ReplicaElementSpec): boolean =>
-  (run.children ?? []).some(
-    (t) =>
-      !('text' in t) &&
-      t.local === 't' &&
-      (t.children ?? []).some((x) => 'text' in x && x.text.length > 0)
-  );
-
-/**
- * Whether a paragraph record holds text: a run or a field with text, or a line break, also a
- * run that a write removed from it while a peer typed into it (that run comes back with it).
- */
-function paragraphHoldsText(room: Room, rec: Y.Map<unknown>): boolean {
-  const list = rec.get(F.children);
-  if (!(list instanceof Y.Array)) return false;
-  const self: unknown = rec.get(F.key);
-  const removed = new Set<string>();
-  for (const field of rec.keys())
-    if (field.startsWith(IDENTITY.removedRun) && removed.size < MAX_REMOVED_RUNS)
-      removed.add(field.slice(IDENTITY.removedRun.length));
-  const listed = (list.toArray() as unknown[]).slice(0, MAX_RUN_CHILDREN);
-  for (const k of [...listed, ...removed]) {
-    const c = typeof k === 'string' ? room.nodes.get(k) : undefined;
-    if (!(c instanceof Y.Map)) continue;
-    const shell = c.get(F.shell) as { ns?: unknown; local?: unknown } | undefined;
-    if (shell?.ns !== NS_A) continue;
-    if (shell.local === 'br') return true;
-    if (shell.local !== 'r' && shell.local !== 'fld') continue;
-    // A removed run counts as `withRemovedRuns` puts it back: not one a peer moved away.
-    const away = removed.has(k as string) && (!isRemoved(c) || c.get(LINEAGE.movedFrom) === self);
-    if (!away && runHoldsText(room, c as Y.Map<unknown>)) return true;
-  }
-  return false;
-}
-
-/**
- * A paragraph's children with each run that a write removed while a peer typed into it put
- * back at its place, after the sibling it followed; or a text body's children with each empty
- * paragraph that a write removed while a peer typed into it. Only a run or a paragraph that
- * holds characters comes back: its remover deleted the ones it saw, or saw none. A child that
- * a peer moved out of this parent, or that the read shows here, does not.
- */
-export function withRemovedRuns(
-  room: Room,
-  partName: string,
-  paragraph: Y.Map<unknown>,
-  children: readonly Spec[],
-  read: (key: string) => ReplicaElementSpec | null
-): readonly Spec[] {
-  const places = new Map<string, string>();
-  for (const field of paragraph.keys()) {
-    if (!field.startsWith(IDENTITY.removedRun)) continue;
-    const prev: unknown = paragraph.get(field);
-    if (typeof prev !== 'string') continue;
-    places.set(field.slice(IDENTITY.removedRun.length), prev);
-    if (places.size >= MAX_REMOVED_RUNS) break;
-  }
-  if (places.size === 0) return children;
-  const shown = new Set(children.map((c) => c.key));
-  const self: unknown = paragraph.get(F.key);
-  // A paragraph puts back runs after its properties; a text body puts back paragraphs after
-  // its body properties and list style.
-  const body = (paragraph.get(F.shell) as { local?: unknown } | undefined)?.local === 'txBody';
-  const kind = body ? 'p' : 'r';
-  const lead = body ? ['bodyPr', 'lstStyle'] : ['pPr'];
-  const back = new Map<string, ReplicaElementSpec>();
-  for (const key of [...places.keys()].sort()) {
-    if (shown.has(key)) continue;
-    const rec = room.nodes.get(key);
-    if (!(rec instanceof Y.Map) || rec.get(F.part) !== partName) continue;
-    const shell = rec.get(F.shell) as { ns?: unknown; local?: unknown } | undefined;
-    if (shell?.ns !== NS_A || shell.local !== kind) continue;
-    // A run a peer moved out of this paragraph shows where it went.
-    if (!isRemoved(rec as Y.Map<unknown>) || rec.get(LINEAGE.movedFrom) === self) continue;
-    const holds = body ? paragraphHoldsText : runHoldsText;
-    // The lists of a run can lack the text when an undo took them; the read shows what a peer
-    // typed there again (`undo-unlisted.ts`), so the read run decides.
-    const listed = holds(room, rec as Y.Map<unknown>);
-    const spec = read(key);
-    if (spec && (listed || specHoldsText(spec))) back.set(key, spec);
-  }
-  if (back.size === 0) return children;
-  // Each run goes after the sibling it followed; a sibling that is gone too passes it on.
-  const anchorOf = (key: string): string => {
-    let at = places.get(key) ?? '';
-    for (let i = 0; i < MAX_REMOVED_RUNS && at !== '' && !shown.has(at) && !back.has(at); i += 1)
-      at = places.get(at) ?? '';
-    return shown.has(at) || back.has(at) ? at : '';
-  };
-  const after = new Map<string, ReplicaElementSpec[]>();
-  for (const [key, spec] of back) {
-    const anchor = anchorOf(key);
-    const list = after.get(anchor);
-    if (list) list.push(spec);
-    else after.set(anchor, [spec]);
-  }
-  const out: Spec[] = [];
-  const emitted = new Set<string>();
-  const emit = (anchor: string, depth: number): void => {
-    if (depth > MAX_REMOVED_RUNS) return;
-    for (const spec of after.get(anchor) ?? []) {
-      if (emitted.has(spec.key)) continue;
-      emitted.add(spec.key);
-      out.push(spec);
-      emit(spec.key, depth + 1);
-    }
-  };
-  let started = false;
-  for (const c of children) {
-    // Children with no sibling before them go after the parent's properties.
-    if (!started && ('text' in c || !lead.includes(c.local))) {
-      started = true;
-      emit('', 0);
-    }
-    out.push(c);
-    emit(c.key, 0);
-  }
-  if (!started) emit('', 0);
-  // A run whose chain of places never reaches the paragraph (only a hostile room) goes last.
-  for (const spec of back.values()) if (!emitted.has(spec.key)) out.push(spec);
-  return out;
 }

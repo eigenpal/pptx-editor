@@ -14,7 +14,100 @@ export interface AltText {
 }
 
 // @public
+export type AnimationClass = 'entrance' | 'emphasis' | 'exit' | 'motionPath' | 'other';
+
+// @public
+export type AnimationCommand =
+/**
+* Add an effect to each selected shape, at the end of the main sequence. A shape in a group
+* animates as its whole group. `trigger` defaults to `onClick`.
+*/
+    {
+    readonly type: 'addAnimation';
+    readonly preset: AnimationPreset;
+    readonly trigger?: AnimationTrigger;
+}
+/** Remove the effect `effectId` (`AnimationEffect.id`) of the current slide. */
+| {
+    readonly type: 'removeAnimation';
+    readonly effectId: string;
+}
+/** Move the effect `effectId` to position `to` of the main sequence (0-based). */
+| {
+    readonly type: 'moveAnimation';
+    readonly effectId: string;
+    readonly to: number;
+}
+/**
+* Change when the effect `effectId` starts and how long it plays. Absent fields stay. Delay is
+* 0 to 3,600,000 ms; duration is 10 to 59,000 ms and is refused for an instant effect.
+*/
+| {
+    readonly type: 'setAnimationTiming';
+    readonly effectId: string;
+    readonly trigger?: AnimationTrigger;
+    readonly delayMs?: number;
+    readonly durationMs?: number;
+}
+/**
+* Set the transition of the current slide, or of the slides `indices`. Absent fields keep
+* their values. `kind: 'none'` removes the effect. Duration is 10 to 59,000 ms;
+* `advanceAfterMs` is 0 to 3,600,000 ms, or null to clear it.
+*/
+| {
+    readonly type: 'setTransition';
+    readonly kind?: TransitionKind | 'none';
+    readonly durationMs?: number;
+    readonly advanceOnClick?: boolean;
+    readonly advanceAfterMs?: number | null;
+    readonly indices?: readonly number[];
+}
+/**
+* Show the order number of each effect on its shape on the canvas. A view setting, not an
+* edit: no undo step, never saved.
+*/
+| {
+    readonly type: 'showAnimationOrder';
+    readonly show: boolean;
+};
+
+// @public
+interface AnimationEffect_2 {
+    readonly delayMs: number;
+    readonly durationMs: number | null;
+    readonly editable: boolean;
+    // (undocumented)
+    readonly effectClass: AnimationClass;
+    readonly id: string;
+    readonly nodeId: string | null;
+    readonly paragraphs?: {
+        readonly start: number;
+        readonly end: number;
+    };
+    readonly preset: AnimationPreset | null;
+    readonly presetId: number | null;
+    readonly sequence: 'main' | 'interactive';
+    readonly shapeId: string;
+    readonly shapeName: string;
+    readonly step: number | null;
+    // (undocumented)
+    readonly trigger: AnimationTrigger;
+    readonly triggerShapeId?: string;
+    readonly triggerShapeName?: string;
+}
+export { AnimationEffect_2 as AnimationEffect }
+
+// @public
+export type AnimationPreset = 'appear' | 'fade' | 'flyIn' | 'wipe' | 'zoom' | 'pulse' | 'spin' | 'growShrink' | 'disappear' | 'fadeOut' | 'flyOut' | 'wipeOut' | 'zoomOut';
+
+// @public
+export type AnimationTrigger = 'onClick' | 'withPrevious' | 'afterPrevious';
+
+// @public
 export type AutonumberScheme = `${'arabic' | 'romanUc' | 'romanLc' | 'alphaUc' | 'alphaLc'}${'Period' | 'ParenR' | 'ParenBoth'}` | 'arabicPlain';
+
+// @public
+export type BevelPreset = 'circle' | 'relaxedInset' | 'cross' | 'coolSlant' | 'angle' | 'softRound' | 'convex' | 'slope' | 'divot' | 'riblet' | 'hardEdge' | 'artDeco';
 
 // @public
 export type BulletFormat = {
@@ -30,6 +123,10 @@ export type BulletFormat = {
     readonly sizePercent?: number | null;
     readonly color?: ColorChoice | null;
 } | {
+    readonly kind: 'picture';
+    readonly picture: Uint8Array;
+    readonly sizePercent?: number | null;
+} | {
     readonly kind?: undefined;
     readonly sizePercent?: number | null;
     readonly color?: ColorChoice | null;
@@ -37,7 +134,7 @@ export type BulletFormat = {
 
 // @public
 export interface BulletFormatMixed {
-    readonly kinds: readonly ('bullet' | 'number' | 'none')[];
+    readonly kinds: readonly ('bullet' | 'number' | 'picture' | 'none')[];
     readonly sizePercent: number | null;
     readonly startAt?: number | null;
 }
@@ -55,6 +152,9 @@ export type BulletFormatRead = {
     readonly startAt: number;
     readonly sizePercent: number;
     readonly color?: string;
+} | {
+    readonly kind: 'picture';
+    readonly sizePercent: number;
 };
 
 // @public
@@ -67,6 +167,55 @@ export type CanResult = {
 
 // @public
 export type CapsStyle = 'none' | 'small' | 'all';
+
+// @public
+export type CaretAffinity = 'downstream' | 'upstream';
+
+// @public
+export type ChartCommand = {
+    readonly type: 'setChartData';
+    readonly nodeId?: string;
+    readonly data: Omit<ChartData, 'workbook'>;
+};
+
+// @public
+export interface ChartData {
+    // (undocumented)
+    readonly categories: readonly ChartDataCategory[];
+    // (undocumented)
+    readonly kind: ChartDataKind;
+    // (undocumented)
+    readonly series: readonly ChartDataSeries[];
+    readonly workbook?: ChartWorkbookState;
+}
+
+// @public
+export interface ChartDataCategory {
+    readonly label: string;
+    readonly source?: number;
+}
+
+// @public
+export type ChartDataKind = 'category' | 'xy';
+
+// @public
+export type ChartDataRead = {
+    readonly ok: true;
+    readonly data: ChartData;
+} | {
+    readonly ok: false;
+    readonly reason: string;
+};
+
+// @public
+export interface ChartDataSeries {
+    readonly name: string;
+    readonly source?: number;
+    readonly values: readonly (number | null)[];
+}
+
+// @public
+export type ChartWorkbookState = 'embedded' | 'kept' | 'external' | 'none';
 
 // @public
 export interface ClipboardNode {
@@ -116,6 +265,8 @@ export interface ClipboardRelationship {
     readonly id: string;
     // (undocumented)
     readonly part: string;
+    readonly relationships?: readonly ClipboardRelationship[];
+    readonly target?: string;
     // (undocumented)
     readonly type: string;
 }
@@ -134,6 +285,100 @@ export type CommandResult = {
 };
 
 // @public
+export type CommentAnchor = {
+    readonly kind: 'slide';
+} | {
+    readonly kind: 'point';
+    readonly x: number;
+    readonly y: number;
+} | {
+    readonly kind: 'shape';
+    readonly nodeId: string;
+};
+
+// @public
+export interface CommentAuthorInput {
+    readonly author?: string;
+    readonly date?: string;
+    readonly initials?: string;
+}
+
+// @public
+export type CommentCommand =
+/**
+* Add a thread on the current slide. With `nodeId`, it points at that element; without it, at
+* the selected element when one element is selected, else at the slide.
+*/
+({
+    readonly type: 'addComment';
+    readonly text: string;
+    readonly nodeId?: string;
+} & CommentAuthorInput)
+/** Reply to the thread of `commentId` (a thread or one of its replies). */
+| ({
+    readonly type: 'replyToComment';
+    readonly commentId: string;
+    readonly text: string;
+    readonly expect?: CommentExpect;
+} & CommentAuthorInput)
+/** Replace the text of a comment or a reply. */
+| {
+    readonly type: 'editComment';
+    readonly commentId: string;
+    readonly text: string;
+    readonly expect?: CommentExpect;
+}
+/** Delete a reply, or a whole thread when `commentId` is a thread. */
+| {
+    readonly type: 'deleteComment';
+    readonly commentId: string;
+    readonly expect?: CommentExpect;
+}
+/** Mark a thread resolved. Refused for the legacy format (`disabled.commentNoStatus`). */
+| {
+    readonly type: 'resolveComment';
+    readonly commentId: string;
+    readonly expect?: CommentExpect;
+}
+/** Mark a resolved thread active again. */
+| {
+    readonly type: 'reopenComment';
+    readonly commentId: string;
+    readonly expect?: CommentExpect;
+};
+
+// @public
+export interface CommentExpect {
+    readonly author: string;
+    readonly date?: string;
+    readonly identity?: string;
+    readonly text: string;
+}
+
+// @public
+export type CommentFormat = 'modern' | 'legacy';
+
+// @public
+export type CommentMarkerStyle = 'initials' | 'icon';
+
+// @public
+export interface CommentSnapshot {
+    readonly activeComment?: string | null;
+    readonly commentAuthor?: string | null;
+    readonly comments?: readonly CommentThread[] | null;
+}
+
+// @public
+export interface CommentThread extends SlideComment {
+    // (undocumented)
+    readonly anchor: CommentAnchor;
+    // (undocumented)
+    readonly format: CommentFormat;
+    readonly replies: readonly SlideComment[];
+    readonly resolved: boolean;
+}
+
+// @public
 export interface ConnectionTarget {
     readonly index: number;
     readonly nodeId: string;
@@ -148,10 +393,31 @@ export interface ConnectorRoute {
 }
 
 // @public
+export interface CustomShowSummary {
+    readonly id: number;
+    readonly name: string;
+}
+
+// @public
 export interface DateTimeState {
     readonly fixed: boolean;
     readonly text: string;
 }
+
+// @public
+export type DiagramCommand = {
+    readonly type: 'addDiagramShape';
+    readonly position: DiagramShapePosition;
+    readonly nodeId?: string;
+    readonly node?: string;
+} | {
+    readonly type: 'deleteDiagramShape';
+    readonly nodeId?: string;
+    readonly node?: string;
+};
+
+// @public
+export type DiagramShapePosition = 'after' | 'before' | 'below';
 
 // @public
 export interface DocumentOpenFailure {
@@ -193,7 +459,7 @@ export interface Editor {
 }
 
 // @public
-export type EditorCommand = {
+export type EditorCommand = CommentCommand | {
     readonly type: 'undo';
 } | {
     readonly type: 'redo';
@@ -587,6 +853,12 @@ export type EditorCommand = {
 | {
     readonly type: 'setAutofit';
     readonly mode: TextFitting;
+}
+/** The selected shapes' text warp, with adjust values by guide name; null removes it. */
+| {
+    readonly type: 'setTextWarp';
+    readonly preset: TextWarpPreset | null;
+    readonly adjust?: Readonly<Record<string, number>>;
 } | {
     readonly type: 'setTransforms';
     readonly items: readonly TransformItem[];
@@ -614,7 +886,7 @@ export type EditorCommand = {
 /** Apply the copied formatting to the selection as one undo step (Ctrl/Cmd+Shift+V). */
 | {
     readonly type: 'pasteFormat';
-} | TextFormatCommand | PictureCommand | FillCommand
+} | TextFormatCommand | PictureCommand | ChartCommand | EquationCommand | DiagramCommand | FillCommand | AnimationCommand
 /**
 * Shape Effects: set or remove one effect of the selected shapes, connectors, and pictures.
 * A shape whose effects come from its theme style (`a:effectRef`) gets that style's effects
@@ -718,6 +990,7 @@ export type EditorSelection = {
     readonly anchor: TextPoint;
     readonly focus: TextPoint;
     readonly cell?: TableCellAddress;
+    readonly diagramNode?: string;
 } | {
     readonly kind: 'cells';
     readonly nodeId: string;
@@ -726,17 +999,23 @@ export type EditorSelection = {
 };
 
 // @public (undocumented)
-export interface EditorSnapshot {
+export interface EditorSnapshot extends CommentSnapshot {
+    readonly animationOrder?: boolean;
+    readonly animations?: SlideAnimations;
     // (undocumented)
     readonly canRedo: boolean;
     // (undocumented)
     readonly canUndo: boolean;
+    readonly chart?: SelectedChartState | null;
     readonly collapsedSections?: readonly string[];
     // (undocumented)
     readonly currentSlide: number;
+    readonly customShows?: readonly CustomShowSummary[];
     readonly dateTime?: DateTimeState | null;
+    readonly diagram?: SelectedDiagramState | null;
     // (undocumented)
     readonly embeddedFontFaces: number;
+    readonly equation?: SelectedEquationState | null;
     // (undocumented)
     readonly error?: string;
     // (undocumented)
@@ -786,6 +1065,27 @@ export interface EditorSnapshot {
     // (undocumented)
     readonly zoom: number;
 }
+
+// @public
+export type EquationCommand =
+/**
+* Insert > Equation: a new text box centered on the slide, with the equation of `linear`.
+* `font` names the font of its math runs; default `Cambria Math`. The text box is selected.
+*/
+    {
+    readonly type: 'insertEquation';
+    readonly linear: string;
+    readonly font?: string;
+}
+/**
+* Replace the math of an equation (`SelectedEquationState.nodeId`) with the equation of
+* `linear`. The equation keeps its alignment and the font, size, and color of its first run.
+*/
+| {
+    readonly type: 'setEquation';
+    readonly nodeId: string;
+    readonly linear: string;
+};
 
 // @public
 export type FillCommand =
@@ -1192,7 +1492,40 @@ export interface RenderThumbnailOptions {
 }
 
 // @public
+export type ReviewPaneOpening = 'auto' | 'manual';
+
+// @public
+export interface ReviewPaneOptions {
+    readonly commentMarkers?: CommentMarkerStyle;
+    readonly opening?: ReviewPaneOpening;
+}
+
+// @public
 export type RotateChoice = 'right90' | 'left90' | 'flipVertical' | 'flipHorizontal';
+
+// @public
+export type Rotation3DPreset = 'isometricLeftDown' | 'isometricRightUp' | 'isometricTopUp' | 'isometricOffAxis1Left' | 'isometricOffAxis1Right' | 'obliqueTopLeft' | 'obliqueTopRight' | 'obliqueBottomLeft' | 'obliqueBottomRight';
+
+// @public
+export interface SelectedChartState {
+    readonly editable: boolean;
+    readonly nodeId: string;
+    readonly reason?: string;
+}
+
+// @public
+export interface SelectedDiagramState {
+    readonly node: string | null;
+    readonly nodeId: string;
+    readonly reason?: string;
+    readonly structure: boolean;
+}
+
+// @public
+export interface SelectedEquationState {
+    readonly linear: string | null;
+    readonly nodeId: string;
+}
 
 // @public
 export interface SelectedImageState {
@@ -1281,6 +1614,7 @@ export interface SelectionGeometry {
     readonly rot: number;
     readonly shapeStyle?: ShapeStyleChoice;
     readonly textFitting?: TextFitting;
+    readonly textWarp?: TextWarpPreset;
     // (undocumented)
     readonly x: number;
     // (undocumented)
@@ -1306,16 +1640,34 @@ export type ShapeEffectChoice = {
 | {
     readonly kind: 'softEdge';
     readonly size: number | null;
+}
+/** Blur radius in points (`a:blur`). No gallery offers it. */
+| {
+    readonly kind: 'blur';
+    readonly size: number | null;
+}
+/** A top bevel (`a:sp3d/a:bevelT`), with a front camera when the shape has no scene. */
+| {
+    readonly kind: 'bevel';
+    readonly preset: BevelPreset | null;
+}
+/** A camera preset (`a:scene3d/a:camera`); null turns the camera back to the front. */
+| {
+    readonly kind: 'rotation3d';
+    readonly preset: Rotation3DPreset | null;
 };
 
 // @public
 export interface ShapeEffectsState {
+    readonly bevel: BevelPreset | 'none';
+    readonly blur: number;
     // (undocumented)
     readonly glow: number;
     readonly glowAccent?: Exclude<ShapeStyleColor, 'dk1'>;
     readonly glowColor?: string;
     // (undocumented)
     readonly reflection: ReflectionPreset | 'none' | 'other';
+    readonly rotation3d: Rotation3DPreset | 'none' | 'other';
     // (undocumented)
     readonly shadow: ShadowPreset | 'none' | 'other';
     // (undocumented)
@@ -1323,7 +1675,7 @@ export interface ShapeEffectsState {
 }
 
 // @public
-export type ShapeEffectsValue = `shadow.${ShadowPreset | 'none'}` | `reflection.${ReflectionPreset | 'none'}` | `glow.${number | 'none'}` | `glow.${number}.${Exclude<ShapeStyleColor, 'dk1'>}` | `softEdge.${number | 'none'}`;
+export type ShapeEffectsValue = `shadow.${ShadowPreset | 'none'}` | `reflection.${ReflectionPreset | 'none'}` | `glow.${number | 'none'}` | `glow.${number}.${Exclude<ShapeStyleColor, 'dk1'>}` | `softEdge.${number | 'none'}` | `bevel.${BevelPreset | 'none'}` | `rotation3d.${Rotation3DPreset | 'none'}`;
 
 // @public
 export interface ShapeStyleChoice {
@@ -1354,6 +1706,14 @@ export interface ShapeSummary {
 }
 
 // @public
+export interface SlideAnimations {
+    readonly editable: boolean;
+    readonly effects: readonly AnimationEffect_2[];
+    // (undocumented)
+    readonly transition: SlideTransitionState;
+}
+
+// @public
 export type SlideBackground = {
     readonly kind: 'solid';
     readonly color: ColorChoice;
@@ -1381,6 +1741,17 @@ export interface SlideBackgroundState {
     // (undocumented)
     readonly pattern?: PatternFill;
     readonly tile?: boolean;
+}
+
+// @public
+export interface SlideComment {
+    readonly author: string;
+    readonly date?: string;
+    readonly id: string;
+    readonly identity: string;
+    readonly initials: string;
+    readonly text: string;
+    readonly textEditable: boolean;
 }
 
 // @public
@@ -1418,6 +1789,14 @@ export interface SlideSummary {
     readonly key: string;
     readonly layoutId?: string;
     readonly pending?: true;
+}
+
+// @public
+export interface SlideTransitionState {
+    readonly advanceAfterMs: number | null;
+    readonly advanceOnClick: boolean;
+    readonly durationMs: number;
+    readonly kind: TransitionKind | 'none' | 'other';
 }
 
 // @public
@@ -1612,6 +1991,9 @@ export interface TextColumns {
 }
 
 // @public
+export type TextEffectsValue = `transform.${Exclude<TextWarpPreset, 'textNoShape'> | 'none'}`;
+
+// @public
 export type TextFitting = 'none' | 'shrink' | 'shape';
 
 // @public
@@ -1689,11 +2071,15 @@ export type TextOrientation = 'horizontal' | 'vertical' | 'vertical270' | 'wordA
 
 // @public
 export interface TextPoint {
+    readonly affinity?: CaretAffinity;
     // (undocumented)
     readonly offset: number;
     // (undocumented)
     readonly paragraph: number;
 }
+
+// @public
+export type TextWarpPreset = 'textNoShape' | 'textPlain' | 'textStop' | 'textTriangle' | 'textTriangleInverted' | 'textChevron' | 'textChevronInverted' | 'textRingInside' | 'textRingOutside' | 'textArchUp' | 'textArchDown' | 'textCircle' | 'textButton' | 'textArchUpPour' | 'textArchDownPour' | 'textCirclePour' | 'textButtonPour' | 'textCurveUp' | 'textCurveDown' | 'textCanUp' | 'textCanDown' | 'textWave1' | 'textWave2' | 'textDoubleWave1' | 'textWave4' | 'textInflate' | 'textDeflate' | 'textInflateBottom' | 'textDeflateBottom' | 'textInflateTop' | 'textDeflateTop' | 'textDeflateInflate' | 'textDeflateInflateDeflate' | 'textFadeRight' | 'textFadeLeft' | 'textFadeUp' | 'textFadeDown' | 'textSlantUp' | 'textSlantDown' | 'textCascadeUp' | 'textCascadeDown';
 
 // @public
 export interface ThemeColorChoice {
@@ -1732,6 +2118,9 @@ export interface TransformItem {
     // (undocumented)
     readonly y: number;
 }
+
+// @public
+export type TransitionKind = 'fade' | 'push' | 'wipe' | 'split' | 'cut';
 
 // @public
 export type UnderlineStyle = 'none' | 'words' | 'single' | 'double' | 'heavy' | 'dotted' | 'dottedHeavy' | 'dash' | 'dashHeavy' | 'dashLong' | 'dashLongHeavy' | 'dotDash' | 'dotDashHeavy' | 'dotDotDash' | 'dotDotDashHeavy' | 'wavy' | 'wavyHeavy' | 'wavyDouble';

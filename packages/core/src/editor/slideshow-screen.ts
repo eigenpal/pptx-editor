@@ -128,8 +128,9 @@ export function startSlideshowController(
 
 /**
  * The show start keys (F5, Shift+F5, Ctrl/Cmd+Enter), while focus is in the editor scope of
- * `anchor` or on nothing. The listener stays registered while a show runs and reads `running`,
- * so a start key pressed right after a show ends is never lost. Returns the function that stops.
+ * `anchor` or on nothing, but not in a comment field (an element with `data-comment-field`).
+ * The listener stays registered while a show runs and reads `running`, so a start key pressed
+ * right after a show ends is never lost. Returns the function that stops.
  * @internal
  */
 export function listenSlideshowStartKeys(
@@ -146,6 +147,8 @@ export function listenSlideshowStartKeys(
     const target = e.target instanceof Node ? e.target : null;
     const free = !target || target === doc.body || target === doc.documentElement;
     if (!free && !scope.contains(target)) return;
+    // A comment field posts on Ctrl/Cmd+Enter.
+    if (target instanceof Element && target.closest('[data-comment-field]')) return;
     e.preventDefault();
     e.stopPropagation();
     start(from);

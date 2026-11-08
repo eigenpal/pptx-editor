@@ -1,4 +1,4 @@
-// Copied from DOCX Editor `packages/core/src/editor/__tests__/load-fonts.test.ts` at commit 5993bd223.
+// Adapted from DOCX Editor `packages/core/src/editor/__tests__/load-fonts.test.ts` at commit 5993bd223.
 // Keep the exported API equal to the source.
 
 // loadFonts: explicit URLs in, hash-verified cached FontSources out

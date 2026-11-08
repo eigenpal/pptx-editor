@@ -29,6 +29,28 @@ describe('reviewModule', () => {
     expect(items[0].date).toBe('2026-01-01T09:00:00.000');
   });
 
+  test('reads threaded comments with their replies, and turns on the snapshot threads', async () => {
+    const editor = createPptxEditor({
+      fixedMeasurer: true,
+      substitutes: false,
+      modules: [reviewModule()],
+      author: 'Ada Lovelace',
+    });
+    const bytes = new Uint8Array(readFileSync(join(FIXTURES, 'text-runs.pptx')));
+    expect((await editor.load(bytes)).ok).toBe(true);
+    expect(editor.snapshot().comments).toEqual([]);
+    expect(editor.exec({ type: 'addComment', text: 'Check the title' }).ok).toBe(true);
+    const thread = editor.snapshot().comments![0]!;
+    const reply = { type: 'replyToComment', commentId: thread.id, text: 'Done' } as const;
+    expect(editor.exec(reply).ok).toBe(true);
+    const review = reviewModule().review!;
+    const items = review.collectReviewItems({ package: editor.session!.store.package });
+    expect(items.map((i) => [i.text, i.author, i.parentId])).toEqual([
+      ['Check the title', 'Ada Lovelace', undefined],
+      ['Done', 'Ada Lovelace', thread.id],
+    ]);
+  });
+
   test('a deck without comments has an empty queue', async () => {
     const editor = createPptxEditor({ fixedMeasurer: true, substitutes: false });
     const bytes = new Uint8Array(readFileSync(join(FIXTURES, 'text-runs.pptx')));

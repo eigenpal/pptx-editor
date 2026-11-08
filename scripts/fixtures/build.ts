@@ -16,7 +16,13 @@ import { eastAsianThemeFontsDeck, eastAsianTypographyDeck, textScriptFixtures } 
 import { followUpFixtures } from './follow-ups.ts';
 import { lineEndsDashesFixtures } from './line-ends-dashes.ts';
 import { chartSizesDeck, chartsDeck, diagramsDeck } from './drawingml.ts';
+import { chartDataDeck } from './chart-data.ts';
+import { diagramEditingDeck } from './diagram-editing.ts';
 import { buildRoundTripDecks } from './round-trip.ts';
+import { pictureBulletsDeck } from './picture-bullets.ts';
+import { textWarpFixtures } from './text-warp.ts';
+import { equationFixtures } from './equations.ts';
+import { THREE_D_EFFECT_STYLES, threeDFixtures } from './three-d.ts';
 
 const OUT = 'fixtures';
 const IN = 914_400;
@@ -96,6 +102,9 @@ const edgeShapes = (size: { width: number; height: number }): string =>
 
 const fixtures: Record<string, FixtureSlide[]> = {
   ...shapeFormatFixtures,
+  ...textWarpFixtures,
+  ...equationFixtures,
+  ...threeDFixtures,
   ...textScriptFixtures,
   ...followUpFixtures,
   ...lineEndsDashesFixtures,
@@ -832,7 +841,14 @@ for (const [name, slides] of Object.entries(fixtures)) {
   // Media only where a slide references it: an orphan part is not worth a repair prompt.
   const media = name === 'pictures' || name === 'picture-editing' || name === 'fills-lines' ? [{ name: 'image1.png', bytes: image, contentType: 'image/png' }] : [];
   const tableStyles = tableStylesFor[name];
-  const bytes = buildPptx({ slides, media, ...(tableStyles ? { tableStyles } : {}), ...slideSizeFor[name] });
+  const effectStyles = name === 'three-d-turned-effects' ? THREE_D_EFFECT_STYLES : undefined;
+  const bytes = buildPptx({
+    slides,
+    media,
+    ...(tableStyles ? { tableStyles } : {}),
+    ...(effectStyles ? { effectStyles } : {}),
+    ...slideSizeFor[name],
+  });
   writeFileSync(`${OUT}/${name}.pptx`, bytes);
 }
 // Sections, comments, a chart, and embedded objects: the slide add, duplicate, and delete checks.
@@ -841,6 +857,8 @@ writeFileSync(`${OUT}/slide-structure.pptx`, buildPptx(slideStructureDeck(image,
 writeFileSync(`${OUT}/slide-layouts.pptx`, buildPptx(slideLayoutsDeck()));
 // One slide per fill rule.
 writeFileSync(`${OUT}/fill-fidelity.pptx`, buildPptx(fillFidelityDeck(image)));
+// Picture bullets at several sizes, levels, and alignments.
+writeFileSync(`${OUT}/picture-bullets.pptx`, buildPptx(pictureBulletsDeck()));
 // East Asian faces from the theme script fonts, by each run's language.
 writeFileSync(`${OUT}/east-asian-theme-fonts.pptx`, buildPptx(eastAsianThemeFontsDeck()));
 // Custom kinsoku lists, and justified and distributed East Asian text.
@@ -849,9 +867,13 @@ writeFileSync(`${OUT}/east-asian-typography.pptx`, buildPptx(eastAsianTypography
 writeFileSync(`${OUT}/charts.pptx`, buildPptx(chartsDeck()));
 // Legend-bearing charts at several text and frame sizes.
 writeFileSync(`${OUT}/chart-sizes.pptx`, buildPptx(chartSizesDeck()));
+// Charts with embedded workbooks, for the Edit Data dialog and `setChartData`.
+writeFileSync(`${OUT}/chart-data.pptx`, buildPptx(chartDataDeck()));
 // Diagrams with their saved drawings (ECMA-376 Part 1, 21.4).
 writeFileSync(`${OUT}/diagrams.pptx`, buildPptx(diagramsDeck()));
+// A process and a list diagram, for the diagram text and structure edits.
+writeFileSync(`${OUT}/diagram-editing.pptx`, buildPptx(diagramEditingDeck()));
 // Links, kept content, an SVG picture, and tab stops: the round-trip checks of the feature edits.
 const roundTrip = buildRoundTripDecks(image);
 for (const [name, bytes] of Object.entries(roundTrip)) writeFileSync(`${OUT}/${name}.pptx`, bytes);
-console.log(`${Object.keys(fixtures).length + 6 + Object.keys(roundTrip).length} fixtures written to ${OUT}/`);
+console.log(`${Object.keys(fixtures).length + 8 + Object.keys(roundTrip).length} fixtures written to ${OUT}/`);

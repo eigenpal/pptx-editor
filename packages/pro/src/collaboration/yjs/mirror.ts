@@ -66,20 +66,29 @@ import {
   COPIES_KEY,
   copyOf,
   idKey,
-  liveIds,
+  isTextBody,
   markCopies,
   markRemoved,
   rootOf,
   type TextWrite,
-  withRemovedRuns,
 } from './text-identity.ts';
+import {
+  newParagraphRescue,
+  type ParagraphRescue,
+  roomListings,
+  withoutEmptiedRescues,
+  withRemovedRuns,
+} from './removed-content.ts';
 import { noteTidiedListings, UNDONE_KEY, UndoneListings } from './undo-unlisted.ts';
 import {
   indexTree,
+  rescuedParents,
+  type RescuedIn,
   shownParentsOnly,
   shownParentKey,
   shownPlaceKept,
   syncList,
+  syncText,
   type SkippedListings,
 } from './mirror-support.ts';
 
@@ -106,66 +115,6 @@ interface PartIds {
 export type RebuildResult =
   | { readonly ok: true; readonly parts: PackagePart[]; readonly removed: string[] }
   | { readonly ok: false; readonly reason: string };
-
-/**
- * Make `text` hold `value` with one delete and one insert around the common ends, or, when the
- * changed span keeps its length, one replace per changed character. Returns what it deleted
- * and inserted, for the identity of moved text (`text-identity.ts`).
- */
-function syncText(text: Y.Text, value: string, created: boolean): TextWrite | undefined {
-  const old = text.toString();
-  if (old === value) return undefined;
-  let start = 0;
-  while (start < old.length && start < value.length && old[start] === value[start]) start++;
-  let end = 0;
-  while (
-    end < old.length - start &&
-    end < value.length - start &&
-    old[old.length - 1 - end] === value[value.length - 1 - end]
-  )
-    end++;
-  // The common ends count UTF-16 units: never cut a surrogate pair at either edge, or Yjs
-  // splits the pair and a peer reads two U+FFFD.
-  const high = (c: number) => c >= 0xd800 && c <= 0xdbff;
-  const low = (c: number) => c >= 0xdc00 && c <= 0xdfff;
-  if (start > 0 && high(old.charCodeAt(start - 1))) start--;
-  if (end > 0 && low(old.charCodeAt(old.length - end))) end--;
-  const removed = old.length - start - end;
-  const added = value.length - start - end;
-  // The same length (Change Case): replace each changed character in place, so a peer's
-  // concurrent insert between two characters stays between them, not at the span's edge.
-  // A span with a surrogate pair is replaced whole, so a replace never splits a pair.
-  if (
-    removed === added &&
-    !/[\uD800-\uDFFF]/.test(old.slice(start, start + removed) + value.slice(start, start + added))
-  ) {
-    // The ids of the replaced characters, read in one walk before the first replace.
-    const was = liveIds(text, start, removed);
-    const deleted: Y.ID[] = [];
-    for (let i = start; i < start + removed; i++) {
-      if (old[i] === value[i]) continue;
-      const id = was[i - start];
-      if (id) deleted.push(id);
-      // The new character goes before the old one, then the old one goes. A `Y.Text` insert
-      // skips the tombstones to its right, so a character a peer types after a new one lands
-      // after the old one's tombstone, and an undo, which puts the old character back right
-      // before its tombstone, keeps the typed character after it.
-      text.insert(i, value[i]!);
-      text.delete(i + 1, 1);
-    }
-    return { created, deleted };
-  }
-  const deleted = removed > 0 ? liveIds(text, start, removed) : [];
-  if (removed > 0) text.delete(start, removed);
-  const doc = text.doc;
-  const clock = doc ? Y.getState(doc.store, doc.clientID) : 0;
-  if (added > 0) text.insert(start, value.slice(start, value.length - end));
-  return {
-    created,
-    deleted,
-    ...(added > 0 && doc ? { inserted: { client: doc.clientID, clock, length: added } } : {}),
-  };
-}
 
 const attrOfElement = (el: Element, local: string): string | undefined =>
   el.attrs.find((a) => a.ns === '' && a.local === local)?.value;
@@ -200,6 +149,14 @@ export class PackageMirror {
    * (`undo-unlisted.ts`). A write never lists them: they show while a peer's content is in them.
    */
   readonly #unlisted = new Map<string, ReadonlySet<string>>();
+  /**
+   * Per part, the runs the last read showed only by the move rescue, each with the parent it
+   * showed them in (`rescuedParents`). A write never lists them there: they stay listed where
+   * the room has them, so an undo of the removal that sent them shows them there again.
+   */
+  readonly #rescuedIn = new Map<string, RescuedIn>();
+  /** The parts whose last local write changed a parent of a rescued run, or its parent. */
+  readonly #touchedRescue = new Set<string>();
   #reading = new Set<string>();
   /** Per part, the listings its last read skipped, by parent key (`dropHiddenListings`). */
   readonly #hiddenListings = new Map<string, Map<string, SkippedListings>>();
@@ -209,6 +166,8 @@ export class PackageMirror {
   #lineage: PartLineage = NO_PART_LINEAGE;
   /** The part being read: the nodes an undo unlisted that show again (`undo-unlisted.ts`). */
   #undone: UndoneListings | null = null;
+  /** The part being read: removed paragraphs that come back (`withRemovedRuns`). */
+  #rescue: ParagraphRescue | undefined;
   /** Each hidden copy → the winner it is a companion of. */
   readonly #winnerOf = new Map<string, string>();
   /** The part of each key this replica knows, for records that a remote undo deletes. */
@@ -356,6 +315,7 @@ export class PackageMirror {
   /** Write one local change. Call inside a local transaction. */
   writeChange(before: PptxPackage, after: PptxPackage, parts: readonly string[]): void {
     for (const name of parts) {
+      this.#touchedRescue.delete(name);
       const next = after.parts.get(name);
       if (!next) {
         this.#room.parts.delete(name);
@@ -428,11 +388,14 @@ export class PackageMirror {
 
   /**
    * The parts among `names` whose last read showed a node only for a peer's content after an
-   * undo (`undo-unlisted.ts`). A local write can take that content, and the store keeps the
-   * node, so such a part is read again.
+   * undo (`undo-unlisted.ts`), or whose last write changed a parent that shows a node only by
+   * the move rescue. A local write can take that content, and the store keeps the node, so
+   * such a part is read again.
    */
   showingUnlisted(names: readonly string[]): string[] {
-    return names.filter((n) => (this.#unlisted.get(n)?.size ?? 0) > 0);
+    return names.filter(
+      (n) => (this.#unlisted.get(n)?.size ?? 0) > 0 || this.#touchedRescue.has(n)
+    );
   }
 
   /**
@@ -473,6 +436,8 @@ export class PackageMirror {
     let key = ids.keyOf.get(node.id);
     let record = key === undefined ? undefined : this.#room.nodes.get(key);
     if (key !== undefined && record instanceof Y.Map && before.get(node.id) === node) return key;
+    if (key !== undefined && this.#rescuedIn.get(partName)?.watch.has(key))
+      this.#touchedRescue.add(partName);
     const created = key === undefined || !(record instanceof Y.Map);
     if (key === undefined || !(record instanceof Y.Map)) {
       key = this.#mint();
@@ -558,8 +523,14 @@ export class PackageMirror {
       return out;
     };
     const listedHere = new Set(children instanceof Y.Array ? children.toArray() : []);
-    // A node that the read shows only for a peer's content after an undo is never listed.
-    const unlisted = this.#unlisted.get(partName);
+    // A node that the read shows only for a peer's content after an undo is never listed, and
+    // a run that the move rescue shows here is not listed here.
+    const undone = this.#unlisted.get(partName);
+    const rescuedIn = this.#rescuedIn.get(partName)?.inParent;
+    const unlisted =
+      rescuedIn && rescuedIn.size > 0
+        ? { has: (k: string) => undone?.has(k) === true || rescuedIn.get(k) === key }
+        : undone;
     const added = view
       ? childKeys.filter((k) => !view.childFrom.has(k) && !listedHere.has(k) && !unlisted?.has(k))
       : [];
@@ -816,6 +787,9 @@ export class PackageMirror {
     for (const name of names)
       [this.#hiddenListings, this.#mergedBodies].forEach((m) => m.delete(name));
     const nextUnlisted = new Map<string, ReadonlySet<string>>();
+    const nextRescuedIn = new Map<string, RescuedIn>();
+    // Which records list each key, built once for the pass on first use (`removed-content.ts`).
+    const listingsOfPart = roomListings(this.#room);
     for (const name of names) {
       const entry = partEntryOf(this.#room.parts.get(name));
       if (!entry) {
@@ -840,10 +814,14 @@ export class PackageMirror {
       const readRecord = (key: string, seen: Set<string>, depth: number) =>
         this.#readElement(key, name, seen, depth, views);
       let cameBack = new Set<string>();
-      const readPart = () => {
+      let stranded = new Set<string>();
+      const listings = listingsOfPart(name);
+      const readPart = (strandedBefore: ReadonlySet<string> = new Set()) => {
         cameBack = new Set();
+        stranded = new Set();
+        this.#rescue = newParagraphRescue(strandedBefore, listings);
         const read = this.#readElement(entry.root, name, new Set(), 0, views);
-        return read && rescueMoved(this.#room, name, read, readRecord, cameBack);
+        return read && rescueMoved(this.#room, name, read, readRecord, cameBack, stranded);
       };
       let rescued = readPart();
       // Split pieces inside a node the rescue put back are not lost: read once more with them.
@@ -858,9 +836,21 @@ export class PackageMirror {
           rescued = readPart();
         }
       }
+      // A node moved into a removed paragraph that has no other place left: the paragraph
+      // comes back with it. One more read, so the paragraph shows before the rescue looks.
+      if (rescued && stranded.size > 0) {
+        this.#reading = new Set();
+        this.#hiddenNow = new Map();
+        views.clear();
+        rescued = readPart(stranded);
+      }
       if (!rescued)
         return { ok: false, reason: `${this.#readRefusal ?? 'invalid node records'} in ${name}` };
-      const placed = placeEditedPieces(this.#room, name, rescued, readRecord, this.#lineage.lost);
+      const placed = withoutEmptiedRescues(
+        this.#room,
+        placeEditedPieces(this.#room, name, rescued, readRecord, this.#lineage.lost),
+        this.#rescue!
+      );
       // A record that a rescue or a placement read refused refuses the part, as the main read.
       if (this.#readRefusal) return { ok: false, reason: `${this.#readRefusal} in ${name}` };
       // Rescued text shows in the drawn cell over the cell it came from (`merged-cells.ts`).
@@ -885,6 +875,7 @@ export class PackageMirror {
       nextDropped.set(name, this.#reading);
       nextHidden.set(name, shownParentsOnly(this.#hiddenNow, spec));
       nextUnlisted.set(name, this.#undone?.shown ?? new Set());
+      nextRescuedIn.set(name, rescuedParents(spec, cameBack));
       parts.push({ kind: 'xml', partName: name, xml: built.part as XmlPart });
     }
     for (const [name, ids] of nextIds) this.#setIds(name, ids);
@@ -897,6 +888,8 @@ export class PackageMirror {
       if (hidden.size > 0) this.#hiddenListings.set(name, hidden);
     for (const name of removed) this.#hiddenListings.delete(name);
     for (const [name, shown] of nextUnlisted) this.#unlisted.set(name, shown);
+    for (const [name, inParent] of nextRescuedIn) this.#rescuedIn.set(name, inParent);
+    for (const name of removed) this.#rescuedIn.delete(name);
     for (const name of removed) this.#unlisted.delete(name);
     for (const [name, bodies] of nextMerged) this.#mergedBodies.set(name, bodies);
     this.#undone = null;
@@ -957,13 +950,20 @@ export class PackageMirror {
       .map(([, v]) => v as { ns: string; local: string; prefix?: string; value: string });
     const ns = s.ns as string;
     const local = s.local as string;
-    // A run (or an empty paragraph) a peer removed while another typed into it comes back.
+    // A run or a paragraph that a peer removed while another typed into it comes back.
     const withRuns =
-      (local === 'p' || local === 'txBody') && ns === NS_A
-        ? withRemovedRuns(this.#room, partName, rec as Y.Map<unknown>, kids, (k) => {
-            const run = this.#readElement(k, partName, seen, depth + 1, views);
-            return this.#readRefusal ? null : run;
-          })
+      (local === 'p' && ns === NS_A) || isTextBody({ ns, local })
+        ? withRemovedRuns(
+            this.#room,
+            partName,
+            rec as Y.Map<unknown>,
+            kids,
+            (k) => {
+              const run = this.#readElement(k, partName, seen, depth + 1, views);
+              return this.#readRefusal ? null : run;
+            },
+            this.#rescue
+          )
         : kids;
     // A node an undo unlisted shows again with what a peer wrote into it (`undo-unlisted.ts`).
     const listed = this.#undone

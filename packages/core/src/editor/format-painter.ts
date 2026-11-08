@@ -8,9 +8,10 @@
 // them; an inherited font or color is not copied (the target keeps its own).
 //
 // The press logic follows DOCX Editor's painter (EigenPal,
-// docx-editor/packages/core/src/editor/surface-format-painter.ts): one press arms the painter
-// for one paint, a second press inside the double-press window keeps it on until Escape, and a
-// press while it is on turns it off. The window lives here, so a host binds `click` only.
+// docx-editor/packages/core/src/editor/surface-format-painter.ts): one press arms the painter for
+// one paint, a second press inside the double-press window keeps it on until Escape, and a press
+// while it is on turns it off. The window lives here, so a host binds `click` only. DOCX Editor
+// commit adf0e178.
 
 import { attr, child, elements, NS, specOf, type Element, type NodeSpec } from '../store/index.ts';
 import type {

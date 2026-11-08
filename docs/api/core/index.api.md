@@ -46,6 +46,130 @@ export function altTextDraftFrom(alt: AltText | undefined): AltTextDraftFields;
 // @internal
 export const amountText: (n: number) => string;
 
+// @public
+export const ANIMATION_PRESET_GROUPS: readonly {
+    readonly effectClass: 'entrance' | 'emphasis' | 'exit';
+    readonly presets: readonly AnimationPreset[];
+}[];
+
+// @public
+export const ANIMATION_TRIGGERS: readonly AnimationTrigger[];
+
+// @public
+export type AnimationClass = 'entrance' | 'emphasis' | 'exit' | 'motionPath' | 'other';
+
+// @public
+export type AnimationCommand =
+/**
+* Add an effect to each selected shape, at the end of the main sequence. A shape in a group
+* animates as its whole group. `trigger` defaults to `onClick`.
+*/
+    {
+    readonly type: 'addAnimation';
+    readonly preset: AnimationPreset;
+    readonly trigger?: AnimationTrigger;
+}
+/** Remove the effect `effectId` (`AnimationEffect.id`) of the current slide. */
+| {
+    readonly type: 'removeAnimation';
+    readonly effectId: string;
+}
+/** Move the effect `effectId` to position `to` of the main sequence (0-based). */
+| {
+    readonly type: 'moveAnimation';
+    readonly effectId: string;
+    readonly to: number;
+}
+/**
+* Change when the effect `effectId` starts and how long it plays. Absent fields stay. Delay is
+* 0 to 3,600,000 ms; duration is 10 to 59,000 ms and is refused for an instant effect.
+*/
+| {
+    readonly type: 'setAnimationTiming';
+    readonly effectId: string;
+    readonly trigger?: AnimationTrigger;
+    readonly delayMs?: number;
+    readonly durationMs?: number;
+}
+/**
+* Set the transition of the current slide, or of the slides `indices`. Absent fields keep
+* their values. `kind: 'none'` removes the effect. Duration is 10 to 59,000 ms;
+* `advanceAfterMs` is 0 to 3,600,000 ms, or null to clear it.
+*/
+| {
+    readonly type: 'setTransition';
+    readonly kind?: TransitionKind | 'none';
+    readonly durationMs?: number;
+    readonly advanceOnClick?: boolean;
+    readonly advanceAfterMs?: number | null;
+    readonly indices?: readonly number[];
+}
+/**
+* Show the order number of each effect on its shape on the canvas. A view setting, not an
+* edit: no undo step, never saved.
+*/
+| {
+    readonly type: 'showAnimationOrder';
+    readonly show: boolean;
+};
+
+// @public
+interface AnimationEffect_2 {
+    readonly delayMs: number;
+    readonly durationMs: number | null;
+    readonly editable: boolean;
+    // (undocumented)
+    readonly effectClass: AnimationClass;
+    readonly id: string;
+    readonly nodeId: string | null;
+    readonly paragraphs?: {
+        readonly start: number;
+        readonly end: number;
+    };
+    readonly preset: AnimationPreset | null;
+    readonly presetId: number | null;
+    readonly sequence: 'main' | 'interactive';
+    readonly shapeId: string;
+    readonly shapeName: string;
+    readonly step: number | null;
+    // (undocumented)
+    readonly trigger: AnimationTrigger;
+    readonly triggerShapeId?: string;
+    readonly triggerShapeName?: string;
+}
+export { AnimationEffect_2 as AnimationEffect }
+
+// @public
+export function animationEffectLabelKey(effect: Pick<AnimationEffect_2, 'preset' | 'effectClass'>): `panel.animations.presets.${AnimationPreset}` | `panel.animations.classes.${AnimationEffect_2['effectClass']}`;
+
+// @public
+export function animationListParts(effects: readonly AnimationEffect_2[]): {
+    readonly main: readonly AnimationEffect_2[];
+    readonly other: readonly AnimationEffect_2[];
+};
+
+// @public
+export type AnimationPreset = 'appear' | 'fade' | 'flyIn' | 'wipe' | 'zoom' | 'pulse' | 'spin' | 'growShrink' | 'disappear' | 'fadeOut' | 'flyOut' | 'wipeOut' | 'zoomOut';
+
+// @public
+export type AnimationStartLabel = {
+    readonly key: 'panel.animations.withSlide';
+} | {
+    readonly key: 'panel.animations.step';
+    readonly step: number;
+} | {
+    readonly key: 'panel.animations.onShapeClick';
+    readonly shapeName: string;
+} | {
+    readonly key: `panel.animations.triggers.${AnimationTrigger}`;
+};
+
+// @public
+export function animationStartLabel(effect: Pick<AnimationEffect_2, 'sequence' | 'step' | 'trigger' | 'triggerShapeName'>): AnimationStartLabel;
+
+// @public
+export type AnimationTrigger = 'onClick' | 'withPrevious' | 'afterPrevious';
+
 // @internal
 export function applyLocalFonts(editor: PptxEditorInstance, families: readonly string[]): Promise<'fonts.localDenied' | 'fonts.localNone' | 'fonts.localAdded'>;
 
@@ -128,6 +252,9 @@ export function backgroundPresetGradient(base: string): GradientFill;
 export function backgroundStatusKey(chosen: SlideBackground | null | undefined, opening: SlideBackground | null | undefined, presets: readonly GradientFill[]): TranslationKey | null;
 
 // @public
+export type BevelPreset = 'circle' | 'relaxedInset' | 'cross' | 'coolSlant' | 'angle' | 'softRound' | 'convex' | 'slope' | 'divot' | 'riblet' | 'hardEdge' | 'artDeco';
+
+// @public
 export function bindHistoryGroup(editor: HistoryGroupHost, element: HTMLElement, config: HistoryGroupBindingOptions): HistoryGroupBinding;
 
 // @internal
@@ -137,7 +264,13 @@ export function builtInGroupPriority(groupId: string, groups: readonly Pick<Chro
 export const BULLET_GALLERY: readonly ListGalleryItem<BulletGalleryKey>[];
 
 // @internal
+export const BULLET_PICTURE_ACCEPT = "image/png,image/jpeg,image/gif";
+
+// @internal
 export const BULLET_TEXT_FONT = "\u0001text";
+
+// @internal
+export function bulletColorEnabled(d: BulletsDialogFields): boolean;
 
 // @internal
 export function bulletCommandOf(seed: BulletsDialogFields, d: BulletsDialogFields): BulletFormat | null | undefined;
@@ -168,6 +301,10 @@ export type BulletFormat = {
     readonly sizePercent?: number | null;
     readonly color?: ColorChoice | null;
 } | {
+    readonly kind: 'picture';
+    readonly picture: Uint8Array;
+    readonly sizePercent?: number | null;
+} | {
     readonly kind?: undefined;
     readonly sizePercent?: number | null;
     readonly color?: ColorChoice | null;
@@ -175,7 +312,7 @@ export type BulletFormat = {
 
 // @public
 export interface BulletFormatMixed {
-    readonly kinds: readonly ('bullet' | 'number' | 'none')[];
+    readonly kinds: readonly ('bullet' | 'number' | 'picture' | 'none')[];
     readonly sizePercent: number | null;
     readonly startAt?: number | null;
 }
@@ -193,10 +330,22 @@ export type BulletFormatRead = {
     readonly startAt: number;
     readonly sizePercent: number;
     readonly color?: string;
+} | {
+    readonly kind: 'picture';
+    readonly sizePercent: number;
 };
 
 // @public
 export type BulletGalleryKey = 'none' | 'filledRound' | 'hollowRound' | 'filledSquare' | 'hollowSquare' | 'star' | 'arrow' | 'checkmark';
+
+// @internal
+export type BulletPictureRead = {
+    readonly ok: true;
+    readonly picture: Uint8Array;
+} | {
+    readonly ok: false;
+    readonly reason: TranslationKey;
+};
 
 // @internal
 export function bulletsDialogError(t: Translate, problem: BulletsFieldError, kind: BulletsDialogTab): DialogError;
@@ -209,6 +358,7 @@ export interface BulletsDialogFields {
     readonly font: string;
     readonly kind: BulletsDialogTab;
     readonly number: string;
+    readonly picture: Uint8Array | null;
     readonly sizePercent: string;
     readonly startAt: string;
 }
@@ -238,6 +388,9 @@ export function canQueryLocalFonts(): boolean;
 // @internal
 export function canRenameSectionInPlace(editor: object | null): boolean;
 
+// @internal
+export function canRequestCommentDraft(editor: object | null | undefined): boolean;
+
 // @public
 export type CanResult = {
     readonly ok: true;
@@ -250,13 +403,13 @@ export type CanResult = {
 export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly ChromeMenuEntry[]>>;
 
 // @public
-export type CanvasMenuKind = 'shapes' | 'picture' | 'text' | 'table' | 'tableFrame' | 'slide';
+export type CanvasMenuKind = 'shapes' | 'picture' | 'chart' | 'diagram' | 'text' | 'table' | 'tableFrame' | 'slide';
 
 // @internal
-export function canvasMenuKind(snapshot: Pick<EditorSnapshot, 'selection' | 'image'> & Partial<Pick<EditorSnapshot, 'table'>>): CanvasMenuKind;
+export function canvasMenuKind(snapshot: Pick<EditorSnapshot, 'selection' | 'image'> & Partial<Pick<EditorSnapshot, 'table' | 'chart' | 'diagram'>>): CanvasMenuKind;
 
 // @internal
-export function canvasMenuLabelKey(kind: CanvasMenuKind): 'contextMenu.textLabel' | 'contextMenu.tableLabel' | 'contextMenu.shapeLabel' | 'contextMenu.pictureLabel' | 'contextMenu.canvasLabel';
+export function canvasMenuLabelKey(kind: CanvasMenuKind): 'contextMenu.textLabel' | 'contextMenu.tableLabel' | 'contextMenu.shapeLabel' | 'contextMenu.pictureLabel' | 'contextMenu.chartLabel' | 'contextMenu.diagramLabel' | 'contextMenu.canvasLabel';
 
 // @internal
 export function canvasMenuPoint(owner: Element, at: {
@@ -267,11 +420,115 @@ export function canvasMenuPoint(owner: Element, at: {
     y: number;
 };
 
+// @internal
+export function canvasMenuRows(entries: readonly ChromeMenuEntry[], editor: Editor | null | undefined): readonly ChromeMenuEntry[];
+
 // @public
 export type CapsStyle = 'none' | 'small' | 'all';
 
 // @public
+export type CaretAffinity = 'downstream' | 'upstream';
+
+// @public
+export type ChartCommand = {
+    readonly type: 'setChartData';
+    readonly nodeId?: string;
+    readonly data: Omit<ChartData, 'workbook'>;
+};
+
+// @public
+export interface ChartData {
+    // (undocumented)
+    readonly categories: readonly ChartDataCategory[];
+    // (undocumented)
+    readonly kind: ChartDataKind;
+    // (undocumented)
+    readonly series: readonly ChartDataSeries[];
+    readonly workbook?: ChartWorkbookState;
+}
+
+// @public
+export interface ChartDataCategory {
+    readonly label: string;
+    readonly source?: number;
+}
+
+// @public
+export type ChartDataKind = 'category' | 'xy';
+
+// @public
+export type ChartDataRead = {
+    readonly ok: true;
+    readonly data: ChartData;
+} | {
+    readonly ok: false;
+    readonly reason: string;
+};
+
+// @public
+export interface ChartDataSeries {
+    readonly name: string;
+    readonly source?: number;
+    readonly values: readonly (number | null)[];
+}
+
+// @public
+export type ChartPaneChange = {
+    readonly type: 'value';
+    readonly series: number;
+    readonly category: number;
+    readonly text: string;
+} | {
+    readonly type: 'seriesName';
+    readonly series: number;
+    readonly text: string;
+} | {
+    readonly type: 'label';
+    readonly category: number;
+    readonly text: string;
+} | {
+    readonly type: 'addSeries';
+    readonly name: string;
+} | {
+    readonly type: 'removeSeries';
+    readonly series: number;
+} | {
+    readonly type: 'addCategory';
+    readonly label: string;
+} | {
+    readonly type: 'removeCategory';
+    readonly category: number;
+};
+
+// @public
+export function chartPaneCommand(data: ChartData, change: ChartPaneChange): ChartPaneResult;
+
+// @public
+export function chartPaneNumericX(data: Pick<ChartData, 'kind' | 'categories'>): boolean;
+
+// @public
+export type ChartPaneResult = {
+    readonly ok: true;
+    readonly command: EditorCommand;
+} | {
+    readonly ok: false;
+    readonly error: 'chartData.errors.number' | 'chartData.errors.xNumber' | 'chartData.errors.tooLong' | 'chartData.errors.limit';
+};
+
+// @public
+export type ChartSlotId = 'chart.editData';
+
+// @public
+export const chartValueText: (v: number | null | undefined) => string;
+
+// @public
+export type ChartWorkbookState = 'embedded' | 'kept' | 'external' | 'none';
+
+// @public
 export type CheckState = boolean | 'mixed';
+
+// @internal
+export function chooseBulletPicture(d: BulletsDialogFields, picture: Uint8Array): BulletsDialogFields;
 
 // @public
 export const CHROME_GROUPS: readonly ChromeGroup[];
@@ -365,12 +622,12 @@ export type ChromeControlState =
     readonly kind: 'panel';
 }
 /**
-* Shows a tab of the side panel: Format or Selection. The slot sends `requestPane`, which a
-* mounted side panel and the host answer.
+* Shows a tab of the side panel: Format, Selection, or Chart Data. The slot sends
+* `requestPane`, which a mounted side panel and the host answer.
 */
 | {
     readonly kind: 'pane';
-    readonly pane: 'format' | 'selection';
+    readonly pane: 'format' | 'selection' | 'chart';
 }
 /**
 * Opens a dialog of the `popups` registry by its key. With a probe command, the slot is on when
@@ -397,7 +654,7 @@ export type ChromeControlState =
 export type ChromeControlToggle = 'pressed' | 'choice';
 
 // @public
-export type ChromeDialogKey = 'pageSetup' | 'background' | 'paragraph' | 'font' | 'bulletsAndNumbering' | 'columns' | 'imageAltText' | 'imageProperties';
+export type ChromeDialogKey = 'pageSetup' | 'background' | 'paragraph' | 'font' | 'bulletsAndNumbering' | 'columns' | 'imageAltText' | 'imageProperties' | 'equation';
 
 // @public
 export interface ChromeGroup {
@@ -411,7 +668,7 @@ export interface ChromeGroup {
 }
 
 // @public
-export type ChromeGroupId = 'history' | 'font' | 'text' | 'script' | 'paragraph' | 'list' | 'insert' | 'shape' | 'format' | 'arrange' | 'more' | 'find' | 'view' | 'file' | 'edit' | 'slide' | 'image' | 'section' | 'table';
+export type ChromeGroupId = 'history' | 'font' | 'text' | 'script' | 'paragraph' | 'list' | 'insert' | 'shape' | 'format' | 'arrange' | 'more' | 'find' | 'view' | 'file' | 'edit' | 'slide' | 'image' | 'section' | 'table' | 'chart' | 'diagram' | 'review';
 
 // @internal
 export function chromeKeepsFocus(target: EventTarget | null): boolean;
@@ -490,7 +747,7 @@ export function chromeOptionChecked(value: unknown, option: string): boolean;
 export function chromeRowState(editor: PptxEditorInstance | null, slot: ChromeSlotId, value?: string, host?: Pick<ChromeActionHost, 'unavailable'>): ChromeCommandState;
 
 // @public
-export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | TableSlotId | ImageSlotId;
+export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.textEffects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | TableSlotId | ImageSlotId | ChartSlotId | DiagramSlotId | EquationSlotId | ReviewSlotId;
 
 // @public
 export function chromeSlotIds(): ChromeSlotId[];
@@ -525,6 +782,9 @@ export type ChromeTranslate = (key: string, params?: TranslationParams) => strin
 
 // @internal
 export function churnWarning(root: string, prop: 'document' | 'fonts'): () => void;
+
+// @internal
+export function claimRejection(rejection: EditorRejection): void;
 
 // @internal
 export function clampSlide(index: number | undefined, count: number): number;
@@ -583,6 +843,8 @@ export interface ClipboardRelationship {
     readonly id: string;
     // (undocumented)
     readonly part: string;
+    readonly relationships?: readonly ClipboardRelationship[];
+    readonly target?: string;
     // (undocumented)
     readonly type: string;
 }
@@ -792,9 +1054,15 @@ export interface CommandContext {
         superscript?: boolean;
         subscript?: boolean;
     };
+    readonly author?: string;
     readonly base?: PptxPackage;
     readonly caretArm?: boolean;
     readonly collaborating?: boolean;
+    // @internal
+    readonly commentAt?: (id: string) => {
+        readonly identity?: string;
+        readonly moved: boolean;
+    };
     // @internal
     readonly gestureBase?: PptxPackage;
     readonly pasteRepeat?: number;
@@ -850,6 +1118,115 @@ export type CommandResult = {
 
 // @internal
 export function commandRowReason(editor: PptxEditorInstance | null, command: EditorCommand | null): string | null;
+
+// @public
+export const COMMENT_AUTHOR_SLOTS = 8;
+
+// @public
+export type CommentAnchor = {
+    readonly kind: 'slide';
+} | {
+    readonly kind: 'point';
+    readonly x: number;
+    readonly y: number;
+} | {
+    readonly kind: 'shape';
+    readonly nodeId: string;
+};
+
+// @public
+export interface CommentAuthorInput {
+    readonly author?: string;
+    readonly date?: string;
+    readonly initials?: string;
+}
+
+// @public
+export function commentAuthorSlot(author: string): number;
+
+// @public
+export type CommentCommand =
+/**
+* Add a thread on the current slide. With `nodeId`, it points at that element; without it, at
+* the selected element when one element is selected, else at the slide.
+*/
+({
+    readonly type: 'addComment';
+    readonly text: string;
+    readonly nodeId?: string;
+} & CommentAuthorInput)
+/** Reply to the thread of `commentId` (a thread or one of its replies). */
+| ({
+    readonly type: 'replyToComment';
+    readonly commentId: string;
+    readonly text: string;
+    readonly expect?: CommentExpect;
+} & CommentAuthorInput)
+/** Replace the text of a comment or a reply. */
+| {
+    readonly type: 'editComment';
+    readonly commentId: string;
+    readonly text: string;
+    readonly expect?: CommentExpect;
+}
+/** Delete a reply, or a whole thread when `commentId` is a thread. */
+| {
+    readonly type: 'deleteComment';
+    readonly commentId: string;
+    readonly expect?: CommentExpect;
+}
+/** Mark a thread resolved. Refused for the legacy format (`disabled.commentNoStatus`). */
+| {
+    readonly type: 'resolveComment';
+    readonly commentId: string;
+    readonly expect?: CommentExpect;
+}
+/** Mark a resolved thread active again. */
+| {
+    readonly type: 'reopenComment';
+    readonly commentId: string;
+    readonly expect?: CommentExpect;
+};
+
+// @public
+export interface CommentExpect {
+    readonly author: string;
+    readonly date?: string;
+    readonly identity?: string;
+    readonly text: string;
+}
+
+// @public
+export type CommentFormat = 'modern' | 'legacy';
+
+// @public
+export function commentInitials(comment: {
+    readonly initials: string;
+    readonly author: string;
+}): string;
+
+// @public
+export type CommentMarkerStyle = 'initials' | 'icon';
+
+// @internal
+export function commentRowShown(editor: Editor | null | undefined): boolean;
+
+// @public
+export interface CommentSnapshot {
+    readonly activeComment?: string | null;
+    readonly commentAuthor?: string | null;
+    readonly comments?: readonly CommentThread[] | null;
+}
+
+// @public
+export interface CommentThread extends SlideComment {
+    // (undocumented)
+    readonly anchor: CommentAnchor;
+    // (undocumented)
+    readonly format: CommentFormat;
+    readonly replies: readonly SlideComment[];
+    readonly resolved: boolean;
+}
 
 // @internal
 export function commitDialogCommand(editor: Pick<Editor, 'exec'> | null, command: EditorCommand | null): DialogCommitResult;
@@ -907,6 +1284,12 @@ export const CONTEXT_MENU_NAMED_PARTS: {
     readonly ImageAltText: MenuNamedRow;
     readonly ImageChange: MenuNamedRow;
     readonly ImageProperties: MenuNamedRow;
+    readonly ChartEditData: MenuNamedRow;
+    readonly DiagramAddAfter: MenuNamedRow;
+    readonly DiagramAddBefore: MenuNamedRow;
+    readonly DiagramAddBelow: MenuNamedRow;
+    readonly DiagramDelete: MenuNamedRow;
+    readonly AddComment: MenuNamedRow;
     readonly FormatBackground: MenuNamedRow;
     readonly NewSlide: MenuNamedRow;
     readonly InsertRowAbove: MenuNamedRow;
@@ -1069,6 +1452,24 @@ export function customHexDraft(text: string): string;
 // @internal
 export function customHexSeed(selected: ColorChoice | null | undefined): string;
 
+// @internal
+export function customShowDraft(url: string): {
+    readonly id: number;
+    readonly returns: boolean;
+} | null;
+
+// @internal
+export function customShowDraftUrl(id: number, returns: boolean): string;
+
+// @internal
+export function customShowLinkLabel(t: Translate, url: string, shows: readonly CustomShowSummary[]): string;
+
+// @public
+export interface CustomShowSummary {
+    readonly id: number;
+    readonly name: string;
+}
+
 // @public
 export interface DateTimeState {
     readonly fixed: boolean;
@@ -1097,6 +1498,24 @@ export function deferFonts(origin: FontOrigin): MarkedFontResolver;
 
 // @public
 export function defineFontResolver<T extends FontResolver>(resolve: T): MarkedFontResolver<T>;
+
+// @public
+export type DiagramCommand = {
+    readonly type: 'addDiagramShape';
+    readonly position: DiagramShapePosition;
+    readonly nodeId?: string;
+    readonly node?: string;
+} | {
+    readonly type: 'deleteDiagramShape';
+    readonly nodeId?: string;
+    readonly node?: string;
+};
+
+// @public
+export type DiagramShapePosition = 'after' | 'before' | 'below';
+
+// @public
+export type DiagramSlotId = 'diagram.addAfter' | 'diagram.addBefore' | 'diagram.addBelow' | 'diagram.delete';
 
 // @internal
 export const DIALOG_FIELD_ATTRIBUTE = "data-pptx-field";
@@ -1364,6 +1783,8 @@ export interface EditorCaret {
     // (undocumented)
     readonly cell?: TableCellAddress;
     // (undocumented)
+    readonly diagramNode?: string;
+    // (undocumented)
     readonly nodeId: string;
     // (undocumented)
     readonly offset: number;
@@ -1399,7 +1820,7 @@ export interface EditorCollaborationSession {
 }
 
 // @public
-export type EditorCommand = {
+export type EditorCommand = CommentCommand | {
     readonly type: 'undo';
 } | {
     readonly type: 'redo';
@@ -1793,6 +2214,12 @@ export type EditorCommand = {
 | {
     readonly type: 'setAutofit';
     readonly mode: TextFitting;
+}
+/** The selected shapes' text warp, with adjust values by guide name; null removes it. */
+| {
+    readonly type: 'setTextWarp';
+    readonly preset: TextWarpPreset | null;
+    readonly adjust?: Readonly<Record<string, number>>;
 } | {
     readonly type: 'setTransforms';
     readonly items: readonly TransformItem[];
@@ -1820,7 +2247,7 @@ export type EditorCommand = {
 /** Apply the copied formatting to the selection as one undo step (Ctrl/Cmd+Shift+V). */
 | {
     readonly type: 'pasteFormat';
-} | TextFormatCommand | PictureCommand | FillCommand
+} | TextFormatCommand | PictureCommand | ChartCommand | EquationCommand | DiagramCommand | FillCommand | AnimationCommand
 /**
 * Shape Effects: set or remove one effect of the selected shapes, connectors, and pictures.
 * A shape whose effects come from its theme style (`a:effectRef`) gets that style's effects
@@ -1982,6 +2409,7 @@ export type EditorSelection = {
     readonly anchor: TextPoint;
     readonly focus: TextPoint;
     readonly cell?: TableCellAddress;
+    readonly diagramNode?: string;
 } | {
     readonly kind: 'cells';
     readonly nodeId: string;
@@ -1990,17 +2418,23 @@ export type EditorSelection = {
 };
 
 // @public (undocumented)
-export interface EditorSnapshot {
+export interface EditorSnapshot extends CommentSnapshot {
+    readonly animationOrder?: boolean;
+    readonly animations?: SlideAnimations;
     // (undocumented)
     readonly canRedo: boolean;
     // (undocumented)
     readonly canUndo: boolean;
+    readonly chart?: SelectedChartState | null;
     readonly collapsedSections?: readonly string[];
     // (undocumented)
     readonly currentSlide: number;
+    readonly customShows?: readonly CustomShowSummary[];
     readonly dateTime?: DateTimeState | null;
+    readonly diagram?: SelectedDiagramState | null;
     // (undocumented)
     readonly embeddedFontFaces: number;
+    readonly equation?: SelectedEquationState | null;
     // (undocumented)
     readonly error?: string;
     // (undocumented)
@@ -2082,6 +2516,57 @@ export const EMPTY_EDITOR_SNAPSHOT: EditorSnapshot;
 export function enterSlideshowScreen(el: HTMLElement): () => void;
 
 // @internal
+export const EQUATION_GALLERY: readonly EquationGalleryItem[];
+
+// @public
+export type EquationCommand =
+/**
+* Insert > Equation: a new text box centered on the slide, with the equation of `linear`.
+* `font` names the font of its math runs; default `Cambria Math`. The text box is selected.
+*/
+    {
+    readonly type: 'insertEquation';
+    readonly linear: string;
+    readonly font?: string;
+}
+/**
+* Replace the math of an equation (`SelectedEquationState.nodeId`) with the equation of
+* `linear`. The equation keeps its alignment and the font, size, and color of its first run.
+*/
+| {
+    readonly type: 'setEquation';
+    readonly nodeId: string;
+    readonly linear: string;
+};
+
+// @internal
+export function equationDialogEdits(selected: SelectedEquationState | null | undefined): boolean;
+
+// @internal
+export function equationDraftCommand(fields: EquationDraftFields, selected: SelectedEquationState | null | undefined): EditorCommand | null;
+
+// @internal
+export interface EquationDraftFields {
+    readonly linear: string;
+}
+
+// @internal
+export function equationDraftFrom(selected: SelectedEquationState | null | undefined): EquationDraftFields;
+
+// @internal
+export interface EquationGalleryItem {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly labelKey: TranslationKey;
+    // (undocumented)
+    readonly linear: string;
+}
+
+// @public
+export type EquationSlotId = 'insert.equation';
+
+// @internal
 export class ExecutionFontLimitError extends RangeError {
     constructor(request: FontFaceRequest, byteLength: number, ceiling: number);
     // (undocumented)
@@ -2105,6 +2590,12 @@ export const fieldPart: (name: string) => {
     readonly 'data-pptx-part': "field";
     readonly 'data-pptx-field': string;
 };
+
+// @internal
+export function fieldShowsRejection(rejection: EditorRejection | null | undefined): boolean;
+
+// @internal
+export function fileDraftUrl(text: string): string;
 
 // @public
 export type FillCommand =
@@ -3093,16 +3584,22 @@ export const LINK_KINDS: readonly LinkKind[];
 export function linkCaretAnchor(editor: object): HTMLElement | null;
 
 // @internal
-export type LinkKind = 'web' | 'email' | 'slide';
+export type LinkKind = 'web' | 'email' | 'slide' | 'customShow' | 'file';
+
+// @internal
+export function linkKindDraft(kind: LinkKind, shows: readonly CustomShowSummary[]): string;
 
 // @public
 export function linkKindOf(url: string): LinkKind;
 
 // @internal
+export function linkKindsFor(shows: readonly CustomShowSummary[], draft: string): readonly LinkKind[];
+
+// @internal
 export function linkPopupAnchor(request: LinkRequest, editor: object): HTMLElement | null;
 
 // @internal
-export function linkPopupAnnouncement(state: HyperlinkPopupState, t: Translate): string;
+export function linkPopupAnnouncement(state: HyperlinkPopupState, t: Translate, shows?: readonly CustomShowSummary[]): string;
 
 // @internal
 export function linkPopupReturnsFocus(editor?: object): boolean;
@@ -3248,6 +3745,9 @@ export function markReadingPopup<F extends object>(renderer: F): F;
 export const MAX_ALT_TEXT = 4000;
 
 // @public
+export const MAX_LINEAR_LENGTH = 1000;
+
+// @public
 export const MAX_RESOLVER_FAMILIES = 64;
 
 // @internal
@@ -3279,6 +3779,7 @@ export const MENU_NAMED_PARTS: {
     readonly TextBox: MenuNamedRow;
     readonly TableInsert: MenuNamedRow;
     readonly ImageInsert: MenuNamedRow;
+    readonly Equation: MenuNamedRow;
     readonly Shapes: MenuNamedRow;
     readonly Line: MenuNamedRow;
     readonly Link: MenuNamedRow;
@@ -3406,6 +3907,9 @@ export function mountedSections(grouped: readonly SlideSection[], limit: number)
 
 // @public
 export function namedFamilies(pkg: PptxPackage): string[];
+
+// @public
+export function nextChartCategoryLabel(data: Pick<ChartData, 'kind' | 'categories'>, fallback: string): string;
 
 // @public (undocumented)
 export const NO_HOST_FACES: HostFaces;
@@ -3837,6 +4341,12 @@ export interface ParagraphLineSpacing {
 // @internal
 export const parseAmount: (text: string) => number;
 
+// @public
+export function parseChartValue(text: string): number | null | undefined;
+
+// @public
+export function parseSeconds(text: string): number | null;
+
 // @internal
 export function parseToolbarSize(draft: string | null): number | null;
 
@@ -3874,6 +4384,9 @@ export function pickPictureFill(editor: PptxEditorInstance, from?: Element | nul
 
 // @internal
 export const PICTURE_FILL_TYPES = "image/png,image/jpeg,image/gif";
+
+// @internal
+export const PICTURE_STYLE = "picture";
 
 // @public
 export type PictureCommand =
@@ -4122,6 +4635,7 @@ export interface PptxEditorEvents {
 
 // @public
 export interface PptxEditorInstance extends Editor {
+    chartData(nodeId?: string): ChartDataRead;
     readonly find: PptxFind;
     // @internal
     finishOpening(): boolean;
@@ -4133,7 +4647,9 @@ export interface PptxEditorInstance extends Editor {
     // @internal
     reject(reason: string, detail?: string): CommandResult;
     renderLayoutThumbnail(layoutId: string, container: HTMLElement): void;
+    selectComment(id: string | null): void;
     readonly session: DocumentSession | null;
+    setAuthor(author: string | undefined): void;
     setFontFamilies(families: readonly string[]): void;
     setFonts(fonts: PptxEditorOptions['fonts']): Promise<void>;
     setSelection(selection: EditorSelection): void;
@@ -4142,6 +4658,7 @@ export interface PptxEditorInstance extends Editor {
 
 // @public
 export interface PptxEditorOptions extends Omit<OpenOptions, 'fonts'> {
+    readonly author?: string;
     readonly autoCorrect?: boolean;
     // (undocumented)
     readonly document?: Uint8Array;
@@ -4272,6 +4789,12 @@ export function railRightToLeft(el: Element | null): boolean;
 // @internal
 export function railStepOfKey(key: string, orientation: SlideRailOrientation | undefined, list: HTMLElement | null): -1 | 0 | 1;
 
+// @internal
+export function readBulletPicture(file: Blob | undefined | null): Promise<BulletPictureRead | null>;
+
+// @public
+export function readCommentThreads(pkg: PptxPackage, slidePart: string): readonly CommentThread[];
+
 // @public
 export type ReflectionPreset = 'tightTouching' | 'halfTouching' | 'fullTouching' | 'tight4pt' | 'half4pt' | 'full4pt' | 'tight8pt' | 'half8pt' | 'full8pt';
 
@@ -4280,6 +4803,9 @@ export function refocusAfterCollapse(list: HTMLElement | null, was: HTMLElement 
 
 // @internal
 export function refocusAfterSorterHides(list: HTMLElement, editor: PptxEditorInstance | null): void;
+
+// @public
+export function registerCommentDraft(editor: object, open: () => void): () => void;
 
 // @internal
 export function registerSectionRenamer(editor: object, take: (sectionId: string) => void): () => void;
@@ -4322,6 +4848,9 @@ export type ReplaceAllResult = {
 
 // @internal
 export function reportFontError(error: EditorFontError, handler: ((error: EditorFontError) => void) | undefined): void;
+
+// @public
+export function requestCommentDraft(editor: object): boolean;
 
 // @internal
 export function requestDialogSection(editor: object, dialog: string, section: string): void;
@@ -4411,13 +4940,26 @@ export interface ReviewModelInput {
 export interface ReviewModuleContribution {
     readonly collectReviewItems: CollectReviewItems;
     readonly displayModes: readonly ReviewDisplayMode[];
+    readonly pane?: ReviewPaneOptions;
 }
+
+// @public
+export type ReviewPaneOpening = 'auto' | 'manual';
+
+// @public
+export interface ReviewPaneOptions {
+    readonly commentMarkers?: CommentMarkerStyle;
+    readonly opening?: ReviewPaneOpening;
+}
+
+// @public
+export type ReviewSlotId = 'review.addComment';
 
 // @public
 export const RIBBON_TABS: readonly RibbonTab[];
 
 // @public
-export type RibbonContext = 'shape' | 'picture' | 'table';
+export type RibbonContext = 'shape' | 'picture' | 'chart' | 'diagram' | 'table';
 
 // @public
 export function ribbonContextActive(snapshot: RibbonSelection, context: RibbonContext): boolean;
@@ -4436,7 +4978,7 @@ export function ribbonInsertTab<T extends {
 }>(tabs: readonly T[]): string | null;
 
 // @public
-export type RibbonSelection = Pick<EditorSnapshot, 'selection' | 'image' | 'table'>;
+export type RibbonSelection = Pick<EditorSnapshot, 'selection' | 'image' | 'table'> & Partial<Pick<EditorSnapshot, 'chart' | 'diagram'>>;
 
 // @internal
 export function ribbonShownTab<T extends {
@@ -4460,7 +5002,7 @@ export interface RibbonTab {
 export function ribbonTabGroups(tab: RibbonTab, groups?: readonly ChromeGroup[]): ChromeGroup[];
 
 // @public
-export type RibbonTabId = 'quickAccess' | 'home' | 'insert' | 'design' | 'slideShow' | 'view' | 'shapeFormat' | 'pictureFormat' | 'tableDesign' | 'tableLayout';
+export type RibbonTabId = 'quickAccess' | 'home' | 'insert' | 'design' | 'slideShow' | 'view' | 'shapeFormat' | 'pictureFormat' | 'chartDesign' | 'diagramDesign' | 'tableDesign' | 'tableLayout';
 
 // @public
 export interface RibbonTabLayout {
@@ -4488,6 +5030,9 @@ export function ribbonTabs(snapshot: RibbonSelection, groups?: readonly ChromeGr
 
 // @public
 export type RotateChoice = 'right90' | 'left90' | 'flipVertical' | 'flipHorizontal';
+
+// @public
+export type Rotation3DPreset = 'isometricLeftDown' | 'isometricRightUp' | 'isometricTopUp' | 'isometricOffAxis1Left' | 'isometricOffAxis1Right' | 'obliqueTopLeft' | 'obliqueTopRight' | 'obliqueBottomLeft' | 'obliqueBottomRight';
 
 // @internal
 export function runChromeRow(editor: PptxEditorInstance | null, host: ChromeActionHost, slot: ChromeSlotId, value?: string, surfaceInput?: HTMLElement | null): void;
@@ -4537,6 +5082,9 @@ export function sameParagraphFormat(a: ParagraphFormatRead | null, b: ParagraphF
 // @internal
 export function scrollIntoNearestScroller(target: HTMLElement, within?: Element | null): void;
 
+// @public
+export function secondsText(ms: number): string;
+
 // @internal
 export function sectionHeaderKeyDown(e: PaneKeyEvent, node: HTMLElement, ctx: SectionKeyContext): void;
 
@@ -4578,6 +5126,27 @@ export function seedParagraphFields(format: ParagraphFormatRead | null): Paragra
 
 // @internal
 export function seedSlideSizeFields(width: number, height: number): SlideSizeFields;
+
+// @public
+export interface SelectedChartState {
+    readonly editable: boolean;
+    readonly nodeId: string;
+    readonly reason?: string;
+}
+
+// @public
+export interface SelectedDiagramState {
+    readonly node: string | null;
+    readonly nodeId: string;
+    readonly reason?: string;
+    readonly structure: boolean;
+}
+
+// @public
+export interface SelectedEquationState {
+    readonly linear: string | null;
+    readonly nodeId: string;
+}
 
 // @public
 export interface SelectedImageState {
@@ -4672,6 +5241,7 @@ export interface SelectionGeometry {
     readonly rot: number;
     readonly shapeStyle?: ShapeStyleChoice;
     readonly textFitting?: TextFitting;
+    readonly textWarp?: TextWarpPreset;
     // (undocumented)
     readonly x: number;
     // (undocumented)
@@ -4779,6 +5349,21 @@ export type ShapeEffectChoice = {
 | {
     readonly kind: 'softEdge';
     readonly size: number | null;
+}
+/** Blur radius in points (`a:blur`). No gallery offers it. */
+| {
+    readonly kind: 'blur';
+    readonly size: number | null;
+}
+/** A top bevel (`a:sp3d/a:bevelT`), with a front camera when the shape has no scene. */
+| {
+    readonly kind: 'bevel';
+    readonly preset: BevelPreset | null;
+}
+/** A camera preset (`a:scene3d/a:camera`); null turns the camera back to the front. */
+| {
+    readonly kind: 'rotation3d';
+    readonly preset: Rotation3DPreset | null;
 };
 
 // @internal
@@ -4786,12 +5371,15 @@ export function shapeEffectCommand(value: unknown): EditorCommand | null;
 
 // @public
 export interface ShapeEffectsState {
+    readonly bevel: BevelPreset | 'none';
+    readonly blur: number;
     // (undocumented)
     readonly glow: number;
     readonly glowAccent?: Exclude<ShapeStyleColor, 'dk1'>;
     readonly glowColor?: string;
     // (undocumented)
     readonly reflection: ReflectionPreset | 'none' | 'other';
+    readonly rotation3d: Rotation3DPreset | 'none' | 'other';
     // (undocumented)
     readonly shadow: ShadowPreset | 'none' | 'other';
     // (undocumented)
@@ -4799,7 +5387,7 @@ export interface ShapeEffectsState {
 }
 
 // @public
-export type ShapeEffectsValue = `shadow.${ShadowPreset | 'none'}` | `reflection.${ReflectionPreset | 'none'}` | `glow.${number | 'none'}` | `glow.${number}.${Exclude<ShapeStyleColor, 'dk1'>}` | `softEdge.${number | 'none'}`;
+export type ShapeEffectsValue = `shadow.${ShadowPreset | 'none'}` | `reflection.${ReflectionPreset | 'none'}` | `glow.${number | 'none'}` | `glow.${number}.${Exclude<ShapeStyleColor, 'dk1'>}` | `softEdge.${number | 'none'}` | `bevel.${BevelPreset | 'none'}` | `rotation3d.${Rotation3DPreset | 'none'}`;
 
 // @public
 export interface ShapePreview {
@@ -4868,7 +5456,10 @@ export function shownOpenFailure(snapshot: EditorSnapshot): DocumentOpenFailure 
 export function showsLoading(snapshot: EditorSnapshot): boolean;
 
 // @internal
-export const SIDE_PANEL_TABS: readonly ["format", "selection", "comments"];
+export const SIDE_PANEL_TAB_ICONS: Readonly<Record<SidePanelTab, string>>;
+
+// @internal
+export const SIDE_PANEL_TABS: readonly ["format", "chart", "selection", "animations", "comments"];
 
 // @public
 export type SidePanelTab = (typeof SIDE_PANEL_TABS)[number];
@@ -4896,6 +5487,14 @@ export const SLIDE_SIZE_PRESETS: Readonly<Record<Exclude<SlideSizePreset, 'custo
     readonly width: number;
     readonly height: number;
 }>>;
+
+// @public
+export interface SlideAnimations {
+    readonly editable: boolean;
+    readonly effects: readonly AnimationEffect_2[];
+    // (undocumented)
+    readonly transition: SlideTransitionState;
+}
 
 // @public
 export type SlideBackground = {
@@ -4933,6 +5532,17 @@ export function slideClickMode(e: {
     metaKey: boolean;
     ctrlKey: boolean;
 }): 'range' | 'toggle' | 'replace';
+
+// @public
+export interface SlideComment {
+    readonly author: string;
+    readonly date?: string;
+    readonly id: string;
+    readonly identity: string;
+    readonly initials: string;
+    readonly text: string;
+    readonly textEditable: boolean;
+}
 
 // @internal
 export interface SlideDrag {
@@ -5186,6 +5796,14 @@ export function slideThemeFonts(session: DocumentSession | null, slide: number):
     readonly headings: string | null;
     readonly body: string | null;
 };
+
+// @public
+export interface SlideTransitionState {
+    readonly advanceAfterMs: number | null;
+    readonly advanceOnClick: boolean;
+    readonly durationMs: number;
+    readonly kind: TransitionKind | 'none' | 'other';
+}
 
 // @internal
 export const SLOT_POPUP_KEYS: Readonly<Partial<Record<ChromeSlotId, string>>>;
@@ -5577,6 +6195,13 @@ export function takeDialogSection(editor: object | null, dialog: string): string
 // @internal
 export function takePaneRequest(editor: object | null | undefined): SidePanelTab | null;
 
+// @internal
+export const TEXT_WARP_GALLERY: readonly {
+    readonly section: 'followPath' | 'warp';
+    readonly labelKey: TranslationKey;
+    readonly warps: readonly Exclude<TextWarpPreset, 'textNoShape'>[];
+}[];
+
 // @public
 export type TextAlign = 'l' | 'ctr' | 'r' | 'just';
 
@@ -5594,6 +6219,12 @@ export interface TextColumns {
     readonly count: number;
     readonly gapEmu: number;
 }
+
+// @internal
+export function textEffectsCommand(value: unknown): EditorCommand | null;
+
+// @public
+export type TextEffectsValue = `transform.${Exclude<TextWarpPreset, 'textNoShape'> | 'none'}`;
 
 // @public
 export type TextFitting = 'none' | 'shrink' | 'shape';
@@ -5676,11 +6307,18 @@ export type TextOrientation = 'horizontal' | 'vertical' | 'vertical270' | 'wordA
 
 // @public
 export interface TextPoint {
+    readonly affinity?: CaretAffinity;
     // (undocumented)
     readonly offset: number;
     // (undocumented)
     readonly paragraph: number;
 }
+
+// @public
+export type TextWarpPreset = 'textNoShape' | 'textPlain' | 'textStop' | 'textTriangle' | 'textTriangleInverted' | 'textChevron' | 'textChevronInverted' | 'textRingInside' | 'textRingOutside' | 'textArchUp' | 'textArchDown' | 'textCircle' | 'textButton' | 'textArchUpPour' | 'textArchDownPour' | 'textCirclePour' | 'textButtonPour' | 'textCurveUp' | 'textCurveDown' | 'textCanUp' | 'textCanDown' | 'textWave1' | 'textWave2' | 'textDoubleWave1' | 'textWave4' | 'textInflate' | 'textDeflate' | 'textInflateBottom' | 'textDeflateBottom' | 'textInflateTop' | 'textDeflateTop' | 'textDeflateInflate' | 'textDeflateInflateDeflate' | 'textFadeRight' | 'textFadeLeft' | 'textFadeUp' | 'textFadeDown' | 'textSlantUp' | 'textSlantDown' | 'textCascadeUp' | 'textCascadeDown';
+
+// @internal
+export function textWarpPreview(preset: string): readonly string[];
 
 // @internal
 export function themeBaseSwatches(t: Translate, first: readonly ThemeSwatch[] | undefined): readonly {
@@ -5764,6 +6402,7 @@ export const TOOLBAR_NAMED_PARTS: {
     readonly Line: "insert.line";
     readonly Shapes: "insert.shape";
     readonly ImageInsert: "insert.image";
+    readonly Equation: "insert.equation";
     readonly ShapeFill: "shape.fill";
     readonly LineColor: "shape.lineColor";
     readonly LineWidth: "shape.lineWidth";
@@ -5772,6 +6411,7 @@ export const TOOLBAR_NAMED_PARTS: {
     readonly LineDash: "shape.lineDash";
     readonly ShapeStyles: "shape.styles";
     readonly ShapeEffects: "shape.effects";
+    readonly TextEffects: "shape.textEffects";
     readonly FormatShape: "shape.properties";
     readonly FormatPainter: "format.painter";
     readonly Order: "arrange.order";
@@ -5815,6 +6455,12 @@ export const TOOLBAR_NAMED_PARTS: {
     readonly ImageCropToShape: "image.cropToShape";
     readonly ImageCropFit: "image.cropFit";
     readonly ImageProperties: "image.properties";
+    readonly ChartEditData: "chart.editData";
+    readonly DiagramAddAfter: "diagram.addAfter";
+    readonly DiagramAddBefore: "diagram.addBefore";
+    readonly DiagramAddBelow: "diagram.addBelow";
+    readonly DiagramDelete: "diagram.delete";
+    readonly AddComment: "review.addComment";
     readonly TableInsert: "table.insert";
     readonly TableStyle: "table.style";
     readonly TableHeaderRow: "table.headerRow";
@@ -5897,10 +6543,10 @@ export interface ToolbarCommandState {
 export function toolbarCommandState(editor: Editor | null, id: ChromeSlotId): ToolbarCommandState;
 
 // @internal
-export type ToolbarContext = 'none' | 'text' | 'shape' | 'picture' | 'table' | 'tableFrame' | 'notes';
+export type ToolbarContext = 'none' | 'text' | 'shape' | 'picture' | 'chart' | 'diagram' | 'table' | 'tableFrame' | 'notes';
 
 // @internal
-export function toolbarContextOf(snapshot: Pick<EditorSnapshot, 'selection' | 'image' | 'table'>): ToolbarContext;
+export function toolbarContextOf(snapshot: Pick<EditorSnapshot, 'selection' | 'image' | 'table'> & Partial<Pick<EditorSnapshot, 'chart' | 'diagram'>>): ToolbarContext;
 
 // @internal
 export interface ToolbarDropdownRow {
@@ -6065,6 +6711,8 @@ export interface ToolbarValueMap {
     'shape.lineWidth': number;
     // (undocumented)
     'shape.styles': ShapeStyleValue | ShapeStyleChoice;
+    // (undocumented)
+    'shape.textEffects': TextEffectsValue;
     'slide.add': string;
     'slide.layout': string;
     'text.changeCase': TextCase;
@@ -6110,6 +6758,15 @@ export interface TransformItem {
     readonly y: number;
 }
 
+// @public
+export const TRANSITION_KINDS: readonly (TransitionKind | 'none')[];
+
+// @public
+export type TransitionKind = 'fade' | 'push' | 'wipe' | 'split' | 'cut';
+
+// @public
+export const transitionKindLabelKey: (kind: SlideTransitionState["kind"]) => `panel.animations.kinds.${SlideTransitionState["kind"]}`;
+
 // @internal
 export function translateDialogErrors<Fields extends object>(t: Translate, errors: DialogErrors<Fields>): DialogErrors<Fields>;
 
@@ -6141,6 +6798,9 @@ export function validateAltTextDraft(fields: AltTextDraftFields): DialogErrors<A
 export function validateBackgroundDraft(fields: BackgroundDraftFields, initial: BackgroundDraftFields, picked?: boolean): DialogErrors<BackgroundDraftFields>;
 
 // @internal
+export function validateEquationDraft(fields: EquationDraftFields): DialogErrors<EquationDraftFields>;
+
+// @internal
 export function validatePicturePropertiesDraft(f: PicturePropertiesDraftFields, initial?: PicturePropertiesDraftFields): DialogErrors<PicturePropertiesDraftFields>;
 
 // @internal
@@ -6151,6 +6811,9 @@ export function valueSlotShown<K extends keyof ToolbarValueMap>(slot: K, raw: un
 
 // @public
 export type VerticalAlign = 't' | 'ctr' | 'b';
+
+// @internal
+export function visibleSidePanelTabs(chartSelected: boolean, open: SidePanelTab): readonly SidePanelTab[];
 
 // @internal
 export function warnAsChildChild(slot: string, parts?: ToolbarPartNames): void;

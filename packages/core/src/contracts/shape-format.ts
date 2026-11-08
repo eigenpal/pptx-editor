@@ -42,6 +42,39 @@ export type ReflectionPreset =
   | 'half8pt'
   | 'full8pt';
 
+/**
+ * The presets of the Bevel gallery: the top bevel presets of `ST_BevelPresetType`
+ * (ECMA-376 Part 1, 20.1.10.9), each 6 pt wide and 6 pt high. @public
+ */
+export type BevelPreset =
+  | 'circle'
+  | 'relaxedInset'
+  | 'cross'
+  | 'coolSlant'
+  | 'angle'
+  | 'softRound'
+  | 'convex'
+  | 'slope'
+  | 'divot'
+  | 'riblet'
+  | 'hardEdge'
+  | 'artDeco';
+
+/**
+ * The presets of the 3-D Rotation gallery: camera presets of `ST_PresetCameraType`
+ * (ECMA-376 Part 1, 20.1.10.47) with parallel projection. @public
+ */
+export type Rotation3DPreset =
+  | 'isometricLeftDown'
+  | 'isometricRightUp'
+  | 'isometricTopUp'
+  | 'isometricOffAxis1Left'
+  | 'isometricOffAxis1Right'
+  | 'obliqueTopLeft'
+  | 'obliqueTopRight'
+  | 'obliqueBottomLeft'
+  | 'obliqueBottomRight';
+
 /** One effect to set; a null preset or size removes the effect. @public */
 export type ShapeEffectChoice =
   | { readonly kind: 'shadow'; readonly preset: ShadowPreset | null }
@@ -54,7 +87,13 @@ export type ShapeEffectChoice =
       readonly color?: ColorChoice;
     }
   /** Soft edge size in points (the gallery offers 1, 2.5, 5, 10, 25, and 50). */
-  | { readonly kind: 'softEdge'; readonly size: number | null };
+  | { readonly kind: 'softEdge'; readonly size: number | null }
+  /** Blur radius in points (`a:blur`). No gallery offers it. */
+  | { readonly kind: 'blur'; readonly size: number | null }
+  /** A top bevel (`a:sp3d/a:bevelT`), with a front camera when the shape has no scene. */
+  | { readonly kind: 'bevel'; readonly preset: BevelPreset | null }
+  /** A camera preset (`a:scene3d/a:camera`); null turns the camera back to the front. */
+  | { readonly kind: 'rotation3d'; readonly preset: Rotation3DPreset | null };
 
 /**
  * The rows of the Shape Styles gallery (theme styles), top to bottom: Colored Outline,
@@ -86,7 +125,62 @@ export type ShapeEffectsValue =
   | `reflection.${ReflectionPreset | 'none'}`
   | `glow.${number | 'none'}`
   | `glow.${number}.${Exclude<ShapeStyleColor, 'dk1'>}`
-  | `softEdge.${number | 'none'}`;
+  | `softEdge.${number | 'none'}`
+  | `bevel.${BevelPreset | 'none'}`
+  | `rotation3d.${Rotation3DPreset | 'none'}`;
+
+/**
+ * A preset text warp (`a:prstTxWarp/@prst`, `ST_TextShapeType`, ECMA-376 Part 1, 20.1.10.76).
+ * `textNoShape` draws the text flat. @public
+ */
+export type TextWarpPreset =
+  | 'textNoShape'
+  | 'textPlain'
+  | 'textStop'
+  | 'textTriangle'
+  | 'textTriangleInverted'
+  | 'textChevron'
+  | 'textChevronInverted'
+  | 'textRingInside'
+  | 'textRingOutside'
+  | 'textArchUp'
+  | 'textArchDown'
+  | 'textCircle'
+  | 'textButton'
+  | 'textArchUpPour'
+  | 'textArchDownPour'
+  | 'textCirclePour'
+  | 'textButtonPour'
+  | 'textCurveUp'
+  | 'textCurveDown'
+  | 'textCanUp'
+  | 'textCanDown'
+  | 'textWave1'
+  | 'textWave2'
+  | 'textDoubleWave1'
+  | 'textWave4'
+  | 'textInflate'
+  | 'textDeflate'
+  | 'textInflateBottom'
+  | 'textDeflateBottom'
+  | 'textInflateTop'
+  | 'textDeflateTop'
+  | 'textDeflateInflate'
+  | 'textDeflateInflateDeflate'
+  | 'textFadeRight'
+  | 'textFadeLeft'
+  | 'textFadeUp'
+  | 'textFadeDown'
+  | 'textSlantUp'
+  | 'textSlantDown'
+  | 'textCascadeUp'
+  | 'textCascadeDown';
+
+/**
+ * A `shape.textEffects` option value: `transform.` and a text warp, or `transform.none` to
+ * remove the warp. @public
+ */
+export type TextEffectsValue = `transform.${Exclude<TextWarpPreset, 'textNoShape'> | 'none'}`;
 
 /** An `arrange.rotate` value: the 90° turns, then the flips. @public */
 export type RotateChoice = 'right90' | 'left90' | 'flipVertical' | 'flipHorizontal';
@@ -110,6 +204,12 @@ export interface ShapeEffectsState {
   /** The theme accent of a Glow Variations color (40% opacity), when the glow has one. */
   readonly glowAccent?: Exclude<ShapeStyleColor, 'dk1'>;
   readonly softEdge: number;
+  /** The top bevel preset, or `none`. */
+  readonly bevel: BevelPreset | 'none';
+  /** The camera preset when it is a 3-D Rotation gallery choice, `none` for a front camera. */
+  readonly rotation3d: Rotation3DPreset | 'none' | 'other';
+  /** Blur radius in points; 0 is no blur. */
+  readonly blur: number;
 }
 
 /** One element of the current slide, as the selection pane lists it. @public */

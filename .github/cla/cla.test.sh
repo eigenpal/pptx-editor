@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copied from DOCX Editor (eigenpal/docx-editor) .github/cla/cla.test.sh at commit 5993bd223.
+# Copied from DOCX Editor (eigenpal/docx-editor) .github/cla/cla.test.sh at commit adf0e178.
 # Hermetic tests for .github/cla/cla.sh — no network, no git, no gh calls.
 # Run locally:  bash .github/cla/cla.test.sh
 # Run in CI:    same command, wired into .github/workflows/ci.yml.

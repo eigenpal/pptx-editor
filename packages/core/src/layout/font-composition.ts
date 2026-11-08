@@ -1,4 +1,4 @@
-// Copied from DOCX Editor `packages/core/src/layout/font-composition.ts` at commit 5993bd223.
+// Copied from DOCX Editor `packages/core/src/layout/font-composition.ts` at commit adf0e178.
 // Keep the exported API equal to the source.
 
 import { supportedFontFamilies } from './supported-font-families.ts';

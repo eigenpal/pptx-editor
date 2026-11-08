@@ -1,4 +1,4 @@
-// Copied from docx-editor/scripts/test/run-parallel.mjs at 39a490db (EigenPal).
+// Adapted from docx-editor/scripts/test/run-parallel.mjs at 39a490db (EigenPal).
 // PPTX Editor changes: the search roots (no `benchmarks/` here), the cache directory name, and
 // the per-file `bun test` arguments from `pptx-suite.mjs` (only the adapter tests preload a DOM).
 // The suite, sharded across processes.

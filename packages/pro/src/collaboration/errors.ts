@@ -3,7 +3,8 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// After DOCX Editor's `packages/pro/src/collaboration/errors.ts`.
+// Adapted from DOCX Editor's `packages/pro/src/collaboration/errors.ts`. DOCX Editor commit
+// adf0e178.
 
 import type { CollaborationFailureCode } from '@pptx-editor.dev/core/editor';
 

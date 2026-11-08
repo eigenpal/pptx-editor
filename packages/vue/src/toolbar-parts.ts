@@ -280,6 +280,7 @@ const SLOT_PART_NAMES = [
   'LineDash',
   'ShapeStyles',
   'ShapeEffects',
+  'TextEffects',
   'Order',
   'AlignObjects',
   'Rotate',

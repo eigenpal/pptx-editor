@@ -106,7 +106,7 @@ const fallbackOffsets = (root: Element): string[] => {
 };
 
 describe('an edit of a drawn mc:Choice copy', () => {
-  test('a move leaves no stale copy for a reader of mc:Fallback, after save and reopen', async () => {
+  test('a move moves the mc:Fallback copy too, after save and reopen', async () => {
     const e = await open(fixture());
     const id = drawnId(e, 'Shape 3');
     e.setSelection({ kind: 'shapes', nodeIds: [id] });
@@ -115,9 +115,45 @@ describe('an edit of a drawn mc:Choice copy', () => {
     // The Choice holds the moved shape.
     const moved = find(find(root, 'mc:Choice'), 'a:off');
     expect(attr(moved, 'x')).toBe(String(5_486_400 + IN));
-    // A Fallback reader no longer sees the shape at its old place, nor its old text.
-    expect(fallbackOffsets(root)).toEqual([]);
-    expect(fallbackReaderText(root)).not.toContain('Fallback branch');
+    // A Fallback reader sees its own copy at the new place.
+    expect(fallbackOffsets(root)).toEqual([String(5_486_400 + IN)]);
+    expect(fallbackReaderText(root)).toContain('Fallback branch');
+  });
+
+  test('a resize and a rotation of the drawn mc:Fallback copy reach the mc:Choice copy', async () => {
+    const choiceBox = box(3, 'FF0000', 'Choice copy');
+    const e = await open(
+      deck(
+        wrap(
+          choice(
+            'a14',
+            'xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main"',
+            choiceBox
+          ) + fallback(box(3, '00FF00', 'Fallback copy'))
+        )
+      )
+    );
+    const id = drawnId(e, 'Box 3');
+    expect(
+      e.exec({
+        type: 'setTransform',
+        nodeId: id,
+        x: 2 * IN,
+        y: IN,
+        cx: 4 * IN,
+        cy: 2 * IN,
+        rot: 45,
+      }).ok
+    ).toBe(true);
+    const root = saved(e);
+    const xfrm = find(find(root, 'mc:Choice'), 'a:xfrm');
+    expect(attr(xfrm, 'rot')).toBe('2700000');
+    expect(attr(find(xfrm, 'a:off'), 'x')).toBe(String(2 * IN));
+    expect(attr(find(xfrm, 'a:ext'), 'cx')).toBe(String(4 * IN));
+    // The Choice keeps its own content.
+    expect(
+      serializeXmlPart(xmlPartOf(e.session!.store.package, '/ppt/slides/slide1.xml')!)
+    ).toContain('Choice copy');
   });
 
   test('typing removes the copy, and undo brings it back', async () => {

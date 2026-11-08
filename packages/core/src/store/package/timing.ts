@@ -38,7 +38,9 @@
 // each replica kept the list for the other shape's step, and the merge removes both steps. The
 // repair touches only a `p:timing` that the session changed (an edit, or a collaborator's
 // different copy): a `p:timing` exactly as the file wrote it saves unchanged, empty lists
-// included (`markFileTimings`, `carryFileTimings`). A `spid` that names no shape is not
+// included (`markFileTimings`, `carryFileTimings`). In a changed `p:timing`, a build entry that
+// repeats an earlier one (the same `spid` and `grpId`) goes too: two collaborators who each
+// animate one shape at the same time both add it. A `spid` that names no shape is not
 // repaired: only an edit that removes the shape removes its entries.
 
 import { MAX_XML_DEPTH } from '@eigenpal/ooxml-core';
@@ -47,6 +49,10 @@ import { attr, child, elements } from './query.ts';
 import type { Element, Node } from './tree.ts';
 
 const NONE: ReadonlySet<string> = new Set();
+const NO_TARGETS: ReadonlySet<Element> = new Set();
+/** The `spid` that a removed target element stands for: no attribute can hold it. */
+const GONE_SPID = '\u0000target';
+const GONE_TARGET: ReadonlySet<string> = new Set([GONE_SPID]);
 
 const isP = (el: Element, local: string): boolean => el.ns === NS.p && el.local === local;
 const isAlternate = (el: Element): boolean => el.ns === NS.mc && el.local === 'AlternateContent';
@@ -72,10 +78,31 @@ function timingsOf(root: Element | undefined): Element[] {
  */
 const fileTimings = new WeakSet<Element>();
 
-/** Record the `p:timing` elements of a slide root that the reader built from a file. */
+/** The slide root's children that hold a transition: `p:transition`, or one in a wrapper. */
+function transitionsOf(root: Element): Element[] {
+  return elements(root).filter(
+    (c) =>
+      isP(c, 'transition') ||
+      (isAlternate(c) &&
+        elements(c).some((b) => isBranch(b) && elements(b).some((t) => isP(t, 'transition'))))
+  );
+}
+
+/**
+ * Record the `p:timing` elements of a slide root that the reader built from a file, and its
+ * transitions (see `repairTransitionRoot`).
+ */
 export function markFileTimings(root: Element): void {
   for (const t of timingsOf(root)) fileTimings.add(t);
+  for (const t of transitionsOf(root)) fileTimings.add(t);
 }
+
+/**
+ * Whether every transition of a slide root is as the file wrote it: the writer leaves such a
+ * slide's transitions as they are. @internal
+ */
+export const fileTransitionsOnly = (root: Element): boolean =>
+  transitionsOf(root).every((t) => fileTimings.has(t));
 
 /**
  * Keep the file mark of a slide's `p:timing` when a collaborator's copy of the part replaces
@@ -83,12 +110,14 @@ export function markFileTimings(root: Element): void {
  * place that equals the marked one keeps the mark.
  */
 export function carryFileTimings(before: Element, after: Element): void {
-  const old = timingsOf(before);
-  const next = timingsOf(after);
-  if (old.length !== next.length) return;
-  for (let i = 0; i < old.length; i += 1)
-    if (fileTimings.has(old[i]) && old[i] !== next[i] && sameTree(old[i], next[i], 0))
-      fileTimings.add(next[i]);
+  for (const of of [timingsOf, transitionsOf]) {
+    const old = of(before);
+    const next = of(after);
+    if (old.length !== next.length) continue;
+    for (let i = 0; i < old.length; i += 1)
+      if (fileTimings.has(old[i]) && old[i] !== next[i] && sameTree(old[i], next[i], 0))
+        fileTimings.add(next[i]);
+  }
 }
 
 /** Whether two trees hold the same XML, node ids and attribute order aside. */
@@ -137,6 +166,15 @@ export function timingRemovals(root: Element, gone: ReadonlySet<string>): Elemen
 }
 
 /**
+ * The elements of a slide root to remove when the paragraphs that the target elements
+ * `targets` (`p:spTgt` with a `p:txEl`) animate are all gone, by the rules of
+ * `timingRemovals`: an effect cannot keep a target that names no paragraph. @internal
+ */
+export function paragraphTargetRemovals(root: Element, targets: ReadonlySet<Element>): Element[] {
+  return removalsIn(root, GONE_TARGET, () => true, false, targets);
+}
+
+/**
  * A slide root as the writer saves it: each `p:timing` that the session changed loses the time
  * node lists and build lists that are empty, by the rules of `timingRemovals` with no shape
  * gone. The root itself when nothing changes.
@@ -145,9 +183,24 @@ export function repairTimingRoot(root: Element): Element {
   const timings = timingsOf(root);
   if (timings.every((t) => fileTimings.has(t))) return root;
   const remove = new Set(removalsIn(root, NONE, (t) => !fileTimings.has(t), true));
-  if (remove.size === 0) return root;
+  for (const t of timings)
+    if (!fileTimings.has(t)) for (const b of repeatedBuilds(t)) remove.add(b);
+  const ranges = rangesPastText(
+    root,
+    timings.filter((t) => !fileTimings.has(t))
+  );
+  if (remove.size === 0 && ranges.size === 0) return root;
   const strip = (el: Element, depth: number): Element => {
     if (depth > MAX_XML_DEPTH) return el;
+    const range = ranges.get(el);
+    if (range) {
+      const attrs = el.attrs.map((a) =>
+        a.ns === '' && (a.local === 'st' || a.local === 'end')
+          ? { ...a, value: String(range[a.local]) }
+          : a
+      );
+      return { ...el, attrs };
+    }
     let changed = false;
     const kids: Node[] = [];
     for (const c of el.children) {
@@ -165,6 +218,68 @@ export function repairTimingRoot(root: Element): Element {
 }
 
 /**
+ * The build entries of a `p:timing` that repeat an earlier entry: the same element, `spid`, and
+ * `grpId`. Two collaborators who each add an effect to one shape at the same time both add its
+ * entry; the first stays.
+ */
+function repeatedBuilds(timing: Element): Element[] {
+  const seen = new Set<string>();
+  const out: Element[] = [];
+  for (const b of elements(child(timing, 'p:bldLst'))) {
+    const spid = attr(b, 'spid');
+    const grpId = attr(b, 'grpId');
+    if (spid === undefined || grpId === undefined) continue;
+    const key = `${b.ns} ${b.local} ${spid} ${grpId}`;
+    if (seen.has(key)) out.push(b);
+    else seen.add(key);
+  }
+  return out;
+}
+
+/**
+ * The paragraph ranges (`p:pRg`) of `timings` that end past the last paragraph of their shape,
+ * with the range that ends at it. Two collaborators who each delete a paragraph before an
+ * animated one both move its range by one, so the merge can leave it one paragraph too far.
+ */
+function rangesPastText(
+  root: Element,
+  timings: readonly Element[]
+): Map<Element, { st: number; end: number }> {
+  const out = new Map<Element, { st: number; end: number }>();
+  if (timings.length === 0) return out;
+  // The number of paragraphs of each shape, by `p:cNvPr/@id`: the most of its copies.
+  const counts = new Map<string, number>();
+  const shapes = (el: Element, depth: number): void => {
+    if (depth > MAX_XML_DEPTH || isP(el, 'timing')) return;
+    if (isP(el, 'sp')) {
+      const id = attr(child(child(el, 'p:nvSpPr'), 'p:cNvPr'), 'id');
+      const n = elements(child(el, 'p:txBody')).filter(
+        (p) => p.ns === NS.a && p.local === 'p'
+      ).length;
+      if (id !== undefined) counts.set(id, Math.max(counts.get(id) ?? 0, n));
+      return;
+    }
+    for (const c of elements(el)) shapes(c, depth + 1);
+  };
+  shapes(root, 0);
+  const walk = (el: Element, depth: number): void => {
+    if (depth > MAX_XML_DEPTH) return;
+    if (isP(el, 'spTgt')) {
+      const pRg = child(child(el, 'p:txEl'), 'p:pRg');
+      const n = counts.get(attr(el, 'spid') ?? '');
+      const st = Number(attr(pRg, 'st'));
+      const end = Number(attr(pRg, 'end'));
+      if (pRg && n && Number.isInteger(st) && Number.isInteger(end) && end >= n)
+        out.set(pRg, { st: Math.min(st, n - 1), end: n - 1 });
+      return;
+    }
+    for (const c of elements(el)) walk(c, depth + 1);
+  };
+  for (const t of timings) walk(t, 0);
+  return out;
+}
+
+/**
  * `timingRemovals` over the `p:timing` elements that `include` accepts. With `repair`, the lists
  * that are already empty go too; without it, only what the removal of `gone` empties goes.
  */
@@ -172,17 +287,19 @@ function removalsIn(
   root: Element,
   gone: ReadonlySet<string>,
   include: (timing: Element) => boolean,
-  repair: boolean
+  repair: boolean,
+  targets: ReadonlySet<Element> = NO_TARGETS
 ): Element[] {
   const out: Element[] = [];
   const own = child(root, 'p:timing');
-  if (own && include(own)) topmost(own, deadIn(own, gone, repair), out);
+  if (own && include(own)) topmost(own, deadIn(own, gone, repair, targets), out);
   for (const ac of elements(root).filter(isAlternate)) {
     const branches = elements(ac).filter(isBranch);
     const timings = branches.flatMap((b) => elements(b).filter((t) => isP(t, 'timing')));
     if (timings.length === 0) continue;
     const dead = new Set<Element>();
-    for (const t of timings) if (include(t)) for (const el of deadIn(t, gone, repair)) dead.add(el);
+    for (const t of timings)
+      if (include(t)) for (const el of deadIn(t, gone, repair, targets)) dead.add(el);
     if (dead.size === 0) continue;
     if (branches.every((b) => elements(b).every((c) => dead.has(c)))) out.push(ac);
     else for (const t of timings) topmost(t, dead, out);
@@ -250,7 +367,10 @@ interface TimeGraph {
   readonly waiters: Map<string, TimeNode[]>;
 }
 
-function readGraph(tnLst: Element | undefined): TimeGraph {
+function readGraph(
+  tnLst: Element | undefined,
+  targets: ReadonlySet<Element> = NO_TARGETS
+): TimeGraph {
   const graph: TimeGraph = { nodes: [], lists: [], waiters: new Map() };
   const { nodes, lists, waiters } = graph;
   // What a node's own content names: every element under it outside its time node lists.
@@ -258,6 +378,7 @@ function readGraph(tnLst: Element | undefined): TimeGraph {
     if (depth > MAX_XML_DEPTH) return;
     const spid = attr(el, 'spid');
     if (spid !== undefined) n.spids.push(spid);
+    if (targets.has(el)) n.spids.push(GONE_SPID);
     if (isP(el, 'tn')) {
       const val = attr(el, 'val');
       const at = val === undefined ? undefined : waiters.get(val);
@@ -363,10 +484,15 @@ function spidIn(el: Element, gone: ReadonlySet<string>, depth: number): boolean 
  * The elements of one `p:timing` (itself included) that go when the shapes in `gone` go, and
  * with `repair` the lists that are already empty.
  */
-function deadIn(timing: Element, gone: ReadonlySet<string>, repair: boolean): Set<Element> {
+function deadIn(
+  timing: Element,
+  gone: ReadonlySet<string>,
+  repair: boolean,
+  targets: ReadonlySet<Element> = NO_TARGETS
+): Set<Element> {
   const dead = new Set<Element>();
   const tnLst = child(timing, 'p:tnLst');
-  const graph = readGraph(tnLst);
+  const graph = readGraph(tnLst, targets);
   removeTimeNodes(graph, gone, repair, dead);
   const bldLst = child(timing, 'p:bldLst');
   const builds = elements(bldLst);

@@ -1,5 +1,6 @@
 // The published packages and their public entry points. One list for api-extractor,
-// notices, and release checks (docx-editor keeps the same list in scripts/lib/packages.mjs).
+// notices, and release checks (DOCX Editor keeps the same list in
+// `scripts/lib/packages.mjs` at adf0e178).
 export const PACKAGES = [
   {
     name: '@pptx-editor.dev/i18n',
@@ -19,7 +20,7 @@ export const PACKAGES = [
     name: '@pptx-editor.dev/pro',
     root: 'packages/pro',
     slug: 'pro',
-    entries: ['index', 'drawing'],
+    entries: ['index', 'drawing', 'react', 'vue'],
   },
   {
     name: '@pptx-editor.dev/pptx-to-pdf',

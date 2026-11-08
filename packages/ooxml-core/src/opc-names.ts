@@ -1,4 +1,4 @@
-// Copied from docx-editor/packages/core/src/store/package/opc-names.ts at d905af34 (EigenPal).
+// Adapted from docx-editor/packages/core/src/store/package/opc-names.ts at d905af34 (EigenPal).
 // It also holds fixes that DOCX Editor does not have yet: K1.
 // Keep it equal to that file plus those fixes.
 // OPC / ZIP / relationship-target normalization profile (document-engine task

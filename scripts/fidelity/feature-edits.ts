@@ -134,6 +134,11 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
       t.run({ type: 'setLink', url: '#slide-2' });
       t.selectText('Links', 0, 16, 7);
       t.run({ type: 'setLink', url: null });
+      // "plain" links to the custom show "Short", and "to" to a file next to the deck.
+      t.selectText('Links', 25, 30);
+      t.run({ type: 'setLink', url: '#custom-show-0' });
+      t.selectText('Links', 11, 13);
+      t.run({ type: 'setLink', url: './docs/Q3 report.pdf' });
     },
     check: (d) => {
       const xml = d.shapeXml(0, 'Links');
@@ -156,6 +161,14 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
           ? undefined
           : `the email link targets ${target('text')}`,
         has(slideJump, 'action="ppaction://hlinksldjump"'),
+        has(
+          runsOf(xml).find((r) => r.text === 'plain')?.rPr ?? '',
+          '<a:hlinkClick r:id="" action="ppaction://customshow?id=0"/>'
+        ),
+        target('to') === 'docs/Q3%20report.pdf'
+          ? undefined
+          : `the file link targets ${target('to')}`,
+        has(rels, 'Target="docs/Q3%20report.pdf" TargetMode="External"'),
         target('More') === 'slide2.xml' ? undefined : `the slide link targets ${target('More')}`,
         lacks(after[7] ?? '', 'hlinkClick'),
         has(after[7] ?? '', '<a:t>A link to remove</a:t>'),
@@ -344,13 +357,61 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
         has(d.shapeXml(0, 'Shape 3'), 'numCol="3"', 'spcCol="91440"')
       ),
   },
+  'paragraphs.text-warp': {
+    fixture: 'text-warp',
+    edit: (t) => {
+      t.select('textArchDown 3');
+      t.run({ type: 'setTextWarp', preset: 'textWave1', adjust: { adj1: 15000 } });
+      t.select('textArchUp 2');
+      t.run({ type: 'setTextWarp', preset: null });
+    },
+    check: (d) =>
+      all(
+        has(
+          d.shapeXml(0, 'textArchDown 3'),
+          '<a:bodyPr wrap="none" rtlCol="0" anchor="t"><a:prstTxWarp prst="textWave1"><a:avLst><a:gd name="adj1" fmla="val 15000"/></a:avLst></a:prstTxWarp><a:noAutofit/></a:bodyPr>'
+        ),
+        has(
+          d.shapeXml(0, 'textArchUp 2'),
+          '<a:bodyPr wrap="none" rtlCol="0" anchor="t"><a:noAutofit/>'
+        ),
+        lacks(d.shapeXml(0, 'textArchUp 2'), 'prstTxWarp')
+      ),
+  },
   'lists.bullets-numbering': {
     fixture: 'bullets-numbering',
     edit: (t) => {
       t.selectText('Shape 2', 0, 1);
       t.run({ type: 'toggleNumbering' });
+      // A picture bullet on "Second level": one media part, related to the slide.
+      t.selectText('Shape 3', 0, 6, 1);
+      t.run({
+        type: 'setBulletFormat',
+        format: { kind: 'picture', picture: t.png, sizePercent: 120 },
+      });
     },
-    check: (d) => has(d.shapeXml(0, 'Shape 2'), '<a:buAutoNum'),
+    check: (d) => {
+      const second = paragraphOf(d.shapeXml(0, 'Shape 3'), 1);
+      const rId = /<a:buBlip><a:blip r:embed="([^"]+)"\/><\/a:buBlip>/.exec(second)?.[1];
+      const rels = d.partXml('/ppt/slides/_rels/slide1.xml.rels');
+      const rel = rId && new RegExp(`<Relationship [^>]*Id="${rId}"[^>]*>`).exec(rels)?.[0];
+      const media = rel ? /Target="\.\.\/media\/([^"]+)"/.exec(rel)?.[1] : undefined;
+      return all(
+        has(d.shapeXml(0, 'Shape 2'), '<a:buAutoNum'),
+        has(second, '<a:buSzPct val="120000"/>', '<a:buBlip>'),
+        media && d.pkg.parts.get(`/ppt/media/${media}`)?.kind === 'binary'
+          ? undefined
+          : 'the picture bullet names no media part',
+        d.editor
+          .session!.layout(0)!
+          .items.some(
+            (i) => i.kind === 'shape' && !!i.text?.lines.some((l) => l.runs.some((r) => r.picture))
+          )
+          ? undefined
+          : 'the reopened copy draws no picture bullet'
+      );
+    },
+    parts: MEDIA,
   },
   'shapes.preset-geometry': {
     fixture: 'preset-shapes',
@@ -609,22 +670,44 @@ export const FEATURE_EDITS: Readonly<Record<string, FeatureEdit>> = {
     },
   },
   'effects.3d-and-other': {
-    fixture: 'preserved-content',
+    // The camera and bevel slide: change a bevel and turn a camera back to the front, add a
+    // bevel and a camera to a flat-looking shape, replace a camera rotation with a preset, and
+    // blur a shape.
+    fixture: 'three-d-effects',
+    slide: 3,
     edit: (t) => {
-      t.select('3-D shape');
-      t.run({ type: 'setShapeFill', color: '#5B9BD5' });
-      t.run({ type: 'nudge', dx: 91440, dy: 0 });
+      t.select('Shape 2');
+      t.run({ type: 'setShapeEffect', effect: { kind: 'bevel', preset: 'angle' } });
+      t.run({ type: 'setShapeEffect', effect: { kind: 'rotation3d', preset: null } });
+      t.select('Shape 6');
+      t.run({ type: 'setShapeEffect', effect: { kind: 'bevel', preset: 'circle' } });
+      t.run({ type: 'setShapeEffect', effect: { kind: 'rotation3d', preset: 'obliqueTopLeft' } });
+      t.select('Shape 5');
+      t.run({ type: 'setShapeEffect', effect: { kind: 'rotation3d', preset: 'isometricTopUp' } });
+      t.select('Shape 7');
+      t.run({ type: 'setShapeEffect', effect: { kind: 'blur', size: 3 } });
     },
-    check: (d) => {
-      const threeD = (xml: string) => /<a:scene3d>.*<\/a:sp3d>/.exec(xml)?.[0];
-      const xml = d.shapeXml(0, '3-D shape');
-      return all(
-        has(xml, 'val="5B9BD5"'),
-        threeD(xml) === threeD(shapeXmlOf(d.original, 0, '3-D shape'))
-          ? undefined
-          : 'the 3-D scene or shape changed'
-      );
-    },
+    check: (d) =>
+      all(
+        has(
+          d.shapeXml(3, 'Shape 2'),
+          '<a:camera prst="orthographicFront"/>',
+          '<a:sp3d extrusionH="152400"><a:bevelT w="76200" h="76200" prst="angle"/></a:sp3d>'
+        ),
+        has(
+          d.shapeXml(3, 'Shape 6'),
+          '<a:camera prst="obliqueTopLeft"/>',
+          '<a:sp3d extrusionH="228600"><a:bevelT w="76200" h="76200"/></a:sp3d>'
+        ),
+        has(d.shapeXml(3, 'Shape 5'), '<a:camera prst="isometricTopUp"/>'),
+        lacks(d.shapeXml(3, 'Shape 5'), '<a:rot'),
+        has(
+          d.shapeXml(3, 'Shape 7'),
+          '<a:effectLst><a:blur rad="38100"/></a:effectLst><a:scene3d>'
+        ),
+        // The shapes the edit did not touch keep their 3-D properties.
+        kept(d, 3, 'Shape 3', 'Shape 4', 'Shape 8', 'Shape 9')
+      ),
   },
   'effects.outer-shadow': {
     fixture: 'effects',

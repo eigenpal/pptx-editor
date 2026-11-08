@@ -3,6 +3,7 @@
 // store ops through an OpBatch, so typing is as serializable and undoable as any other command.
 //
 // Fields (`a:fld`) are atomic: an edit never splits one. A point inside a field snaps to its end.
+// An equation (`a14:m`) that the layout draws is one object character (U+FFFC), atomic too.
 // A field is as long as the text layout shows: a `slidenum` field on a slide shows the slide
 // number (the cascade's rule), so offsets here and caret offsets from layout agree.
 
@@ -19,6 +20,7 @@ import {
 } from '../../store/index.ts';
 import type { TextPoint } from '../../contracts/neutral.ts';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
+import { isMathZone, isSupportedMath } from '../../cascade/math.ts';
 import { caretWordRange } from '@eigenpal/ooxml-core';
 
 /** Slide numbers by part, per batch: slide order does not change inside a text edit. */
@@ -61,7 +63,7 @@ export function splitsPair(text: string, offset: number): boolean {
 /** One inline item with its offset range in the paragraph. */
 export interface Slot {
   readonly el: Element;
-  readonly kind: 'run' | 'break' | 'field';
+  readonly kind: 'run' | 'break' | 'field' | 'math';
   readonly start: number;
   readonly end: number;
   readonly text: string;
@@ -131,6 +133,9 @@ function slotTable(p: Element, slideNumber?: number): SlotTable {
     } else if (el.kind === 'break') {
       out.push({ el, kind: 'break', start: at, end: at + 1, text: '\n', index });
       at += 1;
+    } else if (isMathZone(el) && isSupportedMath(el)) {
+      out.push({ el, kind: 'math', start: at, end: at + 1, text: '\uFFFC', index });
+      at += 1;
     }
   }
   const table = { key, slots: out, afterProps };
@@ -154,7 +159,7 @@ export function paragraphText(p: Element, slideNumber?: number): string {
 export function snapPoint(p: Element, offset: number, slideNumber?: number): number {
   for (const s of slotsOf(p, slideNumber)) {
     if (offset <= s.start || offset >= s.end) continue;
-    if (s.kind === 'field') return s.end;
+    if (s.kind === 'field' || s.kind === 'math') return s.end;
     if (splitsPair(s.text, offset - s.start)) return offset + 1;
   }
   return Math.max(0, Math.min(offset, paragraphLength(p, slideNumber)));
@@ -173,7 +178,7 @@ function widenRange(
   let a = from;
   let b = to;
   for (const s of slotsOf(p, slideNumber)) {
-    if (s.kind === 'field') {
+    if (s.kind === 'field' || s.kind === 'math') {
       if (a > s.start && a < s.end) a = s.start;
       if (b > s.start && b < s.end) b = s.end;
     } else if (s.kind === 'run') {
@@ -420,7 +425,7 @@ export function insertBreak(
  */
 export function wordTextOf(p: Element, slideNumber?: number): string {
   return slotsOf(p, slideNumber)
-    .map((s) => (s.kind === 'field' ? '\uFFFC'.repeat(s.text.length) : s.text))
+    .map((s) => (s.kind === 'field' || s.kind === 'math' ? '\uFFFC'.repeat(s.text.length) : s.text))
     .join('');
 }
 
@@ -505,7 +510,9 @@ export function runsForFormatting(
   if (collapsed) {
     const out: Element[] = [];
     for (const p of paragraphsOf(batch.element(part, txBodyId))) {
-      for (const s of slotsOf(p, n)) if (s.kind !== 'break' || child(s.el, 'a:rPr')) out.push(s.el);
+      // An equation is not a run: its math runs keep their own format.
+      for (const s of slotsOf(p, n))
+        if (s.kind !== 'math' && (s.kind !== 'break' || child(s.el, 'a:rPr'))) out.push(s.el);
       const end = child(p, 'a:endParaRPr');
       if (end) out.push(end);
     }

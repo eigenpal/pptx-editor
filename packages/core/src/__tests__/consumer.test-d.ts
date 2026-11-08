@@ -1,4 +1,4 @@
-// Adapted from docx-editor/packages/core/src/__tests__/consumer.test-d.ts at 5993bd223.
+// After docx-editor/packages/core/src/__tests__/consumer.test-d.ts at 5993bd223.
 
 /**
  * Consumer-side type test.

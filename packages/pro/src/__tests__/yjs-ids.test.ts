@@ -21,6 +21,7 @@ import {
   canonicalPackageFingerprint,
   elements,
   readPptx,
+  serializeXmlPart,
   xmlPartOf,
   type Element,
   type PptxPackage,
@@ -258,10 +259,13 @@ describe('ids that two peers mint at once', () => {
     sync.flush();
     const pkg = saved(a, b);
     const idx: string[] = [];
-    // Comment parts are kept as bytes; read each `p:cm` start tag.
+    // Read each `p:cm` start tag of the saved comment lists.
+    const partText = (
+      part: PptxPackage['parts'] extends ReadonlyMap<string, infer P> ? P : never
+    ) => (part.kind === 'xml' ? serializeXmlPart(part.xml) : new TextDecoder().decode(part.bytes));
     for (const [name, part] of pkg.parts)
-      if (name.startsWith('/ppt/comments/') && part.kind === 'binary')
-        for (const m of new TextDecoder().decode(part.bytes).matchAll(/<p:cm\s[^>]*>/g)) {
+      if (name.startsWith('/ppt/comments/'))
+        for (const m of partText(part).matchAll(/<p:cm\s[^>]*>/g)) {
           const tag = m[0];
           idx.push(`${/authorId="(\d+)"/.exec(tag)?.[1]}:${/\bidx="(\d+)"/.exec(tag)?.[1]}`);
         }

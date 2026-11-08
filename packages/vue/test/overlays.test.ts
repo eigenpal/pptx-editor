@@ -1,5 +1,5 @@
 // Vue overlay markup, keyboard, and focus parity with React. After DOCX Editor:
-// docx-editor/packages/vue/test/cross-adapter-differential.test.ts.
+// docx-editor/packages/vue/test/cross-adapter-differential.test.ts. DOCX Editor commit adf0e178.
 
 import { afterEach, describe, expect, jest, test } from 'bun:test';
 import { createElement, type ReactNode } from 'react';

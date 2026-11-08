@@ -2,7 +2,8 @@
 // them does not re-render on every edit. Moved out of `pptx-editor.ts` (the 1000-line cap).
 
 import type { EditorSnapshot } from '../contracts/index.ts';
-import { deferredParseCount, type PptxPackage } from '../store/index.ts';
+import { deferredParseCount, type PptxPackage, type PresentationInfo } from '../store/index.ts';
+import { runLinkOf } from './link-read.ts';
 import { namedFamilies, type DocumentSession } from './document-session.ts';
 import { notesParagraphs, notesText } from '../automation/commands/notes-commands.ts';
 import { FONT_NAME, STANDARD_FONT_FAMILIES } from './selection-state.ts';
@@ -144,4 +145,14 @@ export function createVersionSource(): (part: object) => number {
     }
     return v;
   };
+}
+
+/** What a link of slide `slide` shows (`SelectionFormat.link`), as `runLinkOf` reads it. */
+export function linkTargetOf(
+  pkg: PptxPackage | undefined,
+  info: PresentationInfo | undefined,
+  slide: number
+): (rId: string | undefined, action: string | undefined) => string | undefined {
+  const slideParts = info?.slides.map((s) => s.partName) ?? [];
+  return (rId, action) => runLinkOf(pkg, info?.slides[slide]?.partName, slideParts, rId, action);
 }

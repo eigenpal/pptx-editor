@@ -8,11 +8,14 @@ export * from './drawing-renderers.ts';
 export * from './geometry/geometry.ts';
 // Internal: the dashes and line ends that the SVG paint and `pptx-to-pdf` both draw.
 export * from './line-strokes.ts';
+// Internal: the strikethrough bars that the SVG paint and `pptx-to-pdf` both draw.
+export * from './text/strikeout-bars.ts';
 export type { PresetShapeDefinition } from '@eigenpal/ooxml-core';
 export * from './text/measurer.ts';
 export * from './text/harfbuzz-measurer.ts';
 export { setHarfBuzzWasmUrl } from './harfbuzz-wasm-binary.ts';
 export * from './text/text-layout.ts';
+export type { LineBidi } from './text/line-visual-order.ts';
 export * from './text/line-metrics.ts';
 export {
   autonumberText,
@@ -21,7 +24,7 @@ export {
   symbolBulletText,
 } from './text/autonumber.ts';
 export { breakOpportunities, isIdeographic, type KinsokuLists } from './text/line-break.ts';
-// Font configuration, copied from DOCX Editor's layout lane (each file header names its source).
+// Font configuration from DOCX Editor's layout lane (each file header names its source).
 // Named exports: `font-resource.ts` also names a `FontRequest` and a `FontSubstitution` that
 // differ from the measurer's.
 export {
@@ -38,3 +41,5 @@ export {
 export * from './font-composition.ts';
 export * from './font-resolver.ts';
 export { deferFonts } from './defer-fonts.ts';
+export type { WarpedRun } from './text/text-warp.ts';
+export { runGlyphs, type RunGlyph } from './text/bidi-line.ts';

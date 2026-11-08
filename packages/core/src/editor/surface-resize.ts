@@ -13,9 +13,10 @@ type HandleAt = readonly [number, number];
 
 /**
  * Resize one shape by a handle moved `ldx`, `ldy` in its parent's space, keeping the opposite
- * handle fixed. Shift keeps the ratio on a corner drag. A locked aspect ratio
- * (`noChangeAspect`) keeps it on every handle: a side handle drives the other axis, which grows
- * about the center, as DOCX Editor's image handles do (`image-overlay-geometry.ts`). @internal
+ * handle fixed. Shift keeps the ratio on a corner drag. A locked aspect ratio (`noChangeAspect`)
+ * keeps it on every handle: a side handle drives the other axis, which grows about the center, as
+ * DOCX Editor's image handles do (`packages/core/src/editor/image-overlay-geometry.ts` at
+ * adf0e178). @internal
  */
 export function resizeOne(
   item: LayoutItem,

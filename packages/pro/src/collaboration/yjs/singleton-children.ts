@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Children that OOXML allows once, written by concurrent peers, adapted from DOCX Editor's
+// Children that OOXML allows once, written by concurrent peers, after DOCX Editor's
 // `packages/pro/src/collaboration/document/singleton-children.ts` at commit `5ffe967`. DOCX
 // Editor names its own node kinds; this table names DrawingML and PresentationML elements. The
 // functions work on replica specs, not id lists, so the exported API differs: `withCompanions`
@@ -132,6 +132,8 @@ const CHILDREN: Readonly<Record<string, readonly Group[]>> = Object.assign(
         'prstShdw',
         'glow',
         'highlight',
+        'extrusionClr',
+        'contourClr',
         'buClr',
         'lnRef',
         'fillRef',
@@ -139,6 +141,12 @@ const CHILDREN: Readonly<Record<string, readonly Group[]>> = Object.assign(
         'fontRef',
       ].map((n) => [n, COLOR])
     ),
+    // CT_Scene3D, CT_Camera, CT_LightRig, and CT_Shape3D: one camera, light rig, rotation,
+    // and bevel of each side, so two first bevels or cameras keep one winner.
+    scene3d: [one('camera'), one('lightRig'), one('backdrop'), one('extLst')],
+    camera: [one('rot')],
+    lightRig: [one('rot')],
+    sp3d: [one('bevelT'), one('bevelB'), one('extrusionClr'), one('contourClr'), one('extLst')],
     // CT_ShapeStyle.
     style: [one('lnRef'), one('fillRef'), one('effectRef'), one('fontRef')],
     // CT_Shape, CT_Picture, CT_Connector, CT_GroupShape, CT_GraphicalObjectFrame.
@@ -246,7 +254,7 @@ function positionOf(groups: readonly Group[], child: Name): number {
 }
 
 /**
- * The property containers whose concurrent copies merge child by child, after DOCX Editor's
+ * The property containers whose concurrent versions merge child by child, after DOCX Editor's
  * `MERGED_KINDS` (`w:pPr`, `w:rPr`, `w:tblPr`): paragraph, run, and text body properties,
  * table and cell properties, and line properties.
  */
@@ -309,7 +317,7 @@ const KEYED: Readonly<Record<string, Readonly<Record<string, EntryKey>>>> = Obje
   }
 );
 
-/** How concurrent copies of a child group (DOCX Editor's `groupKey`). */
+/** How concurrent versions of a child group resolve (DOCX Editor's `groupKey`). */
 export interface ChildGroup {
   /** The group's name among its siblings. */
   readonly slot: string;
@@ -386,8 +394,8 @@ export const fromSeed = (key: string): boolean =>
   key.slice(key.indexOf('.') + 1).startsWith(SEED_MARK);
 
 /**
- * How a replica shows the copy that won a concurrent group (DOCX Editor's companions): the
- * copies it hides, which stay in the room, and, for a property container, the companion that
+ * How a replica shows the version that won a concurrent group (DOCX Editor's companions): the
+ * versions it hides, which stay in the room, and, for a property container, the companion that
  * holds each attribute or child it shows from a copy.
  */
 export interface MergeView {
@@ -424,11 +432,11 @@ const attrValue = (spec: Spec, local: string): string | undefined =>
   spec.attrs?.find((a) => a.ns === '' && a.local === local)?.value;
 
 /**
- * Every concurrent copy of one property container as one (after DOCX Editor's
- * `MERGED_KINDS`): the first copy's attributes and children, then each attribute and child
- * position that only a later copy has, in copy order. A child container that two copies hold
- * merges the same way. One pass over all copies, so the cost grows with their size, not with
- * its square. Returns null when a nested group holds too many copies (`withCompanions`).
+ * Every concurrent version of one property container as one (after DOCX Editor's
+ * `MERGED_KINDS`): the first version's attributes and children, then each attribute and child
+ * position that only a later version has, in version order. A child container that two versions
+ * hold merges the same way. One pass over all versions, so the cost grows with their size, not
+ * with its square. Returns null when a nested group holds too many versions (`withCompanions`).
  */
 function mergeCopies(
   base: Spec,
@@ -487,10 +495,10 @@ function mergeCopies(
 }
 
 /**
- * `kids` as a replica shows them, after DOCX Editor's `partitionWithMerges`: the first copy
- * of each group shows, and the later copies stay in the room as its companions. A property
+ * `kids` as a replica shows them, after DOCX Editor's `partitionWithMerges`: the first version
+ * of each group shows, and the later versions stay in the room as its companions. A property
  * container merges its companions; an OPC entry or another singleton shows the first whole.
- * Copies that the seed wrote are the opened file's own duplicates and stay as loaded, as in
+ * Versions that the seed wrote are the opened file's own duplicates and stay as loaded, as in
  * DOCX Editor ("a group nobody wrote into"), OPC entries too.
  *
  * Returns null when one group holds more than `ROOM_LIMITS.maxCopiesPerGroup` concurrent copies:

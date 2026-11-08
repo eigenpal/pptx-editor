@@ -27,14 +27,17 @@ A named menu child changes its menu in place. `Menu.Entry` with another `id` add
 
 ### The canvas context menu
 
-The canvas context menu has one arrangement for each target: shapes, pictures, text being edited, a table cell, a table selected as an object, or empty slide area.
+The canvas context menu has one arrangement for each target: shapes, pictures, one chart, one diagram, text being edited, a table cell, a table selected as an object, or empty slide area.
 
 - A right-click on a table cell puts the caret in that cell. A range of cells in that table stays selected. The table menu shows **Cut**, **Copy**, and **Paste**, then three submenus: **Insert** (**Insert row above**, **Insert row below**, **Insert column left**, **Insert column right**), **Delete** (**Delete columns**, **Delete rows**, **Delete table**), and **Select** (**Select table**, **Select column**, **Select row**), in the order of the toolbar. Then come **Merge cells**, **Split cells**, **Font…**, and **Paragraph…**. A right-click on a table that is selected as an object, or on the table's select handle, selects the table as an object. Its menu shows **Cut**, **Copy**, **Paste**, **Duplicate**, and **Delete**, then the **Insert** submenu, the order and group rows, and **Edit alt text…**. The rows act on the whole table: **Insert row above** adds a row at the top.
 - The picture menu opens when every selected object is a picture. It adds **Change picture…** and **Format picture…** to the shape rows.
+- The chart menu opens when one chart is selected. It shows **Edit data…** (`chart.editData`), which opens the **Chart Data** tab of the side panel, then the shape rows and **Edit alt text…**.
+- The diagram menu opens when one diagram is selected or a diagram shape holds the caret. It shows **Add shape after**, **Add shape before**, **Add shape below**, and **Delete shape** (`diagram.*`), then the shape rows and **Edit alt text…**.
 - On empty slide area, the menu shows **Paste**, **Format Background…**, and **New slide** (`slide.add`). **New slide** adds a slide after the current slide, with the layout of the current slide. After a title slide, it uses the Title and Content layout of the same master. `ContextMenu.Slot slotId="slide.add" hidden` removes the row.
+- The text, shape, picture, table, and table object menus show **New comment** (`review.addComment`) after the clipboard rows, while the [comments pane](/docs/pro/comments) is mounted or a side panel can show it. Without the pane and the review module, the row is not in the menu.
 - A row that the selection cannot run stays in the menu, disabled with the engine's reason.
 
-In your own rows, `useContextMenuRequest()` returns the open menu: its `kind` (`CanvasMenuKind`: `shapes`, `picture`, `text`, `table`, `tableFrame`, or `slide`), `at`, `owner`, `keyboard`, and `close`. `useContextMenuTarget()` returns the element that the menu opened on, or `null` while no menu is open.
+In your own rows, `useContextMenuRequest()` returns the open menu: its `kind` (`CanvasMenuKind`: `shapes`, `picture`, `chart`, `diagram`, `text`, `table`, `tableFrame`, or `slide`), `at`, `owner`, `keyboard`, and `close`. `useContextMenuTarget()` returns the element that the menu opened on, or `null` while no menu is open.
 
 ### The slide and section menus
 
@@ -82,6 +85,8 @@ The built-in menu bar places **Insert > New slide** (`slide.add` as a direct row
 
 Cut and Copy write the system clipboard through the canvas's copy event, so Ctrl+V pastes what the menu copied. Where the browser refuses, shapes fall back to the editor's own clipboard. Paste of shapes from a menu row pastes the editor's last copy, because a browser lets a page read the system clipboard only from Ctrl+V. Paste into text reads the system clipboard where the browser allows it.
 
+Copied shapes carry their pictures, media, charts, diagrams, and embedded objects. A paste gives each chart, diagram, and embedded object new parts, in the same presentation or in another one. An object with a copy in each branch of `mc:AlternateContent`, such as an equation, goes with all of its copies. A web link passes the link check again on paste. A link to a slide stays only in the presentation that it came from.
+
 ### Layout rows
 
 `slide.add` adds a slide with the picked layout. `slide.layout` changes the layout of the selected slides and marks the current one. The built-in **Insert > New slide** row and the **New slide** rows of the context menus add a slide at once. A `Menu.Item slotId="slide.add"` placed directly in `Menu.Insert` replaces that row and runs as it does. Set `direct={false}` for the gallery, or put the row in a `Menu.Group` to keep both rows.
@@ -115,8 +120,8 @@ A named row is shorthand for one registry row. `<PptxEditor.ContextMenu.Cut hidd
 
 | Menu | Named rows |
 | --- | --- |
-| `ContextMenu` | `Cut`, `Copy`, `Paste`, `Delete`, `Duplicate`, `Bold`, `Italic`, `Underline`, `Link`, `ClearFormatting`, `FormatPainter`, `Font`, `ParagraphDialog`, `BringToFront`, `SendToBack`, `BringForward`, `SendBackward`, `GroupObjects`, `UngroupObjects`, `ImageAltText`, `ImageChange`, `ImageProperties`, `FormatBackground`, `NewSlide`, `InsertRowAbove`, `InsertRowBelow`, `InsertColumnLeft`, `InsertColumnRight`, `MergeCells`, `DeleteTableRow`, `DeleteTableColumn`, `DeleteTable`, `SelectTable`, `SelectTableRow`, and `SelectTableColumn`. A named row finds its row inside a submenu too. |
-| `Menu` | `PageSetup`, `Undo`, `Redo`, `Cut`, `Copy`, `Paste`, `SelectAll`, `Duplicate`, `Delete`, `Find`, `Replace`, `NormalView`, `SlideSorterView`, `SmartGuides`, `NewSlide`, `TextBox`, `TableInsert`, `ImageInsert`, `Shapes`, `Line`, `Link`, `Font`, `ParagraphDialog`, `BulletsAndNumbering`, `Columns`, `Bold`, `Italic`, `Underline`, `Strike`, `BulletList`, `NumberedList`, `FormatPainter`, `ClearFormatting`, `FormatBackground`, `ImageCrop`, `ImageProperties`, `BringToFront`, `SendToBack`, `BringForward`, `SendBackward`, `GroupObjects`, `UngroupObjects`, `PlayFromStart`, `PlayFromCurrent`, and `HideSlide`. Put a row in the menu that holds it, such as `Menu.Edit`. |
+| `ContextMenu` | `Cut`, `Copy`, `Paste`, `Delete`, `Duplicate`, `Bold`, `Italic`, `Underline`, `Link`, `ClearFormatting`, `FormatPainter`, `Font`, `ParagraphDialog`, `BringToFront`, `SendToBack`, `BringForward`, `SendBackward`, `GroupObjects`, `UngroupObjects`, `ImageAltText`, `ImageChange`, `ImageProperties`, `ChartEditData`, `DiagramAddAfter`, `DiagramAddBefore`, `DiagramAddBelow`, `DiagramDelete`, `AddComment`, `FormatBackground`, `NewSlide`, `InsertRowAbove`, `InsertRowBelow`, `InsertColumnLeft`, `InsertColumnRight`, `MergeCells`, `DeleteTableRow`, `DeleteTableColumn`, `DeleteTable`, `SelectTable`, `SelectTableRow`, and `SelectTableColumn`. A named row finds its row inside a submenu too. |
+| `Menu` | `PageSetup`, `Undo`, `Redo`, `Cut`, `Copy`, `Paste`, `SelectAll`, `Duplicate`, `Delete`, `Find`, `Replace`, `NormalView`, `SlideSorterView`, `SmartGuides`, `NewSlide`, `TextBox`, `TableInsert`, `ImageInsert`, `Equation`, `Shapes`, `Line`, `Link`, `Font`, `ParagraphDialog`, `BulletsAndNumbering`, `Columns`, `Bold`, `Italic`, `Underline`, `Strike`, `BulletList`, `NumberedList`, `FormatPainter`, `ClearFormatting`, `FormatBackground`, `ImageCrop`, `ImageProperties`, `BringToFront`, `SendToBack`, `BringForward`, `SendBackward`, `GroupObjects`, `UngroupObjects`, `PlayFromStart`, `PlayFromCurrent`, and `HideSlide`. Put a row in the menu that holds it, such as `Menu.Edit`. |
 
 The tables of names are in core (`MENU_NAMED_PARTS` and `CONTEXT_MENU_NAMED_PARTS`), so React and Vue use the same names.
 

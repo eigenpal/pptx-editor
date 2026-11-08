@@ -46,6 +46,15 @@
         540
       ]
     },
+    "chart-data": {
+      "deck": "5c1b7e7b88fdea2e8764eced47e692c33f09612232c0379063ed98d56699ebcb",
+      "pdf": "d7b15e318fcabd82bef2d3d06f6078343d224b963f979a508f995e43ac8979bc",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
     "chart-sizes": {
       "deck": "8d047dafad73968a13da37c88413db21221458e4a0e0c25ccb0a80fa87c6f357",
       "pdf": "ab02b33e0ae734489e5127ec833e9faf625a70a21e7ccf872b97a1d7592dbf55",
@@ -76,6 +85,15 @@
     "custom-geometry": {
       "deck": "540230794fa8ccd455b024b338058634170036e5b2e16fccf8e5db295152be69",
       "pdf": "3f62514d6ba92dedfb54316e73054298a8c5f6ad2bcff1a61b3ab66be2c49c9f",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "diagram-editing": {
+      "deck": "3bbf5f94417c2492cb16f91b11d5c5ce1779c09a6511ea6e8280e82166985853",
+      "pdf": "88e68e7c6758058716cb5a7a6d0873bdff6594a130cb0b3184dbce12eadd7095",
       "pages": 2,
       "pageSizePt": [
         960,
@@ -122,6 +140,24 @@
       "deck": "8485bc7f758eeba343566d132af8edc3f3bfb115027c1ca4ff0eadb1703384c0",
       "pdf": "b2a473fb27aef063a20efde03c4f704917742a46da2db4f9c22d28c4f720356f",
       "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "equation-lines": {
+      "deck": "7cf6b4149a26c3ddbe92fd6d02c87c399145c833483406baca7a3e5dc7955ab1",
+      "pdf": "c4cfd2bd10e426756e7260121e3186b10c51077fd9521af108da36e3f0eb9575",
+      "pages": 2,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "equations": {
+      "deck": "c6d6b6e4861218f2fe3fd363f9e3d458eae7aed0bc45e54aa293f16049a17383",
+      "pdf": "f90ee61397bdc11431ef1ce70c5110fcd3633d7dfd0952781b7fed089cf9f960",
+      "pages": 4,
       "pageSizePt": [
         960,
         540
@@ -239,6 +275,15 @@
       "deck": "9208098ef49aa308faafad5d9587260a6dc55281f51a08460902097da3a3e53c",
       "pdf": "26d089799d8e9d1fa08a6e5806728f86e8d63dbb474dd1f042a0020d4f7d3669",
       "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "picture-bullets": {
+      "deck": "de76b4500c7541bc28b67947f36b3d8fe9172769fd9823c7cc8ad2dc5140a7e3",
+      "pdf": "18745850ea8bbfc446b91ed1e3ee710cbc371915a4ba6269155322baed51c118",
+      "pages": 2,
       "pageSizePt": [
         960,
         540
@@ -410,6 +455,33 @@
       "deck": "1c911b162675ecfb5fd0ab8c43e448784d76c60d6de2a07675f15954627497cb",
       "pdf": "a9092256f046261c7d613dd97145c545d769b6f5fbde791c71c02d67b5e7bdd7",
       "pages": 1,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "text-warp": {
+      "deck": "12813f6a60a425d8625765860e85c34ea36b9d65de4fa9be8d753dc75e314827",
+      "pdf": "f75fdf444a9b75dfc0ba8b3f5c8717b2ac04566a1148b7a7588a56bb050c1c66",
+      "pages": 3,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "three-d-effects": {
+      "deck": "b2273aae9c64df35c37d9e35dad3686d90a6559ef4810e3d20d3c5bd5ca7874d",
+      "pdf": "7d655f6ef368c871180f21ef2155cda2f1eeb2b152b21a5fb85bf48b2f2176c6",
+      "pages": 6,
+      "pageSizePt": [
+        960,
+        540
+      ]
+    },
+    "three-d-turned-effects": {
+      "deck": "f49084a9cb9b92460b862731e351318070fa34a489ef00ee562f639cdd610115",
+      "pdf": "abd7b4d22750ec96cc8e05fb64ea0bba8fad028378495280b91191cb1ab94b15",
+      "pages": 2,
       "pageSizePt": [
         960,
         540

@@ -1,5 +1,6 @@
-// Tests for the caret word rule copied from DOCX Editor (`layout/caret-word.ts` at 5993bd223):
-// the word a format at a collapsed caret reaches.
+// Tests for the caret word rule, adapted from DOCX Editor
+// (`packages/core/src/layout/caret-word.ts` at 5993bd223): the word a format at a collapsed
+// caret reaches.
 
 import { describe, expect, test } from 'bun:test';
 import { caretWordRange } from '../caret-word.ts';

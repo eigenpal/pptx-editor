@@ -22,6 +22,18 @@ import type { FindMatch, FindOptions } from './find.ts';
 export type { FindMatch, FindOptions } from './find.ts';
 import type { ConnectorRoute } from './connectors.ts';
 export type { ConnectionTarget, ConnectorRoute } from './connectors.ts';
+import type { AnimationCommand, SlideAnimations } from './animation.ts';
+export type * from './animation.ts';
+import type {
+  CustomShowSummary,
+  NotesFormat,
+  NotesParagraph,
+  SlideLayoutSummary,
+  SlideSection,
+} from './deck.ts';
+export type * from './deck.ts';
+import type { CommentCommand, CommentSnapshot } from './comments.ts';
+export type * from './comments.ts';
 
 import type {
   ObjectAxis,
@@ -29,6 +41,7 @@ import type {
   ShapeStyleChoice,
   ShapeEffectsState,
   ShapeSummary,
+  TextWarpPreset,
 } from './shape-format.ts';
 
 import type {
@@ -79,11 +92,15 @@ export type {
   ObjectAxis,
   ShadowPreset,
   ReflectionPreset,
+  BevelPreset,
+  Rotation3DPreset,
   ShapeEffectChoice,
   ShapeStyleRow,
   ShapeStyleColor,
   ShapeStyleValue,
   ShapeEffectsValue,
+  TextEffectsValue,
+  TextWarpPreset,
   RotateChoice,
   ShapeStyleChoice,
   ShapeEffectsState,
@@ -91,6 +108,14 @@ export type {
 } from './shape-format.ts';
 
 import type { PictureCommand, SelectedImageState, AltText } from './picture.ts';
+import type { ChartCommand, SelectedChartState } from './chart.ts';
+import type { EquationCommand, SelectedEquationState } from './equation.ts';
+export type { EquationCommand, SelectedEquationState } from './equation.ts';
+import type { DiagramCommand, SelectedDiagramState } from './diagram.ts';
+
+// Every chart and diagram type is public: `chart.ts` and `diagram.ts` hold nothing else.
+export type * from './chart.ts';
+export type * from './diagram.ts';
 import type { FillCommand, GradientFill, PatternFill, SlideBackground } from './fill.ts';
 import type { SlideBackgroundState } from './fill.ts';
 
@@ -129,6 +154,7 @@ export type OrderMove = 'forward' | 'backward' | 'front' | 'back';
 
 /** Every editing command. Each compiles to store ops or is refused with a reason. @public */
 export type EditorCommand =
+  | CommentCommand
   | { readonly type: 'undo' }
   | { readonly type: 'redo' }
   | { readonly type: 'toggleBold' }
@@ -403,6 +429,12 @@ export type EditorCommand =
   | { readonly type: 'insertLine'; readonly kind: LineKind }
   /** Text fitting: none, shrink text on overflow, or resize the shape to fit its text. */
   | { readonly type: 'setAutofit'; readonly mode: TextFitting }
+  /** The selected shapes' text warp, with adjust values by guide name; null removes it. */
+  | {
+      readonly type: 'setTextWarp';
+      readonly preset: TextWarpPreset | null;
+      readonly adjust?: Readonly<Record<string, number>>;
+    }
   | {
       /** Several transforms in one transaction. Values are in each element's file coordinates. */
       readonly type: 'setTransforms';
@@ -423,7 +455,11 @@ export type EditorCommand =
   | { readonly type: 'pasteFormat' }
   | TextFormatCommand
   | PictureCommand
+  | ChartCommand
+  | EquationCommand
+  | DiagramCommand
   | FillCommand
+  | AnimationCommand
   /**
    * Shape Effects: set or remove one effect of the selected shapes, connectors, and pictures.
    * A shape whose effects come from its theme style (`a:effectRef`) gets that style's effects
@@ -575,6 +611,8 @@ export type EditorSelection =
       readonly focus: TextPoint;
       /** The table cell whose text is edited; `nodeId` is then the table's graphic frame. */
       readonly cell?: TableCellAddress;
+      /** The edited diagram node (`dgm:pt/@modelId`); `nodeId` is then the diagram frame. */
+      readonly diagramNode?: string;
     }
   | {
       /** A range of table cells, from the cell the drag started in to the cell it is over. */
@@ -589,7 +627,17 @@ export type EditorSelection =
 export interface TextPoint {
   readonly paragraph: number;
   readonly offset: number;
+  /**
+   * Where the caret shows when the offset has two places on a line that mixes directions:
+   * `'upstream'` after the character before the offset, `'downstream'` (the default) before
+   * the character at the offset. The caret, the arrow keys, and a click set it; edits and
+   * collaboration read only the offset.
+   */
+  readonly affinity?: CaretAffinity;
 }
+
+/** The side of a direction boundary a caret shows on (`TextPoint.affinity`). @public */
+export type CaretAffinity = 'downstream' | 'upstream';
 
 /** Formatting at the selection, for toolbar state. @public */
 export interface SelectionFormat {
@@ -666,6 +714,8 @@ export interface SelectionGeometry {
   readonly lineTail?: LineEndType;
   /** Text fitting, for shapes with a text body. */
   readonly textFitting?: TextFitting;
+  /** The text warp (`a:prstTxWarp`), `textNoShape` for none. Shapes with a text body only. */
+  readonly textWarp?: TextWarpPreset;
   /** The element's alt text. */
   readonly altText?: AltText;
   /** Flips of the element's transform. */
@@ -709,16 +759,6 @@ export interface SlideSummary {
  */
 export type PresentationView = 'normal' | 'slideSorter';
 
-/** One section of the slide list (`p14:section`). @public */
-export interface SlideSection {
-  /** The section's identity: its GUID in the file. */
-  readonly id: string;
-  readonly name: string;
-  /** The index of its first slide; for an empty section, the index its slides would take. */
-  readonly firstSlide: number;
-  readonly slideCount: number;
-}
-
 /**
  * What a person can do about a file that did not open, after DOCX Editor's reason groups:
  * `damaged` (the archive or its XML is broken, or the file is not a ZIP package at all),
@@ -750,90 +790,6 @@ export interface DocumentOpenFailure {
   readonly reason: DocumentOpenFailureReason;
 }
 
-/** Character formats the speaker notes pane sets. @public */
-export type NotesFormat = 'bold' | 'italic' | 'underline' | 'strike';
-
-/** A run of the speaker notes with its character formatting. @public */
-export interface NotesRun {
-  /** The run's text. A line break inside a paragraph is `\n`. */
-  readonly text: string;
-  /** Bold, from the run or the notes text style it inherits. */
-  readonly bold: boolean;
-  /** Italic, from the run or the notes text style it inherits. */
-  readonly italic: boolean;
-  /** Underlined (any underline style). */
-  readonly underline: boolean;
-  /** Struck through (single or double). */
-  readonly strike: boolean;
-}
-
-/** One paragraph of the speaker notes. @public */
-export interface NotesParagraph {
-  /** The paragraph's runs; neighbors with the same formatting are joined. */
-  readonly runs: readonly NotesRun[];
-}
-
-/**
- * The kind of a slide layout, with the file's own values: `ST_SlideLayoutType` (ECMA-376 Part 1,
- * §19.7.15). `cust` is a custom layout, and also the value for a file that names none or an
- * unknown kind. The Office.js `SlideLayoutType` enum names the same idea with other values
- * (`"TitleOnly"` for `titleOnly`); the automation API keeps that name for its own type. @public
- */
-export type SlideLayoutKind =
-  | 'title'
-  | 'tx'
-  | 'twoColTx'
-  | 'tbl'
-  | 'txAndChart'
-  | 'chartAndTx'
-  | 'dgm'
-  | 'chart'
-  | 'txAndClipArt'
-  | 'clipArtAndTx'
-  | 'titleOnly'
-  | 'blank'
-  | 'txAndObj'
-  | 'objAndTx'
-  | 'objOnly'
-  | 'obj'
-  | 'txAndMedia'
-  | 'mediaAndTx'
-  | 'objOverTx'
-  | 'txOverObj'
-  | 'txAndTwoObj'
-  | 'twoObjAndTx'
-  | 'twoObjOverTx'
-  | 'fourObj'
-  | 'vertTx'
-  | 'clipArtAndVertTx'
-  | 'vertTitleAndTx'
-  | 'vertTitleAndTxOverChart'
-  | 'twoObj'
-  | 'objAndTwoObj'
-  | 'twoObjAndObj'
-  | 'cust'
-  | 'secHead'
-  | 'twoTxTwoObj'
-  | 'objTx'
-  | 'picTx';
-
-/** One slide layout of the deck, as the Layout and New Slide galleries list it. @public */
-export interface SlideLayoutSummary {
-  /** The layout's identity in the open document. */
-  readonly id: string;
-  /** The layout's name (`p:cSld/@name`, for example "Title and Content"). */
-  readonly name: string;
-  /** `p:sldLayout/@type`. */
-  readonly type: SlideLayoutKind;
-  /** The slide master the layout belongs to; galleries group layouts by master. */
-  readonly masterId: string;
-  /**
-   * The master's name, as the gallery's group header shows it: the master's own name, or the
-   * name of its theme (`a:theme/@name`).
-   */
-  readonly masterName: string;
-}
-
 /** A family the deck names that renders with another face. @public */
 export interface EditorFontSubstitution {
   readonly family: string;
@@ -846,7 +802,7 @@ export interface EditorFontSubstitution {
 /** How a click in the slide rail changes the slide selection. @public */
 export type SlideSelectMode = 'replace' | 'toggle' | 'range';
 
-export interface EditorSnapshot {
+export interface EditorSnapshot extends CommentSnapshot {
   readonly status: 'empty' | 'loading' | 'ready' | 'error';
   readonly error?: string;
   /**
@@ -975,6 +931,15 @@ export interface EditorSnapshot {
    */
   readonly image?: SelectedImageState | null;
   /**
+   * The selected chart, while exactly one chart frame is selected; the chart controls show
+   * then. Optional: absent means the implementation does not edit chart data.
+   */
+  readonly chart?: SelectedChartState | null;
+  /** The selected equation, while one text box with one equation is selected. */
+  readonly equation?: SelectedEquationState | null;
+  /** The selected diagram, or the diagram that holds the caret. Absent: no diagram editing. */
+  readonly diagram?: SelectedDiagramState | null;
+  /**
    * The current slide's elements, top first, for the selection pane. Hidden elements are in
    * the list. Optional: absent means the implementation has no selection pane.
    */
@@ -991,8 +956,24 @@ export interface EditorSnapshot {
    */
   readonly sections?: readonly SlideSection[];
   /**
+   * The deck's custom shows, in file order; empty when it has none. A link can go to one
+   * (`#custom-show-<id>`). Reference-stable while they do not change. Optional: absent means
+   * the implementation does not report custom shows.
+   */
+  readonly customShows?: readonly CustomShowSummary[];
+  /**
    * The table of the selection (a caret in a cell, a cell range, or the selected table frame),
    * or null. Optional: absent means the implementation does not edit tables.
    */
   readonly table?: TableContext | null;
+  /**
+   * The current slide's effects and transition. Optional: absent means the implementation does
+   * not edit animations.
+   */
+  readonly animations?: SlideAnimations;
+  /**
+   * Whether the canvas shows the order number of each effect on its shape
+   * (`showAnimationOrder`). A view setting, never saved. Absent reads as false.
+   */
+  readonly animationOrder?: boolean;
 }

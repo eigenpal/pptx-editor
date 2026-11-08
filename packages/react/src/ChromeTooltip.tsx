@@ -1,9 +1,10 @@
 /** @jsxImportSource react */
 // The chrome tooltip bubble, after DOCX Editor's `Tooltip` (packages/react/src/components/ui/
-// Tooltip.tsx). The editor root mounts one; it shows the `data-pptx-tooltip` label of the control
-// under the pointer, or of the control a keyboard user moved to, after core's delay, with a
-// disabled control's reason on its own line. Core's `chrome-tooltip.ts` owns the timing and the
-// position, and the Vue twin renders the same markup.
+// packages/react/src/components/ui/Tooltip.tsx). The editor root mounts one; it shows the
+// `data-pptx-tooltip` label of the control under the pointer, or of the control a keyboard user
+// moved to, after core's delay, with a disabled control's reason on its own line. Core's
+// `chrome-tooltip.ts` owns the timing and the position, and the Vue twin renders the same markup.
+// DOCX Editor commit adf0e178.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';

@@ -651,7 +651,7 @@ export function editResult(
 /**
  * Pass 2: the scripted edit through store ops on the reopened pass-1 copy, then save and reopen.
  * Editing the copy keeps a pass-1 difference out of pass 2. Undoing the applied edits must give
- * back the copy exactly, as in DOCX Editor's evaluation probe.
+ * back the pass-1 file exactly, as in DOCX Editor's evaluation probe.
  */
 async function editPass(
   session: DocumentSession,

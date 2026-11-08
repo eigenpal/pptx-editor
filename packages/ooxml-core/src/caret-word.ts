@@ -1,4 +1,4 @@
-// Copied from docx-editor/packages/core/src/layout/caret-word.ts at 5993bd223 (EigenPal).
+// Adapted from docx-editor/packages/core/src/layout/caret-word.ts at 5993bd223 (EigenPal).
 // The format-neutral part only: `CaretWordRange` and `caretWordRange`, with the helpers they
 // use, unchanged. The layout and revision readers of that module (`hiddenRevisionRanges`,
 // `wordTextFromLayout`, `caretWordAt`, `caretWordSelection`) stay in DOCX Editor.

@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Ported from DOCX Editor `packages/pro/src/drawing/chart-render.ts` at commit ba742d7d1.
+// Adapted from DOCX Editor `packages/pro/src/drawing/chart-render.ts` at commit ba742d7d1.
 // The automatic layout of a whole chart: chart area, title, legend and plot area.
 //
 // Distances are in points and follow the automatic layout of a chart with nothing placed by

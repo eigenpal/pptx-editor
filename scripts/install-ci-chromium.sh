@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copied from docx-editor/scripts/install-ci-chromium.sh at 3843b03c5 (EigenPal).
+# Copied from docx-editor/scripts/install-ci-chromium.sh at adf0e178 (EigenPal).
 # Installs Playwright's Chromium on a CI runner.
 #
 # The runner image already has Chromium's shared libraries. `--with-deps` also runs apt,

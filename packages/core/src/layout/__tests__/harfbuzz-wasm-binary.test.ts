@@ -1,4 +1,5 @@
-// The WASM URL escape hatch (docx-editor/packages/core/src/layout/__tests__/harfbuzz-wasm-binary.test.ts).
+// Copied from DOCX Editor `packages/core/src/layout/__tests__/harfbuzz-wasm-binary.test.ts` at
+// commit adf0e178: the WASM URL escape hatch.
 //
 // The inlined HarfBuzz runtime locates its binary through
 // `resolveHarfBuzzWasmBinaryUrl`, wired in by the build. These tests pin the contract the

@@ -10,14 +10,14 @@ All files come from the free downloads at [ECMA-376 on the Ecma International si
 | --- | --- | --- | --- |
 | `ecma-376/part1/drawingml-geometries/` | `ECMA-376-1_5th_edition_december_2016.zip` | `OfficeOpenXML-DrawingMLGeometries.zip` | None. Byte-identical. |
 | `ecma-376/part4/transitional-schemas/` | `ECMA-376-4_5th_edition_december_2016.zip` | `OfficeOpenXML-XMLSchema-Transitional.zip` | None. Byte-identical. |
-| `ecma-376/part1/schemas/` | Copied from DOCX Editor's `reference/ecma-376/part1/schemas/` | Part 1 Strict schemas | None. The seven files are byte-identical to the 5th edition `OfficeOpenXML-XMLSchema-Strict.zip`. DOCX Editor's modified `dml-main.xsd` is not copied: use `part4/transitional-schemas/dml-main.xsd`. |
+| `ecma-376/part1/schemas/` | Copied from DOCX Editor's `reference/ecma-376/part1/schemas/` at adf0e178 | Part 1 Strict schemas | None. The seven files are byte-identical to the 5th edition `OfficeOpenXML-XMLSchema-Strict.zip`. DOCX Editor's modified `dml-main.xsd` is not copied: use `part4/transitional-schemas/dml-main.xsd`. |
 
 ## Use
 
 | Files | Used by |
 | --- | --- |
 | `presetShapeDefinitions.xml` | `scripts/geometry/build-presets.ts` generates `packages/ooxml-core/src/drawingml-preset-geometry.generated.ts` from it. The generated file carries the guide formulas as data. |
-| `presetTextWarpDefinitions.xml` | Lookup only. Text warps are not drawn yet. |
+| `presetTextWarpDefinitions.xml` | `scripts/geometry/build-presets.ts` generates `packages/ooxml-core/src/drawingml-preset-text-warp.generated.ts` from it. Text layout maps glyph outlines between the warp paths. |
 | `part4/transitional-schemas/*.xsd` | `scripts/validate-xsd.ts` (`bun run validate:xsd`), a test gate. Never bundled. |
 | `part1/schemas/*.xsd` | Lookup only. No gate or build step reads them. |
 

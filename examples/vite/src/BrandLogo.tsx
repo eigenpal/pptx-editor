@@ -4,7 +4,8 @@ import { useId } from 'react';
 // (docx-editor/examples/shared/BrandLogo.tsx); this one is a presentation slide in the same
 // family style: the same outline, paper, and label badge, with a 16:9 frame, a title, bullet
 // lines, and a bar chart, and a `.PPTX` label in orange (#C43E1C) instead of DOCX Editor's
-// blue (#185ABD). The EigenPal mark and spacing are unchanged.
+// blue (#185ABD). The EigenPal mark and spacing are unchanged. Adapted from DOCX Editor at
+// commit adf0e178.
 
 function PptxIcon() {
   return (

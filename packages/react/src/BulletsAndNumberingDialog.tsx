@@ -4,11 +4,14 @@
 // gallery, the size as a percentage of the text, the color, and the start number. OK sends one
 // `setBulletFormat` command with only what changed, so the dialog is one undo step and a size or
 // color change keeps each paragraph's own bullet. The Bulleted tab also takes any character in
-// any font, through a Customize… symbol picker. The form model is the engine's
+// any font, through a Customize… symbol picker, and a picture (PNG, JPEG, or GIF) as a picture
+// bullet. The form model is the engine's
 // (`bullets-dialog-fields.ts`), so the Vue twin can share it. The host owns visibility.
 
-import { useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
+  BULLET_PICTURE_ACCEPT,
+  bulletColorEnabled,
   bulletCommandOf,
   bulletFieldsEnabled,
   bulletFontOptions,
@@ -18,15 +21,18 @@ import {
   customBulletPreview,
   BULLET_TEXT_FONT,
   bulletFontMixed,
+  chooseBulletPicture,
   editBulletGlyph,
   formCommandRejection,
   pickBulletStyle,
+  readBulletPicture,
   seedBulletFields,
   takeDialogSection,
   type BulletFormatRead,
   type BulletsDialogFields,
   type BulletsDialogTab,
 } from '@pptx-editor.dev/core/editor';
+import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
 import { ColorField } from './dialog-color.tsx';
 import {
@@ -58,8 +64,8 @@ export interface BulletsAndNumberingDialogProps extends DialogCustomizationProps
 /**
  * The field names of the Bullets and Numbering dialog, for `BulletsAndNumberingDialog.Field`:
  * the fields of a whole tab (`bullet`, `number`), or one field, named as its input: `style`,
- * `char`, `font`, `sizePercent`, and `color` on the Bulleted tab; `numberStyle`, `numberSizePercent`,
- * `numberColor`, and `startAt` on the Numbered tab. @public
+ * `char`, `font`, `picture`, `sizePercent`, and `color` on the Bulleted tab; `numberStyle`,
+ * `numberSizePercent`, `numberColor`, and `startAt` on the Numbered tab. @public
  */
 export type BulletsAndNumberingDialogFieldName =
   | 'bullet'
@@ -67,6 +73,7 @@ export type BulletsAndNumberingDialogFieldName =
   | 'style'
   | 'char'
   | 'font'
+  | 'picture'
   | 'sizePercent'
   | 'color'
   | 'numberStyle'
@@ -100,6 +107,13 @@ function BulletsAndNumberingDialogRoot({
   const shared = useEditorState((s) => s.format?.bulletFormatMixed);
   const editable = useEditorState((s) => s.status === 'ready' && s.mode === 'edit');
   const [opened, setOpened] = useState<BulletFormatRead | null | undefined>(null);
+  const file = useRef<HTMLInputElement>(null);
+  // Why the Picture field refused the last file the user picked.
+  const [pictureProblem, setPictureProblem] = useState<TranslationKey | null>(null);
+  // Each opening starts with no refusal, as the Vue twin mounts its form anew.
+  useEffect(() => {
+    if (open) setPictureProblem(null);
+  }, [open]);
   const { seed, draft, set, update, error, setError } = useDialogDraft(open, () => {
     setOpened(current);
     const tab = takeDialogSection(editor, 'bulletsAndNumbering');
@@ -178,6 +192,42 @@ function BulletsAndNumberingDialogRoot({
                 )
               }
             />
+            {/* A picture file sets a picture bullet; the style row then shows Picture. */}
+            <div className="pptx-field" {...fieldPart('picture')}>
+              <span>{t('bulletsAndNumberingDialog.picture')}</span>
+              <span className="pptx-gradient__row">
+                <button
+                  type="button"
+                  name="picture"
+                  className="pptx-button"
+                  onClick={() => file.current?.click()}
+                >
+                  {t('bulletsAndNumberingDialog.choosePicture')}
+                </button>
+                <span role="status" className="pptx-dialog__muted">
+                  {pictureProblem
+                    ? t(pictureProblem)
+                    : draft.picture
+                      ? t('bulletsAndNumberingDialog.pictureChosen')
+                      : ''}
+                </span>
+              </span>
+              <input
+                ref={file}
+                type="file"
+                accept={BULLET_PICTURE_ACCEPT}
+                hidden
+                onChange={(e) => {
+                  const picked = e.target.files?.[0];
+                  e.target.value = '';
+                  void readBulletPicture(picked).then((read) => {
+                    if (!read) return;
+                    setPictureProblem(read.ok ? null : read.reason);
+                    if (read.ok) update((d) => chooseBulletPicture(d, read.picture));
+                  });
+                }}
+              />
+            </div>
           </>
         ) : null}
         <NumberField
@@ -197,7 +247,8 @@ function BulletsAndNumberingDialogRoot({
           {...fieldPart(kind === 'bullet' ? 'color' : 'numberColor')}
           name={kind === 'bullet' ? 'color' : 'numberColor'}
           label={t('bulletsAndNumberingDialog.color')}
-          disabled={off(kind)}
+          // A picture bullet has no color.
+          disabled={!draft || !bulletColorEnabled({ ...draft, kind })}
           value={draft.color}
           seed={seed?.color}
           onChange={(v) => set('color', v)}

@@ -3,9 +3,10 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// The contract of the demo's PDF export function, driven in-process with plain request and
-// response stand-ins, after DOCX Editor's `api/convert.node.test.mjs`. The handler imports the
-// built package, so this runs after `bun run build:pdf` and skips itself elsewhere.
+// The contract of the demo's PDF export function, driven in-process with plain request and response
+// stand-ins, after DOCX Editor's `api/convert.node.test.mjs`. The handler imports the built
+// package, so this runs after `bun run build:pdf` and skips itself elsewhere. DOCX Editor commit
+// adf0e178.
 //
 //   node --test api/convert.node.test.mjs
 import { test } from 'node:test';

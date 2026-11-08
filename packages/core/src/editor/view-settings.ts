@@ -1,6 +1,6 @@
 // View settings: how the editor shows the deck, not what the deck holds. Smart guides, the
-// presentation view (Normal or Slide Sorter), the collapsed sections, and the table border pen
-// change no part, take no undo step, and are never saved.
+// presentation view (Normal or Slide Sorter), the collapsed sections, the table border pen, and
+// the animation order marks change no part, take no undo step, and are never saved.
 
 import type { EditorCommand, PresentationView, TableBorderPen } from '../contracts/index.ts';
 import { isColorChoice } from '../automation/commands/style-commands.ts';
@@ -51,7 +51,11 @@ export type ViewCommand = Extract<
   EditorCommand,
   {
     readonly type:
-      'toggleSmartGuides' | 'setPresentationView' | 'setSectionsCollapsed' | 'setTableBorderPen';
+      | 'toggleSmartGuides'
+      | 'setPresentationView'
+      | 'setSectionsCollapsed'
+      | 'setTableBorderPen'
+      | 'showAnimationOrder';
   }
 >;
 
@@ -63,7 +67,8 @@ export function isViewCommand(command: EditorCommand): command is ViewCommand {
     command.type === 'toggleSmartGuides' ||
     command.type === 'setPresentationView' ||
     command.type === 'setSectionsCollapsed' ||
-    command.type === 'setTableBorderPen'
+    command.type === 'setTableBorderPen' ||
+    command.type === 'showAnimationOrder'
   );
 }
 
@@ -76,6 +81,8 @@ export class ViewSettings {
   collapsedSections: readonly string[] = NONE;
   /** The table border pen; it stays when another deck opens, as a pen is a setting. */
   tableBorderPen: TableBorderPen = DEFAULT_TABLE_BORDER_PEN;
+  /** Whether the canvas shows the order number of each effect (`showAnimationOrder`). */
+  animationOrder = false;
 
   constructor(smartGuides: boolean) {
     this.smartGuides = smartGuides;
@@ -88,6 +95,8 @@ export class ViewSettings {
   refusal(command: ViewCommand, all: readonly string[]): string | null {
     if (command.type === 'setPresentationView' && !VIEWS.has(command.view)) return 'errors.view';
     if (command.type === 'setTableBorderPen' && !validPen(command.pen)) return 'errors.unsupported';
+    if (command.type === 'showAnimationOrder' && typeof command.show !== 'boolean')
+      return 'errors.unsupported';
     if (command.type === 'setSectionsCollapsed' && !all.length) return 'disabled.noSections';
     return null;
   }
@@ -105,6 +114,7 @@ export class ViewSettings {
     // A copy the host cannot change after it passed `validPen`.
     else if (command.type === 'setTableBorderPen') this.tableBorderPen = frozenPen(command.pen);
     else if (command.type === 'setPresentationView') this.presentationView = command.view;
+    else if (command.type === 'showAnimationOrder') this.animationOrder = command.show;
     else {
       const ids = new Set(this.collapsedSections);
       for (const id of command.sectionIds ?? all)
@@ -129,13 +139,15 @@ export class ViewSettings {
     presentationView: PresentationView;
     collapsedSections: readonly string[];
     tableBorderPen: TableBorderPen;
+    animationOrder: boolean;
   } {
-    const { smartGuides, presentationView, tableBorderPen } = this;
+    const { smartGuides, presentationView, tableBorderPen, animationOrder } = this;
     return {
       smartGuides,
       presentationView,
       collapsedSections: this.collapsedIn(all),
       tableBorderPen,
+      animationOrder,
     };
   }
 

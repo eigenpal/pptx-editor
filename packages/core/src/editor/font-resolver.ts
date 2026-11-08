@@ -1,4 +1,4 @@
-// Copied from DOCX Editor `packages/core/src/editor/font-resolver.ts` at commit 5993bd223.
+// Copied from DOCX Editor `packages/core/src/editor/font-resolver.ts` at commit adf0e178.
 // Keep the exported API equal to the source.
 
 // Moved to the layout lane so the headless export composition root can call it without a

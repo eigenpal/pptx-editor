@@ -1,4 +1,4 @@
-// Copied from docx-editor/packages/core/src/store/runtime/limits.ts at 26095c63 (EigenPal).
+// Copied from docx-editor/packages/core/src/store/runtime/limits.ts at adf0e178 (EigenPal).
 // Keep it equal to that file.
 // Resource limits with finite defaults and non-disableable hard ceilings
 // (document-engine task 0.3 / design D9, D14). Security ceilings are safety caps

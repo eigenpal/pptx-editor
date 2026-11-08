@@ -4,13 +4,16 @@
 // so they see the same shapes.
 
 import { attr, child, elements, NS, type Element } from '../store/index.ts';
+import { isMathZone, isSupportedMath } from './math.ts';
 
 /**
  * The namespaces a `mc:Choice` may require for the engine to select it. A namespace is here only
  * when the engine reads its markup in a shape tree or can skip it with no change to the picture.
  * `p14` holds extensions inside `p:extLst` (media, creation ids) and `p14:contentPart` (ink); the
  * second is not a shape kind, so `isDrawable` refuses a branch that holds it. VML (`v`), `a14`
- * picture effects, and chart extensions are not here: their `mc:Fallback` draws instead.
+ * picture effects, and chart extensions are not here: their `mc:Fallback` draws instead. `a14`
+ * counts only for a branch whose `a14` markup is Office Math that the layout draws
+ * (`mathOnly`).
  */
 const UNDERSTOOD = new Set<string>([NS.p, NS.a, NS.r, NS.p14]);
 
@@ -78,6 +81,37 @@ function namespaceOf(prefix: string, scopes: readonly Element[]): string | undef
   return undefined;
 }
 
+const mathOnlyCache = new WeakMap<Element, boolean>();
+
+/**
+ * Whether the `a14` markup of a branch is equations that the layout draws: one or more `a14:m`
+ * zones that `isSupportedMath` accepts, and no other `a14` element outside an extension list
+ * (`a:extLst`, `p:extLst`), whose content a reader may skip.
+ */
+function mathOnly(branch: Element): boolean {
+  const hit = mathOnlyCache.get(branch);
+  if (hit !== undefined) return hit;
+  let zones = 0;
+  let other = false;
+  const walk = (el: Element, depth: number): void => {
+    for (const c of elements(el)) {
+      if (other) return;
+      if (c.local === 'extLst' && (c.ns === NS.a || c.ns === NS.p)) continue;
+      if (c.ns === NS.a14) {
+        if (isMathZone(c) && isSupportedMath(c)) zones += 1;
+        else other = true;
+        continue;
+      }
+      if (depth < MAX_DEPTH) walk(c, depth + 1);
+      else other = true;
+    }
+  };
+  walk(branch, 0);
+  const ok = zones > 0 && !other;
+  mathOnlyCache.set(branch, ok);
+  return ok;
+}
+
 /**
  * Whether every element of a branch is a shape kind the cascade draws, or another
  * `mc:AlternateContent`, which resolves in turn.
@@ -90,7 +124,8 @@ function isDrawable(branch: Element): boolean {
 
 /**
  * The branch of `ac` that the engine reads: the first `mc:Choice` whose `Requires` prefixes all
- * name an understood namespace and whose content the cascade draws, else `mc:Fallback`
+ * name an understood namespace and whose content the cascade draws (an `a14` choice: equations
+ * that the layout draws), else `mc:Fallback`
  * (ECMA-376 Part 3, 10.2.1). A prefix resolves in the scope of the `mc:Choice`: on it, on `ac`,
  * then on each element above `ac` up to `root` (the part root). A prefix that none of them
  * declares is not understood. Without `root`, only the `mc:Choice` and `ac` count.
@@ -110,7 +145,7 @@ export function alternateBranch(ac: Element, root?: Element): Element | undefine
     const scopes = [branch, ac].concat(declaringAncestors(ac, root));
     const understood = prefixes.every((prefix) => {
       const ns = namespaceOf(prefix, scopes);
-      return ns !== undefined && UNDERSTOOD.has(ns);
+      return ns !== undefined && (UNDERSTOOD.has(ns) || (ns === NS.a14 && mathOnly(branch)));
     });
     if (understood && isDrawable(branch)) return branch;
   }

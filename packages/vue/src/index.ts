@@ -62,6 +62,7 @@ import { ToolbarControl } from './toolbar.ts';
 import { PageSetupDialog } from './PageSetupDialog.ts';
 import { ImageAltTextDialog } from './ImageAltTextDialog.ts';
 import { ImagePropertiesDialog } from './ImagePropertiesDialog.ts';
+import { EquationDialog } from './EquationDialog.ts';
 import { BackgroundDialog } from './BackgroundDialog.tsx';
 import { ParagraphDialog } from './ParagraphDialog.tsx';
 import { FontDialog } from './FontDialog.tsx';
@@ -234,6 +235,14 @@ export {
   type ImagePropertiesDialogProps,
   type UseImagePropertiesDialogReturn,
 } from './ImagePropertiesDialog.ts';
+export {
+  EquationDialog,
+  useEquationDialog,
+  type EquationDialogFieldName,
+  type EquationDialogFields,
+  type EquationDialogProps,
+  type UseEquationDialogReturn,
+} from './EquationDialog.ts';
 export {
   BackgroundDialog,
   useBackgroundDialog,
@@ -524,6 +533,8 @@ const pptxEditorProps = {
     type: Function as PropType<ClipboardDrawingReader>,
     default: undefined,
   },
+  /** The author of later comments and replies, as on `PptxEditorRoot`. */
+  author: { type: String, default: undefined },
   /** Customize the dialogs the editor mounts, as on `PptxEditorRoot`. */
   popups: { type: Object as PropType<PptxEditorPopups>, default: undefined },
   /** The chrome color mode, as on `PptxEditorRoot`. */
@@ -678,6 +689,7 @@ const PptxEditorDefault = defineComponent({
           ...(props.readClipboardDrawing
             ? { readClipboardDrawing: props.readClipboardDrawing }
             : {}),
+          ...(props.author ? { author: props.author } : {}),
           // Forwarded only with a listener, so the root still warns when nobody listens.
           ...(instance?.vnode.props?.onFontError
             ? { onFontError: (error: EditorFontError) => emit('fontError', error) }
@@ -750,6 +762,7 @@ export const PptxEditor = Object.assign(PptxEditorDefault, {
   BackgroundDialog,
   ImageAltTextDialog,
   ImagePropertiesDialog,
+  EquationDialog,
   ParagraphDialog,
   FontDialog,
   BulletsAndNumberingDialog,

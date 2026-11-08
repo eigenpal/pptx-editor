@@ -1,5 +1,5 @@
 // Adapted from DOCX Editor `packages/react/src/editor/useDocxSource.ts` and
-// `useEditorHostDocument.ts` at commit 5993bd223.
+// `packages/react/src/editor/useEditorHostDocument.ts` at commit 5993bd223.
 //
 // Opening a presentation, as a hook: fetch the bytes, resolve the fonts, keep the two from
 // racing, cancel both when the component unmounts or the source changes, and turn a failure

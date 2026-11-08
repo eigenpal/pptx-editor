@@ -62,9 +62,12 @@ describe('ribbon tabs', () => {
     const registered = new Set(
       CHROME_GROUPS.flatMap((g) => g.controls.map((c) => `${g.id}.${c.id}`))
     );
-    // The section commands live on the slide rail's menu.
+    // The section commands live on the slide rail's menu. New comment lives in the canvas
+    // menus, which show it only with the comments pane of the pro package.
     const offRibbon = [...registered].filter((slot) => !placed.has(slot));
-    expect(offRibbon.every((slot) => slot.startsWith('section.'))).toBe(true);
+    expect(
+      offRibbon.every((slot) => slot.startsWith('section.') || slot === 'review.addComment')
+    ).toBe(true);
     for (const slot of placed) expect(registered.has(slot)).toBe(true);
   });
 

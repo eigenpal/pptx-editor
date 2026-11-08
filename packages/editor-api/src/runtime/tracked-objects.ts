@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/editor-api/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Copied from DOCX Editor's `packages/editor-api/src/runtime/tracked-objects.ts` (commit 5993bd223945).
+// Copied from DOCX Editor's `packages/editor-api/src/runtime/tracked-objects.ts` (commit adf0e178).
 // Deliberate object lifetime.
 //
 // The default is that a proxy dies with the run that made it, and that default is the safe one:

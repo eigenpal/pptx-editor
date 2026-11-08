@@ -3,7 +3,7 @@
 # Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 # Production use requires a commercial agreement: licensing@eigenpal.com
 #
-# Copied from DOCX Editor `packages/docx-to-pdf/scripts/pdf-visual-diff.py`, commit
+# Adapted from DOCX Editor `packages/docx-to-pdf/scripts/pdf-visual-diff.py`, commit
 # 398963c7f67207cebf3c38dcc41d5f0bd1339b5f: `normalized_word`, `word_matches`, and
 # `compare_word_movement`, unchanged. The rest of that file (its rendering command line) is not
 # copied; `worker.py` needs only the word movement.

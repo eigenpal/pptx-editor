@@ -1,4 +1,4 @@
-// Copied from DOCX Editor `packages/core/src/editor/__tests__/custom-fonts.test.ts` at commit 5993bd223.
+// Adapted from DOCX Editor `packages/core/src/editor/__tests__/custom-fonts.test.ts` at commit 5993bd223.
 // Keep the exported API equal to the source.
 
 import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test';

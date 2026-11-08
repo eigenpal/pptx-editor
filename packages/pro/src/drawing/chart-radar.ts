@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Ported from DOCX Editor `packages/pro/src/drawing/chart-radar.ts` at commit ba742d7d1.
+// Adapted from DOCX Editor `packages/pro/src/drawing/chart-radar.ts` at commit ba742d7d1.
 // Radar plots: one spoke per category, clockwise from twelve o'clock, values along each spoke
 // from the centre. Gridlines are polygons through the ticks; the value labels run up the first
 // spoke and the category labels sit past the spoke ends.

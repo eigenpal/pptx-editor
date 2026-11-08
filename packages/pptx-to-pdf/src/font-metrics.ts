@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Copied from docx-editor/packages/docx-to-pdf/src/font-metrics.ts (EigenPal), with a local admitted-face type.
+// Adapted from docx-editor/packages/docx-to-pdf/src/font-metrics.ts at adf0e178 (EigenPal), with a local admitted-face type.
 import type { AdmittedFontFace as ExportAdmittedFontFace } from './pdf-font-embedding.ts';
 
 /** Read static SFNT decoration metrics from the same selected face that Core admitted. */

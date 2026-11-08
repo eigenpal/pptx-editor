@@ -184,12 +184,14 @@ describe('rows the adapter runs', () => {
     const ids = CANVAS_CONTEXT_MENUS.tableFrame.map((e) =>
       e.kind === 'item' ? e.slot : e.kind === 'submenu' ? e.id : ''
     );
-    expect(ids.slice(0, 7)).toEqual([
+    expect(ids.slice(0, 9)).toEqual([
       'edit.cut',
       'edit.copy',
       'edit.paste',
       'more.duplicate',
       'more.delete',
+      '',
+      'review.addComment',
       '',
       'tableInsert',
     ]);

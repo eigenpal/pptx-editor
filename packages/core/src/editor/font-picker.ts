@@ -1,7 +1,8 @@
 // The font family picker's groups, shared by the React and Vue adapters: the theme fonts of the
 // current slide (labeled Headings and Body), the families the deck uses, then every family the
-// editor offers. After DOCX Editor's font picker (`FontFamily.tsx`), which lists the document's
-// fonts in their own group above the full list and draws each name in its own face.
+// editor offers. After DOCX Editor's font picker
+// (`packages/react/src/editor/toolbar/FontFamily.tsx`), which lists the document's fonts in their
+// own group above the full list and draws each name in its own face. DOCX Editor commit adf0e178.
 
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { xmlPartOf } from '../store/index.ts';

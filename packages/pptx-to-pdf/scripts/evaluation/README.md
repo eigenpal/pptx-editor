@@ -2,7 +2,7 @@
 
 These commands compare PPTX Editor's PDF with the reference PDF of each deck. They add no public API.
 
-The protocol is a copy of DOCX Editor's (`packages/docx-to-pdf/scripts/evaluation/`, commit `398963c7f67207cebf3c38dcc41d5f0bd1339b5f`), changed for slides. Each copied file names its DOCX Editor source. This repository keeps the candidate export and the measurement primitives. Comparison policy, scoring, caching, and reports belong to the evaluation caller.
+The protocol adapts DOCX Editor's protocol (`packages/docx-to-pdf/scripts/evaluation/`, commit `398963c7f67207cebf3c38dcc41d5f0bd1339b5f`) for slides. Each file names its DOCX Editor source in its header. This repository keeps the candidate export and the measurement primitives. Comparison policy, scoring, caching, and reports belong to the evaluation caller.
 
 Protocol version 1 separates candidate exports, measurements, comparisons, and detailed evidence.
 
@@ -99,7 +99,7 @@ Logical text has one entry for each laid-out line, in paint order: its text, the
 
 ## Measure and compare
 
-`measure` records each page's size, words with boxes (PyMuPDF), a 192 by 144 RGB sketch, image boxes, the drawing count, and font names. `compare` reports page count and page size differences, word coverage, word movement with the word alignment from DOCX Editor's `pdf-visual-diff.py` (`word_movement.py`), and visual screening by local regions. It names the first divergence with a confidence and a coordinate space. Object counts alone never establish missing visible content. Comparisons are screening only: scores belong to the evaluation caller.
+`measure` records each page's size, words with boxes (PyMuPDF), a 192 by 144 RGB sketch, image boxes, the drawing count, and font names. `compare` reports page count and page size differences, word coverage, word movement with the word alignment from DOCX Editor's `packages/docx-to-pdf/scripts/pdf-visual-diff.py` (`compare_word_movement`) at 398963c7f67207cebf3c38dcc41d5f0bd1339b5f, and visual screening by local regions. It names the first divergence with a confidence and a coordinate space. Object counts alone never establish missing visible content. Comparisons are screening only: scores belong to the evaluation caller.
 
 `compare` pairs pages by number. With `--candidate-report`, it first renumbers the candidate's pages to reference pages through `slideNumbers` and `hiddenSlides`, so a slide without a candidate page shifts no later page. It refuses a report whose page count differs from the candidate's, and a reference that does not have one page per visible slide, because every later slide would pair with the wrong page. Each `page` in the comparison is a reference page (a slide); each `candidatePage` and `candidateLocation.page` is a page of the candidate PDF. A `pagination` finding names a slide that has no candidate page, or candidate pages with no reference page (`extraCandidatePages`: pages past the reference, or pages of hidden slides). Without the report, it also names a word matched on another page. `firstDivergence` is the earliest finding with high or medium confidence, as in DOCX Editor, so a low-confidence visual finding on an earlier slide does not win. With `--candidate-report`, `evidence` pairs each reference page with its candidate page, and its report gives `candidatePage` (null for a slide without one).
 
@@ -144,7 +144,7 @@ uv run --no-project --python '>=3.11' --with 'pymupdf>=1.26,<2' --with 'Pillow>=
 ## Gaps
 
 - The PDF writer does not draw pattern fills, reflections, charts, and some picture formats yet, and it approximates shadow and glow blur (`packages/pptx-to-pdf/README.md`). Comparison B shows these gaps; it does not hide them.
-- There is no Node.js runtime loader yet (DOCX Editor's `runtime-loader.mjs`). Run the Bun commands with Bun, and enforce memory and time limits on the process.
-- DOCX Editor's `probe.ts`, `trace.ts`, `layout-worker.ts`, `quick_text.py`, and browser probe have no PPTX counterpart yet. `probe.ts` comes in its own pull request after this protocol: it serves the corpus intake, not comparison B, and it adds a contract command with its own schema.
+- There is no Node.js runtime loader yet (DOCX Editor's `packages/docx-to-pdf/scripts/evaluation/runtime-loader.mjs`). Run the Bun commands with Bun, and enforce memory and time limits on the process.
+- DOCX Editor's `packages/docx-to-pdf/scripts/evaluation/probe.ts`, `packages/docx-to-pdf/scripts/evaluation/trace.ts`, `packages/docx-to-pdf/scripts/evaluation/layout-worker.ts`, `packages/docx-to-pdf/scripts/evaluation/quick_text.py`, and browser probe have no PPTX counterpart yet. The probe comes in its own pull request after this protocol: it serves the corpus intake, not comparison B, and it adds a contract command with its own schema.
 - The JSON of the reference identity schema waits for the fixture references and their identity file.
 - DOCX Editor's export offers packaged glyph fallback faces (`glyphFallbacks`). The PPTX engine has no fallback list yet, so a character that no face covers is not drawn and is reported as `text.missing-glyph`. This affects symbols and Wingdings bullets when the font plan lacks the face.

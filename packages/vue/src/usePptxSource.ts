@@ -1,5 +1,5 @@
 // Adapted from DOCX Editor `packages/vue/src/editor/useDocxSource.ts` and
-// `useEditorHostDocument.ts` at commit 5993bd223.
+// `packages/vue/src/editor/useEditorHostDocument.ts` at commit 5993bd223.
 //
 // Opening a presentation, as a composable: the Vue twin of React's `usePptxSource.ts`. The
 // rules (the two font paths, the fetch) are core's (`pptx-source.ts`); this file owns only the

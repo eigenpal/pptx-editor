@@ -3,7 +3,7 @@
 # Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 # Production use requires a commercial agreement: licensing@eigenpal.com
 #
-# Copied from DOCX Editor `packages/docx-to-pdf/scripts/evaluation/worker.py`, commit
+# Adapted from DOCX Editor `packages/docx-to-pdf/scripts/evaluation/worker.py`, commit
 # 398963c7f67207cebf3c38dcc41d5f0bd1339b5f. PPTX changes, each marked "PPTX:":
 # - The visual sketch is landscape, 192 by 144, because slides are landscape.
 # - Visual regions are named top, body, and bottom. A slide has no running header or footer.

@@ -8,9 +8,11 @@ import type { EditorCommand, EditorSelection, TableCellAddress } from '../contra
 import { apply, invert, type SlideLayout } from '../layout/index.ts';
 import { caretAt, pointAt, textFrameMatrix } from './surface-geometry.ts';
 import { addressOf, cellItem, cellLayoutAt, tableItem, textItemOf } from './table-cells.ts';
+import { diagramTab, firstDiagramCaret } from './surface-diagram.ts';
 import { parentGroupOf } from '../automation/commands/placement.ts';
 import { comparePoints } from '../automation/commands/text-model.ts';
 import { moveCaret } from './text-input.ts';
+import { samePlace } from './visual-caret-keys.ts';
 
 type TextSelection = Extract<EditorSelection, { kind: 'text' }>;
 
@@ -43,13 +45,47 @@ function cellSelection(
   };
 }
 
-/** A caret at the end of a table's first cell: Enter, F2, or a typed key on a selected table. */
+/**
+ * A caret in a cell that Left or Right moves into, at the visual edge that faces the cell it
+ * came from: the right edge (`side` 1) for Left, the left edge (-1) for Right. On the cell's
+ * first line when the move goes forward in the cell order, else on its last line. Undefined
+ * when the cell has no laid-out line, and for rotated or stacked text, whose line edges do not
+ * face the neighboring cell: the caller then takes the cell's logical start or end.
+ */
+function cellEdgeCaret(
+  layout: SlideLayout | undefined,
+  nodeId: string,
+  cell: TableCellAddress,
+  side: -1 | 1,
+  forward: boolean
+): EditorSelection | undefined {
+  const frame = tableItem(layout, nodeId);
+  const item = frame ? cellItem(frame, cell) : undefined;
+  const m = item ? textFrameMatrix(item) : undefined;
+  const lines = item?.text?.lines ?? [];
+  const line = forward ? lines[0] : lines[lines.length - 1];
+  if (!item?.text || !m || !line) return undefined;
+  if (item.text.rotation !== 0 || item.text.upright !== 'none') return undefined;
+  const xs = [...line.caretX, ...(line.bidi?.trailingX ?? [])];
+  const x = side === 1 ? Math.max(...xs) : Math.min(...xs);
+  const s = apply(m, x, line.top + line.height / 2);
+  const point = pointAt(item, s.x, s.y);
+  return point ? { kind: 'text', nodeId, cell, anchor: point, focus: point } : undefined;
+}
+
+/**
+ * A caret at the end of a table's first cell, or of a diagram's first node: Enter, F2, or a
+ * typed key on a selected table or diagram.
+ */
 export function firstCellCaret(
   layout: SlideLayout | undefined,
   nodeId: string
 ): EditorSelection | undefined {
   const first = tableItem(layout, nodeId)?.table.cells[0];
-  return first ? cellSelection(layout, nodeId, addressOf(first), 'end') : undefined;
+  // A diagram has no cells: the caret goes to the end of its first node.
+  return first
+    ? cellSelection(layout, nodeId, addressOf(first), 'end')
+    : firstDiagramCaret(layout, nodeId);
 }
 
 /** The grid step of an arrow key: [rows, columns]. */
@@ -59,6 +95,12 @@ const ARROWS: Readonly<Record<string, readonly [number, number]>> = {
   ArrowUp: [-1, 0],
   ArrowDown: [1, 0],
 };
+
+/** The grid step of an arrow key: Left and Right swap in a table that runs right to left. */
+function arrowStep(key: string, rtl: boolean): readonly [number, number] | undefined {
+  const step = ARROWS[key];
+  return step && rtl && step[1] !== 0 ? [0, -step[1]] : step;
+}
 
 /** The grid position one arrow step from a drawn cell, past its merge. */
 function stepFrom(
@@ -80,7 +122,8 @@ function stepFrom(
  * Keys with a cell range selected. Delete and Backspace clear the cells, Escape selects the
  * table, Tab and Shift+Tab select the text of the cell after (or before) the focus cell, an
  * arrow puts the caret in the cell beside the focus cell, and Shift+arrow moves the range's
- * focus. The focus stays in the table at its edges.
+ * focus. The focus stays in the table at its edges. In a table that runs right to left, Left
+ * and Right swap, so they step to the cell on that side on screen.
  */
 function cellsKeyAction(
   layout: SlideLayout | undefined,
@@ -106,7 +149,7 @@ function cellsKeyAction(
     const next = drawn[drawn.indexOf(here) + (shift ? -1 : 1)] ?? here;
     return { select: (l) => cellSelection(l, id, addressOf(next), 'all') };
   }
-  const step = ARROWS[key];
+  const step = arrowStep(key, frame.table.rtl);
   if (!step) return null;
   const target = cellLayoutAt(frame.table, stepFrom(here.cell, step));
   if (!target) return { select: () => sel };
@@ -129,6 +172,11 @@ export function tableKeyAction(
   other: boolean
 ): TableKeyAction | null {
   if (other) return null;
+  // Tab in a diagram's text moves to the next node, as Tab in a table moves to the next cell.
+  if (selection.kind === 'text' && selection.diagramNode !== undefined) {
+    const next = key === 'Tab' ? diagramTab(layout, selection, shift) : null;
+    return next ? { select: () => next } : null;
+  }
   if (selection.kind === 'cells') return cellsKeyAction(layout, selection, key, shift);
   if (selection.kind !== 'text' || !selection.cell) return null;
   const sel: TextSelection = selection;
@@ -149,11 +197,11 @@ export function tableKeyAction(
       select: (l) => cellSelection(l, id, { row, column: 0 }, 'start'),
     };
   }
-  const step = ARROWS[key];
+  const step = arrowStep(key, frame.table.rtl);
   if (shift && step) {
     // Shift+arrow at the edge of the cell's text starts a cell range with the next cell.
     const item = textItemOf(layout, sel);
-    if (!item || comparePoints(moveCaret(item, sel.focus, key), sel.focus) !== 0) return null;
+    if (!item || !samePlace(moveCaret(item, sel.focus, key), sel.focus)) return null;
     const target = cellLayoutAt(frame.table, stepFrom(here.cell, step));
     if (!target) return null;
     const range = { anchor: addressOf(here), focus: addressOf(target) };
@@ -164,16 +212,20 @@ export function tableKeyAction(
   if (!item) return null;
   if (key === 'ArrowRight' || key === 'ArrowLeft') {
     const moved = moveCaret(item, sel.focus, key);
-    if (comparePoints(moved, sel.focus) !== 0) return null;
-    const next = drawn[i + (key === 'ArrowRight' ? 1 : -1)];
+    if (!samePlace(moved, sel.focus)) return null;
+    // In a table that runs right to left, the next cell is on the left.
+    const forward = (key === 'ArrowRight') !== frame.table.rtl;
+    const next = drawn[i + (forward ? 1 : -1)];
     if (!next) return null;
     return {
-      select: (l) => cellSelection(l, id, addressOf(next), key === 'ArrowRight' ? 'start' : 'end'),
+      select: (l) =>
+        cellEdgeCaret(l, id, addressOf(next), key === 'ArrowLeft' ? 1 : -1, forward) ??
+        cellSelection(l, id, addressOf(next), forward ? 'start' : 'end'),
     };
   }
   if (key === 'ArrowDown' || key === 'ArrowUp') {
     const moved = moveCaret(item, sel.focus, key);
-    if (comparePoints(moved, sel.focus) !== 0) return null;
+    if (!samePlace(moved, sel.focus)) return null;
     const down = key === 'ArrowDown';
     const row = down ? here.cell.row + here.cell.rowSpan : here.cell.row - 1;
     const target = cellLayoutAt(frame.table, { row, column: here.cell.col });

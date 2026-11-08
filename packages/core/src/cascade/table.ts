@@ -27,6 +27,7 @@ import {
   type ResolvedLine,
 } from './paint-props.ts';
 import { tableStyleFor } from './table-styles.ts';
+import { entryParts } from './picture-bullet.ts';
 import { colorElement, levelEntries, resolveParagraph, syntheticElement } from './text-style.ts';
 import type { Theme } from './theme.ts';
 import type {
@@ -47,6 +48,10 @@ export interface TableScope {
   readonly defaultTextStyle?: Element;
   /** The presentation's custom kinsoku lists (`p:kinsoku`). */
   readonly kinsoku?: KinsokuRules;
+  /** The part of the table, whose relationships the picture bullets of its cells name. */
+  readonly partName?: string;
+  /** The presentation part, whose relationships the picture bullets of `defaultTextStyle` name. */
+  readonly presentationPart?: string;
 }
 
 const MAX_LENGTH = 51_206_400;
@@ -208,6 +213,18 @@ function cellText(
     ...(entry ? [entry] : []),
     ...levelEntries(lstStyle, level),
   ];
+  // A cell's own list style and paragraphs are in the table's part; the deck's default text
+  // style is in the presentation part. The table style's text entry holds no bullet.
+  const pictures = {
+    pkg: scope.pkg,
+    partOf: entryParts(
+      [
+        [scope.defaultTextStyle, scope.presentationPart],
+        [lstStyle, scope.partName],
+      ],
+      scope.partName
+    ),
+  };
   const paragraphs = elements(txBody)
     .filter((p) => p.kind === 'paragraph')
     .map((p) =>
@@ -218,6 +235,7 @@ function cellText(
         theme: scope.theme,
         slideNumber: scope.slideNumber,
         ...(scope.kinsoku ? { kinsoku: scope.kinsoku } : {}),
+        pictures,
       })
     );
   return { ...(txBody ? { nodeId: txBody.id } : {}), body: cellBody(tcPr), paragraphs };

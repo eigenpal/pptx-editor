@@ -1,6 +1,6 @@
-// Provider-first host for the editor facade: the Vue twin of the React adapter's
-// `PptxEditor.Root` / `.Viewport` / `.Content` (packages/react/src/PptxEditorRoot.tsx), after
-// DOCX Editor's Vue adapter (docx-editor/packages/vue/src/editor/DocxEditorRoot.ts).
+// Provider-first host for the editor facade: the Vue twin of the React adapter's `PptxEditor.Root`
+// / `.Viewport` / `.Content` (packages/react/src/PptxEditorRoot.tsx), after DOCX Editor's Vue
+// adapter (docx-editor/packages/vue/src/editor/DocxEditorRoot.ts). DOCX Editor commit adf0e178.
 //
 // `PptxEditorRoot` renders no DOM of its own: it creates the instance on mount, provides it,
 // and lets `PptxEditorContent` attach the surface wherever the host's template puts it. Props
@@ -100,6 +100,11 @@ const pptxEditorRootProps = {
     type: Function as PropType<ClipboardDrawingReader>,
     default: undefined,
   },
+  /**
+   * The author of later comments and replies, as DOCX Editor's `author` prop. A change applies
+   * without a remount (`setAuthor`); existing comments keep their authors.
+   */
+  author: { type: String, default: undefined },
   /** Customize the dialogs the editor mounts. Set an entry to `false` to turn one off. */
   popups: { type: Object as PropType<PptxEditorPopups>, default: undefined },
   /** The chrome color mode: `'light'` (default), `'dark'`, or `'system'`. */
@@ -203,6 +208,7 @@ export const PptxEditorRoot = defineComponent({
         ...(props.modules ? { modules: props.modules } : {}),
         ...(props.autoCorrect === false ? { autoCorrect: false } : {}),
         ...(props.readClipboardDrawing ? { readClipboardDrawing: props.readClipboardDrawing } : {}),
+        ...(props.author ? { author: props.author } : {}),
         onFontError,
         translate: (key, params) => translateKeyOrText(t.value, key, params),
       });
@@ -236,6 +242,11 @@ export const PptxEditorRoot = defineComponent({
     watch(
       () => props.mode,
       (mode) => editor.value?.setMode(mode)
+    );
+    // A new author applies to later comments; the instance ignores the same name.
+    watch(
+      () => props.author,
+      (author) => editor.value?.setAuthor(author)
     );
     // A `modules` change after creation has no effect: say so in development, as React's root.
     // The check is by the identity of each module, so a new array of the same modules does not

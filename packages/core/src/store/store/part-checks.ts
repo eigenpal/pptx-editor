@@ -1,9 +1,10 @@
 // PresentationML checks of the parts a transaction touched, run once at the commit boundary.
 //
-// After DOCX Editor's `TreeDocumentStore.commitTransaction` (store/store/tree-store.ts): the
-// transaction records the parts it rewrote, and the commit validates those and no others, so
-// the cost follows the size of the edit, not the size of the deck. An invalid result abandons
-// the whole transaction: no revision, no history entry, no change event.
+// After DOCX Editor's `TreeDocumentStore.commitTransaction`
+// (packages/core/src/store/store/tree-store.ts): the transaction records the parts it rewrote, and
+// the commit validates those and no others, so the cost follows the size of the edit, not the size
+// of the deck. An invalid result abandons the whole transaction: no revision, no history entry, no
+// change event. DOCX Editor commit adf0e178.
 //
 // The checks compare the package before and after the transaction and refuse only a violation
 // that the transaction INTRODUCED. Reading stays lenient: a deck that arrives with a broken

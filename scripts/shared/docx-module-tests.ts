@@ -70,7 +70,7 @@ export const WML_MAIN_DOCUMENT_PART = MAIN_DOCUMENT_PART_RESULT.ok
 `;
 
 const HEADER =
-  /^\/\/ (Copied from docx-editor\/|It also holds fixes that DOCX Editor|Keep it equal to that file)/;
+  /^\/\/ ((?:Copied|Adapted) from docx-editor\/|It also holds fixes that DOCX Editor|Keep it equal to that file)/;
 
 /**
  * Deliberate differences, as [DOCX Editor text, ooxml-core text]. `@pptx-editor.dev/core/store`

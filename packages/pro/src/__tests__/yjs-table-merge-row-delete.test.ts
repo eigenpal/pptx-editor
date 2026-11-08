@@ -358,7 +358,7 @@ describe('the room format names structure marks', () => {
     const [a] = editors as [PptxEditorInstance, PptxEditorInstance];
     mergeFirstColumn(a, 0, 1);
     sync.flush();
-    expect(SCHEMA_VERSION).toBe(5);
+    expect(SCHEMA_VERSION).toBe(7);
     expect(isStructureEdited(frameOf(a))).toBe(true);
   });
 
@@ -366,6 +366,7 @@ describe('the room format names structure marks', () => {
     ['an older format (2), whose peers would save marks', 2],
     ['an older format (3), whose peers would hide merged text', 3],
     ['format 4, whose peers repair no undo by its listings and marks', 4],
+    ['format 5, whose peers show no paragraph a peer typed into while another removed it', 5],
     ['a newer format', SCHEMA_VERSION + 1],
   ] as const)
     test(`a replica refuses a room of ${name}, keeps its own deck, and saves no mark`, async () => {

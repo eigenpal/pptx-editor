@@ -1,9 +1,10 @@
 // Bounded XML reader tests: DTD/entity rejection, order/attribute/whitespace preservation, and
 // no value coercion.
 //
-// The first two blocks are ported from docx-editor/packages/core/src/store/__tests__/xml-reader.test.ts
-// (EigenPal, Apache-2.0), with WordprocessingML names replaced by DrawingML ones. The rest are
-// regression tests for audit findings S4, S5, K2, and K6.
+// The first two blocks are adapted from
+// docx-editor/packages/core/src/store/__tests__/xml-reader.test.ts at d0bac831c (EigenPal,
+// Apache-2.0), with WordprocessingML names replaced by DrawingML ones. The rest are regression
+// tests for audit findings S4, S5, K2, and K6.
 
 import { describe, expect, test } from 'bun:test';
 import {

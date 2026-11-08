@@ -61,6 +61,7 @@ import { Loading } from './Loading.tsx';
 import { PageSetupDialog } from './PageSetupDialog.tsx';
 import { BackgroundDialog } from './BackgroundDialog.tsx';
 import { ImageAltTextDialog } from './ImageAltTextDialog.tsx';
+import { EquationDialog } from './EquationDialog.tsx';
 import { ImagePropertiesDialog } from './ImagePropertiesDialog.tsx';
 import { ParagraphDialog } from './ParagraphDialog.tsx';
 import { FontDialog } from './FontDialog.tsx';
@@ -84,6 +85,7 @@ import {
 import {
   CONTEXT_MENU_ROW_PARTS,
   PptxEditorContextMenu as ContextMenuRoot,
+  sugarPopups,
   type PptxEditorContextMenuProps,
 } from './context-menu-parts.tsx';
 import type { ContextMenuPartName, MenuRowPartName } from '@pptx-editor.dev/core/editor';
@@ -572,71 +574,7 @@ export {
   type NewSlideControlProps,
 } from './SlideControls.tsx';
 export { gradientCss } from '@pptx-editor.dev/core/editor';
-export {
-  PageSetupDialog,
-  usePageSetupDialog,
-  type PageSetupDialogFieldName,
-  type PageSetupDialogFields,
-  type PageSetupDialogProps,
-  type UsePageSetupDialogReturn,
-} from './PageSetupDialog.tsx';
-export {
-  BackgroundDialog,
-  useBackgroundDialog,
-  type BackgroundDialogFieldName,
-  type BackgroundDialogFields,
-  type BackgroundDialogProps,
-  type UseBackgroundDialogReturn,
-} from './BackgroundDialog.tsx';
-export {
-  ImageAltTextDialog,
-  useImageAltTextDialog,
-  type ImageAltTextDialogFieldName,
-  type ImageAltTextDialogFields,
-  type ImageAltTextDialogProps,
-  type UseImageAltTextDialogReturn,
-} from './ImageAltTextDialog.tsx';
-export {
-  ImagePropertiesDialog,
-  useImagePropertiesDialog,
-  type ImagePropertiesDialogFieldName,
-  type ImagePropertiesDialogFields,
-  type ImagePropertiesDialogProps,
-  type UseImagePropertiesDialogReturn,
-} from './ImagePropertiesDialog.tsx';
-export type {
-  DialogCustomizationProps,
-  DialogPartProps,
-  UseDialogReturn,
-} from './dialog-parts.tsx';
-export {
-  ParagraphDialog,
-  useParagraphDialog,
-  type ParagraphDialogFieldName,
-  type ParagraphDialogProps,
-  type UseParagraphDialogReturn,
-} from './ParagraphDialog.tsx';
-export {
-  FontDialog,
-  useFontDialog,
-  type FontDialogFieldName,
-  type FontDialogProps,
-  type UseFontDialogReturn,
-} from './FontDialog.tsx';
-export {
-  BulletsAndNumberingDialog,
-  useBulletsAndNumberingDialog,
-  type BulletsAndNumberingDialogFieldName,
-  type BulletsAndNumberingDialogProps,
-  type UseBulletsAndNumberingDialogReturn,
-} from './BulletsAndNumberingDialog.tsx';
-export {
-  ColumnsDialog,
-  useColumnsDialog,
-  type ColumnsDialogFieldName,
-  type ColumnsDialogProps,
-  type UseColumnsDialogReturn,
-} from './ColumnsDialog.tsx';
+export * from './dialog-exports.ts';
 export { useParagraphFormat, type UseParagraphFormatReturn } from './useParagraphFormat.ts';
 export { useFontFormat, type UseFontFormatReturn } from './useFontFormat.ts';
 export { useBulletFormat, type UseBulletFormatReturn } from './useBulletFormat.ts';
@@ -778,6 +716,8 @@ export interface PptxEditorProps {
   readonly autoCorrect?: boolean;
   /** Reads copied shapes from the system clipboard, as on `PptxEditor.Root`. Read at mount. */
   readonly readClipboardDrawing?: ClipboardDrawingReader;
+  /** The author of later comments and replies, as on `PptxEditor.Root`. */
+  readonly author?: string;
   /**
    * The notice for a file that does not open (`PptxEditor.OpenFailure`). An object is
    * `PptxEditorOpenFailureProps`, passed straight through. `false` removes the notice, for a host that
@@ -831,31 +771,6 @@ export interface PptxEditorProps {
 }
 
 /**
- * The `popups` the sugar passes to the root: the host's entries, with `contextMenu` and
- * `hyperlinkPopup` mapped onto the same entries. A host entry wins.
- */
-function sugarPopups(
-  popups: PptxEditorPopups | undefined,
-  hyperlinkPopup: boolean | undefined,
-  contextMenu: boolean | PptxEditorContextMenuProps | undefined
-): PptxEditorPopups | undefined {
-  const linkOff = hyperlinkPopup === false && popups?.hyperlink === undefined;
-  const menuEntry =
-    popups?.contextMenu !== undefined || contextMenu === undefined || contextMenu === true
-      ? undefined
-      : contextMenu === false
-        ? (false as const)
-        : (props: PptxEditorContextMenuProps) =>
-            createElement(PptxEditorContextMenu, { ...props, ...contextMenu });
-  if (!linkOff && menuEntry === undefined) return popups;
-  return {
-    ...popups,
-    ...(linkOff ? { hyperlink: false as const } : {}),
-    ...(menuEntry !== undefined ? { contextMenu: menuEntry } : {}),
-  };
-}
-
-/**
  * The complete default editor: toolbar, slide rail, canvas, speaker notes, zoom pill, and the
  * slide show (F5).
  * Sugar over the same primitives a custom layout composes. Takes a `ref` to a `PptxEditorRef`.
@@ -878,6 +793,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
     modules,
     autoCorrect,
     readClipboardDrawing,
+    author,
     openFailure = true,
     renderOpenFailureActions,
     toolbar = true,
@@ -897,7 +813,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
   );
   // Memoized, so stable props give the root the same `popups` at each render.
   const rootPopups = useMemo(
-    () => sugarPopups(popups, hyperlinkPopup, contextMenu),
+    () => sugarPopups(popups, hyperlinkPopup, contextMenu, PptxEditorContextMenu),
     [popups, hyperlinkPopup, contextMenu]
   );
   const dock =
@@ -926,6 +842,7 @@ const PptxEditorDefault = forwardRef<PptxEditorRef, PptxEditorProps>(function Pp
       ...(modules ? { modules } : {}),
       ...(autoCorrect === false ? { autoCorrect } : {}),
       ...(readClipboardDrawing ? { readClipboardDrawing } : {}),
+      ...(author ? { author } : {}),
     },
     createElement(
       PptxEditorViewport,
@@ -984,6 +901,7 @@ export const PptxEditor = Object.assign(PptxEditorDefault, {
   BackgroundDialog,
   ImageAltTextDialog,
   ImagePropertiesDialog,
+  EquationDialog,
   ParagraphDialog,
   FontDialog,
   BulletsAndNumberingDialog,

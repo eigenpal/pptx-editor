@@ -1,6 +1,7 @@
 name: Dependabot Slack reminders
 
-# Copied from DOCX Editor (docx-editor/.github/workflows/dependabot-slack-reminders.yml),
+# Adapted from DOCX Editor (docx-editor/.github/workflows/dependabot-slack-reminders.yml at
+# adf0e178),
 # with the PPTX repository and webhook secret names.
 
 # Posts open Dependabot alerts

@@ -1,4 +1,4 @@
-// Copied from docx-editor/packages/core/src/store/package/sinks.ts at bafbf5ac (EigenPal).
+// Adapted from docx-editor/packages/core/src/store/package/sinks.ts at bafbf5ac (EigenPal).
 // Keep it equal to that file, except `sanitizeHref`, which also strips leading C0 controls.
 // Runtime-sink sanitization and inert executable content (document-engine task
 // 2.8 / lossless-package-model "Safe relationships and inert executable content"

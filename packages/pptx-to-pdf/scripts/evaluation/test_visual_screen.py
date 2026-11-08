@@ -2,7 +2,7 @@
 # Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 # Production use requires a commercial agreement: licensing@eigenpal.com
 #
-# Copied from DOCX Editor `packages/docx-to-pdf/scripts/evaluation/test_visual_screen.py`, commit
+# Adapted from DOCX Editor `packages/docx-to-pdf/scripts/evaluation/test_visual_screen.py`, commit
 # 398963c7f67207cebf3c38dcc41d5f0bd1339b5f. PPTX changes: slide-sized pages, the landscape
 # sketch, positional region names, and the refusal of sketches of different sizes.
 """Synthetic checks for byte-exact visual screening thresholds and regions."""

@@ -4,7 +4,8 @@ Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 /**
- * `POST /api/convert`: the demo's PDF export, after DOCX Editor's `api/convert.ts`.
+ * `POST /api/convert`: the demo's PDF export, after DOCX Editor's `api/convert.ts`. DOCX Editor
+ * commit adf0e178.
  *
  * The React and Vue demos post the saved deck here when the user picks Export > Presentation as
  * PDF. The conversion runs on Node.js because `@pptx-editor.dev/pptx-to-pdf` reads font files

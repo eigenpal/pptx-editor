@@ -1,4 +1,4 @@
-// Copied from docx-editor/packages/core/src/layout/__tests__/word-segment.test.ts at 5993bd223.
+// Copied from docx-editor/packages/core/src/layout/__tests__/word-segment.test.ts at adf0e178.
 // Word segmentation tests (interactive-paginated-editing 5.3).
 
 import { describe, expect, test } from 'bun:test';

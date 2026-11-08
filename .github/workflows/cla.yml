@@ -1,6 +1,6 @@
 name: CLA
 
-# Copied from DOCX Editor (eigenpal/docx-editor) .github/workflows/cla.yml at commit 5993bd223.
+# Copied from DOCX Editor (eigenpal/docx-editor) .github/workflows/cla.yml at commit adf0e178.
 
 # All logic lives in .github/cla/cla.sh and is unit-tested by
 # .github/cla/cla.test.sh (run by ci.yml). This workflow is a thin orchestrator

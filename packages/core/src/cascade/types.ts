@@ -52,6 +52,18 @@ export type ResolvedBullet =
       readonly font?: string;
       readonly size: { readonly pct: number } | { readonly pts: number };
       readonly color?: Rgba;
+    }
+  | {
+      /** A picture bullet (`a:buBlip`, ECMA-376 Part 1, 21.1.2.4.2). */
+      readonly type: 'picture';
+      /** The part whose relationships resolve `rId` and `svgRId`. */
+      readonly part: string;
+      readonly rId: string;
+      /** An `asvg:svgBlip` alternative, when present. */
+      readonly svgRId?: string;
+      /** The picture's width over its height. */
+      readonly aspect: number;
+      readonly size: { readonly pct: number } | { readonly pts: number };
     };
 
 /** Line spacing: a percentage of single spacing, or an exact size in hundredths of a point. */
@@ -94,16 +106,23 @@ export interface RunProps {
   readonly hyperlinkAction?: string;
 }
 
+import type { MathZone } from './math.ts';
+
 /** One inline item of a paragraph. */
 export interface ResolvedRun {
-  readonly kind: 'text' | 'break' | 'field';
-  /** The `a:r` / `a:br` / `a:fld` node. */
+  readonly kind: 'text' | 'break' | 'field' | 'math';
+  /** The `a:r` / `a:br` / `a:fld` / `a14:m` node. */
   readonly nodeId: string;
   /** The `a:t` node holding the text (text and field runs). */
   readonly textNodeId?: string;
   readonly text: string;
   readonly props: RunProps;
   readonly fieldType?: string;
+  /**
+   * The equation of a math run (`a14:m`, ECMA-376 Part 1, 22.1). Its `text` is one object
+   * character (U+FFFC): the caret steps over the whole equation.
+   */
+  readonly math?: MathZone;
 }
 
 /**
@@ -170,6 +189,17 @@ export interface BodyProps {
   readonly spcCol: number;
   readonly autofit: Autofit;
   readonly spcFirstLastPara: boolean;
+  /**
+   * The preset text warp (`a:prstTxWarp`, ECMA-376 Part 1, 20.1.9.19), when it draws one:
+   * absent for `textNoShape` and for a name that `ST_TextShapeType` does not hold.
+   */
+  readonly warp?: TextWarp;
+}
+
+/** A preset text warp: its `ST_TextShapeType` name and its adjust values (`a:avLst`). */
+export interface TextWarp {
+  readonly preset: string;
+  readonly adjust: ReadonlyMap<string, number>;
 }
 
 /** A resolved text body. */
@@ -220,6 +250,11 @@ export interface ResolvedShape extends ResolvedBase {
    * turn adds to the shape's turn. Text lays out in it, not in the geometry's text rectangle.
    */
   readonly textXfrm?: Xfrm;
+  /**
+   * The data model point (`dgm:pt/@modelId`) whose text a diagram shape shows, when it shows
+   * the text of exactly one node. A diagram text edit writes this point and the shape.
+   */
+  readonly diagramNode?: string;
 }
 
 /** `p:pic`. */

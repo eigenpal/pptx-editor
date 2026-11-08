@@ -107,8 +107,9 @@ Each diagnostic has a fixed `code`. Handle an unknown code by its `severity`. Th
 | `effect.inner-shadow` | `approximation` | An inner shadow starts at the fill, so an outline wider than 1 pt, an unfilled outline, and overlapping paths are shaded differently. |  |
 | `effect.silhouette` | `approximation` | A shadow or glow uses an opaque silhouette: picture and fill transparency do not shape it. |  |
 | `effect.soft-edge` | `approximation` | Soft edges are drawn hard. |  |
+| `effect.blur` | `approximation` | Blur is not drawn. |  |
 | `effect.reflection-blur` | `approximation` | A reflection is drawn without its blur. |  |
-| `effect.not-rendered` | `unsupported` | An effect the engine does not render (`a:presetShdw`, `a:blur`, and others). |  |
+| `effect.not-rendered` | `unsupported` | An effect the engine does not render (`a:effectDag` and others). |  |
 | `text.outline` | `unsupported` | Text outlines are not drawn. |  |
 | `text.underline-style` | `approximation` | A dotted, dashed, wavy, heavy, or word-only underline is drawn as a single line, as in the editor. |  |
 | `text.synthetic-style`, `text.upright`, `text.missing-glyph` | `approximation` | Synthetic bold and italic, upright vertical characters, and characters the face lacks. | `missing-glyph` |
@@ -153,7 +154,7 @@ One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`sho
 - A blurred shadow or glow is up to 13 rings, each a transparency group, so overlapping rings never darken, with σ = `blurRad` × 0.5 from the editor. DOCX Editor draws 6 rings at fixed σ multiples (σ = `blurRad` ÷ 4) over a core at half alpha, without groups.
 - Past the paint budget, the export throws `PdfWorkLimitError` with the code `operations`, for operations and content bytes alike, next to `timeout` and `aborted`. DOCX Editor's `PdfWorkLimitError` has the one code `workLimitExceeded` for all of its budgets.
 - Each gradient's stop functions are written once per document, and at most 64 stops are drawn. DOCX Editor writes the stops of each gradient as given; a PPTX group, layout, or theme gradient can fill thousands of shapes.
-- A reflection is a transparency group of the shape under the reflection transform, through a luminosity soft mask of its fade; its blur is left out. Soft edges and picture brightness and contrast are not drawn yet. DOCX Editor draws them with luminosity masks and the image `Decode` array (`picture-effects.ts`, `images.ts`), which is the pattern to follow.
+- A reflection is a transparency group of the shape under the reflection transform, through a luminosity soft mask of its fade; its blur is left out. Soft edges and picture brightness and contrast are not drawn yet. DOCX Editor draws them with luminosity masks and the image `Decode` array (`packages/docx-to-pdf/src/picture-effects.ts` and `packages/docx-to-pdf/src/images.ts` at adf0e178), which is the pattern to follow.
 - Opening an export session always installs the drawing module of `@pptx-editor.dev/pro/drawing`, so a PDF draws glow, inner shadows, reflections, and hard soft edges, as DOCX Editor's PDF export always includes its drawing module.
 - Diagnostic codes are dotted by area (`fill.*`, `picture.*`, `line.*`, `effect.*`, `text.*`, `font.*`, `frame.*`). DOCX Editor's codes are kebab-case, as its Markdown warnings are. The table above names the DOCX Editor code where the idea is the same. Handle an unknown code by its `severity`.
 - A refused open gives core's open error reason, and the package re-exports core's `OpenError` type, so a host reads one vocabulary with core's `openPresentation`. DOCX Editor re-exports its reason union `HeadlessDocumentRejection`; PPTX Core has no separate union to re-export.
@@ -220,5 +221,5 @@ The dependencies are the same as DOCX Editor's `docx-to-pdf`.
 | --- | --- | --- |
 | `pdf-lib` 1.17.1 | MIT | PDF writer |
 | `fontkit` 2.0.4 | MIT | Font parsing and subsetting for the embedder copied from DOCX Editor |
-| `@pptx-editor.dev/pro` | EigenPal Pro License | Charts, glow, inner shadow, reflection, and soft edge (`@pptx-editor.dev/pro/drawing`), which the export always installs, as DOCX Editor's `docx-to-pdf` installs `@docx-editor.dev/pro/drawing` |
+| `@pptx-editor.dev/pro` | EigenPal Pro License | Charts, glow, inner shadow, reflection, soft edge, and 3-D shapes (`@pptx-editor.dev/pro/drawing`), which the export always installs, as DOCX Editor's `docx-to-pdf` installs `@docx-editor.dev/pro/drawing` |
 | `pdfjs-dist` 5.4.624 (dev) | Apache-2.0 | Reads the PDF back in tests |

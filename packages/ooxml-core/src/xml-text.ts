@@ -1,4 +1,4 @@
-// Copied from docx-editor/packages/core/src/store/package/xml-text.ts at fc28dba9 (EigenPal).
+// Adapted from docx-editor/packages/core/src/store/package/xml-text.ts at fc28dba9 (EigenPal).
 // It also holds fixes that DOCX Editor does not have yet: K6.
 // Keep it equal to that file plus those fixes.
 // Character data of a part read at the trust boundary: references decoded, validity checked,

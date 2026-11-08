@@ -1,7 +1,7 @@
 // Read API Extractor snapshots (`docs/api/<slug>/index.api.md`) for the adapter parity checks.
 // After DOCX Editor's scripts/lib/api-snapshot-parse.mjs and the `parseExtendsClause` /
 // `effectiveInterfaceFields` pair in its scripts/check-parity-contract.mjs, reduced to what
-// PPTX Editor checks.
+// PPTX Editor checks. DOCX Editor commit adf0e178.
 
 /** Every top-level exported name of a snapshot. */
 export function exportedNames(snapshot) {

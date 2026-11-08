@@ -5,7 +5,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 */
 
 // The collaboration coverage contract, after DOCX Editor's
-// `packages/core/src/store/store/collaboration-coverage-contract.ts`.
+// `packages/core/src/store/store/collaboration-coverage-contract.ts`. DOCX Editor commit adf0e178.
 //
 // Collaboration here is state-based (decision D26): the Yjs mirror diffs the package before and
 // after each transaction, so any command that commits through the store replicates by
@@ -40,6 +40,7 @@ export const COLLABORATION_UNCOVERED: ReadonlyMap<EditorCommandType, string> = n
   string
 >([
   ['toggleSmartGuides', VIEW_SETTING],
+  ['showAnimationOrder', VIEW_SETTING],
   ['setTableBorderPen', VIEW_SETTING],
   ['setPresentationView', VIEW_SETTING],
   ['setSectionsCollapsed', VIEW_SETTING],

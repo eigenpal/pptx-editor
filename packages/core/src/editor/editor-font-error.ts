@@ -1,4 +1,4 @@
-// Copied from DOCX Editor `packages/core/src/contracts/editor.ts` (`EditorFontError`) at commit
+// Adapted from DOCX Editor `packages/core/src/contracts/editor.ts` (`EditorFontError`) at commit
 // 5993bd223. Keep the exported API equal to the source. It lives in
 // the `editor` lane because the PPTX `contracts` lane holds types only.
 

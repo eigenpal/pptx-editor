@@ -1,8 +1,9 @@
-// The framework-neutral half of the toolbar controls, shared by the React and Vue adapters so
-// the two cannot drift: which part renders a slot, the rows of a value dropdown, the color a
-// split button applies first, the size box text, the font list filter, and the More menu fit
-// (the room the bar may use, the cost of a separator, and which groups leave the bar). After
-// DOCX Editor's `toolbar-measure.ts` and `useToolbarOverflow`.
+// The framework-neutral half of the toolbar controls, shared by the React and Vue adapters so the
+// two cannot drift: which part renders a slot, the rows of a value dropdown, the color a split
+// button applies first, the size box text, the font list filter, and the More menu fit (the room
+// the bar may use, the cost of a separator, and which groups leave the bar). After DOCX Editor's
+// `packages/core/src/editor/toolbar-measure.ts` and `useToolbarOverflow`. DOCX Editor commit
+// adf0e178.
 
 import { inFixedView, placeInFixedFrame } from './fixed-frame.ts';
 import type { ChromeActionHost } from './chrome-actions.ts';

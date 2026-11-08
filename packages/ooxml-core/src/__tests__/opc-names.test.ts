@@ -2,8 +2,8 @@
 // trust-boundary rejections, the "two entries normalize to one name" scenario, owner-relative
 // resolution without root escape, and the external-URI profile.
 //
-// Ported from docx-editor/packages/core/src/store/__tests__/opc-names.test.ts (EigenPal,
-// Apache-2.0), with WordprocessingML part names replaced by PresentationML ones. The `zipItemName` block is
+// Adapted from docx-editor/packages/core/src/store/__tests__/opc-names.test.ts at
+// 26095c632 (EigenPal, Apache-2.0), with WordprocessingML part names replaced by PresentationML ones. The `zipItemName` block is
 // the regression test for audit finding K1.
 
 import { describe, expect, test } from 'bun:test';

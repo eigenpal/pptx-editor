@@ -11,6 +11,7 @@ import {
   type Line,
   type Matrix,
 } from '../layout/index.ts';
+import { caretXOn, lineStopsOf, nearestStop, stopPoint } from './visual-caret.ts';
 
 /** The text frame → slide matrix of a shape item, including the body rotation. */
 export function textFrameMatrix(item: Extract<LayoutItem, { kind: 'shape' }>): Matrix | undefined {
@@ -40,6 +41,11 @@ export function pointAt(item: LayoutItem, sx: number, sy: number): TextPoint | u
       line = l;
       break;
     }
+  // A line in visual order: the nearest caret place, with the side of a direction boundary.
+  if (line.bidi) {
+    const stop = nearestStop(lineStopsOf(item, line), p.x);
+    if (stop) return stopPoint(line.paragraph, stop);
+  }
   let best = 0;
   let dist = Infinity;
   line.caretX.forEach((x, i) => {
@@ -107,7 +113,7 @@ export function caretAt(item: LayoutItem, point: TextPoint): CaretLine | undefin
       (l, i) => point.offset >= l.start && (point.offset < l.end || i === lines.length - 1)
     ) ?? lines[0];
   if (line) {
-    x = line.caretX[Math.max(0, Math.min(point.offset - line.start, line.caretX.length - 1))] ?? x;
+    x = caretXOn(line, point.offset, point.affinity) ?? x;
     h = Math.max(line.fontHeight, 1);
     top = line.baseline - h * 0.8;
     color = textColorAt(line, point.offset);

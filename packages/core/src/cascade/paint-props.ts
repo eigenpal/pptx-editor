@@ -15,6 +15,7 @@ import {
 } from '../store/index.ts';
 import { colorChild, resolveColor, type ColorContext, type Rgba } from './color.ts';
 import type { Theme } from './theme.ts';
+import { presetShadows, type ResolvedThreeD } from './three-d.ts';
 
 /** A rectangle inset as fractions of the bounds (`a:srcRect`, `a:fillToRect`). */
 export interface RelRect {
@@ -132,6 +133,15 @@ export type BlendMode = 'over' | 'mult' | 'screen' | 'darken' | 'lighten';
 /** Resolved shape effects. Distances in EMU, angles in degrees. */
 export interface ResolvedEffects {
   readonly outerShadow?: EffectPlacement & { readonly color: Rgba };
+  /**
+   * A second outer shadow, under the first: the far or opposite copy of a preset shadow
+   * (`a:prstShdw`), or a preset shadow next to an `a:outerShdw`.
+   */
+  readonly secondShadow?: EffectPlacement & { readonly color: Rgba };
+  /** A blur of the whole shape (`a:blur`): radius in EMU; `grow` lets it spread past the edge. */
+  readonly blur?: { readonly radius: number; readonly grow: boolean };
+  /** Bevels, extrusion, contour, and the camera (`a:scene3d`, `a:sp3d`). */
+  readonly threeD?: ResolvedThreeD;
   readonly innerShadow?: {
     readonly blur: number;
     readonly dist: number;
@@ -479,8 +489,29 @@ export function resolveEffects(
   for (const e of elements(list)) {
     const color = (): Rgba => resolveColor(colorChild(e), ctx) ?? { r: 0, g: 0, b: 0, a: 1 };
     switch (e.local) {
-      case 'outerShdw':
-        out = { ...out, outerShadow: { ...placementOf(e, 0), color: color() } };
+      case 'outerShdw': {
+        // An outer shadow written before a preset shadow takes the first place.
+        const shadow = { ...placementOf(e, 0), color: color() };
+        out = out.outerShadow
+          ? { ...out, outerShadow: shadow, secondShadow: out.outerShadow }
+          : { ...out, outerShadow: shadow };
+        break;
+      }
+      case 'prstShdw': {
+        const [first, second] = presetShadows(e, ctx);
+        const extra = out.outerShadow ? first : second;
+        out = {
+          ...out,
+          ...(out.outerShadow ? {} : { outerShadow: first }),
+          ...(extra && !out.secondShadow ? { secondShadow: extra } : {}),
+        };
+        break;
+      }
+      case 'blur':
+        out = {
+          ...out,
+          blur: { radius: effectLength(e, 'rad', 0), grow: boolAttr(e, 'grow') ?? true },
+        };
         break;
       case 'innerShdw':
         out = {

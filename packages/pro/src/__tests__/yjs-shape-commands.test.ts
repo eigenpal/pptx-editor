@@ -194,6 +194,32 @@ describe('shape commands on two replicas', () => {
     expect(readPptx(a.save()!).ok).toBe(true);
   });
 
+  test('concurrent first bevels and cameras keep one scene, one bevel, and one camera', async () => {
+    const { a, b, l } = await pair();
+    l.pause();
+    on(a, 'A');
+    on(b, 'A');
+    a.exec({ type: 'setShapeEffect', effect: { kind: 'bevel', preset: 'circle' } });
+    b.exec({ type: 'setShapeEffect', effect: { kind: 'bevel', preset: 'angle' } });
+    l.flush();
+    expect(fingerprint(a)).toBe(fingerprint(b));
+    let text = xml(a);
+    expect(text.match(/<a:scene3d>/g)).toHaveLength(1);
+    expect(text.match(/<a:sp3d>/g)).toHaveLength(1);
+    expect(text.match(/<a:bevelT /g)).toHaveLength(1);
+    l.pause();
+    a.exec({ type: 'setShapeEffect', effect: { kind: 'rotation3d', preset: 'isometricTopUp' } });
+    b.exec({ type: 'setShapeEffect', effect: { kind: 'rotation3d', preset: 'obliqueTopLeft' } });
+    a.exec({ type: 'setShapeEffect', effect: { kind: 'bevel', preset: 'convex' } });
+    b.exec({ type: 'setShapeEffect', effect: { kind: 'bevel', preset: null } });
+    l.flush();
+    expect(fingerprint(a)).toBe(fingerprint(b));
+    text = xml(a);
+    expect(text.match(/<a:camera /g)).toHaveLength(1);
+    expect((text.match(/<a:bevelT /g) ?? []).length).toBeLessThanOrEqual(1);
+    expect(readPptx(a.save()!).ok).toBe(true);
+  });
+
   test('concurrent glow colors leave one color in the glow', async () => {
     const { a, b, l } = await pair();
     on(a, 'A');

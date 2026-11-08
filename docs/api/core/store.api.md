@@ -410,6 +410,7 @@ export const NS: Readonly<{
     a14: "http://schemas.microsoft.com/office/drawing/2010/main";
     a16: "http://schemas.microsoft.com/office/drawing/2014/main";
     asvg: "http://schemas.microsoft.com/office/drawing/2016/SVG/main";
+    m: "http://schemas.openxmlformats.org/officeDocument/2006/math";
     pic: "http://schemas.openxmlformats.org/drawingml/2006/picture";
     c: "http://schemas.openxmlformats.org/drawingml/2006/chart";
     dgm: "http://schemas.openxmlformats.org/drawingml/2006/diagram";
@@ -729,6 +730,7 @@ export interface Relationship {
     readonly externalTarget?: string;
     // (undocumented)
     readonly id: string;
+    readonly relativeTarget?: string;
     readonly target?: string;
     // (undocumented)
     readonly type: string;
@@ -928,6 +930,18 @@ export interface TableSpanTrim {
 export function tableSpanTrims<T extends TableGridCell>(cells: readonly (readonly (T | undefined)[])[], hasText: (tc: T) => boolean): TableSpanTrim[];
 
 // @public
+export interface TextEditAt {
+    // (undocumented)
+    readonly node: string;
+    // (undocumented)
+    readonly offset: number;
+    // (undocumented)
+    readonly paragraph: number;
+    // (undocumented)
+    readonly part: string;
+}
+
+// @public
 export interface TextNode {
     // (undocumented)
     readonly id: NodeId;
@@ -951,6 +965,7 @@ export interface TransactOptions {
     readonly recordsHistory?: boolean;
     readonly selectionAfter?: unknown;
     readonly selectionBefore?: unknown;
+    readonly textAt?: TextEditAt;
 }
 
 // @public

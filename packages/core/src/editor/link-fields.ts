@@ -1,22 +1,84 @@
 // The link popup's edit form, framework-free: a link goes to a web address, an email address,
-// or a slide of this presentation. The form keeps one draft string, the URL that `setLink`
-// takes: `mailto:` for email, and the `#` form for a slide (`#slide-3`, `#next-slide`). So the
-// controller and the command stay the same for every kind. `@internal`: adapter glue.
+// a slide or a custom show of this presentation, or another file. The form keeps one draft
+// string, the URL that `setLink` takes: `mailto:` for email, the `#` form for a slide
+// (`#slide-3`, `#next-slide`) and a custom show (`#custom-show-2?return=true`), and the `./`
+// form for a file (`./report.pdf`). So the controller and the command stay the same for every
+// kind. `@internal`: adapter glue.
 
 import type { Translate } from '@pptx-editor.dev/i18n';
+import type { CustomShowSummary } from '../contracts/index.ts';
+import {
+  customShowLinkUrl,
+  isFileLink,
+  parseCustomShowLink,
+} from '../automation/commands/custom-show-links.ts';
 import { parseSlideLink } from '../automation/commands/slide-links.ts';
 
+export { fileDraftUrl } from '../automation/commands/custom-show-links.ts';
+
 /** What a link goes to. @internal */
-export type LinkKind = 'web' | 'email' | 'slide';
+export type LinkKind = 'web' | 'email' | 'slide' | 'customShow' | 'file';
 
 /** The kinds in the order the form offers them. @internal */
-export const LINK_KINDS: readonly LinkKind[] = ['web', 'email', 'slide'];
+export const LINK_KINDS: readonly LinkKind[] = ['web', 'email', 'slide', 'customShow', 'file'];
 
-/** The kind of a link draft: `mailto:` is email, the `#` form is a slide, else a web address. */
+/**
+ * The kinds the form offers for a deck: Custom show only when the deck has one, or when the
+ * draft already links to one. @internal
+ */
+export function linkKindsFor(
+  shows: readonly CustomShowSummary[],
+  draft: string
+): readonly LinkKind[] {
+  if (shows.length > 0 || linkKindOf(draft) === 'customShow') return LINK_KINDS;
+  return LINK_KINDS.filter((k) => k !== 'customShow');
+}
+
+/**
+ * The kind of a link draft: `mailto:` is email, `#custom-show-` a custom show, any other `#`
+ * form a slide, `./` and `../` a file, else a web address.
+ */
 export function linkKindOf(url: string): LinkKind {
   const raw = url.trim();
   if (/^mailto:/i.test(raw)) return 'email';
+  if (raw.startsWith('#custom-show-')) return 'customShow';
+  if (isFileLink(raw)) return 'file';
   return raw.startsWith('#') ? 'slide' : 'web';
+}
+
+/** The first draft of a kind, when the form switches to it. @internal */
+export function linkKindDraft(kind: LinkKind, shows: readonly CustomShowSummary[]): string {
+  if (kind === 'slide') return '#next-slide';
+  if (kind === 'customShow')
+    return shows[0] ? customShowLinkUrl({ id: shows[0].id, returns: true }) : '';
+  return '';
+}
+
+/** The custom show and the return choice of a custom show draft, or null. @internal */
+export function customShowDraft(
+  url: string
+): { readonly id: number; readonly returns: boolean } | null {
+  return parseCustomShowLink(url.trim());
+}
+
+/** The draft of a custom show and a return choice. @internal */
+export function customShowDraftUrl(id: number, returns: boolean): string {
+  return customShowLinkUrl({ id, returns });
+}
+
+/**
+ * The words for a custom show link, such as "Custom show: Short", or '' for any other draft.
+ * A show the deck does not have shows its id. @internal
+ */
+export function customShowLinkLabel(
+  t: Translate,
+  url: string,
+  shows: readonly CustomShowSummary[]
+): string {
+  const target = parseCustomShowLink(url.trim());
+  if (!target) return '';
+  const show = shows.find((s) => s.id === target.id);
+  return t('link.customShowName', { name: show?.name || String(target.id) });
 }
 
 /** The fields of an email link the form edits, and the fields it keeps as they are. */

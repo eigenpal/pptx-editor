@@ -1,13 +1,14 @@
 /** @jsxImportSource react */
 // Right-click menus and menu rows with an icon column, a label, and a shortcut hint.
 //
-// Adapted from DOCX Editor (eigenpal/docx-editor, packages/react/src/editor/contextmenu/
-// DocxEditorContextMenu.tsx and parts.tsx, and the `.docx-contextmenu` and
-// `.docx-menubar__item` rules of packages/core/src/styles/editor.css): the menu opens at the
-// pointer and flips to stay inside the window, focus moves into it and returns on close, and a
-// disabled row stays in the menu with the engine's reason as its tooltip. The rows share the
-// popover menu's keyboard rules (`menu-keyboard.ts`). PPTX Editor adds `MenuSubmenu`, the
-// cascading panel of the demo's Insert menu.
+// After DOCX Editor (eigenpal/docx-editor, packages/react/src/editor/contextmenu/
+// packages/react/src/editor/contextmenu/DocxEditorContextMenu.tsx and
+// packages/react/src/editor/contextmenu/parts.tsx, and the `.docx-contextmenu` and
+// `.docx-menubar__item` rules of packages/core/src/styles/editor.css at 26095c632): the menu opens
+// at the pointer and flips to stay inside the window, focus moves into it and returns on close, and
+// a disabled row stays in the menu with the engine's reason as its tooltip. The rows share the
+// popover menu's keyboard rules (`menu-keyboard.ts`). PPTX Editor adds `MenuSubmenu`, the cascading
+// panel of the demo's Insert menu.
 
 import {
   createContext,

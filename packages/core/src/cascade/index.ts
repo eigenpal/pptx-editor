@@ -5,11 +5,20 @@ export * from './types.ts';
 export * from './color.ts';
 export * from './theme.ts';
 export * from './paint-props.ts';
+export {
+  BEVEL_PRESET_TYPES,
+  type BevelPresetType,
+  type ResolvedBevel,
+  type ResolvedThreeD,
+  type Rotation3D,
+} from './three-d.ts';
 export * from './text-style.ts';
-export { inheritedPlaceholders, layoutPlaceholderOf, resolveSlide, XFRM_BOUND } from './slide.ts';
+export { inheritedPlaceholders, layoutPlaceholderOf, resolveSlide } from './slide.ts';
+export { XFRM_BOUND } from './shape-xfrm.ts';
 export { CHART_CONTENT_TYPE, resolveChartPart, type ResolvedChartPart } from './chart-part.ts';
 export { alternateBranch, contentElements, isAlternateContent } from './alternate-content.ts';
 export { resolveTable, type TableScope } from './table.ts';
+export type { PictureBulletSource } from './picture-bullet.ts';
 export {
   DEFAULT_TABLE_STYLE_ID,
   defaultTableStyleId,

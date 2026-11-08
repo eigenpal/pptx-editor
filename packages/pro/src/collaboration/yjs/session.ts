@@ -3,7 +3,8 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// A collaboration session over a Y.Doc, after DOCX Editor's `collaboration/document-session.ts`.
+// A collaboration session over a Y.Doc, after DOCX Editor's
+// `packages/pro/src/collaboration/document-session.ts`. DOCX Editor commit adf0e178.
 //
 // The host owns the Y.Doc and its provider (Hocuspocus, y-webrtc, or a test link) and passes
 // the document in, with an optional Yjs awareness for presence. On attach, an empty room is
@@ -62,6 +63,12 @@ import {
 import { RESTORED_KEY, followsIn } from './text-identity.ts';
 import { repairCopies, repairFollows } from './text-repair.ts';
 import { nodeRecordDeleteFilter } from './undo-delete-filter.ts';
+import {
+  carryFollowed,
+  checkFollowed,
+  type FollowedRun,
+  tieFollowedRuns,
+} from './undo-followed.ts';
 import {
   dropRestoredTwins,
   noteRestored,
@@ -261,7 +268,15 @@ export function createYjsCollaborationSession(
     // What the step must not take from a peer or put back twice (`undo-unlisted.ts`,
     // `undo-splits.ts`), set on the step before Yjs applies it.
     if (undo) {
-      noteUndoneListings(room, top, (write) => doc.transact(write, UNDONE_ORIGIN));
+      // Yjs can skip the top step and apply an older one in the same call: no step that it
+      // can apply puts back the old entry of a run that a peer moved on (`undo-followed.ts`).
+      for (const item of stack.slice(0, -1)) checkFollowed(item);
+      noteUndoneListings(
+        room,
+        top,
+        (write) => doc.transact(write, UNDONE_ORIGIN),
+        checkFollowed(top)
+      );
       top.deletions = withoutLoserRestores(room, top);
     } else {
       const kept = withoutTakenRedo(room, top);
@@ -477,6 +492,7 @@ export function createYjsCollaborationSession(
         const current = undoManager.currStackItem as { meta: Map<string, unknown> } | null;
         if ((undoManager.undoing || undoManager.redoing) && current) {
           event.stackItem.meta.set('attrs', current.meta.get('attrs') ?? []);
+          carryFollowed(current, event.stackItem);
           return;
         }
         const writes = (event.stackItem.meta.get('attrs') as AttributeWrite[] | undefined) ?? [];
@@ -544,13 +560,22 @@ export function createYjsCollaborationSession(
           package: port.package(),
         };
         const moved: [Y.ID, Y.ID, number][] = [];
+        const runs: FollowedRun[] = [];
         doc.transact(() => {
           for (const [part, keys] of fresh)
-            repairCopies(room, part, keys, deleted, view, (from, to, length) =>
-              moved.push([from, to, length])
+            repairCopies(
+              room,
+              part,
+              keys,
+              deleted,
+              view,
+              (from, to, length) => moved.push([from, to, length]),
+              (run) => runs.push(run)
             );
           repairFollows(room, follows, deleted);
         }, TEXT_REPAIR_ORIGIN);
+        // A peer's run that followed this replica's Enter goes back with an undo of the Enter.
+        tieFollowedRuns([...undoManager.undoStack, ...undoManager.redoStack], runs);
         for (const [from, to, length] of moved)
           for (const item of [...undoManager.undoStack, ...undoManager.redoStack]) {
             if (!Y.isDeleted(item.insertions, from)) continue;
@@ -563,6 +588,15 @@ export function createYjsCollaborationSession(
         Y.YEvent<Y.Map<unknown>>
       >;
       const onTransaction = (transaction: Y.Transaction): void => {
+        // A room format that arrives after attach (a late provider sync, a peer that seeded
+        // the room at the same time) refuses the room as attach does: this replica stops
+        // applying the room and keeps its own presentation.
+        const schema = room.meta.get('schema');
+        if (schema !== SCHEMA_VERSION && transaction.changed.has(room.meta as never)) {
+          detach();
+          setStatus('error', 'schema-version-mismatch', `room schema ${String(schema)}`);
+          return;
+        }
         const origin: unknown = transaction.origin;
         // This replica's own undone listings change nothing until its undo, which rebuilds.
         if (

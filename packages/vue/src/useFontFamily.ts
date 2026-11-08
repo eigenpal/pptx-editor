@@ -1,8 +1,9 @@
 // The font family picker's behavior as a composable: the Vue twin of the React adapter's
-// `useFontFamily` (packages/react/src/useFontFamily.ts), after DOCX Editor's Vue
-// `useFontFamily` (docx-editor/packages/vue/src/editor/toolbar/useFontFamily.ts): the current
-// value, the offerable families, the enabled state, and the setter, with no UI. PPTX Editor adds
-// the groups of core's `font-picker.ts` (the slide's theme fonts, the deck's fonts, all fonts).
+// `useFontFamily` (packages/react/src/useFontFamily.ts), after DOCX Editor's Vue `useFontFamily`
+// (docx-editor/packages/vue/src/editor/toolbar/useFontFamily.ts): the current value, the offerable
+// families, the enabled state, and the setter, with no UI. PPTX Editor adds the groups of core's
+// `font-picker.ts` (the slide's theme fonts, the deck's fonts, all fonts). DOCX Editor commit
+// adf0e178.
 
 import { computed, type ComputedRef } from 'vue';
 import {

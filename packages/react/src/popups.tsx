@@ -1,8 +1,9 @@
 /** @jsxImportSource react */
 // The popups registry, after DOCX Editor's (docx-editor/packages/react/src/editor/popup-config.tsx,
-// popup-renderer.ts, dialog-host.tsx). `PptxEditor.Root` mounts the editor's dialogs. A host
-// changes one through `popups`: a render callback replaces the packaged dialog, and `false`
-// turns off automatic rendering. The operation behind a dialog never depends on it.
+// packages/react/src/editor/popup-renderer.ts, packages/react/src/editor/dialog-host.tsx).
+// `PptxEditor.Root` mounts the editor's dialogs. A host changes one through `popups`: a render
+// callback replaces the packaged dialog, and `false` turns off automatic rendering. The operation
+// behind a dialog never depends on it. DOCX Editor commit adf0e178.
 //
 // Every packaged opener (the Format panel, the rail and canvas menus) and any host chrome open
 // a dialog with `useEditorDialog(key).open()`, so a host renderer receives the request from all
@@ -36,6 +37,7 @@ import {
   type BulletsAndNumberingDialogProps,
 } from './BulletsAndNumberingDialog.tsx';
 import { ColumnsDialog, type ColumnsDialogProps } from './ColumnsDialog.tsx';
+import { EquationDialog, type EquationDialogProps } from './EquationDialog.tsx';
 import { markReadingPopup } from '@pptx-editor.dev/core/editor';
 import { usePptxEditor } from './context.ts';
 import type { PptxEditorContextMenuProps } from './context-menu-parts.tsx';
@@ -170,6 +172,12 @@ export interface PptxEditorPopups {
    */
   imageProperties?: PptxEditorPopup<ImagePropertiesDialogProps>;
   /**
+   * Insert > Equation: a gallery and the linear form of an equation, which inserts an equation
+   * or edits the selected one. `false` turns it off; `insertEquation` and `setEquation` keep
+   * working from the API.
+   */
+  equation?: PptxEditorPopup<EquationDialogProps>;
+  /**
    * The menu of a section header in the slide rail and in the slide sorter (Rename, Remove,
    * Move, Collapse all). A callback renders the host's menu, or `SectionContextMenu` with its
    * own options; `false` shows no menu. The section commands keep working from the API.
@@ -186,7 +194,8 @@ export type PptxEditorDialogKey =
   | 'bulletsAndNumbering'
   | 'columns'
   | 'imageAltText'
-  | 'imageProperties';
+  | 'imageProperties'
+  | 'equation';
 
 /** What `useEditorDialog` returns. @public */
 export interface UseEditorDialogReturn {
@@ -349,6 +358,7 @@ function ActiveDialog({ host }: { host: DialogHost }): ReactNode {
     return renderEntry(popups?.imageAltText, ImageAltTextDialog, props);
   if (active === 'imageProperties')
     return renderEntry(popups?.imageProperties, ImagePropertiesDialog, props);
+  if (active === 'equation') return renderEntry(popups?.equation, EquationDialog, props);
   return null;
 }
 

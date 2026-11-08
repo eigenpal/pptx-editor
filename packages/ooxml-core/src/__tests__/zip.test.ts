@@ -1,6 +1,6 @@
-// Tests for the bounded ZIP reader at the trust boundary: the size and ratio caps from DOCX
-// Editor (`zip.ts` at 7cd3776a), the layout and limit checks from PPTX Editor (S1, S6), the
-// path rules, and OPC-equivalent duplicates.
+// Tests for the bounded ZIP reader at the trust boundary: the size and ratio caps from DOCX Editor
+// (`packages/core/src/store/package/zip.ts` at 7cd3776a), the layout and limit checks from PPTX
+// Editor (S1, S6), the path rules, and OPC-equivalent duplicates.
 
 import { describe, expect, test } from 'bun:test';
 import { strToU8, zipSync } from 'fflate';
@@ -210,7 +210,7 @@ describe('OPC-equivalent duplicates are refused', () => {
   });
 });
 
-// Ported from docx-editor/packages/core/src/store/__tests__/package-open-tolerance.test.ts at
+// After docx-editor/packages/core/src/store/__tests__/package-open-tolerance.test.ts at
 // 8f541b37 (EigenPal): the ratio cap at its exact boundaries.
 describe('the ratio cap at its boundaries', () => {
   const generous: ZipLimits = { maxEntries: 100, maxTotalBytes: 256 * 1024 * 1024, maxRatio: 200 };

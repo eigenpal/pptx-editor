@@ -1,6 +1,6 @@
-// Public API snapshots, as in docx-editor/scripts/api-extractor.mjs: one report per published
-// entry point in docs/api/<slug>/<entry>.api.md. `--local` rewrites the snapshots; without it,
-// any drift fails. Packages must be built first (`bun run build:packages`).
+// Public API snapshots, as in docx-editor/scripts/api-extractor.mjs: one report per published entry
+// point in docs/api/<slug>/<entry>.api.md. `--local` rewrites the snapshots; without it, any drift
+// fails. Packages must be built first (`bun run build:packages`). DOCX Editor commit adf0e178.
 import { Extractor, ExtractorConfig } from '@microsoft/api-extractor';
 import { existsSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';

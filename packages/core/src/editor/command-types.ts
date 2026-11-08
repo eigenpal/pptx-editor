@@ -38,6 +38,7 @@ const COMMAND_TABLE = {
   clearFormatting: true,
   setVerticalAlign: true,
   setAutofit: true,
+  setTextWarp: true,
   setParagraphFormat: true,
   toggleSuperscript: true,
   toggleSubscript: true,
@@ -55,6 +56,8 @@ const COMMAND_TABLE = {
   insertShape: true,
   insertLine: true,
   insertImage: true,
+  insertEquation: true,
+  setEquation: true,
   // Arrange
   order: true,
   alignObjects: true,
@@ -95,6 +98,11 @@ const COMMAND_TABLE = {
   deleteSlides: true,
   moveSlides: true,
   setSlideNumbers: true,
+  setTransition: true,
+  addAnimation: true,
+  removeAnimation: true,
+  moveAnimation: true,
+  setAnimationTiming: true,
   setFooter: true,
   setDateTime: true,
   setSlideBackground: true,
@@ -114,6 +122,7 @@ const COMMAND_TABLE = {
   replaceAll: true,
   // View settings
   toggleSmartGuides: true,
+  showAnimationOrder: true,
   setTableBorderPen: true,
   setPresentationView: true,
   setSectionsCollapsed: true,
@@ -127,6 +136,11 @@ const COMMAND_TABLE = {
   setImageStyle: true,
   setImageProperties: true,
   setAltText: true,
+  // Charts
+  setChartData: true,
+  // Diagrams
+  addDiagramShape: true,
+  deleteDiagramShape: true,
   // Tables
   insertTable: true,
   insertRow: true,
@@ -148,6 +162,13 @@ const COMMAND_TABLE = {
   distributeColumns: true,
   pasteCells: true,
   setTableGrid: true,
+  // Comments
+  addComment: true,
+  replyToComment: true,
+  editComment: true,
+  deleteComment: true,
+  resolveComment: true,
+  reopenComment: true,
 } as const satisfies Record<EditorCommandType, true>;
 
 /** Every `EditorCommand['type']`, checked against the union by the compiler. @internal */
@@ -180,4 +201,5 @@ export const INSERT_COMMAND_TYPES: ReadonlySet<EditorCommandType> = new Set([
   'insertTextBox',
   'insertImage',
   'insertTable',
+  'insertEquation',
 ]);

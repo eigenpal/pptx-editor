@@ -8,7 +8,8 @@
 // so typing on a slide keeps them. New Slide reads only the layout of the current slide, not
 // its index (`structureSlideKey`), so moving between slides on one layout keeps its answer.
 
-import type { CanResult, EditorCommand } from '../contracts/index.ts';
+import type { CanResult, EditorCommand, TextPoint } from '../contracts/index.ts';
+import { comparePoints } from '../automation/commands/text-model.ts';
 import { newSlideLayout } from '../automation/commands/slide-layouts.ts';
 import {
   changedPartNames,
@@ -211,7 +212,7 @@ export function typingBox(selection: {
   focus?: unknown;
 }): string | undefined {
   if (selection.kind !== 'text') return undefined;
-  const caret = JSON.stringify(selection.anchor) === JSON.stringify(selection.focus);
+  const caret = comparePoints(selection.anchor as TextPoint, selection.focus as TextPoint) === 0;
   return JSON.stringify([selection.nodeId, selection.cell ?? null, caret]);
 }
 

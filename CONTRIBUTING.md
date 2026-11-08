@@ -53,6 +53,7 @@ The demo builds against workspace source, so it needs no package build.
      The preload fails a test that leaves such a copy, and fails the run when a prototype differs at the end.
 
    - `bun run test --shard 1/3 --balance` runs one CI shard. `--only FILE`, `--exclude PREFIX`, `--jobs N`, `--fail-fast`, and `--retry-failed` are also available. Arguments after `--` go to each `bun test`.
+   - Copy DOCX Editor pro code only into `packages/pro`, never into an Apache-2.0 package.
 5. Add a changeset for code changes with `bun changeset`. Documentation, test, and CI-only changes do not need one.
 6. Submit a pull request against `main` with a conventional-commit title.
 
@@ -164,7 +165,7 @@ A new entry or kind is written only with `--accept-worse`. In CI, `scripts/fidel
 
 ### Add a fixture
 
-1. Add the deck to `scripts/fixtures/build.ts` and run `bun run fixtures:build`. Use only the open fonts of the engine (Carlito, Liberation Sans, Serif, and Mono, Noto Sans CJK JP) and of `fixtures/fonts/` (Noto Sans Arabic, Noto Sans Symbols 2). Name a font for every script in the deck, also in the theme, so the presentation app uses no fallback font.
+1. Add the deck to `scripts/fixtures/build.ts` and run `bun run fixtures:build`. Use only the open fonts of the engine (Carlito, Liberation Sans, Serif, and Mono, Noto Sans CJK JP) and of `fixtures/fonts/` (Noto Sans Arabic, Noto Sans Symbols 2, STIX Two Math). Name a font for every script in the deck, also in the theme, so the presentation app uses no fallback font.
 2. Install those fonts where the presentation app runs, open the deck, and export `fixtures/<name>.pdf`. Any machine can export a reference.
 3. Run `bun run fidelity:record-reference <name>`. It records the deck and PDF hashes, the page count, and the page size in `fixtures/references.json`. A missing or stale reference is a gap, never a pass.
 4. Run `bun run fidelity <name> --update-gaps --accept-worse`, and commit the deck, the PDF, `references.json`, and `thresholds.ts`.
@@ -184,6 +185,12 @@ Schema validation cannot show a repair prompt. `bun run fidelity:roundtrip -- --
 A feature row claims full rendering only when every fixture of the row passes the harness, the row owns no approximation but the line model, glyph advances, and missing glyphs, and its notes name no rendering gap.
 
 A feature row claims a full round trip only with its own edit. `FEATURE_EDITS` in `scripts/fidelity/feature-edits.ts` holds one recipe per row: it edits a fixture of the row through the public editor API, saves, reopens, and finds the edit again. The check of a recipe must fail on the unedited deck, a second save must give the same package, and the edit must change only the parts it owns. `bun test scripts/fidelity/feature-edits.test.ts` runs every recipe. `bun scripts/fidelity/feature-edits.ts --out <dir>` writes one edited copy per row. A row that claims `preserved` also needs a recipe: it edits next to the kept content or its box, and its check finds the content as it was. A recipe with `collaborate` edits in two editors on linked replicas, each with its own collaboration session. Add the row and the fingerprint of its copy to `SAVE_VERIFIED_FEATURE_EDITS` only after the copy opens with no prompt. When a change gives a copy with another fingerprint, the test fails: open the new copy, and record its fingerprint.
+
+A row that claims `preserved` also keeps its content through structural edits. `KEPT_CONTENT_EDITS` in `scripts/fidelity/kept-content-edits.ts` duplicates the slide of each such row, pastes its kept objects on a new slide and into another deck, and groups them. Its check finds each kept object with the same XML and the same parts, and every relationship names a part that exists. `bun test scripts/fidelity/kept-content-edits.test.ts` runs every recipe, and `bun scripts/fidelity/kept-content-edits.ts --out <dir>` writes one copy per recipe. Record each copy in `SAVE_VERIFIED_KEPT_CONTENT_EDITS` only after it opens with no prompt.
+
+`COMMENT_EDITS` in `scripts/fidelity/comment-edits.ts` edits comments in both formats, on duplicated slides, and in two collaborating editors. `bun test scripts/fidelity/comment-edits.test.ts` runs every recipe, and `bun scripts/fidelity/comment-edits.ts --out <dir>` writes one copy per recipe. Record each copy in `SAVE_VERIFIED_COMMENT_EDITS` only after it opens with no prompt. The fingerprint of a collaboration recipe leaves out the numbers of the session's id stripe, because they depend on the sessions that ran before in the process.
+
+A repair prompt holds the open of a deck until you answer it. To check many copies, open each one as a file manager does, and wait until the presentation application lists it as open. First, prove the check with a deck that must prompt, such as a copy with a slide part removed.
 
 Name every approximation in `packages/core/src/layout/approximations.ts`, in `docs/site/content/pptx-fidelity.mdx`, and in the evidence of each feature row that it changes (`docs/site/data/pptx-feature-evidence.ts`). Tests keep the lists equal.
 

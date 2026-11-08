@@ -164,7 +164,7 @@ export const BulletsAndNumberingDialog: typeof BulletsAndNumberingDialogRoot & {
 };
 
 // @public
-export type BulletsAndNumberingDialogFieldName = 'bullet' | 'number' | 'style' | 'char' | 'font' | 'sizePercent' | 'color' | 'numberStyle' | 'numberSizePercent' | 'numberColor' | 'startAt';
+export type BulletsAndNumberingDialogFieldName = 'bullet' | 'number' | 'style' | 'char' | 'font' | 'picture' | 'sizePercent' | 'color' | 'numberStyle' | 'numberSizePercent' | 'numberColor' | 'startAt';
 
 // @public
 export interface BulletsAndNumberingDialogProps extends DialogCustomizationProps {
@@ -340,6 +340,34 @@ export { EditorRejection }
 export { EditorRemoval }
 
 export { EditorSnapshot }
+
+// @public
+export const EquationDialog: typeof EquationDialogRoot & {
+    Header: (props: DialogPartProps) => ReactNode;
+    Title: (props: DialogPartProps) => ReactNode;
+    Body: (props: DialogPartProps) => ReactNode;
+    Footer: (props: DialogPartProps) => ReactNode;
+    Field: (props: DialogPartProps & {
+        readonly name: EquationDialogFieldName;
+    }) => ReactNode;
+    Error: (props: DialogPartProps) => ReactNode;
+    Apply: (props: DialogPartProps) => ReactNode;
+    Cancel: (props: DialogPartProps) => ReactNode;
+};
+
+// @public
+export type EquationDialogFieldName = 'gallery' | 'linear';
+
+// @public
+export interface EquationDialogFields {
+    readonly linear: string;
+}
+
+// @public
+export interface EquationDialogProps extends DialogCustomizationProps {
+    readonly onClose: () => void;
+    readonly open: boolean;
+}
 
 // @public
 export function FillControl(input: FillControlProps): react.JSX.Element;
@@ -1076,6 +1104,18 @@ export const PptxEditor: react.ForwardRefExoticComponent<PptxEditorProps & react
         Apply: (props: DialogPartProps) => ReactNode;
         Cancel: (props: DialogPartProps) => ReactNode;
     };
+    EquationDialog: ((props: EquationDialogProps) => ReactNode) & {
+        Header: (props: DialogPartProps) => ReactNode;
+        Title: (props: DialogPartProps) => ReactNode;
+        Body: (props: DialogPartProps) => ReactNode;
+        Footer: (props: DialogPartProps) => ReactNode;
+        Field: (props: DialogPartProps & {
+            readonly name: EquationDialogFieldName;
+        }) => ReactNode;
+        Error: (props: DialogPartProps) => ReactNode;
+        Apply: (props: DialogPartProps) => ReactNode;
+        Cancel: (props: DialogPartProps) => ReactNode;
+    };
     ParagraphDialog: ((input: ParagraphDialogProps) => ReactNode) & {
         Header: (props: DialogPartProps) => ReactNode;
         Title: (props: DialogPartProps) => ReactNode;
@@ -1158,7 +1198,7 @@ export interface PptxEditorContextMenuProps {
 }
 
 // @public
-export type PptxEditorDialogKey = 'pageSetup' | 'background' | 'paragraph' | 'font' | 'bulletsAndNumbering' | 'columns' | 'imageAltText' | 'imageProperties';
+export type PptxEditorDialogKey = 'pageSetup' | 'background' | 'paragraph' | 'font' | 'bulletsAndNumbering' | 'columns' | 'imageAltText' | 'imageProperties' | 'equation';
 
 export { PptxEditorEvents }
 
@@ -1191,6 +1231,7 @@ export interface PptxEditorPopups {
     bulletsAndNumbering?: PptxEditorPopup<BulletsAndNumberingDialogProps>;
     columns?: PptxEditorPopup<ColumnsDialogProps>;
     contextMenu?: PptxEditorPopup<PptxEditorContextMenuProps>;
+    equation?: PptxEditorPopup<EquationDialogProps>;
     find?: PptxEditorPopup<FindPopupProps>;
     font?: PptxEditorPopup<FontDialogProps>;
     hyperlink?: PptxEditorPopup<HyperlinkPopupProps>;
@@ -1204,6 +1245,7 @@ export interface PptxEditorPopups {
 
 // @public
 export interface PptxEditorProps {
+    readonly author?: string;
     readonly autoCorrect?: boolean;
     readonly children?: ReactNode;
     readonly className?: string;
@@ -1247,6 +1289,7 @@ export const PptxEditorRoot: react.ForwardRefExoticComponent<PptxEditorRootProps
 
 // @public
 export interface PptxEditorRootProps {
+    readonly author?: string;
     readonly autoCorrect?: boolean;
     readonly children?: ReactNode;
     readonly colorMode?: ColorMode;
@@ -1433,6 +1476,7 @@ export interface SidePanelProps {
     readonly className?: string;
     readonly onClose?: () => void;
     readonly onTabChange?: (tab: SidePanelTab) => void;
+    readonly panes?: Partial<Record<SidePanelTab, ReactNode>>;
     readonly paneWidth?: number;
     readonly style?: CSSProperties;
     readonly tab?: SidePanelTab;
@@ -1632,6 +1676,7 @@ export interface ToolbarGroupProps {
 
 // @public
 export interface ToolbarNamedParts {
+    readonly AddComment: ToolbarPartComponent;
     readonly AddSection: ToolbarPartComponent;
     readonly Alignment: ToolbarSlotPartComponent;
     readonly AlignObjects: ToolbarSlotPartComponent;
@@ -1641,13 +1686,19 @@ export interface ToolbarNamedParts {
     readonly BulletStyle: ToolbarSlotPartComponent;
     readonly ChangeCase: ToolbarSlotPartComponent;
     readonly CharacterSpacing: ToolbarSlotPartComponent;
+    readonly ChartEditData: ToolbarPartComponent;
     readonly ClearFormatting: ToolbarPartComponent;
     readonly CollapseAllSections: ToolbarPartComponent;
     readonly Columns: ToolbarSlotPartComponent;
     readonly Copy: ToolbarPartComponent;
     readonly Cut: ToolbarPartComponent;
     readonly Delete: ToolbarPartComponent;
+    readonly DiagramAddAfter: ToolbarPartComponent;
+    readonly DiagramAddBefore: ToolbarPartComponent;
+    readonly DiagramAddBelow: ToolbarPartComponent;
+    readonly DiagramDelete: ToolbarPartComponent;
     readonly Duplicate: ToolbarPartComponent;
+    readonly Equation: ToolbarPartComponent;
     readonly ExpandAllSections: ToolbarPartComponent;
     readonly Find: ToolbarPartComponent;
     readonly Font: ToolbarPartComponent;
@@ -1737,6 +1788,7 @@ export interface ToolbarNamedParts {
     readonly TableTotalRow: ToolbarPartComponent;
     readonly TextBox: ToolbarPartComponent;
     readonly TextDirection: ToolbarSlotPartComponent;
+    readonly TextEffects: ToolbarSlotPartComponent;
     readonly Underline: ToolbarPartComponent;
     readonly Undo: ToolbarPartComponent;
     readonly UngroupObjects: ToolbarPartComponent;
@@ -1963,6 +2015,12 @@ export interface UseEditorValueCommandReturn<V, S = V> {
     readonly options: readonly V[];
     readonly value: S | null;
 }
+
+// @public
+export function useEquationDialog(): UseEquationDialogReturn;
+
+// @public
+export type UseEquationDialogReturn = UseDialogReturn<EquationDialogFields>;
 
 // @public
 export function useFontDialog(): UseFontDialogReturn;

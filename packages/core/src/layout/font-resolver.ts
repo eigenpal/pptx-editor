@@ -1,5 +1,8 @@
-// Copied from DOCX Editor `packages/core/src/layout/font-resolver.ts` at commit 5993bd223.
-// Keep the exported API equal to the source.
+// Adapted from DOCX Editor `packages/core/src/layout/font-resolver.ts` at commit adf0e178.
+// Keep the exported API equal to the source. Two changes: two `push(...items)` calls are loops,
+// because the DOM-free lanes never spread an array into a call (`pptx/no-varargs-spread`), and
+// the font contracts come from `../contracts/editor-fonts.ts`, where DOCX Editor imports
+// `@docx-editor.dev/core/contracts/editor`.
 
 import { supportedFontFamilies } from './supported-font-families.ts';
 // Telling an ON-DEMAND font resolver apart from a zero-argument font LOADER.

@@ -8,7 +8,7 @@
 // The reader keeps these parts as bytes, so a save writes them back unchanged. They are parsed
 // here with the same bounded XML reader as every other part. Only internal parts of the
 // expected relationship type resolve; an external target is never fetched. The approach
-// follows DOCX Editor (EigenPal), `packages/core/src/store/package/diagram-parts.ts`.
+// follows DOCX Editor (EigenPal), `packages/core/src/store/package/diagram-parts.ts` at adf0e178.
 
 import {
   attr,

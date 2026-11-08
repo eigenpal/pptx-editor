@@ -27,7 +27,7 @@ import {
 } from '../index.ts';
 
 // The customization ladder and the popups registry, as in DOCX Editor
-// (docs/site/content/customization/toolbar.mdx and dialogs.mdx).
+// (docs/site/content/customization/toolbar.mdx and dialogs.mdx). DOCX Editor commit adf0e178.
 
 const IN = 914_400;
 

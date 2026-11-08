@@ -20,6 +20,7 @@ import { attr, children, elements } from './query.ts';
 import { NS, REL } from './namespaces.ts';
 import { repairPresentationRoot } from './presentation-repair.ts';
 import { markFileTimings, repairTimingRoot } from './timing.ts';
+import { repairTransitionRoot } from './transition-repair.ts';
 import { sha256FontBytes } from '@eigenpal/ooxml-core';
 import { DerivedParts } from './parts-map.ts';
 import {
@@ -87,8 +88,21 @@ const REQUIRED_TYPES = new Set(
   ].map(asciiFold)
 );
 
-/** Content types the engine reads but can do without. A part that does not parse is kept as bytes. */
-const OPTIONAL_TYPES = new Set([`${PML}tableStyles+xml`, `${PML}handoutMaster+xml`].map(asciiFold));
+/**
+ * Content types the engine reads but can do without. A part that does not parse is kept as bytes.
+ * The comment lists and author lists of both comment formats are trees, so the comment commands
+ * edit them node by node, and two collaborators who edit one list at once keep both edits.
+ */
+const OPTIONAL_TYPES = new Set(
+  [
+    `${PML}tableStyles+xml`,
+    `${PML}handoutMaster+xml`,
+    `${PML}comments+xml`,
+    `${PML}commentAuthors+xml`,
+    `${PPT_MACRO}comments+xml`,
+    `${PPT_MACRO}authors+xml`,
+  ].map(asciiFold)
+);
 
 /**
  * How the reader treats a part.
@@ -404,7 +418,8 @@ export function writePptx(pkg: PptxPackage): Uint8Array<ArrayBuffer> {
   );
   // The presentation part leaves with one extension list, one section list, and one slide id
   // for each slide that has a relationship and a part. A slide whose `p:timing` the session
-  // changed leaves with no empty time node list or build list in it (`repairTimingRoot`).
+  // changed leaves with no empty time node list or build list in it (`repairTimingRoot`), and
+  // a slide leaves with one transition, before its timing (`repairTransitionRoot`).
   const main = mainPresentationPart(pkg);
   for (const part of ordered)
     entries.set(
@@ -415,7 +430,7 @@ export function writePptx(pkg: PptxPackage): Uint8Array<ArrayBuffer> {
               part.partName === main
                 ? { ...part.xml, root: repairedPresentationRoot(pkg) ?? part.xml.root }
                 : isSlideRoot(part.xml.root)
-                  ? { ...part.xml, root: repairTimingRoot(part.xml.root) }
+                  ? { ...part.xml, root: repairTransitionRoot(repairTimingRoot(part.xml.root)) }
                   : part.xml
             )
           )
@@ -548,7 +563,26 @@ export interface Relationship {
   readonly target?: string;
   /** External: the raw URI, retained verbatim and NEVER fetched. */
   readonly externalTarget?: string;
+  /**
+   * External: a relative path to another file (`report.pdf`, `../docs/a%20b.pdf`), retained
+   * verbatim. It is NEVER fetched or opened: a page cannot reach the file.
+   */
+  readonly relativeTarget?: string;
   readonly external: boolean;
+}
+
+/**
+ * Whether an external target is a plain relative path: no scheme, no absolute or network path,
+ * no backslash, query, or fragment, no control character, and no `.` or `..` step past two
+ * leading `..` steps.
+ */
+function isRelativeFileTarget(target: string): boolean {
+  if (target.length === 0 || target.length > 2048) return false;
+  if (/[\\?#:\p{Cc}]/u.test(target) || target.startsWith('/')) return false;
+  const steps = target.split('/');
+  let i = 0;
+  while (i < 2 && steps[i] === '..') i += 1;
+  return steps.slice(i).every((s) => s !== '' && s !== '.' && s !== '..');
 }
 
 /** The `.rels` part name for a source part (`/` for the package). */
@@ -575,7 +609,13 @@ export function relationshipsOf(pkg: PptxPackage, source: string): readonly Rela
     if (!id || !type || target === undefined) continue;
     if (attr(el, 'TargetMode') === 'External') {
       const ok = validateExternalTarget(target);
-      out.push({ id, type, external: true, ...(ok.ok ? { externalTarget: target } : {}) });
+      const relative = !ok.ok && isRelativeFileTarget(target);
+      out.push({
+        id,
+        type,
+        external: true,
+        ...(ok.ok ? { externalTarget: target } : relative ? { relativeTarget: target } : {}),
+      });
       continue;
     }
     const resolved = resolveInternalTarget(owner, target);

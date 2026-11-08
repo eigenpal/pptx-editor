@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Copied from DOCX Editor (docx-editor/scripts/check-adapter-css-thin.mjs), with the PPTX
+// Adapted from DOCX Editor (docx-editor/scripts/check-adapter-css-thin.mjs at 39dddbb08), with the PPTX
 // package names. Guards the single-source-of-truth rule for chrome styling: each adapter's
 // `src/styles/editor.css` only imports the shared core stylesheet. No tokens and no UI rules
 // may fork into one adapter. If this fails, move the style into

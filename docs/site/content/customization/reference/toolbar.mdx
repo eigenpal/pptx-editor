@@ -18,6 +18,8 @@ The toolbar shows only the groups that act on the selection:
 | Text with the caret or a text range in it | `history`, `font`, `text`, `paragraph`, `list`, `insert`, `format` |
 | One or more shapes | `history`, `font`, `text`, `paragraph`, `insert`, `shape`, `format`, `arrange`, `more` |
 | Pictures only | `history`, `insert`, `image`, `arrange`, `more` |
+| One chart | `history`, `insert`, `chart`, `arrange`, `more` |
+| One diagram, or the caret in a diagram shape | `history`, `insert`, `diagram`, `arrange`, `more` |
 | Text in a table cell, or a range of cells | `history`, `font`, `text`, `paragraph`, `list`, `insert`, `format`, `table` |
 | A table, selected as an object | `history`, `font`, `text`, `paragraph`, `insert`, `format`, `arrange`, `more`, `table` |
 | The speaker notes field, while it has focus | `history`, `text.bold`, `text.italic`, `text.underline`, and `text.strike` (they format the notes), and `find` |
@@ -26,8 +28,8 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 
 - A `Toolbar.Slot` or named part for a slot of these groups changes that control. It shows while its group shows.
 - A `Toolbar.Slot` for a slot that no context shows, such as a slot marked with an asterisk, goes after the groups and shows for every selection.
-- An application group with `after` follows its anchor. When the selection does not show the anchor, the group follows the nearest shown group before the anchor, in this order: `history`, `font`, `text`, `script`, `paragraph`, `list`, `insert`, `image`, `shape`, `format`, `arrange`, `more`, `slide`, `find`, `table`. With `contextual={false}`, it follows the order of that bar: its groups, then `image` and `table`.
-- Set `contextual={false}` to show every group for every selection. The controls that cannot run are disabled with the engine's reason, and the `image` or `table` group joins after the other groups. The bar then has no `slide` group, so a placed `slide.background` or `slide.layout` goes after the groups. The slots marked with an asterisk stay off the bar in both modes.
+- An application group with `after` follows its anchor. When the selection does not show the anchor, the group follows the nearest shown group before the anchor, in this order: `history`, `font`, `text`, `script`, `paragraph`, `list`, `insert`, `image`, `chart`, `diagram`, `shape`, `format`, `arrange`, `more`, `slide`, `find`, `table`. With `contextual={false}`, it follows the order of that bar: its groups, then `image`, `chart`, `diagram`, and `table`.
+- Set `contextual={false}` to show every group for every selection. The controls that cannot run are disabled with the engine's reason, and the `image`, `chart`, `diagram`, and `table` groups join after the other groups. The bar then has no `slide` group, so a placed `slide.background` or `slide.layout` goes after the groups. The slots marked with an asterisk stay off the bar in both modes.
 - A `preset={false}` bar shows the slots you place for every selection.
 
 | Group identifier | Slot identifiers |
@@ -38,8 +40,8 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 | `script` | `script.super`\*, `script.sub`\* |
 | `paragraph` | `paragraph.align`, `paragraph.textDirection`, `paragraph.valign`, `paragraph.columns`\*, `paragraph.dialog` (contextual) |
 | `list` | `list.bullet`, `list.bulletStyle`, `list.numbered`, `list.numberStyle`, `list.outdent`, `list.indent`, `list.lineSpacing` |
-| `insert` | `insert.textBox`, `insert.line`, `insert.shape`, `insert.image` |
-| `shape` | `shape.styles`\*, `shape.fill`, `shape.lineColor`, `shape.lineWidth`, `shape.lineStart`, `shape.lineEnd`, `shape.lineDash`, `shape.effects`\*, `shape.properties`\* |
+| `insert` | `insert.textBox`, `insert.line`, `insert.shape`, `insert.image`, `insert.equation` |
+| `shape` | `shape.styles`\*, `shape.fill`, `shape.lineColor`, `shape.lineWidth`, `shape.lineStart`, `shape.lineEnd`, `shape.lineDash`, `shape.effects`\*, `shape.textEffects`\*, `shape.properties`\* |
 | `format` | `format.painter`, `format.clear` |
 | `arrange` | `arrange.order`, `arrange.align`, `arrange.rotate`\*, `arrange.group`, `arrange.ungroup`, `arrange.selectionPane`\* |
 | `more` | `more.duplicate`, `more.delete` |
@@ -50,6 +52,9 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 | `slide` (contextual) | `slide.background`, `slide.add`, `slide.layout`, `slide.reset`, `slide.hide` |
 | `section` (contextual) | `section.add`, `section.rename`, `section.remove`, `section.removeAll`, `section.collapseAll`, `section.expandAll` |
 | `table` (contextual, shown in a table) | `table.insert`, `table.headerRow`, `table.totalRow`, `table.bandedRows`, `table.firstColumn`, `table.lastColumn`, `table.bandedColumns`, `table.style`, `table.cellFill`, `table.borderTarget`, `table.borderColor`, `table.borderStyle`, `table.borderWidth`, `table.select`, `table.delete`, `table.insertRowAbove`, `table.insertRowBelow`, `table.insertColumnLeft`, `table.insertColumnRight`, `table.mergeCells`, `table.splitCell`, `table.distributeRows`, `table.distributeColumns`, `table.cellMargins` |
+| `chart` (contextual, shown for one chart) | `chart.editData` (opens the **Chart Data** tab of the side panel) |
+| `diagram` (contextual, shown for one diagram) | `diagram.addAfter`, `diagram.addBefore`, `diagram.addBelow`, `diagram.delete` |
+| `review` (contextual) | `review.addComment` (opens a new comment draft in the comments pane of `@pptx-editor.dev/pro`) |
 | `image` (contextual) | `image.corrections`, `image.color`, `image.transparency`, `image.change`, `image.reset`, `image.styles`, `image.altText`, `image.crop`, `image.cropToShape`, `image.cropFit`, `image.properties` |
 
 ## Named parts
@@ -89,6 +94,7 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 | `Toolbar.Line`                   | `insert.line`             |
 | `Toolbar.Shapes`                 | `insert.shape`            |
 | `Toolbar.ImageInsert`            | `insert.image`            |
+| `Toolbar.Equation`               | `insert.equation`         |
 | `Toolbar.ShapeFill`              | `shape.fill`              |
 | `Toolbar.LineColor`              | `shape.lineColor`         |
 | `Toolbar.LineWidth`              | `shape.lineWidth`         |
@@ -97,6 +103,7 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 | `Toolbar.LineDash`               | `shape.lineDash`          |
 | `Toolbar.ShapeStyles`            | `shape.styles`            |
 | `Toolbar.ShapeEffects`           | `shape.effects`           |
+| `Toolbar.TextEffects`            | `shape.textEffects`       |
 | `Toolbar.FormatShape`            | `shape.properties`        |
 | `Toolbar.FormatPainter`          | `format.painter`          |
 | `Toolbar.Order`                  | `arrange.order`           |
@@ -164,10 +171,16 @@ Hiding a group never turns off its commands: menus, shortcuts, and the ribbon st
 | `Toolbar.ImageCropToShape`       | `image.cropToShape`       |
 | `Toolbar.ImageCropFit`           | `image.cropFit`           |
 | `Toolbar.ImageProperties`        | `image.properties`        |
+| `Toolbar.ChartEditData`          | `chart.editData`          |
+| `Toolbar.DiagramAddAfter`        | `diagram.addAfter`        |
+| `Toolbar.DiagramAddBefore`       | `diagram.addBefore`       |
+| `Toolbar.DiagramAddBelow`        | `diagram.addBelow`        |
+| `Toolbar.DiagramDelete`          | `diagram.delete`          |
+| `Toolbar.AddComment`             | `review.addComment`       |
 
 ### Pickers
 
-Pickers take `className` and `hidden`: `Toolbar.FontFamily`, `Toolbar.FontSize`, `Toolbar.CharacterSpacing`, `Toolbar.ChangeCase`, `Toolbar.Alignment`, `Toolbar.TextDirection`, `Toolbar.VerticalAlignment`, `Toolbar.BulletStyle`, `Toolbar.NumberStyle`, `Toolbar.LineSpacing`, `Toolbar.Columns`, `Toolbar.Line`, `Toolbar.Shapes`, `Toolbar.LineWidth`, `Toolbar.LineStart`, `Toolbar.LineEnd`, `Toolbar.LineDash`, `Toolbar.ShapeStyles`, `Toolbar.ShapeEffects`, `Toolbar.Order`, `Toolbar.AlignObjects`, and `Toolbar.Rotate`. The color split controls (`Toolbar.FontColor`, `Toolbar.Highlight`, `Toolbar.ShapeFill`, `Toolbar.LineColor`) also take `icon`, the glyph over the color bar. A picker has no single element, so `asChild` on a picker slot prints a development warning and does nothing.
+Pickers take `className` and `hidden`: `Toolbar.FontFamily`, `Toolbar.FontSize`, `Toolbar.CharacterSpacing`, `Toolbar.ChangeCase`, `Toolbar.Alignment`, `Toolbar.TextDirection`, `Toolbar.VerticalAlignment`, `Toolbar.BulletStyle`, `Toolbar.NumberStyle`, `Toolbar.LineSpacing`, `Toolbar.Columns`, `Toolbar.Line`, `Toolbar.Shapes`, `Toolbar.LineWidth`, `Toolbar.LineStart`, `Toolbar.LineEnd`, `Toolbar.LineDash`, `Toolbar.ShapeStyles`, `Toolbar.ShapeEffects`, `Toolbar.TextEffects`, `Toolbar.Order`, `Toolbar.AlignObjects`, and `Toolbar.Rotate`. The color split controls (`Toolbar.FontColor`, `Toolbar.Highlight`, `Toolbar.ShapeFill`, `Toolbar.LineColor`) also take `icon`, the glyph over the color bar. A picker has no single element, so `asChild` on a picker slot prints a development warning and does nothing.
 
 ### Parts the bar does not show
 
