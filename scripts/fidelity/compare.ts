@@ -54,9 +54,11 @@ function differingBox(diff: PNG): [number, number, number, number] | undefined {
 /**
  * A bullet at the start of a line: symbols, punctuation, and private-use characters. A symbol
  * font can map one bullet glyph to other characters in each PDF, so line matching leaves bullets
- * out on both sides; the pixels check the glyph.
+ * out on both sides; the pixels check the glyph. A currency sign, a math sign, or a dash stays
+ * when text follows it with no space, because it is part of a number: `$1,200`, `−5`, `-5`.
  */
-const LEADING_BULLET = /^[\p{S}\p{P}\p{Co}]+\s*/u;
+const LEADING_BULLET =
+  /^(?:[\p{S}\p{P}\p{Co}]+(?=\s)|[\p{Sk}\p{So}\p{Co}\p{Pc}\p{Ps}\p{Pe}\p{Pi}\p{Pf}\p{Po}]+)\s*/u;
 
 /**
  * Right-to-left scripts. A PDF text layer of shaped Arabic or Hebrew text holds glyph forms or
