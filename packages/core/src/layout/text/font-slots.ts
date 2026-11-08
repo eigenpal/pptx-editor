@@ -106,24 +106,23 @@ function splitSlots(text: string, props: Pick<RunProps, 'lang' | 'altLang' | 'sy
   // The slot of each code point, at its first UTF-16 unit.
   const slots: (FontSlot | null)[] = new Array<FontSlot | null>(text.length).fill(null);
   const neutral: boolean[] = new Array<boolean>(text.length).fill(false);
-  let last: FontSlot | null = null;
-  for (let i = 0; i < text.length;) {
+  // A combining mark, a variation selector, a ZWJ, and the character after a ZWJ belong to
+  // the cluster before them: they take its final slot, after the passes below.
+  const follows: boolean[] = new Array<boolean>(text.length).fill(false);
+  for (let i = 0, joined = false; i < text.length;) {
     const cp = text.codePointAt(i) ?? 0;
     const len = cp > 0xffff ? 2 : 1;
     let slot = strongSlot(cp, eastAsianText, symbol);
-    if (
-      slot === 'latin' &&
-      last &&
-      cp >= 0x0300 &&
-      (cp === 0x200d || MARK.test(String.fromCodePoint(cp)))
-    )
-      slot = last;
-    if (slot === 'latin' && NEUTRAL.test(String.fromCodePoint(cp))) {
+    const mark = cp >= 0x0300 && (cp === 0x200d || MARK.test(String.fromCodePoint(cp)));
+    if (i > 0 && (joined || (slot === 'latin' && mark))) {
+      follows[i] = true;
+      slot = null;
+    } else if (slot === 'latin' && NEUTRAL.test(String.fromCodePoint(cp))) {
       neutral[i] = true;
       slot = null;
     }
     slots[i] = slot;
-    if (slot) last = slot;
+    joined = cp === 0x200d;
     i += len;
   }
   // Digits, punctuation, and symbols between complex-script characters, or between such a
@@ -133,7 +132,7 @@ function splitSlots(text: string, props: Pick<RunProps, 'lang' | 'altLang' | 'sy
   const strongAfter: (FontSlot | null)[] = new Array<FontSlot | null>(text.length).fill(null);
   for (let i = text.length - 1, next: FontSlot | null = null; i >= 0; i -= 1) {
     strongAfter[i] = next;
-    if (!neutral[i] && !isSpace(text.charCodeAt(i))) next = slots[i] ?? next;
+    if (!neutral[i] && !follows[i] && !isSpace(text.charCodeAt(i))) next = slots[i] ?? next;
   }
   for (let i = 0, before: FontSlot | null = null; i < text.length; i += 1) {
     if (neutral[i]) {
@@ -155,6 +154,11 @@ function splitSlots(text: string, props: Pick<RunProps, 'lang' | 'altLang' | 'sy
       // East Asian text takes the Latin space (reference PDF of `east-asian-theme-fonts`).
       slots[i] = before === 'cs' && after[i] === 'cs' ? 'cs' : 'latin';
     else if (!isSpace(text.charCodeAt(i))) before = slots[i] ?? before;
+  }
+  // One grapheme cluster never splits across faces (a keycap `1️⃣`, an emoji `❤️`).
+  for (let i = 1, prev: FontSlot = slots[0] ?? 'latin'; i < text.length; i += 1) {
+    if (follows[i]) slots[i] = prev;
+    else if (slots[i] !== null) prev = slots[i]!;
   }
   const out: SlotPiece[] = [];
   let pieceStart = 0;
