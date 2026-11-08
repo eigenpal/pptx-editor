@@ -628,7 +628,7 @@ export class SlideSurface {
     // A table: a caret in the cell, a cell range, or a grid line drag (surface-table.ts).
     // Shift+click on a table adds it to a shape selection, as Shift+click on any shape does.
     // A press on a shape of a multiple selection moves the whole selection, also on its text.
-    const moveAll = !e.shiftKey && !!id && inMultiple(sel, id, group);
+    const moveAll = !e.shiftKey && inMultiple(sel, id, group, painting || this.editor.readOnly());
     const addShape = (e.shiftKey && sel.kind === 'shapes') || moveAll;
     // The format painter paints a cell's word or a cell range, as on a text box.
     const table = id && !addShape ? this.#table.down(layout, id, p, e.shiftKey, painting) : null;
@@ -765,7 +765,7 @@ export class SlideSurface {
     }
     const id = (scope ? this.#hit(p, scope) : undefined) ?? this.#hit(p);
     const item = id ? itemById(layout, id) : undefined;
-    const moveAll = !!id && !this.editor.readOnly() && inMultiple(sel, id, scope);
+    const moveAll = inMultiple(sel, id, scope, this.editor.readOnly());
     const table = id && layout && !moveAll ? this.#table.cursor(layout, id, p) : undefined;
     const cursor = table
       ? table

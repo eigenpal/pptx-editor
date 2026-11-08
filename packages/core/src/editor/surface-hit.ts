@@ -164,11 +164,19 @@ export function onBorder(item: LayoutItem, p: Point, zoom: number): boolean {
 }
 
 /**
- * Whether `id` is one shape of a selection of two or more shapes in the scope `group`. A press
- * on it, also on its text, moves the whole selection. @internal
+ * Whether a press on `id` moves the whole selection: `id` is one shape of a selection of two or
+ * more shapes in the scope `group`, also when the press is on its text. Never while `locked` (a
+ * viewer, or the format painter), where a press on text keeps its own meaning. @internal
  */
-export function inMultiple(sel: EditorSelection, id: string, group: string | undefined): boolean {
+export function inMultiple(
+  sel: EditorSelection,
+  id: string | undefined,
+  group: string | undefined,
+  locked: boolean
+): boolean {
   return (
+    !locked &&
+    id !== undefined &&
     sel.kind === 'shapes' &&
     sel.nodeIds.length > 1 &&
     sel.group === group &&

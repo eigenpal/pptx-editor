@@ -493,6 +493,57 @@ describe('the surface', () => {
     e.destroy();
   });
 
+  test('a double-click on the text of one shape in a multiple selection edits that text', async () => {
+    const { e, press, release, dblclick } = await attached();
+    const id = idOf(e, 'T');
+    e.setSelection({ kind: 'shapes', nodeIds: [id, idOf(e, 'B')] });
+    const c = caretAt(textItem(e), caret(1, 3))!;
+    const y = (c.y1 + c.y2) / 2;
+    press(c.x1, y);
+    release();
+    press(c.x1, y);
+    release();
+    dblclick(c.x1, y);
+    expect(e.snapshot().selection).toEqual({
+      kind: 'text',
+      nodeId: id,
+      anchor: caret(1, 0),
+      focus: caret(1, 6),
+    });
+    // The third press selects the paragraph.
+    press(c.x1, y);
+    release();
+    expect(e.snapshot().selection).toMatchObject({ anchor: caret(1, 0), focus: caret(1, 11) });
+    e.destroy();
+  });
+
+  test('the format painter and a viewer keep a press on the text of a multiple selection', async () => {
+    const { e, press, release, move } = await attached();
+    const ids = [idOf(e, 'T'), idOf(e, 'B')];
+    const c = caretAt(textItem(e), caret(0, 3))!;
+    const y = (c.y1 + c.y2) / 2;
+    // The format painter paints the word under the pointer, not every selected shape.
+    e.setSelection({ kind: 'shapes', nodeIds: [ids[1]] });
+    expect(e.exec({ type: 'toggleFormatPainter' }).ok).toBe(true);
+    e.setSelection({ kind: 'shapes', nodeIds: ids });
+    press(c.x1, y);
+    expect(e.snapshot().selection).toMatchObject({ kind: 'text', nodeId: ids[0] });
+    release();
+    expect(e.snapshot().formatPainter).toBe('off');
+    // A viewer's press on linked text places the caret there, and a drag moves nothing.
+    e.setSelection({ kind: 'text', nodeId: ids[0], anchor: caret(0, 0), focus: caret(0, 5) });
+    expect(e.exec({ type: 'setLink', url: 'https://example.test/' }).ok).toBe(true);
+    e.setMode('view');
+    e.setSelection({ kind: 'shapes', nodeIds: ids });
+    const xfrm = textItem(e).element.xfrm;
+    press(c.x1, y);
+    move(c.x1 + IN / 2, y);
+    release();
+    expect(e.snapshot().selection).toMatchObject({ kind: 'text', nodeId: ids[0] });
+    expect(textItem(e).element.xfrm).toEqual(xfrm);
+    e.destroy();
+  });
+
   test('a triple-click selects the paragraph under the pointer', async () => {
     const { e, press, release } = await attached();
     const id = idOf(e, 'T');
