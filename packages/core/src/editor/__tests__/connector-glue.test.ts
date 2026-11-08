@@ -495,9 +495,24 @@ describe('elbow segment drags', () => {
     const hits = nodes.filter((n) => n.getAttribute('class')?.includes('handle-hit'));
     expect(hits.map((n) => n.getAttribute('data-handle'))).toEqual(['segment0', 'segment1']);
     expect(Number(hits[1].getAttribute('r'))).toBe(11 * 9525);
-    // The end points paint last, over the segment handles.
+    // Every hit area paints under every diamond, and the end points paint last.
+    const kinds = nodes.map((n) => (n.getAttribute('class')?.includes('hit') ? 'hit' : 'other'));
+    expect(kinds.lastIndexOf('hit')).toBeLessThan(nodes.indexOf(diamonds[0]));
     expect(nodes.slice(-2).map((n) => n.getAttribute('data-handle'))).toEqual(['start', 'end']);
     await win.happyDOM.close();
+  });
+
+  test('with smart guides off, a segment still comes in line within the merge reach', async () => {
+    const e = await open(deck(ell));
+    dragSegment(e, 'C4', 1, { x: 3 * IN, y: 2 * IN });
+    const item = named(e, 'C4');
+    const [a, b] = elbowCorners(item)!.slice(1, 3);
+    const from = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const d = startDrag(e.session!.layout(0), 'segment1', [item.element.nodeId], from, 'g')!;
+    const near = { x: 4.99 * IN, y: 2 * IN };
+    const step = dragStep(d, near, { ...input, snapTo: null, mergeTo: 0.02 * IN });
+    expect(e.exec({ type: 'setTransforms', items: step.items }).ok).toBe(true);
+    expect(presetOf(e, 'C4')).toBe('bentConnector2');
   });
 
   test('a segment near another corner line snaps to it, so a bend comes out', async () => {

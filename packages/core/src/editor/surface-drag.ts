@@ -140,6 +140,11 @@ export interface StepInput {
   readonly aspectLocked: (nodeId: string) => boolean;
   /** How near a connection site a connector end glues to it, in EMU; null or absent: never. */
   readonly glueTo?: number | null;
+  /**
+   * How near a connector segment comes in line with another before it snaps to it, when smart
+   * guides are off, in EMU; null or absent: never. Without it, a bend is hard to take out.
+   */
+  readonly mergeTo?: number | null;
 }
 
 /** The boxes after the pointer moved to `p`, and the smart guides they snapped to. */
@@ -165,7 +170,8 @@ export function dragStep(
   if (d.handle === 'start' || d.handle === 'end')
     return { items: [moveLineEnd(d, p, input.shift)], guides };
   if (isSegment(d.handle)) {
-    const t = moveElbowSegment(d.items[0].item, segmentIndex(d.handle), d.start, p, input.snapTo);
+    const snap = input.snapTo ?? input.mergeTo ?? null;
+    const t = moveElbowSegment(d.items[0].item, segmentIndex(d.handle), d.start, p, snap);
     // Back where it started: nothing to write. A route the presets cannot draw keeps the last
     // route the drag showed.
     if (t === 'same') return { items: [], guides };

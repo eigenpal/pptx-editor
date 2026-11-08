@@ -81,6 +81,9 @@ export function handleElements(
 /** Segments shorter than this, in CSS pixels, show no handle: it would cover the ends. */
 const SHORTEST_SEGMENT = 24;
 
+/** Handles nearer than this, in CSS pixels, would cover each other: only the first shows. */
+const HANDLE_GAP = 16;
+
 type Point = { readonly x: number; readonly y: number };
 
 /** Points along an item's first drawn path on the slide, 32 for each curve. */
@@ -127,7 +130,9 @@ function segmentHandles(doc: Document, item: LayoutItem, px: number, label: stri
   // A curve bends between the corners: its handles sit on the drawn curve, nearest each middle.
   const curve = item.kind === 'shape' && item.geometry.paths[0]?.commands.some((c) => c.op === 'C');
   const drawn = curve ? drawnPoints(item) : [];
-  const out: Element[] = [];
+  const hits: Element[] = [];
+  const diamonds: Element[] = [];
+  const placed: Point[] = [];
   for (let i = 0; i < corners.length - 1; i += 1) {
     const a = apply(item.parentMatrix, corners[i].x, corners[i].y);
     const b = apply(item.parentMatrix, corners[i + 1].x, corners[i + 1].y);
@@ -136,6 +141,9 @@ function segmentHandles(doc: Document, item: LayoutItem, px: number, label: stri
     if (!segmentMovable(item, corners, i)) continue;
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     const m = nearest(drawn, mid) ?? mid;
+    // Two handles this near would cover each other (on a curve they can meet): keep the first.
+    if (placed.some((q) => Math.hypot(q.x - m.x, q.y - m.y) < HANDLE_GAP * px)) continue;
+    placed.push(m);
     const r = px * 5;
     const axis = segmentAxis(a, b);
     const titled = (node: Element): Element => {
@@ -145,7 +153,7 @@ function segmentHandles(doc: Document, item: LayoutItem, px: number, label: stri
       node.append(title);
       return node;
     };
-    // A wider, unseen hit area first, so a finger or a quick pointer finds the small diamond.
+    // A wider, unseen hit area, so a finger or a quick pointer finds the small diamond.
     const hit = doc.createElementNS(SVG_NS, 'circle');
     hit.setAttribute('class', `pptx-surface__handle-hit pptx-surface__handle--segment-${axis}`);
     hit.setAttribute('cx', String(m.x));
@@ -161,9 +169,11 @@ function segmentHandles(doc: Document, item: LayoutItem, px: number, label: stri
       `M${m.x} ${m.y - r}L${m.x + r} ${m.y}L${m.x} ${m.y + r}L${m.x - r} ${m.y}Z`
     );
     node.setAttribute('stroke-width', String(px));
-    out.push(titled(hit), titled(node));
+    hits.push(titled(hit));
+    diamonds.push(titled(node));
   }
-  return out;
+  // Every hit area under every diamond, so no hit area covers a neighbor's diamond.
+  return [...hits, ...diamonds];
 }
 
 /**

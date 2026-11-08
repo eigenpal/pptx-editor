@@ -860,6 +860,7 @@ export class SlideSurface {
       shift: e.shiftKey,
       snapTo: this.#snapTo(e),
       glueTo: e.altKey ? null : (2 * SNAP_PX * EMU_PER_PX) / this.editor.zoom(),
+      mergeTo: e.altKey ? null : (2 * EMU_PER_PX) / this.editor.zoom(),
       aspectLocked: (id) => !!this.editor.aspectLocked?.(id),
     });
   };
