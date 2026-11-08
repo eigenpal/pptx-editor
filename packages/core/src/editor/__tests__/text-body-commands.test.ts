@@ -628,8 +628,11 @@ describe('column flow height', () => {
 });
 
 describe('approximations', () => {
-  test('mongolianVert and wordArtVertRtl report "other-vert"', () => {
-    for (const vert of ['mongolianVert', 'wordArtVertRtl']) {
+  test('mongolianVert reports "other-vert" and wordArtVertRtl "word-art-vert"', () => {
+    for (const [vert, id] of [
+      ['mongolianVert', 'other-vert'],
+      ['wordArtVertRtl', 'word-art-vert'],
+    ]) {
       const bytes = buildPptx({
         slides: [
           {
@@ -649,7 +652,7 @@ describe('approximations', () => {
       const r = readPptx(bytes);
       if (!r.ok) throw new Error('open failed');
       const found = layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer()).diagnostics;
-      expect(found).toContain('approximation: other-vert');
+      expect(found).toContain(`approximation: ${id}`);
     }
   });
 });

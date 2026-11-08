@@ -149,6 +149,18 @@ describe('font slots', () => {
     expect(fontSlotPieces('“引用”', props({ lang: 'ja-JP' })).map((p) => p.slot)).toEqual(['ea']);
   });
 
+  test('digits and punctuation take the complex-script slot in complex-script text', () => {
+    // Reference PDF of `rtl-text`, slide 2: the digits, full stops, and percent signs of an
+    // Arabic run draw in its `a:cs` face; its Latin letters keep the Latin face.
+    const arabic = props({ lang: 'ar-SA' });
+    expect(fontSlotPieces('عدد 45.5% Latin.', arabic).map((p) => p.slot)).toEqual([
+      'cs',
+      'latin',
+      'cs',
+    ]);
+    expect(fontSlotPieces('عدد 45.5%.', props()).map((p) => p.slot)).toEqual(['cs', 'latin']);
+  });
+
   test('a surrogate pair stays whole and a combining mark keeps its base slot', () => {
     const pieces = fontSlotPieces('a𠀋b', props());
     expect(pieces).toEqual([

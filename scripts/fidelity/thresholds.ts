@@ -248,7 +248,6 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'three-d-effects/3': ['pixels'],
     'three-d-effects/4': ['pixels'],
     'three-d-turned-effects/1': ['pixels'],
-    'vertical-east-asian/1': ['pixels'],
   },
 };
 

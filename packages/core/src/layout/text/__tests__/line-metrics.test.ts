@@ -93,6 +93,17 @@ describe('baseline in the line box', () => {
     expect(baselineOffsetPt(18, 21.6, CORDIA)).toBeLessThan(0.75 * 21.6);
   });
 
+  test('below the single line the lost space goes 75 % from above the baseline', () => {
+    // Noto Sans Arabic, typo 1374 and 738 of 1000 (share 0.651), at 90 %: rtl-text/1 puts the
+    // first baseline 14 pt below the text top at 20 pt, and 25 pt at 36 pt.
+    const arabic = face(1.374, 0.738);
+    const at = (size: number): number =>
+      baselineOffsetPt(size, lineHeightPt(size, { pct: 0.9 }, 0), arabic);
+    expect(at(20)).toBeCloseTo(0.75 * (21.6 - 24) + 24 * (1.374 / 2.112), 6);
+    expect(Math.round(at(20))).toBe(14);
+    expect(Math.round(at(36))).toBe(25);
+  });
+
   test('above the single line the extra space goes 75 % above the baseline', () => {
     // 1.5 lines: 0.75 × (32.4 − 21.6) + 21.6 × share, below 75 % of the box.
     expect(baselineOffsetPt(18, 32.4, CORDIA)).toBeCloseTo(0.75 * 10.8 + 21.6 * share, 6);

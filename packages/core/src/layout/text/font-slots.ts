@@ -4,12 +4,14 @@
 // scripts) with its `a:cs` face, symbol characters (U+F000 to U+F0FF) with its `a:sym` face,
 // and every other character with its `a:latin` face. Characters that both East Asian and
 // Latin text use (curly quotes, the ellipsis, arrows) take the East Asian face in a run whose
-// language is Chinese, Japanese, or Korean. A space takes the Latin font, also between East
+// language is Chinese, Japanese, or Korean. Digits, punctuation, and symbols take the
+// complex-script face in a run whose language is written in a complex script (reference PDF
+// of `rtl-text`: the digits, full stops, and percent signs of Arabic runs). A space takes the Latin font, also between East
 // Asian words; between two complex-script characters it takes the complex-script font.
 // DOM-free.
 
 import type { RunProps } from '../../cascade/index.ts';
-import { eastAsianScriptOf } from '../../cascade/script-fonts.ts';
+import { complexScriptOf, eastAsianScriptOf } from '../../cascade/script-fonts.ts';
 import { isIdeographic } from './line-break.ts';
 
 /** A run's font slot. */
@@ -61,14 +63,21 @@ function isSharedSymbol(cp: number): boolean {
 
 const isSpace = (cp: number): boolean => cp === 0x20 || cp === 0xa0;
 const MARK = /^[\p{M}\uFE00-\uFE0F]$/u;
+const NEUTRAL = /^[\p{N}\p{P}\p{S}]$/u;
 
 /** The slot of one code point, or null for a space, which takes its neighbors' slot. */
-function strongSlot(cp: number, eastAsianText: boolean, symbol: boolean): FontSlot | null {
+function strongSlot(
+  cp: number,
+  eastAsianText: boolean,
+  complexText: boolean,
+  symbol: boolean
+): FontSlot | null {
   if (isSpace(cp)) return null;
   if (symbol && cp >= 0xf000 && cp <= 0xf0ff) return 'sym';
   if (isEastAsianChar(cp)) return 'ea';
   if (isComplexScriptChar(cp)) return 'cs';
   if (eastAsianText && isSharedSymbol(cp)) return 'ea';
+  if (complexText && NEUTRAL.test(String.fromCodePoint(cp))) return 'cs';
   return 'latin';
 }
 
@@ -100,6 +109,7 @@ const piecesOf = new WeakMap<object, { text: string; pieces: readonly SlotPiece[
 function splitSlots(text: string, props: Pick<RunProps, 'lang' | 'altLang' | 'sym'>): SlotPiece[] {
   const eastAsianText =
     eastAsianScriptOf(props.lang) !== undefined || eastAsianScriptOf(props.altLang) !== undefined;
+  const complexText = complexScriptOf(props.lang) !== undefined;
   const symbol = props.sym !== undefined;
   // The slot of each code point, at its first UTF-16 unit.
   const slots: (FontSlot | null)[] = new Array<FontSlot | null>(text.length).fill(null);
@@ -107,7 +117,7 @@ function splitSlots(text: string, props: Pick<RunProps, 'lang' | 'altLang' | 'sy
   for (let i = 0; i < text.length;) {
     const cp = text.codePointAt(i) ?? 0;
     const len = cp > 0xffff ? 2 : 1;
-    let slot = strongSlot(cp, eastAsianText, symbol);
+    let slot = strongSlot(cp, eastAsianText, complexText, symbol);
     if (
       slot === 'latin' &&
       last &&

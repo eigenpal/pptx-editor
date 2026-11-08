@@ -25,6 +25,7 @@
 // family): typo values for Aptos and Aptos Narrow (bit 7 set), win values for every other entry. Format
 // neutral: no PresentationML names. DOCX Editor commit adf0e178.
 
+import type { LineBasis } from './line-metrics.ts';
 import type { FaceMetrics } from './measurer.ts';
 
 interface FaceLineMetrics {
@@ -91,4 +92,31 @@ export function withFaceLineMetrics(family: string, metrics: FaceMetrics): FaceM
   const known = FACE_LINE_METRICS.get(family.trim().toLowerCase());
   if (!known) return metrics;
   return { ...metrics, ascent: known.ascent / known.upem, descent: known.descent / known.upem };
+}
+
+/**
+ * The metrics that place a line with text in several faces at its largest size (East Asian,
+ * complex-script, and Latin text, `font-slots.ts`): `first`, with the highest ascent and the
+ * deepest descent of all the faces, each as a share of its own face's line, since a 1.2 × size
+ * line does not grow with the face. Diagram text (`face`), whose single line is the face's
+ * extent, takes the extents themselves. Reference PDFs of `east-asian-line-breaking`, slide 4,
+ * `east-asian-theme-fonts`, and `rtl-text`, slide 2: an Arabic line with Latin text in another
+ * run sits 1 pt lower than Arabic text alone, and all their lines are within 0.13 pt.
+ * @internal
+ */
+export function lineFaceMetrics(
+  first: FaceMetrics,
+  others: readonly FaceMetrics[],
+  basis: LineBasis
+): FaceMetrics {
+  const lineOf = (m: FaceMetrics): number =>
+    basis === 'face' ? 1 : Math.max(1e-6, m.ascent + m.descent);
+  const own = lineOf(first);
+  let { ascent, descent } = first;
+  for (const m of others) {
+    const scale = own / lineOf(m);
+    ascent = Math.max(ascent, m.ascent * scale);
+    descent = Math.max(descent, m.descent * scale);
+  }
+  return others.length ? { ...first, ascent, descent } : first;
 }
