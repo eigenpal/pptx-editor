@@ -487,6 +487,22 @@ function segmentRoute(
 const drawable = (route: readonly Point[]): boolean =>
   route.length >= 3 && route.length - 1 <= MOST_SEGMENTS;
 
+/** The unit axis direction from `a` to `b`. */
+const heading = (a: Point, b: Point): string =>
+  `${Math.sign(Math.round(b.x - a.x))},${Math.sign(Math.round(b.y - a.y))}`;
+
+/**
+ * Whether `route` can replace `corners`: a preset draws it, and each glued end still leaves
+ * its site in the same direction, so a merge never runs the connector along the shape's side.
+ */
+function routeFits(item: LayoutItem, corners: readonly Point[], route: readonly Point[]): boolean {
+  if (!drawable(route)) return false;
+  const glue = item.kind === 'shape' ? item.element.connections : undefined;
+  const [n, m] = [route.length - 1, corners.length - 1];
+  if (glue?.start && heading(route[0], route[1]) !== heading(corners[0], corners[1])) return false;
+  return !glue?.end || heading(route[n - 1], route[n]) === heading(corners[m - 1], corners[m]);
+}
+
 /**
  * Whether segment `index` of `corners` has a place to move to that a preset draws. An end
  * segment adds a bend, or two at a glued end, unless it comes in line with another segment.
@@ -503,7 +519,9 @@ export function segmentMovable(
   // A free place beside the segment, and each other corner's line, where segments merge.
   const span = Math.hypot(b.x - a.x, b.y - a.y);
   const lines = [a[across] + span, ...corners.map((q) => q[across])];
-  return lines.some((v) => v !== a[across] && drawable(segmentRoute(item, corners, index, v)));
+  return lines.some(
+    (v) => v !== a[across] && routeFits(item, corners, segmentRoute(item, corners, index, v))
+  );
 }
 
 /**
@@ -535,11 +553,13 @@ export function moveElbowSegment(
     const reach = Math.hypot(d.x, d.y);
     const lines = [a, ...corners.filter((_, i) => i !== index && i !== index + 1)];
     const off = (q: Point): number => Math.abs(q[across] - value);
-    // The nearest line in reach where the route still fits a preset.
+    // The nearest line in reach where the route still fits (`routeFits`).
     const fits = lines
       .filter((q) => off(q) <= reach)
       .sort((u, v) => off(u) - off(v))
-      .find((q) => q === a || drawable(segmentRoute(item, corners, index, q[across])));
+      .find(
+        (q) => q === a || routeFits(item, corners, segmentRoute(item, corners, index, q[across]))
+      );
     if (fits) value = fits[across];
   }
   const route = segmentRoute(item, corners, index, value);
@@ -548,7 +568,7 @@ export function moveElbowSegment(
     route.length === corners.length &&
     route.every((q, i) => Math.abs(q.x - corners[i].x) < 1 && Math.abs(q.y - corners[i].y) < 1);
   if (same || route.length < 3) return 'same';
-  if (!drawable(route)) return null;
+  if (!routeFits(item, corners, route)) return null;
   const n = route.length - 1;
   const vertical = Math.abs(route[1].x - route[0].x) < 1;
   const fit = fitElbow(route, vertical);

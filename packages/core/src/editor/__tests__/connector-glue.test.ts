@@ -525,6 +525,30 @@ describe('elbow segment drags', () => {
     expect(presetOf(e, 'C4')).toBe('bentConnector3');
   });
 
+  test('a middle segment never snaps onto a glued end and runs along the shape', async () => {
+    // From A's right site (3 in, 2.5 in) to B's left site (6 in, 3.5 in): right, down, right.
+    const z = connector({
+      id: 4,
+      prst: 'bentConnector3',
+      x: 3 * IN,
+      y: 2.5 * IN,
+      cx: 3 * IN,
+      cy: IN,
+      st: [2, 3],
+      end: [3, 1],
+    });
+    const e = await open(deck(z));
+    // Near B's side: a snap to its line would drop the run into B, so the segment stays put.
+    dragSegment(e, 'C4', 1, { x: 5.95 * IN, y: 3 * IN }, 0.1 * IN);
+    expect(presetOf(e, 'C4')).toBe('bentConnector3');
+    expect(cornersOf(e, 'C4')).toEqual([
+      [3, 2.5],
+      [5.95, 2.5],
+      [5.95, 3.5],
+      [6, 3.5],
+    ]);
+  });
+
   test('a glued end keeps a short run into its site before the new bend', async () => {
     // An L from (1 in, 1 in) to the top site of B at (7 in, 3 in): right, then down into B.
     const glued = connector({
