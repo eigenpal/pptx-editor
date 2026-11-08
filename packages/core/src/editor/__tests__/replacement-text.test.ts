@@ -22,7 +22,7 @@ import {
   paragraphKey,
   replacementRange,
 } from '../replacement-text.ts';
-import { dispatchBeforeInput, replacementTarget } from '../surface-input.ts';
+import { COMPOSING_CLASS, dispatchBeforeInput, replacementTarget } from '../surface-input.ts';
 
 const IN = 914_400;
 const win = new GlobalWindow();
@@ -392,6 +392,10 @@ describe('a system replacement (insertReplacementText)', () => {
     type(' ');
     beforeInput('insertReplacementText', '😀');
     expect(texts(e)).toEqual(['say hello there! 😀']);
+    // A number is no correction of a word: it goes in too.
+    type(' at');
+    beforeInput('insertReplacementText', '5');
+    expect(texts(e)).toEqual(['say hello there! 😀 at5']);
     e.destroy();
   });
 
@@ -749,6 +753,194 @@ describe('a composition over the text the input holds', () => {
     fire(composition('compositionend', 'hello'));
     // Nothing is lost and no letter goes in twice: the new letter follows the caret.
     expect(texts(e)).toEqual(['a helo!l']);
+    e.destroy();
+  });
+
+  /** A keyboard composes the word over `[from, to)` again, as an Android keyboard does. */
+  async function composeWord(text: string, from: number, to: number) {
+    const opened = await open(para(''));
+    caret(opened.e, 0, 0);
+    opened.type(text);
+    // The keyboard selects the word and starts composing in the same task.
+    opened.input.setSelectionRange(from, to);
+    opened.fire(composition('compositionstart'));
+    return opened;
+  }
+  const key = (k: string, keyCode = 0, isComposing = false): Event =>
+    new win.KeyboardEvent('keydown', {
+      key: k,
+      keyCode,
+      isComposing,
+      bubbles: true,
+    }) as unknown as Event;
+
+  test('a caret move during a composition ends it at its own place', async () => {
+    const { e, input, fire } = await composeWord('hello world', 6, 11);
+    // A tap puts the caret at 3; the keyboard has not changed the word.
+    caret(e, 0, 3);
+    expect(input.classList.contains(COMPOSING_CLASS)).toBe(false);
+    expect(input.value).toBe('hel');
+    // The old composition's end adds nothing.
+    input.value = 'helworl';
+    fire(composition('compositionend', 'worl'));
+    expect(texts(e)).toEqual(['hello world']);
+    // The next key edits at the new caret.
+    fire(key('Backspace'));
+    fire(
+      new win.InputEvent('beforeinput', {
+        inputType: 'deleteContentBackward',
+        bubbles: true,
+        cancelable: true,
+      }) as unknown as Event
+    );
+    expect(texts(e)).toEqual(['helo world']);
+    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 2 });
+    e.destroy();
+  });
+
+  test('text composed before a caret move goes in at the composition, once', async () => {
+    const { e, input, type, fire } = await open(para(''));
+    caret(e, 0, 0);
+    type('abc ');
+    fire(composition('compositionstart'));
+    input.value = 'abc にほ';
+    input.setSelectionRange(6, 6);
+    caret(e, 0, 1);
+    expect(texts(e)).toEqual(['abc にほ']);
+    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 1 });
+    fire(composition('compositionend', 'にほ'));
+    expect(texts(e)).toEqual(['abc にほ']);
+    // A caret after the composition moves with its text. The next composition comes with
+    // its first key, so it is a new one at the new caret.
+    fire(key('Process', 229));
+    fire(composition('compositionstart'));
+    input.value = 'aX';
+    input.setSelectionRange(2, 2);
+    caret(e, 0, 6);
+    expect(texts(e)).toEqual(['aXbc にほ']);
+    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 7 });
+    e.destroy();
+  });
+
+  test('what the keyboard sends late for an ended composition goes to its place', async () => {
+    const { e, input, beforeInput } = await composeWord('hello wrold', 6, 11);
+    caret(e, 0, 3);
+    // The correction arrives with no key, before the keyboard learns of the move.
+    beforeInput('insertText', 'world');
+    expect(texts(e)).toEqual(['hello world']);
+    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 3 });
+    expect(input.value).toBe('hel');
+    e.destroy();
+  });
+
+  test('a composition that continues an ended one goes to its place', async () => {
+    const { e, input, fire } = await composeWord('hello world', 6, 11);
+    caret(e, 0, 3);
+    fire(composition('compositionstart'));
+    input.value = 'helworldx';
+    input.setSelectionRange(9, 9);
+    fire(composition('compositionend', 'worldx'));
+    expect(texts(e)).toEqual(['hello worldx']);
+    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 3 });
+    e.destroy();
+  });
+
+  test('a composition over the word at the new caret is a new composition', async () => {
+    const { e, input, fire } = await composeWord('hello world', 6, 11);
+    caret(e, 0, 5);
+    // The keyboard learned of the move: it composes the word at the new caret again.
+    input.setSelectionRange(0, 5);
+    fire(composition('compositionstart'));
+    input.value = 'Hello';
+    input.setSelectionRange(5, 5);
+    fire(composition('compositionend', 'Hello'));
+    expect(texts(e)).toEqual(['Hello world']);
+    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 5 });
+    e.destroy();
+  });
+
+  test('input that comes after the wait goes in at the new caret', async () => {
+    const { e, beforeInput } = await composeWord('hello world', 6, 11);
+    caret(e, 0, 5);
+    const now = performance.now.bind(performance);
+    performance.now = () => now() + 1000;
+    try {
+      beforeInput('insertText', 'x');
+    } finally {
+      performance.now = now;
+    }
+    expect(texts(e)).toEqual(['hellox world']);
+    e.destroy();
+  });
+
+  test('after a key, input goes in at the new caret', async () => {
+    const { e, fire, beforeInput } = await composeWord('hello world', 6, 11);
+    caret(e, 0, 3);
+    fire(key('x'));
+    beforeInput('insertText', 'x');
+    expect(texts(e)).toEqual(['helxlo world']);
+    e.destroy();
+  });
+
+  test('candidate keys during a composition do not end it', async () => {
+    const { e, input, type, fire } = await open(para(''));
+    caret(e, 0, 0);
+    type('abc ');
+    fire(composition('compositionstart'));
+    input.value = 'abc にほん';
+    for (const k of ['ArrowDown', 'ArrowDown', 'ArrowLeft']) fire(key(k, 229, true));
+    expect(input.classList.contains(COMPOSING_CLASS)).toBe(true);
+    input.value = 'abc 日本';
+    input.setSelectionRange(6, 6);
+    fire(composition('compositionend', '日本'));
+    expect(texts(e)).toEqual(['abc 日本']);
+    e.destroy();
+  });
+
+  test('an edit between a recomposed word and the caret refuses the word change', async () => {
+    const { e, input, fire } = await composeWord('hello wrold', 6, 11);
+    // An edit at the caret (as a peer's) keeps the composition: its place moves.
+    e.input('text', '!');
+    expect(input.classList.contains(COMPOSING_CLASS)).toBe(true);
+    input.value = 'hello world';
+    input.setSelectionRange(11, 11);
+    fire(composition('compositionend', 'world'));
+    // The word moved away from the caret: the change goes in nowhere else.
+    expect(texts(e)).toEqual(['hello wrold!']);
+    expect(e.snapshot().lastRejection?.reason).toBe('errors.inputUnsupported');
+    e.destroy();
+  });
+
+  test('a composition clears a wait for the field change of an earlier edit', async () => {
+    const { e, input, type, fire } = await open(para(''));
+    caret(e, 0, 0);
+    type('ab');
+    // A non-cancelable insert over a range goes to the model at once.
+    const at = (offset: number) => ({ paragraph: 0, offset });
+    e.setSelection({ kind: 'text', nodeId: shapeId(e), anchor: at(0), focus: at(2) });
+    fire(
+      new win.InputEvent('beforeinput', {
+        inputType: 'insertText',
+        data: 'c',
+        bubbles: true,
+        cancelable: false,
+      }) as unknown as Event
+    );
+    fire(composition('compositionstart'));
+    input.value = 'cd';
+    input.setSelectionRange(2, 2);
+    fire(composition('compositionend', 'd'));
+    expect(texts(e)).toEqual(['cd']);
+    // An extension writes the field: that is an edit, not the earlier insert's own change.
+    input.value = 'cde';
+    fire(
+      new win.InputEvent('input', {
+        inputType: 'insertText',
+        data: 'e',
+        bubbles: true,
+      }) as unknown as Event
+    );
+    expect(texts(e)).toEqual(['cde']);
     e.destroy();
   });
 

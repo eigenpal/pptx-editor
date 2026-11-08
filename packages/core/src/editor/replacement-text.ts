@@ -25,6 +25,21 @@ export interface TypingContext {
   /** The paragraph the text comes from (`paragraphKey`). */
   readonly key: string;
   readonly text: string;
+  /** The caret the text ends at. */
+  readonly selection?: EditorSelection;
+  /** The store revision the text was read at. */
+  readonly revision?: number;
+}
+
+/**
+ * Where an IME composition goes in. `at`: the caret of the composition, when the caret
+ * moved away from it (a click, an arrow key, the API); the replacement must match there, and
+ * the caret stays where it moved to. `typed`: the caret is the composition's place, which an
+ * edit moved, so added characters whose target no longer matches go in at the caret.
+ */
+export interface ReplacementPlace {
+  readonly at?: EditorSelection;
+  readonly typed?: boolean;
 }
 
 /** What one system replacement targeted. */
@@ -127,14 +142,39 @@ export function replacementRange(
 
 /**
  * Whether a replacement with no target could correct the word before the caret: the
- * replacement is one word, and the context ends with a word, or with a word and one space.
- * Text with white space in it (dictation of a phrase), or a sign, is no such correction.
+ * replacement is one word with a letter in it, and the context ends with a word, or with a
+ * word and one space. Text with white space in it (dictation of a phrase), a number, an
+ * emoji, or a sign is no such correction, and goes in at the caret.
+ *
+ * The rule also refuses a real one-word insert with no target right after a word (a
+ * dictated "five"). That is the safe side: a refused word is visible and the user types it
+ * again, but a correction that goes in at the caret repeats the word it corrects.
  */
 export function correctsWord(context: string, replacement: string): boolean {
   return (
     /^[\p{L}\p{N}][\p{L}\p{N}\p{M}'’-]*$/u.test(replacement) &&
+    /\p{L}/u.test(replacement) &&
     /[\p{L}\p{N}\p{M}] ?$/u.test(context)
   );
+}
+
+/**
+ * `sel` after an edit at the caret `at` that changed the length of its paragraph by `by`
+ * characters at offset `from`: the points after `from` in that paragraph move with the text.
+ */
+function shifted(
+  sel: EditorSelection,
+  at: EditorSelection,
+  from: number,
+  by: number
+): EditorSelection {
+  if (!by || sel.kind !== 'text' || at.kind !== 'text') return sel;
+  if (sel.nodeId !== at.nodeId || sel.diagramNode !== undefined) return sel;
+  if (JSON.stringify(sel.cell ?? null) !== JSON.stringify(at.cell ?? null)) return sel;
+  const paragraph = at.focus.paragraph;
+  const move = <P extends { paragraph: number; offset: number }>(p: P): P =>
+    p.paragraph === paragraph && p.offset >= from ? { ...p, offset: p.offset + by } : p;
+  return { ...sel, anchor: move(sel.anchor), focus: move(sel.focus) };
 }
 
 /** What `createSystemText` asks of the editor. */
@@ -171,11 +211,41 @@ export function createSystemText(host: SystemTextHost) {
     const part = host.part();
     return session && part && !host.viewing() ? caretParagraph(session, part, sel) : null;
   };
+  /**
+   * Replace `target` before the caret `at`, the caret of a composition that the selection
+   * moved away from. A target that the text before `at` does not hold is refused, and the
+   * composition goes nowhere else. The selection stays where it moved to; the edit moves it
+   * when it comes after the edit in the same paragraph.
+   */
+  const replaceAt = (
+    at: EditorSelection,
+    target: ReplacementTarget | null,
+    replacement: string
+  ): void => {
+    const user = host.selection();
+    const there = caretAt(at);
+    const range = target && there && replacementRange(there.text, there.offset, there.key, target);
+    if (at.kind !== 'text' || !there || !range)
+      return host.refuse('errors.inputUnsupported', 'insertCompositionText');
+    if (there.text.slice(range.from, range.to) === replacement) return;
+    const paragraph = at.focus.paragraph;
+    const point = (offset: number) => ({ paragraph, offset });
+    host.select({ ...at, anchor: point(range.from), focus: point(range.to) });
+    const over = host.selection();
+    if (replacement) host.textInput('text', replacement, at);
+    else host.textInput('deleteBackward', undefined, at);
+    const by = host.selection() === over ? 0 : replacement.length - (range.to - range.from);
+    host.select(shifted(user, at, range.to, by));
+    host.emit();
+  };
   return {
     /** The text the surface's input holds for the system. */
     typingContext(): TypingContext | null {
-      const at = caretAt(host.selection());
-      return at ? { key: at.key, text: contextBefore(at.text, at.offset) } : null;
+      const selection = host.selection();
+      const at = caretAt(selection);
+      if (!at) return null;
+      const revision = host.session()?.store.revision;
+      return { key: at.key, text: contextBefore(at.text, at.offset), selection, revision };
     },
     /**
      * Apply a system text change. With no target, the replacement goes in at the caret, but
@@ -186,7 +256,12 @@ export function createSystemText(host: SystemTextHost) {
      * next typed text. The edit is one text input over the target: one store transaction,
      * one undo step, and an undo puts the caret back where it was.
      */
-    replaceText(target: ReplacementTarget | null, replacement: string, typed = false): void {
+    replaceText(
+      target: ReplacementTarget | null,
+      replacement: string,
+      place: ReplacementPlace = {}
+    ): void {
+      if (place.at) return replaceAt(place.at, target, replacement);
       const sel = host.selection();
       const at = caretAt(sel);
       if (!target) {
@@ -200,11 +275,13 @@ export function createSystemText(host: SystemTextHost) {
       }
       const range = at && replacementRange(at.text, at.offset, at.key, target);
       if (sel.kind !== 'text' || !at || !range) {
-        // A composition's new characters are the user's typing (`typed`): when a peer's edit
-        // moved their target, they go in at the caret, as typing would. They are exactly the
-        // characters that the field did not hold when the composition started, so none
-        // repeats and none is lost.
-        if (typed && replacement) return host.textInput('text', replacement, sel);
+        // A composition that only adds characters (`typed`, an empty target) is the user's
+        // typing: when an edit moved the caret, its place, they go in at the caret, as typing
+        // would, so none is lost and none repeats. A composition that changes characters
+        // which moved is refused: it goes in nowhere else. The surface passes `typed` only
+        // when the caret is the composition's own place; a caret that moved away gets `at`.
+        if (place.typed && replacement && target.text === '')
+          return host.textInput('text', replacement, sel);
         return host.refuse('errors.inputUnsupported', 'insertReplacementText');
       }
       // A change that changes nothing writes nothing: no undo step, no collaboration op.
