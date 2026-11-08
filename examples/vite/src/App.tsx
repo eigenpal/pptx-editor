@@ -59,7 +59,11 @@ import {
   carriesFiles,
   leftDropZone,
   openDeck,
+  attachSheetGrip,
+  notesStartOpen,
   panelStartsOpen,
+  rememberNotes,
+  rememberPanel,
   refuseDroppedFile,
   rememberTheme,
   ribbonChrome,
@@ -85,9 +89,8 @@ const REVIEW_PANES = { comments: <PptxEditorReview /> };
 const DEMO_AUTHOR = 'Demo author';
 
 const base = import.meta.env.BASE_URL;
-/** A phone opens with the notes closed, so the slide gets the room; one tap opens them. */
-const PHONE_SCREEN =
-  typeof matchMedia === 'function' && matchMedia('(max-height: 500px), (max-width: 600px)').matches;
+/** The speaker notes start as the user left them, else closed (demo-files.ts). */
+const NOTES_OPEN = notesStartOpen();
 /** The notes pane stays mounted in the slide sorter, so its open state and draft stay. */
 const HIDDEN: CSSProperties = { display: 'none' };
 
@@ -138,6 +141,19 @@ function Shell({
   const [panel, setPanel] = useState(panelStartsOpen);
   const [panelTab, setPanelTab] = useState<SidePanelTab>('format');
   useEffect(() => followPanelWidth(setPanel), []);
+  // The grip of the panel sheet on a phone: drag it to set the height, or down to close.
+  const sheet = useRef<HTMLDivElement>(null);
+  const grip = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!panel || !grip.current) return;
+    return attachSheetGrip(grip.current, {
+      sheet: () => sheet.current,
+      close: () => {
+        rememberPanel(false);
+        setPanel(false);
+      },
+    });
+  }, [panel]);
   // The toolbar's Selection Pane and Format Pane controls open the panel on their tab.
   useEffect(
     () =>
@@ -304,7 +320,10 @@ function Shell({
             data-pptx-tooltip={t('panel.toggle')}
             aria-pressed={panel}
             onMouseDown={keepFocus}
-            onClick={() => setPanel((p) => !p)}
+            onClick={() => {
+              rememberPanel(!panel);
+              setPanel(!panel);
+            }}
           >
             <Icon name="view_sidebar" className="" />
           </button>
@@ -359,7 +378,8 @@ function Shell({
               </div>
             )}
             <PptxEditor.NotesPane
-              defaultOpen={!PHONE_SCREEN}
+              defaultOpen={NOTES_OPEN}
+              onOpenChange={rememberNotes}
               {...(sorter ? { style: HIDDEN } : {})}
             />
             <PptxEditor.EditNotice />
@@ -367,12 +387,24 @@ function Shell({
             {ribbon ? <PptxEditor.StatusBar /> : null}
           </div>
           {panel ? (
-            <PptxEditor.SidePanel
-              panes={REVIEW_PANES}
-              tab={panelTab}
-              onTabChange={setPanelTab}
-              onClose={() => setPanel(false)}
-            />
+            // A phone shows the panel as a sheet under the slide, with a grip (shell.css).
+            <div ref={sheet} className="demo-sheet">
+              <button
+                ref={grip}
+                type="button"
+                className="demo-sheet__grip"
+                aria-label={t('app.sheetGrip')}
+              />
+              <PptxEditor.SidePanel
+                panes={REVIEW_PANES}
+                tab={panelTab}
+                onTabChange={setPanelTab}
+                onClose={() => {
+                  rememberPanel(false);
+                  setPanel(false);
+                }}
+              />
+            </div>
           ) : null}
           {dragging ? <div className="demo-drop">{t('app.dropHint')}</div> : null}
         </div>

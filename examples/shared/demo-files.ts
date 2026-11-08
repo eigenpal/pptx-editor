@@ -339,31 +339,186 @@ export async function exportSlides(
 }
 
 /**
- * Below this window width the side panel starts closed, so the slide keeps a usable zoom: at
- * 1024 px the 340 px panel leaves the slide near 30%. The panel toggle still opens it.
+ * Up to this window width the side panel is a sheet under the slide (shell.css), so it starts
+ * closed: open, it takes half of a phone's height. The panel toggle still opens it.
  */
-export const NARROW_PANEL_QUERY = '(max-width: 1199px)';
+export const NARROW_PANEL_QUERY = '(max-width: 900px)';
 
 const narrowQuery = (): MediaQueryList | null =>
   typeof window !== 'undefined' && typeof window.matchMedia === 'function'
     ? window.matchMedia(NARROW_PANEL_QUERY)
     : null;
 
-/** Whether the side panel starts open: closed on a narrow window. */
-export function panelStartsOpen(): boolean {
-  return !narrowQuery()?.matches;
+/** Where the demo keeps whether the side panel and the speaker notes are open. */
+const PANEL_KEY = 'pptx-editor-demo-panel';
+const NOTES_KEY = 'pptx-editor-demo-notes';
+
+/** A stored open state, or null. Storage can be off (a private window): then null. */
+function storedOpen(key: string): boolean | null {
+  try {
+    const v = globalThis.localStorage?.getItem(key);
+    return v === 'open' ? true : v === 'closed' ? false : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberOpen(key: string, open: boolean): void {
+  try {
+    globalThis.localStorage?.setItem(key, open ? 'open' : 'closed');
+  } catch {
+    // Storage is off: the next visit starts with the defaults.
+  }
 }
 
 /**
- * Close the side panel when the window becomes narrow, and open it when the window becomes wide
- * again. Between those crossings the user's toggle stands. Returns the cleanup.
+ * Whether the side panel starts open: as the user left it, else open, except on a narrow window,
+ * where it is a sheet that takes half the height.
+ */
+export function panelStartsOpen(): boolean {
+  return storedOpen(PANEL_KEY) ?? !narrowQuery()?.matches;
+}
+
+/**
+ * Keep the side panel open or closed for the next visit: call it for the user's own toggle. A
+ * narrow window does not keep it: there the panel is a sheet that you open for a task and close
+ * after it, and that close must not close the panel of a wide window.
+ */
+export function rememberPanel(open: boolean): void {
+  if (!narrowQuery()?.matches) rememberOpen(PANEL_KEY, open);
+}
+
+/** Whether the speaker notes start open: as the user left them, else closed. */
+export function notesStartOpen(): boolean {
+  return storedOpen(NOTES_KEY) ?? false;
+}
+
+/** Keep the speaker notes open or closed for the next visit. */
+export function rememberNotes(open: boolean): void {
+  rememberOpen(NOTES_KEY, open);
+}
+
+/**
+ * Close the side panel when the window becomes narrow (it becomes a sheet), and give it back
+ * the user's choice when the window becomes wide again. Returns the cleanup.
  */
 export function followPanelWidth(setOpen: (open: boolean) => void): () => void {
   const query = narrowQuery();
   if (!query) return () => {};
-  const changed = (event: MediaQueryListEvent): void => setOpen(!event.matches);
+  const changed = (event: MediaQueryListEvent): void =>
+    setOpen(!event.matches && (storedOpen(PANEL_KEY) ?? true));
   query.addEventListener('change', changed);
   return () => query.removeEventListener('change', changed);
+}
+
+/** The heights the panel sheet snaps to, as parts of the workspace height. */
+const SHEET_SNAPS = [0.4, 0.6, 0.9] as const;
+/** A release faster than this (px per ms) goes on to the next snap height, or closes. */
+const FLICK_SPEED = 0.5;
+
+/** The sheet height: the CSS variable, as a part of the workspace height. */
+function sheetPart(sheet: HTMLElement): number {
+  const host = sheet.parentElement?.getBoundingClientRect().height ?? 0;
+  return host > 0 ? sheet.getBoundingClientRect().height / host : SHEET_SNAPS[0];
+}
+
+/**
+ * The grip of the side panel sheet (shell.css, a narrow window): drag it to set the sheet's
+ * height, and let go to snap to 40%, 60%, or 90% of the workspace. A quick flick goes to the
+ * next height in its direction; a flick or drag down from the lowest height closes the panel.
+ * Arrow Up and Arrow Down step through the heights, and a tap goes to the next height. The
+ * height does not animate: the slide fits again at each height. Returns the cleanup.
+ */
+export function attachSheetGrip(
+  grip: HTMLElement,
+  options: { readonly sheet: () => HTMLElement | null; readonly close: () => void }
+): () => void {
+  let drag: { y: number; t: number; start: number; host: number } | null = null;
+  let last = { y: 0, t: 0 };
+  // A drag sets the height once a frame at most: the slide fits again at each height.
+  let frame = 0;
+  const apply = (sheet: HTMLElement, part: number): void => {
+    sheet.style.setProperty('--demo-sheet-h', `${(part * 100).toFixed(2)}%`);
+  };
+  const set = (sheet: HTMLElement, part: number, now: boolean): void => {
+    cancelAnimationFrame(frame);
+    frame = 0;
+    if (now) apply(sheet, part);
+    else frame = requestAnimationFrame(() => apply(sheet, part));
+  };
+  const snapTo = (sheet: HTMLElement, part: number, velocity: number): void => {
+    // A flick moves one snap height in its direction; a slow release takes the nearest.
+    const nearest = SHEET_SNAPS.reduce((a, b) => (Math.abs(b - part) < Math.abs(a - part) ? b : a));
+    let at = SHEET_SNAPS.indexOf(nearest);
+    if (velocity < -FLICK_SPEED) at = Math.min(at + 1, SHEET_SNAPS.length - 1);
+    if (velocity > FLICK_SPEED) at -= 1;
+    if (at < 0 || part < SHEET_SNAPS[0] / 2) {
+      options.close();
+      return;
+    }
+    set(sheet, SHEET_SNAPS[at]!, true);
+  };
+  const down = (e: PointerEvent): void => {
+    const sheet = options.sheet();
+    if (!sheet || !e.isPrimary || drag) return;
+    const host = sheet.parentElement?.getBoundingClientRect().height ?? 0;
+    if (host <= 0) return;
+    try {
+      grip.setPointerCapture(e.pointerId);
+    } catch {
+      // The pointer is gone already (a fast tap): the drag still works over the grip.
+    }
+    drag = { y: e.clientY, t: e.timeStamp, start: sheetPart(sheet), host };
+    last = { y: e.clientY, t: e.timeStamp };
+  };
+  const move = (e: PointerEvent): void => {
+    const sheet = options.sheet();
+    if (!drag || !sheet) return;
+    let part = drag.start + (drag.y - e.clientY) / drag.host;
+    // Past the highest snap the sheet slows down, as a drag at a hard edge does.
+    const top = SHEET_SNAPS[SHEET_SNAPS.length - 1];
+    if (part > top) part = top + (part - top) * 0.25;
+    set(sheet, Math.max(0.1, part), false);
+    last = { y: e.clientY, t: e.timeStamp };
+  };
+  const up = (e: PointerEvent): void => {
+    const sheet = options.sheet();
+    if (!drag || !sheet) return;
+    const ms = Math.max(1, e.timeStamp - last.t);
+    const velocity = (e.clientY - last.y) / ms;
+    const moved = Math.abs(e.clientY - drag.y);
+    drag = null;
+    // A tap on the grip goes to the next height, and back to the first from the top.
+    if (moved < 4) {
+      const at = SHEET_SNAPS.findIndex((s) => s > sheetPart(sheet) + 0.02);
+      set(sheet, SHEET_SNAPS[at < 0 ? 0 : at]!, true);
+      return;
+    }
+    snapTo(sheet, sheetPart(sheet), velocity);
+  };
+  const key = (e: KeyboardEvent): void => {
+    const sheet = options.sheet();
+    if (!sheet || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault();
+    const part = sheetPart(sheet);
+    const raise = e.key === 'ArrowUp';
+    const next = raise
+      ? SHEET_SNAPS.find((s) => s > part + 0.02)
+      : [...SHEET_SNAPS].reverse().find((s) => s < part - 0.02);
+    if (next !== undefined) set(sheet, next, true);
+  };
+  grip.addEventListener('pointerdown', down);
+  grip.addEventListener('pointermove', move);
+  grip.addEventListener('pointerup', up);
+  grip.addEventListener('pointercancel', up);
+  grip.addEventListener('keydown', key);
+  return () => {
+    grip.removeEventListener('pointerdown', down);
+    grip.removeEventListener('pointermove', move);
+    grip.removeEventListener('pointerup', up);
+    grip.removeEventListener('pointercancel', up);
+    grip.removeEventListener('keydown', key);
+  };
 }
 
 /**

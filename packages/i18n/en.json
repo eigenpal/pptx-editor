@@ -18,6 +18,7 @@
     "discard": "Discard changes",
     "keepEditing": "Keep editing",
     "adapter": "Framework",
+    "sheetGrip": "Resize the side panel",
     "slidesToggle": "Show or hide slide thumbnails"
   },
   "menu": {

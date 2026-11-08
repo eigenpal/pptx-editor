@@ -44,7 +44,11 @@ import {
   isPptxFile,
   carriesFiles,
   leftDropZone,
+  attachSheetGrip,
+  notesStartOpen,
   panelStartsOpen,
+  rememberNotes,
+  rememberPanel,
   refuseDroppedFile,
   ribbonChrome,
   type SlideExport,
@@ -79,14 +83,31 @@ const presentOff = computed(() =>
 );
 // With no deck to open (its fetch failed), the notice says why in place of the spinner.
 const waiting = useEditorState((s) => s.status === 'empty');
-// A phone opens with the notes closed, so the slide gets the room; one tap opens them.
-const phoneScreen =
-  typeof matchMedia === 'function' && matchMedia('(max-height: 500px), (max-width: 600px)').matches;
+// The speaker notes start as the user left them, else closed (demo-files.ts).
+const notesOpen = notesStartOpen();
 // A phone sizes the slide area to the slide's shape (shell.css).
 const slideRatio = useEditorState((s) => (s.slideWidth ? s.slideHeight / s.slideWidth : 0.5625));
 const show = useSlideshow();
-// Closed on a narrow window, so the slide keeps a usable zoom (demo-files.ts).
+// Open as the user left it, else open, except on a narrow window (demo-files.ts).
 const panel = shallowRef(panelStartsOpen());
+/** The user's own open or close of the side panel, kept for the next visit. */
+function setPanelByUser(open: boolean): void {
+  rememberPanel(open);
+  panel.value = open;
+}
+// The grip of the panel sheet on a phone: drag it to set the height, or down to close.
+const sheet = shallowRef<HTMLDivElement | null>(null);
+const grip = shallowRef<HTMLButtonElement | null>(null);
+watch(
+  grip,
+  (el, _old, onCleanup) => {
+    if (!el) return;
+    onCleanup(
+      attachSheetGrip(el, { sheet: () => sheet.value, close: () => setPanelByUser(false) })
+    );
+  },
+  { flush: 'post' }
+);
 const panelTab = shallowRef<SidePanelTab>('format');
 const stopPanelWidth = followPanelWidth((open) => (panel.value = open));
 onBeforeUnmount(stopPanelWidth);
@@ -278,7 +299,7 @@ function onDrop(e: DragEvent): void {
           :data-pptx-tooltip="t('panel.toggle')"
           :aria-pressed="panel"
           @mousedown="keepFocus"
-          @click="panel = !panel"
+          @click="setPanelByUser(!panel)"
         >
           <Icon name="view_sidebar" className="" />
         </button>
@@ -314,16 +335,26 @@ function onDrop(e: DragEvent): void {
           </div>
           <!-- The notes pane stays mounted in the slide sorter, so its open state and draft stay. -->
           <PptxEditorNotesPane
-            :default-open="!phoneScreen"
+            :default-open="notesOpen"
+            @update:open="rememberNotes"
             :style="sorter ? { display: 'none' } : undefined"
           />
           <PptxEditorEditNotice />
           <PptxEditorOpenFailure />
           <PptxEditorStatusBar v-if="ribbon" />
         </div>
-        <PptxEditorSidePanel v-if="panel" v-model:tab="panelTab" :on-close="() => (panel = false)">
-          <template #comments><PptxEditorReview /></template>
-        </PptxEditorSidePanel>
+        <!-- A phone shows the panel as a sheet under the slide, with a grip (shell.css). -->
+        <div v-if="panel" ref="sheet" class="demo-sheet">
+          <button
+            ref="grip"
+            type="button"
+            class="demo-sheet__grip"
+            :aria-label="t('app.sheetGrip')"
+          />
+          <PptxEditorSidePanel v-model:tab="panelTab" :on-close="() => setPanelByUser(false)">
+            <template #comments><PptxEditorReview /></template>
+          </PptxEditorSidePanel>
+        </div>
         <div v-if="dragging" class="demo-drop">{{ t('app.dropHint') }}</div>
       </div>
     </main>
