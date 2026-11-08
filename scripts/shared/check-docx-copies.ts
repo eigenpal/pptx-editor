@@ -45,7 +45,7 @@
 // checks 1 to 3 pass but no DOCX Editor checkout is found. A skip is never a pass.
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { extname, join, relative, resolve } from 'node:path';
 import { format, resolveConfig } from 'prettier';
@@ -194,8 +194,9 @@ if (tracked === undefined) {
   process.exit(1);
 }
 const trackedSet = new Set(tracked);
-// On a local run, new files that are not staged yet count too. CI checks the tracked files.
-const untracked = process.env.CI
+// On a local run, new files that are not staged yet count too. CI (`CI` set to `true` or `1`)
+// checks the tracked files.
+const untracked = /^(?:1|true)$/i.test(process.env.CI ?? '')
   ? []
   : (git(['ls-files', '--others', '--exclude-standard', '-z'], ROOT) ?? '')
       .split('\0')
@@ -239,7 +240,8 @@ const signals = new Map<string, readonly string[]>();
 let mentioning = 0;
 for (const path of only === undefined ? [...tracked, ...untracked] : [only]) {
   const file = join(ROOT, path);
-  if (!existsSync(file)) continue;
+  // A symlink to a folder, such as a linked `node_modules`, is not a file to read.
+  if (!statSync(file, { throwIfNoEntry: false })?.isFile()) continue;
   // Every file, whatever git calls it: UTF-8 without its NUL bytes, or else Latin-1.
   const body = textOf(readFileSync(file));
   if (!MENTION.test(body)) continue;

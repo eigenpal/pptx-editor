@@ -1410,7 +1410,7 @@
     "kind": "adapted",
     "source": ["packages/pro/src/collaboration/__tests__/document-undo-groups-fuzz.test.ts"],
     "commit": "5993bd223",
-    "reason": "DOCX Editor pro code, copied into this pro package under the same licensor and license."
+    "reason": "DOCX Editor pro code, adapted into this pro package under the same licensor and license."
   },
   {
     "file": "packages/pro/src/__tests__/fuzz-shrink.ts",
