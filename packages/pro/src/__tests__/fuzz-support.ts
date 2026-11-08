@@ -173,6 +173,18 @@ export class Relay {
       for (const { from, to, count } of waiting) this.deliver(from, to, count);
   }
 
+  /**
+   * Deliver every waiting update, each link's updates as one merged update, as a provider's
+   * sync sends them to a peer that comes back online. Links stay held for the updates after.
+   */
+  sync(): void {
+    for (let waiting = this.waiting(); waiting.length > 0; waiting = this.waiting())
+      for (const { from, to, count } of waiting) {
+        const held = this.queue(from, to).splice(0, count);
+        Y.applyUpdate(this.docs[to]!, Y.mergeUpdates(held.map((h) => h.update)), this);
+      }
+  }
+
   /** A random delivery of part of one link's waiting updates, or null when none wait. */
   randomDelivery(random: () => number): Delivery | null {
     const waiting = this.waiting();
