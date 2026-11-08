@@ -7,4 +7,4 @@
 '@pptx-editor.dev/editor-api': minor
 ---
 
-Add slide comments with the comment commands, `PptxEditorReview` in `@pptx-editor.dev/pro`, `useReview`, `useReviewOf`, `useReviewItem`, `useReviewAuthor`, `readCommentThreads`, and the `pane` option of `reviewModule`. The room format is now 7, so update every peer of a room together.
+Add slide comments with the comment commands, `readCommentThreads`, the `pane` option of `reviewModule`, and `PptxEditorReview`, `useReview`, `useReviewOf`, `useReviewItem`, and `useReviewAuthor` from `@pptx-editor.dev/pro/react` and `@pptx-editor.dev/pro/vue`. The room format is now 7, so update every peer of a room together.

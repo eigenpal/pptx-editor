@@ -5,4 +5,4 @@
 '@pptx-editor.dev/pptx-to-pdf': minor
 ---
 
-Draw 3-D shapes with the drawing module of `@pptx-editor.dev/pro`, and preset shadows in every edition. Set bevels, 3-D rotation, and blur with `setShapeEffect` or the Shape Effects menu.
+Draw 3-D shapes with `drawingModule` from `@pptx-editor.dev/pro/drawing`, and preset shadows in every edition. Set bevels, 3-D rotation, and blur with `setShapeEffect` or the Shape Effects menu.
