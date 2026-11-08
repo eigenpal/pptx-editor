@@ -67,18 +67,24 @@ const RTL = /[֐-ࣿיִ-﷿ﹰ-﻿]/u;
 /** Control characters: a glyph that the PDF text layer cannot map. */
 const UNMAPPED = /[\u0000-\u0008\u000E-\u001F�]/u;
 
+/** A letter or a digit: the characters that make a line checkable (`lineKey`). */
+const WORD_CHAR = /[\p{L}\p{N}]/gu;
+
 /**
  * The text that line matching compares: normalized, without a leading bullet or whitespace.
- * Empty for a line that is not checked: right-to-left text, unmapped glyphs, and lines without
- * two letters in a row (numbers, and the one glyph per line of vertical or stacked text). The
+ * Empty for a line that is not checked: right-to-left text, unmapped glyphs, and lines with
+ * fewer than two letters or digits. Numbers, dates, percentages, chart and table values, and
+ * slide numbers of two or more digits are checked as words are. A line of one glyph is not: the
+ * one glyph per line of vertical or stacked text, and a lone digit such as a superscript or a
+ * chart tick, which repeats too often on a slide to pair by its text. Its pixels check it. The
  * rule reads the key, after whitespace goes: a PDF can write a space between any two items, so
- * the same text must give the same answer with and without the spaces.
+ * the same text gives the same answer with and without the spaces.
  */
 export function lineKey(text: string): string {
   const n = normalize(text);
   if (RTL.test(n) || UNMAPPED.test(n)) return '';
   const key = n.replace(LEADING_BULLET, '').replace(/\s+/g, '');
-  return /\p{L}{2}/u.test(key) ? key : '';
+  return (key.match(WORD_CHAR)?.length ?? 0) >= 2 ? key : '';
 }
 
 /**
@@ -194,19 +200,25 @@ function assign(pairs: Pair[], take: (p: Pair) => void): void {
 }
 
 /**
- * The unused lines of `pool` on the baseline of `line` that, joined in left-to-right order, hold
- * its text: a PDF can place each word of a justified line apart.
+ * The unused lines of `pool` on one baseline that, joined in left-to-right order, hold the text
+ * of `line`: a PDF can place each word of a justified line apart. Their baseline is within
+ * `LINE_PAIR_LIMIT_PT` of the line, so a joined line out of place fails by its distance, as a
+ * single line does.
  */
 function joinings(line: Entry, pool: readonly Entry[]): Entry[][] {
-  const row = pool
-    .filter((p) => !p.used && Math.abs(p.line.baseline - line.line.baseline) <= SAME_BASELINE_PT)
+  const near = pool
+    .filter((p) => !p.used && Math.abs(p.line.baseline - line.line.baseline) <= LINE_PAIR_LIMIT_PT)
     .sort((p, q) => p.line.xMin - q.line.xMin);
   const out: Entry[][] = [];
-  for (let i = 0; i < row.length; i += 1) {
-    let joined = row[i].bare;
-    for (let j = i + 1; j < row.length && joined.length < line.bare.length; j += 1) {
+  for (let i = 0; i < near.length; i += 1) {
+    // The pieces share one baseline; `pairOf` then measures it against the line.
+    const row = near
+      .slice(i)
+      .filter((p) => Math.abs(p.line.baseline - near[i].line.baseline) <= SAME_BASELINE_PT);
+    let joined = row[0].bare;
+    for (let j = 1; j < row.length && joined.length < line.bare.length; j += 1) {
       joined += row[j].bare;
-      if (joined === line.bare) out.push(row.slice(i, j + 1));
+      if (joined === line.bare) out.push(row.slice(0, j + 1));
     }
   }
   return out;
@@ -216,7 +228,7 @@ function joinings(line: Entry, pool: readonly Entry[]): Entry[][] {
  * Compare the lines of our page with the lines of the reference page. Both pages follow the same
  * rules, so the pairs do not depend on which page is which. A line pairs with a line of the other
  * page with the same text (`lineKey`); failing that, the same text after a one-letter bullet;
- * failing that, several lines of the other page on its baseline that together hold its text.
+ * failing that, several lines of the other page on one baseline that together hold its text.
  * Only pairs within `LINE_PAIR_LIMIT_PT` count, and the nearest are taken first, so repeated
  * text pairs within its shape, never with a line of another shape. Last, the lines of the same
  * text that are left pair at any distance, nearest first: a line that moved is out of place.
