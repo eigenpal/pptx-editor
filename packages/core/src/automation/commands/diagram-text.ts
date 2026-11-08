@@ -124,7 +124,11 @@ export function editDiagramText(
   const drawnBody = child(shape, 'dsp:txBody');
   if (!shape || !point || !drawnBody) throw new CommandRefusal('errors.diagram.noText');
   const pointBody = child(point, 'dgm:t');
-  const same = !!pointBody && bodyText(pointBody) === bodyText(drawnBody);
+  // A point body with no paragraph takes the shape's text instead of the edit.
+  const same =
+    !!pointBody &&
+    paragraphsOf(pointBody).length > 0 &&
+    bodyText(pointBody) === bodyText(drawnBody);
   const at = edit(scratch.batch, frame.drawingPart, drawnBody.id);
   if (same) edit(scratch.batch, frame.dataPart, pointBody.id);
   else {

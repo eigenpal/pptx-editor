@@ -1713,7 +1713,7 @@
     "addBelow": "在下方添加形状",
     "delete": "删除形状",
     "pane": {
-      "help": "按 Enter 键或离开字段即可应用。每个字段是一个形状的文本。",
+      "help": "按 Enter 键或离开字段即可应用。按 Shift+Enter 键开始新段落。每个字段是一个形状的文本。",
       "emptyTitle": "未选择图示",
       "emptyBody": "在幻灯片上选择图示以编辑其形状的文本。",
       "nodeLabel": "形状 {number} 的文本",

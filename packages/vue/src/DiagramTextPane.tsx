@@ -90,7 +90,9 @@ export const DiagramTextPane = defineComponent({
     const editor = usePptxEditor();
     const diagram = useEditorState((s) => s.diagram ?? null);
     const readOnly = useEditorState((s) => s.mode === 'view');
-    const refusal = ref<string | null>(null);
+    // The last add or delete refusal, for the diagram it came from. Each one gets a new count,
+    // so the alert remounts and a repeated refusal is announced again.
+    const refusal = ref<{ text: string; frame: string; count: number } | null>(null);
     const noteId = useId();
     const root = ref<HTMLElement | null>(null);
     /** Focus the new node's field after an add, or the field at `index` after a delete. */
@@ -124,7 +126,8 @@ export const DiagramTextPane = defineComponent({
        */
       const run = (command: EditorCommand, index: number): void => {
         const reason = apply(command);
-        refusal.value = reason;
+        refusal.value =
+          reason === null ? null : { text: reason, frame, count: (refusal.value?.count ?? 0) + 1 };
         if (reason !== null) return;
         const sel = editor.value?.snapshot().selection;
         const added = sel?.kind === 'text' ? sel.diagramNode : undefined;
@@ -150,8 +153,8 @@ export const DiagramTextPane = defineComponent({
           {!selected.structure && selected.reason ? (
             <p class="pptx-chart-pane__note">{t(selected.reason as TranslationKey)}</p>
           ) : null}
-          <p class="pptx-chart-pane__error" role="alert">
-            {refusal.value ?? ''}
+          <p key={refusal.value?.count ?? 0} class="pptx-chart-pane__error" role="alert">
+            {refusal.value?.frame === frame ? refusal.value.text : ''}
           </p>
           {selected.nodes.length === 0 ? (
             <p class="pptx-chart-pane__note">{t('diagram.pane.noNodes')}</p>
@@ -159,7 +162,7 @@ export const DiagramTextPane = defineComponent({
             <ul class="pptx-diagram-pane__list">
               {selected.nodes.map((node, i) => (
                 <li
-                  key={node.node}
+                  key={`${frame}:${node.node}`}
                   class="pptx-diagram-pane__row"
                   style={{ '--pptx-diagram-level': String(Math.min(node.level, 4)) }}
                 >

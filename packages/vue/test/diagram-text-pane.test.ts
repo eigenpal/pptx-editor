@@ -118,5 +118,7 @@ describe('Diagram tab', () => {
     fireEvent.click(button('Delete shape Empty shape'));
     await flush();
     expect(texts(editor)).toEqual(before);
+    // After a delete, the focus goes to the field that took the deleted row's place.
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Text of shape 2');
   });
 });

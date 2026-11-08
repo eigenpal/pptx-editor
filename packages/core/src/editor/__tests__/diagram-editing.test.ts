@@ -304,6 +304,29 @@ describe('diagram text pane', () => {
     e.destroy();
   });
 
+  test('a deleted paragraph leaves the next paragraph its own properties', async () => {
+    const files = unzipSync(fixture('diagrams'));
+    const more =
+      '<a:p><a:pPr algn="r"/><a:r><a:rPr lang="en-US"/><a:t>B</a:t></a:r></a:p>' +
+      '<a:p><a:pPr marL="9" algn="l"/><a:r><a:rPr lang="en-US"/><a:t>C</a:t></a:r></a:p>';
+    for (const name of ['ppt/diagrams/drawing1.xml', 'ppt/diagrams/data1.xml']) {
+      const xml = strFromU8(files[name]!);
+      const at = xml.indexOf('</a:p>', xml.indexOf('<a:t>Plan</a:t>')) + '</a:p>'.length;
+      files[name] = strToU8(xml.slice(0, at) + more + xml.slice(at));
+    }
+    const e = await open('diagrams', 0, zipSync(files));
+    const frame = frameOf(e);
+    e.setSelection({ kind: 'shapes', nodeIds: [frame] });
+    const node = e.snapshot().diagram!.nodes[0]!;
+    expect(node.text).toBe('Plan\nB\nC');
+    const r = e.exec({ type: 'setDiagramText', nodeId: frame, node: node.node, text: 'Plan\nC' });
+    expect(r.ok).toBe(true);
+    const drawing = partText(e, '/ppt/diagrams/drawing1.xml');
+    expect(drawing).toContain('<a:pPr marL="9" algn="l"/><a:r><a:rPr lang="en-US"/><a:t>C</a:t>');
+    expect(drawing).not.toContain('<a:t>B</a:t>');
+    e.destroy();
+  });
+
   test('a change never splits an emoji or a field', async () => {
     // The first node gets a line break, a bold run, and a date field after its text.
     const files = unzipSync(fixture('diagrams'));

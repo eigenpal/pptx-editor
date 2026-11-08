@@ -1713,7 +1713,7 @@
     "addBelow": "Add shape below",
     "delete": "Delete shape",
     "pane": {
-      "help": "Press Enter or leave a field to apply it. Each field is the text of one shape.",
+      "help": "Press Enter or leave a field to apply it. Shift+Enter starts a new paragraph. Each field is the text of one shape.",
       "emptyTitle": "No diagram selected",
       "emptyBody": "Select a diagram on the slide to edit the text of its shapes.",
       "nodeLabel": "Text of shape {number}",

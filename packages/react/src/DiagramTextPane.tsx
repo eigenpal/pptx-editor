@@ -88,7 +88,11 @@ export function DiagramTextPane() {
   const editor = usePptxEditor();
   const diagram = useEditorState((s) => s.diagram ?? null);
   const readOnly = useEditorState((s) => s.mode === 'view');
-  const [refusal, setRefusal] = useState<string | null>(null);
+  // The last add or delete refusal, for the diagram it came from. Each one gets a new count, so
+  // the alert remounts and a repeated refusal is announced again.
+  const [refusal, setRefusal] = useState<{ text: string; frame: string; count: number } | null>(
+    null
+  );
   const noteId = useId();
   const root = useRef<HTMLDivElement>(null);
   // After an add or a delete, the field to focus: the new node's, or the next row's.
@@ -121,7 +125,9 @@ export function DiagramTextPane() {
    */
   const run = (command: EditorCommand, index: number): void => {
     const reason = apply(command);
-    setRefusal(reason);
+    setRefusal((prev) =>
+      reason === null ? null : { text: reason, frame, count: (prev?.count ?? 0) + 1 }
+    );
     if (reason !== null) return;
     const sel = editor?.snapshot().selection;
     const added = sel?.kind === 'text' ? sel.diagramNode : undefined;
@@ -143,8 +149,8 @@ export function DiagramTextPane() {
       {!diagram.structure && diagram.reason ? (
         <p className="pptx-chart-pane__note">{t(diagram.reason as TranslationKey)}</p>
       ) : null}
-      <p className="pptx-chart-pane__error" role="alert">
-        {refusal ?? ''}
+      <p key={refusal?.count ?? 0} className="pptx-chart-pane__error" role="alert">
+        {refusal?.frame === frame ? refusal.text : ''}
       </p>
       {diagram.nodes.length === 0 ? (
         <p className="pptx-chart-pane__note">{t('diagram.pane.noNodes')}</p>
@@ -152,7 +158,7 @@ export function DiagramTextPane() {
         <ul className="pptx-diagram-pane__list">
           {diagram.nodes.map((node, i) => (
             <li
-              key={node.node}
+              key={`${frame}:${node.node}`}
               className="pptx-diagram-pane__row"
               style={{ '--pptx-diagram-level': Math.min(node.level, 4) } as CSSProperties}
             >

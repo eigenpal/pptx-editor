@@ -254,6 +254,17 @@ function replaceBodyText(batch: OpBatch, part: string, bodyId: string, text: str
   let tail = 0;
   while (tail < most - head && old[old.length - 1 - tail] === text[text.length - 1 - tail])
     tail += 1;
+  // A deleted paragraph goes with the newline before it, not the one after it, so the next
+  // paragraph keeps its own properties: "A\nB\nC" to "A\nC" deletes "\nB", not "B\n".
+  while (
+    head > 0 &&
+    head + tail === text.length &&
+    old[old.length - tail - 1] === '\n' &&
+    old[head - 1] === '\n'
+  ) {
+    head -= 1;
+    tail += 1;
+  }
   // The change never starts or ends inside a field, a math zone, or a surrogate pair: the
   // whole item is replaced. The prefix and suffix are the same in both texts, so the new text
   // widens with the old.

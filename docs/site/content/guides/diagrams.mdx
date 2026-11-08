@@ -40,7 +40,7 @@ The **Diagram** tab of the side panel lists the nodes of the selected diagram in
 2. Right-click the diagram and select **Edit text…**, or select **Edit text…** in the **Diagram** toolbar group.
 3. Change the text in a field. Press Enter or leave the field to apply it. Shift+Enter starts a new paragraph, and Escape restores the text.
 
-Each row also has **Add shape after**, **Add shape below**, and **Delete shape** buttons for its node. One applied field, add, or delete is one undo step. In view mode, the fields are read-only: you can still read and copy the text.
+Each row also has **Add shape after**, **Add shape below**, and **Delete shape** buttons for its node. **Add shape** under the list adds a shape after the last top-level node. One applied field, add, or delete is one undo step. In view mode, the fields are read-only: you can still read and copy the text.
 
 From code, `setDiagramText` replaces the text of one node. Only the changed part of the text is replaced, so the rest keeps its formatting, line breaks, and paragraph settings. New text takes the formatting of the run where it goes in. A new newline starts a paragraph, and tabs become spaces. A field, such as a date, becomes plain text when a change touches it. The text can have up to 10,000 characters and 1,000 paragraphs:
 
