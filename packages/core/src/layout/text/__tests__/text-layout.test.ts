@@ -185,6 +185,13 @@ describe('the line metrics of several faces', () => {
     expect(arabic / 12_700).toBeCloseTo(14, 6);
     expect(mixed / 12_700).toBeCloseTo(15, 6);
   });
+
+  test('Latin runs in other faces do not merge: the last run at the largest size decides', () => {
+    const latin = (t: string, face: string): string =>
+      `<a:r><a:rPr lang="en-US" sz="2000"><a:latin typeface="${face}"/></a:rPr><a:t>${t}</a:t></a:r>`;
+    const alone = baseline(latin('abc', 'Latin'));
+    expect(baseline(latin('abc ', 'Arabic') + latin('abc', 'Latin'))).toBe(alone);
+  });
 });
 
 describe('rotated frames', () => {

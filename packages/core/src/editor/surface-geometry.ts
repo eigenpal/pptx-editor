@@ -35,12 +35,22 @@ export function pointAt(item: LayoutItem, sx: number, sy: number): TextPoint | u
   const p = apply(invert(m), sx, sy);
   const lines = item.text.lines;
   if (lines.length === 0) return { paragraph: 0, offset: 0 };
-  let line = lines[lines.length - 1];
-  for (const l of lines)
-    if (p.y < l.top + l.height) {
-      line = l;
-      break;
-    }
+  // The line nearest to the point across the lines, then along them: lines need not be in
+  // place order (`mongolianVert` and `wordArtVert` mirror them, columns restart at the top).
+  // A point on the edge between two lines belongs to the later one.
+  const across = (l: Line): number =>
+    p.y < l.top ? l.top - p.y : p.y < l.top + l.height ? 0 : p.y - (l.top + l.height) + 1;
+  const along = (l: Line): number => {
+    let from = Infinity;
+    let to = -Infinity;
+    for (const x of l.caretX) ((from = Math.min(from, x)), (to = Math.max(to, x)));
+    return Math.max(0, from - p.x, p.x - to);
+  };
+  let line = lines[0];
+  for (const l of lines) {
+    const d = across(l) - across(line) || along(l) - along(line);
+    if (d < 0) line = l;
+  }
   // A line in visual order: the nearest caret place, with the side of a direction boundary.
   if (line.bidi) {
     const stop = nearestStop(lineStopsOf(item, line), p.x);
@@ -122,7 +132,8 @@ export function caretAt(item: LayoutItem, point: TextPoint): CaretLine | undefin
   if (line) {
     x = caretXOn(line, point.offset, point.affinity) ?? x;
     h = Math.max(line.fontHeight, 1);
-    top = line.baseline - h * 0.8;
+    // Stacked text: the line's baseline is the axis through the letter centers.
+    top = line.baseline - h * (item.text.upright === 'all' ? 0.5 : 0.8);
     color = textColorAt(line, point.offset);
   } else if (item.text.lines.length === 0) {
     // An empty body: center vertically per anchor, at the left inset.
