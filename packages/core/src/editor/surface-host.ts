@@ -38,6 +38,7 @@ import { applyTableKey, tableKeyAction } from './table-keys.ts';
 import { isCaretKey, moveTextSelection, type TextInputKind } from './text-input.ts';
 import { zoomKeyAction } from './zoom.ts';
 import { createAnimationsSource } from './animation-command-table.ts';
+import { createSystemText } from './replacement-text.ts';
 import { animationMarks } from './surface-animation-marks.ts';
 
 /** The surface calls the editor passes through as they are. */
@@ -75,6 +76,8 @@ export interface SurfaceHostState {
   readonly painter: FormatPainter;
   readonly views: ViewSettings;
   readonly groups: EditorHistoryGroups;
+  /** The caret format that waits for the next typed text. */
+  readonly arm: { current(): unknown };
   /** One drag step: the steps of one gesture are one undo step. */
   gestureEdit(command: EditorCommand, gesture: string, base?: PptxPackage): void;
   /** The comment threads that show markers on the slide. */
@@ -85,6 +88,13 @@ export function createSurfaceHost(base: SurfaceHostBase, s: SurfaceHostState): S
   const animations = createAnimationsSource();
   return {
     ...base,
+    // System text changes: the input's context and `insertReplacementText`.
+    ...createSystemText({
+      ...s,
+      select: base.select,
+      armed: () => s.arm.current() !== null,
+      textInput: (kind, data, exact) => base.textInput(kind, data, exact),
+    }),
     ...(s.commentMarkers ? { commentMarkers: s.commentMarkers } : {}),
     paintLayout: (l) => s.prompts.paint(s.session(), l, s.selection(), s.viewing()) ?? l,
     selection: () => s.selection(),

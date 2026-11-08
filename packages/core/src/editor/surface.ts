@@ -142,7 +142,7 @@ export class SlideSurface {
   readonly #tableChrome: TableChrome;
   readonly #placeholderChrome: PlaceholderChrome;
   readonly #commentMarkers: CommentMarkers;
-  readonly #unbindInput: () => void;
+  readonly #inputBinding: ReturnType<typeof bindSurfaceInput>;
   #zoomAnchor: { x: number; y: number } | null = null;
   #renderedZoom: number | null = null;
   #paintKey: unknown = null;
@@ -188,8 +188,7 @@ export class SlideSurface {
     this.#input.setAttribute('aria-label', editor.label('canvas.inputAriaLabel'));
     this.#input.setAttribute('aria-multiline', 'true');
     this.#input.setAttribute('autocomplete', 'off');
-    this.#input.setAttribute('autocorrect', 'off');
-    Object.assign(this.#input, { name: 'pptx-slide-text', spellcheck: false }); // Named, never submitted.
+    this.#input.name = 'pptx-slide-text'; // Never submitted. System text settings apply.
     this.#input.tabIndex = -1; // Not a Tab stop: the slide is; text selection focuses the input.
     // A screen reader hears which cell the caret is in after Tab or an arrow moves it.
     this.#live = doc.createElement('div');
@@ -227,7 +226,7 @@ export class SlideSurface {
       },
       doc
     );
-    this.#unbindInput = bindSurfaceInput(this.#input, this.root, editor);
+    this.#inputBinding = bindSurfaceInput(this.#input, this.root, editor);
     this.root.tabIndex = 0;
     this.root.setAttribute('role', 'group');
     // Pinch (ctrl + wheel on trackpads) and Ctrl/Cmd + wheel zoom around the pointer.
@@ -247,7 +246,7 @@ export class SlideSurface {
     this.#table.up();
     this.#resize.disconnect();
     this.host.removeEventListener('wheel', this.#onWheel);
-    this.#unbindInput();
+    this.#inputBinding.destroy();
     this.#paintRest.stop();
     this.#reach.destroy();
     this.root.remove();
@@ -278,6 +277,7 @@ export class SlideSurface {
     this.root.classList.toggle('pptx-surface--painting', this.editor.painting?.() ?? false);
     // A read-only input still takes focus, keys, and copy, but opens no on-screen keyboard.
     this.#input.readOnly = this.editor.readOnly();
+    this.#inputBinding.sync(); // The text before the caret, for the system (`surface-input.ts`).
     const layout = this.editor.layout();
     const zoom = this.editor.zoom();
     // A dragged shape that changed under the drag (a peer's edit) ends the drag.

@@ -73,10 +73,12 @@ const keyDown = (key: string, init: { keyCode?: number; isComposing?: boolean } 
 /** One composition as an input method sends it: updates, then the committed text. */
 function compose(input: HTMLTextAreaElement, steps: readonly string[], commit: string): void {
   fire(input, composition('compositionstart'));
+  // The field holds the text before the caret; the composing text goes in after it.
+  const base = input.value;
   for (const step of steps) {
     // The browser shows the composing text in the field; `beforeinput` cannot be prevented.
     fire(input, beforeInput('insertCompositionText', step));
-    input.value = step;
+    input.value = base + step;
     fire(input, new win.Event('input', { bubbles: true }) as unknown as Event);
     fire(input, composition('compositionupdate', step));
   }

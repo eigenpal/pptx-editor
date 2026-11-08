@@ -86,16 +86,15 @@ While you edit text, Tab and Shift+Tab change the list level at the start of a l
 
 In right-to-left and mixed-direction text, Left and Right move the caret one place on screen, not in reading order. Alt/Ctrl+Left and Alt/Ctrl+Right move past one word on screen. Cmd+Left and Cmd+Right move to the left or the right edge of the line. Home and End move to the start and the end of the line in reading order, wherever they show on screen. A selection holds the text between its two ends in reading order, so on a mixed-direction line it can show as several highlighted parts.
 
-AutoCorrect works while you type:
+Capitals, curly quotes, dashes, and spelling corrections follow the user's system settings. The editor applies each system replacement to the text that the system targets, and one undo removes it. The editor does not add its own capitals, quotes, or dashes.
 
-- Straight quotes become curly quotes.
+AutoCorrect adds the changes that systems do not make:
+
 - `(c)`, `(r)`, and `(tm)` become ©, ®, and ™.
 - `...` becomes …, and `1/2`, `1/4`, and `3/4` become fractions.
-- Two hyphens between words become an en dash.
-- The first word of a sentence, the word "i", and the names of the days get a capital letter.
 - `1.`, `1)`, `*`, or `-` and a space at the start of a paragraph start a numbered or bulleted list. Press Backspace or Ctrl/Cmd+Z right after to keep the typed text.
 
-To turn AutoCorrect off, pass `autoCorrect: false` to `createPptxEditor`, set `autoCorrect={false}` on the React editor, or set `:auto-correct="false"` on the Vue editor.
+To turn AutoCorrect off, pass `autoCorrect: false` to `createPptxEditor`, set `autoCorrect={false}` on the React editor, or set `:auto-correct="false"` on the Vue editor. This option does not change the system replacements.
 
 In the speaker notes field, Ctrl/Cmd+B, I, and U format the text. The other keys in this table and AutoCorrect apply on the slide only.
 

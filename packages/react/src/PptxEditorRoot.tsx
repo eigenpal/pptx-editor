@@ -95,9 +95,9 @@ export interface PptxEditorRootProps {
    */
   readonly modules?: readonly EditorModule[];
   /**
-   * AutoCorrect while typing (default `true`): curly quotes, symbols, fractions, en dashes,
-   * sentence capitals, and lists started by typing `1.`, `1)`, `*`, or `-` and a space. Read
-   * once, when the editor is created.
+   * AutoCorrect while typing (default `true`): symbols, ellipses, fractions, and lists started
+   * by typing `1.`, `1)`, `*`, or `-` and a space. Capitals, curly quotes, dashes, and
+   * spelling follow the user's system settings. Read once, when the editor is created.
    */
   readonly autoCorrect?: boolean;
   /**
