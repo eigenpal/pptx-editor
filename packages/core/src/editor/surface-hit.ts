@@ -6,6 +6,7 @@
 import { apply, invert, type LayoutItem, type SlideLayout } from '../layout/index.ts';
 import { textFrameMatrix } from './surface-geometry.ts';
 import { isLineItem, scopeItems } from '../automation/commands/placement.ts';
+import type { EditorSelection } from '../contracts/index.ts';
 
 const EMU_PER_PX = 9_525;
 
@@ -160,4 +161,25 @@ export function onBorder(item: LayoutItem, p: Point, zoom: number): boolean {
     local.x >= -band && local.x <= cx + band && local.y >= -band && local.y <= cy + band;
   const inInner = local.x > band && local.x < cx - band && local.y > band && local.y < cy - band;
   return inOuter && !inInner && !onGlyph(item, p);
+}
+
+/**
+ * Whether a press on `id` moves the whole selection: `id` is one shape of a selection of two or
+ * more shapes in the scope `group`, also when the press is on its text. Never while `locked` (a
+ * viewer, or the format painter), where a press on text keeps its own meaning. @internal
+ */
+export function inMultiple(
+  sel: EditorSelection,
+  id: string | undefined,
+  group: string | undefined,
+  locked: boolean
+): boolean {
+  return (
+    !locked &&
+    id !== undefined &&
+    sel.kind === 'shapes' &&
+    sel.nodeIds.length > 1 &&
+    sel.group === group &&
+    sel.nodeIds.includes(id)
+  );
 }

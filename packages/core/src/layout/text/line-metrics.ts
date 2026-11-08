@@ -14,7 +14,8 @@
 //   Above it, for percent and exact spacing alike, the extra space goes 75 % above the
 //   baseline, and the baseline sits at most at 75 % of the line box. Below it, the face's
 //   descent stays below the baseline (a smaller line loses space above the text), but never
-//   more than 25 % of the line box. A face with an ascent share of 75 % or more places every
+//   more than 25 % of the line box; a face with an ascent share under 75 % loses 75 % of the
+//   space above the baseline, as a taller line gains it. A face with an ascent share of 75 % or more places every
 //   line at 75 % of the box above the single line. The
 //   face's ascent and descent are the `OS/2` values that fsSelection bit 7 selects
 //   (`os2LineExtents` in `face-line-metrics.ts`), or the table values of a missing face.
@@ -143,8 +144,16 @@ export function baselineInLinePt(single: number, lineHeight: number, metrics: Fa
   // The single line puts the baseline at the face's ascent share, also below 75 % (Cordia New
   // and Gabriola at single spacing: 0 of 178 lines missed, against 178 of 178 with the 75 %
   // floor). A tighter line keeps the face's descent below the baseline, but at most 25 % of the
-  // box, as measured on Latin faces; tight lines of a face under 75 % are not measured.
-  return lineHeight < single - 1e-9 ? Math.max(fit, loose) : fit;
+  // box, as measured on Latin faces. A face under 75 % loses 75 % of the space from above the
+  // baseline, as a taller line gains it (Noto Sans Arabic, typo share 0.651, at 90 %, 20 and
+  // 36 pt: the 26 lines of `rtl-text` are within 0.12 pt, against up to 4 pt with the 25 %
+  // limit). Both rules give 75 % of the box at a share of 75 %.
+  if (lineHeight < single - 1e-9)
+    return Math.max(
+      fit,
+      Math.min(loose, LOOSE_BASELINE_SHARE * (lineHeight - single) + single * share)
+    );
+  return fit;
 }
 
 /**

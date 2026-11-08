@@ -1198,6 +1198,7 @@ export interface CommandContext {
     readonly session: DocumentSession;
     // (undocumented)
     readonly slide: number;
+    readonly slideMaster?: boolean;
     readonly slideSorter?: boolean;
     readonly translate?: (key: string) => string;
 }
@@ -1550,6 +1551,9 @@ export const cssFontFamily: (font: string) => string;
 // @internal
 export const CURRENT_STYLE = "current";
 
+// @public
+export function currentSlideSummary(snapshot: Pick<EditorSnapshot, 'currentSlide' | 'slides'>): SlideSummary | undefined;
+
 // @internal
 export function currentStylePreview(read: BulletFormatRead): string;
 
@@ -1605,6 +1609,9 @@ export interface DateTimeState {
     readonly fixed: boolean;
     readonly text: string;
 }
+
+// @internal
+export function deckSlideCount(editor: SessionHolder | null | undefined): number;
 
 // @public
 export const DEFAULT_FONT: FontConfiguration['defaultFont'];
@@ -2573,7 +2580,6 @@ export interface EditorSnapshot extends CommentSnapshot {
     readonly canUndo: boolean;
     readonly chart?: SelectedChartState | null;
     readonly collapsedSections?: readonly string[];
-    // (undocumented)
     readonly currentSlide: number;
     readonly customShows?: readonly CustomShowSummary[];
     readonly dateTime?: DateTimeState | null;
@@ -2827,6 +2833,9 @@ export type FindStep = {
     readonly reason: string;
     readonly detail?: string;
 };
+
+// @internal
+export function findViewRefusal(view: string | undefined): string | null;
 
 // @internal
 export function firstFontPickerFamily(groups: readonly FontPickerGroup[]): string | null;
@@ -3270,6 +3279,12 @@ export interface FontUrlSource {
 
 // @public
 export type FormatPainterMode = 'off' | 'once' | 'sticky';
+
+// @internal
+export function formatPanelKeys(snapshot: Pick<EditorSnapshot, 'currentSlide' | 'slides'>): {
+    readonly title: TranslationKey;
+    readonly body: TranslationKey;
+};
 
 // @internal
 export function formatPanelSize(geometry: Pick<SelectionGeometry, 'cx' | 'cy' | 'lockAspectRatio'>, side: 'cx' | 'cy', value: number): {
@@ -3893,6 +3908,21 @@ export type MarkedFontResolver<T extends FontResolver = FontResolver> = T & Font
 // @internal
 export function markReadingPopup<F extends object>(renderer: F): F;
 
+// @internal
+export function masterBarHint(t: Translate, s: SlideSummary): string;
+
+// @internal
+export function masterBarTitle(t: Translate, s: SlideSummary): string;
+
+// @internal
+export function masterRailLabel(t: Translate, s: SlideSummary): string;
+
+// @internal
+export function masterRailUsage(t: Translate, s: SlideSummary): string;
+
+// @internal
+export function masterStepTarget(key: string, templates: readonly SlideSummary[], current: number): number | null;
+
 // @public
 export const MAX_ALT_TEXT = 4000;
 
@@ -3926,6 +3956,7 @@ export const MENU_NAMED_PARTS: {
     readonly Replace: MenuNamedRow;
     readonly NormalView: MenuNamedRow;
     readonly SlideSorterView: MenuNamedRow;
+    readonly SlideMasterView: MenuNamedRow;
     readonly SmartGuides: MenuNamedRow;
     readonly NewSlide: MenuNamedRow;
     readonly TextBox: MenuNamedRow;
@@ -4883,7 +4914,7 @@ export function pptxSourceBytes(source: PptxSource): Uint8Array | null;
 export function pptxSourceFontsResolver(latest: () => PptxFontsSource | undefined): MarkedFontResolver;
 
 // @public
-export type PresentationView = 'normal' | 'slideSorter';
+export type PresentationView = 'normal' | 'slideSorter' | 'slideMaster';
 
 // @internal
 export function presetGradient(base: string, light: number, dark: number): GradientFill;
@@ -5977,7 +6008,11 @@ export interface SlideSummary {
     readonly index: number;
     readonly key: string;
     readonly layoutId?: string;
+    readonly masterId?: string;
+    readonly name?: string;
     readonly pending?: true;
+    readonly template?: 'master' | 'layout';
+    readonly usedBy?: number;
 }
 
 // @internal
@@ -6922,7 +6957,7 @@ export interface ToolbarValueMap {
     'text.highlight': ColorChoice | null;
     'text.link': string | null;
     // (undocumented)
-    'view.presentationView': 'normal' | 'slideSorter';
+    'view.presentationView': 'normal' | 'slideSorter' | 'slideMaster';
 }
 
 // @internal

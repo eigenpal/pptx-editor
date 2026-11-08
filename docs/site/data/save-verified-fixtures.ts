@@ -97,15 +97,15 @@ export const SAVE_VERIFIED_FEATURE_EDITS: Readonly<Record<string, string>> = {
   'collaboration.realtime':
     'sha256:47e811007d57bbb5b9257d1727c1396f4add81546e85417cc8dd61361aa54189',
   'effects.3d-and-other': 'sha256:e97f4075d4485c849ef3dba4419a7593ebda6ddeaefcdc1dabb093eb21703f6a',
-  'effects.fill-overlay': 'sha256:88e9c3cc500e47ff17f120022a184f682c8c08dcbc07ab7d0d5abda814ba2fbd',
+  'effects.fill-overlay': 'sha256:1ca1da39ba290ed51260330eea20da74df48a1fa2f57d38db01ed46e6ee2a740',
   'effects.glow-reflection':
     'sha256:331acbe87981e8c099e725961c34f216079391deeb2a91734ae00e0ea5b2da72',
   'effects.outer-shadow': 'sha256:1ae1086598cd4f1320936df7d43135bba0e27815f23793af204ca6600e10af8e',
   'fills-lines.lines': 'sha256:fb26a1338e4636ad2e9ecb0c7178e877fc1c2ec0a62f10cdd71a145ad089ceda',
   'fills-lines.pattern-picture':
-    'sha256:d5d149d4d33512845a4c3b50f801ca1d1f4101d34013960bf3864af22a70de78',
+    'sha256:d27f45aa49306bd4a5df38e239b65bff5cd8e83dec4bf5c1b80fa51bc136ae2b',
   'fills-lines.solid-gradient':
-    'sha256:84ead1d10f7274ca776ab5dbf8995b0fae2a88bc4fbd1a5acff4dbabc8bd0aa2',
+    'sha256:6fccb555a3f2253b2eae428c3b63462a6d9f51ab67c08d2c675e2b28e9e9e06f',
   'fills-lines.theme-colors':
     'sha256:937f0feb9baa7944af5c51556bd358d06ad1bf770773841306d7a516c5c3b909',
   'lists.bullets-numbering':
@@ -198,13 +198,13 @@ export const SAVE_VERIFIED_KEPT_CONTENT_EDITS: Readonly<Record<string, string>> 
   'shapes.custom-geometry: paste into another deck':
     'sha256:ed71ac210577fbece88d29bd8b17f96c2ee0115c13f26f6050f03dcdf0a6b9ed',
   'effects.fill-overlay: duplicate slide':
-    'sha256:f721f7c7d2766bed4c203597bd7761b68ba48b5cbdc666819555b7b6137e4b7d',
+    'sha256:4114727dae3d4d6acee03c2907a301816f66295fe175105d830e21917be7007b',
   'effects.fill-overlay: paste on a new slide':
-    'sha256:7f35039e5f7e6d25f4e7cbaece3b0b48fa294ef4fe93064eb22f33292b3c7cf8',
+    'sha256:20b1b3134391d24065667068ac056f9ed874d88bbf0211c9b5c1cdf46d7e74f5',
   'effects.fill-overlay: paste into another deck':
-    'sha256:7f35039e5f7e6d25f4e7cbaece3b0b48fa294ef4fe93064eb22f33292b3c7cf8',
+    'sha256:20b1b3134391d24065667068ac056f9ed874d88bbf0211c9b5c1cdf46d7e74f5',
   'effects.fill-overlay: group':
-    'sha256:95d1c938a434285872bd5fd529cbee1fc0c953afba04b4e19e800b64736edd8d',
+    'sha256:1412f5d06e757bcc1a282133b90a102b69f7b7b649ac828fdf0d54d7fecb4111',
   'effects.3d-and-other: duplicate slide':
     'sha256:c94c33372ad368532f3e7b50ee56133ff4b414094edfcd7772adfafb31bb2bae',
   'effects.3d-and-other: paste on a new slide':

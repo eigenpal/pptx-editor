@@ -17,6 +17,7 @@ import {
   REL,
   serializeXmlPart,
   shapeTreeOf,
+  slideRefAt,
   xmlPartOf,
   type Element,
   type PptxPackage,
@@ -484,13 +485,18 @@ function pictureBackground(
   return pictureFillXml(addImagePart(batch, part, p.bytes, type), p.tile === true);
 }
 
-/** Set or remove the background of a slide (`p:cSld/p:bg`). */
+/**
+ * Set or remove the background of a slide (`p:cSld/p:bg`), or of the layout or master at a
+ * template index in the slide master view (`slideRefAt`).
+ */
 export function setSlideBackground(
   batch: OpBatch,
   index: number,
   background: SlideBackground | null
 ): void {
-  const part = slideRef(batch.pkg, index).partName;
+  const ref = slideRefAt(batch.pkg, index);
+  if (!ref) throw new CommandRefusal('errors.unsupported', `no slide ${index}`);
+  const part = ref.partName;
   const cSld = find(xmlPartOf(batch.pkg, part)?.root, 'p:cSld');
   if (!cSld) throw new CommandRefusal('errors.malformed');
   const old = child(cSld, 'p:bg');

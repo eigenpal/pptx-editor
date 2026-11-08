@@ -698,12 +698,16 @@ export function stepEditorZoom(
 }
 export { onEditorEvent, type PptxEditorEvents } from './editor-events.ts';
 
-/** "Slide x of y" for the status bar: one-based, or null with no slides. @internal */
+/**
+ * "Slide x of y" for the status bar: one-based, or null with no slides and in the slide master
+ * view, whose rail lists layouts, not slides. @internal
+ */
 export function slideStatus(
   snapshot: Pick<EditorSnapshot, 'currentSlide' | 'slides'>
 ): { readonly current: number; readonly total: number } | null {
   const total = snapshot.slides.length;
-  return total === 0 ? null : { current: snapshot.currentSlide + 1, total };
+  if (total === 0 || snapshot.slides[0]?.template) return null;
+  return { current: snapshot.currentSlide + 1, total };
 }
 
 /** The chrome color mode: light, dark, or the operating system's setting. @public */

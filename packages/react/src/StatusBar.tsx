@@ -89,8 +89,8 @@ export function StatusBarNotes({
 }
 
 /**
- * The view buttons: the editor's view switch (`view.presentationView`: Normal and Slide
- * Sorter), the same control as the default editor's status area. @public
+ * The view buttons: the editor's view switch (`view.presentationView`: Normal, Slide
+ * Sorter, and Slide Master), the same control as the default editor's status area. @public
  */
 export function StatusBarViews({ className, hidden }: StatusBarPartProps): ReactNode {
   if (hidden) return null;

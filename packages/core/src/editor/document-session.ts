@@ -14,6 +14,7 @@ import {
   decodeEmbeddedFont,
   fontEmbeddingPermission,
   presentationInfo,
+  slideRefAt,
   PptxDocumentStore,
   attr,
   NS,
@@ -73,7 +74,10 @@ import {
 /** The longest the late fit waits for substitutes that slides parsed late name. */
 const LATE_SUBSTITUTE_WAIT_MS = 10_000;
 
-/** The resolution of a tiled image whose header states none (measured on `fixtures/fills-lines.pdf`). */
+/**
+ * The resolution of a tiled image whose header states none. Reference PDFs disagree on this
+ * value, so every tiled PNG in `fixtures/` states its resolution (`TILE_FIXTURE_DPI`).
+ */
 const TILE_DPI = 72;
 
 /** Options for opening a presentation. */
@@ -782,21 +786,19 @@ export class DocumentSession {
   }
 
   /**
-   * Layout of slide `index` at the current revision. A slide whose part, layout, master, theme,
+   * Layout of slide `index` at the current revision, or of a template index in the slide master
+   * view (`slideRefAt`). A slide whose part, layout, master, theme,
    * and the other parts it reads are unchanged keeps its layout object across edits elsewhere
    * (`slideDependencies`), so its thumbnail and its paint are reused too.
    */
   layout(index: number): SlideLayout | undefined {
     const pkg = this.store.package;
-    let byIndex = this.#layouts.get(pkg);
-    if (!byIndex) {
-      byIndex = new Map();
-      this.#layouts.set(pkg, byIndex);
-    }
+    const byIndex = this.#layouts.get(pkg) ?? new Map<number, SlideLayout>();
+    this.#layouts.set(pkg, byIndex);
     const hit = byIndex.get(index);
     if (hit) return hit;
     const deps = slideDependencies(pkg, index);
-    const partName = presentationInfo(pkg).slides[index]?.partName;
+    const partName = slideRefAt(pkg, index)?.partName;
     if (!deps || !partName) return undefined;
     const last = this.#bySlide.get(partName);
     if (last && sameDependencies(last.deps, deps)) {

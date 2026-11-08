@@ -14,6 +14,7 @@ import {
   type MouseEvent,
 } from 'react';
 import {
+  currentSlideSummary,
   SELECTION_PANE_NAME_MAX,
   selectFromPane,
   selectionPaneAncestors,
@@ -39,7 +40,7 @@ export interface SelectionPaneProps {
 export function SelectionPane(props: SelectionPaneProps = {}) {
   // Node ids repeat across slides: a new slide starts a new pane, so no rename, focus, or open
   // group carries over to an element of another slide.
-  const slideId = useEditorState((s) => s.slides[s.currentSlide]?.id ?? '');
+  const slideId = useEditorState((s) => currentSlideSummary(s)?.id ?? '');
   return <SlidePane key={slideId} {...props} />;
 }
 

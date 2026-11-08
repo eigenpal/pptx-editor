@@ -277,4 +277,16 @@ describe('approximations a slide uses', () => {
     );
     expect(approximationsOf(picture(line('solid')))).not.toContain('picture-border-dots');
   });
+
+  test('pattern tiles of a turned or flipped shape are measured; a pattern line is not', () => {
+    const patt =
+      '<a:pattFill prst="horz"><a:fgClr><a:srgbClr val="000000"/></a:fgClr><a:bgClr><a:srgbClr val="FFFFFF"/></a:bgClr></a:pattFill>';
+    const box = { id: 2, x: 0, y: 0, cx: IN, cy: IN, fill: patt };
+    expect(approximationsOf(shape({ ...box, rot: 1_800_000, flipH: true }))).not.toContain(
+      'pattern-bitmaps'
+    );
+    expect(
+      approximationsOf(shape({ ...box, fill: undefined, line: `<a:ln w="12700">${patt}</a:ln>` }))
+    ).toContain('pattern-bitmaps');
+  });
 });

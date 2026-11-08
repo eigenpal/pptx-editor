@@ -99,6 +99,7 @@
     "link": "링크 삽입…",
     "clearFormatting": "서식 지우기",
     "newSlide": "새 슬라이드",
+    "editLayout": null,
     "duplicateSlides": "슬라이드 {count}개 복제",
     "deleteSlides": "슬라이드 {count}개 삭제",
     "moveUp": "위로 이동",
@@ -511,7 +512,8 @@
     "presentationView": "프레젠테이션 보기",
     "views": {
       "normal": "기본",
-      "slideSorter": "여러 슬라이드"
+      "slideSorter": "여러 슬라이드",
+      "slideMaster": null
     },
     "equation": "수식",
     "chart": "차트",
@@ -854,7 +856,9 @@
     "instantAnimation": "이 효과는 즉시 실행되므로 재생 시간이 없습니다",
     "noChart": "차트를 선택하세요",
     "noCommentPane": "이 편집기에는 댓글 창이 없습니다",
-    "noDiagram": "다이어그램을 선택하세요"
+    "noDiagram": "다이어그램을 선택하세요",
+    "slideMaster": null,
+    "noSlideMaster": null
   },
   "rail": {
     "ariaLabel": "슬라이드",
@@ -910,7 +914,10 @@
     "format": {
       "emptyTitle": "선택한 항목 없음",
       "emptyBody": "슬라이드에서 도형을 선택하면 위치와 크기가 표시됩니다.",
+      "emptyBodyTemplate": null,
       "slide": "슬라이드",
+      "layout": null,
+      "master": null,
       "multipleTitle": "도형 {count}개 선택됨",
       "multipleBody": "핸들을 끌어 함께 크기를 조정하거나 Ctrl+G로 그룹화하세요.",
       "position": "위치",
@@ -1164,7 +1171,9 @@
       "chart": "차트",
       "diagram": "다이어그램",
       "media": "미디어"
-    }
+    },
+    "masterAriaLabel": null,
+    "layoutAriaLabel": null
   },
   "errors": {
     "notAPresentation": "이 파일은 PPTX 프레젠테이션이 아닙니다.",
@@ -1805,5 +1814,21 @@
       "matrix": "행렬",
       "euler": "오일러 등식"
     }
+  },
+  "masterView": {
+    "title": null,
+    "close": null,
+    "railLabel": null,
+    "master": null,
+    "untitledLayout": null,
+    "usedBy": null,
+    "usedByOne": null,
+    "unused": null,
+    "layoutHint": null,
+    "layoutHintOne": null,
+    "layoutHintNone": null,
+    "masterHint": null,
+    "masterHintOne": null,
+    "masterHintNone": null
   }
 }

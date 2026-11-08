@@ -138,6 +138,17 @@ export {
   type ToolbarArrangedGroup,
   type ToolbarGroupOverride,
 } from './adapter-support.ts';
+export {
+  currentSlideSummary,
+  deckSlideCount,
+  findViewRefusal,
+  formatPanelKeys,
+  masterBarHint,
+  masterBarTitle,
+  masterRailLabel,
+  masterRailUsage,
+  masterStepTarget,
+} from './master-rail.ts';
 export { createEditorRefApi, type EditorRefApi } from './editor-ref.ts';
 export {
   OPEN_FAILURE_MESSAGE_KEYS,

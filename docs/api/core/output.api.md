@@ -28,6 +28,31 @@ export function circleGradientGeometry(fill: Extract<ResolvedFill, {
 };
 
 // @internal
+export interface CompoundBandLine {
+    // (undocumented)
+    readonly lines: readonly CompoundPolyline[];
+    // (undocumented)
+    readonly width: number;
+}
+
+// @internal
+export function compoundBandLines(commands: readonly PathCommand[], cmpd: string, width: number, join: string, miterLimit: number): CompoundBandLine[] | null;
+
+// @internal
+export type CompoundPoint = {
+    readonly x: number;
+    readonly y: number;
+};
+
+// @internal
+export interface CompoundPolyline {
+    // (undocumented)
+    readonly closed: boolean;
+    // (undocumented)
+    readonly points: readonly CompoundPoint[];
+}
+
+// @internal
 export function createSvgDocument(): Document;
 
 // @internal
@@ -111,6 +136,12 @@ export function paintWeight(item: LayoutItem): number;
 
 // @public
 export function pathData(path: GeometryPath): string;
+
+// @internal
+export const PATTERN_PIXEL = 12700;
+
+// @internal
+export function patternBitmap(preset: string): number[][] | undefined;
 
 // @public
 export function registerFontFaces(doc: Document, faces: readonly RegisteredFace[], options?: RegisterFontFacesOptions): FontFaceHandle;

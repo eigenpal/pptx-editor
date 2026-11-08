@@ -329,13 +329,18 @@ describe('PptxEditor.ContextMenu and popups.contextMenu', () => {
     expect(document.querySelector('.pptx-contextmenu') === null).toBe(true);
   });
 
-  test('empty slide area offers Paste, Format Background, and New slide', async () => {
+  test('empty slide area offers Paste, Format Background, Edit layout, and New slide', async () => {
     const { stage } = await canvas();
     rightClick(stage, 10, 6);
     const slots = [...document.querySelectorAll('.pptx-contextmenu [data-slot]')].map((r) =>
       r.getAttribute('data-slot')
     );
-    expect(slots).toEqual(['edit.paste', 'slide.background', 'slide.add']);
+    expect(slots).toEqual([
+      'edit.paste',
+      'slide.background',
+      'view.presentationView.slideMaster',
+      'slide.add',
+    ]);
   });
 
   test('New slide is a registry row: ContextMenu.Slot hides it, and no second row shows', async () => {
@@ -350,7 +355,7 @@ describe('PptxEditor.ContextMenu and popups.contextMenu', () => {
     const slots = [...document.querySelectorAll('.pptx-contextmenu [data-slot]')].map((r) =>
       r.getAttribute('data-slot')
     );
-    expect(slots).toEqual(['edit.paste', 'slide.background']);
+    expect(slots).toEqual(['edit.paste', 'slide.background', 'view.presentationView.slideMaster']);
   });
 });
 

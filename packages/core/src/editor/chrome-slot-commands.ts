@@ -191,7 +191,7 @@ export function commandForSlotValue(
           }
         : { type: 'alignObjects', align: value as ObjectAlign };
     case 'view.presentationView':
-      return value === 'normal' || value === 'slideSorter'
+      return value === 'normal' || value === 'slideSorter' || value === 'slideMaster'
         ? { type: 'setPresentationView', view: value }
         : null;
     case 'slide.add':

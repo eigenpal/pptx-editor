@@ -18,6 +18,7 @@ import {
   platformShortcuts,
   radioGroupStep,
   type SidePanelTab,
+  formatPanelKeys,
 } from '@pptx-editor.dev/core/editor';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { Icon, ToolButton, keepFocus } from './chrome.tsx';
@@ -87,6 +88,9 @@ function FormatTab() {
   const chart = useEditorState((s) => s.chart ?? null);
   const diagram = useEditorState((s) => s.diagram ?? null);
   const readOnly = useEditorState((s) => s.mode === 'view');
+  // A layout or a master in the slide master view names itself in the heading.
+  const panelTitle = useEditorState((s) => formatPanelKeys(s).title);
+  const panelBody = useEditorState((s) => formatPanelKeys(s).body);
   const selected = useEditorState((s) =>
     s.selection.kind === 'shapes' ? s.selection.nodeIds.length : 0
   );
@@ -100,7 +104,7 @@ function FormatTab() {
     ) : (
       <>
         <div className="pptx-panel__section">
-          <h3 className="pptx-panel__title">{t('panel.format.slide')}</h3>
+          <h3 className="pptx-panel__title">{t(panelTitle)}</h3>
           {background.isAvailable ? (
             <button
               type="button"
@@ -114,7 +118,7 @@ function FormatTab() {
         </div>
         <div className="pptx-empty">
           <p className="pptx-empty__title">{t('panel.format.emptyTitle')}</p>
-          <p className="pptx-empty__body">{t('panel.format.emptyBody')}</p>
+          <p className="pptx-empty__body">{t(panelBody)}</p>
         </div>
       </>
     );

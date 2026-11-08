@@ -3527,7 +3527,7 @@ export const PptxEditor: {
             readonly type: PropType<vue.CSSProperties>;
             readonly default: undefined;
         };
-    }>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
+    }>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
         'update:open': (_open: boolean) => true;
     }, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
         readonly open: {
@@ -5937,7 +5937,7 @@ export const PptxEditorNotesPane: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly type: PropType<CSSProperties>;
         readonly default: undefined;
     };
-}>, () => vue_jsx_runtime.JSX.Element, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
+}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {
     'update:open': (_open: boolean) => true;
 }, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
     readonly open: {

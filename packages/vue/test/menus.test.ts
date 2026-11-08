@@ -518,10 +518,15 @@ describe('PptxEditorContextMenu and popups.contextMenu', () => {
     expect(editor.session!.layout(0)!.items.length).toBe(2);
   });
 
-  test('empty slide area offers Paste, Format Background, and New slide', async () => {
+  test('empty slide area offers Paste, Format Background, Edit layout, and New slide', async () => {
     const { editor, stage } = await vueCanvas();
     await rightClick(stage, 10, 6);
-    expect(menuSlots()).toEqual(['edit.paste', 'slide.background', 'slide.add']);
+    expect(menuSlots()).toEqual([
+      'edit.paste',
+      'slide.background',
+      'view.presentationView.slideMaster',
+      'slide.add',
+    ]);
     document.querySelector<HTMLElement>('.pptx-contextmenu [data-slot="slide.add"]')!.click();
     expect(editor.snapshot().slides.length).toBe(2);
   });
@@ -586,7 +591,11 @@ describe('PptxEditorContextMenu and popups.contextMenu', () => {
     });
     // The same flow with a renderer opens the menu.
     expect(await rightClick(stage, 10, 6)).toBe(true);
-    expect(menuSlots()).toEqual(['edit.paste', 'slide.background']);
+    expect(menuSlots()).toEqual([
+      'edit.paste',
+      'slide.background',
+      'view.presentationView.slideMaster',
+    ]);
   });
 });
 

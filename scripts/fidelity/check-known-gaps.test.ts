@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   checkAgainstBase,
+  comparisonOnly,
   looserGaps,
   looserLimits,
   newFixtures,
@@ -58,6 +59,41 @@ describe('the known gaps only shrink', () => {
     // A base list with values (before kinds-only entries) allows any entry.
     const old = { ...base, slides: { 'a/1': { pixels: 0.1 } } } as unknown as KnownGapList;
     expect(looserGaps(old, head, new Set(), source)).toEqual([]);
+  });
+
+  test('a change to the comparison alone may add failures, but not check fewer lines', () => {
+    const head = list(
+      { 'a/1': ['pixels', 'baseline'], 'b/1': ['pixels'] },
+      { deckLines: { a: 12 } }
+    );
+    expect(looserGaps({ ...base, deckLines: { a: 12 } }, head, new Set(), source, true)).toEqual(
+      []
+    );
+    const fewer = list({ 'a/1': ['pixels'] }, { deckLines: { a: 10 } });
+    expect(looserGaps({ ...base, deckLines: { a: 12 } }, fewer, new Set(), source, true)).toEqual([
+      'a: checks fewer lines (12 → 10)',
+    ]);
+  });
+
+  test('comparisonOnly allows the listed files, harness tests, and documentation only', () => {
+    const files = ['scripts/fidelity/compare.ts', 'scripts/fidelity/pdf.ts'];
+    expect(
+      comparisonOnly(
+        ['scripts/fidelity/compare.ts', 'scripts/fidelity/compare.test.ts', 'CONTRIBUTING.md'],
+        files
+      )
+    ).toBe(true);
+    // A file that changes what is painted or printed is not part of the comparison.
+    for (const other of [
+      'scripts/fidelity/local-fonts.ts',
+      'scripts/fidelity/score-deck.ts',
+      'scripts/fidelity/check-known-gaps.ts',
+      'packages/core/src/output/paint.ts',
+    ])
+      expect(comparisonOnly(['scripts/fidelity/compare.ts', other], files)).toBe(false);
+    // With no list (a base from before COMPARISON_FILES), nothing is a comparison change.
+    expect(comparisonOnly(['scripts/fidelity/compare.ts'], [])).toBe(false);
+    expect(comparisonOnly([], files)).toBe(false);
   });
 
   test('fewer checked lines in a deck are refused', () => {

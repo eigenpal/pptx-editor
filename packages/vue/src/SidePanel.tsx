@@ -30,6 +30,7 @@ import {
   panelHistoryKey,
   platformShortcuts,
   radioGroupStep,
+  formatPanelKeys,
 } from '@pptx-editor.dev/core/editor';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { Icon, ToolButton, keepFocus } from './chrome.tsx';
@@ -101,6 +102,9 @@ const FormatTab = defineComponent({
     const chart = useEditorState((s) => s.chart ?? null);
     const diagram = useEditorState((s) => s.diagram ?? null);
     const readOnly = useEditorState((s) => s.mode === 'view');
+    // A layout or a master in the slide master view names itself in the heading.
+    const panelTitle = useEditorState((s) => formatPanelKeys(s).title);
+    const panelBody = useEditorState((s) => formatPanelKeys(s).body);
     const selected = useEditorState((s) =>
       s.selection.kind === 'shapes' ? s.selection.nodeIds.length : 0
     );
@@ -118,7 +122,7 @@ const FormatTab = defineComponent({
         ) : (
           [
             <div class="pptx-panel__section">
-              <h3 class="pptx-panel__title">{t('panel.format.slide')}</h3>
+              <h3 class="pptx-panel__title">{t(panelTitle.value)}</h3>
               {background.isAvailable.value ? (
                 <button
                   type="button"
@@ -132,7 +136,7 @@ const FormatTab = defineComponent({
             </div>,
             <div class="pptx-empty">
               <p class="pptx-empty__title">{t('panel.format.emptyTitle')}</p>
-              <p class="pptx-empty__body">{t('panel.format.emptyBody')}</p>
+              <p class="pptx-empty__body">{t(panelBody.value)}</p>
             </div>,
           ]
         );

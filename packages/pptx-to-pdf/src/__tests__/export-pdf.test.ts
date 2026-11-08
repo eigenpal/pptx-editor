@@ -99,11 +99,12 @@ describe('exportPdf', () => {
     expect(all.pageCount).toBe(info.slides.length);
   });
 
-  test('pictures draw, and content it cannot draw is reported per slide', async () => {
-    // Pattern fills are not drawn yet.
+  test('pictures, pattern fills, and compound lines draw; diagnostics are per slide', async () => {
     const result = await exportPdf(deck('fills-lines'), { fidelityPolicy: 'best-effort' });
     const codes = result.diagnostics.map((d) => d.code);
-    expect(codes).toContain('fill.pattern');
+    expect(codes).not.toContain('fill.pattern');
+    // The dashed compound line draws as one line; the solid ones draw their bands.
+    expect(result.diagnostics.filter((d) => d.code === 'line.compound')).toHaveLength(1);
     for (const d of result.diagnostics) {
       expect(d.pageNumber).toBe((d.pageIndex ?? 0) + 1);
       expect(['unsupported', 'approximation', 'information']).toContain(d.severity);

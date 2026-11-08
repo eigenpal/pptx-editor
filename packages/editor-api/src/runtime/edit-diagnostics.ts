@@ -239,6 +239,16 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'A slide to import has threaded comments or an embedded control. Leave it out with sourceSlideIds.',
   ],
   [
+    'disabled.slideMaster',
+    'host.slide-master',
+    'The editor shows the slide master view, which takes no slide edits. Close the slide master first.',
+  ],
+  [
+    'disabled.noSlideMaster',
+    'host.no-slide-master',
+    'The presentation has no slide master, so the slide master view cannot open. Stay in the normal view.',
+  ],
+  [
     'disabled.slideSorter',
     'host.slide-sorter',
     'The editor shows the slide sorter, which takes no shape edits. Switch the editor to the normal view.',

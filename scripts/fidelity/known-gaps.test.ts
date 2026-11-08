@@ -16,7 +16,7 @@ import {
   slideVerdict,
   writeGaps,
 } from './known-gaps.ts';
-import { FIXTURE_KNOWN_GAPS, type KnownGapList } from './thresholds.ts';
+import { FIXTURE_EXPORT_KNOWN_GAPS, FIXTURE_KNOWN_GAPS, type KnownGapList } from './thresholds.ts';
 import { fixtureFontsIdentity } from './local-fonts.ts';
 import { PDFJS_VERSION } from './pdf.ts';
 import { pinnedChromium } from './harness-page.ts';
@@ -232,6 +232,24 @@ describe('--update-gaps', () => {
     expect(mod.FIXTURE_KNOWN_GAPS).toEqual(recorded);
   });
 
+  test('writes the export lane list by its name and leaves the other list as it was', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'pptx-gaps-'));
+    const file = join(dir, 'thresholds.ts');
+    const editor = list({ 'a/1': ['pixels'] });
+    writeFileSync(
+      file,
+      `export interface KnownGapList { slides: object }\n\n${listSource(editor)}\n\n${listSource(list({}), 'FIXTURE_EXPORT_KNOWN_GAPS')}\n`
+    );
+    const recorded = recordedList([deck('a', [slide(1, baselineFail)])], tools);
+    await writeGaps(file, recorded, 'FIXTURE_EXPORT_KNOWN_GAPS');
+    const mod = (await import(file)) as {
+      FIXTURE_KNOWN_GAPS: KnownGapList;
+      FIXTURE_EXPORT_KNOWN_GAPS: KnownGapList;
+    };
+    expect(mod.FIXTURE_KNOWN_GAPS).toEqual(editor);
+    expect(mod.FIXTURE_EXPORT_KNOWN_GAPS).toEqual(recorded);
+  });
+
   test('a partial run, or a deck that did not finish, keeps the entries of the decks it lacks', () => {
     const old = list({ 'a/1': ['pixels'], 'b/1': ['pixels'], 'c/1': ['baseline'] });
     const next = mergeRecorded(
@@ -306,9 +324,11 @@ describe('--update-gaps', () => {
     });
   });
 
-  test('the committed list was measured with the tools and fonts in use', () => {
-    expect(FIXTURE_KNOWN_GAPS.pdfjs).toBe(PDFJS_VERSION);
-    expect(FIXTURE_KNOWN_GAPS.fonts).toBe(fixtureFontsIdentity());
-    expect(FIXTURE_KNOWN_GAPS.chromium).toBe(pinnedChromium());
+  test('the committed lists were measured with the tools and fonts in use', () => {
+    for (const committed of [FIXTURE_KNOWN_GAPS, FIXTURE_EXPORT_KNOWN_GAPS]) {
+      expect(committed.pdfjs).toBe(PDFJS_VERSION);
+      expect(committed.fonts).toBe(fixtureFontsIdentity());
+      expect(committed.chromium).toBe(pinnedChromium());
+    }
   });
 });

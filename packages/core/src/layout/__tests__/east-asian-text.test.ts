@@ -149,6 +149,35 @@ describe('font slots', () => {
     expect(fontSlotPieces('“引用”', props({ lang: 'ja-JP' })).map((p) => p.slot)).toEqual(['ea']);
   });
 
+  test('digits and punctuation between complex-script characters take their slot', () => {
+    // Reference PDF of `rtl-text`, slide 2: the digits, full stops, and percent signs in
+    // Arabic text draw in the run's `a:cs` face.
+    const slotsOf = (t: string): string[] =>
+      fontSlotPieces(t, props({ lang: 'ar-SA' })).map(
+        (p) => `${p.slot}:${t.slice(p.start, p.end)}`
+      );
+    expect(slotsOf('عدد 45.5% من.')).toEqual(['cs:عدد 45.5% من.']);
+    // Next to Latin letters they stay Latin, also in an Arabic run.
+    expect(slotsOf('Q4 2024 (est.)')).toEqual(['latin:Q4 2024 (est.)']);
+    expect(slotsOf('عدد COVID-19.')).toEqual(['cs:عدد', 'latin: COVID-19.']);
+    expect(slotsOf('1.')).toEqual(['latin:1.']);
+  });
+
+  test('one grapheme cluster keeps one slot after a digit or a symbol', () => {
+    const slotsOf = (t: string, lang: string): string[] =>
+      fontSlotPieces(t, props({ lang })).map((p) => `${p.slot}:${t.slice(p.start, p.end)}`);
+    // A keycap: the digit, U+FE0F, and U+20E3 draw in one face.
+    expect(slotsOf('日本1\uFE0F\u20E3', 'en-US')).toEqual(['ea:日本', 'latin:1\uFE0F\u20E3']);
+    // A heart with U+FE0F: a shared symbol in Japanese text, a Latin symbol otherwise.
+    expect(slotsOf('愛\u2764\uFE0F', 'ja-JP')).toEqual(['ea:愛\u2764\uFE0F']);
+    expect(slotsOf('日本\u2764\uFE0F', 'en-US')).toEqual(['ea:日本', 'latin:\u2764\uFE0F']);
+    // A ZWJ sequence stays whole.
+    expect(slotsOf('日\u{1F468}\u200D\u{1F469}', 'en-US')).toEqual([
+      'ea:日',
+      'latin:\u{1F468}\u200D\u{1F469}',
+    ]);
+  });
+
   test('a surrogate pair stays whole and a combining mark keeps its base slot', () => {
     const pieces = fontSlotPieces('a𠀋b', props());
     expect(pieces).toEqual([

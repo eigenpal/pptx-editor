@@ -332,3 +332,51 @@ describe('degenerate 3-D shapes', () => {
     expect(facets).toBeLessThan(4000);
   });
 });
+
+describe('pattern fills under a turned camera', () => {
+  test('the tiles stay square to the slide: the transforms above the fill cancel', () => {
+    installDrawing();
+    const deck = shape({
+      id: 2,
+      x: IN,
+      y: 2 * IN,
+      cx: 2 * IN,
+      cy: IN / 2,
+      fill: '<a:pattFill prst="horz"><a:fgClr><a:srgbClr val="C00000"/></a:fgClr><a:bgClr><a:srgbClr val="FFFFFF"/></a:bgClr></a:pattFill>',
+      effects:
+        '<a:scene3d><a:camera prst="orthographicFront"><a:rot lat="0" lon="0" rev="2700000"/></a:camera>' +
+        '<a:lightRig rig="threePt" dir="t"/></a:scene3d>',
+    });
+    const r = readPptx(buildPptx({ slides: [{ shapes: deck, layout: 'blank' }] }));
+    if (!r.ok) throw new Error('open failed');
+    const layout = layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer());
+    const svg = paintSlide(doc, layout, { images: () => undefined, idPrefix: 'p' });
+    const pattern = [...svg.querySelectorAll('pattern')].find((p) => p.id.includes('patt'))!;
+    const filled = [...svg.querySelectorAll('path')].find(
+      (p) => p.getAttribute('fill') === `url(#${pattern.id})`
+    )!;
+    let m = [1, 0, 0, 1, 0, 0];
+    let turned = false;
+    for (let el: Element | null = filled; el && el !== svg; el = el.parentElement) {
+      const t = el.getAttribute('transform');
+      if (!t) continue;
+      const [a, b, c, d, e, f] = t
+        .replace(/^matrix\(|\)$/g, '')
+        .split(' ')
+        .map(Number);
+      if (Math.abs(b) > 0.01) turned = true;
+      // The ancestor's transform applies after the ones below it.
+      m = [
+        a * m[0] + c * m[1],
+        b * m[0] + d * m[1],
+        a * m[2] + c * m[3],
+        b * m[2] + d * m[3],
+        a * m[4] + c * m[5] + e,
+        b * m[4] + d * m[5] + f,
+      ];
+    }
+    expect(turned).toBe(true);
+    m.slice(0, 4).forEach((v, i) => expect(v).toBeCloseTo([1, 0, 0, 1][i], 6));
+    expect(Math.abs(m[4]) + Math.abs(m[5])).toBeLessThan(1);
+  });
+});

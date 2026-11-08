@@ -2,7 +2,7 @@
 // split cells, and table and cell formatting. Each compiles to one store transaction against
 // the table of the selection (`tableTarget`), then re-fits the frame to the laid-out table.
 
-import { intAttr } from '../store/index.ts';
+import { intAttr, slideRefAt } from '../store/index.ts';
 import type {
   EditorSelection,
   TableCellAddress,
@@ -65,7 +65,7 @@ const OPTIONS: readonly TableStyleOption[] = [
 const MAX_LENGTH = 51_206_400;
 
 function slidePart(ctx: CommandContext): string {
-  const ref = ctx.session.info.slides[ctx.slide];
+  const ref = slideRefAt(ctx.session.store.package, ctx.slide);
   if (!ref) throw new CommandRefusal('disabled.noEditor');
   return ref.partName;
 }

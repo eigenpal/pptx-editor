@@ -7,7 +7,7 @@ import type { EditorCommand, EditorSelection } from '../contracts/index.ts';
 import { findItem } from '../automation/commands/placement.ts';
 import { selectedIds, type CommandContext } from './commands.ts';
 import { CommandRefusal } from '../automation/commands/op-batch.ts';
-import { nodeIndex, xmlPartOf } from '../store/index.ts';
+import { nodeIndex, xmlPartOf, slideRefAt } from '../store/index.ts';
 import { hasCropFillMode, pictureLock } from './picture-commands.ts';
 
 /** The crop mode of one editor. */
@@ -42,7 +42,7 @@ export class CropMode {
     if (Object.keys(command).some((k) => k !== 'type'))
       throw new CommandRefusal('errors.unsupported', 'toggleCrop');
     if (ctx.readOnly) throw new CommandRefusal('disabled.viewing');
-    const part = ctx.session.info.slides[ctx.slide]?.partName;
+    const part = slideRefAt(ctx.session.store.package, ctx.slide)?.partName;
     if (!part) throw new CommandRefusal('disabled.noEditor');
     const ids = selectedIds(ctx.selection);
     if (ids.length === 0) throw new CommandRefusal('disabled.noSelection');

@@ -99,6 +99,7 @@
     "link": "插入链接…",
     "clearFormatting": "清除格式",
     "newSlide": "新建幻灯片",
+    "editLayout": null,
     "duplicateSlides": "复制 {count} 张幻灯片",
     "deleteSlides": "删除 {count} 张幻灯片",
     "moveUp": "上移",
@@ -511,7 +512,8 @@
     "presentationView": "演示文稿视图",
     "views": {
       "normal": "普通",
-      "slideSorter": "幻灯片浏览"
+      "slideSorter": "幻灯片浏览",
+      "slideMaster": null
     },
     "equation": "公式",
     "chart": "图表",
@@ -854,7 +856,9 @@
     "instantAnimation": "此效果是瞬时的，因此没有持续时间",
     "noChart": "请选择一个图表",
     "noCommentPane": "此编辑器没有批注窗格",
-    "noDiagram": "请选择图示"
+    "noDiagram": "请选择图示",
+    "slideMaster": null,
+    "noSlideMaster": null
   },
   "rail": {
     "ariaLabel": "幻灯片",
@@ -910,7 +914,10 @@
     "format": {
       "emptyTitle": "未选择任何内容",
       "emptyBody": "在幻灯片上选择一个形状以查看其位置和大小。",
+      "emptyBodyTemplate": null,
       "slide": "幻灯片",
+      "layout": null,
+      "master": null,
       "multipleTitle": "已选择 {count} 个形状",
       "multipleBody": "拖动控点可一起调整其大小，或按 Ctrl+G 将其组合。",
       "position": "位置",
@@ -1164,7 +1171,9 @@
       "chart": "图表",
       "diagram": "示意图",
       "media": "媒体"
-    }
+    },
+    "masterAriaLabel": null,
+    "layoutAriaLabel": null
   },
   "errors": {
     "notAPresentation": "此文件不是 PPTX 演示文稿。",
@@ -1805,5 +1814,21 @@
       "matrix": "矩阵",
       "euler": "欧拉恒等式"
     }
+  },
+  "masterView": {
+    "title": null,
+    "close": null,
+    "railLabel": null,
+    "master": null,
+    "untitledLayout": null,
+    "usedBy": null,
+    "usedByOne": null,
+    "unused": null,
+    "layoutHint": null,
+    "layoutHintOne": null,
+    "layoutHintNone": null,
+    "masterHint": null,
+    "masterHintOne": null,
+    "masterHintNone": null
   }
 }

@@ -277,8 +277,8 @@ export const ReadOnlyBadge = defineComponent({
 });
 
 /**
- * Normal and Slide Sorter as two buttons, as in a status bar: the default editor's view switch,
- * a one-of-two choice (`radiogroup`). Hosts place the `view.presentationView` slot instead. The
+ * Normal, Slide Sorter, and Slide Master as buttons, as in a status bar: the default editor's
+ * view switch, a one-of-three choice (`radiogroup`). Hosts place the `view.presentationView` slot instead. The
  * twin of React's `ViewSwitch`. @internal
  */
 export const ViewSwitch = defineComponent({

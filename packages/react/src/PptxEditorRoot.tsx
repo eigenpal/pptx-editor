@@ -53,6 +53,7 @@ import { DialogProvider, type PptxEditorPopups } from './popups.tsx';
 import { ChromeActionHostProvider } from './chrome-actions.tsx';
 import { SlideSorterWatch } from './SlideSorter.tsx';
 import { ChromeTooltip } from './ChromeTooltip.tsx';
+import { MasterViewBar } from './MasterRail.tsx';
 import {
   ChromeDarkContext,
   ScopedByAncestorContext,
@@ -365,7 +366,13 @@ export function PptxEditorContent({ className }: PptxEditorContentProps) {
         data-pptx-canvas=""
         onContextMenu={menu.onContextMenu}
         onKeyDown={menu.onKeyDown}
-      />
+      >
+        {/* The slide master view's bar, in the canvas before the surface that `attach` adds,
+            so it sits on the canvas in any host layout. */}
+        <div className="pptx-master-slot">
+          <MasterViewBar />
+        </div>
+      </div>
       {menu.layer}
     </>
   );

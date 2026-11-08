@@ -12,13 +12,19 @@ import {
   type DragEvent,
   type ReactNode,
 } from 'react';
-import type { EditorModule, PptxEditorInstance, SidePanelTab } from '@pptx-editor.dev/core/editor';
+import {
+  translateKeyOrText,
+  type EditorModule,
+  type PptxEditorInstance,
+  type SidePanelTab,
+} from '@pptx-editor.dev/core/editor';
 import { drawingModule } from '@pptx-editor.dev/pro/drawing';
 import { PptxEditorReview, reviewModule } from '@pptx-editor.dev/pro/react';
 import {
   PptxEditor,
   Icon,
   keepFocus,
+  useEditorCommand,
   useEditorState,
   type PptxEditorPopups,
   usePptxEditor,
@@ -120,7 +126,9 @@ function Shell({
   const sorter = useEditorState((s) => s.presentationView === 'slideSorter');
   // `?chrome=ribbon` shows the ribbon and the status bar in place of the flat toolbar.
   const ribbon = ribbonChrome(location.search);
-  const canPresent = useEditorState((s) => s.status === 'ready' && s.slides.length > 0);
+  // Present follows the slot's state: off with a reason in the slide master view, for one.
+  const present = useEditorCommand('view.playFromStart');
+  const presentOff = present.disabledReason ? translateKeyOrText(t, present.disabledReason) : null;
   // A phone sizes the slide area to the slide's shape (shell.css).
   const slideRatio = useEditorState((s) => (s.slideWidth ? s.slideHeight / s.slideWidth : 0.5625));
   const show = useSlideshow();
@@ -254,8 +262,8 @@ function Shell({
             type="button"
             className="demo-btn demo-btn--sm"
             aria-label={t('slideshow.present')}
-            data-pptx-tooltip={t('slideshow.presentHint')}
-            disabled={!canPresent}
+            data-pptx-tooltip={presentOff ?? t('slideshow.presentHint')}
+            disabled={!present.isEnabled}
             onMouseDown={keepFocus}
             onClick={() => show.start('start')}
           >

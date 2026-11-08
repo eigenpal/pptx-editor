@@ -184,6 +184,8 @@ In Vue, pass the same props to `PptxEditor`, for example `:menu="true"` and `:no
 
 The packaged `PptxEditor` swaps its workspace when the view changes. In a composed editor, read the view with `useEditorState` and make the same switch. The `view.presentationView` slot, in the View menu or a toolbar, changes the view.
 
+The slide master view needs no switch. In that view, `PptxEditor.SlideRail` lists masters and layouts, `PptxEditor.Content` shows the bar with **Close master**, and `PptxEditor.NotesPane` hides. See [Edit layouts and masters](/docs/guides/slide-master).
+
 ```tsx
 import { PptxEditor, useEditorState } from '@pptx-editor.dev/react';
 

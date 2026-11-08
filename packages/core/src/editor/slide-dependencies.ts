@@ -24,6 +24,7 @@
 import {
   child,
   presentationInfo,
+  slideRefAt,
   REL,
   relationshipsOf,
   relTargetByType,
@@ -62,7 +63,8 @@ export function slideDependencies(
   parts?: string[]
 ): readonly unknown[] | undefined {
   const info = presentationInfo(pkg);
-  const ref = info.slides[index];
+  // A slide, or a layout or a master in the slide master view (`slideRefAt`).
+  const ref = slideRefAt(pkg, index);
   if (!ref) return undefined;
   const presentation = xmlPartOf(pkg, info.presentationPart)?.root;
   const tableStyles = relTargetByType(pkg, info.presentationPart, REL.tableStyles);

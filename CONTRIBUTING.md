@@ -160,28 +160,35 @@ When a change alters a pinned problem (for example, a fix changes the text that 
 
 ## Fidelity harness
 
-The harness prints each fixture in `fixtures/` to PDF with the editor's own paint, and compares that PDF with the fixture's reference PDF. pdf.js draws and reads both PDFs in the same way. It converts ICC-based colors through their profiles with its WebAssembly color engine, as a color-managed viewer does. The check uses no system tools and no system fonts. Run it on your own machine; no container or second system is needed. Each slide must pass these checks (`scripts/fidelity/thresholds.ts`): at most 0.5 % of the pixels differ, every reference text line is in our page, our page has no other text lines, and each line is within 0.5 pt of the reference line, vertically (baseline) and horizontally (its nearer edge). A line pairs with a line of the same text in the other PDF only within 4 pt (`LINE_PAIR_LIMIT_PT` in `scripts/fidelity/compare.ts`, 8 times the line tolerance), nearest pair first. pdf.js lines carry no shape, so the limit keeps repeated text in one shape from pairing with the same text in another shape. After that, lines of the same text that are left pair at any distance, nearest first: a line that moved fails by its distance, and is not reported as missing and extra. Both PDFs follow the same rules, so the pairs do not depend on which PDF is the reference. Rotated, vertical, and right-to-left text is checked by pixels only. Save, reopen, and paint again must give the same SVG markup.
+The harness prints each fixture in `fixtures/` to PDF with the editor's own paint, and compares that PDF with the fixture's reference PDF. pdf.js draws and reads both PDFs in the same way. It converts ICC-based colors through their profiles with its WebAssembly color engine, as a color-managed viewer does. The check uses no system tools and no system fonts. Run it on your own machine; no container or second system is needed. Each slide must pass these checks (`scripts/fidelity/thresholds.ts`): at most 0.5 % of the pixels differ, every reference text line is in our page, our page has no other text lines, and each line is within 0.5 pt of the reference line, vertically (baseline) and horizontally (its nearer edge). A line pairs with a line of the same text in the other PDF only within 4 pt (`LINE_PAIR_LIMIT_PT` in `scripts/fidelity/compare.ts`, 8 times the line tolerance), nearest pair first. pdf.js lines carry no shape, so the limit keeps repeated text in one shape from pairing with the same text in another shape. After that, lines of the same text that are left pair at any distance, nearest first: a line that moved fails by its distance, and is not reported as missing and extra. Both PDFs follow the same rules, so the pairs do not depend on which PDF is the reference. A line is checked when its text, without whitespace and a leading bullet, has at least two letters or digits, so numbers, dates, percentages, and chart and table values are checked as words are. A currency sign, a math sign, or a dash with no space after it is part of the number (`$1,200`, `−5`), not a bullet. A line of one letter or digit, such as a superscript or a chart tick, is checked by pixels only, and so are rotated, vertical, and right-to-left text and glyphs with no advance (marks that sit on another glyph). Sheared text, such as a synthetic oblique face, is checked. Save, reopen, and paint again must give the same SVG markup.
 
 Our PDF must draw only with fonts that the harness loaded: the fixture fonts, the engine's fonts, and two open fallback faces. A system font in our PDF fails the gate. A fixture's reference PDF must embed only the open fonts that its deck names. No fixture is exempt.
 
 ### Run
 
 ```bash
-bun run fidelity          # every fixture: the gate
-bun run fidelity tables   # one fixture
+bun run fidelity                 # every fixture, both lanes: the gate
+bun run fidelity tables          # one fixture
+bun run fidelity --lane export   # one lane: editor or export
 ```
 
-Each deck prints one line. The gate summary says what to do next. The report is `fidelity-report/fixtures/index.html`: for each slide, our page, the reference page, the diff, and the scores. Both PDFs are in `fidelity-report/fixtures/<deck>/`.
+Each deck prints one line for each lane. The gate summary of each lane says what to do next. The report is `fidelity-report/fixtures/index.html`: for each slide, our page, the reference page, the diff, and the scores. Both PDFs are in `fidelity-report/fixtures/<deck>/`.
+
+### The export lane
+
+The export lane gates the PDF export (`packages/pptx-to-pdf`) on the same fixtures. It exports each fixture with `exportPdf` from source, with the settings of the evaluation protocol (`packages/pptx-to-pdf/scripts/evaluation/settings.ts`) and the font faces that the editor lane gets, plus the packaged substitutes of the export. It compares that PDF with the same reference PDF through the same code (`rasterPdf`, `comparePixels`, and `compareLines`) and the same thresholds. It has no save check. `exportPdf` names each font that it embeds `PptxFont`, so the lane checks only that every font is embedded. A system font cannot reach the exported PDF: the exporter reads no font file other than the optional CJK package, and `scripts/fidelity/export-fonts.test.ts` keeps it so. The pages of both lanes are drawn with pdf.js in Chromium, so a change of the pinned Chromium records both lists again. Its report is `fidelity-report/fixtures-export/index.html`, and the report of each lane links to the other.
 
 ### Update the known gaps
 
-`FIXTURE_KNOWN_GAPS` in `scripts/fidelity/thresholds.ts` lists, for each slide that fails today, the checks it fails. It records no values, because rasters differ slightly between machines. The gate fails when a slide fails a check that is not listed, or passes a listed check. When your change fixes a check, remove it:
+`FIXTURE_KNOWN_GAPS` in `scripts/fidelity/thresholds.ts` lists, for each slide that fails today, the checks it fails. `FIXTURE_EXPORT_KNOWN_GAPS` is the list of the export lane, with the same rules. It records no values, because rasters differ slightly between machines. The gate fails when a slide fails a check that is not listed, or passes a listed check. When your change fixes a check, remove it:
 
 ```bash
 bun run fidelity --update-gaps
 ```
 
-A new entry or kind is written only with `--accept-worse`. In CI, `scripts/fidelity/check-known-gaps.ts` accepts it only for a new fixture, or in a pull request that changes no engine or harness source. A limit can go away only with its reason in `RETIRED_LIMITS`.
+The command updates the list of each lane that ran.
+
+A new entry or kind is written only with `--accept-worse`. In CI, `scripts/fidelity/check-known-gaps.ts` accepts it only for a new fixture, in a pull request that changes no engine or harness source, or in a pull request whose source changes are only the comparison files (`COMPARISON_FILES` in `scripts/fidelity/thresholds.ts`), harness tests, and documentation. Such a change prints the same pages and checks them in another way, so the failures it finds were there before. It may not check fewer lines, and it changes no engine code. The check reads `COMPARISON_FILES` from the base branch. A limit can go away only with its reason in `RETIRED_LIMITS`.
 
 ### Add a fixture
 

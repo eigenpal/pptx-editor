@@ -575,7 +575,7 @@ export const CHROME_GROUPS: readonly ChromeGroup[] = [
     contextual: true,
     controls: [
       {
-        // View > Normal or Slide Sorter: the Presentation Views, first on the View tab.
+        // View > Normal, Slide Sorter, or Slide Master: the views, first on the View tab.
         id: 'presentationView',
         shape: 'dropdown',
         labelKey: 'toolbar.presentationView',
@@ -584,6 +584,7 @@ export const CHROME_GROUPS: readonly ChromeGroup[] = [
         options: [
           { value: 'normal', labelKey: 'toolbar.views.normal', paths: icon('view_sidebar') },
           { value: 'slideSorter', labelKey: 'toolbar.views.slideSorter', paths: icon('grid_view') },
+          { value: 'slideMaster', labelKey: 'toolbar.views.slideMaster', paths: icon('dashboard') },
         ],
         state: { kind: 'value' },
       },

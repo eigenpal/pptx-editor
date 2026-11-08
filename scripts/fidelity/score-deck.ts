@@ -1,8 +1,10 @@
 // Score one deck: print it to PDF with the editor's own paint, and compare our PDF with the
 // reference PDF page by page (pixels, line breaks, baselines). pdf.js draws and reads both PDFs
 // (`pdf.ts`). Then save, reopen, and paint again: every slide must paint the same markup. The
-// reference PDF leaves hidden slides out, and so does our PDF. A missing or stale reference is a
-// gap, never a pass. `run.ts` drives it.
+// export lane scores the PDF of `exportPdf` (`@pptx-editor.dev/pptx-to-pdf`) instead, with the
+// same fonts and the same comparison; it has no save check. The reference PDF leaves hidden
+// slides out, and so does our PDF. A missing or stale reference is a gap, never a pass. `run.ts`
+// drives it.
 
 import type { Page } from '@playwright/test';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -29,9 +31,11 @@ import {
   postScriptFamilies,
   type FontSet,
 } from './local-fonts.ts';
+import { collectionFace, type LocalFont } from './local-fonts.ts';
 import { openPdf, openPdfFile, PdfPageLimit, rasterSizePx, type Pdf } from './pdf.ts';
 import { deckFacts, referenceProblems, slidePages } from './reference-identity.ts';
 import { probableCause, type DeckResult, type SlideResult } from './report.ts';
+import type { Lane } from './run-args.ts';
 
 /** One deck to score, with the PDF to compare it with, or the reason it has none. */
 export interface DeckInput {
@@ -46,6 +50,68 @@ export interface DeckInput {
    * machine's reference fonts that the deck names (`corpus`, the default).
    */
   readonly fontSet?: FontSet;
+  /**
+   * Which PDF is ours: the editor's print (`editor`, the default), or the PDF of `exportPdf`
+   * (`export`, the export lane).
+   */
+  readonly lane?: Lane;
+}
+
+/** What one lane gives the comparison: our PDF, and each slide's diagnostics and save check. */
+interface OurPdf {
+  readonly bytes?: Uint8Array;
+  readonly diagnostics: readonly (readonly string[])[];
+  /** Save, reopen, and paint again give the same markup; undefined where not checked. */
+  readonly consistent: readonly (boolean | undefined)[];
+}
+
+/**
+ * The fonts of a set as `exportPdf` takes them: the same faces, in the same order, that the
+ * harness page gives the editor (`openDeck`). A collection gives the face alone, as the harness
+ * server does.
+ */
+function exportFonts(fonts: readonly LocalFont[]) {
+  return fonts.flatMap((f) => {
+    const file = new Uint8Array(readFileSync(f.file));
+    const bytes = f.faceIndex === undefined ? file : collectionFace(file, f.faceIndex);
+    return bytes
+      ? [{ family: f.family, bold: f.bold, italic: f.italic, bytes, origin: 'local' }]
+      : [];
+  });
+}
+
+/**
+ * Export the visible slides with `exportPdf`, with the settings of the evaluation protocol
+ * (`packages/pptx-to-pdf/scripts/evaluation/settings.ts`). Each slide's diagnostics read
+ * `<severity>: <code>`. Throws when a visible slide has no page.
+ */
+async function exportDeck(
+  deck: Uint8Array,
+  fonts: readonly LocalFont[],
+  slides: number,
+  visible: readonly number[]
+): Promise<OurPdf> {
+  const { exportPdf } = await import('@pptx-editor.dev/pptx-to-pdf');
+  const { EXPORT_SETTINGS, SESSION_SETTINGS } =
+    await import('../../packages/pptx-to-pdf/scripts/evaluation/settings.ts');
+  const result = await exportPdf(deck, {
+    ...EXPORT_SETTINGS,
+    ...SESSION_SETTINGS,
+    fonts: exportFonts(fonts),
+  });
+  const pages = result.slideNumbers.map((n) => n - 1);
+  if (pages.join() !== visible.join())
+    throw new Error(
+      `the export has pages for slides ${result.slideNumbers.join(', ') || 'none'}, the deck shows slides ${visible.map((i) => i + 1).join(', ')}`
+    );
+  const diagnostics = Array.from({ length: slides }, (_, i) =>
+    result.diagnostics.filter((d) => d.slideIndex === i).map((d) => `${d.severity}: ${d.code}`)
+  );
+  return {
+    bytes: visible.length ? result.bytes : undefined,
+    diagnostics,
+    consistent: diagnostics.map(() => undefined),
+  };
 }
 
 /** A deck that takes longer than this is stopped and reported as an error. */
@@ -75,32 +141,16 @@ export async function scoreDeck(
   const fonts = fixtures
     ? localFonts(undefined, 'fixtures')
     : localFonts(deckFontFamilies(deckBytes));
-  const opened = await openDeck(page, input.file, fonts);
-  if (opened.error)
-    return { name: input.name, error: `the deck does not open: ${opened.error}`, slides: [] };
-  if (opened.slides !== facts.slides)
-    return {
-      name: input.name,
-      error: `the editor opens ${opened.slides} slides, the package has ${facts.slides}`,
-      slides: [],
-    };
-
-  // Paint every slide, print the visible ones, then save, reopen, and paint again.
   const pages = slidePages(facts);
   const visible = pages.flatMap((p, i) => (p === undefined ? [] : [i]));
-  const renders: HarnessRender[] = [];
-  for (let i = 0; i < opened.slides; i += 1) renders.push(await renderSlide(page, i));
-  const oursBytes = visible.length ? await printDeck(page, visible) : undefined;
-  const reopened = await reopenSaved(page);
-  const consistent: boolean[] = [];
-  for (let i = 0; i < opened.slides; i += 1) {
-    const same =
-      !reopened.error &&
-      reopened.slides === opened.slides &&
-      (await renderSlide(page, i)).markup === renders[i].markup;
-    // The markup is the same or not: a share of 0 or 1.
-    consistent.push((same ? 0 : 1) <= THRESHOLDS.maxSelfConsistencyMismatch);
+  let made: OurPdf;
+  if (input.lane === 'export') made = await exportDeck(deckBytes, fonts, facts.slides, visible);
+  else {
+    const printed = await printWithEditor(page, input, fonts, facts.slides, visible);
+    if (typeof printed === 'string') return { name: input.name, error: printed, slides: [] };
+    made = printed;
   }
+  const oursBytes = made.bytes;
 
   let gap = input.gap;
   if (!gap && !input.pdf) gap = { status: 'no-reference', reasons: ['no reference PDF'] };
@@ -125,8 +175,17 @@ export async function scoreDeck(
           `our PDF page ${wrong + 1} is ${ours.pages[wrong][0]} × ${ours.pages[wrong][1]} pt, the slide is ${facts.widthPt} × ${facts.heightPt} pt`
         );
       // Every font of our PDF must be a face that the page loaded: never a system font.
+      // `exportPdf` reads no system font, and it names each font it embeds `PptxFont`, so the
+      // export lane checks only that every font is embedded.
       const loaded = postScriptFamilies(harnessFontFiles(fonts.map((f) => f.file)));
-      result.foreignFonts = foreignOurFonts(await ours.fonts(), loaded);
+      const drawn = await ours.fonts();
+      result.foreignFonts =
+        input.lane === 'export'
+          ? foreignOurFonts(
+              drawn.filter((f) => !f.embedded),
+              loaded
+            )
+          : foreignOurFonts(drawn, loaded);
     }
     if (!gap && input.pdf) {
       try {
@@ -137,7 +196,8 @@ export async function scoreDeck(
         for (const f of refFonts)
           if (!f.embedded) issues.push(`the PDF does not embed the font ${f.name}`);
         if (issues.length) gap = { status: 'stale', reasons: issues };
-        if (fixtures)
+        // The editor lane checks the reference fonts; the export lane would repeat it.
+        if (fixtures && input.lane !== 'export')
           result.foreignReferenceFonts = foreignReferenceFonts(
             refFonts,
             deckFontFamilies(deckBytes, false),
@@ -173,18 +233,18 @@ export async function scoreDeck(
             ),
           ]
         : [[], []];
-    for (let i = 0; i < opened.slides; i += 1) {
+    for (let i = 0; i < facts.slides; i += 1) {
       const pageIndex = pages[i];
-      const r = renders[i];
+      const diagnostics = made.diagnostics[i];
       const s: SlideResult = {
         index: i + 1,
         hidden: pageIndex === undefined,
         page: pageIndex === undefined ? undefined : pageIndex + 1,
         status: gap?.status ?? 'no-reference',
         cause: gap ? gap.reasons.join('; ') : '',
-        selfConsistent: consistent[i],
-        diagnostics: r.diagnostics,
-        fontsSubstituted: r.diagnostics
+        ...(made.consistent[i] === undefined ? {} : { selfConsistent: made.consistent[i] }),
+        diagnostics,
+        fontsSubstituted: diagnostics
           .filter((d) => d.startsWith('font substituted: '))
           .map((d) => d.slice('font substituted: '.length)),
       };
@@ -223,7 +283,7 @@ export async function scoreDeck(
       s.extraLines = lines.extra;
       const pass = slidePasses(px, lines);
       s.status = pass ? 'pass' : 'fail';
-      s.cause = pass ? '' : probableCause(s, r.diagnostics);
+      s.cause = pass ? '' : probableCause(s, diagnostics);
     }
   } finally {
     await ours?.close();
@@ -233,6 +293,37 @@ export async function scoreDeck(
   result.referenceIssues = gap?.reasons ?? [];
   result.milliseconds = Date.now() - started;
   return result;
+}
+
+/**
+ * Open the deck in the editor, paint every slide, print the visible ones, then save, reopen, and
+ * paint again. A string is the reason the deck cannot be scored.
+ */
+async function printWithEditor(
+  page: Page,
+  input: DeckInput,
+  fonts: readonly LocalFont[],
+  slides: number,
+  visible: readonly number[]
+): Promise<OurPdf | string> {
+  const opened = await openDeck(page, input.file, [...fonts]);
+  if (opened.error) return `the deck does not open: ${opened.error}`;
+  if (opened.slides !== slides)
+    return `the editor opens ${opened.slides} slides, the package has ${slides}`;
+  const renders: HarnessRender[] = [];
+  for (let i = 0; i < slides; i += 1) renders.push(await renderSlide(page, i));
+  const bytes = visible.length ? await printDeck(page, [...visible]) : undefined;
+  const reopened = await reopenSaved(page);
+  const consistent: boolean[] = [];
+  for (let i = 0; i < slides; i += 1) {
+    const same =
+      !reopened.error &&
+      reopened.slides === slides &&
+      (await renderSlide(page, i)).markup === renders[i].markup;
+    // The markup is the same or not: a share of 0 or 1.
+    consistent.push((same ? 0 : 1) <= THRESHOLDS.maxSelfConsistencyMismatch);
+  }
+  return { bytes, diagnostics: renders.map((r) => r.diagnostics), consistent };
 }
 
 /** The result of `scoreSafely`. */

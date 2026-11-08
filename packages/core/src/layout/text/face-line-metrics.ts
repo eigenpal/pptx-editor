@@ -25,6 +25,8 @@
 // family): typo values for Aptos and Aptos Narrow (bit 7 set), win values for every other entry. Format
 // neutral: no PresentationML names. DOCX Editor commit adf0e178.
 
+import { isComplexScriptChar, isEastAsianChar } from './font-slots.ts';
+import type { LineBasis } from './line-metrics.ts';
 import type { FaceMetrics } from './measurer.ts';
 
 interface FaceLineMetrics {
@@ -91,4 +93,72 @@ export function withFaceLineMetrics(family: string, metrics: FaceMetrics): FaceM
   const known = FACE_LINE_METRICS.get(family.trim().toLowerCase());
   if (!known) return metrics;
   return { ...metrics, ascent: known.ascent / known.upem, descent: known.descent / known.upem };
+}
+
+/**
+ * The metrics that place a line with text in several faces at its largest size (East Asian,
+ * complex-script, and Latin text, `font-slots.ts`): `first`, with the highest ascent and the
+ * deepest descent of all the faces, each as a share of its own face's line, since a 1.2 × size
+ * line does not grow with the face. Diagram text (`face`), whose single line is the face's
+ * extent, takes the extents themselves. Reference PDFs of `east-asian-line-breaking`, slide 4,
+ * `east-asian-theme-fonts`, and `rtl-text`, slide 2: an Arabic line with Latin text in another
+ * run sits 1 pt lower than Arabic text alone, and all their lines are within 0.13 pt.
+ * @internal
+ */
+export function lineFaceMetrics(
+  first: FaceMetrics,
+  others: readonly FaceMetrics[],
+  basis: LineBasis
+): FaceMetrics {
+  const lineOf = (m: FaceMetrics): number =>
+    basis === 'face' ? 1 : Math.max(1e-6, m.ascent + m.descent);
+  const own = lineOf(first);
+  let { ascent, descent } = first;
+  for (const m of others) {
+    const scale = own / lineOf(m);
+    ascent = Math.max(ascent, m.ascent * scale);
+    descent = Math.max(descent, m.descent * scale);
+  }
+  return others.length ? { ...first, ascent, descent } : first;
+}
+
+/**
+ * The largest size on a line, its face (the last segment at that size), and the metrics that
+ * place the line (`lineFaceMetrics`). The faces of every run at that size merge on a line with
+ * East Asian or complex-script text (units `start` to `end`), where the reference PDFs measure
+ * it; on other lines only the faces of that segment's run merge, by their extents. An equation
+ * keeps its own face.
+ * @internal
+ */
+export function largestFace<F extends { readonly metrics: FaceMetrics }>(
+  segments: readonly {
+    readonly face: F;
+    readonly sizePt: number;
+    readonly runIndex: number;
+    readonly math?: unknown;
+  }[],
+  units: ArrayLike<{ readonly code: number }>,
+  start: number,
+  end: number,
+  basis: LineBasis
+): { readonly sizePt: number; readonly face: F | null; readonly metrics?: FaceMetrics } {
+  let top: (typeof segments)[number] | undefined;
+  for (const s of segments) if (!top || s.sizePt >= top.sizePt) top = s;
+  if (!top) return { sizePt: 0, face: null };
+  if (top.math) return { sizePt: top.sizePt, face: top.face, metrics: top.face.metrics };
+  let script = false;
+  for (let i = start; i < end && !script; i += 1)
+    script = isEastAsianChar(units[i].code) || isComplexScriptChar(units[i].code);
+  const max = top;
+  const others = segments
+    .filter(
+      (s) =>
+        !s.math &&
+        s.sizePt === max.sizePt &&
+        s.face !== max.face &&
+        (script || s.runIndex === max.runIndex)
+    )
+    .map((s) => s.face.metrics);
+  const metrics = lineFaceMetrics(max.face.metrics, others, script ? basis : 'face');
+  return { sizePt: max.sizePt, face: max.face, metrics };
 }

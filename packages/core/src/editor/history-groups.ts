@@ -5,7 +5,7 @@
 // `packages/core/src/contracts/editor-scope.ts` and
 // `packages/core/src/editor/editor-history-group-registry.ts`. DOCX Editor commit adf0e178.
 
-import type { HistoryGroup } from '../contracts/index.ts';
+import type { EditorCommand, HistoryGroup } from '../contracts/index.ts';
 import type { PptxPackage, HistoryGroup as StoreHistoryGroup } from '../store/index.ts';
 
 /** One pointer drag: its store token, and the package when it started. */
@@ -95,4 +95,14 @@ export class EditorHistoryGroups {
     this.#typing = null;
     if (nudge) this.#nudge = null;
   }
+}
+
+/** Repeated pastes of one payload: each one cascades further (`CommandContext.pasteRepeat`). */
+export type PasteSeries = { readonly payload: unknown; readonly count: number };
+
+/** The paste series after `command` ran: a paste of the same payload counts one more. */
+export function nextPasteSeries(command: EditorCommand, series: PasteSeries): PasteSeries {
+  if (command.type !== 'paste') return series;
+  const count = command.payload === series.payload ? series.count + 1 : 1;
+  return { payload: command.payload, count };
 }

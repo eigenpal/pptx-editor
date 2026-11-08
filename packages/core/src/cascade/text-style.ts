@@ -403,7 +403,8 @@ export function resolveParagraph(input: ParagraphInputs): ResolvedParagraph {
       const t = child(item, 'a:t');
       const fieldType = item.kind === 'field' ? attr(item, 'type') : undefined;
       let text = textOf(t);
-      if (fieldType === 'slidenum') text = String(input.slideNumber);
+      // A layout or a master has no number: its field keeps its saved text (`‹#›`).
+      if (fieldType === 'slidenum' && input.slideNumber > 0) text = String(input.slideNumber);
       runs.push({
         kind: item.kind === 'run' ? 'text' : 'field',
         nodeId: item.id,

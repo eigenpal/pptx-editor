@@ -30,6 +30,7 @@ import {
   type ChromeActionHost,
   type ChromeSlotId,
   type HyperlinkPopupStore,
+  findViewRefusal,
 } from '@pptx-editor.dev/core/editor';
 import { ChromeActionHostContext, usePptxEditor, useSlideshow, useTranslation } from './context.ts';
 import { requestFindBar } from './FindBar.tsx';
@@ -105,9 +106,9 @@ function useLocalChromeActionHost(findBars: number | null, linkViews = 0): Chrom
       },
       unavailable: (slot, dialog) =>
         popupReason(popups, slot, dialog, linkViews) ??
-        // Find shows its matches on the slide canvas, which the slide sorter does not show.
-        (SLOT_POPUP_KEYS[slot] === 'find' && editor?.snapshot().presentationView === 'slideSorter'
-          ? 'disabled.findSorter'
+        // Find shows its matches on the slide canvas: not in the slide sorter or master view.
+        (SLOT_POPUP_KEYS[slot] === 'find'
+          ? findViewRefusal(editor?.snapshot().presentationView)
           : null) ??
         // Find needs a find bar to open: nothing answers the request without one.
         (findBars === 0 && SLOT_POPUP_KEYS[slot] === 'find' ? 'find.noBar' : null),

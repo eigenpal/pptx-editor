@@ -6,9 +6,17 @@
 // opportunities, then paragraph spacing, alignment, columns, and vertical anchoring.
 
 import { paintPieces } from './paint-clusters.ts';
+import { largestFace } from './face-line-metrics.ts';
 import type { ResolvedParagraph, ResolvedTextBody, RunProps } from '../../cascade/index.ts';
 import { slotLanguage } from '../../cascade/script-fonts.ts';
-import { anchorOffset, ROTATED_VERT, shiftLines } from './anchor.ts';
+import {
+  anchorOffset,
+  columnLines,
+  frameInsets,
+  ROTATED_VERT,
+  shiftLines,
+  STACKED_LETTER_EM,
+} from './anchor.ts';
 import { AutonumberCounters, autonumberText, symbolBulletText } from './autonumber.ts';
 import { bidiCaretX, markerRuns, placeBidiLine, wholeMarker, type BidiLine } from './bidi-line.ts';
 import { lineBidiOf, shiftLineBidi, type LineBidi } from './line-visual-order.ts';
@@ -355,8 +363,8 @@ function buildSegments(
       for (let i = 0; i < em.length; i += 1) {
         const lowSurrogate =
           piece.text.charCodeAt(i) >= 0xdc00 && piece.text.charCodeAt(i) <= 0xdfff;
-        // `wordArtVert` stacks upright letters: each takes the face's line height, not its width.
-        const unit = stacked && em[i] > 0 ? face.metrics.ascent + face.metrics.descent : em[i];
+        // Stacked text: each upright letter advances by `STACKED_LETTER_EM`, not its width.
+        const unit = stacked && em[i] > 0 ? STACKED_LETTER_EM : em[i];
         adv[i] = unit * sizePt * EMU_PER_PT + (lowSurrogate ? 0 : spacing);
       }
       out.push({
@@ -489,7 +497,7 @@ export function layoutTextOn(
   basis: LineBasis,
   untilOverflow = false
 ): TextLayout {
-  const bp = body.body;
+  const bp = frameInsets(body.body);
   const vert = bp.vert;
   const rotated = ROTATED_VERT.has(vert);
   const rotation = (vert === 'vert270' ? 270 : rotated ? 90 : 0) + bp.rot;
@@ -510,7 +518,7 @@ export function layoutTextOn(
   const numbering = new AutonumberCounters();
   const overflowAt = untilOverflow && columns <= 1 ? outerH + 1 - bp.tIns - bp.bIns : Infinity;
   let overflowed = false;
-  const stackedVert = vert === 'wordArtVert';
+  const stackedVert = vert === 'wordArtVert' || vert === 'wordArtVertRtl';
 
   body.paragraphs.forEach((p, pi) => {
     if (overflowed) return;
@@ -730,36 +738,15 @@ export function layoutTextOn(
       // A fit check reads only the content height: past the box, the rest cannot make it fit.
       if (y > overflowAt) return;
       const first = li === 0;
-      let maxSize = 0;
-      let maxFace: ResolvedFace | null = null;
-      let maxRun = -2;
-      // A segment's units are contiguous: visit each segment on the line once, in order.
-      for (let i = range.start, last = -1; i < range.end; i += 1) {
-        if (units[i].seg === last) continue;
-        last = units[i].seg;
-        const s = segments[last];
-        if (s.sizePt >= maxSize) {
-          maxSize = s.sizePt;
-          maxFace = s.face;
-          maxRun = s.runIndex;
-        }
-      }
-      // One run in several fonts (its East Asian and Latin text, `font-slots.ts`): the tallest
-      // ascent and the deepest descent of its faces place the baseline (reference PDFs of
-      // `east-asian-line-breaking`, slide 4, and `east-asian-theme-fonts`).
-      let metrics = maxFace?.metrics;
-      if (metrics)
-        for (let i = range.start, last = -1; i < range.end; i += 1) {
-          if (units[i].seg === last) continue;
-          last = units[i].seg;
-          const s = segments[last];
-          if (s.runIndex !== maxRun || s.sizePt !== maxSize || s.face === maxFace) continue;
-          metrics = {
-            ...metrics,
-            ascent: Math.max(metrics.ascent, s.face.metrics.ascent),
-            descent: Math.max(metrics.descent, s.face.metrics.descent),
-          };
-        }
+      // A segment's units are contiguous: list each segment on the line once, in order.
+      const onLine: Segment[] = [];
+      for (let i = range.start; i < range.end; i += 1)
+        if (segments[units[i].seg] !== onLine[onLine.length - 1])
+          onLine.push(segments[units[i].seg]);
+      const largest = largestFace(onLine, units, range.start, range.end, basis);
+      let maxSize = largest.sizePt;
+      let maxFace: ResolvedFace | null = largest.face;
+      const metrics = largest.metrics;
       if (maxSize === 0 || !maxFace) {
         // An empty line: an empty paragraph, or the line after a trailing break. The paragraph
         // mark (`a:endParaRPr`) sizes it.
@@ -973,7 +960,8 @@ export function layoutTextOn(
 
   // Vertical anchoring moves lines down; their position arrays stay as they are.
   const dy = bp.tIns + anchorOffset(bp.anchor, innerH, contentHeight);
-  const finalLines = dy === 0 ? placed : shiftLines(placed, dy);
+  const shifted = dy === 0 ? placed : shiftLines(placed, dy);
+  const finalLines = rotated ? columnLines(shifted, vert, outerH) : shifted;
   const frame = {
     x: rect.x + (rect.width - outerW) / 2,
     y: rect.y + (rect.height - outerH) / 2,
@@ -983,7 +971,7 @@ export function layoutTextOn(
   return {
     box: frame,
     rotation,
-    upright: vert === 'eaVert' ? 'eastAsian' : vert === 'wordArtVert' ? 'all' : 'none',
+    upright: vert === 'eaVert' ? 'eastAsian' : stackedVert ? 'all' : 'none',
     lines: finalLines,
     contentHeight: needed + bp.tIns + bp.bIns,
     paragraphLengths,

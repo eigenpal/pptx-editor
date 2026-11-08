@@ -128,6 +128,12 @@ function useNotesOpen(props: NotesPaneProps) {
  * undo. @public
  */
 export function NotesPane(props: NotesPaneProps = {}) {
+  // Layouts and masters have no speaker notes: the slide master view hides the pane.
+  const master = useEditorState((s) => s.presentationView === 'slideMaster');
+  return master ? null : <NotesPaneBody {...props} />;
+}
+
+function NotesPaneBody(props: NotesPaneProps) {
   const { className, showFormatButtons = true } = props;
   const editor = usePptxEditor();
   const { t } = useTranslation();

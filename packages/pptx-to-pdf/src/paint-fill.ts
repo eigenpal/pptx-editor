@@ -24,11 +24,15 @@ import {
   setStrokingRgbColor,
   LineCapStyle,
   LineJoinStyle,
+  PDFContentStream,
+  PDFName,
   PDFNumber,
   PDFOperator,
   PDFOperatorNames,
+  PDFBool,
+  type PDFDocument,
   type PDFImage,
-  type PDFName,
+  PDFRawStream,
   type PDFRef,
 } from 'pdf-lib';
 import type { GradientStop, ResolvedFill, ResolvedLine, Rgba } from '@pptx-editor.dev/core/cascade';
@@ -45,10 +49,13 @@ import {
   gradientPaintStops,
   linearGradientEnds,
   metafilePng,
+  patternBitmap,
+  PATTERN_PIXEL,
 } from '@pptx-editor.dev/core/output';
 import { binaryPartOf, imageSize, metafileFormat, relTarget } from '@pptx-editor.dev/core/store';
 import {
   clipEvenOdd,
+  EMU_PER_PT,
   endPath,
   fillEvenOdd,
   rgb,
@@ -108,8 +115,12 @@ export async function paintFill(
   const f = own.fill;
   if (f.type === 'none' || f.type === 'group') return false;
   if (f.type === 'pattern') {
-    p.diag.add('fill.pattern', 'unsupported', `Pattern fills on ${what} are not drawn yet.`);
-    return false;
+    // The preset path fill modes lighten and darken both colors, as in the SVG paint.
+    const colors = { fg: adjustForPathMode(f.fg, mode), bg: adjustForPathMode(f.bg, mode) };
+    p.push(pushGraphicsState(), ...patternColor({ ...f, ...colors }, p));
+    trace();
+    p.push(fillEvenOdd(), popGraphicsState());
+    return true;
   }
   p.push(pushGraphicsState());
   if (f.type === 'solid') {
@@ -126,6 +137,107 @@ export async function paintFill(
   }
   p.push(popGraphicsState());
   return true;
+}
+
+/**
+ * Set the fill color to a preset pattern, as the SVG paint draws it (`core/output`,
+ * `preset-patterns.ts`): an 8 × 8 tile of 1 pt pixels in the background and foreground colors,
+ * a half-tone pixel as the foreground at half opacity. A pattern maps to the space of the content
+ * that uses it (ISO 32000-1, 8.7.3.1): the page's default space in points, or the slide EMU of a
+ * form XObject (a reflection copy). Each space takes its own matrix to the slide grid, so the tiles
+ * sit on that grid and stay square to the slide whatever the shape's transform.
+ */
+function patternColor(f: Extract<ResolvedFill, { type: 'pattern' }>, p: PageOps): PDFOperator[] {
+  const height = p.page.getHeight();
+  // Pattern space: one unit per pattern pixel, y down from the slide's top-left corner.
+  const s = PATTERN_PIXEL / EMU_PER_PT;
+  const matrix = p.inForm ? [PATTERN_PIXEL, 0, 0, PATTERN_PIXEL, 0, 0] : [s, 0, 0, -s, 0, height];
+  const key = `${f.preset}|${f.fg.r},${f.fg.g},${f.fg.b},${f.fg.a}|${f.bg.r},${f.bg.g},${f.bg.b},${f.bg.a}|${matrix.join(',')}`;
+  let name = p.patterns.get(key);
+  if (!name) {
+    name = p.name('Pattern', patternRef(f, matrix, key, p));
+    p.patterns.set(key, name);
+  }
+  return [
+    PDFOperator.of(PDFOperatorNames.NonStrokingColorspace, [PDFName.of('Pattern')]),
+    PDFOperator.of(PDFOperatorNames.NonStrokingColorN, [name]),
+  ];
+}
+
+/**
+ * The tiling pattern of a preset in two colors with the pattern `matrix`, by `key`, written once
+ * per document: a pattern of a master or a layout repeats on every slide.
+ */
+function patternRef(
+  f: Extract<ResolvedFill, { type: 'pattern' }>,
+  matrix: number[],
+  key: string,
+  p: PageOps
+): PDFRef {
+  let ref = p.res.patterns.get(key);
+  if (!ref) {
+    const ctx = p.res.doc.context;
+    const bits = patternBitmap(f.preset) ?? patternBitmap('pct50')!;
+    const states: Record<string, PDFRef> = {};
+    const ops: PDFOperator[] = [];
+    const paint = (c: Rgba, alpha: number): void => {
+      const a = Math.max(0, Math.min(1, alpha));
+      if (a < 1) {
+        const id = `A${Object.keys(states).length}`;
+        states[id] = ctx.register(ctx.obj({ Type: 'ExtGState', ca: a }));
+        ops.push(PDFOperator.of(PDFOperatorNames.SetGraphicsStateParams, [PDFName.of(id)]));
+      }
+      ops.push(setFillingRgbColor(...rgb(c)));
+    };
+    const rect = (x: number, y: number, w: number, h: number): PDFOperator[] => [
+      moveTo(x, y),
+      lineTo(x + w, y),
+      lineTo(x + w, y + h),
+      lineTo(x, y + h),
+      closePath(),
+    ];
+    ops.push(pushGraphicsState());
+    paint(f.bg, f.bg.a);
+    ops.push(...rect(0, 0, 8, 8), fillEvenOdd(), popGraphicsState());
+    for (const coverage of [1, 0.5]) {
+      const runs: PDFOperator[] = [];
+      bits.forEach((row, y) => {
+        let x = 0;
+        while (x < 8) {
+          if (row[x] !== coverage) {
+            x += 1;
+            continue;
+          }
+          let end = x;
+          while (end < 8 && row[end] === coverage) end += 1;
+          runs.push(...rect(x, y, end - x, 1));
+          x = end;
+        }
+      });
+      if (!runs.length) continue;
+      ops.push(pushGraphicsState());
+      paint(f.fg, f.fg.a * coverage);
+      ops.push(...runs, fillEvenOdd(), popGraphicsState());
+    }
+    const dict = ctx.obj({
+      Type: 'Pattern',
+      PatternType: 1,
+      PaintType: 1,
+      TilingType: 1,
+      BBox: [0, 0, 8, 8],
+      XStep: 8,
+      YStep: 8,
+      Matrix: matrix,
+      Resources: ctx.obj({ ExtGState: ctx.obj(states) }),
+    });
+    let bytes = dict.sizeInBytes();
+    for (const op of ops) bytes += op.sizeInBytes() + 1;
+    p.res.work.count(ops.length);
+    p.res.work.reserveContent(bytes);
+    ref = ctx.register(PDFContentStream.of(dict, ops, false));
+    p.res.patterns.set(key, ref);
+  }
+  return ref;
 }
 
 /** Paint a gradient over a `w` × `h` box at the origin, inside the current clip. */
@@ -460,13 +572,45 @@ async function imageFor(target: string, p: PageOps): Promise<PDFImage | null> {
       p.res.work.reserveContent(bytes.length);
       try {
         image = png ? await p.res.doc.embedPng(bytes) : await p.res.doc.embedJpg(bytes);
+        await smoothImage(image, p);
       } catch {
+        // An image that fails to embed is neither drawn nor saved: the save embeds every image
+        // again, and the failed one would fail the whole export.
+        if (image) forgetImage(p.res.doc, image);
+        image = null;
         p.diag.add('picture.unreadable', 'unsupported', 'A picture cannot be decoded.');
       }
     }
   }
   p.res.images.set(target, image);
   return image;
+}
+
+/**
+ * Remove an image from the list that `PDFDocument.save` embeds. `pdf-lib` keeps the list private
+ * (`images`) and keeps a failed embed's rejected task, so the save would throw the same error.
+ */
+function forgetImage(doc: PDFDocument, image: PDFImage): void {
+  const list = (doc as unknown as { images?: unknown }).images;
+  if (!Array.isArray(list)) return;
+  const at = list.indexOf(image);
+  if (at >= 0) list.splice(at, 1);
+}
+
+/**
+ * Mark an embedded picture for smooth sampling (`/Interpolate`, ISO 32000-1, 8.9.5.3), as the
+ * editor's paint samples it. Without the flag, a PDF viewer can draw an enlarged picture with
+ * hard pixel edges. The picture is embedded now, so its image dictionary exists.
+ */
+async function smoothImage(image: PDFImage, p: PageOps): Promise<void> {
+  await image.embed();
+  const ctx = p.res.doc.context;
+  const dict = ctx.lookup(image.ref);
+  if (!(dict instanceof PDFRawStream)) return;
+  dict.dict.set(PDFName.of('Interpolate'), PDFBool.True);
+  // A PNG with alpha keeps it in a soft mask image: smooth its edges too.
+  const mask = ctx.lookup(dict.dict.get(PDFName.of('SMask')));
+  if (mask instanceof PDFRawStream) mask.dict.set(PDFName.of('Interpolate'), PDFBool.True);
 }
 
 /** Whether a picture fill has an image this writer draws (the image is embedded once). */
@@ -553,19 +697,21 @@ export function lineCapStyle(cap: 'butt' | 'round' | 'square'): LineCapStyle {
  * Set the stroke for an outline, as the SVG `strokeAttrs`: a zero width is a hairline of one
  * pixel at 96 dpi, and `scale` undoes the enclosing group's scale. The width, the dash pattern,
  * and the caps come from the engine's shared rules (`core/layout`, `line-strokes.ts`). A
- * picture's border (`outside`) takes the dashes of a border outside the picture. Returns the
- * stroke color, or null when the outline draws nothing.
+ * picture's border (`outside`) takes the dashes of a border outside the picture. `bands` is true
+ * when the caller draws the bands of a compound line. Returns the stroke color, or null when the
+ * outline draws nothing.
  */
 export function strokeStyle(
   line: ResolvedLine,
   p: PageOps,
   scope: FillScope,
   scale = 1,
-  outside = false
+  outside = false,
+  bands = false
 ): Rgba | null {
   const color = flatColor(line.fill, scope, p, 'lines');
   if (!color) return null;
-  if (line.compound !== 'sng')
+  if (line.compound !== 'sng' && !bands)
     p.diag.add('line.compound', 'approximation', 'Compound lines are drawn as one line.');
   const width = strokeWidth(line, scale);
   const dashes = outside ? outsideDashArray(line, width) : dashArray(line, width);

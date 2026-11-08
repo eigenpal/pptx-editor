@@ -39,11 +39,11 @@ import { guideElements, SNAP_PX } from './surface-guides.ts';
 import { cropAt, cropOverlay, onCropImage, startCropDrag } from './surface-crop.ts';
 import type { CropDrag, CropHandle } from './surface-crop.ts';
 import { withHalos } from './surface-halo.ts';
-import { hitItem, inText, onBorder } from './surface-hit.ts';
+import { hitItem, inMultiple, inText, onBorder } from './surface-hit.ts';
 import { diagramPress } from './surface-diagram.ts';
 import { CaretScroll, fitZoom, outsideVeil } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
-import { selectionAnnouncement } from './surface-announce.ts';
+import { canvasName, selectionAnnouncement, type CanvasNameHost } from './surface-announce.ts';
 import { ShapeDrag, type Handle } from './surface-drag.ts';
 import { boxOutline, commonOutline, handleElements, memberOutline } from './surface-handles.ts';
 import {
@@ -60,7 +60,7 @@ import { CursorLayer, NextFrame, PAINT_BUDGET, setAttr, setStyle } from './surfa
 const EMU_PER_PX = 9_525;
 
 /** What the surface asks of the editor. Input and clipboard calls are in `SurfaceInputHost`. */
-export interface SurfaceHost extends SurfaceInputHost {
+export interface SurfaceHost extends SurfaceInputHost, CanvasNameHost {
   /** Unique to the editor instance: SVG ids of two editors on one page never collide. */
   readonly idPrefix: string;
   readonly layout: () => SlideLayout | undefined;
@@ -309,10 +309,7 @@ export class SlideSurface {
     }
     this.#zoomAnchor = null;
     this.#renderedZoom = zoom;
-    const name = this.editor.label('canvas.ariaLabel', {
-      index: layout.slide.index + 1,
-      total: this.editor.slideCount(),
-    });
+    const name = canvasName(this.editor, layout.slide.index);
     if (this.root.getAttribute('aria-label') !== name) this.root.setAttribute('aria-label', name);
     const said = selectionAnnouncement(layout, this.editor);
     // A canceled drag is said in place of the selection, until the selection changes.
@@ -630,7 +627,9 @@ export class SlideSurface {
     const group = inScope ? scope : undefined;
     // A table: a caret in the cell, a cell range, or a grid line drag (surface-table.ts).
     // Shift+click on a table adds it to a shape selection, as Shift+click on any shape does.
-    const addShape = e.shiftKey && sel.kind === 'shapes';
+    // A press on a shape of a multiple selection moves the whole selection, also on its text.
+    const moveAll = !e.shiftKey && inMultiple(sel, id, group, painting || this.editor.readOnly());
+    const addShape = (e.shiftKey && sel.kind === 'shapes') || moveAll;
     // The format painter paints a cell's word or a cell range, as on a text box.
     const table = id && !addShape ? this.#table.down(layout, id, p, e.shiftKey, painting) : null;
     if (table) {
@@ -670,7 +669,7 @@ export class SlideSurface {
     }
     // A click on a shape's text places the caret there; its border moves it. A viewer's click
     // places it only in linked text, where the link panel then opens; it edits nothing.
-    const textItem = id && !e.shiftKey ? itemById(layout, id) : undefined;
+    const textItem = id && !e.shiftKey && !moveAll ? itemById(layout, id) : undefined;
     const at = textItem && this.#inText(textItem, p) ? pointAt(textItem, p.x, p.y) : undefined;
     const caret =
       at && textItem && (!this.editor.readOnly() || linkedAt(textItem, at)) ? at : undefined;
@@ -766,12 +765,13 @@ export class SlideSurface {
     }
     const id = (scope ? this.#hit(p, scope) : undefined) ?? this.#hit(p);
     const item = id ? itemById(layout, id) : undefined;
-    const table = id && layout ? this.#table.cursor(layout, id, p) : undefined;
+    const moveAll = inMultiple(sel, id, scope, this.editor.readOnly());
+    const table = id && layout && !moveAll ? this.#table.cursor(layout, id, p) : undefined;
     const cursor = table
       ? table
       : !item
         ? ''
-        : !this.editor.readOnly() && this.#inText(item, p)
+        : !moveAll && !this.editor.readOnly() && this.#inText(item, p)
           ? 'text'
           : this.editor.readOnly()
             ? this.#onLink(item, p)

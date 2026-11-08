@@ -34,7 +34,7 @@ const finite = (c: PathCommand): boolean =>
   Object.values(c).every((v) => typeof v === 'string' || Number.isFinite(v));
 
 describe('custom geometry over the canonical tree', () => {
-  test('reads guides, path sizes, and commands, and starts drawing at the first moveTo', () => {
+  test('reads guides, path sizes, and commands, and draws nothing of a path without a first moveTo', () => {
     const g = custom(
       '<a:gd name="half" fmla="*/ w 1 2"/>',
       '<a:path w="100" h="100" fill="none"><a:lnTo><a:pt x="100" y="0"/></a:lnTo>' +
@@ -43,11 +43,8 @@ describe('custom geometry over the canonical tree', () => {
       200,
       100
     );
-    expect(g.paths[0]).toEqual({
-      commands: [{ op: 'M', x: 0, y: 100 }, { op: 'L', x: 200, y: 100 }, { op: 'Z' }],
-      fill: 'none',
-      stroke: true,
-    });
+    // The path starts with lnTo, so it draws nothing, also after its later moveTo.
+    expect(g.paths[0]).toEqual({ commands: [], fill: 'none', stroke: true });
     expect(g.paths[1].commands).toEqual([{ op: 'M', x: 100, y: 0 }]);
     expect(g.textRect).toEqual({ l: 0, t: 0, r: 200, b: 100 });
   });

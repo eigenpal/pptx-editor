@@ -13,7 +13,13 @@ import type {
 } from '../contracts/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
 import { relayoutItem } from '../layout/item-layout.ts';
-import { elements, shapeTreeOf, type PptxPackage } from '../store/index.ts';
+import {
+  elements,
+  isTemplateRef,
+  shapeTreeOf,
+  slideRefAt,
+  type PptxPackage,
+} from '../store/index.ts';
 import type { PresenceLink } from './collaboration-presence.ts';
 import type { DocumentSession } from './document-session.ts';
 import type { FormatPainter } from './format-painter.ts';
@@ -112,6 +118,11 @@ export function createSurfaceHost(base: SurfaceHostBase, s: SurfaceHostState): S
     // A selection made with the pointer while the painter is on takes the copied format.
     pointerUp: () => void (s.painter.mode !== 'off' && base.run({ type: 'pasteFormat' })),
     slideCount: () => s.session()?.info.slides.length ?? 0,
+    template: (index) => {
+      const pkg = s.session()?.store.package;
+      const ref = pkg ? slideRefAt(pkg, index) : undefined;
+      return isTemplateRef(ref) ? { template: ref.template, name: ref.name } : undefined;
+    },
     smartGuides: () => s.views.smartGuides,
     aspectLocked: (id) => aspectLockedIn(s.session()?.store.package, s.part(), id),
     relayout: (item, xfrm) => {

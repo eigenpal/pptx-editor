@@ -2,6 +2,7 @@
 // the slide show, and the find bar). Split from `chrome-controls.ts`, which asks it from
 // `toolbarCommandState`, so the registry stays under the line cap.
 
+import { findViewRefusal } from './master-rail.ts';
 import type { ClipboardPayload, Editor } from '../contracts/index.ts';
 import type { ChromeSlotId, ToolbarCommandState } from './chrome-controls.ts';
 
@@ -83,12 +84,16 @@ export function adapterActionState(editor: Editor, id: ChromeSlotId): ToolbarCom
     }
     // Find reads any open deck and shows its matches on the slide canvas, which the slide
     // sorter does not show. Replace edits the deck, so it also needs editing mode.
+    // The slide master view shows layouts, not slides: Find and the show act on slides.
     case 'find.find':
-    case 'find.replace':
-      if (snap.presentationView === 'slideSorter') return off('disabled.findSorter');
+    case 'find.replace': {
+      const refused = findViewRefusal(snap.presentationView);
+      if (refused) return off(refused);
       return id === 'find.replace' && viewing ? off('disabled.viewing') : on;
+    }
     case 'view.playFromStart':
     case 'view.playFromCurrent':
+      if (snap.presentationView === 'slideMaster') return off('disabled.slideMaster');
       return snap.slides.length > 0 ? on : off('disabled.noEditor');
     default:
       return on;
