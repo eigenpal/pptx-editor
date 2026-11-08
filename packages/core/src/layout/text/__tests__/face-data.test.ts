@@ -215,6 +215,38 @@ describe('cmap coverage', () => {
     expect(unicodeCmapSubtable(new Uint8Array([0x74, 0x74, 0x63, 0x66, 0, 1, 0, 0]), 3)).toBeNull();
   });
 
+  /** Format 4 with the most segments a table can hold: segment i maps U+(2i) only. */
+  function largeFormat4(sorted: boolean): number[] {
+    const count = 32767;
+    const ends = Array.from({ length: count }, (_, i) =>
+      i === count - 1 ? 0xffff : sorted ? i * 2 : 0x20
+    );
+    const out = [...be16(4), 0, 0, 0, 0, ...be16(count * 2), 0, 0, 0, 0, 0, 0];
+    for (const end of ends) out.push(...be16(end));
+    out.push(0, 0);
+    for (const end of ends) out.push(...be16(end));
+    for (let i = 0; i < count; i += 1) out.push(...be16(1));
+    for (let i = 0; i < count; i += 1) out.push(0, 0);
+    return out;
+  }
+
+  test('a format 4 table with 32,767 segments answers the whole BMP in bounded time', () => {
+    const bytes = cmapSfnt(largeFormat4(true));
+    const subtable = unicodeCmapSubtable(bytes, 0)!;
+    expect(subtable.format).toBe(4);
+    const started = performance.now();
+    let mapped = 0;
+    for (let cp = 0; cp < 0x10000; cp += 1) if (cmapMapsCodePoint(bytes, subtable, cp)) mapped += 1;
+    // A scan of every segment took over a second here; a binary search takes milliseconds.
+    expect(performance.now() - started).toBeLessThan(250);
+    // The last segment, U+FFFF, maps to notdef.
+    expect(mapped).toBe(32766);
+  });
+
+  test('a format 4 table whose segments are out of order is refused, so HarfBuzz answers', () => {
+    expect(unicodeCmapSubtable(cmapSfnt(largeFormat4(false)), 0)).toBeNull();
+  });
+
   // Liberation Sans has no U+2011, and HarfBuzz draws it with the face's U+2010.
   const sans = () => source('LiberationSans-Regular.ttf', 'Liberation Sans');
   const adventor = () => source('TeXGyreAdventor-Regular.otf', 'TeX Gyre Adventor');

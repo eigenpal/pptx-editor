@@ -1,14 +1,17 @@
 // Adapted from DOCX Editor `packages/core/src/layout/sfnt-cmap-coverage.ts` at commit adf0e178.
-// `unicodeCmapSubtable` and `cmapMapsCodePoint` are unchanged. `fontMapsCodePoint` is not
-// ported: the HarfBuzz measurer keeps each face's subtable, and a coverage cache, with the
-// loaded face.
+// Changes: `unicodeCmapSubtable` refuses a subtable whose segments or groups are out of order,
+// and `cmapMapsCodePoint` finds a format 4 segment with a binary search instead of a scan. A
+// deck can embed a font with 32,767 segments, and the fallback search asks every face for
+// every character it lacks. `fontMapsCodePoint` is not ported: the HarfBuzz measurer keeps
+// each face's subtable, and a coverage cache, with the loaded face.
 //
 // Whether a face's own cmap maps a code point to a glyph.
 //
 // Shaping cannot answer this: HarfBuzz draws a missing U+2011 with the face's U+2010, and draws
 // a missing precomposed letter as its decomposition. Both hide that the face itself has no
 // glyph. Only the Unicode subtables count: (3,10) or (0,4+) format 12, else (3,1) or (0,0-3)
-// format 4. Every read is bounds-checked, because the bytes come from a file.
+// format 4. Every read is bounds-checked, because the bytes come from a file. A face with no
+// subtable that passes these checks has no answer here, and its caller asks HarfBuzz.
 
 const u16 = (b: Uint8Array, o: number): number => (b[o]! << 8) | b[o + 1]!;
 const u32 = (b: Uint8Array, o: number): number =>
@@ -18,6 +21,37 @@ const u32 = (b: Uint8Array, o: number): number =>
 export interface UnicodeSubtable {
   readonly format: 4 | 12;
   readonly offset: number;
+}
+
+/**
+ * Whether the subtable at `at` fits in `bytes` with its segments (format 4) or groups
+ * (format 12) in increasing order, as the binary search in `cmapMapsCodePoint` needs. One pass
+ * over the subtable, once for each face.
+ */
+function wellFormed(bytes: Uint8Array, format: number, at: number): boolean {
+  if (format === 12) {
+    if (at + 16 > bytes.length) return false;
+    const groups = u32(bytes, at + 12);
+    if (groups > Math.floor((bytes.length - at - 16) / 12)) return false;
+    let previousEnd = -1;
+    for (let group = at + 16, last = group + groups * 12; group < last; group += 12) {
+      const start = u32(bytes, group);
+      const end = u32(bytes, group + 4);
+      if (start <= previousEnd || end < start) return false;
+      previousEnd = end;
+    }
+    return true;
+  }
+  if (format !== 4 || at + 14 > bytes.length) return false;
+  const segments = u16(bytes, at + 6) >>> 1;
+  if (at + 16 + segments * 8 > bytes.length) return false;
+  let previousEnd = -1;
+  for (let segment = 0; segment < segments; segment += 1) {
+    const end = u16(bytes, at + 14 + segment * 2);
+    if (end <= previousEnd) return false;
+    previousEnd = end;
+  }
+  return true;
 }
 
 /** The face's Unicode cmap subtable, or null when it has none this lookup reads. */
@@ -51,8 +85,10 @@ export function unicodeCmapSubtable(bytes: Uint8Array, faceIndex: number): Unico
       if (format === 12 && format12 === null) format12 = offset;
       if (format === 4 && format4 === null) format4 = offset;
     }
-    if (format12 !== null) return { format: 12, offset: format12 };
-    if (format4 !== null) return { format: 4, offset: format4 };
+    if (format12 !== null)
+      return wellFormed(bytes, 12, format12) ? { format: 12, offset: format12 } : null;
+    if (format4 !== null)
+      return wellFormed(bytes, 4, format4) ? { format: 4, offset: format4 } : null;
     return null;
   }
   return null;
@@ -90,8 +126,17 @@ export function cmapMapsCodePoint(
   const deltas = starts + segments * 2;
   const rangeOffsets = deltas + segments * 2;
   if (!fits(rangeOffsets, segments * 2)) return false;
-  for (let segment = 0; segment < segments; segment += 1) {
-    if (codePoint > u16(bytes, ends + segment * 2)) continue;
+  // Segments are sorted by end code (`unicodeCmapSubtable` refuses a table that is not): the
+  // first segment that ends at or after `codePoint` is the only one that can hold it.
+  let low = 0;
+  let high = segments;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if (u16(bytes, ends + middle * 2) < codePoint) low = middle + 1;
+    else high = middle;
+  }
+  if (low < segments) {
+    const segment = low;
     const start = u16(bytes, starts + segment * 2);
     if (codePoint < start) return false;
     const delta = u16(bytes, deltas + segment * 2);
