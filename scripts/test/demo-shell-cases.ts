@@ -224,13 +224,14 @@ export function demoShellCases(
       expect(nav()).toBeNull();
       expect(document.activeElement).toBe(toggle());
 
-      // A press outside (the speaker notes) closes it; the notes keep the press.
+      // A press outside (the speaker notes, which start collapsed) closes it; the notes keep the
+      // press and open.
       await click(toggle());
       expect(nav()).not.toBeNull();
-      const notes = byRole('textbox', { name: 'Speaker notes' });
+      const notes = byRole('button', { name: 'Show speaker notes' });
       await click(notes);
       expect(nav()).toBeNull();
-      expect(document.activeElement).toBe(notes);
+      expect(byRole('textbox', { name: 'Speaker notes' })).not.toBeNull();
     });
 
     test('the narrow side panel overlay closes on Escape', async () => {

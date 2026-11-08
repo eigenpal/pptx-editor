@@ -118,6 +118,8 @@ function run(step: () => void | Promise<void>): Promise<void> {
 export async function openDemoWith(next: DemoHost, options: DemoOptions = {}): Promise<Demo> {
   host = next;
   const { width = 1440, height = 900, query = '?deck=basic', css = false } = options;
+  // Each demo starts as a first visit: no kept panel, notes, or theme from an earlier test.
+  globalThis.localStorage?.clear();
   // The page title of the demo's `index.html`; the deck name goes before it.
   document.title = 'PPTX Editor';
   delete document.documentElement.dataset.pageTitle;

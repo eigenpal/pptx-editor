@@ -235,7 +235,6 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'picture-editing/2': ['pixels'],
     'pictures/1': ['pixels'],
     'preserved-content/1': ['pixels'],
-    'rtl-text/2': ['line-position'],
     'text-direction/1': ['pixels'],
     'three-d-effects/1': ['pixels'],
     'three-d-effects/2': ['pixels'],

@@ -59,6 +59,8 @@ describe('demo slide rail', () => {
 
   test('Tab and Escape after typing in the notes take the focus out of the field', async () => {
     await openDemo();
+    // The demo starts with the notes collapsed.
+    await click(byRole('button', { name: 'Show speaker notes' }));
     const notes = document.querySelector<HTMLElement>('.pptx-notes__text')!;
     await click(notes);
     await press('ControlOrMeta+End');
