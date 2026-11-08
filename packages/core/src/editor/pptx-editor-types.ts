@@ -16,6 +16,7 @@ import type { EditorFontError } from './editor-font-error.ts';
 import type { EditorFontsOption } from './host-fonts.ts';
 import type { TextInputKind } from './text-input.ts';
 import type { PptxFind } from './find-session.ts';
+import type { ReviewAuthorInfo } from './review-authors.ts';
 import type * as seam from './modules.ts';
 
 /** Options for `createPptxEditor`. @public */
@@ -130,6 +131,15 @@ export interface PptxEditorInstance extends Editor {
    * its marker does, or `null` for none. A comments pane shows the picked thread.
    */
   selectComment(id: string | null): void;
+  /**
+   * The review authors of the open deck, with the color each one draws in: every comment
+   * author by order of first appearance (slide order, each thread before its replies), then the
+   * author of new comments. An author keeps a slot for the deck's session, also after their
+   * comments go, so a delete and its undo recolor nobody. The comment markers, the text bands,
+   * the shape rings, and the Pro comments pane all draw from this list. The same array while no
+   * slot changes; empty without an open deck.
+   */
+  getReviewAuthors(): readonly ReviewAuthorInfo[];
   /** Families the font picker offers: standard, configured, embedded, and the deck's own. */
   fontFamilies(): readonly string[];
   /**

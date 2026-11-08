@@ -20,7 +20,7 @@ import {
   type ZipLimits,
 } from '../store/index.ts';
 import { OpBatch } from './commands/op-batch.ts';
-import { withoutEditorMarks } from './commands/table-edit-marks.ts';
+import { openStore } from './commands/open-store.ts';
 import { packageForSave } from './commands/save-repair.ts';
 import { createAutomationHost, type AutomationDocumentPort } from './host.ts';
 import type { AutomationImageTarget } from './plan-images.ts';
@@ -122,6 +122,6 @@ export function createServerAutomationHost(
     return { ok: false, error: { reason: 'empty' } };
   const read = options.limits ? readPptx(bytes, options.limits) : readPptx(bytes);
   if (!read.ok) return { ok: false, error: read.error };
-  const store = new PptxDocumentStore(withoutEditorMarks(read.pkg));
+  const store = openStore(read.pkg);
   return { ok: true, host: createStoreAutomationHost(store, options) };
 }

@@ -28,6 +28,7 @@ import {
 } from '@pptx-editor.dev/core/store';
 import { collaborationModule, createYjsCollaborationSession } from '../index.ts';
 import { coverageDeck, differingParts } from './convergence-harness.ts';
+import { buildPptx, para, run as textRun, shape } from '../../../../scripts/fixtures/builder.ts';
 
 const FIXTURES = join(import.meta.dir, '../../../../fixtures');
 const DATE = '2026-11-07T10:00:00.000';
@@ -319,6 +320,113 @@ describe('legacy comments in a room', () => {
       expect(added).toMatchObject({ author: 'Ben', text: 'Ben adds', format: 'legacy' });
       const ids = [...thread!.replies, added!].map((c) => c.id);
       expect(new Set(ids).size).toBe(ids.length);
+    } finally {
+      a.destroy();
+      b.destroy();
+    }
+  });
+});
+
+describe('comments on text in a room', () => {
+  /** A deck whose slide has one text box, "The quick fox". */
+  const textDeck = (): Uint8Array =>
+    buildPptx({
+      slides: [
+        {
+          shapes: shape({
+            id: 3,
+            name: 'Body',
+            x: 0,
+            y: 0,
+            cx: 6_000_000,
+            cy: 1_000_000,
+            text: para(textRun('The quick fox')),
+          }),
+        },
+      ],
+    });
+  const body = (e: PptxEditorInstance): string =>
+    e.snapshot().shapes!.find((s) => s.name === 'Body')!.nodeId;
+  const caret = (e: PptxEditorInstance, from: number, to = from): void =>
+    e.setSelection({
+      kind: 'text',
+      nodeId: body(e),
+      anchor: { paragraph: 0, offset: from },
+      focus: { paragraph: 0, offset: to },
+    });
+  const range = (e: PptxEditorInstance, i = 0) => {
+    const anchor = threads(e)[i]!.anchor;
+    return anchor.kind === 'text' ? [anchor.start.offset, anchor.end.offset] : anchor.kind;
+  };
+
+  test('a text thread reaches the peer, follows a remote edit, and undo restores it', async () => {
+    const { a, b } = await peers(textDeck());
+    try {
+      caret(a, 4, 9);
+      run(a, { type: 'addComment', text: 'Faster?', date: DATE });
+      expect(range(b)).toEqual([4, 9]);
+      // Ben types before the range: both peers see it move.
+      caret(b, 0);
+      b.input('text', 'Oh ');
+      expect(range(a)).toEqual([7, 12]);
+      expect(range(b)).toEqual([7, 12]);
+      converged(a, b);
+      // Ben's undo takes his text and the move back, on both peers.
+      run(b, { type: 'undo' });
+      expect(range(a)).toEqual([4, 9]);
+      run(b, { type: 'redo' });
+      expect(range(a)).toEqual([7, 12]);
+      converged(a, b);
+    } finally {
+      a.destroy();
+      b.destroy();
+    }
+  });
+
+  test('concurrent edits around a range converge, and the saved deck reads the same', async () => {
+    const { a, b, sync } = await peers(textDeck());
+    try {
+      caret(a, 4, 9);
+      run(a, { type: 'addComment', text: 'Faster?', date: DATE });
+      sync.pause();
+      caret(a, 13);
+      a.input('text', '!');
+      caret(b, 6);
+      b.input('text', 'iii');
+      sync.flush();
+      converged(a, b);
+      // Text typed after the range stays out of it, and text typed in it grows it.
+      expect(range(a)).toEqual([4, 12]);
+      expect(range(b)).toEqual([4, 12]);
+      // A new thread on the text while the peer edits it.
+      sync.pause();
+      caret(a, 0, 3);
+      run(a, { type: 'addComment', text: 'Article', date: DATE });
+      caret(b, 0);
+      b.input('text', 'So ');
+      sync.flush();
+      converged(a, b);
+      // Each peer moves a range for its own edits only, so this one can end off: both agree.
+      expect(range(a, 1)).toEqual(range(b, 1));
+      expect(threads(a).map((t) => t.anchor.kind)).toEqual(['text', 'text']);
+    } finally {
+      a.destroy();
+      b.destroy();
+    }
+  });
+
+  test('each peer draws both authors in distinct colors from its roster', async () => {
+    const { a, b } = await peers(textDeck());
+    try {
+      caret(a, 4, 9);
+      run(a, { type: 'addComment', text: 'Faster?', date: DATE });
+      caret(b, 10, 13);
+      run(b, { type: 'addComment', text: 'Which fox?', date: DATE });
+      for (const e of [a, b]) {
+        const roster = e.getReviewAuthors().filter((x) => x.author === 'Ada' || x.author === 'Ben');
+        expect(roster.map((x) => x.author).sort()).toEqual(['Ada', 'Ben']);
+        expect(new Set(roster.map((x) => x.color)).size).toBe(2);
+      }
     } finally {
       a.destroy();
       b.destroy();

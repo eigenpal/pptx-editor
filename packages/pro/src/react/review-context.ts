@@ -9,11 +9,11 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 
 import { createContext, useCallback, useContext } from 'react';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
-import { useTranslation } from '@pptx-editor.dev/react';
+import { useReviewAuthors, useTranslation } from '@pptx-editor.dev/react';
 import {
-  reviewAuthorInfo,
   reviewActions,
   type ReviewAuthorInfo,
+  type ReviewAuthorMap,
   type ReviewCommentTarget,
   type ReviewItemView,
 } from '../review/comment-view.ts';
@@ -30,6 +30,8 @@ export interface ReviewPaneValue {
   readonly review: UseReviewReturn;
   /** Items by id, so a card renders its replies without a walk of the list. */
   readonly byId: ReadonlyMap<string, ReviewItemView>;
+  /** The editor's review roster by author (`getReviewAuthors`): the colors of the cards. */
+  readonly authors: ReviewAuthorMap;
   /** Whether the compose box of a new comment is open. */
   readonly drafting: boolean;
   /**
@@ -65,14 +67,18 @@ export function useReviewItem(): ReviewItemView | null {
 }
 
 /**
- * The look of one comment author: the color slot and the CSS color that the canvas marker and
- * the packaged cards use, or `undefined` without an author. A custom card draws with it, so it
- * keeps the colors of the rest of the review chrome.
+ * The look of one comment author, from the editor's review roster (`getReviewAuthors`): the
+ * slot and the CSS color of the thread's marker, band, ring, and card, or `undefined` without an
+ * author or for an author the roster does not hold. A custom card draws with it, so it keeps the
+ * colors of the rest of the review chrome.
  *
  * @public
  */
 export function useReviewAuthor(author: string | undefined): ReviewAuthorInfo | undefined {
-  return author ? reviewAuthorInfo(author) : undefined;
+  const pane = useContext(ReviewContext);
+  const roster = useReviewAuthors();
+  if (!author) return undefined;
+  return pane ? pane.authors.get(author) : roster.find((info) => info.author === author);
 }
 
 const INERT_REVIEW: UseReviewReturn = {
@@ -90,6 +96,7 @@ const INERT_PANE: ReviewPaneValue = {
   cardClassName: undefined,
   review: INERT_REVIEW,
   byId: new Map(),
+  authors: new Map(),
   drafting: false,
   draftTarget: null,
   beginDraft: () => {},

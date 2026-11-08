@@ -15,6 +15,8 @@ const HALOED: readonly (readonly [string, number, string?])[] = [
   ['pptx-surface__group-outline', 3],
   ['pptx-surface__marquee', 3],
   ['pptx-surface__caret', 2.5],
+  // A comment ring in its author's color shows on a photo and on a dark fill.
+  ['pptx-surface__comment-ring', 2.2],
 ];
 
 function haloOf(mark: Element): Element | null {

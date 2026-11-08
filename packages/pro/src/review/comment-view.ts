@@ -12,18 +12,21 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 import type { Translate, TranslationKey } from '@pptx-editor.dev/i18n';
 import {
   claimRejection,
-  commentAuthorSlot,
   commentInitials,
   editRejectionMessage,
+  REVIEW_AUTHOR_SLOTS,
   requestPane,
+  reviewAuthorSlotColor,
   type EditorRejection,
   type CommentAnchor,
   type CommentExpect,
   type CommentFormat,
+  type CommentTextRange,
   type CommentThread,
   type EditorSelection,
   type EditorSnapshot,
   type PptxEditorInstance,
+  type ReviewAuthorInfo,
   type ShapeSummary,
   type SlideComment,
 } from '@pptx-editor.dev/core/editor';
@@ -92,6 +95,8 @@ export interface ReviewItemView {
 export interface ReviewCommentTarget {
   readonly nodeId: string;
   readonly name: string;
+  /** The selected text of the element, when the comment points at a range of its text. */
+  readonly range?: CommentTextRange;
 }
 
 /** Options of `UseReviewReturn.setActive`. @public */
@@ -187,30 +192,37 @@ export function shownAs(item: ReviewItemView, seen: CommentSeen): ReviewItemView
   return { ...rest, ...seenOf(seen), identity: seen.identity ?? item.identity };
 }
 
-/** The resolved look of one comment author. @public */
-export interface ReviewAuthorInfo {
-  readonly author: string;
-  /** The color slot, 0 to 7: the token `--doc-review-author-<slot>`. */
-  readonly slot: number;
-  /** The CSS color: `var(--doc-review-author-<slot>)`. */
-  readonly color: string;
+export type { ReviewAuthorInfo };
+
+/** The editor's review roster by author (`getReviewAuthors`). */
+export type ReviewAuthorMap = ReadonlyMap<string, ReviewAuthorInfo>;
+
+/** The roster of `editor` by author, for the pane's parts. */
+export function reviewAuthorMap(roster: readonly ReviewAuthorInfo[]): ReviewAuthorMap {
+  return new Map(roster.map((info) => [info.author, info]));
 }
 
-/** The look of `author`, from the shared slot rule of the canvas markers. */
-export function reviewAuthorInfo(author: string): ReviewAuthorInfo {
-  const slot = commentAuthorSlot(author);
-  return { author, slot, color: `var(--doc-review-author-${slot})` };
-}
+/**
+ * The slot that `author` draws in: the roster's, the one that the canvas marker, band, and ring
+ * of the thread use. Slot 0 stands in only for an author that the roster does not hold yet.
+ */
+const slotOf = (author: string, authors: ReviewAuthorMap): number =>
+  (authors.get(author)?.slot ?? 0) % REVIEW_AUTHOR_SLOTS;
 
 /** The author hooks of an element: `data-review-author` and `data-review-author-slot`. */
-export function authorHooks(author: string): Record<string, string | number> {
+export function authorHooks(
+  author: string,
+  authors: ReviewAuthorMap
+): Record<string, string | number> {
   if (!author) return {};
-  return { 'data-review-author': author, 'data-review-author-slot': commentAuthorSlot(author) };
+  return { 'data-review-author': author, 'data-review-author-slot': slotOf(author, authors) };
 }
 
 /** The accent variable of `author`, for an element's `style`. */
-export function authorStyle(author: string): Record<string, string> {
-  return author ? { '--doc-review-author-current': reviewAuthorInfo(author).color } : {};
+export function authorStyle(author: string, authors: ReviewAuthorMap): Record<string, string> {
+  if (!author) return {};
+  const color = authors.get(author)?.color ?? reviewAuthorSlotColor(slotOf(author, authors));
+  return { '--doc-review-author-current': color };
 }
 
 /** The name of a slide element by node id, at any depth of the group tree. */
@@ -236,7 +248,18 @@ export function commentTarget(
         : undefined;
   if (id === undefined) return null;
   const name = shapes?.find((s) => s.nodeId === id)?.name;
-  return name === undefined ? null : { nodeId: id, name };
+  if (name === undefined) return null;
+  // Selected text of a shape, not of a table cell or a diagram node, as `addComment` reads it.
+  if (selection.kind === 'text' && !selection.cell && !selection.diagramNode) {
+    const { anchor: a, focus: b } = selection;
+    const order = a.paragraph - b.paragraph || a.offset - b.offset;
+    if (order !== 0) {
+      const [start, end] = order < 0 ? [a, b] : [b, a];
+      const point = (p: typeof a) => ({ paragraph: p.paragraph, offset: p.offset });
+      return { nodeId: id, name, range: { start: point(start), end: point(end) } };
+    }
+  }
+  return { nodeId: id, name };
 }
 
 /**
@@ -266,7 +289,9 @@ export function reviewItems(
   for (const thread of threads) {
     const isActive = thread.id === snapshot.activeComment;
     const anchorName =
-      thread.anchor.kind === 'shape' ? shapeName(snapshot.shapes, thread.anchor.nodeId) : undefined;
+      thread.anchor.kind === 'shape' || thread.anchor.kind === 'text'
+        ? shapeName(snapshot.shapes, thread.anchor.nodeId)
+        : undefined;
     const resolvable = writable && thread.format === 'modern';
     const item = (c: SlideComment, parentId?: string): ReviewItemView => ({
       key: c.id,
@@ -306,7 +331,11 @@ export function reviewReady(snapshot: EditorSnapshot | null): boolean {
 /** The actions of `UseReviewReturn`, over one editor. Each reports whether the editor applied it. */
 export interface ReviewActions {
   setActive(key: string | null, options?: ReviewActivationOptions): boolean;
-  comment(text: string, author?: string, target?: { readonly nodeId: string }): boolean;
+  comment(
+    text: string,
+    author?: string,
+    target?: { readonly nodeId: string; readonly range?: CommentTextRange }
+  ): boolean;
   reply(item: ReviewItemView, text: string, author?: string): boolean;
   edit(item: ReviewItemView, text: string): boolean;
   remove(item: ReviewItemView): boolean;
@@ -344,6 +373,7 @@ export function reviewActions(editor: PptxEditorInstance | null): ReviewActions 
         text,
         ...author(name),
         ...(target ? { nodeId: target.nodeId } : {}),
+        ...(target?.range ? { range: target.range } : {}),
       }),
     reply: (item, text, name) =>
       text.trim() !== '' &&

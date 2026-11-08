@@ -13,7 +13,12 @@ export type {
   PptxEditorOptions,
 } from './pptx-editor-types.ts';
 export { readCommentThreads } from './comment-state.ts';
-export { COMMENT_AUTHOR_SLOTS, commentAuthorSlot, commentInitials } from './comment-authors.ts';
+export { commentInitials } from './comment-authors.ts';
+export {
+  REVIEW_AUTHOR_SLOTS,
+  reviewAuthorSlotColor,
+  type ReviewAuthorInfo,
+} from './review-authors.ts';
 export {
   CHROME_GROUPS,
   chromeControlForSlot,

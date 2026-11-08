@@ -158,6 +158,7 @@ export function deferredXmlPart(partName: string, bytes: Uint8Array, decode: (by
 // @public
 export interface DocumentStoreOptions {
     readonly onListenerError?: (error: unknown, change: StoreChange) => void;
+    readonly paragraphText?: ParagraphText;
 }
 
 // @internal
@@ -556,6 +557,9 @@ export type PackageResult = {
     readonly ok: false;
     readonly error: PackageRejection;
 };
+
+// @public
+export type ParagraphText = (p: Element_2, pkg: PptxPackage, part: string) => string;
 
 // @internal
 export function parseDeferredPart(pkg: PptxPackage, partName: string): boolean;

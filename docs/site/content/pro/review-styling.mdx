@@ -1,10 +1,12 @@
 ---
 title: 'Review colors and styling'
-description: 'Color comments by author, choose the comment markers, and style the comments pane with CSS tokens.'
+description: 'Color comments by author, style the highlights and markers on the slide, and style the comments pane with CSS tokens.'
 category: 'Pro'
 ---
 
-Each comment author gets one color in the [comments pane](/docs/pro/comments) and on the canvas markers. The color comes from slots `--doc-review-author-0` through `--doc-review-author-7`. The slot is a hash of the author's name, so an author keeps one color on every slide, in every session, and for every collaborator.
+Each comment author gets one color in the [comments pane](/docs/pro/comments) and on the slide: the marker, the band over commented text, and the ring around a commented picture or shape. The color comes from slots `--doc-review-author-0` through `--doc-review-author-7`.
+
+The editor gives slots by order of first appearance in the deck: slide order, each thread before its replies, and then the author of new comments. An author keeps a slot for the session of the open deck, also after their comments go, so a delete and its undo recolor nobody. `editor.getReviewAuthors()` returns this roster.
 
 ## Change the author colors
 
@@ -28,10 +30,10 @@ The default palette keeps a contrast ratio of at least 5.1:1 between each slot a
 
 ## Style one author
 
-Cards, replies, and markers set `--doc-review-author-current` to their author's slot, and avatars inherit it. Cards and replies also carry `data-review-author` and `data-review-author-slot`:
+Cards, replies, markers, bands, and rings set `--doc-review-author-current` to their author's color, and avatars inherit it. They also carry `data-review-author` and `data-review-author-slot`, so one selector restyles a reviewer's card and what it annotates:
 
 ```css
-.pptx-editor .pptx-review__card[data-review-author='Ada Lovelace'] {
+.pptx-editor [data-review-author='Ada Lovelace'] {
   --doc-review-author-current: #7c3aed;
 }
 ```
@@ -40,7 +42,9 @@ Author names come from the file, so any sender can use any name. Use these selec
 
 ## Read an author's color in your own UI
 
-`useReviewAuthor(name)` returns `{ author, slot, color }`, or `undefined` for an empty name. `color` is a CSS value such as `var(--doc-review-author-3)`. In Vue, the composable takes a ref or a getter and returns a computed ref.
+`useReviewAuthor(name)` returns `{ author, slot, color }` from the roster, or `undefined` for an empty name or an author the roster does not hold. `color` is a CSS value such as `var(--doc-review-author-3)`. `slot` is a rank that can pass 7: the ninth author has slot 8 and color `var(--doc-review-author-0)`. In Vue, the composable takes a ref or a getter and returns a computed ref.
+
+For a legend of every author, `useReviewAuthors()` from `@pptx-editor.dev/react` or `@pptx-editor.dev/vue` returns the whole roster, in slot order.
 
 <FrameworkTabs>
 <Framework value="react">
@@ -87,6 +91,29 @@ const modules = [reviewModule({ pane: { commentMarkers: 'initials' } })];
 
 Each marker is a `.pptx-surface__comment-marker` SVG group with `data-marker` set to `icon` or `initials`. A selected marker has `is-active`, and a marker of a resolved thread has `is-resolved`.
 
+## Style the highlights on the slide
+
+A thread on text draws a band over each line of its range. A thread on a picture, a shape, or another element draws a ring around it: a stroke, so it shows over a solid fill or a photo. A thread is one band or one ring in the color of the author who started it, however many replies it has.
+
+A band is light at rest. It is stronger while its thread is open: the selected thread, or the one the text caret is in. A ring is stronger while its thread is selected or its element is the one selected element. Neither animates, so a band follows the caret.
+
+| Class | Element |
+| --- | --- |
+| `pptx-surface__comment-bands` | A band layer. `data-paper="light"` multiplies with the slide, and `data-paper="dark"` screens with it. |
+| `pptx-surface__comment-band-group` | The band of one thread. An open band has `is-active`, and a band of a resolved thread has `is-resolved`. |
+| `pptx-surface__comment-band`, `pptx-surface__comment-band-rule` | The band of one line, and the rule along its foot |
+| `pptx-surface__comment-ring-group`, `pptx-surface__comment-ring` | The ring of one thread, with `is-active` and `is-resolved` |
+
+The bands blend with the slide as a highlighter does, so the text under a band keeps its color. Over dark text, the band multiplies. Over light text, the band layer screens, and the author color is lifted toward white first. The slide keeps its own colors in the dark chrome theme, so the text color picks the layer, not the theme.
+
+A resolved thread draws no band or ring until you select it. To tint by author with your own strength, set the band fill:
+
+```css
+.pptx-editor .pptx-surface__comment-band-group.is-active .pptx-surface__comment-band {
+  fill: color-mix(in srgb, var(--doc-review-author-current) 45%, white);
+}
+```
+
 ## Style the pane
 
 Add classes with `className` on `PptxEditorReview` and `card.className` for each card. The packaged parts use these classes:
@@ -107,9 +134,10 @@ The pane also reads the editor's theme tokens, such as `--doc-primary`, so a the
 
 ## Limits
 
-- Two authors can share a slot. Eight slots serve any number of authors.
+- Eight slots serve any number of authors: the ninth author takes the first color again.
+- Each editor gives slots by what it has seen. Two collaborators see the same colors for the authors of the deck they opened. Authors who join during a session can take other slots on each peer.
 - The palette holds the same values in the light and dark themes. Add a rule under `.pptx-editor.dark` when you change them for the dark theme.
-- Comment markers do not print or export, so marker styles do not change a PDF.
+- Comment markers, bands, and rings do not print or export, so their styles do not change a PDF.
 
 ## See also
 

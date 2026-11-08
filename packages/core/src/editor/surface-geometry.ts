@@ -83,7 +83,10 @@ export interface CaretLine {
  * gives its color, a gradient its first stop. No color for a line with no text run, for no
  * fill, or for a fill that is nearly transparent.
  */
-function textColorAt(line: Line, offset: number): string | undefined {
+export function textFillAt(
+  line: Line,
+  offset: number
+): { readonly r: number; readonly g: number; readonly b: number } | undefined {
   const runs = line.runs.filter((r) => r.kind === 'text' && r.text.length > 0);
   const before = runs.filter((r) => r.start < offset);
   const run = before[before.length - 1] ?? runs[0];
@@ -95,8 +98,12 @@ function textColorAt(line: Line, offset: number): string | undefined {
       : fill.type === 'linear' || fill.type === 'path'
         ? fill.stops[0]?.color
         : undefined;
-  if (!color || color.a < 0.35) return undefined;
-  return `rgb(${color.r} ${color.g} ${color.b})`;
+  return !color || color.a < 0.35 ? undefined : color;
+}
+
+function textColorAt(line: Line, offset: number): string | undefined {
+  const color = textFillAt(line, offset);
+  return color && `rgb(${color.r} ${color.g} ${color.b})`;
 }
 
 export function caretAt(item: LayoutItem, point: TextPoint): CaretLine | undefined {

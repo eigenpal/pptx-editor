@@ -180,7 +180,7 @@ export class SlideSurface {
     this.#table = new TableGestures(editor);
     this.#tableChrome = new TableChrome(editor);
     this.#placeholderChrome = new PlaceholderChrome(editor);
-    this.#commentMarkers = new CommentMarkers(editor.commentMarkers);
+    this.#commentMarkers = new CommentMarkers(editor.commentMarkers, this.#stage);
     this.#input = doc.createElement('textarea');
     this.#input.className = 'pptx-surface__input';
     // The input receives keystrokes and IME composition for the engine; it is focusable and
@@ -288,6 +288,7 @@ export class SlideSurface {
       this.#paintKey = null;
       this.#painter = null;
       this.#overlay.replaceChildren();
+      this.#commentMarkers.clear();
       // Focus can still land here (Close on an open failure): give the canvas a true name.
       const empty = this.editor.label('canvas.emptyAriaLabel');
       if (this.root.getAttribute('aria-label') !== empty)

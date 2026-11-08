@@ -9,7 +9,11 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // through them that is not reachable here. The Vue twin is `../vue/useReview.ts`.
 
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
-import type { EditorSnapshot, PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import type {
+  CommentTextRange,
+  EditorSnapshot,
+  PptxEditorInstance,
+} from '@pptx-editor.dev/core/editor';
 import { usePptxEditor } from '@pptx-editor.dev/react';
 import {
   commentTarget,
@@ -44,13 +48,14 @@ export interface UseReviewReturn {
    */
   readonly setActive: (key: string | null, options?: ReviewActivationOptions) => boolean;
   /**
-   * Add a thread on the current slide. It points at `target.nodeId`, else at the selected element
+   * Add a thread on the current slide. It points at `target.range` of the text of
+   * `target.nodeId`, at `target.nodeId`, else at the selected text or element
    * (`commentTarget`), else at the slide. `author` overrides `author` for this comment.
    */
   readonly comment: (
     text: string,
     author?: string,
-    target?: { readonly nodeId: string }
+    target?: { readonly nodeId: string; readonly range?: CommentTextRange }
   ) => boolean;
   /** Reply to a thread, or to the thread of a reply. */
   readonly reply: (item: ReviewItemView, text: string, author?: string) => boolean;

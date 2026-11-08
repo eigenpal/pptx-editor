@@ -32,10 +32,11 @@ import {
   type ReactNode,
 } from 'react';
 import { registerCommentDraft } from '@pptx-editor.dev/core/editor';
-import { useEditorState, usePptxEditor } from '@pptx-editor.dev/react';
+import { useEditorState, usePptxEditor, useReviewAuthors } from '@pptx-editor.dev/react';
 import {
   commentTarget,
   liveDraftTarget,
+  reviewAuthorMap,
   reviewReadOnly,
   type ReviewCommentTarget,
   type ReviewItemView,
@@ -174,9 +175,17 @@ function ReviewRoot({ className, hidden, t, card, children, preset = true, filte
     return review.items.filter((i) => kept.has(i.parentId ?? i.id));
   }, [review.items, filter]);
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i] as const)), [items]);
+  // The cards draw each author in the roster's color, as the canvas does.
+  const roster = useReviewAuthors();
+  const authors = useMemo(() => reviewAuthorMap(roster), [roster]);
   // A new slide, or view mode, closes the open fields.
   const slide = useEditorState((s) => s.slides[s.currentSlide]?.id ?? '');
+  // Only a change closes them: a second run of the effect (StrictMode) keeps a draft that the
+  // New comment row opened as the pane mounted.
+  const shown = useRef({ slide, readOnly: review.readOnly });
   useEffect(() => {
+    if (shown.current.slide === slide && shown.current.readOnly === review.readOnly) return;
+    shown.current = { slide, readOnly: review.readOnly };
     setDrafting(false);
     setEditing(null);
   }, [slide, review.readOnly]);
@@ -229,6 +238,7 @@ function ReviewRoot({ className, hidden, t, card, children, preset = true, filte
       cardClassName: card?.className,
       review: items === review.items ? review : { ...review, items },
       byId,
+      authors,
       drafting,
       draftTarget,
       beginDraft,
@@ -243,6 +253,7 @@ function ReviewRoot({ className, hidden, t, card, children, preset = true, filte
       review,
       items,
       byId,
+      authors,
       drafting,
       draftTarget,
       beginDraft,

@@ -9,12 +9,14 @@
 // threads in the comments pane. Editing chrome only: the slide paint, thumbnails, the slide show,
 // exports, and saved files never show it.
 
-import type { CommentMarkerStyle, CommentThread } from '../contracts/index.ts';
+import type { CommentMarkerStyle, CommentThread, EditorSelection } from '../contracts/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
 import { SVG_NS } from '../output/index.ts';
 import { findItem } from '../automation/commands/placement.ts';
-import { commentAuthorSlot, commentInitials } from './comment-authors.ts';
+import { commentInitials } from './comment-authors.ts';
+import { commentHighlights, textAnchorPlace } from './comment-highlights.ts';
 import { ICON_PATHS } from './icon-paths.ts';
+import { reviewAuthorHooks, type ReviewAuthorInfo } from './review-authors.ts';
 
 /** What the markers read from the editor. */
 export interface CommentMarkerHost {
@@ -22,10 +24,29 @@ export interface CommentMarkerHost {
   threads(): readonly CommentThread[];
   /** The picked thread, or null. */
   active(): string | null;
+  /** The look of an author, from the editor's review roster (`getReviewAuthors`). */
+  author(name: string): ReviewAuthorInfo | undefined;
+  /** The editor's selection: a band is open while the caret is in its range. */
+  selection(): EditorSelection;
   /** How a marker looks. */
   style(): CommentMarkerStyle;
   /** Pick a thread and show it in the comments pane. */
   pick(id: string): void;
+}
+
+const NO_SELECTION: EditorSelection = { kind: 'none' };
+
+/**
+ * A centered text label at (`x`, `y`) slide units, `size` screen pixels high. The text is laid
+ * out in screen pixels and scaled to slide units: a font size in slide units (EMU) passes the
+ * browser's font size cap, and the label then draws as a speck.
+ */
+function label(doc: Document, x: number, y: number, size: number, px: number): Element {
+  const text = doc.createElementNS(SVG_NS, 'text');
+  text.setAttribute('transform', `translate(${x} ${y}) scale(${px})`);
+  text.setAttribute('font-size', String(size));
+  text.setAttribute('text-anchor', 'middle');
+  return text;
 }
 
 /** A marker is 28 px high; markers at one place sit 4 px apart. */
@@ -39,7 +60,10 @@ const ICON_PX = 16;
 function placeOf(thread: CommentThread, layout: SlideLayout): { x: number; y: number } {
   const a = thread.anchor;
   if (a.kind === 'point') return { x: a.x, y: a.y };
-  if (a.kind === 'shape') {
+  // A thread on text: at its band, else at its element, as for a thread on the element.
+  const text = a.kind === 'text' ? textAnchorPlace(layout, a) : undefined;
+  if (text) return text;
+  if (a.kind === 'shape' || a.kind === 'text') {
     const item = findItem(layout.items, a.nodeId);
     if (item) {
       const [m0, m1, , , e, f] = item.matrix;
@@ -65,10 +89,59 @@ function roundedRect(
 }
 
 export class CommentMarkers {
-  constructor(private readonly host: CommentMarkerHost | undefined) {}
+  /**
+   * The comment band layers (`comment-highlights.ts`): one that multiplies over light paper and
+   * one that screens over dark paper. They sit in `stage` over the slide paint and under the
+   * overlay, so they blend with the slide and not with the selection chrome.
+   */
+  readonly #layers: SVGSVGElement[] = [];
 
-  /** The markers for `layout`; `px` is one screen pixel in slide units. */
+  constructor(
+    private readonly host: CommentMarkerHost | undefined,
+    private readonly stage?: HTMLElement
+  ) {}
+
+  /** The band layers, made and put under the overlay on the first paint. */
+  #bandLayers(doc: Document): readonly SVGSVGElement[] {
+    if (this.#layers.length === 0 && this.stage) {
+      for (const paper of ['light', 'dark']) {
+        const svg = doc.createElementNS(SVG_NS, 'svg') as SVGSVGElement;
+        svg.setAttribute('class', 'pptx-surface__comment-bands');
+        svg.setAttribute('data-paper', paper);
+        // Review chrome: the comments pane names each thread.
+        svg.setAttribute('aria-hidden', 'true');
+        this.#layers.push(svg);
+      }
+    }
+    const overlay = this.stage?.querySelector(':scope > .pptx-surface__overlay') ?? null;
+    for (const svg of this.#layers)
+      if (svg.parentNode !== this.stage) this.stage!.insertBefore(svg, overlay);
+    return this.#layers;
+  }
+
+  /** Remove the bands, when the surface shows no slide. */
+  clear(): void {
+    for (const svg of this.#layers) svg.replaceChildren();
+  }
+
+  /**
+   * The comment rings and the markers for `layout`, to draw in the overlay in that order. Paints
+   * the bands into their own layers. `px` is one screen pixel in slide units.
+   */
   elements(doc: Document, layout: SlideLayout, px: number): Element[] {
+    const sel = this.host?.selection() ?? NO_SELECTION;
+    const marks = commentHighlights(doc, layout, this.host, sel, px);
+    const { width, height } = layout.slide;
+    this.#bandLayers(doc).forEach((svg, i) => {
+      svg.setAttribute('width', String(width / px));
+      svg.setAttribute('height', String(height / px));
+      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      svg.replaceChildren(...(i === 0 ? marks.light : marks.dark));
+    });
+    return [...marks.rings, ...this.#markers(doc, layout, px)];
+  }
+
+  #markers(doc: Document, layout: SlideLayout, px: number): Element[] {
     const threads = this.host?.threads() ?? [];
     if (threads.length === 0) return [];
     const active = this.host!.active();
@@ -107,11 +180,13 @@ export class CommentMarkers {
     g.setAttribute('data-comment-marker', thread.id);
     g.setAttribute('data-marker', style);
     g.setAttribute('transform', `translate(${x} ${y})`);
-    // The author's color slot, as on the thread's card in the comments pane.
-    g.setAttribute(
-      'style',
-      `--doc-review-author-current: var(--doc-review-author-${commentAuthorSlot(thread.author)})`
-    );
+    // The author's color, as on the thread's card in the comments pane and on its band.
+    const hooks = reviewAuthorHooks(thread.author, this.host?.author(thread.author));
+    if (hooks) {
+      g.setAttribute('data-review-author', hooks.author);
+      g.setAttribute('data-review-author-slot', String(hooks.slot));
+      g.setAttribute('style', `--doc-review-author-current: ${hooks.color}`);
+    }
     const title = doc.createElementNS(SVG_NS, 'title');
     // File text: `textContent` only, never markup.
     title.textContent = thread.author ? `${thread.author}: ${thread.text}` : thread.text;
@@ -155,11 +230,7 @@ export class CommentMarkers {
     if (thread.resolved) {
       g.append(this.#glyph(doc, 'check', (w / px - 14) / 2, SIZE_PX - BADGE_PX + 6, 14, px));
     } else {
-      const text = doc.createElementNS(SVG_NS, 'text');
-      text.setAttribute('x', String(w / 2));
-      text.setAttribute('y', String(top + h / 2 + 3.8 * px));
-      text.setAttribute('font-size', String(10.5 * px));
-      text.setAttribute('text-anchor', 'middle');
+      const text = label(doc, w / 2, top + h / 2 + 3.8 * px, 10.5, px);
       text.setAttribute('class', 'pptx-surface__comment-marker-text');
       text.textContent = initials;
       g.append(text);
@@ -175,11 +246,7 @@ export class CommentMarkers {
       dot.setAttribute('r', String(r));
       dot.setAttribute('class', 'pptx-surface__comment-marker-count');
       dot.setAttribute('stroke-width', String(px));
-      const count = doc.createElementNS(SVG_NS, 'text');
-      count.setAttribute('x', String(cx));
-      count.setAttribute('y', String(cy + 3.2 * px));
-      count.setAttribute('font-size', String(9 * px));
-      count.setAttribute('text-anchor', 'middle');
+      const count = label(doc, cx, cy + 3.2 * px, 9, px);
       count.setAttribute('class', 'pptx-surface__comment-marker-count-text');
       count.textContent = replies > 9 ? '9+' : String(replies);
       g.append(dot, count);

@@ -19,7 +19,13 @@ import {
   PptxEditorViewport,
 } from '@pptx-editor.dev/vue';
 import { buildPptx, shape } from '../../../../../scripts/fixtures/builder.ts';
-import { PptxEditorReview, reviewModule, useReview, type UseReviewReturn } from '../index.ts';
+import {
+  PptxEditorReview,
+  reviewModule,
+  useReview,
+  useReviewAuthor,
+  type UseReviewReturn,
+} from '../index.ts';
 import { repeatedThreadDeck } from '../../__tests__/repeat-deck.ts';
 
 const IN = 914_400;
@@ -410,6 +416,33 @@ describe('PptxEditorReview (Vue)', () => {
     review!.comment('From a composable');
     await settle();
     expect(review!.items.value.map((i) => i.text)).toEqual(['From a composable']);
+  });
+
+  test("cards draw each author in the editor's roster color, and useReviewAuthor reads it", async () => {
+    let grace: ReturnType<typeof useReviewAuthor> | null = null;
+    const Probe = defineComponent({
+      setup() {
+        grace = useReviewAuthor('Grace Hopper');
+        return () => h(PptxEditorReview);
+      },
+    });
+    const editor = await mount([reviewModule()], () => h(Probe));
+    editor.exec({ type: 'addComment', text: 'One', author: 'Grace Hopper' });
+    editor.exec({ type: 'addComment', text: 'Two' });
+    await settle();
+    const roster = editor.getReviewAuthors();
+    expect(roster.map((a) => [a.author, a.slot])).toEqual([
+      ['Ada Lovelace', 0],
+      ['Grace Hopper', 1],
+    ]);
+    for (const info of roster) {
+      const card = document.querySelector(
+        `.pptx-review__card[data-review-author="${info.author}"]`
+      ) as HTMLElement;
+      expect(card.getAttribute('data-review-author-slot')).toBe(String(info.slot));
+      expect(card.style.getPropertyValue('--doc-review-author-current')).toBe(info.color);
+    }
+    expect(grace!.value).toEqual(roster[1]);
   });
 
   test('the side panel shows the pane in its #comments slot', async () => {

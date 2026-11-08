@@ -66,11 +66,15 @@ const modules = [reviewModule()];
 </Framework>
 </FrameworkTabs>
 
-The pane lists the threads of the current slide. Users add a comment to the slide or to the selected element, reply, edit, delete, and resolve or reopen a thread. In a comment field, Enter posts, Shift+Enter starts a new line, and Escape cancels.
+The pane lists the threads of the current slide. Users add a comment to the slide, to the selected text, or to the selected element, reply, edit, delete, and resolve or reopen a thread. In a comment field, Enter posts, Shift+Enter starts a new line, and Escape cancels.
 
-Right-click text, a shape, a picture, or a table on the slide and pick **New comment** to start a comment on that element. The row shows while the pane is mounted, or while a side panel or your host can show the **Comments** tab on request (`listenPaneRequests`). It opens the tab when it is closed and focuses the new draft. In view mode, the row is disabled. Your own control runs the same action with `useEditorCommand('review.addComment')`.
+Right-click text, a shape, a picture, or a table on the slide and pick **New comment** to start a comment on that element, or on the selected text. The row shows while the pane is mounted, or while a side panel or your host can show the **Comments** tab on request (`listenPaneRequests`). It opens the tab when it is closed and focuses the new draft. In view mode, the row is disabled. Your own control runs the same action with `useEditorCommand('review.addComment')`.
 
-A marker on the canvas shows each thread. A click on a marker selects its thread and turns the side panel to the **Comments** tab. The markers are pointer shortcuts: keyboard and screen reader users reach the same threads in the pane. Comment markers are editing chrome. They do not print or export.
+A marker on the canvas shows each thread. A click on a marker selects its thread and turns the side panel to the **Comments** tab. The markers are pointer shortcuts: keyboard and screen reader users reach the same threads in the pane.
+
+The slide also shows what each thread annotates, in the color of the author who started it. A comment on selected text draws a band over that text. The band is light at rest and stronger while its thread is selected or the caret is in it. A comment on a selected picture or shape draws a ring around it. A comment on text follows its text through edits and undo, and collaborators receive the moved range with the edit. When an edit removes all of its text, the thread points at the element. See [Review colors and styling](/docs/pro/review-styling) to change the colors.
+
+Comment markers, bands, and rings are editing chrome. They do not print or export.
 
 Without the review module, `PptxEditorReview` and the packaged **Comments** tab say that comments are kept when you save. The packaged `PptxEditor` component has no side panel, so compose the editor to show the pane. For the other parts of a composed layout, see [Layout](/docs/customization/layout).
 
@@ -206,7 +210,7 @@ export function askForReview(editor: PptxEditorInstance) {
 
 | Command | Fields | Result |
 | --- | --- | --- |
-| `addComment` | `text`, optional `nodeId` | A new thread on the current slide |
+| `addComment` | `text`, optional `nodeId` and `range` | A new thread on the current slide |
 | `replyToComment` | `commentId`, `text` | A reply at the end of the thread |
 | `editComment` | `commentId`, `text` | New text for a comment or a reply |
 | `deleteComment` | `commentId` | Deletes a reply, or a thread with all of its replies |
@@ -243,11 +247,24 @@ if (!result.ok && result.reason === 'errors.commentChanged') {
 
 The comments pane sends `expect` with each action. When the editor refuses a new comment, a save, or a reply, the field keeps its text and shows the reason. After a notice that the comment changed, the edit box shows what the comment reads now, and a second save or reply applies to the comment as it shows now. The pane sends the identity, so it acts on the copy of an exact duplicate that it shows. A reply item of `useReview` reports its thread as `parent`, and the `reply`, `resolve`, and `reopen` actions on a reply item send it as `expect`.
 
+Without `nodeId`, `addComment` points the thread at the selected text of a shape, else at the one selected element, else at the slide. With `nodeId` and `range`, it points at that range of the element's text. `range` has `start` and `end` points, as a text selection does. In this sample, `shape` is an entry of `editor.snapshot().shapes`:
+
+```ts
+editor.exec({
+  type: 'addComment',
+  text: 'Is this the right figure?',
+  nodeId: shape.nodeId,
+  range: { start: { paragraph: 0, offset: 4 }, end: { paragraph: 0, offset: 9 } },
+});
+```
+
+The editor refuses a `range` without `nodeId`, or with no text in it, with `disabled.noCommentTarget`. A deck with only legacy comments has no text ranges: there, the thread points at the element.
+
 `addComment` and `replyToComment` also take `author`, `initials`, and `date`. They override the editor's author for that comment. The date is an ISO 8601 date and time. Without a date, the editor uses the current time in UTC. Each command is one undo step.
 
 ## Read the threads
 
-`editor.snapshot().comments` lists the threads of the current slide. It is `null` without the review module. `activeComment` is the id of the selected thread. Each thread has `id`, `identity`, `format` (`modern` or `legacy`), `author`, `initials`, `date`, `text`, `textEditable`, `resolved`, `anchor`, and `replies`. `textEditable` is `false` for a comment whose content `editComment` cannot write back, such as a mention. Pass `id` to the comment commands. Key your own UI state, such as an open reply field, by `identity`. When a file repeats a GUID, a delete of another comment can change `id`. Once shown, an `identity` never names another comment, also after the slide changes and comes back, or the editor opens another deck:
+`editor.snapshot().comments` lists the threads of the current slide. It is `null` without the review module. `activeComment` is the id of the selected thread. Each thread has `id`, `identity`, `format` (`modern` or `legacy`), `author`, `initials`, `date`, `text`, `textEditable`, `resolved`, `anchor`, and `replies`. `anchor` is `{ kind: 'text', nodeId, start, end }` for a thread on text, `{ kind: 'shape', nodeId }` for a thread on an element, `{ kind: 'point', x, y }` for a place on the slide, or `{ kind: 'slide' }`. `textEditable` is `false` for a comment whose content `editComment` cannot write back, such as a mention. Pass `id` to the comment commands. Key your own UI state, such as an open reply field, by `identity`. When a file repeats a GUID, a delete of another comment can change `id`. Once shown, an `identity` never names another comment, also after the slide changes and comes back, or the editor opens another deck:
 
 - A comment that never had a twin keeps its `identity` until it is deleted. A twin shares the GUID, author, and creation time of another comment of the slide.
 - Twins keep their `identity` when one change explains their group: an edit or a resolve that changes at most one text, or one twin more or less at one place.
@@ -282,7 +299,9 @@ The editor writes the author list, the comment lists, their relationships, and t
 
 ## Limits
 
-- A comment points at the slide or at an element on the top level of the slide. Other targets are refused with `disabled.noCommentTarget`.
+- A comment points at the slide, at an element on the top level of the slide, or at a range of the text of such a shape. Other targets are refused with `disabled.noCommentTarget`.
+- Only threaded comments hold text ranges. In a deck with only legacy comments, a comment on text points at its shape.
+- Each editor moves a text range for its own edits. When two collaborators edit the text of a commented shape at the same time, the range can end a few characters off.
 - Mentions, reactions, and other content of threaded comments are kept but not shown. An edit of a comment with such content is refused with `disabled.commentNotEditable`.
 - The pane lists threads in file order, not by their position on the slide. It shows the threads of the current slide only.
 - The import of a slide with threaded comments from another presentation is refused.

@@ -66,7 +66,11 @@ import {
 // Glow, inner shadow, reflection, and soft edge, and the comments pane (EigenPal Pro License).
 const MODULES: readonly EditorModule[] = [
   drawingModule({ licenseKey: import.meta.env.VITE_PPTX_LICENSE }),
-  reviewModule({ licenseKey: import.meta.env.VITE_PPTX_LICENSE }),
+  // Initials badges in each author's color, as on the comment cards.
+  reviewModule({
+    licenseKey: import.meta.env.VITE_PPTX_LICENSE,
+    pane: { commentMarkers: 'initials' },
+  }),
 ];
 /** The Comments tab of the side panel: the Pro comments pane. */
 const REVIEW_PANES = { comments: <PptxEditorReview /> };

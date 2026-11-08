@@ -36,6 +36,7 @@ import { applyOps, type OpRejection, type PptxOp } from './ops.ts';
 import type { HistoryGroup, TransactOrigin } from './history-group.ts';
 import { introducedViolation } from './part-checks.ts';
 import { paragraphRangeFixes, type TextEditAt } from './paragraph-ranges.ts';
+import { commentAnchorFixes, type ParagraphText } from './comment-anchors.ts';
 export type { TextEditAt } from './paragraph-ranges.ts';
 
 /** What a committed transaction changed. */
@@ -130,6 +131,11 @@ export interface DocumentStoreOptions {
    * error on a microtask), so it is never swallowed.
    */
   readonly onListenerError?: (error: unknown, change: StoreChange) => void;
+  /**
+   * The text of a slide paragraph as the editor counts it: a threaded comment on a range of
+   * text counts characters this way (`comment-anchors.ts`). The default counts the stored text.
+   */
+  readonly paragraphText?: ParagraphText;
 }
 
 function reportListenerError(error: unknown): void {
@@ -167,12 +173,14 @@ export class PptxDocumentStore {
    */
   #cutGroup: HistoryGroup | undefined;
   readonly #onListenerError: (error: unknown, change: StoreChange) => void;
+  readonly #paragraphText: ParagraphText | undefined;
   /** Why the store refuses every commit, once `block` ran. */
   #blocked: string | null = null;
 
   constructor(pkg: PptxPackage, options: DocumentStoreOptions = {}) {
     this.#pkg = pkg;
     this.#onListenerError = options.onListenerError ?? reportListenerError;
+    this.#paragraphText = options.paragraphText;
   }
 
   /**
@@ -226,6 +234,17 @@ export class PptxDocumentStore {
       const after = next.parts.get(name);
       if (before?.kind !== 'xml' || after?.kind !== 'xml') continue;
       for (const op of paragraphRangeFixes(name, before.xml.root, after.xml.root, at)) out.push(op);
+      // A threaded comment on a range of text follows its text (`comment-anchors.ts`).
+      for (const op of commentAnchorFixes(
+        this.#pkg,
+        next,
+        name,
+        before.xml.root,
+        after.xml.root,
+        at,
+        this.#paragraphText
+      ))
+        out.push(op);
     }
     return out;
   }

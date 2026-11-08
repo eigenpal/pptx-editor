@@ -30,7 +30,11 @@ import Shell from './Shell.vue';
 // Glow, inner shadow, reflection, and soft edge, and the comments pane (EigenPal Pro License).
 const MODULES: readonly EditorModule[] = [
   drawingModule({ licenseKey: import.meta.env.VITE_PPTX_LICENSE }),
-  reviewModule({ licenseKey: import.meta.env.VITE_PPTX_LICENSE }),
+  // Initials badges in each author's color, as on the comment cards.
+  reviewModule({
+    licenseKey: import.meta.env.VITE_PPTX_LICENSE,
+    pane: { commentMarkers: 'initials' },
+  }),
 ];
 /** The author of the comments that the demo adds. */
 const DEMO_AUTHOR = 'Demo author';

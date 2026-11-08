@@ -294,7 +294,10 @@ export type CommentAnchor = {
 } | {
     readonly kind: 'shape';
     readonly nodeId: string;
-};
+} | ({
+    readonly kind: 'text';
+    readonly nodeId: string;
+} & CommentTextRange);
 
 // @public
 export interface CommentAuthorInput {
@@ -306,13 +309,17 @@ export interface CommentAuthorInput {
 // @public
 export type CommentCommand =
 /**
-* Add a thread on the current slide. With `nodeId`, it points at that element; without it, at
-* the selected element when one element is selected, else at the slide.
+* Add a thread on the current slide. With `nodeId`, it points at that element, and with
+* `nodeId` and `range`, at that range of its text. Without `nodeId`, it points at the
+* selected text of a shape, else at the selected element when one element is selected, else
+* at the slide. A deck with only legacy comments has no text anchors: the thread then points
+* at the element.
 */
 ({
     readonly type: 'addComment';
     readonly text: string;
     readonly nodeId?: string;
+    readonly range?: CommentTextRange;
 } & CommentAuthorInput)
 /** Reply to the thread of `commentId` (a thread or one of its replies). */
 | ({
@@ -366,6 +373,12 @@ export interface CommentSnapshot {
     readonly activeComment?: string | null;
     readonly commentAuthor?: string | null;
     readonly comments?: readonly CommentThread[] | null;
+}
+
+// @public
+export interface CommentTextRange {
+    readonly end: TextPoint;
+    readonly start: TextPoint;
 }
 
 // @public

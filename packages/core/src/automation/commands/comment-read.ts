@@ -28,6 +28,7 @@ import {
 } from '../../store/index.ts';
 import type { CommentAnchor, CommentThread, SlideComment } from '../../contracts/neutral.ts';
 import { unsignedIntId } from './package-edits.ts';
+import { rangeOfChars, shapeParagraphLengths } from './comment-text-range.ts';
 
 const OD = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
 const MS = 'http://schemas.microsoft.com/office/2018/10/relationships/';
@@ -359,18 +360,25 @@ export const canonicalIdx = (raw: string | undefined): string =>
   raw === undefined ? '' : String(unsignedIntId(raw) ?? raw);
 
 /** The `a16:creationId` and `p:cNvPr/@id` of every drawing element of a slide, by node id. */
-function shapeKeys(root: Element | undefined): {
+function shapeKeys(
+  root: Element | undefined,
+  slideNumber: number | undefined
+): {
   byCreation: Map<string, string>;
   byId: Map<string, string>;
+  nodes: Map<string, Element>;
+  slideNumber: number | undefined;
 } {
   const byCreation = new Map<string, string>();
   const byId = new Map<string, string>();
+  const nodes = new Map<string, Element>();
   const walk = (el: Element, depth: number): void => {
     if (depth > MAX_DEPTH) return;
     for (const c of elements(el)) {
       const nv = elements(c).find((e) => e.ns === NS.p && e.local.startsWith('nv'));
       const cNvPr = child(nv, 'p:cNvPr');
       if (cNvPr) {
+        nodes.set(c.id, c);
         const id = attr(cNvPr, 'id');
         if (id !== undefined && !byId.has(id)) byId.set(id, c.id);
         const creation = attr(descendant(cNvPr, NS.a16, 'creationId', 3), 'id')?.toUpperCase();
@@ -380,22 +388,30 @@ function shapeKeys(root: Element | undefined): {
     }
   };
   if (root) walk(root, 0);
-  return { byCreation, byId };
+  return { byCreation, byId, nodes, slideNumber };
 }
 
-/** The anchor of a threaded comment: an element moniker, a position, or the slide. */
+/**
+ * The anchor of a threaded comment: a text moniker, an element moniker, a position, or the
+ * slide. A text moniker whose range has no text left points at its element.
+ */
 function modernAnchor(cm: Element, keys: ReturnType<typeof shapeKeys>): CommentAnchor {
   for (const list of elements(cm)) {
     if (!list.local.endsWith('MkLst')) continue;
-    // The innermost moniker of a drawing element names it by creation id and drawing id.
+    // The innermost moniker of a drawing element names it by creation id and drawing id. A
+    // text moniker (`ac:txMk`) after it names a range of the element's text.
     const marks = elements(list).filter((m) => m.ns === COMMENTS.ac && m.local.endsWith('Mk'));
+    const text = marks[marks.length - 1]?.local === 'txMk' ? marks.pop() : undefined;
     const mark = marks[marks.length - 1];
     if (!mark) continue;
     const creation = attr(mark, 'creationId')?.toUpperCase();
     const node =
       (creation ? keys.byCreation.get(creation) : undefined) ??
       (attr(mark, 'id') !== undefined ? keys.byId.get(attr(mark, 'id')!) : undefined);
-    if (node) return { kind: 'shape', nodeId: node };
+    if (!node) continue;
+    const lengths = text && shapeParagraphLengths(keys.nodes.get(node), keys.slideNumber);
+    const range = lengths && rangeOfChars(lengths, attr(text, 'cp'), attr(text, 'len'));
+    return range ? { kind: 'text', nodeId: node, ...range } : { kind: 'shape', nodeId: node };
   }
   return pointOf(child(cm, { ns: COMMENTS.p188, local: 'pos' }), 1);
 }
@@ -435,6 +451,40 @@ export const modernText = (el: Element): string =>
   bodyText(child(el, { ns: COMMENTS.p188, local: 'txBody' }));
 
 /** The threads and replies the reader shows: a thread with an id, a reply with an id. */
+/**
+ * The author names of the comments of `legacy` and `modern` comment lists, in the reader's order:
+ * the legacy lists, then the threaded lists, each thread before its replies. Unnamed authors are
+ * left out.
+ */
+export function commentListAuthors(
+  pkg: PptxPackage,
+  legacy: readonly string[],
+  modern: readonly string[]
+): string[] {
+  const out: string[] = [];
+  if (legacy.length > 0) {
+    const authors = legacyAuthors(pkg);
+    for (const part of legacy) {
+      const root = commentTree(pkg, part)?.root;
+      if (root?.ns !== NS.p || root.local !== 'cmLst') continue;
+      for (const cm of elements(root)) {
+        if (cm.ns !== NS.p || cm.local !== 'cm') continue;
+        const name = authors.get(canonicalAuthor(attr(cm, 'authorId')))?.name;
+        if (name) out.push(name);
+      }
+    }
+  }
+  if (modern.length > 0) {
+    const authors = modernAuthors(pkg);
+    for (const part of modern)
+      eachModern(commentTree(pkg, part)?.root, (el) => {
+        const name = authors.get(attr(el, 'authorId')?.toUpperCase() ?? '')?.name;
+        if (name) out.push(name);
+      });
+  }
+  return out;
+}
+
 function eachModern(root: Element | undefined, visit: (el: Element) => void): void {
   if (root?.ns !== COMMENTS.p188 || root.local !== 'cmLst') return;
   for (const cm of elements(root)) {
@@ -641,7 +691,8 @@ function textOfPlain(el: Element | undefined): string {
 export function readSlideComments(pkg: PptxPackage, slidePart: string): CommentThread[] {
   const { legacy, modern } = slideCommentParts(pkg, slidePart);
   if (legacy.length === 0 && modern.length === 0) return [];
-  const keys = shapeKeys(xmlPartOf(pkg, slidePart)?.root);
+  const index = presentationInfo(pkg).slides.findIndex((s) => s.partName === slidePart);
+  const keys = shapeKeys(xmlPartOf(pkg, slidePart)?.root, index < 0 ? undefined : index + 1);
   const count: GuidCount = {
     uses: new Map(),
     twins: new Map(),

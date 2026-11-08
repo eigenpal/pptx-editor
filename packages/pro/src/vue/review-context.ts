@@ -21,11 +21,11 @@ import {
   type Ref,
 } from 'vue';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
-import { useTranslation } from '@pptx-editor.dev/vue';
+import { useReviewAuthors, useTranslation } from '@pptx-editor.dev/vue';
 import {
-  reviewAuthorInfo,
   reviewActions,
   type ReviewAuthorInfo,
+  type ReviewAuthorMap,
   type ReviewCommentTarget,
   type ReviewItemView,
 } from '../review/comment-view.ts';
@@ -39,6 +39,8 @@ export interface ReviewPaneValue {
   /** The review, with `items` narrowed by the pane's `filter`. */
   readonly review: UseReviewReturn;
   readonly byId: ComputedRef<ReadonlyMap<string, ReviewItemView>>;
+  /** The editor's review roster by author (`getReviewAuthors`): the colors of the cards. */
+  readonly authors: ComputedRef<ReviewAuthorMap>;
   readonly drafting: Ref<boolean>;
   /**
    * The element a draft from the canvas menus' New comment row points at, or null: the draft then
@@ -86,15 +88,17 @@ export function useReviewItem(): UseReviewItemReturn {
 export type UseReviewAuthorReturn = ComputedRef<ReviewAuthorInfo | undefined>;
 
 /**
- * The look of one comment author: the color slot and the CSS color of the canvas marker and the
- * packaged cards, or `undefined` without an author. Takes a ref or a getter. @public
+ * The look of one comment author, from the editor's review roster (`getReviewAuthors`): the
+ * slot and the CSS color of the thread's marker, band, ring, and card, or `undefined` without
+ * an author or for an author the roster does not hold. Takes a ref or a getter. @public
  */
 export function useReviewAuthor(
   author: MaybeRefOrGetter<string | undefined>
 ): UseReviewAuthorReturn {
+  const roster = useReviewAuthors();
   return computed(() => {
     const name = toValue(author);
-    return name ? reviewAuthorInfo(name) : undefined;
+    return name ? roster.value.find((info) => info.author === name) : undefined;
   });
 }
 
@@ -112,6 +116,7 @@ const INERT_PANE: ReviewPaneValue = {
     ready: computed(() => false),
   },
   byId: computed(() => new Map()),
+  authors: computed(() => new Map()),
   drafting: shallowRef(false),
   draftTarget: shallowRef(null),
   beginDraft: () => {},

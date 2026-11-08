@@ -114,8 +114,8 @@ export const ReviewCard = markPart(
           'data-comment-id': item.id,
           ...(item.isActive ? { 'data-active': '', 'aria-current': 'true' as const } : {}),
           ...(item.resolved ? { 'data-resolved': '' } : {}),
-          ...authorHooks(item.author),
-          style: authorStyle(item.author),
+          ...authorHooks(item.author, pane.authors.value),
+          style: authorStyle(item.author, pane.authors.value),
           role: 'group' as const,
           'aria-label': t('comments.thread', {
             author: item.author || t('comments.unknownAuthor'),
@@ -296,7 +296,7 @@ export const ReviewReplies = markPart(
     name: 'ReviewReplies',
     props: partProps,
     setup(props) {
-      const { byId } = usePane();
+      const { byId, authors } = usePane();
       const entry = useReviewItem();
       const t = useReviewLabel();
       return () => {
@@ -320,8 +320,8 @@ export const ReviewReplies = markPart(
                     <li
                       class="pptx-review__reply"
                       data-reply-id={reply.id}
-                      {...authorHooks(reply.author)}
-                      style={authorStyle(reply.author)}
+                      {...authorHooks(reply.author, authors.value)}
+                      style={authorStyle(reply.author, authors.value)}
                     >
                       <div class="pptx-review__head">
                         <ReviewAvatar />

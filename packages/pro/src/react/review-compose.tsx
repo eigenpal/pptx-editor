@@ -166,7 +166,7 @@ ReviewAddComment.pptxReviewPart = 'AddComment' as const;
  * the slide; the box names the element. Without an author, it says so and Comment is off. @public
  */
 export function ReviewDraft({ className, hidden, nodeId }: ReviewDraftProps) {
-  const { drafting, draftTarget, endDraft, review } = usePane();
+  const { drafting, draftTarget, endDraft, review, authors } = usePane();
   const editor = usePptxEditor();
   const t = useReviewLabel();
   const [text, setText] = useState('');
@@ -177,13 +177,15 @@ export function ReviewDraft({ className, hidden, nodeId }: ReviewDraftProps) {
   const author = review.author ?? '';
   // `nodeId`, else the element of a draft from a menu, else the selected element.
   const pinned = nodeId ?? draftTarget?.nodeId;
+  // A draft from a menu keeps the text that was selected when it opened.
+  const pinnedRange = !nodeId && draftTarget?.range ? { range: draftTarget.range } : {};
   const target = nodeId ? null : (draftTarget ?? review.commentTarget);
   const blocked = review.author === null;
   const empty = text.trim() === '';
   const post = (): void => {
     if (empty || blocked || review.readOnly) return;
     const refused = refusalOf(editor, () =>
-      review.comment(text, undefined, pinned ? { nodeId: pinned } : undefined)
+      review.comment(text, undefined, pinned ? { nodeId: pinned, ...pinnedRange } : undefined)
     );
     if (refused === null) {
       setText('');
@@ -200,8 +202,8 @@ export function ReviewDraft({ className, hidden, nodeId }: ReviewDraftProps) {
     <div
       className={cx('pptx-review__card', className)}
       data-draft=""
-      {...authorHooks(author)}
-      style={authorStyle(author)}
+      {...authorHooks(author, authors)}
+      style={authorStyle(author, authors)}
     >
       <form
         className="pptx-review__compose"
@@ -252,7 +254,7 @@ ReviewDraft.pptxReviewPart = 'Draft' as const;
  * text, and a round send button. Not on a resolved thread or in view mode. @public
  */
 export function ReviewReply({ className, hidden, children }: ReviewPartProps) {
-  const { review } = usePane();
+  const { review, authors } = usePane();
   const editor = usePptxEditor();
   const entry = useContext(ReviewItemContext);
   const t = useReviewLabel();
@@ -313,8 +315,8 @@ export function ReviewReply({ className, hidden, children }: ReviewPartProps) {
         <span
           className="pptx-review__avatar pptx-review__reply-avatar"
           aria-hidden="true"
-          {...authorHooks(author)}
-          style={authorStyle(author)}
+          {...authorHooks(author, authors)}
+          style={authorStyle(author, authors)}
         >
           {commentInitials({ initials: '', author })}
         </span>

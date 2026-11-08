@@ -8,11 +8,13 @@ import { CommentAnchor } from '@pptx-editor.dev/core/editor';
 import { CommentExpect } from '@pptx-editor.dev/core/editor';
 import { CommentFormat } from '@pptx-editor.dev/core/editor';
 import { CommentMarkerStyle } from '@pptx-editor.dev/core/editor';
+import { CommentTextRange } from '@pptx-editor.dev/core/editor';
 import { ComputedRef } from 'vue';
 import { DefineComponent } from 'vue';
 import { EditorModule } from '@pptx-editor.dev/core/editor';
 import { MaybeRefOrGetter } from 'vue';
 import { PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import { ReviewAuthorInfo } from '@pptx-editor.dev/core/editor';
 import { ReviewDisplayMode } from '@pptx-editor.dev/core/editor';
 import { ReviewPaneOpening } from '@pptx-editor.dev/core/editor';
 import { ReviewPaneOptions } from '@pptx-editor.dev/core/editor';
@@ -59,13 +61,7 @@ export interface ReviewActivationOptions {
     readonly identity?: string;
 }
 
-// @public
-export interface ReviewAuthorInfo {
-    // (undocumented)
-    readonly author: string;
-    readonly color: string;
-    readonly slot: number;
-}
+export { ReviewAuthorInfo }
 
 // @public
 export interface ReviewCommentTarget {
@@ -73,6 +69,7 @@ export interface ReviewCommentTarget {
     readonly name: string;
     // (undocumented)
     readonly nodeId: string;
+    readonly range?: CommentTextRange;
 }
 
 // @public
@@ -162,6 +159,7 @@ export interface UseReviewReturn {
     readonly author: ComputedRef<string | null>;
     readonly comment: (text: string, author?: string, target?: {
         readonly nodeId: string;
+        readonly range?: CommentTextRange;
     }) => boolean;
     readonly commentTarget: ComputedRef<ReviewCommentTarget | null>;
     readonly edit: (item: ReviewItemView, text: string) => boolean;
