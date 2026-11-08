@@ -8,6 +8,11 @@
 //   the second the bottom. The ink bounds of the pair's lines stretch to fill the band between
 //   the two paths, by arc length across and linearly between them. The insets, the anchor, and
 //   the font size do not change the result.
+// - With more than one pair, each pair's ink bounds grow about their center to the widest and
+//   the tallest ink bounds of all pairs (`textDeflateInflate`: "Lower" has no descender, so its
+//   bounds grow to those of "Upper"). Every pair keeps one text size.
+// - Not matched: on `textStop` the reference text along the top path is about 2 % narrower
+//   than along the bottom path, measured from the left. Here both paths take the same width.
 // - An odd number of paths (`textArchUp`, `textCircle`, `textButton`) makes each path a line of
 //   text at its own size, aligned along the path as the paragraph aligns. The baseline of the
 //   line nearest the shape's middle is 0.164 em below the path; the other lines stack away from
@@ -396,11 +401,22 @@ export function warpTextLayout(
       if (li >= Math.ceil((g * lines.length) / groups)) return g;
     return 0;
   };
+  const owned = Array.from({ length: groups }, (_, g) =>
+    shapes.filter((s) => groupOf(s.line) === g && s.kind !== 'highlight')
+  );
+  // Each pair stretches the ink bounds of its lines, grown about their center to the widest and
+  // the tallest ink bounds of all pairs, so the pairs keep one text size.
+  const inks = pairs ? owned.map(inkBounds) : [];
+  let [widest, tallest] = [0, 0];
+  for (const ink of inks)
+    if (ink)
+      [widest, tallest] = [Math.max(widest, ink[2] - ink[0]), Math.max(tallest, ink[3] - ink[1])];
   const maps = new Map<number, WarpMap>();
   for (let g = 0; g < groups; g += 1) {
-    const own = shapes.filter((s) => groupOf(s.line) === g && s.kind !== 'highlight');
+    const own = owned[g]!;
+    const ink = inks[g];
     const map = pairs
-      ? pairMap(own, tracks[2 * g]!, tracks[2 * g + 1]!)
+      ? ink && pairMap(grow(ink, widest, tallest), tracks[2 * g]!, tracks[2 * g + 1]!)
       : pathMap(
           layout,
           body,
@@ -473,11 +489,23 @@ function inkBounds(shapes: readonly Shape[]): [number, number, number, number] |
   return x1 > x0 && y1 > y0 ? [x0, y0, x1, y1] : null;
 }
 
-/** The map of a pair of paths: the ink bounds stretch between the top and the bottom path. */
-function pairMap(shapes: readonly Shape[], top: Track, bottom: Track): WarpMap | null {
-  const ink = inkBounds(shapes);
-  if (!ink) return null;
-  const [x0, y0, x1, y1] = ink;
+/** Bounds grown about their center to at least `w` wide and `h` tall. */
+function grow(
+  [x0, y0, x1, y1]: readonly [number, number, number, number],
+  w: number,
+  h: number
+): [number, number, number, number] {
+  const dx = Math.max(0, w - (x1 - x0)) / 2;
+  const dy = Math.max(0, h - (y1 - y0)) / 2;
+  return [x0 - dx, y0 - dy, x1 + dx, y1 + dy];
+}
+
+/** The map of a pair of paths: the bounds stretch between the top and the bottom path. */
+function pairMap(
+  [x0, y0, x1, y1]: readonly [number, number, number, number],
+  top: Track,
+  bottom: Track
+): WarpMap {
   return ([x, y]) => {
     const u = (x - x0) / (x1 - x0);
     const v = (y - y0) / (y1 - y0);

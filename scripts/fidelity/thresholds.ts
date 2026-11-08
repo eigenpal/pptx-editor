@@ -243,7 +243,6 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'rtl-text/3': ['pixels'],
     'rtl-text/4': ['pixels'],
     'text-direction/1': ['pixels', 'extra-text'],
-    'text-warp/3': ['pixels'],
     'three-d-effects/1': ['pixels'],
     'three-d-effects/2': ['pixels'],
     'three-d-effects/3': ['pixels'],
