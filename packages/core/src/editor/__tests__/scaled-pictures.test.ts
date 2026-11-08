@@ -291,6 +291,48 @@ test('a picture draws at its last scaled size while a new size scales', async ()
   expect(scaled.shown(picture, 0.5, SLIDE)?.picture.bytes).toBe(first);
 });
 
+test('one picture on many parts scales once for each size, and each part keeps its size', async () => {
+  let scales = 0;
+  const sources = Array.from({ length: 6 }, (_, i) => `/ppt/slides/slide${i + 1}.xml`);
+  const factors = sources.map((_, i) => 0.3 + i * 0.1);
+  const picture: DrawablePicture = { bytes: png(4000, 4000), mime: 'image/png' };
+  const seen = new Map<string, string>();
+  const wrong: string[] = [];
+  // Each repaint paints the parts whose pictures changed, as the surface and thumbnails do.
+  const repaint = () => {
+    sources.forEach((source, i) => {
+      const serial = scaled.serialOf(source);
+      if (seen.get(source) === serial) return;
+      seen.set(source, serial);
+      const shown = scaled.shown(picture, factors[i]!, source);
+      const side = Math.floor(4000 * factors[i]!);
+      if (serial && shown?.key !== `${side}x${side}`) wrong.push(`${source} ${shown?.key}`);
+    });
+  };
+  const scaled: ScaledPictures = new ScaledPictures(
+    repaint,
+    async () => {
+      scales += 1;
+      await wait(5);
+      return new Uint8Array([scales]);
+    },
+    () => true
+  );
+  repaint();
+  for (let i = 0; i < 100 && (scaled.busy || scales < 6); i += 1) await wait(20);
+  await wait(50);
+  expect(scales).toBe(6);
+  expect(wrong).toEqual([]);
+  expect(scaled.busy).toBe(false);
+  // Every part still draws its own size, with no new work.
+  sources.forEach((source, i) => {
+    const side = Math.floor(4000 * factors[i]!);
+    expect(scaled.shown(picture, factors[i]!, source)?.key).toBe(`${side}x${side}`);
+  });
+  expect(scales).toBe(6);
+  scaled.dispose();
+});
+
 test('pictures keep their URLs when a picture is inserted, and old sizes are revoked', async () => {
   globals.createImageBitmap = async () => ({ close() {} });
   let serial = 0;

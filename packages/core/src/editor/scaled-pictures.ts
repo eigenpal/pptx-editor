@@ -168,6 +168,11 @@ export class ScaledPictures {
   #serials = new Map<string, number>();
   /** The size key of the last scaled bytes of each picture: they draw while another size scales. */
   #latest = new WeakMap<Uint8Array, string>();
+  /**
+   * For each picture, the size each part that shows it asks for (`want`) and the size it drew
+   * last (`drawn`). A size that no part wants or draws is dropped (`#finish`).
+   */
+  #uses = new WeakMap<Uint8Array, Map<string, { want: string; drawn?: string }>>();
   /** The factor that each part over the budget draws its pictures with (`steady`). */
   #factors = new Map<string, number>();
   #repaint: ReturnType<typeof setTimeout> | null = null;
@@ -209,14 +214,24 @@ export class ScaledPictures {
     const width = Math.max(1, Math.floor(size.width * factor));
     const height = Math.max(1, Math.floor(size.height * factor));
     const key = `${width}x${height}`;
-    const done = this.#done.get(picture.bytes)?.get(key);
-    if (done) return { picture: { bytes: done, mime: picture.mime }, key };
+    let uses = this.#uses.get(picture.bytes);
+    if (!uses) this.#uses.set(picture.bytes, (uses = new Map()));
+    const use = uses.get(source) ?? { want: key };
+    use.want = key;
+    uses.set(source, use);
+    const sizes = this.#done.get(picture.bytes);
+    const done = sizes?.get(key);
+    if (done) {
+      use.drawn = key;
+      return { picture: { bytes: done, mime: picture.mime }, key };
+    }
     if (done === null || this.#disposed) return undefined;
-    const latest = this.#latest.get(picture.bytes);
-    const last = latest === undefined ? undefined : this.#done.get(picture.bytes)?.get(latest);
-    const before = last
-      ? { picture: { bytes: last, mime: picture.mime }, key: latest! }
+    // Meanwhile: the size this part drew last, else the last size of the picture that is ready.
+    const fallback = [use.drawn, this.#latest.get(picture.bytes)].find((k) => k && sizes?.get(k));
+    const before = fallback
+      ? { picture: { bytes: sizes!.get(fallback)!, mime: picture.mime }, key: fallback }
       : undefined;
+    if (before) use.drawn = before.key;
     let pending = this.#pending.get(picture.bytes);
     if (!pending) this.#pending.set(picture.bytes, (pending = new Map()));
     const job = pending.get(key);
@@ -271,9 +286,13 @@ export class ScaledPictures {
     if (!done) this.#done.set(job.picture.bytes, (done = new Map()));
     done.set(job.key, bytes);
     if (bytes) {
-      // Keep this size and the one before it: other sizes are no longer drawn.
-      const before = this.#latest.get(job.picture.bytes);
-      for (const key of done.keys()) if (key !== job.key && key !== before) done.delete(key);
+      // Keep the sizes that a part wants or drew last: no part draws the others any more.
+      const kept = new Set([job.key]);
+      for (const use of this.#uses.get(job.picture.bytes)?.values() ?? []) {
+        kept.add(use.want);
+        if (use.drawn) kept.add(use.drawn);
+      }
+      for (const key of done.keys()) if (!kept.has(key)) done.delete(key);
       this.#latest.set(job.picture.bytes, job.key);
     }
     this.#pending.get(job.picture.bytes)?.delete(job.key);
