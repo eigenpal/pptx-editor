@@ -39,7 +39,7 @@ import { guideElements, SNAP_PX } from './surface-guides.ts';
 import { cropAt, cropOverlay, onCropImage, startCropDrag } from './surface-crop.ts';
 import type { CropDrag, CropHandle } from './surface-crop.ts';
 import { withHalos } from './surface-halo.ts';
-import { hitItem, inText, onBorder } from './surface-hit.ts';
+import { hitItem, inMultiple, inText, onBorder } from './surface-hit.ts';
 import { diagramPress } from './surface-diagram.ts';
 import { CaretScroll, fitZoom, outsideVeil } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
@@ -627,7 +627,9 @@ export class SlideSurface {
     const group = inScope ? scope : undefined;
     // A table: a caret in the cell, a cell range, or a grid line drag (surface-table.ts).
     // Shift+click on a table adds it to a shape selection, as Shift+click on any shape does.
-    const addShape = e.shiftKey && sel.kind === 'shapes';
+    // A press on a shape of a multiple selection moves the whole selection, also on its text.
+    const moveAll = !e.shiftKey && !!id && inMultiple(sel, id, group);
+    const addShape = (e.shiftKey && sel.kind === 'shapes') || moveAll;
     // The format painter paints a cell's word or a cell range, as on a text box.
     const table = id && !addShape ? this.#table.down(layout, id, p, e.shiftKey, painting) : null;
     if (table) {
@@ -667,7 +669,7 @@ export class SlideSurface {
     }
     // A click on a shape's text places the caret there; its border moves it. A viewer's click
     // places it only in linked text, where the link panel then opens; it edits nothing.
-    const textItem = id && !e.shiftKey ? itemById(layout, id) : undefined;
+    const textItem = id && !e.shiftKey && !moveAll ? itemById(layout, id) : undefined;
     const at = textItem && this.#inText(textItem, p) ? pointAt(textItem, p.x, p.y) : undefined;
     const caret =
       at && textItem && (!this.editor.readOnly() || linkedAt(textItem, at)) ? at : undefined;
@@ -763,12 +765,13 @@ export class SlideSurface {
     }
     const id = (scope ? this.#hit(p, scope) : undefined) ?? this.#hit(p);
     const item = id ? itemById(layout, id) : undefined;
-    const table = id && layout ? this.#table.cursor(layout, id, p) : undefined;
+    const moveAll = !!id && !this.editor.readOnly() && inMultiple(sel, id, scope);
+    const table = id && layout && !moveAll ? this.#table.cursor(layout, id, p) : undefined;
     const cursor = table
       ? table
       : !item
         ? ''
-        : !this.editor.readOnly() && this.#inText(item, p)
+        : !moveAll && !this.editor.readOnly() && this.#inText(item, p)
           ? 'text'
           : this.editor.readOnly()
             ? this.#onLink(item, p)

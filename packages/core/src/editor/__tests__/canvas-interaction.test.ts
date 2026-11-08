@@ -469,6 +469,30 @@ describe('the surface', () => {
     e.destroy();
   });
 
+  test('a drag from the text of one shape in a multiple selection moves all shapes', async () => {
+    const { e, press, move, release } = await attached();
+    // happy-dom lays out a small slide, where a smart guide would snap the half inch back.
+    e.exec({ type: 'toggleSmartGuides' });
+    const ids = [idOf(e, 'T'), idOf(e, 'B')];
+    const xOf = (id: string) =>
+      e.session!.layout(0)!.items.find((i) => i.element.nodeId === id)!.element.xfrm.x;
+    const before = ids.map(xOf);
+    e.setSelection({ kind: 'shapes', nodeIds: ids });
+    // A press on the text of T, which places the caret when T is the only selected shape.
+    const c = caretAt(textItem(e), caret(0, 3))!;
+    const y = (c.y1 + c.y2) / 2;
+    press(c.x1, y);
+    move(c.x1 + IN / 2, y);
+    release();
+    expect(e.snapshot().selection).toEqual({ kind: 'shapes', nodeIds: ids });
+    expect(ids.map(xOf)).toEqual(before.map((x) => x + IN / 2));
+    // A click with no drag keeps the selection.
+    press(c.x1 + IN / 2, y);
+    release();
+    expect(e.snapshot().selection).toEqual({ kind: 'shapes', nodeIds: ids });
+    e.destroy();
+  });
+
   test('a triple-click selects the paragraph under the pointer', async () => {
     const { e, press, release } = await attached();
     const id = idOf(e, 'T');
