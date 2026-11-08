@@ -16,12 +16,18 @@ function holdsUncopiedFrame(editor: Editor, slide: number, ids: readonly string[
     (item.children ?? []).some(frameIn);
   // A chosen shape at any depth: a chart picked inside a group (`selection.group`) counts.
   const chosenFrame = (item: LayoutItemLike): boolean =>
-    (chosen.has(item.element.nodeId) && frameIn(item)) || (item.children ?? []).some(chosenFrame);
+    (item.element.layer === 'slide' && chosen.has(item.element.nodeId) && frameIn(item)) ||
+    (item.children ?? []).some(chosenFrame);
   return (session?.layout(slide)?.items ?? []).some(chosenFrame);
 }
 
 interface LayoutItemLike {
-  readonly element: { readonly nodeId: string; readonly kind: string; readonly frameKind?: string };
+  readonly element: {
+    readonly nodeId: string;
+    readonly kind: string;
+    readonly frameKind?: string;
+    readonly layer?: string;
+  };
   readonly children?: readonly LayoutItemLike[];
 }
 

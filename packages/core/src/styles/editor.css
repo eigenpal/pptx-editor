@@ -1957,7 +1957,9 @@
 .pptx-surface__stage [data-layer='slide'] {
   cursor: inherit;
 }
-/* While the format painter is on, the whole slide shows its brush (surface.ts). */
+/* While the format painter is on, the whole slide and the canvas around it show its brush
+   (surface.ts). The stage sets its own cursor, so the canvas rule stops at the slide. */
+.pptx-surface--painting,
 .pptx-surface--painting .pptx-surface__hit,
 .pptx-surface--painting .pptx-surface__stage .pptx-surface__slide {
   cursor: var(--doc-cursor-format-paint);

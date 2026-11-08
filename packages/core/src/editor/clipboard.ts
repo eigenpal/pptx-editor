@@ -316,7 +316,10 @@ export function copySelection(
   selected: { readonly nodeIds: readonly string[]; readonly group?: string },
   document: string
 ): ClipboardPayload | null {
-  const order = scopeItems(items, selected.group).map((i) => i.element.nodeId);
+  // Slide shapes only: a layout or master shape can reuse a slide shape's node id.
+  const order = scopeItems(items, selected.group)
+    .filter((i) => i.element.layer === 'slide')
+    .map((i) => i.element.nodeId);
   const ids = [...selected.nodeIds].sort((a, b) => order.indexOf(a) - order.indexOf(b));
   const batch = new OpBatch(pkg);
   try {

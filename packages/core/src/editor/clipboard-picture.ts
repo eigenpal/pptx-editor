@@ -94,11 +94,13 @@ export function pngResolution(bytes: Uint8Array): number | undefined {
   return undefined;
 }
 
-/** The selected top-level shapes, in z-order, or none for another selection. */
-function selectedItems(lay: SlideLayout, selection: EditorSelection): LayoutItem[] {
+/** The selected top-level shapes, in z-order, or none for another selection. @internal */
+export function selectedItems(lay: SlideLayout, selection: EditorSelection): LayoutItem[] {
   if (selection.kind !== 'shapes' || selection.group) return [];
   const ids = new Set(selection.nodeIds);
-  return scopeItems(lay.items, undefined).filter((i) => ids.has(i.element.nodeId));
+  return scopeItems(lay.items, undefined).filter(
+    (i) => i.element.layer === 'slide' && ids.has(i.element.nodeId)
+  );
 }
 
 /** Draw the selected shapes as a PNG. Null when there is nothing to draw. */

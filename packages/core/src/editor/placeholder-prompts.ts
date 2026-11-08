@@ -201,10 +201,12 @@ export function withPrompts(
   const resolved = resolveSlide(batch.pkg, index);
   if (!resolved) return undefined;
   const byId = new Map<string, LayoutItem>();
+  // Only slide placeholders take a prompt: a layout or master shape can reuse their node ids.
   for (const item of layoutSlide(resolved, measurer).items)
-    if (prompted.has(item.element.nodeId)) byId.set(item.element.nodeId, item);
+    if (item.element.layer === 'slide' && prompted.has(item.element.nodeId))
+      byId.set(item.element.nodeId, item);
   const items = layout.items.map((item) => {
-    const p = byId.get(item.element.nodeId);
+    const p = item.element.layer === 'slide' ? byId.get(item.element.nodeId) : undefined;
     if (item.kind !== 'shape' || p?.kind !== 'shape' || !p.text) return item;
     return { ...item, text: p.text, ...(p.textMatrix ? { textMatrix: p.textMatrix } : {}) };
   });

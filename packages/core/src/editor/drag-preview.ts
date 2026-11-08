@@ -147,12 +147,18 @@ function laidOut(d: Drag, item: LayoutItem, box: Xfrm, relayout?: Relayout): Lay
   return item.table ? resizedTable(item, box, relayout) : relayout(item, box);
 }
 
+/**
+ * Whether an item is a slide shape. Node ids are unique in one part only, so a layout or
+ * master shape can have the node id of a dragged slide shape.
+ */
+const slideShape = (item: LayoutItem): boolean => item.element.layer === 'slide';
+
 /** The layout the overlay draws while a drag previews: each dragged shape at its new box. */
 export function previewLayout(layout: SlideLayout, d: Drag): SlideLayout {
   if (d.shown.size === 0) return layout;
   const map = (items: readonly LayoutItem[]): LayoutItem[] =>
     items.map((item) => {
-      const shown = d.shown.get(item.element.nodeId);
+      const shown = slideShape(item) ? d.shown.get(item.element.nodeId) : undefined;
       if (shown) return shown;
       return item.kind === 'group'
         ? ({ ...item, children: map(item.children) } as LayoutItem)
@@ -168,7 +174,7 @@ function pruned(
 ): LayoutItem[] {
   const out: LayoutItem[] = [];
   for (const item of items) {
-    const at = shown.get(item.element.nodeId);
+    const at = slideShape(item) ? shown.get(item.element.nodeId) : undefined;
     if (at) out.push(at);
     else if (item.kind === 'group') {
       const children = pruned(item.children, shown);
@@ -251,6 +257,8 @@ function byNodeId(root: Element, ids: ReadonlyMap<string, unknown>): Map<string,
   const out = new Map<string, Element>();
   for (const el of root.querySelectorAll('[data-node-id]')) {
     const id = el.getAttribute('data-node-id') ?? '';
+    // A layout or master shape can have the node id of a slide shape (`slideShape`).
+    if (el.getAttribute('data-layer') !== 'slide') continue;
     if (ids.has(id) && !out.has(id)) out.set(id, el);
   }
   return out;

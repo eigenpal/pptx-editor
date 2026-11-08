@@ -51,6 +51,30 @@ Moving, nudging, aligning, or resizing several selected shapes SHALL be one undo
 - **WHEN** three shapes are selected and dragged
 - **THEN** all three move by the same distance, and one undo restores all three
 
+### Requirement: Canvas selection
+
+Node ids are unique in one part only. A layout or master shape can have the node id of a slide shape. A press SHALL select the slide shape under the pointer. Selections, commands, and selection marks SHALL name slide shapes only. The canvas around the slide SHALL act as empty slide area. A drag there SHALL select the slide shapes that it encloses. A click there SHALL clear the selection. A right-click there SHALL open the slide menu. When several shapes are selected, the outline of each shape SHALL paint over the common box.
+
+#### Scenario: A slide shape shares its id with a layout shape
+
+- **WHEN** a user clicks a slide title whose node id is also the node id of a layout header
+- **THEN** the title is selected, and its outline is on the title's box
+
+#### Scenario: Drag from outside the slide
+
+- **WHEN** a user drags from the canvas above and left of the slide across two shapes
+- **THEN** the two shapes are selected
+
+#### Scenario: Click or right-click outside the slide
+
+- **WHEN** a shape is selected and a user clicks or right-clicks the canvas around the slide
+- **THEN** the selection clears, and a right-click opens the slide menu
+
+#### Scenario: A selected shape is removed
+
+- **WHEN** a collaborator removes a selected slide shape whose node id is also the node id of a layout shape
+- **THEN** the selection clears, and no mark shows on the layout shape
+
 ### Requirement: Shape drags write once
 
 A pointer drag that moves, resizes, or rotates shapes, or moves a line end, SHALL change the deck once, on release. While the pointer moves, the editor SHALL show a preview and SHALL NOT write to the store.

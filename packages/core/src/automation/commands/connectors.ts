@@ -365,6 +365,8 @@ export function followingConnectors(
   };
   const out: TransformItem[] = [];
   for (const item of flat) {
+    // A layout or master connector never follows: its node id can name another slide shape.
+    if (item.element.layer !== 'slide') continue;
     if (!isConnector(item) || item.kind !== 'shape' || byNode.has(item.element.nodeId)) continue;
     const c = item.element.connections;
     if (!c) continue;

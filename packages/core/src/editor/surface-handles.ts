@@ -49,17 +49,6 @@ export function handleElements(
   const grid = single?.kind === 'frame' ? single.table : undefined;
   const cx = grid ? grid.width : single ? single.element.xfrm.cx : u.r - u.x;
   const cy = grid ? grid.height : single ? single.element.xfrm.cy : u.b - u.y;
-  if (!single) {
-    const box = doc.createElementNS(SVG_NS, 'rect');
-    box.setAttribute('class', 'pptx-surface__group-outline');
-    box.setAttribute('x', String(u.x));
-    box.setAttribute('y', String(u.y));
-    box.setAttribute('width', String(cx));
-    box.setAttribute('height', String(cy));
-    box.setAttribute('stroke-width', String(px));
-    box.setAttribute('stroke-dasharray', `${px * 2} ${px * 2}`);
-    parts.push(box);
-  }
   for (const handle of HANDLES) {
     if (handle === 'rot' && (!single || isTable(single))) continue;
     if ((handle === 'e' || handle === 's') && single && isTable(single)) continue;
@@ -83,6 +72,28 @@ export function handleElements(
     parts.push(node);
   }
   return parts;
+}
+
+/**
+ * The dashed common box of several selected shapes, in slide units (`px` is one CSS pixel). The
+ * surface paints it under the member outlines (`memberOutline`), so each shape's own outline
+ * stays visible where it meets the common box.
+ */
+export function commonOutline(
+  doc: Document,
+  selected: readonly LayoutItem[],
+  px: number
+): SVGRectElement {
+  const u = unionBounds(selected);
+  const box = doc.createElementNS(SVG_NS, 'rect') as SVGRectElement;
+  box.setAttribute('class', 'pptx-surface__group-outline');
+  box.setAttribute('x', String(u.x));
+  box.setAttribute('y', String(u.y));
+  box.setAttribute('width', String(u.r - u.x));
+  box.setAttribute('height', String(u.b - u.y));
+  box.setAttribute('stroke-width', String(px));
+  box.setAttribute('stroke-dasharray', `${px * 2} ${px * 2}`);
+  return box;
 }
 
 /** How far outside a shape's box the outline of one shape of several sits, in CSS pixels. */

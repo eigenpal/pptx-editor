@@ -124,9 +124,11 @@ export class NextFrame {
 }
 
 /**
- * The layer over the slide that shows the pointer's cursor. The cursor is not set on an
- * ancestor of the slide: a change there restyles every node of the slide (90 ms for a text of
- * 50,000 runs), and here it restyles one element. @internal
+ * The layer over the slide that shows the pointer's cursor. The cursor of the slide is not set
+ * on an ancestor of the slide: a change there restyles every node of the slide (90 ms for a text
+ * of 50,000 runs), and here it restyles one element. The canvas around the slide sets its own
+ * cursor only past the slide's edge, and the stage's `cursor: default` keeps it off the slide.
+ * @internal
  */
 export class CursorLayer {
   readonly element: HTMLDivElement;
