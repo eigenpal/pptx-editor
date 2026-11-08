@@ -4,17 +4,9 @@
 // another paragraph is never matched, and a keyboard that recomposes a word changes it once.
 
 import { afterAll, describe, expect, test } from 'bun:test';
-import { GlobalWindow } from 'happy-dom';
-import {
-  buildPptx,
-  cell,
-  para,
-  run,
-  shape,
-  table,
-} from '../../../../../scripts/fixtures/builder.ts';
-import { attr, child, elements, find, textOf, xmlPartOf } from '../../store/index.ts';
-import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
+import { buildPptx, cell, para, run, table } from '../../../../../scripts/fixtures/builder.ts';
+import { child, elements, find, textOf, xmlPartOf } from '../../store/index.ts';
+import { createPptxEditor } from '../index.ts';
 import {
   compositionEdit,
   contextBefore,
@@ -23,71 +15,9 @@ import {
   replacementRange,
 } from '../replacement-text.ts';
 import { COMPOSING_CLASS, dispatchBeforeInput, replacementTarget } from '../surface-input.ts';
+import { caret, doc, focusOf, IN, open, shapeId, texts, win } from './surface-text-fixture.ts';
 
-const IN = 914_400;
-const win = new GlobalWindow();
-const doc = win.document as unknown as Document;
 afterAll(() => win.happyDOM.close());
-
-async function open(text: string, options: { autoCorrect?: boolean; blankSlides?: number } = {}) {
-  const g = globalThis as { ResizeObserver?: unknown };
-  g.ResizeObserver ??= (win as unknown as { ResizeObserver: unknown }).ResizeObserver;
-  const { blankSlides = 0, ...editorOptions } = options;
-  const e = createPptxEditor({ fixedMeasurer: true, substitutes: false, ...editorOptions });
-  const first = { shapes: shape({ id: 2, name: 'T', x: IN, y: IN, cx: 6 * IN, cy: 2 * IN, text }) };
-  const blank = Array.from({ length: blankSlides }, () => ({ shapes: '' }));
-  const bytes = buildPptx({ slides: [first, ...blank] });
-  expect((await e.load(bytes)).ok).toBe(true);
-  const host = doc.createElement('div') as unknown as HTMLElement;
-  doc.body.append(host as unknown as Node);
-  e.attach(host);
-  const input = host.querySelector('textarea') as HTMLTextAreaElement;
-  const fire = (event: Event): boolean => {
-    input.dispatchEvent(event);
-    return event.defaultPrevented;
-  };
-  const beforeInput = (inputType: string, data?: string) =>
-    fire(
-      new win.InputEvent('beforeinput', {
-        inputType,
-        data,
-        bubbles: true,
-        cancelable: true,
-      }) as unknown as Event
-    );
-  /** Type through the input, one `beforeinput` for each character, as a keyboard does. */
-  const type = (text: string): void => {
-    for (const ch of text) beforeInput('insertText', ch);
-  };
-  /** The system replaces `[from, to)` of the input's text with `text`. */
-  const replace = (from: number, to: number, text: string): boolean => {
-    input.setSelectionRange(from, to);
-    return beforeInput('insertReplacementText', text);
-  };
-  return { e, input, type, replace, beforeInput, fire };
-}
-
-const shapeId = (e: PptxEditorInstance): string => {
-  const part = e.session!.info.slides[0].partName;
-  const tree = find(xmlPartOf(e.session!.store.package, part)!.root, 'p:spTree')!;
-  return elements(tree).find((c) => attr(find(c, 'p:cNvPr'), 'name') === 'T')!.id;
-};
-const texts = (e: PptxEditorInstance): string[] => {
-  const item = e.session!.layout(0)!.items.find((x) => x.kind === 'shape' && x.element.text);
-  const paragraphs = item?.kind === 'shape' ? item.element.text!.paragraphs : [];
-  return paragraphs.map((p) => p.runs.map((r) => (r.kind === 'break' ? '\n' : r.text)).join(''));
-};
-const caret = (e: PptxEditorInstance, paragraph: number, offset: number) =>
-  e.setSelection({
-    kind: 'text',
-    nodeId: shapeId(e),
-    anchor: { paragraph, offset },
-    focus: { paragraph, offset },
-  });
-const focusOf = (e: PptxEditorInstance) => {
-  const sel = e.snapshot().selection;
-  return sel.kind === 'text' ? sel.focus : null;
-};
 
 describe('the text the input holds for the system', () => {
   test('the caret paragraph before the caret, from its last line break, cut when long', () => {
@@ -863,6 +793,39 @@ describe('a composition over the text the input holds', () => {
     fire(composition('compositionend', 'abcd'));
     expect(texts(e)).toEqual(['abcd wor']);
     expect(focusOf(e)).toEqual({ paragraph: 0, offset: 4 });
+    e.destroy();
+  });
+
+  test('the rest of an ended composition, with no key first, goes to its place', async () => {
+    // The keyboard does not know of the tap yet: it composes the word on, at the new caret.
+    const backspace = await composeWord('hello world', 6, 11);
+    caret(backspace.e, 0, 3);
+    backspace.fire(composition('compositionstart'));
+    backspace.input.value = 'helworl';
+    backspace.input.setSelectionRange(7, 7);
+    backspace.fire(composition('compositionend', 'worl'));
+    expect(texts(backspace.e)).toEqual(['hello worl']);
+    expect(focusOf(backspace.e)).toEqual({ paragraph: 0, offset: 3 });
+    backspace.e.destroy();
+    // A correction that the keyboard commits after the tap.
+    const corrected = await composeWord('hello wrold', 6, 11);
+    caret(corrected.e, 0, 3);
+    corrected.beforeInput('insertText', 'world');
+    expect(texts(corrected.e)).toEqual(['hello world']);
+    corrected.e.destroy();
+  });
+
+  test('a late commit that extends the ended text replaces it once', async () => {
+    const { e, input, type, fire, beforeInput } = await open(para(''));
+    caret(e, 0, 0);
+    type('abc ');
+    fire(composition('compositionstart'));
+    input.value = 'abc にほ';
+    input.setSelectionRange(6, 6);
+    caret(e, 0, 1);
+    beforeInput('insertText', 'にほん。');
+    expect(texts(e)).toEqual(['abc にほん。']);
+    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 1 });
     e.destroy();
   });
 

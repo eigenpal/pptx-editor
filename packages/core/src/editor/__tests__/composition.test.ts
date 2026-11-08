@@ -5,29 +5,34 @@ import type { EditorSelection } from '../../contracts/index.ts';
 import {
   applyComposition,
   contextChange,
+  continues,
+  endedComposition,
   ending,
   finalEdit,
   followEdit,
   IDLE,
   partialEdit,
   placement,
+  resumed,
   startComposition,
   type CompositionHost,
 } from '../composition.ts';
 import type { ReplacementPlace, ReplacementTarget, TypingContext } from '../replacement-text.ts';
 
-const caret = (offset: number, paragraph = 0): EditorSelection => ({
+const caret = (offset: number, paragraph = 0): Extract<EditorSelection, { kind: 'text' }> => ({
   kind: 'text',
   nodeId: 'n1',
   anchor: { paragraph, offset },
   focus: { paragraph, offset },
 });
-const ctx = (text: string, revision = 1, key = 'p0'): TypingContext => ({
+const ctx = (text: string, revision = 1, key = 'p0', paragraphId = 'para-a'): TypingContext => ({
   key,
   text,
   selection: caret(text.length),
   revision,
+  paragraphId,
 });
+const expectA = (text: string) => ({ paragraph: 'para-a', text });
 
 describe('the composition state', () => {
   test('a start records the context and the input selection the system made', () => {
@@ -37,6 +42,7 @@ describe('the composition state', () => {
       place: { context: ctx('hello world'), value: 'hello world', from: 6, to: 11 },
       seen: ctx('hello world'),
       width: 80,
+      resumes: null,
     });
   });
 
@@ -47,8 +53,12 @@ describe('the composition state', () => {
     expect(contextChange(state, ctx('xabc ', 2))).toBe('follow');
     // A click: the same revision, another caret.
     expect(contextChange(state, ctx('a'))).toBe('left');
-    // Another paragraph, or no text caret (a slide change, a range).
-    expect(contextChange(state, ctx('abc ', 2, 'p1'))).toBe('left');
+    // A peer's Enter above: a new index (key), the same paragraph element.
+    expect(contextChange(state, ctx('abc ', 2, 'p1'))).toBe('follow');
+    // An edit that took the caret to another paragraph: the place is looked up again.
+    expect(contextChange(state, ctx('abc ', 2, 'p1', 'para-b'))).toBe('moved');
+    // A click into another paragraph, with no edit.
+    expect(contextChange(state, ctx('abc ', 1, 'p1', 'para-b'))).toBe('left');
     expect(contextChange(state, null)).toBe('left');
     expect(contextChange(IDLE, null)).toBe('same');
   });
@@ -64,10 +74,12 @@ describe('the composition state', () => {
 
   test('the text goes in at the caret while it is the place, else at the place', () => {
     const state = startComposition(ctx('abc '), 'abc ', 4, 4, 0);
-    expect(placement(state, ctx('abc '))).toEqual({ typed: true });
-    expect(placement(state, ctx('xabc ', 2))).toEqual({ typed: true });
-    expect(placement(state, ctx('a'))).toEqual({ at: caret(4) });
-    expect(placement(state, null)).toEqual({ at: caret(4) });
+    const expect4 = expectA('abc ');
+    expect(placement(state, ctx('abc '))).toEqual({ typed: true, expect: expect4 });
+    // An edit that sync has not followed yet: the place, checked by its paragraph and text.
+    expect(placement(state, ctx('xabc ', 2))).toEqual({ at: caret(4), expect: expect4 });
+    expect(placement(state, ctx('a'))).toEqual({ at: caret(4), expect: expect4 });
+    expect(placement(state, null)).toEqual({ at: caret(4), expect: expect4 });
     expect(placement(startComposition(null, '', 0, 0, 0), null)).toBeNull();
     expect(placement(IDLE, null)).toBeNull();
   });
@@ -134,10 +146,19 @@ describe('applyComposition', () => {
     expect(calls).toEqual([[insert.target, 'にほ', { at: caret(4) }]]);
   });
 
-  test('added text whose place is gone goes to the start of its paragraph', () => {
+  test('added text whose place is gone goes to the start of its own paragraph', () => {
     const { host, calls } = fake([false, true]);
-    expect(applyComposition(host, { at: caret(9, 2) }, insert)).toBe(true);
-    expect(calls[1]).toEqual([insert.target, 'にほ', { at: caret(0, 2) }]);
+    const where = { at: caret(9, 2), expect: expectA('abc ') };
+    expect(applyComposition(host, where, insert)).toBe(true);
+    // The paragraph by its element id: never the paragraph that now has its index.
+    const start = { at: caret(0, 2), expect: expectA('') };
+    expect(calls[1]).toEqual([{ ...insert.target, paragraph: null }, 'にほ', start]);
+  });
+
+  test('a place with no paragraph id gets no fallback', () => {
+    const { host, calls } = fake([false]);
+    expect(applyComposition(host, { at: caret(9, 2) }, insert)).toBe(false);
+    expect(calls).toHaveLength(1);
   });
 
   test('a changed word whose place is gone is refused, and nothing else changes', () => {
@@ -157,5 +178,48 @@ describe('applyComposition', () => {
     const none = { target: { ...insert.target }, text: '' };
     expect(applyComposition(host, null, none)).toBe(true);
     expect(calls).toEqual([]);
+  });
+});
+
+describe('the rest of an ended composition', () => {
+  test('input continues the committed text when it adds, takes, or corrects', () => {
+    expect(continues('にほ', 'にほん。')).toBe(true); // adds
+    expect(continues('world', 'worldx')).toBe(true);
+    expect(continues('world', 'worl')).toBe(true); // a Backspace
+    expect(continues('wrold', 'world')).toBe(true); // a swap
+    expect(continues('teh', 'the')).toBe(true);
+    expect(continues('wor', 'abcd')).toBe(false); // another word
+    expect(continues('hello', 'help me')).toBe(false);
+    expect(continues('', 'x')).toBe(false);
+    expect(continues('x', '')).toBe(false);
+  });
+
+  test('an ended composition keeps its caret, its text, and its paragraph', () => {
+    const start = startComposition(ctx('hello world'), 'hello world', 6, 11, 0);
+    expect(endedComposition(start, 'hello world')).toEqual({
+      at: caret(11),
+      expect: expectA('hello world'),
+      target: { text: 'world', after: 0, between: '', paragraph: 'p0' },
+    });
+    const typing = startComposition(ctx('abc '), 'abc ', 4, 4, 0);
+    const ended = endedComposition(typing, 'abc にほ');
+    expect(ended).toEqual({
+      at: caret(6),
+      expect: expectA('abc にほ'),
+      target: { text: 'にほ', after: 0, between: '', paragraph: 'p0' },
+    });
+    // The rest of it replaces the committed text there.
+    expect(resumed(ended!, 'にほん。')).toEqual({
+      at: caret(8),
+      expect: expectA('abc にほん。'),
+      target: { text: 'にほん。', after: 0, between: '', paragraph: 'p0' },
+    });
+  });
+
+  test('a place an edit moved, or a field changed outside it, keeps no ended composition', () => {
+    const typing = startComposition(ctx('abc '), 'abc ', 4, 4, 0);
+    expect(endedComposition(followEdit(typing, ctx('xabc ', 2)), 'abc にほ')).toBeNull();
+    expect(endedComposition(typing, 'xbc にほ')).toBeNull();
+    expect(endedComposition(IDLE, '')).toBeNull();
   });
 });

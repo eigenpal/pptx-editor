@@ -44,6 +44,8 @@ export type CompositionState =
       readonly seen: TypingContext | null;
       /** The input's text width when the composition started, for the overlay. */
       readonly width: number;
+      /** A composition that the editor ended, which this one may continue (`continues`). */
+      readonly resumes: EndedComposition | null;
     };
 
 export const IDLE: CompositionState = { phase: 'idle' };
@@ -54,25 +56,32 @@ export function startComposition(
   value: string,
   from: number,
   to: number,
-  width: number
+  width: number,
+  resumes: EndedComposition | null = null
 ): CompositionState {
-  return { phase: 'composing', place: { context, value, from, to }, seen: context, width };
+  const place = { context, value, from, to };
+  return { phase: 'composing', place, seen: context, width, resumes };
 }
 
 /**
  * What a new context during a composition means. `same`: the caret is still at the place.
- * `follow`: an edit moved the caret in the place's paragraph, and the place moves with it.
- * `left`: the caret left the place, so the composition must end.
+ * `follow`: an edit (a peer's, or the API's) moved the caret and kept it in the place's
+ * paragraph, by its element id: a peer's Enter above, a row inserted above the cell, or text
+ * deleted before the caret. The place moves with the caret. `moved`: an edit took the caret
+ * out of the place's paragraph; the place stays where its paragraph is, if that paragraph
+ * still holds it (`followPlace`). `left`: the caret moved with no edit (a click, a tap, a
+ * key, the API), so the composition must end.
  */
 export function contextChange(
   state: CompositionState,
   now: TypingContext | null
-): 'same' | 'follow' | 'left' {
+): 'same' | 'follow' | 'moved' | 'left' {
   if (state.phase === 'idle') return 'same';
   const { seen } = state;
   if (now?.key === seen?.key && now?.text === seen?.text) return 'same';
-  if (now && seen && now.key === seen.key && now.revision !== seen.revision) return 'follow';
-  return 'left';
+  if (!now || !seen || now.revision === seen.revision) return 'left';
+  const same = now.paragraphId ?? now.key;
+  return same === (seen.paragraphId ?? seen.key) ? 'follow' : 'moved';
 }
 
 /** The state after an edit moved the place (`contextChange` gave `follow`). */
@@ -88,7 +97,9 @@ export function ending(state: CompositionState): CompositionState {
 /**
  * Where the composition's text goes, for the caret context `now`. At the caret, while the
  * caret is the place (`typed`: added characters whose target an edit moved still go in at
- * the caret). At the place's own caret (`at`) when the caret left it. Null: no text caret.
+ * the caret). At the place's own caret (`at`) when the caret left it. Either way the place
+ * must still hold its paragraph and the text before it (`expect`), or the write is refused.
+ * Null: no text caret.
  */
 export function placement(
   state: CompositionState,
@@ -96,9 +107,93 @@ export function placement(
 ): ReplacementPlace | null {
   if (state.phase === 'idle' || !state.seen) return null;
   const { seen } = state;
-  const edited = now?.revision !== seen.revision;
-  if (now?.key === seen.key && (now.text === seen.text || edited)) return { typed: true };
-  return seen.selection ? { at: seen.selection } : null;
+  const expect = expectAt(seen);
+  if (now?.key === seen.key && now.text === seen.text) return { typed: true, expect };
+  return seen.selection ? { at: seen.selection, expect } : null;
+}
+
+/** What a place must still hold: its paragraph and the text before its caret. */
+function expectAt(seen: TypingContext): ReplacementPlace['expect'] {
+  return seen.paragraphId === undefined
+    ? undefined
+    : { paragraph: seen.paragraphId, text: seen.text };
+}
+
+/**
+ * A composition that the editor ended (`surface-input.ts`), and what it committed: the
+ * caret after its text, and its text before that caret (`target`). Input with no key first
+ * that continues that text (`continues`) is the input method's rest of it, which it sent
+ * before it learned of the end, and goes there.
+ */
+export interface EndedComposition {
+  readonly at: Extract<EditorSelection, { kind: 'text' }>;
+  readonly expect: NonNullable<ReplacementPlace['expect']>;
+  readonly target: ReplacementTarget;
+}
+
+/**
+ * The ended composition `state`, after its text `value` (the input's final value) went in
+ * at its place. Null when the place moved with an edit or the input changed outside it.
+ */
+export function endedComposition(state: CompositionState, value: string): EndedComposition | null {
+  if (state.phase === 'idle' || !state.seen) return null;
+  const { place, seen } = state;
+  const sel = seen.selection;
+  const paragraph = seen.paragraphId;
+  if (sel?.kind !== 'text' || paragraph === undefined || seen.text !== place.value) return null;
+  const tail = place.value.length - place.to;
+  const kept =
+    value.slice(0, place.from) === place.value.slice(0, place.from) &&
+    value.slice(value.length - tail) === place.value.slice(place.to);
+  if (!kept) return null;
+  const point = { ...sel.focus, offset: sel.focus.offset + value.length - place.value.length };
+  const text = value.slice(place.from, value.length - tail);
+  const between = value.slice(value.length - tail);
+  return {
+    at: { ...sel, anchor: point, focus: point },
+    expect: { paragraph, text: value },
+    target: { text, after: tail, between, paragraph: seen.key },
+  };
+}
+
+/** The ended composition `late` after `text` replaced its text at its place (`continues`). */
+export function resumed(late: EndedComposition, text: string): EndedComposition {
+  const { at, expect, target } = late;
+  const point = { ...at.focus, offset: at.focus.offset + text.length - target.text.length };
+  const cut = expect.text.length - target.after - target.text.length;
+  const after = expect.text.slice(0, cut) + text + (target.between ?? '');
+  return {
+    at: { ...at, anchor: point, focus: point },
+    expect: { ...expect, text: after },
+    target: { ...target, text },
+  };
+}
+
+/**
+ * Whether `data` continues the text an ended composition committed, `committed`: it adds to
+ * it, takes from its end, or changes one character or swaps two (a correction). Content,
+ * never time, decides.
+ */
+export function continues(committed: string, data: string): boolean {
+  if (!committed || !data) return false;
+  if (data.startsWith(committed) || committed.startsWith(data)) return true;
+  return Math.abs(committed.length - data.length) <= 1 && editDistance(committed, data) <= 1;
+}
+
+/** The optimal string alignment distance: inserts, deletes, changes, and swaps of two. */
+function editDistance(a: string, b: string): number {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0]![j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      let best = Math.min(d[i - 1]![j]! + 1, d[i]![j - 1]! + 1, d[i - 1]![j - 1]! + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1])
+        best = Math.min(best, d[i - 2]![j - 2]! + 1);
+      d[i]![j] = best;
+    }
+  }
+  return d[a.length]![b.length]!;
 }
 
 /**
@@ -168,11 +263,13 @@ export function applyComposition(
     return true;
   }
   if (host.replaceText(edit.target, edit.text, where) !== false) return true;
-  const at = where.at;
-  if (!at || at.kind !== 'text' || edit.target.text !== '' || !edit.text) return false;
+  const { at, expect } = where;
+  if (!at || at.kind !== 'text' || !expect || edit.target.text !== '' || !edit.text) return false;
+  // Only in the place's own paragraph, found by its element id.
   const start = { paragraph: at.focus.paragraph, offset: 0 };
-  const target = { text: '', after: 0, between: '', paragraph: edit.target.paragraph };
-  return host.replaceText(target, edit.text, { at: atPoint(at, start) }) !== false;
+  const target = { text: '', after: 0, between: '', paragraph: null };
+  const there = { at: atPoint(at, start), expect: { paragraph: expect.paragraph, text: '' } };
+  return host.replaceText(target, edit.text, there) !== false;
 }
 
 const atPoint = (
