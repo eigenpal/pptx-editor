@@ -27,7 +27,15 @@ import {
 } from '../../layout/index.ts';
 import type { GeometrySpec, Xfrm } from '../../cascade/index.ts';
 import type { ConnectionTarget, ConnectorRoute, TransformItem } from '../../contracts/neutral.ts';
-import { lineEnds, lineTransform, toFile, toParent, unionBounds, type Box } from './placement.ts';
+import {
+  deltaToParent,
+  lineEnds,
+  lineTransform,
+  toFile,
+  toParent,
+  unionBounds,
+  type Box,
+} from './placement.ts';
 
 type Point = { readonly x: number; readonly y: number };
 
@@ -393,7 +401,7 @@ const MOST_SEGMENTS = 5;
 
 /**
  * The corners of an elbow or curve connector in its parent space, from its start to its end,
- * or null for any other item. A curve has the corners of the elbow with the same values: its
+ * with no segment of zero length, or null for any other item. A curve has the corners of the elbow with the same values: its
  * segments bend between them.
  */
 export function elbowCorners(item: LayoutItem): Point[] | null {
@@ -408,7 +416,10 @@ export function elbowCorners(item: LayoutItem): Point[] | null {
   const own = multiply(invert(item.parentMatrix), item.matrix);
   const pts: Point[] = [];
   for (const c of cmds) if (c.op === 'M' || c.op === 'L') pts.push(apply(own, c.x, c.y));
-  return pts.length >= 3 ? pts : null;
+  // Adjust values can put a corner on an end or on another corner: those segments have no
+  // length, so the route is the corners without them. A straight route keeps one segment.
+  const route = simplified(pts);
+  return route.length >= 2 ? route : null;
 }
 
 /** The corners without repeated points and without corners on a straight run. */
@@ -435,30 +446,37 @@ export function segmentAxis(a: Point, b: Point): 'x' | 'y' {
 
 /**
  * The transform of an elbow or curve connector after segment `index` of its route moves across
- * to the slide point `p`. A middle segment moves with its two corners. An end segment keeps
+ * as far as the pointer moved from slide point `from` to `to`. A middle segment moves with its two corners. An end segment keeps
  * its end and gains a bend there. A glued end keeps a short run in its site's direction
  * before the bend, so the connector still meets the shape square. Segments that come in line
- * merge. Within `snap` (slide units) of another corner's line, the segment snaps to it, so a
- * bend is easy to take out. The ends and their glue stay. Null when the route would need more
+ * merge. Within `snap` (slide units) of another corner's line or of its own first line, the
+ * segment snaps to it, so a bend is easy to take out and a slip is easy to undo. The ends and their glue stay. Null when the route would need more
  * segments than a preset draws, or when the item is no elbow or curve.
  */
 export function moveElbowSegment(
   item: LayoutItem,
   index: number,
-  p: Point,
+  from: Point,
+  to: Point,
   snap: number | null = null
 ): TransformItem | null {
   const corners = elbowCorners(item);
   const family = familyOf(item);
   if (!corners || index < 0 || index >= corners.length - 1) return null;
-  const at = toParent(item, p.x, p.y);
   const a = corners[index];
   const b = corners[index + 1];
   const across = segmentAxis(a, b);
+  // The segment moves by the pointer's move, so a press beside the handle does not jump it.
+  const p0 = toParent(item, from.x, from.y);
+  const p1 = toParent(item, to.x, to.y);
+  const at = { ...a, [across]: a[across] + p1[across] - p0[across] };
   if (snap !== null) {
-    const lines = corners.filter((_, i) => i !== index && i !== index + 1).map((q) => q[across]);
-    const nearest = lines.sort((u, v) => Math.abs(u - at[across]) - Math.abs(v - at[across]))[0];
-    if (nearest !== undefined && Math.abs(nearest - at[across]) <= snap) at[across] = nearest;
+    const d = deltaToParent(item, snap, 0);
+    const reach = Math.hypot(d.x, d.y);
+    const lines = [a, ...corners.filter((_, i) => i !== index && i !== index + 1)];
+    const off = (q: Point): number => Math.abs(q[across] - at[across]);
+    const nearest = lines.sort((u, v) => off(u) - off(v))[0];
+    if (off(nearest) <= reach) at[across] = nearest[across];
   }
   const moved = (q: Point): Point => ({ ...q, [across]: at[across] });
   const last = corners.length - 2;

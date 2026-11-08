@@ -7,7 +7,7 @@ import { presetConnectionSites } from '@eigenpal/ooxml-core';
 import { apply, type LayoutItem } from '../../layout/index.ts';
 import { serializeXmlPart, xmlPartOf } from '../../store/index.ts';
 import { findItem, lineEnds } from '../../automation/commands/placement.ts';
-import { elbowPoints, placedSites } from '../../automation/commands/connectors.ts';
+import { elbowCorners, elbowPoints, placedSites } from '../../automation/commands/connectors.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 import { dragStep, startDrag } from '../surface-drag.ts';
 import { preview } from '../drag-preview.ts';
@@ -411,12 +411,16 @@ describe('elbow segment drags', () => {
   function dragSegment(
     e: PptxEditorInstance,
     name: string,
-    index: number,
+    index: 0 | 1 | 2 | 3 | 4,
     to: { x: number; y: number },
     snapTo: number | null = null
   ): ReturnType<typeof dragStep> {
-    const id = named(e, name).element.nodeId;
-    const d = startDrag(e.session!.layout(0), `segment${index}`, [id], to, 'g')!;
+    const item = named(e, name);
+    // Press at the middle of the segment, as on its handle, and move to `to`.
+    const [a, b] = elbowCorners(item)!.slice(index, index + 2);
+    const from = apply(item.parentMatrix, (a.x + b.x) / 2, (a.y + b.y) / 2);
+    const id = item.element.nodeId;
+    const d = startDrag(e.session!.layout(0), `segment${index}`, [id], from, 'g')!;
     const step = dragStep(d, to, { ...input, snapTo });
     if (step.items.length)
       expect(e.exec({ type: 'setTransforms', items: step.items }).ok).toBe(true);
@@ -528,5 +532,71 @@ describe('elbow segment drags', () => {
       [7, 3],
     ]);
     expect(slideXml(e)).toContain('<a:endCxn id="3" idx="0"/>');
+  });
+
+  test('a corner on an end makes no segment: a drag never moves the end', async () => {
+    // adj1 = 0 puts the first corner on the start: the route is an L from (1 in, 1 in).
+    const flat = connector({
+      id: 4,
+      prst: 'bentConnector3',
+      x: IN,
+      y: IN,
+      cx: 4 * IN,
+      cy: 2 * IN,
+    }).replace('<a:avLst/>', '<a:avLst><a:gd name="adj1" fmla="val 0"/></a:avLst>');
+    const e = await open(deck(flat));
+    expect(elbowCorners(named(e, 'C4'))!.length).toBe(3);
+    dragSegment(e, 'C4', 0, { x: 2 * IN, y: 2 * IN });
+    expect(cornersOf(e, 'C4')[0]).toEqual([1, 1]);
+    expect(cornersOf(e, 'C4').at(-1)).toEqual([5, 3]);
+  });
+
+  test('a press beside the handle moves the segment only as far as the pointer', async () => {
+    const e = await open(deck(ell));
+    const item = named(e, 'C4');
+    // Press 0.1 in left of the vertical segment's middle, and do not move.
+    const press = { x: 4.9 * IN, y: 2 * IN };
+    const d = startDrag(e.session!.layout(0), 'segment1', [item.element.nodeId], press, 'g')!;
+    const step = dragStep(d, press, input);
+    expect(e.exec({ type: 'setTransforms', items: step.items }).ok).toBe(true);
+    expect(presetOf(e, 'C4')).toBe('bentConnector2');
+  });
+
+  test('a curve shows its segment handles on the drawn curve', async () => {
+    const { GlobalWindow } = await import('happy-dom');
+    const win = new GlobalWindow();
+    const curve = connector({
+      id: 4,
+      prst: 'curvedConnector3',
+      x: IN,
+      y: IN,
+      cx: 4 * IN,
+      cy: 2 * IN,
+    });
+    const e = await open(deck(curve));
+    const item = named(e, 'C4');
+    const doc = win.document as unknown as Document;
+    const nodes = handleElements(doc, [item], lineEnds(item), 9525, 'Move');
+    const hits = nodes.filter((n) => n.getAttribute('class')?.includes('handle-hit'));
+    expect(hits).toHaveLength(3);
+    // The first handle is on the curve, not at the elbow middle (2 in, 1 in) off the curve.
+    const at = { x: Number(hits[0].getAttribute('cx')), y: Number(hits[0].getAttribute('cy')) };
+    expect(near(at, { x: 2 * IN, y: IN }, 0.05 * IN)).toBe(false);
+    if (item.kind !== 'shape') throw new Error('kind');
+    const [m, c] = item.geometry.paths[0].commands;
+    if (m.op !== 'M' || c.op !== 'C') throw new Error('path');
+    const onCurve = (t: number) => {
+      const u = 1 - t;
+      const f = (s: number, a: number, b: number, z: number) =>
+        u * u * u * s + 3 * u * u * t * a + 3 * u * t * t * b + t * t * t * z;
+      return apply(item.matrix, f(m.x, c.x1, c.x2, c.x), f(m.y, c.y1, c.y2, c.y));
+    };
+    const gap = Math.min(
+      ...Array.from({ length: 101 }, (_, k) => onCurve(k / 100)).map((p) =>
+        Math.hypot(p.x - at.x, p.y - at.y)
+      )
+    );
+    expect(gap).toBeLessThan(0.02 * IN);
+    await win.happyDOM.close();
   });
 });

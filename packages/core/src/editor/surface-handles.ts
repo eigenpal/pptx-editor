@@ -81,6 +81,42 @@ export function handleElements(
 /** Segments shorter than this, in CSS pixels, show no handle: it would cover the ends. */
 const SHORTEST_SEGMENT = 24;
 
+type Point = { readonly x: number; readonly y: number };
+
+/** Points along an item's first drawn path on the slide, 32 for each curve. */
+function drawnPoints(item: LayoutItem): Point[] {
+  if (item.kind !== 'shape') return [];
+  const out: Point[] = [];
+  let at: Point = { x: 0, y: 0 };
+  for (const c of item.geometry.paths[0]?.commands ?? []) {
+    if (c.op === 'Z') continue;
+    if (c.op === 'C' || c.op === 'Q') {
+      // A quadratic as the cubic that draws it: each control two thirds of the way to its one.
+      const q = (s: number, k: number): number => s + ((k - s) * 2) / 3;
+      const a = c.op === 'C' ? { x: c.x1, y: c.y1 } : { x: q(at.x, c.x1), y: q(at.y, c.y1) };
+      const b = c.op === 'C' ? { x: c.x2, y: c.y2 } : { x: q(c.x, c.x1), y: q(c.y, c.y1) };
+      for (let k = 1; k <= 32; k += 1) {
+        const t = k / 32;
+        const u = 1 - t;
+        const f = (s: number, p: number, r: number, e: number): number =>
+          u * u * u * s + 3 * u * u * t * p + 3 * u * t * t * r + t * t * t * e;
+        out.push(apply(item.matrix, f(at.x, a.x, b.x, c.x), f(at.y, a.y, b.y, c.y)));
+      }
+    } else out.push(apply(item.matrix, c.x, c.y));
+    at = { x: c.x, y: c.y };
+  }
+  return out;
+}
+
+/** The point of `points` nearest `p`, or undefined when there is none. */
+function nearest(points: readonly Point[], p: Point): Point | undefined {
+  let best: Point | undefined;
+  for (const q of points)
+    if (!best || Math.hypot(q.x - p.x, q.y - p.y) < Math.hypot(best.x - p.x, best.y - p.y))
+      best = q;
+  return best;
+}
+
 /**
  * A diamond at the middle of each segment of an elbow or curve connector. A drag moves the
  * segment across (`moveElbowSegment`); on an end segment it adds a bend.
@@ -88,12 +124,16 @@ const SHORTEST_SEGMENT = 24;
 function segmentHandles(doc: Document, item: LayoutItem, px: number, label: string): Element[] {
   const corners = elbowCorners(item);
   if (!corners) return [];
+  // A curve bends between the corners: its handles sit on the drawn curve, nearest each middle.
+  const curve = item.kind === 'shape' && item.geometry.paths[0]?.commands.some((c) => c.op === 'C');
+  const drawn = curve ? drawnPoints(item) : [];
   const out: Element[] = [];
   for (let i = 0; i < corners.length - 1; i += 1) {
     const a = apply(item.parentMatrix, corners[i].x, corners[i].y);
     const b = apply(item.parentMatrix, corners[i + 1].x, corners[i + 1].y);
     if (Math.hypot(b.x - a.x, b.y - a.y) < SHORTEST_SEGMENT * px) continue;
-    const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const m = nearest(drawn, mid) ?? mid;
     const r = px * 5;
     const axis = segmentAxis(a, b);
     const titled = (node: Element): Element => {

@@ -13,7 +13,7 @@
 
 import type { TransformItem } from '../contracts/index.ts';
 import type { ResolvedElement } from '../cascade/index.ts';
-import type { LayoutItem, SlideLayout } from '../layout/index.ts';
+import { apply, type LayoutItem, type SlideLayout } from '../layout/index.ts';
 import type { PaintOptions } from '../output/index.ts';
 import { PaintedPreview, preview, previewLayout, type Relayout } from './drag-preview.ts';
 import {
@@ -52,7 +52,7 @@ import { resizeOne, scaleMany } from './surface-resize.ts';
 import { clampTableResize } from './surface-table.ts';
 
 /** A segment of an elbow or curve connector's route, by its index from the start. */
-export type SegmentHandle = `segment${number}`;
+export type SegmentHandle = `segment${0 | 1 | 2 | 3 | 4}`;
 export type Handle =
   'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'rot' | 'start' | 'end' | SegmentHandle;
 export type BoxHandle = Exclude<Handle, 'start' | 'end' | SegmentHandle>;
@@ -161,7 +161,13 @@ export function dragStep(
     return { items: [moveLineEnd(d, p, input.shift)], guides };
   if (isSegment(d.handle)) {
     // A route the presets cannot draw keeps the last route the drag showed.
-    const t = moveElbowSegment(d.items[0].item, Number(d.handle.slice(7)), p, input.snapTo);
+    const t = moveElbowSegment(
+      d.items[0].item,
+      Number(d.handle.slice(7)),
+      d.start,
+      p,
+      input.snapTo
+    );
     return { items: t ? [t] : [...(d.pending ?? [])], guides };
   }
   const [hx, hy] = HANDLE_POS[d.handle];
@@ -328,10 +334,13 @@ export class ShapeDrag {
   get segmentAxis(): 'x' | 'y' | null {
     const d = this.#drag;
     if (!d || !isSegment(d.handle)) return null;
-    const corners = elbowCorners(d.items[0].item);
+    const { item } = d.items[0];
+    const corners = elbowCorners(item);
     const i = Number(d.handle.slice(7));
     const [a, b] = [corners?.[i], corners?.[i + 1]];
-    return a && b ? segmentAxis(a, b) : null;
+    // On the slide, as the handle's own pointer: a turned group turns the segment too.
+    const slide = (q: Point): Point => apply(item.parentMatrix, q.x, q.y);
+    return a && b ? segmentAxis(slide(a), slide(b)) : null;
   }
 
   /** The smart guides of the last pointer move. */
