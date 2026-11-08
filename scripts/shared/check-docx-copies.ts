@@ -5,13 +5,15 @@
 //
 // 1. Each entry has a valid shape, and each manifest file is a tracked file on disk.
 // 2. One comment paragraph of each file names the kind, DOCX Editor, each source, and the
-//    commit of each entry, each as a whole word (`headerProblems`). A file without a `copied`
-//    entry never claims a copy of DOCX Editor, in any case and across line breaks.
-// 3. Each tracked text file, of any type, with a copy signal has an entry, or is in
-//    `MENTIONS_ALLOWED` with a reason (`copySignals`). A signal is a `docx-editor/` path, or a
-//    paragraph that mentions DOCX Editor and names a commit, a path that is not in this
-//    repository, or a path right after the mention, or has a copy verb near it. A plain name
-//    mention needs no entry.
+//    commit of each entry, each as a whole word, and names no foreign file that no entry of
+//    the file lists (`headerProblems`). A file without a `copied` entry puts no copy word near
+//    a mention of DOCX Editor, unless its entry gives a `reason`.
+// 3. Each tracked text file (`git ls-files --eol`), of any type, with a copy signal has an
+//    entry, or is in `MENTIONS_ALLOWED` with a reason (`copySignals`). A signal is a
+//    `docx-editor/` path, or a paragraph that mentions DOCX Editor and names a commit, a path
+//    that is not in this repository, or a path right after the mention, or has a copy verb in
+//    it or a copy word near the mention. A commit or a foreign path in the next two comment
+//    paragraphs counts too. A plain name mention needs no entry.
 // 4. With a DOCX Editor checkout: each commit exists, and each source exists at its commit.
 // 5. With a checkout: each `copied` file equals its source at the commit, after the
 //    normalization of `normalizedBody` in `docx-normalize.ts`. Comments other than directives
@@ -19,17 +21,21 @@
 //    the package scopes `@docx-editor.dev/` and `@pptx-editor.dev/` compare equal. Code that
 //    does not parse fails. `RENAMED_MODULES` maps each DOCX Editor module that a copy imports
 //    from another path here. Any other difference is drift.
-// 6. With a checkout: an `adapted` or `reference` file with one source must not equal it, and
-//    an `adapted` file must keep `ADAPTED_FLOOR` of its source lines (`kindProblems`). An
-//    `adapted` source that the check cannot compare fails.
+// 6. With a checkout: an `adapted` or `reference` file must not equal any source. An `adapted`
+//    file must keep `ADAPTED_FLOOR` of its source lines together, and each of its sources must
+//    share a line with it unless the entry gives a `reason`. A `reference` file must share at
+//    most `REFERENCE_CEILING` of its lines with each source (`kindProblems`). An `adapted`
+//    source that the check cannot compare fails.
 //
 // Usage:
-//   bun run check:docx-copies [--docx <path>] [--ref <commit>] [--write] [--diff] [--only <path>]
+//   bun run check:docx-copies [--docx <path>] [--ref <commit>] [--write] [--diff] [--report]
+//     [--only <path>]
 // `--docx` defaults to $DOCX_EDITOR_DIR, then ~/Developer/docx-editor, ~/docx-editor, and the
 // docx-editor folder next to the main checkout. `--ref` compares each copy with that commit
 // instead of the one its entry names, and `--write` then puts that commit in the entry and the
-// header paragraph of each copy that is the same. `--diff` prints each difference. `--only
-// <path>` checks the entries and the signals of one tracked file.
+// header paragraph of each copy that is the same. `--diff` prints each difference. `--report`
+// prints the overlap of each `adapted` and `reference` file with each source. `--only <path>`
+// checks the entries and the signals of one tracked file.
 // Exit codes: 0 when every check passes, 1 on a failure, 2 on a usage error, and 3 when the
 // checks 1 to 3 pass but no DOCX Editor checkout is found. A skip is never a pass.
 
@@ -41,15 +47,17 @@ import { format, resolveConfig } from 'prettier';
 import { findDocxCheckout } from './docx-checkout.ts';
 import {
   ADAPTED_FLOOR,
+  REFERENCE_CEILING,
   type CopyEntry,
   MENTION,
   MENTIONS_ALLOWED,
   allowedReason,
   comparable,
+  comparablePair,
   copySignals,
   headerOf,
   headerProblems,
-  isBinary,
+  textFiles,
   kindProblems,
   lineOverlap,
   localPaths,
@@ -115,13 +123,15 @@ const RENAMED_MODULES: ReadonlyMap<string, readonly (readonly [string, string])[
 ]);
 
 const OPTIONS_WITH_VALUE = new Set(['--docx', '--ref', '--only']);
-const FLAGS = new Set(['--write', '--diff', '--help']);
+const FLAGS = new Set(['--write', '--diff', '--report', '--help']);
 
 for (let at = 2; at < process.argv.length; at += 1) {
   const arg = process.argv[at]!;
   if (OPTIONS_WITH_VALUE.has(arg)) at += 1;
   else if (!FLAGS.has(arg)) {
-    console.error(`Unknown argument: ${arg}. Use --docx, --ref, --write, --diff, --only, --help.`);
+    console.error(
+      `Unknown argument: ${arg}. Use --docx, --ref, --write, --diff, --report, --only, --help.`
+    );
     process.exit(2);
   }
 }
@@ -148,6 +158,7 @@ const onlyOption = option('--only');
 const only = onlyOption === undefined ? undefined : relative(ROOT, resolve(onlyOption));
 const write = process.argv.includes('--write');
 const showDiff = process.argv.includes('--diff');
+const report = process.argv.includes('--report');
 if (write && ref === undefined) {
   console.error('--write needs --ref <commit>.');
   process.exit(2);
@@ -186,6 +197,7 @@ if (parsed.entries.length === 0)
   fail(MANIFEST, 'the manifest has no entry, so nothing was checked');
 const entries = parsed.entries.filter((entry) => only === undefined || entry.file === only);
 
+const isLocal = localPaths(tracked);
 const texts = new Map<string, string>();
 const broken = new Set<CopyEntry>();
 for (const entry of entries) {
@@ -196,22 +208,28 @@ for (const entry of entries) {
     continue;
   }
   if (!texts.has(entry.file)) texts.set(entry.file, readFileSync(file, 'utf8'));
-  for (const problem of headerProblems(entry, texts.get(entry.file)!))
+  const siblings = parsed.entries.filter((other) => other.file === entry.file);
+  const options = {
+    isLocal,
+    sources: siblings.flatMap((other) => other.source),
+    copied: siblings.some((other) => other.kind === 'copied'),
+  };
+  for (const problem of headerProblems(entry, texts.get(entry.file)!, entry.file, options))
     fail(entry.file, `${problem} (${entry.kind} entry)`);
 }
 
-const isLocal = localPaths(tracked);
+// Text files as git reads them, so a NUL byte cannot hide a file.
+const textSet = new Set(textFiles(git(['ls-files', '--eol', '-z'], ROOT) ?? ''));
 const signals = new Map<string, readonly string[]>();
 let mentioning = 0;
 for (const path of only === undefined ? tracked : [only]) {
   const file = join(ROOT, path);
   if (!existsSync(file)) continue;
-  const bytes = readFileSync(file);
-  if (isBinary(bytes)) continue;
-  const text = bytes.toString('utf8');
-  if (!MENTION.test(text)) continue;
+  if (!textSet.has(path)) continue;
+  const body = readFileSync(file, 'utf8');
+  if (!MENTION.test(body)) continue;
   mentioning += 1;
-  signals.set(path, copySignals(text, path, isLocal));
+  signals.set(path, copySignals(body, path, isLocal));
 }
 for (const path of unlistedMentions(signals, parsed.entries))
   fail(path, `${signals.get(path)![0]}, but the file has no entry in ${MANIFEST}`);
@@ -329,27 +347,32 @@ for (const entry of entries) {
   } else console.log(`  ok   ${path} (copied, the same)`);
 }
 
-// Check 6: the kind of each adapted entry and each reference with one source.
+// Check 6: the kind of each adapted and reference entry, from its overlap with each source.
 let measured = 0;
 let lowest = Number.POSITIVE_INFINITY;
+let highestReference = 0;
 for (const entry of entries) {
   if (entry.kind === 'copied' || broken.has(entry)) continue;
-  if (entry.kind === 'reference' && entry.source.length !== 1) continue;
   const commit = resolved(entry.commit!)!;
-  const files = entry.source.every(
-    (source) => comparable(source) && types.get(`${commit}:${source}`) === 'blob'
+  const files = entry.source.map(
+    (source) => comparablePair(entry.file, source) && types.get(`${commit}:${source}`) === 'blob'
   );
-  if (!files || !comparable(entry.file)) {
+  if (!comparable(entry.file) || !files.some(Boolean)) {
     if (entry.kind === 'adapted')
       fail(entry.file, 'an adapted entry needs source files that the check can compare');
+    if (report) console.log(`  report ${entry.file} (${entry.kind}): not compared`);
     continue;
   }
   let ours: string;
-  const theirs: string[] = [];
+  const theirs: (string | null)[] = [];
   try {
     ours = await body(texts.get(entry.file)!, entry.file);
-    for (const source of entry.source)
-      theirs.push(await body(git(['show', `${commit}:${source}`], docx) ?? '', source, entry.file));
+    for (const [at, source] of entry.source.entries())
+      theirs.push(
+        files[at]
+          ? await body(git(['show', `${commit}:${source}`], docx) ?? '', source, entry.file)
+          : null
+      );
   } catch (error) {
     if (entry.kind === 'adapted')
       fail(entry.file, `cannot be compared: ${(error as Error).message}`);
@@ -357,10 +380,21 @@ for (const entry of entries) {
   }
   for (const problem of kindProblems(entry, ours, theirs))
     fail(entry.file, `${problem} (${entry.kind} entry)`);
+  const overlaps = theirs.map((other) => (other === null ? null : lineOverlap(other, ours)));
+  if (report)
+    console.log(
+      `  report ${entry.file} (${entry.kind}): ` +
+        entry.source
+          .map((source, at) => `${source} ${overlaps[at]?.toFixed(3) ?? 'not compared'}`)
+          .join(', ')
+    );
   if (entry.kind === 'adapted') {
     measured += 1;
-    lowest = Math.min(lowest, lineOverlap(theirs.join('\n'), ours));
-  }
+    const joined = theirs.filter((other): other is string => other !== null).join('\n');
+    lowest = Math.min(lowest, lineOverlap(joined, ours));
+  } else
+    for (const overlap of overlaps)
+      if (overlap !== null) highestReference = Math.max(highestReference, overlap);
 }
 
 // `--write`: move each unchanged copy, in its header paragraph and in its entry, to `--ref`.
@@ -394,7 +428,8 @@ console.log(
   `\n${entries.length} manifest entries (${count('copied')} copied, ${count('adapted')} adapted, ` +
     `${count('reference')} references), ${same} copies the same as their source, ` +
     `${measured} adapted files measured (lowest line overlap ` +
-    `${measured > 0 ? lowest.toFixed(3) : 'none'}, floor ${ADAPTED_FLOOR}), ` +
+    `${measured > 0 ? lowest.toFixed(3) : 'none'}, floor ${ADAPTED_FLOOR}), highest ` +
+    `reference overlap ${highestReference.toFixed(3)} (ceiling ${REFERENCE_CEILING}), ` +
     `${mentioning} files that mention DOCX Editor, ${signalled} with a copy signal outside the allowed files, ` +
     `${MENTIONS_ALLOWED.length} allowed patterns, ${failures} failures.`
 );

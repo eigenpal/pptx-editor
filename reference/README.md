@@ -10,7 +10,7 @@ All files come from the free downloads at [ECMA-376 on the Ecma International si
 | --- | --- | --- | --- |
 | `ecma-376/part1/drawingml-geometries/` | `ECMA-376-1_5th_edition_december_2016.zip` | `OfficeOpenXML-DrawingMLGeometries.zip` | None. Byte-identical. |
 | `ecma-376/part4/transitional-schemas/` | `ECMA-376-4_5th_edition_december_2016.zip` | `OfficeOpenXML-XMLSchema-Transitional.zip` | None. Byte-identical. |
-| `ecma-376/part1/schemas/` | Copied from DOCX Editor's `reference/ecma-376/part1/schemas/` | Part 1 Strict schemas | None. The seven files are byte-identical to the 5th edition `OfficeOpenXML-XMLSchema-Strict.zip`. DOCX Editor's modified `dml-main.xsd` is not copied: use `part4/transitional-schemas/dml-main.xsd`. |
+| `ecma-376/part1/schemas/` | From DOCX Editor's `reference/ecma-376/part1/schemas/` at adf0e178 | Part 1 Strict schemas | None. The seven files are byte-identical to the 5th edition `OfficeOpenXML-XMLSchema-Strict.zip`. DOCX Editor's modified `dml-main.xsd` is left out: use `part4/transitional-schemas/dml-main.xsd`. |
 
 ## Use
 

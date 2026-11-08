@@ -1,7 +1,7 @@
 name: Release
 
-# DOCX Editor's release flow (docx-editor/.github/workflows/release.yml), sized for v0. DOCX Editor
-# commit adf0e178.
+# DOCX Editor's release flow (docx-editor/.github/workflows/release.yml), sized for v0. Adapted from
+# DOCX Editor at commit adf0e178.
 #
 # 1. Every push to main with pending changesets in `.changeset/` opens or updates a
 #    "chore: release" PR with the version bumps and CHANGELOG entries applied.

@@ -1,6 +1,6 @@
 # PptxEditor and Office.js API compatibility
 
-This directory measures the public surface of `@pptx-editor.dev/editor-api` against the Office.js presentation API (the `PowerPoint` namespace of `@types/office-js`). The tooling is a port of DOCX Editor's `packages/editor-api/compat/` and `packages/editor-api/scripts/`. Each copied script names its DOCX Editor path and commit in its first lines.
+This directory measures the public surface of `@pptx-editor.dev/editor-api` against the Office.js presentation API (the `PowerPoint` namespace of `@types/office-js`). The tooling is a port of DOCX Editor's `packages/editor-api/compat/` and `packages/editor-api/scripts/` at 5993bd223. Each such script names its DOCX Editor path and commit in its first lines.
 
 ## Informational presentation editing report
 

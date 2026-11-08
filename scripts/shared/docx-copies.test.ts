@@ -7,15 +7,17 @@ import {
   type CopyEntry,
   MENTION,
   MENTIONS_ALLOWED,
+  REFERENCE_CEILING,
   allowedReason,
+  claimsCopy,
   copySignals,
   headerProblems,
-  isBinary,
   kindProblems,
   lineOverlap,
   localPaths,
   parseManifest,
   sourceProblems,
+  textFiles,
   unlistedMentions,
 } from './docx-copies.ts';
 import { localModule, normalizedBody } from './docx-normalize.ts';
@@ -122,7 +124,7 @@ describe('headerProblems', () => {
     ]);
     expect(headerProblems({ ...COPY, kind: 'adapted' }, COPY_HEADER)).toEqual([
       'no comment paragraph names all of the entry; the closest, at line 1, lacks "adapted"',
-      'line 1 claims a copy of DOCX Editor, but the entry is adapted',
+      'line 1 puts a copy word near DOCX Editor, but the entry is adapted',
     ]);
     expect(headerProblems(COPY, 'export const a = 1;\n')).toEqual([
       'the file has no comment paragraph',
@@ -157,8 +159,41 @@ describe('headerProblems', () => {
       '# COPIED VERBATIM FROM DOCX EDITOR\n',
     ])
       expect(headerProblems(adapted, `${header}\n${claim}`, 'a.sh').at(-1)).toContain(
-        'claims a copy of DOCX Editor'
+        'puts a copy word near DOCX Editor'
       );
+    // A guide that describes the copies in other files gives a reason.
+    const guide = { ...adapted, reason: 'The guide describes the copies of this package.' };
+    expect(headerProblems(guide, `${header}\n// a copy of DOCX Editor\n`)).toEqual([]);
+  });
+
+  test('reads a copy word near a mention, in the same sentence and outside code spans', () => {
+    for (const text of [
+      'The modules are copies of DOCX Editor files',
+      'DOCX Editor code, copied with one change',
+      'a DocxEditor copy',
+    ])
+      expect(claimsCopy(text)).toBe(true);
+    for (const text of [
+      'The second copy of the editor state. DOCX Editor keeps one.',
+      "DOCX Editor's `Copy` button",
+      'DOCX Editor draws the shape in the same order as the slide, so this long sentence is a copy',
+    ])
+      expect(claimsCopy(text)).toBe(false);
+  });
+
+  test('fails a header that names a foreign file that no entry lists', () => {
+    const isLocal = localPaths([COPY.file]);
+    const header =
+      '// Copied from DOCX Editor `packages/core/src/layout/font-composition.ts` at commit ' +
+      'adf0e178, with\n// `packages/core/src/layout/font-names.ts`.\n';
+    expect(headerProblems(COPY, header, COPY.file, { isLocal })).toEqual([
+      'the header at line 1 names packages/core/src/layout/font-names.ts, which no entry lists',
+    ]);
+    const sources = [...COPY.source, 'packages/core/src/layout/font-names.ts'];
+    expect(headerProblems(COPY, header, COPY.file, { isLocal, sources })).toEqual([]);
+    // A folder that holds a source is covered by it.
+    const folder = header.replace('font-names.ts', '');
+    expect(headerProblems(COPY, folder, COPY.file, { isLocal })).toEqual([]);
   });
 
   // Each review found a comment form that an earlier check missed. The manifest records each
@@ -201,22 +236,62 @@ describe('kindProblems', () => {
   const adapted: CopyEntry = { ...COPY, kind: 'adapted' };
   const body = 'export function scale(a) {\n  return a * 2;\n}\nexport const unit = 4;\n';
 
-  test('fails an adapted or reference entry that equals its one source', () => {
+  const other = 'export function format(n) {\n  return String(n);\n}\n';
+  const two: CopyEntry = { ...adapted, source: ['a.ts', 'b.ts'] };
+
+  test('fails an adapted or reference entry that equals any of its sources', () => {
     expect(kindProblems(adapted, body, [body])).toEqual([
       `the code equals ${COPY.source[0]}: mark the entry as copied`,
     ]);
     expect(kindProblems({ ...adapted, kind: 'reference' }, body, [body])).toHaveLength(1);
     expect(kindProblems(COPY, body, [body])).toEqual([]);
+    expect(kindProblems(two, body, [other, body])).toEqual([
+      'the code equals b.ts: mark the entry as copied',
+    ]);
+    expect(kindProblems({ ...two, kind: 'reference' }, body, [null, body])).toHaveLength(1);
   });
 
-  test('fails an adapted entry under the line overlap floor, so a wrong source fails', () => {
-    const other = 'export function format(n) {\n  return String(n);\n}\n';
+  test('fails each source of an adapted entry that shares no line, unless it gives a reason', () => {
+    expect(kindProblems(two, body, [body.replace('a * 2', 'a * 3'), other])).toEqual([
+      'the code shares no line with b.ts: fix the source, or move it to a reference entry ' +
+        'with a `reason`',
+    ]);
+    const why = { ...two, reason: 'The second source holds the type only.' };
+    expect(kindProblems(why, body, [body.replace('a * 2', 'a * 3'), other])).toEqual([]);
+    expect(kindProblems(two, body, [body.replace('a * 2', 'a * 3'), null])).toEqual([
+      'the check cannot compare b.ts with the code: name a file in the same language, or move ' +
+        'it to a reference entry with a `reason`',
+    ]);
+    expect(kindProblems(why, body, [body.replace('a * 2', 'a * 3'), null])).toEqual([]);
+    expect(kindProblems({ ...two, kind: 'reference' }, body, [other, other])).toEqual([]);
+  });
+
+  test('fails a reference over the ceiling with any one source', () => {
+    const reference: CopyEntry = { ...two, kind: 'reference' };
+    const changed = body.replace('a * 2', 'a * 3');
+    expect(lineOverlap(body, changed)).toBeGreaterThan(REFERENCE_CEILING);
+    expect(kindProblems(reference, changed, [other, body])).toEqual([
+      'the code shares 0.667 of its lines with b.ts, over 0.5: mark the entry as adapted',
+    ]);
+    expect(kindProblems(two, changed, [body, body])).toEqual([]);
+  });
+
+  test('fails an adapted entry under the line overlap floor of its sources together', () => {
     expect(lineOverlap(other, body)).toBeLessThan(ADAPTED_FLOOR);
     expect(kindProblems(adapted, body, [other])[0]).toContain('under 0.1');
     const changed = body.replace('a * 2', 'a * 3');
     expect(lineOverlap(body, changed)).toBeGreaterThan(ADAPTED_FLOOR);
     expect(kindProblems(adapted, changed, [body])).toEqual([]);
     expect(kindProblems({ ...adapted, kind: 'reference' }, body, [other])).toEqual([]);
+  });
+
+  test('reads the text files from `git ls-files --eol`', () => {
+    const records = [
+      'i/lf    w/lf    attr/                 \ta.ts',
+      'i/-text w/-text attr/                 \tfont.ttf',
+      'i/none  w/none  attr/                 \tempty.txt',
+    ];
+    expect(textFiles(`${records.join('\0')}\0`)).toEqual(['a.ts', 'empty.txt']);
   });
 
   test('counts lines with repeats, and not lines without a letter or a digit', () => {
@@ -238,6 +313,9 @@ describe('the copy signals', () => {
       '// the docx_editor fork',
       "const url = 'https://github.com/eigenpal/docx-editor/blob/main/README.md';",
       '<!-- the DOCX Editor demo -->',
+      'const a = DocxEditor.create();',
+      '// https://github.com/eigenpal/docx-js-editor/blob/main/a.ts',
+      'packages/editor-api/compat/docxeditor/declarations.ts',
     ])
       expect(MENTION.test(text)).toBe(true);
   });
@@ -246,7 +324,8 @@ describe('the copy signals', () => {
     for (const text of [
       "import { a } from '@docx-editor.dev/fonts';",
       'a docx file in the editor',
-      'packages/core/src/docxeditor.ts',
+      "import { a } from '@docxeditor.dev/core';",
+      'see https://docx-editor.dev/docs',
     ])
       expect(MENTION.test(text)).toBe(false);
   });
@@ -261,6 +340,10 @@ describe('the copy signals', () => {
       "// As DOCX Editor's `surface-pointer.ts` does.",
       '// The menu, copied\n// from DOCX Editor.',
       '/* code */ const a = 1; /* adapted from DOCX Editor */',
+      '// The harness, forked from DOCX Editor.',
+      '// After DOCX Editor. The rule is the same code, line for line.',
+      '// The menu as DOCX Editor has it, a copy with two rows less.',
+      '// As DOCX Editor does.\n\n// See commit 5993bd223.',
     ])
       expect(signal(text)).not.toEqual([]);
     for (const text of [
@@ -268,6 +351,8 @@ describe('the copy signals', () => {
       "// The Vue twin of the React adapter's `ChromeTooltip.tsx`, after DOCX Editor's `Tooltip`.",
       "// The editor follows DOCX Editor's names, as in Office.js and React/Vue.",
       '// The color, #1a2b3c4d, as DOCX Editor draws it.',
+      "// The second copy of the slide list keeps the order. DOCX Editor's list has none.",
+      '// As DOCX Editor does.\n\n// One.\n\n// Two.\n\n// See commit 5993bd223.',
     ])
       expect(signal(text)).toEqual([]);
   });
@@ -288,17 +373,24 @@ describe('the copy signals', () => {
       'scripts/new.cjs',
       '.husky/post-commit',
       'packages/react/src/new.jsx',
+      // A package guide is outside the root and `docs/` guides.
+      'packages/core/README.md',
     ]);
     expect(signalsOf('// see DOCX Editor (abc1234f)')).toEqual(['line 1: a commit hash']);
   });
 
   test('gives a reason for each allowed file', () => {
-    expect(MENTIONS_ALLOWED.length).toBeLessThan(13);
+    expect(MENTIONS_ALLOWED.length).toBeLessThan(14);
     for (const [pattern, reason] of MENTIONS_ALLOWED) {
       expect(reason.length).toBeGreaterThan(10);
-      expect(allowedReason(pattern.replace('*', 'a'))).toBe(reason);
+      expect(allowedReason(pattern.replaceAll('**', 'a').replaceAll('*', 'a'))).toBe(reason);
     }
     expect(allowedReason('scripts/shared/new-copy.ts')).toBeUndefined();
+    // `*.md` is the root folder only, and `docs/**/*.md` any folder under `docs/`.
+    expect(allowedReason('CONTRIBUTING.md')).toBeDefined();
+    expect(allowedReason('docs/architecture/engine-lanes.md')).toBeDefined();
+    expect(allowedReason('packages/core/README.md')).toBeUndefined();
+    expect(allowedReason('reference/README.md')).toBeUndefined();
   });
 });
 
@@ -307,30 +399,40 @@ describe('the copy signals', () => {
 describe('the repository', () => {
   const run = spawnSync('git', ['-C', ROOT, 'ls-files', '-z'], { encoding: 'utf8' });
   const tracked = run.stdout.split('\0').filter(Boolean);
+  const eol = spawnSync('git', ['-C', ROOT, 'ls-files', '--eol', '-z'], { encoding: 'utf8' });
+  const text = new Set(textFiles(eol.stdout));
   const { entries } = parseManifest(
     readFileSync(join(import.meta.dir, 'docx-copies.json'), 'utf8')
   );
+
+  const isLocal = localPaths(tracked);
 
   test('names each manifest entry in one comment paragraph of its file', () => {
     expect(run.status).toBe(0);
     const problems = entries.flatMap((entry) => {
       const file = join(ROOT, entry.file);
       if (!tracked.includes(entry.file) || !existsSync(file)) return [`${entry.file}: missing`];
-      return headerProblems(entry, readFileSync(file, 'utf8')).map((p) => `${entry.file}: ${p}`);
+      const siblings = entries.filter((other) => other.file === entry.file);
+      const options = {
+        isLocal,
+        sources: siblings.flatMap((other) => other.source),
+        copied: siblings.some((other) => other.kind === 'copied'),
+      };
+      return headerProblems(entry, readFileSync(file, 'utf8'), entry.file, options).map(
+        (p) => `${entry.file}: ${p}`
+      );
     });
     expect(problems).toEqual([]);
   });
 
   test('has an entry for each tracked file with a copy signal', () => {
-    const isLocal = localPaths(tracked);
+    expect(eol.status).toBe(0);
     const signals = new Map<string, readonly string[]>();
     for (const path of tracked) {
       const file = join(ROOT, path);
-      if (!existsSync(file)) continue;
-      const bytes = readFileSync(file);
-      if (isBinary(bytes)) continue;
-      const text = bytes.toString('utf8');
-      if (MENTION.test(text)) signals.set(path, copySignals(text, path, isLocal));
+      if (!text.has(path) || !existsSync(file)) continue;
+      const body = readFileSync(file, 'utf8');
+      if (MENTION.test(body)) signals.set(path, copySignals(body, path, isLocal));
     }
     expect(signals.size).toBeGreaterThan(0);
     expect(unlistedMentions(signals, entries)).toEqual([]);

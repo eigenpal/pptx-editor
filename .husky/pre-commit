@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Keep every whole-repository gate. Same shape as the DOCX Editor hook
+# Keep every whole-repository gate. Adapted from the DOCX Editor hook
 # (docx-editor/.husky/pre-commit at adf0e178): format and lint staged files, then run the
 # repository gates that nothing else covers.
 run_check() {

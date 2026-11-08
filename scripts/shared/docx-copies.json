@@ -13,13 +13,13 @@
   },
   {
     "file": ".github/dependabot.yml",
-    "kind": "reference",
+    "kind": "adapted",
     "source": [".github/dependabot.yml"],
     "commit": "adf0e178"
   },
   {
     "file": ".github/workflows/ci.yml",
-    "kind": "reference",
+    "kind": "adapted",
     "source": [".github/workflows/ci.yml"],
     "commit": "adf0e178"
   },
@@ -37,19 +37,19 @@
   },
   {
     "file": ".github/workflows/post-release.yml",
-    "kind": "reference",
+    "kind": "adapted",
     "source": [".github/workflows/post-release.yml"],
     "commit": "adf0e178"
   },
   {
     "file": ".github/workflows/release.yml",
-    "kind": "reference",
+    "kind": "adapted",
     "source": [".github/workflows/release.yml"],
     "commit": "adf0e178"
   },
   {
     "file": ".husky/pre-commit",
-    "kind": "reference",
+    "kind": "adapted",
     "source": [".husky/pre-commit"],
     "commit": "adf0e178"
   },
@@ -85,13 +85,13 @@
   },
   {
     "file": "examples/shared/pdf-export-plugin.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["examples/shared/pdf-export-plugin.ts"],
     "commit": "adf0e178"
   },
   {
     "file": "examples/vite/src/BrandLogo.tsx",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["examples/shared/BrandLogo.tsx"],
     "commit": "adf0e178"
   },
@@ -175,7 +175,7 @@
   },
   {
     "file": "packages/core/src/automation/protocol.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/core/src/automation/protocol.ts"],
     "commit": "adf0e178"
   },
@@ -205,7 +205,7 @@
   },
   {
     "file": "packages/core/src/contracts/history-group.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/core/src/contracts/editor-scope.ts"],
     "commit": "adf0e178"
   },
@@ -271,12 +271,16 @@
   },
   {
     "file": "packages/core/src/editor/chrome-menus.ts",
-    "kind": "reference",
-    "source": [
-      "packages/core/src/editor/chrome-controls.ts",
-      "packages/core/src/editor/chrome-menu-entries.ts"
-    ],
+    "kind": "adapted",
+    "source": ["packages/core/src/editor/chrome-menu-entries.ts"],
     "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/chrome-menus.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/editor/chrome-controls.ts"],
+    "commit": "adf0e178",
+    "reason": "This module defines the CHROME_MENUS rows that the menu registry follows, with its own code."
   },
   {
     "file": "packages/core/src/editor/chrome-review.ts",
@@ -301,7 +305,7 @@
   },
   {
     "file": "packages/core/src/editor/collaboration-status.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/core/src/collaboration/failure.ts"],
     "commit": "adf0e178"
   },
@@ -350,7 +354,10 @@
   {
     "file": "packages/core/src/editor/editor-ref.ts",
     "kind": "reference",
-    "source": ["packages/vue/src/components/DocxEditor/useDocxEditorRefApi.ts"],
+    "source": [
+      "packages/vue/src/components/DocxEditor/useDocxEditorRefApi.ts",
+      "packages/react/src/components/DocxEditor/hooks"
+    ],
     "commit": "adf0e178"
   },
   {
@@ -386,18 +393,27 @@
   {
     "file": "packages/core/src/editor/history-groups.ts",
     "kind": "reference",
-    "source": ["packages/core/src/contracts/editor-scope.ts"],
+    "source": [
+      "packages/core/src/contracts/editor-scope.ts",
+      "packages/core/src/editor/editor-history-group-registry.ts"
+    ],
     "commit": "adf0e178"
   },
   {
     "file": "packages/core/src/editor/icon-paths.ts",
     "kind": "adapted",
+    "source": ["packages/core/src/editor/generated-icon-paths.ts"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/core/src/editor/icon-paths.ts",
+    "kind": "reference",
     "source": [
-      "packages/core/src/editor/generated-icon-paths.ts",
       "packages/react/src/editor/DocxEditorHyperLink.tsx",
       "packages/pro/src/react/review-icons.tsx"
     ],
-    "commit": "adf0e178c"
+    "commit": "adf0e178c",
+    "reason": "The path strings of these icons are read from JSX markup, so no line of code is shared."
   },
   {
     "file": "packages/core/src/editor/link-popup.ts",
@@ -590,13 +606,13 @@
   },
   {
     "file": "packages/core/src/layout/harfbuzz-wasm-binary.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/core/src/layout/harfbuzz-wasm-binary.ts"],
     "commit": "adf0e178"
   },
   {
     "file": "packages/core/src/layout/node-module-shim.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/core/src/layout/node-module-shim.ts"],
     "commit": "adf0e178"
   },
@@ -627,7 +643,10 @@
   {
     "file": "packages/core/src/layout/text/harfbuzz-measurer.ts",
     "kind": "reference",
-    "source": ["packages/core/src/layout/harfbuzz-shaper.ts"],
+    "source": [
+      "packages/core/src/layout/harfbuzz-shaper.ts",
+      "packages/core/src/layout/shaped-measurer.ts"
+    ],
     "commit": "adf0e178"
   },
   {
@@ -671,11 +690,17 @@
     "kind": "adapted",
     "source": [
       "packages/core/src/layout/rtl-paragraph.ts",
-      "packages/core/src/layout/rtl-letter.ts",
       "packages/core/src/layout/arabic-script-language.ts",
       "packages/core/src/layout/line-end-whitespace.ts"
     ],
     "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/text/rtl-paragraph.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/layout/rtl-letter.ts"],
+    "commit": "adf0e178",
+    "reason": "The strong right-to-left letter test is written again over UTF-16 units, with no shared line."
   },
   {
     "file": "packages/core/src/layout/text/run-kerning.ts",
@@ -748,9 +773,16 @@
   },
   {
     "file": "packages/core/src/store/store/history-group.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/core/src/store/store/history-group.ts"],
     "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/store/store/history-group.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/store/tree-store.ts"],
+    "commit": "adf0e178",
+    "reason": "The store applies the same history scope rule here, with its own transaction code."
   },
   {
     "file": "packages/core/src/store/store/node-index.ts",
@@ -778,9 +810,16 @@
   },
   {
     "file": "packages/core/tsup.config.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/core/tsup.config.ts"],
     "commit": "adf0e178"
+  },
+  {
+    "file": "packages/editor-api/compat/README.md",
+    "kind": "reference",
+    "source": ["packages/editor-api/compat", "packages/editor-api/scripts"],
+    "commit": "5993bd223",
+    "reason": "The guide lists the compatibility files, and one of them is a copy of a DOCX Editor helper."
   },
   {
     "file": "packages/editor-api/compat/type-assert.ts",
@@ -793,6 +832,13 @@
     "kind": "adapted",
     "source": ["packages/editor-api/scripts/compat-report.mjs"],
     "commit": "5993bd223945cabdaf3900557d9fb59bfd8c2d8c"
+  },
+  {
+    "file": "packages/editor-api/scripts/compat-report.mjs",
+    "kind": "reference",
+    "source": ["packages/editor-api/compat/agent-editing-scope.json"],
+    "commit": "5993bd223945cabdaf3900557d9fb59bfd8c2d8c",
+    "reason": "The header names this profile because PPTX Editor has no counterpart and leaves it out."
   },
   {
     "file": "packages/editor-api/scripts/fetch-office-reference.mjs",
@@ -809,7 +855,11 @@
   {
     "file": "packages/editor-api/scripts/generate-conformance.mjs",
     "kind": "reference",
-    "source": ["packages/editor-api/scripts/generate-conformance.mjs"],
+    "source": [
+      "packages/editor-api/scripts/generate-conformance.mjs",
+      "packages/editor-api/compat/docxeditor/declarations.ts",
+      "packages/editor-api/scripts/lib/extract-docxeditor-shape.mjs"
+    ],
     "commit": "5993bd223945cabdaf3900557d9fb59bfd8c2d8c"
   },
   {
@@ -839,11 +889,15 @@
   {
     "file": "packages/editor-api/scripts/lib/manifest-integrity.mjs",
     "kind": "adapted",
-    "source": [
-      "packages/editor-api/scripts/lib/manifest-integrity.mjs",
-      "packages/editor-api/compat/docxeditor/declarations.ts"
-    ],
+    "source": ["packages/editor-api/scripts/lib/manifest-integrity.mjs"],
     "commit": "5993bd223945cabdaf3900557d9fb59bfd8c2d8c"
+  },
+  {
+    "file": "packages/editor-api/scripts/lib/manifest-integrity.mjs",
+    "kind": "reference",
+    "source": ["packages/editor-api/compat/docxeditor/declarations.ts"],
+    "commit": "5993bd223945cabdaf3900557d9fb59bfd8c2d8c",
+    "reason": "The header names this fixture because PPTX Editor has none and leaves its check out."
   },
   {
     "file": "packages/editor-api/scripts/lib/provenance.mjs",
@@ -907,19 +961,19 @@
   },
   {
     "file": "packages/editor-api/src/runtime/batch.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/editor-api/src/runtime/batch.ts"],
     "commit": "5993bd223945"
   },
   {
     "file": "packages/editor-api/src/runtime/browser.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/editor-api/src/runtime/browser.ts"],
     "commit": "5993bd223945"
   },
   {
     "file": "packages/editor-api/src/runtime/client-object.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/editor-api/src/runtime/client-object.ts"],
     "commit": "5993bd223945"
   },
@@ -931,7 +985,7 @@
   },
   {
     "file": "packages/editor-api/src/runtime/errors.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/editor-api/src/runtime/errors.ts"],
     "commit": "5993bd223945"
   },
@@ -943,7 +997,7 @@
   },
   {
     "file": "packages/editor-api/src/runtime/internals.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/editor-api/src/runtime/internals.ts"],
     "commit": "5993bd223945"
   },
@@ -961,7 +1015,7 @@
   },
   {
     "file": "packages/editor-api/src/runtime/queue.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/editor-api/src/runtime/queue.ts"],
     "commit": "5993bd223945"
   },
@@ -973,7 +1027,7 @@
   },
   {
     "file": "packages/editor-api/src/runtime/runtime.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/editor-api/src/runtime/runtime.ts"],
     "commit": "5993bd223945"
   },
@@ -994,6 +1048,13 @@
     "kind": "reference",
     "source": ["packages/i18n"],
     "commit": "adf0e178"
+  },
+  {
+    "file": "packages/ooxml-core/README.md",
+    "kind": "reference",
+    "source": ["packages/core/src/store/package/drawing-shape-color.ts"],
+    "commit": "5993bd223",
+    "reason": "The guide describes the modules of this package that are copies of DOCX Editor files."
   },
   {
     "file": "packages/ooxml-core/src/__tests__/caret-word.test.ts",
@@ -1082,7 +1143,10 @@
   {
     "file": "packages/ooxml-core/src/drawingml-geometry.ts",
     "kind": "reference",
-    "source": ["packages/core/src/store/package/drawing-geometry-engine.ts"],
+    "source": [
+      "packages/core/src/store/package/drawing-geometry-engine.ts",
+      "packages/core/src/store/package/drawing-geometry-formula.ts"
+    ],
     "commit": "5993bd223"
   },
   {
@@ -1152,6 +1216,19 @@
     "commit": "7cd3776a"
   },
   {
+    "file": "packages/pptx-to-pdf/README.md",
+    "kind": "reference",
+    "source": ["packages/docx-to-pdf/src/picture-effects.ts", "packages/docx-to-pdf/src/images.ts"],
+    "commit": "adf0e178",
+    "reason": "The guide names the font embedder of this package, which is a copy of the DOCX Editor one."
+  },
+  {
+    "file": "packages/pptx-to-pdf/scripts/evaluation/README.md",
+    "kind": "reference",
+    "source": ["packages/docx-to-pdf/scripts/evaluation"],
+    "commit": "398963c7f67207cebf3c38dcc41d5f0bd1339b5f"
+  },
+  {
     "file": "packages/pptx-to-pdf/scripts/evaluation/export.test.ts",
     "kind": "reference",
     "source": [
@@ -1181,7 +1258,10 @@
   {
     "file": "packages/pptx-to-pdf/scripts/evaluation/settings.ts",
     "kind": "reference",
-    "source": ["packages/docx-to-pdf/scripts/evaluation/export.ts"],
+    "source": [
+      "packages/docx-to-pdf/scripts/evaluation/export.ts",
+      "packages/docx-to-pdf/scripts/evaluation/trace.ts"
+    ],
     "commit": "398963c7f67207cebf3c38dcc41d5f0bd1339b5f"
   },
   {
@@ -1246,7 +1326,7 @@
   },
   {
     "file": "packages/pptx-to-pdf/src/options.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": [
       "packages/docx-to-pdf/src/options.ts",
       "packages/docx-to-pdf/src/context.ts",
@@ -1274,7 +1354,7 @@
   },
   {
     "file": "packages/pptx-to-pdf/src/pdf-session.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/docx-to-pdf/src/pdf-session.ts"],
     "commit": "398963c7f67207cebf3c38dcc41d5f0bd1339b5f"
   },
@@ -1286,7 +1366,7 @@
   },
   {
     "file": "packages/pptx-to-pdf/src/types.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/docx-to-pdf/src/types.ts"],
     "commit": "adf0e178"
   },
@@ -1300,7 +1380,8 @@
     "file": "packages/pro/src/__tests__/fuzz-support.ts",
     "kind": "reference",
     "source": ["packages/pro/src/collaboration/__tests__/document-undo-groups-fuzz.test.ts"],
-    "commit": "5993bd223"
+    "commit": "5993bd223",
+    "reason": "Two small functions, seededRandom and shrink, are copies; the rest of the harness is its own code."
   },
   {
     "file": "packages/pro/src/__tests__/singleton-children.test.ts",
@@ -1316,7 +1397,7 @@
   },
   {
     "file": "packages/pro/src/collaboration/errors.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/pro/src/collaboration/errors.ts"],
     "commit": "adf0e178"
   },
@@ -1351,7 +1432,8 @@
     "file": "packages/pro/src/collaboration/yjs/singleton-children.ts",
     "kind": "reference",
     "source": ["packages/pro/src/collaboration/document/singleton-children.ts"],
-    "commit": "5ffe967"
+    "commit": "5ffe967",
+    "reason": "In this module, a copy is one concurrent version of a group in a room, not code from DOCX Editor."
   },
   {
     "file": "packages/pro/src/collaboration/yjs/text-identity.ts",
@@ -1550,7 +1632,7 @@
   },
   {
     "file": "packages/pro/src/react/review-types.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["packages/pro/src/react/review-types.ts"],
     "commit": "adf0e178c"
   },
@@ -1657,7 +1739,10 @@
   {
     "file": "packages/react/src/context-menu-parts.tsx",
     "kind": "reference",
-    "source": ["docs/site/content/customization/menus.mdx"],
+    "source": [
+      "docs/site/content/customization/menus.mdx",
+      "packages/react/src/editor/contextmenu"
+    ],
     "commit": "adf0e178"
   },
   {
@@ -1669,7 +1754,7 @@
   {
     "file": "packages/react/src/menu-parts.tsx",
     "kind": "reference",
-    "source": ["docs/site/content/customization/menus.mdx"],
+    "source": ["docs/site/content/customization/menus.mdx", "packages/react/src/editor/menu"],
     "commit": "adf0e178"
   },
   {
@@ -1786,7 +1871,7 @@
   {
     "file": "packages/vue/src/menu-parts.tsx",
     "kind": "reference",
-    "source": ["docs/site/content/customization/menus.mdx"],
+    "source": ["docs/site/content/customization/menus.mdx", "packages/vue/src/editor/menu"],
     "commit": "adf0e178"
   },
   {
@@ -1835,6 +1920,18 @@
     "commit": "adf0e178"
   },
   {
+    "file": "reference/README.md",
+    "kind": "reference",
+    "source": ["reference/ecma-376/part1/schemas"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "reference/quick-ref/themes-colors.md",
+    "kind": "reference",
+    "source": ["reference/quick-ref/themes-colors.md"],
+    "commit": "adf0e178"
+  },
+  {
     "file": "scripts/api-extractor.mjs",
     "kind": "reference",
     "source": ["scripts/api-extractor.mjs"],
@@ -1860,7 +1957,7 @@
   },
   {
     "file": "scripts/check-api-changeset.mjs",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["scripts/check-api-changeset.mjs"],
     "commit": "adf0e178"
   },
@@ -1890,7 +1987,7 @@
   },
   {
     "file": "scripts/check-package-artifacts.mjs",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["scripts/check-package-artifacts.mjs"],
     "commit": "adf0e178"
   },
@@ -1944,13 +2041,13 @@
   },
   {
     "file": "scripts/oxlint/pptx-rules.mjs",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["scripts/oxlint/docx-rules.mjs"],
     "commit": "adf0e178"
   },
   {
     "file": "scripts/oxlint/pptx-rules.test.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["scripts/__tests__/oxlint-rules.test.ts"],
     "commit": "adf0e178"
   },
@@ -1980,13 +2077,13 @@
   },
   {
     "file": "scripts/release-mode.mjs",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["scripts/release-mode.mjs"],
     "commit": "b9a04a30f"
   },
   {
     "file": "scripts/release-mode.test.ts",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["scripts/release-mode.test.ts"],
     "commit": "b9a04a30f"
   },

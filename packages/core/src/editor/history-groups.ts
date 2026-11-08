@@ -2,8 +2,8 @@
 // gestures the editor groups itself (a typing burst, a drag, repeated nudges). Each one stands for
 // a store token (`store/store/history-group.ts`); the store makes the commands that carry one token
 // a single undo step. The handle follows DOCX Editor's
-// `packages/core/src/contracts/editor-scope.ts` and `editor/editor-history-group-registry.ts`. DOCX
-// Editor commit adf0e178.
+// `packages/core/src/contracts/editor-scope.ts` and
+// `packages/core/src/editor/editor-history-group-registry.ts`. DOCX Editor commit adf0e178.
 
 import type { HistoryGroup } from '../contracts/index.ts';
 import type { PptxPackage, HistoryGroup as StoreHistoryGroup } from '../store/index.ts';

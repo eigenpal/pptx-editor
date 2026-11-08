@@ -1,7 +1,7 @@
 // Repository lint rules that oxlint has no built-in for, in the shape of DOCX Editor's
 // `scripts/oxlint/docx-rules.mjs`. ESLint expressed them as `no-restricted-syntax` selectors;
 // oxlint has no such rule, so each concern is its own rule here, with the selectors and messages
-// of the ESLint configuration this replaces. DOCX Editor commit adf0e178.
+// of the ESLint configuration this replaces. Adapted from DOCX Editor at commit adf0e178.
 //
 // One rule per concern also removes a trap of the ESLint configuration: there, a block that set
 // `no-restricted-syntax` REPLACED the earlier value, so the lane block had to restate the sink

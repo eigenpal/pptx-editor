@@ -1,6 +1,6 @@
 name: Post-release updates
 
-# After DOCX Editor's post-release workflow (docx-editor/.github/workflows/post-release.yml).
+# Adapted from DOCX Editor's post-release workflow (docx-editor/.github/workflows/post-release.yml).
 # When a Release run publishes, comment "Released in vX.Y.Z" on every shipped PR and every
 # issue it closed. When PPTX_ROADMAP_PROJECT_NUMBER is set, stamp that project's "Shipped in" field. DOCX Editor also
 # verifies the published packages and updates its sites here; PPTX Editor has no such

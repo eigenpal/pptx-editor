@@ -8,11 +8,11 @@
 // Output coordinates are shape-local EMU: (0,0) is the shape's top-left, (w,h) its extent.
 // Arcs become cubic Beziers, which are exact for any scale, so painters draw curves as curves.
 //
-// This is PPTX Editor's module (from `packages/core/src/layout/geometry/geometry.ts`), not a
-// copy of a DOCX Editor file. DOCX Editor evaluates the same definitions in
+// This is PPTX Editor's module (from `packages/core/src/layout/geometry/geometry.ts`), with no DOCX
+// Editor counterpart file. DOCX Editor evaluates the same definitions in
 // docx-editor/packages/core/src/store/package/drawing-geometry-engine.ts and
-// drawing-geometry-formula.ts at 5993bd223, and flattens every curve to a polyline. Fixes for
-// the DOCX Editor team (this module):
+// docx-editor/packages/core/src/store/package/drawing-geometry-formula.ts at 5993bd223, and
+// flattens every curve to a polyline. Fixes for the DOCX Editor team (this module):
 // - Only `a:moveTo` sets the current point. A path that starts with `a:lnTo`, `a:arcTo`,
 //   `a:quadBezTo`, or `a:cubicBezTo` has no current point, so that command draws nothing, and
 //   neither the fill nor the outline shows it (ECMA-376 Part 1, 20.1.9, `CT_Path2D`). The

@@ -200,7 +200,7 @@ export function isSymbolFont(family: string): boolean {
 
 /**
  * Wingdings bullets of the Bullets gallery that DOCX Editor's table
- * (`symbol-encoding.ts`, a copy kept equal to its source) does not list, each compared with the
+ * (`symbol-encoding.ts`, kept equal to its source) does not list, each compared with the
  * glyph the face draws: the Star bullet, `v` (0x76).
  */
 const GALLERY_TWINS: ReadonlyMap<string, string> = new Map([['v', '❖']]);

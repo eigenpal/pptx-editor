@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/editor-api/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// After DOCX Editor's `packages/editor-api/src/runtime/batch.ts` (commit 5993bd223945).
+// Adapted from DOCX Editor's `packages/editor-api/src/runtime/batch.ts` (commit 5993bd223945).
 //
 // Planning, refusal mapping, and positional hydration of one batch.
 

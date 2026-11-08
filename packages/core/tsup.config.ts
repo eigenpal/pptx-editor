@@ -4,10 +4,10 @@ import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Options } from 'tsup';
 
-// HarfBuzz is inlined, as in DOCX Editor (docx-editor/packages/core/tsup.config.ts). Left external,
-// the harfbuzzjs glue reaches the consumer's bundler with an `await import("module")` that no
-// browser target can resolve, so Bun and esbuild builds fail. Inlined, `module` is aliased to
-// `src/layout/node-module-shim.ts`, the glue's WASM URL goes through `setHarfBuzzWasmUrl`, and
+// HarfBuzz is inlined, adapted from DOCX Editor (docx-editor/packages/core/tsup.config.ts). Left
+// external, the harfbuzzjs glue reaches the consumer's bundler with an `await import("module")`
+// that no browser target can resolve, so Bun and esbuild builds fail. Inlined, `module` is aliased
+// to `src/layout/node-module-shim.ts`, the glue's WASM URL goes through `setHarfBuzzWasmUrl`, and
 // `harfbuzz.wasm` ships in `dist/`. DOCX Editor commit adf0e178.
 
 const here = dirname(fileURLToPath(import.meta.url));

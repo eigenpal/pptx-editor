@@ -1,5 +1,6 @@
 // The HarfBuzz measurer: exact advances from the real font bytes, the same approach as
-// docx-editor/packages/core/src/layout/harfbuzz-shaper.ts and shaped-measurer.ts, reduced to
+// docx-editor/packages/core/src/layout/harfbuzz-shaper.ts and
+// packages/core/src/layout/shaped-measurer.ts, reduced to
 // the advances and line metrics that slide text layout needs. DOCX Editor commit adf0e178.
 //
 // The WASM module loads through a dynamic import so importing layout never adds top-level

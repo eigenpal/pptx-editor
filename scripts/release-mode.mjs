@@ -1,4 +1,4 @@
-// After DOCX Editor's scripts/release-mode.mjs (commit b9a04a30f). The canary logic is the
+// Adapted from DOCX Editor's scripts/release-mode.mjs (commit b9a04a30f). The canary logic is the
 // same. The stable path keeps this repository's rule: pending changesets update the release
 // PR, and otherwise `changeset publish` publishes what npm does not have yet. DOCX Editor
 // also answers `idle` from a registry lookup; this repository does not need that yet.

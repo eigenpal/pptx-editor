@@ -3,12 +3,12 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// The shared harness of the seeded collaboration fuzzers (`*-fuzz.test.ts`). After DOCX
-// Editor `packages/pro/src/collaboration/__tests__/document-undo-groups-fuzz.test.ts` (commit
-// 5993bd223): `seededRandom` is a copy, and the environment knobs, the trail, the shrink, and
-// `kindOf` keep its shape. The peer harness is PPTX-only: N editors on N Y.Docs
-// (`openPeer` in `lineage-support.ts`) and a relay that holds every update back until an action
-// delivers it. The text conservation oracle is `fuzz-ledger.ts`.
+// The shared harness of the seeded collaboration fuzzers (`*-fuzz.test.ts`). After DOCX Editor
+// `packages/pro/src/collaboration/__tests__/document-undo-groups-fuzz.test.ts` (commit 5993bd223):
+// `seededRandom` is a copy, `shrink` is a copy that takes `replay` as an argument, and the
+// environment knobs, the trail, and `kindOf` keep its shape. The peer harness is PPTX-only: N
+// editors on N Y.Docs (`openPeer` in `lineage-support.ts`) and a relay that holds every update back
+// until an action delivers it. The text conservation oracle is `fuzz-ledger.ts`.
 //
 // A fuzzer records each step as a plain action in deck coordinates (a paragraph and an offset,
 // a row and a column), so a replay of fewer actions stays meaningful. Deliveries are actions

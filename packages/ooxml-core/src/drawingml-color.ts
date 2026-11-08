@@ -3,8 +3,8 @@
 // element names and attribute strings only, so it works over any XML tree. The theme lookup is
 // the caller's, because each document format maps scheme color names in its own way.
 //
-// This is PPTX Editor's module (from `packages/core/src/cascade/color.ts`), not a copy of a
-// DOCX Editor file. DOCX Editor resolves the same colors in
+// This is PPTX Editor's module (from `packages/core/src/cascade/color.ts`), with no
+// DOCX Editor counterpart file. DOCX Editor resolves the same colors in
 // docx-editor/packages/core/src/store/package/drawing-shape-color.ts at 5993bd223, with other
 // math. The fixes below also apply to DOCX Editor. The color
 // values are measured on the reference PDF of the `colors` fixture of PPTX Editor:

@@ -7,8 +7,10 @@
 //   `docx-normalize.ts`.
 // - `adapted`: the code changes its sources on purpose, but keeps at least `ADAPTED_FLOOR` of
 //   the lines of the shorter body (`lineOverlap`).
-// - `reference`: the file follows a DOCX Editor design, and its code is its own.
-// The sources of each entry must exist at its commit. A file can have more than one entry.
+// - `reference`: the file follows a DOCX Editor design, and its code is its own: it shares at
+//   most `REFERENCE_CEILING` of its lines with each source.
+// The sources of each entry must exist at its commit. A file can have more than one entry. An
+// optional `reason` says why a source shares no line with the file (`kindProblems`).
 
 /** The kinds of manifest entries. */
 export const KINDS = ['copied', 'adapted', 'reference'] as const;
@@ -20,22 +22,27 @@ export interface CopyEntry {
   readonly kind: CopyKind;
   readonly source: readonly string[];
   readonly commit: string | null;
+  readonly reason?: string;
 }
 
 /**
- * A mention of DOCX Editor: "DOCX Editor", `docx-editor`, or `docx_editor`, in any case, also
- * across a line break inside a comment ("DOCX\n// Editor"). The package scope
- * `@docx-editor.dev/` is not one.
+ * A mention of DOCX Editor: "DOCX Editor", `docx-editor`, `docx_editor`, `docx-js-editor`,
+ * `DocxEditor`, or `docxeditor`, in any case, also across a line break inside a comment
+ * ("DOCX\n// Editor"). The package scope `@docx-editor.dev/` and the site are not one.
  */
-export const MENTION = /\bdocx(?:[-_]|\s+(?:(?:\/\/+|\*|#|--|<!--)\s*)*)editor(?!\.dev)/i;
+export const MENTION =
+  /\bdocx(?:[-_]?(?:js[-_])?|\s+(?:(?:\/\/+|\*|#|--|<!--)\s*)*)editor(?!\.dev)/i;
 
 /**
- * Tracked files that mention DOCX Editor without a manifest entry, as [pattern, reason]. A
- * pattern that ends in `/` matches a folder, `*.ext` matches an extension, and any other
- * pattern matches one path.
+ * Tracked files that may hold copy signals without a manifest entry, as [pattern, reason]. A
+ * pattern that ends in `/` matches a folder and everything in it. In any other pattern, `*`
+ * matches a part of one path segment and `**` any number of folders, so `*.md` matches the
+ * Markdown files of the root folder only.
  */
 export const MENTIONS_ALLOWED: readonly (readonly [string, string])[] = [
-  ['*.md', 'Markdown guides, READMEs, and changelogs describe the products; they hold no code'],
+  ['*.md', 'the root guides (README, AGENTS, CONTRIBUTING) describe the products; no code'],
+  ['docs/**/*.md', 'the repository documentation, which names DOCX Editor for shared concepts'],
+  ['packages/*/CHANGELOG.md', 'release notes that changesets writes, with this repository commits'],
   ['docs/site/content/', 'public documentation pages, which name DOCX Editor for shared concepts'],
   ['scripts/shared/check-docx-copies.ts', 'the drift check, which names the checkout it reads'],
   ['scripts/shared/docx-checkout.ts', 'the checkout search of the drift check'],
@@ -53,13 +60,15 @@ export const MENTIONS_ALLOWED: readonly (readonly [string, string])[] = [
 
 /** The reason when `path` is in `MENTIONS_ALLOWED`. */
 export function allowedReason(path: string): string | undefined {
-  const match = MENTIONS_ALLOWED.find(([pattern]) =>
-    pattern.startsWith('*.')
-      ? path.endsWith(pattern.slice(1))
-      : pattern.endsWith('/')
-        ? path.startsWith(pattern)
-        : path === pattern
-  );
+  const match = MENTIONS_ALLOWED.find(([pattern]) => {
+    if (pattern.endsWith('/')) return path.startsWith(pattern);
+    const parts = pattern
+      .split('/')
+      .map((part) =>
+        part === '**' ? '(?:[^/]+/)*' : `${part.split('*').map(escaped).join('[^/]*')}/`
+      );
+    return new RegExp(`^${parts.join('').replace(/\/$/, '')}$`).test(path);
+  });
   return match?.[1];
 }
 
@@ -83,7 +92,7 @@ export function parseManifest(text: string): { entries: CopyEntry[]; problems: s
       problems.push(`${where} is not an object`);
       return;
     }
-    const { file, kind, source, commit, ...rest } = item as Record<string, unknown>;
+    const { file, kind, source, commit, reason, ...rest } = item as Record<string, unknown>;
     const name = typeof file === 'string' ? file : where;
     const wrong = (message: string) => problems.push(`${name}: ${message}`);
     if (typeof file !== 'string' || file === '') return wrong('`file` must be a path');
@@ -93,6 +102,8 @@ export function parseManifest(text: string): { entries: CopyEntry[]; problems: s
       return wrong('`source` must be an array of paths');
     if (commit !== null && (typeof commit !== 'string' || !COMMIT.test(commit)))
       return wrong('`commit` must be a commit hash or null');
+    if (reason !== undefined && (typeof reason !== 'string' || reason.trim().length < 10))
+      wrong('`reason` must be a sentence');
     if (source.length === 0) wrong('an entry must name a source');
     if (commit === null) wrong('an entry must name the commit of its sources');
     if (kind === 'copied' && source.length > 1) wrong('a copied entry names one source');
@@ -104,13 +115,25 @@ export function parseManifest(text: string): { entries: CopyEntry[]; problems: s
       kind: kind as CopyKind,
       source: source as string[],
       commit: commit as string | null,
+      ...(typeof reason === 'string' ? { reason } : {}),
     });
   });
   return { entries, problems };
 }
 
-/** Whether `bytes` look like a binary file: a NUL byte in the first 8000 bytes. */
-export const isBinary = (bytes: Uint8Array): boolean => bytes.subarray(0, 8000).includes(0);
+/**
+ * The text files of `git ls-files --eol -z` output: every tracked file whose index content git
+ * does not read as binary (`i/-text`). A NUL byte cannot hide a text file this way.
+ */
+export function textFiles(lsFilesEol: string): string[] {
+  return lsFilesEol
+    .split('\0')
+    .filter(Boolean)
+    .flatMap((record) => {
+      const tab = record.indexOf('\t');
+      return tab < 0 || record.startsWith('i/-text') ? [] : [record.slice(tab + 1)];
+    });
+}
 
 /** What `sourceProblems` reads from a DOCX Editor checkout. */
 export interface DocxLookup {
@@ -153,12 +176,12 @@ export function sourceProblems(
   return problems;
 }
 
-/** A copy verb: a text with one near a mention claims a copy. */
+/** A copy verb: a paragraph with one and a mention claims a copy. */
 const COPY_VERB =
-  /\b(?:copied|copies|copy of|adapted|adapts|ported|ports|based on|derived from|taken from)\b/i;
+  /\b(?:copied|copying|adapted|adapts|ported|ports? from|based on|derived from|taken from|forked|lifted|borrowed|cloned|verbatim|line for line|same code)\b/i;
 
-/** A copy claim about the file itself, in any case and across line breaks. */
-const COPY_CLAIM = /\b(?:copied|a copy)\s+(?:(?:verbatim|unchanged)\s+)?(?:from|of)\s+/i;
+/** A copy word, which a file without a `copied` entry must not put near a mention. */
+const COPY_WORD = /\bcop(?:y|ied|ies|ying)\b/i;
 
 /** A commit hash: 7 to 40 lowercase hex digits with a digit and a letter. */
 const COMMIT_IN_TEXT = /(?<![\w#-])(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}(?![\w-])/;
@@ -168,7 +191,7 @@ const FILE_NAME = String.raw`[\w-]+(?:\.[\w-]+)*\.(?:ts|tsx|mts|cts|js|jsx|mjs|c
 
 /** A path with a folder, such as `scripts/lib/packages.mjs`, or a file name. */
 const PATH_TOKEN = new RegExp(
-  String.raw`(?<![@\w./-])(?:(?:[\w-][\w.-]*/)+(?:${FILE_NAME}|[\w.-]*\w)|${FILE_NAME})`,
+  String.raw`(?<![@*\w./-])(?:(?:[\w-][\w.-]*/)+(?:${FILE_NAME}|[\w.-]*\w)|${FILE_NAME})`,
   'g'
 );
 
@@ -178,20 +201,22 @@ const PATH_AFTER = new RegExp(
 );
 
 /**
- * Whether a path token names a file: it ends in a source extension, has two folders, or starts
- * at a repository folder. "React/Vue" and "and/or" do not.
+ * Whether a path token names a file: it ends in a source extension, or starts at a repository
+ * folder. "React/Vue" and "DOM/CSS/fetch" do not.
  */
 const fileLike = (token: string): boolean =>
   !LIBRARY_NAMES.has(token.toLowerCase()) &&
   (new RegExp(String.raw`^${FILE_NAME}$|/${FILE_NAME}$`).test(token) ||
-    token.split('/').length > 2 ||
-    /^(?:packages|scripts|docs|examples|e2e|src|lib|test|\.github)\//.test(token));
+    /^(?:packages|scripts|docs|examples|e2e|src|lib|test|api|\.github|\.husky)\//.test(token));
 
 /** Library names that look like file names. */
 const LIBRARY_NAMES = new Set(['office.js', 'pdf.js', 'node.js', 'vue.js', 'next.js']);
 
-/** How far, in characters, a copy verb may be from a mention to count as near it. */
+/** How far, in characters, a copy word may be from a mention to count as near it. */
 const NEAR = 40;
+
+/** How many comment paragraphs after a mention paragraph the signals also read. */
+const FOLLOWING = 2;
 
 /** The extensions whose `#` lines are comments. A file without an extension counts too. */
 const HASH_COMMENTS = new Set(['.sh', '.py', '.yml', '.yaml', '.toml', '']);
@@ -217,12 +242,13 @@ function extension(path: string): string {
 
 /**
  * The paragraphs of `text`. Line comments (`//`, and `#` in hash comment files), block
- * comments that start a line (`/*`, `<!--`), and the `"comment"` and `"$comment"` strings of a
- * JSON file are comment lines. Any other line is code.
+ * comments that start a line (`/*`, `<!--`), the `"comment"` and `"$comment"` strings of a
+ * JSON file, and the prose lines of a Markdown file are comment lines. Any other line is code.
  */
 export function paragraphs(text: string, path: string): Paragraph[] {
   const hash = HASH_COMMENTS.has(extension(path));
   const json = extension(path) === '.json';
+  const prose = extension(path) === '.md' || extension(path) === '.mdx';
   const out: Paragraph[] = [];
   let close: string | null = null;
   let open: { lines: string[]; first: number; last: number } | null = null;
@@ -250,6 +276,7 @@ export function paragraphs(text: string, path: string): Paragraph[] {
     else if (trimmed.startsWith('<!--')) content = block(trimmed.slice(4), '-->');
     else if (hash && trimmed.startsWith('#')) content = trimmed.replace(/^#+!?/, '');
     else if (json) content = /^"\$?comment"\s*:\s*"(.*)",?$/.exec(trimmed)?.[1] ?? null;
+    else if (prose && !trimmed.startsWith('```')) content = trimmed;
     if (content === null) {
       flush();
       if (trimmed !== '') out.push({ text: trimmed, first: at, last: at, comment: false });
@@ -299,11 +326,34 @@ export function headerOf(entry: CopyEntry, text: string, path: string): Paragrap
 /**
  * How the text of a manifest file disagrees with its entry. One comment paragraph must name
  * the kind, DOCX Editor, each source, and the commit (`headerOf`). A file whose entries are
- * not `copied` must not claim a copy of DOCX Editor in any paragraph, in any case.
+ * not `copied` must not claim a copy of DOCX Editor in any paragraph, in any case, unless the
+ * entry gives a `reason`: a guide can describe the copies in other files.
  */
-export function headerProblems(entry: CopyEntry, text: string, path = entry.file): string[] {
+export function headerProblems(
+  entry: CopyEntry,
+  text: string,
+  path = entry.file,
+  options: {
+    isLocal?: (token: string) => boolean;
+    sources?: readonly string[];
+    copied?: boolean;
+  } = {}
+): string[] {
   const problems: string[] = [];
   const found = paragraphs(text, path);
+  const header = found.find((p) => p.comment && lacks(entry, p.text).length === 0);
+  if (header !== undefined && options.isLocal !== undefined) {
+    const named = options.sources ?? entry.source;
+    const extra = [...header.text.matchAll(PATH_TOKEN)]
+      .map(([token]) => token.replace(/^docx-editor\//, ''))
+      .filter((token) => fileLike(token) && !options.isLocal!(token))
+      .find((token) => {
+        const bare = token.replace(/\/$/, '');
+        return !named.some((s) => s === bare || s.endsWith(`/${bare}`) || s.startsWith(`${bare}/`));
+      });
+    if (extra !== undefined)
+      problems.push(`the header at line ${header.first + 1} names ${extra}, which no entry lists`);
+  }
   if (!found.some((p) => p.comment && lacks(entry, p.text).length === 0)) {
     const near = found
       .filter((p) => p.comment)
@@ -316,28 +366,40 @@ export function headerProblems(entry: CopyEntry, text: string, path = entry.file
             `lacks ${near.missing.join(', ')}`
     );
   }
-  if (entry.kind !== 'copied') {
+  if (entry.kind !== 'copied' && options.copied !== true && entry.reason === undefined) {
     const claim = found.find((p) => claimsCopy(p.text));
     if (claim !== undefined)
       problems.push(
-        `line ${claim.first + 1} claims a copy of DOCX Editor, but the entry is ${entry.kind}`
+        `line ${claim.first + 1} puts a copy word near DOCX Editor, but the entry is ${entry.kind}`
       );
   }
   return problems;
 }
 
-/** Whether `text` says "copied from" or "a copy of" DOCX Editor. */
-function claimsCopy(text: string): boolean {
-  const source = new RegExp(COPY_CLAIM.source + MENTION.source, 'i');
-  return source.test(text);
+/** Whether `text` has a copy word ("copy", "copied", "copies", "copying") near a mention. */
+export function claimsCopy(text: string): boolean {
+  // A code span such as `Copy` names a control, not a claim.
+  const prose = text.replace(/`[^`]*`/g, (span) => ' '.repeat(span.length));
+  const mention = new RegExp(MENTION.source, 'gi');
+  let match: RegExpExecArray | null;
+  while ((match = mention.exec(prose)) !== null) {
+    const end = match.index + match[0].length;
+    const before = prose.slice(Math.max(0, match.index - NEAR), match.index).split(SENTENCE_END);
+    const after = prose.slice(end, end + NEAR).split(SENTENCE_END);
+    if (COPY_WORD.test(before.at(-1)!) || COPY_WORD.test(after[0]!)) return true;
+  }
+  return false;
 }
+
+/** The end of a sentence: a full stop, a question mark, or an exclamation mark, then a space. */
+const SENTENCE_END = /[.!?]\s+/;
 
 /**
  * The structural signs in `text` that it takes something from DOCX Editor, which need a
- * manifest entry, in a paragraph that mentions DOCX Editor: a `docx-editor/` path, a commit
+ * manifest entry. In a paragraph that mentions DOCX Editor: a `docx-editor/` path, a commit
  * hash, a path that is not in this repository (`isLocal` is false), a path right after the
- * mention, or a copy verb near it. A plain name mention, such as "as DOCX Editor's toolbar",
- * needs none.
+ * mention, or a copy verb anywhere. A commit or a foreign path in the next `FOLLOWING` comment
+ * paragraphs counts too. A plain name mention, such as "as DOCX Editor's toolbar", needs none.
  */
 export function copySignals(
   text: string,
@@ -345,27 +407,33 @@ export function copySignals(
   isLocal: (token: string) => boolean = () => false
 ): string[] {
   const signals: string[] = [];
-  for (const p of paragraphs(text, path)) {
-    const mention = new RegExp(MENTION.source, 'gi');
-    let match: RegExpExecArray | null;
-    const at = (what: string) => signals.push(`line ${p.first + 1}: ${what}`);
-    if (!MENTION.test(p.text)) continue;
-    const foreign = [...p.text.matchAll(PATH_TOKEN)]
+  const found = paragraphs(text, path);
+  const foreignIn = (p: Paragraph) =>
+    [...p.text.matchAll(PATH_TOKEN)]
       .map(([token]) => token)
       .find((token) => fileLike(token) && !isLocal(token));
+  found.forEach((p, index) => {
+    const at = (what: string) => signals.push(`line ${p.first + 1}: ${what}`);
+    if (!MENTION.test(p.text)) return;
+    const mention = new RegExp(MENTION.source, 'gi');
+    let match: RegExpExecArray | null;
+    let after = false;
+    while ((match = mention.exec(p.text)) !== null)
+      after ||= PATH_AFTER.test(p.text.slice(match.index + match[0].length));
+    const foreign = foreignIn(p);
+    const next = found
+      .slice(index + 1)
+      .filter((q) => q.comment)
+      .slice(0, FOLLOWING);
+    const later = next.find((q) => COMMIT_IN_TEXT.test(q.text) || foreignIn(q) !== undefined);
     if (/docx-editor\//i.test(p.text)) at('a docx-editor/ path');
     else if (COMMIT_IN_TEXT.test(p.text)) at('a commit hash');
     else if (foreign !== undefined) at(`the path ${foreign}, which is not in this repository`);
-    else
-      while ((match = mention.exec(p.text)) !== null) {
-        const end = match.index + match[0].length;
-        const near = p.text.slice(Math.max(0, match.index - NEAR), end + NEAR);
-        if (PATH_AFTER.test(p.text.slice(end))) at('a path right after the mention');
-        else if (COPY_VERB.test(near)) at('a copy verb near the mention');
-        else continue;
-        break;
-      }
-  }
+    else if (after) at('a path right after the mention');
+    else if (COPY_VERB.test(p.text)) at('a copy verb in the paragraph of the mention');
+    else if (claimsCopy(p.text)) at('a copy word near the mention');
+    else if (later !== undefined) at(`a commit or a foreign path at line ${later.first + 1}`);
+  });
   return signals;
 }
 
@@ -428,12 +496,20 @@ export function localPaths(tracked: readonly string[]): (token: string) => boole
 }
 
 /**
- * The least line overlap (`lineOverlap`) of an `adapted` file with its sources. In the manifest,
- * the lowest overlap of an adapted file is 0.190, about twice the floor. A wrong source overlaps
- * less: `chart-number-format.ts` for `chart-axes.ts` gives 0.022, and for `chart-scale.ts` 0.000.
- * A file under the floor follows a design and is a `reference`, or names a wrong source.
+ * The least line overlap (`lineOverlap`) of an `adapted` file with its sources together.
+ * `kindProblems` also fails a source that shares no line with the file, unless the entry has
+ * a `reason`. When the floor was set, the lowest overlap of an adapted file was 0.190. The
+ * check prints the current lowest.
  */
 export const ADAPTED_FLOOR = 0.1;
+
+/**
+ * The most line overlap of a `reference` file with any one source: above it, the file keeps
+ * the code of that source and is `adapted`. When the ceiling was set, the highest overlap of a
+ * reference was 0.440, so no reference was within 0.05 of it. The check prints the current
+ * highest (`--report` prints each overlap).
+ */
+export const REFERENCE_CEILING = 0.5;
 
 /** The extensions whose bodies `normalizedBody` compares. A file without one is a hash file. */
 const COMPARED_EXTENSIONS = new Set([
@@ -453,22 +529,70 @@ const COMPARED_EXTENSIONS = new Set([
 /** Whether the check can compare the body of `path` with `normalizedBody`. */
 export const comparable = (path: string): boolean => COMPARED_EXTENSIONS.has(extension(path));
 
+/** The language of a comparable file: script, style sheet, or a file with hash comments. */
+function language(path: string): string {
+  const ext = extension(path);
+  if (ext === '.css') return 'css';
+  return ['.ts', '.mts', '.tsx', '.js', '.mjs'].includes(ext) ? 'script' : 'hash';
+}
+
+/**
+ * Whether the check compares the body of `source` with the body of `file`: both comparable,
+ * in the same language. A style sheet never shares a line with a script.
+ */
+export const comparablePair = (file: string, source: string): boolean =>
+  comparable(file) && comparable(source) && language(file) === language(source);
+
 /**
  * How the code of a manifest file disagrees with the kind of its entry, from the normalized
- * bodies of the file (`ours`) and of each source (`theirs`). An `adapted` or `reference` entry
- * with one source must not equal it: it is a copy. An `adapted` entry must keep at least
- * `ADAPTED_FLOOR` of the lines of its sources.
+ * body of the file (`ours`) and of each source (`theirs`, in the order of `entry.source`; null
+ * for a source that the check cannot compare, such as a folder):
+ * - An `adapted` or `reference` file must not equal any of its sources: it is a copy.
+ * - An `adapted` file must keep `ADAPTED_FLOOR` of the lines of its sources together.
+ * - Each source of an `adapted` entry must share a line with the file, and the check must be
+ *   able to compare it, unless the entry gives a `reason`. A reference may share none: it
+ *   follows a design.
+ * - A `reference` must share at most `REFERENCE_CEILING` with each source.
  */
-export function kindProblems(entry: CopyEntry, ours: string, theirs: readonly string[]): string[] {
+export function kindProblems(
+  entry: CopyEntry,
+  ours: string,
+  theirs: readonly (string | null)[]
+): string[] {
   if (entry.kind === 'copied') return [];
-  if (theirs.length === 1 && theirs[0] === ours)
-    return [`the code equals ${entry.source[0]}: mark the entry as copied`];
-  if (entry.kind !== 'adapted') return [];
-  const overlap = lineOverlap(theirs.join('\n'), ours);
-  return overlap < ADAPTED_FLOOR
-    ? [
+  const equal = theirs.findIndex((body) => body === ours);
+  if (equal >= 0) return [`the code equals ${entry.source[equal]}: mark the entry as copied`];
+  const problems: string[] = [];
+  const overlaps = theirs.map((body) => (body === null ? null : lineOverlap(body, ours)));
+  const bodies = theirs.filter((body): body is string => body !== null);
+  if (entry.kind === 'adapted' && bodies.length > 0) {
+    const overlap = lineOverlap(bodies.join('\n'), ours);
+    if (overlap < ADAPTED_FLOOR)
+      problems.push(
         `the code shares ${overlap.toFixed(3)} of its lines with its sources, under ` +
-          `${ADAPTED_FLOOR}: name the right source, or mark the entry as a reference`,
-      ]
-    : [];
+          `${ADAPTED_FLOOR}: name the right source, or mark the entry as a reference`
+      );
+  }
+  if (entry.reason === undefined && entry.kind === 'adapted')
+    overlaps.forEach((overlap, at) => {
+      if (overlap === 0)
+        problems.push(
+          `the code shares no line with ${entry.source[at]}: fix the source, or move it to ` +
+            'a reference entry with a `reason`'
+        );
+      else if (overlap === null && bodies.length > 0)
+        problems.push(
+          `the check cannot compare ${entry.source[at]} with the code: name a file in the same ` +
+            'language, or move it to a reference entry with a `reason`'
+        );
+    });
+  if (entry.kind === 'reference')
+    overlaps.forEach((overlap, at) => {
+      if (overlap !== null && overlap > REFERENCE_CEILING)
+        problems.push(
+          `the code shares ${overlap.toFixed(3)} of its lines with ${entry.source[at]}, over ` +
+            `${REFERENCE_CEILING}: mark the entry as adapted`
+        );
+    });
+  return problems;
 }

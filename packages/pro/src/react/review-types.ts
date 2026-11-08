@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// The public prop types of `PptxEditorReview` and its parts, after DOCX Editor's
+// The public prop types of `PptxEditorReview` and its parts, adapted from DOCX Editor's
 // (docx-editor/packages/pro/src/react/review-types.ts at adf0e178c). The Vue twin is
 // `../vue/review-types.ts`.
 

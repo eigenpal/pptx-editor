@@ -3,8 +3,8 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// The public types, named as in DOCX Editor's `docx-to-pdf` (`packages/docx-to-pdf/src/types.ts` at
-// adf0e178) where the concept is the same.
+// The public types, adapted from DOCX Editor's `docx-to-pdf` (`packages/docx-to-pdf/src/types.ts`
+// at adf0e178) where the concept is the same.
 
 import type {
   FontSubstitution,

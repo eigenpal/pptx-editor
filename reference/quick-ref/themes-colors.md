@@ -2,7 +2,7 @@
 
 Extracted from ECMA-376 5th Edition - dml-main.xsd
 
-Adapted from DOCX Editor's `reference/quick-ref/themes-colors.md`. The DrawingML sections are the same in both products. The WordprocessingML sections are replaced with PresentationML usage.
+Adapted from DOCX Editor's `reference/quick-ref/themes-colors.md` at adf0e178. The DrawingML sections are the same in both products. The WordprocessingML sections are replaced with PresentationML usage.
 
 ## Theme Structure
 

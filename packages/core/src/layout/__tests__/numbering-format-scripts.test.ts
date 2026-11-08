@@ -1,6 +1,6 @@
 // Adapted from DOCX Editor `packages/core/src/layout/__tests__/numbering-format-scripts.test.ts`
-// at commit adf0e178. The tests call the script formatters directly: PPTX Editor does not copy
-// `numbering-format.ts`, and `hebrew1` is not a presentation scheme.
+// at commit adf0e178. The tests call the script formatters directly: PPTX Editor has no port
+// of the general numbering formatter, and `hebrew1` is not a presentation scheme.
 
 import { describe, expect, test } from 'bun:test';
 import {

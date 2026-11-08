@@ -1,6 +1,6 @@
-// Where the HarfBuzz runtime finds its `.wasm`, and the one escape hatch for
-// bundlers that lose it (docx-editor/packages/core/src/layout/harfbuzz-wasm-binary.ts;
-// PPTX Editor ships ESM only, so the CommonJS branch is gone). DOCX Editor commit adf0e178.
+// Where the HarfBuzz runtime finds its `.wasm`, and the one escape hatch for bundlers that lose it
+// (docx-editor/packages/core/src/layout/harfbuzz-wasm-binary.ts; PPTX Editor ships ESM only, so the
+// CommonJS branch is gone). Adapted from DOCX Editor at commit adf0e178.
 //
 // The runtime ships inlined in this package's ESM build, and its loader locates the
 // binary with `new URL('harfbuzz.wasm', import.meta.url)`. Webpack, Turbopack and

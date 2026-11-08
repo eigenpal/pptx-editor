@@ -1,5 +1,5 @@
 // Development warnings for customizations that cannot do what they say. Shared by the React and Vue
-// adapters (moved from packages/react/src/dev-warnings.ts). After DOCX Editor's
+// adapters (moved from the React adapter's `dev-warnings.ts`). After DOCX Editor's
 // `packages/react/src/editor/toolbar/toolbar-warnings.ts` and
 // `packages/react/src/lib/is-development.ts`. DOCX Editor commit adf0e178.
 //

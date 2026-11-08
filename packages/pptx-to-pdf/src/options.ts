@@ -3,9 +3,9 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Option checks, the work budget, and the cancellation scope, after DOCX Editor's `docx-to-pdf`
-// (`packages/docx-to-pdf/src/options.ts`, `packages/docx-to-pdf/src/context.ts` budgets,
-// `packages/docx-to-pdf/src/pdf-work.ts` `withPdfWork`). DOCX Editor commit adf0e178.
+// Option checks, the work budget, and the cancellation scope, adapted from DOCX Editor's
+// `docx-to-pdf` (`packages/docx-to-pdf/src/options.ts`, `packages/docx-to-pdf/src/context.ts`
+// budgets, `packages/docx-to-pdf/src/pdf-work.ts` `withPdfWork`). DOCX Editor commit adf0e178.
 
 import {
   ExportResourceError,
