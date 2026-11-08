@@ -23,8 +23,13 @@ describe('lineKey', () => {
     expect(lineKey('The word سلام')).toBe('');
     expect(lineKey('Arial \u0000')).toBe('');
     expect(lineKey('2.5')).toBe('');
-    expect(lineKey('S S')).toBe('');
+    expect(lineKey('S')).toBe('');
     expect(lineKey('日本')).toBe('日本');
+  });
+
+  test('reads the text without whitespace, so a space between two glyphs changes nothing', () => {
+    expect(lineKey('日 本 語')).toBe('日本語');
+    expect(lineKey('S S')).toBe('SS');
   });
 });
 

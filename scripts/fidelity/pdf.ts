@@ -136,6 +136,10 @@ export async function openPdf(bytes: Uint8Array, maxPages = Infinity): Promise<P
         // Whitespace items carry no glyph; pdf.js also adds them to bridge gaps, which would join
         // columns. Spaces come from the gaps instead (`groupLines`).
         if (!('str' in item) || !item.str.trim()) continue;
+        // An item with no advance is a mark that sits on another glyph, such as an Arabic dot
+        // that a font draws apart from its letter. It holds no text of a line, and a text layer
+        // maps it to any character: the pixels check it.
+        if (!(item.width > 0)) continue;
         const [a, b, c, d, e, f] = item.transform as number[];
         // Rotated, mirrored, and vertical text is checked by pixels only. Text that is only
         // sheared (`c`) stays: its baseline is level. A synthetic oblique face shears its
