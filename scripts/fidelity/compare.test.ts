@@ -19,17 +19,27 @@ describe('lineKey', () => {
   test('drops whitespace and a leading bullet, and skips lines it cannot check', () => {
     expect(lineKey('•  The quick  fox')).toBe('Thequickfox');
     expect(lineKey('1. First')).toBe('1.First');
-    // Right-to-left text, unmapped glyphs, numbers, and single glyphs are checked by pixels.
+    // Right-to-left text, unmapped glyphs, and single glyphs are checked by pixels.
     expect(lineKey('The word سلام')).toBe('');
     expect(lineKey('Arial \u0000')).toBe('');
-    expect(lineKey('2.5')).toBe('');
     expect(lineKey('S')).toBe('');
+    expect(lineKey('1')).toBe('');
+    expect(lineKey('• 7 %')).toBe('');
     expect(lineKey('日本')).toBe('日本');
   });
 
   test('reads the text without whitespace, so a space between two glyphs changes nothing', () => {
     expect(lineKey('日 本 語')).toBe('日本語');
     expect(lineKey('S S')).toBe('SS');
+  });
+
+  test('checks numbers, dates, and values of two or more letters or digits', () => {
+    expect(lineKey('2.5')).toBe('2.5');
+    expect(lineKey('14')).toBe('14');
+    expect(lineKey('45 %')).toBe('45%');
+    expect(lineKey('2026-11-08')).toBe('2026-11-08');
+    expect(lineKey('2𝑎')).toBe('2𝑎');
+    expect(lineKey('$1,200')).toBe('1,200');
   });
 });
 
@@ -169,6 +179,47 @@ describe('compareLines', () => {
     expect(shuffled.matched).toBe(ab.matched);
     expect(shuffled.worstBaseline).toBeCloseTo(ab.worstBaseline, 9);
     expect(shuffled.worstShift).toBeCloseTo(ab.worstShift, 9);
+  });
+
+  test('lines that join to hold a line may sit off its baseline: they fail by the distance', () => {
+    const ours = [{ text: 'C → N', xMin: 10, xMax: 60, baseline: 100.3 }];
+    const ref = [
+      { text: 'C →', xMin: 10, xMax: 40, baseline: 100 },
+      { text: 'N', xMin: 48, xMax: 60, baseline: 100 },
+    ];
+    for (const r of [compareLines(ours, ref), compareLines(ref, ours)]) {
+      expect(r).toMatchObject({ missing: [], extra: [] });
+      expect(r.worstBaseline).toBeCloseTo(0.3, 6);
+    }
+  });
+
+  test('repeated values of a table pair cell by cell, in either page', () => {
+    // A column of the same value: the third cell of our page is 1 pt low.
+    const a = [
+      line('10', 100, 50),
+      line('10', 120, 50),
+      line('10', 141, 50),
+      line('25 %', 160, 50),
+    ];
+    const b = [
+      line('10', 100, 50),
+      line('10', 120, 50),
+      line('10', 140, 50),
+      line('25 %', 160, 50),
+    ];
+    for (const [x, y] of [
+      [a, b],
+      [b, a],
+    ]) {
+      const r = compareLines(x!, y!);
+      expect(r).toMatchObject({ matched: 4, total: 4, missing: [], extra: [] });
+      expect(r.worstBaseline).toBe(1);
+    }
+    // A lone digit is not checked, so it is neither missing nor extra.
+    expect(compareLines([line('1', 100)], [line('2', 100)])).toMatchObject({
+      total: 0,
+      extra: [],
+    });
   });
 
   test('a reference line set word by word joins to hold our line, as ours joins to hold its', () => {
