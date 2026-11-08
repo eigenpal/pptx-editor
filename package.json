@@ -64,6 +64,10 @@
     "stress:hang": "bun scripts/stress/hang-check.ts",
     "bench:edit:browser": "playwright test --config e2e/bench.config.ts e2e/edit.bench.ts",
     "bench:open:browser": "playwright test --config e2e/bench.config.ts e2e/open.bench.ts",
+    "bench:hang:browser": "playwright test --config e2e/hang.config.ts e2e/hang.stress.ts",
+    "bench:network:browser": "playwright test --config e2e/bench.config.ts e2e/network.bench.ts",
+    "bench:memory:browser": "playwright test --config e2e/memory.config.ts",
+    "bench:interaction:browser": "playwright test --config e2e/bench.config.ts e2e/interaction-hang.bench.ts",
     "fidelity": "bun scripts/fidelity/run.ts",
     "fidelity:corpus": "bun scripts/fidelity/run.ts --set corpus",
     "fidelity:census": "bun scripts/fidelity/census.ts",
@@ -78,7 +82,10 @@
     "changeset": "changeset",
     "version-packages": "changeset version && bun install --lockfile-only",
     "release": "bun run build:packages && bun run notices:generate && bun run check:package-artifacts && changeset publish",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:hang:browser": "playwright test --config e2e/hang.config.ts",
+    "test:stress:interactions": "playwright test --config e2e/interactions.config.ts",
+    "test:fixtures:browser": "playwright test --config e2e/fixtures.config.ts"
   },
   "dependencies": {
     "@pptx-editor.dev/pptx-to-pdf": "workspace:*"

@@ -92,6 +92,19 @@ export function addRelationship(
   type: string,
   target: string
 ): string {
+  return addRelationships(batch, source, type, [target])[0]!;
+}
+
+/**
+ * Add a relationship of `type` from `source` to each of `targets`, in order, and return their
+ * new ids. The ids in use are read once for all of them. Creates the rels part.
+ */
+export function addRelationships(
+  batch: OpBatch,
+  source: string,
+  type: string,
+  targets: readonly string[]
+): string[] {
   const relsName = relsPartName(source);
   if (!xmlPartOf(batch.pkg, relsName))
     batch.push({
@@ -124,38 +137,38 @@ export function addRelationship(
   }
   // In a collaboration session the number comes from the actor's stripe (DOCX Editor's
   // actor-scoped ids), so two peers do not mint one; alone it is one past the largest.
-  let id: string;
-  if (batch.allocationActor) {
-    // The same cursor as every other kind; relationship numbers start at 1, as a file's own do.
-    const next = stripedIds(
-      batch.allocationActor,
-      numbers,
-      1,
-      MAX_RELATIONSHIP_NUMBER,
-      batch.mintedOf('rId')
-    );
-    id = relationshipIdFromNumber(next());
-  } else {
-    let n = max + 1;
-    while (used.has(relationshipIdFromNumber(n))) n += 1;
-    id = relationshipIdFromNumber(n);
-  }
-  batch.push({
-    op: 'insertNode',
-    part: relsName,
-    parent: rels.root.id,
-    index: rels.root.children.length,
-    spec: {
-      ns: NS.rel,
-      local: 'Relationship',
-      attrs: [
-        { ns: '', local: 'Id', value: id },
-        { ns: '', local: 'Type', value: type },
-        { ns: '', local: 'Target', value: relativeTarget(source, target) },
-      ],
-    },
+  const next = batch.allocationActor
+    ? // The same cursor as every other kind; relationship numbers start at 1, as a file's own do.
+      stripedIds(batch.allocationActor, numbers, 1, MAX_RELATIONSHIP_NUMBER, batch.mintedOf('rId'))
+    : null;
+  let n = max;
+  const index = rels.root.children.length;
+  return targets.map((target, i) => {
+    let id: string;
+    if (next) id = relationshipIdFromNumber(next());
+    else {
+      n += 1;
+      while (used.has(relationshipIdFromNumber(n))) n += 1;
+      id = relationshipIdFromNumber(n);
+    }
+    used.add(id);
+    batch.push({
+      op: 'insertNode',
+      part: relsName,
+      parent: rels.root.id,
+      index: index + i,
+      spec: {
+        ns: NS.rel,
+        local: 'Relationship',
+        attrs: [
+          { ns: '', local: 'Id', value: id },
+          { ns: '', local: 'Type', value: type },
+          { ns: '', local: 'Target', value: relativeTarget(source, target) },
+        ],
+      },
+    });
+    return id;
   });
-  return id;
 }
 
 /** Add an external relationship (a hyperlink); its target is recorded, never fetched. */
@@ -189,6 +202,25 @@ export function removeRelationship(batch: OpBatch, source: string, id: string): 
   if (rel) batch.push({ op: 'removeNode', part: relsPartName(source), node: rel.id });
 }
 
+/**
+ * Remove the nodes `ids` of `part`, last first: a removal shifts only the siblings after it,
+ * so none of the others moves.
+ */
+function removeLastFirst(batch: OpBatch, part: string, ids: readonly string[]): void {
+  for (let i = ids.length - 1; i >= 0; i -= 1) batch.push({ op: 'removeNode', part, node: ids[i] });
+}
+
+/** Remove relationships of `source` by id, in one pass over its relationships part. */
+export function removeRelationships(batch: OpBatch, source: string, ids: readonly string[]): void {
+  const gone = new Set(ids);
+  const rels = xmlPartOf(batch.pkg, relsPartName(source));
+  const nodes: string[] = [];
+  // The first relationship with an id goes, as `removeRelationship` removes it.
+  for (const rel of elements(rels?.root))
+    if (gone.delete(attr(rel, 'Id') ?? '')) nodes.push(rel.id);
+  removeLastFirst(batch, relsPartName(source), nodes);
+}
+
 /** Whether an element of `root` names `id` in an `r:*` attribute. Bounded at 256 levels. */
 function namesRelationship(root: Element, id: string): boolean {
   const stack: { el: Element; depth: number }[] = [{ el: root, depth: 0 }];
@@ -220,22 +252,34 @@ export function removeUnusedHyperlink(
 
 /** Add a content-type override for a part. */
 export function addOverride(batch: OpBatch, partName: string, contentType: string): void {
+  addOverrides(batch, [[partName, contentType]]);
+}
+
+/** Add content-type overrides, as `[partName, contentType]`, in one read of the content types. */
+export function addOverrides(
+  batch: OpBatch,
+  overrides: readonly (readonly [string, string])[]
+): void {
+  if (overrides.length === 0) return;
   const ct = xmlPartOf(batch.pkg, CONTENT_TYPES_PART);
   if (!ct) throw new CommandRefusal('errors.malformed');
-  batch.push({
-    op: 'insertNode',
-    part: CONTENT_TYPES_PART,
-    parent: ct.root.id,
-    index: ct.root.children.length,
-    spec: {
-      ns: NS.ct,
-      local: 'Override',
-      attrs: [
-        { ns: '', local: 'PartName', value: partName },
-        { ns: '', local: 'ContentType', value: contentType },
-      ],
-    },
-  });
+  const index = ct.root.children.length;
+  overrides.forEach(([partName, contentType], i) =>
+    batch.push({
+      op: 'insertNode',
+      part: CONTENT_TYPES_PART,
+      parent: ct.root.id,
+      index: index + i,
+      spec: {
+        ns: NS.ct,
+        local: 'Override',
+        attrs: [
+          { ns: '', local: 'PartName', value: partName },
+          { ns: '', local: 'ContentType', value: contentType },
+        ],
+      },
+    })
+  );
 }
 
 /**
@@ -273,6 +317,20 @@ export function ensureContentType(
       ],
     },
   });
+}
+
+/**
+ * Remove the content-type overrides of `partNames`, in one pass over the content types: the
+ * first override of each part goes, as `removeOverride` removes it.
+ */
+export function removeOverrides(batch: OpBatch, partNames: readonly string[]): void {
+  const ct = xmlPartOf(batch.pkg, CONTENT_TYPES_PART);
+  const gone = new Set(partNames.map(partNameKey));
+  const nodes: string[] = [];
+  for (const e of elements(ct?.root))
+    if (e.local === 'Override' && gone.delete(partNameKey(attr(e, 'PartName') ?? '')))
+      nodes.push(e.id);
+  removeLastFirst(batch, CONTENT_TYPES_PART, nodes);
 }
 
 /** Remove a content-type override. Part names compare the OPC way (ASCII case-insensitive). */
@@ -316,6 +374,34 @@ export function freePartName(batch: OpBatch, prefix: string, suffix: string): st
     if (!taken(name) && !taken(relsPartName(name))) return name;
   }
   throw new CommandRefusal('errors.tooLarge');
+}
+
+/**
+ * The part namer of a command that adds many parts: `freePartName` with the names in use read
+ * once. Each name it gives counts as taken for the next. In a collaboration session it is
+ * `freePartName` itself, whose names come from the actor's stripe.
+ */
+export function partNamer(batch: OpBatch): (prefix: string, suffix: string) => string {
+  if (batch.allocationActor) return (prefix, suffix) => freePartName(batch, prefix, suffix);
+  const present = new Set<string>();
+  for (const name of batch.pkg.parts.keys()) present.add(partNameKey(name));
+  const taken = (name: string): boolean => {
+    const key = partNameKey(name);
+    return present.has(key) || batch.reservedPartNames.has(key);
+  };
+  // The lowest number that may be free, for each pattern: the numbers below it are taken.
+  const from = new Map<string, number>();
+  return (prefix, suffix) => {
+    const pattern = `${prefix}\u0000${suffix}`;
+    for (let n = from.get(pattern) ?? 1, tries = 0; tries < 100_000; n += 1, tries += 1) {
+      const name = `${prefix}${n}${suffix}`;
+      if (taken(name) || taken(relsPartName(name))) continue;
+      from.set(pattern, n + 1);
+      present.add(partNameKey(name));
+      return name;
+    }
+    throw new CommandRefusal('errors.tooLarge');
+  };
 }
 
 /** `xsd:unsignedInt`: the largest value of `ST_DrawingElementId`, `ST_Index`, and their kin. */

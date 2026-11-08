@@ -9,6 +9,7 @@ import {
   comparePoints,
   deleteRange,
   insertBreak,
+  insertLines,
   insertText,
   splitParagraph,
 } from '../automation/commands/text-model.ts';
@@ -113,13 +114,19 @@ export function editText(
     if (!clean) throw new CommandRefusal('errors.invalidText');
     if (!collapsed) at = deleteRange(batch, part, txBodyId, sel.anchor, sel.focus);
     // Newlines start paragraphs; U+000B (the clipboard's line break) is a line break.
-    clean.split('\n').forEach((line, i) => {
-      if (i > 0) at = splitParagraph(batch, part, txBodyId, at);
+    const typeLine = (line: string): void =>
       line.split('\u000B').forEach((piece, j) => {
         if (j > 0) at = insertBreak(batch, part, txBodyId, at);
         if (piece) at = insertText(batch, part, txBodyId, at, piece);
       });
-    });
+    const lines = clean.split('\n');
+    typeLine(lines[0]!);
+    if (lines.length === 1) return at;
+    // The text after the caret moves to a paragraph of its own; the lines between the first
+    // and the last go in before it as whole paragraphs, and the last line joins it.
+    at = splitParagraph(batch, part, txBodyId, at);
+    if (lines.length > 2) at = insertLines(batch, part, txBodyId, at, lines.slice(1, -1));
+    typeLine(lines[lines.length - 1]!);
     return at;
   }
   if (!collapsed) at = deleteRange(batch, part, txBodyId, sel.anchor, sel.focus);

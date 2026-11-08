@@ -13,6 +13,7 @@ import {
   elements,
   NS,
   presentationInfo,
+  relsPartName,
   specOf,
   textOf,
   type Element,
@@ -23,21 +24,43 @@ import { CommandRefusal, type OpBatch } from './op-batch.ts';
 import { isMathZone, isSupportedMath } from '../../cascade/math.ts';
 import { caretWordRange } from '@eigenpal/ooxml-core';
 
-/** Slide numbers by part, per batch: slide order does not change inside a text edit. */
-const slideNumbers = new WeakMap<OpBatch, Map<string, number | undefined>>();
+/**
+ * Slide numbers by part, per batch, with the writes to the presentation part and its
+ * relationships when they were read. A batch can add or move a slide between two text edits
+ * (one automation `context.sync()`): it writes those parts, and the numbers are read again.
+ * The check counts writes (`OpBatch.writesTo`): it does not read `batch.pkg`, which closes the
+ * open transaction, so a paste of many line breaks keeps one transaction.
+ */
+interface SlideNumbers {
+  readonly presentationPart: string;
+  readonly writes: number;
+  readonly byPart: Map<string, number | undefined>;
+}
+const slideNumbers = new WeakMap<OpBatch, SlideNumbers>();
+
+/** The writes of `batch` to the presentation part `part` and to its relationships. */
+const structureWrites = (batch: OpBatch, part: string): number =>
+  batch.writesTo(part) + batch.writesTo(relsPartName(part));
 
 /**
  * The number a `slidenum` field shows in `part` (1-based slide index, as the cascade resolves
  * it), or undefined for a part that is not a slide (notes, layouts) where the stored text shows.
  */
 export function slideNumberOf(batch: OpBatch, part: string): number | undefined {
-  let byPart = slideNumbers.get(batch);
-  if (!byPart) slideNumbers.set(batch, (byPart = new Map()));
-  if (!byPart.has(part)) {
-    const index = presentationInfo(batch.pkg).slides.findIndex((s) => s.partName === part);
-    byPart.set(part, index < 0 ? undefined : index + 1);
+  let known = slideNumbers.get(batch);
+  if (!known || structureWrites(batch, known.presentationPart) !== known.writes) {
+    // Every slide at once: a Replace All across a long deck asks for each of its slides.
+    const info = presentationInfo(batch.pkg);
+    const byPart = new Map<string, number | undefined>();
+    info.slides.forEach((s, i) => byPart.has(s.partName) || byPart.set(s.partName, i + 1));
+    known = {
+      presentationPart: info.presentationPart,
+      writes: structureWrites(batch, info.presentationPart),
+      byPart,
+    };
+    slideNumbers.set(batch, known);
   }
-  return byPart.get(part);
+  return known.byPart.get(part);
 }
 
 /** The text an inline item shows: its `a:t`, or the slide number for a `slidenum` field. */
@@ -247,6 +270,72 @@ export function splitRunAt(batch: OpBatch, part: string, pId: string, offset: nu
   });
 }
 
+/**
+ * The run that text typed at `offset` goes in: an empty run at the caret (a format armed for
+ * this text), then the run that ends at the caret, then the run that contains it.
+ */
+function hostRunAt(slots: readonly Slot[], offset: number): Slot | undefined {
+  return (
+    slots.find((s) => s.kind === 'run' && s.start === offset && s.end === offset) ??
+    slots.find((s) => s.kind === 'run' && offset > s.start && offset <= s.end) ??
+    slots.find((s) => s.kind === 'run' && offset === s.start && s.start === 0)
+  );
+}
+
+/**
+ * Put whole lines in as paragraphs before paragraph `at.paragraph`, with the caret at its start,
+ * as typing each line there and pressing Enter after it does: each new paragraph takes that
+ * paragraph's properties and paragraph mark, and its text takes the run properties that typed
+ * text takes there. U+000B in a line is a line break. One insert for each line, with no read of
+ * the text body in between, so 30,000 pasted lines cost what they insert. Returns the caret,
+ * still at the start of the same paragraph.
+ */
+export function insertLines(
+  batch: OpBatch,
+  part: string,
+  txBodyId: string,
+  at: TextPoint,
+  lines: readonly string[]
+): TextPoint {
+  const txBody = batch.element(part, txBodyId);
+  const p = paragraphsOf(txBody)[at.paragraph];
+  if (!p) throw new CommandRefusal('errors.unsupported', 'no paragraph');
+  const n = slideNumberOf(batch, part);
+  const pPr = child(p, 'a:pPr');
+  const end = child(p, 'a:endParaRPr');
+  // The run properties `insertText` gives text typed at the start of `p`.
+  const host = hostRunAt(slotsOf(p, n), 0);
+  const hostRPr = host && child(host.el, 'a:rPr');
+  // The host run is the first run of `p`. Typed text goes into it, so text before the first
+  // line break takes its run properties, or none. A line break, and a new run of text after
+  // it, take the properties that `insertBreak` and `insertText` give there (`rPrSpecAt`).
+  const after = rPrSpecAt(p, 0, n);
+  const rPr = host && child(host.el, 'a:t') ? hostRPr && specOf(hostRPr) : after;
+  let index = txBody.children.findIndex((c) => c.id === p.id);
+  for (const line of lines) {
+    const inline: NodeSpec[] = [];
+    line.split('\u000B').forEach((piece, j) => {
+      if (j > 0) inline.push(aSpec('br', {}, [after]));
+      const own = j === 0 ? rPr : after;
+      if (piece)
+        inline.push(aSpec('r', {}, [...(own ? [own] : []), aSpec('t', {}, [{ text: piece }])]));
+    });
+    batch.insert({
+      op: 'insertNode',
+      part,
+      parent: txBodyId,
+      index,
+      spec: aSpec('p', {}, [
+        ...(pPr ? [specOf(pPr)] : []),
+        ...inline,
+        ...(end ? [specOf(end)] : []),
+      ]),
+    });
+    index += 1;
+  }
+  return { paragraph: at.paragraph + lines.length, offset: 0 };
+}
+
 /** Insert text at a point. Returns the point after the insertion. */
 export function insertText(
   batch: OpBatch,
@@ -260,13 +349,7 @@ export function insertText(
   if (!p) throw new CommandRefusal('errors.unsupported', 'no paragraph');
   const n = slideNumberOf(batch, part);
   const offset = snapPoint(p, at.offset, n);
-  const slots = slotsOf(p, n);
-  // Prefer an empty run at the caret (a format armed for this text), then the run that ends
-  // at the caret, then the run that contains it.
-  const host =
-    slots.find((s) => s.kind === 'run' && s.start === offset && s.end === offset) ??
-    slots.find((s) => s.kind === 'run' && offset > s.start && offset <= s.end) ??
-    slots.find((s) => s.kind === 'run' && offset === s.start && s.start === 0);
+  const host = hostRunAt(slotsOf(p, n), offset);
   if (host) {
     const t = child(host.el, 'a:t');
     if (t) {

@@ -81,14 +81,106 @@ export function ribbonChrome(search: string): boolean {
   return new URLSearchParams(search).get('chrome') === 'ribbon';
 }
 
-/** The longest the demo waits for a deck it serves. */
-const DECK_FETCH_MS = 30_000;
+/**
+ * A deck download fails when no bytes arrive for this long. The limit is on progress, not on
+ * the whole download, so a slow connection that keeps sending bytes still finishes.
+ */
+export const DECK_STALL_MS = 10_000;
 
-/** Fetch a deck that the demo serves. Rejects on a network error, an HTTP error, or a stall. */
-export async function fetchDeck(base: string, file: string): Promise<Uint8Array> {
-  const res = await fetch(`${base}${file}`, { signal: AbortSignal.timeout(DECK_FETCH_MS) });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${file}`);
-  return new Uint8Array(await res.arrayBuffer());
+/** A deck download that sent no bytes for `DECK_STALL_MS`. */
+export class DeckStallError extends Error {
+  constructor(file: string) {
+    super(`No bytes of ${file} arrived for ${DECK_STALL_MS} ms`);
+    this.name = 'DeckStallError';
+  }
+}
+
+/** Options of `fetchDeck`. */
+export interface FetchDeckOptions {
+  /** Fail when no bytes arrive for this long. Defaults to `DECK_STALL_MS`. */
+  readonly stallMs?: number;
+  /** Cancels the download. */
+  readonly signal?: AbortSignal;
+}
+
+/**
+ * Fetch a deck that the demo serves. Rejects on a network error, an HTTP error, a stall (no
+ * response or no body bytes for `stallMs`), or a cancel.
+ */
+export async function fetchDeck(
+  base: string,
+  file: string,
+  { stallMs = DECK_STALL_MS, signal }: FetchDeckOptions = {}
+): Promise<Uint8Array> {
+  const controller = new AbortController();
+  signal?.throwIfAborted();
+  signal?.addEventListener('abort', () => controller.abort(signal.reason), { once: true });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // The stall rejects the wait itself too: a host whose body stream ignores the abort
+  // cannot hold the open.
+  const stalled = new Promise<never>((_, reject) => {
+    controller.signal.addEventListener('abort', () => reject(controller.signal.reason));
+  });
+  stalled.catch(() => undefined);
+  const arm = (): void => {
+    clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(new DeckStallError(file)), stallMs);
+  };
+  arm();
+  try {
+    const res = await Promise.race([
+      fetch(`${base}${file}`, { signal: controller.signal }),
+      stalled,
+    ]);
+    if (!res.ok) throw new Error(`HTTP ${res.status} for ${file}`);
+    if (!res.body) return new Uint8Array(await Promise.race([res.arrayBuffer(), stalled]));
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+      for (;;) {
+        arm();
+        const next = await Promise.race([reader.read(), stalled]);
+        if (next.done) break;
+        chunks.push(next.value);
+        size += next.value.byteLength;
+      }
+    } catch (cause) {
+      void reader.cancel(cause).catch(() => undefined);
+      throw cause;
+    }
+    const bytes = new Uint8Array(size);
+    let at = 0;
+    for (const chunk of chunks) (bytes.set(chunk, at), (at += chunk.byteLength));
+    return bytes;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Download the deck the demo opens first. A deck that the user opens before it arrives cancels
+ * it, so a late download never replaces the user's deck, and its failure shows no notice.
+ * Returns the cancel.
+ */
+export function fetchFirstDeck(
+  base: string,
+  file: string,
+  handlers: {
+    readonly loaded: (bytes: Uint8Array) => void;
+    readonly failed: (cause: unknown) => void;
+  }
+): () => void {
+  const controller = new AbortController();
+  fetchDeck(base, file, { signal: controller.signal }).then(
+    (bytes) => {
+      if (!controller.signal.aborted) handlers.loaded(bytes);
+    },
+    (cause: unknown) => {
+      if (!controller.signal.aborted) handlers.failed(cause ?? new Error('fetch failed'));
+    }
+  );
+  return () => controller.abort();
 }
 
 /** Say that a deck the demo serves did not load, in the editor's notice. */

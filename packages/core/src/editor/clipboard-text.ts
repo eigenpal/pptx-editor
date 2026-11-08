@@ -283,30 +283,37 @@ export function pasteParagraphs(
     batch.insert({ op: 'insertNode', part, parent: first.id, index: 0, spec: sourcePPr });
   }
   let lastId = first.id;
+  // Each pasted paragraph goes in after the one before it, with its runs: one insert each, and
+  // no read of the text body in between, so 5,000 pasted paragraphs cost what they insert.
+  let bodyIndex = batch.element(part, txBodyId).children.findIndex((c) => c.id === first.id);
+  const firstPPrSpec = firstPPr ? specOf(firstPPr) : undefined;
   specs.forEach((spec, i) => {
-    if (i > 0) {
-      const body = batch.element(part, txBodyId);
-      const index = body.children.findIndex((c) => c.id === lastId) + 1;
-      const own = (spec.children ?? []).find(
-        (c): c is NodeSpec => !('text' in c) && c.local === 'pPr'
-      );
-      const pPr = own ?? (firstPPr ? specOf(firstPPr) : undefined);
-      const end = (spec.children ?? []).find(
-        (c): c is NodeSpec => !('text' in c) && c.local === 'endParaRPr'
-      );
-      lastId = batch.insert({
-        op: 'insertNode',
-        part,
-        parent: txBodyId,
-        index,
-        spec: { ...spec, children: [...(pPr ? [pPr] : []), ...(end ? [end] : [])] },
-      });
+    if (i === 0) {
+      let index = inlineEnd(batch.element(part, lastId));
+      for (const item of inlineOf(spec)) {
+        batch.insert({ op: 'insertNode', part, parent: lastId, index, spec: item });
+        index += 1;
+      }
+      return;
     }
-    let index = inlineEnd(batch.element(part, lastId));
-    for (const item of inlineOf(spec)) {
-      batch.insert({ op: 'insertNode', part, parent: lastId, index, spec: item });
-      index += 1;
-    }
+    const own = (spec.children ?? []).find(
+      (c): c is NodeSpec => !('text' in c) && c.local === 'pPr'
+    );
+    const pPr = own ?? firstPPrSpec;
+    const end = (spec.children ?? []).find(
+      (c): c is NodeSpec => !('text' in c) && c.local === 'endParaRPr'
+    );
+    bodyIndex += 1;
+    lastId = batch.insert({
+      op: 'insertNode',
+      part,
+      parent: txBodyId,
+      index: bodyIndex,
+      spec: {
+        ...spec,
+        children: [...(pPr ? [pPr] : []), ...inlineOf(spec), ...(end ? [end] : [])],
+      },
+    });
   });
   const paragraphs = paragraphsOf(batch.element(part, txBodyId));
   const lastIndex = paragraphs.findIndex((p) => p.id === lastId);

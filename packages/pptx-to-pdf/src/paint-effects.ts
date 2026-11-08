@@ -301,7 +301,8 @@ async function silhouette(
   // A line's width as the shape draws it, under the effect transform.
   const lineScale = matrixScale(full) / matrixScale(item.matrix);
   const fills = item.kind === 'picture' || ownFill(el.fill, scope).fill.type !== 'none';
-  const line = el.line && flatColor(el.line.fill, scope, p, 'lines') ? el.line : undefined;
+  const paintLine = item.paintLine ?? el.line;
+  const line = paintLine && flatColor(paintLine.fill, scope, p, 'lines') ? paintLine : undefined;
   const lineWidth = line ? (line.width || 9525) * lineScale : 0;
   const trace = (paths: readonly GeometryPath[], close: PDFOperator) => () => {
     for (const path of paths) {

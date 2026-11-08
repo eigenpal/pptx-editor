@@ -6,7 +6,7 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { GlobalWindow } from 'happy-dom';
 import { textDeck } from '../../../../../scripts/bench/text-deck.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
-import { ThumbnailPainter } from '../thumbnails.ts';
+import { MAX_PAINTED, ThumbnailPainter } from '../thumbnails.ts';
 
 // A DOM for this file only: the engine test run registers no global DOM.
 const win = new GlobalWindow();
@@ -204,6 +204,63 @@ describe('thumbnails of a long deck', () => {
       await until(() => painted(boxes.slice(30, 35)) === 5);
       expect(painted(boxes.slice(30, 35))).toBe(5);
       expect(painted(boxes.slice(20, 30))).toBeLessThan(10);
+      editor.destroy();
+      list.remove();
+    } finally {
+      w.IntersectionObserver = had;
+    }
+  });
+
+  test('a rail scrolled end to end keeps at most MAX_PAINTED thumbnails painted', async () => {
+    type Entry = { target: Element; isIntersecting: boolean };
+    let latest: ((e: Entry[]) => void) | null = null;
+    class Observer {
+      constructor(cb: (e: Entry[]) => void) {
+        latest = cb;
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+    const w = win as unknown as { IntersectionObserver: unknown };
+    const had = w.IntersectionObserver;
+    w.IntersectionObserver = Observer;
+    try {
+      const n = MAX_PAINTED + 100;
+      const editor = await open(n);
+      const view = { top: 0 };
+      const { list, boxes } = rail(n, view);
+      // A deck this long opens in the background: wait until every slide is parsed.
+      await until(() => !editor.snapshot().pendingSlides);
+      const disposers = boxes.map((box, i) => editor.renderThumbnail(i, box, DEFER));
+      // Idle time paints until the painter is full, then stops: the rest paint in view.
+      await until(() => painted(boxes) === MAX_PAINTED);
+      await wait(100);
+      expect(painted(boxes)).toBe(MAX_PAINTED);
+      // The rail asks again when a summary changes, after the disposer: still full.
+      disposers.forEach((dispose) => dispose());
+      boxes.forEach((box, i) => editor.renderThumbnail(i, box, DEFER));
+      await wait(100);
+      expect(painted(boxes)).toBe(MAX_PAINTED);
+      const shown = (): HTMLElement[] =>
+        boxes.slice(Math.floor(view.top / ITEM_H), Math.ceil((view.top + 600) / ITEM_H));
+      // Scroll to the end, one screen at a time: each screen paints as it comes into view.
+      for (view.top = 0; view.top <= (n - 6) * ITEM_H; view.top += 600) {
+        latest!(shown().map((b) => ({ target: b as unknown as Element, isIntersecting: true })));
+        await until(() => painted(shown()) === shown().length);
+        expect(painted(shown())).toBe(shown().length);
+        await endOfTask();
+        expect(painted(boxes)).toBeLessThanOrEqual(MAX_PAINTED);
+      }
+      // The first screen was emptied; back in view, it paints again.
+      view.top = 0;
+      expect(painted(shown())).toBe(0);
+      latest!(shown().map((b) => ({ target: b as unknown as Element, isIntersecting: true })));
+      await until(() => painted(shown()) === shown().length);
+      expect(painted(shown())).toBe(shown().length);
+      // Every thumbnail shows its own slide.
+      for (const [i, box] of boxes.entries())
+        if (box.firstElementChild) expect(box.textContent).toContain(`Slide ${i + 1} title`);
       editor.destroy();
       list.remove();
     } finally {

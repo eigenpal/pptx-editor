@@ -483,7 +483,9 @@ describe('the clipboard host', () => {
   test('slides copied in the slide list paste after the current slide, in another editor too', async () => {
     const { ran, clip } = await host();
     const data: Record<string, string> = {};
-    expect(clip.copyTo(transfer(data), false, true)).toBe(true);
+    // The surface calls the copy unbound, as the facade hands it over.
+    const { copyTo } = clip;
+    expect(copyTo(transfer(data), false, true)).toBe(true);
     expect(Object.keys(data)).toEqual([SLIDES_MIME]);
     expect(clip.pasteFrom(transfer(data))).toBe(true);
     const command = ran[0]!;
@@ -531,4 +533,20 @@ describe('the clipboard host', () => {
     expect(refused).toEqual(['errors.clipboard']);
     expect(data).toEqual({});
   });
+});
+
+test('literal angle brackets stay in one clipboard run and preserve their text', () => {
+  const text = '<'.repeat(50_000);
+  const paragraphs = richFromHtml(`<p>${text}</p>`)!;
+  expect(paragraphs).toHaveLength(1);
+  expect(paragraphs[0]!.runs).toEqual([{ text }]);
+  expect(richFromHtml('before << 2<b>bold</b>after <')!.flatMap((p) => p.runs)).toEqual([
+    { text: 'before << 2' },
+    { text: 'bold', bold: true },
+    { text: 'after <' },
+  ]);
+  expect(richFromHtml('before <<<!--comment-->after <span title="')![0]!.runs).toEqual([
+    { text: 'before <<' },
+    { text: 'after' },
+  ]);
 });

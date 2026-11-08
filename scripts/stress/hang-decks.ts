@@ -20,6 +20,7 @@ import {
   tableRows,
   type HangDeck,
 } from './deck-parts.ts';
+import { payloadDecks } from './payload-decks.ts';
 import { uiScaleDecks } from './ui-scale-decks.ts';
 
 export type { HangDeck } from './deck-parts.ts';
@@ -138,6 +139,22 @@ const grid = (cols: number) => Array.from({ length: cols }, () => Math.floor((11
 
 /** The full set. */
 export const HANG_DECKS: readonly HangDeck[] = [
+  {
+    id: 'tabs-many-stops',
+    target: '60000 tab characters with 60000 explicit stops behind the cursor',
+    bytes: () =>
+      one(
+        box(
+          2,
+          '<a:p><a:pPr><a:tabLst>' +
+            '<a:tab pos="0" algn="l"/>'.repeat(60_000) +
+            '</a:tabLst></a:pPr>' +
+            run('\t'.repeat(60_000)) +
+            '</a:p>',
+          { bodyPr: NOFIT }
+        )
+      ),
+  },
   // Size.
   {
     id: 'slides-3000',
@@ -224,13 +241,29 @@ export const HANG_DECKS: readonly HangDeck[] = [
     bytes: () => one(box(2, para(run('a' + '́'.repeat(50_000))), { bodyPr: NOFIT })),
   },
   {
+    id: 'bullet-combining-marks-50k',
+    target: 'a bullet grapheme of 50000 combining marks',
+    bytes: () =>
+      one(
+        box(
+          2,
+          para(run('item'), `<a:pPr><a:buChar char="${'a' + '\u0301'.repeat(50_000)}"/></a:pPr>`),
+          { bodyPr: NOFIT }
+        )
+      ),
+  },
+  {
     id: 'cjk-100k-no-breaks',
     target: '100000 CJK characters in kinsoku rules',
     bytes: () =>
       one(
         box(
           2,
-          para(run('、「'.repeat(50_000), 'lang="ja-JP"'), '<a:pPr eaLnBrk="1" hangingPunct="1"/>'),
+          // Not `run()`: its `lang="en-US"` and a second `lang` are not well-formed XML.
+          para(
+            `<a:r><a:rPr lang="ja-JP" altLang="en-US"/><a:t>${'、「'.repeat(50_000)}</a:t></a:r>`,
+            '<a:pPr eaLnBrk="1" hangingPunct="1"/>'
+          ),
           { bodyPr: NOFIT }
         )
       ),
@@ -531,6 +564,33 @@ export const HANG_DECKS: readonly HangDeck[] = [
 
   // Tables.
   {
+    id: 'table-tiny-dashed-borders',
+    target: 'one-EMU dotted borders on a large table cell',
+    bytes: () =>
+      one(
+        table({
+          id: 2,
+          x: 0,
+          y: 0,
+          cx: 2147483647,
+          cy: 2147483647,
+          columns: [2147483647],
+          tblPr: '<a:tblPr/>',
+          rows:
+            '<a:tr h="2147483647">' +
+            cell('', {
+              tcPr: ['lnL', 'lnR', 'lnT', 'lnB', 'lnTlToBr', 'lnBlToTr']
+                .map(
+                  (side) =>
+                    `<a:${side} w="1">${solid('000000')}<a:prstDash val="sysDot"/></a:${side}>`
+                )
+                .join(''),
+            }) +
+            '</a:tr>',
+        })
+      ),
+  },
+  {
     id: 'table-span-huge',
     target: 'table cells with huge grid and row spans',
     bytes: () =>
@@ -680,6 +740,8 @@ export const HANG_DECKS: readonly HangDeck[] = [
   },
   // Sizes that the editor UI reads on every change: the toolbar state, the slide panel, the
   // layout menu, the selection, and the live region. Each one must open and edit in the
-  // browser without a long freeze (`e2e/hang.bench.ts`).
+  // browser without a long freeze (`e2e/hang.stress.ts`).
   ...uiScaleDecks(),
+  // Adversarial payloads: pictures, SVG, metafiles, effects, charts, text, and package parts.
+  ...payloadDecks(),
 ];

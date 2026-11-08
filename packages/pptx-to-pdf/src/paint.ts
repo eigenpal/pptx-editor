@@ -200,7 +200,8 @@ async function drawGeometry(
     item.kind === 'shape' &&
     (boxed.type === 'picture' || (boxed.type === 'path' && boxed.path !== 'circle'));
   // Only an outline that draws: a picture with `a:ln/a:noFill` has none to split.
-  if (item.kind === 'picture' && el.line && el.line.fill.type !== 'none' && paths.length > 1)
+  const line = item.paintLine ?? el.line;
+  if (item.kind === 'picture' && line && line.fill.type !== 'none' && paths.length > 1)
     p.diag.add(
       'picture.outline',
       'approximation',
@@ -226,18 +227,18 @@ async function drawGeometry(
         path.fill
       );
     // A picture's outline follows all of its geometry, as in the SVG paint.
-    if (!el.line || (!path.stroke && item.kind !== 'picture')) continue;
+    if (!line || (!path.stroke && item.kind !== 'picture')) continue;
     p.push(pushGraphicsState());
     const picture = item.kind === 'picture';
-    const color = strokeStyle(el.line, p, scope, groupScale, picture);
+    const color = strokeStyle(line, p, scope, groupScale, picture);
     if (color) {
       p.alpha(1, color.a);
-      const width = strokeWidth(el.line, groupScale);
+      const width = strokeWidth(line, groupScale);
       // A picture's border lies outside the picture.
       if (picture) outsideOf(path.commands, width, w, h, p);
       // An open path stops short under its line ends, and a dashed one can get square caps, as
       // in the SVG paint (`core/layout`, `planStroke`).
-      const plan = picture ? undefined : planStroke(path.commands, el.line, groupScale);
+      const plan = picture ? undefined : planStroke(path.commands, line, groupScale);
       tracePath(plan ? plan.commands : path.commands, p);
       p.push(stroke());
       if (plan) drawStrokeExtras(plan, color, width, p);

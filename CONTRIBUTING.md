@@ -57,6 +57,20 @@ The demo builds against workspace source, so it needs no package build.
 5. Add a changeset for code changes with `bun changeset`. Documentation, test, and CI-only changes do not need one.
 6. Submit a pull request against `main` with a conventional-commit title.
 
+## Browser responsiveness checks
+
+Run these checks against the source demos in this checkout:
+
+```bash
+bun run test:hang:browser
+bun run test:stress:interactions
+bun run test:fixtures:browser
+```
+
+The hang corpus covers large presentations, extreme text, geometry, tables, pictures, and font waits. Each presentation opens through the demo's file input in a fresh browser context. The check records open time, main-thread gaps, and frame gaps, then checks recovery with another presentation. A crash, an uncaught error, a request outside the demo, an open over 20 seconds, or a main-thread gap over 5 seconds fails it. Set `HANG_STRICT=1` to also fail on a gap over 1 second. In Chromium, the check also records long tasks, heap size, and DOM size. `bun run test:hang:browser` also runs the bullet and font wait checks (`bullet-hang.stress.ts` and `font-hang.stress.ts`). `bun run bench:hang:browser` runs only the hang corpus (`hang.stress.ts`). Rows go to `test-results/hang-<browser>/rows.jsonl`. The interaction suite runs the same navigation, editing, paste, and replacement sequences in React and Vue. The fixture suite opens each synthetic fixture, navigates its slides, and saves and reopens it. These checks test responsiveness. They do not replace PDF fidelity comparisons.
+
+Set `HANG_BROWSER=firefox` or `HANG_BROWSER=webkit` to use another browser engine. Install the engines first with `bunx playwright install chromium firefox webkit`. Set `HANG_ONLY=slides-3000,tabs-many-stops` to select hang corpus cases. Each suite starts its own servers and refuses occupied ports.
+
 ## Add a collaboration fixture
 
 Every editing command and every kind of text input must converge when two people edit one deck. The gate, `packages/pro/src/__tests__/collaboration-coverage.test.ts`, runs each edit on peer A of two editors on linked Y.Docs, flushes, and compares both replicas and their saved decks. When you add a command:

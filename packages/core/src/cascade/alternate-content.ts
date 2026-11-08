@@ -136,6 +136,22 @@ function isDrawable(branch: Element): boolean {
  * `Requires="p14"` choice. @internal
  */
 export function alternateBranch(ac: Element, root?: Element): Element | undefined {
+  // The tree is immutable: the same element under the same root picks the same branch. The
+  // cascade, a toolbar probe, and find then check thousands of `Requires` prefixes once.
+  const known = branchByElement.get(ac);
+  if (known && known.root === root) return known.branch;
+  const branch = pickBranch(ac, root);
+  branchByElement.set(ac, { root, branch });
+  return branch;
+}
+
+/** The branch each `mc:AlternateContent` picked, with the root it resolved under. */
+const branchByElement = new WeakMap<
+  Element,
+  { readonly root: Element | undefined; readonly branch: Element | undefined }
+>();
+
+function pickBranch(ac: Element, root: Element | undefined): Element | undefined {
   let first: Element | undefined;
   for (const branch of elements(ac)) {
     if (branch.ns !== NS.mc || branch.local !== 'Choice') continue;

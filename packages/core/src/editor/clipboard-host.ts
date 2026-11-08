@@ -281,6 +281,19 @@ export function createClipboardHost(editor: ClipboardEditor) {
     return Array.from(data.files ?? []).find((f) => PICTURE_TYPES.has(f.type));
   };
 
+  /** Fill a clipboard event with the slides selected in the slide list. */
+  const copySlidesTo = (data: DataTransfer, cut: boolean): boolean => {
+    copies += 1;
+    const session = editor.session();
+    const slides = editor.selectedSlides();
+    if (!session || !slides.length) return false;
+    const json = slidesClipboard(session, slides);
+    if (!json) return (editor.refuse('errors.clipboard'), true);
+    data.setData(SLIDES_MIME, json);
+    if (cut && !editor.readOnly()) editor.exec({ type: 'deleteSlides', indices: [...slides] });
+    return true;
+  };
+
   return {
     get lastCopied(): ClipboardPayload | null {
       return lastCopied;
@@ -288,20 +301,13 @@ export function createClipboardHost(editor: ClipboardEditor) {
     copy,
     warm,
     /** Fill a clipboard event with the slides selected in the slide list. */
-    copySlidesTo(data: DataTransfer, cut: boolean): boolean {
-      copies += 1;
-      const session = editor.session();
-      const slides = editor.selectedSlides();
-      if (!session || !slides.length) return false;
-      const json = slidesClipboard(session, slides);
-      if (!json) return (editor.refuse('errors.clipboard'), true);
-      data.setData(SLIDES_MIME, json);
-      if (cut && !editor.readOnly()) editor.exec({ type: 'deleteSlides', indices: [...slides] });
-      return true;
-    },
-    /** Fill a clipboard event: with the selected slides when it comes from the slide list. */
+    copySlidesTo,
+    /**
+     * Fill a clipboard event: with the selected slides when it comes from the slide list. The
+     * surface calls it unbound, so it names no `this`.
+     */
     copyTo(data: DataTransfer, cut: boolean, slideList = false): boolean {
-      if (slideList) return this.copySlidesTo(data, cut);
+      if (slideList) return copySlidesTo(data, cut);
       copies += 1;
       const selection = editor.selection();
       // A cell range: its text as tab-separated text and as this editor's cells format.

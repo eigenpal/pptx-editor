@@ -150,7 +150,7 @@ State members are refs. Function members are plain functions.
 | --- | --- | --- |
 | `useFonts(source, ...fragments)` or `useFonts(...origins)` | `UseFontsReturn` | A `MarkedFontResolver` with a stable identity, for the `fonts` prop. Each argument can be a ref or a getter. See [Fonts](/docs/customization/fonts). |
 | `useFontFamily()` | `UseFontFamilyReturn` | `value`, `theme`, `options`, `groups`, `isEnabled`, and `disabledReason`: computed refs. `isCurrent(row)` and `setValue(family)`. Use it for your own font picker. See [Build the list from `useFontFamily`](/docs/customization/toolbar#build-the-list-from-usefontfamily). |
-| `usePptxSource(source, options?)` | `UsePptxSourceReturn` | `document`, `fonts`, `error`, and `isLoading`: computed refs. `source` and `options` can be refs or getters. See the font loading rules in [Open a presentation](/docs/react/hooks#open-a-presentation). |
+| `usePptxSource(source, options?)` | `UsePptxSourceReturn` | `document`, `fonts`, `error`, and `isLoading`: computed refs. `source` and `options` can be refs or getters. See the font loading and download rules in [Open a presentation](/docs/react/hooks#open-a-presentation). |
 
 ## Build your own chrome
 

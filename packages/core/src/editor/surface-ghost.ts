@@ -8,6 +8,7 @@
 import type { EditorSelection } from '../contracts/index.ts';
 import { runGlyphs, type LayoutItem, type Matrix } from '../layout/index.ts';
 import { SVG_NS } from '../output/index.ts';
+import { paintClusterRanges } from '../layout/text/paint-clusters.ts';
 
 const EMU_PER_PT = 12_700;
 
@@ -28,21 +29,26 @@ export function ghostBullet(
   const g = doc.createElementNS(SVG_NS, 'g');
   g.setAttribute('class', 'pptx-surface__ghost-bullet');
   g.setAttribute('transform', `matrix(${m.join(' ')}) scale(${EMU_PER_PT})`);
-  const text = doc.createElementNS(SVG_NS, 'text');
-  // Each character at the left edge of its cell, also in a bullet that reads right to left.
+  // Each character at the left edge of its cell, also in a bullet that reads right to left. A
+  // very long grapheme draws in bounded pieces, so one bullet cannot stall the browser.
   const glyphs = runGlyphs(run);
-  text.setAttribute('x', glyphs.map((g) => String(g.x / EMU_PER_PT)).join(' '));
-  text.setAttribute('y', String((line.baseline - run.rise) / EMU_PER_PT));
-  text.setAttribute('font-family', `${run.face.id}, sans-serif`);
-  text.setAttribute('font-size', String(run.sizePt));
-  const fill = run.props.fill;
-  if (fill.type === 'solid')
-    text.setAttribute('fill', `rgb(${fill.color.r} ${fill.color.g} ${fill.color.b})`);
-  text.setAttribute('xml:space', 'preserve');
-  // The characters stand in their cells and are already mirrored: the browser must not reorder
-  // or mirror them again.
-  text.setAttribute('style', 'unicode-bidi:bidi-override;direction:ltr');
-  text.textContent = glyphs.map((g) => g.char).join('');
-  g.appendChild(text);
+  for (const piece of paintClusterRanges(run.text)) {
+    const part = glyphs.filter((gl) => gl.index >= piece.start && gl.index < piece.end);
+    if (!part.length) continue;
+    const text = doc.createElementNS(SVG_NS, 'text');
+    text.setAttribute('x', part.map((gl) => String(gl.x / EMU_PER_PT)).join(' '));
+    text.setAttribute('y', String((line.baseline - run.rise) / EMU_PER_PT));
+    text.setAttribute('font-family', `${run.face.id}, sans-serif`);
+    text.setAttribute('font-size', String(run.sizePt));
+    const fill = run.props.fill;
+    if (fill.type === 'solid')
+      text.setAttribute('fill', `rgb(${fill.color.r} ${fill.color.g} ${fill.color.b})`);
+    text.setAttribute('xml:space', 'preserve');
+    // The characters stand in their cells and are already mirrored: the browser must not
+    // reorder or mirror them again.
+    text.setAttribute('style', 'unicode-bidi:bidi-override;direction:ltr');
+    text.textContent = part.map((gl) => gl.char).join('');
+    g.appendChild(text);
+  }
   return g;
 }

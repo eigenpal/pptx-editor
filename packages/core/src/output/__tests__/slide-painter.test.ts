@@ -6,7 +6,8 @@ import { GlobalWindow } from 'happy-dom';
 import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { createPptxEditor } from '../../editor/index.ts';
 import type { LayoutItem } from '../../layout/index.ts';
-import { paintSlide, SlidePainter, type PaintOptions } from '../paint.ts';
+import { paintSlide, type PaintOptions } from '../paint.ts';
+import { SlidePainter } from '../slide-painter.ts';
 
 const win = new GlobalWindow();
 const doc = win.document as unknown as Document;

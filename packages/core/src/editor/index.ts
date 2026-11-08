@@ -161,6 +161,7 @@ export {
   type MountedSections,
   type ProgressiveMount,
 } from './progressive-mount.ts';
+export { clampSlide } from './progressive-open.ts';
 export { STANDARD_COLORS, gradientCss, presetGradient, swatchName } from './palette.ts';
 export { PATTERN_CHOICES, patternCss, patternDialogStart, patternLabel } from './pattern-fields.ts';
 export { focusEdge, handleMenuKey, panelItems } from './menu-keyboard.ts';
@@ -885,12 +886,15 @@ export type * from '../contracts/index.ts';
 export * from './font-composition.ts';
 export * from './font-resolver.ts';
 export {
+  EAGER_FONTS_WAIT_MS,
   fetchPptxSource,
   isAbortError,
   pptxFontsShape,
   pptxSourceBytes,
   pptxSourceFontsResolver,
   resolveEagerPptxFonts,
+  SOURCE_STALL_MS,
+  watchEagerPptxFonts,
   type PptxFontOrigin,
   type PptxFontsInput,
   type PptxFontsShape,

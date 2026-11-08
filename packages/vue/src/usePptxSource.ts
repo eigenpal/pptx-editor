@@ -22,7 +22,7 @@ import {
   pptxFontsShape,
   pptxSourceBytes,
   pptxSourceFontsResolver,
-  resolveEagerPptxFonts,
+  watchEagerPptxFonts,
   type FontResolver,
   type PptxSource,
   type UsePptxSourceOptions,
@@ -45,7 +45,8 @@ export interface UsePptxSourceReturn {
 /**
  * Load a presentation, and optionally its fonts, for `PptxEditor`, the twin of React's
  * `usePptxSource` and of DOCX Editor's `useDocxSource`. Eager fonts hold the deck back until
- * they settle; an on-demand resolver does not. A font failure never fails the deck. @public
+ * they settle, for at most 2 seconds; an on-demand resolver does not. A font failure never
+ * fails the deck, and a URL that sends no bytes for 10 seconds fails with an error. @public
  */
 export function usePptxSource(
   source: MaybeRefOrGetter<PptxSource | null | undefined>,
@@ -76,17 +77,15 @@ export function usePptxSource(
         fontsSettled.value = true;
         return;
       }
-      let live = true;
       fonts.value = undefined;
       fontsSettled.value = false;
-      void resolveEagerPptxFonts(fontsSource).then((composed) => {
-        if (!live) return;
-        if (composed) fonts.value = composed;
-        fontsSettled.value = true;
-      });
-      onCleanup(() => {
-        live = false;
-      });
+      // An origin that never answers holds the deck only for the font wait.
+      onCleanup(
+        watchEagerPptxFonts(fontsSource, {
+          resolved: (composed) => (fonts.value = composed),
+          release: () => (fontsSettled.value = true),
+        })
+      );
     },
     { immediate: true }
   );

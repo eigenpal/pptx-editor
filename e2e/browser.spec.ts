@@ -503,7 +503,9 @@ async function railState(page: Page) {
   });
 }
 
-test('long deck: the rail paints the thumbnails in view first, then the rest', async ({ page }) => {
+test('long deck: the rail paints the thumbnails in view first, then more up to its limit', async ({
+  page,
+}) => {
   // Visibility from CSS layout and the browser's IntersectionObserver: happy-dom has neither.
   // With idle time held, only the first-paint burst, the items in view (or near it), and the
   // ones that scroll into view can paint: the observer path, alone.
@@ -550,11 +552,17 @@ test('long deck: the rail paints the thumbnails in view first, then the rest', a
   const last = page.locator('.pptx-rail__item').last().locator('.pptx-rail__thumb > svg');
   await expect(last).toHaveCount(1);
   expect(band((await railState(page)).painted)).toEqual([]);
-  // In idle time, every thumbnail paints.
+  // In idle time, thumbnails paint up to the rail's limit (`MAX_PAINTED` in `thumbnails.ts`),
+  // and no further: each painted thumbnail holds memory. The items in view stay painted.
+  const MAX_PAINTED = 200;
   await page.evaluate(() => (window as unknown as { releaseIdle(): void }).releaseIdle());
   await expect
     .poll(async () => (await railState(page)).painted.length, { timeout: 30_000 })
-    .toBe(SLIDES);
+    .toBe(MAX_PAINTED);
+  await page.waitForTimeout(1_000);
+  const idle = await railState(page);
+  expect(idle.painted.length).toBeLessThanOrEqual(MAX_PAINTED);
+  expect(idle.inView.every((i) => idle.painted.includes(i))).toBe(true);
 });
 
 test('long deck: the first slide takes input while the rest opens, and every slide is there after', async ({

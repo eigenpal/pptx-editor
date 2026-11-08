@@ -158,9 +158,13 @@ export function Deck({ url }: { url: string }) {
 | `document` | `Uint8Array \| undefined` | The bytes, for the `document` prop. |
 | `fonts` | `FontConfiguration \| FontResolver \| undefined` | The value for the `fonts` prop. |
 | `error` | `Error \| null` | Why the presentation did not open. A font failure never shows here. |
-| `isLoading` | `boolean` | True until the presentation arrives or fails, and while eager fonts load. |
+| `isLoading` | `boolean` | True until the presentation arrives or fails, and for up to 2 seconds while eager fonts load. |
 
-Eager fonts (a value, a promise, or a zero-argument loader) hold the deck back until they settle, so the slides lay out once. An on-demand resolver (`packagedFonts()`, `googleFonts()`) needs the parsed deck, so the bytes go through at once, and `fonts` is one resolver for the life of the hook. A string source is always a URL, fetched as you wrote it. Check a URL from user input first.
+Eager fonts (a value, a promise, or a zero-argument loader) hold the deck back until they settle, so the slides lay out once. They hold it for at most 2 seconds. Fonts that settle later still apply, and the slides lay out again. An on-demand resolver (`packagedFonts()`, `googleFonts()`) needs the parsed deck, so the bytes go through at once, and `fonts` is one resolver for the life of the hook.
+
+A string source is always a URL, fetched as you wrote it. Check a URL from user input first. When no bytes arrive for 10 seconds, the download stops and `error` is a `TimeoutError`. A slow download that keeps sending bytes finishes.
+
+The download also stops when the file is longer than 528 MiB, the longest file the editor opens. The hook checks the `Content-Length` header before the body arrives, and the byte count while it downloads. In both cases, `error` is a `RangeError`.
 
 ## Build your own chrome
 

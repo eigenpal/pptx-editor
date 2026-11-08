@@ -125,6 +125,8 @@ export class SlideSurface {
   readonly #cursor: CursorLayer;
   /** The frame that paints the items a paint budget left out (`PAINT_BUDGET`). */
   readonly #paintRest: NextFrame;
+  /** The view for the window, and the repaint when the window grows (surface-paint.ts). */
+  readonly #reach: paint.WindowReach;
   readonly #input: HTMLTextAreaElement;
   readonly #live: HTMLDivElement;
   readonly #resize: ResizeObserver;
@@ -196,6 +198,8 @@ export class SlideSurface {
     // The input sits in the stage, on the caret, so an IME candidate window opens there.
     this.#cursor = new CursorLayer(doc);
     this.#paintRest = new NextFrame(doc.defaultView as Window | null);
+    const shown = () => ((l) => l && { slide: l.slide, zoom: editor.zoom() })(editor.layout());
+    this.#reach = new paint.WindowReach(doc.defaultView, EMU_PER_PX, shown, () => this.render());
     this.#caretScroll = new CaretScroll(host, this.#stage, this.root);
     this.#stage.append(this.#cursor.element, this.#overlay, this.#input);
     this.root.append(this.#stage, this.#live);
@@ -246,6 +250,7 @@ export class SlideSurface {
     this.host.removeEventListener('wheel', this.#onWheel);
     this.#unbindInput();
     this.#paintRest.stop();
+    this.#reach.destroy();
     this.root.remove();
   }
 
@@ -323,8 +328,9 @@ export class SlideSurface {
     }
     const painted = this.editor.paintLayout?.(layout) ?? layout;
     const paintKey = this.editor.paintKey?.();
-    // Converted pictures, or new faces: paint every item again, the old ones standing in.
+    // Converted pictures, new faces, or a wider view: paint again, the old nodes standing in.
     if (this.#painter?.invalidate(paintKey)) this.#paintKey = null;
+    if (this.#painter?.view(this.#view(layout))) this.#paintKey = null;
     if (this.#paintKey !== painted) {
       this.#paintKey = painted;
       const opts = {
@@ -854,8 +860,12 @@ export class SlideSurface {
       images: this.editor.imageUrl,
       ...(this.editor.imageSize ? { imageSize: this.editor.imageSize } : {}),
       idPrefix: `${this.editor.idPrefix}s${layout.slide.index}`,
+      view: this.#view(layout),
     };
   }
+
+  /** What the surface can show at this zoom (`surfaceView`). */
+  #view = (layout: SlideLayout) => this.#reach.view(layout.slide, this.editor.zoom());
 
   /**
    * End a drag (an undo or a redo). A shape drag ends with no edit, and says so when it moved. A

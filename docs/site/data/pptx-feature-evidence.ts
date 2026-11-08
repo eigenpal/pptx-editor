@@ -24,7 +24,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   },
   'text.font-family-size': {
     fixtures: ['text-runs', 'open-font-families'],
-    approximations: ['line-model', 'glyph-advances', 'missing-glyphs'],
+    approximations: ['line-model', 'long-text-clusters', 'glyph-advances', 'missing-glyphs'],
   },
   'text.color-highlight': {
     fixtures: ['text-runs', 'colors', 'fills-lines'],
@@ -81,6 +81,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
     approximations: [
       'line-model',
       'aligned-bullets',
+      'long-text-clusters',
       'numbering-schemes',
       'symbol-bullets',
       'trailing-break',
@@ -119,7 +120,7 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   },
   'fills-lines.lines': {
     fixtures: ['lines-arrows', 'line-ends-dashes', 'fills-lines'],
-    approximations: ['inset-lines', 'compound-lines'],
+    approximations: ['inset-lines', 'dash-complexity', 'compound-lines'],
   },
   'fills-lines.theme-colors': {
     fixtures: ['colors', 'follow-ups'],
@@ -164,7 +165,12 @@ export const FEATURE_EVIDENCE: Readonly<Record<string, FeatureEvidence>> = {
   // --- Tables ------------------------------------------------------------
   'tables.render': {
     fixtures: ['tables', 'table-editing'],
-    approximations: ['default-table-style', 'coincident-borders', 'inconsistent-merges'],
+    approximations: [
+      'default-table-style',
+      'coincident-borders',
+      'inconsistent-merges',
+      'dash-complexity',
+    ],
   },
   'tables.cell-text': {
     fixtures: ['tables', 'table-editing'],

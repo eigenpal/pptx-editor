@@ -142,6 +142,9 @@ export function pictureImage(
     width: num(r.width),
     height: num(r.height),
     preserveAspectRatio: 'none',
+    // The browser decodes the picture off the frame: a slide of large pictures never holds
+    // a frame for seconds, and each picture shows when it is decoded.
+    decoding: 'async',
     style: STORED_PIXELS_STYLE,
     opacity: alpha < 1 ? num(alpha) : undefined,
     filter,
@@ -366,6 +369,7 @@ function tilePaint(
       width: num(tw),
       height: num(th),
       preserveAspectRatio: 'none',
+      decoding: 'async',
       style: STORED_PIXELS_STYLE,
       transform:
         mx || my

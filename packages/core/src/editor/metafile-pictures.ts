@@ -6,6 +6,7 @@ import { metafileFormat } from '@eigenpal/ooxml-core';
 import { metafilePng } from '../output/metafile-png.ts';
 import { binaryPartOf, REL, relationshipsOf, type PptxPackage } from '../store/index.ts';
 import { drawableImageMime } from './drawable-image.ts';
+import { partPictureScale, ScaledPictures, type ShownPicture } from './scaled-pictures.ts';
 
 /** Picture bytes and the MIME type to draw them with. */
 export interface DrawablePicture {
@@ -88,6 +89,8 @@ export function metafilePartsOf(pkg: PptxPackage, slides: readonly string[]): Sh
 interface ShownMetafiles {
   readonly parts: readonly string[];
   readonly bytes: Uint8Array[];
+  /** The parts that show pictures: the slides, their layouts and masters, and drawings. */
+  readonly sources?: readonly string[];
 }
 
 /** The metafiles of one slide, by package revision (`metafilePartsOf`). */
@@ -96,7 +99,7 @@ const shownByPackage = new WeakMap<PptxPackage, Map<string, ShownMetafiles>>();
 function walkMetafiles(pkg: PptxPackage, slides: readonly string[]): ShownMetafiles {
   const seen = new Set<string>(slides);
   const queue = [...slides];
-  const out = { parts: [] as string[], bytes: [] as Uint8Array[] };
+  const out = { parts: [] as string[], bytes: [] as Uint8Array[], sources: queue };
   for (let i = 0; i < queue.length; i += 1) {
     const source = queue[i]!;
     const master = relationshipsOf(pkg, source).some((r) => r.type === REL.theme);
@@ -145,11 +148,18 @@ export class MetafilePictures {
   /** Stops the conversions with the current fonts: a font change or `dispose()` aborts it. */
   #abort = new AbortController();
   /** The blob URL of each picture part name, with the bytes it draws. */
-  #urls = new Map<string, { readonly drawn: Uint8Array; readonly url: string }>();
+  #urls = new Map<
+    string,
+    { readonly drawn: Uint8Array; readonly url: string; readonly viewers: Set<string> }
+  >();
+  /** The URL name that each part that shows a picture part draws it with (`url`). */
+  #viewing = new Map<string, string>();
   #disposed = false;
   readonly #fonts: () => readonly Uint8Array[];
   readonly #changed: () => void;
   readonly #convert: typeof metafilePng;
+  /** Pictures over their part's pixel budget draw scaled on screen (`scaled-pictures.ts`). */
+  readonly scaled: ScaledPictures;
 
   /**
    * `fonts` gives the font files that metafile text draws with. `changed` hears that PNGs are
@@ -163,6 +173,7 @@ export class MetafilePictures {
     this.#fonts = fonts;
     this.#changed = changed;
     this.#convert = convert;
+    this.scaled = new ScaledPictures(changed);
   }
 
   /**
@@ -202,19 +213,52 @@ export class MetafilePictures {
   }
 
   /**
-   * A blob URL for `picture`, the drawable bytes of the part `part`. New bytes for the part (a
-   * new PNG, or a replaced picture) revoke the URL of the old ones; `dispose()` revokes the
-   * rest. Undefined with no `Blob`.
+   * How the picture part `part` of `pkg` with `bytes` draws on screen for the part `source` that
+   * shows it: `drawable`, scaled when the pictures of `source` are over their pixel budget
+   * (`partPictureScale`). Undefined while it cannot draw.
    */
-  url(part: string, picture: DrawablePicture): string | undefined {
-    const hit = this.#urls.get(part);
-    if (hit?.drawn === picture.bytes) return hit.url;
-    if (this.#disposed || typeof URL === 'undefined' || typeof Blob === 'undefined') return;
-    if (hit) URL.revokeObjectURL(hit.url);
-    const blob = new Blob([picture.bytes.slice().buffer], { type: picture.mime });
-    const url = URL.createObjectURL(blob);
-    this.#urls.set(part, { drawn: picture.bytes, url });
-    return url;
+  shown(
+    bytes: Uint8Array,
+    named: string | undefined,
+    pkg: PptxPackage,
+    source: string
+  ): ShownPicture | undefined {
+    const picture = this.drawable(bytes, named);
+    const factor = this.scaled.steady(source, partPictureScale(pkg, source));
+    return picture && this.scaled.shown(picture, factor, source);
+  }
+
+  /**
+   * A blob URL for `picture`, the drawable bytes of the part `part`, at the size that `size`
+   * names (`ScaledPictures`; empty for the stored size), as part `viewer` shows it. New bytes
+   * for the part at that size (a new PNG, or a replaced picture) revoke the URL of the old ones.
+   * A size that no part shows any more is revoked; `dispose()` revokes the rest. Undefined with
+   * no `Blob`.
+   */
+  url(part: string, picture: DrawablePicture, size = '', viewer = ''): string | undefined {
+    const name = size ? `${part}#${size}` : part;
+    let hit = this.#urls.get(name);
+    if (hit?.drawn !== picture.bytes) {
+      if (this.#disposed || typeof URL === 'undefined' || typeof Blob === 'undefined') return;
+      if (hit) URL.revokeObjectURL(hit.url);
+      const blob = new Blob([picture.bytes.slice().buffer], { type: picture.mime });
+      const url = URL.createObjectURL(blob);
+      hit = { drawn: picture.bytes, url, viewers: hit?.viewers ?? new Set() };
+      this.#urls.set(name, hit);
+    }
+    const seat = `${part}\n${viewer}`;
+    const before = this.#viewing.get(seat);
+    if (before !== name) {
+      this.#viewing.set(seat, name);
+      hit.viewers.add(seat);
+      const old = before === undefined ? undefined : this.#urls.get(before);
+      old?.viewers.delete(seat);
+      if (old && old.viewers.size === 0) {
+        URL.revokeObjectURL(old.url);
+        this.#urls.delete(before!);
+      }
+    }
+    return hit.url;
   }
 
   /** Convert the metafile `bytes` once. Resolves when its PNG is ready or it did not convert. */
@@ -311,14 +355,18 @@ export class MetafilePictures {
     return this.#timedOut.has(bytes) ? 'timed-out' : 'pending';
   }
 
-  /** A key that changes when the PNG of a metafile that slide part `slide` shows changes. */
+  /**
+   * A key that changes when the PNG of a metafile that slide part `slide` shows changes, or when
+   * a picture finishes scaling (`ScaledPictures.serial`).
+   */
   stateOf(pkg: PptxPackage, slide: string | undefined): string {
-    return (slide ? metafilesOf(pkg, [slide]) : [])
-      .map((b) => {
-        const png = this.#done.get(b) ?? this.#last.get(b);
-        return png ? this.#serials.get(png) : '-';
-      })
-      .join(',');
+    const shown = slide ? metafilePartsOf(pkg, [slide]) : null;
+    const pngs = (shown?.bytes ?? []).map((b) => {
+      const png = this.#done.get(b) ?? this.#last.get(b);
+      return png ? this.#serials.get(png) : '-';
+    });
+    const scaled = (shown?.sources ?? []).map((s) => this.scaled.serialOf(s)).filter(Boolean);
+    return scaled.length ? `${pngs.join(',')};${scaled.join(',')}` : pngs.join(',');
   }
 
   /** The fonts changed: each metafile converts again with them. The last PNGs draw until then. */
@@ -347,10 +395,12 @@ export class MetafilePictures {
    */
   dispose(): void {
     this.#disposed = true;
+    this.scaled.dispose();
     this.#listen(false);
     this.#hiddenTimeouts.clear();
     for (const { url } of this.#urls.values()) URL.revokeObjectURL(url);
     this.#urls.clear();
+    this.#viewing.clear();
     this.#abort.abort();
     if (this.#repaint) clearTimeout(this.#repaint);
     this.#queue = [];

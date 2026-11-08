@@ -2,7 +2,8 @@
 // from `a:tr/@h` grown to fit cell text, and one box with laid-out text per drawn cell. All
 // lengths are EMU in the frame's local space.
 
-import type { ResolvedTable, ResolvedTableCell } from '../cascade/index.ts';
+import type { CellBorders, ResolvedTable, ResolvedTableCell } from '../cascade/index.ts';
+import { boundedDashLine } from './dash-limit.ts';
 import { heightIndependent, placeTextLayout, ROTATED_VERT } from './text/anchor.ts';
 import { layoutText, type TextLayout } from './text/text-layout.ts';
 import type { TextMeasurer } from './text/measurer.ts';
@@ -10,6 +11,8 @@ import type { TextMeasurer } from './text/measurer.ts';
 /** One drawn cell: its box in the frame and its text. */
 export interface CellLayout {
   readonly cell: ResolvedTableCell;
+  /** Border paint overrides when native dash expansion exceeds the resource limit. */
+  readonly paintBorders?: CellBorders;
   readonly x: number;
   readonly y: number;
   readonly width: number;
@@ -93,7 +96,18 @@ export function layoutTable(
       ? placeTextLayout(measured, cell.text.body, box)
       : layoutText(cell.text, box, measurer);
     for (const s of text.substitutions) substitutions?.add(s);
-    return { cell, x, y, width: w, height: h, text };
+    let paintBorders: CellBorders | undefined;
+    for (const side of Object.keys(cell.borders) as (keyof CellBorders)[]) {
+      const length =
+        side === 'top' || side === 'bottom'
+          ? w
+          : side === 'left' || side === 'right'
+            ? h
+            : Math.hypot(w, h);
+      const bounded = boundedDashLine(cell.borders[side], length);
+      if (bounded) paintBorders = { ...(paintBorders ?? cell.borders), [side]: bounded };
+    }
+    return { cell, x, y, width: w, height: h, text, ...(paintBorders ? { paintBorders } : {}) };
   });
   return {
     columnX: table.rtl ? colX.map((v) => width - v).reverse() : colX,

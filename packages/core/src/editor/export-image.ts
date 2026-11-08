@@ -17,6 +17,8 @@ import type { DocumentSession } from './document-session.ts';
 import { toBase64 } from '../automation/commands/base64.ts';
 import { CommandRefusal } from '../automation/commands/op-batch.ts';
 import { uniquePrefix } from './paint-ids.ts';
+import { FACE_LOAD_WAIT_MS } from '../output/font-faces.ts';
+import { within } from './within.ts';
 import { FONT_NAME } from './selection-state.ts';
 
 /** Options for a slide picture. @public */
@@ -196,6 +198,26 @@ async function decodeSvg(text: string): Promise<HTMLImageElement> {
   }
 }
 
+/** The bounded wait of each font set `ready` promise: one wait for each loading period. */
+const settledWaits = new WeakMap<Promise<unknown>, Promise<unknown>>();
+
+/**
+ * The page's fonts, for a picture of a slide: settles when the browser's font set is ready, or
+ * after the face load wait. A face whose load never settles keeps the set loading, and must not
+ * hold an export. The set gives the same `ready` promise while it stays loading, so a ZIP of
+ * every slide waits once, not once for each slide. @internal
+ */
+export function fontsSettled(): Promise<unknown> {
+  const ready = typeof document === 'undefined' ? undefined : document.fonts?.ready;
+  if (!ready) return Promise.resolve();
+  let wait = settledWaits.get(ready);
+  if (!wait) {
+    wait = within(ready, FACE_LOAD_WAIT_MS, undefined);
+    settledWaits.set(ready, wait);
+  }
+  return wait;
+}
+
 /**
  * Slide `index` as a PNG of `options.width` pixels (default 1920), drawn from the editor's own
  * paint. It waits for the slide's EMF and WMF pictures (`session.picturesReady`); one that is
@@ -209,7 +231,7 @@ export async function exportSlidePng(
   options: SlideImageOptions = {}
 ): Promise<Blob> {
   const timeoutMs = options.picturesTimeoutMs;
-  await Promise.all([document.fonts?.ready, session.picturesReady(index, { timeoutMs })]);
+  await Promise.all([fontsSettled(), session.picturesReady(index, { timeoutMs })]);
   const { svg, width, height } = paintAlone(session, index, options, () => true);
   return drawPng(svg, width, height);
 }

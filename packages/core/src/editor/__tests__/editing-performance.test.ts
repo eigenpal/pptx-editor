@@ -8,6 +8,7 @@ import { textDeck } from '../../../../../scripts/bench/text-deck.ts';
 import { find, presentationInfo, xmlPartOf } from '../../store/index.ts';
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 import { renderKey, slideDependencies } from '../slide-dependencies.ts';
+import { nodeIndexTestRecorder } from '../../store/store/node-index.ts';
 
 // A DOM for this file only: the engine test run registers no global DOM.
 const win = new GlobalWindow();
@@ -290,6 +291,30 @@ describe('SVG ids', () => {
     const both = [...ids(a), ...ids(b)];
     expect(both.length).toBeGreaterThan(1);
     expect(new Set(both).size).toBe(both.length);
+    editor.destroy();
+  });
+});
+
+describe('the toolbar asks what it can do on a slide of thousands of shapes', () => {
+  test('without walking the whole slide for Insert Text Box and the slide-wide commands', async () => {
+    const shapes = Array.from({ length: 3000 }, (_, i) =>
+      shape({
+        id: i + 2,
+        x: (i % 60) * 150_000,
+        y: Math.floor(i / 60) * 100_000,
+        cx: IN / 10,
+        cy: IN / 10,
+      })
+    ).join('');
+    const editor = await open(buildPptx({ slides: [{ shapes }] }));
+    const recorder = nodeIndexTestRecorder();
+    recorder.reset();
+    expect(editor.can({ type: 'insertTextBox' }).ok).toBe(true);
+    expect(editor.can({ type: 'resetSlides', indices: [0] }).ok).toBe(true);
+    expect(recorder.completeBuilds).toBe(0);
+    // The edit itself still works, and commits a whole index.
+    expect(editor.exec({ type: 'insertTextBox' }).ok).toBe(true);
+    expect(editor.session!.layout(0)!.items.length).toBe(3001);
     editor.destroy();
   });
 });

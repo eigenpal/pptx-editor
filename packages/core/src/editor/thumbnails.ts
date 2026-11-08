@@ -13,9 +13,20 @@
 // (thumbnail-queue.ts) paints the first of a task at once and the ones in view before the
 // frame; the rest paint when they scroll into view or when idle. A container never shows a
 // wrong slide: one that waits is empty.
+//
+// At most `MAX_PAINTED` thumbnails stay painted. Each painted thumbnail holds its SVG, and the
+// browser holds the layout and the shaped text of it: in a deck of thousands of slides, a rail
+// scrolled end to end would keep them all. Past the limit, the thumbnails painted longest ago
+// that are out of view are emptied, and paint again when they come into view.
 
 import type { SlideLayout } from '../layout/index.ts';
-import { paintSlide, SlidePainter, type PaintOptions } from '../output/index.ts';
+import {
+  paintSlide,
+  paintWeight,
+  SlidePainter,
+  type PaintOptions,
+  type ViewRect,
+} from '../output/index.ts';
 import type { PptxPackage } from '../store/index.ts';
 import type { DocumentSession } from './document-session.ts';
 import { renderKey } from './slide-dependencies.ts';
@@ -24,6 +35,14 @@ import { idleCallback, ThumbnailQueue, type Ask, type IdleDeadline } from './thu
 /** The render key of slide `index`: its parts, its faces, and its converted pictures. */
 const keyOf = (session: DocumentSession, index: number): string | undefined =>
   renderKey(session.store.package, index, session.paintKey(session.info.slides[index]?.partName));
+
+/** The slide's own rectangle: a thumbnail clips to it (`PaintOptions.view`). */
+const slideView = (lay: SlideLayout): ViewRect => ({
+  x: 0,
+  y: 0,
+  width: lay.slide.width,
+  height: lay.slide.height,
+});
 
 /** The label of a frame the engine does not draw ("Chart (not rendered in this version)"). */
 export function frameLabelOf(
@@ -55,14 +74,27 @@ interface Painted {
   readonly key: string;
 }
 
-/** The number of items from which a current slide's first thumbnail waits for idle time. */
+/**
+ * The number of items (`paintWeight`: a group counts its shapes) from which a current slide's
+ * first thumbnail waits for idle time.
+ */
 const LARGE_SLIDE_ITEMS = 2_000;
+
+/** The number of items slide layout `lay` paints, with the shapes in its groups. */
+function slideWeight(lay: SlideLayout | undefined): number {
+  let weight = 0;
+  for (const item of lay?.items ?? []) weight += paintWeight(item);
+  return weight;
+}
 
 /**
  * The new items an idle repaint paints into one thumbnail. A large slide fills its thumbnail
  * over several idle periods, so no idle repaint blocks input for long.
  */
 const IDLE_PAINT_BUDGET = 1_000;
+
+/** The painted thumbnails kept (rail and slide sorter): several screens of the slide sorter. */
+export const MAX_PAINTED = 200;
 
 /** Quiet time after the last change before a changed slide repaints. */
 const QUIET_MS = 150;
@@ -91,6 +123,9 @@ export class ThumbnailPainter {
    * changed in place repaints the items that changed, not the whole slide.
    */
   #painters = new WeakMap<HTMLElement, SlidePainter>();
+  /** The painted containers on the page, painted longest ago first, with their slide. */
+  #shown = new Map<HTMLElement, Ask>();
+  #evicting = false;
   readonly #frameLabel = (kind: string): string => this.#host.frameLabel(kind);
   /** First paints of containers out of view, which wait for view or idle time. */
   readonly #queue = new ThumbnailQueue({
@@ -99,6 +134,7 @@ export class ThumbnailPainter {
       this.#painted.delete(container);
       container.replaceChildren();
     },
+    full: () => this.#shown.size >= MAX_PAINTED,
   });
 
   constructor(host: ThumbnailHost) {
@@ -132,6 +168,9 @@ export class ThumbnailPainter {
     if (was?.session === session && was.key === key) {
       this.#pending.delete(container);
       this.#queue.drop(container);
+      // Asked again after a release (the rail asks again when a slide's summary changes): it
+      // still shows its slide, and counts as painted.
+      if (!this.#shown.has(container)) this.#keep(container, { index, part });
       return;
     }
     if (!was || was.session !== session || was.part !== part) {
@@ -139,7 +178,7 @@ export class ThumbnailPainter {
       const current = !defer || index === this.#host.currentSlide?.();
       // A large current slide paints its thumbnail when idle, not in the frame that paints the
       // slide itself. Until then, the container is empty.
-      if (defer && current && (session.layout(index)?.items.length ?? 0) > LARGE_SLIDE_ITEMS) {
+      if (defer && current && slideWeight(session.layout(index)) > LARGE_SLIDE_ITEMS) {
         this.#queue.drop(container);
         if (this.#painted.delete(container) || container.firstChild) container.replaceChildren();
         this.#pending.set(container, index);
@@ -182,6 +221,7 @@ export class ThumbnailPainter {
       images: session.imageUrl,
       imageSize: session.imageSize,
       idPrefix: `${this.#host.idPrefix}l${this.#count}`,
+      view: slideView(lay),
       hitTargets: false,
       frameLabel: (kind) => this.#host.frameLabel(kind),
     });
@@ -214,6 +254,7 @@ export class ThumbnailPainter {
    * and no observer watches it.
    */
   release(container: HTMLElement): void {
+    this.#shown.delete(container);
     this.#pending.delete(container);
     this.#queue.drop(container);
   }
@@ -228,6 +269,7 @@ export class ThumbnailPainter {
     this.#cancel();
     this.#pending.clear();
     this.#layoutBoxes.clear();
+    this.#shown.clear();
     this.#queue.clear();
   }
 
@@ -303,8 +345,10 @@ export class ThumbnailPainter {
       });
       this.#painters.set(container, painter);
     }
-    // Converted pictures, or new faces: every item paints again.
+    // Converted pictures, or new faces: every item paints again. A thumbnail clips to its
+    // slide: text out of it does not paint.
     painter.invalidate(session.paintKey(part));
+    painter.view(slideView(lay));
     const svg = painter.paint(lay, budget);
     if (svg.getAttribute('width') !== '100%') {
       svg.setAttribute('width', '100%');
@@ -314,7 +358,44 @@ export class ThumbnailPainter {
       container.replaceChildren(svg);
     // Items left out: the slide is not painted yet, and its next repaint goes on with it.
     this.#painted.set(container, { session, part, key: painter.pending ? '' : key });
+    this.#keep(container, { index, part });
     return !painter.pending;
+  }
+
+  /** Note a painted container as the newest; past `MAX_PAINTED`, empty the oldest out of view. */
+  #keep(container: HTMLElement, ask: Ask): void {
+    // A container may paint before the host places it (a rail that mounts its items in
+    // batches): it counts now, and the end of the task forgets it if it is still off the page.
+    this.#shown.delete(container);
+    this.#shown.set(container, ask);
+    if (this.#shown.size <= MAX_PAINTED || this.#evicting) return;
+    this.#evicting = true;
+    // At the end of the task, after this task's paints: all layout reads, then the writes.
+    queueMicrotask(() => {
+      this.#evicting = false;
+      this.#evict();
+    });
+  }
+
+  #evict(): void {
+    let excess = this.#shown.size - MAX_PAINTED;
+    if (excess <= 0) return;
+    const out: [HTMLElement, Ask][] = [];
+    for (const [container, ask] of this.#shown) {
+      if (out.length >= excess) break;
+      if (!container.isConnected) {
+        this.#shown.delete(container);
+        excess -= 1;
+      } else if (!this.#queue.inView(container)) out.push([container, ask]);
+    }
+    for (const [container, ask] of out) {
+      if (!this.#queue.park(container, ask)) continue;
+      this.#shown.delete(container);
+      this.#pending.delete(container);
+      this.#painted.delete(container);
+      this.#painters.delete(container);
+      container.replaceChildren();
+    }
   }
 
   #schedule(): void {

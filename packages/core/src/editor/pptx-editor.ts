@@ -24,7 +24,8 @@ import { tableStyleList } from '../cascade/index.ts';
 import { createClipboardHost } from './clipboard-host.ts';
 import { createOpeningLane } from './pptx-editor-opening.ts';
 import { commandCacheKey, compile, type CommandContext } from './commands.ts';
-import { clampSlide, type DocumentSession } from './document-session.ts';
+import type { DocumentSession } from './document-session.ts';
+import { clampSlide } from './progressive-open.ts';
 import { changedSlide, isHistoryMark, validSelection, type HistoryMark } from './history-marks.ts';
 import { markOf, markOptions } from './history-marks.ts';
 import { EditorHistoryGroups } from './history-groups.ts';
@@ -317,7 +318,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
       return (seam.canSessionHistory(modules, false) ?? session.store.canRedo) && mode === 'edit'
         ? { ok: true }
         : { ok: false, reason: mode === 'view' ? 'disabled.viewing' : 'disabled.nothingToRedo' };
-    return checkCommand(command, selection, mode === 'view', session, slide, (only) => {
+    return checkCommand(command, selection, mode === 'view', session, slide, slideSel, (only) => {
       try {
         // A probe: the same compiler without autofit (it adds ops, never a refusal); ops drop.
         const ctx = { ...context(command, true), ...(only ? { selection: only } : {}) };

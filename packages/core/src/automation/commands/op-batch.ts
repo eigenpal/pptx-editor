@@ -99,6 +99,8 @@ export class OpBatch {
   #tx: OpenTransaction | null = null;
   #open: PptxOp[] = [];
   readonly ops: PptxOp[] = [];
+  /** How many ops of the batch wrote each part. */
+  readonly #writes = new Map<string, number>();
   /** Case-folded part names that new parts must not take. */
   readonly reservedPartNames: ReadonlySet<string>;
   /**
@@ -165,6 +167,19 @@ export class OpBatch {
     }
     this.#open.push(op);
     this.ops.push(op);
+    this.#wrote(op);
+  }
+
+  #wrote(op: PptxOp): void {
+    this.#writes.set(op.part, (this.#writes.get(op.part) ?? 0) + 1);
+  }
+
+  /**
+   * How many ops of the batch wrote `part` so far. A cache of what a part says can check it
+   * without reading `pkg`, which closes the open transaction. @internal
+   */
+  writesTo(part: string): number {
+    return this.#writes.get(part) ?? 0;
   }
 
   /**
@@ -178,7 +193,7 @@ export class OpBatch {
     const r = applyOps(this.#pkg, ops);
     if (!r.ok) throw new CommandRefusal('errors.unsupported', describe(r.rejection));
     this.#pkg = r.pkg;
-    for (const op of ops) this.ops.push(op);
+    for (const op of ops) (this.ops.push(op), this.#wrote(op));
   }
 
   /** Insert and return the new element's id. */

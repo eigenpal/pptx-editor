@@ -5,7 +5,7 @@
 import type { ResolvedLine } from '../cascade/index.ts';
 import type { CellLayout, TableLayout } from '../layout/index.ts';
 import { fillPaint, strokeAttrs, type PaintContext } from './paint-fill.ts';
-import { paintText } from './paint-text.ts';
+import { paintText, textShows, type Shows } from './paint-text.ts';
 import { num, svg } from './svg.ts';
 
 function edge(
@@ -33,7 +33,7 @@ function edge(
 }
 
 function borders(doc: Document, c: CellLayout, ctx: PaintContext): SVGElement[] {
-  const b = c.cell.borders;
+  const b = c.paintBorders ?? c.cell.borders;
   const r = c.x + c.width;
   const bottom = c.y + c.height;
   return [
@@ -46,14 +46,40 @@ function borders(doc: Document, c: CellLayout, ctx: PaintContext): SVGElement[] 
   ].filter((e): e is SVGElement => e !== null);
 }
 
-/** The table's SVG nodes, in the frame's local space. */
+/**
+ * Whether cell `c` can show, with its borders and a margin of its widest border on every side.
+ * Its text is checked line by line, since it can overflow the cell.
+ */
+function cellShows(c: CellLayout, shows: Shows): boolean {
+  const b = c.cell.borders;
+  let pad = 0;
+  for (const line of [b.top, b.bottom, b.left, b.right, b.tlToBr, b.blToTr])
+    if (line) pad = Math.max(pad, line.width);
+  const x0 = c.x - pad;
+  const y0 = c.y - pad;
+  const x1 = c.x + c.width + pad;
+  const y1 = c.y + c.height + pad;
+  return shows([
+    { x: x0, y: y0 },
+    { x: x1, y: y0 },
+    { x: x1, y: y1 },
+    { x: x0, y: y1 },
+  ]);
+}
+
+/**
+ * The table's SVG nodes, in the frame's local space. With `shows`, a cell that cannot show
+ * paints no fill and no border, and a text line that cannot show is left out.
+ */
 export function paintTable(
   doc: Document,
   table: TableLayout,
   background: Parameters<typeof fillPaint>[0],
-  ctx: PaintContext
+  ctx: PaintContext,
+  shows?: Shows
 ): SVGElement[] {
   const out: SVGElement[] = [];
+  const cells = shows ? table.cells.filter((c) => cellShows(c, shows)) : table.cells;
   const bg = fillPaint(background, table.width, table.height, ctx);
   if (bg.paint !== 'none')
     out.push(
@@ -64,7 +90,7 @@ export function paintTable(
         'fill-opacity': bg.opacity < 1 ? num(bg.opacity) : undefined,
       })
     );
-  for (const c of table.cells) {
+  for (const c of cells) {
     const fill = fillPaint(c.cell.fill, c.width, c.height, ctx);
     if (fill.paint === 'none') continue;
     // Gradients and pictures fill the cell's own box.
@@ -80,8 +106,14 @@ export function paintTable(
     );
   }
   const lines = svg(doc, 'g', { 'data-kind': 'table-borders' });
-  for (const c of table.cells) for (const node of borders(doc, c, ctx)) lines.appendChild(node);
+  for (const c of cells) for (const node of borders(doc, c, ctx)) lines.appendChild(node);
   out.push(lines);
-  for (const c of table.cells) if (c.text.lines.length) out.push(paintText(doc, c.text, ctx));
+  const shown = new Set(cells);
+  for (const c of table.cells) {
+    if (!c.text.lines.length) continue;
+    // A cell out of view paints its text only when the text overflows into view.
+    if (shows && !shown.has(c) && !textShows(c.text, shows)) continue;
+    out.push(paintText(doc, c.text, ctx, shows));
+  }
   return out;
 }

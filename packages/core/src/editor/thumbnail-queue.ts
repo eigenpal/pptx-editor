@@ -15,6 +15,10 @@
 // with every thumbnail painted costs the browser no intersection work while it edits. Where
 // there is no observer (happy-dom, a server), the waiting containers paint when idle.
 //
+// The painter keeps a bounded number of thumbnails painted (`thumbnails.ts`). When it is full,
+// the idle time paints no watched container: those paint when they come into view. A painted
+// container that the painter empties again (`park`) waits in the same way.
+//
 // A waiting container off the page (a rail kept alive while hidden) is held weakly and looked
 // for again every `RECHECK_MS`, at most `RECHECK_TRIES` times: it paints when it is back. The
 // adapters release a container when they unmount it (`renderThumbnail`'s disposer), so a closed rail
@@ -73,6 +77,8 @@ export interface QueueHost {
   paint(container: HTMLElement, ask: Ask): void;
   /** Empty `container`: it waits, and showed another slide. */
   blank(container: HTMLElement): void;
+  /** Whether the painter keeps as many painted thumbnails as it may: idle time paints none. */
+  full?(): boolean;
 }
 
 /** The first-paint queue of one thumbnail painter. */
@@ -143,6 +149,27 @@ export class ThumbnailQueue {
       if (this.#soonTimer !== null) clearTimeout(this.#soonTimer);
       this.#soonTimer = null;
     }
+  }
+
+  /**
+   * Make a painted container that the host emptied wait again: it paints when it comes into
+   * view. False, and nothing changes, where no observer can watch it (no
+   * `IntersectionObserver`, or not on the page): there it would never paint again.
+   */
+  park(container: HTMLElement, ask: Ask): boolean {
+    const view = container.ownerDocument?.defaultView as
+      (Window & { IntersectionObserver?: unknown }) | null;
+    if (!container.isConnected || typeof view?.IntersectionObserver !== 'function') return false;
+    this.#checking.delete(container);
+    this.#soon.delete(container);
+    this.#waiting.set(container, ask);
+    this.#watch(container);
+    return this.#watched.has(container);
+  }
+
+  /** Whether `container` is in view (see `#inView`): a layout read. */
+  inView(container: HTMLElement): boolean {
+    return this.#inView(container);
   }
 
   /** Whether anything waits, is watched, or is scheduled (for tests). @internal */
@@ -354,6 +381,8 @@ export class ThumbnailQueue {
         this.#leave(container);
         continue;
       }
+      // A full painter paints a watched container only when it comes into view.
+      if (this.#watched.has(container) && this.#host.full?.()) continue;
       if (left() < 2 && !(painted === 0 && deadline?.didTimeout)) {
         more = true;
         break;

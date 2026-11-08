@@ -16,6 +16,7 @@ import type { LayoutItem, Matrix } from './slide-layout.ts';
 import { AutonumberCounters, isExactScheme, isSymbolFont } from './text/autonumber.ts';
 import { hasCharacters } from './text/text-layout.ts';
 import { isIdeographic } from './text/line-break.ts';
+import { hasLongPaintCluster } from './text/paint-clusters.ts';
 
 /** One known approximation. */
 export interface Approximation {
@@ -29,6 +30,7 @@ export interface Approximation {
 /** Every known approximation, in the fidelity page order. */
 export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'line-model', title: 'Line model', perSlide: true },
+  { id: 'long-text-clusters', title: 'Long text clusters', perSlide: true },
   { id: 'glyph-advances', title: 'Glyph advances', perSlide: false },
   { id: 'color-transforms', title: 'Color transform spaces', perSlide: false },
   { id: 'gray-transform', title: 'Gray transform', perSlide: false },
@@ -56,6 +58,7 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'emf-wmf', title: 'EMF and WMF pictures', perSlide: false },
   { id: 'inset-lines', title: 'Inset lines', perSlide: false },
   { id: 'hyperlink-text', title: 'Hyperlink text', perSlide: true },
+  { id: 'dash-complexity', title: 'Dash complexity', perSlide: true },
   { id: 'compound-lines', title: 'Compound lines', perSlide: true },
   { id: 'path-start', title: 'Paths without a move', perSlide: false },
   { id: 'flipped-text', title: 'Text in flipped shapes', perSlide: true },
@@ -188,6 +191,8 @@ class Collector {
 
     const counters = new AutonumberCounters();
     for (const p of body.paragraphs) {
+      if (p.bullet?.type === 'char' && hasLongPaintCluster(p.bullet.char))
+        this.add('long-text-clusters');
       if (p.runs.length === 0) continue;
       const item = counters.next(p);
       // The line rules are measured on Latin text in the reference fonts; other scripts,
@@ -208,6 +213,7 @@ class Collector {
       for (const run of p.runs) {
         if (run.kind === 'math') this.add('equations');
         const props = run.props;
+        if (hasLongPaintCluster(run.text)) this.add('long-text-clusters');
         if (tabbed && run.text.includes('\t')) this.add('tab-stops');
         if (props.caps === 'small') this.add('small-caps');
         if (props.baseline !== 0) this.add('script-size');

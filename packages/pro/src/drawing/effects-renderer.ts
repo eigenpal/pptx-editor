@@ -73,6 +73,15 @@ function region(b: EffectBounds): Record<string, string> {
   };
 }
 
+/**
+ * The most a glow grows, or a soft edge shrinks, the outline: 100 pt, in EMU. The browser's
+ * `feMorphology` costs time in proportion to its radius on every paint, so a radius of a few
+ * inches stops the page for seconds. Glows of up to 200 pt and soft edges of up to 100 pt draw
+ * as stored. A larger glow draws as a 200 pt glow, and a larger soft edge shrinks the outline
+ * by 100 pt and keeps its blur.
+ */
+const MAX_MORPH_SPREAD = 1_270_000;
+
 /** `SourceAlpha` as an opaque gray image: each color channel holds the alpha. */
 const ALPHA_TO_GRAY = '0 0 0 1 0  0 0 0 1 0  0 0 0 1 0  0 0 0 0 1';
 /** Back from the gray image: the red channel becomes the alpha. */
@@ -93,13 +102,23 @@ const GRAY_TO_ALPHA = '0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1 0 0 0 0';
  * the minimum, and back. Every input stays opaque only inside the filter region, so a shrink
  * needs a region that holds its spread (`body`).
  */
-function morphAlpha(spread: number, result: string): EffectNode[] {
-  const r = Math.abs(spread);
+function morphAlpha(spread: number, result: string, bounds: EffectBounds): EffectNode[] {
+  const r = Math.min(Math.abs(spread), MAX_MORPH_SPREAD);
+  // The alpha moves at most `r` from the content: the primitives work only on the bounds and
+  // `r` around them, not on a filter region that a wide blur makes much larger.
+  const b = grow(bounds, r + PX);
+  const sub = {
+    x: num(b.x),
+    y: num(b.y),
+    width: num(Math.max(1, b.r - b.x)),
+    height: num(Math.max(1, b.b - b.y)),
+  };
   const grows = spread > 0;
   const d = r / Math.SQRT2;
   const thin = Math.min(PX, r);
   const morph = (rx: number, ry: number, out: string): EffectNode =>
     node('feMorphology', {
+      ...sub,
       in: `${result}-g`,
       operator: grows ? 'dilate' : 'erode',
       radius: `${num(rx)} ${num(ry)}`,
@@ -108,6 +127,7 @@ function morphAlpha(spread: number, result: string): EffectNode[] {
   const mode = grows ? 'lighten' : 'darken';
   return [
     node('feColorMatrix', {
+      ...sub,
       in: 'SourceAlpha',
       type: 'matrix',
       values: ALPHA_TO_GRAY,
@@ -116,9 +136,22 @@ function morphAlpha(spread: number, result: string): EffectNode[] {
     morph(r, thin, `${result}-h`),
     morph(thin, r, `${result}-v`),
     morph(d, d, `${result}-d`),
-    node('feBlend', { in: `${result}-h`, in2: `${result}-v`, mode, result: `${result}-hv` }),
-    node('feBlend', { in: `${result}-d`, in2: `${result}-hv`, mode, result: `${result}-m` }),
+    node('feBlend', {
+      ...sub,
+      in: `${result}-h`,
+      in2: `${result}-v`,
+      mode,
+      result: `${result}-hv`,
+    }),
+    node('feBlend', {
+      ...sub,
+      in: `${result}-d`,
+      in2: `${result}-hv`,
+      mode,
+      result: `${result}-m`,
+    }),
     node('feColorMatrix', {
+      ...sub,
       in: `${result}-m`,
       type: 'matrix',
       values: GRAY_TO_ALPHA,
@@ -169,10 +202,18 @@ export function bodyEffects(
   }
   if (softEdge && softEdge.radius > 0) {
     const { spread, sigma } = softEdgeSpread(softEdge.radius);
+    // A shrink by more than half the narrower side of the bounds leaves nothing: the horizontal
+    // or the vertical rectangle of `morphAlpha` fits nowhere. The shape then paints nothing,
+    // with no `feMorphology` that costs time in proportion to the radius.
+    if (Math.abs(spread) > Math.min(bounds.r - bounds.x, bounds.b - bounds.y) / 2) {
+      const id = ids.id('fx');
+      const empty = node('feFlood', { 'flood-opacity': '0' });
+      return { defs: [node('filter', { id, ...region(bounds) }, [empty])], filter: id };
+    }
     // A kernel that reaches past the region reads transparent pixels, which `darken` skips.
-    margin = Math.max(margin, Math.abs(spread) + PX);
+    margin = Math.max(margin, Math.min(Math.abs(spread), MAX_MORPH_SPREAD) + PX);
     prims.push(
-      ...morphAlpha(spread, 'se'),
+      ...morphAlpha(spread, 'se', bounds),
       node('feGaussianBlur', { in: 'se', stdDeviation: num(sigma), result: 'sm' }),
       // The mask holds the shape's alpha already: the shape's colors, made opaque, take it.
       node('feComponentTransfer', { in: source, result: 'so' }, [
@@ -202,9 +243,11 @@ export function glowEffect(
   const glow = effects.glow;
   if (!glow || glow.radius <= 0) return null;
   const id = ids.id('glow');
-  const { spread, sigma } = glowSpread(glow.radius);
+  // A glow past 200 pt draws as a 200 pt glow: it grows the outline by the most that
+  // `morphAlpha` grows it, and its blur stays within a filter region that the browser draws.
+  const { spread, sigma } = glowSpread(Math.min(glow.radius, 2 * MAX_MORPH_SPREAD));
   const filter = node('filter', { id, ...region(grow(bounds, spread + 3 * sigma + PX)) }, [
-    ...morphAlpha(spread, 'gd'),
+    ...morphAlpha(spread, 'gd', bounds),
     node('feGaussianBlur', { in: 'gd', stdDeviation: num(sigma), result: 'gb' }),
     node('feFlood', {
       'flood-color': toCss({ ...glow.color, a: 1 }),

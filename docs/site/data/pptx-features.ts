@@ -446,7 +446,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Dashes and line ends draw at measured sizes, at every line width. Compound line bands are not measured.',
+      'Dashes and line ends draw at measured sizes. Shape and picture outlines and table borders draw solid when their estimated dash count exceeds 100,000. Save preserves the original pattern. Compound line bands are not measured.',
   },
   {
     id: 'fills-lines.theme-colors',
@@ -515,7 +515,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Insert, move, resize, rotate, and Change Picture. Change Picture fits the new image in the old frame; this rule is not measured. Change Picture takes PNG, JPEG, and GIF only, not SVG.',
+      'Insert, move, resize, rotate, and Change Picture. Change Picture fits the new image in the old frame; this rule is not measured. Change Picture takes PNG, JPEG, and GIF only, not SVG. An SVG picture draws as vector art when it is a plain icon: at most 256 KB, with a root `viewBox` or a size in pixels, solid colors, and only shapes, paths, groups, `<use>`, `<symbol>`, clip paths, and simple style sheets, within 1,000 shapes and 4,000 path vertices. Otherwise, for example with text, gradients, filters, masks, markers, or animation, it draws its PNG fallback. When the raster pictures of one slide, layout, or master hold more than about 105 million decoded pixels, each one draws scaled down on screen, decoded off the main thread, and the placeholder shows until it is ready. After an edit, scaled sizes stay until the share of a picture moves by more than 25%; an animated GIF then shows its first frame. Export and save use the stored pictures.',
   },
   {
     id: 'pictures.adjustments',

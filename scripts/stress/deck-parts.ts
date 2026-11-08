@@ -30,6 +30,8 @@ export interface DeckParts {
   get(name: string): string;
   set(name: string, xml: string): void;
   bin(name: string): void;
+  /** Set a part's bytes. */
+  put(name: string, bytes: Uint8Array): void;
 }
 
 /** `bytes` with its parts edited by `edit`. */
@@ -39,6 +41,7 @@ export function patched(bytes: Uint8Array, edit: (parts: DeckParts) => void): Ui
     get: (name) => strFromU8(files[name]!),
     set: (name, xml) => void (files[name] = strToU8(xml)),
     bin: (name) => void (files[name] = new Uint8Array([0])),
+    put: (name, data) => void (files[name] = data.slice()),
   });
   return zipSync(files);
 }

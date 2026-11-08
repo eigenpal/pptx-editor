@@ -13,6 +13,7 @@ import { readPptx } from '../../store/index.ts';
 import { resolveSlide } from '../../cascade/index.ts';
 import { createFixedMeasurer, layoutSlide } from '../../layout/index.ts';
 import { paintSlide } from '../index.ts';
+import { uprightPieces } from '../paint-text.ts';
 
 // A DOM for this file only: the engine test run registers no global DOM.
 const win = new GlobalWindow();
@@ -234,6 +235,111 @@ describe('an empty text body', () => {
   });
 });
 
+describe('text elements', () => {
+  const body = (vert: string, text: string): string =>
+    shape({
+      id: 2,
+      x: 1_000_000,
+      y: 1_000_000,
+      cx: 1_000_000,
+      cy: 4_000_000,
+      text: para(run(text)),
+      bodyPr: `<a:bodyPr vert="${vert}" wrap="square"><a:noAutofit/></a:bodyPr>`,
+    });
+
+  test('stacked letters paint as one text element, each letter at its own place', () => {
+    const texts = [...paint(body('wordArtVert', 'STACK ME')).querySelectorAll('text')];
+    expect(texts).toHaveLength(1);
+    const text = texts[0]!;
+    expect(text.textContent).toBe('STACK ME');
+    expect(text.getAttribute('text-anchor')).toBe('middle');
+    expect(text.getAttribute('x')!.split(' ')).toHaveLength(8);
+    expect(new Set(text.getAttribute('y')!.split(' ')).size).toBe(8);
+    expect(text.parentElement!.getAttribute('transform')).toBe('rotate(-90)');
+  });
+
+  test('a character outside the basic plane keeps a text element of its own', () => {
+    const texts = [...paint(body('wordArtVert', 'A\u{1F600}B')).querySelectorAll('text')];
+    expect(texts.map((t) => t.textContent)).toEqual(['A', '\u{1F600}', 'B']);
+  });
+
+  test('the text group sets the kerning and ligature style once for its runs', () => {
+    const root = paint(body('horz', 'one two'));
+    const group = root.querySelector('[data-pptx-text]')!;
+    expect(group.getAttribute('style')).toContain('font-kerning:none');
+    // `white-space` does not inherit into a `<text>` in every browser: each one sets it.
+    expect(root.querySelector('text')!.getAttribute('style')).toBe('white-space:pre');
+  });
+});
+
+describe('tab glyph paint', () => {
+  test('tabs separate glyph spans without changing upright or surrogate positions', () => {
+    expect(uprightPieces('A\t縦𠀋\tB', 'eastAsian')).toEqual([
+      { start: 0, end: 1, upright: false },
+      { start: 2, end: 3, upright: true },
+      { start: 3, end: 5, upright: true },
+      { start: 6, end: 7, upright: false },
+    ]);
+    expect(uprightPieces('A\t𠀋', 'all')).toEqual([
+      { start: 0, end: 1, upright: true },
+      { start: 2, end: 4, upright: true },
+    ]);
+    expect(uprightPieces('A\t縦𠀋\tB', 'none')).toEqual([
+      { start: 0, end: 1, upright: false },
+      { start: 2, end: 5, upright: false },
+      { start: 6, end: 7, upright: false },
+    ]);
+  });
+  test('keeps text positions and decorations without sending tabs to SVG text layout', () => {
+    const opened = readPptx(
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes: shape({
+              id: 2,
+              x: 0,
+              y: 0,
+              cx: 6_000_000,
+              cy: 4_000_000,
+              text: para(run('A\t\tB', 'sz="1800" u="sng"')),
+            }),
+          },
+        ],
+      })
+    );
+    if (!opened.ok) throw new Error('open failed');
+    const layout = layoutSlide(resolveSlide(opened.pkg, 0)!, createFixedMeasurer());
+    const item = layout.items[0];
+    if (item.kind !== 'shape' || !item.text) throw new Error('no text');
+    const source = item.text.lines[0].runs[0];
+    const root = paintSlide(doc, layout, { images: () => undefined, idPrefix: 'tabs' });
+    const text = [...root.querySelectorAll('text')];
+    expect(text.map((t) => t.textContent)).toEqual(['A', 'B']);
+    expect(Number(text[0].getAttribute('x'))).toBeCloseTo(source.x[0] / 12_700, 3);
+    expect(Number(text[1].getAttribute('x'))).toBeCloseTo(source.x[3] / 12_700, 3);
+    const underline = root.querySelector('[data-pptx-text] rect');
+    expect(Number(underline?.getAttribute('width'))).toBeCloseTo(
+      (source.x[4] - source.x[0]) / 12_700,
+      3
+    );
+  });
+
+  test('a long tab-only run emits no SVG text node', () => {
+    const root = paint(
+      shape({
+        id: 2,
+        x: 0,
+        y: 0,
+        cx: 6_000_000,
+        cy: 4_000_000,
+        text: para(run('\t'.repeat(60_000), 'sz="1800"')),
+      })
+    );
+    expect(root.querySelectorAll('text').length).toBe(0);
+  });
+});
+
 describe('warped text', () => {
   test('a picture bullet draws on the parallelogram that the warp gives it', () => {
     const pPr =
@@ -266,6 +372,37 @@ describe('warped text', () => {
     const image = root.querySelector('image[data-run="bullet"]');
     expect(image?.getAttribute('transform')).toMatch(/^matrix\(/);
     expect(image?.getAttribute('width')).toBe('1');
+  });
+
+  test('paints every glyph outline when a view culls the lines of other text', () => {
+    const r = readPptx(
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes: shape({
+              id: 2,
+              x: 914_400,
+              y: 914_400,
+              cx: 2_743_200,
+              cy: 1_828_800,
+              bodyPr:
+                '<a:bodyPr wrap="none"><a:prstTxWarp prst="textWave1"><a:avLst/></a:prstTxWarp></a:bodyPr>',
+              text: para(run('Wave')),
+            }),
+          },
+        ],
+      })
+    );
+    if (!r.ok) throw new Error('open failed');
+    const layout = layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer());
+    const opts = { images: () => undefined, idPrefix: 't' };
+    const all = paintSlide(doc, layout, opts).querySelectorAll('[data-pptx-text] path').length;
+    expect(all).toBeGreaterThan(0);
+    // Far below the warped lines' boxes: an unwarped line there would not paint.
+    const view = { x: 0, y: 6_000_000, width: 100, height: 100 };
+    const culled = paintSlide(doc, layout, { ...opts, view });
+    expect(culled.querySelectorAll('[data-pptx-text] path').length).toBe(all);
   });
 });
 

@@ -43,7 +43,6 @@ export function finiteFacet(f: ThreeDFacet): boolean;
 export interface FontFaceHandle {
     // (undocumented)
     dispose(): void;
-    // (undocumented)
     readonly ready: Promise<void>;
 }
 
@@ -101,10 +100,14 @@ export interface PaintOptions {
     readonly idPrefix: string;
     readonly images: ImageUrlPort;
     readonly imageSize?: ImageSizePort;
+    readonly view?: ViewRect;
 }
 
 // @public
 export function paintSlide(doc: Document, layout: SlideLayout, opts: PaintOptions): SVGSVGElement;
+
+// @internal
+export function paintWeight(item: LayoutItem): number;
 
 // @public
 export function pathData(path: GeometryPath): string;
@@ -115,6 +118,7 @@ export function registerFontFaces(doc: Document, faces: readonly RegisteredFace[
 // @public
 export interface RegisterFontFacesOptions {
     readonly family?: (face: RegisteredFace) => string;
+    readonly waitMs?: number;
 }
 
 // @internal
@@ -128,6 +132,7 @@ export class SlidePainter {
     paint(layout: SlideLayout, budget?: number): SVGSVGElement;
     paints(opts: PaintOptions): boolean;
     get pending(): boolean;
+    view(view: ViewRect | undefined): boolean;
 }
 
 // @internal
@@ -138,6 +143,14 @@ export const SVG_NS = "http://www.w3.org/2000/svg";
 
 // @internal
 export function threeDColor(fill: ResolvedFill): Rgba;
+
+// @public
+export interface ViewRect {
+    readonly height: number;
+    readonly width: number;
+    readonly x: number;
+    readonly y: number;
+}
 
 // (No @packageDocumentation comment for this package)
 

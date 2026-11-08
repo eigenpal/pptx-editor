@@ -17,6 +17,7 @@
 // not the arity, picks the path.
 
 import type { FontConfiguration } from '../contracts/index.ts';
+import { PPTX_ZIP_LIMITS } from '../store/index.ts';
 import {
   composeFontConfiguration,
   type FontConfigurationBase,
@@ -30,6 +31,7 @@ import {
   type FontOrigin,
   type MarkedFontResolver,
 } from '../layout/font-resolver.ts';
+import { FONT_WAIT_MS } from './host-fonts.ts';
 
 /** A complete font configuration, or a fragment that composes with the defaults. @public */
 export type PptxFontsInput = FontConfiguration | FontConfigurationFragment;
@@ -50,7 +52,7 @@ export type PptxSource = string | URL | Uint8Array | ArrayBuffer;
 
 /** Options for `usePptxSource`. @public */
 export interface UsePptxSourceOptions {
-  /** The fonts. Eager origins hold the deck back until they settle; resolvers do not. */
+  /** The fonts. Eager origins hold the deck back until they settle, for at most 2 seconds. */
   readonly fonts?: PptxFontsSource;
   /** Passed to `fetch` for a URL source: credentials and headers. */
   readonly fetchOptions?: RequestInit;
@@ -139,18 +141,156 @@ export async function resolveEagerPptxFonts(
 }
 
 /**
- * Fetch a URL source with the browser's `fetch`, as the caller wrote it. A URL from user input
- * needs the caller's own check first: this adds no allowlist. @internal
+ * The longest eager fonts hold the deck back, as the editor's own font wait. Fonts that arrive
+ * later still apply: the editor reflows. @internal
+ */
+export const EAGER_FONTS_WAIT_MS = FONT_WAIT_MS;
+
+/**
+ * Resolve an eager `fonts` option for a hook. `release` runs once, when the fonts settle or
+ * after `waitMs`, whichever is first, so an origin that never answers cannot hold the deck.
+ * `resolved` runs when they settle, also after the release. Returns the cancel. @internal
+ */
+export function watchEagerPptxFonts(
+  source: PptxFontsSource,
+  handlers: {
+    readonly resolved: (fonts: FontConfiguration) => void;
+    readonly release: () => void;
+  },
+  waitMs = EAGER_FONTS_WAIT_MS
+): () => void {
+  let live = true;
+  let released = false;
+  const release = (): void => {
+    if (!live || released) return;
+    released = true;
+    handlers.release();
+  };
+  const timer = setTimeout(() => {
+    if (live && !released)
+      console.warn(`[fonts] fonts did not settle in ${waitMs} ms; the deck opens without them`);
+    release();
+  }, waitMs);
+  void resolveEagerPptxFonts(source).then((composed) => {
+    clearTimeout(timer);
+    if (live && composed) handlers.resolved(composed);
+    release();
+  });
+  return () => {
+    live = false;
+    clearTimeout(timer);
+  };
+}
+
+/**
+ * A URL source fails when no bytes arrive for this long. The limit is on progress, not on the
+ * whole download, so a slow connection that keeps sending bytes still finishes. @internal
+ */
+export const SOURCE_STALL_MS = 10_000;
+
+/**
+ * The longest URL source the editor downloads, in bytes: the most that the editor reads from an
+ * archive (`PPTX_ZIP_LIMITS`), and room for the archive's own headers. A longer file cannot
+ * open, so its download stops early. @internal
+ */
+export const SOURCE_MAX_BYTES = PPTX_ZIP_LIMITS.maxTotalBytes + 16 * 1024 * 1024;
+
+/**
+ * The most bytes a download sets aside before they arrive, from its `Content-Length`. A server
+ * can declare any length, so a larger file goes on in chunks past this buffer. @internal
+ */
+export const SOURCE_BUFFER_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Fetch a URL source with the browser's `fetch`, as the caller wrote it. Rejects with a
+ * `TimeoutError` when no response or no body bytes arrive for `stallMs`, with a `RangeError`
+ * when the body is longer than `maxBytes`, and with the abort when `signal` aborts. The default
+ * `maxBytes` is the longest file the editor opens (`SOURCE_MAX_BYTES`), so a server that never
+ * stops sending cannot grow the page's memory without end. With a valid `Content-Length`, the
+ * body goes into one buffer of that length, up to `bufferBytes`, so a download of up to that
+ * length holds the file once, not twice.
+ * A URL from user input needs the caller's own check first: this adds no allowlist. @internal
  */
 export async function fetchPptxSource(
   url: string | URL,
   init: RequestInit | undefined,
-  signal: AbortSignal
+  signal: AbortSignal,
+  stallMs = SOURCE_STALL_MS,
+  maxBytes = SOURCE_MAX_BYTES,
+  bufferBytes = SOURCE_BUFFER_BYTES
 ): Promise<Uint8Array> {
-  const response = await fetch(String(url), { ...init, signal });
-  if (!response.ok)
-    throw new Error(`could not open the presentation: ${response.status} ${response.statusText}`);
-  return new Uint8Array(await response.arrayBuffer());
+  signal.throwIfAborted();
+  const controller = new AbortController();
+  const cancelled = (): void => controller.abort(signal.reason);
+  signal.addEventListener('abort', cancelled, { once: true });
+  // An abort rejects the wait itself too: a body stream that ignores it cannot hold the open.
+  const aborted = new Promise<never>((_, reject) =>
+    controller.signal.addEventListener('abort', () => reject(controller.signal.reason))
+  );
+  aborted.catch(() => undefined);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const arm = (): void => {
+    clearTimeout(timer);
+    timer = setTimeout(
+      () =>
+        controller.abort(
+          new DOMException(`no bytes of the presentation for ${stallMs} ms`, 'TimeoutError')
+        ),
+      stallMs
+    );
+  };
+  arm();
+  try {
+    const response = await Promise.race([
+      fetch(String(url), { ...init, signal: controller.signal }),
+      aborted,
+    ]);
+    if (!response.ok)
+      throw new Error(`could not open the presentation: ${response.status} ${response.statusText}`);
+    const tooLarge = () => new RangeError(`the presentation is larger than ${maxBytes} bytes`);
+    const header = response.headers.get('content-length')?.trim();
+    const declared = header && /^\d+$/.test(header) ? Number(header) : undefined;
+    if (declared !== undefined && declared > maxBytes) throw tooLarge();
+    if (!response.body) {
+      const whole = new Uint8Array(await Promise.race([response.arrayBuffer(), aborted]));
+      if (whole.byteLength > maxBytes) throw tooLarge();
+      return whole;
+    }
+    const reader = response.body.getReader();
+    // The declared length is a hint: an encoded body can decode to more or fewer bytes. Bytes
+    // past it, or past `bufferBytes`, go to chunks after the buffer.
+    const buffer = declared ? new Uint8Array(Math.min(declared, bufferBytes)) : undefined;
+    let filled = 0;
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+      for (;;) {
+        arm();
+        const next = await Promise.race([reader.read(), aborted]);
+        if (next.done) break;
+        const chunk = next.value;
+        size += chunk.byteLength;
+        if (size > maxBytes) throw tooLarge();
+        if (buffer && chunks.length === 0 && filled + chunk.byteLength <= buffer.byteLength) {
+          buffer.set(chunk, filled);
+          filled += chunk.byteLength;
+        } else chunks.push(chunk);
+      }
+    } catch (cause) {
+      void reader.cancel(cause).catch(() => undefined);
+      throw cause;
+    }
+    if (buffer && chunks.length === 0)
+      return filled === buffer.byteLength ? buffer : buffer.slice(0, filled);
+    const bytes = new Uint8Array(size);
+    if (buffer) bytes.set(buffer.subarray(0, filled));
+    let at = filled;
+    for (const chunk of chunks) (bytes.set(chunk, at), (at += chunk.byteLength));
+    return bytes;
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener('abort', cancelled);
+  }
 }
 
 /** Whether a fetch failure is the hook cancelling itself. @internal */

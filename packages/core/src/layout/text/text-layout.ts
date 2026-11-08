@@ -5,6 +5,7 @@
 // applied first, then shaping, then character spacing, then greedy line filling at break
 // opportunities, then paragraph spacing, alignment, columns, and vertical anchoring.
 
+import { paintPieces } from './paint-clusters.ts';
 import type { ResolvedParagraph, ResolvedTextBody, RunProps } from '../../cascade/index.ts';
 import { slotLanguage } from '../../cascade/script-fonts.ts';
 import { anchorOffset, ROTATED_VERT, shiftLines } from './anchor.ts';
@@ -641,8 +642,26 @@ export function layoutTextOn(
      * wrapped line, text at a centered, right, or decimal stop that would pass `lineEnd` moves
      * left to end there (reference PDF of `svg-tab-stops`).
      */
+    // Only record-high stops can be the first stop after a cursor. Keep their original
+    // order, including the first of equal positions, even for an unsorted input list.
+    // Searching this increasing index avoids scanning every stop for every tab character.
+    const tabStops: ResolvedParagraph['tabs'][number][] = [];
+    let furthestStop = -Infinity;
+    for (const stop of p.tabs) {
+      if (stop.pos > furthestStop) {
+        tabStops.push(stop);
+        furthestStop = stop.pos;
+      }
+    }
     const tabAdvance = (i: number, x: number, lineEnd: number): number => {
-      const stop = p.tabs.find((t) => t.pos > x + 1);
+      let lo = 0;
+      let hi = tabStops.length;
+      while (lo < hi) {
+        const mid = lo + Math.floor((hi - lo) / 2);
+        if (tabStops[mid].pos > x + 1) hi = mid;
+        else lo = mid + 1;
+      }
+      const stop = tabStops[lo];
       if (!stop) {
         const d = p.defaultTab > 0 ? p.defaultTab : 914_400;
         return (Math.floor(x / d) + 1) * d - x;
@@ -903,7 +922,7 @@ export function layoutTextOn(
         end: sourceOffset + (range.end - range.start),
         caretX: range.end === range.start ? [origin] : caretX,
         ...(lineBidi ? { bidi: lineBidi } : {}),
-        runs: lineRuns,
+        runs: paintPieces(lineRuns),
         fontHeight: maxSize * EMU_PER_PT,
         ...(first && pending
           ? { pendingBullet: wholeMarker(placeMarker(pending, shift), p.rtl) }

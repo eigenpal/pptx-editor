@@ -360,3 +360,51 @@ describe('ghost bullets', () => {
     expect(text.getAttribute('style')).toContain('unicode-bidi:bidi-override');
   });
 });
+
+test('an oversized ghost bullet keeps its source and positions in bounded paint pieces', async () => {
+  const bullet = 'a' + '\u0301'.repeat(5000);
+  const editor = await open(para('', `<a:pPr><a:buChar char="${bullet}"/></a:pPr>`));
+  try {
+    const layout = editor.session!.layout(0)!;
+    const item = layout.items.find((x) => x.kind === 'shape' && x.element.text)!;
+    if (item.kind !== 'shape' || !item.text) throw new Error('no shape');
+    const pending = item.text.lines[0].pendingBullet!;
+    const doc = new GlobalWindow().document as unknown as Document;
+    const point = { paragraph: 0, offset: 0 };
+    const ghost = ghostBullet(
+      doc,
+      item,
+      { kind: 'text', nodeId: item.element.nodeId, anchor: point, focus: point },
+      textFrameMatrix(item)
+    )!;
+    const pieces = [...ghost.querySelectorAll('text')];
+    expect(pieces.map((p) => p.textContent).join('')).toBe(bullet);
+    expect(pieces.every((p) => p.textContent!.length <= 256)).toBe(true);
+    expect(pieces.flatMap((p) => p.getAttribute('x')!.split(' ').map(Number))).toEqual(
+      pending.x.slice(0, -1).map((x) => x / 12_700)
+    );
+    expect(pending.text).toBe(bullet);
+    expect(pending.runIndex).toBe(-1);
+    expect(item.element.text!.paragraphs[0].bullet).toMatchObject({ type: 'char', char: bullet });
+    // The ghost is an editing overlay, absent from the slide's fidelity paint.
+    expect(layout.diagnostics).not.toContain('approximation: long-text-clusters');
+  } finally {
+    editor.destroy();
+  }
+});
+
+test('an oversized visible bullet uses bounded layout runs and reports the approximation', async () => {
+  const bullet = 'a' + '\u0301'.repeat(5000);
+  const editor = await open(para(run('item'), `<a:pPr><a:buChar char="${bullet}"/></a:pPr>`));
+  try {
+    const layout = editor.session!.layout(0)!;
+    const item = layout.items.find((x) => x.kind === 'shape' && x.element.text)!;
+    if (item.kind !== 'shape' || !item.text) throw new Error('no shape');
+    const runs = item.text.lines[0].runs.filter((r) => r.kind === 'bullet');
+    expect(runs.map((r) => r.text).join('')).toBe(bullet);
+    expect(runs.every((r) => r.text.length <= 256 && r.runIndex === -1)).toBe(true);
+    expect(layout.diagnostics).toContain('approximation: long-text-clusters');
+  } finally {
+    editor.destroy();
+  }
+});

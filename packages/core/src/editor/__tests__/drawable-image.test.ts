@@ -36,9 +36,11 @@ test('empty, unknown, and markup bytes in a raster part draw nothing', () => {
   ).toBeUndefined();
 });
 
+const ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9 9"><rect/></svg>';
+
 test('an SVG part must start as markup', () => {
   const bom = String.fromCharCode(0xfeff);
-  expect(drawableImageMime(text(`${bom}  <svg/>`), 'image/svg+xml')).toBe('image/svg+xml');
+  expect(drawableImageMime(text(`${bom}  ${ICON}`), 'image/svg+xml')).toBe('image/svg+xml');
   expect(drawableImageMime(png(10, 10), 'image/svg+xml')).toBeUndefined();
 });
 
@@ -53,6 +55,37 @@ test('a WebP passes the same size checks', () => {
   expect(drawableImageMime(webpHeader('VP8X', 20_000, 20_000), 'image/webp')).toBeUndefined();
   expect(drawableImageMime(webpHeader('VP8X', 40_000, 10), 'image/webp')).toBeUndefined();
   expect(drawableImageMime(text('RIFF\0\0\0\0WEBPVP8 '), 'image/webp')).toBeUndefined();
+});
+
+const svgDoc = (body: string) =>
+  text(
+    '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"' +
+      ` viewBox="0 0 9 9">${body}</svg>`
+  );
+
+test('an SVG picture with a <use> cycle, an entity, or deep nesting draws nothing', () => {
+  const cycle = svgDoc('<g id="a"><rect width="1" height="1"/><use href="#a"/></g>');
+  expect(drawableImageMime(cycle, 'image/svg+xml')).toBeUndefined();
+  const entity = text('<!DOCTYPE svg [<!ENTITY a "aaaa">]><svg><text>&a;</text></svg>');
+  expect(drawableImageMime(entity, 'image/svg+xml')).toBeUndefined();
+  const deep = svgDoc(`${'<g>'.repeat(1000)}${'</g>'.repeat(1000)}`);
+  expect(drawableImageMime(deep, 'image/svg+xml')).toBeUndefined();
+});
+
+// The SVG icon subset and its limits: svg-picture.test.ts.
+test('an SVG picture outside the icon subset draws nothing', () => {
+  const marker = '<defs><marker id="m"><path d="M0 0L1 1"/></marker></defs>';
+  expect(drawableImageMime(svgDoc(marker), 'image/svg+xml')).toBeUndefined();
+  const icon = '<path d="M0 0h9v9z" fill="#4472c4"/>';
+  expect(drawableImageMime(svgDoc(icon), 'image/svg+xml')).toBe('image/svg+xml');
+});
+
+test('an SVG picture with a plain document type declaration draws', () => {
+  const doctype =
+    '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" ' +
+    '"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">';
+  const plain = text(`${doctype}${ICON}`);
+  expect(drawableImageMime(plain, 'image/svg+xml')).toBe('image/svg+xml');
 });
 
 test('an export paints a damaged picture as the placeholder', async () => {

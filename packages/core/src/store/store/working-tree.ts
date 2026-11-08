@@ -10,7 +10,19 @@
 
 import type { Element, Node, NodeId, NodeKind, XmlPart } from '../package/tree.ts';
 import { deriveKind, isTransparentWrapper } from '../package/node-kinds.ts';
-import { adoptNodeIndex, layeredNodeIndex, nodeIndex, type Location } from './node-index.ts';
+import {
+  adoptNodeIndex,
+  cachedNodeIndex,
+  findNodeNear,
+  layeredNodeIndex,
+  nodeIndex,
+  type Location,
+} from './node-index.ts';
+
+/** Lookups a transaction answers by a short walk before it builds the part's index. */
+const NEAR_LOOKUPS = 64;
+/** The nodes one such walk may visit. */
+const NEAR_VISITS = 64;
 
 // Work counters for tests, beside `nodeIndexTestRecorder`: a transaction copies the index once
 // per part it commits, and its edits write only the entries they touch. The kept index is a
@@ -56,17 +68,35 @@ export function workingTreeTestRecorder(): {
  * (`layeredNodeIndex`), which flattens into one map only when the layers grow.
  */
 class KeptIndex {
-  /** The index of the part the transaction opened. It is shared and never written. */
-  readonly #base: ReadonlyMap<NodeId, Location>;
+  readonly #part: XmlPart;
+  /**
+   * The index of the part the transaction opened, once read. It is shared and never written.
+   * Until a lookup needs it, none is built: a probe that inserts a shape into a slide of 24,000
+   * shapes finds the slide tree near the root (`findNodeNear`) and never walks the shapes.
+   */
+  #base: ReadonlyMap<NodeId, Location> | undefined;
+  /** Lookups answered without the index; past {@link NEAR_LOOKUPS}, the index is built. */
+  #near = 0;
   /** The entries that edits wrote or removed (`undefined`), over `#base`. */
   readonly #changes = new Map<NodeId, Location | undefined>();
 
-  constructor(source: ReadonlyMap<NodeId, Location>) {
-    this.#base = source;
+  constructor(part: XmlPart) {
+    this.#part = part;
+    this.#base = cachedNodeIndex(part);
   }
 
   get(id: NodeId): Location | undefined {
-    return this.#changes.has(id) ? this.#changes.get(id) : this.#base.get(id);
+    if (this.#changes.has(id)) return this.#changes.get(id);
+    if (!this.#base && this.#near < NEAR_LOOKUPS) {
+      this.#near += 1;
+      const found = findNodeNear(this.#part, id, NEAR_VISITS);
+      if (found !== undefined) return found ?? undefined;
+    }
+    return this.#index().get(id);
+  }
+
+  #index(): ReadonlyMap<NodeId, Location> {
+    return (this.#base ??= nodeIndex(this.#part));
   }
 
   set(id: NodeId, loc: Location): void {
@@ -81,7 +111,7 @@ class KeptIndex {
 
   /** The whole index, for the cache. The caller gives up this index: nothing may change it. */
   release(): ReadonlyMap<NodeId, Location> {
-    return layeredNodeIndex(this.#base, this.#changes);
+    return layeredNodeIndex(this.#index(), this.#changes);
   }
 }
 
@@ -98,7 +128,7 @@ export class WorkingTree {
     this.#root = part.root;
     this.#nextId = part.nextId;
     // A copy: the cached index belongs to the previous root, which history still holds.
-    this.#index = new KeptIndex(nodeIndex(part));
+    this.#index = new KeptIndex(part);
     workingTreeOpens += 1;
   }
 
