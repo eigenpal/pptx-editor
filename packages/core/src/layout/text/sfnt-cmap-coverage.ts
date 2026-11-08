@@ -1,6 +1,6 @@
 // Adapted from DOCX Editor `packages/core/src/layout/sfnt-cmap-coverage.ts` at commit adf0e178.
-// Changes: `unicodeCmapSubtable` refuses a subtable whose segments or groups are out of order,
-// and `cmapMapsCodePoint` finds a format 4 segment with a binary search instead of a scan. A
+// Changes: `unicodeCmapSubtable` ranks the encodings as HarfBuzz and fontkit do, and passes
+// over a subtable that is cut short or whose segments or groups are out of order. And `cmapMapsCodePoint` finds a format 4 segment with a binary search instead of a scan. A
 // deck can embed a font with 32,767 segments, and the fallback search asks every face for
 // every character it lacks. `fontMapsCodePoint` is not ported: the HarfBuzz measurer keeps
 // each face's subtable, and a coverage cache, with the loaded face.
@@ -9,13 +9,19 @@
 //
 // Shaping cannot answer this: HarfBuzz draws a missing U+2011 with the face's U+2010, and draws
 // a missing precomposed letter as its decomposition. Both hide that the face itself has no
-// glyph. Only the Unicode subtables count: (3,10) or (0,4+) format 12, else (3,1) or (0,0-3)
-// format 4. Every read is bounds-checked, because the bytes come from a file. A face with no
+// glyph. Only the Unicode subtables count, in the order of `UNICODE_ENCODINGS`. Every read is bounds-checked, because the bytes come from a file. A face with no
 // subtable that passes these checks has no answer here, and its caller asks HarfBuzz.
 
 const u16 = (b: Uint8Array, o: number): number => (b[o]! << 8) | b[o + 1]!;
 const u32 = (b: Uint8Array, o: number): number =>
   (b[o]! * 0x1000000 + (b[o + 1]! << 16) + (b[o + 2]! << 8) + b[o + 3]!) >>> 0;
+
+/**
+ * The Unicode encodings, as `platform * 0x10000 + encoding`, first choice first: (3,10) and
+ * (0,4) for the full repertoire, then (3,1) and (0,3) to (0,0) for the BMP. A face whose
+ * (0,3) table is a subset of its (3,1) table answers from (3,1), as HarfBuzz does.
+ */
+const UNICODE_ENCODINGS = [0x3000a, 0x00004, 0x30001, 0x00003, 0x00002, 0x00001, 0x00000];
 
 /** The chosen Unicode subtable: its format and offset in the font bytes. */
 export interface UnicodeSubtable {
@@ -69,27 +75,23 @@ export function unicodeCmapSubtable(bytes: Uint8Array, faceIndex: number): Unico
     if (u32(bytes, record) !== 0x636d6170) continue;
     const cmap = u32(bytes, record + 8);
     if (!fits(cmap, 4)) return null;
-    let format4: number | null = null;
-    let format12: number | null = null;
+    // The best-ranked subtable of format 4 or 12 that is well formed; a broken one is passed.
+    let best: UnicodeSubtable | null = null;
+    let bestRank = UNICODE_ENCODINGS.length;
     const encodings = u16(bytes, cmap + 2);
     for (let entry = 0; entry < encodings; entry += 1) {
       const at = cmap + 4 + entry * 8;
-      if (!fits(at, 8)) return null;
-      const platform = u16(bytes, at);
-      const encoding = u16(bytes, at + 2);
+      if (!fits(at, 8)) break;
+      const rank = UNICODE_ENCODINGS.indexOf(u16(bytes, at) * 0x10000 + u16(bytes, at + 2));
+      if (rank < 0 || rank >= bestRank) continue;
       const offset = cmap + u32(bytes, at + 4);
       if (!fits(offset, 2)) continue;
-      const unicode = platform === 0 || (platform === 3 && (encoding === 1 || encoding === 10));
-      if (!unicode) continue;
       const format = u16(bytes, offset);
-      if (format === 12 && format12 === null) format12 = offset;
-      if (format === 4 && format4 === null) format4 = offset;
+      if ((format !== 4 && format !== 12) || !wellFormed(bytes, format, offset)) continue;
+      best = { format, offset };
+      bestRank = rank;
     }
-    if (format12 !== null)
-      return wellFormed(bytes, 12, format12) ? { format: 12, offset: format12 } : null;
-    if (format4 !== null)
-      return wellFormed(bytes, 4, format4) ? { format: 4, offset: format4 } : null;
-    return null;
+    return best;
   }
   return null;
 }

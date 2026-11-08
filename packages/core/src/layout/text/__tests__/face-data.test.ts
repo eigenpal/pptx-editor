@@ -131,11 +131,23 @@ describe('the OS/2 strikeout stroke', () => {
 
 /** A one-table sfnt whose cmap holds `subtable` under (platform, encoding). */
 function cmapSfnt(subtable: number[], platform = 3, encoding = 1): Uint8Array {
-  const cmap = [0, 0, 0, 1, ...be16(platform), ...be16(encoding), ...be32(12)];
+  return cmapSfntOf([{ platform, encoding, subtable }]);
+}
+
+/** A one-table sfnt whose cmap lists each subtable under its (platform, encoding), in order. */
+function cmapSfntOf(
+  entries: readonly { platform: number; encoding: number; subtable: number[] }[]
+): Uint8Array {
+  const cmap = [0, 0, ...be16(entries.length)];
+  let offset = 4 + entries.length * 8;
+  for (const { platform, encoding, subtable } of entries) {
+    cmap.push(...be16(platform), ...be16(encoding), ...be32(offset));
+    offset += subtable.length;
+  }
+  for (const { subtable } of entries) cmap.push(...subtable);
   const header = [0, 1, 0, 0, 0, 1, 0, 16, 0, 0, 0, 0];
-  const record = [0x63, 0x6d, 0x61, 0x70, 0, 0, 0, 0, ...be32(28)];
-  record.push(...be32(cmap.length + subtable.length));
-  return new Uint8Array([...header, ...record, ...cmap, ...subtable]);
+  const record = [0x63, 0x6d, 0x61, 0x70, 0, 0, 0, 0, ...be32(28), ...be32(cmap.length)];
+  return new Uint8Array([...header, ...record, ...cmap]);
 }
 const be16 = (value: number) => [(value >> 8) & 0xff, value & 0xff];
 const be32 = (value: number) => [
@@ -203,6 +215,37 @@ describe('cmap coverage', () => {
 
   test('a symbol cmap has no Unicode subtable to read', () => {
     expect(unicodeCmapSubtable(cmapSfnt(format4(), 3, 0), 0)).toBeNull();
+  });
+
+  /** Format 4 that maps U+2010 only. */
+  const hyphenOnly = (): number[] => {
+    const out = [...be16(4), 0, 0, 0, 0, ...be16(4), 0, 0, 0, 0, 0, 0];
+    out.push(...be16(0x2010), ...be16(0xffff), 0, 0, ...be16(0x2010), ...be16(0xffff));
+    out.push(...be16((5 - 0x2010) & 0xffff), ...be16(1), 0, 0, 0, 0);
+    out[3] = out.length;
+    return out;
+  };
+
+  test('(3,1) wins over an earlier (0,3), as HarfBuzz ranks them', () => {
+    const bytes = cmapSfntOf([
+      { platform: 0, encoding: 3, subtable: hyphenOnly() },
+      { platform: 3, encoding: 1, subtable: format4() },
+    ]);
+    const subtable = unicodeCmapSubtable(bytes, 0)!;
+    expect(cmapMapsCodePoint(bytes, subtable, 0x3042)).toBe(true);
+  });
+
+  test('a malformed subtable is passed over for the next one', () => {
+    // The (3,1) table's segment count runs past the end of the font.
+    const broken = format4();
+    broken[6] = 0x7f;
+    const bytes = cmapSfntOf([
+      { platform: 3, encoding: 1, subtable: broken },
+      { platform: 0, encoding: 3, subtable: hyphenOnly() },
+    ]);
+    const subtable = unicodeCmapSubtable(bytes, 0)!;
+    expect(cmapMapsCodePoint(bytes, subtable, 0x2010)).toBe(true);
+    expect(cmapMapsCodePoint(bytes, subtable, 0x3042)).toBe(false);
   });
 
   test('truncated or garbage bytes answer missing without reading out of bounds', () => {
