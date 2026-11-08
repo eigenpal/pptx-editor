@@ -36,9 +36,10 @@ export interface SurfaceInputHost {
   /**
    * Apply a system text change: `replacement` replaces `target` when the model text before
    * the caret holds it, and goes in at the caret when there is no target
-   * (`replacement-text.ts`).
+   * (`replacement-text.ts`). `committed`: the text an IME committed; when the target no
+   * longer matches, its new characters go in at the caret, so no typed text is lost.
    */
-  replaceText?(target: ReplacementTarget | null, replacement: string): void;
+  replaceText?(target: ReplacementTarget | null, replacement: string, committed?: string): void;
   /** The text the input holds for the system, or null for none. */
   typingContext?(): TypingContext | null;
   /** The text for a translation key: the input's description. */
@@ -144,7 +145,8 @@ function contextTarget(
   end: number
 ): ReplacementTarget | null {
   if (!context || value !== context.text || end <= start || end > value.length) return null;
-  return { text: value.slice(start, end), after: value.length - end, paragraph: context.key };
+  const between = value.slice(end);
+  return { text: value.slice(start, end), after: between.length, between, paragraph: context.key };
 }
 
 /**
@@ -273,6 +275,9 @@ export function bindSurfaceInput(
   // caret, not the whole text of the shape.
   const description = host.label?.('canvas.inputDescription');
   if (description) input.setAttribute('aria-description', description);
+  // The input follows each caret move at once, not lazily at the next key: a mobile keyboard
+  // reads the text before the caret when the caret moves, for its capitals and suggestions,
+  // and an empty input reads to it as the start of a sentence.
   const sync = (): void => {
     if (composing) return;
     context = host.typingContext?.() ?? null;
@@ -286,13 +291,17 @@ export function bindSurfaceInput(
       input.setSelectionRange(end, end);
   };
   /**
-   * Collapse a selection in the input that nothing synced to the model: a native key the
-   * editor does not handle (a line-wise selection move) can make one. The user sees no
-   * selection on the slide, so no input may replace it. Not during a composition.
+   * Put the input caret back where `sync` left it, at the end of the value: a native key the
+   * editor does not handle can move it or select with it (a line-wise move). The user sees
+   * neither on the slide, so no input may start from there. Not during a composition. Every
+   * edit that reads the input selection runs after this, unless the system made that
+   * selection for the same event.
    */
   const collapse = (): void => {
-    if (composing || input.selectionStart === input.selectionEnd) return;
-    input.setSelectionRange(input.value.length, input.value.length);
+    if (composing) return;
+    const end = input.value.length;
+    if (input.selectionStart !== end || input.selectionEnd !== end)
+      input.setSelectionRange(end, end);
   };
   const width = measurer(input);
   // The input grows with the text being composed, so the text shows at the caret while the
@@ -351,6 +360,8 @@ export function bindSurfaceInput(
     sync();
   };
   const onCompositionStart = (): void => {
+    // A composition that no key started (a native move came last) starts at the synced caret.
+    collapse();
     composing = true;
     input.classList.add(COMPOSING_CLASS);
     composeFrom = { value: input.value, width: input.value ? input.scrollWidth : 0 };
@@ -373,13 +384,14 @@ export function bindSurfaceInput(
     if (edit.target.text === '' && edit.text === '') return; // Nothing changed.
     if (edit.target.text === '' && edit.target.after === 0)
       return host.textInput('text', edit.text);
-    host.replaceText(edit.target, edit.text);
+    host.replaceText(edit.target, edit.text, data);
   };
   const onKeyDown = (e: KeyboardEvent): void => {
-    if (isCompositionKey(e)) return;
-    // Before the key acts: a selection that a native key left in the input is not the
-    // system's target. The system makes its own selection after this, for its own input.
+    // Before the key acts, also the first key of a composition (key code 229): a caret or a
+    // selection that a native key left in the input is not the system's. The system makes
+    // its own selection after this, for its own input.
     if (e.target === input) collapse();
+    if (isCompositionKey(e)) return;
     if ((e.key === 'Meta' || e.key === 'Control') && !e.repeat) host.warmCopy?.();
     if (host.shortcut(e.key, e)) {
       e.preventDefault();

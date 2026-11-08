@@ -32,6 +32,8 @@ export interface ReplacementTarget {
   readonly text: string;
   /** How many characters lie between the end of the target and the caret. */
   readonly after: number;
+  /** The text between the end of the target and the caret, when the event says. */
+  readonly between?: string;
   /** The paragraph key of the target, or null when the event does not say. */
   readonly paragraph: string | null;
 }
@@ -116,6 +118,9 @@ export function replacementRange(
   const to = caret - target.after;
   const from = to - target.text.length;
   if (from < 0) return null;
+  // The text up to the caret matches too, so an empty target (an insertion) is placed only
+  // where the model still holds what the event saw.
+  if (target.between !== undefined && text.slice(to, caret) !== target.between) return null;
   return text.slice(from, to) === target.text ? { from, to } : null;
 }
 
@@ -167,7 +172,7 @@ export function createSystemText(host: SystemTextHost) {
      * next typed text. The edit is one text input over the target: one store transaction,
      * one undo step, and an undo puts the caret back where it was.
      */
-    replaceText(target: ReplacementTarget | null, replacement: string): void {
+    replaceText(target: ReplacementTarget | null, replacement: string, committed?: string): void {
       const sel = host.selection();
       if (!target) {
         if (replacement) host.textInput('text', replacement, sel);
@@ -175,8 +180,13 @@ export function createSystemText(host: SystemTextHost) {
       }
       const at = caretAt(sel);
       const range = at && replacementRange(at.text, at.offset, at.key, target);
-      if (sel.kind !== 'text' || !at || !range)
+      if (sel.kind !== 'text' || !at || !range) {
+        // An IME's text is the user's typing: when a peer's edit moved its target, the
+        // characters the model does not hold before the caret go in there, as typing would.
+        const fresh = committed && at ? newCharacters(at.text.slice(0, at.offset), committed) : '';
+        if (fresh) return host.textInput('text', fresh, sel);
         return host.refuse('errors.inputUnsupported', 'insertReplacementText');
+      }
       // A change that changes nothing writes nothing: no undo step, no collaboration op.
       if (at.text.slice(range.from, range.to) === replacement) return;
       const point = (offset: number) => ({ paragraph: sel.focus.paragraph, offset });
@@ -197,6 +207,17 @@ export function createSystemText(host: SystemTextHost) {
       host.emit();
     },
   };
+}
+
+/**
+ * The end of `committed` that `before` (the model text before the caret) does not already
+ * end with: the characters to type so that the text before the caret ends with `committed`.
+ * A word the model holds is never typed twice.
+ */
+export function newCharacters(before: string, committed: string): string {
+  for (let k = Math.min(committed.length, before.length); k > 0; k -= 1)
+    if (before.endsWith(committed.slice(0, k))) return committed.slice(k);
+  return committed;
 }
 
 /** One change to the context: `target` becomes `text`. */
@@ -221,7 +242,12 @@ export function fieldEdit(before: string, after: string, key: string): ContextEd
   )
     trail += 1;
   return {
-    target: { text: before.slice(lead, before.length - trail), after: trail, paragraph: key },
+    target: {
+      text: before.slice(lead, before.length - trail),
+      after: trail,
+      between: before.slice(before.length - trail),
+      paragraph: key,
+    },
     text: after.slice(lead, after.length - trail),
   };
 }
@@ -262,5 +288,7 @@ export function compositionEdit(
     trail += 1;
   replaced = replaced.slice(0, replaced.length - trail);
   text = text.slice(0, text.length - trail);
-  return { target: { text: replaced, after: tail + trail, paragraph: key }, text };
+  const reach = tail + trail;
+  const between = before.slice(before.length - reach);
+  return { target: { text: replaced, after: reach, between, paragraph: key }, text };
 }

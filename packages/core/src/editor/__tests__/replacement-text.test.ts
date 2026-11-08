@@ -20,6 +20,7 @@ import {
   contextBefore,
   CONTEXT_LIMIT,
   paragraphKey,
+  newCharacters,
   replacementRange,
 } from '../replacement-text.ts';
 import { dispatchBeforeInput, replacementTarget } from '../surface-input.ts';
@@ -414,6 +415,7 @@ describe('a system replacement (insertReplacementText)', () => {
     expect(replacementTarget(event, field, context)).toEqual({
       text: 'teh',
       after: 0,
+      between: '',
       paragraph: 'k',
     });
     // A selection over a value that is not the context cannot be used: it never matches.
@@ -438,6 +440,7 @@ describe('a system replacement (insertReplacementText)', () => {
     expect(replacementTarget(early, collapsed, context)).toEqual({
       text: 'te',
       after: 1,
+      between: 'h',
       paragraph: 'k',
     });
     const two = { ...event, getTargetRanges: () => [range, range] } as unknown as InputEvent;
@@ -453,27 +456,31 @@ describe('a composition over the text the input holds', () => {
   test('the change against the context keeps the shared characters', () => {
     // A plain composition after the context.
     expect(compositionEdit('abc ', 'abc 日本語', 7, '日本語', 'k')).toEqual({
-      target: { text: '', after: 0, paragraph: 'k' },
+      target: { text: '', after: 0, between: '', paragraph: 'k' },
       text: '日本語',
     });
     // A keyboard recomposes the word before the caret: only the new letter goes in.
     expect(compositionEdit('a helo', 'a hello', 7, 'hello', 'k')).toEqual({
-      target: { text: '', after: 1, paragraph: 'k' },
+      target: { text: '', after: 1, between: 'o', paragraph: 'k' },
       text: 'l',
     });
     expect(compositionEdit('a teh', 'a the', 5, 'the', 'k')).toEqual({
-      target: { text: 'eh', after: 0, paragraph: 'k' },
+      target: { text: 'eh', after: 0, between: '', paragraph: 'k' },
       text: 'he',
     });
     // An empty commit deletes what the composition covered; an unchanged one changes nothing.
     expect(compositionEdit('a hello', 'a ', 2, '', 'k')).toEqual({
-      target: { text: 'hello', after: 0, paragraph: 'k' },
+      target: { text: 'hello', after: 0, between: '', paragraph: 'k' },
       text: '',
     });
     expect(compositionEdit('a hello', 'a hello', 7, 'hello', 'k')).toEqual({
-      target: { text: '', after: 0, paragraph: 'k' },
+      target: { text: '', after: 0, between: '', paragraph: 'k' },
       text: '',
     });
+    // When the model lost the target, only the committed characters it lacks are new.
+    expect(newCharacters('a hel', 'hello')).toBe('lo');
+    expect(newCharacters('a hello', 'hello')).toBe('');
+    expect(newCharacters('a help', 'hello')).toBe('hello');
     // The field does not hold the committed text at the caret.
     expect(compositionEdit('abc', 'abcに', 4, '日本', 'k')).toBeNull();
   });
@@ -508,6 +515,55 @@ describe('a composition over the text the input holds', () => {
     expect(texts(e)).toEqual(['a ']);
     expect(focusOf(e)).toEqual({ paragraph: 0, offset: 2 });
     expect(input.value).toBe('a ');
+    e.destroy();
+  });
+
+  /** A simulated IME: the first key (229), then a composition at the input's selection. */
+  function ime(fire: (e: Event) => boolean, input: HTMLTextAreaElement, data: string, key = true) {
+    if (key)
+      fire(
+        new win.KeyboardEvent('keydown', {
+          key: 'Process',
+          keyCode: 229,
+          bubbles: true,
+        }) as unknown as Event
+      );
+    fire(composition('compositionstart'));
+    const { selectionStart: s, selectionEnd: t, value } = input;
+    input.value = value.slice(0, s) + data + value.slice(t);
+    input.setSelectionRange(s + data.length, s + data.length);
+    fire(composition('compositionend', data));
+  }
+
+  for (const [label, from, to, key] of [
+    ['a stale selection, then an IME key', 0, 11, true],
+    ['a stale caret, then an IME key', 0, 0, true],
+    ['a stale caret, then a composition with no key', 0, 0, false],
+  ] as const) {
+    test(`${label}: the composition goes in at the model caret`, async () => {
+      const { e, input, type, fire } = await open(para(''));
+      caret(e, 0, 0);
+      type('hello world');
+      // A native key the editor does not handle (Ctrl+P, Ctrl+Shift+P) moved the input caret.
+      input.setSelectionRange(from, to);
+      ime(fire, input, '日', key);
+      expect(texts(e)).toEqual(['hello world日']);
+      expect(focusOf(e)).toEqual({ paragraph: 0, offset: 12 });
+      e.destroy();
+    });
+  }
+
+  test('a recomposed word whose target a peer changed keeps the typed text', async () => {
+    const { e, input, fire } = await open(para(run('a helo')));
+    caret(e, 0, 6);
+    fire(composition('compositionstart'));
+    // A peer's edit lands while the keyboard composes: the model is no longer the field.
+    e.input('text', '!');
+    input.value = 'a hello';
+    input.setSelectionRange(7, 7);
+    fire(composition('compositionend', 'hello'));
+    // Nothing is lost and no word goes in twice: the committed word follows the caret.
+    expect(texts(e)).toEqual(['a helo!hello']);
     e.destroy();
   });
 
