@@ -160,7 +160,7 @@ const SlideshowScreen = defineComponent({
       const el = root.value;
       if (!el) return;
       stops = [
-        enterSlideshowScreen(el),
+        enterSlideshowScreen(el, () => controller.exit()),
         listenSlideshowKeys(controller, () => root.value),
         observeSlideshowScreen(el, (next) => {
           size.value = next;

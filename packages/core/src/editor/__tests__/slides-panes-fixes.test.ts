@@ -1,5 +1,6 @@
 // Core rules behind the slide pane fixes: the open-failure reasons, `setNotes` with the shown
-// formats, the focus after a slide opens from the sorter, and the focus after a show ends.
+// formats, the focus after a slide opens from the sorter, the focus after a show ends, and the
+// show end when the browser leaves full screen.
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
@@ -247,5 +248,41 @@ describe('focus', () => {
     await frame();
     expect(document.activeElement).toBe(items[2]!);
     scope.remove();
+  });
+
+  test('the show ends when the browser leaves full screen, not on an exit it never held', () => {
+    let held: Element | null = null;
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => held,
+    });
+    const change = (el: Element | null): void => {
+      held = el;
+      document.dispatchEvent(new Event('fullscreenchange'));
+    };
+    const show = document.createElement('div');
+    show.tabIndex = -1;
+    document.body.append(show);
+    try {
+      let left = 0;
+      const leave = enterSlideshowScreen(show, () => left++);
+      // A late exit of an earlier show, before this show held full screen.
+      change(null);
+      expect(left).toBe(0);
+      change(show);
+      expect(left).toBe(0);
+      // The first Escape: the browser leaves full screen and keeps the key.
+      change(null);
+      expect(left).toBe(1);
+      change(null);
+      expect(left).toBe(1);
+      leave();
+      change(show);
+      change(null);
+      expect(left).toBe(1);
+    } finally {
+      show.remove();
+      delete (document as { fullscreenElement?: unknown }).fullscreenElement;
+    }
   });
 });
