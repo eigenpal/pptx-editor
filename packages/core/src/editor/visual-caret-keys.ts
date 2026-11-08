@@ -5,9 +5,10 @@
 // The caret keys on a line in visual order (`Line.bidi`). Left and Right step one place on
 // screen; past the line's edge they go to the next line in reading order: a line of the same
 // paragraph is entered at its edge on the key's side, another paragraph at its start or end.
-// With Ctrl or Alt they walk the places by word. Home and End go to the visual edges of the line
-// in the paragraph's reading direction. Every result is a logical offset with the side it shows
-// on. A line without `bidi` keeps the source-order keys of `text-input.ts`.
+// With Ctrl or Alt they walk the places by word, and with Cmd they go to the line's visual edge on
+// their side. Home and End stay at the logical line edges (`text-input.ts`); `lineEdgePlace`
+// only picks the side the caret shows on. Every result is a logical offset with the side it
+// shows on. A line without `bidi` keeps the source-order keys of `text-input.ts`.
 
 import type { LayoutItem, Line } from '../layout/index.ts';
 import type { TextPoint } from '../contracts/index.ts';

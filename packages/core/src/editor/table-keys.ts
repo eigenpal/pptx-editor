@@ -46,6 +46,32 @@ function cellSelection(
 }
 
 /**
+ * A caret in a cell that Left or Right moves into, at the visual edge that faces the cell it
+ * came from: the right edge (`side` 1) for Left, the left edge (-1) for Right. On the cell's
+ * first line when the move goes forward in the cell order, else on its last line. Undefined
+ * when the cell has no laid-out line.
+ */
+function cellEdgeCaret(
+  layout: SlideLayout | undefined,
+  nodeId: string,
+  cell: TableCellAddress,
+  side: -1 | 1,
+  forward: boolean
+): EditorSelection | undefined {
+  const frame = tableItem(layout, nodeId);
+  const item = frame ? cellItem(frame, cell) : undefined;
+  const m = item ? textFrameMatrix(item) : undefined;
+  const lines = item?.text?.lines ?? [];
+  const line = forward ? lines[0] : lines[lines.length - 1];
+  if (!item || !m || !line) return undefined;
+  const xs = [...line.caretX, ...(line.bidi?.trailingX ?? [])];
+  const x = side === 1 ? Math.max(...xs) : Math.min(...xs);
+  const s = apply(m, x, line.top + line.height / 2);
+  const point = pointAt(item, s.x, s.y);
+  return point ? { kind: 'text', nodeId, cell, anchor: point, focus: point } : undefined;
+}
+
+/**
  * A caret at the end of a table's first cell, or of a diagram's first node: Enter, F2, or a
  * typed key on a selected table or diagram.
  */
@@ -94,7 +120,8 @@ function stepFrom(
  * Keys with a cell range selected. Delete and Backspace clear the cells, Escape selects the
  * table, Tab and Shift+Tab select the text of the cell after (or before) the focus cell, an
  * arrow puts the caret in the cell beside the focus cell, and Shift+arrow moves the range's
- * focus. The focus stays in the table at its edges.
+ * focus. The focus stays in the table at its edges. In a table that runs right to left, Left
+ * and Right swap, so they step to the cell on that side on screen.
  */
 function cellsKeyAction(
   layout: SlideLayout | undefined,
@@ -189,7 +216,9 @@ export function tableKeyAction(
     const next = drawn[i + (forward ? 1 : -1)];
     if (!next) return null;
     return {
-      select: (l) => cellSelection(l, id, addressOf(next), forward ? 'start' : 'end'),
+      select: (l) =>
+        cellEdgeCaret(l, id, addressOf(next), key === 'ArrowLeft' ? 1 : -1, forward) ??
+        cellSelection(l, id, addressOf(next), forward ? 'start' : 'end'),
     };
   }
   if (key === 'ArrowDown' || key === 'ArrowUp') {
