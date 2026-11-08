@@ -262,7 +262,11 @@ export function fillPaint(
       return { paint: defs.add(pattern), opacity: 1 };
     }
     case 'pattern':
-      return patternPaint(fill, ctx);
+      // The preset path fill modes lighten and darken both colors.
+      return patternPaint(
+        { ...fill, fg: adjustForPathMode(fill.fg, mode), bg: adjustForPathMode(fill.bg, mode) },
+        ctx
+      );
   }
 }
 

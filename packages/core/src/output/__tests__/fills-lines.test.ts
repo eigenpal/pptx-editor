@@ -115,6 +115,25 @@ describe('preset patterns', () => {
     expect(filled.getAttribute('d')!.startsWith('M')).toBe(true);
   });
 
+  test('darken and lighten path fills change both pattern colors', () => {
+    // `cube` paints its top lighter and its side darker than its face.
+    const root = paintShapes(
+      shape({
+        id: 2,
+        x: 0,
+        y: 0,
+        cx: 914_400,
+        cy: 914_400,
+        prst: 'cube',
+        fill: PATTERN('horz').replace('FFFFFF', '808080'),
+      })
+    );
+    const backgrounds = [...root.querySelectorAll('pattern')]
+      .filter((p) => p.id.includes('patt'))
+      .map((p) => p.querySelector('rect')!.getAttribute('fill'));
+    expect(new Set(backgrounds).size).toBe(3);
+  });
+
   test('a half-tone pixel draws the foreground at half opacity', () => {
     const p = patternOf(
       shape({ id: 2, x: 0, y: 0, cx: 914_400, cy: 914_400, fill: PATTERN('dnDiag') })

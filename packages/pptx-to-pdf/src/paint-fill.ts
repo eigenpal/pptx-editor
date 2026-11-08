@@ -115,7 +115,9 @@ export async function paintFill(
   const f = own.fill;
   if (f.type === 'none' || f.type === 'group') return false;
   if (f.type === 'pattern') {
-    p.push(pushGraphicsState(), ...patternColor(f, p));
+    // The preset path fill modes lighten and darken both colors, as in the SVG paint.
+    const colors = { fg: adjustForPathMode(f.fg, mode), bg: adjustForPathMode(f.bg, mode) };
+    p.push(pushGraphicsState(), ...patternColor({ ...f, ...colors }, p));
     trace();
     p.push(fillEvenOdd(), popGraphicsState());
     return true;
@@ -140,16 +142,20 @@ export async function paintFill(
 /**
  * Set the fill color to a preset pattern, as the SVG paint draws it (`core/output`,
  * `preset-patterns.ts`): an 8 × 8 tile of 1 pt pixels in the background and foreground colors,
- * a half-tone pixel as the foreground at half opacity. The pattern space is the page's, so the
- * tiles sit on the slide grid and stay square to the slide whatever the shape's transform. In a
- * form XObject (a shadow or a reflection copy), the tiles follow the form's space instead.
+ * a half-tone pixel as the foreground at half opacity. A pattern maps to the space of the content
+ * that uses it (ISO 32000-1, 8.7.3.1): the page's default space in points, or the slide EMU of a
+ * form XObject (a reflection copy). Each space takes its own matrix to the slide grid, so the tiles
+ * sit on that grid and stay square to the slide whatever the shape's transform.
  */
 function patternColor(f: Extract<ResolvedFill, { type: 'pattern' }>, p: PageOps): PDFOperator[] {
   const height = p.page.getHeight();
-  const key = `${f.preset}|${f.fg.r},${f.fg.g},${f.fg.b},${f.fg.a}|${f.bg.r},${f.bg.g},${f.bg.b},${f.bg.a}|${height}`;
+  // Pattern space: one unit per pattern pixel, y down from the slide's top-left corner.
+  const s = PATTERN_PIXEL / EMU_PER_PT;
+  const matrix = p.inForm ? [PATTERN_PIXEL, 0, 0, PATTERN_PIXEL, 0, 0] : [s, 0, 0, -s, 0, height];
+  const key = `${f.preset}|${f.fg.r},${f.fg.g},${f.fg.b},${f.fg.a}|${f.bg.r},${f.bg.g},${f.bg.b},${f.bg.a}|${matrix.join(',')}`;
   let name = p.patterns.get(key);
   if (!name) {
-    name = p.name('Pattern', patternRef(f, height, key, p));
+    name = p.name('Pattern', patternRef(f, matrix, key, p));
     p.patterns.set(key, name);
   }
   return [
@@ -159,12 +165,12 @@ function patternColor(f: Extract<ResolvedFill, { type: 'pattern' }>, p: PageOps)
 }
 
 /**
- * The tiling pattern of a preset in two colors on a page of `height` pt, by `key`, written once
+ * The tiling pattern of a preset in two colors with the pattern `matrix`, by `key`, written once
  * per document: a pattern of a master or a layout repeats on every slide.
  */
 function patternRef(
   f: Extract<ResolvedFill, { type: 'pattern' }>,
-  height: number,
+  matrix: number[],
   key: string,
   p: PageOps
 ): PDFRef {
@@ -213,8 +219,6 @@ function patternRef(
       paint(f.fg, f.fg.a * coverage);
       ops.push(...runs, fillEvenOdd(), popGraphicsState());
     }
-    // Pattern space: one unit per pattern pixel, y down from the slide's top-left corner.
-    const s = PATTERN_PIXEL / EMU_PER_PT;
     const dict = ctx.obj({
       Type: 'Pattern',
       PatternType: 1,
@@ -223,7 +227,7 @@ function patternRef(
       BBox: [0, 0, 8, 8],
       XStep: 8,
       YStep: 8,
-      Matrix: [s, 0, 0, -s, 0, height],
+      Matrix: matrix,
       Resources: ctx.obj({ ExtGState: ctx.obj(states) }),
     });
     let bytes = dict.sizeInBytes();
