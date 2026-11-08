@@ -260,7 +260,7 @@ async function runSet(args: Extract<RunArgs, { mode: 'set' }>): Promise<number> 
       ? 'The list was measured with other tools (TOOLS above): record it in a pull request that changes only the tools, with bun run fidelity --update-gaps --accept-worse.'
       : '';
     const step = refused
-      ? `Nothing was written to ${info.gaps}: this lane has new entries or kinds (LOOSER, NEW above), and the list of another lane may have been written. Fix the regression. Only a new fixture, a pull request that changes no engine or harness source, or a pull request that changes only the comparison (COMPARISON_FILES in thresholds.ts) may record them, with: bun run fidelity <deck> --lane ${lane} --update-gaps --accept-worse`
+      ? `Nothing was written to ${info.gaps}: this lane has new entries or kinds (LOOSER, NEW above)${lanes.length > 1 ? ', and the list of another lane may have been written' : ''}. Fix the regression. Only a new fixture, a pull request that changes no engine or harness source, or a pull request that changes only the comparison (COMPARISON_FILES in thresholds.ts) may record them, with: bun run fidelity <deck> --lane ${lane} --update-gaps --accept-worse`
       : args.updateGaps
         ? `${info.gaps} in scripts/fidelity/thresholds.ts now records this run. Review its diff: a new kind is a regression to fix, not to record.`
         : fixes.length

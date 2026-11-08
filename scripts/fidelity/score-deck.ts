@@ -97,7 +97,6 @@ async function exportDeck(
   const result = await exportPdf(deck, {
     ...EXPORT_SETTINGS,
     ...SESSION_SETTINGS,
-    timeoutMs: DECK_TIMEOUT_MS,
     fonts: exportFonts(fonts),
   });
   const pages = result.slideNumbers.map((n) => n - 1);
