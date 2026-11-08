@@ -5,4 +5,4 @@
 '@pptx-editor.dev/i18n': minor
 ---
 
-Change the slide size with the `setSlideSize` command or in **Page setup**. Pick a preset or a custom size in either orientation, and scale the content to fit as one undo step.
+Change the slide size with `setSlideSize` or **Page setup**.

@@ -60,7 +60,7 @@ The separate DOM-free lane guard retains `bun check` to detect ambient DOM type 
 
    - `bun run test --shard 1/3 --balance` runs one CI shard. `--only FILE`, `--exclude PREFIX`, `--jobs N`, `--fail-fast`, and `--retry-failed` are also available. Arguments after `--` go to each `bun test`.
    - Copy DOCX Editor pro code only into `packages/pro`, never into an Apache-2.0 package.
-5. Add a changeset for code changes with `bun changeset`. Documentation, test, and CI-only changes do not need one.
+5. Add a changeset for code changes with `bun changeset`. Write one short paragraph of at most 400 characters, as [the changeset guide](.changeset/README.md) says. Documentation, test, and CI-only changes do not need one.
 6. Submit a pull request against `main` with a conventional-commit title.
 
 ## Browser responsiveness checks
