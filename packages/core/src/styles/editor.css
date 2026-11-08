@@ -1331,18 +1331,29 @@
 .pptx-rail[data-orientation='horizontal'] .pptx-master-rail__item::before {
   content: none;
 }
-/* The bar over the canvas in the slide master view: what is being edited, and Close. It
-   floats over the canvas top, as the find bar does, and the canvas pads its top by the bar's
-   room, so the fitted zoom keeps the slide clear of it. */
+/* The bar over the canvas in the slide master view: what is being edited, and Close. It is the
+   canvas's first child (`.pptx-master-slot`), in the 52px that the canvas pads its top by, so
+   the fitted zoom keeps the slide clear of it in any host layout. Its negative margin gives
+   that room back to the surface, and `sticky` keeps it in view while a zoomed slide scrolls. */
+.pptx-master-slot {
+  display: contents;
+}
+.pptx-canvas:has(> .pptx-master-slot > .pptx-master-bar) {
+  padding-top: 52px;
+}
 .pptx-master-bar {
-  position: absolute;
-  top: 8px;
-  inset-inline: 12px;
+  position: sticky;
+  /* A sticky offset counts from inside the canvas's 52px top padding: -44px is 8px from its
+     top edge. */
+  top: -44px;
+  left: 12px;
   z-index: 20;
+  box-sizing: border-box;
   display: flex;
   gap: 10px;
   align-items: center;
-  min-height: 44px;
+  height: 44px;
+  margin: -44px 12px 0;
   padding: 6px 8px 6px 12px;
   border-radius: var(--doc-radius-surface, 14px);
   background: var(--doc-surface);
@@ -1365,11 +1376,17 @@
   align-items: baseline;
   min-width: 0;
 }
+/* A long layout name from the file shrinks with an ellipsis; the hint gives way first. */
 .pptx-master-bar__title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   font-weight: 600;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .pptx-master-bar__hint {
+  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -1391,9 +1408,6 @@
   transition:
     background-color 150ms ease,
     transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-.pptx-master-bar ~ .pptx-canvas {
-  padding-top: 52px;
 }
 @media (hover: hover) and (pointer: fine) {
   .pptx-master-bar__close:hover {

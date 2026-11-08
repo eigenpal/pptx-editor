@@ -394,8 +394,6 @@ export const PptxEditorContent = defineComponent({
       attached = null;
     });
     return () => [
-      // The slide master view names the template on the canvas and closes the view.
-      h(MasterViewBar),
       // `mergeProps` keeps a host's own `@contextmenu` and `@keydown` next to the menu's.
       h(
         'div',
@@ -407,7 +405,10 @@ export const PptxEditorContent = defineComponent({
           'data-pptx-canvas': '',
           onContextmenu: menu.onContextmenu,
           onKeydown: menu.onKeydown,
-        })
+        }),
+        // The slide master view's bar, in the canvas before the surface that `attach` adds,
+        // so it sits on the canvas in any host layout.
+        [h('div', { class: 'pptx-master-slot' }, [h(MasterViewBar)])]
       ),
       menu.layer(),
     ];

@@ -360,15 +360,19 @@ export function PptxEditorContent({ className }: PptxEditorContentProps) {
   }, [editor]);
   return (
     <>
-      {/* The slide master view names the template on the canvas and closes the view. */}
-      <MasterViewBar />
       <div
         ref={host}
         className={`pptx-canvas${className ? ` ${className}` : ''}`}
         data-pptx-canvas=""
         onContextMenu={menu.onContextMenu}
         onKeyDown={menu.onKeyDown}
-      />
+      >
+        {/* The slide master view's bar, in the canvas before the surface that `attach` adds,
+            so it sits on the canvas in any host layout. */}
+        <div className="pptx-master-slot">
+          <MasterViewBar />
+        </div>
+      </div>
       {menu.layer}
     </>
   );

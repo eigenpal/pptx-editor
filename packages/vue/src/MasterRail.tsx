@@ -145,7 +145,9 @@ export const MasterViewBar = defineComponent({
         <div class="pptx-master-bar" role="region" aria-label={masterBarTitle(t, s)}>
           <Icon name="dashboard" class="pptx-icon pptx-master-bar__icon" />
           <div class="pptx-master-bar__text">
-            <span class="pptx-master-bar__title">{masterBarTitle(t, s)}</span>
+            <span class="pptx-master-bar__title" title={masterBarTitle(t, s)}>
+              {masterBarTitle(t, s)}
+            </span>
             <span class="pptx-master-bar__hint">{masterBarHint(t, s)}</span>
           </div>
           <button

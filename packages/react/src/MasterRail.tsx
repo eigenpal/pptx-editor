@@ -139,7 +139,9 @@ export function MasterViewBar() {
     <div className="pptx-master-bar" role="region" aria-label={masterBarTitle(t, current)}>
       <Icon name="dashboard" className="pptx-icon pptx-master-bar__icon" />
       <div className="pptx-master-bar__text">
-        <span className="pptx-master-bar__title">{masterBarTitle(t, current)}</span>
+        <span className="pptx-master-bar__title" title={masterBarTitle(t, current)}>
+          {masterBarTitle(t, current)}
+        </span>
         <span className="pptx-master-bar__hint">{masterBarHint(t, current)}</span>
       </div>
       <button
