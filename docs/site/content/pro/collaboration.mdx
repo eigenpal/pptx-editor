@@ -79,6 +79,22 @@ session.setConnected(true); // Connected again.
 
 Read `session.statusSnapshot()` for state and failure details. Subscribe with `session.subscribeStatus(listener)` and release the returned subscription when your UI unmounts. A connection flag reports transport state; it does not authenticate a participant.
 
+## Handle unfinished input during peer edits
+
+An input method composes text before the participant commits it. A peer's edit after an unfinished composition, or in another paragraph, keeps the composition. When a peer's edit changes the text before it, the composition ends and its text is not entered. The editor reports this as `lastRejection` in `editor.snapshot()`, with the reason `errors.compositionChanged`, and the edit notice of the React and Vue adapters shows the translated message.
+
+To react in your own UI, read the snapshot. This example uses the `editor` from [Create one session per editor](#create-one-session-per-editor):
+
+```ts
+const unsubscribe = editor.subscribe(() => {
+  const rejection = editor.snapshot().lastRejection;
+  if (rejection?.reason === 'errors.compositionChanged') {
+    // Ask the participant to type the text again.
+  }
+});
+// Call unsubscribe() when your UI unmounts.
+```
+
 ## Save and close a room
 
 Save the PPTX through the editor. Persist Yjs room updates separately when you need a durable collaboration room. A saved PPTX does not replace your provider’s room persistence.

@@ -673,20 +673,40 @@ describe('a composition over the text the input holds', () => {
     e.destroy();
   });
 
-  test('an edit at the place of a composition ends it, and its text goes in nowhere', async () => {
-    const { e, input, fire } = await open(para(run('a helo')));
+  test('a local edit during a composition ends it at its place, and keeps its caret', async () => {
+    const { e, input, fire } = await open(para(run('a helo')) + para(run('two')));
     caret(e, 0, 6);
     fire(composition('compositionstart'));
-    input.value = 'a hel';
-    // An edit at the place moves the caret in the paragraph: the place no longer holds.
-    e.input('text', '!');
+    input.value = 'a helo日';
+    // An API edit in another paragraph, which moves the caret there.
+    caret(e, 1, 3);
     expect(input.classList.contains(COMPOSING_CLASS)).toBe(false);
-    expect(e.snapshot().lastRejection?.reason).toBe('errors.compositionChanged');
+    // The text went in at its place when the caret moved; the edit's caret is not moved back.
+    expect(texts(e)).toEqual(['a helo日', 'two']);
+    e.input('text', '!');
+    expect(texts(e)).toEqual(['a helo日', 'two!']);
+    expect(focusOf(e)).toEqual({ paragraph: 1, offset: 4 });
     // The browser's late end adds nothing, and no letter goes in twice.
-    input.value = 'a hello';
-    input.setSelectionRange(7, 7);
-    fire(composition('compositionend', 'hello'));
-    expect(texts(e)).toEqual(['a helo!']);
+    input.value = 'a helo日本';
+    fire(composition('compositionend', '日本'));
+    expect(texts(e)).toEqual(['a helo日', 'two!']);
+    e.destroy();
+  });
+
+  test('an API edit that moves the caret during a composition ends it, not moved back', async () => {
+    const { e, input, fire } = await open(para(run('a helo')) + para(run('two')));
+    caret(e, 0, 6);
+    fire(composition('compositionstart'));
+    input.value = 'a helo日';
+    // One API command edits text and leaves the caret in another paragraph.
+    const [two] = e.find.matches('two');
+    expect(e.exec({ type: 'replace', match: two!, replacement: 'three' }).ok).toBe(true);
+    expect(input.classList.contains(COMPOSING_CLASS)).toBe(false);
+    expect(texts(e)).toEqual(['a helo日', 'three']);
+    // The selection is where the command left it, not the composition's caret.
+    const left = e.snapshot().selection;
+    expect(focusOf(e)).not.toEqual({ paragraph: 0, offset: 7 });
+    expect(left.kind === 'text' && left.focus.paragraph === 0).toBe(false);
     e.destroy();
   });
 

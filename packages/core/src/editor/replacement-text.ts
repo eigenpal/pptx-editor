@@ -19,9 +19,16 @@ import type { EditorSelection } from '../contracts/index.ts';
 import { paragraphText, paragraphsOf, slideNumberOf } from '../automation/commands/text-model.ts';
 import type { DocumentSession } from './document-session.ts';
 import { selectionBody } from './table-cells.ts';
-import { placeCaret, type TextPlace } from './paragraph-place.ts';
+import { deliveringChange } from '../store/store/delivering.ts';
+import {
+  holdsSelection,
+  placeCaret,
+  selectionPlace,
+  type SelectionPlace,
+  type TextPlace,
+} from './paragraph-place.ts';
 
-export type { TextPlace } from './paragraph-place.ts';
+export type { SelectionPlace, TextPlace } from './paragraph-place.ts';
 
 /** The text the hidden input holds for the system: the caret paragraph before the caret. */
 export interface TypingContext {
@@ -259,18 +266,48 @@ export function createSystemText(host: SystemTextHost) {
       ? placeCaret(session.probeBatch(), part, place)
       : null;
   };
+  /** The place of the selection now, for a composition over it; null with no slide. */
+  const placeOfSelection = (): SelectionPlace | null => {
+    const session = host.session();
+    const part = host.part();
+    if (!session || !part || host.viewing()) return null;
+    const { revision } = session.store;
+    return selectionPlace(session.probeBatch(), part, host.selection(), revision);
+  };
   return {
     /** The text the surface's input holds for the system. */
     typingContext,
-    /** The store revision. */
-    revision: (): number | undefined => host.session()?.store.revision,
+    /** Whether the store delivers a peer's transaction now (origin `remote`). */
+    remoteChange(): boolean {
+      const store = host.session()?.store;
+      return !!store && deliveringChange(store)?.origin === 'remote';
+    },
+    /** The place of the selection now, for a composition over a selected range. */
+    selectionPlace: placeOfSelection,
     /**
-     * The context at a composition's place after an edit, with the caret put back there: the
-     * caret that the edit left is not the place. Null when the place no longer holds. The
-     * text alone can miss an edit before the place that leaves the same text there (a peer
-     * types "Hello " before "Hello|"). A collaboration session moves the caret with its
-     * characters, so a caret that the edit moved inside the place's paragraph also ends the
-     * place. That caret only refuses: it never places text.
+     * Write a composition over a selected range: `replacement` replaces the selection, when it
+     * is still `place` (`holdsSelection`). Else the change is refused with its reason, and goes
+     * in nowhere else. Whether it applied.
+     */
+    composeSelection(place: SelectionPlace, replacement: string): boolean {
+      const now = placeOfSelection();
+      if (!now || !holdsSelection(place, now)) {
+        host.refuse('errors.compositionChanged');
+        return false;
+      }
+      const was = host.selection();
+      host.textInput('text', replacement);
+      return host.selection() !== was;
+    },
+    /**
+     * The context at a composition's place after a peer's transaction, with the caret put back
+     * there: the caret that the collaboration session moved is not the place. The surface
+     * asks only for a remote change; a local or API change ends the composition, and its
+     * caret stays where the host set it. Null when the place no longer holds. The text alone
+     * can miss an edit before the place that leaves the same text there (a peer types "Hello "
+     * before "Hello|"). The session moves the caret with its characters, so a caret that the
+     * edit moved inside the place's paragraph also ends the place. That caret only refuses:
+     * it never places text.
      */
     keepPlace(place: TextPlace): TypingContext | null {
       const at = caretOf(place);

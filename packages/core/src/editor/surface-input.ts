@@ -24,9 +24,9 @@ import {
   contextChange,
   ending,
   finalEdit,
-  followEdit,
+  placeKept,
   IDLE,
-  lose,
+  placeLost,
   partialEdit,
   placement,
   startComposition,
@@ -37,9 +37,11 @@ import {
   fieldEdit,
   type ContextEdit,
   type ReplacementTarget,
+  type SelectionPlace,
   type TextPlace,
   type TypingContext,
 } from './replacement-text.ts';
+import { holdsSelection } from './paragraph-place.ts';
 
 /** What the input wiring asks of the editor. */
 export interface SurfaceInputHost {
@@ -66,8 +68,15 @@ export interface SurfaceInputHost {
    * when the place no longer holds (`paragraph-place.ts`).
    */
   keepPlace?(place: TextPlace): TypingContext | null;
-  /** The store revision: a composition over a selected range ends unwritten after an edit. */
-  revision?(): number | undefined;
+  /** Whether the store delivers a peer's transaction now: only that can keep a place. */
+  remoteChange?(): boolean;
+  /** The place of the selection now, for a composition over a selected range. */
+  selectionPlace?(): SelectionPlace | null;
+  /**
+   * Write a composition over a selected range, when the selection is still `place`; else
+   * refuse it with its reason (`replacement-text.ts`).
+   */
+  composeSelection?(place: SelectionPlace, replacement: string): boolean;
   /** The text for a translation key: the input's description. */
   label?(key: string): string;
   shortcut(key: string, event: KeyboardEvent): boolean;
@@ -310,18 +319,26 @@ export function bindSurfaceInput(
   const sync = (): void => {
     if (composition.phase === 'ending') return;
     if (composition.phase === 'composing') {
-      // A composition changes the model only when it ends, so a new context during it comes
-      // from elsewhere (`contextChange`).
+      // A composition changes the model only when it ends, so a change during it comes from
+      // elsewhere (`composition.ts`).
+      const range = composition.place.selection;
+      if (range) {
+        // Over a selected range: any other range, or other text in it, ends the composition,
+        // and its write is refused (`composeSelection`).
+        const now = host.selectionPlace?.() ?? null;
+        if (!now || !holdsSelection(range, now)) interrupt();
+        return;
+      }
       const now = host.typingContext?.() ?? null;
-      const change = contextChange(composition, now);
-      if (change === 'follow') {
-        // An edit: the place must still hold (an edit after it, or in another paragraph), and
-        // the caret goes back to it. Else the composition ends, and its text is refused.
+      const change = contextChange(composition, now, host.remoteChange?.() ?? false);
+      if (change === 'remote') {
+        // A peer's edit: the place must still hold (an edit after it, or in another
+        // paragraph), and the caret goes back to it. Else the composition is lost.
         const where = placement(composition);
         const at = host.keepPlace ? where && host.keepPlace(where) : now;
-        if (at && composition.phase === 'composing') composition = followEdit(composition, at);
+        if (at && composition.phase === 'composing') composition = placeKept(composition, at);
         else {
-          composition = lose(composition);
+          composition = placeLost(composition);
           interrupt();
         }
       } else if (change === 'left') interrupt();
@@ -370,18 +387,20 @@ export function bindSurfaceInput(
     input.classList.remove(COMPOSING_CLASS);
     fit();
     if (state.phase === 'idle') return sync();
+    const { place } = state;
     if (state.lost) {
-      // An edit before or over the place: the text goes in nowhere, and the user learns why.
+      // A peer's edit before or over the place: the text goes in nowhere, and the user
+      // learns why.
       if (data || (edit && (edit.text || edit.target.text)))
         host.refuse('errors.compositionChanged');
-    } else if (state.place.context) {
+    } else if (place.context) {
       if (edit) applyComposition(host, placement(state), edit);
-    } else if (data) {
-      // With no text caret when it started (a selected range), the text replaces the range,
-      // unless the model changed or the editor ended the composition: never another range.
-      const kept = state.phase === 'composing' && state.place.revision === host.revision?.();
-      if (kept) host.textInput('text', data);
-      else host.refuse('errors.compositionChanged');
+    } else {
+      // Over a selected range: the text replaces the range through its checked write, never
+      // another range. An end with no text after `interrupt` passes what the input showed.
+      if (data && place.selection && host.composeSelection)
+        host.composeSelection(place.selection, data);
+      else if (data) host.refuse('errors.compositionChanged');
     }
     sync();
   };
@@ -411,7 +430,11 @@ export function bindSurfaceInput(
       input.focus({ preventScroll: true });
     }
     const state = composition;
-    if (state.phase === 'ending') finish(state, partialEdit(state.place, input.value), '');
+    if (state.phase === 'ending') {
+      // No final text came: what the input shows goes in, as the end would have put it.
+      const shown = state.place.context || input.value === state.place.value ? '' : input.value;
+      finish(state, partialEdit(state.place, input.value), shown);
+    }
     sync();
   };
   const onBeforeInput = (e: InputEvent): void => {
@@ -460,8 +483,9 @@ export function bindSurfaceInput(
     echo = null;
     const { value, selectionStart, selectionEnd } = input;
     const width = value ? input.scrollWidth : 0;
-    const revision = host.revision?.();
-    composition = startComposition(context, value, selectionStart, selectionEnd, width, revision);
+    // With no text caret (a selected range, a shape), the place is the selection.
+    const range = context ? undefined : (host.selectionPlace?.() ?? undefined);
+    composition = startComposition(context, value, selectionStart, selectionEnd, width, range);
     input.classList.add(COMPOSING_CLASS);
     // The candidate window opens at the caret: the end of a long context.
     input.scrollLeft = input.scrollWidth;

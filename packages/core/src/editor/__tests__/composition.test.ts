@@ -7,7 +7,8 @@ import {
   contextChange,
   ending,
   finalEdit,
-  followEdit,
+  placeKept,
+  placeLost,
   IDLE,
   partialEdit,
   placement,
@@ -42,27 +43,30 @@ describe('the composition state', () => {
     });
   });
 
-  test('a new context is the same place, an edit that moves it, or a caret that left', () => {
+  test('a peer edit is checked again; a local move or edit ends the composition', () => {
     const state = startComposition(ctx('abc '), 'abc ', 4, 4, 0);
-    expect(contextChange(state, ctx('abc '))).toBe('same');
-    // A peer's edit before the caret: a new revision, so the place is checked again.
-    expect(contextChange(state, ctx('xabc ', 2))).toBe('follow');
-    // A click: the same revision, another caret.
-    expect(contextChange(state, ctx('a'))).toBe('left');
-    // Any edit maps the place, wherever the edit left the caret.
-    expect(contextChange(state, ctx('abc ', 2))).toBe('follow');
-    expect(contextChange(state, ctx('abc ', 2, 'p1', 'para-b'))).toBe('follow');
-    // A click into another paragraph, with no edit.
-    expect(contextChange(state, ctx('abc ', 1, 'p1', 'para-b'))).toBe('left');
-    expect(contextChange(state, null)).toBe('left');
-    expect(contextChange(IDLE, null)).toBe('same');
+    expect(contextChange(state, ctx('abc '), false)).toBe('same');
+    // A peer's edit: a new revision, so the place is checked again, wherever the caret went.
+    expect(contextChange(state, ctx('xabc ', 2), true)).toBe('remote');
+    expect(contextChange(state, ctx('abc ', 2, 'p1', 'para-b'), true)).toBe('remote');
+    // A local or API edit: the composition ends, and the caret stays where the edit left it.
+    expect(contextChange(state, ctx('abc !', 2), false)).toBe('left');
+    // A click: the same revision, another caret, also in another paragraph.
+    expect(contextChange(state, ctx('a'), false)).toBe('left');
+    expect(contextChange(state, ctx('abc ', 1, 'p1', 'para-b'), false)).toBe('left');
+    // No context, before or now.
+    expect(contextChange(state, null, true)).toBe('left');
+    expect(contextChange(startComposition(null, '', 0, 0, 0), null, false)).toBe('left');
+    expect(contextChange(IDLE, null, false)).toBe('same');
   });
 
-  test('an edit moves the place; an end waits for the final text', () => {
+  test('a peer edit that keeps the place moves its context; an end waits for the text', () => {
     const state = startComposition(ctx('abc '), 'abc ', 4, 4, 0);
-    const moved = followEdit(state, ctx('xabc ', 2));
+    const moved = placeKept(state, ctx('xabc ', 2));
     expect(moved.phase === 'composing' && moved.seen).toEqual(ctx('xabc ', 2));
-    expect(contextChange(moved, ctx('xabc ', 2))).toBe('same');
+    expect(contextChange(moved, ctx('xabc ', 2), false)).toBe('same');
+    const lost = placeLost(state);
+    expect(lost.phase !== 'idle' && lost.lost).toBe(true);
     expect(ending(state).phase).toBe('ending');
     expect(ending(IDLE)).toBe(IDLE);
   });
@@ -71,7 +75,7 @@ describe('the composition state', () => {
     const state = startComposition(ctx('abc '), 'abc ', 4, 4, 0);
     expect(placement(state)).toEqual({ at: caret(4), paragraph: 'para-a', before: 'abc ' });
     // An edit that kept the place: its context there.
-    expect(placement(followEdit(state, ctx('abc ', 2, 'p1')))).toEqual({
+    expect(placement(placeKept(state, ctx('abc ', 2, 'p1')))).toEqual({
       at: caret(4),
       paragraph: 'para-a',
       before: 'abc ',

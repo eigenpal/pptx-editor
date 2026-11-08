@@ -1,14 +1,41 @@
-// The state of one IME composition in the surface's input, and where its text goes in.
+// IME composition in the slide surface: the state of one composition, and where its text goes.
 //
-// A composition changes the model only when it ends. Its place is fixed when it starts: the
-// caret's paragraph (by element id), the paragraph's exact text before the caret, and the
-// part of the input's value that the system selected for it (a keyboard that composes a word
-// again selects that word). Every change it makes applies there, and nowhere else
-// (`applyComposition`). When the model caret leaves that place (a click or a tap, an arrow
-// key, the API, a slide change), the surface makes the browser end the composition
-// (`surface-input.ts`), and the browser's final text goes to the place. An edit after the
-// place, or in another paragraph, keeps the place; any other edit ends the composition, and
-// its text is refused (`paragraph-place.ts`).
+// Four modules hold the rules:
+// - `surface-input.ts`: the browser events. It starts, keeps, and ends compositions.
+// - `composition.ts` (this module): the state and its pure transitions.
+// - `replacement-text.ts`: the editor side. It checks a place and writes there.
+// - `paragraph-place.ts`: what a place is, and the check that it still holds.
+//
+// The invariant: text is written only at a place that the check proves. A composition at a
+// caret has a `TextPlace`: the caret, its paragraph's element id, and the paragraph's exact
+// text before the caret. A composition over a selected range has a `SelectionPlace`: the
+// range, its paragraphs' element ids, and its exact text. Every write goes through one checked
+// write (`compose` or `composeSelection`), which refuses with `errors.compositionChanged`
+// when the place no longer holds. A write never goes to the paragraph start, to another
+// paragraph, or to the caret instead.
+//
+// A composition ends when:
+// - the browser ends it (`compositionend`): its text goes in at its place;
+// - the caret or the selection moves locally (a click, a tap, a key, the API), or the editor
+//   is about to change what it applies to (an undo, a slide change): the surface makes the
+//   browser end it, and its text goes in at its place;
+// - a local or API edit changes the model: the same, and the caret stays where the edit
+//   left it;
+// - a peer's transaction leaves the place unproven (an edit before or over it, a split before
+//   it, a merge, a delete): the composition is lost, and its text is refused.
+// A peer's transaction that keeps the place (an edit after it, or in another paragraph) keeps
+// the composition.
+//
+//   idle --compositionstart--> composing --compositionend--> idle (write at the place)
+//   composing --peer edit, place holds--> composing
+//   composing --peer edit, place gone--> lost --end--> idle (refused)
+//   composing --local caret move or edit, undo, slide change--> ending --end--> idle (write)
+//
+// Known limit: with no collaboration session there is no caret that moves with its
+// characters. A store edit there (a host's transaction) that puts the same text before the
+// place as was there passes the check, and the text goes in after that text. For example, a
+// host that turns "Hello|" into "Hello Hello" gets the composition after the first "Hello".
+// Text alone cannot tell such an edit from one after the place.
 //
 // The transitions are pure; `applyComposition` writes through the editor.
 
@@ -17,6 +44,7 @@ import {
   fieldEdit,
   type ContextEdit,
   type ReplacementTarget,
+  type SelectionPlace,
   type TextPlace,
   type TypingContext,
 } from './replacement-text.ts';
@@ -30,8 +58,8 @@ export interface CompositionPlace {
   /** The input selection that the system made for the composition, in `value`. */
   readonly from: number;
   readonly to: number;
-  /** The store revision then, for a composition with no text caret (a selected range). */
-  readonly revision?: number;
+  /** For a composition with no text caret (a selected range, a shape): the selection then. */
+  readonly selection?: SelectionPlace;
 }
 
 /**
@@ -46,7 +74,7 @@ export type CompositionState =
       readonly seen: TypingContext | null;
       /** The input's text width when the composition started, for the overlay. */
       readonly width: number;
-      /** An edit before or over the place ended it: the composition's text is refused. */
+      /** A peer's edit took the place away: the composition's text is refused. */
       readonly lost?: true;
     };
 
@@ -59,30 +87,32 @@ export function startComposition(
   from: number,
   to: number,
   width: number,
-  revision?: number
+  selection?: SelectionPlace
 ): CompositionState {
-  const place = { context, value, from, to, ...(revision === undefined ? {} : { revision }) };
+  const place = { context, value, from, to, ...(selection ? { selection } : {}) };
   return { phase: 'composing', place, seen: context, width };
 }
 
 /**
- * What a new context during a composition means. `follow`: the model changed (a peer's
- * edit, or the API's), so the place must be checked again (`keepPlace`); the caret that the
- * edit left is not the place. `same`: the caret is still at the place. `left`: the caret
- * moved with no edit (a click, a tap, a key, the API), so the composition must end.
+ * What a new context during a composition at a caret means. `remote`: a peer's transaction
+ * changed the model, so the place must be checked again (`keepPlace`). `same`: the caret is
+ * still at the place. `left`: the caret moved, or a local or API edit changed the model, so
+ * the composition must end. No context, before or now, is `left` too.
  */
 export function contextChange(
   state: CompositionState,
-  now: TypingContext | null
-): 'same' | 'follow' | 'left' {
+  now: TypingContext | null,
+  remote: boolean
+): 'same' | 'remote' | 'left' {
   if (state.phase === 'idle') return 'same';
   const { seen } = state;
-  if (now && seen && now.revision !== seen.revision) return 'follow';
-  return now?.key === seen?.key && now?.text === seen?.text ? 'same' : 'left';
+  if (!now || !seen) return 'left';
+  if (now.revision !== seen.revision) return remote ? 'remote' : 'left';
+  return now.key === seen.key && now.text === seen.text ? 'same' : 'left';
 }
 
-/** The state after an edit kept the place (`contextChange` gave `follow`). */
-export function followEdit(state: CompositionState, now: TypingContext): CompositionState {
+/** The state after a peer's edit kept the place (`contextChange` gave `remote`). */
+export function placeKept(state: CompositionState, now: TypingContext): CompositionState {
   return state.phase === 'idle' ? state : { ...state, seen: now };
 }
 
@@ -91,8 +121,8 @@ export function ending(state: CompositionState): CompositionState {
   return state.phase === 'composing' ? { ...state, phase: 'ending' } : state;
 }
 
-/** The state after an edit took the place away (`keepPlace`): its text will be refused. */
-export function lose(state: CompositionState): CompositionState {
+/** The state after a peer's edit took the place away (`keepPlace`): its text is refused. */
+export function placeLost(state: CompositionState): CompositionState {
   return state.phase === 'idle' ? state : { ...state, lost: true };
 }
 

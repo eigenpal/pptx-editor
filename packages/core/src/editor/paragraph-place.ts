@@ -75,3 +75,69 @@ export function placeCaret(batch: OpBatch, part: string, place: TextPlace): Text
   if (p?.id !== id) return null;
   return paragraphText(p, slideNumberOf(batch, part)).startsWith(before) ? caret : null;
 }
+
+/**
+ * The place of a composition over a selected range: the range, the element ids of its anchor
+ * and focus paragraphs, and its exact text. Another selection (a shape) has no ids or text,
+ * and holds only while the store revision is the same.
+ */
+export interface SelectionPlace {
+  readonly at: EditorSelection;
+  readonly ids: readonly [string, string] | null;
+  readonly text: string;
+  readonly revision: number;
+}
+
+type Point = { readonly paragraph: number; readonly offset: number };
+const samePoint = (p: Point, q: Point) => p.paragraph === q.paragraph && p.offset === q.offset;
+
+/** The place of the selection `sel` now. Reads only. */
+export function selectionPlace(
+  batch: OpBatch,
+  part: string,
+  sel: EditorSelection,
+  revision: number
+): SelectionPlace {
+  const none = { at: sel, ids: null, text: '', revision };
+  if (sel.kind !== 'text' || sel.diagramNode !== undefined) return none;
+  const body = selectionBody(batch, part, sel);
+  const paragraphs = body ? paragraphsOf(body) : [];
+  const a = paragraphs[sel.anchor.paragraph];
+  const f = paragraphs[sel.focus.paragraph];
+  if (!a || !f) return none;
+  const forward =
+    sel.anchor.paragraph < sel.focus.paragraph ||
+    (sel.anchor.paragraph === sel.focus.paragraph && sel.anchor.offset <= sel.focus.offset);
+  const [start, end] = forward ? [sel.anchor, sel.focus] : [sel.focus, sel.anchor];
+  const slide = slideNumberOf(batch, part);
+  const texts = paragraphs
+    .slice(start.paragraph, end.paragraph + 1)
+    .map((p) => paragraphText(p, slide));
+  const last = texts.length - 1;
+  texts[last] = texts[last]!.slice(0, end.offset);
+  const text = texts.join('\n').slice(start.offset);
+  return { at: sel, ids: [a.id, f.id], text, revision };
+}
+
+/** Whether two selections are the same: the same body, cell, anchor, and focus. */
+function sameSelection(a: EditorSelection, b: EditorSelection): boolean {
+  if (a.kind !== 'text' || b.kind !== 'text') return JSON.stringify(a) === JSON.stringify(b);
+  return (
+    a.nodeId === b.nodeId &&
+    a.diagramNode === b.diagramNode &&
+    a.cell?.row === b.cell?.row &&
+    a.cell?.column === b.cell?.column &&
+    samePoint(a.anchor, b.anchor) &&
+    samePoint(a.focus, b.focus)
+  );
+}
+
+/**
+ * Whether the selection place `now` is still `place`: the same range, in the same paragraphs
+ * by element id, with the same text. A place with no text range needs the same revision too.
+ */
+export function holdsSelection(place: SelectionPlace, now: SelectionPlace): boolean {
+  if (!sameSelection(place.at, now.at)) return false;
+  if (!place.ids || !now.ids) return !place.ids && !now.ids && place.revision === now.revision;
+  return place.ids[0] === now.ids[0] && place.ids[1] === now.ids[1] && place.text === now.text;
+}
