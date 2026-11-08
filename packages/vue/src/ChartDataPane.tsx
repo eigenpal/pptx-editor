@@ -3,10 +3,11 @@
 // with the same markup, classes, and ARIA, on the same core helpers (`chart-pane.ts`). A field
 // applies when the user presses Enter or leaves it, as one undo step.
 
-import { defineComponent, ref, useId, type PropType } from 'vue';
+import { defineComponent, ref, useId, watch, type PropType } from 'vue';
 import {
   chartPaneCommand,
   chartPaneDraftKey,
+  chartPaneDraftContinues,
   chartValueText,
   nextChartCategoryLabel,
   type ChartData,
@@ -23,6 +24,7 @@ import { useEditorState, usePptxEditor, useTranslation } from './composables.ts'
 const ChartField = defineComponent({
   name: 'PptxChartDataField',
   props: {
+    draftKey: { type: String, required: true },
     label: { type: String, required: true },
     visibleLabel: { type: String, default: undefined },
     value: { type: String, required: true },
@@ -38,6 +40,7 @@ const ChartField = defineComponent({
       draft.value = null;
       error.value = null;
     };
+    watch(() => props.draftKey, reset, { flush: 'sync' });
     const commit = (): void => {
       const d = draft.value;
       if (d === null) return;
@@ -109,7 +112,7 @@ const SeriesCard = defineComponent({
           <summary class="pptx-chart-pane__summary">{name}</summary>
           <div class="pptx-chart-pane__card-body">
             <ChartField
-              key={props.draftKey}
+              draftKey={props.draftKey}
               label={t('chartData.seriesName', { number: index + 1 })}
               visibleLabel={t('chartData.name')}
               value={series.name}
@@ -119,7 +122,8 @@ const SeriesCard = defineComponent({
             <div class="pptx-panel__grid">
               {data.categories.map((c, i) => (
                 <ChartField
-                  key={`${props.draftKey}:${i}`}
+                  key={i}
+                  draftKey={props.draftKey}
                   label={t('chartData.cellLabel', { series: name, category: c.label })}
                   visibleLabel={c.label}
                   value={chartValueText(series.values[i])}
@@ -159,6 +163,7 @@ export const ChartDataPane = defineComponent({
     const readOnly = useEditorState((s) => s.mode === 'view');
     const refusal = ref<string | null>(null);
     const open = ref<ReadonlySet<number>>(new Set([0]));
+    let draftScope = { key: '', reset: 0 };
     const toggle = (index: number, isOpen: boolean): void => {
       if (open.value.has(index) === isOpen) return;
       const next = new Set(open.value);
@@ -186,7 +191,16 @@ export const ChartDataPane = defineComponent({
           </div>
         );
       const data = read.data;
-      const draftKey = chartPaneDraftKey(e!.snapshot(), data);
+      const scopeKey = chartPaneDraftKey(e!.snapshot(), data);
+      if (scopeKey !== draftScope.key) {
+        draftScope = {
+          key: scopeKey,
+          reset:
+            draftScope.reset +
+            (draftScope.key && chartPaneDraftContinues(draftScope.key, scopeKey) ? 0 : 1),
+        };
+      }
+      const draftKey = String(draftScope.reset);
       const disabled = readOnly.value || !selected.editable;
       /** Applies one change: null when it applied, else the reason. */
       const apply = (change: ChartPaneChange): string | null => {
@@ -224,7 +238,7 @@ export const ChartDataPane = defineComponent({
               {data.categories.map((c, i) => (
                 <li key={i} class="pptx-chart-pane__row">
                   <ChartField
-                    key={draftKey}
+                    draftKey={draftKey}
                     label={t(xy ? 'chartData.xValueLabel' : 'chartData.categoryLabel', {
                       number: i + 1,
                     })}

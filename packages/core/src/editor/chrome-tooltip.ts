@@ -1,5 +1,5 @@
 // Chrome tooltips, after DOCX Editor's `Tooltip` (packages/react/src/components/ui/Tooltip.tsx): a
-// small bubble under a control after a 400 ms hover delay, in place of the native `title`. A
+// small bubble under a control after a 400 ms hover delay, in place of the native `title`.
 // Keyboard focus shows the bubble immediately without entry motion. A
 // control names its tooltip with `data-pptx-tooltip` (and `data-pptx-tooltip-reason` when it is
 // disabled for a reason); one listener per document finds the control under the pointer or the
@@ -118,7 +118,7 @@ function createController(doc: Document): Controller {
   let timer: number | null = null;
   let pending: HTMLElement | null = null;
   let shown: HTMLElement | null = null;
-  // The control a click or Escape closed: it opens again only after the pointer leaves it.
+  // The control a click or Escape closed: it opens again after the pointer or keyboard focus leaves it.
   let suppressed: HTMLElement | null = null;
   let source: 'pointer' | 'focus' = 'pointer';
   let closedAt = -Infinity;
@@ -195,6 +195,7 @@ function createController(doc: Document): Controller {
   };
   const onFocusIn = (e: FocusEvent): void => {
     const el = tooltipTarget(e.target);
+    if (keyboard && el !== suppressed) suppressed = null;
     if (el && keyboard) request(el, 'focus');
     else if (source === 'focus') hide();
   };

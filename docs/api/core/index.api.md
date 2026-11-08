@@ -504,6 +504,9 @@ export type ChartPaneChange = {
 export function chartPaneCommand(data: ChartData, change: ChartPaneChange): ChartPaneResult;
 
 // @internal
+export function chartPaneDraftContinues(previous: string, next: string): boolean;
+
+// @internal
 export function chartPaneDraftKey(snapshot: EditorSnapshot, data: ChartData): string;
 
 // @public

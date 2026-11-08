@@ -9,6 +9,7 @@ import { useId, useState } from 'react';
 import {
   chartPaneCommand,
   chartPaneDraftKey,
+  chartPaneDraftContinues,
   chartValueText,
   nextChartCategoryLabel,
   type ChartData,
@@ -23,6 +24,7 @@ import { useEditorState, usePptxEditor, useTranslation } from './context.ts';
  * the tab or the editor refuses stays in the field with its reason; Escape restores the value.
  */
 function ChartField({
+  draftKey,
   label,
   visibleLabel,
   value,
@@ -30,6 +32,7 @@ function ChartField({
   disabled,
   onCommit,
 }: {
+  draftKey: string;
   label: string;
   /** The label over the field; without it, the field has only its accessible name. */
   visibleLabel?: string;
@@ -42,6 +45,12 @@ function ChartField({
   const errorId = useId();
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [scope, setScope] = useState(draftKey);
+  if (scope !== draftKey) {
+    setScope(draftKey);
+    setDraft(null);
+    setError(null);
+  }
   const reset = (): void => {
     setDraft(null);
     setError(null);
@@ -113,7 +122,7 @@ function SeriesCard({
       <summary className="pptx-chart-pane__summary">{name}</summary>
       <div className="pptx-chart-pane__card-body">
         <ChartField
-          key={draftKey}
+          draftKey={draftKey}
           label={t('chartData.seriesName', { number: index + 1 })}
           visibleLabel={t('chartData.name')}
           value={series.name}
@@ -123,7 +132,8 @@ function SeriesCard({
         <div className="pptx-panel__grid">
           {data.categories.map((c, i) => (
             <ChartField
-              key={`${draftKey}:${i}`}
+              key={i}
+              draftKey={draftKey}
               label={t('chartData.cellLabel', { series: name, category: c.label })}
               visibleLabel={c.label}
               value={chartValueText(series.values[i])}
@@ -158,6 +168,7 @@ export function ChartDataPane() {
   const read = editor && chart ? editor.chartData(chart.nodeId) : null;
   const [refusal, setRefusal] = useState<string | null>(null);
   const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set([0]));
+  const [draftScope, setDraftScope] = useState({ key: '', reset: 0 });
   if (!chart || !read)
     return (
       <div className="pptx-empty">
@@ -173,7 +184,18 @@ export function ChartDataPane() {
       </div>
     );
   const data = read.data;
-  const draftKey = chartPaneDraftKey(editor!.snapshot(), data);
+  const scopeKey = chartPaneDraftKey(editor!.snapshot(), data);
+  const nextScope =
+    scopeKey === draftScope.key
+      ? draftScope
+      : {
+          key: scopeKey,
+          reset:
+            draftScope.reset +
+            (draftScope.key && chartPaneDraftContinues(draftScope.key, scopeKey) ? 0 : 1),
+        };
+  if (nextScope !== draftScope) setDraftScope(nextScope);
+  const draftKey = String(nextScope.reset);
   const disabled = readOnly || !chart.editable;
   /** Applies one change: null when it applied, else the reason. */
   const apply = (change: ChartPaneChange): string | null => {
@@ -219,7 +241,7 @@ export function ChartDataPane() {
           {data.categories.map((c, i) => (
             <li key={i} className="pptx-chart-pane__row">
               <ChartField
-                key={draftKey}
+                draftKey={draftKey}
                 label={t(xy ? 'chartData.xValueLabel' : 'chartData.categoryLabel', {
                   number: i + 1,
                 })}

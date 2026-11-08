@@ -490,6 +490,7 @@ export {
 export {
   chartPaneCommand,
   chartPaneDraftKey,
+  chartPaneDraftContinues,
   chartPaneNumericX,
   chartValueText,
   nextChartCategoryLabel,

@@ -159,6 +159,79 @@ describe('Chart Data tab (React)', () => {
     expect(name.getAttribute('aria-invalid')).toBe('false');
   });
 
+  test('undo and redo keep focus in an existing clean field', async () => {
+    const editor = await mount(<SidePanel tab="chart" />);
+    selectChart(editor);
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Add category' })));
+    const field = screen.getByRole('textbox', { name: 'Category 1' });
+    field.focus();
+    act(() => void fireEvent.keyDown(field, { key: 'z', ctrlKey: true }));
+    expect(values(editor).categories.length).toBe(4);
+    expect(document.activeElement).toBe(field);
+    act(() => void fireEvent.keyDown(field, { key: 'y', ctrlKey: true }));
+    expect(values(editor).categories.length).toBe(5);
+    expect(document.activeElement).toBe(field);
+  });
+
+  test('appends and other value edits preserve pending typing and focus', async () => {
+    const editor = await mount(<SidePanel tab="chart" />);
+    selectChart(editor);
+    const field = screen.getByRole('textbox', { name: 'Plan, East' }) as HTMLInputElement;
+    field.focus();
+    act(() => void fireEvent.change(field, { target: { value: '77' } }));
+    const before = values(editor);
+    act(
+      () =>
+        void editor.exec({
+          type: 'setChartData',
+          data: {
+            ...before,
+            categories: [...before.categories, { label: 'Added' }],
+            series: [
+              ...before.series.map((series) => ({ ...series, values: [...series.values, null] })),
+              { name: 'Added series', values: [1, 2, 3, 4, 5] },
+            ],
+          },
+        })
+    );
+    expect(field.value).toBe('77');
+    expect(document.activeElement).toBe(field);
+    expect(values(editor).series[0]!.values[2]).toBe(51);
+    const appended = values(editor);
+    act(
+      () =>
+        void editor.exec({
+          type: 'setChartData',
+          data: {
+            ...appended,
+            series: appended.series.map((series, index) =>
+              index === 1 ? { ...series, values: series.values.map(() => 12) } : series
+            ),
+          },
+        })
+    );
+    expect(field.value).toBe('77');
+    expect(document.activeElement).toBe(field);
+    act(() => void fireEvent.keyDown(field, { key: 'Enter' }));
+    expect(values(editor).series[0]!.values[2]).toBe(77);
+  });
+
+  test('switching between equal-size charts clears drafts without replacing fields', async () => {
+    const editor = await mount(<SidePanel tab="chart" />);
+    selectChart(editor);
+    const original = editor.snapshot().chart!.nodeId;
+    act(() => void editor.exec({ type: 'duplicate' }));
+    expect(editor.snapshot().chart!.nodeId).not.toBe(original);
+    const field = screen.getByRole('textbox', { name: 'Plan, East' }) as HTMLInputElement;
+    type(field, 'many');
+    field.focus();
+    act(() => editor.setSelection({ kind: 'shapes', nodeIds: [original] }));
+    expect(screen.getByRole('textbox', { name: 'Plan, East' })).toBe(field);
+    expect(field.value).toBe('51');
+    expect(field.getAttribute('aria-invalid')).toBe('false');
+    expect(document.activeElement).toBe(field);
+  });
+
   test('a name that the workbook refuses stays in its field with the reason', async () => {
     const editor = await mount(<SidePanel tab="chart" />);
     selectChart(editor);

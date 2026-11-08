@@ -153,7 +153,7 @@ describe('listenChromeTooltips', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(last()).toBe(null);
     undo.focus();
-    await wait(TOOLTIP_DELAY_MS + 30);
+    expect(last()?.instant).toBe(true);
     expect(last()?.target).toBe(undo);
     undo.blur();
     expect(last()).toBe(null);
@@ -162,6 +162,23 @@ describe('listenChromeTooltips', () => {
     bold.focus();
     await wait(TOOLTIP_DELAY_MS + 30);
     expect(last()).toBe(null);
+  });
+
+  test('Escape dismissal resets after keyboard focus leaves and returns', () => {
+    const { bold, undo, last } = setup();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    bold.focus();
+    expect(last()?.target).toBe(bold);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(last()).toBe(null);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    undo.focus();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true })
+    );
+    bold.focus();
+    expect(last()?.target).toBe(bold);
+    expect(last()?.instant).toBe(true);
   });
 
   test('a control with its menu open shows no tooltip', async () => {

@@ -8,7 +8,11 @@ import { join } from 'node:path';
 import { createElement } from 'react';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { createApp, defineComponent, h, nextTick, shallowRef, type App, type Component } from 'vue';
-import { createPptxEditor, type PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import {
+  createPptxEditor,
+  panelHistoryKey,
+  type PptxEditorInstance,
+} from '@pptx-editor.dev/core/editor';
 import { PptxEditorContext } from '../../react/src/context.ts';
 import { ChartDataPane as RChartDataPane } from '../../react/src/ChartDataPane.tsx';
 import { ChartDataPane } from '../src/ChartDataPane.tsx';
@@ -149,6 +153,83 @@ describe('Chart Data tab', () => {
     await flush();
     expect(el.querySelector('input[aria-invalid="true"]')).toBe(null);
     expect([...el.querySelectorAll('input')].some((input) => input.value === 'many')).toBe(false);
+  });
+
+  test('Vue keeps input focus through undo and redo of a category append', async () => {
+    const editor = await deck();
+    const el = await mountVue(editor);
+    const before = data(editor);
+    editor.exec({
+      type: 'setChartData',
+      data: {
+        ...before,
+        categories: [...before.categories, { label: 'Added' }],
+        series: before.series.map((series) => ({ ...series, values: [...series.values, null] })),
+      },
+    });
+    await flush();
+    const field = el.querySelector<HTMLInputElement>('input[aria-label="Category 1"]')!;
+    field.focus();
+    for (const [key, count] of [
+      ['z', 4],
+      ['y', 5],
+    ] as const) {
+      panelHistoryKey(
+        {
+          key,
+          ctrlKey: true,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+          target: field,
+          preventDefault() {},
+        },
+        editor
+      );
+      await flush();
+      expect(data(editor).categories.length).toBe(count);
+      expect(document.activeElement).toBe(field);
+    }
+  });
+
+  test('Vue preserves drafts on appends and clears them on an equal-size chart switch', async () => {
+    const editor = await deck();
+    const el = await mountVue(editor);
+    const original = editor.snapshot().chart!.nodeId;
+    editor.exec({ type: 'duplicate' });
+    await flush();
+    expect(editor.snapshot().chart!.nodeId).not.toBe(original);
+    const field = el.querySelector<HTMLInputElement>('input[aria-label="Plan, East"]')!;
+    field.focus();
+    fireEvent.input(field, { target: { value: '77' } });
+    await flush();
+    const before = data(editor);
+    editor.exec({
+      type: 'setChartData',
+      data: {
+        ...before,
+        categories: [...before.categories, { label: 'Added' }],
+        series: [
+          ...before.series.map((series) => ({ ...series, values: [...series.values, null] })),
+          { name: 'Added series', values: [1, 2, 3, 4, 5] },
+        ],
+      },
+    });
+    await flush();
+    expect(field.value).toBe('77');
+    expect(document.activeElement).toBe(field);
+    // Restore the same grid before checking chart identity independently of its size.
+    editor.exec({ type: 'undo' });
+    await flush();
+    fireEvent.input(field, { target: { value: 'many' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    await flush();
+    editor.setSelection({ kind: 'shapes', nodeIds: [original] });
+    await flush();
+    expect(el.querySelector('input[aria-label="Plan, East"]')).toBe(field);
+    expect(field.value).toBe('51');
+    expect(field.getAttribute('aria-invalid')).toBe('false');
+    expect(document.activeElement).toBe(field);
   });
 
   test('Vue applies a field on Enter as one undo step, and adds and removes', async () => {

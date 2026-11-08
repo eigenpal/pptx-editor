@@ -214,6 +214,69 @@ const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const over = (el: Element) =>
   void el.dispatchEvent(new MouseEvent('pointerover', { bubbles: true }));
 
+test.each(['React', 'Vue'] as const)(
+  '%s tooltip markup skips entry motion for warm hover and keyboard focus',
+  async (adapter) => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    let unmount: () => void;
+    if (adapter === 'React') {
+      const view = render(
+        createElement(
+          'div',
+          { className: 'pptx-editor' },
+          createElement('button', { 'data-pptx-tooltip': 'First' }, 'First'),
+          createElement('button', { 'data-pptx-tooltip': 'Second' }, 'Second'),
+          createElement(ReactChromeTooltip)
+        ),
+        { container: host }
+      );
+      unmount = () => view.unmount();
+    } else {
+      const app = createApp({
+        render: () =>
+          h('div', { class: 'pptx-editor' }, [
+            h('button', { 'data-pptx-tooltip': 'First' }, 'First'),
+            h('button', { 'data-pptx-tooltip': 'Second' }, 'Second'),
+            h(ChromeTooltip),
+          ]),
+      });
+      app.mount(host);
+      unmount = () => app.unmount();
+    }
+    const update = async (action: () => void | Promise<void>) => {
+      if (adapter === 'React') await act(action);
+      else {
+        await action();
+        await nextTick();
+      }
+    };
+    try {
+      const [first, second] = [...host.querySelectorAll('button')];
+      await update(() => over(first!));
+      expect(host.querySelector('.pptx-tooltip')).toBe(null);
+      await update(() => wait(TOOLTIP_DELAY_MS + 40));
+      expect(host.querySelector('.pptx-tooltip')?.hasAttribute('data-instant')).toBe(false);
+      await update(() => over(second!));
+      expect(host.querySelector('.pptx-tooltip')?.textContent).toBe('Second');
+      expect(host.querySelector('.pptx-tooltip')?.getAttribute('data-instant')).toBe('true');
+      await update(() => {
+        document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      });
+      expect(host.querySelector('.pptx-tooltip')).toBe(null);
+      await update(() => {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+        first!.focus();
+      });
+      expect(host.querySelector('.pptx-tooltip')?.textContent).toBe('First');
+      expect(host.querySelector('.pptx-tooltip')?.getAttribute('data-instant')).toBe('true');
+    } finally {
+      unmount();
+      host.remove();
+    }
+  }
+);
+
 test('React and Vue draw the same tooltip bubble, with the reason on its own line', async () => {
   const editor = await open();
   const reactHost = render(
