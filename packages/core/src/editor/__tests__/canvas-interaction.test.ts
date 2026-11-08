@@ -20,6 +20,7 @@ import { CANVAS_CONTEXT_MENUS, canvasMenuKind } from '../chrome-menus.ts';
 import { canvasMenuLabelKey } from '../menu-arrangement.ts';
 import { contextMenuSelection } from '../surface-context-menu.ts';
 import { caretAt } from '../surface-geometry.ts';
+import { itemById } from '../surface.ts';
 import { onBorder, onGlyph } from '../surface-hit.ts';
 import { scrollBoxIntoView } from '../surface-view.ts';
 import { shapeKeyAction, tabSelection } from '../shape-keys.ts';
@@ -541,6 +542,43 @@ describe('the surface', () => {
     release();
     expect(e.snapshot().selection).toMatchObject({ kind: 'text', nodeId: ids[0] });
     expect(textItem(e).element.xfrm).toEqual(xfrm);
+    e.destroy();
+  });
+
+  test('a multiple selection moves from a child text in a group and from a table cell', async () => {
+    const { e, root, key, press, move, release } = await attached();
+    e.exec({ type: 'toggleSmartGuides' });
+    const xOf = (id: string) => itemById(e.session!.layout(0), id)!.matrix[4];
+    // Two children of an entered group: a drag from the text of one moves both.
+    const [g, g1, g2] = ['G', 'G1', 'G2'].map((n) => idOf(e, n));
+    e.setSelection({ kind: 'shapes', nodeIds: [g1, g2], group: g });
+    const c = caretAt(itemById(e.session!.layout(0), g1)!, caret(0, 3))!;
+    const y = (c.y1 + c.y2) / 2;
+    const inGroup = [g1, g2].map(xOf);
+    press(c.x1, y);
+    move(c.x1 + IN / 2, y);
+    release();
+    expect(e.snapshot().selection).toEqual({ kind: 'shapes', nodeIds: [g1, g2], group: g });
+    expect([g1, g2].map(xOf)).toEqual(inGroup.map((x) => x + IN / 2));
+    // A text box and a table: Escape during a drag from a cell writes nothing.
+    const ids = [idOf(e, 'T'), tableId(e)];
+    e.setSelection({ kind: 'shapes', nodeIds: ids });
+    const before = ids.map(xOf);
+    const cellY = 4 * IN + 370_840 / 2;
+    press(6.5 * IN, cellY);
+    move(7 * IN, cellY);
+    expect(key(root, 'Escape')).toBe(true);
+    release();
+    expect(ids.map(xOf)).toEqual(before);
+    // The drag moves both shapes, keeps the keys on the slide, and undoes as one step.
+    press(6.5 * IN, cellY);
+    move(7 * IN, cellY);
+    release();
+    expect(e.snapshot().selection).toEqual({ kind: 'shapes', nodeIds: ids });
+    expect(ids.map(xOf)).toEqual(before.map((x) => x + IN / 2));
+    expect(doc.activeElement === (root as unknown as Node)).toBe(true);
+    expect(e.exec({ type: 'undo' }).ok).toBe(true);
+    expect(ids.map(xOf)).toEqual(before);
     e.destroy();
   });
 
