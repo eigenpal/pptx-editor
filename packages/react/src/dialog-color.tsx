@@ -50,6 +50,9 @@ export function ColorField(props: {
   const panel = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const rendered = useRenderedColor(props.value, props.current ?? null, props.automatic ?? null);
+  // The color the button shows, read when the grid opens: the grid focuses its swatch.
+  const shown = useRef(rendered);
+  shown.current = rendered;
   const labelOf = (p: ColorPick): string => colorPickLabel(t, p);
   // The grid closes on a pick, on Escape (which does not close the dialog), and on a press
   // outside it.
@@ -60,7 +63,7 @@ export function ColorField(props: {
       if (!panel.current?.contains(target) && !button.current?.contains(target)) setOpen(false);
     };
     document.addEventListener('pointerdown', away, true);
-    focusCurrentSwatch(panel.current);
+    focusCurrentSwatch(panel.current, shown.current);
     return () => document.removeEventListener('pointerdown', away, true);
   }, [open]);
   const data = Object.fromEntries(Object.entries(props).filter(([k]) => k.startsWith('data-')));

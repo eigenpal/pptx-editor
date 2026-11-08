@@ -137,6 +137,16 @@ describe('Chart Data tab (React)', () => {
     expect((document.activeElement as HTMLInputElement).value).toBe('East');
   });
 
+  test('a color grid of an automatic color focuses the swatch of that color', async () => {
+    const editor = await mount(<SidePanel tab="chart" />);
+    selectChart(editor);
+    const grid = screen.getByRole('button', { name: 'Color of Plan: color grid' });
+    const shown = grid.style.background;
+    act(() => void fireEvent.click(grid));
+    expect(document.activeElement).not.toBe(grid);
+    expect((document.activeElement as HTMLElement).style.background).toBe(shown);
+  });
+
   test('removing a category clears rejected drafts before indexes change', async () => {
     const editor = await mount(<SidePanel tab="chart" />);
     selectChart(editor);

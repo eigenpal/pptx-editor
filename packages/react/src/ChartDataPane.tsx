@@ -139,7 +139,9 @@ function SeriesCard({
       open={open}
       onToggle={(e) => onToggle(e.currentTarget.open)}
     >
-      <summary className="pptx-chart-pane__summary">{name}</summary>
+      <summary className="pptx-chart-pane__summary">
+        <span className="pptx-chart-pane__label">{name}</span>
+      </summary>
       <div className="pptx-chart-pane__card-body">
         <ChartField
           draftKey={draftKey}
@@ -316,7 +318,7 @@ function ChartFormatSection({
             <ChartCheck
               label={t('chartFormat.gridlines')}
               checked={format.gridlines === true}
-              disabled={disabled || !format.axes}
+              disabled={disabled}
               onChange={(gridlines) => set({ gridlines })}
             />
             <div className="pptx-panel__grid">
@@ -337,7 +339,9 @@ function ChartFormatSection({
                 onCommit={(text) => run(chartTitleCommand(format, 'valueAxisTitle', text))}
               />
             </div>
-            <p className="pptx-chart-pane__note">{t('chartFormat.axisTitleHelp')}</p>
+            <p className="pptx-chart-pane__note">
+              {t(format.axes ? 'chartFormat.axisTitleHelp' : 'chartFormat.axesOffHelp')}
+            </p>
           </>
         ) : null}
       </section>

@@ -57,7 +57,10 @@ export const ColorField = dialogControl(
         (now, _old, onCleanup) => {
           if (!now) return;
           document.addEventListener('pointerdown', away, true);
-          focusCurrentSwatch(panel.value);
+          focusCurrentSwatch(
+            panel.value,
+            renderedColorOf(props.value, rows.value, props.current, props.automatic)
+          );
           onCleanup(() => document.removeEventListener('pointerdown', away, true));
         },
         { flush: 'post' }

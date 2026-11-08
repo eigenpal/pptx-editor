@@ -1758,6 +1758,7 @@
     "xAxisTitle": "X 轴标题",
     "yAxisTitle": "Y 轴标题",
     "axisTitleHelp": "将坐标轴标题留空则不显示标题。",
+    "axesOffHelp": "打开“坐标轴”后即可设置坐标轴标题。",
     "typeChangeRemoved": "此图表类型不保留您设置的颜色或坐标轴标题。改回原类型或撤消即可恢复它们。",
     "typeChangeHint": "某些图表类型不保留您设置的颜色或坐标轴标题。",
     "pieFirstSeries": "饼图只显示第一个系列。",

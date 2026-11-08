@@ -1758,6 +1758,7 @@
     "xAxisTitle": "X축 제목",
     "yAxisTitle": "Y축 제목",
     "axisTitleHelp": "축 제목을 비워 두면 제목이 표시되지 않습니다.",
+    "axesOffHelp": "축 제목을 설정하려면 [축]을 켜십시오.",
     "typeChangeRemoved": "이 차트 종류에서는 설정한 색과 축 제목이 유지되지 않습니다. 원래 종류로 바꾸거나 실행 취소하면 다시 복원됩니다.",
     "typeChangeHint": "일부 차트 종류에서는 설정한 색과 축 제목이 유지되지 않습니다.",
     "pieFirstSeries": "원형 차트에는 첫 번째 계열만 표시됩니다.",

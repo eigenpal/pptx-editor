@@ -51,14 +51,29 @@ export function syncSwatchTabStops(grid: HTMLElement | null): void {
   for (const b of all) b.tabIndex = b === stop ? 0 : -1;
 }
 
+/** `#RRGGBB` as the `rgb(r, g, b)` text that a browser gives back for an inline color. */
+function rgbText(hex: string): string | null {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  return m
+    ? `rgb(${m
+        .slice(1)
+        .map((h) => parseInt(h, 16))
+        .join(', ')})`
+    : null;
+}
+
 /**
- * Focus the chosen swatch of an open color grid, else its first button, and scroll it into
- * view. The panel can hold more than one grid. @internal
+ * Focus the chosen swatch of an open color grid, else the first swatch of `shown` (the color
+ * that the field's button shows, such as an automatic color), else its first button, and scroll
+ * the panel into view. The panel can hold more than one grid. @internal
  */
-export function focusCurrentSwatch(panel: HTMLElement | null): void {
+export function focusCurrentSwatch(panel: HTMLElement | null, shown: string | null = null): void {
+  const rgb = shown ? rgbText(shown) : null;
+  const buttons = [...(panel?.querySelectorAll<HTMLElement>('button') ?? [])];
   const to =
     panel?.querySelector<HTMLElement>('button[aria-pressed="true"]') ??
-    panel?.querySelector<HTMLElement>('button');
+    (rgb ? buttons.find((b) => b.style.background === rgb) : undefined) ??
+    buttons[0];
   to?.focus({ preventScroll: true });
   // The whole panel, with its custom color field, scrolls into view: the grid can open at the
   // bottom of a side panel.

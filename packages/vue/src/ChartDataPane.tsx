@@ -130,7 +130,9 @@ const SeriesCard = defineComponent({
           open={props.open}
           onToggle={(e: Event) => props.onToggle((e.currentTarget as HTMLDetailsElement).open)}
         >
-          <summary class="pptx-chart-pane__summary">{name}</summary>
+          <summary class="pptx-chart-pane__summary">
+            <span class="pptx-chart-pane__label">{name}</span>
+          </summary>
           <div class="pptx-chart-pane__card-body">
             <ChartField
               draftKey={props.draftKey}
@@ -317,7 +319,7 @@ const ChartFormatSection = defineComponent({
                 <ChartCheck
                   label={t('chartFormat.gridlines')}
                   checked={format.gridlines === true}
-                  disabled={disabled || !format.axes}
+                  disabled={disabled}
                   onChange={(gridlines: boolean) => set({ gridlines })}
                 />
                 <div class="pptx-panel__grid">
@@ -342,7 +344,9 @@ const ChartFormatSection = defineComponent({
                     }
                   />
                 </div>
-                <p class="pptx-chart-pane__note">{t('chartFormat.axisTitleHelp')}</p>
+                <p class="pptx-chart-pane__note">
+                  {t(format.axes ? 'chartFormat.axisTitleHelp' : 'chartFormat.axesOffHelp')}
+                </p>
               </>
             ) : null}
           </section>

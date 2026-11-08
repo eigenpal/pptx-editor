@@ -1758,6 +1758,7 @@
     "xAxisTitle": "X axis title",
     "yAxisTitle": "Y axis title",
     "axisTitleHelp": "Leave an axis title empty for no title.",
+    "axesOffHelp": "Turn on Axes to set the axis titles.",
     "typeChangeRemoved": "This chart type does not keep the colors or axis titles that you set. Change back to bring them back, or use Undo.",
     "typeChangeHint": "Some chart types do not keep the colors or axis titles that you set.",
     "pieFirstSeries": "A pie chart shows only the first series.",

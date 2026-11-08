@@ -2877,7 +2877,7 @@ export function focusCurrentSlideIn(root: HTMLElement | null | undefined): void;
 export function focusCurrentSlideOrCanvas(root: HTMLElement | null | undefined, editor: PptxEditorInstance | null): void;
 
 // @internal
-export function focusCurrentSwatch(panel: HTMLElement | null): void;
+export function focusCurrentSwatch(panel: HTMLElement | null, shown?: string | null): void;
 
 // @internal
 export function focusDialogInitialField(dialog: HTMLElement): void;
