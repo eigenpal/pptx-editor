@@ -627,7 +627,17 @@ export type EditorSelection =
 export interface TextPoint {
   readonly paragraph: number;
   readonly offset: number;
+  /**
+   * Where the caret shows when the offset has two places on a line that mixes directions:
+   * `'upstream'` after the character before the offset, `'downstream'` (the default) before
+   * the character at the offset. The caret, the arrow keys, and a click set it; edits and
+   * collaboration read only the offset.
+   */
+  readonly affinity?: CaretAffinity;
 }
+
+/** The side of a direction boundary a caret shows on (`TextPoint.affinity`). @public */
+export type CaretAffinity = 'downstream' | 'upstream';
 
 /** Formatting at the selection, for toolbar state. @public */
 export interface SelectionFormat {

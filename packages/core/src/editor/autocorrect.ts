@@ -27,7 +27,7 @@ import {
   slotsOf,
   splitParagraph,
 } from '../automation/commands/text-model.ts';
-import { editText, type TextInputKind } from './text-input.ts';
+import { editText, typedCaret, type TextInputKind } from './text-input.ts';
 import { setListKind } from '../automation/commands/list-commands.ts';
 import { attr, child } from '../store/index.ts';
 
@@ -269,6 +269,10 @@ export function withAutoCorrect(enabled: boolean) {
     const fixed = enabled
       ? autoCorrectInput(batch, part, slide, txBodyId, item, sel, kind, data)
       : null;
-    return fixed ?? { at: editText(batch, part, txBodyId, item, sel, kind, data), list: false };
+    const done = fixed ?? {
+      at: editText(batch, part, txBodyId, item, sel, kind, data),
+      list: false,
+    };
+    return kind === 'text' ? { ...done, at: typedCaret(item, sel.focus.paragraph, done.at) } : done;
   };
 }

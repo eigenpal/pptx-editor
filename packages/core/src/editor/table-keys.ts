@@ -12,6 +12,7 @@ import { diagramTab, firstDiagramCaret } from './surface-diagram.ts';
 import { parentGroupOf } from '../automation/commands/placement.ts';
 import { comparePoints } from '../automation/commands/text-model.ts';
 import { moveCaret } from './text-input.ts';
+import { samePlace } from './visual-caret-keys.ts';
 
 type TextSelection = Extract<EditorSelection, { kind: 'text' }>;
 
@@ -165,7 +166,7 @@ export function tableKeyAction(
   if (shift && step) {
     // Shift+arrow at the edge of the cell's text starts a cell range with the next cell.
     const item = textItemOf(layout, sel);
-    if (!item || comparePoints(moveCaret(item, sel.focus, key), sel.focus) !== 0) return null;
+    if (!item || !samePlace(moveCaret(item, sel.focus, key), sel.focus)) return null;
     const target = cellLayoutAt(frame.table, stepFrom(here.cell, step));
     if (!target) return null;
     const range = { anchor: addressOf(here), focus: addressOf(target) };
@@ -176,7 +177,7 @@ export function tableKeyAction(
   if (!item) return null;
   if (key === 'ArrowRight' || key === 'ArrowLeft') {
     const moved = moveCaret(item, sel.focus, key);
-    if (comparePoints(moved, sel.focus) !== 0) return null;
+    if (!samePlace(moved, sel.focus)) return null;
     const next = drawn[i + (key === 'ArrowRight' ? 1 : -1)];
     if (!next) return null;
     return {
@@ -185,7 +186,7 @@ export function tableKeyAction(
   }
   if (key === 'ArrowDown' || key === 'ArrowUp') {
     const moved = moveCaret(item, sel.focus, key);
-    if (comparePoints(moved, sel.focus) !== 0) return null;
+    if (!samePlace(moved, sel.focus)) return null;
     const down = key === 'ArrowDown';
     const row = down ? here.cell.row + here.cell.rowSpan : here.cell.row - 1;
     const target = cellLayoutAt(frame.table, { row, column: here.cell.col });

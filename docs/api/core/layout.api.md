@@ -576,6 +576,7 @@ export function layoutTextOn(body: ResolvedTextBody, rect: {
 export interface Line {
     // (undocumented)
     readonly baseline: number;
+    readonly bidi?: LineBidi;
     readonly caretX: readonly number[];
     readonly column: number;
     // (undocumented)
@@ -595,6 +596,13 @@ export interface Line {
 
 // @internal
 export type LineBasis = 'size' | 'face';
+
+// @public
+export interface LineBidi {
+    readonly paragraphRtl: boolean;
+    readonly rtl: readonly boolean[];
+    readonly trailingX: readonly number[];
+}
 
 // @internal
 export function lineEndReach(line: ResolvedLine, scale?: number): number;

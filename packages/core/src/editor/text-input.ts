@@ -22,6 +22,8 @@ import {
   wordStartBefore,
   type ParagraphUnits,
 } from '../automation/commands/text-units.ts';
+import { bidiCollapse, bidiKeyTarget, bidiVerticalTarget } from './visual-caret-keys.ts';
+import { caretXOn, lineIndexAt } from './visual-caret.ts';
 
 /** Every kind of text input the editor applies. @public */
 export type TextInputKind =
@@ -123,12 +125,32 @@ export function editText(
   return end ? deleteRange(batch, part, txBodyId, at, end) : at;
 }
 
-/** Collapse a horizontal selection without stepping past its edge, in either selection direction. */
-export function collapseTextRange(sel: TextSelection, key: string): TextPoint | null {
+/**
+ * The caret after typed text: in a paragraph in visual order it stays at the trailing edge of
+ * the typed text (upstream), also where a direction boundary puts the next character elsewhere.
+ */
+export function typedCaret(item: ShapeItem, typedIn: number, at: TextPoint): TextPoint {
+  const bidi = item.text?.lines.some((l) => l.paragraph === typedIn && l.bidi);
+  return bidi && at.offset > 0 ? { ...at, affinity: 'upstream' } : at;
+}
+
+/**
+ * Collapse a horizontal selection without stepping past its edge, in either selection direction.
+ * With the shape's layout, a range on one line in visual order collapses to the outermost edge
+ * of its selected bands in the key's direction, and a range over several lines to the end that
+ * the paragraph's reading direction puts on that side (DOCX Editor `surface-selection-collapse.ts`).
+ */
+export function collapseTextRange(
+  sel: TextSelection,
+  key: string,
+  item?: ShapeItem
+): TextPoint | null {
   const order = comparePoints(sel.anchor, sel.focus);
   if (order === 0 || (key !== 'ArrowLeft' && key !== 'ArrowRight')) return null;
   const start = order < 0 ? sel.anchor : sel.focus;
   const end = order < 0 ? sel.focus : sel.anchor;
+  const visual = item && bidiCollapse(item, start, end, key === 'ArrowLeft' ? -1 : 1);
+  if (visual) return visual;
   return key === 'ArrowLeft' ? start : end;
 }
 
@@ -144,7 +166,7 @@ export function moveTextSelection(
   extend: boolean,
   mods: CaretModifiers = {}
 ): TextSelection {
-  const at = !extend && collapseTextRange(selection, key);
+  const at = !extend && collapseTextRange(selection, key, item);
   const modified = !!(mods.altKey || mods.ctrlKey || mods.metaKey);
   const focus = at && !modified ? at : moveCaret(item, at || selection.focus, key, mods);
   return { ...selection, anchor: extend ? selection.anchor : focus, focus };
@@ -207,6 +229,11 @@ export function moveCaret(
   const key = edge ? (pressed === 'ArrowLeft' ? 'Home' : 'End') : pressed;
   let { paragraph, offset } = focus;
   const u = unitsOf(item, paragraph);
+  // A line in visual order: Left and Right step on screen, Home and End go to its visual edges.
+  const visual = bidiKeyTarget(item, focus, key, word, u, () =>
+    lineEdge(item, paragraph, offset, false)
+  );
+  if (visual) return visual;
   if (key === 'ArrowLeft') {
     if (offset > 0) offset = word ? wordStartBefore(u, offset) : stopBefore(u, offset);
     else if (paragraph > 0) offset = lens[--paragraph] ?? 0;
@@ -222,7 +249,9 @@ export function moveCaret(
     const li = lineIndexAt(lines, paragraph, offset);
     const target = lines[li + (key === 'ArrowUp' ? -1 : 1)];
     if (target && li >= 0) {
-      const x = lines[li].caretX[offset - lines[li].start] ?? 0;
+      const x = caretXOn(lines[li], offset, focus.affinity) ?? 0;
+      const onBidi = bidiVerticalTarget(item, target, x);
+      if (onBidi) return onBidi;
       let best = 0;
       target.caretX.forEach((cx, i) => {
         if (Math.abs(cx - x) < Math.abs((target.caretX[best] ?? 0) - x)) best = i;
@@ -232,18 +261,6 @@ export function moveCaret(
     }
   }
   return { paragraph, offset };
-}
-
-type Lines = NonNullable<ShapeItem['text']>['lines'];
-
-/** The laid-out line that holds the caret: a line's end offset belongs to the next line. */
-function lineIndexAt(lines: Lines, paragraph: number, offset: number): number {
-  return lines.findIndex(
-    (l, i) =>
-      l.paragraph === paragraph &&
-      offset >= l.start &&
-      (offset < l.end || lines[i + 1]?.paragraph !== paragraph)
-  );
 }
 
 /**

@@ -10,6 +10,7 @@ import { slotLanguage } from '../../cascade/script-fonts.ts';
 import { anchorOffset, ROTATED_VERT, shiftLines } from './anchor.ts';
 import { AutonumberCounters, autonumberText, symbolBulletText } from './autonumber.ts';
 import { bidiCaretX, markerRuns, placeBidiLine, wholeMarker, type BidiLine } from './bidi-line.ts';
+import { lineBidiOf, shiftLineBidi, type LineBidi } from './line-visual-order.ts';
 import { fontSlotPieces, slotFamily, type FontSlot } from './font-slots.ts';
 import {
   breakOpportunities,
@@ -113,6 +114,8 @@ export interface Line {
   readonly end: number;
   /** x of each source offset from start to end inclusive, for caret placement. */
   readonly caretX: readonly number[];
+  /** The units in visual order (UAX #9), absent where they read in source order. */
+  readonly bidi?: LineBidi;
   readonly runs: readonly GlyphRun[];
   /** Height of the tallest font, for the caret. */
   readonly fontHeight: number;
@@ -884,6 +887,7 @@ export function layoutTextOn(
         extra = justifyExtra(units, segments, range.start, contentEnd, room);
       if (!wrap && p.align === 'ctr') shift = (avail(first) - width) / 2;
       let caretX: number[] = [];
+      let lineBidi: LineBidi | undefined;
       const origin = (p.rtl ? colW - left - shift : left + shift) + bp.lIns;
       let x = origin;
       const runs: GlyphRun[] = [];
@@ -925,6 +929,7 @@ export function layoutTextOn(
         caretX = bidiCaretX(bidiLine, range.start, range.end - range.start, advance).map(
           (v) => v + lineLeftX
         );
+        lineBidi = lineBidiOf(bidiLine, lineLeftX, range.start, advance, p.rtl);
       }
       // A bidi line placed its runs above; a left-to-right line places them here.
       const lineEnd = bidiLine ? range.start : range.end;
@@ -958,6 +963,7 @@ export function layoutTextOn(
         start: sourceOffset,
         end: sourceOffset + (range.end - range.start),
         caretX: range.end === range.start ? [origin] : caretX,
+        ...(lineBidi ? { bidi: lineBidi } : {}),
         runs: lineRuns,
         fontHeight: maxSize * EMU_PER_PT,
         ...(first && pending
@@ -997,6 +1003,7 @@ export function layoutTextOn(
         top: line.top - offset,
         baseline: placeBaseline(line.baseline - offset),
         caretX: line.caretX.map((v) => v + dx),
+        ...(line.bidi ? { bidi: shiftLineBidi(line.bidi, dx) } : {}),
         runs: line.runs.map((r) => ({ ...r, x: r.x.map((v) => v + dx) })),
         ...(line.marks ? { marks: line.marks.map((m) => moveMark(m, dx)) } : {}),
       });

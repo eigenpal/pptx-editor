@@ -427,6 +427,9 @@ export function canvasMenuRows(entries: readonly ChromeMenuEntry[], editor: Edit
 export type CapsStyle = 'none' | 'small' | 'all';
 
 // @public
+export type CaretAffinity = 'downstream' | 'upstream';
+
+// @public
 export type ChartCommand = {
     readonly type: 'setChartData';
     readonly nodeId?: string;
@@ -6304,6 +6307,7 @@ export type TextOrientation = 'horizontal' | 'vertical' | 'vertical270' | 'wordA
 
 // @public
 export interface TextPoint {
+    readonly affinity?: CaretAffinity;
     // (undocumented)
     readonly offset: number;
     // (undocumented)

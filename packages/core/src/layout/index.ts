@@ -15,6 +15,7 @@ export * from './text/measurer.ts';
 export * from './text/harfbuzz-measurer.ts';
 export { setHarfBuzzWasmUrl } from './harfbuzz-wasm-binary.ts';
 export * from './text/text-layout.ts';
+export type { LineBidi } from './text/line-visual-order.ts';
 export * from './text/line-metrics.ts';
 export {
   autonumberText,
