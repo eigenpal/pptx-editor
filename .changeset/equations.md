@@ -6,4 +6,4 @@
 '@pptx-editor.dev/i18n': minor
 ---
 
-Draw equations (Office Math) on the canvas and in the PDF export, and insert and edit equations from a linear form with the `insertEquation` and `setEquation` commands and the new Equation dialog.
+Draw equations on the canvas and in the PDF export. Insert and edit them with `insertEquation`, `setEquation`, and the Equation dialog.

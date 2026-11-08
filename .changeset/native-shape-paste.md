@@ -4,4 +4,4 @@
 '@pptx-editor.dev/vue': minor
 ---
 
-Paste shapes copied in other presentation applications as editable shapes in a desktop host. Pass `readClipboardDrawing` to read the DrawingML clipboard package from the system clipboard; the editor pastes its shapes, pictures, connectors, groups, and tables at their source positions. In a browser, the paste stays a picture. `drawingClipboardPayload` converts a package for the `paste` command, and `DRAWING_CLIPBOARD_TYPES` names the clipboard types.
+Paste shapes from other presentation applications as editable shapes in desktop hosts with `readClipboardDrawing`. Add `drawingClipboardPayload` and `DRAWING_CLIPBOARD_TYPES`.

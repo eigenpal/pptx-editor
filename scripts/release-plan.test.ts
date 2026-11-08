@@ -73,17 +73,54 @@ test('the fixed group matches the public packages', () => {
   expect(config.fixed.flat().sort()).toEqual(publicPackages);
 });
 
-test('the pending changesets release no major version', async () => {
-  const { directory } = fixture();
+function copyPendingChangesets(directory: string): void {
   for (const file of readdirSync(join(root, '.changeset')))
     if (file.endsWith('.md') && file !== 'README.md')
       writeFileSync(
         join(directory, '.changeset', file),
         readFileSync(join(root, '.changeset', file))
       );
+}
+
+test('the pending changesets release no major version', async () => {
+  const { directory } = fixture();
+  copyPendingChangesets(directory);
   const releases = await plan(directory);
   expect(releases.some((release) => release.type === 'major')).toBe(false);
   expect(new Set(releases.map((release) => release.newVersion)).size).toBeLessThanOrEqual(1);
+});
+
+// A changelog entry says what changed for the reader in one short paragraph. Details go in
+// the documentation. The fixed group writes each entry into every package that it names.
+const SUMMARY_MAX_CHARACTERS = 400;
+
+test('each pending changeset is one short paragraph', async () => {
+  const { directory } = fixture();
+  copyPendingChangesets(directory);
+  const { changesets } = await getReleasePlan(directory);
+  const long = changesets
+    .filter(
+      (changeset) =>
+        changeset.summary.length > SUMMARY_MAX_CHARACTERS || changeset.summary.includes('\n')
+    )
+    .map((changeset) => `.changeset/${changeset.id}.md (${changeset.summary.length} characters)`);
+  expect(long).toEqual([]);
+});
+
+// changesets/action omits every changelog from the release PR body when the body passes
+// 60,000 characters. Estimate the body with room for commit links and headings.
+test('the release PR body keeps its changelogs', async () => {
+  const { directory } = fixture();
+  copyPendingChangesets(directory);
+  const { changesets, releases } = await getReleasePlan(directory);
+  const summaries = new Map(changesets.map((changeset) => [changeset.id, changeset.summary]));
+  let characters = 0;
+  for (const release of releases) {
+    if (release.type === 'none') continue;
+    characters += 200;
+    for (const id of release.changesets) characters += (summaries.get(id)?.length ?? 0) + 120;
+  }
+  expect(characters).toBeLessThan(60_000);
 });
 
 test('a minor change after 0.1.0 releases 0.2.0, not 1.0.0', async () => {

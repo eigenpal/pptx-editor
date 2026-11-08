@@ -4,9 +4,4 @@
 '@pptx-editor.dev/vue': patch
 ---
 
-A presentation that does not arrive no longer keeps the editor on the loading screen.
-
-- `usePptxSource` stops a URL download when no bytes arrive for 10 seconds, and `error` is a `TimeoutError`. A slow download that keeps sending bytes finishes, however long it takes.
-- `usePptxSource` stops a URL download that grows past 528 MiB, the longest file the editor opens (512 MiB of contents and room for the archive headers), and `error` is a `RangeError`. With a valid `Content-Length` of up to 64 MiB, the download fills one buffer of that length, so it holds the file in memory once. A longer declared length sets aside at most 64 MiB before the bytes arrive.
-- Eager fonts hold the deck back for at most 2 seconds. Fonts that settle later still apply, and the slides lay out again.
-- `registerFontFaces` settles `ready` after at most 2 seconds (`waitMs`), so a face whose load never settles cannot hold the open.
+`usePptxSource` stops stalled and oversized downloads, and fonts hold the open for at most 2 seconds.

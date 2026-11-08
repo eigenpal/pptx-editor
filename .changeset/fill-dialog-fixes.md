@@ -4,4 +4,4 @@
 '@pptx-editor.dev/vue': patch
 ---
 
-The pattern dialog focuses the shape's own pattern, and the pattern and gradient dialogs return focus to the fill menu and close only on a press and release on the backdrop. `setShapePicture` takes an optional `mime`, and `slideBackground.tile` reports a tiled picture background.
+Fix focus in the pattern and gradient dialogs. `setShapePicture` takes `mime`, and `slideBackground.tile` reports tiled backgrounds.
