@@ -257,6 +257,10 @@ function measurer(input: HTMLTextAreaElement): (text: string) => number {
 /** A strong right-to-left letter: Hebrew, Arabic, Syriac, Thaana, N'Ko, and their forms. */
 const RTL = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufefc]/u;
 
+/** Edits that the field shows as the model does, at the end of the caret's context. */
+const FIELD_WRITES = new Set(['insertText', 'insertReplacementText']);
+const FIELD_DELETES = new Set(['deleteContentBackward', 'deleteWordBackward']);
+
 /** The surface's input binding. */
 export interface SurfaceInputBinding {
   /** Put the caret's context in the input (`TypingContext`); none while an IME composes. */
@@ -317,6 +321,16 @@ export function bindSurfaceInput(
   const onSelectionChange = (): void => {
     if (input.ownerDocument.activeElement === input) collapse();
   };
+  /** Whether the field's own change shows an edit: text at the caret, or a delete before it. */
+  const fieldShows = (e: InputEvent): boolean =>
+    context !== null &&
+    (FIELD_WRITES.has(e.inputType) ? !!e.data : FIELD_DELETES.has(e.inputType) && !!input.value);
+  /**
+   * The type of a non-cancelable edit that went to the model at its `beforeinput`: the
+   * `input` event of that type after it is the field's own change, not a second edit. The
+   * next key or `beforeinput` ends the wait. No timer: a browser can run input tasks first.
+   */
+  let echo: string | null = null;
   const width = measurer(input);
   // The input grows with the text being composed, so the text shows at the caret while the
   // IME composes it (the slide shows the text only once the composition ends). The context
@@ -359,10 +373,15 @@ export function bindSurfaceInput(
   const onBeforeInput = (e: InputEvent): void => {
     // The IME owns the field until it finishes; the result arrives at composition end.
     if (composing) return;
-    // An edit the browser does not let the editor cancel changes the field itself: the
-    // `input` event after it applies that change once (`fieldEdit`), so nothing goes in twice.
-    if (!e.cancelable) return;
-    e.preventDefault();
+    echo = null;
+    if (!e.cancelable) {
+      // An edit the browser does not let the editor cancel changes the field itself, where
+      // the field holds what it changes: the `input` event after it applies that change once
+      // (`fieldEdit`). Any other edit goes to the model now, and the field's own change after
+      // it, if any, is not a second edit.
+      if (fieldShows(e)) return;
+      echo = e.inputType;
+    } else e.preventDefault();
     const target =
       e.inputType === 'insertReplacementText'
         ? replacementTarget(e, input, context)
@@ -372,21 +391,25 @@ export function bindSurfaceInput(
     dispatchBeforeInput(host, e, target);
     sync();
   };
-  const onInput = (): void => {
+  const onInput = (e: Event): void => {
     if (composing) return fit();
     // An input that no `beforeinput` announced, or one that could not be prevented, changed
     // the field itself (an extension that writes the field, for example): its change goes
     // to the model, so the field and the model agree again.
     const before = context?.text ?? '';
     const edit =
-      context && input.value !== before ? fieldEdit(before, input.value, context.key) : null;
+      context && echo !== (e as InputEvent).inputType && input.value !== before
+        ? fieldEdit(before, input.value, context.key)
+        : null;
+    echo = null;
     if (edit && host.replaceText) host.replaceText(edit.target, edit.text);
     collapse();
     sync();
   };
   const onCompositionStart = (): void => {
-    // A composition that no key started (a native move came last) starts at the synced caret.
-    collapse();
+    // No reset here: a reconversion selects the word it composes again and starts in the
+    // same task. A caret or a selection from a native key in an earlier task is already
+    // reset, by its `selectionchange` or by the composition's first key.
     composing = true;
     input.classList.add(COMPOSING_CLASS);
     composeFrom = { value: input.value, width: input.value ? input.scrollWidth : 0 };
@@ -416,6 +439,7 @@ export function bindSurfaceInput(
     // selection that a native key left in the input is not the system's. The system makes
     // its own selection after this, for its own input.
     if (e.target === input) collapse();
+    echo = null;
     if (isCompositionKey(e)) return;
     if ((e.key === 'Meta' || e.key === 'Control') && !e.repeat) host.warmCopy?.();
     if (host.shortcut(e.key, e)) {

@@ -363,6 +363,118 @@ describe('a system replacement (insertReplacementText)', () => {
     e.destroy();
   });
 
+  test('a replacement a task after its selection never repeats the word', async () => {
+    const { e, input, type, fire, beforeInput } = await open(para(''));
+    caret(e, 0, 0);
+    type('say teh');
+    input.focus();
+    input.setSelectionRange(4, 7);
+    fire(new win.Event('selectionchange') as unknown as Event);
+    const revision = e.session!.store.revision;
+    beforeInput('insertReplacementText', 'the');
+    expect(texts(e)).toEqual(['say teh']);
+    expect(e.snapshot().lastRejection?.reason).toBe('errors.inputUnsupported');
+    expect(e.session!.store.revision).toBe(revision);
+    // After the space that ends the word too.
+    type(' ');
+    beforeInput('insertReplacementText', 'the');
+    expect(texts(e)).toEqual(['say teh ']);
+    e.destroy();
+  });
+
+  test('a replacement with no target that is no single word goes in at the caret', async () => {
+    const { e, type, beforeInput } = await open(para(''));
+    caret(e, 0, 0);
+    type('say');
+    beforeInput('insertReplacementText', ' hello there');
+    beforeInput('insertReplacementText', '!');
+    expect(texts(e)).toEqual(['say hello there!']);
+    type(' ');
+    beforeInput('insertReplacementText', '😀');
+    expect(texts(e)).toEqual(['say hello there! 😀']);
+    e.destroy();
+  });
+
+  const uncancelable = (inputType: string, data?: string): Event =>
+    new win.InputEvent('beforeinput', {
+      inputType,
+      data,
+      bubbles: true,
+      cancelable: false,
+    }) as unknown as Event;
+
+  test('a delete that cannot be canceled over a selected range goes to the model', async () => {
+    const { e, type, fire } = await open(para(''));
+    caret(e, 0, 0);
+    type('hello world');
+    const at = (offset: number) => ({ paragraph: 0, offset });
+    e.setSelection({ kind: 'text', nodeId: shapeId(e), anchor: at(5), focus: at(11) });
+    // The input holds no text for a range, so no input event follows.
+    fire(uncancelable('deleteContentBackward'));
+    expect(texts(e)).toEqual(['hello']);
+    e.destroy();
+  });
+
+  test('a delete that cannot be canceled at a paragraph start joins the paragraphs', async () => {
+    const { e, input, type, fire, beforeInput } = await open(para(''));
+    caret(e, 0, 0);
+    type('one');
+    beforeInput('insertParagraph');
+    type('two');
+    caret(e, 1, 0);
+    expect(input.value).toBe('');
+    fire(uncancelable('deleteContentBackward'));
+    expect(texts(e)).toEqual(['onetwo']);
+    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 3 });
+    e.destroy();
+  });
+
+  test('an Enter that cannot be canceled splits once, and its field change is no edit', async () => {
+    const { e, input, type, fire } = await open(para(''));
+    caret(e, 0, 0);
+    type('one');
+    fire(uncancelable('insertParagraph'));
+    // The browser writes a line break into the field, after the model split.
+    input.value += '\n';
+    fire(
+      new win.InputEvent('input', {
+        inputType: 'insertParagraph',
+        bubbles: true,
+      }) as unknown as Event
+    );
+    expect(texts(e)).toEqual(['one', '']);
+    expect(focusOf(e)).toEqual({ paragraph: 1, offset: 0 });
+    expect(input.value).toBe('');
+    e.destroy();
+  });
+
+  test('a field change after a later key is an edit, also when no echo came', async () => {
+    const { e, input, type, fire } = await open(para(''));
+    caret(e, 0, 0);
+    type('ab');
+    // A non-cancelable insert with no field change: no input event follows it.
+    e.setSelection({
+      kind: 'text',
+      nodeId: shapeId(e),
+      anchor: { paragraph: 0, offset: 0 },
+      focus: { paragraph: 0, offset: 2 },
+    });
+    fire(uncancelable('insertText', 'x'));
+    expect(texts(e)).toEqual(['x']);
+    type('y');
+    fire(uncancelable('insertText', 'z'));
+    input.value += 'z';
+    fire(
+      new win.InputEvent('input', {
+        inputType: 'insertText',
+        data: 'z',
+        bubbles: true,
+      }) as unknown as Event
+    );
+    expect(texts(e)).toEqual(['xyz']);
+    e.destroy();
+  });
+
   test('a field change of one emoji to another replaces the whole emoji', async () => {
     const { e, input, fire, beforeInput } = await open(para(''));
     caret(e, 0, 0);
@@ -603,13 +715,28 @@ describe('a composition over the text the input holds', () => {
       caret(e, 0, 0);
       type('hello world');
       // A native key the editor does not handle (Ctrl+P, Ctrl+Shift+P) moved the input caret.
+      // The browser reports the move a task later; the composition comes after that.
+      input.focus();
       input.setSelectionRange(from, to);
+      fire(new win.Event('selectionchange') as unknown as Event);
       ime(fire, input, '日', key);
       expect(texts(e)).toEqual(['hello world日']);
       expect(focusOf(e)).toEqual({ paragraph: 0, offset: 12 });
       e.destroy();
     });
   }
+
+  test('a reconversion composes the word the system selected again, in place', async () => {
+    const { e, input, type, fire } = await open(para(''));
+    caret(e, 0, 0);
+    type('hello world');
+    // The IME selects the word and starts composing in the same task.
+    input.setSelectionRange(6, 11);
+    ime(fire, input, 'WORLD', false);
+    expect(texts(e)).toEqual(['hello WORLD']);
+    expect(focusOf(e)).toEqual({ paragraph: 0, offset: 11 });
+    e.destroy();
+  });
 
   test('a recomposed word whose target a peer changed keeps the typed text', async () => {
     const { e, input, fire } = await open(para(run('a helo')));

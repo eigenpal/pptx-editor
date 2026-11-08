@@ -5,7 +5,8 @@
 // the caret. On agreement the replacement replaces those characters. A target that the model
 // text does not hold, or that names another paragraph, is never matched: the input is
 // refused, so no text the system did not target changes and no word goes in twice. A
-// replacement with no target goes in at the caret.
+// replacement with no target goes in at the caret, unless it is one word right after a
+// word (`correctsWord`): such a replacement can correct that word, so it is refused.
 //
 // PPTX Editor types into a hidden textarea, not into painted pages, so the target comes from
 // the textarea's selection over the text that the surface mirrors into it (`TypingContext`):
@@ -124,6 +125,18 @@ export function replacementRange(
   return text.slice(from, to) === target.text ? { from, to } : null;
 }
 
+/**
+ * Whether a replacement with no target could correct the word before the caret: the
+ * replacement is one word, and the context ends with a word, or with a word and one space.
+ * Text with white space in it (dictation of a phrase), or a sign, is no such correction.
+ */
+export function correctsWord(context: string, replacement: string): boolean {
+  return (
+    /^[\p{L}\p{N}][\p{L}\p{N}\p{M}'’-]*$/u.test(replacement) &&
+    /[\p{L}\p{N}\p{M}] ?$/u.test(context)
+  );
+}
+
 /** What `createSystemText` asks of the editor. */
 export interface SystemTextHost {
   session(): DocumentSession | null;
@@ -165,7 +178,8 @@ export function createSystemText(host: SystemTextHost) {
       return at ? { key: at.key, text: contextBefore(at.text, at.offset) } : null;
     },
     /**
-     * Apply a system text change. With no target, the replacement goes in at the caret. With
+     * Apply a system text change. With no target, the replacement goes in at the caret, but
+     * one word right after a word is refused (`correctsWord`). With
      * one, it replaces the target when the model text before the caret holds it, in the
      * caret's paragraph; else the input is refused, so no word goes in twice. An empty
      * replacement deletes the target. A caret format that waits at the caret stays for the
@@ -174,11 +188,16 @@ export function createSystemText(host: SystemTextHost) {
      */
     replaceText(target: ReplacementTarget | null, replacement: string, typed = false): void {
       const sel = host.selection();
+      const at = caretAt(sel);
       if (!target) {
+        // A single word right after a word can be a correction of that word whose target
+        // the editor no longer has (its selection went a task before it): it is refused, so
+        // no word goes in twice. Other text with no target goes in at the caret.
+        if (at && correctsWord(contextBefore(at.text, at.offset), replacement))
+          return host.refuse('errors.inputUnsupported', 'insertReplacementText');
         if (replacement) host.textInput('text', replacement, sel);
         return;
       }
-      const at = caretAt(sel);
       const range = at && replacementRange(at.text, at.offset, at.key, target);
       if (sel.kind !== 'text' || !at || !range) {
         // A composition's new characters are the user's typing (`typed`): when a peer's edit
