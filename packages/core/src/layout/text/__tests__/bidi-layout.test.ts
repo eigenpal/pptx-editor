@@ -5,6 +5,7 @@ import { resolveSlide } from '../../../cascade/index.ts';
 import { createFixedMeasurer, layoutSlide, type Line, type TextLayout } from '../../index.ts';
 import { paragraphBidi, visualOrderOfLevels } from '../rtl-paragraph.ts';
 import { runGlyphs } from '../bidi-line.ts';
+import { bidiAlgorithm } from '../bidi.ts';
 import { leadingOffset, paragraphAlignment } from '../paragraph-alignment.ts';
 
 // The shape is 6,000,000 EMU wide with the default insets (91,440 EMU on each side).
@@ -153,6 +154,30 @@ describe('a run that reads against the paragraph resolves like an isolate', () =
   test('spaces and digits inside a left-to-right run keep it whole', () => {
     expect(rtl(he(`${SHALOM} `) + r('"5 apples"', 'en-US'))).toBe(`"5 apples" ${reversed(SHALOM)}`);
     expect(rtl(he(`${DATE} `) + r('$5 USD', 'en-US'))).toBe(`$5 USD ${reversed(DATE)}`);
+  });
+
+  test('spaces beside a bracket paired outside the run stay with the bracket', () => {
+    // Brackets at level 1 draw mirrored (L4), so `) abc (` shows as ( abc ) from the left.
+    expect(rtl(he(`${SHALOM} `) + r('( abc ', 'en-US') + r(')', 'en-US'))).toBe(
+      `) abc ( ${reversed(SHALOM)}`
+    );
+    // The space after the opening bracket stands beside it: `(abc )` from the left, as UAX #9
+    // orders the paragraph's text when it resolves it as one.
+    const runs = [{ text: `${SHALOM} ` }, { text: '(' }, { text: ' abc)' }];
+    expect([...paragraphBidi(runs, true)!.levels]).toEqual([
+      ...bidiAlgorithm.getEmbeddingLevels(runs.map((run) => run.text).join(''), 'rtl').levels,
+    ]);
+    expect(rtl(he(`${SHALOM} `) + r('(', 'en-US') + r(' abc)', 'en-US'))).toBe(
+      `)abc ( ${reversed(SHALOM)}`
+    );
+    expect(ltr(r('abc (', 'en-US') + he(`${SHALOM} )`) + r(' def', 'en-US'))).toBe(
+      `abc (${reversed(SHALOM)} ) def`
+    );
+  });
+
+  test('a directional mark does not turn off the run isolates', () => {
+    const line = rtl(he(`${SHALOM}\u200f `) + r('"5 apples"', 'en-US'));
+    expect(line.replace('\u200f', '')).toBe(`"5 apples" ${reversed(SHALOM)}`);
   });
 
   test('a bracket pair across two runs resolves as one pair (UAX #9 N0)', () => {

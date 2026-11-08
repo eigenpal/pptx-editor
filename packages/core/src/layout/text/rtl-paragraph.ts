@@ -25,6 +25,11 @@ export function arabicScriptLanguage(lang: string | undefined): boolean {
 }
 
 const HAS_BIDI_CONTROLS = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u;
+/**
+ * Embedding, override, and isolate controls: authored structure that the per-run isolates
+ * (`isolateRunLevels`) must not change. The marks (ALM, LRM, RLM) are strong characters only.
+ */
+const HAS_BIDI_STRUCTURE = /[\u202a-\u202e\u2066-\u2069]/u;
 
 /**
  * A slash between ASCII digits. In a right-to-left run of an Arabic-script language it separates
@@ -92,30 +97,45 @@ function withArabicSlashes(text: string, runs: readonly BidiRunText[], rtl: bool
 }
 
 /**
- * The partner of each paired bracket of `text` (UAX #9 BD16), or -1. A stack of 63 openings, as
- * in BD16; past it, pairing stops.
+ * The partner of each paired bracket of `text` (UAX #9 BD16), or -1. Each paragraph (up to a
+ * paragraph separator) pairs on its own, with a stack of 63 openings; a paragraph that
+ * overflows the stack pairs none of its brackets, as BD16 stops there.
  */
 function bracketPartners(text: string): Int32Array {
   const partner = new Int32Array(text.length).fill(-1);
-  const stack: { at: number; closing: string }[] = [];
+  let stack: { at: number; closing: string }[] = [];
+  let pairs: [number, number][] = [];
+  let overflow = false;
+  const endParagraph = (): void => {
+    if (!overflow)
+      for (const [open, close] of pairs) [partner[open], partner[close]] = [close, open];
+    stack = [];
+    pairs = [];
+    overflow = false;
+  };
   for (let i = 0; i < text.length; i++) {
     const ch = text[i]!;
+    if (bidiAlgorithm.getBidiCharTypeName(ch) === 'B') {
+      endParagraph();
+      continue;
+    }
+    if (overflow) continue;
     const closing = bidiAlgorithm.openingToClosingBracket(ch);
     if (closing) {
-      if (stack.length === 63) break;
-      stack.push({ at: i, closing: bidiAlgorithm.getCanonicalBracket(closing) ?? closing });
+      if (stack.length === 63) overflow = true;
+      else stack.push({ at: i, closing: bidiAlgorithm.getCanonicalBracket(closing) ?? closing });
       continue;
     }
     if (!bidiAlgorithm.closingToOpeningBracket(ch)) continue;
     const canonical = bidiAlgorithm.getCanonicalBracket(ch) ?? ch;
     for (let k = stack.length - 1; k >= 0; k--) {
       if (stack[k]!.closing !== canonical) continue;
-      partner[i] = stack[k]!.at;
-      partner[stack[k]!.at] = i;
+      pairs.push([stack[k]!.at, i]);
       stack.length = k;
       break;
     }
   }
+  endParagraph();
   return partner;
 }
 
@@ -128,8 +148,8 @@ function bracketPartners(text: string): Int32Array {
  * (`An English phrase in a right-to-left paragraph: `, `"Hello, world!"`). Three kinds of
  * character keep their paragraph-wide level: the whitespace at the run's edges, so it still
  * separates the run from the text beside it; a bracket whose pair lies outside the run, so the
- * pair resolves as one (UAX #9 N0); and everything when the paragraph has authored bidi
- * controls. Text outside the run sees the run's characters, so right-to-left words in two
+ * pair resolves as one (UAX #9 N0), with the whitespace between it and the run's text; and
+ * everything when the paragraph has authored embedding, override, or isolate controls. Text outside the run sees the run's characters, so right-to-left words in two
  * runs of a left-to-right paragraph still read as one stretch.
  */
 function isolateRunLevels(
@@ -153,13 +173,19 @@ function isolateRunLevels(
     ).levels;
     // The run's own base is 1 (right to left) or 0; the isolate starts one above the paragraph.
     const raise = rtl ? 2 : 0;
+    partners ??= bracketPartners(text);
+    const pairs = partners;
+    // Whitespace and brackets paired outside the run, at either edge, stay with the paragraph.
+    const edge = (i: number): boolean => {
+      const pair = pairs[start + i]!;
+      return /\s/u.test(run.text[i]!) || (pair >= 0 && (pair < start || pair >= offset));
+    };
     let first = 0;
-    while (first < run.text.length && /\s/u.test(run.text[first]!)) first++;
+    while (first < run.text.length && edge(first)) first++;
     let last = run.text.length;
-    while (last > first && /\s/u.test(run.text[last - 1]!)) last--;
+    while (last > first && edge(last - 1)) last--;
     for (let i = first; i < last; i++) {
-      partners ??= bracketPartners(text);
-      const pair = partners[start + i]!;
+      const pair = pairs[start + i]!;
       if (pair >= 0 && (pair < start || pair >= offset)) continue;
       levels[start + i] = own[i]! + raise;
     }
@@ -182,8 +208,8 @@ export function paragraphBidi(
     withArabicSlashes(text, runs, rtl),
     rtl ? 'rtl' : 'ltr'
   ).levels;
-  // Authored Unicode controls decide on their own.
-  if (!controls) isolateRunLevels(levels, text, runs, rtl);
+  // Authored embedding, override, and isolate controls decide on their own.
+  if (!HAS_BIDI_STRUCTURE.test(text)) isolateRunLevels(levels, text, runs, rtl);
   return { rtl, levels };
 }
 
