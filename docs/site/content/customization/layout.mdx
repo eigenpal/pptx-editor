@@ -342,7 +342,7 @@ In the pane, a row keeps the keyboard focus. Up and Down move, Right and Left op
 
 ### Open the side panel from the toolbar
 
-The toolbar's **Selection pane**, **Format shape**, and **Edit data…** controls call `requestPane(editor, pane)`. A mounted side panel turns to that tab and moves the focus to it. While no side panel is mounted and your host does not listen, the controls are disabled with the `disabled.noSidePanel` reason.
+The toolbar's **Selection pane**, **Format shape**, and **Edit chart…** controls call `requestPane(editor, pane)`. A mounted side panel turns to that tab and moves the focus to it. While no side panel is mounted and your host does not listen, the controls are disabled with the `disabled.noSidePanel` reason.
 
 When your layout can hide the side panel, listen for the requests and show the panel. `listenPaneRequests` returns a function that stops the listener:
 
@@ -417,6 +417,8 @@ watch(
 </FrameworkTabs>
 
 `requestPane` returns `false` when nothing listens. Every listener hears each request, and your host decides what an answer does.
+
+The listener also gets a `PaneRequest` with a `focus` flag. **Insert** > **Chart** opens the **Chart** tab with `focus` set to `false`, so the keyboard stays on the slide and **Undo** and **Delete** act on the new chart. Pass `requestPane(editor, pane, { focus: false })` to open a tab the same way.
 
 ### Show the pane elsewhere
 

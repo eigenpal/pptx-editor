@@ -1,4 +1,4 @@
-// A new table or picture takes the place of an empty placeholder of the slide: its box and its
+// A new table, chart, or picture takes the place of an empty placeholder of the slide: its box and its
 // index, so the slide layout still positions it (ECMA-376 Part 1, 19.3.1.36 ph). DOM-free, so
 // the editor commands and the surface chrome read the same rules.
 
@@ -21,6 +21,9 @@ import { removeShapes } from './shape-removal.ts';
 
 /** The placeholder types a table fills (§19.7.10 `ST_PlaceholderType`): content and table. */
 export const TABLE_PLACEHOLDERS: ReadonlySet<string> = new Set(['obj', 'tbl']);
+
+/** The placeholder types a chart fills: content and chart. */
+export const CHART_PLACEHOLDERS: ReadonlySet<string> = new Set(['obj', 'chart']);
 
 /** The placeholder types a picture fills: content, picture, and clip art. */
 export const PICTURE_PLACEHOLDERS: ReadonlySet<string> = new Set(['obj', 'pic', 'clipArt']);
@@ -134,6 +137,67 @@ export function emptyPlaceholderOf(
   };
 }
 
+/** The step a new frame moves by when its place is taken: 5 % of the slide, down and right. */
+const INSERT_STEP = 0.05;
+
+/**
+ * Where a new frame of `cx` by `cy` goes, from the place (`x`, `y`). When a top-level frame or
+ * picture covers more than half of it, it starts one step past that frame's corner, and it
+ * moves one step more for each frame that starts there: objects inserted one after another
+ * cascade, and each one shows its own corner. Text shapes do not count, so a new object can sit
+ * on an empty text placeholder. It stays on the slide.
+ */
+export function freeInsertPosition(
+  tree: Element,
+  x: number,
+  y: number,
+  size: {
+    readonly cx: number;
+    readonly cy: number;
+    readonly slideW: number;
+    readonly slideH: number;
+  }
+): { x: number; y: number } {
+  const boxes: { x: number; y: number; cx: number; cy: number }[] = [];
+  for (const el of elements(tree)) {
+    if (el.local !== 'graphicFrame' && el.local !== 'pic') continue;
+    const xfrm = path(el, 'p:xfrm') ?? path(el, 'p:spPr', 'a:xfrm');
+    const off = path(xfrm, 'a:off');
+    const ext = path(xfrm, 'a:ext');
+    if (!off || !ext) continue;
+    const n = (v: string | undefined) => Number(v ?? 0) || 0;
+    boxes.push({
+      x: n(attr(off, 'x')),
+      y: n(attr(off, 'y')),
+      cx: n(attr(ext, 'cx')),
+      cy: n(attr(ext, 'cy')),
+    });
+  }
+  const area = Math.max(1, size.cx * size.cy);
+  const dx = Math.round(size.slideW * INSERT_STEP);
+  const dy = Math.round(size.slideH * INSERT_STEP);
+  const fits = (px: number, py: number) =>
+    px + size.cx <= size.slideW && py + size.cy <= size.slideH;
+  // A frame that covers more than half of the new one: start one step past its corner.
+  const cover = boxes.find((b) => {
+    const w = Math.min(x + size.cx, b.x + b.cx) - Math.max(x, b.x);
+    const h = Math.min(y + size.cy, b.y + b.cy) - Math.max(y, b.y);
+    return w > 0 && h > 0 && w * h > area / 2;
+  });
+  if (cover && fits(cover.x + dx, cover.y + dy)) {
+    x = cover.x + dx;
+    y = cover.y + dy;
+  }
+  // Then one step more for each frame that starts at about the same point: a cascade.
+  for (let i = 0; i < boxes.length; i++) {
+    const near = boxes.some((b) => Math.abs(b.x - x) < dx / 2 && Math.abs(b.y - y) < dy / 2);
+    if (!near || !fits(x + dx, y + dy)) break;
+    x += dx;
+    y += dy;
+  }
+  return { x, y };
+}
+
 /**
  * The tree index where the frame that fills `into` goes: the placeholder's own place, so the
  * z-order stays. -1 when the placeholder is gone.
@@ -188,16 +252,21 @@ export function removeFilledPlaceholder(
 }
 
 /**
- * The empty placeholder a new table or picture fills on slide `slideIndex`: the one that is
- * selected or holds the caret, or else the first one that takes it. @internal
+ * The empty placeholder a new table, chart, or picture fills on slide `slideIndex`: the one that
+ * is selected or holds the caret, or else the first one that takes it. @internal
  */
 export function placeholderFor(
   batch: OpBatch,
   part: string,
   slideIndex: number,
   selection: EditorSelection,
-  what: 'table' | 'picture'
+  what: 'table' | 'chart' | 'picture'
 ): EmptyPlaceholder | undefined {
-  const types = what === 'table' ? TABLE_PLACEHOLDERS : PICTURE_PLACEHOLDERS;
+  const types =
+    what === 'table'
+      ? TABLE_PLACEHOLDERS
+      : what === 'chart'
+        ? CHART_PLACEHOLDERS
+        : PICTURE_PLACEHOLDERS;
   return emptyPlaceholderOf(batch, part, slideIndex, types, selectedPlaceholder(selection));
 }

@@ -1,5 +1,5 @@
 // The commands that have their own modules for one kind of slide content: comments, animations,
-// chart data, and diagrams. `compile` in `commands.ts` asks here first.
+// charts, and diagrams. `compile` in `commands.ts` asks here first.
 
 import type {
   ChartCommand,
@@ -13,7 +13,7 @@ import {
   isAnimationCommand,
   type AnimationEditCommand,
 } from './animation-command-table.ts';
-import { compileChartCommand } from './chart-commands.ts';
+import { compileChartCommand, isChartCommandType } from './chart-commands.ts';
 import { compileCommentCommand, isCommentCommand } from './comment-commands.ts';
 import type { CommandContext, CommandEffect } from './commands.ts';
 import { compileDiagramCommand } from './diagram-commands.ts';
@@ -26,7 +26,7 @@ export function isObjectCommand(command: EditorCommand): command is ObjectComman
   return (
     isCommentCommand(command) ||
     isAnimationCommand(command) ||
-    command.type === 'setChartData' ||
+    isChartCommandType(command.type) ||
     command.type === 'addDiagramShape' ||
     command.type === 'deleteDiagramShape' ||
     command.type === 'setDiagramText'
@@ -41,6 +41,7 @@ export function compileObjectCommand(
 ): CommandEffect {
   if (isCommentCommand(command)) return compileCommentCommand(ctx, batch, command);
   if (isAnimationCommand(command)) return compileAnimationCommand(ctx, batch, command);
-  if (command.type === 'setChartData') return compileChartCommand(ctx, batch, command);
+  if (isChartCommandType(command.type))
+    return compileChartCommand(ctx, batch, command as ChartCommand);
   return compileDiagramCommand(ctx, batch, command as DiagramCommand);
 }

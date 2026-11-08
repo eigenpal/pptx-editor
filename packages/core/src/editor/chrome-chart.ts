@@ -17,7 +17,7 @@ export const CHART_CHROME_GROUP: ChromeGroup = {
     {
       id: 'editData',
       labelKey: 'chartData.editData',
-      paths: ICON_PATHS['table_chart'] ?? [],
+      paths: ICON_PATHS['insert_chart'] ?? [],
       state: { kind: 'pane', pane: 'chart' },
     },
   ],

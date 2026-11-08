@@ -7,6 +7,7 @@ import { escapeXmlAttribute } from '../../store/index.ts';
 import { CommandRefusal, type OpBatch } from './op-batch.ts';
 import { nextShapeId, spTreeOf } from './package-edits.ts';
 import {
+  freeInsertPosition,
   placeholderIndex,
   removeFilledPlaceholder,
   type EmptyPlaceholder,
@@ -39,9 +40,15 @@ export function insertTableFrame(
   const rowH = 370_840;
   const cx = colW * cols;
   const cy = rowH * rows;
-  const x = into ? into.x : Math.round((slideW - cx) / 2);
-  const y = into ? into.y : Math.round((slideH - cy) / 2);
   const tree = spTreeOf(batch, part);
+  const { x, y } = into
+    ? into
+    : freeInsertPosition(tree, Math.round((slideW - cx) / 2), Math.round((slideH - cy) / 2), {
+        cx,
+        cy,
+        slideW,
+        slideH,
+      });
   // In a collaboration session the id comes from the actor's stripe (`shapeIds`).
   const id = nextShapeId(batch, tree);
   const cell =

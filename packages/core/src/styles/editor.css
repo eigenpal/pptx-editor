@@ -647,6 +647,26 @@
   background: var(--doc-popover-bg);
   color: var(--doc-popover-fg);
   box-shadow: var(--doc-card-shadow-strong);
+  /* It opens as the menus do, from its swatch button at the top right. */
+  transform-origin: top right;
+  animation: pptx-pop 0.15s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+/* The swatch button answers a press as the other buttons do. */
+.pptx-color-field__button {
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.pptx-color-field__button:not(:disabled):active {
+  transform: scale(0.94);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pptx-color-field__panel {
+    animation: none;
+  }
+  .pptx-color-field__button,
+  .pptx-color-field__button:not(:disabled):active {
+    transition: none;
+    transform: none;
+  }
 }
 /* A dimmed field (style None in the Bullets and Numbering dialog) dims its label and unit too. */
 .pptx-field:has(:disabled) {
@@ -1117,8 +1137,20 @@
   height: auto;
   aspect-ratio: 1;
 }
-.pptx-swatch:hover {
-  transform: scale(1.1);
+/* A grid swatch grows a little under a mouse, never on a tap, and a field's swatch button
+   does not grow: it is a button, not a color to pick. */
+.pptx-swatches > .pptx-swatch {
+  transition: transform 120ms ease-out;
+}
+@media (hover: hover) and (pointer: fine) {
+  .pptx-swatch:not(.pptx-color-field__button):hover {
+    transform: scale(1.1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pptx-swatches > .pptx-swatch {
+    transition: none;
+  }
 }
 .pptx-swatch[aria-pressed='true'],
 .pptx-swatch[aria-current='true'] {
@@ -4876,6 +4908,15 @@ legend.pptx-dialog__label {
 
 /* Chart Data tab: the categories as a list of fields with a remove button each, then one
    collapsible card per series with its name and a value field for each category. */
+/* A field that depends on the check box above it, such as the chart title text. */
+.pptx-chart-pane__sub {
+  margin-left: 24px;
+}
+/* A series color swatch as tall as the fields beside it. */
+.pptx-chart-pane .pptx-color-field__button {
+  width: 32px;
+  height: 32px;
+}
 .pptx-chart-pane__note {
   margin: 0 0 8px;
   color: var(--doc-text-muted);
@@ -4917,6 +4958,36 @@ legend.pptx-dialog__label {
   border: 1px solid var(--doc-border);
   border-radius: var(--doc-radius-control, 8px);
   background: var(--doc-surface);
+}
+/* The series card's own chevron, as the panel's other disclosures: it turns down when the card
+   opens. The browser's triangle does not follow the panel's icons. */
+.pptx-chart-pane__summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+}
+.pptx-chart-pane__summary::-webkit-details-marker {
+  display: none;
+}
+.pptx-chart-pane__summary::before {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: 0 3px;
+  border-right: 1.5px solid var(--doc-text-muted);
+  border-bottom: 1.5px solid var(--doc-text-muted);
+  content: '';
+  transform: rotate(-45deg);
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.pptx-chart-pane__card[open] > .pptx-chart-pane__summary::before {
+  transform: rotate(45deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pptx-chart-pane__summary::before {
+    transition: none;
+  }
 }
 .pptx-chart-pane__summary {
   overflow: hidden;

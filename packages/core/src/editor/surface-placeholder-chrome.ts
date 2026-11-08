@@ -1,6 +1,7 @@
 // The editing chrome of empty placeholders on the slide: a dotted outline shows where each one
-// is, and an empty content, table, or picture placeholder shows insert buttons in its middle.
-// A press on a button selects the placeholder and inserts a table or asks for a picture; the
+// is, and an empty content, table, chart, or picture placeholder shows insert buttons in its
+// middle. A press on a button selects the placeholder and inserts a table or a column chart, or
+// asks for a picture; the
 // new object takes the placeholder's place (`automation/commands/placeholder-fill.ts`). It is
 // editing chrome: the slide paint, the slide show, thumbnails, and saved files never show it.
 
@@ -9,6 +10,7 @@ import type { EditorCommand, EditorSelection } from '../contracts/index.ts';
 import { SVG_NS } from '../output/index.ts';
 import { ICON_PATHS } from './icon-paths.ts';
 import {
+  CHART_PLACEHOLDERS,
   PICTURE_PLACEHOLDERS,
   TABLE_PLACEHOLDERS,
 } from '../automation/commands/placeholder-fill.ts';
@@ -37,7 +39,18 @@ export interface PlaceholderChromeHost {
   readonly fillableType?: (nodeId: string) => string | undefined;
 }
 
-type Insert = 'table' | 'picture';
+type Insert = 'table' | 'chart' | 'picture';
+/** The label key and the icon of each insert button. */
+const INSERT_LABELS: Readonly<Record<Insert, string>> = {
+  table: 'canvas.placeholderTable',
+  chart: 'canvas.placeholderChart',
+  picture: 'canvas.placeholderPicture',
+};
+const INSERT_ICONS: Readonly<Record<Insert, string>> = {
+  table: 'table',
+  chart: 'insert_chart',
+  picture: 'image',
+};
 type Box = { readonly x: number; readonly y: number; readonly cx: number; readonly cy: number };
 
 /** An empty placeholder of the slide, top level and not turned: the chrome draws on its box. */
@@ -108,6 +121,7 @@ export class PlaceholderChrome {
       const fillable = this.host.fillableType?.(id);
       const inserts: Insert[] = [];
       if (fillable && TABLE_PLACEHOLDERS.has(fillable)) inserts.push('table');
+      if (fillable && CHART_PLACEHOLDERS.has(fillable)) inserts.push('chart');
       if (fillable && PICTURE_PLACEHOLDERS.has(fillable) && this.host.pickImage)
         inserts.push('picture');
       const width = (inserts.length * BUTTON_PX + (inserts.length - 1) * GAP_PX) * px;
@@ -134,9 +148,7 @@ export class PlaceholderChrome {
     g.setAttribute('aria-hidden', 'true');
     g.setAttribute('transform', `translate(${x} ${y})`);
     const title = doc.createElementNS(SVG_NS, 'title');
-    title.textContent = this.host.label(
-      insert === 'table' ? 'canvas.placeholderTable' : 'canvas.placeholderPicture'
-    );
+    title.textContent = this.host.label(INSERT_LABELS[insert]);
     const box = doc.createElementNS(SVG_NS, 'rect');
     box.setAttribute('class', 'pptx-surface__placeholder-insert-box');
     box.setAttribute('width', String(size));
@@ -148,7 +160,7 @@ export class PlaceholderChrome {
     const k = (20 * px) / 960;
     icon.setAttribute('transform', `translate(${4 * px} ${24 * px}) scale(${k})`);
     icon.setAttribute('class', 'pptx-surface__placeholder-insert-icon');
-    for (const d of ICON_PATHS[insert === 'table' ? 'table' : 'image'] ?? []) {
+    for (const d of ICON_PATHS[INSERT_ICONS[insert]] ?? []) {
       const path = doc.createElementNS(SVG_NS, 'path');
       path.setAttribute('d', d);
       icon.append(path);
@@ -183,6 +195,8 @@ export class PlaceholderChrome {
     this.host.select({ kind: 'shapes', nodeIds: [button.id] });
     if (button.insert === 'table')
       this.host.run({ type: 'insertTable', rows: TABLE_SIZE, cols: TABLE_SIZE });
+    else if (button.insert === 'chart')
+      this.host.run({ type: 'insertChart', chartType: 'columnClustered' });
     else {
       const box = this.#boxes.get(`${button.id}|picture`);
       if (box) this.#pending = { id: button.id, box };

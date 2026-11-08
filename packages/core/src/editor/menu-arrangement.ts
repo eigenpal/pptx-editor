@@ -190,6 +190,7 @@ export const MENU_NAMED_PARTS = {
   TextBox: row('insert.textBox'),
   TableInsert: row('table.insert'),
   ImageInsert: row('insert.image'),
+  ChartInsert: row('insert.chart'),
   Equation: row('insert.equation'),
   Shapes: row('insert.shape'),
   Line: row('insert.line'),

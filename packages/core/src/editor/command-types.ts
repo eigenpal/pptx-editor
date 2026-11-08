@@ -138,6 +138,10 @@ const COMMAND_TABLE = {
   setAltText: true,
   // Charts
   setChartData: true,
+  insertChart: true,
+  setChartType: true,
+  setChartFormat: true,
+  setChartColor: true,
   // Diagrams
   addDiagramShape: true,
   deleteDiagramShape: true,

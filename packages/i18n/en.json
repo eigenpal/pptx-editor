@@ -75,7 +75,8 @@
     "alignOrDistribute": "Align or distribute",
     "slideBackground": "Slide background…",
     "columns": "Columns…",
-    "equation": "Equation…"
+    "equation": "Equation…",
+    "chart": "Chart"
   },
   "contextMenu": {
     "railLabel": "Slide actions",
@@ -515,6 +516,7 @@
       "slideMaster": "Slide master"
     },
     "equation": "Equation",
+    "chart": "Chart",
     "newComment": "New comment"
   },
   "table": {
@@ -940,7 +942,9 @@
         "group": "Group",
         "connector": "Connector",
         "graphicFrame": "Embedded object",
-        "table": "Table"
+        "table": "Table",
+        "chart": "Chart",
+        "diagram": "Diagram"
       },
       "table": "Table",
       "rowHeight": "Row height",
@@ -1142,6 +1146,7 @@
     "inputAriaLabel": "Text of the selected shape",
     "adjustHandle": "Drag to change the shape",
     "placeholderTable": "Insert a table here",
+    "placeholderChart": "Insert a chart here",
     "placeholderPicture": "Insert a picture here",
     "tableCell": "Row {row}, column {column}",
     "diagramShape": "Diagram shape {index} of {count}",
@@ -1215,6 +1220,10 @@
       "notNumber": "Each value must be a number.",
       "layout": "The cell references of the chart do not form one table, so you can change only names and values.",
       "workbook": "The embedded workbook cannot take this change. Give each series a different name, and keep the cells beside the data empty."
+    },
+    "chartFormat": {
+      "noAxes": "This chart type has no axes.",
+      "sameType": "The chart already has this type."
     },
     "diagram": {
       "noDiagram": "Select one diagram.",
@@ -1685,7 +1694,7 @@
     "emptyBody": "Select New comment to start a thread."
   },
   "chartData": {
-    "editData": "Edit data…",
+    "editData": "Edit chart…",
     "categories": "Categories",
     "xValues": "X values",
     "seriesName": "Name of series {number}",
@@ -1695,6 +1704,7 @@
     "newSeries": "Series {number}",
     "newCategory": "Category {number}",
     "addCategory": "Add category",
+    "addXValue": "Add X value",
     "addSeries": "Add series",
     "help": "Press Enter or leave a field to apply it. Leave a value empty for no value.",
     "workbookKept": "The embedded workbook keeps its old values. The chart shows the values you enter.",
@@ -1709,11 +1719,60 @@
     "series": "Series",
     "unnamed": "Unnamed series",
     "emptyTitle": "No chart selected",
-    "emptyBody": "Select a chart on the slide to edit its data.",
+    "emptyBody": "Select a chart on the slide to edit it.",
     "notEditableTitle": "This chart data is read-only",
     "removeCategoryNamed": "Remove category {name}",
+    "removeXValueNamed": "Remove X value {name}",
     "removeSeriesNamed": "Remove series {name}",
     "removeSeries": "Remove series"
+  },
+  "chartFormat": {
+    "types": {
+      "columnClustered": "Column",
+      "columnStacked": "Stacked column",
+      "columnPercentStacked": "100% stacked column",
+      "barClustered": "Bar",
+      "barStacked": "Stacked bar",
+      "barPercentStacked": "100% stacked bar",
+      "line": "Line",
+      "lineMarkers": "Line with markers",
+      "area": "Area",
+      "areaStacked": "Stacked area",
+      "areaPercentStacked": "100% stacked area",
+      "pie": "Pie",
+      "doughnut": "Doughnut",
+      "radar": "Radar",
+      "scatter": "Scatter",
+      "scatterLines": "Scatter with lines",
+      "other": "Other type"
+    },
+    "type": "Chart type",
+    "elements": "Chart elements",
+    "showTitle": "Title",
+    "titleText": "Title text",
+    "defaultTitle": "Chart Title",
+    "legend": "Legend",
+    "legendPositions": {
+      "none": "None",
+      "top": "Top",
+      "bottom": "Bottom",
+      "left": "Left",
+      "right": "Right"
+    },
+    "dataLabels": "Data labels",
+    "gridlines": "Gridlines",
+    "axes": "Axes",
+    "categoryAxisTitle": "Category axis title",
+    "valueAxisTitle": "Value axis title",
+    "xAxisTitle": "X axis title",
+    "yAxisTitle": "Y axis title",
+    "axisTitleHelp": "Leave an axis title empty for no title.",
+    "axesOffHelp": "Turn on Axes to set the axis titles.",
+    "typeChangeRemoved": "This chart type does not keep the colors or axis titles that you set. Change back to bring them back, or use Undo.",
+    "typeChangeHint": "Some chart types do not keep the colors or axis titles that you set.",
+    "pieFirstSeries": "A pie chart shows only the first series.",
+    "colors": "Colors",
+    "seriesColor": "Color of {name}"
   },
   "diagram": {
     "editText": "Edit text…",

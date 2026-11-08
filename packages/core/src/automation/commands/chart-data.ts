@@ -179,13 +179,21 @@ export function setChartData(
     else if (workbookState(pkg, frame, read.model) === 'embedded')
       throw new CommandRefusal('errors.chartData.workbook');
   }
+  writeChartPart(batch, frame.part, chartSpace);
+}
+
+/**
+ * Write a chart part again whole, from its new `c:chartSpace`. Throws `CommandRefusal` when a
+ * value cannot be written as XML.
+ */
+export function writeChartPart(batch: OpBatch, part: string, chartSpace: Element): void {
   let xml: string;
   try {
-    xml = serializeXmlPart({ partName: frame.part, root: chartSpace, nextId: 0 });
+    xml = serializeXmlPart({ partName: part, root: chartSpace, nextId: 0 });
   } catch {
     throw new CommandRefusal('errors.chartData.invalidText');
   }
   // As bytes, as the reader keeps a chart part: a collaboration peer and a reopened copy then
   // hold the same part, with its attributes in the order written.
-  replacePart(batch, frame.part, { base64: toBase64(new TextEncoder().encode(xml)) });
+  replacePart(batch, part, { base64: toBase64(new TextEncoder().encode(xml)) });
 }

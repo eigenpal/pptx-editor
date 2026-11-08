@@ -144,7 +144,7 @@ export const CHROME_MENUS: readonly ChromeMenu[] = [
     id: 'insert',
     labelKey: 'menu.insert',
     entries: [
-      // The order: New Slide, then Text Box, Table, Picture, Shape (Line sits in the Shape menu).
+      // The order: New Slide, then Text Box, Table, Picture, Shape, Line, Chart, and Equation.
       // New Slide adds a slide on the next layout, as the slide context menu's row; Table opens
       // the size grid.
       {
@@ -157,6 +157,7 @@ export const CHROME_MENUS: readonly ChromeMenu[] = [
       item('insert.image', 'menu.picture'),
       item('insert.shape', 'menu.shape'),
       item('insert.line', 'menu.line'),
+      item('insert.chart', 'menu.chart'),
       item('insert.equation', 'menu.equation'),
       SEPARATOR,
       item('text.link', 'menu.link', 'contextMenu.shortcuts.link'),

@@ -80,6 +80,7 @@ import { MAX_RESOLVER_FAMILIES } from '@pptx-editor.dev/core/editor';
 import { MenuNamedRow } from '@pptx-editor.dev/core/editor';
 import { MenuRowPartName } from '@pptx-editor.dev/core/editor';
 import { MouseEvent as MouseEvent_2 } from 'react';
+import { PaneRequest } from '@pptx-editor.dev/core/editor';
 import { ParagraphDialogFields } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatCommand } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatRead } from '@pptx-editor.dev/core/editor';
@@ -973,6 +974,8 @@ export interface PaneProps {
     readonly style?: CSSProperties;
 }
 
+export { PaneRequest }
+
 // @public
 export const ParagraphDialog: typeof ParagraphDialogRoot & {
     Header: (props: DialogPartProps) => ReactNode;
@@ -1688,6 +1691,7 @@ export interface ToolbarNamedParts {
     readonly ChangeCase: ToolbarSlotPartComponent;
     readonly CharacterSpacing: ToolbarSlotPartComponent;
     readonly ChartEditData: ToolbarPartComponent;
+    readonly ChartInsert: ToolbarSlotPartComponent;
     readonly ClearFormatting: ToolbarPartComponent;
     readonly CollapseAllSections: ToolbarPartComponent;
     readonly Columns: ToolbarSlotPartComponent;

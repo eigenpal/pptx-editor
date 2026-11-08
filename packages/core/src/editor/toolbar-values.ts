@@ -4,6 +4,7 @@
 // not listed takes `unknown`, as before. DOCX Editor commit adf0e178.
 
 import type {
+  ChartType,
   ColorChoice,
   FontFormatCommand,
   ParagraphFormatCommand,
@@ -84,6 +85,8 @@ export interface ToolbarValueMap {
   /** A preset geometry name (`rect`). */
   'insert.shape': string;
   'insert.line': LineKind;
+  /** The type of the new chart. */
+  'insert.chart': ChartType;
   'shape.fill': ColorChoice | null;
   'shape.lineColor': ColorChoice | null;
   /** Points. */

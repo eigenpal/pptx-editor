@@ -97,6 +97,8 @@ export interface ToolbarNamedParts {
   readonly Shapes: ToolbarSlotPartComponent;
   /** `insert.image`. */
   readonly ImageInsert: ToolbarPartComponent;
+  /** `insert.chart`: the chart types; a pick inserts a chart and opens the Chart tab. */
+  readonly ChartInsert: ToolbarSlotPartComponent;
   /** `insert.equation`: opens the Equation dialog. */
   readonly Equation: ToolbarPartComponent;
   /** `shape.fill`. */

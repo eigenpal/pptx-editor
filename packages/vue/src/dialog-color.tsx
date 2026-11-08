@@ -11,6 +11,7 @@ import {
   colorPickLabel,
   colorPickOf,
   colorPicks,
+  focusCurrentSwatch,
   renderedColorOf,
   type ColorPick,
 } from '@pptx-editor.dev/core/editor';
@@ -33,6 +34,8 @@ export const ColorField = dialogControl(
       seed: { type: String as PropType<ColorPick>, default: undefined },
       /** The color the selection has now (`#RRGGBB`): the swatch of "Current color" shows it. */
       current: { type: String as PropType<string | null>, default: null },
+      /** The automatic color (`#RRGGBB`), when the field knows it: the swatch of `auto` shows it. */
+      automatic: { type: String as PropType<string | null>, default: null },
       disabled: { type: Boolean, default: false },
       className: { type: String, default: undefined },
       onChange: { type: Function as PropType<(pick: ColorPick) => void>, required: true as const },
@@ -54,7 +57,10 @@ export const ColorField = dialogControl(
         (now, _old, onCleanup) => {
           if (!now) return;
           document.addEventListener('pointerdown', away, true);
-          panel.value?.querySelector<HTMLElement>('button')?.focus();
+          focusCurrentSwatch(
+            panel.value,
+            renderedColorOf(props.value, rows.value, props.current, props.automatic)
+          );
           onCleanup(() => document.removeEventListener('pointerdown', away, true));
         },
         { flush: 'post' }
@@ -64,7 +70,7 @@ export const ColorField = dialogControl(
         button.value?.focus();
       };
       return () => {
-        const rendered = renderedColorOf(props.value, rows.value, props.current);
+        const rendered = renderedColorOf(props.value, rows.value, props.current, props.automatic);
         const moreLabel = t('colors.moreColors', { field: props.label });
         return (
           <div class={['pptx-color-field', props.className].filter(Boolean).join(' ')}>

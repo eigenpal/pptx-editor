@@ -653,6 +653,7 @@ export type {
   RibbonTabId,
   ShapeStyleChoice,
   ShapeStyleValue,
+  PaneRequest,
   SidePanelTab,
   SlideBackground,
   SlideLayoutSummary,

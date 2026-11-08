@@ -71,7 +71,7 @@ const ARRANGE: RibbonGroupPick = {
 /** The Insert group in the reference order: pictures, shapes, then text box. */
 const INSERT: RibbonGroupPick = {
   id: 'insert',
-  controls: ['image', 'shape', 'line', 'textBox', 'equation'],
+  controls: ['image', 'shape', 'line', 'textBox', 'chart', 'equation'],
 };
 
 /**

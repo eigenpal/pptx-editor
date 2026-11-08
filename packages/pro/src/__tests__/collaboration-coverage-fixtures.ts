@@ -548,6 +548,30 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
     },
   },
 
+  // A new chart: its chart part, its workbook, and the frame, with part names from the actor.
+  insertChart: {
+    command: () => ({ type: 'insertChart', chartType: 'lineMarkers' }),
+  },
+  // A type change, a format change, and a color write the chart part again whole.
+  setChartType: {
+    deck: () => buildPptx(chartDataDeck()),
+    arrange: select('Chart 1'),
+    command: () => ({ type: 'setChartType', chartType: 'barStacked' }),
+  },
+  setChartFormat: {
+    deck: () => buildPptx(chartDataDeck()),
+    arrange: select('Chart 1'),
+    command: () => ({
+      type: 'setChartFormat',
+      format: { title: 'Revenue', legend: 'right', dataLabels: true, valueAxisTitle: 'Units' },
+    }),
+  },
+  setChartColor: {
+    deck: () => buildPptx(chartDataDeck()),
+    arrange: select('Chart 1'),
+    command: () => ({ type: 'setChartColor', index: 2, color: { theme: 'accent6' } }),
+  },
+
   // Equations: the math, and its plain-text fallback, in one Markup Compatibility wrapper.
   insertEquation: {
     command: () => ({ type: 'insertEquation', linear: 'x=(-b\\pm\\sqrt(b^2-4ac))/(2a)' }),

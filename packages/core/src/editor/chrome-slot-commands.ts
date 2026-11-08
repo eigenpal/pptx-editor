@@ -20,6 +20,7 @@ import { shapeFormatSlotCommand } from './chrome-shapes.ts';
 import { SLIDE_SLOT_COMMANDS } from './chrome-slide-groups.ts';
 import { TABLE_SLOT_COMMANDS, tableCommandForSlotValue } from './chrome-table.ts';
 import { isColorChoice } from '../automation/commands/style-commands.ts';
+import { isChartType } from '../automation/commands/chart-type.ts';
 import { imageSlotCommand } from './chrome-picture.ts';
 import { DIAGRAM_SLOT_COMMANDS } from './chrome-diagram.ts';
 import { LINE_DASHES } from './line-presets.ts';
@@ -148,6 +149,8 @@ export function commandForSlotValue(
       return typeof value === 'string' ? { type: 'insertShape', preset: value } : null;
     case 'insert.equation':
       return typeof value === 'string' ? { type: 'insertEquation', linear: value } : null;
+    case 'insert.chart':
+      return isChartType(value) ? { type: 'insertChart', chartType: value } : null;
     case 'shape.fill':
       return isColorChoice(value) || value === null ? { type: 'setShapeFill', color: value } : null;
     case 'shape.lineColor':

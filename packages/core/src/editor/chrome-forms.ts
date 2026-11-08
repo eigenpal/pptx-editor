@@ -51,6 +51,61 @@ export function syncSwatchTabStops(grid: HTMLElement | null): void {
   for (const b of all) b.tabIndex = b === stop ? 0 : -1;
 }
 
+/** `#RRGGBB` as the `rgb(r, g, b)` text that a browser gives back for an inline color. */
+function rgbText(hex: string): string | null {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  return m
+    ? `rgb(${m
+        .slice(1)
+        .map((h) => parseInt(h, 16))
+        .join(', ')})`
+    : null;
+}
+
+/**
+ * Focus the chosen swatch of an open color grid, else the first swatch of `shown` (the color
+ * that the field's button shows, such as an automatic color), else its first button, and scroll
+ * the panel into view. The panel can hold more than one grid. @internal
+ */
+export function focusCurrentSwatch(panel: HTMLElement | null, shown: string | null = null): void {
+  const rgb = shown ? rgbText(shown) : null;
+  const buttons = [...(panel?.querySelectorAll<HTMLElement>('button') ?? [])];
+  const to =
+    panel?.querySelector<HTMLElement>('button[aria-pressed="true"]') ??
+    (rgb ? buttons.find((b) => b.style.background === rgb) : undefined) ??
+    buttons[0];
+  to?.focus({ preventScroll: true });
+  // The whole panel, with its custom color field, scrolls into view: the grid can open at the
+  // bottom of a side panel.
+  panel?.scrollIntoView?.({ block: 'nearest' });
+}
+
+/**
+ * After a row of the Chart tab is added or removed, move the focus to row `index` of `list`
+ * (`data-chart-row`), else to its last row: its first field (the summary of a closed card),
+ * with the text selected for a new row. `from` is the tab or an element in it; the focus moves
+ * after the tab renders again, so a keyboard user keeps their place. @internal
+ */
+export function focusChartRow(
+  from: Element | null,
+  list: 'category' | 'series',
+  index: number,
+  select = false
+): void {
+  const pane = from?.closest('.pptx-chart-pane');
+  const view = pane?.ownerDocument.defaultView;
+  if (!pane || !view) return;
+  view.requestAnimationFrame(() => {
+    const rows = pane.querySelectorAll(`[data-chart-row="${list}"]`);
+    const row = rows[Math.min(index, rows.length - 1)];
+    // A closed series card shows its summary only.
+    const closed = row instanceof view.HTMLDetailsElement && !row.open;
+    const field = row?.querySelector<HTMLElement>(closed ? 'summary' : 'input:not([disabled])');
+    field?.focus();
+    if (select && field instanceof view.HTMLInputElement) field.select();
+  });
+}
+
 /**
  * The arrow keys, Home, and End in a roving swatch grid, as a WAI-ARIA grid of buttons: they
  * move by column and row, and the Tab stop moves with the focus. @internal
@@ -120,21 +175,27 @@ export function colorPickLabel(t: Translate, pick: ColorPick): string {
   if (pick === 'auto') return t('colors.automatic');
   if (pick === 'keep') return t('colors.keep');
   if (pick === 'mixed') return t('colors.mixed');
-  if (pick.startsWith('#')) return pick;
+  if (pick.startsWith('#')) {
+    const standard = STANDARD_COLORS.find((s) => s.color.toUpperCase() === pick.toUpperCase());
+    return standard ? t(`colors.standard.${standard.name}`) : pick;
+  }
   const [slot, shift] = pick.split(':') as [ThemeColorSlot, string?];
   return swatchName(t, { slot, shift: Number(shift ?? 0), color: '' });
 }
 
 /**
  * A color pick as the slide renders it, or null for the inherited color. No change (`keep`)
- * shows `current`, the color the selection has now, so its swatch is never empty. @internal
+ * shows `current`, the color the selection has now, so its swatch is never empty. The automatic
+ * color (`auto`) shows `automatic` when the field knows it (a chart series). @internal
  */
 export function renderedColorOf(
   pick: ColorPick,
   rows: readonly (readonly ThemeSwatch[])[],
-  current: string | null = null
+  current: string | null = null,
+  automatic: string | null = null
 ): string | null {
   if (pick === 'keep') return current;
+  if (pick === 'auto') return automatic;
   const choice = colorChoiceOf(pick);
   if (choice === null) return null;
   if (typeof choice === 'string') return choice;

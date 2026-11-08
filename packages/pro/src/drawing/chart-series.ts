@@ -60,16 +60,15 @@ export function isLineKind(plot: ChartPlot): boolean {
   );
 }
 
-/** Whether a plot colours each point of its one series by itself. */
+/**
+ * Whether a plot colours each point by itself. A pie, doughnut, or of-pie chart does with any
+ * number of series: it draws its first series, one colour per slice. A bar chart does only with
+ * one series.
+ */
 export function variesByPoint(plot: ChartPlot): boolean {
-  return (
-    plot.varyColors &&
-    plot.series.length === 1 &&
-    (plot.kind === 'pie' ||
-      plot.kind === 'doughnut' ||
-      plot.kind === 'bar' ||
-      plot.kind === 'ofPie')
-  );
+  if (!plot.varyColors) return false;
+  if (plot.kind === 'pie' || plot.kind === 'doughnut' || plot.kind === 'ofPie') return true;
+  return plot.kind === 'bar' && plot.series.length === 1;
 }
 
 function markerLook(
