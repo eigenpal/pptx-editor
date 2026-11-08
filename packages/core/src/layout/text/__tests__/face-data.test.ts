@@ -304,11 +304,20 @@ describe('cmap coverage', () => {
   test('a character the cmap lacks is measured as missing, not as the glyph shaping chose', () => {
     const m = createHarfBuzzMeasurer([sans()]);
     const face = m.resolve({ family: 'Liberation Sans', bold: false, italic: false });
-    const hyphen = m.advances(face, 'a‐b');
-    const nonBreaking = m.advances(face, 'a‑b');
-    expect(nonBreaking[1]).toBe(0.5);
-    expect(nonBreaking[1]).not.toBe(hyphen[1]);
-    expect([nonBreaking[0], nonBreaking[2]]).toEqual([hyphen[0], hyphen[2]]);
+    // U+226E is not in the cmap; HarfBuzz draws it as '<' and a combining long solidus.
+    const lessThan = m.advances(face, 'a<b');
+    const notLess = m.advances(face, 'a\u226eb');
+    expect(notLess[1]).toBe(0.5);
+    expect(notLess[1]).not.toBe(lessThan[1]);
+    expect([notLess[0], notLess[2]]).toEqual([lessThan[0], lessThan[2]]);
+  });
+
+  test("a missing hyphen or dash is measured at the face's own hyphen advance", () => {
+    const m = createHarfBuzzMeasurer([sans()]);
+    const face = m.resolve({ family: 'Liberation Sans', bold: false, italic: false });
+    const hyphen = m.advances(face, '\u2010')[0]!;
+    expect(hyphen).toBeCloseTo(682 / 2048, 9);
+    expect(m.advances(face, 'a\u2011b')[1]).toBe(hyphen);
   });
 
   test('spaces and default ignorable characters keep the advance shaping gives them', () => {

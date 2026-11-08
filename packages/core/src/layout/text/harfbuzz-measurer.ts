@@ -361,6 +361,33 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     return cmapHas(lf, lf.cmap, cp) || SHAPER_DRAWS.test(String.fromCodePoint(cp));
   };
 
+  // The face's own hyphen advance in em (U+2010, else U+002D), or null when it has neither.
+  const hyphens = new WeakMap<LoadedFace, number | null>();
+  const hyphenAdvance = (lf: LoadedFace): number | null => {
+    let known = hyphens.get(lf);
+    if (known === undefined) {
+      const cp = lf.cmap && !cmapHas(lf, lf.cmap, 0x2010) ? 0x2d : 0x2010;
+      const glyph = lf.font.nominalGlyph(cp) || lf.font.nominalGlyph(0x2d);
+      known = glyph ? lf.font.glyphHAdvance(glyph) / lf.upem : null;
+      hyphens.set(lf, known);
+    }
+    return known;
+  };
+
+  /**
+   * The estimated advance of a character the face lacks. A hyphen or dash (U+2010 to U+2013)
+   * takes the face's own hyphen advance, as a browser or the PDF fallback draws a hyphen of
+   * about that width: U+2011 in Liberation Sans is 0.333 em, not 0.5 em. Of the other
+   * characters, East Asian ones are full width (1 em), and the rest half width.
+   */
+  const missingAdvance = (lf: LoadedFace, cp: number): number => {
+    if (cp >= 0x2010 && cp <= 0x2013) {
+      const hyphen = hyphenAdvance(lf);
+      if (hyphen !== null) return hyphen;
+    }
+    return isIdeographic(cp) ? 1 : 0.5;
+  };
+
   const advances = (
     face: ResolvedFace,
     text: string,
@@ -394,14 +421,14 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
       // Glyph 0 is `.notdef`: the face lacks the character, and paint falls back to a system
       // face. A character the face's cmap lacks is missing too, also when HarfBuzz draws it
       // with another of the face's glyphs (U+2010 for U+2011, or a decomposition): paint
-      // draws characters, not HarfBuzz's glyphs. Measure the fallback, not the face's glyph:
-      // East Asian characters are full width (1 em), others half width, once per cluster. An
-      // approximation, listed on the public fidelity page.
+      // draws characters, not HarfBuzz's glyphs. Measure the fallback, not the face's glyph,
+      // once per cluster (`missingAdvance`). An approximation, listed on the public fidelity
+      // page.
       const own = infos[g].codepoint !== 0;
       if (own && (text.charCodeAt(cluster) < 0x80 || covers(lf, text.codePointAt(cluster)!)))
         out[cluster] += positions[g].xAdvance / lf.upem;
       else {
-        out[cluster] += isIdeographic(text.codePointAt(cluster)!) ? 1 : 0.5;
+        out[cluster] += missingAdvance(lf, text.codePointAt(cluster)!);
         estimated = cluster;
       }
     }
