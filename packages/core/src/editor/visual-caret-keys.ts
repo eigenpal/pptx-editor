@@ -1,4 +1,4 @@
-// Adapted from DOCX Editor `packages/core/src/layout/visual-caret-navigation.ts`
+// After DOCX Editor `packages/core/src/layout/visual-caret-navigation.ts`
 // (`horizontalCaretStep`, `visualLineEdge`, `visualWordBoundary`) and
 // `packages/core/src/editor/surface-selection-collapse.ts` at commit adf0e178.
 //

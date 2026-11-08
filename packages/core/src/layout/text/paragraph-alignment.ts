@@ -1,4 +1,4 @@
-// Adapted from DOCX Editor `packages/core/src/layout/paragraph-alignment.ts` at commit adf0e178:
+// After DOCX Editor `packages/core/src/layout/paragraph-alignment.ts` at commit adf0e178:
 // `paragraphAlignment`, the physical alignment of a paragraph. The source reads `w:jc`, whose
 // `left` and `right` are the leading and trailing edges of a bidi paragraph. DrawingML
 // `a:pPr/@algn` names physical edges instead: in the `rtl-text` reference PDF (slides 1 and

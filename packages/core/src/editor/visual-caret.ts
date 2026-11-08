@@ -1,4 +1,4 @@
-// Adapted from DOCX Editor `packages/core/src/layout/visual-caret-navigation.ts` and
+// After DOCX Editor `packages/core/src/layout/visual-caret-navigation.ts` and
 // `packages/core/src/editor/surface-selection-collapse.ts` at commit adf0e178.
 //
 // The caret on a line in visual order (`Line.bidi`). Offsets stay logical; a stop is one place

@@ -1,6 +1,6 @@
 // The vertical extent that an equation claims on its line.
 //
-// Adapted from DOCX Editor (eigenpal/docx-editor, packages/core/src/layout/equation-line-extent.ts
+// After DOCX Editor (eigenpal/docx-editor, packages/core/src/layout/equation-line-extent.ts
 // at adf0e178c, Apache-2.0), `fitEquationLineExtent`: the line keeps the font box of the
 // equation's base text (the band that the line model already gives it), and every other part
 // claims for itself at its own position. A glyph piece claims its ink, plus the math leading

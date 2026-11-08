@@ -1,7 +1,8 @@
-// The highlight of a text range, as rectangles per laid-out line in the text frame. Shared by
-// the local selection and the selections of collaboration peers. Editing chrome only: never
-// part of the slide paint. On a line in visual order (`Line.bidi`), the range covers one band
-// for each stretch that stands together on screen (DOCX Editor `selection-rects.ts`).
+// The highlight of a text range, as rectangles per laid-out line in the text frame. Shared by the
+// local selection and the selections of collaboration peers. Editing chrome only: never part of the
+// slide paint. On a line in visual order (`Line.bidi`), the range covers one band for each stretch
+// that stands together on screen (DOCX Editor `packages/core/src/layout/selection-rects.ts` at
+// adf0e178).
 
 import type { TextPoint } from '../contracts/index.ts';
 import type { LayoutItem } from '../layout/index.ts';

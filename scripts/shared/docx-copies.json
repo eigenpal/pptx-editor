@@ -484,6 +484,12 @@
     "commit": "adf0e178"
   },
   {
+    "file": "packages/core/src/editor/surface-text-selection.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/layout/selection-rects.ts"],
+    "commit": "adf0e178"
+  },
+  {
     "file": "packages/core/src/editor/text-drag.ts",
     "kind": "reference",
     "source": ["packages/core/src/editor/surface-pointer.ts"],
@@ -517,9 +523,33 @@
     "commit": "adf0e178"
   },
   {
+    "file": "packages/core/src/editor/visual-caret-keys.ts",
+    "kind": "reference",
+    "source": [
+      "packages/core/src/layout/visual-caret-navigation.ts",
+      "packages/core/src/editor/surface-selection-collapse.ts"
+    ],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/editor/visual-caret.ts",
+    "kind": "reference",
+    "source": [
+      "packages/core/src/layout/visual-caret-navigation.ts",
+      "packages/core/src/editor/surface-selection-collapse.ts"
+    ],
+    "commit": "adf0e178"
+  },
+  {
     "file": "packages/core/src/layout/__tests__/harfbuzz-wasm-binary.test.ts",
     "kind": "copied",
     "source": ["packages/core/src/layout/__tests__/harfbuzz-wasm-binary.test.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/__tests__/numbering-format-scripts.test.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/layout/__tests__/numbering-format-scripts.test.ts"],
     "commit": "adf0e178"
   },
   {
@@ -577,6 +607,18 @@
     "commit": "adf0e178"
   },
   {
+    "file": "packages/core/src/layout/text/bidi-line.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/layout/bidi-trailing-spaces.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/text/bidi.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/layout/bidi.ts"],
+    "commit": "adf0e178"
+  },
+  {
     "file": "packages/core/src/layout/text/face-line-metrics.ts",
     "kind": "reference",
     "source": ["packages/core/src/layout/symbol-face-metrics.ts"],
@@ -586,6 +628,71 @@
     "file": "packages/core/src/layout/text/harfbuzz-measurer.ts",
     "kind": "reference",
     "source": ["packages/core/src/layout/harfbuzz-shaper.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/text/math-ink.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/layout/equation-ink.ts"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/core/src/layout/text/math-layout.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/layout/equation-layout.ts"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/core/src/layout/text/math-line-extent.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/layout/equation-line-extent.ts"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/core/src/layout/text/math-scripts.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/layout/equation-scripts.ts"],
+    "commit": "adf0e178c"
+  },
+  {
+    "file": "packages/core/src/layout/text/numbering-format-scripts.ts",
+    "kind": "copied",
+    "source": ["packages/core/src/layout/numbering-format-scripts.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/text/paragraph-alignment.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/layout/paragraph-alignment.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/text/rtl-paragraph.ts",
+    "kind": "adapted",
+    "source": [
+      "packages/core/src/layout/rtl-paragraph.ts",
+      "packages/core/src/layout/rtl-letter.ts",
+      "packages/core/src/layout/arabic-script-language.ts",
+      "packages/core/src/layout/line-end-whitespace.ts"
+    ],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/text/run-kerning.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/layout/run-kerning.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/text/sfnt-cmap-coverage.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/layout/sfnt-cmap-coverage.ts"],
+    "commit": "adf0e178"
+  },
+  {
+    "file": "packages/core/src/layout/text/sfnt-strikeout-metrics.ts",
+    "kind": "adapted",
+    "source": ["packages/core/src/layout/sfnt-strikeout-metrics.ts"],
     "commit": "adf0e178"
   },
   {

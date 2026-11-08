@@ -1,9 +1,10 @@
 // Adapted from DOCX Editor `packages/core/src/layout/rtl-paragraph.ts` at commit adf0e178, with
-// `rtl-letter.ts`, `arabic-script-language.ts`, and `line-end-whitespace.ts` of the same commit.
-// The source reads run directions from `w:rtl`, resolves each run-direction group on its own,
-// and works on styled spans. Slide runs have no direction, so a paragraph resolves as one
-// UAX #9 paragraph, a run that reads against the paragraph resolves on its own like an
-// isolate (`isolateRunLevels`), and this module works on the UTF-16 units of a paragraph.
+// `packages/core/src/layout/rtl-letter.ts`, `packages/core/src/layout/arabic-script-language.ts`,
+// and `packages/core/src/layout/line-end-whitespace.ts` of the same commit. The source reads run
+// directions from `w:rtl`, resolves each run-direction group on its own, and works on styled spans.
+// Slide runs have no direction, so a paragraph resolves as one UAX #9 paragraph, a run that reads
+// against the paragraph resolves on its own like an isolate (`isolateRunLevels`), and this module
+// works on the UTF-16 units of a paragraph.
 
 import type { ResolvedParagraph } from '../../cascade/index.ts';
 import { bidiAlgorithm } from './bidi.ts';

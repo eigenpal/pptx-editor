@@ -429,7 +429,7 @@ export function localPaths(tracked: readonly string[]): (token: string) => boole
 
 /**
  * The least line overlap (`lineOverlap`) of an `adapted` file with its sources. In the manifest,
- * the lowest overlap of an adapted file is 0.205, about twice the floor. A wrong source overlaps
+ * the lowest overlap of an adapted file is 0.190, about twice the floor. A wrong source overlaps
  * less: `chart-number-format.ts` for `chart-axes.ts` gives 0.022, and for `chart-scale.ts` 0.000.
  * A file under the floor follows a design and is a `reference`, or names a wrong source.
  */

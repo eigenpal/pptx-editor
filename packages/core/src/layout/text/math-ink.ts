@@ -2,7 +2,7 @@
 // clearances between drawn glyphs, not between font boxes, because a font box reaches far above
 // and below its glyphs.
 //
-// Adapted from DOCX Editor (eigenpal/docx-editor, packages/core/src/layout/equation-ink.ts at
+// After DOCX Editor (eigenpal/docx-editor, packages/core/src/layout/equation-ink.ts at
 // adf0e178c, Apache-2.0): the ink of a glyph is read once per face and character from its
 // outline, and a glyph with no outline gives its font box instead, so clearances stay
 // conservative. PPTX Editor reads the outline from the face that draws the glyph: the run's

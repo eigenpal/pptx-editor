@@ -2,16 +2,16 @@
 // filled marks (rules, the radical sign, stretched delimiters, braces). DOM-free; the measurer
 // is injected, as for text. All lengths are EMU, with y up from the math baseline.
 //
-// The rules follow TeX's math layout: atoms with classes and the spaces between them, script
-// sizes (73 % and 60 %, rounded down to half a point), cramped styles under radicals and in
-// subscripts, and shifts that keep a minimum gap. The model of scripts (`math-scripts.ts`), ink
+// The rules follow TeX's math layout: atoms with classes and the spaces between them, script sizes
+// (73 % and 60 %, rounded down to half a point), cramped styles under radicals and in subscripts,
+// and shifts that keep a minimum gap. The model of scripts (`math-scripts.ts`), ink
 // (`math-ink.ts`), and line extent (`math-line-extent.ts`) is DOCX Editor's equation layout
-// (eigenpal/docx-editor, packages/core/src/layout/equation-*.ts at adf0e178c, Apache-2.0), with
-// its script sizes; each module names the constants that the reference PDFs change. The
-// constants are measured on the reference PDF of the `equations` fixture (STIX Two Math, 18 pt). Where a run's font is not available,
-// the runs draw in STIX Two Math or Latin Modern Math when the host has them, else in the serif
-// text face, with italic letters instead of math alphanumerics. The known approximation
-// `equations` lists what differs.
+// (eigenpal/docx-editor, packages/core/src/layout/equation-layout.ts and its other `equation-*.ts`
+// modules at adf0e178c, Apache-2.0), with its script sizes; each module names the constants that
+// the reference PDFs change. The constants are measured on the reference PDF of the `equations`
+// fixture (STIX Two Math, 18 pt). Where a run's font is not available, the runs draw in STIX Two
+// Math or Latin Modern Math when the host has them, else in the serif text face, with italic
+// letters instead of math alphanumerics. The known approximation `equations` lists what differs.
 
 import type { PathCommand } from '@eigenpal/ooxml-core';
 import type { MathNode, MathRow, MathRun, MathStyle, MathZone } from '../../cascade/math.ts';
