@@ -147,7 +147,7 @@ Each item below is a place where the renderer does not yet follow the specificat
 - **Hyperlink text.** Link text draws in the theme `hlink` color with a single underline, unless the run states otherwise.
 - **Dash complexity.** Shape and picture outlines and table borders draw solid when their geometry could require more than 100,000 dash segments. The engine estimates this count from curve control polygons. SVG and PDF use the same result. Save preserves the original dash pattern.
 - **Compound lines.** The widths of the bands of `dbl`, `thickThin`, `thinThick`, and `tri` lines follow fixed fractions. The specification gives no fractions.
-- **Paths without a move.** A custom geometry path draws nothing before its first `a:moveTo`, so a path with no `a:moveTo` draws nothing. When a later `a:moveTo` follows, the drawing starts there.
+- **Paths without a move.** A custom geometry path whose first drawing command is not `a:moveTo` draws nothing, also when a later `a:moveTo` follows. Each path of a shape follows this rule on its own.
 - **Text in flipped shapes.** Glyphs are never mirrored. Under a net horizontal flip, text stays upright. Under a net vertical flip, it turns 180°.
 - **Content placeholders.** `pic`, `tbl`, and `chart` placeholders inherit the master's body placeholder and its text style. `clipArt`, `dgm`, and `media` placeholders inherit no master placeholder.
 - **Small caps.** Lowercase letters draw at 80 % of the size.
