@@ -124,6 +124,29 @@ describe('text warp layout', () => {
     }
   });
 
+  test('each pair of a warp with two pairs keeps the text size of the largest pair', () => {
+    // textDeflateInflate has two pairs: one line in each. The short line grows about its center
+    // to the bounds of the long line, so it does not stretch to the ends of its band.
+    const { text } = lay(
+      warpOf('textDeflateInflate'),
+      para(run('Long line'), '<a:pPr algn="ctr"/>') + para(run('ab'), '<a:pPr algn="ctr"/>')
+    );
+    const span = (line: number): [number, number] => {
+      let [a, b] = [Infinity, -Infinity];
+      for (const w of text.warped ?? [])
+        if (w.line === line)
+          for (const c of w.glyphs) if (c.op !== 'Z') [a, b] = [Math.min(a, c.x), Math.max(b, c.x)];
+      return [a, b];
+    };
+    const [l0, r0] = span(0);
+    const [l1, r1] = span(1);
+    // The long line spans the band. The short one keeps about its width relative to it (0.9 em
+    // of ink against 4.15 em); the curved band edge moves it a little.
+    expect(r0 - l0).toBeCloseTo(CX, -3);
+    expect((r1 - l1) / (r0 - l0)).toBeCloseTo(0.9 / 4.15, 1);
+    expect((l1 + r1) / 2).toBeCloseTo((l0 + r0) / 2, -3);
+  });
+
   test('a picture bullet maps its corners into the warp', () => {
     const bullet =
       '<a:pPr marL="342900" indent="-342900"><a:buBlip><a:blip r:embed="rIdBu"/></a:buBlip></a:pPr>';

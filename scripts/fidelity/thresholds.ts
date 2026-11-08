@@ -221,7 +221,6 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'shape-effects-presets/2': ['line-breaks'],
     'shape-effects-presets/3': ['line-breaks'],
     'text-direction/1': ['pixels', 'extra-text'],
-    'text-warp/3': ['pixels'],
     'three-d-effects/1': ['pixels'],
     'three-d-effects/2': ['pixels'],
     'three-d-effects/3': ['pixels'],
