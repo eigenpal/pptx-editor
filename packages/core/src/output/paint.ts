@@ -385,7 +385,8 @@ function paintGeometry(
   doc: Document,
   item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>,
   shapeCtx: PaintContext,
-  groupScale: number
+  groupScale: number,
+  front?: Matrix
 ): SVGElement[] {
   const ctx = withFillMatrix(item, shapeCtx);
   const el = item.element;
@@ -394,10 +395,13 @@ function paintGeometry(
   const line = item.paintLine ?? el.line;
   const stroke = line ? strokeAttrs(line, w, h, ctx, groupScale) : { stroke: 'none' };
   const paintFor = shapePaints(item, ctx);
-  // A pattern fill of a turned, flipped, or scaled box draws in slide space (`slideSpaceFill`).
+  // A pattern fill of a turned, flipped, or scaled box draws in slide space (`slideSpaceFill`),
+  // also under the turned face of a 3-D camera (`front`), which the body's parent applies.
   const shown = el.fill.type === 'group' ? ctx.groupFill : el.fill;
   const slideFill =
-    item.kind === 'shape' && shown?.type === 'pattern' ? slideSpaceFill(item.matrix) : undefined;
+    item.kind === 'shape' && shown?.type === 'pattern'
+      ? slideSpaceFill(item.matrix, front)
+      : undefined;
   const fillPaintFor = slideFill ? shapePaints(item, shapeCtx) : paintFor;
   const fillElement = (
     path: GeometryPath,
@@ -735,7 +739,11 @@ export function paintItem(
       }
       const body = svg(doc, 'g', { transform: matrixAttr(item.matrix) });
       if (threeD) for (const node of facetElements(doc, threeD.under, SEAM)) body.appendChild(node);
-      for (const node of paintGeometry(doc, item, local, parentScale)) body.appendChild(node);
+      // A turned camera turns the face and its text about the shape's center, and the regions
+      // of the effects that copy the face turn with it.
+      const front = threeD?.front.some((v, i) => v !== IDENTITY[i]) ? threeD.front : undefined;
+      for (const node of paintGeometry(doc, item, local, parentScale, front))
+        body.appendChild(node);
       // The bevel shades the geometry, under the text (ECMA-376 Part 1, 20.1.5.1).
       if (threeD) for (const node of facetElements(doc, threeD.over, SEAM)) body.appendChild(node);
       const bodyFx =
@@ -744,9 +752,6 @@ export function paintItem(
           : null;
       if (bodyFx) effectDefs(ctx.defs, bodyFx.defs);
       const copies = effects?.outerShadow || (pro && (effects?.reflection || effects?.glow));
-      // A turned camera turns the face and its text about the shape's center, and the regions
-      // of the effects that copy the face turn with it.
-      const front = threeD?.front.some((v, i) => v !== IDENTITY[i]) ? threeD.front : undefined;
       let cornerCache: { x: number; y: number }[] | undefined;
       const cornersOf = (): { x: number; y: number }[] =>
         (cornerCache ??= front

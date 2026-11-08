@@ -4,7 +4,8 @@ import { buildPptx, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { resolveSlide } from '../../cascade/index.ts';
 import { createFixedMeasurer, layoutSlide } from '../../layout/index.ts';
 import { readPptx } from '../../store/index.ts';
-import { compoundBands } from '../compound-lines.ts';
+import type { PathCommand } from '../../layout/index.ts';
+import { compoundBandLines, compoundBands, MAX_OFFSET_BAND_POINTS } from '../compound-lines.ts';
 import { paintSlide } from '../index.ts';
 import {
   PATTERN_PIXEL,
@@ -224,5 +225,24 @@ describe('compound line paint', () => {
     const masked = [...root.querySelectorAll('mask path[stroke-dasharray]')];
     expect(masked.length).toBeGreaterThan(0);
     for (const p of masked) expect(p.getAttribute('d')).toMatch(/^M0 914400L0 0/);
+  });
+});
+
+describe('offset band limits', () => {
+  /** An open zigzag of `n` points with sharp corners. */
+  const zigzag = (n: number): PathCommand[] =>
+    Array.from({ length: n }, (_, i) => ({
+      op: i === 0 ? 'M' : 'L',
+      x: i * 1000,
+      y: i % 2 ? 1000 : 0,
+    }));
+
+  test('round corners count toward the point limit of the bands', () => {
+    // 4,000 input points pass the input limit, but each sharp round corner adds an arc.
+    expect(compoundBandLines(zigzag(4000), 'tri', 60_000, 'round', 4)).toBeNull();
+    const small = compoundBandLines(zigzag(100), 'tri', 60_000, 'round', 4)!;
+    const points = small.flatMap((b) => b.lines).reduce((n, l) => n + l.points.length, 0);
+    expect(points).toBeGreaterThan(300);
+    expect(points).toBeLessThanOrEqual(MAX_OFFSET_BAND_POINTS);
   });
 });
