@@ -34,10 +34,11 @@ export const THRESHOLDS = {
 } as const;
 
 /**
- * Comparison B: the `pptx-to-pdf` PDF against the reference PDF. The pass limits match comparison A where the metric is the same. The screening
- * values only flag a page for review; they are DOCX Editor's
- * (`docx-to-pdf/scripts/evaluation/worker.py`). `worker.py` and `pptx-eval` read these values
- * from `packages/pptx-to-pdf/scripts/evaluation/thresholds.json`, generated from this file.
+ * Comparison B: the `pptx-to-pdf` PDF against the reference PDF. The pass limits match comparison A
+ * where the metric is the same. The screening values only flag a page for review; they are DOCX
+ * Editor's (`packages/docx-to-pdf/scripts/evaluation/worker.py`). `worker.py` and `pptx-eval` read
+ * these values from `packages/pptx-to-pdf/scripts/evaluation/thresholds.json`, generated from this
+ * file. DOCX Editor commit adf0e178.
  */
 export const COMPARISON_B = {
   /** Raster width for the pixel metric, as comparison A. */
@@ -135,22 +136,26 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
   pdfjs: '6.4.299',
   chromium: 'chromium-headless-shell 1248',
   fonts:
-    '@docx-editor.dev/fonts 2.34.0, @docx-editor.dev/fonts-cjk 2.34.0, fixtures/fonts 86f1cf126005',
+    '@docx-editor.dev/fonts 2.34.0, @docx-editor.dev/fonts-cjk 2.34.0, fixtures/fonts f68672445aef',
   deckLines: {
     'alignment-anchor': 19,
     'arrange-flip-hidden': 3,
     autofit: 9,
     'bullets-gallery': 17,
     'bullets-numbering': 21,
+    'chart-data': 13,
     'chart-sizes': 91,
     charts: 58,
     colors: 0,
     'custom-geometry': 0,
+    'diagram-editing': 9,
     diagrams: 20,
     'east-asian-line-breaking': 136,
     'east-asian-theme-fonts': 16,
     'east-asian-typography': 77,
     effects: 4,
+    'equation-lines': 17,
+    equations: 11,
     'fill-fidelity': 0,
     'fills-lines': 0,
     'follow-ups': 0,
@@ -164,6 +169,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'lines-arrows': 0,
     'open-font-families': 8,
     'paragraph-format': 27,
+    'picture-bullets': 24,
     'picture-editing': 0,
     pictures: 0,
     'placeholders-background': 3,
@@ -183,12 +189,19 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     tables: 29,
     'text-direction': 47,
     'text-runs': 11,
+    'text-warp': 0,
+    'three-d-effects': 0,
+    'three-d-turned-effects': 0,
     'vertical-columns': 12,
     'vertical-east-asian': 0,
   },
   slides: {
-    'east-asian-line-breaking/4': ['pixels'],
     'east-asian-typography/2': ['extra-text'],
+    'equation-lines/1': ['baseline'],
+    'equation-lines/2': ['line-breaks', 'baseline', 'extra-text'],
+    'equations/1': ['line-breaks', 'baseline'],
+    'equations/3': ['baseline'],
+    'equations/4': ['line-position'],
     'fill-fidelity/3': ['pixels'],
     'fill-fidelity/4': ['pixels'],
     'fill-fidelity/6': ['pixels'],
@@ -200,7 +213,7 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'picture-editing/1': ['pixels'],
     'picture-editing/2': ['pixels'],
     'pictures/1': ['pixels'],
-    'preserved-content/1': ['pixels', 'line-breaks', 'extra-text'],
+    'preserved-content/1': ['pixels'],
     'rtl-text/1': ['pixels'],
     'rtl-text/2': ['pixels'],
     'rtl-text/3': ['pixels'],
@@ -208,6 +221,12 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'shape-effects-presets/2': ['line-breaks'],
     'shape-effects-presets/3': ['line-breaks'],
     'text-direction/1': ['pixels', 'extra-text'],
+    'text-warp/3': ['pixels'],
+    'three-d-effects/1': ['pixels'],
+    'three-d-effects/2': ['pixels'],
+    'three-d-effects/3': ['pixels'],
+    'three-d-effects/4': ['pixels'],
+    'three-d-turned-effects/1': ['pixels'],
     'vertical-east-asian/1': ['pixels'],
   },
 };

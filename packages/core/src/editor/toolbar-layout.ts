@@ -1,7 +1,8 @@
 // Toolbar layout rules both adapters share: the named parts (`Toolbar.Bold` …), each group's
-// collapse priority, and which groups leave the bar for the More menu when it runs out of
-// width. After DOCX Editor's toolbar (docs/site/content/customization/toolbar.mdx: named parts,
-// `priority`, `pinned`, `overflow`) and core's `toolbar-item-fit.ts`.
+// collapse priority, and which groups leave the bar for the More menu when it runs out of width.
+// After DOCX Editor's toolbar (docs/site/content/customization/toolbar.mdx: named parts,
+// `priority`, `pinned`, `overflow`) and core's `packages/core/src/editor/toolbar-item-fit.ts`. DOCX
+// Editor commit adf0e178.
 //
 // Every export is adapter glue, not a stable API: `@internal`.
 
@@ -48,6 +49,7 @@ export const TOOLBAR_NAMED_PARTS = {
   Line: 'insert.line',
   Shapes: 'insert.shape',
   ImageInsert: 'insert.image',
+  Equation: 'insert.equation',
   ShapeFill: 'shape.fill',
   LineColor: 'shape.lineColor',
   LineWidth: 'shape.lineWidth',
@@ -56,6 +58,7 @@ export const TOOLBAR_NAMED_PARTS = {
   LineDash: 'shape.lineDash',
   ShapeStyles: 'shape.styles',
   ShapeEffects: 'shape.effects',
+  TextEffects: 'shape.textEffects',
   FormatShape: 'shape.properties',
   FormatPainter: 'format.painter',
   Order: 'arrange.order',
@@ -99,6 +102,12 @@ export const TOOLBAR_NAMED_PARTS = {
   ImageCropToShape: 'image.cropToShape',
   ImageCropFit: 'image.cropFit',
   ImageProperties: 'image.properties',
+  ChartEditData: 'chart.editData',
+  DiagramAddAfter: 'diagram.addAfter',
+  DiagramAddBefore: 'diagram.addBefore',
+  DiagramAddBelow: 'diagram.addBelow',
+  DiagramDelete: 'diagram.delete',
+  AddComment: 'review.addComment',
   // The table group: DOCX Editor's names where it has the part (`TableInsert`,
   // `TableCellFill`, `TableBorderTarget`), and the same `Table` prefix for PPTX-only ideas.
   TableInsert: 'table.insert',
@@ -148,13 +157,12 @@ function isPictureGroup(group: Pick<ChromeGroup, 'id' | 'contextual'>): boolean 
 const HOST_PRIORITY = 0;
 
 /**
- * The collapse order of the built-in groups: the first id leaves the bar first. After DOCX
- * Editor's `TOOLBAR_COLLAPSE_ORDER` (packages/core/src/editor/toolbar-fit.ts), where zoom goes
- * first and text formatting and history last: the view and file controls, Find, the clipboard,
- * and the slide controls leave before the formatting groups, and the insert controls leave
- * after the formatting details, so the most used
- * controls (font, size, bold, italic, underline, the paragraph controls) stay on the bar the
- * longest, on the toolbar and on every ribbon tab. @internal
+ * The collapse order of the built-in groups: the first id leaves the bar first. After DOCX Editor's
+ * `TOOLBAR_COLLAPSE_ORDER` (packages/core/src/editor/toolbar-fit.ts at adf0e178), where zoom goes
+ * first and text formatting and history last: the view and file controls, Find, the clipboard, and
+ * the slide controls leave before the formatting groups, and the insert controls leave after the
+ * formatting details, so the most used controls (font, size, bold, italic, underline, the paragraph
+ * controls) stay on the bar the longest, on the toolbar and on every ribbon tab. @internal
  */
 export const TOOLBAR_COLLAPSE_ORDER: readonly ChromeGroup['id'][] = [
   'view',

@@ -6,7 +6,8 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // Legacy PresentationML comments (ECMA-376 Part 1, 19.4): `ppt/commentAuthors.xml` holds
 // `p:cmAuthor id name`, and each slide links to a `p:cmLst` part of `p:cm authorId dt idx`
 // with `p:text`. A reply names its parent in `p15:threadingInfo/p15:parentCm` (a `p15`
-// extension). Modern threaded comments (`p188:`) are not read yet.
+// extension). `reviewModule` reads both formats through `readCommentThreads` of the core
+// editor lane; this function stays for hosts that read only legacy comments.
 
 import {
   attr,
@@ -66,8 +67,11 @@ function descendant(el: Element | undefined, local: string): Element | undefined
   return undefined;
 }
 
+/** An id field with `-`, `#`, and `%` encoded, as the engine's legacy comment ids hold it. */
+const idField = (raw: string): string => encodeURIComponent(raw).replace(/-/g, '%2D');
+
 const commentId = (slidePart: string, authorId: string, idx: string): string =>
-  `${slidePart}#cm-${authorId}-${idx}`;
+  `${slidePart}#cm-${idField(authorId)}-${idField(idx)}`;
 
 /** Every legacy comment of every slide, in slide order and then file order. */
 export function legacyComments(pkg: PptxPackage): ReviewItem[] {

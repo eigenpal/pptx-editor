@@ -24,10 +24,10 @@
 // DOCX Editor's arguments, but the panel shows the link at the caret: a `null` link asks for the
 // URL field, and any other value only asks for reading mode.
 
-import type { Editor, EditorSelection } from '../contracts/index.ts';
+import type { CustomShowSummary, Editor, EditorSelection } from '../contracts/index.ts';
 import { sanitizeHref } from '../store/index.ts';
 import type { Translate } from '@pptx-editor.dev/i18n';
-import { slideLinkIndex, slideLinkLabel } from './link-fields.ts';
+import { customShowLinkLabel, slideLinkIndex, slideLinkLabel } from './link-fields.ts';
 import { surfaceInputOf, surfaceRootOf } from './surface-registry.ts';
 
 /** What the link popup shows. @public */
@@ -120,7 +120,11 @@ function selectionKey(selection: EditorSelection): string {
 function safeHref(url: string): string | null {
   if (!url) return null;
   const safe = sanitizeHref(url);
-  return safe.ok ? safe.href : null;
+  // A relative path (a file or a program the file links to) names nothing a browser can open:
+  // it would resolve against the page. Only an address with a scheme, or a `#` form, opens.
+  if (!safe.ok || !(safe.href.startsWith('#') || /^[a-z][a-z0-9+.-]*:/i.test(safe.href)))
+    return null;
+  return safe.href;
 }
 
 /** The link popup controller of one editor. @internal */
@@ -229,7 +233,7 @@ export function createHyperlinkPopupController(
     openTarget() {
       const href = state.href;
       if (href?.startsWith('#')) {
-        // A slide link shows its slide in the editor.
+        // A slide link shows its slide in the editor. A custom show link has no one slide.
         const snap = editor.snapshot();
         const index = slideLinkIndex(href, snap.currentSlide, snap.slides.length);
         if (index === null) return false;
@@ -369,10 +373,14 @@ export function listenLinkPanelKey(
 }
 
 /** What the root's polite live region says for a state: the open link, or the copy. @internal */
-export function linkPopupAnnouncement(state: HyperlinkPopupState, t: Translate): string {
+export function linkPopupAnnouncement(
+  state: HyperlinkPopupState,
+  t: Translate,
+  shows: readonly CustomShowSummary[] = []
+): string {
   if (state.mode !== 'reading') return '';
-  // A slide link says its slide ("Slide 3"), not its `#` form.
-  const url = slideLinkLabel(t, state.url) || state.url;
+  // A slide link says its slide ("Slide 3"), and a custom show link its show, not a `#` form.
+  const url = slideLinkLabel(t, state.url) || customShowLinkLabel(t, state.url, shows) || state.url;
   return state.copied ? t('link.copied') : t('link.announce', { url });
 }
 

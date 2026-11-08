@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// Copied from DOCX Editor packages/editor-api/scripts/compat-report.mjs at commit 5993bd223945cabdaf3900557d9fb59bfd8c2d8c.
+// Adapted from DOCX Editor packages/editor-api/scripts/compat-report.mjs at commit 5993bd223945cabdaf3900557d9fb59bfd8c2d8c.
 // Changes: the presentation namespace, PPTX Editor names, and paths. DOCX Editor's fixed
-// agent-editing profile (agent-editing-scope.json, renderAgentSummary) has no PPTX counterpart
+// agent-editing profile (packages/editor-api/compat/agent-editing-scope.json,
+// renderAgentSummary) has no PPTX counterpart
 // and is not copied.
 import fs from 'node:fs';
 import path from 'node:path';

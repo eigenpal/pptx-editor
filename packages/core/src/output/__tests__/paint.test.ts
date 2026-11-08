@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { GlobalWindow } from 'happy-dom';
+import { PNG } from 'pngjs';
 import {
   buildPptx,
   cell,
@@ -338,3 +339,77 @@ describe('tab glyph paint', () => {
     expect(root.querySelectorAll('text').length).toBe(0);
   });
 });
+
+describe('warped text', () => {
+  test('a picture bullet draws on the parallelogram that the warp gives it', () => {
+    const pPr =
+      '<a:pPr marL="342900" indent="-342900"><a:buBlip><a:blip r:embed="rIdBu"/></a:buBlip></a:pPr>';
+    const r = readPptx(
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes: shape({
+              id: 2,
+              x: 914_400,
+              y: 914_400,
+              cx: 2_743_200,
+              cy: 1_828_800,
+              bodyPr:
+                '<a:bodyPr wrap="none"><a:prstTxWarp prst="textWave1"><a:avLst/></a:prstTxWarp></a:bodyPr>',
+              text: para(run('Item'), pPr),
+            }),
+            rels: [['rIdBu', R_IMAGE, '../media/image1.png']],
+          },
+        ],
+        media: [{ name: 'image1.png', bytes: pngBytes(), contentType: 'image/png' }],
+      })
+    );
+    if (!r.ok) throw new Error('open failed');
+    const layout = layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer());
+    const url = 'data:image/png;base64,';
+    const root = paintSlide(doc, layout, { images: () => url, idPrefix: 't' });
+    const image = root.querySelector('image[data-run="bullet"]');
+    expect(image?.getAttribute('transform')).toMatch(/^matrix\(/);
+    expect(image?.getAttribute('width')).toBe('1');
+  });
+
+  test('paints every glyph outline when a view culls the lines of other text', () => {
+    const r = readPptx(
+      buildPptx({
+        slides: [
+          {
+            layout: 'blank',
+            shapes: shape({
+              id: 2,
+              x: 914_400,
+              y: 914_400,
+              cx: 2_743_200,
+              cy: 1_828_800,
+              bodyPr:
+                '<a:bodyPr wrap="none"><a:prstTxWarp prst="textWave1"><a:avLst/></a:prstTxWarp></a:bodyPr>',
+              text: para(run('Wave')),
+            }),
+          },
+        ],
+      })
+    );
+    if (!r.ok) throw new Error('open failed');
+    const layout = layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer());
+    const opts = { images: () => undefined, idPrefix: 't' };
+    const all = paintSlide(doc, layout, opts).querySelectorAll('[data-pptx-text] path').length;
+    expect(all).toBeGreaterThan(0);
+    // Far below the warped lines' boxes: an unwarped line there would not paint.
+    const view = { x: 0, y: 6_000_000, width: 100, height: 100 };
+    const culled = paintSlide(doc, layout, { ...opts, view });
+    expect(culled.querySelectorAll('[data-pptx-text] path').length).toBe(all);
+  });
+});
+
+const R_IMAGE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
+
+function pngBytes(): Uint8Array<ArrayBuffer> {
+  const image = new PNG({ width: 4, height: 4 });
+  image.data.fill(200);
+  return new Uint8Array(PNG.sync.write(image));
+}

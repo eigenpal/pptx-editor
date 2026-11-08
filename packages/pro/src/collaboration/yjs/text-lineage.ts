@@ -4,15 +4,15 @@ Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // Text that concurrent structure edits would duplicate or lose (openspec change
-// `collaboration-text-lineage`). Adapted from DOCX Editor
-// `packages/pro/src/collaboration/document/split-dedup.ts` and `materialize-orphans.ts` at
-// 5ffe9674 (its #581): PPTX Editor's `splitRunAt` keeps the origin run, so the winner rule and
-// the text comparison differ. The names differ too, because these functions work on replica
-// specs and one module holds both rules: `markLineage` and `dropLosingSplits` stand for
-// `SplitDedupIndex.record` and `loserRuns` with `splitWinnerOrder`, and `rescueMoved` and
-// `placeEditedPieces` stand for `reportOrphans` and `adoptLooseMembers`. DOCX Editor takes the
-// first replica id in string order as the winner; this module takes the earliest first cut,
-// then the smaller numeric client id.
+// `collaboration-text-lineage`). After DOCX Editor
+// `packages/pro/src/collaboration/document/split-dedup.ts` and
+// `packages/pro/src/collaboration/document/materialize-orphans.ts` at 5ffe9674 (its #581): PPTX
+// Editor's `splitRunAt` keeps the origin run, so the winner rule and the text comparison differ.
+// The names differ too, because these functions work on replica specs and one module holds both
+// rules: `markLineage` and `dropLosingSplits` stand for `SplitDedupIndex.record` and `loserRuns`
+// with `splitWinnerOrder`, and `rescueMoved` and `placeEditedPieces` stand for `reportOrphans` and
+// `adoptLooseMembers`. DOCX Editor takes the first replica id in string order as the winner; this
+// module takes the earliest first cut, then the smaller numeric client id.
 //
 // Split lineage. Formatting part of a run splits it: the run keeps the text before the cut, and
 // new runs take the rest. Two peers that split one run at once each mint their own new runs,

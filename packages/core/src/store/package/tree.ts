@@ -6,7 +6,7 @@
 // namespace declarations are retained as fidelity evidence, attribute records are arrays (so a
 // file-supplied `__proto__` is inert by construction), and every element and text node has a
 // stable id minted deterministically in document order. The same bytes always produce the same
-// ids, and an edit never renumbers untouched nodes.
+// ids, and an edit never renumbers untouched nodes. DOCX Editor commit adf0e178.
 
 import { readXml, type XmlNode, type XmlLimits, type XmlRejection } from '@eigenpal/ooxml-core';
 import { NS } from './namespaces.ts';

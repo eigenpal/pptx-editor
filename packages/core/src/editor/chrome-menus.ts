@@ -1,15 +1,18 @@
-// The menu registry: the menu bar and the canvas context menus as rows over chrome slots, after
-// DOCX Editor's `CHROME_MENUS` (docx-editor/packages/core/src/editor/chrome-controls.ts,
-// chrome-menu-entries.ts). A row names a slot, so its label, icon, enabled state, and action
-// come from the same registry entry as the toolbar control: a menu row and its toolbar twin
-// cannot describe one capability two ways. The adapters render these rows; a host replaces
-// one with `Menu.Item` or `ContextMenu.Slot`, adds its own, or turns the preset off.
+// The menu registry: the menu bar and the canvas context menus as rows over chrome slots, adapted
+// from DOCX Editor's `CHROME_MENUS` (docx-editor/packages/core/src/editor/chrome-controls.ts,
+// packages/core/src/editor/chrome-menu-entries.ts). A row names a slot, so its label, icon, enabled
+// state, and action come from the same registry entry as the toolbar control: a menu row and its
+// toolbar twin cannot describe one capability two ways. The adapters render these rows; a host
+// replaces one with `Menu.Item` or `ContextMenu.Slot`, adds its own, or turns the preset off. DOCX
+// Editor commit adf0e178.
 //
 // The menu bar includes rows whose commands the engine provides.
 
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
-import type { EditorSnapshot } from '../contracts/index.ts';
+import type { Editor, EditorSnapshot } from '../contracts/index.ts';
 import { chromeControlForSlot, chromeSlotIsToggle, type ChromeSlotId } from './chrome-controls.ts';
+import { commentRowShown } from './chrome-review.ts';
+import { tidySeparators } from './chrome-forms.ts';
 import { ICON_PATHS } from './icon-paths.ts';
 
 /** A row that runs one chrome slot. @public */
@@ -153,6 +156,7 @@ export const CHROME_MENUS: readonly ChromeMenu[] = [
       item('insert.image', 'menu.picture'),
       item('insert.shape', 'menu.shape'),
       item('insert.line', 'menu.line'),
+      item('insert.equation', 'menu.equation'),
       SEPARATOR,
       item('text.link', 'menu.link', 'contextMenu.shortcuts.link'),
     ],
@@ -223,10 +227,11 @@ export const CHROME_MENUS: readonly ChromeMenu[] = [
 ];
 
 /**
- * What a canvas context menu opened on: shapes, pictures only, text being edited, a table cell
- * (a caret in a cell, or a cell range), or empty slide area. @public
+ * What a canvas context menu opened on: shapes, pictures only, one chart, text being edited, a
+ * table cell (a caret in a cell, or a cell range), or empty slide area. @public
  */
-export type CanvasMenuKind = 'shapes' | 'picture' | 'text' | 'table' | 'tableFrame' | 'slide';
+export type CanvasMenuKind =
+  'shapes' | 'picture' | 'chart' | 'diagram' | 'text' | 'table' | 'tableFrame' | 'slide';
 
 /**
  * The context menu kind for a snapshot: a table cell (a caret in a cell, or a cell range), text
@@ -234,12 +239,15 @@ export type CanvasMenuKind = 'shapes' | 'picture' | 'text' | 'table' | 'tableFra
  * slide. @internal
  */
 export function canvasMenuKind(
-  snapshot: Pick<EditorSnapshot, 'selection' | 'image'> & Partial<Pick<EditorSnapshot, 'table'>>
+  snapshot: Pick<EditorSnapshot, 'selection' | 'image'> &
+    Partial<Pick<EditorSnapshot, 'table' | 'chart' | 'diagram'>>
 ): CanvasMenuKind {
   const sel = snapshot.selection;
   if (sel.kind === 'cells' || (sel.kind === 'text' && sel.cell)) return 'table';
+  if (snapshot.diagram) return 'diagram';
   if (sel.kind === 'text') return 'text';
   if (sel.kind === 'shapes' && snapshot.table) return 'tableFrame';
+  if (sel.kind === 'shapes' && snapshot.chart) return 'chart';
   if (sel.kind === 'shapes') return snapshot.image ? 'picture' : 'shapes';
   return 'slide';
 }
@@ -274,14 +282,24 @@ const TABLE_DELETE: ChromeMenuEntry = {
 };
 
 /**
+ * New comment, after the clipboard rows of the text, shape, picture, and table menus. It shows
+ * only while a comments pane can open a draft (`canvasMenuRows`).
+ */
+const NEW_COMMENT = item('review.addComment');
+
+/**
  * The canvas context menus, one per kind of target, in a fixed order. Rows the selection
- * cannot run stay in the menu, disabled with the engine's reason. @public
+ * cannot run stay in the menu, disabled with the engine's reason. The New comment row
+ * (`review.addComment`) is the exception: without a comments pane, `canvasMenuRows` leaves it
+ * out. @public
  */
 export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly ChromeMenuEntry[]>> = {
   text: [
     item('edit.cut', 'contextMenu.cut', 'contextMenu.shortcuts.cut'),
     item('edit.copy', 'contextMenu.copy', 'contextMenu.shortcuts.copy'),
     item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
+    SEPARATOR,
+    NEW_COMMENT,
     SEPARATOR,
     item('text.bold', 'contextMenu.bold', 'contextMenu.shortcuts.bold'),
     item('text.italic', 'contextMenu.italic', 'contextMenu.shortcuts.italic'),
@@ -298,6 +316,8 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
     item('more.duplicate', 'contextMenu.duplicate', 'contextMenu.shortcuts.duplicate'),
     item('more.delete', 'contextMenu.delete', 'contextMenu.shortcuts.delete'),
+    SEPARATOR,
+    NEW_COMMENT,
     SEPARATOR,
     ...ORDER_ROWS,
     SEPARATOR,
@@ -316,6 +336,8 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     item('edit.cut', 'contextMenu.cut', 'contextMenu.shortcuts.cut'),
     item('edit.copy', 'contextMenu.copy', 'contextMenu.shortcuts.copy'),
     item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
+    SEPARATOR,
+    NEW_COMMENT,
     SEPARATOR,
     TABLE_INSERT,
     TABLE_DELETE,
@@ -362,6 +384,8 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     item('more.duplicate', 'contextMenu.duplicate', 'contextMenu.shortcuts.duplicate'),
     item('more.delete', 'contextMenu.delete', 'contextMenu.shortcuts.delete'),
     SEPARATOR,
+    NEW_COMMENT,
+    SEPARATOR,
     TABLE_INSERT,
     SEPARATOR,
     ...ORDER_ROWS,
@@ -381,6 +405,8 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     item('more.duplicate', 'contextMenu.duplicate', 'contextMenu.shortcuts.duplicate'),
     item('more.delete', 'contextMenu.delete', 'contextMenu.shortcuts.delete'),
     SEPARATOR,
+    NEW_COMMENT,
+    SEPARATOR,
     ...ORDER_ROWS,
     SEPARATOR,
     item('arrange.group', 'contextMenu.group', 'contextMenu.shortcuts.group'),
@@ -391,6 +417,39 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     item('image.altText', 'contextMenu.altText'),
     item('image.properties'),
   ],
+  // The chart menu: Edit Data first, then the shape rows without the format painter.
+  chart: [
+    item('chart.editData'),
+    SEPARATOR,
+    item('edit.cut', 'contextMenu.cut', 'contextMenu.shortcuts.cut'),
+    item('edit.copy', 'contextMenu.copy', 'contextMenu.shortcuts.copy'),
+    item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
+    item('more.duplicate', 'contextMenu.duplicate', 'contextMenu.shortcuts.duplicate'),
+    item('more.delete', 'contextMenu.delete', 'contextMenu.shortcuts.delete'),
+    SEPARATOR,
+    ...ORDER_ROWS,
+    SEPARATOR,
+    item('arrange.group', 'contextMenu.group', 'contextMenu.shortcuts.group'),
+    item('arrange.ungroup', 'contextMenu.ungroup', 'contextMenu.shortcuts.ungroup'),
+    SEPARATOR,
+    item('image.altText', 'contextMenu.altText'),
+  ],
+  // The diagram menu: the shape commands first, then the object rows.
+  diagram: [
+    item('diagram.addAfter'),
+    item('diagram.addBefore'),
+    item('diagram.addBelow'),
+    item('diagram.delete'),
+    SEPARATOR,
+    item('edit.cut', 'contextMenu.cut', 'contextMenu.shortcuts.cut'),
+    item('edit.copy', 'contextMenu.copy', 'contextMenu.shortcuts.copy'),
+    item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
+    item('more.duplicate', 'contextMenu.duplicate', 'contextMenu.shortcuts.duplicate'),
+    SEPARATOR,
+    ...ORDER_ROWS,
+    SEPARATOR,
+    item('image.altText', 'contextMenu.altText'),
+  ],
   slide: [
     item('edit.paste', 'contextMenu.paste', 'contextMenu.shortcuts.paste'),
     SEPARATOR,
@@ -399,6 +458,20 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     { ...item('slide.add', 'contextMenu.newSlide'), direct: true },
   ],
 };
+
+/**
+ * The rows of a canvas context menu as `editor` shows them: without the New comment row while no
+ * comments pane can open a draft (`commentRowShown`), so core without the pro review pane shows
+ * no dead row. Separators left alone go with it. @internal
+ */
+export function canvasMenuRows(
+  entries: readonly ChromeMenuEntry[],
+  editor: Editor | null | undefined
+): readonly ChromeMenuEntry[] {
+  if (commentRowShown(editor)) return entries;
+  const kept = entries.filter((e) => e.kind !== 'item' || e.slot !== 'review.addComment');
+  return kept.length === entries.length ? entries : tidySeparators(kept);
+}
 
 /** The key that names a menu row for host overrides: the slot, and its value if any. @internal */
 export function chromeMenuRowKey(entry: Pick<ChromeMenuItemEntry, 'slot' | 'value'>): string {

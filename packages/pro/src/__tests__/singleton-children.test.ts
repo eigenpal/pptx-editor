@@ -3,8 +3,9 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// The pure rule of `singleton-children.ts`, as DOCX Editor's `singleton-children.test.ts`:
-// slots, schema order, seed keys, and the limit on concurrent copies.
+// The pure rule of `singleton-children.ts`, as DOCX Editor's
+// `packages/pro/src/collaboration/__tests__/singleton-children.test.ts`: slots, schema order, seed
+// keys, and the limit on concurrent copies. DOCX Editor commit adf0e178.
 
 import { describe, expect, test } from 'bun:test';
 import {

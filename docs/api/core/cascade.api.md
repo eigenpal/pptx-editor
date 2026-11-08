@@ -22,6 +22,12 @@ export type Autofit = {
 };
 
 // @public
+export const BEVEL_PRESET_TYPES: readonly ["relaxedInset", "circle", "slope", "cross", "angle", "softRound", "convex", "coolSlant", "divot", "riblet", "hardEdge", "artDeco"];
+
+// @public
+export type BevelPresetType = (typeof BEVEL_PRESET_TYPES)[number];
+
+// @public
 export const BLACK: Rgba;
 
 // @public
@@ -77,6 +83,7 @@ export interface BodyProps {
     readonly upright: boolean;
     // (undocumented)
     readonly vert: string;
+    readonly warp?: TextWarp;
     // (undocumented)
     readonly wrap: 'square' | 'none';
 }
@@ -264,6 +271,7 @@ export interface ParagraphInputs {
     readonly kinsoku?: KinsokuRules;
     // (undocumented)
     readonly paragraph: Element_2;
+    readonly pictures?: PictureBulletSource;
     readonly slideNumber: number;
     // (undocumented)
     readonly theme: Theme;
@@ -274,6 +282,13 @@ export function parseHex(hex: string | undefined): Rgba | undefined;
 
 // @public
 export function parseTheme(part: XmlPart | undefined): Theme;
+
+// @public
+export interface PictureBulletSource {
+    readonly partOf: (entry: Element_2) => string | undefined;
+    // (undocumented)
+    readonly pkg: PptxPackage;
+}
 
 // @public
 export const PRESET_COLORS: Readonly<Record<string, string>>;
@@ -306,6 +321,13 @@ export function resolveChartPart(pkg: PptxPackage, sourcePart: string, graphicDa
 export function resolveColor(el: Element_2 | undefined, ctx: ColorContext): Rgba | undefined;
 
 // @public
+export interface ResolvedBevel {
+    readonly h: number;
+    readonly preset: BevelPresetType;
+    readonly w: number;
+}
+
+// @public
 export type ResolvedBullet = {
     readonly type: 'char';
     readonly char: string;
@@ -327,6 +349,17 @@ export type ResolvedBullet = {
         readonly pts: number;
     };
     readonly color?: Rgba;
+} | {
+    readonly type: 'picture';
+    readonly part: string;
+    readonly rId: string;
+    readonly svgRId?: string;
+    readonly aspect: number;
+    readonly size: {
+        readonly pct: number;
+    } | {
+        readonly pts: number;
+    };
 };
 
 // @public
@@ -339,6 +372,10 @@ export interface ResolvedChartPart {
 
 // @public
 export interface ResolvedEffects {
+    readonly blur?: {
+        readonly radius: number;
+        readonly grow: boolean;
+    };
     readonly fillOverlay?: {
         readonly blend: BlendMode;
         readonly fill: Exclude<ResolvedFill, {
@@ -369,10 +406,14 @@ export interface ResolvedEffects {
         readonly endPos: number;
         readonly fadeDir: number;
     };
+    readonly secondShadow?: EffectPlacement & {
+        readonly color: Rgba;
+    };
     // (undocumented)
     readonly softEdge?: {
         readonly radius: number;
     };
+    readonly threeD?: ResolvedThreeD;
     readonly unsupported: readonly string[];
 }
 
@@ -551,7 +592,8 @@ export interface ResolvedRun {
     // (undocumented)
     readonly fieldType?: string;
     // (undocumented)
-    readonly kind: 'text' | 'break' | 'field';
+    readonly kind: 'text' | 'break' | 'field' | 'math';
+    readonly math?: MathZone;
     readonly nodeId: string;
     // (undocumented)
     readonly props: RunProps;
@@ -566,6 +608,7 @@ export interface ResolvedShape extends ResolvedBase {
         readonly start?: ConnectionRef;
         readonly end?: ConnectionRef;
     };
+    readonly diagramNode?: string;
     // (undocumented)
     readonly effects?: ResolvedEffects;
     // (undocumented)
@@ -643,6 +686,24 @@ export interface ResolvedTextBody {
 }
 
 // @public
+export interface ResolvedThreeD {
+    readonly bevelBottom?: ResolvedBevel;
+    readonly bevelTop?: ResolvedBevel;
+    readonly camera: string;
+    readonly cameraRot?: Rotation3D;
+    // (undocumented)
+    readonly contourColor?: Rgba;
+    readonly contourW: number;
+    // (undocumented)
+    readonly extrusionColor?: Rgba;
+    readonly extrusionH: number;
+    // (undocumented)
+    readonly lightDir: string;
+    readonly lightRig: string;
+    readonly material: string;
+}
+
+// @public
 export function resolveEffects(container: Element_2 | undefined, ctx: ColorContext): ResolvedEffects | undefined;
 
 // @public
@@ -676,6 +737,13 @@ export interface Rgba {
     readonly g: number;
     // (undocumented)
     readonly r: number;
+}
+
+// @public
+export interface Rotation3D {
+    readonly lat: number;
+    readonly lon: number;
+    readonly rev: number;
 }
 
 // @public
@@ -744,8 +812,10 @@ export interface TableScope {
     // (undocumented)
     readonly defaultTextStyle?: Element_2;
     readonly kinsoku?: KinsokuRules;
+    readonly partName?: string;
     // (undocumented)
     readonly pkg: PptxPackage;
+    readonly presentationPart?: string;
     // (undocumented)
     readonly slideNumber: number;
     // (undocumented)
@@ -761,6 +831,14 @@ export function tableStyleList(pkg: PptxPackage): readonly {
     name: string;
     builtIn?: true;
 }[];
+
+// @public
+export interface TextWarp {
+    // (undocumented)
+    readonly adjust: ReadonlyMap<string, number>;
+    // (undocumented)
+    readonly preset: string;
+}
 
 // @public
 export interface Theme {

@@ -1,4 +1,4 @@
-// Copied from docx-editor/packages/core/src/layout/grapheme.ts at 5993bd223 (EigenPal).
+// Copied from docx-editor/packages/core/src/layout/grapheme.ts at adf0e178 (EigenPal).
 // Keep it equal to that file.
 // Unicode grapheme segmentation for semantic positions (interactive-paginated-editing 3.3).
 // Uses Intl.Segmenter through a small replaceable boundary — no hand-written splitter.

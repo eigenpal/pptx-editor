@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 //
-// Installs the packages the way a consumer does: from tarballs, into an empty project, with
-// npm resolving what it finds inside them. Then it exports a PDF under Node, builds a React
-// app with Vite and with Bun's bundler, and opens the Vite build in Chromium to check that a
-// slide renders (docx-editor/scripts/check-consumer-install.mjs, sized for PPTX Editor).
+// Installs the packages the way a consumer does: from tarballs, into an empty project, with npm
+// resolving what it finds inside them. Then it exports a PDF under Node, builds a React app with
+// Vite and with Bun's bundler, and opens the Vite build in Chromium to check that a slide renders
+// (docx-editor/scripts/check-consumer-install.mjs, sized for PPTX Editor). DOCX Editor commit
+// adf0e178.
 //
 // This is the only check that reads a published manifest instead of a workspace one, so it
 // is the only place where a `workspace:` range, a missing `exports` subpath, a `files` list

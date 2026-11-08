@@ -1,4 +1,4 @@
-// After DOCX Editor's scripts/release-mode.test.ts (commit b9a04a30f): the canary cases are
+// Adapted from DOCX Editor's scripts/release-mode.test.ts (commit b9a04a30f): the canary cases are
 // the same; the stable cases cover this repository's pending-or-publish rule.
 import { afterEach, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

@@ -33,6 +33,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // repair never writes a key it does not find in a list.
 
 import * as Y from 'yjs';
+import type { FollowedRun } from './undo-followed.ts';
 import type { Element, Node, NodeId, PptxPackage } from '@pptx-editor.dev/core/store';
 import { F, type Room } from './schema.ts';
 import { LINEAGE } from './text-lineage.ts';
@@ -72,6 +73,12 @@ export interface RepairView {
 /** Text this replica typed that a repair moved: the first old id, the first new id, a length. */
 export type MovedText = (from: Y.ID, to: Y.ID, length: number) => void;
 
+/**
+ * A peer's run that a repair moved after this replica's Enter (`followEnter`). The move
+ * belongs to the Enter's step, so an undo of the Enter takes the run back (`undo-followed.ts`).
+ */
+export type MovedRun = (run: FollowedRun) => void;
+
 interface CopyEntry {
   readonly key: string;
   readonly copy: Copy;
@@ -103,6 +110,7 @@ interface Repair {
   readonly laterStart: (a: CopyEntry, b: CopyEntry) => number;
   /** False once the rules took `MAX_STEPS` steps. */
   readonly step: (n?: number) => boolean;
+  readonly movedRun?: MovedRun | undefined;
 }
 
 const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
@@ -156,7 +164,8 @@ export function repairCopies(
   fresh: readonly string[],
   deleted: ReadonlySet<string>,
   view: RepairView,
-  moved: MovedText
+  moved: MovedText,
+  movedRun?: MovedRun
 ): void {
   const doc = room.doc;
   const me = doc.clientID;
@@ -306,7 +315,7 @@ export function repairCopies(
     for (const r of x) if (y.has(r)) return true;
     return false;
   };
-  const ctx: Repair = { room, me, incoming, all, placed, share, laterStart, step };
+  const ctx: Repair = { room, me, incoming, all, placed, share, laterStart, step, movedRun };
   // Order: this replica's new paragraph goes after a peer's that cut the same text earlier.
   reorderParagraphs(ctx);
   followEnter(ctx);
@@ -321,11 +330,14 @@ function childrenOf(room: Room, key: string): Y.Array<string> | undefined {
 
 /**
  * Follow an Enter: a peer's copy that shows in the paragraph this replica's Enter moved its own
- * copy of the same characters out of goes along, right before that copy. Two peers format one
- * word while one of them presses Enter before it: the word goes with the Enter, whichever
- * format keeps it.
+ * copy of the same characters out of goes along: right before that copy, or right after it when
+ * the peer's split starts later (a format of text after the cut). Two peers format one word
+ * while one of them presses Enter before it: the word goes with the Enter, whichever format
+ * keeps it. A peer formats text after the cut of this replica's Enter at the same time: the
+ * formatted runs go into the new paragraph, so the text stays in order.
  */
-function followEnter({ room, me, incoming, all, placed, share, step }: Repair): void {
+function followEnter(ctx: Repair): void {
+  const { room, me, incoming, all, placed, share, laterStart, step, movedRun } = ctx;
   // Where each text record is in the room's lists under a paragraph parent: its paragraph and
   // its run. A copy that lost to a peer's format shows nowhere, so the store cannot tell.
   const under = new Map<string, Map<string, { p: string; run: string }>>();
@@ -345,7 +357,10 @@ function followEnter({ room, me, incoming, all, placed, share, step }: Repair): 
     }
     return found.get(textKey);
   };
-  for (const p of incoming) {
+  // The peer's copies in the order their splits start, so the runs that go after one copy of
+  // this replica keep their order: each goes after the last one placed there.
+  const lastAfter = new Map<string, string>();
+  for (const p of [...incoming].sort(laterStart)) {
     const pp = placed.get(p.key);
     if (!pp?.p || !pp.run) continue;
     for (const q of all) {
@@ -354,16 +369,75 @@ function followEnter({ room, me, incoming, all, placed, share, step }: Repair): 
       const at = locate(pp.p.parent, q.key);
       const qRec = at ? room.nodes.get(at.run) : undefined;
       if (!at || at.p === pp.p.key || !(qRec instanceof Y.Map)) continue;
-      if (qRec.get(LINEAGE.movedFrom) !== pp.p.key) continue;
+      // This replica's Enter moved the run out of the peer's paragraph: the peer's copy goes
+      // right before it. Or the Enter cut a run there and made this copy in the new paragraph,
+      // and the peer's split starts after the cut: the peer's copy goes right after it.
+      const before = qRec.get(LINEAGE.movedFrom) === pp.p.key;
+      const after =
+        !before &&
+        q.copy.newParagraph &&
+        laterStart(p, q) > 0 &&
+        sourceParagraph(room, q, locate, pp.p.parent) === pp.p.key;
+      if (!before && !after) continue;
       const from = childrenOf(room, pp.p.key);
       const to = childrenOf(room, at.p);
       const fromAt = from?.toArray().indexOf(pp.run) ?? -1;
       if (!from || !to || fromAt < 0) continue;
+      const deleted = listEntryId(from, fromAt);
       from.delete(fromAt, 1);
-      to.insert(to.toArray().indexOf(at.run), [pp.run]);
+      if (!after) {
+        to.insert(to.toArray().indexOf(at.run), [pp.run]);
+        break;
+      }
+      const anchor = lastAfter.get(at.run) ?? at.run;
+      const clock = Y.getState(room.doc.store, me);
+      to.insert(to.toArray().indexOf(anchor) + 1, [pp.run]);
+      lastAfter.set(at.run, pp.run);
+      if (deleted)
+        movedRun?.({
+          anchor: Y.createID(q.copy.client, q.copy.clock),
+          gone: deleted,
+          added: Y.createID(me, clock),
+          run: pp.run,
+          from,
+          to,
+        });
       break;
     }
   }
+}
+
+/**
+ * The id of the live entry at `index` of a list, or undefined. Its item and the items that hold
+ * it keep their content after a delete, as `Y.UndoManager` keeps what it may restore: an undo
+ * of the Enter that a repair ties the entry's move to puts it back (`MovedRun`).
+ */
+function listEntryId(list: Y.Array<string>, index: number): Y.ID | undefined {
+  let at = 0;
+  for (let item = list._start; item !== null; item = item.right) {
+    if (item.deleted || !item.countable) continue;
+    if (index < at + item.length) {
+      for (let kept: Y.Item | null = item; kept !== null && !kept.keep;) {
+        kept.keep = true;
+        kept = (kept.parent as Y.AbstractType<unknown>)._item;
+      }
+      return Y.createID(item.id.client, item.id.clock + index - at);
+    }
+    at += item.length;
+  }
+  return undefined;
+}
+
+/** The paragraph under `parent` whose run holds the first character a copy copies. */
+function sourceParagraph(
+  room: Room,
+  c: CopyEntry,
+  locate: (parent: string, textKey: string) => { p: string; run: string } | undefined,
+  parent: string
+): string | undefined {
+  const item = itemOf(room.doc, c.copy.source(0));
+  const key = item ? recordOfItem(item)?.get(F.key) : undefined;
+  return typeof key === 'string' ? locate(parent, key)?.p : undefined;
 }
 
 /**

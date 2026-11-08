@@ -36,10 +36,10 @@ export function registerFontFaces(
 ): FontFaceHandle {
   const added: FontFace[] = [];
   const loads: Promise<unknown>[] = [];
-  // A DOM without the CSS Font Loading API (a test DOM, an old embedded view) draws with the
-  // host's own fonts, as DOCX Editor's `embedded-font-faces.ts` does. Layout is unchanged.
-  // The constructor comes from the document's own window: another window's font set refuses
-  // a FontFace made by this one.
+  // A DOM without the CSS Font Loading API (a test DOM, an old embedded view) draws with the host's
+  // own fonts, as DOCX Editor's `packages/core/src/editor/embedded-font-faces.ts` does. Layout is
+  // unchanged. The constructor comes from the document's own window: another window's font set
+  // refuses a FontFace made by this one. DOCX Editor commit adf0e178.
   const FontFaceCtor = ((doc.defaultView ?? globalThis) as { FontFace?: typeof FontFace }).FontFace;
   if (typeof FontFaceCtor !== 'function' || !doc.fonts)
     return { ready: Promise.resolve(), dispose: () => {} };

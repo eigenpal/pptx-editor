@@ -17,7 +17,7 @@ const XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n';
 const IN = 914_400;
 const CHART_CT = 'application/vnd.openxmlformats-officedocument.drawingml.chart+xml';
 
-const title = (text: string): string =>
+export const title = (text: string): string =>
   shape({
     id: 2,
     x: 0.5 * IN,
@@ -29,7 +29,7 @@ const title = (text: string): string =>
   });
 
 /** A graphic frame that shows one chart or diagram. */
-function frame(id: number, name: string, box: number[], uri: string, data: string): string {
+export function frame(id: number, name: string, box: number[], uri: string, data: string): string {
   const [x, y, cx, cy] = box.map(Math.round);
   return (
     `<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="${id}" name="${name}"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr>` +
@@ -338,7 +338,7 @@ export function chartSizesDeck(): FixtureOptions {
 
 // --- Diagrams --------------------------------------------------------------------------------
 
-const DIAGRAM_PARTS = [
+export const DIAGRAM_PARTS = [
   ['data', 'diagramData', `${R}/diagramData`, 'application/vnd.openxmlformats-officedocument.drawingml.diagramData+xml'],
   ['layout', 'diagramLayout', `${R}/diagramLayout`, 'application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml'],
   ['quickStyle', 'diagramQuickStyle', `${R}/diagramQuickStyle`, 'application/vnd.openxmlformats-officedocument.drawingml.diagramStyle+xml'],

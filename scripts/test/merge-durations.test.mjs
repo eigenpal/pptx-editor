@@ -1,4 +1,4 @@
-// Copied from docx-editor/scripts/test/merge-durations.test.mjs at 39a490db (EigenPal).
+// Copied from docx-editor/scripts/test/merge-durations.test.mjs at adf0e178 (EigenPal).
 import { expect, test } from 'bun:test';
 import { mergeDurations } from './merge-durations.mjs';
 

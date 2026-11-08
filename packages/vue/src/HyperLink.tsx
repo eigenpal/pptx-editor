@@ -24,8 +24,13 @@ import {
   type VNodeArrayChildren,
 } from 'vue';
 import {
-  LINK_KINDS,
+  customShowDraft,
+  customShowDraftUrl,
+  fileDraftUrl,
+  customShowLinkLabel,
+  linkKindDraft,
   linkKindOf,
+  linkKindsFor,
   linkSelectionRect,
   mailtoParts,
   mailtoUrl,
@@ -36,9 +41,13 @@ import {
   type LinkKind,
   type MailtoParts,
 } from '@pptx-editor.dev/core/editor';
+import type { CustomShowSummary } from '@pptx-editor.dev/core/contracts';
 import { Icon, Popover } from './chrome.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
 import { hyperlinkPopupKey, useHyperlinkPopup } from './useHyperlinkPopup.ts';
+
+/** No custom shows: one array, so the selector result stays the same. */
+const NO_SHOWS: readonly CustomShowSummary[] = [];
 
 const CLOSED_STATE: HyperlinkPopupState = {
   mode: 'closed',
@@ -121,10 +130,19 @@ const HyperLinkUrl = part(
     setup(props, { slots }) {
       const { state, openTarget } = useHyperlinkPopup();
       const { t } = useTranslation();
+      const shows = useEditorState((s) => s.customShows ?? NO_SHOWS);
       return () => {
         const s = state.value;
         if (props.hidden || !s.url) return null;
         const children = slots.default?.();
+        // A custom show link names its show; it opens in a slide show, not here.
+        const show = customShowLinkLabel(t, s.url, shows.value);
+        if (show) {
+          const attrs = { class: ['pptx-link__url', props.className], 'data-inert': '' };
+          return wire(props.asChild, children, attrs, () => (
+            <span {...attrs}>{children ?? show}</span>
+          ));
+        }
         const slide = slideLinkLabel(t, s.url);
         if (slide) {
           const attrs = {
@@ -239,7 +257,10 @@ const HyperLinkFields = part(
       const { state, setUrl, commitEdit } = useHyperlinkPopup();
       const { t } = useTranslation();
       const slides = useEditorState((s) => s.slides.length);
+      const shows = useEditorState((s) => s.customShows ?? NO_SHOWS);
       const kind = ref<LinkKind>(linkKindOf(state.value.draft));
+      // The kinds stay as they opened: Custom show only for a deck with one, or a link to one.
+      const kinds = linkKindsFor(shows.value, state.value.draft);
       const mail = shallowRef(mailtoParts(state.value.draft));
       const field = ref<HTMLInputElement | HTMLSelectElement | null>(null);
       // After the popover is placed: a browser does not focus into a hidden panel. A change of
@@ -262,6 +283,8 @@ const HyperLinkFields = part(
         web: 'link.kindWeb',
         email: 'link.kindEmail',
         slide: 'link.kindSlide',
+        customShow: 'link.kindCustomShow',
+        file: 'link.kindFile',
       } as const;
       return () => {
         if (props.hidden) return null;
@@ -271,6 +294,7 @@ const HyperLinkFields = part(
           'aria-describedby': s.error && provision ? provision.errorId : undefined,
         };
         const value = (e: Event): string => (e.target as HTMLInputElement).value;
+        const show = customShowDraft(s.draft);
         return (
           <div class={['pptx-link__fields', props.className]}>
             <label class="pptx-field pptx-link__kind">
@@ -281,10 +305,10 @@ const HyperLinkFields = part(
                   const next = value(e) as LinkKind;
                   kind.value = next;
                   mail.value = { address: '', subject: '', rest: '' };
-                  setUrl(next === 'slide' ? '#next-slide' : '');
+                  setUrl(linkKindDraft(next, shows.value));
                 }}
               >
-                {LINK_KINDS.map((k) => (
+                {kinds.map((k) => (
                   <option key={k} value={k}>
                     {t(KIND_LABEL[k])}
                   </option>
@@ -328,6 +352,57 @@ const HyperLinkFields = part(
                   onKeydown={onEnter}
                 />
               </>
+            ) : kind.value === 'customShow' ? (
+              <>
+                <select
+                  ref={field}
+                  class="pptx-link__field"
+                  aria-label={t('link.customShow')}
+                  value={show ? String(show.id) : ''}
+                  {...invalid}
+                  onChange={(e: Event) =>
+                    setUrl(customShowDraftUrl(Number(value(e)), show?.returns ?? true))
+                  }
+                  onKeydown={onEnter}
+                >
+                  {/* A link to a show the deck no longer has keeps its id as a choice. */}
+                  {show && !shows.value.some((x) => x.id === show.id) ? (
+                    <option value={String(show.id)}>
+                      {customShowLinkLabel(t, s.draft, shows.value)}
+                    </option>
+                  ) : null}
+                  {shows.value.map((x) => (
+                    <option key={x.id} value={String(x.id)}>
+                      {x.name || String(x.id)}
+                    </option>
+                  ))}
+                </select>
+                <label class="pptx-radio pptx-link__return">
+                  <input
+                    type="checkbox"
+                    checked={show?.returns ?? true}
+                    disabled={!show}
+                    onChange={(e: Event) =>
+                      show &&
+                      setUrl(customShowDraftUrl(show.id, (e.target as HTMLInputElement).checked))
+                    }
+                  />
+                  {t('link.returnAfterShow')}
+                </label>
+              </>
+            ) : kind.value === 'file' ? (
+              <input
+                ref={field}
+                class="pptx-font-picker__search pptx-link__field"
+                type="text"
+                dir="ltr"
+                aria-label={t('link.filePath')}
+                placeholder={t('link.filePlaceholder')}
+                value={s.draft}
+                {...invalid}
+                onInput={(e: Event) => setUrl(fileDraftUrl(value(e)))}
+                onKeydown={onEnter}
+              />
             ) : (
               <select
                 ref={field}

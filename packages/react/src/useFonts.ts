@@ -1,4 +1,4 @@
-// Copied from DOCX Editor `packages/react/src/editor/useFonts.ts` at commit 5993bd223.
+// Adapted from DOCX Editor `packages/react/src/editor/useFonts.ts` at commit 5993bd223.
 // Keep the exported API equal to the source.
 
 // The stable-identity wrapper every font source needs before it can be a prop.

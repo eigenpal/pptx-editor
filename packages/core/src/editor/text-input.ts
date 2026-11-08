@@ -23,6 +23,13 @@ import {
   wordStartBefore,
   type ParagraphUnits,
 } from '../automation/commands/text-units.ts';
+import {
+  bidiCollapse,
+  bidiKeyTarget,
+  bidiVerticalTarget,
+  lineEdgePlace,
+} from './visual-caret-keys.ts';
+import { caretXOn, lineIndexAt } from './visual-caret.ts';
 
 /** Every kind of text input the editor applies. @public */
 export type TextInputKind =
@@ -130,12 +137,33 @@ export function editText(
   return end ? deleteRange(batch, part, txBodyId, at, end) : at;
 }
 
-/** Collapse a horizontal selection without stepping past its edge, in either selection direction. */
-export function collapseTextRange(sel: TextSelection, key: string): TextPoint | null {
+/**
+ * The caret after typed text: in a paragraph in visual order it stays at the trailing edge of
+ * the typed text (upstream), also where a direction boundary puts the next character elsewhere.
+ */
+export function typedCaret(item: ShapeItem, typedIn: number, at: TextPoint): TextPoint {
+  const bidi = item.text?.lines.some((l) => l.paragraph === typedIn && l.bidi);
+  return bidi && at.offset > 0 ? { ...at, affinity: 'upstream' } : at;
+}
+
+/**
+ * Collapse a horizontal selection without stepping past its edge, in either selection direction.
+ * With the shape's layout, a range on one line in visual order collapses to the outermost edge
+ * of its selected bands in the key's direction, and a range over several lines to the end that
+ * the paragraph's reading direction puts on that side (DOCX Editor
+ * `packages/core/src/editor/surface-selection-collapse.ts` at adf0e178).
+ */
+export function collapseTextRange(
+  sel: TextSelection,
+  key: string,
+  item?: ShapeItem
+): TextPoint | null {
   const order = comparePoints(sel.anchor, sel.focus);
   if (order === 0 || (key !== 'ArrowLeft' && key !== 'ArrowRight')) return null;
   const start = order < 0 ? sel.anchor : sel.focus;
   const end = order < 0 ? sel.focus : sel.anchor;
+  const visual = item && bidiCollapse(item, start, end, key === 'ArrowLeft' ? -1 : 1);
+  if (visual) return visual;
   return key === 'ArrowLeft' ? start : end;
 }
 
@@ -151,7 +179,7 @@ export function moveTextSelection(
   extend: boolean,
   mods: CaretModifiers = {}
 ): TextSelection {
-  const at = !extend && collapseTextRange(selection, key);
+  const at = !extend && collapseTextRange(selection, key, item);
   const modified = !!(mods.altKey || mods.ctrlKey || mods.metaKey);
   const focus = at && !modified ? at : moveCaret(item, at || selection.focus, key, mods);
   return { ...selection, anchor: extend ? selection.anchor : focus, focus };
@@ -172,17 +200,19 @@ export interface CaretModifiers {
 }
 
 /**
- * The caret after a navigation key, with the key map of DOCX Editor's `surface-input.ts`.
- * Left and Right step one character (a whole emoji, a whole field). With Alt (macOS) or Ctrl
- * (other platforms) they step to the start of the word before or the end of the word after
- * (UAX #29 words, the same units as a word deletion; forward, past the spaces after the word,
- * to the start of the next one), and at a paragraph edge into the next paragraph; both keys
- * are accepted on every platform. With Cmd alone they go to the line edges, as Home and End
- * do, for keyboards without those keys. Up and Down keep the x position on the next line; with
- * Alt (macOS) or Ctrl alone they go to the start of the paragraph (Up, or of the one before
- * when the caret is there already) or of the next paragraph (Down, or the end of the last).
- * Home and End go to the edges of the laid-out line (`lineEdge`). Home and End with Ctrl or
- * Cmd, and Up and Down with Cmd, go to the start or the end of the text body.
+ * The caret after a navigation key, with the key map of DOCX Editor's
+ * `packages/core/src/editor/surface-input.ts`. Left and Right step one character (a whole emoji, a
+ * whole field). With Alt (macOS) or Ctrl (other platforms) they step to the start of the word
+ * before or the end of the word after (UAX #29 words, the same units as a word deletion; forward,
+ * past the spaces after the word, to the start of the next one), and at a paragraph edge into the
+ * next paragraph; both keys are accepted on every platform. With Cmd alone they go to the line
+ * edges, for keyboards without Home and End: the start and the end of a left-to-right line, and
+ * the visual edge on the arrow's side of a line in visual order. Up and Down keep the x position
+ * on the next line; with Alt (macOS) or Ctrl alone they go to the start of the paragraph (Up, or
+ * of the one before when the caret is there already) or of the next paragraph (Down, or the end of
+ * the last). Home and End go to the edges of the laid-out line (`lineEdge`). Home and End with
+ * Ctrl or Cmd, and Up and Down with Cmd, go to the start or the end of the text body. DOCX Editor
+ * commit adf0e178.
  */
 export function moveCaret(
   item: ShapeItem,
@@ -214,22 +244,30 @@ export function moveCaret(
   const key = edge ? (pressed === 'ArrowLeft' ? 'Home' : 'End') : pressed;
   let { paragraph, offset } = focus;
   const u = unitsOf(item, paragraph);
+  // A line in visual order: Left and Right step on screen, and with Cmd go to its visual edge
+  // on their side. Home and End stay logical (below).
+  const visual = bidiKeyTarget(item, focus, pressed, { word, edge }, u, () =>
+    lineEdge(item, paragraph, offset, false)
+  );
+  if (visual) return visual;
   if (key === 'ArrowLeft') {
     if (offset > 0) offset = word ? wordStartBefore(u, offset) : stopBefore(u, offset);
     else if (paragraph > 0) offset = lens[--paragraph] ?? 0;
   } else if (key === 'ArrowRight') {
     if (offset < u.length) offset = word ? nextWordStart(u, offset) : stopAfter(u, offset);
     else if (paragraph < lens.length - 1) ((paragraph += 1), (offset = 0));
-  } else if (key === 'Home' || key === 'End')
-    offset =
-      lineEdge(item, paragraph, offset, key === 'Home') ??
-      (key === 'Home' ? 0 : (lens[paragraph] ?? 0));
-  else if (key === 'ArrowUp' || key === 'ArrowDown') {
+  } else if (key === 'Home' || key === 'End') {
+    const home = key === 'Home';
+    offset = lineEdge(item, paragraph, offset, home) ?? (home ? 0 : (lens[paragraph] ?? 0));
+    return lineEdgePlace(item, { paragraph, offset }, !home);
+  } else if (key === 'ArrowUp' || key === 'ArrowDown') {
     const lines = item.text?.lines ?? [];
     const li = lineIndexAt(lines, paragraph, offset);
     const target = lines[li + (key === 'ArrowUp' ? -1 : 1)];
     if (target && li >= 0) {
-      const x = lines[li].caretX[offset - lines[li].start] ?? 0;
+      const x = caretXOn(lines[li], offset, focus.affinity) ?? 0;
+      const onBidi = bidiVerticalTarget(item, target, x);
+      if (onBidi) return onBidi;
       let best = 0;
       target.caretX.forEach((cx, i) => {
         if (Math.abs(cx - x) < Math.abs((target.caretX[best] ?? 0) - x)) best = i;
@@ -239,18 +277,6 @@ export function moveCaret(
     }
   }
   return { paragraph, offset };
-}
-
-type Lines = NonNullable<ShapeItem['text']>['lines'];
-
-/** The laid-out line that holds the caret: a line's end offset belongs to the next line. */
-function lineIndexAt(lines: Lines, paragraph: number, offset: number): number {
-  return lines.findIndex(
-    (l, i) =>
-      l.paragraph === paragraph &&
-      offset >= l.start &&
-      (offset < l.end || lines[i + 1]?.paragraph !== paragraph)
-  );
 }
 
 /**

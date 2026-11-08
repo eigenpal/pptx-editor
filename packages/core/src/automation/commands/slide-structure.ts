@@ -38,6 +38,10 @@ import {
 } from './package-edits.ts';
 import { toBase64 } from './base64.ts';
 import { ACTOR_ID_STRIPE } from './actor-scoped-ids.ts';
+import { newGuid } from './comment-write.ts';
+
+/** The namespace of threaded comments. */
+const THREADED_NS = 'http://schemas.microsoft.com/office/powerpoint/2018/8/main';
 
 const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
 const MS2007 = 'http://schemas.microsoft.com/office/2007/relationships/';
@@ -46,6 +50,8 @@ const P15 = 'http://schemas.microsoft.com/office/powerpoint/2012/main';
 
 /** Comments by a single author in one list (`p:cmLst`), ECMA-376 Part 1 §19.4. */
 const LEGACY_COMMENTS = `${R}comments`;
+/** Threaded comments (`p188:cmLst`), which name their slide and their authors by id. */
+const THREADED_COMMENTS = 'http://schemas.microsoft.com/office/2018/10/relationships/comments';
 const CT_COMMENTS = 'application/vnd.openxmlformats-officedocument.presentationml.comments+xml';
 const CT_AUTHORS =
   'application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml';
@@ -61,6 +67,7 @@ const OWNED = new Set([
   `${R}package`,
   `${R}oleObject`,
   LEGACY_COMMENTS,
+  THREADED_COMMENTS,
   `${R}tags`,
   `${R}vmlDrawing`,
   `${R}diagramData`,
@@ -73,14 +80,10 @@ const OWNED = new Set([
 ]);
 
 /**
- * Targets the engine cannot copy safely: threaded comments name their slide by its creation
- * id and their authors by GUID, and embedded controls (`p:control`) carry binary state. A duplicate of a slide
- * with one of them is refused, never made to share it.
+ * Targets the engine cannot copy safely: embedded controls (`p:control`) carry binary state. A
+ * duplicate of a slide with one is refused, never made to share it.
  */
-const NOT_COPYABLE = new Set([
-  'http://schemas.microsoft.com/office/2018/10/relationships/comments',
-  `${R}control`,
-]);
+const NOT_COPYABLE = new Set([`${R}control`]);
 
 /** Never removed with a deleted slide: layouts, masters, themes, and other slides. */
 const STRUCTURAL = new Set([
@@ -152,11 +155,14 @@ export function editable(batch: OpBatch, partName: string): XmlPart | undefined 
 
 /**
  * Copies the parts a duplicated slide owns, once each, under fresh names. Legacy comments get
- * new indexes, so every author's comment indexes stay unique in the presentation.
+ * new indexes, so every author's comment indexes stay unique in the presentation, and threaded
+ * comments and replies get new GUIDs. A save points the copied threads at the new slide
+ * (`comment-repair.ts`).
  */
 export class PartCopier {
   readonly #copies = new Map<string, string>();
   readonly #comments: string[] = [];
+  readonly #threaded: string[] = [];
 
   constructor(
     readonly batch: OpBatch,
@@ -199,11 +205,13 @@ export class PartCopier {
   #decide(type: string, part: string | undefined, depth: number): RelTarget {
     if (NOT_COPYABLE.has(type)) throw new CommandRefusal('disabled.slideNotCopyable', type);
     if (!part || !OWNED.has(type) || !this.batch.pkg.parts.has(part)) return { keep: true };
-    return { part: this.#copy(part, depth + 1, type === LEGACY_COMMENTS) };
+    const comments =
+      type === LEGACY_COMMENTS ? 'legacy' : type === THREADED_COMMENTS ? 'threaded' : undefined;
+    return { part: this.#copy(part, depth + 1, comments) };
   }
 
   /** Copy one owned part (and what it owns) under a free name; returns the new name. */
-  #copy(source: string, depth: number, comments = false): string {
+  #copy(source: string, depth: number, comments?: 'legacy' | 'threaded'): string {
     const done = this.#copies.get(source);
     if (done) return done;
     if (depth > MAX_DEPTH || this.#copies.size >= MAX_PARTS)
@@ -230,13 +238,32 @@ export class PartCopier {
         part: relsPartName(name),
         xml: this.relsXml(source, name, undefined, depth),
       });
-    if (tree) this.#comments.push(name);
+    if (comments === 'legacy') this.#comments.push(name);
+    if (comments === 'threaded') this.#threaded.push(name);
     return name;
   }
 
-  /** Give the copied legacy comments new indexes. Call once, after the last copy. */
+  /** Give the copied comments new indexes and GUIDs. Call once, after the last copy. */
   finish(): void {
     if (this.#comments.length) renumberComments(this.batch, this.#comments, this.presentation);
+    for (const part of this.#threaded) {
+      const walk = (el: Element, depth: number): void => {
+        if (depth > MAX_DEPTH) return;
+        for (const c of elements(el)) {
+          if (c.ns === THREADED_NS && (c.local === 'cm' || c.local === 'reply') && attr(c, 'id'))
+            this.batch.push({
+              op: 'setAttribute',
+              part,
+              node: c.id,
+              name: { ns: '', local: 'id' },
+              value: newGuid(),
+            });
+          walk(c, depth + 1);
+        }
+      };
+      const root = xmlPartOf(this.batch.pkg, part)?.root;
+      if (root) walk(root, 0);
+    }
   }
 }
 

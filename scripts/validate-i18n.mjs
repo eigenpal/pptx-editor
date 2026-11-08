@@ -1,4 +1,5 @@
-// The i18n CLI for packages/i18n, after docx-editor/scripts/validate-i18n.mjs.
+// The i18n CLI for packages/i18n, after docx-editor/scripts/validate-i18n.mjs. DOCX Editor commit
+// adf0e178.
 //
 //   node scripts/validate-i18n.mjs validate [--fix]  Check every locale against en.json.
 //   node scripts/validate-i18n.mjs status            Show translation coverage per locale.

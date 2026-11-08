@@ -72,6 +72,8 @@ export function canvasMenuLabelKey(
   | 'contextMenu.tableLabel'
   | 'contextMenu.shapeLabel'
   | 'contextMenu.pictureLabel'
+  | 'contextMenu.chartLabel'
+  | 'contextMenu.diagramLabel'
   | 'contextMenu.canvasLabel' {
   if (kind === 'table' || kind === 'tableFrame') return 'contextMenu.tableLabel';
   return kind === 'text'
@@ -80,7 +82,11 @@ export function canvasMenuLabelKey(
       ? 'contextMenu.shapeLabel'
       : kind === 'picture'
         ? 'contextMenu.pictureLabel'
-        : 'contextMenu.canvasLabel';
+        : kind === 'chart'
+          ? 'contextMenu.chartLabel'
+          : kind === 'diagram'
+            ? 'contextMenu.diagramLabel'
+            : 'contextMenu.canvasLabel';
 }
 
 /**
@@ -137,6 +143,12 @@ export const CONTEXT_MENU_NAMED_PARTS = {
   ImageAltText: row('image.altText'),
   ImageChange: row('image.change'),
   ImageProperties: row('image.properties'),
+  ChartEditData: row('chart.editData'),
+  DiagramAddAfter: row('diagram.addAfter'),
+  DiagramAddBefore: row('diagram.addBefore'),
+  DiagramAddBelow: row('diagram.addBelow'),
+  DiagramDelete: row('diagram.delete'),
+  AddComment: row('review.addComment'),
   FormatBackground: row('slide.background'),
   NewSlide: row('slide.add'),
   InsertRowAbove: row('table.insertRowAbove'),
@@ -176,6 +188,7 @@ export const MENU_NAMED_PARTS = {
   TextBox: row('insert.textBox'),
   TableInsert: row('table.insert'),
   ImageInsert: row('insert.image'),
+  Equation: row('insert.equation'),
   Shapes: row('insert.shape'),
   Line: row('insert.line'),
   Link: row('text.link'),

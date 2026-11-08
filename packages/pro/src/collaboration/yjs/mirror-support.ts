@@ -3,10 +3,11 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Helpers of the package mirror (`mirror.ts`) that read no mirror state: the key-list sync of a
-// write, and the listings a read skipped (`PackageMirror.dropHiddenListings`).
+// Helpers of the package mirror (`mirror.ts`) that read no mirror state: the text and key-list
+// syncs of a write, the listings a read skipped (`PackageMirror.dropHiddenListings`), and the
+// runs a read showed by the move rescue (`rescuedParents`).
 
-import type * as Y from 'yjs';
+import * as Y from 'yjs';
 import type {
   Element,
   Node,
@@ -15,6 +16,9 @@ import type {
   ReplicaElementSpec,
 } from '@pptx-editor.dev/core/store';
 import { specKeys } from './move-rescue.ts';
+import { liveIds, type TextWrite } from './text-identity.ts';
+
+const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 
 /** Every node of a tree by id. */
 export function indexTree(root: Element | undefined): Map<NodeId, Node> {
@@ -161,3 +165,100 @@ export function shownParentKey(
     return parent === undefined ? undefined : keyOf?.get(parent);
   };
 }
+
+/**
+ * Make `text` hold `value` with one delete and one insert around the common ends, or, when the
+ * changed span keeps its length, one replace per changed character. Returns what it deleted
+ * and inserted, for the identity of moved text (`text-identity.ts`).
+ */
+export function syncText(text: Y.Text, value: string, created: boolean): TextWrite | undefined {
+  const old = text.toString();
+  if (old === value) return undefined;
+  let start = 0;
+  while (start < old.length && start < value.length && old[start] === value[start]) start++;
+  let end = 0;
+  while (
+    end < old.length - start &&
+    end < value.length - start &&
+    old[old.length - 1 - end] === value[value.length - 1 - end]
+  )
+    end++;
+  // The common ends count UTF-16 units: never cut a surrogate pair at either edge, or Yjs
+  // splits the pair and a peer reads two U+FFFD.
+  const high = (c: number) => c >= 0xd800 && c <= 0xdbff;
+  const low = (c: number) => c >= 0xdc00 && c <= 0xdfff;
+  if (start > 0 && high(old.charCodeAt(start - 1))) start--;
+  if (end > 0 && low(old.charCodeAt(old.length - end))) end--;
+  const removed = old.length - start - end;
+  const added = value.length - start - end;
+  // The same length (Change Case): replace each changed character in place, so a peer's
+  // concurrent insert between two characters stays between them, not at the span's edge.
+  // A span with a surrogate pair is replaced whole, so a replace never splits a pair.
+  if (
+    removed === added &&
+    !/[\uD800-\uDFFF]/.test(old.slice(start, start + removed) + value.slice(start, start + added))
+  ) {
+    // The ids of the replaced characters, read in one walk before the first replace.
+    const was = liveIds(text, start, removed);
+    const deleted: Y.ID[] = [];
+    for (let i = start; i < start + removed; i++) {
+      if (old[i] === value[i]) continue;
+      const id = was[i - start];
+      if (id) deleted.push(id);
+      // The new character goes before the old one, then the old one goes. A `Y.Text` insert
+      // skips the tombstones to its right, so a character a peer types after a new one lands
+      // after the old one's tombstone, and an undo, which puts the old character back right
+      // before its tombstone, keeps the typed character after it.
+      text.insert(i, value[i]!);
+      text.delete(i + 1, 1);
+    }
+    return { created, deleted };
+  }
+  const deleted = removed > 0 ? liveIds(text, start, removed) : [];
+  if (removed > 0) text.delete(start, removed);
+  const doc = text.doc;
+  const clock = doc ? Y.getState(doc.store, doc.clientID) : 0;
+  if (added > 0) text.insert(start, value.slice(start, value.length - end));
+  return {
+    created,
+    deleted,
+    ...(added > 0 && doc ? { inserted: { client: doc.clientID, clock, length: added } } : {}),
+  };
+}
+
+/** The inline nodes that the move rescue put back in one part (`rescuedParents`). */
+export interface RescuedIn {
+  /** Each node, with the parent the read shows it in. */
+  readonly inParent: ReadonlyMap<string, string>;
+  /** Each parent that shows one, and that parent's parent: a write there can take the node. */
+  readonly watch: ReadonlySet<string>;
+}
+
+/**
+ * Each inline node (a run, a line break, a field) that the move rescue put back (`placed` of
+ * `rescueMoved`), with the parent the read shows it in.
+ */
+export function rescuedParents(spec: ReplicaElementSpec, placed: ReadonlySet<string>): RescuedIn {
+  const inParent = new Map<string, string>();
+  const watch = new Set<string>();
+  if (placed.size === 0) return { inParent, watch };
+  const up = new Map<string, string>();
+  const stack: ReplicaElementSpec[] = [spec];
+  while (stack.length > 0) {
+    const s = stack.pop()!;
+    for (const c of s.children ?? []) {
+      if ('text' in c) continue;
+      up.set(c.key, s.key);
+      if (placed.has(c.key) && c.ns === NS_A && INLINE.has(c.local)) inParent.set(c.key, s.key);
+      stack.push(c);
+    }
+  }
+  for (const parent of inParent.values()) {
+    watch.add(parent);
+    const grand = up.get(parent);
+    if (grand !== undefined) watch.add(grand);
+  }
+  return { inParent, watch };
+}
+
+const INLINE = new Set(['r', 'br', 'fld']);

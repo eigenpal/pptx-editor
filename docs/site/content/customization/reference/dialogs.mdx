@@ -18,6 +18,7 @@ Pass the map through `popups` on `PptxEditor.Root`. A function renders that surf
 | `bulletsAndNumbering` | The Bullets and Numbering dialog (**Format > Bullets and numbering…** and the last row of the Bullets and Numbering galleries): the bullet or number style, size, color, and start number. |
 | `imageAltText` | The alt text of the selected object: description, title, and **Mark as decorative**. |
 | `imageProperties` | Format Picture: the size, rotation, and crop of the selected picture. |
+| `equation` | The Equation dialog (**Equation** in the **Insert** toolbar group and menu): a gallery and the linear form, which inserts an equation or edits the selected one. |
 | `columns` | The Columns dialog (**Format > Columns…** and **Columns > More columns…**): the column count and the spacing between columns. |
 | `paragraph` | The Paragraph dialog (**Format > Paragraph…**, **Line Spacing > Line Spacing Options…**, and the text context menu): alignment, indents, spacing, and line spacing. |
 | `hyperlink` | The link popup (Ctrl+K or Cmd+K, the toolbar's link control, **Insert > Link…**). |
@@ -28,7 +29,7 @@ Pass the map through `popups` on `PptxEditor.Root`. A function renders that surf
 
 ### What a `false` entry does
 
-A `false` entry turns off automatic rendering for that key. It does not turn off the operation. `setLink`, `editor.find`, `setSlideBackground`, `setFontFormat`, `setParagraphFormat`, `setBulletFormat`, `setColumns`, `setAltText`, and `setImageProperties` keep working from the API. `useEditorCommand('image.altText').execute(description)` also sets the description with the popup off.
+A `false` entry turns off automatic rendering for that key. It does not turn off the operation. `setLink`, `editor.find`, `setSlideBackground`, `setFontFormat`, `setParagraphFormat`, `setBulletFormat`, `setColumns`, `setAltText`, `setImageProperties`, `insertEquation`, and `setEquation` keep working from the API. `useEditorCommand('image.altText').execute(description)` also sets the description with the popup off.
 
 The toolbar control or menu row that opens the surface stays visible. It is disabled with a reason, such as "Links are turned off in this editor". There are two exceptions:
 
@@ -39,7 +40,7 @@ When you replace an input popup, give your users another way to reach its operat
 
 ### Open a dialog by key
 
-`useEditorDialog(key).open()` opens a modal dialog from your own control. The keys are `pageSetup`, `background`, `font`, `paragraph`, `bulletsAndNumbering`, `columns`, `imageAltText`, and `imageProperties`. `isAvailable` is `false` when the entry is `false`.
+`useEditorDialog(key).open()` opens a modal dialog from your own control. The keys are `pageSetup`, `background`, `font`, `paragraph`, `bulletsAndNumbering`, `columns`, `imageAltText`, `imageProperties`, and `equation`. `isAvailable` is `false` when the entry is `false`.
 
 ## The link popup renderer
 
@@ -159,7 +160,7 @@ The dialog has a Bulleted tab and a Numbered tab. It opens on the tab of the sel
 
 | Tab | Fields | Value |
 | --- | --- | --- |
-| `bullet` | `style`, `char`, `font`, `sizePercent`, `color` | The bullet from the gallery, or your own character in a font, its size in percent of the text (25 to 400), and its color. A symbol font's character also shows as its Unicode twin at the end of the box. The swatch button beside a color field shows the color and opens the color grid (theme tints and shades, standard colors). |
+| `bullet` | `style`, `char`, `font`, `picture`, `sizePercent`, `color` | The bullet from the gallery, your own character in a font, or a picture, its size in percent of the text (25 to 400), and its color. A symbol font's character also shows as its Unicode twin at the end of the box. **Choose picture…** takes a PNG, JPEG, or GIF file and sets the style to **Picture**. A picture bullet has no color, so the color field is off. The swatch button beside a color field shows the color and opens the color grid (theme tints and shades, standard colors). |
 | `number` | `numberStyle`, `numberSizePercent`, `numberColor`, `startAt` | The numbering scheme, its size and color, and the start number (1 to 32767). |
 
 ### Columns fields

@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Copied from docx-editor/packages/docx-to-pdf/src/fonts.ts (EigenPal), without the legacy symbol-font text mapping (PPTX core has none).
+// Adapted from docx-editor/packages/docx-to-pdf/src/fonts.ts at adf0e178 (EigenPal), without the legacy symbol-font text mapping (PPTX core has none).
 import { create as openFont, type FontkitFont } from 'fontkit';
 import { PDFDocument, PDFName, PDFString, type PDFRef } from 'pdf-lib';
 import {

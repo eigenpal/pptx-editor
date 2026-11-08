@@ -1,7 +1,7 @@
 /** @jsxImportSource react */
 // `PptxEditor.ContextMenu`: the slide canvas's context menu as library parts, after DOCX
 // Editor's `DocxEditor.ContextMenu` (docx-editor/docs/site/content/customization/menus.mdx,
-// packages/react/src/editor/contextmenu/).
+// packages/react/src/editor/contextmenu/). DOCX Editor commit adf0e178.
 //
 // The canvas opens a menu request (right-click, Shift+F10, the Menu key) for what is under the
 // pointer: shapes, text being edited, or empty slide area. The menu renders core's
@@ -28,6 +28,7 @@ import {
   CONTEXT_MENU_NAMED_PARTS,
   arrangeMenuRows,
   canvasMenuLabelKey,
+  canvasMenuRows,
   warnMenuPart,
   type CanvasMenuKind,
 } from '@pptx-editor.dev/core/editor';
@@ -37,9 +38,9 @@ import {
   MenuSeparator,
   type ContextMenuPoint,
 } from './ContextMenu.tsx';
-import { TranslationContext, useTranslation } from './context.ts';
+import { TranslationContext, usePptxEditor, useTranslation } from './context.ts';
 import { ToolbarContext } from './headless-hooks.tsx';
-import { useCanvasMenuRegistry } from './popups.tsx';
+import { useCanvasMenuRegistry, type PptxEditorPopups } from './popups.tsx';
 import { MenuEntries } from './menu-rows.tsx';
 import { defineMenuRowParts, menuSlotRowOf } from './menu-parts.tsx';
 
@@ -210,6 +211,7 @@ function OpenContextMenu({
   children,
 }: PptxEditorContextMenuProps & { readonly target: ContextMenuRequest }): ReactNode {
   const { t } = useTranslation();
+  const editor = usePptxEditor();
   // `disabled` turning on closes an open menu.
   useEffect(() => {
     if (disabled) target.close();
@@ -225,7 +227,8 @@ function OpenContextMenu({
     } = arrangeMenuRows(CANVAS_CONTEXT_MENUS[target.kind], flatten(children), menuSlotRowOf);
     content = (
       <>
-        <MenuEntries entries={shown} overrides={overrides} />
+        {/* New comment shows only while a comments pane can open a draft. */}
+        <MenuEntries entries={canvasMenuRows(shown, editor)} overrides={overrides} />
         {extras.length ? <MenuSeparator /> : null}
         {extras}
       </>
@@ -244,4 +247,30 @@ function OpenContextMenu({
       <MenuCloseContext.Provider value={target.close}>{content}</MenuCloseContext.Provider>
     </ContextMenu>
   );
+}
+
+/**
+ * The `popups` the sugar passes to the root: the host's entries, with `contextMenu` and
+ * `hyperlinkPopup` mapped onto the same entries. A host entry wins. @internal
+ */
+export function sugarPopups(
+  popups: PptxEditorPopups | undefined,
+  hyperlinkPopup: boolean | undefined,
+  contextMenu: boolean | PptxEditorContextMenuProps | undefined,
+  /** The menu the entry renders: `PptxEditor.ContextMenu`. */
+  Menu: (props: PptxEditorContextMenuProps) => ReactNode
+): PptxEditorPopups | undefined {
+  const linkOff = hyperlinkPopup === false && popups?.hyperlink === undefined;
+  const menuEntry =
+    popups?.contextMenu !== undefined || contextMenu === undefined || contextMenu === true
+      ? undefined
+      : contextMenu === false
+        ? (false as const)
+        : (props: PptxEditorContextMenuProps) => <Menu {...props} {...contextMenu} />;
+  if (!linkOff && menuEntry === undefined) return popups;
+  return {
+    ...popups,
+    ...(linkOff ? { hyperlink: false as const } : {}),
+    ...(menuEntry !== undefined ? { contextMenu: menuEntry } : {}),
+  };
 }

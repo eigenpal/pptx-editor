@@ -164,17 +164,18 @@ const isSlideEntry = (el: Element): boolean => el.ns === NS.p && el.local === 's
  * The presentation part with its slide lists made consistent, or undefined when they are.
  *
  * - A slide entry (`p:sldId`) whose `r:id` names no relationship goes, with its section entries.
- *   A slide that one peer deletes while another moves it comes back in `p:sldIdLst` and in its
- *   section: the move inserts both entries again. The delete wins, as a deletion wins over a
- *   concurrent move in DOCX Editor (`paragraph-text-deletions.ts`). DOCX Editor records the
- *   deletion; here it is inferred from the missing relationship. A peer update that Yjs keeps
- *   pending is not in the package yet, so it cannot make a live entry look dead (the test of a
- *   move that arrives before its slide shows this).
+ * A slide that one peer deletes while another moves it comes back in `p:sldIdLst` and in its
+ * section: the move inserts both entries again. The delete wins, as a deletion wins over a
+ * concurrent move in DOCX Editor
+ * (`packages/pro/src/collaboration/document/paragraph-text-deletions.ts`). DOCX Editor records the
+ * deletion; here it is inferred from the missing relationship. A peer update that Yjs keeps pending
+ * is not in the package yet, so it cannot make a live entry look dead (the test of a move that
+ * arrives before its slide shows this).
  * - A section entry (`p14:sldId`) that names no slide of the list goes, and a slide that two
  *   sections name stays in one: walking the slides in list order, the first section at or after
  *   the section of the slide before. Each section then lists its slides in list order. An undo
  *   of a delete puts the slide back in its old section while a peer's move put it in another;
- *   a presentation app repairs a file that names a slide twice.
+ *   a presentation app repairs a file that names a slide twice. DOCX Editor commit adf0e178.
  *
  * Every replica that sees the lists computes the same result, so two that repair at once remove
  * the same records. A file that arrives with such lists is made valid the same way.

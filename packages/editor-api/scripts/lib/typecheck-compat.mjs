@@ -1,4 +1,4 @@
-// Copied from DOCX Editor packages/editor-api/scripts/lib/typecheck-compat.mjs at commit 5993bd223945cabdaf3900557d9fb59bfd8c2d8c.
+// Copied from DOCX Editor packages/editor-api/scripts/lib/typecheck-compat.mjs at commit adf0e178.
 // Changes: none; only this header is new.
 /**
  * A thin, in-process wrapper around the real TypeScript compiler (`ts.createProgram`) for a

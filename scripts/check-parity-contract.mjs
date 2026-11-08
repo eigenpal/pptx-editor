@@ -6,7 +6,7 @@
 // mount probes for `class`, `className`, and every mapped slot
 // (`packages/vue/test/parity-shape.ts`). The Vue prop types derive from those runtime props, so
 // a hand-written interface cannot hide a drift. The contract is
-// `scripts/parity/parity.contract.json`.
+// `scripts/parity/parity.contract.json`. DOCX Editor commit adf0e178.
 //
 // Fails on any drift the contract does not acknowledge:
 // - a React component export with a props type has no `components` entry and no

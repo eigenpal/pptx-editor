@@ -15,6 +15,9 @@ import { DEFAULT_TABLE_STYLE_ID, defaultTableStyleId } from '../../cascade/index
 import { createPptxEditor, type PptxEditorInstance } from '../index.ts';
 import { OpBatch } from '../../automation/commands/op-batch.ts';
 import { applyTableKey, tableKeyAction } from '../table-keys.ts';
+import { cellItem, tableItem } from '../table-cells.ts';
+import { caretAt, textFrameMatrix } from '../surface-geometry.ts';
+import { apply } from '../../layout/index.ts';
 import { selectionScope } from '../../automation/commands/placement.ts';
 import { contextMenuSelection } from '../surface-context-menu.ts';
 import { readTable, type TableModel } from '../../automation/commands/table-model.ts';
@@ -22,7 +25,7 @@ import { readTable, type TableModel } from '../../automation/commands/table-mode
 const IN = 914_400;
 
 /** A 3 × 3 table: row 0 "A B C", row 1 "D E F", row 2 "G H I". */
-function deck(rows?: string, columns = [IN, IN, IN]): Uint8Array {
+function deck(rows?: string, columns = [IN, IN, IN], rtl = false): Uint8Array {
   const letters = (r: number) =>
     ['ABC', 'DEF', 'GHI'][r]
       .split('')
@@ -40,7 +43,7 @@ function deck(rows?: string, columns = [IN, IN, IN]): Uint8Array {
             cx: columns.reduce((a, b) => a + b, 0),
             cy: 3 * 370_840,
             columns,
-            tblPr: `<a:tblPr firstRow="1" bandRow="1"><a:tableStyleId>${DEFAULT_TABLE_STYLE_ID}</a:tableStyleId></a:tblPr>`,
+            tblPr: `<a:tblPr${rtl ? ' rtl="1"' : ''} firstRow="1" bandRow="1"><a:tableStyleId>${DEFAULT_TABLE_STYLE_ID}</a:tableStyleId></a:tblPr>`,
             rows: rows ?? [0, 1, 2].map((r) => `<a:tr h="370840">${letters(r)}</a:tr>`).join(''),
           }),
       },
@@ -274,5 +277,95 @@ describe('review fixes: links, resize, bullets, scope', () => {
     ];
     expect(e.exec({ type: 'setTransforms', items }).ok).toBe(true);
     expect(model(e).rows.map((r) => attr(r, 'h'))).toEqual(rowsBefore);
+  });
+});
+
+/** A cell of one right-to-left paragraph. */
+const rtlCell = (text: string, lang = 'he-IL'): string =>
+  '<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr rtl="1"/>' +
+  `<a:r><a:rPr lang="${lang}"/><a:t>${text}</a:t></a:r></a:p></a:txBody><a:tcPr/></a:tc>`;
+
+/** The caret's x in the slide, from the painted caret geometry of the selection. */
+function caretSlideX(e: PptxEditorInstance): number {
+  const sel = e.snapshot().selection;
+  if (sel.kind !== 'text' || !sel.cell) throw new Error('no cell caret');
+  const frame = tableItem(e.session!.layout(0), sel.nodeId)!;
+  return caretAt(cellItem(frame, sel.cell)!, sel.focus)!.x1;
+}
+
+/** The left and right x of the text of a cell, in the slide. */
+function textEdges(e: PptxEditorInstance, column: number): [number, number] {
+  const frame = tableItem(e.session!.layout(0), frameId(e))!;
+  const item = cellItem(frame, { row: 0, column })!;
+  const line = item.text!.lines[0];
+  const xs = [...line.caretX, ...(line.bidi?.trailingX ?? [])];
+  const m = textFrameMatrix(item)!;
+  return [apply(m, Math.min(...xs), line.top).x, apply(m, Math.max(...xs), line.top).x];
+}
+
+describe('arrow keys in a table that runs right to left', () => {
+  test('Left at the edge of a cell moves to the cell on its left, the next one', async () => {
+    const e = await open(deck(undefined, undefined, true));
+    caretIn(e, 0, 1, 0);
+    expect(press(e, 'ArrowLeft')).toBe(true);
+    // The caret enters at the edge that faces the cell it came from: the right edge of `C`.
+    expect(e.snapshot().selection).toMatchObject({
+      cell: { row: 0, column: 2 },
+      focus: { offset: 1 },
+    });
+    caretIn(e, 0, 1, 1);
+    expect(press(e, 'ArrowRight')).toBe(true);
+    expect(e.snapshot().selection).toMatchObject({
+      cell: { row: 0, column: 0 },
+      focus: { offset: 0 },
+    });
+    // Shift with Left starts a cell range with the cell on the left.
+    caretIn(e, 0, 1, 0);
+    expect(press(e, 'ArrowLeft', true)).toBe(true);
+    expect(e.snapshot().selection).toMatchObject({
+      kind: 'cells',
+      anchor: { row: 0, column: 1 },
+      focus: { row: 0, column: 2 },
+    });
+  });
+
+  test('Left walks through each cell of right-to-left text and numbers', async () => {
+    const row = `<a:tr h="370840">${rtlCell('אבג')}${rtlCell('120')}${rtlCell('דהו')}</a:tr>`;
+    const e = await open(deck(row, undefined, true));
+    caretIn(e, 0, 0, 0);
+    // The left edge of `אבג` (offset 3), then into `120` at its right edge.
+    expect(press(e, 'ArrowLeft')).toBe(false);
+    caretIn(e, 0, 0, 3);
+    expect(press(e, 'ArrowLeft')).toBe(true);
+    expect(e.snapshot().selection).toMatchObject({ cell: { row: 0, column: 1 } });
+    expect(caretSlideX(e)).toBeCloseTo(textEdges(e, 1)[1], 0);
+    // The next Left steps inside `120`; it does not skip to the next cell.
+    expect(press(e, 'ArrowLeft')).toBe(false);
+  });
+
+  test('in a left-to-right table, Right enters a Hebrew cell at its left edge', async () => {
+    const row = `<a:tr h="370840">${rtlCell('אבג')}${rtlCell('דהו')}${cell('x')}</a:tr>`;
+    const e = await open(deck(row));
+    // The caret at the right edge of the first cell's text: its logical start.
+    caretIn(e, 0, 0, 0);
+    expect(press(e, 'ArrowRight')).toBe(true);
+    expect(e.snapshot().selection).toMatchObject({ cell: { row: 0, column: 1 } });
+    expect(caretSlideX(e)).toBeCloseTo(textEdges(e, 1)[0], 0);
+    expect(press(e, 'ArrowRight')).toBe(false);
+  });
+
+  test('a cell of vertical text is entered at its logical end', async () => {
+    const vertical =
+      '<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr rtl="1"/>' +
+      '<a:r><a:rPr lang="he-IL"/><a:t>אבג</a:t></a:r></a:p></a:txBody>' +
+      '<a:tcPr vert="vert"/></a:tc>';
+    const row = `<a:tr h="370840">${cell('a')}${vertical}${cell('x')}</a:tr>`;
+    const e = await open(deck(row));
+    caretIn(e, 0, 2, 0);
+    expect(press(e, 'ArrowLeft')).toBe(true);
+    expect(e.snapshot().selection).toMatchObject({
+      cell: { row: 0, column: 1 },
+      focus: { paragraph: 0, offset: 3 },
+    });
   });
 });

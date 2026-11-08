@@ -3,7 +3,8 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/editor-api/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// After DOCX Editor's `packages/editor-api/src/runtime/client-object.ts` (commit 5993bd223945).
+// Adapted from DOCX Editor's `packages/editor-api/src/runtime/client-object.ts` (commit
+// 5993bd223945).
 //
 // A proxy is three things: the context it belongs to, the path that says whether it can be
 // addressed, and the properties a completed `load` filled in.

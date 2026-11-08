@@ -1,6 +1,8 @@
-// Collaboration peers on the canvas, after DOCX Editor's remote-selection and remote-caret
-// painters (`surface-remote-selection.ts`, `surface-remote-caret.ts`): a colored outline on the
-// shapes a peer selected, and a colored range and caret with the participant's name in text.
+// Collaboration peers on the canvas, after DOCX Editor's remote-selection and remote-caret painters
+// (`packages/core/src/editor/surface-remote-selection.ts`,
+// `packages/core/src/editor/surface-remote-caret.ts`): a colored outline on the shapes a peer
+// selected, and a colored range and caret with the participant's name in text. DOCX Editor commit
+// adf0e178.
 //
 // Editing chrome only: drawn in the surface overlay, never into the slide paint, thumbnails,
 // or the fidelity harness. The color is the participant's checked hex color, set as

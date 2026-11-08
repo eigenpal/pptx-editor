@@ -7,9 +7,9 @@
 // store. Kinds follow the reader's rule (`deriveKind`), so a rebuilt node has the kind it has
 // after save and reopen.
 //
-// Node ids stay replica-local: a key this replica already knows keeps its store id, so a
-// selection on an untouched shape survives a peer's edit. Unknown keys get fresh ids from the
-// part's counter. After DOCX Editor's materialize step (`pro/src/collaboration/document/`).
+// Node ids stay replica-local: a key this replica already knows keeps its store id, so a selection
+// on an untouched shape survives a peer's edit. Unknown keys get fresh ids from the part's counter.
+// After DOCX Editor's materialize step (`packages/pro/src/collaboration/document/` at adf0e178).
 
 import { MAX_XML_DEPTH, XML_DEFAULT_MAX_ELEMENTS } from '@eigenpal/ooxml-core';
 import { deriveKind } from '../package/node-kinds.ts';

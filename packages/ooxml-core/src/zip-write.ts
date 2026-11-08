@@ -1,4 +1,4 @@
-// Copied from docx-editor/packages/core/src/store/package/zip-write.ts at 7cd3776a (EigenPal).
+// Adapted from docx-editor/packages/core/src/store/package/zip-write.ts at 7cd3776a (EigenPal).
 // It also holds fixes that DOCX Editor does not have yet: P6.
 // Keep it equal to that file plus those fixes.
 // Deterministic ZIP writing in steps.

@@ -25,11 +25,16 @@ export type RibbonTabId =
   | 'view'
   | 'shapeFormat'
   | 'pictureFormat'
+  | 'chartDesign'
+  | 'diagramDesign'
   | 'tableDesign'
   | 'tableLayout';
 
-/** What a contextual tab waits for: shapes, a picture, or a table in the selection. @public */
-export type RibbonContext = 'shape' | 'picture' | 'table';
+/**
+ * What a contextual tab waits for: shapes, a picture, a chart, a diagram, or a table in the
+ * selection. @public
+ */
+export type RibbonContext = 'shape' | 'picture' | 'chart' | 'diagram' | 'table';
 
 /** Some controls of one registry group, in the given order. @public */
 export interface RibbonGroupPick {
@@ -64,7 +69,10 @@ const ARRANGE: RibbonGroupPick = {
 };
 
 /** The Insert group in the reference order: pictures, shapes, then text box. */
-const INSERT: RibbonGroupPick = { id: 'insert', controls: ['image', 'shape', 'line', 'textBox'] };
+const INSERT: RibbonGroupPick = {
+  id: 'insert',
+  controls: ['image', 'shape', 'line', 'textBox', 'equation'],
+};
 
 /**
  * The ribbon, in the reference order. A group may sit on more than one tab:
@@ -128,6 +136,18 @@ export const RIBBON_TABS: readonly RibbonTab[] = [
     context: 'picture',
   },
   {
+    id: 'chartDesign',
+    labelKey: 'ribbon.tabs.chartDesign',
+    groups: ['chart', ARRANGE],
+    context: 'chart',
+  },
+  {
+    id: 'diagramDesign',
+    labelKey: 'ribbon.tabs.diagramDesign',
+    groups: ['diagram', ARRANGE],
+    context: 'diagram',
+  },
+  {
     id: 'tableDesign',
     labelKey: 'ribbon.tabs.tableDesign',
     groups: [
@@ -183,18 +203,22 @@ export interface RibbonTabLayout {
 }
 
 /** What a contextual tab reads from the snapshot. @public */
-export type RibbonSelection = Pick<EditorSnapshot, 'selection' | 'image' | 'table'>;
+export type RibbonSelection = Pick<EditorSnapshot, 'selection' | 'image' | 'table'> &
+  Partial<Pick<EditorSnapshot, 'chart' | 'diagram'>>;
 
 /** Whether a contextual tab's context holds for `snapshot`. @public */
 export function ribbonContextActive(snapshot: RibbonSelection, context: RibbonContext): boolean {
   switch (context) {
     case 'shape':
       // Shapes are selected, or the text of a shape is being edited, as in the reference
-      // application. Pictures alone show Picture Format, and a table shows its two tabs.
+      // application. Pictures alone show Picture Format, a chart shows Chart Design, a
+      // diagram shows Diagram Design, and a table shows its two tabs.
       return (
         (snapshot.selection.kind === 'shapes' || snapshot.selection.kind === 'text') &&
         snapshot.image == null &&
-        !snapshot.table
+        !snapshot.table &&
+        !snapshot.chart &&
+        !snapshot.diagram
       );
     case 'table':
       // The selection is in or on a table (`tableChromeVisible`).
@@ -202,6 +226,12 @@ export function ribbonContextActive(snapshot: RibbonSelection, context: RibbonCo
     case 'picture':
       // Every selected element is a picture.
       return snapshot.image != null;
+    case 'chart':
+      // Exactly one chart frame is selected.
+      return snapshot.chart != null;
+    case 'diagram':
+      // A diagram frame is selected, or a diagram shape holds the caret.
+      return snapshot.diagram != null;
   }
 }
 

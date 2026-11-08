@@ -1,5 +1,6 @@
 /** @jsxImportSource react */
-// Provider-first host for the editor facade (docx-editor/packages/react/src/editor/DocxEditorRoot.tsx).
+// Provider-first host for the editor facade
+// (docx-editor/packages/react/src/editor/DocxEditorRoot.tsx). DOCX Editor commit adf0e178.
 //
 // `Root` renders no DOM of its own: it creates the instance in an effect (StrictMode-safe: a
 // fresh instance per effect run, destroyed on cleanup), publishes it through context, and lets
@@ -25,6 +26,7 @@ import {
   translateKeyOrText,
   warnModulesChanged,
   type ColorMode,
+  type ClipboardDrawingReader,
   type CommandResult,
   type LoadOptions,
   type EditorCommand,
@@ -97,6 +99,18 @@ export interface PptxEditorRootProps {
    * once, when the editor is created.
    */
   readonly autoCorrect?: boolean;
+  /**
+   * Reads the DrawingML clipboard package from the system clipboard, for a desktop host that
+   * can. A paste of copied shapes from another application then pastes editable shapes, not
+   * their picture. See `PptxEditorOptions.readClipboardDrawing`. Read once, when the editor is
+   * created.
+   */
+  readonly readClipboardDrawing?: ClipboardDrawingReader;
+  /**
+   * The author of later comments and replies, as DOCX Editor's `author` prop. A change applies
+   * without a remount (`setAuthor`); existing comments keep their authors.
+   */
+  readonly author?: string;
   /** Customize the dialogs the editor mounts. Set an entry to `false` to turn one off. */
   readonly popups?: PptxEditorPopups;
   /**
@@ -172,6 +186,8 @@ export const PptxEditorRoot = forwardRef<PptxEditorRef, PptxEditorRootProps>(
         ...(props.fonts ? { fonts: props.fonts } : {}),
         ...(props.modules ? { modules: props.modules } : {}),
         ...(props.autoCorrect === false ? { autoCorrect: false } : {}),
+        ...(props.readClipboardDrawing ? { readClipboardDrawing: props.readClipboardDrawing } : {}),
+        ...(props.author ? { author: props.author } : {}),
         onFontError: (error) => reportFontError(error, callbacks.current.onFontError),
         translate: (key, params) => translateKeyOrText(tRef.current, key, params),
       });
@@ -203,6 +219,12 @@ export const PptxEditorRoot = forwardRef<PptxEditorRef, PptxEditorRootProps>(
     useEffect(() => {
       editor?.setMode(mode);
     }, [editor, mode]);
+
+    // A new author applies to later comments; the instance ignores the same name.
+    const author = props.author;
+    useEffect(() => {
+      editor?.setAuthor(author);
+    }, [editor, author]);
 
     // A `modules` change after creation has no effect: say so in development. The check is by
     // the identity of each module, so an inline array of the same modules does not warn.

@@ -170,7 +170,7 @@ export const LinkPopupHost = defineComponent({
       // Keep the live region mounted so reading and copy state changes are announced.
       const live = (
         <span class="pptx-sr-only" role="status" aria-live="polite">
-          {linkPopupAnnouncement(s, t)}
+          {linkPopupAnnouncement(s, t, editorRef.value?.snapshot().customShows)}
         </span>
       );
       if (s.mode === 'closed') return live;

@@ -1,4 +1,4 @@
-// Copied from DOCX Editor `packages/core/src/editor/__tests__/font-composition.test.ts` at commit 5993bd223.
+// Copied from DOCX Editor `packages/core/src/editor/__tests__/font-composition.test.ts` at commit adf0e178.
 // Keep the exported API equal to the source.
 
 // Composition of font origins into one FontConfiguration (font-resolution-overhaul 1.1).

@@ -1,4 +1,4 @@
-// Copied from DOCX Editor `packages/core/src/layout/font-deferred.ts` at commit 5993bd223.
+// Copied from DOCX Editor `packages/core/src/layout/font-deferred.ts` at commit adf0e178.
 // Keep the exported API equal to the source.
 
 // Faces an origin delivers after the first paint (`FontConfigurationFragment.deferred`).
@@ -219,4 +219,14 @@ export async function composeLateOrigins(
     if (!signal?.aborted) host.report(first.originIndex, cause);
     return undefined;
   }
+}
+
+/**
+ * The failure of a background composition that took `steps` deferred steps already, or
+ * undefined while it may take more: a resolver whose answers defer forever must stop.
+ */
+export function deferredStepsSpent(steps: number): RangeError | undefined {
+  return steps >= MAX_DEFERRED_STEPS
+    ? new RangeError(`Font loading stopped after ${MAX_DEFERRED_STEPS} deferred steps`)
+    : undefined;
 }

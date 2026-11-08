@@ -20,10 +20,11 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 //   peer moved (the walk left stops at a character that shows where it is), so the text keeps
 //   its order in the run or paragraph that now holds its neighbours.
 //
-// DOCX Editor ties moved text to its source characters (`split-text-sources.ts`), so its undo
-// moves nothing back; this pass reaches the same text after the fact. Only the undoing replica
-// knows which characters its undo put back, so only it writes the repair, as part of the undo's
-// own step: a redo reverts it with the undo. Everything read is bounded.
+// DOCX Editor ties moved text to its source characters
+// (`packages/pro/src/collaboration/document/split-text-sources.ts` at adf0e178), so its undo moves
+// nothing back; this pass reaches the same text after the fact. Only the undoing replica knows
+// which characters its undo put back, so only it writes the repair, as part of the undo's own step:
+// a redo reverts it with the undo. Everything read is bounded.
 
 import * as Y from 'yjs';
 import { F, type Room } from './schema.ts';
@@ -308,9 +309,9 @@ export function textsOfMarks(room: Room, keys: Iterable<string | null>): Set<Y.T
 /** The texts of `parts` that hold a live character an undo or a redo put back. */
 export function restoredTextsOf(room: Room, parts: ReadonlySet<string>): Set<Y.Text> {
   const texts = new Set<Y.Text>();
-  let looked = 0;
-  for (const key of room.doc.getMap(RESTORED_KEY).keys()) {
-    if ((looked += 1) > MAX_RESTORED) break;
+  // The keys in one order on every replica before the cap, so each looks at the same marks.
+  const keys = [...room.doc.getMap(RESTORED_KEY).keys()].sort().slice(0, MAX_RESTORED);
+  for (const key of keys) {
     for (const text of textsOfMarks(room, [key])) {
       const part = partOfText(room, text);
       if (part !== null && parts.has(part)) texts.add(text);

@@ -14,9 +14,6 @@ import {
   ARROW_MITER_LIMIT,
   drawingRenderers,
   hasCharacters,
-  isOpenPath,
-  lineEndReach,
-  multiply as multiplyMatrix,
   outsideDashArray,
   planStroke,
   strokeWidth,
@@ -27,8 +24,16 @@ import {
   type Matrix,
   type SlideLayout,
 } from '../layout/index.ts';
-import { effectDefs, effectElement, shadowCopy, type EffectSource } from './paint-effects.ts';
-import { boundsOf, cornersUnder, grow, PX } from './effect-transforms.ts';
+import {
+  effectDefs,
+  effectElement,
+  facetElements,
+  shadowCopy,
+  type EffectSource,
+} from './paint-effects.ts';
+import { threeDColor } from './painter-math.ts';
+import { boundsOf, PX } from './effect-transforms.ts';
+import { boxCorners, contentCorners } from './item-corners.ts';
 import {
   fillPaint,
   pictureImage,
@@ -657,55 +662,116 @@ export function paintItem(
       const aria = item.kind === 'picture' && opts.altText ? pictureAria(el, opts.altText) : {};
       const outer = svg(doc, 'g', { ...common, 'data-kind': item.kind, ...aria });
       const effects = item.element.effects;
-      // Glow, inner shadow, reflection, and soft edge paint only through the installed effects
-      // renderer (`@pptx-editor.dev/pro/drawing`); the outer shadow is the engine's.
+      // Glow, inner shadow, reflection, soft edge, blur, and 3-D paint only through the installed
+      // effects renderer (`@pptx-editor.dev/pro/drawing`); outer and preset shadows are the
+      // engine's.
       const pro = effects ? drawingRenderers().effects : undefined;
       const ids = ctx.defs;
+      const threeD =
+        pro?.threeD && effects?.threeD
+          ? pro.threeD({
+              effects,
+              paths: item.geometry.paths,
+              matrix: item.matrix,
+              width: el.xfrm.cx,
+              height: el.xfrm.cy,
+              color: threeDColor(item.element.fill),
+            })
+          : null;
+      const extrusion = threeD ? facetElements(doc, threeD.behind, SEAM) : [];
+      // A face turned edge-on paints only its extrusion: it has no area to paint or to copy.
+      if (threeD && !threeD.showsFace) {
+        for (const node of extrusion) outer.appendChild(node);
+        return outer;
+      }
       const body = svg(doc, 'g', { transform: matrixAttr(item.matrix) });
+      if (threeD) for (const node of facetElements(doc, threeD.under, SEAM)) body.appendChild(node);
       for (const node of paintGeometry(doc, item, local, parentScale)) body.appendChild(node);
+      // The bevel shades the geometry, under the text (ECMA-376 Part 1, 20.1.5.1).
+      if (threeD) for (const node of facetElements(doc, threeD.over, SEAM)) body.appendChild(node);
       const bodyFx =
         pro && effects && (effects.softEdge || effects.innerShadow)
           ? pro.body(effects, boundsOf(boxCorners(item)), ids)
           : null;
       if (bodyFx) effectDefs(ctx.defs, bodyFx.defs);
       const copies = effects?.outerShadow || (pro && (effects?.reflection || effects?.glow));
-      // The body and the text paint in a group of their own only for the copies to refer to.
-      const content = copies ? svg(doc, 'g') : outer;
-      content.appendChild(
+      // A turned camera turns the face and its text about the shape's center, and the regions
+      // of the effects that copy the face turn with it.
+      const front = threeD?.front.some((v, i) => v !== IDENTITY[i]) ? threeD.front : undefined;
+      let cornerCache: { x: number; y: number }[] | undefined;
+      const cornersOf = (): { x: number; y: number }[] =>
+        (cornerCache ??= front
+          ? contentCorners(item).map((q) => applyMatrix(front, q.x, q.y))
+          : contentCorners(item));
+      const blurFx =
+        pro?.blur && effects?.blur ? pro.blur(effects, boundsOf(cornersOf()), ids) : null;
+      if (blurFx) effectDefs(ctx.defs, blurFx.defs);
+      // The body and the text paint in a group of their own only for a filter or the copies to
+      // refer to. Without copies, the extrusion lies under the face.
+      if (!copies) for (const node of extrusion) outer.appendChild(node);
+      const content = copies || blurFx ? svg(doc, 'g') : outer;
+      const face = front ? svg(doc, 'g') : undefined;
+      if (face && front)
+        content.appendChild(svg(doc, 'g', { transform: matrixAttr(front) }, [face]));
+      const parts = face ?? content;
+      parts.appendChild(
         bodyFx ? svg(doc, 'g', { filter: `url(#${bodyFx.filter})` }, [body]) : body
       );
       // An empty body's caret line draws nothing: no group for it. A copy of the content (a
-      // shadow, a reflection, a glow) can carry a line from out of view into it: every line
-      // of such a shape paints.
+      // shadow, a reflection, a glow), a blur, or a turned face can carry a line from out of
+      // view into it: every line of such a shape paints.
       if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text)) {
         const shows =
-          effects?.outerShadow || effects?.reflection || effects?.glow
+          effects?.outerShadow || effects?.reflection || effects?.glow || blurFx || threeD
             ? undefined
             : showsIn(opts.view, item.textMatrix);
-        content.appendChild(paintText(doc, item.text, local, shows, matrixAttr(item.textMatrix)));
+        parts.appendChild(paintText(doc, item.text, local, shows, matrixAttr(item.textMatrix)));
       }
-      if (!effects || !copies) return outer;
+      const shown = blurFx
+        ? svg(doc, 'g', { filter: `url(#${blurFx.filter})` }, [content])
+        : content;
+      if (!effects || !copies) {
+        if (shown !== outer) outer.appendChild(shown);
+        return outer;
+      }
+      const corners = cornersOf();
       // Shadow, reflection, and glow use the content, text included (design D1 of `effects-fidelity`).
       const contentId = ctx.defs.id('content');
       content.setAttribute('id', contentId);
+      const faceId = face ? ctx.defs.id('face') : undefined;
+      if (face && faceId) face.setAttribute('id', faceId);
       const source: EffectSource = {
         contentId,
         matrix: item.matrix,
         width: el.xfrm.cx,
         height: el.xfrm.cy,
-        corners: contentCorners(item),
+        corners,
+        ...(front && faceId ? { face: { id: faceId, corners: contentCorners(item), front } } : {}),
       };
       const reflection = pro && effects.reflection ? pro.reflection(effects, source, ids) : null;
       if (reflection) {
         effectDefs(ctx.defs, reflection.defs);
         outer.appendChild(effectElement(doc, reflection.node));
       }
+      // A preset shadow's second copy lies under its first.
+      const second = shadowCopy(ctx.defs, effects, source, 'secondShadow');
+      if (second) outer.appendChild(second);
       const shadow = shadowCopy(ctx.defs, effects, source);
       if (shadow) outer.appendChild(shadow);
-      const glow = pro && effects.glow ? pro.glow(effects, boundsOf(source.corners), ids) : null;
+      // The glow lies under the extrusion: a copy that paints the glow alone, then the sides.
+      const under = extrusion.length > 0;
+      const glow =
+        pro && effects.glow ? pro.glow(effects, boundsOf(source.corners), ids, under) : null;
       if (glow) effectDefs(ctx.defs, glow.defs);
+      if (glow && under)
+        outer.appendChild(
+          svg(doc, 'g', { filter: `url(#${glow.filter})`, 'data-effect': 'glow' }, [
+            svg(doc, 'use', { href: `#${contentId}` }),
+          ])
+        );
+      for (const node of extrusion) outer.appendChild(node);
       outer.appendChild(
-        glow ? svg(doc, 'g', { filter: `url(#${glow.filter})` }, [content]) : content
+        glow && !under ? svg(doc, 'g', { filter: `url(#${glow.filter})` }, [shown]) : shown
       );
       return outer;
     }
@@ -787,63 +853,9 @@ export function paintChildren(
   return { next: i, spent };
 }
 
-/**
- * How far the outline can paint past the shape's geometry, in slide space: a picture's outline
- * lies outside it, a shape's is centered, a miter join reaches up to half the miter limit times
- * the width, and line ends reach further. Effect filter regions grow by this, so they never cut
- * the outline off.
- */
-function outlineReach(item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>): number {
-  const line = item.element.line;
-  if (!line || line.fill.type === 'none') return 0;
-  const width = Math.max(line.width, PX);
-  const join = line.join === 'miter' ? Math.max(2, line.miterLimit / 2) : 2;
-  const ends =
-    item.kind === 'shape' && item.geometry.paths.some((p) => p.stroke && isOpenPath(p.commands));
-  return Math.max(width * join, ends ? lineEndReach(line) : 0);
-}
-
-/**
- * The slide-space corners of a shape's box and geometry, with its outline. Geometry can reach
- * past the box (a callout tail, `a:custGeom`); a Bezier curve lies inside its control points.
- */
-function boxCorners(
-  item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>
-): { x: number; y: number }[] {
-  const { cx, cy } = item.element.xfrm;
-  const m = item.matrix;
-  const points = cornersUnder(m, cx, cy);
-  for (const path of item.geometry.paths)
-    for (const c of path.commands) {
-      if (c.op === 'Z') continue;
-      if (c.op === 'C') points.push(applyMatrix(m, c.x1, c.y1), applyMatrix(m, c.x2, c.y2));
-      else if (c.op === 'Q') points.push(applyMatrix(m, c.x1, c.y1));
-      points.push(applyMatrix(m, c.x, c.y));
-    }
-  const b = grow(boundsOf(points), outlineReach(item));
-  return [
-    { x: b.x, y: b.y },
-    { x: b.r, y: b.y },
-    { x: b.r, y: b.b },
-    { x: b.x, y: b.b },
-  ];
-}
-
-/** Slide-space corners of a shape's box, its outline, and its text frame (text can overflow the box). */
-function contentCorners(
-  item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>
-): { x: number; y: number }[] {
-  const out = boxCorners(item);
-  if (item.kind === 'shape' && item.text && item.textMatrix && hasCharacters(item.text)) {
-    const b = item.text.box;
-    const h = Math.max(b.height, item.text.contentHeight);
-    const frame: Matrix = [1, 0, 0, 1, b.x, b.y];
-    // Rotated text can extend either way: take the box as a square of its larger side.
-    const side = item.text.rotation % 180 !== 0 ? Math.max(b.width, h) : 0;
-    out.push(...cornersUnder(multiplyMatrix(item.textMatrix, frame), side || b.width, side || h));
-  }
-  return out;
-}
+/** The outline width that closes the antialiased seams between 3-D polygons: half a pixel. */
+const SEAM = PX / 2;
+const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
 
 /** Paint a slide into a new `<svg>` sized by viewBox in EMU. The caller sets CSS size. */
 export function paintSlide(doc: Document, layout: SlideLayout, opts: PaintOptions): SVGSVGElement {

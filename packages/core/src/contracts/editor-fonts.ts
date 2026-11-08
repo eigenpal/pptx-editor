@@ -1,4 +1,4 @@
-// Copied from DOCX Editor `packages/core/src/contracts/editor-fonts.ts` at commit 5993bd223.
+// Copied from DOCX Editor `packages/core/src/contracts/editor-fonts.ts` at commit adf0e178.
 // Keep the exported API equal to the source.
 
 // The editor's font configuration contract. Split from `editor.ts`, which re-exports it.

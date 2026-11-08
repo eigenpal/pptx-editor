@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Copied from docx-editor/packages/docx-to-pdf/src/fontkit.d.ts (EigenPal).
+// Copied from docx-editor/packages/docx-to-pdf/src/fontkit.d.ts at adf0e178 (EigenPal).
 declare module 'fontkit' {
   export interface FontkitFont {
     readonly underlinePosition: number;

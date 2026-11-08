@@ -1,7 +1,7 @@
 // Adversarial tests for runtime-sink sanitization and inert executable content. All functions
 // are pure string transforms, so no external request is possible.
 //
-// Ported from docx-editor/packages/core/src/store/__tests__/sinks.test.ts (EigenPal,
+// Adapted from docx-editor/packages/core/src/store/__tests__/sinks.test.ts at 26095c632 (EigenPal,
 // Apache-2.0). The field-instruction checks keep DOCX field names: the module classifies them
 // the same way for both products. The last block adds the checked escapes the save path uses.
 

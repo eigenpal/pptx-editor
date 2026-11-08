@@ -32,7 +32,7 @@ import {
   splitParagraph,
 } from './text-model.ts';
 import { cleanText } from './text-units.ts';
-import { diffHunks, type TextHunk } from './text-diff.ts';
+import { diffHunks, type TextHunk } from '../../store/package/text-diff.ts';
 
 /** The body placeholder of a notes slide. */
 function notesBody(pkg: PptxPackage, notesPart: string): Element | undefined {

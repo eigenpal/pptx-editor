@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Mirrors the Vue adapter's source tree against the React adapter's, after DOCX Editor's
 // scripts/check-adapter-mirror.mjs: every Vue source file has a React twin at the same relative
-// path (`.ts` and `.tsx` count as one), unless the list below names it with a reason. The list
-// only shrinks: an entry whose file is gone, or that now has a twin, fails as stale. Names
-// compare by exact case, so a check on a case-insensitive file system agrees with CI.
+// path (`.ts` and `.tsx` count as one), unless the list below names it with a reason. The list only
+// shrinks: an entry whose file is gone, or that now has a twin, fails as stale. Names compare by
+// exact case, so a check on a case-insensitive file system agrees with CI. DOCX Editor commit
+// adf0e178.
 //
 // React files with no Vue twin are listed the same way (`reactOnly`). DOCX Editor checks only
 // the Vue side; here both sides are small enough to hold to the same rule.
@@ -15,6 +16,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REACT_SRC = join(ROOT, 'packages/react/src');
 const VUE_SRC = join(ROOT, 'packages/vue/src');
+const PRO_REACT_SRC = join(ROOT, 'packages/pro/src/react');
+const PRO_VUE_SRC = join(ROOT, 'packages/pro/src/vue');
 
 const SKIP = [/(^|\/)__tests__\//];
 
@@ -44,12 +47,16 @@ export const REACT_ONLY = {
   'chrome-actions.tsx':
     'The React chrome action host (dialogs, find bar, link popup); Vue holds it in composables.ts and popups.ts.',
   'context.ts': 'The React contexts and hooks; Vue holds them in composables.ts.',
+  'dialog-exports.ts':
+    'The dialog re-exports of the React entry, split out for the line cap; Vue exports its dialogs from index.ts.',
   'dialog-sections.ts':
     'A re-export of the core dialog-section requests; the Vue dialogs import them from core directly.',
   'Loading.tsx': 'The Vue twin is loading.ts.',
   'PptxEditorRoot.tsx': 'The Vue twin is components.ts.',
   'Ribbon.tsx': 'The Vue twin is ribbon.ts.',
   'StatusBar.tsx': 'The Vue twin is status-bar.ts.',
+  'sugar-parts.ts':
+    'Helpers of the React <PptxEditor> sugar component; the Vue sugar component holds them in index.ts.',
   'toolbar-action.tsx': 'ToolbarAction; Vue holds it in toolbar-parts.ts.',
   'toolbar-named-parts.tsx': 'The named toolbar parts; Vue holds them in toolbar-parts.ts.',
   'Toolbar.tsx':
@@ -100,7 +107,15 @@ export function mirrorErrors({ reactFiles, vueFiles, vueOnly = VUE_ONLY, reactOn
 function main() {
   const reactFiles = walk(REACT_SRC);
   const vueFiles = walk(VUE_SRC);
-  const errors = mirrorErrors({ reactFiles, vueFiles });
+  // The Pro entries for the adapters mirror each other with no exceptions.
+  const proReact = walk(PRO_REACT_SRC);
+  const proVue = walk(PRO_VUE_SRC);
+  const errors = [
+    ...mirrorErrors({ reactFiles, vueFiles }),
+    ...mirrorErrors({ reactFiles: proReact, vueFiles: proVue, vueOnly: {}, reactOnly: {} }).map(
+      (error) => `pro: ${error}`
+    ),
+  ];
   if (errors.length) {
     console.error('✘ adapter mirror:\n');
     for (const error of errors) console.error(`  - ${error}`);
@@ -112,7 +127,7 @@ function main() {
   const vueOnly = Object.keys(VUE_ONLY).length;
   const reactOnly = Object.keys(REACT_ONLY).length;
   console.log(
-    `✓ adapter mirror: ${vueFiles.length} Vue and ${reactFiles.length} React files (${vueOnly} Vue-only and ${reactOnly} React-only, each with a reason).`
+    `✓ adapter mirror: ${vueFiles.length} Vue and ${reactFiles.length} React files, and ${proVue.length} and ${proReact.length} in Pro (${vueOnly} Vue-only and ${reactOnly} React-only, each with a reason).`
   );
 }
 

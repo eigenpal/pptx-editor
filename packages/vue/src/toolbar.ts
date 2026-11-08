@@ -1,10 +1,10 @@
 // The toolbar: the Vue twin of the React adapter's `PptxEditor.Toolbar`, with the same
-// customization ladder (DOCX Editor's toolbar.mdx): `class` and state attributes, `icon`,
-// `asChild`, `ToolbarSlot slotId` and `ToolbarGroup id` overrides with `hidden`, and
-// `preset` false. The arrangement comes from core (`arrangeToolbarGroups`,
-// `toolbarGroupsFor`), so a group override means the same in both adapters, and groups that do
-// not fit the width move into a More menu by core's rule (`toolbarCollapsedIds`). The markup and
-// classes match React's, so the one core stylesheet styles both.
+// customization ladder (DOCX Editor's docs/site/content/customization/toolbar.mdx): `class` and
+// state attributes, `icon`, `asChild`, `ToolbarSlot slotId` and `ToolbarGroup id` overrides with
+// `hidden`, and `preset` false. The arrangement comes from core (`arrangeToolbarGroups`,
+// `toolbarGroupsFor`), so a group override means the same in both adapters, and groups that do not
+// fit the width move into a More menu by core's rule (`toolbarCollapsedIds`). The markup and
+// classes match React's, so the one core stylesheet styles both. DOCX Editor commit adf0e178.
 //
 // `ToolbarSlot` and `ToolbarGroup` under a preset bar are descriptions: the bar reads their
 // props and renders the controls itself, as in DOCX Editor's Vue toolbar.

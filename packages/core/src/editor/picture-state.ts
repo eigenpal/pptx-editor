@@ -28,6 +28,32 @@ import {
   usableCrop,
 } from './picture-commands.ts';
 import { pictureStyleOf } from './picture-presets.ts';
+import { chartStateAt } from './chart-commands.ts';
+import { equationStateAt } from './equation-state.ts';
+import { diagramStateAt } from './diagram-commands.ts';
+
+export { chartDataAt } from './chart-commands.ts';
+
+/** The selected picture, chart, and equation, as the snapshot reports them. */
+export function selectedObjectsAt(
+  pkg: PptxPackage | undefined,
+  part: string | undefined,
+  selection: EditorSelection,
+  cropping: string | null,
+  layout?: SlideLayout
+): {
+  image: SelectedImageState | null;
+  chart: ReturnType<typeof chartStateAt>;
+  equation: ReturnType<typeof equationStateAt>;
+  diagram: ReturnType<typeof diagramStateAt>;
+} {
+  return {
+    image: pictureStateAt(pkg, part, selection, cropping, layout),
+    chart: chartStateAt(pkg, part, selection),
+    equation: equationStateAt(pkg, part, selection),
+    diagram: diagramStateAt(pkg, part, selection),
+  };
+}
 
 function elementAt(
   pkg: PptxPackage | undefined,

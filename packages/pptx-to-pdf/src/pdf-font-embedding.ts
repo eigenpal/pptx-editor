@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Copied from docx-editor/packages/docx-to-pdf/src/pdf-font-embedding.ts (EigenPal), with a local admitted-face type.
+// Adapted from docx-editor/packages/docx-to-pdf/src/pdf-font-embedding.ts at adf0e178 (EigenPal), with a local admitted-face type.
 // It is the only fsType check in this package. One difference: a face without OS/2 is refused.
 import { create as createFontkitFont, type FontkitCollection, type FontkitFont } from 'fontkit';
 

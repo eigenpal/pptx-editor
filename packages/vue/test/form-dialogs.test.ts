@@ -634,3 +634,32 @@ describe('the popups registry renders the packaged dialogs', () => {
       expect(document.querySelector('[data-pptx-dialog]') === null).toBe(true);
     });
 });
+
+describe('the Picture field of the Bullets and Numbering dialog', () => {
+  /** Pick `file` in the dialog's picture file input, and wait for the read. */
+  async function pick(file: File): Promise<string> {
+    const input = document.querySelector<HTMLInputElement>(
+      '[data-pptx-dialog="bulletsAndNumbering"] input[type="file"]'
+    )!;
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    await act(async () => {
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    await nextTick();
+    const field = input.closest('[data-pptx-part="picture"]') ?? input.parentElement!;
+    return field.querySelector('[role="status"]')?.textContent ?? '';
+  }
+
+  test('says why it refuses a file, in both adapters', async () => {
+    const svg = () =>
+      new File(['<svg xmlns="http://www.w3.org/2000/svg"/>'], 'a.svg', { type: 'image/svg+xml' });
+    const editor = await deck();
+    selectText(editor);
+    mountReact(createElement(RBulletsDialog, { open: true, onClose: () => {} }), editor);
+    expect(await pick(svg())).toBe('Choose a PNG, JPEG, or GIF picture.');
+    cleanup();
+    await mountVue(() => h(BulletsAndNumberingDialog, { open: true, onClose: () => {} }), editor);
+    expect(await pick(svg())).toBe('Choose a PNG, JPEG, or GIF picture.');
+  });
+});

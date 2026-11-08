@@ -25,6 +25,8 @@ const BOOT_STALL_MS = 15_000;
 const SLACK_MS = 3_000;
 
 type Mode = 'stall' | 'midstall' | 'lie' | 'trickle';
+/** The files the bench server sends. */
+const DECKS = new Set(['showcase.pptx', 'sample.pptx', 'blank.pptx']);
 
 let server: Server;
 let origin = '';
@@ -32,6 +34,8 @@ let origin = '';
 test.beforeAll(async () => {
   server = createServer((req, res) => {
     const [, mode, file] = (req.url ?? '').split('/') as [string, Mode, string];
+    // Only the demo's own decks: a request path never names another file.
+    if (!DECKS.has(file)) return void res.writeHead(404).end();
     const bytes = readFileSync(PUBLIC + file);
     const headers = { 'access-control-allow-origin': '*', 'content-type': 'application/zip' };
     if (mode === 'stall') return;

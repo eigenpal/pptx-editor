@@ -58,6 +58,7 @@ import { FontFamilyControl } from './FontFamilyControl.tsx';
 import { ImageControl, LinkControl } from './toolbar-file-controls.tsx';
 import { FillControl, LineMenuControl, ShapeGalleryControl } from './ShapeControls.tsx';
 import { EffectMenuControl, ShapeStyleGalleryControl } from './ShapeFormatControls.tsx';
+import { TextEffectsMenuControl } from './TextEffectsControl.tsx';
 import {
   LayoutControl,
   NewSlideControl,
@@ -407,6 +408,7 @@ const SHAPED_PARTS: Partial<Record<ChromeSlotId, Component>> = {
   'shape.lineEnd': LineMenuControl,
   'shape.styles': ShapeStyleGalleryControl,
   'shape.effects': EffectMenuControl,
+  'shape.textEffects': TextEffectsMenuControl,
   'slide.add': NewSlideControl,
   'slide.layout': LayoutControl,
   'section.add': SectionAddControl,

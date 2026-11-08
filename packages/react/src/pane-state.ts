@@ -1,7 +1,7 @@
 // The open state of the speaker notes, which the notes pane draws and host chrome (a View menu
 // row, a Notes button) can toggle. `PptxEditor.Root` holds it, so they agree without the host
 // wiring them. A notes pane given `open` is controlled by the host instead, as DOCX Editor's
-// `Navigation` is: it mirrors that value into the root, and a toggle from the hook goes to its
+// `Navigation` is: it writes that value into the root, and a toggle from the hook goes to its
 // `onOpenChange`.
 
 import { createContext, useCallback, useContext, useMemo, useRef, type CSSProperties } from 'react';

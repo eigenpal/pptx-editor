@@ -1,4 +1,4 @@
-// Tests for the stepped ZIP writer (`zip-write.ts`). The first block is ported from
+// Tests for the stepped ZIP writer (`zip-write.ts`). The first block is adapted from
 // docx-editor/packages/core/src/store/package/__tests__/zip-write.test.ts at 7cd3776a (EigenPal), with WordprocessingML
 // part names replaced by PresentationML ones. The second block reads every saved archive with
 // an independent reader: `node:zlib` inflates each entry and `Bun.hash.crc32` checks each CRC,

@@ -10,11 +10,16 @@
     "pdf-export",
     "print",
     "charts",
+    "diagrams",
     "chat-panel",
     "east-asian-text",
     "long-decks",
     "tables",
     "copy-and-paste",
+    "animations",
+    "text-warp",
+    "equations",
+    "3d-effects",
     "undo-history"
   ]
 }

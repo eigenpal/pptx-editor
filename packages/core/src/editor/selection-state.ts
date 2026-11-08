@@ -16,6 +16,7 @@ import type {
   PatternFill,
   PatternPreset,
   TextFitting,
+  TextWarpPreset,
   VerticalAlign,
 } from '../contracts/index.ts';
 import { selectedIds, type CommandContext } from './commands.ts';
@@ -232,7 +233,7 @@ export function formatAt(
     ...(hex ? { color: hex } : {}),
     align: p.align === 'ctr' || p.align === 'r' || p.align === 'just' ? p.align : 'l',
     verticalAlign: verticalOf(item.element.text.body.anchor),
-    bullets: p.bullet?.type === 'char',
+    bullets: p.bullet?.type === 'char' || p.bullet?.type === 'picture',
     numbering: p.bullet?.type === 'autonum',
     ...paragraphField(layout, ids, paragraphs, sel),
     superscript: props.baseline > 0,
@@ -560,6 +561,9 @@ export function geometryOf(
         }
       : {}),
     ...(textFitting ? { textFitting } : {}),
+    ...(e.kind === 'shape' && e.text
+      ? { textWarp: (e.text.body.warp?.preset ?? 'textNoShape') as TextWarpPreset }
+      : {}),
     flipH: e.xfrm.flipH,
     flipV: e.xfrm.flipV,
     lockAspectRatio: aspectLocked(el),

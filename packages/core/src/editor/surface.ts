@@ -12,6 +12,7 @@ import { selectionRects } from './surface-text-selection.ts';
 import { cellsOverlay, TableGestures } from './surface-table.ts';
 import { TableChrome } from './surface-table-chrome.ts';
 import { PlaceholderChrome } from './surface-placeholder-chrome.ts';
+import { CommentMarkers, type CommentMarkerHost } from './comment-markers.ts';
 import { textItemOf } from './table-cells.ts';
 import { paragraphUnits, wordSelectionAt } from '../automation/commands/text-units.ts';
 import {
@@ -23,6 +24,7 @@ import {
   type TextDragUnit,
 } from './text-drag.ts';
 import { presenceElements } from './surface-presence.ts';
+import { animationMarkElements, type AnimationMark } from './surface-animation-marks.ts';
 import type { PaintedPresence } from './collaboration-presence.ts';
 import {
   cornersOf,
@@ -38,7 +40,8 @@ import { cropAt, cropOverlay, onCropImage, startCropDrag } from './surface-crop.
 import type { CropDrag, CropHandle } from './surface-crop.ts';
 import { withHalos } from './surface-halo.ts';
 import { hitItem, inText, onBorder } from './surface-hit.ts';
-import { fitZoom, outsideVeil, scrollBoxIntoView } from './surface-view.ts';
+import { diagramPress } from './surface-diagram.ts';
+import { CaretScroll, fitZoom, outsideVeil } from './surface-view.ts';
 import { clampZoom, wheelZoomFactor } from './zoom.ts';
 import { selectionAnnouncement } from './surface-announce.ts';
 import { ShapeDrag, type Handle } from './surface-drag.ts';
@@ -75,6 +78,8 @@ export interface SurfaceHost extends SurfaceInputHost {
   select(selection: EditorSelection): void;
   /** Collaboration peers on this slide, painted as editing chrome. */
   presence?(): readonly PaintedPresence[];
+  /** The animation order marks to draw (`showAnimationOrder`). */
+  animationMarks?(): readonly AnimationMark[];
   /** The boxes a shape drag writes on release, in file coordinates: one undo step. */
   transform(items: readonly TransformItem[], gesture: string): void;
   fitChanged(zoom: number): void;
@@ -102,6 +107,8 @@ export interface SurfaceHost extends SurfaceInputHost {
   pickImage?(): void;
   /** The placeholder type a new table or picture can fill on this slide (`emptyPlaceholderType`). */
   fillableType?(nodeId: string): string | undefined;
+  /** The comment threads that show markers on the slide (`comment-markers.ts`). */
+  readonly commentMarkers?: CommentMarkerHost;
 }
 
 /** Find a slide item by node id, inside groups too. */
@@ -134,6 +141,7 @@ export class SlideSurface {
   readonly #table: TableGestures;
   readonly #tableChrome: TableChrome;
   readonly #placeholderChrome: PlaceholderChrome;
+  readonly #commentMarkers: CommentMarkers;
   readonly #unbindInput: () => void;
   #zoomAnchor: { x: number; y: number } | null = null;
   #renderedZoom: number | null = null;
@@ -152,8 +160,8 @@ export class SlideSurface {
   #fitSlide = '';
   #gestures = 0;
   #pressed = false;
-  /** The caret the view last followed (`#keepCaretInView`). */
-  #caretKey = '';
+  /** Scrolls the caret into view when a key moves it (`CaretScroll`). */
+  readonly #caretScroll: CaretScroll;
   /** The presses of a multi-click: their count, time, and place. */
   #presses = new PressCounter();
 
@@ -172,6 +180,7 @@ export class SlideSurface {
     this.#table = new TableGestures(editor);
     this.#tableChrome = new TableChrome(editor);
     this.#placeholderChrome = new PlaceholderChrome(editor);
+    this.#commentMarkers = new CommentMarkers(editor.commentMarkers);
     this.#input = doc.createElement('textarea');
     this.#input.className = 'pptx-surface__input';
     // The input receives keystrokes and IME composition for the engine; it is focusable and
@@ -191,6 +200,7 @@ export class SlideSurface {
     this.#paintRest = new NextFrame(doc.defaultView as Window | null);
     const shown = () => ((l) => l && { slide: l.slide, zoom: editor.zoom() })(editor.layout());
     this.#reach = new paint.WindowReach(doc.defaultView, EMU_PER_PX, shown, () => this.render());
+    this.#caretScroll = new CaretScroll(host, this.#stage, this.root);
     this.#stage.append(this.#cursor.element, this.#overlay, this.#input);
     this.root.append(this.#stage, this.#live);
     host.append(this.root);
@@ -403,7 +413,9 @@ export class SlideSurface {
           ...adjustHandleElements(doc, selected[0], px, this.editor.label('canvas.adjustHandle'))
         );
     }
+    parts.push(...animationMarkElements(doc, layout, this.editor.animationMarks?.() ?? [], px));
     parts.push(...presenceElements(doc, layout, this.editor.presence?.() ?? [], px));
+    parts.push(...this.#commentMarkers.elements(doc, layout, px));
     parts.push(...guideElements(doc, this.#drag.guides, px));
     if (this.#marquee) {
       const { start: a, at: b } = this.#marquee;
@@ -443,7 +455,12 @@ export class SlideSurface {
             item.kind === 'shape' ? ghostBullet(doc, item, sel, textFrameMatrix(item)) : null;
           if (ghost) parts.push(ghost);
           this.#placeInput(caret, zoom / EMU_PER_PX);
-          this.#keepCaretInView(sel, caret, zoom / EMU_PER_PX);
+          this.#caretScroll.follow(
+            JSON.stringify([sel.nodeId, sel.cell, sel.focus]),
+            caret,
+            zoom / EMU_PER_PX,
+            this.#pressed
+          );
         }
       }
     }
@@ -463,49 +480,6 @@ export class SlideSurface {
     style.height = `${height}px`;
     style.fontSize = style.lineHeight = `${height}px`;
   }
-
-  /**
-   * Scroll the caret (the focus end of a range) into view when it moves by a key: typing at a
-   * high zoom, or an arrow key. A pointer press does not scroll: the caret is under it.
-   */
-  #keepCaretInView(
-    sel: Extract<EditorSelection, { kind: 'text' }>,
-    caret: { x1: number; y1: number; x2: number; y2: number },
-    scale: number
-  ): void {
-    const key = JSON.stringify([sel.nodeId, sel.cell, sel.focus]);
-    if (key === this.#caretKey) return;
-    this.#caretKey = key;
-    if (this.#pressed) return;
-    // Read the stage position at the next frame, where the browser lays out the page anyway. A
-    // read here would force a layout of the whole slide on every keystroke.
-    const pending = !this.#caretScroll;
-    this.#caretScroll = { caret, scale };
-    const view = this.host.ownerDocument.defaultView;
-    if (!pending) return;
-    const scroll = () => {
-      const next = this.#caretScroll;
-      this.#caretScroll = null;
-      if (!next || !this.root.isConnected) return;
-      const c = next.caret;
-      const st = this.#stage.getBoundingClientRect();
-      const box = {
-        left: st.left + Math.min(c.x1, c.x2) * next.scale,
-        right: st.left + Math.max(c.x1, c.x2) * next.scale,
-        top: st.top + Math.min(c.y1, c.y2) * next.scale,
-        bottom: st.top + Math.max(c.y1, c.y2) * next.scale,
-      };
-      scrollBoxIntoView(this.host, box, 32);
-    };
-    if (view?.requestAnimationFrame) view.requestAnimationFrame(scroll);
-    else scroll();
-  }
-
-  /** The caret scroll that waits for the next frame (`#keepCaretInView`). */
-  #caretScroll: {
-    caret: { x1: number; y1: number; x2: number; y2: number };
-    scale: number;
-  } | null = null;
 
   /** A caret in the table cell under `p`, for a right-click; none in view mode. */
   #cellCaret(id: string, p: { x: number; y: number }) {
@@ -576,6 +550,11 @@ export class SlideSurface {
     if (crop && (cropHandle || onCropImage(crop, p))) {
       this.#cropDrag = startCropDrag(crop, cropHandle ?? 'move', p, `g${++this.#gestures}`);
       this.root.focus({ preventScroll: true });
+      e.preventDefault();
+      return;
+    }
+    // A comment marker shows its thread in the comments pane.
+    if (!painting && this.#commentMarkers.press(target)) {
       e.preventDefault();
       return;
     }
@@ -653,6 +632,21 @@ export class SlideSurface {
       e.preventDefault();
       if (table === 'text') this.#input.focus({ preventScroll: true });
       else this.root.focus({ preventScroll: true });
+      return;
+    }
+    // A diagram: a caret in the shape of a node, once the diagram is selected.
+    const diagram = id && !addShape && !painting && !this.editor.readOnly();
+    const node = diagram ? diagramPress(layout, id, sel, p, e.shiftKey) : null;
+    if (node?.kind === 'text') {
+      this.#textDrag = {
+        id: node.nodeId,
+        unit: 'character',
+        anchor: node.anchor,
+        anchorEnd: node.anchor,
+      };
+      this.editor.select(node);
+      e.preventDefault();
+      this.#input.focus({ preventScroll: true });
       return;
     }
     if (sel.kind === 'text' && id === sel.nodeId) {
@@ -814,14 +808,12 @@ export class SlideSurface {
       const drag = this.#textDrag;
       const sel = this.editor.selection();
       // A word or paragraph drag in a table cell runs over the cell's own text item.
-      const item =
-        drag.unit !== 'character' && sel.kind === 'text'
-          ? textItemOf(layout, sel)
-          : itemById(layout, drag.id);
+      const own = sel.kind === 'text' && (drag.unit !== 'character' || !!sel.diagramNode);
+      const item = own ? textItemOf(layout, sel) : itemById(layout, drag.id);
       const point = item ? pointAt(item, p.x, p.y) : undefined;
       if (item && point)
         this.editor.select(
-          drag.unit !== 'character' && sel.kind === 'text'
+          own && sel.kind === 'text'
             ? { ...sel, ...dragSelection(drag, item, point) }
             : { kind: 'text', nodeId: drag.id, ...dragSelection(drag, item, point) }
         );

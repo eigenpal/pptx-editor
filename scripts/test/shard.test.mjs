@@ -1,4 +1,4 @@
-// Copied from docx-editor/scripts/test/shard.test.mjs at 39a490db (EigenPal).
+// Copied from docx-editor/scripts/test/shard.test.mjs at adf0e178 (EigenPal).
 import { describe, expect, test } from 'bun:test';
 import { selectShard } from './shard.mjs';
 

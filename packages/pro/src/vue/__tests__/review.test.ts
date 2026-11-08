@@ -1,0 +1,421 @@
+/*
+Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
+Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
+Production use requires a commercial agreement: licensing@eigenpal.com
+*/
+// The twin of `../../react/__tests__/review.test.tsx`.
+import { afterEach, describe, expect, test } from 'bun:test';
+import { createApp, defineComponent, h, nextTick, type App, type Component, type VNode } from 'vue';
+import {
+  listenSlideshowStartKeys,
+  type EditorModule,
+  type PptxEditorInstance,
+} from '@pptx-editor.dev/core/editor';
+import {
+  PptxEditorContent,
+  PptxEditorEditNotice,
+  PptxEditorRoot,
+  PptxEditorSidePanel,
+  PptxEditorViewport,
+} from '@pptx-editor.dev/vue';
+import { buildPptx, shape } from '../../../../../scripts/fixtures/builder.ts';
+import { PptxEditorReview, reviewModule, useReview, type UseReviewReturn } from '../index.ts';
+import { repeatedThreadDeck } from '../../__tests__/repeat-deck.ts';
+
+const IN = 914_400;
+
+let app: App | null = null;
+afterEach(() => {
+  app?.unmount();
+  app = null;
+  document.body.replaceChildren();
+});
+
+async function mount(
+  modules: readonly EditorModule[] | undefined,
+  pane: () => VNode = () => h(PptxEditorReview)
+): Promise<PptxEditorInstance> {
+  const host = document.createElement('div');
+  document.body.append(host);
+  let ready: PptxEditorInstance | null = null;
+  app = createApp(
+    defineComponent({
+      setup: () => () =>
+        h(
+          PptxEditorRoot,
+          { onReady: (e: PptxEditorInstance) => (ready = e), author: 'Ada Lovelace', modules },
+          () => h(PptxEditorViewport, null, () => [h(PptxEditorContent), pane()])
+        ),
+    }) as Component
+  );
+  app.mount(host);
+  await nextTick();
+  const deck = buildPptx({
+    slides: [{ shapes: shape({ id: 2, name: 'Title', x: IN, y: IN, cx: IN, cy: IN }) }],
+  });
+  const editor = ready as PptxEditorInstance | null;
+  expect((await editor!.load(deck)).ok).toBe(true);
+  await settle();
+  return editor!;
+}
+
+const settle = async (): Promise<void> => {
+  for (let i = 0; i < 3; i += 1) await nextTick();
+};
+const button = (name: string): HTMLButtonElement | undefined =>
+  [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+    (b) => (b.getAttribute('aria-label') ?? b.textContent?.trim()) === name
+  );
+const field = (label: string): HTMLTextAreaElement | null =>
+  document.querySelector<HTMLTextAreaElement>(`textarea[aria-label="${label}"]`);
+
+async function type(el: HTMLTextAreaElement, text: string): Promise<void> {
+  el.value = text;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  await settle();
+}
+async function key(el: HTMLElement, init: KeyboardEventInit): Promise<void> {
+  el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
+  await settle();
+}
+async function click(el: HTMLElement | undefined): Promise<void> {
+  el!.click();
+  await settle();
+}
+async function post(text: string): Promise<void> {
+  await click(button('New comment'));
+  const el = field('Add a comment…')!;
+  await type(el, text);
+  await key(el, { key: 'Enter' });
+}
+
+describe('PptxEditorReview (Vue)', () => {
+  test('without a review module it says that comments are kept', async () => {
+    await mount(undefined);
+    expect(document.body.textContent).toContain('Comments are kept when you save.');
+    expect(button('New comment')).toBeUndefined();
+  });
+
+  test('adds, replies to, resolves, reopens, and deletes a thread', async () => {
+    const editor = await mount([reviewModule()]);
+    await post('Check <b>this</b>');
+    const [thread] = editor.snapshot().comments!;
+    expect(thread).toMatchObject({ author: 'Ada Lovelace', text: 'Check <b>this</b>' });
+    const list = document.querySelector('ul[aria-label="Comments on this slide"]')!;
+    expect(list.querySelectorAll(':scope > li')).toHaveLength(1);
+    // File text renders as text.
+    expect(list.querySelector('b')).toBeNull();
+    expect(list.textContent).toContain('Check <b>this</b>');
+
+    editor.selectComment(thread!.id);
+    await settle();
+    expect(list.querySelector('[aria-current="true"]')).not.toBeNull();
+    const reply = field('Reply to Ada Lovelace')!;
+    await type(reply, 'Done');
+    await key(reply, { key: 'Enter' });
+    expect(editor.snapshot().comments![0]!.replies.map((r) => r.text)).toEqual(['Done']);
+
+    await click(button('Resolve thread by Ada Lovelace'));
+    expect(editor.snapshot().comments![0]!.resolved).toBe(true);
+    expect(document.body.textContent).toContain('Resolved');
+    await click(button('Reopen thread by Ada Lovelace'));
+    expect(editor.snapshot().comments![0]!.resolved).toBe(false);
+
+    await click(button('Delete comment by Ada Lovelace'));
+    expect(editor.snapshot().comments).toEqual([]);
+    expect(document.body.textContent).toContain('No comments on this slide');
+  });
+
+  test('Shift+Enter keeps the field open; Escape cancels the draft', async () => {
+    const editor = await mount([reviewModule()]);
+    await click(button('New comment'));
+    const el = field('Add a comment…')!;
+    await type(el, 'Line');
+    await key(el, { key: 'Enter', shiftKey: true });
+    expect(editor.snapshot().comments).toEqual([]);
+    await key(el, { key: 'Escape' });
+    expect(field('Add a comment…')).toBeNull();
+  });
+
+  test('Ctrl+Enter in a comment field posts and does not start the slide show', async () => {
+    const editor = await mount([reviewModule()]);
+    let started = 0;
+    const stop = listenSlideshowStartKeys(
+      () => document.querySelector('.pptx-editor'),
+      () => false,
+      () => void started++
+    );
+    try {
+      await click(button('New comment'));
+      const el = field('Add a comment…')!;
+      await type(el, 'Note');
+      await key(el, { key: 'Enter', ctrlKey: true });
+      expect(started).toBe(0);
+      expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['Note']);
+      // The same key outside a comment field starts the show.
+      await key(document.body, { key: 'Enter', ctrlKey: true });
+      expect(started).toBe(1);
+    } finally {
+      stop();
+    }
+  });
+
+  test('a field whose comment is gone closes and saves nothing', async () => {
+    const editor = await mount([reviewModule()]);
+    expect((await editor.load(await repeatedThreadDeck())).ok).toBe(true);
+    await settle();
+    const [a] = editor.snapshot().comments!;
+    editor.selectComment(a!.id);
+    await settle();
+    await type(field('Reply to Ada Lovelace')!, 'For A');
+    await click(button('Edit comment by Ada Lovelace'));
+    await type(field('Edit comment')!, 'A edited');
+    // A peer deletes A: B, a repeat with A's author and date, keeps its own card.
+    editor.exec({ type: 'deleteComment', commentId: a!.id });
+    await settle();
+    expect(editor.snapshot().comments!.map((t) => [t.id === a!.id, t.text])).toEqual([
+      [false, 'B'],
+      [false, 'C'],
+    ]);
+    expect(field('Edit comment')).toBeNull();
+    // The pick ends with A, so no reply line carries A's draft to B.
+    expect(editor.snapshot().activeComment).toBeNull();
+    expect(field('Reply to Ada Lovelace')).toBeNull();
+    expect(editor.snapshot().comments![0]!.replies).toEqual([]);
+  });
+
+  test("a peer's edit of the thread keeps the unsent reply and the open edit box", async () => {
+    const editor = await mount([reviewModule()]);
+    await post('First');
+    const [thread] = editor.snapshot().comments!;
+    editor.selectComment(thread!.id);
+    await settle();
+    await type(field('Reply to Ada Lovelace')!, 'Draft');
+    await click(button('Edit comment by Ada Lovelace'));
+    await type(field('Edit comment')!, 'Mine');
+    editor.exec({ type: 'editComment', commentId: thread!.id, text: 'Theirs' });
+    await settle();
+    expect(editor.snapshot().comments![0]!.text).toBe('Theirs');
+    expect(field('Edit comment')!.value).toBe('Mine');
+    expect(field('Reply to Ada Lovelace')!.value).toBe('Draft');
+    await key(field('Edit comment')!, { key: 'Enter' });
+    expect(editor.snapshot().comments![0]!.text).toBe('Mine');
+  });
+
+  test('a delete of a twin keeps the fields and the pick of another twin', async () => {
+    const editor = await mount([reviewModule()]);
+    expect((await editor.load(await repeatedThreadDeck())).ok).toBe(true);
+    await settle();
+    const [a, b] = editor.snapshot().comments!;
+    editor.selectComment(b!.id);
+    await settle();
+    await type(field('Reply to Ada Lovelace')!, 'For B');
+    const edits = [...document.querySelectorAll<HTMLButtonElement>('button')].filter(
+      (el) => el.getAttribute('aria-label') === 'Edit comment by Ada Lovelace'
+    );
+    await click(edits[1]);
+    await type(field('Edit comment')!, 'B edited');
+    editor.exec({ type: 'deleteComment', commentId: a!.id });
+    await settle();
+    expect(editor.snapshot().comments![0]).toMatchObject({ text: 'B', identity: b!.identity });
+    expect(editor.snapshot().activeComment).toBe(editor.snapshot().comments![0]!.id);
+    expect(field('Edit comment')!.value).toBe('B edited');
+    expect(field('Reply to Ada Lovelace')!.value).toBe('For B');
+  });
+
+  test('a save on a twin that a peer changed is refused: the box keeps the text and says so', async () => {
+    const editor = await mount([reviewModule()]);
+    expect((await editor.load(await repeatedThreadDeck())).ok).toBe(true);
+    await settle();
+    const [a] = editor.snapshot().comments!;
+    await click(button('Edit comment by Ada Lovelace'));
+    await type(field('Edit comment')!, 'Mine');
+    editor.exec({ type: 'editComment', commentId: a!.id, text: 'Peer' });
+    await settle();
+    await key(field('Edit comment')!, { key: 'Enter' });
+    expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['Peer', 'B', 'C']);
+    expect(field('Edit comment')!.value).toBe('Mine');
+    const notice = document.querySelector('.pptx-review__notice')!;
+    expect(notice.getAttribute('role')).toBe('status');
+    expect(notice.firstElementChild!.textContent).toBe(
+      'This comment changed. Save again to replace it.'
+    );
+    expect(notice.querySelector('.pptx-review__current')!.textContent).toBe('It now reads: Peer');
+    expect(field('Edit comment')!.getAttribute('aria-describedby')).toContain(notice.id);
+    // A second, deliberate save replaces the comment as it shows now.
+    await key(field('Edit comment')!, { key: 'Enter' });
+    expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['Mine', 'B', 'C']);
+    expect(field('Edit comment')).toBeNull();
+  });
+
+  test('a refusal for another reason says that reason, and the notice clears on typing', async () => {
+    const editor = await mount([reviewModule()]);
+    await post('First');
+    await click(button('Edit comment by Ada Lovelace'));
+    await type(field('Edit comment')!, '\u0001');
+    await key(field('Edit comment')!, { key: 'Enter' });
+    const notice = document.querySelector('.pptx-review__notice')!;
+    expect(notice.textContent).toBe('Comment text must have 1 to 10,000 characters');
+    expect(editor.snapshot().comments![0]!.text).toBe('First');
+    await type(field('Edit comment')!, 'Second');
+    expect(notice.textContent).toBe('');
+    expect(notice.isConnected).toBe(true);
+  });
+
+  test('without an author, Enter in the reply line posts nothing and says nothing new', async () => {
+    const editor = await mount([reviewModule()]);
+    await post('First');
+    editor.setAuthor(undefined);
+    const [thread] = editor.snapshot().comments!;
+    editor.selectComment(thread!.id);
+    await settle();
+    await type(field('Reply to Ada Lovelace')!, 'Hello');
+    await key(field('Reply to Ada Lovelace')!, { key: 'Enter' });
+    expect(editor.snapshot().comments![0]!.replies).toEqual([]);
+    expect(field('Reply to Ada Lovelace')!.value).toBe('Hello');
+    expect(document.querySelector('.pptx-review__notice')!.textContent).toBe('');
+    expect(document.body.textContent).toContain('Set an author to comment.');
+  });
+
+  test('the pane edits the copy of an exact duplicate that it shows, and says a refusal once', async () => {
+    const editor = await mount([reviewModule()], () =>
+      h('div', [h(PptxEditorReview), h(PptxEditorEditNotice)])
+    );
+    expect((await editor.load(await repeatedThreadDeck('same'))).ok).toBe(true);
+    await settle();
+    const edits = [...document.querySelectorAll<HTMLButtonElement>('button')].filter(
+      (el) => el.getAttribute('aria-label') === 'Edit comment by Ada Lovelace'
+    );
+    await click(edits[1]);
+    await type(field('Edit comment')!, '\u0001');
+    await key(field('Edit comment')!, { key: 'Enter' });
+    expect(document.querySelector('.pptx-review__notice')!.textContent).toBe(
+      'Comment text must have 1 to 10,000 characters'
+    );
+    // The field shows the refusal: the edit notice does not repeat it.
+    expect(document.querySelector('.pptx-edit-notice')).toBeNull();
+    // The identity names the copy, which text alone cannot.
+    await type(field('Edit comment')!, 'Mine');
+    await key(field('Edit comment')!, { key: 'Enter' });
+    expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['A', 'Mine', 'A']);
+  });
+
+  test('the draft shows its refusal, and a reply notice goes with the pick', async () => {
+    const editor = await mount([reviewModule()]);
+    await click(button('New comment'));
+    await type(field('Add a comment…')!, '\u0001');
+    await key(field('Add a comment…')!, { key: 'Enter' });
+    expect(document.querySelector('.pptx-review__notice')!.textContent).toBe(
+      'Comment text must have 1 to 10,000 characters'
+    );
+    await key(field('Add a comment…')!, { key: 'Escape' });
+    await post('First');
+    const [thread] = editor.snapshot().comments!;
+    editor.selectComment(thread!.id);
+    await settle();
+    await type(field('Reply to Ada Lovelace')!, '\u0001');
+    await key(field('Reply to Ada Lovelace')!, { key: 'Enter' });
+    const notice = () => document.querySelector('.pptx-review__reply-line .pptx-review__notice');
+    expect(notice()!.textContent).not.toBe('');
+    editor.selectComment(null);
+    await settle();
+    editor.selectComment(thread!.id);
+    await settle();
+    expect(notice()!.textContent).toBe('');
+  });
+
+  test('when one of three copies goes, an edit of a copy closes and saves nothing', async () => {
+    const editor = await mount([reviewModule()]);
+    expect((await editor.load(await repeatedThreadDeck('same'))).ok).toBe(true);
+    await settle();
+    const [first] = editor.snapshot().comments!;
+    await click(button('Edit comment by Ada Lovelace'));
+    await type(field('Edit comment')!, 'Mine');
+    editor.exec({ type: 'deleteComment', commentId: first!.id });
+    await settle();
+    expect(field('Edit comment')).toBeNull();
+    expect(editor.snapshot().comments!.map((c) => c.text)).toEqual(['A', 'A']);
+  });
+
+  test('a delete that changes a thread id keeps its card, its pick, and its fields', async () => {
+    const editor = await mount([reviewModule()]);
+    expect((await editor.load(await repeatedThreadDeck('pair'))).ok).toBe(true);
+    await settle();
+    const [a, b] = editor.snapshot().comments!;
+    editor.selectComment(b!.id);
+    await settle();
+    await type(field('Reply to Ada Lovelace')!, 'For B');
+    const edits = [...document.querySelectorAll<HTMLButtonElement>('button')].filter(
+      (el) => el.getAttribute('aria-label') === 'Edit comment by Ada Lovelace'
+    );
+    await click(edits[1]);
+    await type(field('Edit comment')!, 'B edited');
+    // A peer deletes A: B is the last copy of the GUID, so its id loses the mark.
+    editor.exec({ type: 'deleteComment', commentId: a!.id });
+    await settle();
+    const [left] = editor.snapshot().comments!;
+    expect(left).toMatchObject({ text: 'B', identity: b!.identity });
+    expect(left!.id).not.toBe(b!.id);
+    expect(editor.snapshot().activeComment).toBe(left!.id);
+    expect(field('Edit comment')!.value).toBe('B edited');
+    expect(field('Reply to Ada Lovelace')!.value).toBe('For B');
+    await key(field('Reply to Ada Lovelace')!, { key: 'Enter' });
+    expect(editor.snapshot().comments![0]!.replies.map((r) => r.text)).toEqual(['For B']);
+  });
+
+  test('parts: hidden removes a part, a card class reaches each card, filter picks threads', async () => {
+    const editor = await mount([reviewModule()], () =>
+      h(
+        PptxEditorReview,
+        { card: { className: 'host-card' }, filter: (i: { resolved: boolean }) => !i.resolved },
+        () => [h(PptxEditorReview.Delete, { hidden: true })]
+      )
+    );
+    await post('One');
+    await post('Two');
+    expect(document.querySelectorAll('.host-card')).toHaveLength(2);
+    expect(button('Delete comment by Ada Lovelace')).toBeUndefined();
+    const [first] = editor.snapshot().comments!;
+    editor.exec({ type: 'resolveComment', commentId: first!.id });
+    await settle();
+    expect(document.querySelectorAll('.host-card')).toHaveLength(1);
+  });
+
+  test('preset=false renders only the parts you pass; asChild wires your button', async () => {
+    await mount([reviewModule()], () =>
+      h(PptxEditorReview, { preset: false }, () => [
+        h(PptxEditorReview.AddComment, { asChild: true }, () => [
+          h('button', { type: 'button' }, 'Ask'),
+        ]),
+        h(PptxEditorReview.Draft),
+      ])
+    );
+    expect(button('New comment')).toBeUndefined();
+    expect(document.querySelector('ul')).toBeNull();
+    await click(button('Ask'));
+    expect(field('Add a comment…')).not.toBeNull();
+  });
+
+  test('useReview gives the data and the actions', async () => {
+    let review: UseReviewReturn | null = null;
+    const Probe = defineComponent({
+      setup() {
+        review = useReview();
+        return () => null;
+      },
+    });
+    await mount([reviewModule()], () => h(Probe));
+    expect(review!.ready.value).toBe(true);
+    expect(review!.author.value).toBe('Ada Lovelace');
+    review!.comment('From a composable');
+    await settle();
+    expect(review!.items.value.map((i) => i.text)).toEqual(['From a composable']);
+  });
+
+  test('the side panel shows the pane in its #comments slot', async () => {
+    await mount([reviewModule()], () =>
+      h(PptxEditorSidePanel, { tab: 'comments' }, { comments: () => h(PptxEditorReview) })
+    );
+    expect(button('New comment')).toBeDefined();
+  });
+});

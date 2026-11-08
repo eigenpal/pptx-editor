@@ -510,6 +510,8 @@ describe('PptxEditorContextMenu and popups.contextMenu', () => {
     expect(menu.getAttribute('aria-label')).toBe('Shape actions');
     const duplicate = menu.querySelector<HTMLElement>('[data-slot="more.duplicate"]')!;
     expect(duplicate.getAttribute('aria-disabled')).toBeNull();
+    // Without the pro comments pane, the menu has no New comment row.
+    expect(menu.querySelector('[data-slot="review.addComment"]')).toBeNull();
     duplicate.click();
     await nextTick();
     expect(document.querySelector('.pptx-contextmenu') === null).toBe(true);

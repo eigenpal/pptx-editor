@@ -3,7 +3,8 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// The shared Yjs schema of a PPTX room, after DOCX Editor's `collaboration/document/schema.ts`.
+// The shared Yjs schema of a PPTX room, after DOCX Editor's
+// `packages/pro/src/collaboration/document/schema.ts`. DOCX Editor commit adf0e178.
 //
 //   pptx-meta-v1      Y.Map   schema version
 //   pptx-parts-v1     Y.Map   part name → { kind: 'xml', root: key } | { kind: 'binary' }
@@ -32,6 +33,15 @@ import * as Y from 'yjs';
  * The room format. A replica attaches only to a room of its own format, so a replica of another
  * format refuses the room and keeps its own deck (`schema-version-mismatch`).
  *
+ * - 7: comment lists and author lists are XML trees in the room, and a save joins the lists that
+ *   two peers added at once and points copied threads at their slide (`comment-repair.ts` in
+ *   `@pptx-editor.dev/core`). A replica of format 6 saves the room without that step, so its file
+ *   could hold two author lists or threads that name another slide.
+ * - 6: a read puts back a paragraph that a write removed from any text body while a peer typed
+ *   into it, with that text (`withRemovedRuns` in `removed-content.ts`), counts a move mark only
+ *   while another record lists the node, and shows a run that the move rescue put back without
+ *   any write listing it there. A replica of format 5 shows no such paragraph, so it would
+ *   show other text.
  * - 5: an undo records where each node it unlists was (`pptx-undone-v1`) and marks each
  *   character it puts back with the character it stands for (`pptx-restored-v1`), and every
  *   replica repairs by them. A replica of format 4 neither writes nor reads them: it would
@@ -51,7 +61,7 @@ import * as Y from 'yjs';
  *
  * No format before 3 was published.
  */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 7;
 
 export const META_KEY = 'pptx-meta-v1';
 export const PARTS_KEY = 'pptx-parts-v1';

@@ -138,6 +138,21 @@ describe('autonumber sequences (R6)', () => {
     );
     expect(markers(t)).toEqual(['1)', '', '2)', '', '1)']);
   });
+
+  test('an Arabic or East Asian number draws in the first run font for its script', () => {
+    const run = (t: string, fonts: string): string =>
+      `<a:r><a:rPr lang="ar-SA" sz="1800">${fonts}</a:rPr><a:t>${t}</a:t></a:r>`;
+    const fonts =
+      '<a:latin typeface="Liberation Sans"/><a:ea typeface="Noto Sans CJK JP"/>' +
+      '<a:cs typeface="Noto Sans Arabic"/>';
+    const para = (scheme: string): string =>
+      `<a:p><a:pPr marL="457200" indent="-457200"><a:buFont typeface="Carlito"/>` +
+      `<a:buAutoNum type="${scheme}"/></a:pPr>${run('نص', fonts)}</a:p>`;
+    const t = lay(para('arabic1Minus') + para('ea1ChsPeriod') + para('arabicPeriod'));
+    const families = t.lines.map((l) => l.runs.find((x) => x.kind === 'bullet')?.face.family);
+    expect(markers(t)).toEqual(['أ‌-', '一.', '1.']);
+    expect(families).toEqual(['Noto Sans Arabic', 'Noto Sans CJK JP', 'Carlito']);
+  });
 });
 
 describe('symbol font bullets', () => {

@@ -15,8 +15,9 @@ export interface Location {
 
 const indexCache = new WeakMap<Element, ReadonlyMap<NodeId, Location>>();
 
-// Work counters for tests, as DOCX Editor's `nodeIndexTestRecorder` (store/package/ooxml-edit.ts):
-// a count is exact on every machine, a wall-clock limit is not.
+// Work counters for tests, as DOCX Editor's `nodeIndexTestRecorder`
+// (`packages/core/src/store/package/ooxml-edit.ts` at adf0e178): a count is exact on every machine,
+// a wall-clock limit is not.
 let nodeIndexCompleteBuilds = 0;
 let nodeIndexCompleteVisits = 0;
 

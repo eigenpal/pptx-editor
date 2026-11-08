@@ -4,8 +4,15 @@
 // from the face metrics, not by CSS text decoration, so they match the measured geometry.
 
 import { toCss, type ResolvedFill } from '../cascade/index.ts';
-import { isIdeographic, type GlyphRun, type TextLayout } from '../layout/index.ts';
-import { fillPaint, type PaintContext } from './paint-fill.ts';
+import {
+  isIdeographic,
+  strikeoutBars,
+  type GlyphRun,
+  type PathCommand,
+  type TextLayout,
+  type WarpedRun,
+} from '../layout/index.ts';
+import { fillPaint, STORED_PIXELS_STYLE, type PaintContext } from './paint-fill.ts';
 import { num, svg } from './svg.ts';
 
 const EMU_PER_PT = 12_700;
@@ -69,24 +76,25 @@ function decorationRects(
   const size = run.sizePt;
   const baseline = baselineEmu / EMU_PER_PT;
   const xs = run.x.map((v) => v / EMU_PER_PT);
-  const x0 = xs[0];
   // Trailing spaces at a line end are not underlined; the layout already
   // excludes them from alignment, and runs keep them, so trim here.
   let end = run.text.length;
   while (end > 0 && run.text[end - 1] === ' ') end -= 1;
-  const x1 = xs[end] ?? xs[xs.length - 1];
+  // A right-to-left run ends at its left: its trailing spaces are its leftmost cells.
+  const x0 = run.rtl ? xs[run.text.length - end] : xs[0];
+  const x1 = run.rtl ? xs[xs.length - 1] : (xs[end] ?? xs[xs.length - 1]);
   if (x1 <= x0) return out;
   const m = run.face.metrics;
   const thickness = Math.max(m.underlineThickness * size, size / 20);
   const y = baseline - run.rise / EMU_PER_PT;
   // A strikethrough takes the run's fill and its alpha, as the glyphs do; an underline takes
   // its own fill (`a:uFill`) when the run has one.
-  const bar = (top: number, { paint, opacity }: TextPaint): SVGElement =>
+  const bar = (top: number, { paint, opacity }: TextPaint, height = thickness): SVGElement =>
     svg(doc, 'rect', {
       x: num(x0),
       y: num(top),
       width: num(x1 - x0),
-      height: num(thickness),
+      height: num(height),
       fill: paint,
       'fill-opacity': opacity < 1 ? num(opacity) : undefined,
     });
@@ -96,9 +104,46 @@ function decorationRects(
     if (run.props.underline === 'dbl') out.push(bar(ty + thickness * 2, underline));
   }
   if (run.props.strike !== 'noStrike') {
-    const sy = y - size * 0.3;
-    out.push(bar(sy - thickness / 2, text));
-    if (run.props.strike === 'dblStrike') out.push(bar(sy - thickness * 2, text));
+    const strike = strikeoutBars(m, size, run.props.strike === 'dblStrike');
+    for (const top of strike.tops) out.push(bar(y + top, text, strike.thickness));
+  }
+  return out;
+}
+
+/**
+ * The style of a right-to-left word: its letters in source order, anchored at its right edge,
+ * with the features the measurer shapes with (`harfbuzz-measurer.ts`): no standard,
+ * contextual, discretionary, or historical ligatures, contextual alternates kept, and kerning
+ * only when the run asks for it.
+ */
+function rtlStyle(kerning: boolean): string {
+  return (
+    'white-space:pre;direction:rtl;unicode-bidi:bidi-override;' +
+    `font-kerning:${kerning ? 'normal' : 'none'};` +
+    'font-variant-ligatures:no-common-ligatures no-discretionary-ligatures no-historical-ligatures;' +
+    'font-feature-settings:"liga" 0,"clig" 0,"dlig" 0,"hlig" 0'
+  );
+}
+
+/**
+ * The words of a right-to-left run, each painted as one `<text>` that starts at the word's
+ * right edge and reads right to left, so the browser shapes and joins its letters. Spaces
+ * between the words take the room that layout gave them, justification included, and each
+ * word fills the width layout measured for it (`textLength`), so character spacing, kerning
+ * that the browser applies differently, and a fallback face for a missing glyph never move
+ * the next word. Every
+ * character of the run has an odd bidi level, so the override keeps the browser from
+ * reordering the word again.
+ */
+function rtlWords(run: GlyphRun): { text: string; right: number; width: number }[] {
+  const out: { text: string; right: number; width: number }[] = [];
+  const n = run.text.length;
+  // A tab draws nothing (`uprightPieces`): it splits words as a space does.
+  const re = /[^ \t\u3000]+/gu;
+  // Unit `i` draws in cell `n - 1 - i`, so a word that starts at unit `i` ends at `x[n - i]`.
+  for (let m = re.exec(run.text); m; m = re.exec(run.text)) {
+    const right = run.x[n - m.index];
+    out.push({ text: m[0], right, width: right - run.x[n - m.index - m[0].length] });
   }
   return out;
 }
@@ -133,6 +178,157 @@ export function uprightPieces(
 }
 
 /**
+ * The picture of a picture bullet, standing on the baseline, in points; null when the picture
+ * has no image to show (the bullet then shows nothing).
+ */
+function bulletPicture(
+  doc: Document,
+  run: GlyphRun,
+  baseline: number,
+  ctx: PaintContext
+): SVGElement | null {
+  const pic = run.picture;
+  if (!pic) return null;
+  const url =
+    ctx.images(pic.part, pic.svgRId ?? pic.rId) ??
+    (pic.svgRId ? ctx.images(pic.part, pic.rId) : undefined);
+  const x = run.x[0];
+  const width = run.x[run.x.length - 1] - x;
+  if (!url || !(width > 0) || !(pic.height > 0)) return null;
+  return svg(doc, 'image', {
+    href: url,
+    x: num(x / EMU_PER_PT),
+    y: num((baseline - pic.height) / EMU_PER_PT),
+    width: num(width / EMU_PER_PT),
+    height: num(pic.height / EMU_PER_PT),
+    preserveAspectRatio: 'none',
+    style: STORED_PIXELS_STYLE,
+    'data-run': 'bullet',
+  });
+}
+
+/** SVG path data for commands in EMU, written in points. */
+function pointPathData(commands: readonly PathCommand[]): string {
+  const p = (v: number): string => num(v / EMU_PER_PT);
+  let d = '';
+  for (const c of commands) {
+    if (c.op === 'Z') d += 'Z';
+    else if (c.op === 'M' || c.op === 'L') d += `${c.op}${p(c.x)} ${p(c.y)}`;
+    else if (c.op === 'Q') d += `Q${p(c.x1)} ${p(c.y1)} ${p(c.x)} ${p(c.y)}`;
+    else if (c.op === 'C') d += `C${p(c.x1)} ${p(c.y1)} ${p(c.x2)} ${p(c.y2)} ${p(c.x)} ${p(c.y)}`;
+  }
+  return d;
+}
+
+/**
+ * The marks of a line's equations (fraction rules, radical signs, stretched delimiters, braces):
+ * filled paths in the math run's fill, after the line's glyphs.
+ */
+function paintMarks(
+  doc: Document,
+  line: TextLayout['lines'][number],
+  group: SVGElement,
+  bounds: TextBounds,
+  ctx: PaintContext
+): void {
+  for (const mark of line.marks ?? []) {
+    const fill = textFill(mark.props.fill, bounds, ctx);
+    if (fill.paint === 'none') continue;
+    const commands = mark.commands.map((c): PathCommand => {
+      if (c.op === 'Z') return c;
+      if (c.op === 'Q') return { ...c, y1: line.baseline - c.y1, y: line.baseline - c.y };
+      if (c.op === 'C')
+        return { ...c, y1: line.baseline - c.y1, y2: line.baseline - c.y2, y: line.baseline - c.y };
+      return { ...c, y: line.baseline - c.y };
+    });
+    group.appendChild(
+      svg(doc, 'path', {
+        d: pointPathData(commands),
+        fill: fill.paint,
+        'fill-opacity': fill.opacity < 1 ? num(fill.opacity) : undefined,
+        'data-run': String(mark.runIndex),
+      })
+    );
+  }
+}
+
+/**
+ * Paint warped text (`a:prstTxWarp`): each run's glyphs as one filled path that layout mapped
+ * into the warp, with its highlight behind and its underline over it, in the run's fills.
+ */
+function paintWarped(
+  doc: Document,
+  layout: TextLayout,
+  warped: readonly WarpedRun[],
+  group: SVGElement,
+  bounds: TextBounds,
+  ctx: PaintContext
+): void {
+  for (const w of warped) {
+    const run = layout.lines[w.line]?.runs[w.run];
+    if (!run) continue;
+    const pic = run.picture;
+    if (pic) {
+      // The bullet's picture on the parallelogram the warp gives its corners.
+      const url =
+        ctx.images(pic.part, pic.svgRId ?? pic.rId) ??
+        (pic.svgRId ? ctx.images(pic.part, pic.rId) : undefined);
+      if (url && w.picture) {
+        const { origin, across, down } = w.picture;
+        const m = [across[0], across[1], down[0], down[1], origin[0], origin[1]];
+        group.appendChild(
+          svg(doc, 'image', {
+            href: url,
+            x: '0',
+            y: '0',
+            width: '1',
+            height: '1',
+            preserveAspectRatio: 'none',
+            transform: `matrix(${m.map((v) => num(v / EMU_PER_PT)).join(' ')})`,
+            style: STORED_PIXELS_STYLE,
+            'data-run': 'bullet',
+          })
+        );
+      }
+      continue;
+    }
+    const fill = textFill(run.props.fill, bounds, ctx);
+    if (w.highlight.length && run.props.highlight)
+      group.appendChild(
+        svg(doc, 'path', {
+          d: pointPathData(w.highlight),
+          fill: toCss({ ...run.props.highlight, a: 1 }),
+        })
+      );
+    if (fill.paint === 'none' && !run.props.outline) continue;
+    const outline = run.props.outline;
+    group.appendChild(
+      svg(doc, 'path', {
+        d: pointPathData(w.glyphs),
+        fill: fill.paint,
+        'fill-opacity': fill.opacity < 1 ? num(fill.opacity) : undefined,
+        stroke:
+          outline && outline.fill.type === 'solid'
+            ? toCss({ ...outline.fill.color, a: 1 })
+            : undefined,
+        'stroke-width': outline ? num(outline.width / EMU_PER_PT) : undefined,
+        'data-run': run.kind === 'bullet' ? 'bullet' : String(run.runIndex),
+      })
+    );
+    if (w.underline.length) {
+      const under = run.props.underlineFill ? textFill(run.props.underlineFill, bounds, ctx) : fill;
+      group.appendChild(
+        svg(doc, 'path', {
+          d: pointPathData(w.underline),
+          fill: under.paint,
+          'fill-opacity': under.opacity < 1 ? num(under.opacity) : undefined,
+        })
+      );
+    }
+  }
+}
+
+/**
  * The text style of a body: no kerning and no ligatures, since each character sits at its
  * measured place. Every property is inherited, so the runs take it from the body.
  */
@@ -157,18 +353,31 @@ function lineCorners(
   let left = Infinity;
   let right = -Infinity;
   let size = 0;
+  let top = line.top;
+  let bottom = line.top + line.height;
   for (const run of line.runs) {
     if (!run.x.length) continue;
     left = Math.min(left, run.x[0], run.x[run.x.length - 1]);
     right = Math.max(right, run.x[0], run.x[run.x.length - 1]);
     size = Math.max(size, run.sizePt * EMU_PER_PT);
+    // A picture bullet stands on the baseline and can be taller than the line.
+    if (run.picture) top = Math.min(top, line.baseline - run.picture.height);
   }
+  // An equation's marks (a radical sign, a stretched delimiter) can reach past its glyphs.
+  for (const mark of line.marks ?? [])
+    for (const c of mark.commands) {
+      if (c.op === 'Z') continue;
+      left = Math.min(left, c.x);
+      right = Math.max(right, c.x);
+      top = Math.min(top, line.baseline - c.y);
+      bottom = Math.max(bottom, line.baseline - c.y);
+    }
   const pad = Math.max(line.height, size) * 2;
   const box = layout.box;
   const x0 = box.x + left - pad;
   const x1 = box.x + right + pad;
-  const y0 = box.y + line.top - pad;
-  const y1 = box.y + line.top + line.height + pad;
+  const y0 = box.y + top - pad;
+  const y1 = box.y + bottom + pad;
   const corners = [
     { x: x0, y: y0 },
     { x: x1, y: y0 },
@@ -188,8 +397,9 @@ function lineCorners(
   }));
 }
 
-/** Whether any line of `layout` can show. */
+/** Whether any line of `layout` can show. Warped text always can: the warp moves its lines. */
 export function textShows(layout: TextLayout, shows: Shows): boolean {
+  if (layout.warped) return true;
   return layout.lines.some((line) => shows(lineCorners(layout, line)));
 }
 
@@ -222,9 +432,19 @@ export function paintText(
   group.setAttribute('style', TEXT_STYLE);
   const pt = (emu: number): string => num(emu / EMU_PER_PT);
   const bounds = textBounds(layout);
+  // Warped glyphs lie where the warp maps them, not in their lines' boxes: every one paints.
+  if (layout.warped) {
+    paintWarped(doc, layout, layout.warped, group, bounds, ctx);
+    return group;
+  }
   for (const line of layout.lines) {
     if (shows && !shows(lineCorners(layout, line))) continue;
     for (const run of line.runs) {
+      if (run.picture) {
+        const image = bulletPicture(doc, run, line.baseline, ctx);
+        if (image) group.appendChild(image);
+        continue;
+      }
       if (run.text.length === 0) continue;
       const fill = textFill(run.props.fill, bounds, ctx);
       if (run.props.highlight && run.kind === 'text') {
@@ -296,7 +516,18 @@ export function paintText(
         );
         from = -1;
       };
-      for (const piece of uprightPieces(run.text, layout.upright)) {
+      const kerning = run.props.kern !== undefined && run.props.size >= run.props.kern;
+      for (const word of run.rtl ? rtlWords(run) : []) {
+        const text = makeText(word.text, {
+          x: pt(word.right),
+          y: pt(baseline),
+          textLength: word.width > 0 ? pt(word.width) : undefined,
+          lengthAdjust: word.width > 0 ? 'spacing' : undefined,
+        });
+        text.setAttribute('style', rtlStyle(kerning));
+        group.appendChild(text);
+      }
+      for (const piece of run.rtl ? [] : uprightPieces(run.text, layout.upright)) {
         const content = run.text.slice(piece.start, piece.end);
         // A space draws nothing, so it can join a stack in any direction.
         const stacks =
@@ -331,6 +562,7 @@ export function paintText(
         for (const d of decorationRects(doc, run, line.baseline, fill, under)) group.appendChild(d);
       }
     }
+    if (line.marks) paintMarks(doc, line, group, bounds, ctx);
   }
   return group;
 }

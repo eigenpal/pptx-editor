@@ -17,6 +17,19 @@ export interface TextHunk {
  * bounds the time and memory a large paste costs.
  */
 export function diffHunks(a: string, b: string, maxEdits = 400): TextHunk[] {
+  return diffResult(a, b, maxEdits).hunks;
+}
+
+/**
+ * The changed regions between `a` and `b` (see {@link diffHunks}), and whether they are the
+ * shortest edit script: `exact` is false when the texts differ in more than `maxEdits` places
+ * and `hunks` is one region over the whole changed middle.
+ */
+export function diffResult(
+  a: string,
+  b: string,
+  maxEdits = 400
+): { readonly hunks: TextHunk[]; readonly exact: boolean } {
   let pre = 0;
   while (pre < a.length && pre < b.length && a[pre] === b[pre]) pre += 1;
   let suf = 0;
@@ -28,9 +41,9 @@ export function diffHunks(a: string, b: string, maxEdits = 400): TextHunk[] {
     suf += 1;
   const n = a.length - pre - suf;
   const m = b.length - pre - suf;
-  if (n === 0 && m === 0) return [];
+  if (n === 0 && m === 0) return { hunks: [], exact: true };
   const whole: TextHunk[] = [{ aStart: pre, aEnd: pre + n, bStart: pre, bEnd: pre + m }];
-  if (n === 0 || m === 0) return whole;
+  if (n === 0 || m === 0) return { hunks: whole, exact: true };
   const max = Math.min(n + m, maxEdits);
   const off = max + 1;
   const v = new Int32Array(2 * max + 3);
@@ -55,7 +68,7 @@ export function diffHunks(a: string, b: string, maxEdits = 400): TextHunk[] {
       }
     }
   }
-  if (!done) return whole;
+  if (!done) return { hunks: whole, exact: false };
   // Walk back through the snapshots: each step is one deletion or insertion and a diagonal.
   const ops: number[] = []; // 0 equal, 1 delete from a, 2 insert from b; built backwards
   let x = n;
@@ -99,5 +112,5 @@ export function diffHunks(a: string, b: string, maxEdits = 400): TextHunk[] {
     else ib += 1;
   }
   if (open) out.push({ ...open, aEnd: ia, bEnd: ib });
-  return out;
+  return { hunks: out, exact: true };
 }

@@ -36,6 +36,9 @@ export function effectMatrix(e: EffectPlacement, shape: Matrix, w: number, h: nu
 // @internal
 export function elementsWithAttribute(root: Element, name: string): Element[];
 
+// @internal
+export function finiteFacet(f: ThreeDFacet): boolean;
+
 // @public
 export interface FontFaceHandle {
     // (undocumented)
@@ -137,6 +140,9 @@ export const STORED_PIXELS_STYLE = "image-orientation: none";
 
 // @public (undocumented)
 export const SVG_NS = "http://www.w3.org/2000/svg";
+
+// @internal
+export function threeDColor(fill: ResolvedFill): Rgba;
 
 // @public
 export interface ViewRect {

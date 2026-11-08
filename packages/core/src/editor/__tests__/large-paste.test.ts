@@ -144,9 +144,9 @@ async function htmlPasteMs(count: number): Promise<number> {
 }
 
 // A paste holds at most 5,000 paragraphs. A cost that grows with the square of the paragraphs
-// takes 6.25 times as long for 2.5 times the paragraphs. The limit of 5 leaves room for a busy
-// machine and still fails that cost.
-test('pasted HTML paragraphs cost what they insert: 2.5 times the paragraphs take less than five times the time', async () => {
-  const [small, large] = await fastest(htmlPasteMs, 2_000, 5_000, 5);
-  expect(large).toBeLessThan(small * 5);
+// takes 64 times as long for 8 times the paragraphs, and a linear one 8 times. The limit of 24
+// leaves room for a busy machine and still fails that cost.
+test('pasted HTML paragraphs cost what they insert: 8 times the paragraphs take less than 24 times the time', async () => {
+  const [small, large] = await fastest(htmlPasteMs, 625, 5_000, 5);
+  expect(large).toBeLessThan(small * 24);
 }, 30_000);

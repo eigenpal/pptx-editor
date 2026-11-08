@@ -84,6 +84,8 @@ While you edit text, Tab and Shift+Tab change the list level at the start of a l
 | Alt/Ctrl+Backspace, Cmd+Backspace | Delete the word before the caret. |
 | Shift+Enter | Start a new line in the same paragraph. |
 
+In right-to-left and mixed-direction text, Left and Right move the caret one place on screen, not in reading order. Alt/Ctrl+Left and Alt/Ctrl+Right move past one word on screen. Cmd+Left and Cmd+Right move to the left or the right edge of the line. Home and End move to the start and the end of the line in reading order, wherever they show on screen. A selection holds the text between its two ends in reading order, so on a mixed-direction line it can show as several highlighted parts.
+
 AutoCorrect works while you type:
 
 - Straight quotes become curly quotes.
@@ -162,7 +164,7 @@ The editor takes its accessible names from the locale catalog, so they change wi
 - **Color modes.** Set `colorMode` to `light`, `dark`, or `system`. `system` follows the operating system and updates when it changes. Only the chrome changes. The slide always shows the colors of the file. See [Appearance](/docs/customization/appearance).
 - **Reduced motion.** When the operating system asks for reduced motion, the editor stops the loading spinner, the tooltip animation, the press effect of buttons, the slide-in of notices, and the transition of the slide show control bar.
 - **Forced colors.** In a forced colors (high contrast) mode, the chrome uses the system colors. Selection, pressed and checked controls, focus rings, and disabled controls stay visible. The slide keeps the colors of the file. See [Appearance](/docs/customization/appearance).
-- **Slide show motion.** The slide show does not play the animations and transitions of the file. They stay in the file on save.
+- **Slide show motion.** The slide show does not play the animations and transitions of the file. They stay in the file on save. The **Animations** tab of the side panel lists the effects of a slide as text, in play order.
 
 ## Known limits
 

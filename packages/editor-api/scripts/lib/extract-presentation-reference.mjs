@@ -1,4 +1,4 @@
-// Copied from DOCX Editor packages/editor-api/scripts/lib/extract-word-reference.mjs at commit 5993bd223945cabdaf3900557d9fb59bfd8c2d8c.
+// Adapted from DOCX Editor packages/editor-api/scripts/lib/extract-word-reference.mjs at commit 5993bd223945cabdaf3900557d9fb59bfd8c2d8c.
 // Changes: the presentation namespace, PPTX Editor names, and paths only.
 /**
  * Extracts normalized conformance facts for a manifest-selected subset of

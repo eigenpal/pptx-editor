@@ -117,7 +117,9 @@ export function textBodies(pkg: PptxPackage): TextBodyRef[] {
 /** The text of a paragraph as find reads it: fields are object characters. */
 function searchText(p: Element, slideNumber: number | undefined): string {
   return slotsOf(p, slideNumber)
-    .map((s) => (s.kind === 'field' ? FIELD_CHAR.repeat(s.text.length) : s.text))
+    .map((s) =>
+      s.kind === 'field' || s.kind === 'math' ? FIELD_CHAR.repeat(s.text.length) : s.text
+    )
     .join('');
 }
 

@@ -321,17 +321,15 @@ const SLOW: Record<string, (n: number) => string> = {
   transforms: (n) => svg(`<g transform="${'scale(1) '.repeat(n / 9)}"/>`),
 };
 
+// The check refuses a part over `MAX_SVG_BYTES`, so the largest input it reads takes about a
+// millisecond when its cost is linear. A cost that grows with the square of the input would take
+// seconds there (about 6.5e10 steps), so a limit of 100 ms fails it with room for a slow machine.
+// A ratio of two times this small would measure noise, not growth.
 for (const [name, make] of Object.entries(SLOW))
-  test(`the check of ${name} grows linearly: four times the input takes less than six times as long`, () => {
-    const n = MAX_SVG_BYTES * 0.8;
-    const [a, b] = [enc(make(n / 4)), enc(make(n))];
-    expect(b.length).toBeLessThanOrEqual(MAX_SVG_BYTES);
-    // The fastest of five turns each, taken in turn, so a busy moment slows both.
-    let small = Infinity;
-    let large = Infinity;
-    for (let k = 0; k < 5; k += 1) {
-      small = Math.min(small, checkMs(a));
-      large = Math.min(large, checkMs(b));
-    }
-    expect(large).toBeLessThan(small * 6);
+  test(`the check of ${name} at the size limit takes less than 100 ms`, () => {
+    const bytes = enc(make(MAX_SVG_BYTES * 0.95));
+    expect(bytes.length).toBeLessThanOrEqual(MAX_SVG_BYTES);
+    let best = Infinity;
+    for (let k = 0; k < 3; k += 1) best = Math.min(best, checkMs(bytes));
+    expect(best).toBeLessThan(100);
   });

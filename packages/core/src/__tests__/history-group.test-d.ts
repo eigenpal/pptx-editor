@@ -1,5 +1,5 @@
-// Compile-time consumer checks for history group handles, ported from DOCX Editor's
-// `packages/core/src/__tests__/history-group.test-d.ts`. `bun run typecheck` checks this file;
+// Compile-time consumer checks for history group handles, adapted from DOCX Editor's
+// `packages/core/src/__tests__/history-group.test-d.ts` at be94e1c51. `bun run typecheck` checks this file;
 // a failed `@ts-expect-error` fails the gate.
 import type { Editor, EditorCommand, HistoryGroup } from '../contracts/index.ts';
 import type { HistoryGroup as StoreHistoryGroup, TransactOptions } from '../store/index.ts';

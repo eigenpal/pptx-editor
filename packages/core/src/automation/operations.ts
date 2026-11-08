@@ -1,4 +1,5 @@
-// The operation vocabulary, after DOCX Editor's `packages/core/src/automation/operations.ts`.
+// The operation vocabulary, after DOCX Editor's `packages/core/src/automation/operations.ts`. DOCX
+// Editor commit adf0e178.
 //
 // Each operation is plain data. A query answers from the working package; a command lowers to
 // store ops through the edits in `commands/`. Lengths are in points and angles in degrees, as

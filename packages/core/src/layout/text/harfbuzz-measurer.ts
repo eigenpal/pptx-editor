@@ -1,13 +1,22 @@
 // The HarfBuzz measurer: exact advances from the real font bytes, the same approach as
-// docx-editor/packages/core/src/layout/harfbuzz-shaper.ts and shaped-measurer.ts, reduced to
-// the advances and line metrics that slide text layout needs.
+// docx-editor/packages/core/src/layout/harfbuzz-shaper.ts and
+// packages/core/src/layout/shaped-measurer.ts, reduced to
+// the advances and line metrics that slide text layout needs. DOCX Editor commit adf0e178.
 //
 // The WASM module loads through a dynamic import so importing layout never adds top-level
 // await to a host's import graph. Call `initializeHarfBuzz()` once before measuring.
 
+import type { PathCommand } from '@eigenpal/ooxml-core';
 import { AdvanceCache } from './advance-cache.ts';
 import { os2LineExtents, withFaceLineMetrics } from './face-line-metrics.ts';
 import { isIdeographic } from './line-break.ts';
+import { unkernedTextRanges } from './run-kerning.ts';
+import {
+  cmapMapsCodePoint,
+  unicodeCmapSubtable,
+  type UnicodeSubtable,
+} from './sfnt-cmap-coverage.ts';
+import { sfntStrikeoutStrokeEm } from './sfnt-strikeout-metrics.ts';
 import {
   DEFAULT_FALLBACK_FAMILY,
   eastAsianFallbackFamilies,
@@ -80,6 +89,29 @@ function shapingFeatures(
   return set;
 }
 
+/**
+ * The features for one shaping call: `shapingFeatures`, and with kerning on, `kern` off over
+ * full-width East Asian text (`unkernedTextRanges`). Clusters are UTF-16 offsets, as the ranges.
+ */
+function featuresFor(
+  module: HarfBuzzModule,
+  kerning: boolean,
+  text: string
+): InstanceType<HarfBuzzModule['Feature']>[] {
+  const set = shapingFeatures(module, kerning);
+  if (!kerning) return set;
+  const ranges = unkernedTextRanges(text);
+  if (ranges.length === 0) return set;
+  return [...set, ...ranges.map(([start, end]) => new module.Feature('kern', 0, start, end))];
+}
+
+/**
+ * Characters that HarfBuzz may draw with a glyph the face's cmap does not give them, and that
+ * still draw right: spaces take the face's space (Unicode spaces fallback), and default
+ * ignorable characters draw nothing.
+ */
+const SHAPER_DRAWS = /^[\p{Zs}\p{Default_Ignorable_Code_Point}]$/u;
+
 /** One font face the host makes available: family name, style, and sfnt bytes. */
 export interface FontSource {
   readonly family: string;
@@ -120,6 +152,11 @@ interface LoadedFace {
    * Unit tests cover this substitution rule; no reference PDF measures it.
    */
   readonly kerns: boolean;
+  /**
+   * The face's Unicode cmap subtable (`unicodeCmapSubtable`), or null for a face without one,
+   * such as a symbol face. Coverage then comes from HarfBuzz alone.
+   */
+  readonly cmap: UnicodeSubtable | null;
 }
 
 const MAX_TEXT = 100_000;
@@ -131,6 +168,13 @@ const CACHE_LIMIT = 20_000;
  * `CACHE_LIMIT` copies of a long paragraph.
  */
 const CACHE_CHARS = 1_000_000;
+/**
+ * Outline commands for one glyph: a real glyph has a few hundred at most. A glyph with more has
+ * no outline, so a text warp skips it.
+ */
+const MAX_OUTLINE_COMMANDS = 2_000;
+/** Outline commands kept in the outline cache, over all glyphs. */
+const MAX_CACHED_OUTLINE_COMMANDS = 1_000_000;
 
 /**
  * An sfnt table of face 0, read from the font bytes in JavaScript. `Face.referenceTable` makes
@@ -206,18 +250,23 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
       const ext = font.hExtents();
       const line = os2LineExtents(sfntTable(entry.bytes, 'OS/2'));
       const [underlinePosition, underlineThickness] = readOs2Underline(entry.bytes, upem);
+      const strike = sfntStrikeoutStrokeEm(entry.bytes, 0);
       const out: LoadedFace = {
         entry,
         font,
         upem,
         kerns:
           entry.origin === HOST_SUBSTITUTE_ORIGIN || sfntTable(entry.bytes, 'kern') !== undefined,
+        cmap: unicodeCmapSubtable(entry.bytes, 0),
         metrics: {
           ascent: (line ? line[0] : Math.abs(ext.ascender)) / upem,
           descent: (line ? line[1] : Math.abs(ext.descender)) / upem,
           lineGap: ext.lineGap / upem,
           underlinePosition,
           underlineThickness,
+          ...(strike
+            ? { strikeoutPosition: strike.offsetEm, strikeoutThickness: strike.thicknessEm }
+            : {}),
         },
       };
       loaded.set(entry.id, out);
@@ -296,6 +345,56 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     return face;
   };
 
+  // The cmap answer for each BMP code point of a face: 0 not read yet, 1 mapped, 2 missing.
+  // A lookup reads the font bytes (a binary search over thousands of groups in an East Asian
+  // face), and the measurer asks for every non-ASCII character it shapes. 64 KiB for each face
+  // that measures non-ASCII text.
+  const bmpCoverage = new WeakMap<LoadedFace, Uint8Array>();
+  const cmapHas = (lf: LoadedFace, cmap: UnicodeSubtable, cp: number): boolean => {
+    if (cp > 0xffff) return cmapMapsCodePoint(lf.entry.bytes, cmap, cp);
+    let known = bmpCoverage.get(lf);
+    if (!known) bmpCoverage.set(lf, (known = new Uint8Array(0x10000)));
+    if (known[cp] === 0) known[cp] = cmapMapsCodePoint(lf.entry.bytes, cmap, cp) ? 1 : 2;
+    return known[cp] === 1;
+  };
+
+  /**
+   * Whether the face draws a non-ASCII `cp` with its own glyph. Spaces and default ignorable
+   * characters keep HarfBuzz's answer (`SHAPER_DRAWS`), and so does every character of a face
+   * without a Unicode subtable. Other characters need the face's cmap.
+   */
+  const covers = (lf: LoadedFace, cp: number): boolean => {
+    if (!lf.cmap) return true;
+    return cmapHas(lf, lf.cmap, cp) || SHAPER_DRAWS.test(String.fromCodePoint(cp));
+  };
+
+  // The face's own hyphen advance in em (U+2010, else U+002D), or null when it has neither.
+  const hyphens = new WeakMap<LoadedFace, number | null>();
+  const hyphenAdvance = (lf: LoadedFace): number | null => {
+    let known = hyphens.get(lf);
+    if (known === undefined) {
+      const cp = lf.cmap && !cmapHas(lf, lf.cmap, 0x2010) ? 0x2d : 0x2010;
+      const glyph = lf.font.nominalGlyph(cp) || lf.font.nominalGlyph(0x2d);
+      known = glyph ? lf.font.glyphHAdvance(glyph) / lf.upem : null;
+      hyphens.set(lf, known);
+    }
+    return known;
+  };
+
+  /**
+   * The estimated advance of a character the face lacks. A hyphen or dash (U+2010 to U+2013)
+   * takes the face's own hyphen advance, as a browser or the PDF fallback draws a hyphen of
+   * about that width: U+2011 in Liberation Sans is 0.333 em, not 0.5 em. Of the other
+   * characters, East Asian ones are full width (1 em), and the rest half width.
+   */
+  const missingAdvance = (lf: LoadedFace, cp: number): number => {
+    if (cp >= 0x2010 && cp <= 0x2013) {
+      const hyphen = hyphenAdvance(lf);
+      if (hyphen !== null) return hyphen;
+    }
+    return isIdeographic(cp) ? 1 : 0.5;
+  };
+
   const advances = (
     face: ResolvedFace,
     text: string,
@@ -317,19 +416,28 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     buffer.guessSegmentProperties();
     // Slide text takes no standard or contextual ligatures, and embedded subset fonts
     // often lack the ligature glyphs. Paint disables them too.
-    module.shape(lf.font, buffer, shapingFeatures(module, kerning));
+    module.shape(lf.font, buffer, featuresFor(module, kerning, text));
     // `addText` adds UTF-16, so clusters are UTF-16 offsets into `text`.
     const infos = buffer.getGlyphInfos();
     const positions = buffer.getGlyphPositions();
+    let estimated = -1;
     for (let g = 0; g < infos.length; g += 1) {
       const cluster = infos[g].cluster;
       if (cluster < 0 || cluster >= out.length) continue;
+      if (cluster === estimated) continue;
       // Glyph 0 is `.notdef`: the face lacks the character, and paint falls back to a system
-      // face. Measure the fallback, not the empty box: East Asian characters are full width
-      // (1 em), others half width. An approximation, listed on the public fidelity page.
-      if (infos[g].codepoint === 0)
-        out[cluster] += isIdeographic(text.codePointAt(cluster) ?? 0) ? 1 : 0.5;
-      else out[cluster] += positions[g].xAdvance / lf.upem;
+      // face. A character the face's cmap lacks is missing too, also when HarfBuzz draws it
+      // with another of the face's glyphs (U+2010 for U+2011, or a decomposition): paint
+      // draws characters, not HarfBuzz's glyphs. Measure the fallback, not the face's glyph,
+      // once per cluster (`missingAdvance`). An approximation, listed on the public fidelity
+      // page.
+      const own = infos[g].codepoint !== 0;
+      if (own && (text.charCodeAt(cluster) < 0x80 || covers(lf, text.codePointAt(cluster)!)))
+        out[cluster] += positions[g].xAdvance / lf.upem;
+      else {
+        out[cluster] += missingAdvance(lf, text.codePointAt(cluster)!);
+        estimated = cluster;
+      }
     }
     cache.set(key, out, text.length);
     return out;
@@ -340,6 +448,7 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
   const has = (entry: RegisteredFace, cp: number): boolean => {
     const lf = load(entry);
     if (!lf) return false;
+    if (lf.cmap) return cmapHas(lf, lf.cmap, cp);
     const glyph = lf.font.nominalGlyph(cp);
     return glyph !== undefined && glyph !== 0;
   };
@@ -374,5 +483,55 @@ export function createHarfBuzzMeasurer(sources: readonly FontSource[]): TextMeas
     return found ?? undefined;
   };
 
-  return { resolve, advances, fallbackFace, faces };
+  // Glyph outlines in em, y up, by face id and code point; bounded by entries and by commands.
+  const outlines = new Map<string, readonly PathCommand[] | null>();
+  let cachedCommands = 0;
+  let draw: InstanceType<HarfBuzzModule['DrawFuncs']> | null = null;
+  let sink: PathCommand[] = [];
+  let overflow = false;
+  let k = 1;
+  const glyphOutline = (face: ResolvedFace, cp: number): readonly PathCommand[] | undefined => {
+    const key = `${face.id}|${cp}`;
+    const hit = outlines.get(key);
+    if (hit !== undefined) return hit ?? undefined;
+    const entry = faces.find((f) => f.id === face.id);
+    const lf = entry ? load(entry) : null;
+    const glyph = lf?.font.nominalGlyph(cp);
+    let out: PathCommand[] | null = null;
+    if (lf && glyph) {
+      k = 1 / lf.upem;
+      // Drawing is synchronous, so one set of callbacks writes into the current sink.
+      if (!draw) {
+        draw = new module.DrawFuncs();
+        const add = (c: PathCommand): void => {
+          if (sink.length < MAX_OUTLINE_COMMANDS) sink.push(c);
+          else overflow = true;
+        };
+        draw.setMoveToFunc((x, y) => add({ op: 'M', x: x * k, y: y * k }));
+        draw.setLineToFunc((x, y) => add({ op: 'L', x: x * k, y: y * k }));
+        draw.setQuadraticToFunc((x1, y1, x, y) =>
+          add({ op: 'Q', x1: x1 * k, y1: y1 * k, x: x * k, y: y * k })
+        );
+        draw.setCubicToFunc((x1, y1, x2, y2, x, y) =>
+          add({ op: 'C', x1: x1 * k, y1: y1 * k, x2: x2 * k, y2: y2 * k, x: x * k, y: y * k })
+        );
+        draw.setClosePathFunc(() => add({ op: 'Z' }));
+      }
+      sink = [];
+      overflow = false;
+      lf.font.drawGlyph(glyph, draw);
+      out = overflow ? null : sink;
+      sink = [];
+    }
+    const commands = out?.length ?? 0;
+    if (outlines.size >= CACHE_LIMIT || cachedCommands + commands > MAX_CACHED_OUTLINE_COMMANDS) {
+      outlines.clear();
+      cachedCommands = 0;
+    }
+    cachedCommands += commands;
+    outlines.set(key, out);
+    return out ?? undefined;
+  };
+
+  return { resolve, advances, fallbackFace, glyphOutline, faces };
 }

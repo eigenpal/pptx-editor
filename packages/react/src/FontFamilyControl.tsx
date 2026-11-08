@@ -7,7 +7,7 @@
 // each name drawn in its own face, the current family marked and scrolled into view when the
 // list opens. With children, a host composes the parts itself. Core's `font-picker.ts` builds
 // the groups and rows, and the Vue twin (`packages/vue/src/FontFamilyControl.tsx`) renders the
-// same markup.
+// same markup. DOCX Editor commit adf0e178.
 
 import {
   createContext,

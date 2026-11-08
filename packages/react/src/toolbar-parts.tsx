@@ -1,6 +1,6 @@
 /** @jsxImportSource react */
 // Toolbar customization parts, after DOCX Editor's toolbar ladder
-// (docx-editor/docs/site/content/customization/toolbar.mdx):
+// (docx-editor/docs/site/content/customization/toolbar.mdx at adf0e178):
 //
 //   1. `className`, and state as `data-active` / `data-disabled` on every control.
 //   2. `icon` on `Toolbar.Slot`.

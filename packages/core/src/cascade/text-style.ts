@@ -25,6 +25,8 @@ import {
   resolveLine,
   type ResolvedFill,
 } from './paint-props.ts';
+import { isMathZone, readMathZone } from './math.ts';
+import { pictureBulletImage, type PictureBulletSource } from './picture-bullet.ts';
 import { slotLanguage } from './script-fonts.ts';
 import { collectionScriptFont, resolveThemeFont, type Theme } from './theme.ts';
 import type {
@@ -264,21 +266,30 @@ export function resolveRunProps(
 function resolveBullet(
   chain: readonly Element[],
   ctx: ColorContext,
-  theme: Theme
+  theme: Theme,
+  pictures: PictureBulletSource | undefined
 ): ResolvedBullet | null {
   const kind = lastChild(chain, ['buNone', 'buChar', 'buAutoNum', 'buBlip']);
-  if (!kind || kind.local === 'buNone' || kind.local === 'buBlip') return null;
-  const fontEl = lastChild(chain, ['buFont', 'buFontTx']);
+  if (!kind || kind.local === 'buNone') return null;
   const sizeEl = lastChild(chain, ['buSzPct', 'buSzPts', 'buSzTx']);
-  const colorEl = lastChild(chain, ['buClr', 'buClrTx']);
-  const face = fontEl?.local === 'buFont' ? attr(fontEl, 'typeface') : undefined;
-  const font = face ? resolveThemeFont(face, theme) : undefined;
   const size =
     sizeEl?.local === 'buSzPct'
       ? { pct: percentAttr(attr(sizeEl, 'val')) ?? 1 }
       : sizeEl?.local === 'buSzPts'
         ? { pts: intAttr(sizeEl, 'val') ?? 1800 }
         : { pct: 1 };
+  if (kind.local === 'buBlip') {
+    // A picture that cannot be found or read draws no bullet; the file keeps the markup.
+    let entry: Element | undefined;
+    for (let i = chain.length - 1; i >= 0 && !entry; i -= 1)
+      if (chain[i].children.includes(kind)) entry = chain[i];
+    const image = entry ? pictureBulletImage(kind, entry, pictures) : undefined;
+    return image ? { type: 'picture', ...image, size } : null;
+  }
+  const fontEl = lastChild(chain, ['buFont', 'buFontTx']);
+  const colorEl = lastChild(chain, ['buClr', 'buClrTx']);
+  const face = fontEl?.local === 'buFont' ? attr(fontEl, 'typeface') : undefined;
+  const font = face ? resolveThemeFont(face, theme) : undefined;
   const color = colorEl?.local === 'buClr' ? resolveColor(colorChild(colorEl), ctx) : undefined;
   const common = { ...(font ? { font } : {}), size, ...(color ? { color } : {}) };
   if (kind.local === 'buChar') return { type: 'char', char: attr(kind, 'char') ?? '•', ...common };
@@ -302,6 +313,9 @@ function percentAttr(raw: string | undefined): number | undefined {
   return m[2] ? v / 100 : v / 100_000;
 }
 
+/** The text of a math run: one object character, so the caret steps over the equation. */
+const OBJECT_CHAR = '\uFFFC';
+
 const ALIGNS = new Set(['l', 'ctr', 'r', 'just', 'dist', 'justLow', 'thaiDist']);
 
 /** Inputs for resolving one paragraph. */
@@ -316,6 +330,8 @@ export interface ParagraphInputs {
   readonly slideNumber: number;
   /** The presentation's custom kinsoku lists (`readKinsoku`). */
   readonly kinsoku?: KinsokuRules;
+  /** The package and the part of each chain entry, for picture bullets (`a:buBlip`). */
+  readonly pictures?: PictureBulletSource;
 }
 
 /** The most characters read from each `p:kinsoku` list: a guard against a hostile file. */
@@ -364,8 +380,25 @@ export function resolveParagraph(input: ParagraphInputs): ResolvedParagraph {
     if (def) runBase.push(def);
   }
   const runs: ResolvedRun[] = [];
+  let mathAlign: ResolvedParagraph['align'] | undefined;
   for (const item of elements(paragraph)) {
-    if (item.kind === 'run' || item.kind === 'field') {
+    if (isMathZone(item)) {
+      const zone = readMathZone(item, (rPr) =>
+        resolveRunProps(rPr ? [...runBase, rPr] : runBase, ctx, theme, fontRef)
+      );
+      if (!zone) continue;
+      // Display math aligns its paragraph by `m:jc` (ECMA-376 Part 1, 22.1.2.51).
+      if (zone.display)
+        mathAlign ??=
+          zone.justification === 'left' ? 'l' : zone.justification === 'right' ? 'r' : 'ctr';
+      runs.push({
+        kind: 'math',
+        nodeId: item.id,
+        text: OBJECT_CHAR,
+        props: zone.props,
+        math: zone,
+      });
+    } else if (item.kind === 'run' || item.kind === 'field') {
       const rPr = child(item, 'a:rPr');
       const t = child(item, 'a:t');
       const fieldType = item.kind === 'field' ? attr(item, 'type') : undefined;
@@ -400,14 +433,14 @@ export function resolveParagraph(input: ParagraphInputs): ResolvedParagraph {
   return {
     nodeId: paragraph.id,
     level,
-    align: (ALIGNS.has(align) ? align : 'l') as ResolvedParagraph['align'],
+    align: mathAlign ?? ((ALIGNS.has(align) ? align : 'l') as ResolvedParagraph['align']),
     marL: clampEmu(numberAttr(chain, 'marL'), 0),
     marR: clampEmu(numberAttr(chain, 'marR'), 0),
     indent: clampEmu(numberAttr(chain, 'indent'), 0),
     lineSpacing: spacing(lastChild(chain, ['lnSpc']), { pct: 1 }),
     spaceBefore: spacing(lastChild(chain, ['spcBef']), { pts: 0 }),
     spaceAfter: spacing(lastChild(chain, ['spcAft']), { pts: 0 }),
-    bullet: resolveBullet(chain, ctx, theme),
+    bullet: resolveBullet(chain, ctx, theme, input.pictures),
     defaultTab: clampEmu(numberAttr(chain, 'defTabSz'), 914_400) || 914_400,
     tabs,
     rtl: lastAttr(chain, 'rtl') === '1',

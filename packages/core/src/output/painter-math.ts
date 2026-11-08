@@ -4,7 +4,7 @@
 // a public API.
 
 import type { EffectPlacement, GradientStop, ResolvedFill, Rgba } from '../cascade/index.ts';
-import type { GeometryPath, Matrix } from '../layout/index.ts';
+import type { GeometryPath, Matrix, ThreeDFacet } from '../layout/index.ts';
 import {
   blurSigma as sigmaFor,
   effectMatrix as placementOf,
@@ -73,4 +73,30 @@ export function circleGradientGeometry(
  */
 export function gradientPaintStops(stops: readonly GradientStop[]): GradientStop[] {
   return paintStops(stops);
+}
+
+/**
+ * The color that a bevel and an extrusion shade: the solid fill, the middle stop of a gradient,
+ * the pattern's foreground, else mid gray (a picture fill, or no fill).
+ * @internal
+ */
+export function threeDColor(fill: ResolvedFill): Rgba {
+  if (fill.type === 'solid') return fill.color;
+  if ((fill.type === 'linear' || fill.type === 'path') && fill.stops.length > 0)
+    return fill.stops[Math.floor(fill.stops.length / 2)]!.color;
+  if (fill.type === 'pattern') return fill.fg;
+  return { r: 128, g: 128, b: 128, a: 1 };
+}
+
+/**
+ * Whether every coordinate and color channel of a 3-D facet is a finite number. The SVG and PDF
+ * paints skip a facet that is not, so a degenerate shape never writes `NaN`.
+ * @internal
+ */
+export function finiteFacet(f: ThreeDFacet): boolean {
+  const c = f.color;
+  return (
+    [c.r, c.g, c.b, c.a].every(Number.isFinite) &&
+    f.polygons.every((poly) => poly.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)))
+  );
 }

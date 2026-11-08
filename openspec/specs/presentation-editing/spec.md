@@ -117,6 +117,63 @@ Copying and pasting shapes SHALL carry their pictures and refuse to carry extern
 - **WHEN** a picture is copied from one deck and pasted into another
 - **THEN** the second deck gains the image part, a relationship to it, and the picture renders
 
+### Requirement: Chart data editing
+
+An edit of chart data SHALL change the series names, category labels, values, point counts, and cell references of the chart part in one undo step. It SHALL write the same cells into an embedded workbook only when the workbook's structure allows it, and SHALL otherwise keep the workbook unchanged. It SHALL turn off the automatic update of a linked workbook, and SHALL never open it.
+
+#### Scenario: Add a category
+
+- **WHEN** a category is added to a column chart with an embedded workbook
+- **THEN** every series gains a cached point, its references cover the new row, and the workbook gains the same row
+
+#### Scenario: Remove a category with point formatting
+
+- **WHEN** a category is removed from a series with a formatted data point after it
+- **THEN** the formatted point moves to its new index, and the formatting of the removed point goes away
+
+#### Scenario: A workbook with formulas
+
+- **WHEN** the chart's embedded workbook has a formula in its data cells
+- **THEN** the chart part changes, and the workbook saves unchanged
+
+### Requirement: Equation editing
+
+Insert Equation and Edit Equation SHALL write Office Math from a linear form in one undo step, and SHALL refuse a linear form that the parser does not read, with no change. A new equation SHALL be a text box in `mc:AlternateContent`, with the math in a `mc:Choice` that requires `a14` and the equation as plain text in a `mc:Fallback`. An edit of the math SHALL keep the alignment and the first run's format, SHALL remove the stale fallback, and SHALL refuse an equation whose math the linear form cannot write.
+
+#### Scenario: Insert an equation
+
+- **WHEN** `insertEquation` runs with the linear form `A=\pi r^2`
+- **THEN** the slide gains a selected text box whose math has a superscript, and its fallback holds `A=πr^2`
+
+#### Scenario: Edit an equation
+
+- **WHEN** `setEquation` runs on a selected equation with the linear form `y=(a+1)/b`
+- **THEN** the math is a fraction, the run font stays, and the wrapper has no fallback
+
+#### Scenario: Unreadable linear form
+
+- **WHEN** `insertEquation` runs with the linear form `x^`
+- **THEN** the command refuses, and the undo history does not change
+
+### Requirement: Diagram editing
+
+A text edit in a diagram shape SHALL write the drawing shape's text and the text of the data model point that the shape shows, in one transaction. An added or deleted diagram shape SHALL change the data model's points and connections, renumber the sibling order, and lay the saved drawing out again, in one undo step. A diagram whose saved drawing is not one line of shapes with up to one level of children SHALL refuse structure edits, and SHALL write nothing.
+
+#### Scenario: Type in a diagram shape
+
+- **WHEN** text is typed at the end of a process shape
+- **THEN** the drawing shape and its data point hold the new text, with the run formatting they had
+
+#### Scenario: Add a shape after a node
+
+- **WHEN** a shape is added after the third node of a four-node process
+- **THEN** the data model holds five top-level nodes in order, each named by one connection, and the drawing holds five boxes and four arrows
+
+#### Scenario: Delete a node
+
+- **WHEN** a node is deleted
+- **THEN** its subtree, transition points, connections, and presentation points leave the data model, and no connection names a missing point
+
 ### Requirement: Progressive open
 
 A long deck SHALL show its start slide and take input before its other slides parse, and SHALL parse them in background tasks that give way to input. Every read, edit, undo, search, and save before then SHALL give the result of a deck that parsed whole, and a save SHALL parse the rest first. A slide that does not parse SHALL refuse the deck (or, after edits, make it read-only), and SHALL never be saved. An editor with a collaboration module SHALL parse the whole deck before its first slide shows.

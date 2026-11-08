@@ -1,4 +1,4 @@
-// Copied from DOCX Editor `packages/core/src/layout/supported-font-families.ts` at commit 5993bd223.
+// Copied from DOCX Editor `packages/core/src/layout/supported-font-families.ts` at commit adf0e178.
 // Keep the exported API equal to the source.
 
 // Catalog metadata is not font data: it never contributes to face/byte budgets.

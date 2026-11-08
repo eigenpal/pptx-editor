@@ -13,7 +13,7 @@ import type {
   ResolvedTextBody,
 } from '../cascade/index.ts';
 import type { LayoutItem, Matrix } from './slide-layout.ts';
-import { isExactScheme, isSymbolFont } from './text/autonumber.ts';
+import { AutonumberCounters, isExactScheme, isSymbolFont } from './text/autonumber.ts';
 import { hasCharacters } from './text/text-layout.ts';
 import { isIdeographic } from './text/line-break.ts';
 import { hasLongPaintCluster } from './text/paint-clusters.ts';
@@ -37,6 +37,8 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'blur', title: 'Blur', perSlide: true },
   { id: 'shadow-skew', title: 'Shadow skew', perSlide: true },
   { id: 'glow-soft-edge', title: 'Glow and soft edge', perSlide: true },
+  { id: 'preset-shadow', title: 'Preset shadows', perSlide: true },
+  { id: 'three-d', title: '3-D shapes', perSlide: true },
   { id: 'effects-not-drawn', title: 'Effects not drawn', perSlide: true },
   { id: 'fill-overlay', title: 'Fill overlay', perSlide: true },
   { id: 'gradient-colors', title: 'Gradient colors', perSlide: true },
@@ -81,8 +83,9 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'table-cell-effects', title: 'Table cell effects', perSlide: false },
   { id: 'coincident-borders', title: 'Coincident cell borders', perSlide: true },
   { id: 'inconsistent-merges', title: 'Inconsistent cell merges', perSlide: false },
-  { id: 'text-warp', title: 'Text warp', perSlide: false },
+  { id: 'text-warp', title: 'Text warp', perSlide: true },
   { id: 'diagram-drawing', title: 'Diagram drawings', perSlide: true },
+  { id: 'equations', title: 'Equations', perSlide: true },
 ] satisfies Approximation[]);
 
 const CONTENT_PLACEHOLDERS = new Set(['pic', 'tbl', 'chart', 'clipArt', 'dgm', 'media']);
@@ -160,9 +163,13 @@ class Collector {
     if (
       (fx.outerShadow?.blur ?? 0) > 0 ||
       (fx.reflection?.blur ?? 0) > 0 ||
-      (fx.innerShadow?.blur ?? 0) > 0
+      (fx.innerShadow?.blur ?? 0) > 0 ||
+      (fx.blur?.radius ?? 0) > 0
     )
       this.add('blur');
+    if (fx.secondShadow || (fx.outerShadow && fx.outerShadow.blur === 0 && fx.outerShadow.sy !== 1))
+      this.add('preset-shadow');
+    if (fx.threeD) this.add('three-d');
     if (fx.outerShadow && (fx.outerShadow.kx !== 0 || fx.outerShadow.ky !== 0))
       this.add('shadow-skew');
     if (fx.glow || fx.softEdge) this.add('glow-soft-edge');
@@ -180,11 +187,14 @@ class Collector {
     if (bp.vert === 'wordArtVert') this.add('word-art-vert');
     if (bp.vert === 'mongolianVert' || bp.vert === 'wordArtVertRtl') this.add('other-vert');
     if (bp.anchorCtr || bp.anchor === 'just' || bp.anchor === 'dist') this.add('anchoring');
+    if (bp.warp) this.add('text-warp');
 
+    const counters = new AutonumberCounters();
     for (const p of body.paragraphs) {
       if (p.bullet?.type === 'char' && hasLongPaintCluster(p.bullet.char))
         this.add('long-text-clusters');
       if (p.runs.length === 0) continue;
+      const item = counters.next(p);
       // The line rules are measured on Latin text in the reference fonts; other scripts,
       // vertical text, substituted faces, and overflowing anchored text are not (the
       // fidelity page, "Line model").
@@ -192,7 +202,7 @@ class Collector {
       if (p.rtl) this.add('rtl');
       if (p.align === 'justLow' || p.align === 'thaiDist') this.add('anchoring');
       if (p.bullet && (p.align === 'ctr' || p.align === 'r')) this.add('aligned-bullets');
-      if (p.bullet?.type === 'autonum' && !isExactScheme(p.bullet.scheme))
+      if (p.bullet?.type === 'autonum' && !isExactScheme(p.bullet.scheme, item))
         this.add('numbering-schemes');
       if (p.bullet?.type === 'char' && isSymbolFont(p.bullet.font ?? ''))
         this.add('symbol-bullets');
@@ -201,6 +211,7 @@ class Collector {
       // (`svg-tab-stops`); right-to-left and unwrapped text are not.
       const tabbed = p.tabs.some((t) => t.align !== 'l') && (p.rtl || bp.wrap !== 'square');
       for (const run of p.runs) {
+        if (run.kind === 'math') this.add('equations');
         const props = run.props;
         if (hasLongPaintCluster(run.text)) this.add('long-text-clusters');
         if (tabbed && run.text.includes('\t')) this.add('tab-stops');

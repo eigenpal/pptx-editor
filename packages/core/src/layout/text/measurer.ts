@@ -3,6 +3,7 @@
 // tests. Both answer the same two questions: which face draws this request, and how wide is
 // this text in that face.
 
+import type { PathCommand } from '@eigenpal/ooxml-core';
 import { eastAsianScriptOf } from '../../cascade/script-fonts.ts';
 
 /** A font request from a run. */
@@ -30,6 +31,13 @@ export interface FaceMetrics {
   readonly lineGap: number;
   readonly underlinePosition: number;
   readonly underlineThickness: number;
+  /**
+   * The face's `OS/2` `yStrikeoutPosition`, above the baseline, when the face has usable
+   * strikeout values. Paint centers the strikethrough on it.
+   */
+  readonly strikeoutPosition?: number;
+  /** The face's `OS/2` `yStrikeoutSize`: the strikethrough thickness. */
+  readonly strikeoutThickness?: number;
 }
 
 /** The face that measures and paints a request. */
@@ -67,6 +75,13 @@ export interface TextMeasurer {
    * character with an estimated width (the "Missing glyphs" approximation).
    */
   fallbackFace?(face: ResolvedFace, codePoint: number, lang?: string): ResolvedFace | undefined;
+  /**
+   * The outline of the glyph that the face's character map gives a character, in em with y up
+   * and the origin on the baseline at the glyph's start. Undefined when the face lacks the
+   * character or its outline, and when the outline has more than 2,000 commands. Optional:
+   * without it, warped text (`a:prstTxWarp`) draws flat.
+   */
+  glyphOutline?(face: ResolvedFace, codePoint: number): readonly PathCommand[] | undefined;
 }
 
 /**
@@ -179,7 +194,7 @@ export function eastAsianFallbackFamilies(lang?: string): readonly string[] {
 
 /**
  * A deterministic measurer for tests and for hosts without fonts: every code unit is 0.5 em,
- * spaces 0.25 em. Never use it for fidelity work.
+ * spaces 0.25 em, and every glyph outline is a box. Never use it for fidelity work.
  */
 export function createFixedMeasurer(): TextMeasurer {
   const metrics: FaceMetrics = {
@@ -208,5 +223,16 @@ export function createFixedMeasurer(): TextMeasurer {
       }
       return out;
     },
+    // A box for every character but a space: 0.4 em wide and 0.7 em tall.
+    glyphOutline: (_face, cp) =>
+      cp === 32
+        ? []
+        : [
+            { op: 'M', x: 0.05, y: 0 },
+            { op: 'L', x: 0.45, y: 0 },
+            { op: 'L', x: 0.45, y: 0.7 },
+            { op: 'L', x: 0.05, y: 0.7 },
+            { op: 'Z' },
+          ],
   };
 }

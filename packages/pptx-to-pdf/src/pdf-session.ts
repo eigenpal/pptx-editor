@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// After DOCX Editor's `docx-to-pdf` (`packages/docx-to-pdf/src/pdf-session.ts`, commit
+// Adapted from DOCX Editor's `docx-to-pdf` (`packages/docx-to-pdf/src/pdf-session.ts`, commit
 // 398963c7f67207cebf3c38dcc41d5f0bd1339b5f).
 
 import { openExportSession } from './open-session.ts';

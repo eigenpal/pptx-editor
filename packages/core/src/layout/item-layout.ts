@@ -20,6 +20,7 @@ import { boxMatrix, multiply, type Matrix } from './matrix.ts';
 import type { ItemPlacement, LayoutItem, SourceMap } from './slide-layout.ts';
 import { layoutTable } from './table-layout.ts';
 import { layoutTextOn, type TextLayout } from './text/text-layout.ts';
+import { warpTextLayout } from './text/text-warp.ts';
 import type { LineBasis } from './text/line-metrics.ts';
 import type { TextMeasurer } from './text/measurer.ts';
 
@@ -235,6 +236,7 @@ function layoutPlaced(
         const box = { x: 0, y: 0, width: tx.cx, height: tx.cy };
         text = layoutTextOn(el.text, box, measurer, 'face');
         for (const s of text.substitutions) diagnostics.add(`font substituted: ${s}`);
+        if (el.text.body.warp) diagnostics.add('text warp drawn flat: diagram text');
         textMatrix = uprightTextMatrix(
           multiply(parent, boxMatrix({ ...tx, rot: tx.rot + el.xfrm.rot }, false)),
           text.box
@@ -249,6 +251,12 @@ function layoutPlaced(
         );
         for (const s of text.substitutions) diagnostics.add(`font substituted: ${s}`);
         textMatrix = uprightTextMatrix(matrix, text.box);
+        const warp = el.text.body.warp;
+        if (warp) {
+          const result = warpTextLayout(text, el.text, warp, el.xfrm.cx, el.xfrm.cy, measurer);
+          if ('warped' in result) text = { ...text, warped: result.warped };
+          else diagnostics.add(`text warp drawn flat: ${result.flat}`);
+        }
       }
       return {
         ...placement,

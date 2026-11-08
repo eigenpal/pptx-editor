@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/editor-api/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// After DOCX Editor's `packages/editor-api/src/runtime/errors.ts` (commit 5993bd223945).
+// Adapted from DOCX Editor's `packages/editor-api/src/runtime/errors.ts` (commit 5993bd223945).
 //
 // One error class, a stable code per refusal, and one fixed sentence per code. Nothing from the
 // engine or the file reaches a message: host details only select a public diagnostic, whose

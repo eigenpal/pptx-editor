@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Ported from DOCX Editor `packages/pro/src/drawing/chart-text.ts` at commit ba742d7d1.
+// Adapted from DOCX Editor `packages/pro/src/drawing/chart-text.ts` at commit ba742d7d1.
 // Chart text: run styles resolved through the chart's text property layers, widths measured
 // with the layout's text measurer, and the label boxes the chart lowers to text shapes.
 //

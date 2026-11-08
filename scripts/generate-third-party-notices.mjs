@@ -1,6 +1,6 @@
 // THIRD_PARTY_NOTICES.md per published package, from the bundler metafile: every package that
 // tsup inlined into dist must ship its license text (docx-editor/scripts/generate-third-party-notices.mjs).
-// `--check` compares against the current dist.
+// `--check` compares against the current dist. DOCX Editor commit adf0e178.
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';

@@ -4,12 +4,16 @@
 export * from './document-session.ts';
 export { createPptxEditor } from './pptx-editor.ts';
 export { textClipboardParagraphs } from './clipboard-rich.ts';
+export { drawingClipboardPayload, DRAWING_CLIPBOARD_TYPES } from './clipboard-drawing.ts';
+export type { ClipboardDrawingReader } from './clipboard-host.ts';
 export { createBrowserAutomationHost } from './automation-host.ts';
 export type {
   FontMeasurementState,
   PptxEditorInstance,
   PptxEditorOptions,
 } from './pptx-editor-types.ts';
+export { readCommentThreads } from './comment-state.ts';
+export { COMMENT_AUTHOR_SLOTS, commentAuthorSlot, commentInitials } from './comment-authors.ts';
 export {
   CHROME_GROUPS,
   chromeControlForSlot,
@@ -246,6 +250,7 @@ export {
   shapeStylePreview,
   type ShapeStylePreview,
 } from './chrome-shapes.ts';
+export { TEXT_WARP_GALLERY, textEffectsCommand, textWarpPreview } from './chrome-text-effects.ts';
 export type {
   BulletGalleryKey,
   NumberGalleryKey,
@@ -341,6 +346,7 @@ export {
   CANVAS_CONTEXT_MENUS,
   CHROME_MENUS,
   canvasMenuKind,
+  canvasMenuRows,
   chromeMenuRowKey,
   resolveChromeMenuRow,
   type CanvasMenuKind,
@@ -481,7 +487,30 @@ export {
   type AltTextDraftFields,
   type PicturePropertiesDraftFields,
 } from './picture-fields.ts';
+export {
+  chartPaneCommand,
+  chartPaneNumericX,
+  chartValueText,
+  nextChartCategoryLabel,
+  parseChartValue,
+  type ChartPaneChange,
+  type ChartPaneResult,
+} from './chart-pane.ts';
+export { type ChartSlotId } from './chrome-chart.ts';
+export {
+  EQUATION_GALLERY,
+  MAX_LINEAR_LENGTH,
+  equationDialogEdits,
+  equationDraftCommand,
+  equationDraftFrom,
+  validateEquationDraft,
+  type EquationDraftFields,
+  type EquationGalleryItem,
+} from './equation-fields.ts';
+export { type EquationSlotId } from './chrome-insert.ts';
+export { type DiagramSlotId } from './chrome-diagram.ts';
 export { type ImageSlotId } from './chrome-picture.ts';
+export { commentRowShown, type ReviewSlotId } from './chrome-review.ts';
 export {
   resetDevWarnings,
   warnAsChildChild,
@@ -589,10 +618,14 @@ export {
   type ColumnsFieldError,
 } from './columns-dialog-fields.ts';
 export {
+  BULLET_PICTURE_ACCEPT,
   BULLET_TEXT_FONT,
   CURRENT_STYLE,
+  PICTURE_STYLE,
+  bulletColorEnabled,
   bulletCommandOf,
   bulletFieldsEnabled,
+  chooseBulletPicture,
   bulletFontChoices,
   bulletFontMixed,
   bulletsFieldError,
@@ -601,7 +634,9 @@ export {
   customBulletPreview,
   editBulletGlyph,
   pickBulletStyle,
+  readBulletPicture,
   seedBulletFields,
+  type BulletPictureRead,
   type BulletsDialogFields,
   type BulletsDialogTab,
   type BulletsFieldError,
@@ -714,6 +749,7 @@ export {
 export {
   SELECTION_PANE_NAME_MAX,
   SIDE_PANEL_TABS,
+  SIDE_PANEL_TAB_ICONS,
   selectFromPane,
   selectionPaneAncestors,
   selectionPaneKey,
@@ -724,11 +760,27 @@ export {
   type SidePanelTab,
 } from './selection-pane.ts';
 export {
+  ANIMATION_PRESET_GROUPS,
+  ANIMATION_TRIGGERS,
+  TRANSITION_KINDS,
+  animationEffectLabelKey,
+  animationListParts,
+  animationStartLabel,
+  parseSeconds,
+  secondsText,
+  transitionKindLabelKey,
+  type AnimationStartLabel,
+} from './animation-pane.ts';
+export {
+  canRequestCommentDraft,
   hasPaneListener,
   isPaneSlot,
   listenPaneRequests,
   paneListenersVersion,
+  registerCommentDraft,
+  requestCommentDraft,
   requestPane,
+  visibleSidePanelTabs,
   subscribePaneListeners,
   takePaneRequest,
 } from './pane-requests.ts';
@@ -737,6 +789,8 @@ export {
   dispatchFindRequest,
   editNoticeShows,
   linkPopupShowsRejection,
+  claimRejection,
+  fieldShowsRejection,
   editRejectionMessage,
   editRemovalMessage,
   REMOVAL_NOTICE_MS,
@@ -787,7 +841,13 @@ export {
 } from './link-popup.ts';
 export {
   LINK_KINDS,
+  customShowDraft,
+  customShowDraftUrl,
+  customShowLinkLabel,
+  fileDraftUrl,
+  linkKindDraft,
   linkKindOf,
+  linkKindsFor,
   mailtoParts,
   mailtoUrl,
   slideLinkChoices,

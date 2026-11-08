@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copied from DOCX Editor (eigenpal/docx-editor) .github/cla/cla.sh at commit 5993bd223.
+# Copied from DOCX Editor (eigenpal/docx-editor) .github/cla/cla.sh at commit adf0e178.
 # CLA workflow logic. Sourced by .github/workflows/cla.yml (which calls cla_main)
 # and tested by .github/cla/cla.test.sh (which sources and calls the pure
 # functions). Side effects (git push, gh api) live only in cla_main.

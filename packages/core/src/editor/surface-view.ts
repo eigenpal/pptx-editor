@@ -79,3 +79,60 @@ export function fitZoom(
   const h = Math.max(100, host.clientHeight - sum(pad?.paddingTop, pad?.paddingBottom) - own.y);
   return Math.max(0.1, Math.min(w / (size.width / 9_525), h / (size.height / 9_525)));
 }
+
+/** A caret line in slide EMU: the caret's two ends. */
+interface CaretLine {
+  readonly x1: number;
+  readonly y1: number;
+  readonly x2: number;
+  readonly y2: number;
+}
+
+/**
+ * Scrolls the caret (the focus end of a range) into view when it moves by a key: typing at a
+ * high zoom, or an arrow key. A pointer press does not scroll: the caret is under it.
+ */
+export class CaretScroll {
+  /** The caret the view last followed. */
+  #key = '';
+  /** The caret scroll that waits for the next frame. */
+  #pending: { caret: CaretLine; scale: number } | null = null;
+  readonly #host: HTMLElement;
+  readonly #stage: HTMLElement;
+  readonly #root: HTMLElement;
+
+  constructor(host: HTMLElement, stage: HTMLElement, root: HTMLElement) {
+    this.#host = host;
+    this.#stage = stage;
+    this.#root = root;
+  }
+
+  /** Follow the caret `key` at `caret`; `pressed` is true while a pointer press is down. */
+  follow(key: string, caret: CaretLine, scale: number, pressed: boolean): void {
+    if (key === this.#key) return;
+    this.#key = key;
+    if (pressed) return;
+    // Read the stage position at the next frame, where the browser lays out the page anyway. A
+    // read here would force a layout of the whole slide on every keystroke.
+    const waiting = !!this.#pending;
+    this.#pending = { caret, scale };
+    if (waiting) return;
+    const view = this.#host.ownerDocument.defaultView;
+    const scroll = () => {
+      const next = this.#pending;
+      this.#pending = null;
+      if (!next || !this.#root.isConnected) return;
+      const c = next.caret;
+      const st = this.#stage.getBoundingClientRect();
+      const box = {
+        left: st.left + Math.min(c.x1, c.x2) * next.scale,
+        right: st.left + Math.max(c.x1, c.x2) * next.scale,
+        top: st.top + Math.min(c.y1, c.y2) * next.scale,
+        bottom: st.top + Math.max(c.y1, c.y2) * next.scale,
+      };
+      scrollBoxIntoView(this.#host, box, 32);
+    };
+    if (view?.requestAnimationFrame) view.requestAnimationFrame(scroll);
+    else scroll();
+  }
+}

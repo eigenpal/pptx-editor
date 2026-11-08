@@ -33,3 +33,31 @@ export function paintClusterRanges(text: string): readonly { start: number; end:
   if (start < text.length) ranges.push({ start, end: text.length });
   return ranges;
 }
+
+/**
+ * `runs` with each very long grapheme split into bounded pieces, so no painter draws one
+ * oversized cluster. Unit `i` of a right-to-left run draws in cell `n - 1 - i`, so its piece
+ * `[a, b)` takes the cell edges `n - b` to `n - a`.
+ */
+export function paintPieces<
+  R extends {
+    readonly text: string;
+    readonly x: readonly number[];
+    readonly rtl?: true;
+    readonly start: number;
+  },
+>(runs: readonly R[]): R[] {
+  return runs.flatMap((run) => {
+    const pieces = paintClusterRanges(run.text);
+    if (pieces.length === 1) return [run];
+    const n = run.text.length;
+    return pieces.map((piece) => ({
+      ...run,
+      text: run.text.slice(piece.start, piece.end),
+      x: run.rtl
+        ? run.x.slice(n - piece.end, n - piece.start + 1)
+        : run.x.slice(piece.start, piece.end + 1),
+      start: run.start + piece.start,
+    }));
+  });
+}

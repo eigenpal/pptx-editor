@@ -1,9 +1,10 @@
-// The background half of a progressive open: the first slide shows and takes input, and the
-// other slides parse in short tasks. After DOCX Editor's `surface-progressive-open.ts` and
-// `docx-editor-opening-layout.ts`: a large open ends its first task as soon as the first view
-// can paint, the rest runs in slices of about 12 ms on message-channel tasks, a slice ends early
-// when input waits, the screen hears about progress at most every 300 ms, and a reader of the
-// whole document finishes the rest at once.
+// The background half of a progressive open: the first slide shows and takes input, and the other
+// slides parse in short tasks. After DOCX Editor's
+// `packages/core/src/editor/surface-progressive-open.ts` and
+// `packages/core/src/editor/docx-editor-opening-layout.ts`: a large open ends its first task as
+// soon as the first view can paint, the rest runs in slices of about 12 ms on message-channel
+// tasks, a slice ends early when input waits, the screen hears about progress at most every 300 ms,
+// and a reader of the whole document finishes the rest at once. DOCX Editor commit adf0e178.
 //
 // What runs in the background here is the PARSE of the slide and notes slide parts
 // (`store/package/deferred-parts.ts`): layout is already lazy, one slide at a time

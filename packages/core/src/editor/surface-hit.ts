@@ -122,7 +122,8 @@ export function onGlyph(item: LayoutItem, p: Point): boolean {
     if (line.end <= line.start || q.y < line.top || q.y > line.top + line.height) return false;
     let lo = Infinity;
     let hi = -Infinity;
-    for (const x of line.caretX) {
+    // A line in visual order: the trailing edges reach the ends that leading edges miss.
+    for (const x of [...line.caretX, ...(line.bidi?.trailingX ?? [])]) {
       lo = Math.min(lo, x);
       hi = Math.max(hi, x);
     }

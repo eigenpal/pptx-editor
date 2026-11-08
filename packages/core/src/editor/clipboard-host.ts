@@ -11,7 +11,9 @@
 //   applications: the text of text boxes, or a picture of the shapes.
 //
 // What a paste reads, in order: cells, this editor's text or shapes, HTML text, a picture file,
-// and plain text. Text pasted with no text selected goes in a new text box.
+// and plain text. Text pasted with no text selected goes in a new text box. A host that reads
+// the system clipboard (`readDrawing`) turns a picture paste into the shapes it shows, when the
+// clipboard also holds them as a DrawingML package (`clipboard-drawing.ts`).
 
 import type { ClipboardPayload, EditorCommand, EditorSelection } from '../contracts/index.ts';
 import type { SlideLayout } from '../layout/index.ts';
@@ -44,6 +46,7 @@ import {
   pngResolution,
   type ShapesPicture,
 } from './clipboard-picture.ts';
+import { drawingClipboardPayload } from './clipboard-drawing.ts';
 import type { DocumentSession } from './document-session.ts';
 import { selectedText } from './selection-state.ts';
 import { copyCellsTo, tablePasteFrom } from './table-clipboard.ts';
@@ -70,10 +73,21 @@ export interface ClipboardEditor {
   selectedSlides(): readonly number[];
   /** Run a command: a paste, a cleared cell range (a cut of cells), a picture. */
   exec(command: EditorCommand): void;
+  /** The DrawingML clipboard package on the system clipboard, from the host, if it reads one. */
+  readDrawing?: ClipboardDrawingReader;
 }
+
+/**
+ * Reads the DrawingML clipboard package from the system clipboard: its bytes, or null when the
+ * clipboard holds none. @public
+ */
+export type ClipboardDrawingReader = () =>
+  Uint8Array | null | undefined | Promise<Uint8Array | null | undefined>;
 
 /** Picture types a paste inserts. */
 const PICTURE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/bmp', 'image/webp']);
+/** How long a paste waits for the host's DrawingML package before it pastes the picture. */
+const READ_DRAWING_MS = 2000;
 /** The largest picture a paste reads, as the picture command's media limit. */
 const MAX_PICTURE = 50 * 1024 * 1024;
 
@@ -86,6 +100,8 @@ export function createClipboardHost(editor: ClipboardEditor) {
   /** Counts copies of any kind, so a late picture never replaces a later copy of text or slides. */
   let copies = 0;
   const pictures = createPictureCache();
+  /** Counts pastes, so a later paste wins over a host read still running for an earlier one. */
+  let reads = 0;
 
   /** The key of the selected shapes' picture: the deck, its revision, the slide, the shapes. */
   const pictureKey = (): string | null => {
@@ -200,11 +216,38 @@ export function createClipboardHost(editor: ClipboardEditor) {
   const pasteParagraphs = (paragraphs: readonly RichParagraph[]): void =>
     editor.exec({ type: 'pasteText', paragraphs: paragraphSpecs(paragraphs) });
 
+  /** The deck and slide a paste is made on: a paste that ends on another slide is dropped. */
+  const place = (): string => `${editor.session()?.id}:${editor.slide()}`;
+
+  /**
+   * Paste the shapes of the host's DrawingML package, or the picture when the host reads no
+   * package, one that holds no shape this editor pastes, or none within `READ_DRAWING_MS`.
+   * A later paste wins over one still reading.
+   */
+  const pasteDrawing = async (file: File, read: ClipboardDrawingReader): Promise<void> => {
+    const at = place();
+    const mine = reads;
+    let payload: ClipboardPayload | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const late = new Promise<null>(
+        (done) => (timer = setTimeout(() => done(null), READ_DRAWING_MS))
+      );
+      const bytes = await Promise.race([Promise.resolve().then(read), late]);
+      payload = bytes ? drawingClipboardPayload(bytes) : null;
+    } catch {
+      // A host read that fails pastes the picture.
+    } finally {
+      clearTimeout(timer);
+    }
+    if (mine !== reads) return;
+    if (!payload) return pastePicture(file, at);
+    if (place() === at) editor.exec({ type: 'paste', payload });
+  };
+
   /** Insert a picture file from the clipboard, at the size its resolution gives. */
-  const pastePicture = async (file: File): Promise<void> => {
+  const pastePicture = async (file: File, at = place()): Promise<void> => {
     if (file.size === 0 || file.size > MAX_PICTURE) return editor.refuse('errors.clipboard');
-    // The picture goes on the slide the paste was made on: another slide by then drops it.
-    const at = `${editor.session()?.id}:${editor.slide()}`;
     const bytes = new Uint8Array(await file.arrayBuffer());
     let width = 640;
     let height = 480;
@@ -218,7 +261,7 @@ export function createClipboardHost(editor: ClipboardEditor) {
     }
     // The command counts pixels at 96 per inch: a 144 dpi screenshot is two-thirds as large.
     const scale = 96 / (pngResolution(bytes) ?? 96);
-    if (`${editor.session()?.id}:${editor.slide()}` !== at) return;
+    if (place() !== at) return;
     editor.exec({
       type: 'insertImage',
       bytes,
@@ -305,6 +348,8 @@ export function createClipboardHost(editor: ClipboardEditor) {
      */
     pasteFrom(data: DataTransfer, slideList = false, chrome = false): boolean {
       if (editor.readOnly()) return false;
+      // A host read still running belongs to an earlier paste: this paste wins over it.
+      reads += 1;
       // Copied cells or tab-separated text fill cells; one copied cell goes in at the caret.
       const table = tablePasteFrom(data, editor.selection());
       if (table && 'cells' in table)
@@ -352,7 +397,11 @@ export function createClipboardHost(editor: ClipboardEditor) {
         return true;
       }
       if (file) {
-        void pastePicture(file).catch(() => editor.refuse('errors.clipboard'));
+        // The picture of shapes copied in another application: the host may read the shapes.
+        const read = editing ? undefined : editor.readDrawing;
+        void (read ? pasteDrawing(file, read) : pastePicture(file)).catch(() =>
+          editor.refuse('errors.clipboard')
+        );
         return true;
       }
       const text = data.getData('text/plain');

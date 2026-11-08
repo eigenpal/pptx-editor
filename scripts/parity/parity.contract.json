@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "comment": "Which React adapter members the Vue adapter pairs, under which name, and which it defers. After DOCX Editor's scripts/parity/parity.contract.json. bun run check:parity enforces it against docs/api/{react,vue}/index.api.md.",
+  "comment": "Which React adapter members the Vue adapter pairs, under which name, and which it defers. After DOCX Editor's scripts/parity/parity.contract.json at adf0e178. bun run check:parity enforces it against docs/api/{react,vue}/index.api.md.",
   "components": {
     "comment": "Each paired component: the React props type (read from docs/api/react/index.api.md, with its extends clause and Omit<> bases folded in) against the Vue component's runtime props and emits, with mount probes for class, className, and every mapped slot (packages/vue/test/parity-shape.ts). The React component is the reactNamesAsVueNames twin of the key, or the key itself. classUnprobed and hostClassGap acknowledge a class the probe cannot see, with the reason; topLevel marks the PptxEditor sugar, whose callbacks must be emits and whose className must be the fallthrough class.",
     "PptxEditorSlideRail": {
@@ -44,7 +44,9 @@
       "reactCallbacksAsVueEmits": {
         "onTabChange": ["tabChange", "update:tab"]
       },
-      "reactRenderPropsAsVueSlots": {},
+      "reactRenderPropsAsVueSlots": {
+        "panes": "comments"
+      },
       "reactClassNameAsVueClass": {},
       "vueExclusive": {}
     },
@@ -79,6 +81,7 @@
       "reactProps": "PptxEditorProps",
       "topLevel": true,
       "paired": [
+        "author",
         "autoCorrect",
         "colorMode",
         "contextMenu",
@@ -93,6 +96,7 @@
         "notesPane",
         "openFailure",
         "popups",
+        "readClipboardDrawing",
         "slideRail",
         "toolbar"
       ],
@@ -114,6 +118,7 @@
     "PptxEditorRoot": {
       "reactProps": "PptxEditorRootProps",
       "paired": [
+        "author",
         "autoCorrect",
         "colorMode",
         "document",
@@ -122,7 +127,8 @@
         "locale",
         "mode",
         "modules",
-        "popups"
+        "popups",
+        "readClipboardDrawing"
       ],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {
@@ -248,6 +254,17 @@
     },
     "BulletsAndNumberingDialog": {
       "reactProps": "BulletsAndNumberingDialogProps",
+      "paired": ["className", "onClose", "open", "preset", "style"],
+      "deferredInVue": {},
+      "reactCallbacksAsVueEmits": {},
+      "reactRenderPropsAsVueSlots": {
+        "children": "default"
+      },
+      "reactClassNameAsVueClass": {},
+      "vueExclusive": {}
+    },
+    "EquationDialog": {
+      "reactProps": "EquationDialogProps",
       "paired": ["className", "onClose", "open", "preset", "style"],
       "deferredInVue": {},
       "reactCallbacksAsVueEmits": {},
@@ -991,6 +1008,10 @@
       "BulletsAndNumberingDialog",
       "BulletsAndNumberingDialogFieldName",
       "BulletsAndNumberingDialogProps",
+      "EquationDialog",
+      "EquationDialogFieldName",
+      "EquationDialogFields",
+      "EquationDialogProps",
       "ColumnsDialog",
       "ColumnsDialogFieldName",
       "ColumnsDialogProps",
@@ -1003,11 +1024,13 @@
       "UseBackgroundDialogReturn",
       "UseBulletsAndNumberingDialogReturn",
       "UseColumnsDialogReturn",
+      "UseEquationDialogReturn",
       "UseFontDialogReturn",
       "UseParagraphDialogReturn",
       "useBackgroundDialog",
       "useBulletsAndNumberingDialog",
       "useColumnsDialog",
+      "useEquationDialog",
       "useFontDialog",
       "useParagraphDialog",
       "PptxEditor",
@@ -1108,6 +1131,7 @@
       "ChromeGroupId",
       "ChromeMenuId",
       "ChromeSlotId",
+      "ClipboardDrawingReader",
       "ColumnsDialogFields",
       "CommandResult",
       "DocumentOpenFailure",

@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pptx-to-pdf/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Copied from docx-editor/packages/docx-to-pdf/src/context.ts (EigenPal): the stream and hex
+// Adapted from docx-editor/packages/docx-to-pdf/src/context.ts at ac84ccf30 (EigenPal): the stream and hex
 // helpers the font writer uses.
 import { deflateSync } from 'node:zlib';
 import type { PDFContext, PDFRawStream } from 'pdf-lib';

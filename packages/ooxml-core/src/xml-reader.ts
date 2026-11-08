@@ -1,4 +1,4 @@
-// Copied from docx-editor/packages/core/src/store/package/xml-reader.ts at fc28dba9 (EigenPal).
+// Adapted from docx-editor/packages/core/src/store/package/xml-reader.ts at fc28dba9 (EigenPal).
 // It also holds fixes that DOCX Editor does not have yet: S4, S5, K6.
 // Keep it equal to that file plus those fixes.
 // Bounded, fidelity-preserving XML reader (document-engine task 2.4 / design D14).

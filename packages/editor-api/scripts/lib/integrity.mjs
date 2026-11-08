@@ -1,4 +1,4 @@
-// Copied from DOCX Editor packages/editor-api/scripts/lib/integrity.mjs at commit 5993bd223945cabdaf3900557d9fb59bfd8c2d8c.
+// Copied from DOCX Editor packages/editor-api/scripts/lib/integrity.mjs at commit adf0e178.
 // Changes: the presentation namespace, PPTX Editor names, and paths only.
 /**
  * Subresource-Integrity-style hash verification for fetched upstream bytes

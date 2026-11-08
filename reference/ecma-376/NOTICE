@@ -2,7 +2,8 @@ ECMA-376 reference material
 ===========================
 
 The files in this directory and the data generated from them
-(packages/ooxml-core/src/drawingml-preset-geometry.generated.ts) are copied
+(packages/ooxml-core/src/drawingml-preset-geometry.generated.ts and
+packages/ooxml-core/src/drawingml-preset-text-warp.generated.ts) are copied
 from, or derived from, ECMA-376 "Office Open XML File Formats", 5th edition
 (December 2016), Parts 1 and 4, published by Ecma International:
 https://ecma-international.org/publications-and-standards/standards/ecma-376/

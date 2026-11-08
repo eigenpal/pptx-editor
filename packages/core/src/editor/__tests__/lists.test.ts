@@ -330,6 +330,35 @@ describe('ghost bullets', () => {
     expect(ghost?.getAttribute('class')).toBe('pptx-surface__ghost-bullet');
     expect(ghostBullet(doc, item, at(0, 3), textFrameMatrix(item))).toBeNull();
   });
+
+  test('a right-to-left ghost bullet stands in its cells and is not reordered again', () => {
+    const doc = new GlobalWindow().document as unknown as Document;
+    const pending = {
+      kind: 'bullet',
+      text: '(\u05d0',
+      x: [100, 110, 120],
+      rtl: true,
+      face: { id: 'f' },
+      sizePt: 18,
+      rise: 0,
+      props: { fill: { type: 'none' } },
+    };
+    const item = {
+      kind: 'shape',
+      text: { lines: [{ paragraph: 0, baseline: 0, pendingBullet: pending }] },
+    } as unknown as Parameters<typeof ghostBullet>[1];
+    const sel = {
+      kind: 'text',
+      nodeId: 'n',
+      anchor: { paragraph: 0, offset: 0 },
+      focus: { paragraph: 0, offset: 0 },
+    } as const;
+    const text = ghostBullet(doc, item, sel, [1, 0, 0, 1, 0, 0])!.querySelector('text')!;
+    // Source order, each character in its cell from the right, the bracket already mirrored.
+    expect(text.textContent).toBe(')\u05d0');
+    expect(text.getAttribute('x')).toBe(`${110 / 12_700} ${100 / 12_700}`);
+    expect(text.getAttribute('style')).toContain('unicode-bidi:bidi-override');
+  });
 });
 
 test('an oversized ghost bullet keeps its source and positions in bounded paint pieces', async () => {

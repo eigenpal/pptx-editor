@@ -4,7 +4,8 @@
  * `en.json` is the source of truth. A locale catalog mirrors its shape; a `null` leaf falls
  * back to English. Keys are dotted paths (`toolbar.bold`). Parameters use `{name}`.
  *
- * Mirrors docx-editor/packages/i18n: one catalog, typed keys, no hardcoded English in chrome.
+ * Mirrors docx-editor/packages/i18n: one catalog, typed keys, no hardcoded English in chrome. DOCX
+ * Editor commit adf0e178.
  *
  * @packageDocumentation
  * @public

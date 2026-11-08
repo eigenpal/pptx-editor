@@ -177,4 +177,4 @@ export function selectionPaneAllIds(shapes: readonly ShapeSummary[] | undefined)
 /** The longest name the pane writes, as `renameShape` takes it. @internal */
 export const SELECTION_PANE_NAME_MAX = SHAPE_NAME_MAX;
 
-export { SIDE_PANEL_TABS, type SidePanelTab } from './pane-requests.ts';
+export { SIDE_PANEL_TABS, SIDE_PANEL_TAB_ICONS, type SidePanelTab } from './pane-requests.ts';

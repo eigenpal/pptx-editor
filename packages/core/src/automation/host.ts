@@ -1,4 +1,5 @@
-// The one host implementation, after DOCX Editor's `packages/core/src/automation/host.ts`.
+// The one host implementation, after DOCX Editor's `packages/core/src/automation/host.ts`. DOCX
+// Editor commit adf0e178.
 //
 // INTERNAL composition. Both shipped hosts (`server-host.ts` here, and the browser host in the
 // editor lane) call this with a port over a `PptxDocumentStore`, and the port commits through

@@ -19,9 +19,11 @@ export {
   blurSigma,
   circleGradientGeometry,
   effectMatrix,
+  finiteFacet,
   gradientPaintStops,
   linearGradientEnds,
   lumTransfer,
+  threeDColor,
 } from './painter-math.ts';
 export {
   registerFontFaces,

@@ -5,19 +5,27 @@
 // applied first, then shaping, then character spacing, then greedy line filling at break
 // opportunities, then paragraph spacing, alignment, columns, and vertical anchoring.
 
-import { paintClusterRanges } from './paint-clusters.ts';
+import { paintPieces } from './paint-clusters.ts';
 import type { ResolvedParagraph, ResolvedTextBody, RunProps } from '../../cascade/index.ts';
 import { slotLanguage } from '../../cascade/script-fonts.ts';
 import { anchorOffset, ROTATED_VERT, shiftLines } from './anchor.ts';
 import { AutonumberCounters, autonumberText, symbolBulletText } from './autonumber.ts';
+import { bidiCaretX, markerRuns, placeBidiLine, wholeMarker, type BidiLine } from './bidi-line.ts';
+import { lineBidiOf, shiftLineBidi, type LineBidi } from './line-visual-order.ts';
 import { fontSlotPieces, slotFamily, type FontSlot } from './font-slots.ts';
 import {
   breakOpportunities,
+  forcedLineEnd,
   isHangingPunctuation,
-  isIdeographic,
   isTrailingSpace,
 } from './line-break.ts';
+import { layoutMath, type MathBox } from './math-layout.ts';
 import type { ResolvedFace, TextMeasurer } from './measurer.ts';
+import { justifyExtra } from './justify.ts';
+import { leadingOffset, paragraphAlignment } from './paragraph-alignment.ts';
+import { bidiPieces, paragraphBidiOf, type ParagraphBidi } from './rtl-paragraph.ts';
+import type { WarpedRun } from './text-warp.ts';
+import type { PathCommand } from '@eigenpal/ooxml-core';
 import {
   autofitSizePt,
   baselineInLinePt,
@@ -38,8 +46,14 @@ export interface GlyphRun {
   readonly kind: 'text' | 'bullet';
   /** Display text (after caps). */
   readonly text: string;
-  /** Left edge of each UTF-16 unit, EMU from the text box left. Length = text.length + 1. */
+  /**
+   * Left edge of each UTF-16 unit, EMU from the text box left. Length = text.length + 1. In a
+   * run that reads right to left (`rtl`), the values are the cell edges from left to right, and
+   * unit `i` draws in cell `text.length - 1 - i`.
+   */
   readonly x: readonly number[];
+  /** The run reads right to left: its units stand in visual order from right to left. */
+  readonly rtl?: true;
   readonly face: ResolvedFace;
   /** Rendered size in points (after autofit and script scaling). */
   readonly sizePt: number;
@@ -50,6 +64,41 @@ export interface GlyphRun {
   readonly runIndex: number;
   /** Source offset of `text[0]` within the paragraph. */
   readonly start: number;
+  /**
+   * The picture of a picture bullet (`a:buBlip`). Such a run has no text, and `x` holds its
+   * left and right edge. The picture stands on the baseline.
+   */
+  readonly picture?: BulletPicture;
+}
+
+/** The picture of a picture bullet, as paint draws it. */
+export interface BulletPicture {
+  /** The part whose relationships resolve `rId` and `svgRId`. */
+  readonly part: string;
+  /** The relationship of the raster picture (`a:blip/@r:embed`). */
+  readonly rId: string;
+  /** The relationship of an `asvg:svgBlip` alternative, when present. */
+  readonly svgRId?: string;
+  /** The picture's height, EMU. */
+  readonly height: number;
+}
+
+/**
+ * The height of a picture bullet over its bullet size: measured on reference PDFs, where the
+ * picture is 0.7 times the bullet size high, whatever the text's face, and keeps its aspect.
+ */
+export const PICTURE_BULLET_SCALE = 0.7;
+
+/**
+ * A shape that an equation draws itself: a fraction rule, a radical sign, a stretched
+ * delimiter, a brace, or an arrow. Paint fills it (nonzero) with the run's fill.
+ */
+export interface LineMark {
+  /** The outline: x in EMU from the text box left, y in EMU up from the line's baseline. */
+  readonly commands: readonly PathCommand[];
+  readonly props: RunProps;
+  /** Index into the paragraph's runs: the math run. */
+  readonly runIndex: number;
 }
 
 /** One laid-out line. */
@@ -66,6 +115,8 @@ export interface Line {
   readonly end: number;
   /** x of each source offset from start to end inclusive, for caret placement. */
   readonly caretX: readonly number[];
+  /** The units in visual order (UAX #9), absent where they read in source order. */
+  readonly bidi?: LineBidi;
   readonly runs: readonly GlyphRun[];
   /** Height of the tallest font, for the caret. */
   readonly fontHeight: number;
@@ -74,6 +125,11 @@ export interface Line {
    * the editor draws it dimmed while the caret is in the paragraph.
    */
   readonly pendingBullet?: GlyphRun;
+  /**
+   * The marks of the line's equations (`a14:m`). The glyphs of an equation are text runs of the
+   * line, each at its own size and rise; the equation is one object character in the source.
+   */
+  readonly marks?: readonly LineMark[];
 }
 
 /**
@@ -111,6 +167,12 @@ export interface TextLayout {
   readonly paragraphLengths: readonly number[];
   /** Families that were not available and were substituted. */
   readonly substitutions: readonly string[];
+  /**
+   * The glyphs of a warped text body (`a:prstTxWarp`) as paths in this frame, one entry for each
+   * run that draws. Paint fills these instead of drawing the runs as text; the lines keep the
+   * flat layout, for the caret and the selection.
+   */
+  readonly warped?: readonly WarpedRun[];
 }
 
 interface Segment {
@@ -123,6 +185,8 @@ interface Segment {
   readonly rise: number;
   readonly advances: Float64Array;
   readonly isBreak: boolean;
+  /** The laid-out equation of a math run, which is one unit as wide as the equation. */
+  readonly math?: MathBox;
 }
 
 /** The face for a run: its Latin font, or the font of `slot`, bold and italic. */
@@ -151,67 +215,6 @@ function displayText(text: string, caps: RunProps['caps']): string {
   }
   return out;
 }
-
-/** The width a space may grow to in East Asian justified text, as a share of its font size. */
-const EAST_ASIAN_SPACE_EM = 0.5;
-
-/**
- * The room that justified and distributed alignment adds after each unit of a line, `[start,
- * end)`. A line with no East Asian character widens its spaces only. A line with East Asian
- * characters first widens each space to half its font size, then spreads the rest evenly over
- * the gaps between all its characters, Latin letters included (reference PDF of the
- * `east-asian-typography` fixture).
- */
-function justifyExtra(
-  units: readonly Unit[],
-  segments: readonly { sizePt: number }[],
-  start: number,
-  end: number,
-  room: number
-): Float64Array | undefined {
-  const out = new Float64Array(Math.max(0, end - start));
-  const spaces: number[] = [];
-  let eastAsian = false;
-  for (let i = start; i < end; i += 1) {
-    if (units[i].code === 32) spaces.push(i);
-    else if (isIdeographic(units[i].code)) eastAsian = true;
-  }
-  if (!eastAsian) {
-    if (spaces.length === 0) return undefined;
-    for (const i of spaces) out[i - start] = room / spaces.length;
-    return out;
-  }
-  let rest = room;
-  if (spaces.length > 0) {
-    const share = room / spaces.length;
-    for (const i of spaces) {
-      const grow = Math.max(
-        0,
-        segments[units[i].seg].sizePt * EAST_ASIAN_SPACE_EM * EMU_PER_PT - units[i].advance
-      );
-      const add = Math.min(share, grow);
-      out[i - start] += add;
-      rest -= add;
-    }
-  }
-  if (rest <= 0) return out;
-  const gaps: number[] = [];
-  for (let i = start; i < end - 1; i += 1) {
-    const next = units[i + 1].code;
-    // Never inside a surrogate pair or before a combining mark.
-    if (
-      (next >= 0xdc00 && next <= 0xdfff) ||
-      (next >= 0x0300 && MARK.test(String.fromCharCode(next)))
-    )
-      continue;
-    gaps.push(i);
-  }
-  if (gaps.length === 0) return out;
-  for (const i of gaps) out[i - start] += rest / gaps.length;
-  return out;
-}
-
-const MARK = /^[\p{M}\uFE00-\uFE0F]$/u;
 
 /**
  * Split text by the face that draws each character: `face`, or another face for a character
@@ -265,7 +268,8 @@ function buildSegments(
   measurer: TextMeasurer,
   fontScale: number,
   substitutions: Set<string>,
-  stacked = false
+  stacked = false,
+  bidi?: ParagraphBidi
 ): Segment[] {
   const out: Segment[] = [];
   let offset = 0;
@@ -277,6 +281,23 @@ function buildSegments(
     const face = faceFor(props, measurer);
     const rise = (props.baseline / 100) * runSize * EMU_PER_PT;
     const spacing = (props.spacing / 100) * EMU_PER_PT;
+    if (run.kind === 'math' && run.math) {
+      const box = layoutMath(run.math, measurer, fontScale);
+      out.push({
+        runIndex,
+        start: offset,
+        text: run.text,
+        props,
+        face: box.face,
+        sizePt: box.sizePt,
+        rise: 0,
+        advances: Float64Array.of(box.width),
+        isBreak: false,
+        math: box,
+      });
+      offset += run.text.length;
+      return;
+    }
     if (run.kind === 'break') {
       if (face.substituted) substitutions.add(props.latin);
       out.push({
@@ -325,7 +346,7 @@ function buildSegments(
       }
     }
     let local = 0;
-    for (const piece of slotted) {
+    for (const piece of bidiPieces(slotted, bidi?.levels, offset)) {
       const face = piece.face;
       const sizePt = piece.small ? baseSize * SMALL_CAPS_SCALE : baseSize;
       const kerning = props.kern !== undefined && props.size >= props.kern;
@@ -354,6 +375,89 @@ function buildSegments(
     offset += run.text.length;
   });
   return out;
+}
+
+/**
+ * The glyphs and marks of an equation at `x` on its line: each glyph piece is a text run with
+ * the equation's source offset, so the caret and the hit test treat it as one character.
+ */
+function placeMath(
+  box: MathBox,
+  x: number,
+  runIndex: number,
+  start: number,
+  runs: GlyphRun[],
+  marks: LineMark[]
+): void {
+  for (const g of box.glyphs)
+    runs.push({
+      kind: 'text',
+      text: g.text,
+      x: g.x.map((v) => v + x),
+      face: g.face,
+      sizePt: g.sizePt,
+      rise: g.y,
+      props: g.props,
+      runIndex,
+      start,
+    });
+  for (const m of box.marks) marks.push(moveMark({ ...m, runIndex }, x));
+}
+
+/**
+ * The runs of a bidi line, from its pieces, with the line's visible content starting at `left`.
+ * Runs stay in source order, so the run before an offset is the run that holds it.
+ */
+function placeBidiRuns(
+  line: BidiLine,
+  left: number,
+  start: number,
+  units: readonly Unit[],
+  segments: readonly Segment[],
+  runs: GlyphRun[],
+  marks: LineMark[]
+): void {
+  const placed: GlyphRun[] = [];
+  for (const piece of line.pieces) {
+    const s = segments[piece.seg];
+    const x = piece.x.map((v) => v + left);
+    if (s.math) {
+      placeMath(s.math, x[0], s.runIndex, start + piece.from, placed, marks);
+      continue;
+    }
+    if (s.isBreak) continue;
+    let text = '';
+    for (let i = piece.from; i < piece.to; i += 1)
+      text += String.fromCharCode(units[start + i].code);
+    placed.push({
+      kind: 'text',
+      text,
+      x,
+      face: s.face,
+      sizePt: s.sizePt,
+      rise: s.rise,
+      props: s.props,
+      runIndex: s.runIndex,
+      start: start + piece.from,
+      ...(piece.rtl ? { rtl: true as const } : {}),
+    });
+  }
+  placed.sort((a, b) => a.start - b.start);
+  for (const run of placed) runs.push(run);
+}
+
+/** A mark moved right by `dx`. */
+function moveMark(mark: LineMark, dx: number): LineMark {
+  if (dx === 0) return mark;
+  return {
+    ...mark,
+    commands: mark.commands.map((c) => {
+      if (c.op === 'Z') return c;
+      if (c.op === 'Q') return { ...c, x1: c.x1 + dx, x: c.x + dx };
+      if (c.op === 'C') return { ...c, x1: c.x1 + dx, x2: c.x2 + dx, x: c.x + dx };
+      return { ...c, x: c.x + dx };
+    }),
+  };
 }
 
 interface Unit {
@@ -406,10 +510,12 @@ export function layoutTextOn(
   const numbering = new AutonumberCounters();
   const overflowAt = untilOverflow && columns <= 1 ? outerH + 1 - bp.tIns - bp.bIns : Infinity;
   let overflowed = false;
+  const stackedVert = vert === 'wordArtVert';
 
   body.paragraphs.forEach((p, pi) => {
     if (overflowed) return;
-    const segments = buildSegments(p, measurer, fontScale, substitutions, vert === 'wordArtVert');
+    const bidi = paragraphBidiOf(p);
+    const segments = buildSegments(p, measurer, fontScale, substitutions, stackedVert, bidi);
     const sourceLength = p.runs.reduce((n, r) => n + (r.kind === 'break' ? 1 : r.text.length), 0);
     paragraphLengths.push(sourceLength);
     const firstProps = p.runs.find((r) => r.kind !== 'break')?.props ?? p.endProps;
@@ -424,7 +530,27 @@ export function layoutTextOn(
     // caret is there (`Line.pendingBullet`). Empty paragraphs consume no number.
     let marker: GlyphRun | null = null;
     const number = sourceLength > 0 ? numbering.next(p) : numbering.peek(p);
-    if (p.bullet) {
+    if (p.bullet?.type === 'picture') {
+      const sizePt =
+        'pct' in p.bullet.size
+          ? firstSize * p.bullet.size.pct
+          : autofitSizePt(p.bullet.size.pts / 100, fontScale);
+      const height = sizePt * PICTURE_BULLET_SCALE * EMU_PER_PT;
+      const x0 = p.marL + p.indent;
+      const { part, rId, svgRId, aspect } = p.bullet;
+      marker = {
+        kind: 'bullet',
+        text: '',
+        x: [x0, x0 + height * aspect],
+        face: faceFor(firstProps, measurer),
+        sizePt,
+        rise: 0,
+        props: firstProps,
+        runIndex: -1,
+        start: 0,
+        picture: { part, rId, ...(svgRId ? { svgRId } : {}), height },
+      };
+    } else if (p.bullet) {
       const raw =
         p.bullet.type === 'char' ? p.bullet.char : autonumberText(p.bullet.scheme, number ?? 1);
       const sizePt =
@@ -437,11 +563,24 @@ export function layoutTextOn(
         underline: 'none',
         strike: 'noStrike',
       };
-      const face = measurer.resolve({
-        family: p.bullet.font ?? firstProps.latin,
-        bold: p.bullet.font ? false : firstProps.bold,
-        italic: p.bullet.font ? false : firstProps.italic,
-      });
+      // A number in complex-script or East Asian characters draws in the first run's font for
+      // that script, not the bullet font (reference PDF of `rtl-text`: `أ-` in the run's
+      // `a:cs` face, where the bullet font has no Arabic glyphs).
+      const scriptSlot =
+        p.bullet.type === 'autonum'
+          ? // A copy of the props: the marker must not replace the first run's cached split,
+            // which the `normAutofit` search reuses at each step.
+            fontSlotPieces(raw, { ...firstProps }).find((s) => s.slot === 'cs' || s.slot === 'ea')
+              ?.slot
+          : undefined;
+      const face =
+        (scriptSlot === 'cs' || scriptSlot === 'ea') && slotFamily(firstProps, scriptSlot) !== ''
+          ? faceFor(firstProps, measurer, slotFamily(firstProps, scriptSlot), scriptSlot)
+          : measurer.resolve({
+              family: p.bullet.font ?? firstProps.latin,
+              bold: p.bullet.font ? false : firstProps.bold,
+              italic: p.bullet.font ? false : firstProps.italic,
+            });
       // A Wingdings or Symbol bullet is a byte of that font. When the font is not loaded, the
       // bullet draws its Unicode twin (DOCX Editor's table), not the plain letter; the file
       // keeps its character.
@@ -472,7 +611,9 @@ export function layoutTextOn(
       for (let i = 0; i < s.text.length; i += 1)
         units.push({ seg: si, code: s.text.charCodeAt(i), advance: s.advances[i] });
     });
-    const breaks = paragraphBreaks(p, segments.map((s) => s.text).join(''));
+    const paragraphText = segments.map((s) => s.text).join('');
+    const breaks = paragraphBreaks(p, paragraphText);
+    const codes = bidi ? units.map((u) => u.code) : [];
 
     const bullet = sourceLength > 0 ? marker : null;
     const pending = sourceLength > 0 ? null : marker;
@@ -480,6 +621,16 @@ export function layoutTextOn(
       ? Math.max(p.marL, marker.x[marker.x.length - 1])
       : p.marL + p.indent;
     const lineLeft = (first: boolean): number => (first ? firstLineStart : p.marL);
+    // The bullet stands at the paragraph's leading edge, and moves with its line: centered and
+    // right-aligned text keep it next to the text, at the same distance as on a left-aligned
+    // line. In a right-to-left paragraph the bullet's text reads in the paragraph's direction
+    // (`markerRuns`).
+    const placeMarker = (m: GlyphRun, shift: number): GlyphRun => {
+      const x0 = m.x[0];
+      const w = m.x[m.x.length - 1] - x0;
+      const at = (p.rtl ? colW - x0 - w - shift : x0 + shift) + bp.lIns;
+      return { ...m, x: m.x.map((v) => v - x0 + at) };
+    };
     const avail = (first: boolean): number => colW - lineLeft(first) - p.marR;
 
     /**
@@ -560,7 +711,7 @@ export function layoutTextOn(
           p.hangingPunct && i > start && isHangingPunctuation(u.code) && x - left <= limit + 1;
         if (wrap && next - left > limit + 1 && !isTrailingSpace(u.code) && !hangs) {
           if (lastBreak > start) end = lastBreak;
-          else end = Math.max(i, start + 1);
+          else end = forcedLineEnd(paragraphText, breaks, start, i);
           break;
         }
         x = next;
@@ -622,8 +773,38 @@ export function layoutTextOn(
       const lineMetrics = metrics ?? maxFace.metrics;
       const single = singleLinePt(maxSize, lineMetrics, basis);
       const heightPt = lineHeightInPt(single, p.lineSpacing, reduction);
-      const height = heightPt * EMU_PER_PT;
-      const baseline = baselineInLinePt(single, heightPt, lineMetrics) * EMU_PER_PT;
+      let height = heightPt * EMU_PER_PT;
+      let baseline = baselineInLinePt(single, heightPt, lineMetrics) * EMU_PER_PT;
+      // An equation that needs more room than the line has makes the line taller. Above single
+      // percent spacing (`a:spcPct`), the equation grows the single line, and the spacing then
+      // adds its share of the text band on top, as DOCX Editor's `equationSpacingBand` does for
+      // its `auto` rule: the line keeps the equation's own extent. The extra goes above and
+      // below the baseline as on a text line. At 150 % (`equation-lines`, slide 1), the first
+      // line of stacked display fractions comes 8.2 pt above the reference and the line pitch
+      // 3 pt over it, against 14.2 pt and 5 pt when the equation fills the extra space. At
+      // single spacing and below, and at exact spacing (`a:spcPts`), the equation fills the
+      // line's own space first (the reference PDFs of `equations` and `preserved-content`).
+      const raised = 'pct' in p.lineSpacing && heightPt > single + 1e-9;
+      const singleBase = baselineInLinePt(single, single, lineMetrics) * EMU_PER_PT;
+      let growAbove = 0;
+      let growBelow = 0;
+      for (let i = range.start, last = -1; i < range.end; i += 1) {
+        if (units[i].seg === last) continue;
+        last = units[i].seg;
+        const box = segments[last].math;
+        if (!box) continue;
+        if (raised) {
+          growAbove = Math.max(growAbove, box.lineAscent - singleBase);
+          growBelow = Math.max(growBelow, box.lineDescent - (single * EMU_PER_PT - singleBase));
+          continue;
+        }
+        const above = Math.max(0, box.lineAscent - baseline);
+        const below = Math.max(0, box.lineDescent - (height - baseline));
+        height += above + below;
+        baseline += above;
+      }
+      height += growAbove + growBelow;
+      baseline += growAbove;
 
       // Positions, then alignment. Positions include the left inset, so no later pass copies
       // the position arrays to add it.
@@ -636,6 +817,12 @@ export function layoutTextOn(
         contentEnd -= 1;
       let width = 0;
       for (let i = range.start; i < contentEnd; i += 1) width += units[i].advance;
+      // A bidi line in visual order (UAX #9 L1/L2); its visible extent is what aligns.
+      const segOf = (i: number): number => units[i].seg;
+      const placeLine = (advance: (i: number) => number): BidiLine | undefined =>
+        bidi && placeBidiLine(bidi, codes, range.start, range.end, contentEnd, advance, segOf);
+      let bidiLine = placeLine((i) => units[i].advance);
+      if (bidiLine) width = bidiLine.contentRight - bidiLine.contentLeft;
       // A hanging comma or full stop stays outside the line for alignment.
       const hanging =
         p.hangingPunct &&
@@ -647,21 +834,31 @@ export function layoutTextOn(
       const lastOfPara = li === lineRanges.length - 1 || range.forced;
       let shift = 0;
       let extra: Float64Array | undefined;
-      if (p.align === 'ctr') shift = room / 2;
-      else if (p.align === 'r') shift = room;
+      // `shift` is measured from the paragraph's leading edge: the right edge when it is `rtl`.
+      const alignment = paragraphAlignment(p.align);
+      const justifies = p.align === 'just' || p.align === 'justLow';
+      const distributes = p.align === 'dist' || p.align === 'thaiDist';
+      if (alignment !== 'both') shift = leadingOffset(alignment, p.rtl, room);
       // A justified line that ends with hanging punctuation fills the line, also the last line.
-      else if (((p.align === 'just' && (!lastOfPara || hanging)) || p.align === 'dist') && room > 0)
+      else if (((justifies && (!lastOfPara || hanging)) || distributes) && room > 0)
         // The hanging character keeps its gap: the line ends where the character starts.
         extra = justifyExtra(units, segments, range.start, contentEnd, room);
       if (!wrap && p.align === 'ctr') shift = (avail(first) - width) / 2;
-      const caretX: number[] = [];
-      const origin = left + shift + bp.lIns;
+      let caretX: number[] = [];
+      let lineBidi: LineBidi | undefined;
+      const origin = (p.rtl ? colW - left - shift : left + shift) + bp.lIns;
       let x = origin;
       const runs: GlyphRun[] = [];
+      const marks: LineMark[] = [];
       let cur: { seg: number; text: string; xs: number[]; start: number } | null = null;
       const flush = (): void => {
         if (!cur) return;
         const s = segments[cur.seg];
+        if (s.math) {
+          placeMath(s.math, cur.xs[0], s.runIndex, cur.start, runs, marks);
+          cur = null;
+          return;
+        }
         if (!s.isBreak && cur.text.length > 0) {
           cur.xs.push(x);
           runs.push({
@@ -680,7 +877,21 @@ export function layoutTextOn(
       };
       // Display text keeps source length (caps never change length), so unit index = offset.
       const sourceOffset = range.start;
-      for (let i = range.start; i < range.end; i += 1) {
+      const advance = (i: number): number => units[i].advance + (extra?.[i - range.start] ?? 0);
+      if (bidiLine && extra) bidiLine = placeLine(advance);
+      if (bidiLine) {
+        // Justification widened the line: its right edge moved with it.
+        const shown = bidiLine.contentRight - bidiLine.contentLeft;
+        const lineLeftX = (p.rtl ? colW - left - shift - shown : left + shift) + bp.lIns;
+        placeBidiRuns(bidiLine, lineLeftX, range.start, units, segments, runs, marks);
+        caretX = bidiCaretX(bidiLine, range.start, range.end - range.start, advance).map(
+          (v) => v + lineLeftX
+        );
+        lineBidi = lineBidiOf(bidiLine, lineLeftX, range.start, advance, p.rtl);
+      }
+      // A bidi line placed its runs above; a left-to-right line places them here.
+      const lineEnd = bidiLine ? range.start : range.end;
+      for (let i = range.start; i < lineEnd; i += 1) {
         const u = units[i];
         if (!cur || cur.seg !== u.seg) {
           flush();
@@ -693,12 +904,13 @@ export function layoutTextOn(
         x += u.advance + (extra?.[i - range.start] ?? 0);
       }
       flush();
-      caretX.push(x);
-      // The bullet moves with its line: centered and right-aligned text keep the bullet next
-      // to the text, at the same distance as on a left-aligned line.
+      if (!bidiLine) caretX.push(x);
       const lineRuns =
         first && bullet
-          ? [{ ...bullet, x: bullet.x.map((v) => v + shift + bp.lIns) }, ...runs]
+          ? [
+              ...(p.rtl ? markerRuns(placeMarker(bullet, shift)) : [placeMarker(bullet, shift)]),
+              ...runs,
+            ]
           : runs;
       lines.push({
         paragraph: pi,
@@ -709,20 +921,13 @@ export function layoutTextOn(
         start: sourceOffset,
         end: sourceOffset + (range.end - range.start),
         caretX: range.end === range.start ? [origin] : caretX,
-        runs: lineRuns.flatMap((run) => {
-          const pieces = paintClusterRanges(run.text);
-          if (pieces.length === 1) return [run];
-          return pieces.map((piece) => ({
-            ...run,
-            text: run.text.slice(piece.start, piece.end),
-            x: run.x.slice(piece.start, piece.end + 1),
-            start: run.start + piece.start,
-          }));
-        }),
+        ...(lineBidi ? { bidi: lineBidi } : {}),
+        runs: paintPieces(lineRuns),
         fontHeight: maxSize * EMU_PER_PT,
         ...(first && pending
-          ? { pendingBullet: { ...pending, x: pending.x.map((v) => v + shift + bp.lIns) } }
+          ? { pendingBullet: wholeMarker(placeMarker(pending, shift), p.rtl) }
           : {}),
+        ...(marks.length > 0 ? { marks } : {}),
       });
       y += height;
     });
@@ -756,7 +961,9 @@ export function layoutTextOn(
         top: line.top - offset,
         baseline: placeBaseline(line.baseline - offset),
         caretX: line.caretX.map((v) => v + dx),
+        ...(line.bidi ? { bidi: shiftLineBidi(line.bidi, dx) } : {}),
         runs: line.runs.map((r) => ({ ...r, x: r.x.map((v) => v + dx) })),
+        ...(line.marks ? { marks: line.marks.map((m) => moveMark(m, dx)) } : {}),
       });
     }
     contentHeight = Math.min(y, innerH);

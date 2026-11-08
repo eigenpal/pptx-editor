@@ -1,6 +1,6 @@
-# Supply-chain defense, as in DOCX Editor (docx-editor/.github/dependabot.yml): a 7-day
+# Supply-chain defense, adapted from DOCX Editor (docx-editor/.github/dependabot.yml): a 7-day
 # cooldown before Dependabot opens an update PR. Compromised packages are almost always
-# yanked within hours, well before this window elapses.
+# yanked within hours, well before this window elapses. DOCX Editor commit adf0e178.
 #
 # One grouped PR per week for minor and patch updates of the workspace (the demo is a
 # workspace member, so it is covered). Majors stay ungrouped: they are real upgrade work.

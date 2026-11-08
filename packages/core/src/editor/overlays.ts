@@ -413,6 +413,21 @@ export function editNoticeShows(
   return !!rejection && !rejection.noop && rejection !== dismissed;
 }
 
+const fieldRejections = new WeakSet<EditorRejection>();
+
+/**
+ * Mark `rejection` as shown by the field whose action the editor refused, such as a comment
+ * field: the edit notice then stays hidden, so the refusal reads once. @internal
+ */
+export function claimRejection(rejection: EditorRejection): void {
+  fieldRejections.add(rejection);
+}
+
+/** Whether a field shows `rejection` itself (`claimRejection`). @internal */
+export function fieldShowsRejection(rejection: EditorRejection | null | undefined): boolean {
+  return !!rejection && fieldRejections.has(rejection);
+}
+
 /**
  * Whether the open link popup already shows `rejection`: its Apply was refused, and the popup
  * says why under the field. The edit notice then stays hidden, so the refusal shows once.

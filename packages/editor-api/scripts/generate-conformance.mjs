@@ -1,16 +1,17 @@
 #!/usr/bin/env node
-// Copied from DOCX Editor packages/editor-api/scripts/generate-conformance.mjs at commit 5993bd223945cabdaf3900557d9fb59bfd8c2d8c.
-// Changes: the presentation namespace, PPTX Editor names, and paths. DOCX Editor compares the
-// reference with a hand-written declarations file (compat/docxeditor/declarations.ts) through
-// extract-docxeditor-shape.mjs; PPTX Editor has no such file, so that module is not copied and
-// no shape JSON is written. The authored side of each assertion is the real public type, read
-// from src/index.ts by the compiler (`Pick<PptxEditor.Shape, 'fill'>`,
+// After DOCX Editor packages/editor-api/scripts/generate-conformance.mjs at commit
+// 5993bd223945cabdaf3900557d9fb59bfd8c2d8c. Changes: the presentation namespace, PPTX Editor names,
+// and paths. DOCX Editor compares the reference with a hand-written declarations file
+// (packages/editor-api/compat/docxeditor/declarations.ts) through
+// packages/editor-api/scripts/lib/extract-docxeditor-shape.mjs; PPTX Editor has no such file, so
+// that module is not copied and no shape JSON is written. The authored side of each assertion is
+// the real public type, read from src/index.ts by the compiler (`Pick<PptxEditor.Shape, 'fill'>`,
 // `PptxEditor.ShapeCollection['addTextBox']`). The reference side comes from
-// reference/presentation.full-inventory.json, which keeps the enum names that the subset
-// reference collapses to string literals. One assertion covers all the overloads of a member,
-// in order; a property assertion also covers `readonly` and `?`; a writable property also gets
-// a write check. `manifest.conformanceExceptions` names the selected members that cannot hold,
-// with the reason. `--check` fails when the committed file differs from a fresh generation.
+// reference/presentation.full-inventory.json, which keeps the enum names that the subset reference
+// collapses to string literals. One assertion covers all the overloads of a member, in order; a
+// property assertion also covers `readonly` and `?`; a writable property also gets a write check.
+// `manifest.conformanceExceptions` names the selected members that cannot hold, with the reason.
+// `--check` fails when the committed file differs from a fresh generation.
 /**
  * The conformance generator.
  *

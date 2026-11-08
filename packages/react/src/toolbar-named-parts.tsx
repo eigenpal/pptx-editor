@@ -2,8 +2,9 @@
 // The named toolbar parts (`Toolbar.Bold`, `Toolbar.FontFamily`, …), after DOCX Editor's
 // `definePart` (docx-editor/packages/react/src/editor/toolbar/parts.tsx). Each part is a
 // `Toolbar.Slot` with its slot pinned, and carries the slot as a static (`pptxSlot`), so the
-// toolbar recognizes it among its children and puts it in the slot's place. The table of
-// names lives in core (`TOOLBAR_NAMED_PARTS`), so the Vue twin uses the same names.
+// toolbar recognizes it among its children and puts it in the slot's place. The table of names
+// lives in core (`TOOLBAR_NAMED_PARTS`), so the Vue twin uses the same names. DOCX Editor commit
+// adf0e178.
 
 import type { ReactNode } from 'react';
 import { TOOLBAR_NAMED_PARTS, type ChromeSlotId } from '@pptx-editor.dev/core/editor';
@@ -96,6 +97,8 @@ export interface ToolbarNamedParts {
   readonly Shapes: ToolbarSlotPartComponent;
   /** `insert.image`. */
   readonly ImageInsert: ToolbarPartComponent;
+  /** `insert.equation`: opens the Equation dialog. */
+  readonly Equation: ToolbarPartComponent;
   /** `shape.fill`. */
   readonly ShapeFill: ToolbarColorSplitComponent;
   /** `shape.lineColor`. */
@@ -112,6 +115,8 @@ export interface ToolbarNamedParts {
   readonly ShapeStyles: ToolbarSlotPartComponent;
   /** `shape.effects`. */
   readonly ShapeEffects: ToolbarSlotPartComponent;
+  /** `shape.textEffects`. */
+  readonly TextEffects: ToolbarSlotPartComponent;
   /** `shape.properties`. */
   readonly FormatShape: ToolbarPartComponent;
   /** `format.painter`. */
@@ -198,6 +203,18 @@ export interface ToolbarNamedParts {
   readonly ImageCropFit: ToolbarPartComponent;
   /** `image.properties`. */
   readonly ImageProperties: ToolbarPartComponent;
+  /** `chart.editData`. */
+  readonly ChartEditData: ToolbarPartComponent;
+  /** `diagram.addAfter`. */
+  readonly DiagramAddAfter: ToolbarPartComponent;
+  /** `diagram.addBefore`. */
+  readonly DiagramAddBefore: ToolbarPartComponent;
+  /** `diagram.addBelow`. */
+  readonly DiagramAddBelow: ToolbarPartComponent;
+  /** `diagram.delete`. */
+  readonly DiagramDelete: ToolbarPartComponent;
+  /** `review.addComment`. */
+  readonly AddComment: ToolbarPartComponent;
   /** `table.insert`. */
   readonly TableInsert: ToolbarPartComponent;
   /** `table.style`. */

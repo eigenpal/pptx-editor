@@ -1,4 +1,4 @@
-// Copied from docx-editor/scripts/test/output-capture.mjs at 39a490db (EigenPal).
+// Copied from docx-editor/scripts/test/output-capture.mjs at adf0e178 (EigenPal).
 // A test file's combined stdout and stderr, held in bounded memory.
 //
 // The runner used to append every chunk to one string. A file that logged in a loop wrote more

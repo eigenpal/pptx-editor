@@ -3,7 +3,7 @@ Copyright (c) 2026 Eigenpal, Inc. All rights reserved.
 Licensed under the EigenPal Pro Evaluation License 1.0. See packages/pro/LICENSE.md.
 Production use requires a commercial agreement: licensing@eigenpal.com
 */
-// Glow, inner shadow, reflection, and soft edge as SVG (design D1 of `effects-fidelity`), as
+// Glow, inner shadow, reflection, soft edge, and blur as SVG (design D1 of `effects-fidelity`), as
 // plain data that the engine's SVG paint builds (`EffectNode`).
 //
 // A shape paints as one content group (geometry and text). A reflection is a `<use>` copy of that
@@ -40,6 +40,7 @@ import {
   reflectionFade,
   softEdgeSpread,
 } from './effects-math.ts';
+import { threeDPaint } from './three-d.ts';
 
 /** Format a number for an SVG attribute, as the engine's paint does. */
 function num(v: number): string {
@@ -236,7 +237,8 @@ export function bodyEffects(
 export function glowEffect(
   effects: ResolvedEffects,
   bounds: EffectBounds,
-  ids: EffectIds
+  ids: EffectIds,
+  alone = false
 ): EffectFilterPaint | null {
   const glow = effects.glow;
   if (!glow || glow.radius <= 0) return null;
@@ -253,10 +255,14 @@ export function glowEffect(
       result: 'gc',
     }),
     node('feComposite', { in: 'gc', in2: 'gb', operator: 'in', result: 'glow' }),
-    node('feMerge', {}, [
-      node('feMergeNode', { in: 'glow' }),
-      node('feMergeNode', { in: 'SourceGraphic' }),
-    ]),
+    ...(alone
+      ? []
+      : [
+          node('feMerge', {}, [
+            node('feMergeNode', { in: 'glow' }),
+            node('feMergeNode', { in: 'SourceGraphic' }),
+          ]),
+        ]),
   ]);
   return { defs: [filter], filter: id };
 }
@@ -335,9 +341,34 @@ export function reflectionEffect(
   };
 }
 
+/**
+ * Blur (`a:blur`, ECMA-376 Part 1, 20.1.8.15) over the content, with the kernel of the shadows
+ * (`blurSigma`). Without `grow`, the blur stays inside the content's own outline.
+ */
+export function blurEffect(
+  effects: ResolvedEffects,
+  bounds: EffectBounds,
+  ids: EffectIds
+): EffectFilterPaint | null {
+  const blur = effects.blur;
+  const sigma = blur ? blurSigma(blur.radius) : 0;
+  if (!blur || sigma <= 0) return null;
+  const id = ids.id('blur');
+  const prims = [
+    node('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: num(sigma), result: 'bl' }),
+    ...(blur.grow
+      ? []
+      : [node('feComposite', { in: 'bl', in2: 'SourceAlpha', operator: 'in', result: 'bi' })]),
+  ];
+  const margin = blur.grow ? 3 * sigma + PX : PX;
+  return { defs: [node('filter', { id, ...region(grow(bounds, margin)) }, prims)], filter: id };
+}
+
 /** The effects renderer that `installDrawing` installs. */
 export const drawingEffectsRenderer: DrawingEffectsRenderer = Object.freeze({
   body: bodyEffects,
   glow: glowEffect,
   reflection: reflectionEffect,
+  blur: blurEffect,
+  threeD: threeDPaint,
 });

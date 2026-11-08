@@ -1,7 +1,7 @@
 // SHA-256 tests.
 //
-// The first block is ported from docx-editor/packages/core/src/store/__tests__/sha256.test.ts
-// (EigenPal, Apache-2.0). The second is the regression test for audit finding P5
+// The first block is adapted from docx-editor/packages/core/src/store/__tests__/sha256.test.ts
+// at 424a12168 (EigenPal, Apache-2.0). The second is the regression test for audit finding P5
 //: part fingerprints use the native hash and give the same digests.
 
 import { describe, expect, test } from 'bun:test';

@@ -2,7 +2,7 @@
 // them (typed text for numbers), their seed from `ParagraphFormatRead`, the range checks with a
 // message per field, and the one `setParagraphFormat` command that OK sends. After DOCX
 // Editor's `packages/core/src/editor/paragraph-dialog-fields.ts`, in slide units: inches
-// for indents, points or lines for spacing.
+// for indents, points or lines for spacing. DOCX Editor commit adf0e178.
 //
 // A field the selection disagrees about opens blank (or on a "Mixed" choice). A blank is not a
 // value, so OK writes only what the user set; any value typed into a blank field differs from
