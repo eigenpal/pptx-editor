@@ -114,12 +114,14 @@ export const shadingFill = (name: PDFName): PDFOperator =>
 const PLAIN_FORM_BYTES = 1024;
 
 /** The resource kinds a page names, and the prefix of each name. */
-const PREFIX = { Font: 'F', XObject: 'X', ExtGState: 'GS', Shading: 'Sh' } as const;
+const PREFIX = { Font: 'F', XObject: 'X', ExtGState: 'GS', Shading: 'Sh', Pattern: 'P' } as const;
 
 export class PageOps {
   #ops: PDFOperator[] = [];
   readonly #states = new Map<string, PDFName>();
   readonly #fontKeys = new Map<string, PDFName>();
+  /** Pattern fills of this page by preset and colors, so each is written once per page. */
+  readonly patterns = new Map<string, PDFName>();
   #resourcesRef: PDFRef | undefined;
   #names = 0;
   #items = 0;

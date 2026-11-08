@@ -1,7 +1,7 @@
 // Fill and outline paint: solid, linear and path gradients (`paint-gradient.ts`), pictures
 // (stretch with srcRect and fillRect, tile), patterns, and outline strokes. Paint servers are
 // defined in the shape's local coordinate space (userSpaceOnUse over the shape box), so rotation
-// and flips carry them.
+// and flips carry them. Pattern tiles are the exception: they stay square to the slide.
 
 import {
   toCss,
@@ -11,7 +11,7 @@ import {
   type ResolvedLine,
   type BlipEffect,
 } from '../cascade/index.ts';
-import { dashArray, strokeCap, strokeWidth } from '../layout/index.ts';
+import { dashArray, invert, strokeCap, strokeWidth, type Matrix } from '../layout/index.ts';
 import { ALIGN_POINTS, lumTransfer } from './effect-transforms.ts';
 import { circleGradient, linearGradient, rectGradient, shapeGradient } from './paint-gradient.ts';
 import { PATTERN_PIXEL, patternBitmap } from './preset-patterns.ts';
@@ -52,10 +52,10 @@ export interface PaintContext {
 /** The paint context of one fill, inside this lane. */
 export interface FillContext extends PaintContext {
   /**
-   * The slide position (EMU) of the fill box's top-left corner, for pattern tiles on the slide's
-   * grid. Paint sets it for each shape box that maps to the slide by a translation only.
+   * The matrix from the fill box to the slide (EMU), for pattern tiles on the slide's grid. Paint
+   * sets it for each shape and picture box.
    */
-  readonly fillOrigin?: { readonly x: number; readonly y: number };
+  readonly fillMatrix?: Matrix;
 }
 
 /** An SVG paint (`fill` or `stroke` value) plus its opacity. */
@@ -261,8 +261,10 @@ export function fillPaint(
 
 /**
  * A preset pattern as its 8×8 bitmap in the two colors (design D2 of `fill-and-line-fidelity`).
- * The tiles sit on a grid from the slide's top-left corner, not from the shape: the reference PDF
- * places every tile at a multiple of 8 pt (`fixtures/fills-lines.pdf`, slide 1).
+ * The tiles sit on a grid from the slide's top-left corner, square to the slide: the reference PDF
+ * places every tile at a multiple of 8 pt, and a rotated or flipped shape shows the same unturned
+ * tiles (`fixtures/follow-ups.pdf`, slide 3). The pattern space is the slide's, so the tiles keep
+ * their size in a scaled group too.
  */
 function patternPaint(fill: Extract<ResolvedFill, { type: 'pattern' }>, ctx: FillContext): Paint {
   const { defs } = ctx;
@@ -270,7 +272,6 @@ function patternPaint(fill: Extract<ResolvedFill, { type: 'pattern' }>, ctx: Fil
   const bits = patternBitmap(fill.preset) ?? patternBitmap('pct50')!;
   const size = 8 * PATTERN_PIXEL;
   const fg = toCss({ ...fill.fg, a: 1 });
-  const phase = (v: number): number => -(((v % size) + size) % size);
   const kids: SVGElement[] = [
     svg(doc, 'rect', {
       width: num(size),
@@ -307,7 +308,7 @@ function patternPaint(fill: Extract<ResolvedFill, { type: 'pattern' }>, ctx: Fil
     }
   });
   const id = defs.id('patt');
-  const origin = ctx.fillOrigin ?? { x: 0, y: 0 };
+  const toSlide = ctx.fillMatrix && slideSpace(ctx.fillMatrix);
   return {
     paint: defs.add(
       svg(
@@ -316,8 +317,7 @@ function patternPaint(fill: Extract<ResolvedFill, { type: 'pattern' }>, ctx: Fil
         {
           id,
           patternUnits: 'userSpaceOnUse',
-          x: num(phase(origin.x)),
-          y: num(phase(origin.y)),
+          patternTransform: toSlide,
           width: num(size),
           height: num(size),
         },
@@ -326,6 +326,48 @@ function patternPaint(fill: Extract<ResolvedFill, { type: 'pattern' }>, ctx: Fil
     ),
     opacity: 1,
   };
+}
+
+/**
+ * The `patternTransform` that maps slide space into a box's local space, or undefined when the box
+ * maps to the slide by the identity or cannot be inverted (a box of zero width or height). It
+ * inverts the matrix as `matrixAttr` writes it, so the two cancel exactly.
+ */
+function slideSpace(m: Matrix): string | undefined {
+  const r = roundedMatrix(m);
+  if (r[0] === 1 && r[1] === 0 && r[2] === 0 && r[3] === 1 && r[4] === 0 && r[5] === 0)
+    return undefined;
+  return invertedAttr(r);
+}
+
+/** A matrix as `matrixAttr` writes it. */
+function roundedMatrix(m: Matrix): Matrix {
+  return m.map((v) => Number(num(v))) as unknown as Matrix;
+}
+
+/** The inverse of `r` as a `transform` value, or undefined when `r` cannot be inverted. */
+function invertedAttr(r: Matrix): string | undefined {
+  const det = r[0] * r[3] - r[1] * r[2];
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-9) return undefined;
+  const fine = (v: number): string => {
+    const x = Math.round(v * 1e9) / 1e9;
+    return Object.is(x, -0) ? '0' : String(x);
+  };
+  return `matrix(${invert(r).map(fine).join(' ')})`;
+}
+
+/**
+ * How to draw a pattern fill of a box that the slide turns, flips, or scales: in slide space,
+ * under a `transform` that undoes the box's matrix. A browser that prints a pattern under a turned
+ * transform resamples its tiles; in slide space they print pixel for pixel. `matrix` is the box's
+ * matrix as `matrixAttr` writes it: map the fill path through it. Undefined for a box that maps to
+ * the slide by a translation, or that cannot be inverted.
+ */
+export function slideSpaceFill(m: Matrix): { matrix: Matrix; transform: string } | undefined {
+  const r = roundedMatrix(m);
+  if (r[0] === 1 && r[1] === 0 && r[2] === 0 && r[3] === 1) return undefined;
+  const transform = invertedAttr(r);
+  return transform ? { matrix: r, transform } : undefined;
 }
 
 /** The smallest tile side, EMU (one pixel at 96 DPI): a file cannot ask for subpixel tiles. */

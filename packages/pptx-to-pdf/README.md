@@ -93,7 +93,7 @@ Each diagnostic has a fixed `code`. Handle an unknown code by its `severity`. Th
 
 | Code | Severity | Meaning | DOCX Editor code for the same idea |
 | --- | --- | --- | --- |
-| `fill.pattern`, `fill.picture` | `unsupported` | A pattern fill, or a picture fill on text, is not drawn. |  |
+| `fill.pattern`, `fill.picture` | `unsupported` | A pattern on text or a line, or a picture fill on text, is not drawn. |  |
 | `line.gradient` | `approximation` | A gradient on a line is drawn in its middle color. |  |
 | `fill.outside-box` | `approximation` | A shape's picture fill or rectangular path gradient paints only the shape's box; geometry more than 0.75 pt past it is empty. |  |
 | `fill.gradient-stops` | `approximation` | A gradient with more than 64 stops is drawn with 64. |  |
@@ -102,7 +102,7 @@ Each diagnostic has a fixed `code`. Handle an unknown code by its `severity`. Th
 | `picture.svg-fallback` | `information` | An SVG picture is drawn from its PNG fallback, the raster copy that the file stores beside it. |  |
 | `picture.tile` | `approximation` | A tiled picture is drawn stretched. |  |
 | `picture.color-effects` | `approximation` | Picture color effects are not applied. | `image-effects` |
-| `line.compound` | `approximation` | Compound lines are drawn as one line. |  |
+| `line.compound` | `approximation` | A dashed compound line, or a compound table border, is drawn as one line. |  |
 | `effect.shadow-blur`, `effect.inner-shadow-blur`, `effect.glow` | `approximation` | The blur is drawn as layered rings. |  |
 | `effect.inner-shadow` | `approximation` | An inner shadow starts at the fill, so an outline wider than 1 pt, an unfilled outline, and overlapping paths are shaded differently. |  |
 | `effect.silhouette` | `approximation` | A shadow or glow uses an opaque silhouette: picture and fill transparency do not shape it. |  |
@@ -190,8 +190,8 @@ One page per slide, at the slide size (EMU ÷ 12700 points). Hidden slides (`sho
 | Gradient fills on lines | Drawn in the gradient's middle color (`approximation`) |
 | Tiled pictures; picture color effects (grayscale, duotone, brightness, black and white) | Drawn stretched; effects not applied (`approximation`) |
 | Dashes and line ends | Drawn with the editor's geometry |
-| Compound lines | Drawn as one line (`approximation`) |
-| Pattern fills | Not drawn (`unsupported`) |
+| Compound lines | Drawn band by band, with the editor's geometry. Dashed compound lines and compound table borders draw as one line (`approximation`) |
+| Pattern fills on shapes, backgrounds, and table cells | Drawn as PDF tiling patterns with the editor's bitmaps, on the slide grid. Patterns on text and lines are not drawn (`unsupported`) |
 | Underline styles other than single and double | Drawn as a single line (`approximation`) |
 | Text outlines | Not drawn (`unsupported`) |
 | Upright East Asian vertical text, synthetic bold and italic | Drawn as normal text (`approximation`) |
