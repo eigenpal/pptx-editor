@@ -1186,6 +1186,7 @@
     "unsafeLink": "リンクは http、https、mailto、tel、ftp のいずれかで始まる必要があります",
     "inputUnsupported": "この種類の入力はサポートされていません: {detail}",
     "compositionChanged": "入力位置より前のテキストが変更されたため、確定前のテキストは追加されませんでした。",
+    "compositionRangeChanged": "入力が終わる前に選択したテキストが変更されたため、確定前のテキストは追加されませんでした。",
     "invalidText": "このテキストには、スライドに入力できる文字がありません。",
     "superseded": "このプレゼンテーションを開き終える前に、別のプレゼンテーションが開かれました。",
     "coordinateRange": "位置またはサイズが、スライドで扱える範囲を超えています。",

@@ -162,6 +162,8 @@ export function fromCollaborationSelection(
 export class PresenceLink {
   readonly #registry: EditorModuleRegistry;
   #published = '';
+  /** The store revision that a peer's transaction made, while no other change followed. */
+  #remoteAt = -1;
   #painted: {
     source: unknown;
     pkg: unknown;
@@ -181,6 +183,7 @@ export class PresenceLink {
   /** Forget what was published: the next `publish` sends again (after an attach). */
   reset(): void {
     this.#published = '';
+    this.#remoteAt = -1;
   }
 
   /** Publish the editor selection when it changed. */
@@ -221,9 +224,6 @@ export class PresenceLink {
     const session = this.#registry.collaboration?.session;
     return session?.subscribeRemoteSelections?.(() => listener()) ?? (() => {});
   }
-
-  /** The store revision that a peer's transaction made, while no other change followed. */
-  #remoteAt = -1;
 
   /** Record a store change the editor handles: a peer's transaction (`remote`) or another. */
   delivered(change: { readonly origin: string; readonly toRevision: number }): void {

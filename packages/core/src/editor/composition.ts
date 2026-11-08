@@ -10,9 +10,9 @@
 // caret has a `TextPlace`: the caret, its paragraph's element id, and the paragraph's exact
 // text before the caret. A composition over a selected range has a `SelectionPlace`: the
 // range, its paragraphs' element ids, and its exact text. Every write goes through one checked
-// write (`compose` or `composeSelection`), which refuses with `errors.compositionChanged`
-// when the place no longer holds. A write never goes to the paragraph start, to another
-// paragraph, or to the caret instead.
+// write (`compose` or `composeSelection`). When the place no longer holds, it refuses with
+// `errors.compositionChanged` (a caret) or `errors.compositionRangeChanged` (a range). A
+// write never goes to the paragraph start, to another paragraph, or to the caret instead.
 //
 // A composition ends when:
 // - the browser ends it (`compositionend`): its text goes in at its place;

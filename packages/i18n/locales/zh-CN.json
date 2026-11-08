@@ -1186,6 +1186,7 @@
     "unsafeLink": "链接必须以 http、https、mailto、tel 或 ftp 开头",
     "inputUnsupported": "不支持此类输入：{detail}",
     "compositionChanged": "输入位置之前的文本已被更改，因此未添加未完成的文本。",
+    "compositionRangeChanged": "输入结束前所选文本已被更改，因此未添加未完成的文本。",
     "invalidText": "此文本中没有幻灯片可容纳的字符。",
     "superseded": "在此演示文稿打开完成之前，已打开另一个演示文稿。",
     "coordinateRange": "位置或大小超出了幻灯片可容纳的范围。",

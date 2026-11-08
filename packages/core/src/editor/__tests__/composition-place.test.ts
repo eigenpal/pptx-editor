@@ -6,6 +6,7 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { para, run } from '../../../../../scripts/fixtures/builder.ts';
 import { xmlPartOf, type Element } from '../../store/index.ts';
 import type { PptxEditorInstance } from '../index.ts';
+import { PresenceLink } from '../collaboration-presence.ts';
 import { COMPOSING_CLASS } from '../surface-input.ts';
 import { caret, focusOf, open, shapeId, texts, win } from './surface-text-fixture.ts';
 
@@ -66,7 +67,7 @@ describe('a composition over a selected range', () => {
     expect(input.classList.contains(COMPOSING_CLASS)).toBe(false);
     fire(composition('compositionend', 'X'));
     expect(texts(e)).toEqual(['alpha beta', 'gamma delta']);
-    expect(rejection(e)).toBe('errors.compositionChanged');
+    expect(rejection(e)).toBe('errors.compositionRangeChanged');
     e.destroy();
   });
 
@@ -78,7 +79,7 @@ describe('a composition over a selected range', () => {
     range(e, 0, 0, 10);
     fire(composition('compositionend', 'X'));
     expect(texts(e)).toEqual(['alpha beta']);
-    expect(rejection(e)).toBe('errors.compositionChanged');
+    expect(rejection(e)).toBe('errors.compositionRangeChanged');
     e.destroy();
   });
 
@@ -90,7 +91,7 @@ describe('a composition over a selected range', () => {
     caret(e, 1, 3);
     fire(composition('compositionend', 'X'));
     expect(texts(e)).toEqual(['alpha beta', 'gamma delta']);
-    expect(rejection(e)).toBe('errors.compositionChanged');
+    expect(rejection(e)).toBe('errors.compositionRangeChanged');
     e.destroy();
   });
 
@@ -103,7 +104,7 @@ describe('a composition over a selected range', () => {
     range(e, 1, 6, 11);
     expect(input.classList.contains(COMPOSING_CLASS)).toBe(false);
     expect(texts(e)).toEqual(['alpha beta', 'gamma delta']);
-    expect(rejection(e)).toBe('errors.compositionChanged');
+    expect(rejection(e)).toBe('errors.compositionRangeChanged');
     e.destroy();
   });
 });
@@ -201,5 +202,18 @@ describe('the origin of a change during a composition', () => {
     expect(texts(e)).toEqual(['ONE!', 'two日本']);
     expect(rejection(e)).toBeNull();
     e.destroy();
+  });
+
+  test('the record of a peer change holds for its revision, until a new deck', () => {
+    const link = new PresenceLink({} as never);
+    link.delivered({ origin: 'remote', toRevision: 3 });
+    expect(link.remoteAt(3)).toBe(true);
+    expect(link.remoteAt(4)).toBe(false);
+    link.delivered({ origin: 'user', toRevision: 4 });
+    expect(link.remoteAt(4)).toBe(false);
+    link.delivered({ origin: 'remote', toRevision: 5 });
+    // A new deck starts its revisions again: the old record must not match them.
+    link.reset();
+    expect(link.remoteAt(5)).toBe(false);
   });
 });

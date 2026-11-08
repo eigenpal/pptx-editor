@@ -81,7 +81,7 @@ Read `session.statusSnapshot()` for state and failure details. Subscribe with `s
 
 ## Handle unfinished input during peer edits
 
-An input method composes text before the participant commits it. A peer's edit after an unfinished composition, or in another paragraph, keeps the composition. When a peer's edit changes the text before it, the composition ends and its text is not entered. The editor reports this as `lastRejection` in `editor.snapshot()`, with the reason `errors.compositionChanged`, and the edit notice of the React and Vue adapters shows the translated message.
+An input method composes text before the participant commits it. A peer's edit after an unfinished composition, or in another paragraph, keeps the composition. When a peer's edit changes the text before it, the composition ends and its text is not entered. The editor reports this as `lastRejection` in `editor.snapshot()`, with the reason `errors.compositionChanged`. A composition over selected text ends the same way when that text changes, with the reason `errors.compositionRangeChanged`. The edit notice of the React and Vue adapters shows the translated message.
 
 `lastRejection` stays set after later edits, so do not react to every `editor.subscribe()` notification. Use `onEditorEvent()`, which calls its handler once for each new rejection. This example uses the `editor` from [Create one session per editor](#create-one-session-per-editor):
 
@@ -89,14 +89,15 @@ An input method composes text before the participant commits it. A peer's edit a
 import { onEditorEvent } from '@pptx-editor.dev/core/editor';
 
 const off = onEditorEvent(editor, 'rejection', (rejection) => {
-  if (rejection.reason === 'errors.compositionChanged') {
+  const reason = rejection.reason;
+  if (reason === 'errors.compositionChanged' || reason === 'errors.compositionRangeChanged') {
     // Ask the participant to type the text again.
   }
 });
 // Call off() when your UI unmounts.
 ```
 
-In React or Vue, call `useEditorEvent('rejection', handler)` from `@pptx-editor.dev/react` or `@pptx-editor.dev/vue` inside the editor root. It unsubscribes when the component unmounts. To get the editor instance itself, use `usePptxEditor()`.
+In React, call [`useEditorEvent('rejection', handler)`](/docs/react/hooks#events) inside the editor root; in Vue, call [`useEditorEvent('rejection', handler)`](/docs/vue/composables#events). Each unsubscribes when its component unmounts. To get the editor instance itself, use [`usePptxEditor()`](/docs/react/hooks#usepptxeditor) in React or [`usePptxEditor()`](/docs/vue/composables#usepptxeditor) in Vue.
 
 ## Save and close a room
 

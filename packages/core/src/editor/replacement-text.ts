@@ -281,7 +281,7 @@ export function createSystemText(host: SystemTextHost) {
   return {
     /** The text the surface's input holds for the system. */
     typingContext,
-    /** Whether the store delivers a peer's transaction now (origin `remote`). */
+    /** Whether the store is still at the revision of a peer's change (`PresenceLink.remoteAt`). */
     remoteChange: (): boolean => host.remoteChange?.() ?? false,
     /** The place of the selection now, for a composition over a selected range. */
     selectionPlace: placeOfSelection,
@@ -293,7 +293,7 @@ export function createSystemText(host: SystemTextHost) {
     composeSelection(place: SelectionPlace, replacement: string): boolean {
       const now = placeOfSelection();
       if (!now || !holdsSelection(place, now)) {
-        host.refuse('errors.compositionChanged');
+        host.refuse('errors.compositionRangeChanged');
         return false;
       }
       const was = host.selection();

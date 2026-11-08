@@ -68,7 +68,7 @@ export interface SurfaceInputHost {
    * when the place no longer holds (`paragraph-place.ts`).
    */
   keepPlace?(place: TextPlace): TypingContext | null;
-  /** Whether the store delivers a peer's transaction now: only that can keep a place. */
+  /** Whether the store is still at the revision of a peer's change: only that keeps a place. */
   remoteChange?(): boolean;
   /** The place of the selection now, for a composition over a selected range. */
   selectionPlace?(): SelectionPlace | null;
@@ -400,7 +400,7 @@ export function bindSurfaceInput(
       // another range. An end with no text after `interrupt` passes what the input showed.
       if (data && place.selection && host.composeSelection)
         host.composeSelection(place.selection, data);
-      else if (data) host.refuse('errors.compositionChanged');
+      else if (data) host.refuse('errors.compositionRangeChanged');
     }
     sync();
   };
