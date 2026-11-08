@@ -595,15 +595,6 @@
     z-index: 30;
     box-shadow: var(--demo-shadow-2);
   }
-  .demo-root .pptx-panel {
-    position: absolute;
-    top: 0;
-    right: 12px;
-    bottom: 12px;
-    z-index: 30;
-    max-width: calc(100% - 24px);
-    box-shadow: var(--demo-shadow-2);
-  }
   .demo-menubar .pptx-menubar__trigger {
     padding: 0 3px;
     font-size: 14px;
@@ -790,6 +781,89 @@
   .demo-root .pptx-panel__head .pptx-toolbar__button {
     min-width: 40px;
     height: 40px;
+  }
+}
+
+/* The side panel in its sheet (`.demo-sheet`). A wide window keeps the panel at the right of the
+   slide: the sheet has no box of its own, and its grip hides. */
+.demo-sheet {
+  display: contents;
+}
+.demo-sheet__grip {
+  display: none;
+}
+/* A phone or a tablet in portrait: the panel is a sheet under the slide, in the layout, so the
+   slide gets smaller and stays in view, with the chart or shape that you edit. Drag the grip to
+   set the sheet's height (demo-files.ts). The height does not animate: the slide fits again at
+   each height, and a layout animation would fit it at every frame. */
+@media (max-width: 900px) and (min-height: 501px) {
+  .demo-workspace:has(> .demo-sheet) {
+    flex-direction: column;
+    gap: 0;
+  }
+  .demo-workspace:has(> .demo-sheet) > .demo-docpane {
+    padding-bottom: 8px;
+  }
+  /* While the sheet is open, the view switch and the zoom leave: the slide takes their strip,
+     and the sheet's close button brings them back. */
+  .demo-workspace:has(> .demo-sheet) .demo-status {
+    display: none;
+  }
+  .demo-workspace:has(> .demo-sheet) .demo-docpane > .demo-canvas {
+    padding-bottom: 0;
+  }
+  .demo-sheet {
+    display: flex;
+    flex-direction: column;
+    flex: none;
+    height: var(--demo-sheet-h, 40%);
+    min-height: 0;
+  }
+  .demo-sheet__grip {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    cursor: ns-resize;
+    /* The grip takes the drag; the page does not scroll under it. */
+    touch-action: none;
+  }
+  .demo-sheet__grip::before {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--doc-text-muted);
+    opacity: 0.45;
+    content: '';
+  }
+  .demo-sheet__grip:focus-visible {
+    outline: 2px solid var(--doc-primary);
+    outline-offset: -2px;
+  }
+  .demo-root .demo-sheet .pptx-panel {
+    flex: 1 1 auto;
+    width: auto;
+    min-height: 0;
+  }
+}
+/* A short window (a phone held sideways): the panel stays at the right of the slide, narrower,
+   in the layout, so the slide moves aside and stays in view. */
+@media (max-height: 500px) {
+  .demo-root .pptx-panel {
+    --demo-panel-w: 280px;
+  }
+  /* The view switch and the zoom column leave while the panel is open, so the slide keeps the
+     width; closing the panel brings them back. */
+  .demo-workspace:has(> .demo-sheet) .demo-status {
+    display: none;
+  }
+  .demo-workspace:has(> .demo-sheet) .demo-docpane > .demo-canvas {
+    padding-inline-end: 0;
   }
 }
 

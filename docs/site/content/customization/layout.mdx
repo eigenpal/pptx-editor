@@ -420,6 +420,36 @@ watch(
 
 The listener also gets a `PaneRequest` with a `focus` flag. **Insert** > **Chart** opens the **Chart** tab with `focus` set to `false`, so the keyboard stays on the slide and **Undo** and **Delete** act on the new chart. Pass `requestPane(editor, pane, { focus: false })` to open a tab the same way.
 
+### Show the side panel on a narrow screen
+
+On a phone or a narrow window, put the side panel under the slide in your layout, not over it. The slide area gets shorter, the editor fits the slide to the new size, and the chart or shape that you edit stays in view. In a short window, such as a phone held sideways, keep the panel at the right with a smaller width.
+
+The following CSS assumes that your layout puts the slide area (`.my-slide`) and the side panel in one flex row (`.my-workspace`):
+
+```css
+@media (max-width: 900px) and (min-height: 501px) {
+  .my-workspace {
+    flex-direction: column;
+  }
+  .my-workspace > .my-slide {
+    flex: 1 1 0%;
+    min-height: 0;
+  }
+  .my-workspace > .pptx-panel {
+    flex: none;
+    width: auto;
+    height: 40%;
+  }
+}
+@media (max-height: 500px) {
+  .my-workspace > .pptx-panel {
+    width: 280px;
+  }
+}
+```
+
+Start the panel closed on a narrow screen, and open it from `listenPaneRequests`: **Insert** > **Chart** then shows the **Chart** tab under the new chart.
+
 ### Show the pane elsewhere
 
 To show the pane outside the side panel, render `PptxEditor.SelectionPane` (`PptxEditorSelectionPane` in Vue) anywhere inside the root. The pane writes through the `setShapesVisible`, `renameShape`, and `order` commands, so each change is one undo step. In view mode, the pane selects but does not change objects.

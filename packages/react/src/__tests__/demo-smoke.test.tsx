@@ -72,8 +72,9 @@ describe('demo smoke', () => {
     await dragItem(items()[0], items()[2], 'after');
     expect(order()).toEqual([before[1], before[2], before[0], ...before.slice(3)]);
 
-    // Speaker notes.
+    // Speaker notes, which the demo starts collapsed.
     await click(items()[0]);
+    await click(byRole('button', { name: 'Show speaker notes' }));
     const notes = document.querySelector<HTMLElement>('.pptx-notes__text')!;
     await fill(notes, 'Edited in the e2e test');
     await blur(notes);
