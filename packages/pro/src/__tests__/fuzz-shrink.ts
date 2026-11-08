@@ -5,8 +5,10 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // The seeded generator and the shrink of the collaboration fuzzers, adapted from DOCX Editor
 // `packages/pro/src/collaboration/__tests__/document-undo-groups-fuzz.test.ts` at commit
-// 5993bd223. `shrink` takes `replay` as an argument, and `kindOf` also drops the seed prefix and
-// keeps 60 characters.
+// 5993bd223. This is DOCX Editor pro code, adapted into this pro package under the same licensor
+// and license. `shrink` takes `replay` as an argument, and `kindOf` also drops the seed prefix
+// and keeps 60 characters. `seededRandom` is also the `mulberry32` of DOCX Editor's Apache-2.0
+// `packages/core/src/store/__tests__/random-edit-test-support.ts` at 5993bd223.
 
 /** A small deterministic generator (mulberry32), so a failure names its seed. */
 export function seededRandom(seed: number): () => number {

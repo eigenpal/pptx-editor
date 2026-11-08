@@ -1409,7 +1409,15 @@
     "file": "packages/pro/src/__tests__/fuzz-shrink.ts",
     "kind": "adapted",
     "source": ["packages/pro/src/collaboration/__tests__/document-undo-groups-fuzz.test.ts"],
-    "commit": "5993bd223"
+    "commit": "5993bd223",
+    "reason": "DOCX Editor pro code, copied into this pro package under the same licensor and license."
+  },
+  {
+    "file": "packages/pro/src/__tests__/fuzz-shrink.ts",
+    "kind": "reference",
+    "source": ["packages/core/src/store/__tests__/random-edit-test-support.ts"],
+    "commit": "5993bd223",
+    "reason": "Only seededRandom matches its mulberry32, so the file stays under the adapted floor for this source."
   },
   {
     "file": "packages/pro/src/__tests__/fuzz-support.ts",
@@ -1961,7 +1969,7 @@
   },
   {
     "file": "reference/quick-ref/themes-colors.md",
-    "kind": "reference",
+    "kind": "adapted",
     "source": ["reference/quick-ref/themes-colors.md"],
     "commit": "adf0e178"
   },

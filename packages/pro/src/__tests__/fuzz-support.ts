@@ -5,9 +5,10 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 */
 // The shared harness of the seeded collaboration fuzzers (`*-fuzz.test.ts`). After DOCX Editor
 // `packages/pro/src/collaboration/__tests__/document-undo-groups-fuzz.test.ts` (commit 5993bd223):
-// the environment knobs and the trail keep its shape, and `fuzz-shrink.ts` holds the generator
-// and the shrink. The peer harness is PPTX-only: N editors on N Y.Docs (`openPeer` in `lineage-support.ts`) and a relay that holds every update back
-// until an action delivers it. The text conservation oracle is `fuzz-ledger.ts`.
+// the environment knobs and the trail keep its shape, and `fuzz-shrink.ts` holds the generator and
+// the shrink. The peer harness is PPTX-only: N editors on N Y.Docs (`openPeer` in
+// `lineage-support.ts`) and a relay that holds every update back until an action delivers it. The
+// text conservation oracle is `fuzz-ledger.ts`.
 //
 // A fuzzer records each step as a plain action in deck coordinates (a paragraph and an offset,
 // a row and a column), so a replay of fewer actions stays meaningful. Deliveries are actions

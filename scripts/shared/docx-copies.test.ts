@@ -11,6 +11,7 @@ import {
   REFERENCE_CEILING,
   allowedReason,
   claimsCopy,
+  comparablePair,
   copySignals,
   folderProblems,
   headerProblems,
@@ -19,6 +20,7 @@ import {
   localPaths,
   parseManifest,
   sourceProblems,
+  rawBody,
   textOf,
   unlistedMentions,
 } from './docx-copies.ts';
@@ -325,7 +327,9 @@ describe('kindProblems', () => {
 
   test('reads a file as text when its bytes are UTF-8 once the NUL bytes go', () => {
     expect(textOf(new TextEncoder().encode('a\0b'))).toBe('ab');
-    expect(textOf(new Uint8Array([0xff, 0xfe, 0x00]))).toBeNull();
+    // Bytes that are not UTF-8 read as Latin-1, so a mention in them is still found.
+    const latin1 = new Uint8Array([0xe9, ...new TextEncoder().encode(' DOCX Editor')]);
+    expect(textOf(latin1)).toBe('\u00e9 DOCX Editor');
   });
 
   test('scans a staged file with a NUL byte, which git calls binary', () => {
@@ -338,12 +342,24 @@ describe('kindProblems', () => {
       writeFileSync(join(dir, 'a.ts'), claim);
       run('add', 'a.ts');
       expect(run('ls-files', '--eol', 'a.ts')).toStartWith('i/-text');
-      const text = textOf(readFileSync(join(dir, 'a.ts')));
-      expect(text).not.toBeNull();
-      expect(copySignals(text!, 'a.ts')).not.toEqual([]);
+      expect(copySignals(textOf(readFileSync(join(dir, 'a.ts'))), 'a.ts')).not.toEqual([]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  test('compares a guide or a data file by its trimmed raw lines', () => {
+    expect(comparablePair('reference/a.md', 'reference/a.md')).toBe(true);
+    expect(comparablePair('a.json', 'b.json')).toBe(true);
+    expect(comparablePair('a.md', 'a.ts')).toBe(false);
+    const ours = rawBody('# Colors\n\n  The theme has twelve colors.\n');
+    expect(lineOverlap(rawBody('# Colors\nThe theme has twelve colors.\n'), ours)).toBe(1);
+    const reference: CopyEntry = { ...COPY, kind: 'reference', file: 'a.md', source: ['a.md'] };
+    expect(
+      kindProblems(reference, ours, [rawBody('# Colors\nThe theme has twelve colors.\nMore.\n')])
+    ).toEqual([
+      'the code shares 1.000 of its lines with a.md, over 0.5: mark the entry as adapted',
+    ]);
   });
 
   test('counts lines with repeats, and not lines without a letter or a digit', () => {
@@ -398,10 +414,8 @@ describe('the copy signals', () => {
       '// As DOCX Editor does.\n\n// See commit 5993bd223.',
       '// A port of DOCX Editor.',
       '// It duplicates DOCX Editor.',
-      '// It reuses the DOCX Editor code.',
       '// Carried over from DOCX Editor.',
       '// Identical to DOCX Editor.',
-      '// It mirrors DOCX Editor.',
     ])
       expect(signal(text)).not.toEqual([]);
     for (const text of [
@@ -411,6 +425,9 @@ describe('the copy signals', () => {
       '// The color, #1a2b3c4d, as DOCX Editor draws it.',
       "// The second copy of the slide list keeps the order. DOCX Editor's list has none.",
       '// As DOCX Editor does.\n\n// One.\n\n// Two.\n\n// See commit 5993bd223.',
+      // Words that name a design, not a copy.
+      '// It mirrors the value into the root, as DOCX Editor does.',
+      '// It reuses the slide list, as DOCX Editor does.',
     ])
       expect(signal(text)).toEqual([]);
   });
@@ -489,7 +506,7 @@ describe('the repository', () => {
       const file = join(ROOT, path);
       if (!existsSync(file)) continue;
       const body = textOf(readFileSync(file));
-      if (body !== null && MENTION.test(body)) signals.set(path, copySignals(body, path, isLocal));
+      if (MENTION.test(body)) signals.set(path, copySignals(body, path, isLocal));
     }
     expect(signals.size).toBeGreaterThan(0);
     expect(unlistedMentions(signals, entries)).toEqual([]);

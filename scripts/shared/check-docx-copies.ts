@@ -10,8 +10,9 @@
 //    DOCX Editor names a foreign file that no entry of the file lists. A file without a
 //    `copied` entry puts no copy word near a mention of DOCX Editor, unless it is a Markdown
 //    guide whose entry gives a `reason`. Elsewhere a `reason` is a note for reviewers.
-// 3. Each tracked file whose bytes are UTF-8 once the NUL bytes go, of any type, with a copy
-//    signal has an entry, or is in `MENTIONS_ALLOWED` with a reason (`copySignals`). A signal is a
+// 3. Each tracked file, read as UTF-8 without its NUL bytes or else as Latin-1, of any type,
+//    with a copy signal has an entry (on a local run, untracked files that git does not
+//    ignore too), or is in `MENTIONS_ALLOWED` with a reason (`copySignals`). A signal is a
 //    `docx-editor/` path, or a paragraph that mentions DOCX Editor and names a commit, a path
 //    that is not in this repository, or a path right after the mention, or has a copy verb in
 //    it or a copy word near the mention. A commit or a foreign path in the next two comment
@@ -27,7 +28,9 @@
 //    file must keep `ADAPTED_FLOOR` of the lines of its sources together and of each source on
 //    its own. A `reference` file must share at most `REFERENCE_CEILING` of its lines with each
 //    source (`kindProblems`). A folder source counts as each file in it that the check can
-//    compare (`folderProblems`). An `adapted` source that the check cannot compare fails.
+//    compare (`folderProblems`). A file that `normalizedBody` cannot normalize (Markdown, JSON)
+//    compares by its trimmed raw lines (`rawBody`). An `adapted` source that the check cannot
+//    compare fails.
 //
 // Usage:
 //   bun run check:docx-copies [--docx <path>] [--ref <commit>] [--write] [--diff] [--report]
@@ -57,6 +60,8 @@ import {
   comparable,
   comparablePair,
   copySignals,
+  normalizable,
+  rawBody,
   folderProblems,
   headerOf,
   headerProblems,
@@ -189,6 +194,12 @@ if (tracked === undefined) {
   process.exit(1);
 }
 const trackedSet = new Set(tracked);
+// On a local run, new files that are not staged yet count too. CI checks the tracked files.
+const untracked = process.env.CI
+  ? []
+  : (git(['ls-files', '--others', '--exclude-standard', '-z'], ROOT) ?? '')
+      .split('\0')
+      .filter(Boolean);
 if (only !== undefined && !trackedSet.has(only)) {
   console.error(`FAIL: --only ${onlyOption} is not a tracked file of this repository.`);
   process.exit(1);
@@ -200,7 +211,7 @@ if (parsed.entries.length === 0)
   fail(MANIFEST, 'the manifest has no entry, so nothing was checked');
 const entries = parsed.entries.filter((entry) => only === undefined || entry.file === only);
 
-const isLocal = localPaths(tracked);
+const isLocal = localPaths([...tracked, ...untracked]);
 const recorded = parsed.entries.flatMap((entry) => entry.source);
 const texts = new Map<string, string>();
 const broken = new Set<CopyEntry>();
@@ -226,12 +237,12 @@ for (const entry of entries) {
 
 const signals = new Map<string, readonly string[]>();
 let mentioning = 0;
-for (const path of only === undefined ? tracked : [only]) {
+for (const path of only === undefined ? [...tracked, ...untracked] : [only]) {
   const file = join(ROOT, path);
   if (!existsSync(file)) continue;
-  // Every file whose bytes are UTF-8 apart from NUL bytes, whatever git calls it.
+  // Every file, whatever git calls it: UTF-8 without its NUL bytes, or else Latin-1.
   const body = textOf(readFileSync(file));
-  if (body === null || !MENTION.test(body)) continue;
+  if (!MENTION.test(body)) continue;
   mentioning += 1;
   signals.set(path, copySignals(body, path, isLocal));
 }
@@ -310,6 +321,7 @@ for (const { entry, message } of sourceProblems(live, lookup)) {
 
 /** The normalized body of `text`, after the module renames of `path` when `docx` is set. */
 async function body(text: string, path: string, renamesOf?: string): Promise<string> {
+  if (!normalizable(path)) return rawBody(text);
   const normalized = await normalizedBody(text, extname(path), path);
   return (RENAMED_MODULES.get(renamesOf ?? '') ?? []).reduce(
     (out, [docxModule, here]) => out.replaceAll(`'<module>/${docxModule}'`, `'<module>/${here}'`),

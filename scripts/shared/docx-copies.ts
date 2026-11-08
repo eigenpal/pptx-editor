@@ -125,16 +125,16 @@ export function parseManifest(text: string): { entries: CopyEntry[]; problems: s
 }
 
 /**
- * The text of a file: its bytes without NUL bytes, decoded as UTF-8, or null when they are not
- * UTF-8. Git calls a file with a NUL byte binary (`i/-text`), so the check reads the bytes
- * itself, and a NUL byte cannot hide a text file.
+ * The text of a file: its bytes without NUL bytes, decoded as UTF-8, or as Latin-1 when they
+ * are not UTF-8. Git calls a file with a NUL byte binary (`i/-text`), so the check reads the
+ * bytes itself, and no file is skipped: a mention in any encoding that keeps ASCII is found.
  */
-export function textOf(bytes: Uint8Array): string | null {
+export function textOf(bytes: Uint8Array): string {
   const kept = bytes.includes(0) ? bytes.filter((byte) => byte !== 0) : bytes;
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(kept);
   } catch {
-    return null;
+    return new TextDecoder('latin1').decode(kept);
   }
 }
 
@@ -181,7 +181,7 @@ export function sourceProblems(
 
 /** A copy verb: a paragraph with one and a mention claims a copy. */
 const COPY_VERB =
-  /\b(?:copied|copying|adapted|adapts|ported|ports? from|port of|based on|derived from|taken from|forked|lifted|borrowed|cloned|verbatim|line for line|same code|duplicat\w*|reuses?|carried over|identical to|mirrors?)\b/i;
+  /\b(?:copied|copying|adapted|adapts|ported|ports? from|port of|based on|derived from|taken from|forked|lifted|borrowed|cloned|verbatim|line for line|same code|duplicat\w*|carried over|identical to)\b/i;
 
 /** A copy word, which a file without a `copied` entry must not put near a mention. */
 const COPY_WORD = /\bcop(?:y|ied|ies|ying)\b/i;
@@ -519,9 +519,9 @@ export function localPaths(tracked: readonly string[]): (token: string) => boole
 }
 
 /**
- * The least line overlap (`lineOverlap`) of an `adapted` file with its sources together, and
- * with each source on its own (`kindProblems`). When the floor was set, the lowest overlap of an adapted file was 0.190. The
- * check prints the current lowest.
+ * The least line overlap (`lineOverlap`) of an `adapted` file with its sources together, and with
+ * each source on its own (`kindProblems`). When the floor was set, the lowest overlap of an adapted
+ * file was 0.190. The check prints the current lowest.
  */
 export const ADAPTED_FLOOR = 0.1;
 
@@ -576,13 +576,29 @@ const COMPARED_EXTENSIONS = new Set([
   '',
 ]);
 
-/** Whether the check can compare the body of `path` with `normalizedBody`. */
-export const comparable = (path: string): boolean => COMPARED_EXTENSIONS.has(extension(path));
+/** Whether `normalizedBody` can normalize `path`. */
+export const normalizable = (path: string): boolean => COMPARED_EXTENSIONS.has(extension(path));
 
-/** The language of a comparable file: script, style sheet, or a file with hash comments. */
+/** The files that the check compares by their raw lines (`rawBody`): guides and data. */
+const RAW_EXTENSIONS = new Set(['.md', '.mdx', '.json']);
+
+/** Whether the check can compare the body of `path`: normalized, or by its raw lines. */
+export const comparable = (path: string): boolean =>
+  normalizable(path) || RAW_EXTENSIONS.has(extension(path));
+
+/** The body of a file that `normalizedBody` cannot normalize: its trimmed lines. */
+export const rawBody = (text: string): string =>
+  text
+    .split('\n')
+    .map((line) => line.trim())
+    .join('\n');
+
+/** The language of a comparable file: script, style sheet, a file with hash comments, or data. */
 function language(path: string): string {
   const ext = extension(path);
   if (ext === '.css') return 'css';
+  if (ext === '.md' || ext === '.mdx') return 'markdown';
+  if (ext === '.json') return 'json';
   return ['.ts', '.mts', '.tsx', '.js', '.mjs'].includes(ext) ? 'script' : 'hash';
 }
 

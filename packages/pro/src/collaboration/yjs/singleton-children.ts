@@ -434,9 +434,9 @@ const attrValue = (spec: Spec, local: string): string | undefined =>
 /**
  * Every concurrent version of one property container as one (after DOCX Editor's
  * `MERGED_KINDS`): the first version's attributes and children, then each attribute and child
- * position that only a later copy has, in copy order. A child container that two copies hold
- * merges the same way. One pass over all copies, so the cost grows with their size, not with
- * its square. Returns null when a nested group holds too many copies (`withCompanions`).
+ * position that only a later version has, in version order. A child container that two versions
+ * hold merges the same way. One pass over all versions, so the cost grows with their size, not
+ * with its square. Returns null when a nested group holds too many versions (`withCompanions`).
  */
 function mergeCopies(
   base: Spec,
@@ -496,9 +496,9 @@ function mergeCopies(
 
 /**
  * `kids` as a replica shows them, after DOCX Editor's `partitionWithMerges`: the first version
- * of each group shows, and the later copies stay in the room as its companions. A property
+ * of each group shows, and the later versions stay in the room as its companions. A property
  * container merges its companions; an OPC entry or another singleton shows the first whole.
- * Copies that the seed wrote are the opened file's own duplicates and stay as loaded, as in
+ * Versions that the seed wrote are the opened file's own duplicates and stay as loaded, as in
  * DOCX Editor ("a group nobody wrote into"), OPC entries too.
  *
  * Returns null when one group holds more than `ROOM_LIMITS.maxCopiesPerGroup` concurrent copies:

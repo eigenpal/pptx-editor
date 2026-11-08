@@ -157,13 +157,12 @@ function isPictureGroup(group: Pick<ChromeGroup, 'id' | 'contextual'>): boolean 
 const HOST_PRIORITY = 0;
 
 /**
- * The collapse order of the built-in groups: the first id leaves the bar first. After DOCX
- * Editor's `TOOLBAR_COLLAPSE_ORDER` (packages/core/src/editor/toolbar-fit.ts at adf0e178), where zoom goes
- * first and text formatting and history last: the view and file controls, Find, the clipboard,
- * and the slide controls leave before the formatting groups, and the insert controls leave
- * after the formatting details, so the most used
- * controls (font, size, bold, italic, underline, the paragraph controls) stay on the bar the
- * longest, on the toolbar and on every ribbon tab. @internal
+ * The collapse order of the built-in groups: the first id leaves the bar first. After DOCX Editor's
+ * `TOOLBAR_COLLAPSE_ORDER` (packages/core/src/editor/toolbar-fit.ts at adf0e178), where zoom goes
+ * first and text formatting and history last: the view and file controls, Find, the clipboard, and
+ * the slide controls leave before the formatting groups, and the insert controls leave after the
+ * formatting details, so the most used controls (font, size, bold, italic, underline, the paragraph
+ * controls) stay on the bar the longest, on the toolbar and on every ribbon tab. @internal
  */
 export const TOOLBAR_COLLAPSE_ORDER: readonly ChromeGroup['id'][] = [
   'view',
