@@ -88,7 +88,7 @@
     "@changesets/get-release-plan": "5.0.2",
     "@docx-editor.dev/fonts-cjk": "^2.34.0",
     "@happy-dom/global-registrator": "21.0.4",
-    "@microsoft/api-extractor": "^7.52.0",
+    "@microsoft/api-extractor": "^7.60.1",
     "@playwright/test": "^1.56.0",
     "@testing-library/react": "^16.0.0",
     "@types/bun": "^1.4.3",
