@@ -25,6 +25,13 @@ export {
   lumTransfer,
   threeDColor,
 } from './painter-math.ts';
+export { PATTERN_PIXEL, patternBitmap } from './preset-patterns.ts';
+export {
+  compoundBandLines,
+  type CompoundBandLine,
+  type Point as CompoundPoint,
+  type Polyline as CompoundPolyline,
+} from './compound-lines.ts';
 export {
   registerFontFaces,
   type FontFaceHandle,

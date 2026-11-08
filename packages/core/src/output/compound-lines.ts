@@ -93,18 +93,26 @@ const CURVE_STEPS = 16;
 /** The largest angle (radians) of one arc segment of a round offset corner. */
 const ARC_STEP = Math.PI / 18;
 
-type Point = { readonly x: number; readonly y: number };
+/**
+ * A point of a polyline.
+ * @internal
+ */
+export type Point = { readonly x: number; readonly y: number };
 
-/** One subpath as a polyline (curves flattened). */
-interface Polyline {
-  readonly points: Point[];
-  closed: boolean;
+/**
+ * One subpath as a polyline (curves flattened).
+ * @internal
+ */
+export interface Polyline {
+  readonly points: readonly Point[];
+  readonly closed: boolean;
 }
 
 /** The subpaths of `commands` as polylines, or null past `MAX_OFFSET_POINTS`. */
 function polylines(commands: readonly PathCommand[]): Polyline[] | null {
-  const out: Polyline[] = [];
-  let line: Polyline | undefined;
+  type Open = { points: Point[]; closed: boolean };
+  const out: Open[] = [];
+  let line: Open | undefined;
   let count = 0;
   const add = (p: Point): void => {
     if (!line) out.push((line = { points: [], closed: false }));
@@ -184,11 +192,11 @@ function windingArea(lines: readonly Polyline[]): number {
 }
 
 /**
- * Path data for `line` offset by `k` to the left of its direction (to the right for a negative
- * `k`). A corner takes the line's join on its outer side, as the stroke's own edge does, and the
- * meeting point of the two offset segments on its inner side.
+ * `line` offset by `k` to the left of its direction (to the right for a negative `k`). A corner
+ * takes the line's join on its outer side, as the stroke's own edge does, and the meeting point of
+ * the two offset segments on its inner side.
  */
-function offsetData(line: Polyline, k: number, join: string, miterLimit: number): string {
+function offsetLine(line: Polyline, k: number, join: string, miterLimit: number): Polyline {
   const { points, closed } = line;
   const n = points.length;
   const out: Point[] = [];
@@ -234,29 +242,49 @@ function offsetData(line: Polyline, k: number, join: string, miterLimit: number)
       out.push(at(p, { x: Math.cos(a), y: Math.sin(a) }));
     }
   }
-  return (
-    out.map((p, i) => `${i ? 'L' : 'M'}${num(p.x)} ${num(p.y)}`).join('') + (closed ? 'Z' : '')
-  );
+  return { points: out, closed };
+}
+
+/** Path data for polylines. */
+function polylineData(lines: readonly Polyline[]): string {
+  return lines
+    .map(
+      ({ points, closed }) =>
+        points.map((p, i) => `${i ? 'L' : 'M'}${num(p.x)} ${num(p.y)}`).join('') +
+        (closed ? 'Z' : '')
+    )
+    .join('');
 }
 
 /**
- * The bands of a compound line as strokes of the path offset to each band's center, so every
- * band edge is vector geometry. The outer side is the outside of a closed path (by its winding)
- * and the left of an open path's direction. Null past `MAX_OFFSET_POINTS`.
+ * One band of a compound line: polylines to stroke at `width`, with miter joins.
+ * @internal
  */
-function offsetBands(
-  doc: Document,
+export interface CompoundBandLine {
+  readonly width: number;
+  readonly lines: readonly Polyline[];
+}
+
+/**
+ * The bands of a compound line as polylines of the path offset to each band's center: stroked
+ * at the band's width with miter joins, every band edge is vector geometry. The outer side is the
+ * outside of a closed path (by its winding) and the left of an open path's direction. `join` is
+ * the line's join (`round`, `bevel`, or `miter`). Null for a single line or an unknown type, or
+ * past `MAX_OFFSET_POINTS`. The SVG paint and `pptx-to-pdf` share it.
+ * @internal
+ */
+export function compoundBandLines(
   commands: readonly PathCommand[],
   cmpd: string,
-  stroke: Record<string, string | undefined>,
-  width: number
-): SVGElement[] | null {
+  width: number,
+  join: string,
+  miterLimit: number
+): CompoundBandLine[] | null {
+  if (!Object.hasOwn(COMPOUND_BANDS, cmpd) || !(width > 0)) return null;
   const lines = polylines(commands);
   if (!lines || lines.length === 0) return null;
   const side = windingArea(lines) < 0 ? -1 : 1;
-  const join = stroke['stroke-linejoin'] ?? 'miter';
-  const limit = Number(stroke['stroke-miterlimit']) || 4;
-  const out: SVGElement[] = [];
+  const out: CompoundBandLine[] = [];
   let p = 0;
   COMPOUND_BANDS[cmpd].forEach((f, i) => {
     const p0 = p;
@@ -265,20 +293,35 @@ function offsetBands(
     const o0 = (0.5 - p0) * width;
     const o1 = (0.5 - p) * width;
     const k = (side * (o0 + o1)) / 2;
-    const d = lines.map((line) => offsetData(line, k, join, limit)).join('');
-    // The corners are in the offset geometry: a miter join keeps them as built.
-    out.push(
-      svg(doc, 'path', {
-        d,
-        fill: 'none',
-        ...stroke,
-        'stroke-width': num(o0 - o1),
-        'stroke-linejoin': 'miter',
-        'stroke-miterlimit': num(Math.max(limit, 4)),
-      })
-    );
+    out.push({ width: o0 - o1, lines: lines.map((line) => offsetLine(line, k, join, miterLimit)) });
   });
   return out;
+}
+
+/** The bands of a compound line as offset strokes (`compoundBandLines`), as SVG paths. */
+function offsetBands(
+  doc: Document,
+  commands: readonly PathCommand[],
+  cmpd: string,
+  stroke: Record<string, string | undefined>,
+  width: number
+): SVGElement[] | null {
+  const join = stroke['stroke-linejoin'] ?? 'miter';
+  const limit = Number(stroke['stroke-miterlimit']) || 4;
+  const bands = compoundBandLines(commands, cmpd, width, join, limit);
+  // The corners are in the offset geometry: a miter join keeps them as built.
+  return bands
+    ? bands.map((band) =>
+        svg(doc, 'path', {
+          d: polylineData(band.lines),
+          fill: 'none',
+          ...stroke,
+          'stroke-width': num(band.width),
+          'stroke-linejoin': 'miter',
+          'stroke-miterlimit': num(Math.max(limit, 4)),
+        })
+      )
+    : null;
 }
 
 /**

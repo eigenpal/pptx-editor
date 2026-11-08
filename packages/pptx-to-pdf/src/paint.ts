@@ -30,9 +30,10 @@ import {
   PDFOperator,
   PDFOperatorNames,
 } from 'pdf-lib';
-import type { Rgba } from '@pptx-editor.dev/core/cascade';
+import type { ResolvedLine, Rgba } from '@pptx-editor.dev/core/cascade';
 import {
   ARROW_MITER_LIMIT,
+  dashArray,
   hasCharacters,
   planStroke,
   strokeWidth,
@@ -41,6 +42,7 @@ import {
   type SlideLayout,
   type StrokePlan,
 } from '@pptx-editor.dev/core/layout';
+import { compoundBandLines, type CompoundBandLine } from '@pptx-editor.dev/core/output';
 import {
   drawGlow,
   drawShadows,
@@ -230,20 +232,57 @@ async function drawGeometry(
     if (!line || (!path.stroke && item.kind !== 'picture')) continue;
     p.push(pushGraphicsState());
     const picture = item.kind === 'picture';
-    const color = strokeStyle(line, p, scope, groupScale, picture);
+    const width = strokeWidth(line, groupScale);
+    // An open path stops short under its line ends, and a dashed one can get square caps, as
+    // in the SVG paint (`core/layout`, `planStroke`).
+    const plan = picture ? undefined : planStroke(path.commands, line, groupScale);
+    const commands = plan ? plan.commands : path.commands;
+    const bands = picture ? null : solidBands(line, width, commands);
+    const color = strokeStyle(line, p, scope, groupScale, picture, !!bands);
     if (color) {
       p.alpha(1, color.a);
-      const width = strokeWidth(line, groupScale);
       // A picture's border lies outside the picture.
       if (picture) outsideOf(path.commands, width, w, h, p);
-      // An open path stops short under its line ends, and a dashed one can get square caps, as
-      // in the SVG paint (`core/layout`, `planStroke`).
-      const plan = picture ? undefined : planStroke(path.commands, line, groupScale);
-      tracePath(plan ? plan.commands : path.commands, p);
-      p.push(stroke());
+      if (bands) drawBands(bands, line.join === 'miter' ? line.miterLimit : 4, p);
+      else {
+        tracePath(commands, p);
+        p.push(stroke());
+      }
       if (plan) drawStrokeExtras(plan, color, width, p);
     }
     p.push(popGraphicsState());
+  }
+}
+
+/**
+ * The bands of a solid compound line, as the SVG paint draws them (`core/output`,
+ * `compoundBandLines`), or null for a single line. A dashed compound line draws as one line: the
+ * SVG paint cuts its bands with a mask.
+ */
+function solidBands(
+  line: ResolvedLine,
+  width: number,
+  commands: readonly PathCommand[]
+): CompoundBandLine[] | null {
+  if (line.compound === 'sng' || dashArray(line, width)) return null;
+  const join = line.join === 'miter' ? 'miter' : line.join === 'bevel' ? 'bevel' : 'round';
+  return compoundBandLines(commands, line.compound, width, join, Math.max(1, line.miterLimit));
+}
+
+/** Stroke the bands of a compound line in the current stroke color, caps, and dashes. */
+function drawBands(bands: readonly CompoundBandLine[], miterLimit: number, p: PageOps): void {
+  // The corners are in the offset geometry: a miter join keeps them as built.
+  p.push(
+    setLineJoin(LineJoinStyle.Miter),
+    PDFOperator.of(PDFOperatorNames.SetLineMiterLimit, [PDFNumber.of(Math.max(miterLimit, 4))])
+  );
+  for (const band of bands) {
+    p.push(setLineWidth(band.width));
+    for (const { points, closed } of band.lines) {
+      points.forEach((q, i) => p.push(i ? lineTo(q.x, q.y) : moveTo(q.x, q.y)));
+      if (closed) p.push(closePath());
+    }
+    p.push(stroke());
   }
 }
 

@@ -6,6 +6,7 @@
 /**
  * One pattern pixel: 1 pt. The reference PDF draws each preset as an 8 × 8 pt tile
  * (`fixtures/follow-ups.pdf`, slide 2: pattern matrix scale 0.125 over a 64-unit cell).
+ * @internal
  */
 export const PATTERN_PIXEL = 12700;
 
@@ -78,7 +79,8 @@ export const PRESET_PATTERNS: readonly string[] = Object.keys(BITMAPS);
 
 /**
  * The 8×8 bitmap of a preset (rows of foreground coverage: 1, 0.5, or 0), or undefined for an
- * unknown name.
+ * unknown name. The SVG paint and `pptx-to-pdf` share it.
+ * @internal
  */
 export function patternBitmap(preset: string): number[][] | undefined {
   if (!Object.prototype.hasOwnProperty.call(BITMAPS, preset)) return undefined;
