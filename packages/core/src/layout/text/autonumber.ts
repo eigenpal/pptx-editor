@@ -36,7 +36,12 @@ function roman(n: number): string {
   return out;
 }
 
-/** The letters of `sequence` as digits: 1 is the first letter, and past the last come pairs. */
+/**
+ * The letters of `sequence` as digits: 1 is the first letter, and past the last come pairs
+ * (Latin 27 is `aa`, 28 is `ab`). The standard gives no rule past the last letter. Latin, Thai,
+ * and Hindi letters use this rule. The Arabic and Hebrew counters of DOCX Editor repeat a
+ * letter instead (Arabic 29 is `أأ`, Hebrew 23 is `תא`).
+ */
 function letters(n: number, sequence: readonly string[]): string {
   let out = '';
   let rest = Math.max(1, n);
@@ -216,17 +221,28 @@ export function symbolBulletText(
 }
 
 /**
- * Whether `autonumberText` draws a scheme as a reference PDF shows it: Latin letters, Arabic
- * and Roman numbers, and the Hebrew and Arabic letter schemes of the `rtl-text` fixture. The
- * other schemes follow the standard's description of their counter, with no reference
- * measurement. @internal
+ * The last item number that a reference PDF measures for a non-Latin scheme: the `rtl-text`
+ * fixture draws Hebrew items 1 to 4 and Arabic items 1 and 2. Larger numbers (the repeated
+ * letters and the wrap after 392) come from DOCX Editor's counters, with no measurement here.
  */
-export function isExactScheme(scheme: string): boolean {
-  return (
-    /^(alphaLc|alphaUc|arabic|romanLc|romanUc)(ParenBoth|ParenR|Period|Plain)$/.test(scheme) ||
-    scheme === 'hebrew2Minus' ||
-    scheme === 'arabic1Minus'
-  );
+const MEASURED_UP_TO: ReadonlyMap<string, number> = new Map([
+  ['hebrew2Minus', 4],
+  ['arabic1Minus', 2],
+]);
+
+/**
+ * Whether `autonumberText` draws a scheme as a reference PDF shows it, for every item number
+ * up to `upTo`. Latin letters and Arabic and Roman numbers are exact at any number.
+ * `hebrew2Minus` is exact for items 1 to 4 and `arabic1Minus` for items 1 and 2 (the
+ * `rtl-text` fixture). With no `upTo`, the answer covers every number. The other schemes
+ * follow the standard's description of their counter, with no reference measurement.
+ * @internal
+ */
+export function isExactScheme(scheme: string, upTo = Number.POSITIVE_INFINITY): boolean {
+  if (/^(alphaLc|alphaUc|arabic|romanLc|romanUc)(ParenBoth|ParenR|Period|Plain)$/.test(scheme))
+    return true;
+  const measured = MEASURED_UP_TO.get(scheme);
+  return measured !== undefined && upTo <= measured;
 }
 
 /**

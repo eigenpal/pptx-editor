@@ -483,7 +483,7 @@ export function installDrawingRenderers(renderers: Partial<DrawingRenderers>): v
 export function invert(m: Matrix): Matrix;
 
 // @internal
-export function isExactScheme(scheme: string): boolean;
+export function isExactScheme(scheme: string, upTo?: number): boolean;
 
 // @public
 export function isFontResolver(value: unknown): value is MarkedFontResolver;

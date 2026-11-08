@@ -566,12 +566,15 @@ export function layoutTextOn(
         underline: 'none',
         strike: 'noStrike',
       };
-      // A number in Arabic, Hebrew, or East Asian characters draws in the first run's font for
+      // A number in complex-script or East Asian characters draws in the first run's font for
       // that script, not the bullet font (reference PDF of `rtl-text`: `أ-` in the run's
       // `a:cs` face, where the bullet font has no Arabic glyphs).
       const scriptSlot =
         p.bullet.type === 'autonum'
-          ? fontSlotPieces(raw, firstProps).find((s) => s.slot === 'cs' || s.slot === 'ea')?.slot
+          ? // A copy of the props: the marker must not replace the first run's cached split,
+            // which the `normAutofit` search reuses at each step.
+            fontSlotPieces(raw, { ...firstProps }).find((s) => s.slot === 'cs' || s.slot === 'ea')
+              ?.slot
           : undefined;
       const face =
         (scriptSlot === 'cs' || scriptSlot === 'ea') && slotFamily(firstProps, scriptSlot) !== ''

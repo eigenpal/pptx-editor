@@ -383,8 +383,15 @@ describe('isExactScheme', () => {
   test('lists the schemes that a reference PDF measures', () => {
     expect(isExactScheme('arabicPeriod')).toBe(true);
     expect(isExactScheme('romanUcParenR')).toBe(true);
-    expect(isExactScheme('hebrew2Minus')).toBe(true);
-    expect(isExactScheme('arabic1Minus')).toBe(true);
+    expect(isExactScheme('arabicPeriod', 32767)).toBe(true);
+    // The rtl-text fixture measures Hebrew items 1 to 4 and Arabic items 1 and 2.
+    expect(isExactScheme('hebrew2Minus', 4)).toBe(true);
+    expect(isExactScheme('hebrew2Minus', 5)).toBe(false);
+    expect(isExactScheme('hebrew2Minus')).toBe(false);
+    expect(isExactScheme('arabic1Minus', 2)).toBe(true);
+    expect(isExactScheme('arabic1Minus', 3)).toBe(false);
+    expect(isExactScheme('arabic1Minus')).toBe(false);
+    expect(isExactScheme('arabic2Minus', 1)).toBe(false);
     expect(isExactScheme('thaiAlphaPeriod')).toBe(false);
     expect(isExactScheme('ea1ChsPlain')).toBe(false);
     expect(isExactScheme('unknownScheme')).toBe(false);
