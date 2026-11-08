@@ -133,6 +133,7 @@ const SLOT_UNION = {
   'table.cellMargins': true,
   'chart.editData': true,
   'insert.equation': true,
+  'diagram.editText': true,
   'diagram.addAfter': true,
   'diagram.addBefore': true,
   'diagram.addBelow': true,

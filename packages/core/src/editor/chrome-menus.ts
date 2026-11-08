@@ -434,8 +434,10 @@ export const CANVAS_CONTEXT_MENUS: Readonly<Record<CanvasMenuKind, readonly Chro
     SEPARATOR,
     item('image.altText', 'contextMenu.altText'),
   ],
-  // The diagram menu: the shape commands first, then the object rows.
+  // The diagram menu: Edit Text and the shape commands first, then the object rows.
   diagram: [
+    item('diagram.editText'),
+    SEPARATOR,
     item('diagram.addAfter'),
     item('diagram.addBefore'),
     item('diagram.addBelow'),

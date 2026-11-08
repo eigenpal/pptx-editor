@@ -576,6 +576,11 @@ export const CONVERGENCE_FIXTURES: Partial<Record<EditorCommandType, Convergence
     arrange: select('Diagram 1'),
     command: (e) => ({ type: 'deleteDiagramShape', node: firstDiagramNode(e) }),
   },
+  setDiagramText: {
+    deck: () => buildPptx(diagramEditingDeck()),
+    arrange: select('Diagram 1'),
+    command: (e) => ({ type: 'setDiagramText', node: firstDiagramNode(e), text: 'Scope' }),
+  },
 
   // Tables.
   insertTable: { command: () => ({ type: 'insertTable', rows: 2, cols: 2 }) },

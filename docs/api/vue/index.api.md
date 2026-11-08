@@ -3614,16 +3614,17 @@ export const PptxEditor: {
             readonly default: undefined;
         };
     }>> & Readonly<{
-        onTabChange?: ((_tab: "comments" | "format" | "chart" | "animations" | "selection") => any) | undefined;
-        "onUpdate:tab"?: ((_tab: "comments" | "format" | "chart" | "animations" | "selection") => any) | undefined;
+        onTabChange?: ((_tab: "comments" | "diagram" | "format" | "chart" | "animations" | "selection") => any) | undefined;
+        "onUpdate:tab"?: ((_tab: "comments" | "diagram" | "format" | "chart" | "animations" | "selection") => any) | undefined;
     }>, {
         readonly className: string;
         readonly style: vue.CSSProperties;
         readonly paneWidth: number;
         readonly onClose: () => void;
-        readonly tab: "comments" | "format" | "chart" | "animations" | "selection";
+        readonly tab: "comments" | "diagram" | "format" | "chart" | "animations" | "selection";
     }, SlotsType<{
         comments?: (() => VNodeChild) | undefined;
+        diagram?: (() => VNodeChild) | undefined;
         format?: (() => VNodeChild) | undefined;
         chart?: (() => VNodeChild) | undefined;
         animations?: (() => VNodeChild) | undefined;
@@ -6466,16 +6467,17 @@ export const PptxEditorSidePanel: vue.DefineComponent<vue.ExtractPropTypes<{
         readonly default: undefined;
     };
 }>> & Readonly<{
-    onTabChange?: ((_tab: "comments" | "format" | "chart" | "animations" | "selection") => any) | undefined;
-    "onUpdate:tab"?: ((_tab: "comments" | "format" | "chart" | "animations" | "selection") => any) | undefined;
+    onTabChange?: ((_tab: "comments" | "diagram" | "format" | "chart" | "animations" | "selection") => any) | undefined;
+    "onUpdate:tab"?: ((_tab: "comments" | "diagram" | "format" | "chart" | "animations" | "selection") => any) | undefined;
 }>, {
     readonly className: string;
     readonly style: CSSProperties;
     readonly paneWidth: number;
     readonly onClose: () => void;
-    readonly tab: "comments" | "format" | "chart" | "animations" | "selection";
+    readonly tab: "comments" | "diagram" | "format" | "chart" | "animations" | "selection";
 }, SlotsType<{
     comments?: (() => VNodeChild) | undefined;
+    diagram?: (() => VNodeChild) | undefined;
     format?: (() => VNodeChild) | undefined;
     chart?: (() => VNodeChild) | undefined;
     animations?: (() => VNodeChild) | undefined;

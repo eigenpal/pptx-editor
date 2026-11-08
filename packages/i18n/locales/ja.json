@@ -851,7 +851,8 @@
     "noAnimationChange": "効果または画面切り替えはすでにこの設定です",
     "instantAnimation": "この効果は瞬時に行われるため、継続時間はありません",
     "noChart": "グラフを選択してください",
-    "noCommentPane": "このエディターにはコメント ウィンドウがありません"
+    "noCommentPane": "このエディターにはコメント ウィンドウがありません",
+    "noDiagram": "図表を選択してください"
   },
   "rail": {
     "ariaLabel": "スライド",
@@ -899,6 +900,7 @@
     "tabs": {
       "format": "書式",
       "chart": "グラフ",
+      "diagram": "図表",
       "selection": "選択",
       "animations": "アニメーション",
       "comments": "コメント"
@@ -1212,7 +1214,8 @@
       "lastShape": "図には最上位の図形が少なくとも 1 つ必要です。",
       "layoutUnsupported": "この図はレイアウトし直せないため、図形を追加または削除できません。",
       "noChildren": "この図は最上位より下の図形を表示しません。",
-      "tooLarge": "図の図形がエディターで編集できる数を超えています。"
+      "tooLarge": "図の図形がエディターで編集できる数を超えています。",
+      "textTooLong": "テキストが長すぎます。10,000 文字以内、1,000 段落以内にしてください。"
     },
     "equationEmpty": "数式を入力してください。",
     "equationSyntax": "この数式を読み取れません。かっことバックスラッシュの後の名前を確認してください。"
@@ -1704,10 +1707,25 @@
     "removeSeries": "系列の削除"
   },
   "diagram": {
+    "editText": "テキストの編集…",
     "addAfter": "後に図形を追加",
     "addBefore": "前に図形を追加",
     "addBelow": "下に図形を追加",
-    "delete": "図形を削除"
+    "delete": "図形を削除",
+    "pane": {
+      "help": "Enter キーを押すか、フィールドから移動すると適用されます。Shift+Enter キーで新しい段落を開始します。各フィールドは 1 つの図形のテキストです。",
+      "emptyTitle": "図表が選択されていません",
+      "emptyBody": "スライド上の図表を選択して、図形のテキストを編集します。",
+      "nodeLabel": "図形 {number} のテキスト",
+      "nodeLabelLevel": "図形 {number} のテキスト (レベル {level})",
+      "readOnly": "この図形のテキストはここでは編集できません。",
+      "addAfterNamed": "{name} の後に図形を追加",
+      "addBelowNamed": "{name} の下に図形を追加",
+      "deleteNamed": "図形 {name} を削除",
+      "addShape": "図形の追加",
+      "emptyShape": "空の図形",
+      "noNodes": "この図表には編集できるノードがありません。"
+    }
   },
   "equation": {
     "close": "閉じる",

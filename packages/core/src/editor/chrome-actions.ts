@@ -266,6 +266,10 @@ export function runChromeRow(
       // New slide without a layout: the layout `newSlideLayout` picks (`addSlide`).
       else if (slot === 'slide.add') runToolbarCommand(editor, slot);
       return;
+    // A pane row (Edit data…, Edit text…, Selection pane) asks the side panel for its tab.
+    case 'pane':
+      runToolbarCommand(editor, slot);
+      return;
     case 'command':
       if (isSectionSlot(slot)) {
         if (chromeRowState(editor, slot).isEnabled) runSectionSlot(editor, slot);

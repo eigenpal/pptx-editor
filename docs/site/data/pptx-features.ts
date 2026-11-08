@@ -673,7 +673,7 @@ export const pptxFeatures: PptxFeature[] = [
     editing: 'partial',
     rendering: 'partial',
     notes:
-      'A diagram draws from its saved drawing. A diagram with no saved drawing shows a placeholder. You can type in a diagram shape. The edit writes the shape and its node in the data model. The addDiagramShape and deleteDiagramShape commands add and delete nodes. They work when the drawing is one line of shapes, with up to one level of children. After such an edit, the editor spaces the shapes evenly on the line. Text formatting, diagram colors, diagram styles, and layout changes are not editable. A shape that shows the text of more than one node is read-only.',
+      'A diagram draws from its saved drawing. A diagram with no saved drawing shows a placeholder. You can type in a diagram shape. The edit writes the shape and its node in the data model. The Diagram tab of the side panel lists the nodes and edits their text (setDiagramText). The context menu and the toolbar open it with Edit text. The addDiagramShape and deleteDiagramShape commands add and delete nodes. They work when the drawing is one line of shapes, with up to one level of children. After such an edit, the editor spaces the shapes evenly on the line. Text formatting, diagram colors, diagram styles, and layout changes are not editable. A shape that shows the text of more than one node is read-only.',
     roundTrip: 'full',
     tier: 'community',
     docsLink: '/docs/guides/diagrams',

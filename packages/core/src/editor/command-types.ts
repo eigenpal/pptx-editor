@@ -141,6 +141,7 @@ const COMMAND_TABLE = {
   // Diagrams
   addDiagramShape: true,
   deleteDiagramShape: true,
+  setDiagramText: true,
   // Tables
   insertTable: true,
   insertRow: true,

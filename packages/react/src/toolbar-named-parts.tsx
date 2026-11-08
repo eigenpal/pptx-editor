@@ -205,6 +205,8 @@ export interface ToolbarNamedParts {
   readonly ImageProperties: ToolbarPartComponent;
   /** `chart.editData`. */
   readonly ChartEditData: ToolbarPartComponent;
+  /** `diagram.editText`. */
+  readonly DiagramEditText: ToolbarPartComponent;
   /** `diagram.addAfter`. */
   readonly DiagramAddAfter: ToolbarPartComponent;
   /** `diagram.addBefore`. */

@@ -7,6 +7,21 @@
  */
 export type DiagramShapePosition = 'after' | 'before' | 'below';
 
+/** One node of the selected diagram, in outline order. @public */
+export interface DiagramNodeState {
+  /** The data model id of the node (`dgm:pt/@modelId`). */
+  readonly node: string;
+  /** The node's plain text: a newline between paragraphs and at each line break. */
+  readonly text: string;
+  /** 0 for a top-level node, 1 for its child, and so on. */
+  readonly level: number;
+  /**
+   * Whether `setDiagramText` and typing can change the text: one drawing shape shows the text
+   * of this node alone.
+   */
+  readonly editable: boolean;
+}
+
 /** The selected diagram, while one diagram frame is selected or holds the caret. @public */
 export interface SelectedDiagramState {
   /** The node id of the diagram's graphic frame. */
@@ -20,6 +35,8 @@ export interface SelectedDiagramState {
   readonly structure: boolean;
   /** Why the shapes cannot be added or deleted, as a translation key, when `structure` is false. */
   readonly reason?: string;
+  /** The content nodes of the data model, in outline order: each node, then its children. */
+  readonly nodes: readonly DiagramNodeState[];
 }
 
 /** The diagram commands. @public */
@@ -48,4 +65,19 @@ export type DiagramCommand =
       readonly type: 'deleteDiagramShape';
       readonly nodeId?: string;
       readonly node?: string;
+    }
+  | {
+      /**
+       * Replace the text of diagram node `node` of the selected diagram, or of the diagram frame
+       * `nodeId` on the current slide. The data model and the saved drawing get the same text.
+       * Only the changed part is replaced: new text takes the formatting of the run where it
+       * goes in, and a field or math zone that the change touches becomes plain text. A new
+       * newline starts a paragraph; tabs become spaces. Empty text leaves the shape empty.
+       * Refused with `errors.diagram.noText` for a node whose text no single drawing shape
+       * shows, and with `errors.diagram.textTooLong` past 10,000 characters or 1,000 lines.
+       */
+      readonly type: 'setDiagramText';
+      readonly node: string;
+      readonly text: string;
+      readonly nodeId?: string;
     };

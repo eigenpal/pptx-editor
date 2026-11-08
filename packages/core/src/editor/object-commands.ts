@@ -28,7 +28,8 @@ export function isObjectCommand(command: EditorCommand): command is ObjectComman
     isAnimationCommand(command) ||
     command.type === 'setChartData' ||
     command.type === 'addDiagramShape' ||
-    command.type === 'deleteDiagramShape'
+    command.type === 'deleteDiagramShape' ||
+    command.type === 'setDiagramText'
   );
 }
 

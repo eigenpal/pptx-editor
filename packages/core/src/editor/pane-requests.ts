@@ -7,11 +7,18 @@
 // This module imports nothing: the refusal scan of the automation hosts follows imports.
 
 /** The tabs of the side panel, in order. @internal */
-export const SIDE_PANEL_TABS = ['format', 'chart', 'selection', 'animations', 'comments'] as const;
+export const SIDE_PANEL_TABS = [
+  'format',
+  'chart',
+  'diagram',
+  'selection',
+  'animations',
+  'comments',
+] as const;
 
 /**
- * A tab of the side panel: Format, Chart Data, Selection (the selection pane), Animations, or
- * Comments. @public
+ * A tab of the side panel: Format, Chart Data, Diagram (the text of the diagram's shapes),
+ * Selection (the selection pane), Animations, or Comments. @public
  */
 export type SidePanelTab = (typeof SIDE_PANEL_TABS)[number];
 
@@ -23,6 +30,7 @@ export type SidePanelTab = (typeof SIDE_PANEL_TABS)[number];
 export const SIDE_PANEL_TAB_ICONS: Readonly<Record<SidePanelTab, string>> = {
   format: 'tune',
   chart: 'table_chart',
+  diagram: 'edit_note',
   selection: 'list_alt',
   animations: 'play_arrow',
   comments: 'comment',
@@ -103,21 +111,26 @@ export function isPaneSlot(slot: string): boolean {
     slot === 'arrange.selectionPane' ||
     slot === 'shape.properties' ||
     slot === 'chart.editData' ||
+    slot === 'diagram.editText' ||
     slot === 'review.addComment'
   );
 }
 
 /**
- * The tabs the side panel shows, in order: Chart Data only while a chart is selected, or while
- * it is the open tab (it then says to select a chart). @internal
+ * The tabs the side panel shows, in order: Chart Data only while a chart is selected, and
+ * Diagram only while a diagram is selected, or while the tab is open (it then says to select
+ * one). @internal
  */
 export function visibleSidePanelTabs(
   chartSelected: boolean,
-  open: SidePanelTab
+  open: SidePanelTab,
+  diagramSelected = false
 ): readonly SidePanelTab[] {
-  return chartSelected || open === 'chart'
-    ? SIDE_PANEL_TABS
-    : SIDE_PANEL_TABS.filter((tab) => tab !== 'chart');
+  return SIDE_PANEL_TABS.filter(
+    (tab) =>
+      (tab !== 'chart' || chartSelected || open === 'chart') &&
+      (tab !== 'diagram' || diagramSelected || open === 'diagram')
+  );
 }
 
 /** Whether a side panel or a host listens for pane requests of `editor`. @internal */
