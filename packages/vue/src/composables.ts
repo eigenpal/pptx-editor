@@ -63,6 +63,7 @@ import {
   paneListenersVersion,
   subscribePaneListeners,
   isPaneSlot,
+  type ReviewAuthorInfo,
 } from '@pptx-editor.dev/core/editor';
 import { NOTES_SLOTS, useNotesTarget } from './notes-target.ts';
 
@@ -211,6 +212,22 @@ export function useEditorState<T>(
   isEqual: (a: T, b: T) => boolean = Object.is
 ): UseEditorStateReturn<T> {
   return useSlice(selector, isEqual);
+}
+
+/** What `useReviewAuthors` returns: the deck's review authors. @public */
+export type UseReviewAuthorsReturn = UseEditorStateReturn<readonly ReviewAuthorInfo[]>;
+
+const NO_AUTHORS: readonly ReviewAuthorInfo[] = Object.freeze([]);
+
+/**
+ * The review authors of the open deck, in slot order (`getReviewAuthors`): every comment author
+ * by first appearance, then the author of new comments, each with the color the comment markers,
+ * the text bands, and the comments pane draw them in, as React's `useReviewAuthors`. The ref
+ * changes only when a slot changes. @public
+ */
+export function useReviewAuthors(): UseReviewAuthorsReturn {
+  const editorRef = usePptxEditor();
+  return useSlice(() => editorRef.value?.getReviewAuthors() ?? NO_AUTHORS, Object.is);
 }
 
 /** What `useSlideLayouts` returns: the deck's slide layouts. @public */

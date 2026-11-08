@@ -1842,6 +1842,85 @@
 .pptx-editor.dark .pptx-surface__comment-marker-badge {
   stroke: var(--doc-border);
 }
+/* Commented text and elements (comment-highlights.ts), after DOCX Editor's comment bands (the
+   `.docx-comment-band` rules of docx-editor/packages/core/src/styles/editor.css at f189d6503),
+   in the color of the author who started the thread. A band is light at rest and deepens while
+   its thread is open; it follows the caret, so it has no transition.
+   The band layers sit over the slide paint and blend with it, as a highlighter does: `multiply`
+   over light paper, so dark text keeps its color, and `screen` over dark paper (light text),
+   with the author color lifted toward white first, so light text keeps its color. The slide is
+   not themed, so the paper is the slide's in either chrome theme.
+   Each band and ring carries `data-review-author`, `data-review-author-slot`, and
+   `--doc-review-author-current`, the hooks of the thread's card, so one selector restyles a
+   reviewer's card and what it annotates. A resolved thread draws nothing until it is open. */
+.pptx-surface__comment-bands {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+.pptx-surface__comment-bands[data-paper='dark'] {
+  mix-blend-mode: screen;
+}
+/* Declared on the element that sets `--doc-review-author-current`, so it computes there. */
+.pptx-surface__comment-band-group {
+  --pptx-comment-band-ink: var(--doc-review-author-current, var(--doc-review-author-0));
+}
+.pptx-surface__comment-band {
+  fill: color-mix(in srgb, var(--pptx-comment-band-ink) 16%, white);
+}
+.pptx-surface__comment-band-rule {
+  fill: color-mix(in srgb, var(--pptx-comment-band-ink) 55%, white);
+}
+.pptx-surface__comment-band-group.is-active .pptx-surface__comment-band {
+  fill: color-mix(in srgb, var(--pptx-comment-band-ink) 34%, white);
+}
+.pptx-surface__comment-band-group.is-active .pptx-surface__comment-band-rule {
+  fill: var(--pptx-comment-band-ink);
+}
+.pptx-surface__comment-bands[data-paper='dark'] .pptx-surface__comment-band-group {
+  --pptx-comment-band-ink: color-mix(
+    in srgb,
+    var(--doc-review-author-current, var(--doc-review-author-0)) 55%,
+    white
+  );
+}
+.pptx-surface__comment-bands[data-paper='dark'] .pptx-surface__comment-band {
+  fill: color-mix(in srgb, var(--pptx-comment-band-ink) 24%, black);
+}
+.pptx-surface__comment-bands[data-paper='dark'] .pptx-surface__comment-band-rule {
+  fill: color-mix(in srgb, var(--pptx-comment-band-ink) 60%, black);
+}
+.pptx-surface__comment-bands[data-paper='dark']
+  .pptx-surface__comment-band-group.is-active
+  .pptx-surface__comment-band {
+  fill: color-mix(in srgb, var(--pptx-comment-band-ink) 42%, black);
+}
+.pptx-surface__comment-bands[data-paper='dark']
+  .pptx-surface__comment-band-group.is-active
+  .pptx-surface__comment-band-rule {
+  fill: var(--pptx-comment-band-ink);
+}
+/* An element's ring: a stroke, not a wash, which a solid fill or a photo would hide. A light
+   halo under it (surface-halo.ts) keeps it visible on a dark fill. */
+.pptx-surface__comment-ring {
+  fill: none;
+  stroke: var(--doc-review-author-current, var(--doc-review-author-0));
+  stroke-opacity: 0.6;
+}
+.pptx-surface__halo--comment-ring {
+  stroke-opacity: 0.6;
+}
+.pptx-surface__comment-ring-group.is-active > .pptx-surface__comment-ring,
+.pptx-surface__comment-ring-group.is-active > .pptx-surface__halo--comment-ring {
+  stroke-opacity: 1;
+}
+.pptx-surface__comment-band-group.is-resolved:not(.is-active),
+.pptx-surface__comment-ring-group.is-resolved:not(.is-active) {
+  display: none;
+}
 .pptx-surface__placeholder-insert-box {
   fill: var(--doc-surface);
   fill-opacity: 0.9;

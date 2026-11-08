@@ -118,7 +118,7 @@ interface Moved {
  * Each hunk that only deletes or only inserts, moved to the place nearest `hint` (an offset in
  * `a`) among the places that give the same text. Other hunks stay.
  */
-function slid(
+export function slid(
   a: string,
   b: string,
   hunks: readonly TextHunk[],

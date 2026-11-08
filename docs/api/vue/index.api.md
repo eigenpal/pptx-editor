@@ -106,6 +106,7 @@ import { PropType } from 'vue';
 import { Ref } from 'vue';
 import { requestPane } from '@pptx-editor.dev/core/editor';
 import { ResolvedColorMode } from '@pptx-editor.dev/core/editor';
+import { ReviewAuthorInfo } from '@pptx-editor.dev/core/editor';
 import { RibbonTabId } from '@pptx-editor.dev/core/editor';
 import { ShallowRef } from 'vue';
 import { ShapeStyleChoice } from '@pptx-editor.dev/core/editor';
@@ -8969,6 +8970,12 @@ export interface UsePptxSourceReturn {
     readonly fonts: ComputedRef<FontConfiguration | FontResolver | undefined>;
     readonly isLoading: ComputedRef<boolean>;
 }
+
+// @public
+export function useReviewAuthors(): UseReviewAuthorsReturn;
+
+// @public
+export type UseReviewAuthorsReturn = UseEditorStateReturn<readonly ReviewAuthorInfo[]>;
 
 // @public
 export function useScopeClassName(): UseScopeClassNameReturn;

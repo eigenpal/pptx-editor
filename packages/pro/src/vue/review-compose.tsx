@@ -166,7 +166,7 @@ export const ReviewDraft = Object.assign(
       nodeId: { type: String, default: undefined },
     },
     setup(props) {
-      const { drafting, draftTarget, endDraft, review } = usePane();
+      const { drafting, draftTarget, endDraft, review, authors } = usePane();
       const editor = usePptxEditor();
       const t = useReviewLabel();
       const text = ref('');
@@ -185,7 +185,9 @@ export const ReviewDraft = Object.assign(
         const empty = text.value.trim() === '';
         const post = (): void => {
           if (empty || blocked || review.readOnly.value) return;
-          const at = pinned ? { nodeId: pinned } : undefined;
+          // A draft from a menu keeps the text that was selected when it opened.
+          const range = !props.nodeId ? draftTarget.value?.range : undefined;
+          const at = pinned ? { nodeId: pinned, ...(range ? { range } : {}) } : undefined;
           const refused = refusalOf(editor.value, () => review.comment(text.value, undefined, at));
           if (refused === null) {
             text.value = '';
@@ -202,8 +204,8 @@ export const ReviewDraft = Object.assign(
           <div
             class={cx('pptx-review__card', props.className)}
             data-draft=""
-            {...authorHooks(author)}
-            style={authorStyle(author)}
+            {...authorHooks(author, authors.value)}
+            style={authorStyle(author, authors.value)}
           >
             <form
               class="pptx-review__compose"
@@ -260,7 +262,7 @@ export const ReviewReply = Object.assign(
     name: 'ReviewReply',
     props: { className: { type: String, default: undefined }, asChild: Boolean, hidden: Boolean },
     setup(props, { slots }) {
-      const { review } = usePane();
+      const { review, authors } = usePane();
       const editor = usePptxEditor();
       const entry = useReviewItem();
       const t = useReviewLabel();
@@ -331,8 +333,8 @@ export const ReviewReply = Object.assign(
               <span
                 class="pptx-review__avatar pptx-review__reply-avatar"
                 aria-hidden="true"
-                {...authorHooks(author)}
-                style={authorStyle(author)}
+                {...authorHooks(author, authors.value)}
+                style={authorStyle(author, authors.value)}
               >
                 {commentInitials({ initials: '', author })}
               </span>

@@ -7,7 +7,11 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 // DOCX Editor's Vue `useReview` (docx-editor/packages/pro/src/vue/useReview.ts at adf0e178c).
 
 import { computed, shallowRef, toValue, watch, type ComputedRef, type MaybeRefOrGetter } from 'vue';
-import type { EditorSnapshot, PptxEditorInstance } from '@pptx-editor.dev/core/editor';
+import type {
+  CommentTextRange,
+  EditorSnapshot,
+  PptxEditorInstance,
+} from '@pptx-editor.dev/core/editor';
 import { usePptxEditor } from '@pptx-editor.dev/vue';
 import {
   commentTarget,
@@ -33,11 +37,14 @@ export interface UseReviewReturn {
   readonly activeKey: ComputedRef<string | null>;
   /** Pick a thread, or `null` for none. `{ announce: true }` also asks for the Comments tab. */
   readonly setActive: (key: string | null, options?: ReviewActivationOptions) => boolean;
-  /** Add a thread on the current slide, at `target.nodeId`, the selected element, or the slide. */
+  /**
+   * Add a thread on the current slide, at `target.range` of the text of `target.nodeId`, at
+   * `target.nodeId`, the selected text or element, or the slide.
+   */
   readonly comment: (
     text: string,
     author?: string,
-    target?: { readonly nodeId: string }
+    target?: { readonly nodeId: string; readonly range?: CommentTextRange }
   ) => boolean;
   /** Reply to a thread, or to the thread of a reply. */
   readonly reply: (item: ReviewItemView, text: string, author?: string) => boolean;

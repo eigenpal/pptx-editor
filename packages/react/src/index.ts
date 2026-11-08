@@ -578,6 +578,7 @@ export * from './dialog-exports.ts';
 export { useParagraphFormat, type UseParagraphFormatReturn } from './useParagraphFormat.ts';
 export { useFontFormat, type UseFontFormatReturn } from './useFontFormat.ts';
 export { useBulletFormat, type UseBulletFormatReturn } from './useBulletFormat.ts';
+export { useReviewAuthors } from './useReviewAuthors.ts';
 export { useFonts, type FontsInput, type UseFontsReturn } from './useFonts.ts';
 export { useFontFamily, type UseFontFamilyReturn } from './useFontFamily.ts';
 export { EditorFontError } from '@pptx-editor.dev/core/editor';

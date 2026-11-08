@@ -829,7 +829,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     tableStyles: () => (session ? tableStyleList(session.store.package) : []),
     chartData: (id) => chartDataAt(session?.store.package, partAt(slide), selection, id),
     setSelection: (next) => select(next),
-    ...comments.methods(emit),
+    ...comments.methods(emit, () => session?.store.package),
     copy: clipboard.copy,
     selectAll,
     focus: () => surface?.focus(),
@@ -933,7 +933,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
           part: () => partAt(slide),
           surface: () => surface,
           ...{ prompts, presence, painter, views, groups, gestureEdit },
-          commentMarkers: comments.markers(snapshot, instance),
+          commentMarkers: comments.markers(snapshot, instance, () => session?.store.package),
         })
       );
       surface.render();

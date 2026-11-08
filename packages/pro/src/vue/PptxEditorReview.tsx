@@ -27,10 +27,11 @@ import {
   type VNodeChild,
 } from 'vue';
 import { registerCommentDraft } from '@pptx-editor.dev/core/editor';
-import { useEditorState, usePptxEditor } from '@pptx-editor.dev/vue';
+import { useEditorState, usePptxEditor, useReviewAuthors } from '@pptx-editor.dev/vue';
 import {
   commentTarget,
   liveDraftTarget,
+  reviewAuthorMap,
   reviewReadOnly,
   type ReviewCommentTarget,
   type ReviewItemView,
@@ -264,11 +265,14 @@ const ReviewRoot = defineComponent({
           ?.scrollIntoView?.({ block: 'nearest' })
       );
     });
+    // The cards draw each author in the roster's color, as the canvas does.
+    const roster = useReviewAuthors();
     const pane: ReviewPaneValue = {
       t: () => props.t,
       cardClassName: () => props.card?.className,
       review,
       byId: computed(() => new Map(items.value.map((i) => [i.id, i] as const))),
+      authors: computed(() => reviewAuthorMap(roster.value)),
       drafting,
       draftTarget,
       beginDraft: () => {

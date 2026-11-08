@@ -1127,9 +1127,6 @@ export type CommandResult = {
 export function commandRowReason(editor: PptxEditorInstance | null, command: EditorCommand | null): string | null;
 
 // @public
-export const COMMENT_AUTHOR_SLOTS = 8;
-
-// @public
 export type CommentAnchor = {
     readonly kind: 'slide';
 } | {
@@ -1139,7 +1136,10 @@ export type CommentAnchor = {
 } | {
     readonly kind: 'shape';
     readonly nodeId: string;
-};
+} | ({
+    readonly kind: 'text';
+    readonly nodeId: string;
+} & CommentTextRange);
 
 // @public
 export interface CommentAuthorInput {
@@ -1149,18 +1149,19 @@ export interface CommentAuthorInput {
 }
 
 // @public
-export function commentAuthorSlot(author: string): number;
-
-// @public
 export type CommentCommand =
 /**
-* Add a thread on the current slide. With `nodeId`, it points at that element; without it, at
-* the selected element when one element is selected, else at the slide.
+* Add a thread on the current slide. With `nodeId`, it points at that element, and with
+* `nodeId` and `range`, at that range of its text. Without `nodeId`, it points at the
+* selected text of a shape, else at the selected element when one element is selected, else
+* at the slide. A deck with only legacy comments has no text anchors: the thread then points
+* at the element.
 */
 ({
     readonly type: 'addComment';
     readonly text: string;
     readonly nodeId?: string;
+    readonly range?: CommentTextRange;
 } & CommentAuthorInput)
 /** Reply to the thread of `commentId` (a thread or one of its replies). */
 | ({
@@ -1223,6 +1224,12 @@ export interface CommentSnapshot {
     readonly activeComment?: string | null;
     readonly commentAuthor?: string | null;
     readonly comments?: readonly CommentThread[] | null;
+}
+
+// @public
+export interface CommentTextRange {
+    readonly end: TextPoint;
+    readonly start: TextPoint;
 }
 
 // @public
@@ -4668,6 +4675,7 @@ export interface PptxEditorInstance extends Editor {
     fontFamilies(): readonly string[];
     fontMeasurement(): FontMeasurementState;
     readonly fonts: PptxEditorOptions['fonts'];
+    getReviewAuthors(): readonly ReviewAuthorInfo[];
     input(kind: TextInputKind, data?: string): CommandResult;
     readonly lastCopied: ClipboardPayload | null;
     // @internal
@@ -4939,6 +4947,19 @@ export function returnAppliesFrom(target: EventTarget | null): boolean;
 
 // @internal
 export function revealCurrentFont(list: HTMLElement | null): void;
+
+// @public
+export const REVIEW_AUTHOR_SLOTS = 8;
+
+// @public
+export interface ReviewAuthorInfo {
+    readonly author: string;
+    readonly color: string;
+    readonly slot: number;
+}
+
+// @public
+export function reviewAuthorSlotColor(slot: number): string;
 
 // @public
 export type ReviewDisplayMode = 'final' | 'markup';

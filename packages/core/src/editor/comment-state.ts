@@ -8,7 +8,14 @@ import type { CommentThread, EditorSnapshot, SlideComment } from '../contracts/i
 import type { CommentMarkerHost } from './comment-markers.ts';
 import { requestPane } from './pane-requests.ts';
 import {
+  createStableReviewAuthorSlots,
+  reviewAuthorsOf,
+  type ReviewAuthorInfo,
+  type StableReviewAuthorSlots,
+} from './review-authors.ts';
+import {
   COMMENTS,
+  commentListAuthors,
   commentNodes,
   identityGroup,
   presentationTarget,
@@ -18,6 +25,24 @@ import {
 import type { EditorModuleRegistry } from './modules.ts';
 
 const NONE: readonly CommentThread[] = Object.freeze([]);
+const NO_NAMES: readonly string[] = Object.freeze([]);
+/** Comments are the only review items of a deck: no other authors come before them. */
+const EMPTY_SLOTS: ReadonlyMap<string, number> = new Map();
+
+/** The resolved review roster of `CommentState.authors`. */
+interface Roster {
+  readonly names: readonly string[];
+  readonly me: string | undefined;
+  readonly list: readonly ReviewAuthorInfo[];
+  readonly byAuthor: ReadonlyMap<string, ReviewAuthorInfo>;
+}
+/** The roster without an open deck: no authors, not even the author of new comments. */
+const NO_ROSTER: Roster = Object.freeze({
+  names: NO_NAMES,
+  me: undefined,
+  list: Object.freeze([]),
+  byAuthor: new Map(),
+});
 /** How many slides other than the shown one keep their threads cached. */
 const OTHERS = 4;
 
@@ -110,6 +135,19 @@ export class CommentState {
   #fresh = 0;
   /** How many decks this editor opened before the current one (-1 before the first). */
   #loads = -1;
+  /** The author slots of the open deck, stable for its session (`review-authors.ts`). */
+  #slots: StableReviewAuthorSlots = createStableReviewAuthorSlots();
+  /** The comment parts of each slide, by its relationships part object. */
+  readonly #listsOf = new WeakMap<object, ReturnType<typeof slideCommentParts>>();
+  /** The deck's comment authors in reading order, and the part objects they come from. */
+  #deck: {
+    /** The package that the names were last checked for: a package never changes. */
+    readonly pkg: PptxPackage;
+    readonly key: readonly unknown[];
+    readonly names: readonly string[];
+  } | null = null;
+  /** The resolved roster, the same objects while no slot changes. */
+  #roster: Roster | null = null;
 
   constructor(
     author: string | undefined,
@@ -159,16 +197,90 @@ export class CommentState {
     this.#active = null;
     this.#activeIdentity = null;
     this.#loads += 1;
+    this.#slots = createStableReviewAuthorSlots();
+    this.#deck = null;
+    this.#roster = null;
   }
 
-  /** The editor's `setAuthor` and `selectComment`: each calls `emit` when it changes state. */
-  methods(emit: () => void): {
+  /**
+   * The review authors of the open deck, in slot order (`getReviewAuthors`): every comment
+   * author in deck order, then the author of new comments. The same array while no slot changes.
+   */
+  authors(pkg: PptxPackage | undefined): readonly ReviewAuthorInfo[] {
+    return this.#resolve(pkg).list;
+  }
+
+  /** The resolved look of `author`, or undefined for an author the roster does not hold. */
+  authorInfo(pkg: PptxPackage | undefined, author: string): ReviewAuthorInfo | undefined {
+    return this.#resolve(pkg).byAuthor.get(author);
+  }
+
+  #resolve(pkg: PptxPackage | undefined): Roster {
+    if (!pkg) return NO_ROSTER;
+    const names = this.#deckAuthors(pkg);
+    const me = this.author;
+    const prior = this.#roster;
+    if (prior && prior.names === names && prior.me === me) return prior;
+    const slots = this.#slots.resolve(EMPTY_SLOTS, me ? [...names, me] : names);
+    const unchanged =
+      prior !== null &&
+      prior.list.length === slots.size &&
+      prior.list.every((info) => slots.get(info.author) === info.slot);
+    const list = unchanged ? prior.list : Object.freeze(reviewAuthorsOf(slots));
+    const byAuthor = unchanged ? prior.byAuthor : new Map(list.map((i) => [i.author, i]));
+    this.#roster = { names, me, list, byAuthor };
+    return this.#roster;
+  }
+
+  /** The deck's comment authors, the same array while their parts are the same objects. */
+  #deckAuthors(pkg: PptxPackage): readonly string[] {
+    if (this.#deck?.pkg === pkg) return this.#deck.names;
+    const info = presentationInfo(pkg);
+    const key: unknown[] = [];
+    const lists: ReturnType<typeof slideCommentParts>[] = [];
+    for (const s of info.slides) {
+      const rels = pkg.parts.get(relsPartName(s.partName));
+      let parts = rels ? this.#listsOf.get(rels) : undefined;
+      if (!parts) {
+        parts = slideCommentParts(pkg, s.partName);
+        if (rels) this.#listsOf.set(rels, parts);
+      }
+      lists.push(parts);
+      // Slide order is reading order: a moved slide can move its authors.
+      key.push(s.partName);
+      for (const name of [...parts.legacy, ...parts.modern]) key.push(pkg.parts.get(name));
+    }
+    for (const type of [COMMENTS.legacyAuthorsRel, COMMENTS.modernAuthorsRel]) {
+      const part = presentationTarget(pkg, type);
+      key.push(part ? pkg.parts.get(part) : undefined);
+    }
+    if (this.#deck && same(this.#deck.key, key)) {
+      this.#deck = { ...this.#deck, pkg };
+      return this.#deck.names;
+    }
+    const names = Object.freeze(
+      lists.flatMap((parts) => commentListAuthors(pkg, parts.legacy, parts.modern))
+    );
+    this.#deck = { pkg, key, names };
+    return names;
+  }
+
+  /**
+   * The editor's `setAuthor` and `selectComment`, which call `emit` when they change state, and
+   * `getReviewAuthors` over the open package.
+   */
+  methods(
+    emit: () => void,
+    pkg: () => PptxPackage | undefined
+  ): {
     setAuthor(author: string | undefined): void;
     selectComment(id: string | null): void;
+    getReviewAuthors(): readonly ReviewAuthorInfo[];
   } {
     return {
       setAuthor: (author) => void (this.setAuthor(author) && emit()),
       selectComment: (id) => void (this.select(id) && emit()),
+      getReviewAuthors: () => this.authors(pkg()),
     };
   }
 
@@ -384,11 +496,14 @@ export class CommentState {
    */
   markers(
     snapshot: () => EditorSnapshot,
-    editor: { selectComment(id: string): void }
+    editor: { selectComment(id: string): void },
+    pkg: () => PptxPackage | undefined
   ): CommentMarkerHost {
     return {
       threads: () => snapshot().comments ?? NONE,
       active: () => snapshot().activeComment ?? null,
+      author: (name) => this.authorInfo(pkg(), name),
+      selection: () => snapshot().selection,
       style: () => this.modules.review?.pane?.commentMarkers ?? 'icon',
       pick: (id) => {
         editor.selectComment(id);

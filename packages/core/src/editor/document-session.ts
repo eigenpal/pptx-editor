@@ -2,10 +2,8 @@
 // URLs. The editor facade and the fidelity harness both open documents through this, so the
 // harness measures and paints exactly what the editor shows.
 
-import {
-  partWithoutEditorMarks,
-  withoutEditorMarks,
-} from '../automation/commands/table-edit-marks.ts';
+import { partWithoutEditorMarks } from '../automation/commands/table-edit-marks.ts';
+import { openStore } from '../automation/commands/open-store.ts';
 import {
   loadDefaultFonts,
   ALL_DEFAULT_FONT_FAMILIES,
@@ -906,7 +904,7 @@ export async function openPresentation(
   const opened = options.progressive ? firstSlideOnly(read.pkg, options.progressive) : null;
   if (opened && !opened.ok) return { ok: false, error: opened.error };
   const { sources: embedded, refused } = embeddedFontSources(read.pkg);
-  const store = new PptxDocumentStore(withoutEditorMarks(read.pkg));
+  const store = openStore(read.pkg);
   const host = options.fonts ?? [];
   const base = {
     host,

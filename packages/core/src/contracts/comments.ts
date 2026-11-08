@@ -3,17 +3,35 @@
 // comments: the comment lists of ECMA-376 Part 1, 19.4 (`p:cmLst`, `legacy`), and the threaded
 // comments of the `p188` extension (`modern`).
 
+import type { TextPoint } from './neutral.ts';
+
 /** The file format of a comment thread. @public */
 export type CommentFormat = 'modern' | 'legacy';
 
 /**
- * Where a thread points on its slide. `shape`: an element of the slide, by its node id. `point`:
- * a place on the slide, in EMU. `slide`: the slide as a whole, with no place. @public
+ * A range of a shape's text, with the points that a text selection (`EditorSelection`) uses. A
+ * snapshot gives `start` before `end`. `addComment` takes the two points in either order. @public
+ */
+export interface CommentTextRange {
+  /** The first character of the range. */
+  readonly start: TextPoint;
+  /** The point after the last character of the range. */
+  readonly end: TextPoint;
+}
+
+/**
+ * Where a thread points on its slide. `text`: a range of an element's text, by its node id.
+ * `shape`: an element of the slide, by its node id. `point`: a place on the slide, in EMU.
+ * `slide`: the slide as a whole, with no place.
+ *
+ * A `text` thread follows its text through edits. When an edit removes all of its text, the
+ * thread points at the element (`shape`). Only the threaded format holds `text` anchors. @public
  */
 export type CommentAnchor =
   | { readonly kind: 'slide' }
   | { readonly kind: 'point'; readonly x: number; readonly y: number }
-  | { readonly kind: 'shape'; readonly nodeId: string };
+  | { readonly kind: 'shape'; readonly nodeId: string }
+  | ({ readonly kind: 'text'; readonly nodeId: string } & CommentTextRange);
 
 /** One comment or reply. Its text and author come from the file: show them as text. @public */
 export interface SlideComment {
@@ -120,13 +138,18 @@ export interface CommentExpect {
  */
 export type CommentCommand =
   /**
-   * Add a thread on the current slide. With `nodeId`, it points at that element; without it, at
-   * the selected element when one element is selected, else at the slide.
+   * Add a thread on the current slide. With `nodeId`, it points at that element, and with
+   * `nodeId` and `range`, at that range of its text. Without `nodeId`, it points at the
+   * selected text of a shape, else at the selected element when one element is selected, else
+   * at the slide. A deck with only legacy comments has no text anchors: the thread then points
+   * at the element.
    */
   | ({
       readonly type: 'addComment';
       readonly text: string;
       readonly nodeId?: string;
+      /** A range of the text of `nodeId`. Refused without `nodeId` or when empty. */
+      readonly range?: CommentTextRange;
     } & CommentAuthorInput)
   /** Reply to the thread of `commentId` (a thread or one of its replies). */
   | ({

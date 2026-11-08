@@ -9,7 +9,7 @@ Production use requires a commercial agreement: licensing@eigenpal.com
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { useState, type ReactNode } from 'react';
+import { StrictMode, useState, type ReactNode } from 'react';
 import type { EditorModule, PptxEditorInstance } from '@pptx-editor.dev/core/editor';
 import {
   PptxEditorContent,
@@ -126,6 +126,20 @@ describe('New comment in the canvas context menu', () => {
     );
     const field = screen.getByRole('textbox', { name: 'Add a comment…' });
     expect(document.activeElement).toBe(field);
+  });
+
+  test('a closed pane under StrictMode keeps the draft that its first mount opened', async () => {
+    // StrictMode runs each effect twice: the second run must not close the draft.
+    await mount(
+      [reviewModule()],
+      <StrictMode>
+        <SidePanel tab={undefined} panes={{ comments: <PptxEditorReview /> }} />
+      </StrictMode>
+    );
+    rightClickTitle();
+    act(() => void fireEvent.click(row()!));
+    await act(frame);
+    expect(screen.getByRole('textbox', { name: 'Add a comment…' })).toBeDefined();
   });
 
   test('in view mode the row stays, off with the viewing reason', async () => {

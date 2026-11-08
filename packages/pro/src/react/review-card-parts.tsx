@@ -109,7 +109,7 @@ export const ReviewCard = markPart(function ReviewCard({
   hidden,
   children,
 }: ReviewPartProps) {
-  const { review, cardClassName } = usePane();
+  const { review, cardClassName, authors } = usePane();
   const entry = useContext(ReviewItemContext);
   const t = useReviewLabel();
   if (hidden || !entry) return null;
@@ -121,8 +121,8 @@ export const ReviewCard = markPart(function ReviewCard({
     'data-comment-id': entry.id,
     ...(entry.isActive ? { 'data-active': '', 'aria-current': 'true' as const } : {}),
     ...(entry.resolved ? { 'data-resolved': '' } : {}),
-    ...authorHooks(entry.author),
-    style: authorStyle(entry.author),
+    ...authorHooks(entry.author, authors),
+    style: authorStyle(entry.author, authors),
     role: 'group' as const,
     'aria-label': t('comments.thread', { author: entry.author || t('comments.unknownAuthor') }),
     tabIndex: 0,
@@ -265,7 +265,7 @@ export const ReviewReplies = markPart(function ReviewReplies({
   className,
   hidden,
 }: ReviewPartProps) {
-  const { byId } = usePane();
+  const { byId, authors } = usePane();
   const entry = useContext(ReviewItemContext);
   const t = useReviewLabel();
   if (hidden || !entry || entry.replyIds.length === 0) return null;
@@ -283,8 +283,8 @@ export const ReviewReplies = markPart(function ReviewReplies({
           <li
             className="pptx-review__reply"
             data-reply-id={reply.id}
-            {...authorHooks(reply.author)}
-            style={authorStyle(reply.author)}
+            {...authorHooks(reply.author, authors)}
+            style={authorStyle(reply.author, authors)}
           >
             <div className="pptx-review__head">
               <ReviewAvatar />

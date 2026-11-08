@@ -98,6 +98,7 @@ import { ReactElement } from 'react';
 import { ReactNode } from 'react';
 import { requestPane } from '@pptx-editor.dev/core/editor';
 import { ResolvedColorMode } from '@pptx-editor.dev/core/editor';
+import { ReviewAuthorInfo } from '@pptx-editor.dev/core/editor';
 import { RibbonTabId } from '@pptx-editor.dev/core/editor';
 import { ShapeStyleChoice } from '@pptx-editor.dev/core/editor';
 import { ShapeStyleValue } from '@pptx-editor.dev/core/editor';
@@ -2158,6 +2159,9 @@ export interface UsePptxSourceResult {
     readonly fonts: FontConfiguration | FontResolver | undefined;
     readonly isLoading: boolean;
 }
+
+// @public
+export function useReviewAuthors(): readonly ReviewAuthorInfo[];
 
 // @public
 export function useScopeClassName(): '' | 'pptx-editor ' | 'pptx-editor dark ';

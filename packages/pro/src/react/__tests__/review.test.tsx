@@ -19,7 +19,7 @@ import {
   PptxEditorViewport,
   SidePanel,
 } from '@pptx-editor.dev/react';
-import { buildPptx, shape } from '../../../../../scripts/fixtures/builder.ts';
+import { buildPptx, para, run, shape } from '../../../../../scripts/fixtures/builder.ts';
 import { PptxEditorReview, reviewModule, useReview, useReviewAuthor } from '../index.ts';
 import { repeatedThreadDeck } from '../../__tests__/repeat-deck.ts';
 
@@ -32,7 +32,8 @@ afterEach(() => {
 
 async function mount(
   modules: readonly EditorModule[] | undefined,
-  pane: ReactNode = <PptxEditorReview />
+  pane: ReactNode = <PptxEditorReview />,
+  text?: string
 ): Promise<PptxEditorInstance> {
   let editor: PptxEditorInstance | null = null;
   render(
@@ -44,7 +45,19 @@ async function mount(
     </PptxEditorRoot>
   );
   const deck = buildPptx({
-    slides: [{ shapes: shape({ id: 2, name: 'Title', x: IN, y: IN, cx: IN, cy: IN }) }],
+    slides: [
+      {
+        shapes: shape({
+          id: 2,
+          name: 'Title',
+          x: IN,
+          y: IN,
+          cx: 4 * IN,
+          cy: IN,
+          ...(text ? { text: para(run(text)) } : {}),
+        }),
+      },
+    ],
   });
   await act(async () => void (await editor!.load(deck)));
   return editor!;
@@ -402,6 +415,52 @@ describe('PptxEditorReview', () => {
     expect(me!.color).toBe(`var(--doc-review-author-${me!.slot})`);
     act(() => void review!.comment('From a hook'));
     expect(review!.items.map((i) => i.text)).toEqual(['From a hook']);
+  });
+
+  test("cards draw each author in the editor's roster color, not a name hash", async () => {
+    const editor = await mount([reviewModule()]);
+    act(() => void editor.exec({ type: 'addComment', text: 'One', author: 'Grace Hopper' }));
+    act(() => void editor.exec({ type: 'addComment', text: 'Two' }));
+    const roster = editor.getReviewAuthors();
+    // The signing author holds the first slot from the start; Grace takes the next one.
+    expect(roster.map((a) => [a.author, a.slot])).toEqual([
+      ['Ada Lovelace', 0],
+      ['Grace Hopper', 1],
+    ]);
+    const list = screen.getByRole('list', { name: 'Comments on this slide' });
+    for (const info of roster) {
+      const card = list.querySelector(`[data-review-author="${info.author}"]`) as HTMLElement;
+      expect(card.getAttribute('data-review-author-slot')).toBe(String(info.slot));
+      expect(card.style.getPropertyValue('--doc-review-author-current')).toBe(info.color);
+    }
+    let grace: ReturnType<typeof useReviewAuthor> | null = null;
+    function Probe() {
+      grace = useReviewAuthor('Grace Hopper');
+      return null;
+    }
+    cleanup();
+    await mount([reviewModule()], <Probe />);
+    expect(grace).toBeUndefined();
+  });
+
+  test('a draft on selected text points the comment at that text', async () => {
+    const editor = await mount([reviewModule()], <PptxEditorReview />, 'Quick brown fox');
+    const nodeId = editor.snapshot().shapes![0]!.nodeId;
+    act(() =>
+      editor.setSelection({
+        kind: 'text',
+        nodeId,
+        anchor: { paragraph: 0, offset: 6 },
+        focus: { paragraph: 0, offset: 11 },
+      })
+    );
+    post('Which brown?');
+    expect(editor.snapshot().comments![0]!.anchor).toEqual({
+      kind: 'text',
+      nodeId,
+      start: { paragraph: 0, offset: 6 },
+      end: { paragraph: 0, offset: 11 },
+    });
   });
 
   test('SidePanel shows the pane in its Comments tab', async () => {

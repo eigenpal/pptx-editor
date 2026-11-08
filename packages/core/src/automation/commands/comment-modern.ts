@@ -3,7 +3,8 @@
 // relationship and by `p188:commentRel`, and the comments, replies, text, and status in it.
 // A comment points at its slide through a moniker list: `pc:sldMkLst` names the slide by its
 // `p14:creationId` and `p:sldId/@id`, and `ac:deMkLst` adds a drawing element of the slide by its
-// `p:cNvPr/@id` and `a16:creationId`.
+// `p:cNvPr/@id` and `a16:creationId`, and `ac:txMkLst` adds a range of the element's text
+// (`comment-text-range.ts`).
 
 import {
   attr,
@@ -168,21 +169,34 @@ const paragraphsXml = (text: string): string =>
     )
     .join('');
 
-/** The moniker list of a new comment: the slide, and the element `target` when given. */
+/** A range of a shape's text as a text moniker counts it (`comment-text-range.ts`). */
+export interface TextChars {
+  readonly cp: number;
+  readonly len: number;
+}
+
+/**
+ * The moniker list of a new comment: the slide, the element `target` when given, and a range of
+ * its text when `chars` is given and the element is a shape (`ac:txMkLst`).
+ */
 function monikerXml(
   batch: OpBatch,
   slidePart: string,
   creation: string,
-  target: { readonly kind: string; readonly id: string; readonly creationId: string } | undefined
+  target: { readonly kind: string; readonly id: string; readonly creationId: string } | undefined,
+  chars: TextChars | undefined
 ): string {
   const ref = presentationInfo(batch.pkg).slides.find((s) => s.partName === slidePart)!;
   const slide = `<pc:docMk/><pc:sldMk cId="${creation}" sldId="${xmlAttr(ref.sldId, 'slide id')}"/>`;
   if (!target) return `<pc:sldMkLst xmlns:pc="${COMMENTS.pc}">${slide}</pc:sldMkLst>`;
+  const list = chars && target.kind === 'sp' ? 'txMkLst' : 'deMkLst';
   return (
-    `<ac:deMkLst xmlns:ac="${COMMENTS.ac}" xmlns:pc="${COMMENTS.pc}">${slide}` +
+    `<ac:${list} xmlns:ac="${COMMENTS.ac}" xmlns:pc="${COMMENTS.pc}">${slide}` +
     // Attributes in name order, as a collaboration room writes back a part kept as bytes.
     `<ac:${MONIKERS[target.kind]} creationId="${target.creationId}" ` +
-    `id="${xmlAttr(target.id, 'shape id')}"/></ac:deMkLst>`
+    `id="${xmlAttr(target.id, 'shape id')}"/>` +
+    (list === 'txMkLst' ? `<ac:txMk cp="${chars!.cp}" len="${chars!.len}"/>` : '') +
+    `</ac:${list}>`
   );
 }
 
@@ -235,14 +249,18 @@ function elementTarget(
   return { kind: el.local, id, creationId };
 }
 
-/** Add a threaded comment on `slidePart`, pointing at `nodeId` when given. Returns its GUID. */
+/**
+ * Add a threaded comment on `slidePart`, pointing at `nodeId` when given, and at the range
+ * `chars` of its text when given. Returns its GUID.
+ */
 export function addModernComment(
   batch: OpBatch,
   slidePart: string,
   text: string,
   author: { readonly name: string; readonly initials: string },
   date: string,
-  nodeId: string | undefined
+  nodeId: string | undefined,
+  chars?: TextChars
 ): string {
   const authorId = modernAuthorId(batch, author);
   const creation = slideCreationId(batch, slidePart);
@@ -256,7 +274,7 @@ export function addModernComment(
     index: root.children.length,
     spec: fragment(
       `<p188:cm authorId="${authorId}" created="${date}" id="${id}">` +
-        monikerXml(batch, slidePart, creation, target) +
+        monikerXml(batch, slidePart, creation, target, chars) +
         `${bodyXml(text)}</p188:cm>`
     ),
   });

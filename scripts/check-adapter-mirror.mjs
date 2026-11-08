@@ -63,6 +63,7 @@ export const REACT_ONLY = {
     'The toolbar, its groups, and its controls; Vue splits them over toolbar.ts, toolbar-bar.tsx, and toolbar-controls.tsx.',
   'useBulletFormat.ts': 'A React hook; Vue holds useBulletFormat in composables.ts.',
   'useFontFormat.ts': 'A React hook; Vue holds useFontFormat in composables.ts.',
+  'useReviewAuthors.ts': 'A React hook; Vue holds useReviewAuthors in composables.ts.',
   'useParagraphFormat.ts': 'A React hook; Vue holds useParagraphFormat in composables.ts.',
 };
 

@@ -4,7 +4,8 @@
 // delete keep the format of their thread (`comment-modern.ts`, `comment-legacy.ts`).
 
 import { presentationInfo, xmlPartOf, child, elements } from '../store/index.ts';
-import type { CommentCommand, EditorCommand } from '../contracts/index.ts';
+import type { CommentCommand, EditorCommand, TextPoint } from '../contracts/index.ts';
+import { rangeChars, shapeParagraphLengths } from '../automation/commands/comment-text-range.ts';
 import type { CommandContext, CommandEffect } from './commands.ts';
 import { CommandRefusal, type OpBatch } from '../automation/commands/op-batch.ts';
 import { deckUses, legacyFacts, modernFacts } from '../automation/commands/comment-read.ts';
@@ -21,6 +22,7 @@ import {
   findModern,
   replyModern,
   setModernStatus,
+  type TextChars,
 } from '../automation/commands/comment-modern.ts';
 import {
   addLegacyComment,
@@ -43,9 +45,33 @@ export function isCommentCommand(command: EditorCommand): command is CommentComm
   return TYPES.has(command.type);
 }
 
-/** The top-level element a new thread points at: `nodeId`, or the one selected element. */
-function targetOf(ctx: CommandContext, batch: OpBatch, slidePart: string, nodeId: unknown) {
+/** Whether `v` is a `TextPoint` the command can read. */
+const isPoint = (v: unknown): v is TextPoint => {
+  const p = v as { paragraph?: unknown; offset?: unknown } | null;
+  return (
+    typeof p === 'object' &&
+    p !== null &&
+    Number.isSafeInteger(p.paragraph) &&
+    Number.isSafeInteger(p.offset) &&
+    (p.paragraph as number) >= 0 &&
+    (p.offset as number) >= 0
+  );
+};
+
+/**
+ * The top-level element a new thread points at, and the range of its text: `nodeId` and
+ * `range`, else the selected text of a shape, else the one selected element.
+ */
+function targetOf(
+  ctx: CommandContext,
+  batch: OpBatch,
+  slidePart: string,
+  nodeId: unknown,
+  range: unknown
+): { readonly id: string; readonly chars?: TextChars } | undefined {
   const sel = ctx.selection;
+  if (range !== undefined && nodeId === undefined)
+    throw new CommandRefusal('disabled.noCommentTarget');
   const id =
     nodeId !== undefined
       ? nodeId
@@ -56,11 +82,32 @@ function targetOf(ctx: CommandContext, batch: OpBatch, slidePart: string, nodeId
           : undefined;
   if (id === undefined) return undefined;
   const tree = child(child(xmlPartOf(batch.pkg, slidePart)?.root, 'p:cSld'), 'p:spTree');
-  if (typeof id === 'string' && elements(tree).some((e) => e.id === id)) return id;
-  // An element inside a group, or one that is gone: an explicit id is refused, a selection
-  // points the thread at the slide.
-  if (nodeId !== undefined) throw new CommandRefusal('disabled.noCommentTarget');
-  return undefined;
+  const el = typeof id === 'string' ? elements(tree).find((e) => e.id === id) : undefined;
+  if (!el) {
+    // An element inside a group, or one that is gone: an explicit id is refused, a selection
+    // points the thread at the slide.
+    if (nodeId !== undefined) throw new CommandRefusal('disabled.noCommentTarget');
+    return undefined;
+  }
+  // The selected text of a shape, not of a table cell or a diagram node: a text moniker counts
+  // the characters of a shape's own text body.
+  const picked =
+    range !== undefined
+      ? range
+      : nodeId === undefined && sel.kind === 'text' && !sel.cell && !sel.diagramNode
+        ? { start: sel.anchor, end: sel.focus }
+        : undefined;
+  if (picked === undefined) return { id: el.id };
+  const r = picked as { start?: unknown; end?: unknown } | null;
+  const lengths = shapeParagraphLengths(el, ctx.slide + 1);
+  const chars =
+    typeof r === 'object' && r !== null && isPoint(r.start) && isPoint(r.end) && lengths
+      ? rangeChars(lengths, { start: r.start, end: r.end })
+      : null;
+  if (chars) return { id: el.id, chars };
+  // A range the host named must hold text; a collapsed caret points at the element.
+  if (range !== undefined) throw new CommandRefusal('disabled.noCommentTarget');
+  return { id: el.id };
 }
 
 /**
@@ -126,10 +173,11 @@ export function compileCommentCommand(
     const text = commentText(command.text);
     const author = commentAuthor(command, ctx.author);
     const date = commentDate(command.date);
-    const target = targetOf(ctx, batch, slidePart, command.nodeId);
+    const target = targetOf(ctx, batch, slidePart, command.nodeId, command.range);
     const legacy = deckUses(batch.pkg, 'legacy') && !deckUses(batch.pkg, 'modern');
-    if (legacy) addLegacyComment(batch, slidePart, text, author, date, target);
-    else addModernComment(batch, slidePart, text, author, date, target);
+    // The legacy format has no text anchors: its thread points at the element.
+    if (legacy) addLegacyComment(batch, slidePart, text, author, date, target?.id);
+    else addModernComment(batch, slidePart, text, author, date, target?.id, target?.chars);
     return { label };
   }
   const { slidePart, key } = splitCommentId(batch, command.commentId);
