@@ -9,6 +9,8 @@
 // - code 404: an editor module answers 404. Expect the boot failure message at once.
 // - code stall: an editor module never answers. Expect the slow-load message.
 // - late first deck: a file opened while the first deck trickles in stays open.
+// - corporate networks: a blocked or stalled font CDN or `.wasm`, a proxy block page, a 403,
+//   and WebAssembly turned off. Expect the deck or a notice within the stall limit.
 //
 // Usage: BENCH_PORT=<port> bun run bench:network:browser
 
@@ -159,3 +161,68 @@ test('late first deck', async ({ page }) => {
   expect(state.slides).toBe(5);
   expect(state.notice).toBeNull();
 });
+
+// Corporate networks and browser extensions. An ad blocker or a firewall rejects a request at
+// once, a filtering proxy can hold it open, and a scanning proxy can answer with its own page.
+// A locked-down browser can turn WebAssembly off. In each case the deck opens or the demo says
+// why, within the stall limit.
+const NETWORK_CASES: {
+  name: string;
+  setup: (page: Page) => Promise<unknown>;
+  outcome: string[];
+}[] = [
+  {
+    name: 'font CDN blocked',
+    setup: (page) => page.route(/cdn\.jsdelivr\.net/, (route) => route.abort('blockedbyclient')),
+    outcome: ['deck'],
+  },
+  {
+    name: 'font CDN stall',
+    setup: (page) => page.route(/cdn\.jsdelivr\.net/, () => undefined),
+    outcome: ['deck'],
+  },
+  {
+    name: 'deck block page',
+    setup: (page) =>
+      page.route('**/showcase.pptx', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'text/html',
+          body: '<html><body>This file is blocked by your network policy.</body></html>',
+        })
+      ),
+    outcome: ['deck notice', 'open failure'],
+  },
+  {
+    name: 'deck 403',
+    setup: (page) => page.route('**/showcase.pptx', (route) => route.fulfill({ status: 403 })),
+    outcome: ['deck notice', 'open failure'],
+  },
+  {
+    name: 'wasm blocked',
+    setup: (page) => page.route(/\.wasm(\?|$)/, (route) => route.abort('blockedbyclient')),
+    outcome: ['deck'],
+  },
+  {
+    name: 'wasm stall',
+    setup: (page) => page.route(/\.wasm(\?|$)/, () => undefined),
+    outcome: ['deck'],
+  },
+  {
+    name: 'WebAssembly off',
+    setup: (page) =>
+      page.addInitScript(() => {
+        delete (globalThis as { WebAssembly?: unknown }).WebAssembly;
+      }),
+    outcome: ['deck'],
+  },
+];
+
+for (const { name, setup, outcome } of NETWORK_CASES) {
+  test(name, async ({ page }) => {
+    await setup(page);
+    const result = await openDemo(page, DECK_STALL_MS + SLACK_MS);
+    rows.push({ scenario: name, ...result });
+    expect(outcome).toContain(result.outcome);
+  });
+}
