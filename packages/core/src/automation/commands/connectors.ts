@@ -419,7 +419,11 @@ export function elbowCorners(item: LayoutItem): Point[] | null {
   // Adjust values can put a corner on an end or on another corner: those segments have no
   // length, so the route is the corners without them. A straight route keeps one segment.
   const route = simplified(pts);
-  return route.length >= 2 ? route : null;
+  // A connector turned off the axes (say 45°) has slanted segments: no segment drag fits it.
+  const square = route.every(
+    (q, i) => i === 0 || Math.abs(q.x - route[i - 1].x) < 1 || Math.abs(q.y - route[i - 1].y) < 1
+  );
+  return route.length >= 2 && square ? route : null;
 }
 
 /** The corners without repeated points and without corners on a straight run. */
@@ -439,34 +443,75 @@ function simplified(pts: readonly Point[]): Point[] {
   return out;
 }
 
-/**
- * Whether a drag of segment `index` of `corners` can draw a route a preset has: an end
- * segment adds one bend, or two at a glued end, and no preset draws more than five segments.
- */
-export function segmentMovable(
-  item: LayoutItem,
-  corners: readonly Point[],
-  index: number
-): boolean {
-  const glue = item.kind === 'shape' ? item.element.connections : undefined;
-  const last = corners.length - 2;
-  const added =
-    (index === 0 ? (glue?.start ? 2 : 1) : 0) + (index === last ? (glue?.end ? 2 : 1) : 0);
-  return corners.length - 1 + added <= MOST_SEGMENTS;
-}
-
 /** The axis a segment of a route moves along: `y` for a horizontal segment, `x` for a vertical. */
 export function segmentAxis(a: Point, b: Point): 'x' | 'y' {
   return Math.abs(a.y - b.y) < Math.abs(a.x - b.x) ? 'y' : 'x';
 }
 
 /**
+ * The route after segment `index` of `corners` moves across to the line `value`. A middle
+ * segment moves with its two corners. An end segment keeps its end and gains a bend there; a
+ * glued end keeps a short run in its site's direction before the bend, so the connector still
+ * meets the shape square. Segments that come in line merge.
+ */
+function segmentRoute(
+  item: LayoutItem,
+  corners: readonly Point[],
+  index: number,
+  value: number
+): Point[] {
+  const a = corners[index];
+  const b = corners[index + 1];
+  const across = segmentAxis(a, b);
+  const moved = (q: Point): Point => ({ ...q, [across]: value });
+  const last = corners.length - 2;
+  const glue = item.kind === 'shape' ? item.element.connections : undefined;
+  // The point on the segment a short run from end `q`, toward `to`.
+  const stub = (q: Point, to: Point): Point => {
+    const len = Math.hypot(to.x - q.x, to.y - q.y);
+    const k = len > 0 ? Math.min(STUB, len / 2) / len : 0;
+    return { x: q.x + (to.x - q.x) * k, y: q.y + (to.y - q.y) * k };
+  };
+  // An end segment: the end, its run out of a glued site, then the moved segment.
+  const head = (end: Point, other: Point, glued: boolean): Point[] =>
+    glued ? [end, stub(end, other), moved(stub(end, other))] : [end, moved(end)];
+  return simplified([
+    ...corners.slice(0, index),
+    ...(index === 0 ? head(a, b, !!glue?.start) : [moved(a)]),
+    ...(index === last ? head(b, a, !!glue?.end).reverse() : [moved(b)]),
+    ...corners.slice(index + 2),
+  ]);
+}
+
+/** Whether a preset draws a route: two to five segments. */
+const drawable = (route: readonly Point[]): boolean =>
+  route.length >= 3 && route.length - 1 <= MOST_SEGMENTS;
+
+/**
+ * Whether segment `index` of `corners` has a place to move to that a preset draws. An end
+ * segment adds a bend, or two at a glued end, unless it comes in line with another segment.
+ */
+export function segmentMovable(
+  item: LayoutItem,
+  corners: readonly Point[],
+  index: number
+): boolean {
+  const a = corners[index];
+  const b = corners[index + 1];
+  if (!a || !b) return false;
+  const across = segmentAxis(a, b);
+  // A free place beside the segment, and each other corner's line, where segments merge.
+  const span = Math.hypot(b.x - a.x, b.y - a.y);
+  const lines = [a[across] + span, ...corners.map((q) => q[across])];
+  return lines.some((v) => v !== a[across] && drawable(segmentRoute(item, corners, index, v)));
+}
+
+/**
  * The transform of an elbow or curve connector after segment `index` of its route moves across
- * as far as the pointer moved from slide point `from` to `to`. A middle segment moves with its two corners. An end segment keeps
- * its end and gains a bend there. A glued end keeps a short run in its site's direction
- * before the bend, so the connector still meets the shape square. Segments that come in line
- * merge, and a route back where it started is `same`. Within `snap` (slide units) of another corner's line or of its own first line, the
- * segment snaps to it, so a bend is easy to take out and a slip is easy to undo. The ends and their glue stay. Null when the route would need more
+ * as far as the pointer moved from slide point `from` to `to` (see `segmentRoute`). Within
+ * `snap` (slide units) of another corner's line or of its own first line, the segment snaps to
+ * it, so a bend is easy to take out and a slip is easy to undo. The ends and their glue stay.
+ * `same` when the route is back where it started. Null when the route would need more
  * segments than a preset draws, or when the item is no elbow or curve.
  */
 export function moveElbowSegment(
@@ -480,45 +525,27 @@ export function moveElbowSegment(
   const family = familyOf(item);
   if (!corners || index < 0 || index >= corners.length - 1) return null;
   const a = corners[index];
-  const b = corners[index + 1];
-  const across = segmentAxis(a, b);
+  const across = segmentAxis(a, corners[index + 1]);
   // The segment moves by the pointer's move, so a press beside the handle does not jump it.
   const p0 = toParent(item, from.x, from.y);
   const p1 = toParent(item, to.x, to.y);
-  const at = { ...a, [across]: a[across] + p1[across] - p0[across] };
+  let value = a[across] + p1[across] - p0[across];
   if (snap !== null) {
     const d = deltaToParent(item, snap, 0);
     const reach = Math.hypot(d.x, d.y);
     const lines = [a, ...corners.filter((_, i) => i !== index && i !== index + 1)];
-    const off = (q: Point): number => Math.abs(q[across] - at[across]);
+    const off = (q: Point): number => Math.abs(q[across] - value);
     const nearest = lines.sort((u, v) => off(u) - off(v))[0];
-    if (off(nearest) <= reach) at[across] = nearest[across];
+    if (off(nearest) <= reach) value = nearest[across];
   }
-  const moved = (q: Point): Point => ({ ...q, [across]: at[across] });
-  const last = corners.length - 2;
-  const glue = item.kind === 'shape' ? item.element.connections : undefined;
-  // The point on the segment a short run from end `q`, toward `to`.
-  const stub = (q: Point, to: Point): Point => {
-    const len = Math.hypot(to.x - q.x, to.y - q.y);
-    const k = len > 0 ? Math.min(STUB, len / 2) / len : 0;
-    return { x: q.x + (to.x - q.x) * k, y: q.y + (to.y - q.y) * k };
-  };
-  // An end segment: the end, its run out of a glued site, then the moved segment.
-  const head = (end: Point, other: Point, glued: boolean): Point[] =>
-    glued ? [end, stub(end, other), moved(stub(end, other))] : [end, moved(end)];
-  const route = simplified([
-    ...corners.slice(0, index),
-    ...(index === 0 ? head(a, b, !!glue?.start) : [moved(a)]),
-    ...(index === last ? head(b, a, !!glue?.end).reverse() : [moved(b)]),
-    ...corners.slice(index + 2),
-  ]);
+  const route = segmentRoute(item, corners, index, value);
   // Back on its first route (a straight elbow back in line too): nothing to write.
   const same =
     route.length === corners.length &&
     route.every((q, i) => Math.abs(q.x - corners[i].x) < 1 && Math.abs(q.y - corners[i].y) < 1);
   if (same || route.length < 3) return 'same';
+  if (!drawable(route)) return null;
   const n = route.length - 1;
-  if (n > MOST_SEGMENTS) return null;
   const vertical = Math.abs(route[1].x - route[0].x) < 1;
   const fit = fitElbow(route, vertical);
   const connector: ConnectorRoute = { preset: `${family}${n}`, adjust: fit.adjust };

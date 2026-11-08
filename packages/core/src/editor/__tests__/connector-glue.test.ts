@@ -576,28 +576,53 @@ describe('elbow segment drags', () => {
     expect(back.items).toEqual([]);
   });
 
-  test('a segment whose drag needs a sixth segment shows no handle', async () => {
+  test('an end segment of five shows a handle when it can come in line with another', async () => {
     const { GlobalWindow } = await import('happy-dom');
     const win = new GlobalWindow();
-    // A bentConnector4 glued at both ends: an end segment drag adds two segments.
-    const four = connector({
+    // Corners (1,1) (2,1) (2,1.5) (4,1.5) (4,3) (5,3), in inches.
+    const five = connector({
       id: 4,
-      prst: 'bentConnector4',
-      x: 3 * IN,
-      y: 2 * IN,
-      cx: 3 * IN,
-      cy: IN,
-      st: [2, 3],
-      end: [3, 1],
-    });
-    const e = await open(deck(four));
+      prst: 'bentConnector5',
+      x: IN,
+      y: IN,
+      cx: 4 * IN,
+      cy: 2 * IN,
+    }).replace(
+      '<a:avLst/>',
+      '<a:avLst><a:gd name="adj1" fmla="val 25000"/><a:gd name="adj2" fmla="val 25000"/>' +
+        '<a:gd name="adj3" fmla="val 75000"/></a:avLst>'
+    );
+    const e = await open(deck(five));
     const item = named(e, 'C4');
     const doc = win.document as unknown as Document;
-    const nodes = handleElements(doc, [item], lineEnds(item), 9525, 'Move');
-    const shown = nodes
+    const shown = handleElements(doc, [item], lineEnds(item), 9525, 'Move')
       .filter((n) => n.getAttribute('class')?.includes('handle--adjust'))
       .map((n) => n.getAttribute('data-handle'));
-    expect(shown).toEqual(['segment1', 'segment2']);
+    expect(shown).toContain('segment0');
+    // A free place adds a sixth segment, so nothing changes; in line with the next run, it merges.
+    expect(dragSegment(e, 'C4', 0, { x: 1.5 * IN, y: 0.5 * IN }).items).toEqual([]);
+    dragSegment(e, 'C4', 0, { x: 1.5 * IN, y: 1.5 * IN });
+    expect(presetOf(e, 'C4')).toBe('bentConnector4');
+    await win.happyDOM.close();
+  });
+
+  test('a connector turned off the axes shows no segment handles', async () => {
+    const { GlobalWindow } = await import('happy-dom');
+    const win = new GlobalWindow();
+    const turned = connector({
+      id: 4,
+      prst: 'bentConnector3',
+      x: IN,
+      y: IN,
+      cx: 4 * IN,
+      cy: 2 * IN,
+    }).replace('<a:xfrm>', '<a:xfrm rot="2700000">');
+    const e = await open(deck(turned));
+    const item = named(e, 'C4');
+    expect(elbowCorners(item)).toBeNull();
+    const doc = win.document as unknown as Document;
+    const nodes = handleElements(doc, [item], lineEnds(item), 9525, 'Move');
+    expect(nodes.map((n) => n.getAttribute('data-handle'))).toEqual(['start', 'end']);
     await win.happyDOM.close();
   });
 
