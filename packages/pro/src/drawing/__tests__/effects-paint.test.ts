@@ -210,3 +210,28 @@ describe('effect filter regions', () => {
     expect(Number(f.getAttribute('x'))).toBeLessThanOrEqual(0);
   });
 });
+
+describe('glow paint', () => {
+  test('the glow is a copy under the content, and the text paints with no filter', () => {
+    const root = paint(
+      shape({
+        id: 2,
+        x: 1_000_000,
+        y: 1_000_000,
+        cx: 2_000_000,
+        cy: 1_000_000,
+        text: '<a:p><a:r><a:rPr lang="en-US" sz="1800"/><a:t>Glow</a:t></a:r></a:p>',
+        effects:
+          '<a:effectLst><a:glow rad="63500"><a:srgbClr val="FF0000"/></a:glow></a:effectLst>',
+      })
+    );
+    const copy = root.querySelector('[data-effect="glow"]')!;
+    expect(copy.firstElementChild?.tagName.toLowerCase()).toBe('use');
+    // The glow filter paints the glow alone: no merge with the source graphic.
+    expect(root.querySelector('feMerge')).toBeNull();
+    const text = root.querySelector('text');
+    expect(text).not.toBeNull();
+    for (let n: Element | null = text; n && n !== root; n = n.parentElement)
+      expect(n.hasAttribute('filter')).toBe(false);
+  });
+});

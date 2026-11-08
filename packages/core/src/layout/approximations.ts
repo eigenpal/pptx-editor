@@ -46,7 +46,7 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'gradient-tiles', title: 'Gradient tiles', perSlide: true },
   { id: 'rect-path-gradient', title: 'Rectangle path gradients', perSlide: true },
   { id: 'shape-path-gradient', title: 'Shape path gradients', perSlide: true },
-  { id: 'pattern-bitmaps', title: 'Pattern bitmaps', perSlide: true },
+  { id: 'pattern-bitmaps', title: 'Pattern tiles', perSlide: true },
   { id: 'path-fill-modes', title: 'Path fill modes', perSlide: true },
   { id: 'fill-rotation', title: 'Fill rotation', perSlide: true },
   { id: 'gradient-text', title: 'Gradient text', perSlide: true },
@@ -71,7 +71,7 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'tab-stops', title: 'Tab stops', perSlide: true },
   { id: 'anchoring', title: 'Anchoring and alignment variants', perSlide: true },
   { id: 'ea-vert', title: 'Upright East Asian text (`eaVert`)', perSlide: true },
-  { id: 'word-art-vert', title: 'Stacked text (`wordArtVert`)', perSlide: true },
+  { id: 'word-art-vert', title: 'Stacked text (`wordArtVert`, `wordArtVertRtl`)', perSlide: true },
   { id: 'other-vert', title: 'Other vertical text types', perSlide: true },
   { id: 'script-size', title: 'Superscript and subscript', perSlide: true },
   { id: 'aligned-bullets', title: 'Bullets on aligned lines', perSlide: true },
@@ -89,7 +89,14 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
 ] satisfies Approximation[]);
 
 const CONTENT_PLACEHOLDERS = new Set(['pic', 'tbl', 'chart', 'clipArt', 'dgm', 'media']);
-const ROTATED_TEXT = new Set(['vert', 'vert270', 'eaVert', 'wordArtVert', 'mongolianVert']);
+const ROTATED_TEXT = new Set([
+  'vert',
+  'vert270',
+  'eaVert',
+  'wordArtVert',
+  'wordArtVertRtl',
+  'mongolianVert',
+]);
 const DRAWN_UNDERLINES = new Set(['none', 'sng', 'dbl']);
 const RECOLOR_EFFECTS = new Set(['grayscale', 'duotone', 'biLevel']);
 
@@ -127,10 +134,14 @@ class Collector {
   /** The fill that `a:grpFill` paints in the items being visited (`output/paint.ts`). */
   private group: ResolvedFill | undefined;
 
-  fill(given: ResolvedFill | undefined, rotated: boolean): void {
+  /**
+   * `slideTiles` is true for the fill of a shape box that maps to the slide without a scale: its
+   * pattern tiles are measured on reference PDFs, also when the box turns or flips.
+   */
+  fill(given: ResolvedFill | undefined, rotated: boolean, slideTiles = false): void {
     const fill = given?.type === 'group' ? this.group : given;
     if (!fill) return;
-    if (fill.type === 'pattern') this.add('pattern-bitmaps');
+    if (fill.type === 'pattern' && !slideTiles) this.add('pattern-bitmaps');
     if (fill.type === 'path' && fill.path === 'rect') this.add('rect-path-gradient');
     if (fill.type === 'path' && fill.path === 'shape') this.add('shape-path-gradient');
     if (twoStops(fill)) this.add('gradient-colors');
@@ -184,8 +195,8 @@ class Collector {
     if (!body) return;
     const bp = body.body;
     if (bp.vert === 'eaVert') this.add('ea-vert');
-    if (bp.vert === 'wordArtVert') this.add('word-art-vert');
-    if (bp.vert === 'mongolianVert' || bp.vert === 'wordArtVertRtl') this.add('other-vert');
+    if (bp.vert === 'wordArtVert' || bp.vert === 'wordArtVertRtl') this.add('word-art-vert');
+    if (bp.vert === 'mongolianVert') this.add('other-vert');
     if (bp.anchorCtr || bp.anchor === 'just' || bp.anchor === 'dist') this.add('anchoring');
     if (bp.warp) this.add('text-warp');
 
@@ -267,7 +278,7 @@ class Collector {
       case 'picture': {
         const rotated = el.xfrm.rot % 360 !== 0;
         this.effects(item.element.effects, item.geometry.paths.length <= MAX_OVERLAY_PATHS);
-        this.fill(item.element.fill, rotated);
+        this.fill(item.element.fill, rotated, unscaled(item.matrix));
         this.line(item.element.line, item.kind === 'picture');
         for (const p of item.geometry.paths)
           if (p.fill !== 'norm' && p.fill !== 'none') this.add('path-fill-modes');
@@ -282,6 +293,12 @@ class Collector {
 }
 
 const flipped = (m: Matrix): boolean => m[0] * m[3] - m[1] * m[2] < 0;
+
+/** Whether a matrix keeps lengths: a turn, a flip, and a move only. */
+const unscaled = (m: Matrix): boolean =>
+  Math.abs(Math.hypot(m[0], m[1]) - 1) < 1e-6 &&
+  Math.abs(Math.hypot(m[2], m[3]) - 1) < 1e-6 &&
+  Math.abs(m[0] * m[2] + m[1] * m[3]) < 1e-6;
 
 /** The most paths of a shape that paint draws a fill overlay on (`output/paint.ts`, test-checked). */
 export const MAX_OVERLAY_PATHS = 64;

@@ -32,6 +32,7 @@
 //     before them fit (measured with none, one, and two at the end of a body placeholder).
 
 import { XFRM_BOUND, type ResolvedShape } from '../cascade/index.ts';
+import { frameInsets } from './text/anchor.ts';
 import { evaluateGeometry } from './geometry/geometry.ts';
 import { layoutText, layoutTextOn } from './text/text-layout.ts';
 import type { TextMeasurer } from './text/measurer.ts';
@@ -196,7 +197,8 @@ function acrossLines(
 ): { swapped: boolean; extent: number } {
   const laid = layoutText(text, rect, measurer);
   const swapped = Math.round(laid.rotation - text.body.rot) % 180 !== 0;
-  const { numCol, tIns, bIns } = text.body;
+  // The insets of the frame the text lays out in (`frameInsets`).
+  const { numCol, tIns, bIns } = frameInsets(text.body);
   if (numCol <= 1) return { swapped, extent: laid.contentHeight };
   // The line breaks do not depend on the extent (only on the other side of the box), so one
   // layout tall enough for every line in the first column gives the lines; the column flow
@@ -206,7 +208,13 @@ function acrossLines(
     swapped ? { ...rect, width: MAX_COORDINATE } : { ...rect, height: MAX_COORDINATE },
     measurer
   );
-  const lines = tall.lines.map((l) => ({ top: l.top - tIns, height: l.height }));
+  // `columnLines` mirrors the lines of `wordArtVert` and `mongolianVert`: read their tops in
+  // flow order.
+  const mirrored = text.body.vert === 'wordArtVert' || text.body.vert === 'mongolianVert';
+  const lines = tall.lines.map((l) => ({
+    top: (mirrored ? tall.box.height - l.top - l.height : l.top) - tIns,
+    height: l.height,
+  }));
   return { swapped, extent: columnFlowHeight(lines, numCol) + tIns + bIns };
 }
 

@@ -66,6 +66,11 @@ const C = {
   radGap: 0.178,
   radBottom: 0.087,
   radMinContent: 0.66,
+  // The room a radical claims on its line above its rule: the radical extra ascender of
+  // OpenType MATH, the value of STIX Two Math. On the reference PDF of `equations`, the lines of
+  // `√(x+1)`, `∛8 = 2`, and `a_(n+1) = √(a_n + 1)` come 0.29 pt nearer (0.66, 1.38, and 0.42 pt
+  // off, against 0.95, 1.67, and 0.71 pt with the rule's outline alone).
+  radExtraAscender: 0.078,
   delimMin: 0.927,
   delimFactor: 0.9,
   delimPad: 0.02,
@@ -113,6 +118,8 @@ export interface MathMark {
   /** The outline, EMU, x from the box origin and y up from the math baseline. Fill nonzero. */
   readonly commands: readonly PathCommand[];
   readonly props: RunProps;
+  /** The room, EMU, that the mark claims on its line above its outline (`mathLineExtent`). */
+  readonly claimAbove?: number;
 }
 
 /** A laid-out math zone. */
@@ -514,7 +521,11 @@ function radical(node: Extract<MathNode, { kind: 'rad' }>, env: Env): Box {
   const cx = signX + signW - 0.06 * em;
   place(out, content, cx, 0);
   const end = cx + content.w + 0.02 * em;
-  out.marks.push({ props, commands: rect(signX + signW, top - t, end - signX - signW, t) });
+  out.marks.push({
+    props,
+    commands: rect(signX + signW, top - t, end - signX - signW, t),
+    claimAbove: C.radExtraAscender * em,
+  });
   out.asc = Math.max(out.asc, top);
   out.desc = Math.max(out.desc, -bottom);
   out.w = end + 0.04 * em;

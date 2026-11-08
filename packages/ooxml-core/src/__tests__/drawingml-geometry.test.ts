@@ -257,12 +257,28 @@ describe('drawing commands before the first moveTo', () => {
     expect(g.paths.map((p) => p.commands.length)).toEqual([0, 0, 0]);
   });
 
-  test('a later moveTo starts the drawing', () => {
+  test('a later moveTo does not start the drawing', () => {
+    // The reference PDF of fixture `follow-ups` slide 1 shows no part of these paths.
     const g = custom(
       '',
       '<a:path w="100" h="100"><a:lnTo><a:pt x="100" y="0"/></a:lnTo>' +
         '<a:moveTo><a:pt x="0" y="100"/></a:moveTo><a:lnTo><a:pt x="100" y="100"/></a:lnTo>' +
-        '<a:close/></a:path>',
+        '<a:close/></a:path>' +
+        '<a:path w="100" h="100"><a:moveTo><a:pt x="0" y="0"/></a:moveTo>' +
+        '<a:lnTo><a:pt x="100" y="0"/></a:lnTo></a:path>',
+      100,
+      100
+    );
+    expect(g.paths[0].commands).toEqual([]);
+    // Each path follows the rule on its own.
+    expect(g.paths[1].commands.map((c) => c.op).join('')).toBe('ML');
+  });
+
+  test('a close before the first moveTo is ignored', () => {
+    const g = custom(
+      '',
+      '<a:path w="100" h="100"><a:close/><a:moveTo><a:pt x="0" y="100"/></a:moveTo>' +
+        '<a:lnTo><a:pt x="100" y="100"/></a:lnTo><a:close/></a:path>',
       100,
       100
     );

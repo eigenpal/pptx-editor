@@ -169,7 +169,9 @@ jobs:
           # deck). The shards run the rest of scripts/fidelity/. These run first and do not stop
           # the gate, so a red gate still has its report and these results.
           bun test scripts/fidelity/harness-page.test.ts || tests=$?
-          # The schema check runs also when the gate fails.
+          # Both lanes: the editor's print and exportPdf, each against the reference PDFs
+          # (fidelity-report/fixtures/ and fidelity-report/fixtures-export/). The schema check
+          # runs also when the gate fails.
           bun run fidelity || gate=$?
           bun run validate:xsd || xsd=$?
           exit "$(( ${tests:-0} || ${gate:-0} || ${xsd:-0} ))"

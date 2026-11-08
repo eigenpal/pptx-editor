@@ -14,7 +14,8 @@
 // - A structure claims the ink of its marks (rules, radical signs, delimiters, and braces), not
 //   its box, also a fraction of a display equation. The reference PDF of `equation-lines`, slide
 //   1, stacks two display fractions closer than their boxes: the ink of the second starts 1.25
-//   pt above the end of the ink of the first.
+//   pt above the end of the ink of the first. The rule of a radical also claims the radical
+//   extra ascender above it (`MathMark.claimAbove`, measured in `math-layout.ts`).
 // These are not measured, because no fixture holds them (the reference draws n-ary operators
 // with a math font that is not open), so they keep the ink rule:
 // - The operator of an inline n-ary structure claims its ink, not its whole box, and an inline
@@ -82,7 +83,7 @@ export function mathLineExtent(
   for (const m of marks)
     for (const c of m.commands)
       if (c.op !== 'Z') {
-        ascent = Math.max(ascent, c.y);
+        ascent = Math.max(ascent, c.y + (m.claimAbove ?? 0));
         descent = Math.max(descent, -c.y);
       }
   return { ascent, descent };

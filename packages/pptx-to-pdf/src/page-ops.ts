@@ -95,6 +95,8 @@ export interface PaintResources {
    * once, however many shapes use it.
    */
   readonly gradients: Map<string, StopFunctions>;
+  /** Tiling patterns by preset, colors, and page height, written once per document. */
+  readonly patterns: Map<string, PDFRef>;
 }
 
 /** Fill, clip, and path operators that `pdf-lib` has no helper for. */
@@ -114,14 +116,17 @@ export const shadingFill = (name: PDFName): PDFOperator =>
 const PLAIN_FORM_BYTES = 1024;
 
 /** The resource kinds a page names, and the prefix of each name. */
-const PREFIX = { Font: 'F', XObject: 'X', ExtGState: 'GS', Shading: 'Sh' } as const;
+const PREFIX = { Font: 'F', XObject: 'X', ExtGState: 'GS', Shading: 'Sh', Pattern: 'P' } as const;
 
 export class PageOps {
   #ops: PDFOperator[] = [];
   readonly #states = new Map<string, PDFName>();
   readonly #fontKeys = new Map<string, PDFName>();
+  /** This page's names of the document's tiling patterns (`PaintResources.patterns`). */
+  readonly patterns = new Map<string, PDFName>();
   #resourcesRef: PDFRef | undefined;
   #names = 0;
+  #forms = 0;
   #items = 0;
   constructor(
     readonly page: PDFPage,
@@ -148,16 +153,30 @@ export class PageOps {
     this.res.work.reserveContent(bytes);
   }
 
-  /** Run `draw` with its operators collected apart from the page, for a form XObject. */
+  /**
+   * Run `draw` with its operators collected apart from the page, for a form XObject. Every form
+   * here is in slide EMU (y down from the slide's top-left corner) and is drawn at the page's
+   * slide transform, so its space is slide EMU (`inForm`).
+   */
   async capture(draw: () => Promise<void>): Promise<PDFOperator[]> {
     const outer = this.#ops;
     this.#ops = [];
+    this.#forms += 1;
     try {
       await draw();
       return this.#ops;
     } finally {
+      this.#forms -= 1;
       this.#ops = outer;
     }
+  }
+
+  /**
+   * Whether the operators go into a form XObject, whose space is slide EMU, not the page's
+   * default space in points. A pattern maps to the space of the content that uses it.
+   */
+  get inForm(): boolean {
+    return this.#forms > 0;
   }
 
   /** The page's resource name for a face, added once per page. */

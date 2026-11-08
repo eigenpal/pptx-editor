@@ -16,10 +16,10 @@ const shape = (body: string, bodyPr = '<a:bodyPr/>'): string =>
   '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>' +
   `<p:txBody>${bodyPr}<a:lstStyle/>${body}</p:txBody></p:sp>`;
 
-function lay(body: string, bodyPr?: string): TextLayout {
+function lay(body: string, bodyPr?: string, measurer = createFixedMeasurer()): TextLayout {
   const r = readPptx(buildPptx({ slides: [{ shapes: shape(body, bodyPr), layout: 'blank' }] }));
   if (!r.ok) throw new Error('open failed');
-  const item = layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer()).items[0];
+  const item = layoutSlide(resolveSlide(r.pkg, 0)!, measurer).items[0];
   if (item.kind !== 'shape' || !item.text) throw new Error('no text');
   return item.text;
 }
@@ -152,6 +152,71 @@ describe('autonumber sequences (R6)', () => {
     const families = t.lines.map((l) => l.runs.find((x) => x.kind === 'bullet')?.face.family);
     expect(markers(t)).toEqual(['أ‌-', '一.', '1.']);
     expect(families).toEqual(['Noto Sans Arabic', 'Noto Sans CJK JP', 'Carlito']);
+  });
+});
+
+describe('the line metrics of several faces', () => {
+  // Noto Sans Arabic (typo 1374 and 738 of 1000) and Liberation Sans (win 1854 and 434 of 2048).
+  const fixed = createFixedMeasurer();
+  const measurer: TextMeasurer = {
+    ...fixed,
+    resolve: (req) => {
+      const f = fixed.resolve(req);
+      const [ascent, descent] = req.family === 'Arabic' ? [1.374, 0.738] : [0.905, 0.212];
+      return { ...f, metrics: { ...f.metrics, ascent, descent } };
+    },
+  };
+  const run = (t: string, lang: string): string =>
+    `<a:r><a:rPr lang="${lang}" sz="2000"><a:latin typeface="Latin"/><a:cs typeface="Arabic"/>` +
+    `</a:rPr><a:t>${t}</a:t></a:r>`;
+  const baseline = (runs: string): number => {
+    const t = lay(
+      `<a:p><a:pPr><a:lnSpc><a:spcPct val="90000"/></a:lnSpc></a:pPr>${runs}</a:p>`,
+      undefined,
+      measurer
+    );
+    return t.lines[0].baseline - t.lines[0].top;
+  };
+
+  test('Latin text in another run lowers an Arabic line to the union of the face shares', () => {
+    // rtl-text/2: the Arabic line with `PPTX` sits 15 pt below the text top, Arabic alone 14 pt.
+    const arabic = baseline(run('نص عربي.', 'ar-SA'));
+    const mixed = baseline(run('نص ', 'ar-SA') + run('PPTX', 'en-US') + run(' عربي.', 'ar-SA'));
+    expect(arabic / 12_700).toBeCloseTo(14, 6);
+    expect(mixed / 12_700).toBeCloseTo(15, 6);
+  });
+
+  test('Latin runs in other faces do not merge: the last run at the largest size decides', () => {
+    const latin = (t: string, face: string): string =>
+      `<a:r><a:rPr lang="en-US" sz="2000"><a:latin typeface="${face}"/></a:rPr><a:t>${t}</a:t></a:r>`;
+    const alone = baseline(latin('abc', 'Latin'));
+    expect(baseline(latin('abc ', 'Arabic') + latin('abc', 'Latin'))).toBe(alone);
+  });
+});
+
+describe('rotated frames', () => {
+  const insets = 'lIns="10000" tIns="20000" rIns="30000" bIns="40000"';
+  test('vert and vert270 keep each inset on its side of the shape', () => {
+    // text-direction/1: a `vert` line starts at the top inset, its text top at the right one.
+    const vert = lay(`<a:p>${r('abc')}</a:p>`, `<a:bodyPr vert="vert" ${insets}/>`);
+    expect(vert.lines[0].top).toBe(30_000);
+    expect(vert.lines[0].runs[0].x[0]).toBe(20_000);
+    const up = lay(`<a:p>${r('abc')}</a:p>`, `<a:bodyPr vert="vert270" ${insets}/>`);
+    expect(up.lines[0].top).toBe(10_000);
+    expect(up.lines[0].runs[0].x[0]).toBe(40_000);
+  });
+
+  test('stacked columns start at the left for wordArtVert and at the right for the Rtl type', () => {
+    const cell = 1.425 * 18 * 12_700;
+    const ltr = lay(`<a:p>${r('ab')}</a:p>`, `<a:bodyPr vert="wordArtVert" ${insets}/>`);
+    const rtl = lay(`<a:p>${r('ab')}</a:p>`, `<a:bodyPr vert="wordArtVertRtl" ${insets}/>`);
+    expect(ltr.upright).toBe('all');
+    expect(rtl.upright).toBe('all');
+    const [a, b] = ltr.lines[0].runs[0].x;
+    expect(b - a).toBeCloseTo(cell, 6);
+    // The frame turns clockwise: its top is the right edge of the shape (box width 6000000).
+    expect(ltr.lines[0].baseline).toBeCloseTo(6_000_000 - 10_000 - cell / 2, 6);
+    expect(rtl.lines[0].baseline).toBeCloseTo(30_000 + cell / 2, 6);
   });
 });
 

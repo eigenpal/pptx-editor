@@ -3,7 +3,9 @@
 // `pptx-eval`: `bun packages/pptx-to-pdf/scripts/evaluation/thresholds-json.ts --write`.
 //
 // Comparison A is our PDF against the reference PDF: the editor prints each slide with its own
-// paint, and pdf.js draws and reads both PDFs the same way (`pdf.ts`).
+// paint, and pdf.js draws and reads both PDFs the same way (`pdf.ts`). The export lane of
+// `bun run fidelity` scores the PDF of `exportPdf` (comparison B) against the same reference PDFs
+// with the same code and these same thresholds (`FIXTURE_EXPORT_KNOWN_GAPS`).
 
 export const THRESHOLDS = {
   /** Raster width of both pages (height follows the slide's aspect ratio). */
@@ -38,7 +40,10 @@ export const THRESHOLDS = {
  * where the metric is the same. The screening values only flag a page for review; they are DOCX
  * Editor's (`packages/docx-to-pdf/scripts/evaluation/worker.py`). `worker.py` and `pptx-eval` read
  * these values from `packages/pptx-to-pdf/scripts/evaluation/thresholds.json`, generated from this
- * file. DOCX Editor commit adf0e178.
+ * file. DOCX Editor commit adf0e178. In this repository, the export lane of `bun run fidelity`
+ * gates the fixtures on comparison B with the checks of comparison A (`THRESHOLDS`): pixels, every
+ * reference line, no extra lines, baseline, and line position. The word metrics below are for
+ * `worker.py` and `pptx-eval`, which measure words with PyMuPDF.
  */
 export const COMPARISON_B = {
   /** Raster width for the pixel metric, as comparison A. */
@@ -47,11 +52,14 @@ export const COMPARISON_B = {
   pixelThreshold: THRESHOLDS.pixelThreshold,
   /** Pixel mismatch per slide, as a fraction of all pixels, as comparison A. */
   maxPixelMismatch: THRESHOLDS.maxPixelMismatch,
-  /** Every reference word must be matched (percent). A report only in CI until CI has PyMuPDF. */
+  /**
+   * Every reference word must be matched (percent), in `worker.py`. The export lane gates the
+   * same text through lines instead (`THRESHOLDS.minLineBreakMatch`, `maxExtraLines`).
+   */
   minWordMatchPercent: 100,
   /**
-   * Each matched word may move this far from its reference position (points). A report only in
-   * CI until CI has PyMuPDF.
+   * Each matched word may move this far from its reference position (points), in `worker.py`.
+   * The export lane gates lines instead (`THRESHOLDS.maxBaselineDeltaPt`, `maxLineShiftPt`).
    */
   maxWordDisplacementPt: 0.5,
   /** Page sides may differ by this many points before the page size is a finding. */
@@ -222,11 +230,109 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'fill-fidelity/3': ['pixels'],
     'fill-fidelity/4': ['pixels'],
     'fill-fidelity/6': ['pixels'],
+    'fills-lines/1': ['extra-text'],
+    'picture-editing/1': ['pixels'],
+    'picture-editing/2': ['pixels'],
+    'pictures/1': ['pixels'],
+    'preserved-content/1': ['pixels'],
+    'rtl-text/2': ['line-position'],
+    'text-direction/1': ['pixels'],
+    'three-d-effects/1': ['pixels'],
+    'three-d-effects/2': ['pixels'],
+    'three-d-effects/3': ['pixels'],
+    'three-d-effects/4': ['pixels'],
+    'three-d-turned-effects/1': ['pixels'],
+  },
+};
+
+/**
+ * Known gaps of the export lane, a ratchet with the rules of `FIXTURE_KNOWN_GAPS`: the fixture
+ * slides whose `exportPdf` PDF fails today, with each check they fail. `bun run fidelity
+ * --update-gaps` rewrites this list from a run of the export lane.
+ */
+export const FIXTURE_EXPORT_KNOWN_GAPS: KnownGapList = {
+  pdfjs: '6.4.299',
+  chromium: 'chromium-headless-shell 1248',
+  fonts:
+    '@docx-editor.dev/fonts 2.34.0, @docx-editor.dev/fonts-cjk 2.34.0, fixtures/fonts f68672445aef',
+  deckLines: {
+    'alignment-anchor': 19,
+    'arrange-flip-hidden': 3,
+    autofit: 9,
+    'bullets-gallery': 17,
+    'bullets-numbering': 21,
+    'chart-data': 20,
+    'chart-sizes': 161,
+    charts: 118,
+    colors: 0,
+    'custom-geometry': 0,
+    'diagram-editing': 9,
+    diagrams: 20,
+    'east-asian-line-breaking': 136,
+    'east-asian-theme-fonts': 16,
+    'east-asian-typography': 91,
+    effects: 4,
+    'equation-lines': 20,
+    equations: 28,
+    'fill-fidelity': 0,
+    'fills-lines': 0,
+    'follow-ups': 0,
+    'font-effects': 11,
+    gradients: 0,
+    'groups-transforms': 4,
+    'header-footer': 3,
+    hyperlinks: 13,
+    'line-ends-dashes': 0,
+    'line-model': 65,
+    'lines-arrows': 0,
+    'open-font-families': 8,
+    'paragraph-format': 27,
+    'picture-bullets': 24,
+    'picture-editing': 0,
+    pictures: 0,
+    'placeholders-background': 3,
+    'preserve-unsupported': 5,
+    'preserved-content': 3,
+    'preset-shapes': 0,
+    'rtl-text': 4,
+    'shape-effects-presets': 24,
+    'shape-styles': 24,
+    'slide-layouts': 10,
+    'slide-size': 0,
+    'slide-size-rounding': 0,
+    'slide-structure': 7,
+    spacing: 18,
+    'svg-tab-stops': 13,
+    'table-editing': 14,
+    tables: 46,
+    'text-direction': 47,
+    'text-runs': 11,
+    'text-warp': 0,
+    'three-d-effects': 0,
+    'three-d-turned-effects': 0,
+    'vertical-columns': 12,
+    'vertical-east-asian': 0,
+  },
+  slides: {
+    'chart-sizes/11': ['line-breaks'],
+    'chart-sizes/12': ['line-breaks'],
+    'chart-sizes/3': ['line-breaks'],
+    'chart-sizes/7': ['baseline', 'line-position'],
+    'chart-sizes/8': ['baseline'],
+    'charts/6': ['baseline', 'line-position'],
+    'effects/1': ['pixels'],
+    'equation-lines/1': ['baseline'],
+    'equation-lines/2': ['line-breaks', 'baseline', 'line-position', 'extra-text'],
+    'equations/1': ['line-breaks', 'baseline', 'line-position', 'extra-text'],
+    'equations/2': ['baseline', 'line-position'],
+    'equations/3': ['baseline', 'line-position'],
+    'equations/4': ['line-breaks', 'baseline', 'line-position', 'extra-text'],
+    'fill-fidelity/2': ['pixels'],
+    'fill-fidelity/3': ['pixels'],
+    'fill-fidelity/6': ['pixels'],
     'fills-lines/1': ['pixels', 'extra-text'],
     'fills-lines/2': ['pixels'],
-    'follow-ups/1': ['pixels'],
-    'follow-ups/2': ['pixels'],
-    'follow-ups/3': ['pixels'],
+    'font-effects/1': ['line-breaks', 'extra-text'],
     'picture-editing/1': ['pixels'],
     'picture-editing/2': ['pixels'],
     'pictures/1': ['pixels'],
@@ -235,14 +341,15 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'rtl-text/2': ['pixels', 'line-position'],
     'rtl-text/3': ['pixels'],
     'rtl-text/4': ['pixels'],
-    'shape-effects-presets/2': ['line-breaks'],
-    'shape-effects-presets/3': ['line-breaks'],
-    'text-direction/1': ['pixels', 'extra-text'],
-    'text-warp/3': ['pixels'],
+    'shape-effects-presets/2': ['pixels'],
+    'svg-tab-stops/1': ['pixels'],
+    'text-direction/1': ['pixels'],
+    'text-runs/1': ['line-breaks', 'extra-text'],
     'three-d-effects/1': ['pixels'],
     'three-d-effects/2': ['pixels'],
     'three-d-effects/3': ['pixels'],
     'three-d-effects/4': ['pixels'],
+    'three-d-effects/6': ['pixels'],
     'three-d-turned-effects/1': ['pixels'],
     'vertical-east-asian/1': ['pixels'],
   },

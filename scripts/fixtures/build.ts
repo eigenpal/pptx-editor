@@ -9,7 +9,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 import { buildPptx, cell, para, run, shape, solid, table, type FixtureSlide } from './builder.ts';
 import { slideLayoutsDeck } from './slide-layouts.ts';
-import { fillFidelityDeck } from './fill-fidelity.ts';
+import { fillFidelityDeck, TILE_FIXTURE_DPI, withResolution } from './fill-fidelity.ts';
 import { slideStructureDeck } from './slide-structure.ts';
 import { shapeFormatFixtures } from './shape-format.ts';
 import { eastAsianThemeFontsDeck, eastAsianTypographyDeck, textScriptFixtures } from './text-scripts.ts';
@@ -839,7 +839,9 @@ mkdirSync(OUT, { recursive: true });
 const image = testPng();
 for (const [name, slides] of Object.entries(fixtures)) {
   // Media only where a slide references it: an orphan part is not worth a repair prompt.
-  const media = name === 'pictures' || name === 'picture-editing' || name === 'fills-lines' ? [{ name: 'image1.png', bytes: image, contentType: 'image/png' }] : [];
+  // The tiled picture of `fills-lines` states its resolution (`TILE_FIXTURE_DPI`).
+  const bytes1 = name === 'fills-lines' ? withResolution(image, TILE_FIXTURE_DPI) : image;
+  const media = name === 'pictures' || name === 'picture-editing' || name === 'fills-lines' ? [{ name: 'image1.png', bytes: bytes1, contentType: 'image/png' }] : [];
   const tableStyles = tableStylesFor[name];
   const effectStyles = name === 'three-d-turned-effects' ? THREE_D_EFFECT_STYLES : undefined;
   const bytes = buildPptx({

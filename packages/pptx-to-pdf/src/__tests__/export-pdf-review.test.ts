@@ -118,9 +118,9 @@ const pictureDeck = (bytes: Uint8Array, srcRect = '', blipChildren = '', ln = ''
     media: [{ name: 'img.png', bytes, contentType: 'image/png' }],
   });
 
-/** A fill this writer does not draw yet. */
-const pattern =
-  '<a:pattFill prst="pct50"><a:fgClr><a:srgbClr val="FF0000"/></a:fgClr><a:bgClr><a:srgbClr val="FFFFFF"/></a:bgClr></a:pattFill>';
+/** A pattern line, which this writer does not draw yet. */
+const patternLine =
+  '<a:ln w="12700"><a:pattFill prst="pct50"><a:fgClr><a:srgbClr val="FF0000"/></a:fgClr><a:bgClr><a:srgbClr val="FFFFFF"/></a:bgClr></a:pattFill></a:ln>';
 
 describe('cancellation and limits', () => {
   test('an engine failure inside the work is PdfEncodingError, never a bare TypeError', async () => {
@@ -375,7 +375,7 @@ describe('diagnostics placement', () => {
         { ...textSlide('Hidden'), hidden: true },
         {
           layout: 'blank',
-          shapes: shape({ id: 2, x: IN, y: IN, cx: IN, cy: IN, fill: pattern }),
+          shapes: shape({ id: 2, x: IN, y: IN, cx: IN, cy: IN, line: patternLine }),
         },
       ],
     });

@@ -184,6 +184,7 @@ async function renderSession(
     fonts: new Map(),
     images: new Map(),
     gradients: new Map(),
+    patterns: new Map(),
   };
   for (const [pageIndex, { index, layout }] of layouts.entries()) {
     step();

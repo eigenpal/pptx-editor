@@ -9,6 +9,7 @@ describe('the harness command line', () => {
       decks: [],
       updateGaps: false,
       acceptWorse: false,
+      lanes: ['editor', 'export'],
     });
     expect(parseRunArgs(['tables', 'colors', '--update-gaps'])).toEqual({
       mode: 'set',
@@ -16,6 +17,7 @@ describe('the harness command line', () => {
       decks: ['tables', 'colors'],
       updateGaps: true,
       acceptWorse: false,
+      lanes: ['editor', 'export'],
     });
     expect(parseRunArgs(['tables', '--update-gaps', '--accept-worse'])).toMatchObject({
       updateGaps: true,
@@ -27,7 +29,13 @@ describe('the harness command line', () => {
     expect(parseRunArgs(['--set', 'corpus', 'deck2'])).toMatchObject({
       set: 'corpus',
       decks: ['deck2'],
+      lanes: ['editor'],
     });
+    expect(parseRunArgs(['--lane', 'export'])).toMatchObject({ lanes: ['export'] });
+    expect(() => parseRunArgs(['--lane', 'print'])).toThrow('--lane must be editor or export');
+    expect(() => parseRunArgs(['--list', 'j', '--out', 'o', '--lane', 'export'])).toThrow(
+      '--lane does not go with --list'
+    );
     expect(parseRunArgs(['-h'])).toEqual({ mode: 'help' });
   });
 
