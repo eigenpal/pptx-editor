@@ -46,7 +46,7 @@ export const APPROXIMATIONS: readonly Approximation[] = Object.freeze([
   { id: 'gradient-tiles', title: 'Gradient tiles', perSlide: true },
   { id: 'rect-path-gradient', title: 'Rectangle path gradients', perSlide: true },
   { id: 'shape-path-gradient', title: 'Shape path gradients', perSlide: true },
-  { id: 'pattern-bitmaps', title: 'Pattern bitmaps', perSlide: true },
+  { id: 'pattern-bitmaps', title: 'Pattern tiles', perSlide: true },
   { id: 'path-fill-modes', title: 'Path fill modes', perSlide: true },
   { id: 'fill-rotation', title: 'Fill rotation', perSlide: true },
   { id: 'gradient-text', title: 'Gradient text', perSlide: true },
@@ -127,10 +127,14 @@ class Collector {
   /** The fill that `a:grpFill` paints in the items being visited (`output/paint.ts`). */
   private group: ResolvedFill | undefined;
 
-  fill(given: ResolvedFill | undefined, rotated: boolean): void {
+  /**
+   * `slideTiles` is true for the fill of a shape box that maps to the slide without a scale: its
+   * pattern tiles are measured on reference PDFs, also when the box turns or flips.
+   */
+  fill(given: ResolvedFill | undefined, rotated: boolean, slideTiles = false): void {
     const fill = given?.type === 'group' ? this.group : given;
     if (!fill) return;
-    if (fill.type === 'pattern') this.add('pattern-bitmaps');
+    if (fill.type === 'pattern' && !slideTiles) this.add('pattern-bitmaps');
     if (fill.type === 'path' && fill.path === 'rect') this.add('rect-path-gradient');
     if (fill.type === 'path' && fill.path === 'shape') this.add('shape-path-gradient');
     if (twoStops(fill)) this.add('gradient-colors');
@@ -267,7 +271,7 @@ class Collector {
       case 'picture': {
         const rotated = el.xfrm.rot % 360 !== 0;
         this.effects(item.element.effects, item.geometry.paths.length <= MAX_OVERLAY_PATHS);
-        this.fill(item.element.fill, rotated);
+        this.fill(item.element.fill, rotated, unscaled(item.matrix));
         this.line(item.element.line, item.kind === 'picture');
         for (const p of item.geometry.paths)
           if (p.fill !== 'norm' && p.fill !== 'none') this.add('path-fill-modes');
@@ -282,6 +286,12 @@ class Collector {
 }
 
 const flipped = (m: Matrix): boolean => m[0] * m[3] - m[1] * m[2] < 0;
+
+/** Whether a matrix keeps lengths: a turn, a flip, and a move only. */
+const unscaled = (m: Matrix): boolean =>
+  Math.abs(Math.hypot(m[0], m[1]) - 1) < 1e-6 &&
+  Math.abs(Math.hypot(m[2], m[3]) - 1) < 1e-6 &&
+  Math.abs(m[0] * m[2] + m[1] * m[3]) < 1e-6;
 
 /** The most paths of a shape that paint draws a fill overlay on (`output/paint.ts`, test-checked). */
 export const MAX_OVERLAY_PATHS = 64;

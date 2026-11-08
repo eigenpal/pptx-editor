@@ -434,7 +434,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'The fill menu sets a preset pattern with two colors (`setShapePattern`), or a stretched picture (`setShapePicture`, which can also tile). Picture crop, offset, scale, and transparency of a fill are not editable. Tiles use the image resolution, or 72 DPI when it states none, and keep their recolor; the 72 DPI rule is measured on PNG only, and the tile size of a PNG that states no resolution is approximate. Pattern tiles are 8 × 8 pt on the slide grid; 12 of the 54 preset bitmaps are measured, and the others are approximate.',
+      'The fill menu sets a preset pattern with two colors (`setShapePattern`), or a stretched picture (`setShapePicture`, which can also tile). Picture crop, offset, scale, and transparency of a fill are not editable. Tiles use the image resolution, or 72 DPI when it states none, and keep their recolor; the 72 DPI rule is measured on PNG only, and the tile size of a PNG that states no resolution is approximate. Pattern tiles are 8 × 8 pt on the slide grid and stay square to the slide when the shape turns or flips; all 54 preset bitmaps are measured. Tiles in scaled groups, text, lines, table cells, and backgrounds are approximate.',
     docsLink: '/docs/recipes/pattern-picture-fills',
   },
   {
@@ -446,7 +446,7 @@ export const pptxFeatures: PptxFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Dashes and line ends draw at measured sizes. Shape and picture outlines and table borders draw solid when their estimated dash count exceeds 100,000. Save preserves the original pattern. Compound line bands are not measured.',
+      'Dashes and line ends draw at measured sizes. Shape and picture outlines and table borders draw solid when their estimated dash count exceeds 100,000. Save preserves the original pattern. Compound line bands are measured on closed paths and straight lines; curved open paths, counterclockwise paths, and dashes on curves are approximate.',
   },
   {
     id: 'fills-lines.theme-colors',

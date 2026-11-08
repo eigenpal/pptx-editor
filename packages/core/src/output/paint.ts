@@ -39,6 +39,7 @@ import {
   pictureImage,
   pictureRect,
   pictureUrl,
+  slideSpaceFill,
   strokeAttrs,
   type ImageSizePort,
   type FillContext,
@@ -367,16 +368,14 @@ function outsideOutline(
 }
 
 /**
- * The context with the slide position of a shape's box, for pattern tiles on the slide's grid.
- * Only a box that maps to the slide by a translation gets one: the tile grid of a rotated,
- * flipped, or scaled box is not measured, so its tiles start at the box's corner.
+ * The context with the matrix of a shape's box to the slide, for pattern tiles that sit on the
+ * slide's grid, square to the slide.
  */
-function withFillOrigin(
+function withFillMatrix(
   item: Extract<LayoutItem, { kind: 'shape' } | { kind: 'picture' }>,
   ctx: PaintContext
 ): FillContext {
-  const [a, b, c, d, e, f] = item.matrix;
-  return a === 1 && b === 0 && c === 0 && d === 1 ? { ...ctx, fillOrigin: { x: e, y: f } } : ctx;
+  return { ...ctx, fillMatrix: item.matrix };
 }
 
 /** The fill of the placeholder that a picture the paint cannot draw shows. */
@@ -388,13 +387,31 @@ function paintGeometry(
   shapeCtx: PaintContext,
   groupScale: number
 ): SVGElement[] {
-  const ctx = withFillOrigin(item, shapeCtx);
+  const ctx = withFillMatrix(item, shapeCtx);
   const el = item.element;
   const { cx: w, cy: h } = el.xfrm;
   const out: SVGElement[] = [];
   const line = item.paintLine ?? el.line;
   const stroke = line ? strokeAttrs(line, w, h, ctx, groupScale) : { stroke: 'none' };
   const paintFor = shapePaints(item, ctx);
+  // A pattern fill of a turned, flipped, or scaled box draws in slide space (`slideSpaceFill`).
+  const shown = el.fill.type === 'group' ? ctx.groupFill : el.fill;
+  const slideFill =
+    item.kind === 'shape' && shown?.type === 'pattern' ? slideSpaceFill(item.matrix) : undefined;
+  const fillPaintFor = slideFill ? shapePaints(item, shapeCtx) : paintFor;
+  const fillElement = (
+    path: GeometryPath,
+    d: string,
+    attrs: Record<string, string | undefined>
+  ): SVGElement =>
+    slideFill
+      ? svg(doc, 'g', { transform: slideFill.transform }, [
+          svg(doc, 'path', {
+            d: pathData({ ...path, commands: mapCommands(path.commands, slideFill.matrix) }),
+            ...attrs,
+          }),
+        ])
+      : svg(doc, 'path', { d, ...attrs });
   const effects = item.geometry.paths.length <= MAX_OVERLAY_PATHS ? el.effects : undefined;
   if (item.kind === 'picture') {
     const fill = item.element.fill;
@@ -452,14 +469,13 @@ function paintGeometry(
         ? { paint: 'none', opacity: 1 }
         : lostPicture
           ? { paint: PICTURE_PLACEHOLDER, opacity: 1 }
-          : paintFor(el.fill, d, path.fill);
+          : fillPaintFor(el.fill, d, path.fill);
     const overlay = fill.paint === 'none' ? null : overlayPath(doc, d, effects, paintFor);
     if (overlay) {
       // The overlay blends with this fill only (design D5 of `fill-fidelity`); the outline draws on top.
       out.push(
         isolated(doc, [
-          svg(doc, 'path', {
-            d,
+          fillElement(path, d, {
             fill: fill.paint,
             'fill-opacity': fill.opacity < 1 ? num(fill.opacity) : undefined,
             'fill-rule': 'evenodd',
@@ -470,24 +486,33 @@ function paintGeometry(
     }
     const compound =
       path.stroke && line && stroke.stroke !== 'none'
-        ? compoundStroke(ctx.defs, strokeD, line.compound, stroke, w, h)
+        ? compoundStroke(
+            ctx.defs,
+            strokeD,
+            line.compound,
+            stroke,
+            w,
+            h,
+            plan?.commands ?? path.commands
+          )
         : null;
     const own = overlay ? { paint: 'none', opacity: 1 } : fill;
     const filled = own.paint !== 'none';
-    if (compound || (strokeD !== d && filled)) {
-      // The fill and the stroke draw apart: the bands of a compound line, or a stroke that
-      // stops short under a line end. Line ends stay on the center line.
+    if (compound || (strokeD !== d && filled) || (slideFill && filled)) {
+      // The fill and the stroke draw apart: the bands of a compound line, a stroke that stops
+      // short under a line end, or a fill in slide space. Line ends stay on the center line.
       if (filled)
         out.push(
-          svg(doc, 'path', {
-            d,
+          fillElement(path, d, {
             fill: own.paint,
             'fill-opacity': own.opacity < 1 ? num(own.opacity) : undefined,
             'fill-rule': 'evenodd',
             stroke: 'none',
           })
         );
-      out.push(compound ?? svg(doc, 'path', { d: strokeD, fill: 'none', ...stroke }), ...extras);
+      if (compound) out.push(compound);
+      else if (path.stroke) out.push(svg(doc, 'path', { d: strokeD, fill: 'none', ...stroke }));
+      out.push(...extras);
       continue;
     }
     out.push(
@@ -502,6 +527,30 @@ function paintGeometry(
     );
   }
   return out;
+}
+
+/** Path commands mapped through a matrix. */
+function mapCommands(commands: readonly PathCommand[], m: Matrix): PathCommand[] {
+  return commands.map((c): PathCommand => {
+    switch (c.op) {
+      case 'Z':
+        return c;
+      case 'M':
+      case 'L': {
+        const p = applyMatrix(m, c.x, c.y);
+        return { op: c.op, x: p.x, y: p.y };
+      }
+      case 'Q': {
+        const [p1, p] = [applyMatrix(m, c.x1, c.y1), applyMatrix(m, c.x, c.y)];
+        return { op: 'Q', x1: p1.x, y1: p1.y, x: p.x, y: p.y };
+      }
+      case 'C': {
+        const [p1, p2] = [applyMatrix(m, c.x1, c.y1), applyMatrix(m, c.x2, c.y2)];
+        const p = applyMatrix(m, c.x, c.y);
+        return { op: 'C', x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, x: p.x, y: p.y };
+      }
+    }
+  });
 }
 
 /** SVG path data for path commands. */
