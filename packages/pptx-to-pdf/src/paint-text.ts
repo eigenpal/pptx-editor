@@ -34,6 +34,7 @@ import {
 import type { ResolvedFill } from '@pptx-editor.dev/core/cascade';
 import {
   hasCharacters,
+  runGlyphs,
   strikeoutBars,
   type GlyphRun,
   type PathCommand,
@@ -153,12 +154,8 @@ export async function drawText(layout: TextLayout, p: PageOps, scope: FillScope)
         p.push(setFillingRgbColor(...rgb(runColor)));
       } else p.push(setTextRenderingMode(TextRenderingMode.Clip));
       let shown = 0;
-      for (let i = 0; i < run.text.length; i += 1) {
-        const code = run.text.charCodeAt(i);
-        const pair = code >= 0xd800 && code <= 0xdbff && i + 1 < run.text.length;
-        const ch = run.text.slice(i, pair ? i + 2 : i + 1);
-        const x = run.x[i];
-        if (pair) i += 1;
+      // Each character in its cell; a right-to-left run reads right to left (`runGlyphs`).
+      for (const { char: ch, x } of runGlyphs(run)) {
         // The glyph the face's cmap gives, as the editor's SVG text draws it (no ligatures).
         const glyph = font.font.glyphForCodePoint(ch.codePointAt(0) ?? 0)?.id ?? 0;
         if (glyph <= 0) {
@@ -473,12 +470,8 @@ export function fillTextOutlines(
       if (!face) continue;
       const k = (run.sizePt * EMU_PER_PT) / face.font.unitsPerEm;
       const y = line.baseline - run.rise;
-      for (let i = 0; i < run.text.length; i += 1) {
-        const code = run.text.charCodeAt(i);
-        const pair = code >= 0xd800 && code <= 0xdbff && i + 1 < run.text.length;
-        const cp = run.text.codePointAt(i) ?? 0;
-        const x = run.x[i];
-        if (pair) i += 1;
+      for (const { char, x } of runGlyphs(run)) {
+        const cp = char.codePointAt(0) ?? 0;
         const glyph = face.font.glyphForCodePoint(cp);
         if (!glyph || glyph.id <= 0) continue;
         // Font units, y up → EMU, y down, at the glyph's origin.

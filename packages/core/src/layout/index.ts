@@ -41,3 +41,4 @@ export * from './font-composition.ts';
 export * from './font-resolver.ts';
 export { deferFonts } from './defer-fonts.ts';
 export type { WarpedRun } from './text/text-warp.ts';
+export { runGlyphs, type RunGlyph } from './text/bidi-line.ts';

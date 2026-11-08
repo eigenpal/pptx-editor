@@ -4,6 +4,7 @@ import { readPptx } from '../../../store/index.ts';
 import { resolveSlide } from '../../../cascade/index.ts';
 import { createFixedMeasurer, layoutSlide, type Line, type TextLayout } from '../../index.ts';
 import { paragraphBidi, visualOrderOfLevels } from '../rtl-paragraph.ts';
+import { runGlyphs } from '../bidi-line.ts';
 import { leadingOffset, paragraphAlignment } from '../paragraph-alignment.ts';
 
 // The shape is 6,000,000 EMU wide with the default insets (91,440 EMU on each side).
@@ -246,5 +247,34 @@ describe('caret positions', () => {
   test('an empty right-to-left paragraph puts the caret at the right', () => {
     const line = lay(para('<a:endParaRPr lang="ar-SA" sz="1800"/>')).lines[0];
     expect(line.caretX[0]).toBeCloseTo(BOX_RIGHT, 3);
+  });
+});
+
+describe('glyph positions for readers that place each glyph', () => {
+  test('a right-to-left run puts unit i in cell n - 1 - i and mirrors brackets', () => {
+    const glyphs = runGlyphs({ text: 'a(b', x: [0, 10, 20, 30], rtl: true });
+    expect(glyphs.map((g) => [g.char, g.x])).toEqual([
+      ['a', 20],
+      [')', 10],
+      ['b', 0],
+    ]);
+  });
+
+  test('a surrogate pair is one character in its two cells', () => {
+    const adlam = '\u{1e900}';
+    const glyphs = runGlyphs({ text: `${adlam}a`, x: [0, 10, 10, 20], rtl: true });
+    expect(glyphs.map((g) => [g.char, g.x])).toEqual([
+      [adlam, 10],
+      ['a', 0],
+    ]);
+  });
+
+  test('a left-to-right run keeps its characters and positions', () => {
+    const glyphs = runGlyphs({ text: 'a(b', x: [0, 10, 20, 30] });
+    expect(glyphs.map((g) => [g.char, g.x])).toEqual([
+      ['a', 0],
+      ['(', 10],
+      ['b', 20],
+    ]);
   });
 });

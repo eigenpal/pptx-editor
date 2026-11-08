@@ -23,6 +23,7 @@
 // glyphs. A picture bullet does not bend: it turns and stretches with the warp at its corners.
 // The cutting spends one output budget, so a font with huge glyphs draws the text flat early.
 
+import { runGlyphs } from './bidi-line.ts';
 import type { PathCommand } from '@eigenpal/ooxml-core';
 import { evaluatePresetTextWarp } from '@eigenpal/ooxml-core';
 import type { ResolvedTextBody, TextWarp } from '../../cascade/index.ts';
@@ -277,8 +278,9 @@ function runBars(
   const size = run.sizePt * EMU_PER_PT;
   let end = run.text.length;
   while (end > 0 && run.text[end - 1] === ' ') end -= 1;
-  const x0 = run.x[0]!;
-  const x1 = run.x[end] ?? run.x[run.x.length - 1]!;
+  // A right-to-left run ends at its left: its trailing spaces are its leftmost cells.
+  const x0 = run.rtl ? run.x[run.text.length - end]! : run.x[0]!;
+  const x1 = run.rtl ? run.x[run.x.length - 1]! : (run.x[end] ?? run.x[run.x.length - 1]!);
   const strike: Polyline[] = [];
   const under: Polyline[] = [];
   const highlight: Polyline[] = [];
@@ -365,10 +367,10 @@ export function warpTextLayout(
       if (size <= 0) continue;
       const step = 0.03;
       const glyphs: Polyline[] = [];
-      for (let i = 0; i < run.text.length; i += 1) {
-        const cp = run.text.codePointAt(i) ?? 0;
-        const x = run.x[i]!;
-        if (cp > 0xffff) i += 1;
+      // A right-to-left run places each character in its own cell (`runGlyphs`).
+      for (const glyph of runGlyphs(run)) {
+        const cp = glyph.char.codePointAt(0) ?? 0;
+        const x = glyph.x;
         const outline = measurer.glyphOutline(run.face, cp);
         if (!outline) continue;
         for (const ring of glyphRings(outline, x, line.baseline - run.rise, size, step, budget))

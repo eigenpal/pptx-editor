@@ -773,6 +773,16 @@ export interface ResolvedFace {
 export function roundToWholePoint(emu: number): number;
 
 // @public
+export interface RunGlyph {
+    readonly char: string;
+    readonly index: number;
+    readonly x: number;
+}
+
+// @public
+export function runGlyphs(run: BidiRun): RunGlyph[];
+
+// @public
 export const SCRIPT_SIZE_SCALE: number;
 
 // @public

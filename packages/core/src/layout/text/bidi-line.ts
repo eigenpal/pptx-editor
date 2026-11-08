@@ -165,3 +165,38 @@ export function wholeMarker<T extends BidiRun>(placed: T, rtl: boolean): T {
   const runs = markerRuns(placed);
   return runs.length === 1 ? runs[0] : placed;
 }
+
+/** One character of a glyph run, at its place on the line. */
+export interface RunGlyph {
+  /** UTF-16 offset of the character in the run's text. */
+  readonly index: number;
+  /** The character to draw: in a right-to-left run, the mirror of a paired bracket. */
+  readonly char: string;
+  /** The left edge of its cell, EMU from the text box left. */
+  readonly x: number;
+}
+
+/**
+ * The characters of a glyph run in source order, each with the left edge of its cell. In a
+ * run that reads right to left (`GlyphRun.rtl`), unit `i` draws in cell `n - 1 - i`, and a
+ * character with a mirror image (UAX #9 L4, such as a bracket) draws as that mirror. A
+ * surrogate pair is one character. For readers that place each glyph at its own position.
+ */
+export function runGlyphs(run: BidiRun): RunGlyph[] {
+  const n = run.text.length;
+  const out: RunGlyph[] = [];
+  for (let i = 0; i < n;) {
+    const cp = run.text.codePointAt(i) ?? 0;
+    const len = cp > 0xffff ? 2 : 1;
+    const ch = run.text.slice(i, i + len);
+    if (run.rtl)
+      out.push({
+        index: i,
+        char: bidiAlgorithm.getMirroredCharacter(ch) ?? ch,
+        x: run.x[n - i - len]!,
+      });
+    else out.push({ index: i, char: ch, x: run.x[i]! });
+    i += len;
+  }
+  return out;
+}
