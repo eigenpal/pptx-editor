@@ -1,0 +1,199 @@
+import { describe, expect, test } from 'bun:test';
+import { buildPptx } from '../../../../../../scripts/fixtures/builder.ts';
+import { readPptx } from '../../../store/index.ts';
+import { resolveSlide } from '../../../cascade/index.ts';
+import { createFixedMeasurer, layoutSlide, type Line, type TextLayout } from '../../index.ts';
+import { paragraphBidi, visualOrderOfLevels } from '../rtl-paragraph.ts';
+import { leadingOffset, paragraphAlignment } from '../paragraph-alignment.ts';
+
+// The shape is 6,000,000 EMU wide with the default insets (91,440 EMU on each side).
+const BOX_RIGHT = 6_000_000 - 91_440;
+const BOX_LEFT = 91_440;
+
+const shape = (body: string): string =>
+  '<p:sp><p:nvSpPr><p:cNvPr id="2" name="S"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>' +
+  '<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="6000000" cy="4000000"/></a:xfrm>' +
+  '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>' +
+  `<p:txBody><a:bodyPr/><a:lstStyle/>${body}</p:txBody></p:sp>`;
+
+function lay(body: string): TextLayout {
+  const r = readPptx(buildPptx({ slides: [{ shapes: shape(body), layout: 'blank' }] }));
+  if (!r.ok) throw new Error('open failed');
+  const item = layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer()).items[0];
+  if (item.kind !== 'shape' || !item.text) throw new Error('no text');
+  return item.text;
+}
+
+const r = (t: string, lang = 'ar-SA', size = 1800): string =>
+  `<a:r><a:rPr lang="${lang}" sz="${size}"/><a:t xml:space="preserve">${t}</a:t></a:r>`;
+const para = (runs: string, pPr = '<a:pPr rtl="1" algn="r"/>'): string =>
+  `<a:p>${pPr}${runs}</a:p>`;
+
+/** The characters of a line from left to right, as paint draws them. */
+function visual(line: Line): string {
+  return [...line.runs]
+    .sort((a, b) => a.x[0] - b.x[0])
+    .map((run) => (run.rtl ? [...run.text].reverse().join('') : run.text))
+    .join('');
+}
+
+const reversed = (text: string): string => [...text].reverse().join('');
+const left = (line: Line): number => Math.min(...line.runs.map((run) => run.x[0]));
+const right = (line: Line): number => Math.max(...line.runs.map((run) => run.x[run.x.length - 1]));
+
+// Arabic and Hebrew words of the tests.
+const SALAM = 'سلام';
+const DAR = 'دار';
+const SHALOM = 'שלום';
+const DATE = 'תאריך';
+
+describe('bidi levels (UAX #9)', () => {
+  test('a left-to-right paragraph without right-to-left letters needs no levels', () => {
+    expect(paragraphBidi([{ text: 'Hello 123' }], false)).toBeUndefined();
+  });
+
+  test('digits in a right-to-left run take an even level', () => {
+    const bidi = paragraphBidi([{ text: `${SALAM} 12` }], true)!;
+    expect([...bidi.levels]).toEqual([1, 1, 1, 1, 1, 2, 2]);
+  });
+
+  test('L2 reverses each run of a level and higher', () => {
+    expect(visualOrderOfLevels([1, 1, 2, 2, 1])).toEqual([4, 2, 3, 1, 0]);
+    expect(visualOrderOfLevels([0, 1, 1, 0])).toEqual([0, 2, 1, 3]);
+  });
+});
+
+describe('visual order of a line', () => {
+  test('Arabic with a Latin word reads from the right, the Latin word left to right', () => {
+    const line = lay(para(r(`${SALAM} `) + r('PPTX', 'en-US') + r(` ${DAR}.`))).lines[0];
+    expect(visual(line)).toBe(`.${reversed(DAR)} PPTX ${reversed(SALAM)}`);
+    // Runs stay in source order for the caret and the selection.
+    expect(line.runs.map((run) => run.start)).toEqual(
+      [...line.runs.map((run) => run.start)].sort((a, b) => a - b)
+    );
+  });
+
+  test('Hebrew with a number keeps the number left to right', () => {
+    const line = lay(para(r(`${SHALOM} 120.50 ${DATE}`, 'he-IL'))).lines[0];
+    expect(visual(line)).toBe(`${reversed(DATE)} 120.50 ${reversed(SHALOM)}`);
+  });
+
+  test('Hebrew and Arabic words in a left-to-right paragraph read right to left in place', () => {
+    const line = lay(
+      para(
+        r('The word ', 'en-US') + r(SALAM) + r(' and ', 'en-US') + r(SHALOM, 'he-IL'),
+        '<a:pPr/>'
+      )
+    ).lines[0];
+    expect(visual(line)).toBe(`The word ${reversed(SALAM)} and ${reversed(SHALOM)}`);
+  });
+
+  test('neutrals at a run edge stay in their run', () => {
+    // A left-to-right run keeps its colon and quotation marks inside it.
+    const a = lay(para(r('phrase: ', 'en-US') + r(SALAM))).lines[0];
+    expect(visual(a)).toBe(`${reversed(SALAM)}phrase: `);
+    const b = lay(para(r(`${SHALOM}: `, 'he-IL') + r('"Hi, all!"', 'en-US'))).lines[0];
+    expect(visual(b)).toBe(`"Hi, all!" :${reversed(SHALOM)}`);
+    // A run with no strong letter reads in the paragraph's direction.
+    const c = lay(para(r('ECMA-376', 'en-US') + r('.', 'he-IL'))).lines[0];
+    expect(visual(c)).toBe('.ECMA-376');
+  });
+
+  test('a slash between digits separates numbers in an Arabic run, not in a Hebrew run', () => {
+    const arabic = lay(para(r(`${SALAM} 17/08/96`))).lines[0];
+    expect(visual(arabic)).toStartWith('96/08/17');
+    const hebrew = lay(para(r(`${SHALOM} 852/20`, 'he-IL'))).lines[0];
+    expect(visual(hebrew)).toContain('852/20');
+  });
+});
+
+describe('physical alignment', () => {
+  test('DrawingML algn names physical edges, also in a right-to-left paragraph', () => {
+    expect(paragraphAlignment('l')).toBe('left');
+    expect(paragraphAlignment('r')).toBe('right');
+    expect(leadingOffset('right', true, 10)).toBe(0);
+    expect(leadingOffset('left', true, 10)).toBe(10);
+    expect(leadingOffset('right', false, 10)).toBe(10);
+    expect(leadingOffset('both', true, 10)).toBe(0);
+  });
+
+  test('algn="r" ends a right-to-left line at the right inset', () => {
+    const line = lay(para(r(SALAM), '<a:pPr rtl="1" algn="r"/>')).lines[0];
+    expect(right(line)).toBeCloseTo(BOX_RIGHT, 3);
+  });
+
+  test('algn="l" starts a right-to-left line at the left inset', () => {
+    const line = lay(para(r(SALAM), '<a:pPr rtl="1" algn="l"/>')).lines[0];
+    expect(left(line)).toBeCloseTo(BOX_LEFT, 3);
+  });
+
+  test('marL is measured from the right in a right-to-left paragraph', () => {
+    const line = lay(para(r(SALAM), '<a:pPr rtl="1" algn="r" marL="457200"/>')).lines[0];
+    expect(right(line)).toBeCloseTo(BOX_RIGHT - 457_200, 3);
+  });
+
+  test('a number bullet stands right of the text and reads in the paragraph direction', () => {
+    const t = lay(
+      para(
+        r(SALAM),
+        '<a:pPr rtl="1" algn="r" marL="457200" indent="-457200"><a:buAutoNum type="arabicPeriod"/></a:pPr>'
+      )
+    );
+    const line = t.lines[0];
+    const bullets = line.runs.filter((run) => run.kind === 'bullet');
+    expect(visual({ ...line, runs: bullets })).toBe('.1');
+    expect(Math.max(...bullets.map((b) => b.x[b.x.length - 1]))).toBeCloseTo(BOX_RIGHT, 3);
+    const text = line.runs.filter((run) => run.kind === 'text');
+    expect(Math.max(...text.map((b) => b.x[b.x.length - 1]))).toBeCloseTo(BOX_RIGHT - 457_200, 3);
+  });
+});
+
+describe('trailing spaces', () => {
+  // 18 pt text in the fixed measurer: letters 9 pt, spaces 4.5 pt wide.
+  const word = SALAM.repeat(4);
+  const words = Array.from({ length: 12 }, () => word).join(' ');
+
+  test('a wrapped right-to-left line ends at the right inset, its space hanging on the left', () => {
+    const t = lay(para(r(words)));
+    expect(t.lines.length).toBeGreaterThan(1);
+    const first = t.lines[0];
+    expect(right(first)).toBeCloseTo(BOX_RIGHT, 3);
+    // The space that ends the line in source order stands at its left end.
+    const run = first.runs[0];
+    expect(run.rtl).toBe(true);
+    expect(run.text.endsWith(' ')).toBe(true);
+  });
+
+  test('the space after a left-to-right run hangs past the right inset', () => {
+    const t = lay(
+      para(r('phrase phrase phrase phrase phrase phrase phrase phrase ', 'en-US') + r(words))
+    );
+    const first = t.lines[0];
+    const latin = first.runs.find((run) => !run.rtl)!;
+    const lastLetter = latin.x[latin.text.trimEnd().length];
+    expect(lastLetter).toBeCloseTo(BOX_RIGHT, 3);
+  });
+
+  test('a justified right-to-left line fills the line, and its last line starts at the right', () => {
+    const t = lay(para(r(words), '<a:pPr rtl="1" algn="just"/>'));
+    // The space that ends the line in source order hangs past the left inset.
+    const SPACE = 0.25 * 18 * 12_700;
+    expect(left(t.lines[0]) + SPACE).toBeCloseTo(BOX_LEFT, 3);
+    expect(right(t.lines[0])).toBeCloseTo(BOX_RIGHT, 3);
+    expect(right(t.lines[t.lines.length - 1])).toBeCloseTo(BOX_RIGHT, 3);
+  });
+});
+
+describe('caret positions', () => {
+  test('offsets of a right-to-left line run from the right edge to the left', () => {
+    const line = lay(para(r(SALAM))).lines[0];
+    expect(line.caretX[0]).toBeCloseTo(BOX_RIGHT, 3);
+    for (let i = 1; i < line.caretX.length; i += 1)
+      expect(line.caretX[i]).toBeLessThan(line.caretX[i - 1]);
+  });
+
+  test('an empty right-to-left paragraph puts the caret at the right', () => {
+    const line = lay(para('<a:endParaRPr lang="ar-SA" sz="1800"/>')).lines[0];
+    expect(line.caretX[0]).toBeCloseTo(BOX_RIGHT, 3);
+  });
+});

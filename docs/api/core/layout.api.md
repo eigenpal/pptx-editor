@@ -447,6 +447,7 @@ export interface GlyphRun {
     // (undocumented)
     readonly props: RunProps;
     readonly rise: number;
+    readonly rtl?: true;
     readonly runIndex: number;
     readonly sizePt: number;
     readonly start: number;

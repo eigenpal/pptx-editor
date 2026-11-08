@@ -9,6 +9,7 @@ import type { ResolvedParagraph, ResolvedTextBody, RunProps } from '../../cascad
 import { slotLanguage } from '../../cascade/script-fonts.ts';
 import { anchorOffset, ROTATED_VERT, shiftLines } from './anchor.ts';
 import { AutonumberCounters, autonumberText, symbolBulletText } from './autonumber.ts';
+import { bidiCaretX, markerRuns, placeBidiLine, wholeMarker, type BidiLine } from './bidi-line.ts';
 import { fontSlotPieces, slotFamily, type FontSlot } from './font-slots.ts';
 import {
   breakOpportunities,
@@ -19,6 +20,8 @@ import {
 } from './line-break.ts';
 import { layoutMath, type MathBox } from './math-layout.ts';
 import type { ResolvedFace, TextMeasurer } from './measurer.ts';
+import { leadingOffset, paragraphAlignment } from './paragraph-alignment.ts';
+import { bidiPieces, paragraphBidiOf, type ParagraphBidi } from './rtl-paragraph.ts';
 import type { WarpedRun } from './text-warp.ts';
 import type { PathCommand } from '@eigenpal/ooxml-core';
 import {
@@ -41,8 +44,14 @@ export interface GlyphRun {
   readonly kind: 'text' | 'bullet';
   /** Display text (after caps). */
   readonly text: string;
-  /** Left edge of each UTF-16 unit, EMU from the text box left. Length = text.length + 1. */
+  /**
+   * Left edge of each UTF-16 unit, EMU from the text box left. Length = text.length + 1. In a
+   * run that reads right to left (`rtl`), the values are the cell edges from left to right, and
+   * unit `i` draws in cell `text.length - 1 - i`.
+   */
   readonly x: readonly number[];
+  /** The run reads right to left: its units stand in visual order from right to left. */
+  readonly rtl?: true;
   readonly face: ResolvedFace;
   /** Rendered size in points (after autofit and script scaling). */
   readonly sizePt: number;
@@ -316,7 +325,8 @@ function buildSegments(
   measurer: TextMeasurer,
   fontScale: number,
   substitutions: Set<string>,
-  stacked = false
+  stacked = false,
+  bidi?: ParagraphBidi
 ): Segment[] {
   const out: Segment[] = [];
   let offset = 0;
@@ -393,7 +403,7 @@ function buildSegments(
       }
     }
     let local = 0;
-    for (const piece of slotted) {
+    for (const piece of bidiPieces(slotted, bidi?.levels, offset)) {
       const face = piece.face;
       const sizePt = piece.small ? baseSize * SMALL_CAPS_SCALE : baseSize;
       const kerning = props.kern !== undefined && props.size >= props.kern;
@@ -449,6 +459,48 @@ function placeMath(
       start,
     });
   for (const m of box.marks) marks.push(moveMark({ ...m, runIndex }, x));
+}
+
+/**
+ * The runs of a bidi line, from its pieces, with the line's visible content starting at `left`.
+ * Runs stay in source order, so the run before an offset is the run that holds it.
+ */
+function placeBidiRuns(
+  line: BidiLine,
+  left: number,
+  start: number,
+  units: readonly Unit[],
+  segments: readonly Segment[],
+  runs: GlyphRun[],
+  marks: LineMark[]
+): void {
+  const placed: GlyphRun[] = [];
+  for (const piece of line.pieces) {
+    const s = segments[piece.seg];
+    const x = piece.x.map((v) => v + left);
+    if (s.math) {
+      placeMath(s.math, x[0], s.runIndex, start + piece.from, placed, marks);
+      continue;
+    }
+    if (s.isBreak) continue;
+    let text = '';
+    for (let i = piece.from; i < piece.to; i += 1)
+      text += String.fromCharCode(units[start + i].code);
+    placed.push({
+      kind: 'text',
+      text,
+      x,
+      face: s.face,
+      sizePt: s.sizePt,
+      rise: s.rise,
+      props: s.props,
+      runIndex: s.runIndex,
+      start: start + piece.from,
+      ...(piece.rtl ? { rtl: true as const } : {}),
+    });
+  }
+  placed.sort((a, b) => a.start - b.start);
+  for (const run of placed) runs.push(run);
 }
 
 /** A mark moved right by `dx`. */
@@ -515,10 +567,12 @@ export function layoutTextOn(
   const numbering = new AutonumberCounters();
   const overflowAt = untilOverflow && columns <= 1 ? outerH + 1 - bp.tIns - bp.bIns : Infinity;
   let overflowed = false;
+  const stackedVert = vert === 'wordArtVert';
 
   body.paragraphs.forEach((p, pi) => {
     if (overflowed) return;
-    const segments = buildSegments(p, measurer, fontScale, substitutions, vert === 'wordArtVert');
+    const bidi = paragraphBidiOf(p);
+    const segments = buildSegments(p, measurer, fontScale, substitutions, stackedVert, bidi);
     const sourceLength = p.runs.reduce((n, r) => n + (r.kind === 'break' ? 1 : r.text.length), 0);
     paragraphLengths.push(sourceLength);
     const firstProps = p.runs.find((r) => r.kind !== 'break')?.props ?? p.endProps;
@@ -616,6 +670,7 @@ export function layoutTextOn(
     });
     const paragraphText = segments.map((s) => s.text).join('');
     const breaks = paragraphBreaks(p, paragraphText);
+    const codes = bidi ? units.map((u) => u.code) : [];
 
     const bullet = sourceLength > 0 ? marker : null;
     const pending = sourceLength > 0 ? null : marker;
@@ -623,6 +678,16 @@ export function layoutTextOn(
       ? Math.max(p.marL, marker.x[marker.x.length - 1])
       : p.marL + p.indent;
     const lineLeft = (first: boolean): number => (first ? firstLineStart : p.marL);
+    // The bullet stands at the paragraph's leading edge, and moves with its line: centered and
+    // right-aligned text keep it next to the text, at the same distance as on a left-aligned
+    // line. In a right-to-left paragraph the bullet's text reads in the paragraph's direction
+    // (`markerRuns`).
+    const placeMarker = (m: GlyphRun, shift: number): GlyphRun => {
+      const x0 = m.x[0];
+      const w = m.x[m.x.length - 1] - x0;
+      const at = (p.rtl ? colW - x0 - w - shift : x0 + shift) + bp.lIns;
+      return { ...m, x: m.x.map((v) => v - x0 + at) };
+    };
     const avail = (first: boolean): number => colW - lineLeft(first) - p.marR;
 
     /**
@@ -791,6 +856,12 @@ export function layoutTextOn(
         contentEnd -= 1;
       let width = 0;
       for (let i = range.start; i < contentEnd; i += 1) width += units[i].advance;
+      // A bidi line in visual order (UAX #9 L1/L2); its visible extent is what aligns.
+      const segOf = (i: number): number => units[i].seg;
+      const placeLine = (advance: (i: number) => number): BidiLine | undefined =>
+        bidi && placeBidiLine(bidi, codes, range.start, range.end, contentEnd, advance, segOf);
+      let bidiLine = placeLine((i) => units[i].advance);
+      if (bidiLine) width = bidiLine.contentRight - bidiLine.contentLeft;
       // A hanging comma or full stop stays outside the line for alignment.
       const hanging =
         p.hangingPunct &&
@@ -802,15 +873,16 @@ export function layoutTextOn(
       const lastOfPara = li === lineRanges.length - 1 || range.forced;
       let shift = 0;
       let extra: Float64Array | undefined;
-      if (p.align === 'ctr') shift = room / 2;
-      else if (p.align === 'r') shift = room;
+      // `shift` is measured from the paragraph's leading edge: the right edge when it is `rtl`.
+      const alignment = paragraphAlignment(p.align);
+      if (alignment !== 'both') shift = leadingOffset(alignment, p.rtl, room);
       // A justified line that ends with hanging punctuation fills the line, also the last line.
       else if (((p.align === 'just' && (!lastOfPara || hanging)) || p.align === 'dist') && room > 0)
         // The hanging character keeps its gap: the line ends where the character starts.
         extra = justifyExtra(units, segments, range.start, contentEnd, room);
       if (!wrap && p.align === 'ctr') shift = (avail(first) - width) / 2;
-      const caretX: number[] = [];
-      const origin = left + shift + bp.lIns;
+      let caretX: number[] = [];
+      const origin = (p.rtl ? colW - left - shift : left + shift) + bp.lIns;
       let x = origin;
       const runs: GlyphRun[] = [];
       const marks: LineMark[] = [];
@@ -841,7 +913,20 @@ export function layoutTextOn(
       };
       // Display text keeps source length (caps never change length), so unit index = offset.
       const sourceOffset = range.start;
-      for (let i = range.start; i < range.end; i += 1) {
+      const advance = (i: number): number => units[i].advance + (extra?.[i - range.start] ?? 0);
+      if (bidiLine && extra) bidiLine = placeLine(advance);
+      if (bidiLine) {
+        // Justification widened the line: its right edge moved with it.
+        const shown = bidiLine.contentRight - bidiLine.contentLeft;
+        const lineLeftX = (p.rtl ? colW - left - shift - shown : left + shift) + bp.lIns;
+        placeBidiRuns(bidiLine, lineLeftX, range.start, units, segments, runs, marks);
+        caretX = bidiCaretX(bidiLine, range.start, range.end - range.start, advance).map(
+          (v) => v + lineLeftX
+        );
+      }
+      // A bidi line placed its runs above; a left-to-right line places them here.
+      const lineEnd = bidiLine ? range.start : range.end;
+      for (let i = range.start; i < lineEnd; i += 1) {
         const u = units[i];
         if (!cur || cur.seg !== u.seg) {
           flush();
@@ -854,12 +939,13 @@ export function layoutTextOn(
         x += u.advance + (extra?.[i - range.start] ?? 0);
       }
       flush();
-      caretX.push(x);
-      // The bullet moves with its line: centered and right-aligned text keep the bullet next
-      // to the text, at the same distance as on a left-aligned line.
+      if (!bidiLine) caretX.push(x);
       const lineRuns =
         first && bullet
-          ? [{ ...bullet, x: bullet.x.map((v) => v + shift + bp.lIns) }, ...runs]
+          ? [
+              ...(p.rtl ? markerRuns(placeMarker(bullet, shift)) : [placeMarker(bullet, shift)]),
+              ...runs,
+            ]
           : runs;
       lines.push({
         paragraph: pi,
@@ -873,7 +959,7 @@ export function layoutTextOn(
         runs: lineRuns,
         fontHeight: maxSize * EMU_PER_PT,
         ...(first && pending
-          ? { pendingBullet: { ...pending, x: pending.x.map((v) => v + shift + bp.lIns) } }
+          ? { pendingBullet: wholeMarker(placeMarker(pending, shift), p.rtl) }
           : {}),
         ...(marks.length > 0 ? { marks } : {}),
       });

@@ -77,12 +77,13 @@ function decorationRects(
   const size = run.sizePt;
   const baseline = baselineEmu / EMU_PER_PT;
   const xs = run.x.map((v) => v / EMU_PER_PT);
-  const x0 = xs[0];
   // Trailing spaces at a line end are not underlined; the layout already
   // excludes them from alignment, and runs keep them, so trim here.
   let end = run.text.length;
   while (end > 0 && run.text[end - 1] === ' ') end -= 1;
-  const x1 = xs[end] ?? xs[xs.length - 1];
+  // A right-to-left run ends at its left: its trailing spaces are its leftmost cells.
+  const x0 = run.rtl ? xs[run.text.length - end] : xs[0];
+  const x1 = run.rtl ? xs[xs.length - 1] : (xs[end] ?? xs[xs.length - 1]);
   if (x1 <= x0) return out;
   const m = run.face.metrics;
   const thickness = Math.max(m.underlineThickness * size, size / 20);
@@ -107,6 +108,26 @@ function decorationRects(
     const strike = strikeoutBars(m, size, run.props.strike === 'dblStrike');
     for (const top of strike.tops) out.push(bar(y + top, text, strike.thickness));
   }
+  return out;
+}
+
+/** A right-to-left word: its letters in source order, anchored at its right edge. */
+const RTL_STYLE = 'direction:rtl;unicode-bidi:bidi-override';
+
+/**
+ * The words of a right-to-left run, each painted as one `<text>` that starts at the word's
+ * right edge and reads right to left, so the browser shapes and joins its letters. Spaces
+ * between the words take the room that layout gave them, justification included. Every
+ * character of the run has an odd bidi level, so the override keeps the browser from
+ * reordering the word again.
+ */
+function rtlWords(run: GlyphRun): { text: string; right: number }[] {
+  const out: { text: string; right: number }[] = [];
+  const n = run.text.length;
+  const re = /[^ \u3000]+/gu;
+  // Unit `i` draws in cell `n - 1 - i`, so a word that starts at unit `i` ends at `x[n - i]`.
+  for (let m = re.exec(run.text); m; m = re.exec(run.text))
+    out.push({ text: m[0], right: run.x[n - m.index] });
   return out;
 }
 
@@ -351,7 +372,12 @@ export function paintText(doc: Document, layout: TextLayout, ctx: PaintContext):
         text.textContent = content;
         return text;
       };
-      for (const piece of uprightPieces(run.text, layout.upright)) {
+      for (const word of run.rtl ? rtlWords(run) : []) {
+        const text = makeText(word.text, { x: pt(word.right), y: pt(baseline) });
+        text.setAttribute('style', `${text.getAttribute('style')};${RTL_STYLE}`);
+        group.appendChild(text);
+      }
+      for (const piece of run.rtl ? [] : uprightPieces(run.text, layout.upright)) {
         if (!piece.upright) {
           const xs = run.x.slice(piece.start, piece.end).map(pt).join(' ');
           group.appendChild(

@@ -195,7 +195,6 @@ export const FIXTURE_KNOWN_GAPS: KnownGapList = {
     'vertical-east-asian': 0,
   },
   slides: {
-    'east-asian-line-breaking/4': ['pixels'],
     'east-asian-typography/2': ['extra-text'],
     'equation-lines/1': ['baseline'],
     'equation-lines/2': ['line-breaks', 'baseline', 'extra-text'],
