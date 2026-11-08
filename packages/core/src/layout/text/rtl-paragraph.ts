@@ -2,9 +2,8 @@
 // `rtl-letter.ts`, `arabic-script-language.ts`, and `line-end-whitespace.ts` of the same commit.
 // The source reads run directions from `w:rtl`, resolves each run-direction group on its own,
 // and works on styled spans. Slide runs have no direction, so a paragraph resolves as one
-// UAX #9 paragraph (`runEdgeLevels` keeps the neutrals at the edges of a run that reads
-// against the paragraph inside that run), and this module works on the UTF-16 units of a
-// paragraph.
+// UAX #9 paragraph, a run that reads against the paragraph resolves on its own like an
+// isolate (`isolateRunLevels`), and this module works on the UTF-16 units of a paragraph.
 
 import type { ResolvedParagraph } from '../../cascade/index.ts';
 import { bidiAlgorithm } from './bidi.ts';
@@ -93,34 +92,77 @@ function withArabicSlashes(text: string, runs: readonly BidiRunText[], rtl: bool
 }
 
 /**
- * Keep the punctuation at the edges of a run that reads against the paragraph inside that run:
- * the characters before its first strong character and after its last one, other than
- * whitespace, take the level of that strong character. In the `rtl-text` reference PDF, a
- * left-to-right run of a right-to-left paragraph keeps its colon and its quotation marks inside
- * it (`An English phrase in a right-to-left paragraph: `, `"Hello, world!"`). Whitespace keeps
- * its UAX #9 level, so it still separates the run from the text beside it.
+ * The partner of each paired bracket of `text` (UAX #9 BD16), or -1. A stack of 63 openings, as
+ * in BD16; past it, pairing stops.
  */
-function runEdgeLevels(levels: Uint8Array, runs: readonly BidiRunText[], rtl: boolean): void {
+function bracketPartners(text: string): Int32Array {
+  const partner = new Int32Array(text.length).fill(-1);
+  const stack: { at: number; closing: string }[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!;
+    const closing = bidiAlgorithm.openingToClosingBracket(ch);
+    if (closing) {
+      if (stack.length === 63) break;
+      stack.push({ at: i, closing: bidiAlgorithm.getCanonicalBracket(closing) ?? closing });
+      continue;
+    }
+    if (!bidiAlgorithm.closingToOpeningBracket(ch)) continue;
+    const canonical = bidiAlgorithm.getCanonicalBracket(ch) ?? ch;
+    for (let k = stack.length - 1; k >= 0; k--) {
+      if (stack[k]!.closing !== canonical) continue;
+      partner[i] = stack[k]!.at;
+      partner[stack[k]!.at] = i;
+      stack.length = k;
+      break;
+    }
+  }
+  return partner;
+}
+
+/**
+ * Resolve each run that reads against the paragraph on its own, as an isolate does (UAX #9
+ * X5a-X5c), one level above the paragraph: a right-to-left run of a left-to-right paragraph
+ * from level 1, a left-to-right run of a right-to-left paragraph from level 2. Its letters,
+ * digits, and punctuation keep their order inside it: in the `rtl-text` reference PDF, a
+ * left-to-right run of a right-to-left paragraph keeps its colon and its quotation marks
+ * (`An English phrase in a right-to-left paragraph: `, `"Hello, world!"`). Three kinds of
+ * character keep their paragraph-wide level: the whitespace at the run's edges, so it still
+ * separates the run from the text beside it; a bracket whose pair lies outside the run, so the
+ * pair resolves as one (UAX #9 N0); and everything when the paragraph has authored bidi
+ * controls. Text outside the run sees the run's characters, so right-to-left words in two
+ * runs of a left-to-right paragraph still read as one stretch.
+ */
+function isolateRunLevels(
+  levels: Uint8Array,
+  text: string,
+  runs: readonly BidiRunText[],
+  rtl: boolean
+): void {
+  let partners: Int32Array | undefined;
   let offset = 0;
   for (const run of runs) {
     const start = offset;
     offset += run.text.length;
-    if (runIsRtl(run.text, rtl) === rtl) continue;
-    const strong: number[] = [];
-    for (let i = 0; i < run.text.length;) {
-      const cp = run.text.codePointAt(i)!;
-      if (strongRtl(String.fromCodePoint(cp)) !== undefined) strong.push(i);
-      i += cp > 0xffff ? 2 : 1;
+    const runRtl = runIsRtl(run.text, rtl);
+    if (runRtl === rtl) continue;
+    const own = bidiAlgorithm.getEmbeddingLevels(
+      runRtl && arabicScriptLanguage(run.lang)
+        ? run.text.replace(RTL_RUN_DIGIT_SLASH, NEUTRAL_SLASH)
+        : run.text,
+      runRtl ? 'rtl' : 'ltr'
+    ).levels;
+    // The run's own base is 1 (right to left) or 0; the isolate starts one above the paragraph.
+    const raise = rtl ? 2 : 0;
+    let first = 0;
+    while (first < run.text.length && /\s/u.test(run.text[first]!)) first++;
+    let last = run.text.length;
+    while (last > first && /\s/u.test(run.text[last - 1]!)) last--;
+    for (let i = first; i < last; i++) {
+      partners ??= bracketPartners(text);
+      const pair = partners[start + i]!;
+      if (pair >= 0 && (pair < start || pair >= offset)) continue;
+      levels[start + i] = own[i]! + raise;
     }
-    const first = strong[0];
-    const last = strong[strong.length - 1];
-    if (first === undefined || last === undefined) continue;
-    const take = (i: number, from: number): void => {
-      if (!/\s/u.test(run.text[i]!)) levels[start + i] = levels[start + from]!;
-    };
-    for (let i = 0; i < first; i++) take(i, first);
-    const lastEnd = last + (run.text.codePointAt(last)! > 0xffff ? 2 : 1);
-    for (let i = lastEnd; i < run.text.length; i++) take(i, last);
   }
 }
 
@@ -141,7 +183,7 @@ export function paragraphBidi(
     rtl ? 'rtl' : 'ltr'
   ).levels;
   // Authored Unicode controls decide on their own.
-  if (!controls) runEdgeLevels(levels, runs, rtl);
+  if (!controls) isolateRunLevels(levels, text, runs, rtl);
   return { rtl, levels };
 }
 

@@ -136,6 +136,31 @@ describe('runs with more than one script', () => {
   });
 });
 
+describe('a run that reads against the paragraph resolves like an isolate', () => {
+  const ltr = (runs: string): string => visual(lay(para(runs, '<a:pPr/>')).lines[0]);
+  const rtl = (runs: string): string => visual(lay(para(runs)).lines[0]);
+  const he = (t: string): string => r(t, 'he-IL');
+
+  test('numbers at the edges of a right-to-left run keep their order', () => {
+    expect(ltr(he(`${SHALOM} 123`))).toBe(`123 ${reversed(SHALOM)}`);
+    expect(ltr(he(`2024 ${DATE}`))).toBe(`${reversed(DATE)} 2024`);
+    expect(ltr(he(`${DATE} 12-14`))).toBe(`12-14 ${reversed(DATE)}`);
+    expect(ltr(he('\u05d1-50%'))).toBe('50%-\u05d1');
+    // An Arabic run separates numbers at a slash.
+    expect(ltr(r(`${SALAM} 12/34`))).toBe(`34/12 ${reversed(SALAM)}`);
+  });
+
+  test('spaces and digits inside a left-to-right run keep it whole', () => {
+    expect(rtl(he(`${SHALOM} `) + r('"5 apples"', 'en-US'))).toBe(`"5 apples" ${reversed(SHALOM)}`);
+    expect(rtl(he(`${DATE} `) + r('$5 USD', 'en-US'))).toBe(`$5 USD ${reversed(DATE)}`);
+  });
+
+  test('a bracket pair across two runs resolves as one pair (UAX #9 N0)', () => {
+    // Both brackets take level 1, so paint mirrors them (L4) and the line reads (abc).
+    expect(rtl(he(`${SHALOM} (`) + r('abc)', 'en-US'))).toBe(`)abc( ${reversed(SHALOM)}`);
+  });
+});
+
 describe('physical alignment', () => {
   for (const [algn, side] of [
     ['ctr', 'center'],
