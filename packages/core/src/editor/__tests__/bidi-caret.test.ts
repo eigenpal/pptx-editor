@@ -216,10 +216,61 @@ describe('caret keys on a line in visual order', () => {
       expect(leftward.map((p) => caretX(item, p))).toEqual([...stops.map((s) => s.x)].reverse());
       const rightward = walk(item, { paragraph: 0, ...left }, 'ArrowRight');
       expect(rightward.map((p) => caretX(item, p))).toEqual(stops.map((s) => s.x));
-      // Home goes to the right edge (the reading start), End to the left edge.
-      expect(caretX(item, moveCaret(item, { paragraph: 0, offset: 2 }, 'Home'))).toBe(right.x);
-      expect(caretX(item, moveCaret(item, { paragraph: 0, offset: 2 }, 'End'))).toBe(left.x);
+      // Cmd with Left or Right goes to the visual edge on the arrow's side.
+      const meta = { metaKey: true };
+      const at = { paragraph: 0, offset: 2 };
+      expect(caretX(item, moveCaret(item, at, 'ArrowLeft', meta))).toBe(left.x);
+      expect(caretX(item, moveCaret(item, at, 'ArrowRight', meta))).toBe(right.x);
+      // With Shift, the range grows to that edge from its anchor.
+      const sel = { kind: 'text' as const, nodeId: 'n', anchor: at, focus: at };
+      const grown = moveTextSelection(item, sel, 'ArrowLeft', true, meta);
+      expect(grown.anchor).toEqual(at);
+      expect(caretX(item, grown.focus)).toBe(left.x);
+      // Home and End go to the logical start and end of the line.
+      expect(moveCaret(item, at, 'Home').offset).toBe(line.start);
+      expect(moveCaret(item, at, 'End').offset).toBe(line.end);
     });
+
+  describe('Home and End on lines that start or end in the other direction', () => {
+    const cases = [
+      ['a left-to-right line that starts in Hebrew', ltr(r('שלום world', 'he-IL')), 10],
+      ['a right-to-left line of Latin text', rtl(r('abc def')), 7],
+      ['a right-to-left line that ends in Latin', rtl(r('אבג דהו abc', 'he-IL')), 11],
+      ['a right-to-left line that starts in Latin', rtl(r('PPTX') + r(' אבג', 'he-IL')), 8],
+    ] as const;
+    for (const [name, body, length] of cases)
+      test(`${name}: Home is offset 0 and End the text end`, () => {
+        const item = lay(body);
+        const line = item.text!.lines[0];
+        for (let offset = 0; offset <= length; offset += 1) {
+          const at = { paragraph: 0, offset };
+          const home = moveCaret(item, at, 'Home');
+          expect(home).toEqual({ paragraph: 0, offset: 0 });
+          expect(caretX(item, home)).toBe(line.caretX[0]);
+          const end = moveCaret(item, at, 'End');
+          expect(end.offset).toBe(length);
+          // The caret shows after the last character, at its trailing edge.
+          expect(caretX(item, end)).toBe(line.bidi!.trailingX[length - 1]);
+          const shifted = moveTextSelection(
+            item,
+            { kind: 'text', nodeId: 'n', anchor: at, focus: at },
+            'End',
+            true
+          );
+          expect([shifted.anchor, shifted.focus.offset]).toEqual([at, length]);
+        }
+      });
+
+    test('End before the spaces of a wrap shows after the last word', () => {
+      const words = 'אבג דהו זחט טיכ למנ סעפ צקר שתא בגד';
+      const item = lay(rtl(r('PPTX', 'en-US') + r(` ${words}`, 'he-IL')), 1_400_000);
+      const line = item.text!.lines[0];
+      expect(item.text!.lines.length).toBeGreaterThan(1);
+      const end = moveCaret(item, { paragraph: 0, offset: 0 }, 'End');
+      expect(end.offset).toBeLessThan(line.end);
+      expect(caretX(item, end)).toBe(line.bidi!.trailingX[end.offset - 1 - line.start]);
+    });
+  });
 
   test('Shift extends a selection on screen; the anchor stays', () => {
     const item = lay(HEBREW_LATIN);

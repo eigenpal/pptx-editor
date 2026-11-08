@@ -99,39 +99,53 @@ function visualWordStep(
 }
 
 /**
- * The caret after Left, Right, Home, or End on a line in visual order, or null when the caret
- * is not on one (the source-order keys apply). `word` is Ctrl or Alt with an arrow. `logicalEnd`
- * gives the offset where End stops on the line (before a break or the spaces of a wrap).
+ * The caret after Left or Right on a line in visual order, or null when the caret is not on one
+ * (the source-order keys apply). `word` is Ctrl or Alt with the arrow. `edge` is Cmd alone with
+ * it: the caret goes to the line's visual edge on the arrow's side, whatever the paragraph's
+ * direction. `logicalEnd` gives the offset where End stops on the line (before a break or the
+ * spaces of a wrap), so an edge step does not land in the spaces a wrap hangs.
  */
 export function bidiKeyTarget(
   item: ShapeItem,
   focus: TextPoint,
-  key: string,
-  word: boolean,
+  pressed: string,
+  mods: { readonly word: boolean; readonly edge: boolean },
   u: ParagraphUnits,
   logicalEnd: () => number | undefined
 ): TextPoint | null {
+  if (pressed !== 'ArrowLeft' && pressed !== 'ArrowRight') return null;
   const lines = linesOf(item);
   const line = lines[lineIndexAt(lines, focus.paragraph, focus.offset)];
   if (!line?.bidi) return null;
-  if (key === 'ArrowLeft' || key === 'ArrowRight') {
-    const direction = key === 'ArrowLeft' ? -1 : 1;
-    // At a paragraph edge a word step goes on like a plain arrow, so the key is never dead.
-    return (
-      (word ? visualWordStep(item, focus, direction, u) : null) ??
-      visualStep(item, focus, direction) ??
-      focus
-    );
+  const direction = pressed === 'ArrowLeft' ? -1 : 1;
+  if (mods.edge) {
+    const stops = lineStopsOf(item, line);
+    const limit = logicalEnd();
+    const kept = limit === undefined ? stops : stops.filter((s) => s.offset <= limit);
+    const pool = kept.length > 0 ? kept : stops;
+    const stop = direction === -1 ? pool[0] : pool[pool.length - 1];
+    return stop ? stopPoint(line.paragraph, stop) : null;
   }
-  if (key !== 'Home' && key !== 'End') return null;
-  const stops = lineStopsOf(item, line);
-  const limit = key === 'End' ? logicalEnd() : undefined;
-  const kept = limit === undefined ? stops : stops.filter((s) => s.offset <= limit);
-  const pool = kept.length > 0 ? kept : stops;
-  // Home and End are the line's edges in reading order: a right-to-left line starts at its right.
-  const side = (key === 'Home' ? -1 : 1) * (line.bidi.paragraphRtl ? -1 : 1);
-  const stop = side === -1 ? pool[0] : pool[pool.length - 1];
-  return stop ? stopPoint(line.paragraph, stop) : null;
+  // At a paragraph edge a word step goes on like a plain arrow, so the key is never dead.
+  return (
+    (mods.word ? visualWordStep(item, focus, direction, u) : null) ??
+    visualStep(item, focus, direction) ??
+    focus
+  );
+}
+
+/**
+ * Home or End at the logical line edge `point` (DOCX Editor `lineEdgeTarget`): on a line in
+ * visual order, End shows the caret after the line's last character (upstream), where a
+ * direction boundary puts the next character elsewhere. Home shows it before the first.
+ */
+export function lineEdgePlace(item: ShapeItem, point: TextPoint, end: boolean): TextPoint {
+  if (!end || point.offset === 0) return point;
+  const lines = linesOf(item);
+  const line = lines[lineIndexAt(lines, point.paragraph, point.offset)];
+  if (!line?.bidi || point.offset <= line.start) return point;
+  const up = caretXOn(line, point.offset, 'upstream');
+  return up !== caretXOn(line, point.offset) ? { ...point, affinity: 'upstream' } : point;
 }
 
 /** Up or Down onto bidi line `target`: the place nearest `x`; null for another line. */

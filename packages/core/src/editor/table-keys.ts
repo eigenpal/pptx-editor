@@ -68,6 +68,12 @@ const ARROWS: Readonly<Record<string, readonly [number, number]>> = {
   ArrowDown: [1, 0],
 };
 
+/** The grid step of an arrow key: Left and Right swap in a table that runs right to left. */
+function arrowStep(key: string, rtl: boolean): readonly [number, number] | undefined {
+  const step = ARROWS[key];
+  return step && rtl && step[1] !== 0 ? [0, -step[1]] : step;
+}
+
 /** The grid position one arrow step from a drawn cell, past its merge. */
 function stepFrom(
   c: {
@@ -114,7 +120,7 @@ function cellsKeyAction(
     const next = drawn[drawn.indexOf(here) + (shift ? -1 : 1)] ?? here;
     return { select: (l) => cellSelection(l, id, addressOf(next), 'all') };
   }
-  const step = ARROWS[key];
+  const step = arrowStep(key, frame.table.rtl);
   if (!step) return null;
   const target = cellLayoutAt(frame.table, stepFrom(here.cell, step));
   if (!target) return { select: () => sel };
@@ -162,7 +168,7 @@ export function tableKeyAction(
       select: (l) => cellSelection(l, id, { row, column: 0 }, 'start'),
     };
   }
-  const step = ARROWS[key];
+  const step = arrowStep(key, frame.table.rtl);
   if (shift && step) {
     // Shift+arrow at the edge of the cell's text starts a cell range with the next cell.
     const item = textItemOf(layout, sel);
@@ -178,10 +184,12 @@ export function tableKeyAction(
   if (key === 'ArrowRight' || key === 'ArrowLeft') {
     const moved = moveCaret(item, sel.focus, key);
     if (!samePlace(moved, sel.focus)) return null;
-    const next = drawn[i + (key === 'ArrowRight' ? 1 : -1)];
+    // In a table that runs right to left, the next cell is on the left.
+    const forward = (key === 'ArrowRight') !== frame.table.rtl;
+    const next = drawn[i + (forward ? 1 : -1)];
     if (!next) return null;
     return {
-      select: (l) => cellSelection(l, id, addressOf(next), key === 'ArrowRight' ? 'start' : 'end'),
+      select: (l) => cellSelection(l, id, addressOf(next), forward ? 'start' : 'end'),
     };
   }
   if (key === 'ArrowDown' || key === 'ArrowUp') {

@@ -22,7 +22,12 @@ import {
   wordStartBefore,
   type ParagraphUnits,
 } from '../automation/commands/text-units.ts';
-import { bidiCollapse, bidiKeyTarget, bidiVerticalTarget } from './visual-caret-keys.ts';
+import {
+  bidiCollapse,
+  bidiKeyTarget,
+  bidiVerticalTarget,
+  lineEdgePlace,
+} from './visual-caret-keys.ts';
 import { caretXOn, lineIndexAt } from './visual-caret.ts';
 
 /** Every kind of text input the editor applies. @public */
@@ -229,8 +234,9 @@ export function moveCaret(
   const key = edge ? (pressed === 'ArrowLeft' ? 'Home' : 'End') : pressed;
   let { paragraph, offset } = focus;
   const u = unitsOf(item, paragraph);
-  // A line in visual order: Left and Right step on screen, Home and End go to its visual edges.
-  const visual = bidiKeyTarget(item, focus, key, word, u, () =>
+  // A line in visual order: Left and Right step on screen, and with Cmd go to its visual edge
+  // on their side. Home and End stay logical (below).
+  const visual = bidiKeyTarget(item, focus, pressed, { word, edge }, u, () =>
     lineEdge(item, paragraph, offset, false)
   );
   if (visual) return visual;
@@ -240,11 +246,11 @@ export function moveCaret(
   } else if (key === 'ArrowRight') {
     if (offset < u.length) offset = word ? nextWordStart(u, offset) : stopAfter(u, offset);
     else if (paragraph < lens.length - 1) ((paragraph += 1), (offset = 0));
-  } else if (key === 'Home' || key === 'End')
-    offset =
-      lineEdge(item, paragraph, offset, key === 'Home') ??
-      (key === 'Home' ? 0 : (lens[paragraph] ?? 0));
-  else if (key === 'ArrowUp' || key === 'ArrowDown') {
+  } else if (key === 'Home' || key === 'End') {
+    const home = key === 'Home';
+    offset = lineEdge(item, paragraph, offset, home) ?? (home ? 0 : (lens[paragraph] ?? 0));
+    return lineEdgePlace(item, { paragraph, offset }, !home);
+  } else if (key === 'ArrowUp' || key === 'ArrowDown') {
     const lines = item.text?.lines ?? [];
     const li = lineIndexAt(lines, paragraph, offset);
     const target = lines[li + (key === 'ArrowUp' ? -1 : 1)];
