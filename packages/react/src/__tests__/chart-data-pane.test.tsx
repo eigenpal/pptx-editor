@@ -62,7 +62,7 @@ describe('Chart Data tab (React)', () => {
     selectChart(editor);
     const tab = screen.getByRole('tab', { name: 'Chart' });
     expect(tab.getAttribute('aria-selected')).toBe('false');
-    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Edit data…' })));
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Edit chart…' })));
     expect(tab.getAttribute('aria-selected')).toBe('true');
     expect(document.activeElement).toBe(tab);
     // With the chart deselected, the open tab stays and says to select a chart.

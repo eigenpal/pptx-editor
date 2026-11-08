@@ -52,6 +52,20 @@ export function syncSwatchTabStops(grid: HTMLElement | null): void {
 }
 
 /**
+ * Focus the chosen swatch of an open color grid, else its first button, and scroll it into
+ * view. The panel can hold more than one grid. @internal
+ */
+export function focusCurrentSwatch(panel: HTMLElement | null): void {
+  const to =
+    panel?.querySelector<HTMLElement>('button[aria-pressed="true"]') ??
+    panel?.querySelector<HTMLElement>('button');
+  to?.focus({ preventScroll: true });
+  // The whole panel, with its custom color field, scrolls into view: the grid can open at the
+  // bottom of a side panel.
+  panel?.scrollIntoView?.({ block: 'nearest' });
+}
+
+/**
  * The arrow keys, Home, and End in a roving swatch grid, as a WAI-ARIA grid of buttons: they
  * move by column and row, and the Tab stop moves with the focus. @internal
  */
@@ -120,21 +134,27 @@ export function colorPickLabel(t: Translate, pick: ColorPick): string {
   if (pick === 'auto') return t('colors.automatic');
   if (pick === 'keep') return t('colors.keep');
   if (pick === 'mixed') return t('colors.mixed');
-  if (pick.startsWith('#')) return pick;
+  if (pick.startsWith('#')) {
+    const standard = STANDARD_COLORS.find((s) => s.color.toUpperCase() === pick.toUpperCase());
+    return standard ? t(`colors.standard.${standard.name}`) : pick;
+  }
   const [slot, shift] = pick.split(':') as [ThemeColorSlot, string?];
   return swatchName(t, { slot, shift: Number(shift ?? 0), color: '' });
 }
 
 /**
  * A color pick as the slide renders it, or null for the inherited color. No change (`keep`)
- * shows `current`, the color the selection has now, so its swatch is never empty. @internal
+ * shows `current`, the color the selection has now, so its swatch is never empty. The automatic
+ * color (`auto`) shows `automatic` when the field knows it (a chart series). @internal
  */
 export function renderedColorOf(
   pick: ColorPick,
   rows: readonly (readonly ThemeSwatch[])[],
-  current: string | null = null
+  current: string | null = null,
+  automatic: string | null = null
 ): string | null {
   if (pick === 'keep') return current;
+  if (pick === 'auto') return automatic;
   const choice = colorChoiceOf(pick);
   if (choice === null) return null;
   if (typeof choice === 'string') return choice;

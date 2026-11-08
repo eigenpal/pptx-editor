@@ -4719,6 +4719,15 @@ legend.pptx-dialog__label {
 
 /* Chart Data tab: the categories as a list of fields with a remove button each, then one
    collapsible card per series with its name and a value field for each category. */
+/* A field that depends on the check box above it, such as the chart title text. */
+.pptx-chart-pane__sub {
+  margin-left: 24px;
+}
+/* A series color swatch as tall as the fields beside it. */
+.pptx-chart-pane .pptx-color-field__button {
+  width: 32px;
+  height: 32px;
+}
 .pptx-chart-pane__note {
   margin: 0 0 8px;
   color: var(--doc-text-muted);

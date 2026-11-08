@@ -32,7 +32,8 @@ import { chartStateAt } from './chart-commands.ts';
 import { equationStateAt } from './equation-state.ts';
 import { diagramStateAt } from './diagram-commands.ts';
 
-export { chartDataAt } from './chart-commands.ts';
+export { chartDataAt, chartReads } from './chart-commands.ts';
+export { afterInsertCommand } from './pane-requests.ts';
 
 /** The selected picture, chart, and equation, as the snapshot reports them. */
 export function selectedObjectsAt(

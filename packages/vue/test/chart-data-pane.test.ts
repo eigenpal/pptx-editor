@@ -69,7 +69,7 @@ function mountReact(editor: PptxEditorInstance): HTMLElement {
 
 /** Ids from `useId` differ between the adapters: compare the markup without them. */
 const canon = (root: Element): string =>
-  canonicalDom(root, { normalizeStyle: true, formState: true }).replace(
+  canonicalDom(root, { normalizeStyle: true, formState: true, dropSelectValue: true }).replace(
     /\b(id|aria-describedby)="[^"]*"/g,
     '$1=""'
   );

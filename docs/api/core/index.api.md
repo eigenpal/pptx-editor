@@ -430,10 +430,52 @@ export type CapsStyle = 'none' | 'small' | 'all';
 export type CaretAffinity = 'downstream' | 'upstream';
 
 // @public
+export const CHART_LEGEND_CHOICES: readonly ChartLegendPosition[];
+
+// @public
+export const CHART_TYPE_CHOICES: readonly ChartType[];
+
+// @public
+export function chartAxisTitleLabels(format: ChartFormat): {
+    readonly category: 'chartFormat.categoryAxisTitle' | 'chartFormat.xAxisTitle';
+    readonly value: 'chartFormat.valueAxisTitle' | 'chartFormat.yAxisTitle';
+};
+
+// @public
+export function chartColorCommand(index: number, pick: ColorPick): EditorCommand | null;
+
+// @public
+export interface ChartColorEntry {
+    readonly automatic: ColorChoice;
+    readonly color: ColorChoice | null;
+    readonly name: string;
+}
+
+// @public
+export const chartColorPick: (entry: ChartColorEntry) => ColorPick;
+
+// @public
 export type ChartCommand = {
     readonly type: 'setChartData';
     readonly nodeId?: string;
     readonly data: Omit<ChartData, 'workbook'>;
+} | {
+    readonly type: 'insertChart';
+    readonly chartType: ChartType;
+    readonly data?: NewChartData;
+} | {
+    readonly type: 'setChartType';
+    readonly nodeId?: string;
+    readonly chartType: ChartType;
+} | {
+    readonly type: 'setChartFormat';
+    readonly nodeId?: string;
+    readonly format: ChartFormatChange;
+} | {
+    readonly type: 'setChartColor';
+    readonly nodeId?: string;
+    readonly index: number;
+    readonly color: ColorChoice | null;
 };
 
 // @public
@@ -471,6 +513,54 @@ export interface ChartDataSeries {
     readonly source?: number;
     readonly values: readonly (number | null)[];
 }
+
+// @public
+export interface ChartFormat {
+    readonly axes: boolean | null;
+    readonly axisTitles: {
+        readonly category: string | null;
+        readonly value: string | null;
+    } | null;
+    // (undocumented)
+    readonly colors: readonly ChartColorEntry[];
+    readonly colorsBy: 'series' | 'point';
+    readonly dataLabels: boolean;
+    readonly gridlines: boolean | null;
+    // (undocumented)
+    readonly legend: ChartLegendPosition;
+    readonly title: string | null;
+    readonly type: ChartType | null;
+}
+
+// @public
+export interface ChartFormatChange {
+    // (undocumented)
+    readonly axes?: boolean;
+    // (undocumented)
+    readonly categoryAxisTitle?: string | null;
+    // (undocumented)
+    readonly dataLabels?: boolean;
+    // (undocumented)
+    readonly gridlines?: boolean;
+    // (undocumented)
+    readonly legend?: ChartLegendPosition;
+    // (undocumented)
+    readonly title?: string | null;
+    // (undocumented)
+    readonly valueAxisTitle?: string | null;
+}
+
+// @public
+export type ChartFormatRead = {
+    readonly ok: true;
+    readonly format: ChartFormat;
+} | {
+    readonly ok: false;
+    readonly reason: string;
+};
+
+// @public
+export type ChartLegendPosition = 'none' | 'top' | 'bottom' | 'left' | 'right';
 
 // @public
 export type ChartPaneChange = {
@@ -522,7 +612,22 @@ export type ChartPaneResult = {
 };
 
 // @public
+export function chartSeriesNote(format: ChartFormat, seriesCount: number): 'chartFormat.pieFirstSeries' | null;
+
+// @public
 export type ChartSlotId = 'chart.editData';
+
+// @public
+export function chartTitleCommand(format: ChartFormat, field: 'title' | 'categoryAxisTitle' | 'valueAxisTitle', text: string): EditorCommand | null;
+
+// @public
+export type ChartType = 'columnClustered' | 'columnStacked' | 'columnPercentStacked' | 'barClustered' | 'barStacked' | 'barPercentStacked' | 'line' | 'lineMarkers' | 'area' | 'areaStacked' | 'areaPercentStacked' | 'pie' | 'doughnut' | 'radar' | 'scatter' | 'scatterLines';
+
+// @public
+export function chartTypeChangeNote(before: ChartFormat, after: ChartFormat): 'chartFormat.typeChangeRemoved' | null;
+
+// @public
+export function chartTypeHint(format: ChartFormat): 'chartFormat.typeChangeHint' | null;
 
 // @public
 export const chartValueText: (v: number | null | undefined) => string;
@@ -753,7 +858,7 @@ export function chromeOptionChecked(value: unknown, option: string): boolean;
 export function chromeRowState(editor: PptxEditorInstance | null, slot: ChromeSlotId, value?: string, host?: Pick<ChromeActionHost, 'unavailable'>): ChromeCommandState;
 
 // @public
-export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.textEffects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | TableSlotId | ImageSlotId | ChartSlotId | DiagramSlotId | EquationSlotId | ReviewSlotId;
+export type ChromeSlotId = 'history.undo' | 'history.redo' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'text.characterSpacing' | 'text.changeCase' | 'text.dialog' | 'script.super' | 'script.sub' | 'paragraph.align' | 'list.bullet' | 'list.numbered' | 'list.bulletStyle' | 'list.numberStyle' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'paragraph.valign' | 'paragraph.dialog' | 'paragraph.textDirection' | 'paragraph.autofit' | 'paragraph.columns' | 'insert.textBox' | 'insert.line' | 'insert.shape' | 'insert.image' | 'shape.fill' | 'shape.lineColor' | 'shape.lineWidth' | 'shape.lineStart' | 'shape.lineEnd' | 'shape.lineDash' | 'shape.styles' | 'shape.effects' | 'shape.textEffects' | 'shape.properties' | 'format.painter' | 'format.clear' | 'arrange.order' | 'arrange.align' | 'arrange.group' | 'arrange.ungroup' | 'arrange.rotate' | 'arrange.selectionPane' | 'more.duplicate' | 'more.delete' | 'find.find' | 'find.replace' | 'view.smartGuides' | 'view.presentationView' | 'file.pageSetup' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.selectAll' | 'slide.add' | 'slide.layout' | 'slide.reset' | 'slide.hide' | 'slide.background' | 'view.playFromStart' | 'view.playFromCurrent' | 'section.add' | 'section.rename' | 'section.remove' | 'section.removeAll' | 'section.collapseAll' | 'section.expandAll' | TableSlotId | ImageSlotId | ChartSlotId | DiagramSlotId | EquationSlotId | ChartInsertSlotId | ReviewSlotId;
 
 // @public
 export function chromeSlotIds(): ChromeSlotId[];
@@ -2526,10 +2631,10 @@ export function editRemovalMessage(t: Translate, removal: EditorRemoval): string
 export function effectSeparatorBefore(group: string, options: readonly EffectOption[], i: number): boolean;
 
 // @public
-export type ElementKindLabelKey = 'panel.format.elementKind.shape' | 'panel.format.elementKind.picture' | 'panel.format.elementKind.group' | 'panel.format.elementKind.connector' | 'panel.format.elementKind.graphicFrame' | 'panel.format.elementKind.table';
+export type ElementKindLabelKey = 'panel.format.elementKind.shape' | 'panel.format.elementKind.picture' | 'panel.format.elementKind.group' | 'panel.format.elementKind.connector' | 'panel.format.elementKind.graphicFrame' | 'panel.format.elementKind.table' | 'panel.format.elementKind.chart' | 'panel.format.elementKind.diagram';
 
 // @internal
-export function elementKindLabelKey(geometry: Pick<SelectionGeometry, 'kind' | 'nodeId'>, table: EditorSnapshot['table']): ElementKindLabelKey;
+export function elementKindLabelKey(geometry: Pick<SelectionGeometry, 'kind' | 'nodeId'>, table: EditorSnapshot['table'], objects?: Pick<EditorSnapshot, 'chart' | 'diagram'>): ElementKindLabelKey;
 
 // @internal
 export function elementRotates(geometry: Pick<SelectionGeometry, 'nodeId'>, table: EditorSnapshot['table']): boolean;
@@ -2757,6 +2862,9 @@ export function focusCurrentSlideIn(root: HTMLElement | null | undefined): void;
 
 // @internal
 export function focusCurrentSlideOrCanvas(root: HTMLElement | null | undefined, editor: PptxEditorInstance | null): void;
+
+// @internal
+export function focusCurrentSwatch(panel: HTMLElement | null): void;
 
 // @internal
 export function focusDialogInitialField(dialog: HTMLElement): void;
@@ -3674,7 +3782,7 @@ export function listenLinkPanelKey(editor: object, reading: () => boolean, doc?:
 export function listenLinkRequests(editor: object, enabled: () => boolean, open: (anchor: HTMLElement | null) => void): () => void;
 
 // @public
-export function listenPaneRequests(editor: object, open: (pane: SidePanelTab) => void): () => void;
+export function listenPaneRequests(editor: object, open: (pane: SidePanelTab, request: PaneRequest) => void): () => void;
 
 // @internal
 export function listenPopoverDismiss(options: {
@@ -3810,6 +3918,7 @@ export const MENU_NAMED_PARTS: {
     readonly TextBox: MenuNamedRow;
     readonly TableInsert: MenuNamedRow;
     readonly ImageInsert: MenuNamedRow;
+    readonly ChartInsert: MenuNamedRow;
     readonly Equation: MenuNamedRow;
     readonly Shapes: MenuNamedRow;
     readonly Line: MenuNamedRow;
@@ -3938,6 +4047,17 @@ export function mountedSections(grouped: readonly SlideSection[], limit: number)
 
 // @public
 export function namedFamilies(pkg: PptxPackage): string[];
+
+// @public
+export interface NewChartData {
+    // (undocumented)
+    readonly categories: readonly string[];
+    // (undocumented)
+    readonly series: readonly {
+        readonly name: string;
+        readonly values: readonly (number | null)[];
+    }[];
+}
 
 // @public
 export function nextChartCategoryLabel(data: Pick<ChartData, 'kind' | 'categories'>, fallback: string): string;
@@ -4285,6 +4405,11 @@ export function panelItems(panel: HTMLElement): HTMLElement[];
 
 // @internal
 export function panelKeyPressed(panel: HTMLElement | null): void;
+
+// @public
+export interface PaneRequest {
+    readonly focus: boolean;
+}
 
 // @public
 export type ParagraphAlignment = 'left' | 'center' | 'right' | 'justify' | 'distributed';
@@ -4669,6 +4794,7 @@ export interface PptxEditorEvents {
 // @public
 export interface PptxEditorInstance extends Editor {
     chartData(nodeId?: string): ChartDataRead;
+    chartFormat(nodeId?: string): ChartFormatRead;
     readonly find: PptxFind;
     // @internal
     finishOpening(): boolean;
@@ -4854,7 +4980,7 @@ export const REMOVAL_NOTICE_MS = 10000;
 export function removalNoticeShows(removal: EditorRemoval | null | undefined, closed: number | null): removal is EditorRemoval;
 
 // @internal
-export function renderedColorOf(pick: ColorPick, rows: readonly (readonly ThemeSwatch[])[], current?: string | null): string | null;
+export function renderedColorOf(pick: ColorPick, rows: readonly (readonly ThemeSwatch[])[], current?: string | null, automatic?: string | null): string | null;
 
 // @internal
 export function renderImageWith(session: DocumentSession, index: number, request: ImageRender, rasterize: ImageRasterizer): Promise<Uint8Array>;
@@ -4893,7 +5019,9 @@ export function requestDialogSection(editor: object, dialog: string, section: st
 export function requestLinkPopup(editor: unknown, anchor?: HTMLElement | null): void;
 
 // @public
-export function requestPane(editor: object, pane: SidePanelTab): boolean;
+export function requestPane(editor: object, pane: SidePanelTab, options?: {
+    readonly focus?: boolean;
+}): boolean;
 
 // @internal
 export function requestSectionRenameIn(editor: object | null, sectionId: string): void;
@@ -6244,7 +6372,10 @@ export type TableStyleOption = 'firstRow' | 'lastRow' | 'bandRow' | 'firstCol' |
 export function takeDialogSection(editor: object | null, dialog: string): string | undefined;
 
 // @internal
-export function takePaneRequest(editor: object | null | undefined): SidePanelTab | null;
+export function takePaneRequest(editor: object | null | undefined): {
+    readonly pane: SidePanelTab;
+    readonly focus: boolean;
+} | null;
 
 // @internal
 export const TEXT_WARP_GALLERY: readonly {
@@ -6453,6 +6584,7 @@ export const TOOLBAR_NAMED_PARTS: {
     readonly Line: "insert.line";
     readonly Shapes: "insert.shape";
     readonly ImageInsert: "insert.image";
+    readonly ChartInsert: "insert.chart";
     readonly Equation: "insert.equation";
     readonly ShapeFill: "shape.fill";
     readonly LineColor: "shape.lineColor";
@@ -6734,6 +6866,7 @@ export interface ToolbarValueMap {
     'font.size': number | {
         readonly step: 1 | -1;
     };
+    'insert.chart': ChartType;
     // (undocumented)
     'insert.line': LineKind;
     'insert.shape': string;

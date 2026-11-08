@@ -75,7 +75,8 @@
     "alignOrDistribute": "对齐或分布",
     "slideBackground": "幻灯片背景…",
     "columns": "分栏…",
-    "equation": "公式…"
+    "equation": "公式…",
+    "chart": "图表"
   },
   "contextMenu": {
     "railLabel": "幻灯片操作",
@@ -513,6 +514,7 @@
       "slideSorter": "幻灯片浏览"
     },
     "equation": "公式",
+    "chart": "图表",
     "newComment": "新建批注"
   },
   "table": {
@@ -933,7 +935,9 @@
         "group": "组",
         "connector": "连接符",
         "graphicFrame": "嵌入对象",
-        "table": "表格"
+        "table": "表格",
+        "chart": "图表",
+        "diagram": "图示"
       },
       "table": "表格",
       "rowHeight": "行高",
@@ -1135,6 +1139,7 @@
     "inputAriaLabel": "所选形状的文本",
     "adjustHandle": "拖动以更改形状",
     "placeholderTable": "在此处插入表格",
+    "placeholderChart": "在此处插入图表",
     "placeholderPicture": "在此处插入图片",
     "tableCell": "第 {row} 行，第 {column} 列",
     "diagramShape": "图示形状 {index}/{count}",
@@ -1206,6 +1211,10 @@
       "notNumber": "每个值都必须是数字。",
       "layout": "此图表的单元格引用不构成一个表格，因此只能更改名称和值。",
       "workbook": "嵌入的工作簿无法接受此更改。请为每个系列指定不同的名称，并保持数据旁边的单元格为空。"
+    },
+    "chartFormat": {
+      "noAxes": "此类型的图表没有坐标轴。",
+      "sameType": "图表已是此类型。"
     },
     "diagram": {
       "noDiagram": "请选择一个图示。",
@@ -1676,7 +1685,7 @@
     "emptyBody": "选择“新建批注”开始一个会话。"
   },
   "chartData": {
-    "editData": "编辑数据…",
+    "editData": "编辑图表…",
     "categories": "类别",
     "xValues": "X 值",
     "seriesName": "系列 {number} 的名称",
@@ -1700,11 +1709,58 @@
     "series": "系列",
     "unnamed": "未命名系列",
     "emptyTitle": "未选择图表",
-    "emptyBody": "选择幻灯片上的图表以编辑其数据。",
+    "emptyBody": "选择幻灯片上的图表以编辑它。",
     "notEditableTitle": "此图表数据为只读",
     "removeCategoryNamed": "删除类别 {name}",
     "removeSeriesNamed": "删除系列 {name}",
     "removeSeries": "删除系列"
+  },
+  "chartFormat": {
+    "types": {
+      "columnClustered": "柱形图",
+      "columnStacked": "堆积柱形图",
+      "columnPercentStacked": "百分比堆积柱形图",
+      "barClustered": "条形图",
+      "barStacked": "堆积条形图",
+      "barPercentStacked": "百分比堆积条形图",
+      "line": "折线图",
+      "lineMarkers": "带数据标记的折线图",
+      "area": "面积图",
+      "areaStacked": "堆积面积图",
+      "areaPercentStacked": "百分比堆积面积图",
+      "pie": "饼图",
+      "doughnut": "圆环图",
+      "radar": "雷达图",
+      "scatter": "散点图",
+      "scatterLines": "带直线和数据标记的散点图",
+      "other": "其他类型"
+    },
+    "type": "图表类型",
+    "elements": "图表元素",
+    "showTitle": "标题",
+    "titleText": "标题文字",
+    "defaultTitle": "图表标题",
+    "legend": "图例",
+    "legendPositions": {
+      "none": "无",
+      "top": "顶部",
+      "bottom": "底部",
+      "left": "左侧",
+      "right": "右侧"
+    },
+    "dataLabels": "数据标签",
+    "gridlines": "网格线",
+    "axes": "坐标轴",
+    "categoryAxisTitle": "类别轴标题",
+    "valueAxisTitle": "数值轴标题",
+    "xAxisTitle": "X 轴标题",
+    "yAxisTitle": "Y 轴标题",
+    "axisTitleHelp": "将坐标轴标题留空则不显示标题。",
+    "typeChangeRemoved": "此图表类型不保留您设置的颜色或坐标轴标题。撤消可恢复它们。",
+    "typeChangeHint": "某些图表类型不保留您设置的颜色或坐标轴标题。",
+    "pieFirstSeries": "饼图只显示第一个系列。",
+    "colors": "颜色",
+    "seriesColor": "{name} 的颜色"
   },
   "diagram": {
     "editText": "编辑文本…",

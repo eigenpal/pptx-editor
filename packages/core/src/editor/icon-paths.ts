@@ -10,7 +10,9 @@
 // `check_box_outline_blank`, `view_column_2`, `dashboard`, `restart_alt`, `visibility_off`,
 // `view_agenda`, `grid_view`, `unfold_less`, `unfold_more`, `add_row_*`/`add_column_*`,
 // `toolbar`, `call_to_action`, `dock_to_*`, `crop`, `brightness_6`, `palette`, `opacity`,
-// `imagesmode`, `style`, `frame_person`, `list_alt`, `table_chart`, `functions`, and `accessibility_new` from the official
+// `imagesmode`, `style`, `frame_person`, `list_alt`, `table_chart`, `functions`, `insert_chart`,
+// `bar_chart`, `align_horizontal_left`, `show_chart`, `area_chart`, `pie_chart`, `donut_large`,
+// `scatter_plot`, `legend_toggle`, and `accessibility_new` from the official
 // Material Symbols; the table icons (`table`, `table_rows`, `view_column`, `border_*`, `padding`,
 // `height`, `fit_width`, `delete_sweep`, `open_with`) from DOCX Editor's `generated-icon-paths.ts`, also
 // official Material Symbols; `add_comment`, `send`, and `refresh` from DOCX Editor's review icons
@@ -21,6 +23,29 @@
 /** Material Symbol name → SVG path data. */
 export const ICON_PATHS: Readonly<Record<string, readonly string[]>> = {
   functions: ['M240-160v-80l260-240-260-240v-80h480v120H431l215 200-215 200h289v120H240Z'],
+  insert_chart: [
+    'M280-280h80v-280h-80v280Zm160 0h80v-400h-80v400Zm160 0h80v-160h-80v160ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z',
+  ],
+  bar_chart: ['M640-160v-280h160v280H640Zm-240 0v-640h160v640H400Zm-240 0v-440h160v440H160Z'],
+  align_horizontal_left: [
+    'M80-80v-800h80v800H80Zm160-200v-120h400v120H240Zm0-280v-120h640v120H240Z',
+  ],
+  show_chart: ['m140-220-60-60 300-300 160 160 284-320 56 56-340 384-160-160-240 240Z'],
+  area_chart: [
+    'M120-160v-520l160 120 200-280 200 160h160v520H120Zm200-120 160-220 280 218v-318H652L496-725 298-447l-98-73v144l120 96Z',
+  ],
+  pie_chart: [
+    'M520-520h278q-15-110-91.5-186.5T520-798v278Zm-80 358v-636q-121 15-200.5 105.5T160-480q0 122 79.5 212.5T440-162Zm80 0q110-14 187-91t91-187H520v278Zm-40-318Zm0 400q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 155.5 31.5t127 86q54.5 54.5 86 127T880-480q0 82-31.5 155T763-197.5q-54 54.5-127 86T480-80Z',
+  ],
+  donut_large: [
+    'M441-82Q287-97 184-211T81-480q0-155 103-269t257-129v120q-104 14-172 93t-68 185q0 106 68 185t172 93v120Zm80 0v-120q94-12 159-78t79-160h120q-14 143-114.5 243.5T521-82Zm238-438q-14-94-79-160t-159-78v-120q143 14 243.5 114.5T879-520H759Z',
+  ],
+  scatter_plot: [
+    'M680-120q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47Zm0-80q33 0 56.5-23.5T760-280q0-33-23.5-56.5T680-360q-33 0-56.5 23.5T600-280q0 33 23.5 56.5T680-200Zm-400-40q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47Zm0-80q33 0 56.5-23.5T360-400q0-33-23.5-56.5T280-480q-33 0-56.5 23.5T200-400q0 33 23.5 56.5T280-320Zm160-240q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47Zm0-80q33 0 56.5-23.5T520-720q0-33-23.5-56.5T440-800q-33 0-56.5 23.5T360-720q0 33 23.5 56.5T440-640Zm240 360ZM280-400Zm160-320Z',
+  ],
+  legend_toggle: [
+    'M160-200v-80h640v80H160Zm0-160v-80h640v80H160Zm0-160v-94l240-146 200 142 200-142v98L600-520 397-664 160-520Z',
+  ],
   table_chart: [
     'M760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120ZM200-640h560v-120H200v120Zm100 80H200v360h100v-360Zm360 0v360h100v-360H660Zm-80 0H380v360h200v-360Z',
   ],

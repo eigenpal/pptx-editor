@@ -98,6 +98,8 @@ const FormatTab = defineComponent({
     const editor = usePptxEditor();
     const geometry = useEditorState((s) => s.geometry);
     const table = useEditorState((s) => s.table);
+    const chart = useEditorState((s) => s.chart ?? null);
+    const diagram = useEditorState((s) => s.diagram ?? null);
     const readOnly = useEditorState((s) => s.mode === 'view');
     const selected = useEditorState((s) =>
       s.selection.kind === 'shapes' ? s.selection.nodeIds.length : 0
@@ -206,7 +208,9 @@ const FormatTab = defineComponent({
       return [
         <div class="pptx-panel__section">
           <h3 class="pptx-panel__title">{t('panel.format.element')}</h3>
-          <span class="pptx-chip">{t(elementKindLabelKey(g, table.value))}</span>
+          <span class="pptx-chip">
+            {t(elementKindLabelKey(g, table.value, { chart: chart.value, diagram: diagram.value }))}
+          </span>
         </div>,
         <div class="pptx-panel__section">
           <h3 class="pptx-panel__title">{t('panel.format.size')}</h3>
@@ -362,10 +366,10 @@ export const PptxEditorSidePanel = defineComponent({
       (e, _old, onCleanup) => {
         if (!e) return;
         onCleanup(
-          listenPaneRequests(e, (pane) => {
+          listenPaneRequests(e, (pane, request) => {
             takePaneRequest(e);
             setTab(pane);
-            focusTab(pane);
+            if (request.focus) focusTab(pane);
           })
         );
       },
@@ -373,10 +377,10 @@ export const PptxEditorSidePanel = defineComponent({
     );
     // A host that shows a closed panel for a request mounts it after the request: take it now.
     onMounted(() => {
-      const pane = takePaneRequest(editor.value);
-      if (!pane) return;
-      setTab(pane);
-      focusTab(pane);
+      const request = takePaneRequest(editor.value);
+      if (!request) return;
+      setTab(request.pane);
+      if (request.focus) focusTab(request.pane);
     });
     return () => {
       const { class: hostClass, style: hostStyle, ...rest } = attrs;

@@ -6,7 +6,7 @@
 // it renders and dispatches, never whether it is enabled. Enabled state has exactly one source,
 // `toolbarCommandState`, which asks `Editor.can`.
 
-import { hasPaneListener, requestPane } from './pane-requests.ts';
+import { afterInsertCommand, hasPaneListener, requestPane } from './pane-requests.ts';
 import type {
   Editor,
   EditorCommand,
@@ -18,7 +18,12 @@ import { warnChromeSlotRun, warnDialogSlotRun, warnInvalidSlotValue } from './de
 import { ICON_PATHS } from './icon-paths.ts';
 import { IMAGE_CHROME_GROUP, imageSlotState, type ImageSlotId } from './chrome-picture.ts';
 import { adapterActionState } from './chrome-adapter-state.ts';
-import { EQUATION_PROBES, INSERT_GROUP, type EquationSlotId } from './chrome-insert.ts';
+import {
+  EQUATION_PROBES,
+  INSERT_GROUP,
+  type ChartInsertSlotId,
+  type EquationSlotId,
+} from './chrome-insert.ts';
 import { CHART_CHROME_GROUP, chartSlotState, type ChartSlotId } from './chrome-chart.ts';
 import { DIAGRAM_CHROME_GROUP, diagramSlotState, type DiagramSlotId } from './chrome-diagram.ts';
 import {
@@ -769,6 +774,7 @@ export type ChromeSlotId =
   | ChartSlotId
   | DiagramSlotId
   | EquationSlotId
+  | ChartInsertSlotId
   | ReviewSlotId;
 
 /** Every slot id, derived from the registry. @public */
@@ -808,6 +814,7 @@ const PROBES: Partial<Record<ChromeSlotId, unknown>> = {
   'paragraph.valign': 't',
   'text.link': 'https://example.com',
   'insert.line': 'line',
+  'insert.chart': 'columnClustered',
   'shape.lineStart': 'none',
   'shape.lineEnd': 'none',
   'arrange.order': 'forward',
@@ -982,5 +989,5 @@ export function runToolbarCommand<K extends ChromeSlotId>(
   const result = editor.exec(command, options);
   // A refused draw (no table) leaves the pen as it was.
   if (result.ok) rememberTableBorderPen(editor, id, value);
-  return result;
+  return afterInsertCommand(editor, command, result);
 }

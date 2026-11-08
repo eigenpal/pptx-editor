@@ -172,10 +172,34 @@ export type CapsStyle = 'none' | 'small' | 'all';
 export type CaretAffinity = 'downstream' | 'upstream';
 
 // @public
+export interface ChartColorEntry {
+    readonly automatic: ColorChoice;
+    readonly color: ColorChoice | null;
+    readonly name: string;
+}
+
+// @public
 export type ChartCommand = {
     readonly type: 'setChartData';
     readonly nodeId?: string;
     readonly data: Omit<ChartData, 'workbook'>;
+} | {
+    readonly type: 'insertChart';
+    readonly chartType: ChartType;
+    readonly data?: NewChartData;
+} | {
+    readonly type: 'setChartType';
+    readonly nodeId?: string;
+    readonly chartType: ChartType;
+} | {
+    readonly type: 'setChartFormat';
+    readonly nodeId?: string;
+    readonly format: ChartFormatChange;
+} | {
+    readonly type: 'setChartColor';
+    readonly nodeId?: string;
+    readonly index: number;
+    readonly color: ColorChoice | null;
 };
 
 // @public
@@ -213,6 +237,57 @@ export interface ChartDataSeries {
     readonly source?: number;
     readonly values: readonly (number | null)[];
 }
+
+// @public
+export interface ChartFormat {
+    readonly axes: boolean | null;
+    readonly axisTitles: {
+        readonly category: string | null;
+        readonly value: string | null;
+    } | null;
+    // (undocumented)
+    readonly colors: readonly ChartColorEntry[];
+    readonly colorsBy: 'series' | 'point';
+    readonly dataLabels: boolean;
+    readonly gridlines: boolean | null;
+    // (undocumented)
+    readonly legend: ChartLegendPosition;
+    readonly title: string | null;
+    readonly type: ChartType | null;
+}
+
+// @public
+export interface ChartFormatChange {
+    // (undocumented)
+    readonly axes?: boolean;
+    // (undocumented)
+    readonly categoryAxisTitle?: string | null;
+    // (undocumented)
+    readonly dataLabels?: boolean;
+    // (undocumented)
+    readonly gridlines?: boolean;
+    // (undocumented)
+    readonly legend?: ChartLegendPosition;
+    // (undocumented)
+    readonly title?: string | null;
+    // (undocumented)
+    readonly valueAxisTitle?: string | null;
+}
+
+// @public
+export type ChartFormatRead = {
+    readonly ok: true;
+    readonly format: ChartFormat;
+} | {
+    readonly ok: false;
+    readonly reason: string;
+};
+
+// @public
+export type ChartLegendPosition = 'none' | 'top' | 'bottom' | 'left' | 'right';
+
+// @public
+export type ChartType = 'columnClustered' | 'columnStacked' | 'columnPercentStacked' | 'barClustered' | 'barStacked' | 'barPercentStacked' | 'line' | 'lineMarkers' | 'area' | 'areaStacked' | 'areaPercentStacked' | 'pie' | 'doughnut' | 'radar' | 'scatter' | 'scatterLines';
 
 // @public
 export type ChartWorkbookState = 'embedded' | 'kept' | 'external' | 'none';
@@ -1348,6 +1423,17 @@ export type LineKind = 'line' | 'arrow' | 'elbow' | 'curved';
 // @public
 export interface LoadOptions {
     readonly startSlide?: number;
+}
+
+// @public
+export interface NewChartData {
+    // (undocumented)
+    readonly categories: readonly string[];
+    // (undocumented)
+    readonly series: readonly {
+        readonly name: string;
+        readonly values: readonly (number | null)[];
+    }[];
 }
 
 // @public

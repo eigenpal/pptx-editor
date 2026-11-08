@@ -84,6 +84,8 @@ function FormatTab() {
   const editor = usePptxEditor();
   const geometry = useEditorState((s) => s.geometry);
   const table = useEditorState((s) => s.table);
+  const chart = useEditorState((s) => s.chart ?? null);
+  const diagram = useEditorState((s) => s.diagram ?? null);
   const readOnly = useEditorState((s) => s.mode === 'view');
   const selected = useEditorState((s) =>
     s.selection.kind === 'shapes' ? s.selection.nodeIds.length : 0
@@ -146,7 +148,7 @@ function FormatTab() {
     <>
       <div className="pptx-panel__section">
         <h3 className="pptx-panel__title">{t('panel.format.element')}</h3>
-        <span className="pptx-chip">{t(elementKindLabelKey(g, table))}</span>
+        <span className="pptx-chip">{t(elementKindLabelKey(g, table, { chart, diagram }))}</span>
       </div>
       <div className="pptx-panel__section">
         <h3 className="pptx-panel__title">{t('panel.format.size')}</h3>
@@ -313,20 +315,20 @@ export function SidePanel({
   useEffect(
     () =>
       editor
-        ? listenPaneRequests(editor, (pane) => {
+        ? listenPaneRequests(editor, (pane, request) => {
             takePaneRequest(editor);
             latest.current(pane);
-            setAsked({ pane });
+            if (request.focus) setAsked({ pane });
           })
         : undefined,
     [editor]
   );
   // A host that shows a closed panel for a request mounts it after the request: take it now.
   useEffect(() => {
-    const pane = takePaneRequest(editor);
-    if (!pane) return;
-    latest.current(pane);
-    setAsked({ pane });
+    const request = takePaneRequest(editor);
+    if (!request) return;
+    latest.current(request.pane);
+    if (request.focus) setAsked({ pane: request.pane });
   }, [editor]);
   // A request (a comment marker, the Selection pane control) lands the focus in the panel: on the
   // pane's current item when it marks one (`aria-current`), else on the tab. Focus that a pane

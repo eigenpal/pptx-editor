@@ -502,6 +502,7 @@ export type {
   GradientFill,
   PatternFill,
   PatternPreset,
+  PaneRequest,
   SidePanelTab,
   ParagraphDialogFields,
   PptxEditorInstance,

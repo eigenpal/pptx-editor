@@ -146,7 +146,7 @@ describe('the placeholder chrome', () => {
     );
     expect(outlines.length).toBe(2);
     expect(outlines[1]!.getAttribute('stroke-dasharray')).toBe(`${PX} ${2 * PX}`);
-    expect(buttons(parts)).toEqual(['table', 'picture']);
+    expect(buttons(parts)).toEqual(['table', 'chart', 'picture']);
     // A placeholder with text shows nothing, and view mode shows nothing.
     const filled = await open(title() + placeholder(3, '<p:ph idx="1"/>', 'Text'));
     expect(chrome(filled).c.elements(doc, layoutOf(filled), PX)).toEqual([]);
@@ -188,9 +188,9 @@ describe('the placeholder chrome', () => {
       ).toBe(true);
     }
     e.setSelection({ kind: 'none' });
-    expect(buttons(c.elements(doc, layoutOf(e), PX))).toEqual(['table', 'picture']);
+    expect(buttons(c.elements(doc, layoutOf(e), PX))).toEqual(['table', 'chart', 'picture']);
     e.setSelection({ kind: 'shapes', nodeIds: [contentId] });
-    expect(buttons(c.elements(doc, layoutOf(e), PX))).toEqual(['table', 'picture']);
+    expect(buttons(c.elements(doc, layoutOf(e), PX))).toEqual(['table', 'chart', 'picture']);
   });
 
   test('the table button fills the placeholder; the picture button asks for a file', async () => {
@@ -232,6 +232,21 @@ describe('the placeholder chrome', () => {
     expect(c.press(layoutOf(e), doc.createElementNS('http://www.w3.org/2000/svg', 'rect'))).toBe(
       false
     );
+  });
+
+  test('the chart button fills the placeholder with a column chart', async () => {
+    const e = await open(title() + content);
+    const id = tree(e)[1]!.id;
+    const { c, commands } = chrome(e);
+    const button = c
+      .elements(doc, layoutOf(e), PX)
+      .find((p) => p.getAttribute('data-placeholder-insert') === `${id}|chart`)!;
+    expect(button.querySelector('title')!.textContent).toBe('canvas.placeholderChart');
+    expect(c.press(layoutOf(e), button.firstElementChild!)).toBe(true);
+    expect(commands).toEqual([{ type: 'insertChart', chartType: 'columnClustered' }]);
+    expect(tree(e).map((el) => el.local)).toEqual(['sp', 'graphicFrame']);
+    const format = e.chartFormat();
+    expect(format.ok && format.format.type).toBe('columnClustered');
   });
 
   test('a placeholder with its own fill shows its outline but no buttons', async () => {

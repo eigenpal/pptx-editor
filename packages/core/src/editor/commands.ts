@@ -208,6 +208,7 @@ const CANVAS_INSERTS: ReadonlySet<EditorCommand['type']> = new Set([
   'insertLine',
   'insertImage',
   'insertTable',
+  'insertChart',
   'insertEquation',
   'paste',
 ]);

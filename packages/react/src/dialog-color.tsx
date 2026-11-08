@@ -10,6 +10,7 @@ import {
   colorPickLabel,
   colorPickOf,
   colorPicks,
+  focusCurrentSwatch,
   renderedColorOf,
   type ColorPick,
 } from '@pptx-editor.dev/core/editor';
@@ -18,9 +19,13 @@ import { useEditorState, useTranslation } from './context.ts';
 import { SelectField, dialogControl } from './dialog-form.tsx';
 
 /** A color pick as the slide renders it, or null for the inherited color and no change. */
-function useRenderedColor(pick: ColorPick, current: string | null): string | null {
+function useRenderedColor(
+  pick: ColorPick,
+  current: string | null,
+  automatic: string | null
+): string | null {
   const rows = useEditorState((s) => s.themeColors);
-  return renderedColorOf(pick, rows, current);
+  return renderedColorOf(pick, rows, current, automatic);
 }
 
 /** A color field: the list of picks and the swatch grid beside it. */
@@ -32,6 +37,8 @@ export function ColorField(props: {
   readonly seed: ColorPick | undefined;
   /** The color the selection has now (`#RRGGBB`): the swatch of "Current color" shows it. */
   readonly current?: string | null;
+  /** The automatic color (`#RRGGBB`), when the field knows it: the swatch of `auto` shows it. */
+  readonly automatic?: string | null;
   readonly disabled?: boolean;
   readonly onChange: (pick: ColorPick) => void;
   readonly className?: string;
@@ -42,7 +49,7 @@ export function ColorField(props: {
   const [open, setOpen] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
-  const rendered = useRenderedColor(props.value, props.current ?? null);
+  const rendered = useRenderedColor(props.value, props.current ?? null, props.automatic ?? null);
   const labelOf = (p: ColorPick): string => colorPickLabel(t, p);
   // The grid closes on a pick, on Escape (which does not close the dialog), and on a press
   // outside it.
@@ -53,7 +60,7 @@ export function ColorField(props: {
       if (!panel.current?.contains(target) && !button.current?.contains(target)) setOpen(false);
     };
     document.addEventListener('pointerdown', away, true);
-    panel.current?.querySelector<HTMLElement>('button')?.focus();
+    focusCurrentSwatch(panel.current);
     return () => document.removeEventListener('pointerdown', away, true);
   }, [open]);
   const data = Object.fromEntries(Object.entries(props).filter(([k]) => k.startsWith('data-')));

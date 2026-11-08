@@ -75,7 +75,8 @@
     "alignOrDistribute": "맞춤 또는 배분",
     "slideBackground": "슬라이드 배경…",
     "columns": "열…",
-    "equation": "수식…"
+    "equation": "수식…",
+    "chart": "차트"
   },
   "contextMenu": {
     "railLabel": "슬라이드 작업",
@@ -513,6 +514,7 @@
       "slideSorter": "여러 슬라이드"
     },
     "equation": "수식",
+    "chart": "차트",
     "newComment": "새 댓글"
   },
   "table": {
@@ -933,7 +935,9 @@
         "group": "그룹",
         "connector": "연결선",
         "graphicFrame": "포함된 개체",
-        "table": "표"
+        "table": "표",
+        "chart": "차트",
+        "diagram": "다이어그램"
       },
       "table": "표",
       "rowHeight": "행 높이",
@@ -1135,6 +1139,7 @@
     "inputAriaLabel": "선택한 도형의 텍스트",
     "adjustHandle": "끌어서 도형 모양 변경",
     "placeholderTable": "여기에 표 삽입",
+    "placeholderChart": "여기에 차트 삽입",
     "placeholderPicture": "여기에 그림 삽입",
     "tableCell": "{row}행, {column}열",
     "diagramShape": "다이어그램 도형 {index}/{count}",
@@ -1206,6 +1211,10 @@
       "notNumber": "모든 값은 숫자여야 합니다.",
       "layout": "이 차트의 셀 참조는 하나의 표를 이루지 않으므로 이름과 값만 변경할 수 있습니다.",
       "workbook": "포함된 통합 문서가 이 변경을 받을 수 없습니다. 각 계열에 다른 이름을 지정하고 데이터 옆의 셀을 비워 두세요."
+    },
+    "chartFormat": {
+      "noAxes": "이 종류의 차트에는 축이 없습니다.",
+      "sameType": "차트가 이미 이 종류입니다."
     },
     "diagram": {
       "noDiagram": "다이어그램을 하나 선택하세요.",
@@ -1676,7 +1685,7 @@
     "emptyBody": "새 댓글을 선택해 스레드를 시작하세요."
   },
   "chartData": {
-    "editData": "데이터 편집…",
+    "editData": "차트 편집…",
     "categories": "범주",
     "xValues": "X 값",
     "seriesName": "계열 {number} 이름",
@@ -1700,11 +1709,58 @@
     "series": "계열",
     "unnamed": "이름 없는 계열",
     "emptyTitle": "선택한 차트 없음",
-    "emptyBody": "데이터를 편집하려면 슬라이드에서 차트를 선택하세요.",
+    "emptyBody": "차트를 편집하려면 슬라이드에서 차트를 선택하세요.",
     "notEditableTitle": "이 차트 데이터는 읽기 전용입니다",
     "removeCategoryNamed": "항목 {name} 제거",
     "removeSeriesNamed": "계열 {name} 제거",
     "removeSeries": "계열 제거"
+  },
+  "chartFormat": {
+    "types": {
+      "columnClustered": "세로 막대형",
+      "columnStacked": "누적 세로 막대형",
+      "columnPercentStacked": "100% 기준 누적 세로 막대형",
+      "barClustered": "가로 막대형",
+      "barStacked": "누적 가로 막대형",
+      "barPercentStacked": "100% 기준 누적 가로 막대형",
+      "line": "꺾은선형",
+      "lineMarkers": "표식이 있는 꺾은선형",
+      "area": "영역형",
+      "areaStacked": "누적 영역형",
+      "areaPercentStacked": "100% 기준 누적 영역형",
+      "pie": "원형",
+      "doughnut": "도넛형",
+      "radar": "방사형",
+      "scatter": "분산형",
+      "scatterLines": "직선 및 표식이 있는 분산형",
+      "other": "기타 종류"
+    },
+    "type": "차트 종류",
+    "elements": "차트 요소",
+    "showTitle": "제목",
+    "titleText": "제목 텍스트",
+    "defaultTitle": "차트 제목",
+    "legend": "범례",
+    "legendPositions": {
+      "none": "없음",
+      "top": "위쪽",
+      "bottom": "아래쪽",
+      "left": "왼쪽",
+      "right": "오른쪽"
+    },
+    "dataLabels": "데이터 레이블",
+    "gridlines": "눈금선",
+    "axes": "축",
+    "categoryAxisTitle": "항목 축 제목",
+    "valueAxisTitle": "값 축 제목",
+    "xAxisTitle": "X축 제목",
+    "yAxisTitle": "Y축 제목",
+    "axisTitleHelp": "축 제목을 비워 두면 제목이 표시되지 않습니다.",
+    "typeChangeRemoved": "이 차트 종류에서는 설정한 색과 축 제목이 유지되지 않습니다. 실행 취소하면 다시 복원됩니다.",
+    "typeChangeHint": "일부 차트 종류에서는 설정한 색과 축 제목이 유지되지 않습니다.",
+    "pieFirstSeries": "원형 차트에는 첫 번째 계열만 표시됩니다.",
+    "colors": "색",
+    "seriesColor": "{name} 색"
   },
   "diagram": {
     "editText": "텍스트 편집…",

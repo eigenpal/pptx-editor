@@ -9,6 +9,7 @@ import type {
   EditorSelection,
   TableStyleChoice,
   ChartDataRead,
+  ChartFormatRead,
 } from '../contracts/index.ts';
 import type { ClipboardDrawingReader } from './clipboard-host.ts';
 import type { DocumentSession, OpenOptions } from './document-session.ts';
@@ -157,6 +158,12 @@ export interface PptxEditorInstance extends Editor {
    * dialog shows it; `setChartData` writes it back.
    */
   chartData(nodeId?: string): ChartDataRead;
+  /**
+   * The type and elements of the selected chart, or of the chart frame `nodeId` on the current
+   * slide: its title, legend, data labels, gridlines, axes, and colors. The Chart tab shows it;
+   * `setChartType`, `setChartFormat`, and `setChartColor` change it.
+   */
+  chartFormat(nodeId?: string): ChartFormatRead;
   /** The shapes copied last in this editor (paste uses it when the clipboard is not readable). */
   readonly lastCopied: ClipboardPayload | null;
   /**

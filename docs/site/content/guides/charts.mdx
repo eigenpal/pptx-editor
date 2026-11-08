@@ -1,6 +1,6 @@
 ---
 title: 'Charts'
-description: 'Draw charts from the values cached in their chart parts, and edit the data that a chart plots.'
+description: 'Insert charts, change their type, title, legend, axes, and colors, edit the data that a chart plots, and draw charts from their chart parts.'
 category: 'Guides'
 ---
 
@@ -31,17 +31,69 @@ Right legends, top and bottom legends of one row, and radar labels keep their sp
 
 The module turns a chart into shapes and labels in the chart's frame. The engine lays them out with the same geometry and text measurement as every other shape. The editor and the PDF export draw that one layout, so the two agree.
 
-A chart selects, moves, and deletes as one object. Only its data is editable. See [Edit chart data](#edit-chart-data).
+A chart selects, moves, and deletes as one object. You can insert a chart, change its type and elements, and edit its data. Inserting and editing are part of the free engine and the React and Vue adapters. The Pro drawing module only draws the result.
+
+## Insert a chart
+
+Choose **Insert** > **Chart**, or the **Chart** button of the toolbar's insert group, and then pick a type: **Column**, **Bar**, **Line**, **Area**, **Pie**, **Doughnut**, or **Scatter**. The new chart fills the empty content placeholder that is selected or holds the cursor, or else the first one. An empty content placeholder also shows a chart button in its middle, which inserts a column chart there. On a slide with no such placeholder, the chart is centered below the title area. When another chart, table, or picture covers that place, the new chart starts 5% of the slide down and to the right of it, so each chart shows its own corner. The chart is selected, and the side panel opens on its **Chart** tab, where you replace the sample data.
+
+From code, run `insertChart` with any `ChartType`. Without `data`, the chart gets three series over four categories of sample values, or one series for a pie or doughnut chart. The sample names follow the editor's language.
+
+```ts
+const result = editor.exec({
+  type: 'insertChart',
+  chartType: 'columnClustered',
+  data: {
+    categories: ['Q1', 'Q2', 'Q3', 'Q4'],
+    series: [
+      { name: 'Plan', values: [42, 35, 51, 28] },
+      { name: 'Actual', values: [38, 41, 47, null] }, // null is a blank cell
+    ],
+  },
+});
+if (!result.ok) console.warn(result.reason); // a translation key
+```
+
+A scatter chart's categories are its X values, so each one must be a number. The new chart has an embedded workbook with the same data, so applications that edit chart data in a spreadsheet show your values.
+
+## Change the type and the chart elements
+
+The **Chart** tab of the side panel shows these sections above the data:
+
+- **Chart type** lists every `ChartType`. A chart of another type, such as a 3-D chart, shows **Other type** until you pick one. When the chart has colors or axis titles that you set, a hint says that some types cannot keep them. After such a change, a note says what was removed, and **Undo** restores it. A pie chart draws only its first series, and says so when the data has more.
+- **Chart elements** turns the **Title**, **Data labels**, **Axes**, and **Gridlines** on and off, sets the title text, places the **Legend** (none, top, bottom, left, or right), and sets the axis titles. Leave an axis title empty for no title. While **Axes** is off, the gridlines and axis title fields are unavailable. A pie or doughnut chart has no axis fields.
+- **Colors** sets the color of each series, or of each slice of a pie or doughnut chart. **Automatic** gives back the color of the chart style.
+
+A check box, list, or color applies when it changes. A text field applies when you press Enter or leave it. Each change is one undo step.
+
+From code, `editor.chartFormat(nodeId?)` reads the type, elements, and colors of the selected chart. `setChartType`, `setChartFormat`, and `setChartColor` change them:
+
+```ts
+editor.exec({ type: 'setChartType', chartType: 'lineMarkers' });
+editor.exec({
+  type: 'setChartFormat',
+  format: { title: 'Sales', legend: 'right', dataLabels: true, valueAxisTitle: 'Units' },
+});
+// Series 2 in the theme's sixth accent; `null` gives back the automatic color.
+editor.exec({ type: 'setChartColor', index: 1, color: { theme: 'accent6' } });
+
+const read = editor.chartFormat();
+if (read.ok) console.log(read.format.type, read.format.colorsBy);
+```
+
+A field of `setChartFormat` that you leave out keeps its value. A `title` of `null` removes the title. A new title text keeps the font of the old title. `ChartFormat.colorsBy` is `point` for a pie or doughnut chart: `setChartColor` then colors the slice at `index`.
+
+A type change keeps each series' name, data, and color, and the chart's title, legend, and data labels. Markers, trendlines, error bars, and 3-D views that the new type does not have go away. The axes stay when the new type plots on the same kind of axes. Otherwise the chart gets new axes.
 
 ## Edit chart data
 
-You can change the series names, the category labels, and the values of a chart. You can also add and remove series and categories. Data editing is part of the free engine and the React and Vue adapters. The Pro drawing module only draws the result.
+You can change the series names, the category labels, and the values of a chart. You can also add and remove series and categories.
 
 The data of bar, column, line, area, pie, doughnut, radar, and scatter charts is editable. In a scatter chart, the categories are the X values.
 
-### Use the Chart Data tab
+### Use the Chart tab
 
-Select a chart. Then choose **Edit data…** on the chart toolbar group, on the **Chart Design** ribbon tab, or in the chart's context menu. The side panel opens on its **Chart Data** tab, beside the slide. The tab shows while a chart is selected:
+Select a chart. Then choose **Edit chart…** on the chart toolbar group, on the **Chart Design** ribbon tab, or in the chart's context menu. The side panel opens on its **Chart** tab, beside the slide. The tab shows while a chart is selected. Below the type, elements, and colors, it shows the data:
 
 - **Categories** lists a field for each category label, or **X values** for a scatter chart. Each row has a remove button. **Add category** adds a category at the end.
 - **Series** shows a card for each series, with its name and a value field for each category. A card opens and closes with its title. **Add series** adds a series at the end, and **Remove series** removes the series of its card.
@@ -111,7 +163,9 @@ When the workbook is `kept` or `external`, the tab shows a note. An application 
 - When the cell references do not form one table, you can change only names, category labels, and values.
 - A chart edits up to 255 series and 4,000 categories. Names and labels have up to 255 characters.
 - Date categories show as serial numbers.
-- Chart formatting, such as colors, axes, and the chart type, is not editable.
+- The type, elements, and colors of the read-only charts above are not editable either.
+- Chart styles, fonts, number formats, axis scales, and the formatting of one data label are not editable.
+- A changed chart part keeps its chart style (`c:style`). A new chart has the automatic look of the theme.
 
 ## See also
 

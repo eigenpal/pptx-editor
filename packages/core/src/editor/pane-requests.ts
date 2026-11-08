@@ -29,21 +29,33 @@ export type SidePanelTab = (typeof SIDE_PANEL_TABS)[number];
  */
 export const SIDE_PANEL_TAB_ICONS: Readonly<Record<SidePanelTab, string>> = {
   format: 'tune',
-  chart: 'table_chart',
+  chart: 'insert_chart',
   diagram: 'edit_note',
   selection: 'list_alt',
   animations: 'play_arrow',
   comments: 'comment',
 };
 
-type PaneListener = (pane: SidePanelTab) => void;
+/** How a side panel answers a request: whether it moves the focus to the tab. @public */
+export interface PaneRequest {
+  /**
+   * False keeps the focus where it is: Insert > Chart opens the Chart tab, and the keyboard
+   * stays on the slide, so Undo and Delete act on the new chart.
+   */
+  readonly focus: boolean;
+}
+
+type PaneListener = (pane: SidePanelTab, request: PaneRequest) => void;
 
 /** For each editor: the functions that answer a pane request. */
 const listeners = new WeakMap<object, Set<PaneListener>>();
 /** Who follows the listeners coming and going: the toolbar slots read them. */
 const watchers = new Set<() => void>();
 /** The last request of each editor, until a side panel takes it (`takePaneRequest`). */
-const recent = new WeakMap<object, { readonly pane: SidePanelTab; readonly at: number }>();
+const recent = new WeakMap<
+  object,
+  { readonly pane: SidePanelTab; readonly focus: boolean; readonly at: number }
+>();
 /** A side panel that mounts this soon after a request answers it: the host just opened it. */
 const RECENT_MS = 1000;
 let version = 0;
@@ -58,10 +70,13 @@ const changed = (): void => {
  * least one listener is registered, the toolbar's Selection pane and Format shape controls are
  * on. Returns the function that stops listening. @public
  */
-export function listenPaneRequests(editor: object, open: (pane: SidePanelTab) => void): () => void {
+export function listenPaneRequests(
+  editor: object,
+  open: (pane: SidePanelTab, request: PaneRequest) => void
+): () => void {
   let set = listeners.get(editor);
   if (!set) listeners.set(editor, (set = new Set()));
-  const own: PaneListener = (pane) => open(pane);
+  const own: PaneListener = (pane, request) => open(pane, request);
   set.add(own);
   changed();
   return () => {
@@ -74,14 +89,19 @@ export function listenPaneRequests(editor: object, open: (pane: SidePanelTab) =>
  * what an answer means. Returns false when nothing listens. A listener that throws does not stop
  * the others; the first error is thrown after all of them ran. @public
  */
-export function requestPane(editor: object, pane: SidePanelTab): boolean {
+export function requestPane(
+  editor: object,
+  pane: SidePanelTab,
+  options: { readonly focus?: boolean } = {}
+): boolean {
   const set = listeners.get(editor);
   if (!set || set.size === 0) return false;
-  recent.set(editor, { pane, at: Date.now() });
+  const request: PaneRequest = { focus: options.focus !== false };
+  recent.set(editor, { pane, focus: request.focus, at: Date.now() });
   let failure: { error: unknown } | null = null;
   for (const listener of [...set]) {
     try {
-      listener(pane);
+      listener(pane, request);
     } catch (error) {
       failure ??= { error };
     }
@@ -91,15 +111,31 @@ export function requestPane(editor: object, pane: SidePanelTab): boolean {
 }
 
 /**
- * The tab of a request that no side panel has taken yet, made in the last second, or null. A
- * side panel takes it when it turns to a tab, and when it mounts: a host that shows a closed
- * panel for a request mounts the panel after the request. @internal
+ * After a command ran: a new chart opens the Chart tab, where its sample data waits to be
+ * replaced. The focus stays on the slide, so Undo, Delete, and the arrow keys act on the new
+ * chart. Returns `result`. @internal
  */
-export function takePaneRequest(editor: object | null | undefined): SidePanelTab | null {
+export function afterInsertCommand<R extends { readonly ok: boolean }>(
+  editor: object,
+  command: { readonly type: string },
+  result: R
+): R {
+  if (result.ok && command.type === 'insertChart') requestPane(editor, 'chart', { focus: false });
+  return result;
+}
+
+/**
+ * The tab of a request that no side panel has taken yet, made in the last second, and whether
+ * it moves the focus, or null. A side panel takes it when it turns to a tab, and when it mounts:
+ * a host that shows a closed panel for a request mounts the panel after the request. @internal
+ */
+export function takePaneRequest(
+  editor: object | null | undefined
+): { readonly pane: SidePanelTab; readonly focus: boolean } | null {
   if (!editor) return null;
   const last = recent.get(editor);
   recent.delete(editor);
-  return last && Date.now() - last.at < RECENT_MS ? last.pane : null;
+  return last && Date.now() - last.at < RECENT_MS ? { pane: last.pane, focus: last.focus } : null;
 }
 
 /**

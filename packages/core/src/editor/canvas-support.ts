@@ -15,18 +15,25 @@ export type ElementKindLabelKey =
   | 'panel.format.elementKind.group'
   | 'panel.format.elementKind.connector'
   | 'panel.format.elementKind.graphicFrame'
-  | 'panel.format.elementKind.table';
+  | 'panel.format.elementKind.table'
+  | 'panel.format.elementKind.chart'
+  | 'panel.format.elementKind.diagram';
 
 /**
- * The Format panel's name for the selected element: a table frame is a table (the snapshot's
- * `table` names it), not an embedded object. @internal
+ * The Format panel's name for the selected element: a table, chart, or diagram frame is named
+ * for what it shows (the snapshot's `table`, `chart`, and `diagram` name them), not as an
+ * embedded object. @internal
  */
 export function elementKindLabelKey(
   geometry: Pick<SelectionGeometry, 'kind' | 'nodeId'>,
-  table: EditorSnapshot['table']
+  table: EditorSnapshot['table'],
+  objects: Pick<EditorSnapshot, 'chart' | 'diagram'> = {}
 ): ElementKindLabelKey {
-  if (geometry.kind === 'graphicFrame' && table?.nodeId === geometry.nodeId)
-    return 'panel.format.elementKind.table';
+  if (geometry.kind === 'graphicFrame') {
+    if (table?.nodeId === geometry.nodeId) return 'panel.format.elementKind.table';
+    if (objects.chart?.nodeId === geometry.nodeId) return 'panel.format.elementKind.chart';
+    if (objects.diagram?.nodeId === geometry.nodeId) return 'panel.format.elementKind.diagram';
+  }
   return `panel.format.elementKind.${geometry.kind}`;
 }
 

@@ -400,6 +400,16 @@ export const EDIT_DIAGNOSTICS: readonly (readonly [string, string, string])[] = 
     'The embedded workbook cannot take the new table. Give each series a different name, and keep the cells beside the data empty.',
   ],
   [
+    'errors.chartFormat.noAxes',
+    'edit.chart-format-axes',
+    'A pie or doughnut chart has no axes. Leave out gridlines, axes, and axis titles, or change the chart type first.',
+  ],
+  [
+    'errors.chartFormat.sameType',
+    'edit.chart-type-same',
+    'The chart already has this type. Read chartFormat().type and send setChartType only for another type.',
+  ],
+  [
     'errors.chartData.layout',
     'edit.chart-data-layout',
     'The cell references of the chart do not form one table. Change only names and values.',

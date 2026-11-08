@@ -88,6 +88,7 @@ import { MAX_RESOLVER_FAMILIES } from '@pptx-editor.dev/core/editor';
 import { MaybeRefOrGetter } from 'vue';
 import { MenuNamedRow } from '@pptx-editor.dev/core/editor';
 import { MenuRowPartName } from '@pptx-editor.dev/core/editor';
+import { PaneRequest } from '@pptx-editor.dev/core/editor';
 import { ParagraphDialogFields } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatCommand } from '@pptx-editor.dev/core/editor';
 import { ParagraphFormatRead } from '@pptx-editor.dev/core/editor';
@@ -2139,6 +2140,8 @@ export type PageSetupDialogProps = ExtractPublicPropTypes<typeof pageSetupDialog
 
 // @public
 export type PaneProps = ExtractPublicPropTypes<typeof paneProps>;
+
+export { PaneRequest }
 
 // @public
 export const ParagraphDialog: {

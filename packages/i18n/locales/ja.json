@@ -75,7 +75,8 @@
     "alignOrDistribute": "配置または整列",
     "slideBackground": "スライドの背景…",
     "columns": "段組み…",
-    "equation": "数式…"
+    "equation": "数式…",
+    "chart": "グラフ"
   },
   "contextMenu": {
     "railLabel": "スライドの操作",
@@ -513,6 +514,7 @@
       "slideSorter": "スライド一覧"
     },
     "equation": "数式",
+    "chart": "グラフ",
     "newComment": "新しいコメント"
   },
   "table": {
@@ -933,7 +935,9 @@
         "group": "グループ",
         "connector": "コネクタ",
         "graphicFrame": "埋め込みオブジェクト",
-        "table": "表"
+        "table": "表",
+        "chart": "グラフ",
+        "diagram": "ダイアグラム"
       },
       "table": "表",
       "rowHeight": "行の高さ",
@@ -1135,6 +1139,7 @@
     "inputAriaLabel": "選択した図形のテキスト",
     "adjustHandle": "ドラッグして図形の形を変更",
     "placeholderTable": "ここに表を挿入",
+    "placeholderChart": "ここにグラフを挿入",
     "placeholderPicture": "ここに画像を挿入",
     "tableCell": "{row} 行、{column} 列",
     "diagramShape": "図の図形 {index}/{count}",
@@ -1206,6 +1211,10 @@
       "notNumber": "値はすべて数値にしてください。",
       "layout": "このグラフのセル参照は 1 つの表になっていないため、名前と値のみ変更できます。",
       "workbook": "埋め込まれたブックはこの変更を受け付けられません。系列ごとに異なる名前を付け、データの隣のセルを空にしてください。"
+    },
+    "chartFormat": {
+      "noAxes": "この種類のグラフには軸がありません。",
+      "sameType": "グラフはすでにこの種類です。"
     },
     "diagram": {
       "noDiagram": "図を 1 つ選択してください。",
@@ -1676,7 +1685,7 @@
     "emptyBody": "[新しいコメント] を選んでスレッドを始めます。"
   },
   "chartData": {
-    "editData": "データの編集…",
+    "editData": "グラフの編集…",
     "categories": "項目",
     "xValues": "X の値",
     "seriesName": "系列 {number} の名前",
@@ -1700,11 +1709,58 @@
     "series": "系列",
     "unnamed": "名前のない系列",
     "emptyTitle": "グラフが選択されていません",
-    "emptyBody": "データを編集するには、スライド上のグラフを選択してください。",
+    "emptyBody": "グラフを編集するには、スライド上のグラフを選択してください。",
     "notEditableTitle": "このグラフのデータは読み取り専用です",
     "removeCategoryNamed": "項目 {name} を削除",
     "removeSeriesNamed": "系列 {name} を削除",
     "removeSeries": "系列の削除"
+  },
+  "chartFormat": {
+    "types": {
+      "columnClustered": "縦棒",
+      "columnStacked": "積み上げ縦棒",
+      "columnPercentStacked": "100% 積み上げ縦棒",
+      "barClustered": "横棒",
+      "barStacked": "積み上げ横棒",
+      "barPercentStacked": "100% 積み上げ横棒",
+      "line": "折れ線",
+      "lineMarkers": "マーカー付き折れ線",
+      "area": "面",
+      "areaStacked": "積み上げ面",
+      "areaPercentStacked": "100% 積み上げ面",
+      "pie": "円",
+      "doughnut": "ドーナツ",
+      "radar": "レーダー",
+      "scatter": "散布図",
+      "scatterLines": "散布図 (直線とマーカー)",
+      "other": "その他の種類"
+    },
+    "type": "グラフの種類",
+    "elements": "グラフ要素",
+    "showTitle": "タイトル",
+    "titleText": "タイトルのテキスト",
+    "defaultTitle": "グラフ タイトル",
+    "legend": "凡例",
+    "legendPositions": {
+      "none": "なし",
+      "top": "上",
+      "bottom": "下",
+      "left": "左",
+      "right": "右"
+    },
+    "dataLabels": "データ ラベル",
+    "gridlines": "目盛線",
+    "axes": "軸",
+    "categoryAxisTitle": "項目軸ラベル",
+    "valueAxisTitle": "数値軸ラベル",
+    "xAxisTitle": "X 軸ラベル",
+    "yAxisTitle": "Y 軸ラベル",
+    "axisTitleHelp": "軸ラベルを空にすると、ラベルは表示されません。",
+    "typeChangeRemoved": "このグラフの種類では、設定した色や軸ラベルは保持されません。元に戻すと復元されます。",
+    "typeChangeHint": "一部のグラフの種類では、設定した色や軸ラベルは保持されません。",
+    "pieFirstSeries": "円グラフには最初の系列だけが表示されます。",
+    "colors": "色",
+    "seriesColor": "{name} の色"
   },
   "diagram": {
     "editText": "テキストの編集…",

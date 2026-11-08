@@ -1,9 +1,20 @@
-// The Chart Data tab of the side panel, headless: the text of each field, the check of what the
-// user types, and the one `setChartData` command that each committed field, or each add or
-// remove, sends. The React and Vue panes (`ChartDataPane.tsx`) render from these, so both check
-// the same input with the same keys.
+// The Chart tab of the side panel, headless: the text of each field, the check of what the user
+// types, and the one command that each committed field, or each add or remove, sends: the
+// chart's data (`setChartData`), its type (`setChartType`), its elements (`setChartFormat`),
+// and its colors (`setChartColor`). The React and Vue panes (`ChartDataPane.tsx`) render from
+// these, so both check the same input with the same keys.
 
-import type { ChartData, EditorCommand, EditorSnapshot } from '../contracts/index.ts';
+import type {
+  ChartColorEntry,
+  ChartData,
+  ChartFormat,
+  ChartLegendPosition,
+  ChartType,
+  EditorCommand,
+  EditorSnapshot,
+} from '../contracts/index.ts';
+import { CHART_TYPES } from '../automation/commands/chart-type.ts';
+import { colorChoiceOf, colorPickOf, type ColorPick } from './color-fields.ts';
 import {
   MAX_CHART_LABEL,
   MAX_CHART_POINTS,
@@ -173,4 +184,95 @@ export function chartPaneCommand(data: ChartData, change: ChartPaneChange): Char
     ok: true,
     command: { type: 'setChartData', data: { kind: data.kind, categories, series } },
   };
+}
+
+// --- The chart's type and elements ------------------------------------------------------------
+
+/** The chart types the Chart tab offers, in the order of its type list. @public */
+export const CHART_TYPE_CHOICES: readonly ChartType[] = CHART_TYPES;
+
+/** The legend positions the Chart tab offers. @public */
+export const CHART_LEGEND_CHOICES: readonly ChartLegendPosition[] = [
+  'none',
+  'top',
+  'bottom',
+  'left',
+  'right',
+];
+
+/** Whether a chart plots X values by Y values: its axis titles are X and Y. */
+const plotsXy = (format: ChartFormat): boolean =>
+  format.type === 'scatter' || format.type === 'scatterLines';
+
+/**
+ * The note after a type change, when the new type drops what the user set: the colors move
+ * between series and points, or the axes and their titles go. Undo restores them. Null when
+ * the new type keeps everything. @public
+ */
+export function chartTypeChangeNote(
+  before: ChartFormat,
+  after: ChartFormat
+): 'chartFormat.typeChangeRemoved' | null {
+  const colors = before.colorsBy !== after.colorsBy && before.colors.some((c) => c.color !== null);
+  const titles =
+    after.axisTitles === null && !!(before.axisTitles?.category || before.axisTitles?.value);
+  return colors || titles ? 'chartFormat.typeChangeRemoved' : null;
+}
+
+/**
+ * The hint before a type change: the chart has colors or axis titles that some types cannot
+ * keep. Null when it has none. @public
+ */
+export function chartTypeHint(format: ChartFormat): 'chartFormat.typeChangeHint' | null {
+  const colors = format.colors.some((c) => c.color !== null);
+  const titles = !!(format.axisTitles?.category || format.axisTitles?.value);
+  return colors || titles ? 'chartFormat.typeChangeHint' : null;
+}
+
+/** The note of a pie chart with more than one series: it draws the first one only. @public */
+export function chartSeriesNote(
+  format: ChartFormat,
+  seriesCount: number
+): 'chartFormat.pieFirstSeries' | null {
+  return format.type === 'pie' && seriesCount > 1 ? 'chartFormat.pieFirstSeries' : null;
+}
+
+/** The labels of the two axis title fields: category and value, or X and Y. @public */
+export function chartAxisTitleLabels(format: ChartFormat): {
+  readonly category: 'chartFormat.categoryAxisTitle' | 'chartFormat.xAxisTitle';
+  readonly value: 'chartFormat.valueAxisTitle' | 'chartFormat.yAxisTitle';
+} {
+  return plotsXy(format)
+    ? { category: 'chartFormat.xAxisTitle', value: 'chartFormat.yAxisTitle' }
+    : { category: 'chartFormat.categoryAxisTitle', value: 'chartFormat.valueAxisTitle' };
+}
+
+/**
+ * The `setChartFormat` command of a typed title: an empty or blank title turns the title (or the
+ * axis title) off. Null when the text is what the chart shows already. @public
+ */
+export function chartTitleCommand(
+  format: ChartFormat,
+  field: 'title' | 'categoryAxisTitle' | 'valueAxisTitle',
+  text: string
+): EditorCommand | null {
+  const next = text.trim() === '' ? null : text;
+  const now =
+    field === 'title'
+      ? format.title
+      : field === 'categoryAxisTitle'
+        ? (format.axisTitles?.category ?? null)
+        : (format.axisTitles?.value ?? null);
+  if (next === now) return null;
+  return { type: 'setChartFormat', format: { [field]: next } };
+}
+
+/** The pick of a color field for one series or point: `auto` for its automatic color. @public */
+export const chartColorPick = (entry: ChartColorEntry): ColorPick =>
+  entry.color === null ? 'auto' : colorPickOf(entry.color);
+
+/** The `setChartColor` command of a pick in the color field of series or point `index`. @public */
+export function chartColorCommand(index: number, pick: ColorPick): EditorCommand | null {
+  if (pick === 'keep' || pick === 'mixed') return null;
+  return { type: 'setChartColor', index, color: colorChoiceOf(pick) };
 }

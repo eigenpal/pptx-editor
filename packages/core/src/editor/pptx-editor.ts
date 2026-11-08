@@ -47,7 +47,7 @@ import { activeOf, createBackgroundSource, formatAt, geometryOf } from './select
 import { CommentState } from './comment-state.ts';
 import { FormatPainter } from './format-painter.ts';
 import { CropMode } from './crop-mode.ts';
-import { chartDataAt, selectedObjectsAt, withAltText } from './picture-state.ts';
+import { afterInsertCommand, chartReads, selectedObjectsAt, withAltText } from './picture-state.ts';
 import { isViewCommand, ViewSettings, type ViewCommand } from './view-settings.ts';
 import { PlaceholderPrompts } from './placeholder-prompts.ts';
 import { RemovalNotice } from './removal-notice.ts';
@@ -827,7 +827,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
     },
     fontFamilies,
     tableStyles: () => (session ? tableStyleList(session.store.package) : []),
-    chartData: (id) => chartDataAt(session?.store.package, partAt(slide), selection, id),
+    ...chartReads(() => [session?.store.package, partAt(slide), selection]),
     setSelection: (next) => select(next),
     ...comments.methods(emit, () => session?.store.package),
     copy: clipboard.copy,
@@ -908,7 +908,7 @@ export function createPptxEditor(options: PptxEditorOptions = {}): PptxEditorIns
         cropping,
         textInput,
         shortcut,
-        run: (command, options) => exec(command, options),
+        run: (command, options) => afterInsertCommand(instance, command, exec(command, options)),
         beginHistoryGroup: () => groups.begin(),
         refuse: (reason, detail) => void refuse(reason, detail),
         fitChanged: (value) => {

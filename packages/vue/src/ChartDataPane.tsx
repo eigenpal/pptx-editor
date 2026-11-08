@@ -1,20 +1,39 @@
 /** @jsxImportSource vue */
-// The Chart Data tab of the side panel: the Vue twin of the React adapter's `ChartDataPane.tsx`,
-// with the same markup, classes, and ARIA, on the same core helpers (`chart-pane.ts`). A field
-// applies when the user presses Enter or leaves it, as one undo step.
+// The Chart tab of the side panel: the Vue twin of the React adapter's `ChartDataPane.tsx`, with
+// the same markup, classes, and ARIA, on the same core helpers (`chart-pane.ts`): the chart's
+// type, elements, and colors, then its data. A field applies when the user presses Enter or
+// leaves it, and a check box, list, or color when it changes, each as one undo step.
 
 import { defineComponent, ref, useId, watch, type PropType } from 'vue';
 import {
+  CHART_LEGEND_CHOICES,
+  CHART_TYPE_CHOICES,
+  chartAxisTitleLabels,
+  chartSeriesNote,
+  chartTypeChangeNote,
+  chartTypeHint,
+  chartColorCommand,
+  chartColorPick,
   chartPaneCommand,
   chartPaneDraftKey,
   chartPaneDraftContinues,
+  chartTitleCommand,
   chartValueText,
+  colorPickOf,
   nextChartCategoryLabel,
+  renderedColorOf,
   type ChartData,
+  type ChartFormatChange,
+  type ChartLegendPosition,
   type ChartPaneChange,
+  type ChartType,
+  type ColorPick,
+  type EditorCommand,
 } from '@pptx-editor.dev/core/editor';
 import type { TranslationKey } from '@pptx-editor.dev/i18n';
 import { ToolButton } from './chrome.tsx';
+import { ColorField } from './dialog-color.tsx';
+import { SelectField } from './dialog-form.tsx';
 import { useEditorState, usePptxEditor, useTranslation } from './composables.ts';
 
 /**
@@ -151,7 +170,195 @@ const SeriesCard = defineComponent({
   },
 });
 
-/** The Chart Data tab: the data of the selected chart, or why it shows none. */
+/** The most color fields the tab shows: a pie chart can have thousands of points. */
+const MAX_COLOR_FIELDS = 100;
+
+/** A check box row of the Chart tab. */
+const ChartCheck = defineComponent({
+  name: 'PptxChartCheck',
+  props: {
+    label: { type: String, required: true },
+    checked: { type: Boolean, required: true },
+    disabled: { type: Boolean, required: true },
+    onChange: { type: Function as PropType<(checked: boolean) => void>, required: true },
+  },
+  setup(props) {
+    return () => (
+      <label class="pptx-radio">
+        <input
+          type="checkbox"
+          checked={props.checked}
+          disabled={props.disabled}
+          onChange={(e: Event) => props.onChange((e.currentTarget as HTMLInputElement).checked)}
+        />
+        {props.label}
+      </label>
+    );
+  },
+});
+
+/**
+ * The chart's type, its elements (title, legend, data labels, axes, gridlines, and axis
+ * titles), and the color of each series, or of each point of a pie chart.
+ */
+const ChartFormatSection = defineComponent({
+  name: 'PptxChartFormatSection',
+  props: {
+    nodeId: { type: String, required: true },
+    draftKey: { type: String, required: true },
+    disabled: { type: Boolean, required: true },
+    /** The number of series in the chart's data. */
+    seriesCount: { type: Number, required: true },
+    /** Runs a command: null when it ran (or there was none), else the reason. */
+    run: {
+      type: Function as PropType<(command: EditorCommand | null) => string | null>,
+      required: true,
+    },
+  },
+  setup(props) {
+    const { t } = useTranslation();
+    const editor = usePptxEditor();
+    const rows = useEditorState((s) => s.themeColors);
+    // Every change to the document renders the section again, which reads the chart again.
+    const revision = useEditorState((s) => s.revision);
+    // What the last type change dropped, for the chart it changed.
+    const typeNote = ref<{ nodeId: string; key: TranslationKey } | null>(null);
+    return () => {
+      void revision.value;
+      const read = editor.value ? editor.value.chartFormat(props.nodeId) : null;
+      if (!read?.ok) return null;
+      const format = read.format;
+      const { draftKey, disabled, run } = props;
+      const axisLabels = chartAxisTitleLabels(format);
+      const set = (change: ChartFormatChange) => run({ type: 'setChartFormat', format: change });
+      const nodeId = props.nodeId;
+      const changeType = (chartType: ChartType) => {
+        const reason = run({ type: 'setChartType', chartType });
+        const after = reason === null && editor.value ? editor.value.chartFormat(nodeId) : null;
+        const key = after?.ok ? chartTypeChangeNote(format, after.format) : null;
+        typeNote.value = key ? { nodeId, key } : null;
+      };
+      const notes = [
+        typeNote.value?.nodeId === nodeId ? typeNote.value.key : chartTypeHint(format),
+        chartSeriesNote(format, props.seriesCount),
+      ].filter((k) => k !== null);
+      return (
+        <>
+          <section class="pptx-panel__section">
+            <SelectField
+              name="chartType"
+              label={t('chartFormat.type')}
+              value={format.type ?? ''}
+              mixed={t('chartFormat.types.other')}
+              options={CHART_TYPE_CHOICES.map((v) => [v, t(`chartFormat.types.${v}`)] as const)}
+              disabled={disabled}
+              onChange={changeType}
+            />
+            <div role="status">
+              {notes.map((key) => (
+                <p key={key} class="pptx-chart-pane__note">
+                  {t(key)}
+                </p>
+              ))}
+            </div>
+          </section>
+          <section class="pptx-panel__section">
+            <h3 class="pptx-panel__title">{t('chartFormat.elements')}</h3>
+            <ChartCheck
+              label={t('chartFormat.showTitle')}
+              checked={format.title !== null}
+              disabled={disabled}
+              onChange={(on: boolean) => set({ title: on ? t('chartFormat.defaultTitle') : null })}
+            />
+            {format.title !== null ? (
+              <div class="pptx-chart-pane__sub">
+                <ChartField
+                  draftKey={draftKey}
+                  label={t('chartFormat.titleText')}
+                  visibleLabel={t('chartFormat.titleText')}
+                  value={format.title}
+                  disabled={disabled}
+                  onCommit={(text: string) => run(chartTitleCommand(format, 'title', text))}
+                />
+              </div>
+            ) : null}
+            <SelectField
+              name="chartLegend"
+              label={t('chartFormat.legend')}
+              value={format.legend}
+              options={CHART_LEGEND_CHOICES.map(
+                (v) => [v, t(`chartFormat.legendPositions.${v}`)] as const
+              )}
+              disabled={disabled}
+              onChange={(legend: ChartLegendPosition) => set({ legend })}
+            />
+            <ChartCheck
+              label={t('chartFormat.dataLabels')}
+              checked={format.dataLabels}
+              disabled={disabled}
+              onChange={(dataLabels: boolean) => set({ dataLabels })}
+            />
+            {format.axes !== null ? (
+              <>
+                <ChartCheck
+                  label={t('chartFormat.axes')}
+                  checked={format.axes}
+                  disabled={disabled}
+                  onChange={(axes: boolean) => set({ axes })}
+                />
+                <ChartCheck
+                  label={t('chartFormat.gridlines')}
+                  checked={format.gridlines === true}
+                  disabled={disabled || !format.axes}
+                  onChange={(gridlines: boolean) => set({ gridlines })}
+                />
+                <div class="pptx-panel__grid">
+                  <ChartField
+                    draftKey={draftKey}
+                    label={t(axisLabels.category)}
+                    visibleLabel={t(axisLabels.category)}
+                    value={format.axisTitles?.category ?? ''}
+                    disabled={disabled || !format.axes}
+                    onCommit={(text: string) =>
+                      run(chartTitleCommand(format, 'categoryAxisTitle', text))
+                    }
+                  />
+                  <ChartField
+                    draftKey={draftKey}
+                    label={t(axisLabels.value)}
+                    visibleLabel={t(axisLabels.value)}
+                    value={format.axisTitles?.value ?? ''}
+                    disabled={disabled || !format.axes}
+                    onCommit={(text: string) =>
+                      run(chartTitleCommand(format, 'valueAxisTitle', text))
+                    }
+                  />
+                </div>
+                <p class="pptx-chart-pane__note">{t('chartFormat.axisTitleHelp')}</p>
+              </>
+            ) : null}
+          </section>
+          <section class="pptx-panel__section">
+            <h3 class="pptx-panel__title">{t('chartFormat.colors')}</h3>
+            {format.colors.slice(0, MAX_COLOR_FIELDS).map((entry, i) => (
+              <ColorField
+                key={i}
+                name={`chartColor${i}`}
+                label={t('chartFormat.seriesColor', { name: entry.name || t('chartData.unnamed') })}
+                value={chartColorPick(entry)}
+                automatic={renderedColorOf(colorPickOf(entry.automatic), rows.value)}
+                disabled={disabled}
+                onChange={(pick: ColorPick) => run(chartColorCommand(i, pick))}
+              />
+            ))}
+          </section>
+        </>
+      );
+    };
+  },
+});
+
+/** The Chart tab: the type, elements, colors, and data of the selected chart, or why it shows none. */
 export const ChartDataPane = defineComponent({
   name: 'PptxChartDataPane',
   setup() {
@@ -210,6 +417,14 @@ export const ChartDataPane = defineComponent({
         refusal.value = null;
         return !result || result.ok ? null : t(result.reason as TranslationKey);
       };
+      /** Runs a command of the type, elements, or colors; the tab announces a refusal. */
+      const runFormat = (command: EditorCommand | null): string | null => {
+        if (!command) return null;
+        const result = editor.value?.exec(command);
+        const reason = !result || result.ok ? null : t(result.reason as TranslationKey);
+        refusal.value = reason;
+        return reason;
+      };
       /** Applies an add or a remove; the tab announces a refusal, as no field shows it. */
       const run = (change: ChartPaneChange): boolean => {
         const reason = apply(change);
@@ -225,15 +440,22 @@ export const ChartDataPane = defineComponent({
             : null;
       return (
         <div class="pptx-chart-pane">
-          <p class="pptx-chart-pane__note">{t('chartData.help')}</p>
-          {note ? <p class="pptx-chart-pane__note">{note}</p> : null}
           <p class="pptx-chart-pane__error" role="alert">
             {refusal.value ?? ''}
           </p>
+          <ChartFormatSection
+            nodeId={selected.nodeId}
+            draftKey={draftKey}
+            disabled={readOnly.value}
+            seriesCount={data.series.length}
+            run={runFormat}
+          />
           <section class="pptx-panel__section">
             <h3 class="pptx-panel__title">
               {t(xy ? 'chartData.xValues' : 'chartData.categories')}
             </h3>
+            <p class="pptx-chart-pane__note">{t('chartData.help')}</p>
+            {note ? <p class="pptx-chart-pane__note">{note}</p> : null}
             <ul class="pptx-chart-pane__list">
               {data.categories.map((c, i) => (
                 <li key={i} class="pptx-chart-pane__row">
