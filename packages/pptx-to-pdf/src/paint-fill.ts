@@ -30,6 +30,7 @@ import {
   PDFOperator,
   PDFOperatorNames,
   PDFBool,
+  type PDFDocument,
   type PDFImage,
   PDFRawStream,
   type PDFRef,
@@ -144,9 +145,31 @@ export async function paintFill(
  * form XObject (a shadow or a reflection copy), the tiles follow the form's space instead.
  */
 function patternColor(f: Extract<ResolvedFill, { type: 'pattern' }>, p: PageOps): PDFOperator[] {
-  const key = `${f.preset}|${f.fg.r},${f.fg.g},${f.fg.b},${f.fg.a}|${f.bg.r},${f.bg.g},${f.bg.b},${f.bg.a}`;
+  const height = p.page.getHeight();
+  const key = `${f.preset}|${f.fg.r},${f.fg.g},${f.fg.b},${f.fg.a}|${f.bg.r},${f.bg.g},${f.bg.b},${f.bg.a}|${height}`;
   let name = p.patterns.get(key);
   if (!name) {
+    name = p.name('Pattern', patternRef(f, height, key, p));
+    p.patterns.set(key, name);
+  }
+  return [
+    PDFOperator.of(PDFOperatorNames.NonStrokingColorspace, [PDFName.of('Pattern')]),
+    PDFOperator.of(PDFOperatorNames.NonStrokingColorN, [name]),
+  ];
+}
+
+/**
+ * The tiling pattern of a preset in two colors on a page of `height` pt, by `key`, written once
+ * per document: a pattern of a master or a layout repeats on every slide.
+ */
+function patternRef(
+  f: Extract<ResolvedFill, { type: 'pattern' }>,
+  height: number,
+  key: string,
+  p: PageOps
+): PDFRef {
+  let ref = p.res.patterns.get(key);
+  if (!ref) {
     const ctx = p.res.doc.context;
     const bits = patternBitmap(f.preset) ?? patternBitmap('pct50')!;
     const states: Record<string, PDFRef> = {};
@@ -200,20 +223,17 @@ function patternColor(f: Extract<ResolvedFill, { type: 'pattern' }>, p: PageOps)
       BBox: [0, 0, 8, 8],
       XStep: 8,
       YStep: 8,
-      Matrix: [s, 0, 0, -s, 0, p.page.getHeight()],
+      Matrix: [s, 0, 0, -s, 0, height],
       Resources: ctx.obj({ ExtGState: ctx.obj(states) }),
     });
     let bytes = dict.sizeInBytes();
     for (const op of ops) bytes += op.sizeInBytes() + 1;
     p.res.work.count(ops.length);
     p.res.work.reserveContent(bytes);
-    name = p.name('Pattern', ctx.register(PDFContentStream.of(dict, ops, false)));
-    p.patterns.set(key, name);
+    ref = ctx.register(PDFContentStream.of(dict, ops, false));
+    p.res.patterns.set(key, ref);
   }
-  return [
-    PDFOperator.of(PDFOperatorNames.NonStrokingColorspace, [PDFName.of('Pattern')]),
-    PDFOperator.of(PDFOperatorNames.NonStrokingColorN, [name]),
-  ];
+  return ref;
 }
 
 /** Paint a gradient over a `w` × `h` box at the origin, inside the current clip. */
@@ -550,6 +570,10 @@ async function imageFor(target: string, p: PageOps): Promise<PDFImage | null> {
         image = png ? await p.res.doc.embedPng(bytes) : await p.res.doc.embedJpg(bytes);
         await smoothImage(image, p);
       } catch {
+        // An image that fails to embed is neither drawn nor saved: the save embeds every image
+        // again, and the failed one would fail the whole export.
+        if (image) forgetImage(p.res.doc, image);
+        image = null;
         p.diag.add('picture.unreadable', 'unsupported', 'A picture cannot be decoded.');
       }
     }
@@ -559,14 +583,30 @@ async function imageFor(target: string, p: PageOps): Promise<PDFImage | null> {
 }
 
 /**
+ * Remove an image from the list that `PDFDocument.save` embeds. `pdf-lib` keeps the list private
+ * (`images`) and keeps a failed embed's rejected task, so the save would throw the same error.
+ */
+function forgetImage(doc: PDFDocument, image: PDFImage): void {
+  const list = (doc as unknown as { images?: unknown }).images;
+  if (!Array.isArray(list)) return;
+  const at = list.indexOf(image);
+  if (at >= 0) list.splice(at, 1);
+}
+
+/**
  * Mark an embedded picture for smooth sampling (`/Interpolate`, ISO 32000-1, 8.9.5.3), as the
  * editor's paint samples it. Without the flag, a PDF viewer can draw an enlarged picture with
  * hard pixel edges. The picture is embedded now, so its image dictionary exists.
  */
 async function smoothImage(image: PDFImage, p: PageOps): Promise<void> {
   await image.embed();
-  const dict = p.res.doc.context.lookup(image.ref);
-  if (dict instanceof PDFRawStream) dict.dict.set(PDFName.of('Interpolate'), PDFBool.True);
+  const ctx = p.res.doc.context;
+  const dict = ctx.lookup(image.ref);
+  if (!(dict instanceof PDFRawStream)) return;
+  dict.dict.set(PDFName.of('Interpolate'), PDFBool.True);
+  // A PNG with alpha keeps it in a soft mask image: smooth its edges too.
+  const mask = ctx.lookup(dict.dict.get(PDFName.of('SMask')));
+  if (mask instanceof PDFRawStream) mask.dict.set(PDFName.of('Interpolate'), PDFBool.True);
 }
 
 /** Whether a picture fill has an image this writer draws (the image is embedded once). */

@@ -95,6 +95,8 @@ export interface PaintResources {
    * once, however many shapes use it.
    */
   readonly gradients: Map<string, StopFunctions>;
+  /** Tiling patterns by preset, colors, and page height, written once per document. */
+  readonly patterns: Map<string, PDFRef>;
 }
 
 /** Fill, clip, and path operators that `pdf-lib` has no helper for. */
@@ -120,7 +122,7 @@ export class PageOps {
   #ops: PDFOperator[] = [];
   readonly #states = new Map<string, PDFName>();
   readonly #fontKeys = new Map<string, PDFName>();
-  /** Pattern fills of this page by preset and colors, so each is written once per page. */
+  /** This page's names of the document's tiling patterns (`PaintResources.patterns`). */
   readonly patterns = new Map<string, PDFName>();
   #resourcesRef: PDFRef | undefined;
   #names = 0;
