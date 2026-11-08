@@ -24,7 +24,7 @@
     "build:preview": "bun run build:react:source && bun run build:vue:source && bun run build:assemble",
     "build:nextjs": "bun run build:packages && bun run --filter './examples/nextjs' build",
     "build:packages": "bun run --filter '@pptx-editor.dev/i18n' build && bun run --filter '@pptx-editor.dev/core' build && bun run --filter '@pptx-editor.dev/react' build && bun run --filter '@pptx-editor.dev/vue' build && bun run --filter '@pptx-editor.dev/pro' build && bun run --filter '@pptx-editor.dev/pptx-to-pdf' build && bun run --filter '@pptx-editor.dev/editor-api' build",
-    "typecheck": "bun run --filter '*' typecheck && bun check -p tsconfig.json && bun run check:lane-boundaries",
+    "typecheck": "bun run --filter '*' typecheck && tsc --noEmit -p tsconfig.json && bun run check:lane-boundaries",
     "lint": "node scripts/check-max-lines-caps.mjs && oxlint --report-unused-disable-directives-severity=warn api/ examples/shared/ packages/*/src/ packages/pptx-to-pdf/scripts/ examples/*/src/ scripts/ e2e/",
     "lint:fix": "node scripts/check-max-lines-caps.mjs && oxlint --report-unused-disable-directives-severity=warn --fix api/ examples/shared/ packages/*/src/ packages/pptx-to-pdf/scripts/ examples/*/src/ scripts/ e2e/",
     "format": "prettier --write \"api/**/*.{ts,mjs}\" \"examples/shared/**/*.ts\" \"packages/*/src/**/*.{ts,tsx,json,css}\" \"packages/pptx-to-pdf/scripts/**/*.{ts,json}\" \"examples/*/src/**/*.{ts,tsx,css,vue}\" \"scripts/**/*.{ts,mjs}\" \"e2e/**/*.ts\" \"docs/site/data/*.ts\"",
@@ -116,7 +116,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tsup": "^9.0.0",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "vite": "^8.0.10"
   },
   "author": "Eigenpal, Inc.",

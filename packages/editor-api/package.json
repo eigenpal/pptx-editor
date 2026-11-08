@@ -27,7 +27,7 @@
   },
   "scripts": {
     "build": "tsup",
-    "typecheck": "bun check",
+    "typecheck": "tsc --noEmit",
     "api:extract": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/editor-api --local",
     "api:check": "node ../../scripts/api-extractor.mjs --package @pptx-editor.dev/editor-api",
     "compat:generate": "node scripts/generate-conformance.mjs",
