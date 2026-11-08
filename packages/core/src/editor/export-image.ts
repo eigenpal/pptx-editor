@@ -198,14 +198,24 @@ async function decodeSvg(text: string): Promise<HTMLImageElement> {
   }
 }
 
+/** The bounded wait of each font set `ready` promise: one wait for each loading period. */
+const settledWaits = new WeakMap<Promise<unknown>, Promise<unknown>>();
+
 /**
  * The page's fonts, for a picture of a slide: settles when the browser's font set is ready, or
  * after the face load wait. A face whose load never settles keeps the set loading, and must not
- * hold an export. @internal
+ * hold an export. The set gives the same `ready` promise while it stays loading, so a ZIP of
+ * every slide waits once, not once for each slide. @internal
  */
 export function fontsSettled(): Promise<unknown> {
   const ready = typeof document === 'undefined' ? undefined : document.fonts?.ready;
-  return ready ? within(ready, FACE_LOAD_WAIT_MS, undefined) : Promise.resolve();
+  if (!ready) return Promise.resolve();
+  let wait = settledWaits.get(ready);
+  if (!wait) {
+    wait = within(ready, FACE_LOAD_WAIT_MS, undefined);
+    settledWaits.set(ready, wait);
+  }
+  return wait;
 }
 
 /**

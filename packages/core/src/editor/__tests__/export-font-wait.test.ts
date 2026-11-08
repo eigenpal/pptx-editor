@@ -30,3 +30,11 @@ test('with no document, a slide picture does not wait for fonts', async () => {
   g.document = undefined;
   await expect(fontsSettled()).resolves.toBeUndefined();
 });
+
+test('slides exported one after another wait for a stalled font set once, not once each', async () => {
+  g.document = { fonts: { ready: new Promise(() => {}) } };
+  await fontsSettled();
+  const t0 = performance.now();
+  for (let i = 0; i < 20; i += 1) await fontsSettled();
+  expect(performance.now() - t0).toBeLessThan(FACE_LOAD_WAIT_MS / 2);
+});
