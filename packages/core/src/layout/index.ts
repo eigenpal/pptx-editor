@@ -8,6 +8,8 @@ export * from './drawing-renderers.ts';
 export * from './geometry/geometry.ts';
 // Internal: the dashes and line ends that the SVG paint and `pptx-to-pdf` both draw.
 export * from './line-strokes.ts';
+// Internal: the strikethrough bars that the SVG paint and `pptx-to-pdf` both draw.
+export * from './text/strikeout-bars.ts';
 export type { PresetShapeDefinition } from '@eigenpal/ooxml-core';
 export * from './text/measurer.ts';
 export * from './text/harfbuzz-measurer.ts';

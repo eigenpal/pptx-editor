@@ -27,6 +27,7 @@ import type { PathCommand } from '@eigenpal/ooxml-core';
 import { evaluatePresetTextWarp } from '@eigenpal/ooxml-core';
 import type { ResolvedTextBody, TextWarp } from '../../cascade/index.ts';
 import type { TextMeasurer } from './measurer.ts';
+import { strikeoutBars } from './strikeout-bars.ts';
 import type { GlyphRun, TextLayout } from './text-layout.ts';
 
 const EMU_PER_PT = 12_700;
@@ -295,9 +296,8 @@ function runBars(
       if (run.props.underline === 'dbl') under.push(rect(x0, ty + thick * 2, x1, ty + thick * 3));
     }
     if (run.props.strike !== 'noStrike') {
-      const sy = y - size * 0.3;
-      strike.push(rect(x0, sy - thick / 2, x1, sy + thick / 2));
-      if (run.props.strike === 'dblStrike') strike.push(rect(x0, sy - thick * 2, x1, sy - thick));
+      const bars = strikeoutBars(m, size, run.props.strike === 'dblStrike');
+      for (const top of bars.tops) strike.push(rect(x0, y + top, x1, y + top + bars.thickness));
     }
   }
   return [strike, under, highlight];

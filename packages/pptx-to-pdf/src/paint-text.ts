@@ -34,6 +34,7 @@ import {
 import type { ResolvedFill } from '@pptx-editor.dev/core/cascade';
 import {
   hasCharacters,
+  strikeoutBars,
   type GlyphRun,
   type PathCommand,
   type TextLayout,
@@ -347,15 +348,15 @@ function drawDecorations(
   const m = run.face.metrics;
   const thickness = Math.max(m.underlineThickness * size, size / 20);
   const y = baseline - run.rise;
-  const bars = (fillValue: ResolvedFill, tops: readonly number[]): void => {
+  const bars = (fillValue: ResolvedFill, tops: readonly number[], height = thickness): void => {
     const own = ownFill(fillValue, scope).fill;
     const trace = (): void => {
       for (const top of tops)
         p.push(
           moveTo(x0, top),
           lineTo(x1, top),
-          lineTo(x1, top + thickness),
-          lineTo(x0, top + thickness),
+          lineTo(x1, top + height),
+          lineTo(x0, top + height),
           closePath()
         );
     };
@@ -385,10 +386,11 @@ function drawDecorations(
     );
   }
   if (strike !== 'noStrike') {
-    const mid = y - size * 0.3;
+    const bar = strikeoutBars(m, size, strike === 'dblStrike');
     bars(
       run.props.fill,
-      strike === 'dblStrike' ? [mid - thickness / 2, mid - thickness * 2] : [mid - thickness / 2]
+      bar.tops.map((top) => y + top),
+      bar.thickness
     );
   }
 }

@@ -6,6 +6,7 @@
 import { toCss, type ResolvedFill } from '../cascade/index.ts';
 import {
   isIdeographic,
+  strikeoutBars,
   type GlyphRun,
   type PathCommand,
   type TextLayout,
@@ -88,12 +89,12 @@ function decorationRects(
   const y = baseline - run.rise / EMU_PER_PT;
   // A strikethrough takes the run's fill and its alpha, as the glyphs do; an underline takes
   // its own fill (`a:uFill`) when the run has one.
-  const bar = (top: number, { paint, opacity }: TextPaint): SVGElement =>
+  const bar = (top: number, { paint, opacity }: TextPaint, height = thickness): SVGElement =>
     svg(doc, 'rect', {
       x: num(x0),
       y: num(top),
       width: num(x1 - x0),
-      height: num(thickness),
+      height: num(height),
       fill: paint,
       'fill-opacity': opacity < 1 ? num(opacity) : undefined,
     });
@@ -103,9 +104,8 @@ function decorationRects(
     if (run.props.underline === 'dbl') out.push(bar(ty + thickness * 2, underline));
   }
   if (run.props.strike !== 'noStrike') {
-    const sy = y - size * 0.3;
-    out.push(bar(sy - thickness / 2, text));
-    if (run.props.strike === 'dblStrike') out.push(bar(sy - thickness * 2, text));
+    const strike = strikeoutBars(m, size, run.props.strike === 'dblStrike');
+    for (const top of strike.tops) out.push(bar(y + top, text, strike.thickness));
   }
   return out;
 }

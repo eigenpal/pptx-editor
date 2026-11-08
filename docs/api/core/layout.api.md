@@ -281,6 +281,8 @@ export interface FaceMetrics {
     readonly descent: number;
     // (undocumented)
     readonly lineGap: number;
+    readonly strikeoutPosition?: number;
+    readonly strikeoutThickness?: number;
     // (undocumented)
     readonly underlinePosition: number;
     // (undocumented)
@@ -810,6 +812,15 @@ export interface SourceMap {
     // (undocumented)
     readonly sy: number;
 }
+
+// @internal
+export interface StrikeoutBars {
+    readonly thickness: number;
+    readonly tops: readonly number[];
+}
+
+// @internal
+export function strikeoutBars(metrics: FaceMetrics, size: number, double: boolean): StrikeoutBars;
 
 // @internal
 export function strokeCap(line: ResolvedLine): 'butt' | 'round' | 'square';

@@ -31,6 +31,13 @@ export interface FaceMetrics {
   readonly lineGap: number;
   readonly underlinePosition: number;
   readonly underlineThickness: number;
+  /**
+   * The face's `OS/2` `yStrikeoutPosition`, above the baseline, when the face has usable
+   * strikeout values. Paint centers the strikethrough on it.
+   */
+  readonly strikeoutPosition?: number;
+  /** The face's `OS/2` `yStrikeoutSize`: the strikethrough thickness. */
+  readonly strikeoutThickness?: number;
 }
 
 /** The face that measures and paints a request. */
