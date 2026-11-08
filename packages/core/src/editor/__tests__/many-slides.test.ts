@@ -219,16 +219,17 @@ async function growth(
 
 // One slide at a time, these read the whole deck again for each slide: four times the slides
 // took 16 times as long (3 s for Delete, 11 s for Duplicate, and 0.8 s for Hide Slide on 600
-// slides). A limit of 10 times leaves room for a busy machine and still fails that cost.
+// slides). A limit of 10 times leaves room for a busy machine and still fails that cost. Each
+// deck has at least 300 slides: on smaller decks a fixed cost steps up once, which is not growth.
 test('Delete of every slide but one costs less than 10 times as much on 4 times the slides', async () => {
-  expect(await growth(300, (n) => ({ type: 'deleteSlides', indices: all(1, n) }))).toBeLessThan(10);
-});
+  expect(await growth(600, (n) => ({ type: 'deleteSlides', indices: all(1, n) }))).toBeLessThan(10);
+}, 60_000);
 
 test('Duplicate of every slide costs less than 10 times as much on 4 times the slides', async () => {
-  expect(await growth(150, (n) => ({ type: 'duplicateSlides', indices: all(0, n) }))).toBeLessThan(
+  expect(await growth(300, (n) => ({ type: 'duplicateSlides', indices: all(0, n) }))).toBeLessThan(
     10
   );
-});
+}, 60_000);
 
 test('Hide Slide on every slide costs less than 10 times as much on 4 times the slides, and the toggle shows them again', async () => {
   expect(await growth(600, (n) => ({ type: 'setSlidesHidden', indices: all(0, n) }))).toBeLessThan(
@@ -241,4 +242,4 @@ test('Hide Slide on every slide costs less than 10 times as much on 4 times the 
   // The toggle shows them again when every one of them is hidden.
   expect(e.exec({ type: 'setSlidesHidden', indices: [0, 2] }).ok).toBe(true);
   expect(hidden()).toEqual([false, false, false, false]);
-});
+}, 60_000);
