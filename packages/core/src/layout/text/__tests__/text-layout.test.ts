@@ -16,10 +16,10 @@ const shape = (body: string, bodyPr = '<a:bodyPr/>'): string =>
   '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>' +
   `<p:txBody>${bodyPr}<a:lstStyle/>${body}</p:txBody></p:sp>`;
 
-function lay(body: string, bodyPr?: string): TextLayout {
+function lay(body: string, bodyPr?: string, measurer = createFixedMeasurer()): TextLayout {
   const r = readPptx(buildPptx({ slides: [{ shapes: shape(body, bodyPr), layout: 'blank' }] }));
   if (!r.ok) throw new Error('open failed');
-  const item = layoutSlide(resolveSlide(r.pkg, 0)!, createFixedMeasurer()).items[0];
+  const item = layoutSlide(resolveSlide(r.pkg, 0)!, measurer).items[0];
   if (item.kind !== 'shape' || !item.text) throw new Error('no text');
   return item.text;
 }
@@ -152,6 +152,38 @@ describe('autonumber sequences (R6)', () => {
     const families = t.lines.map((l) => l.runs.find((x) => x.kind === 'bullet')?.face.family);
     expect(markers(t)).toEqual(['أ‌-', '一.', '1.']);
     expect(families).toEqual(['Noto Sans Arabic', 'Noto Sans CJK JP', 'Carlito']);
+  });
+});
+
+describe('the line metrics of several faces', () => {
+  // Noto Sans Arabic (typo 1374 and 738 of 1000) and Liberation Sans (win 1854 and 434 of 2048).
+  const fixed = createFixedMeasurer();
+  const measurer: TextMeasurer = {
+    ...fixed,
+    resolve: (req) => {
+      const f = fixed.resolve(req);
+      const [ascent, descent] = req.family === 'Arabic' ? [1.374, 0.738] : [0.905, 0.212];
+      return { ...f, metrics: { ...f.metrics, ascent, descent } };
+    },
+  };
+  const run = (t: string, lang: string): string =>
+    `<a:r><a:rPr lang="${lang}" sz="2000"><a:latin typeface="Latin"/><a:cs typeface="Arabic"/>` +
+    `</a:rPr><a:t>${t}</a:t></a:r>`;
+  const baseline = (runs: string): number => {
+    const t = lay(
+      `<a:p><a:pPr><a:lnSpc><a:spcPct val="90000"/></a:lnSpc></a:pPr>${runs}</a:p>`,
+      undefined,
+      measurer
+    );
+    return t.lines[0].baseline - t.lines[0].top;
+  };
+
+  test('Latin text in another run lowers an Arabic line to the union of the face shares', () => {
+    // rtl-text/2: the Arabic line with `PPTX` sits 15 pt below the text top, Arabic alone 14 pt.
+    const arabic = baseline(run('نص عربي.', 'ar-SA'));
+    const mixed = baseline(run('نص ', 'ar-SA') + run('PPTX', 'en-US') + run(' عربي.', 'ar-SA'));
+    expect(arabic / 12_700).toBeCloseTo(14, 6);
+    expect(mixed / 12_700).toBeCloseTo(15, 6);
   });
 });
 

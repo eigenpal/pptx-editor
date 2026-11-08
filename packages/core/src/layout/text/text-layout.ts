@@ -6,8 +6,9 @@
 // opportunities, then paragraph spacing, alignment, columns, and vertical anchoring.
 
 import { paintPieces } from './paint-clusters.ts';
+import { lineFaceMetrics } from './face-line-metrics.ts';
 import type { ResolvedParagraph, ResolvedTextBody, RunProps } from '../../cascade/index.ts';
-import { slotLanguage } from '../../cascade/script-fonts.ts';
+import { complexScriptOf, slotLanguage } from '../../cascade/script-fonts.ts';
 import { anchorOffset, ROTATED_VERT, shiftLines } from './anchor.ts';
 import { AutonumberCounters, autonumberText, symbolBulletText } from './autonumber.ts';
 import { bidiCaretX, markerRuns, placeBidiLine, wholeMarker, type BidiLine } from './bidi-line.ts';
@@ -20,7 +21,7 @@ import {
   isTrailingSpace,
 } from './line-break.ts';
 import { layoutMath, type MathBox } from './math-layout.ts';
-import type { ResolvedFace, TextMeasurer } from './measurer.ts';
+import type { FaceMetrics, ResolvedFace, TextMeasurer } from './measurer.ts';
 import { justifyExtra } from './justify.ts';
 import { leadingOffset, paragraphAlignment } from './paragraph-alignment.ts';
 import { bidiPieces, paragraphBidiOf, type ParagraphBidi } from './rtl-paragraph.ts';
@@ -569,9 +570,12 @@ export function layoutTextOn(
       const scriptSlot =
         p.bullet.type === 'autonum'
           ? // A copy of the props: the marker must not replace the first run's cached split,
-            // which the `normAutofit` search reuses at each step.
-            fontSlotPieces(raw, { ...firstProps }).find((s) => s.slot === 'cs' || s.slot === 'ea')
-              ?.slot
+            // which the `normAutofit` search reuses at each step. The number is read without
+            // a complex-script language: the digits of `1.` keep the bullet font (`rtl-text`).
+            fontSlotPieces(raw, {
+              ...firstProps,
+              lang: complexScriptOf(firstProps.lang) ? undefined : firstProps.lang,
+            }).find((s) => s.slot === 'cs' || s.slot === 'ea')?.slot
           : undefined;
       const face =
         (scriptSlot === 'cs' || scriptSlot === 'ea') && slotFamily(firstProps, scriptSlot) !== ''
@@ -732,7 +736,7 @@ export function layoutTextOn(
       const first = li === 0;
       let maxSize = 0;
       let maxFace: ResolvedFace | null = null;
-      let maxRun = -2;
+      let maxMath = false;
       // A segment's units are contiguous: visit each segment on the line once, in order.
       for (let i = range.start, last = -1; i < range.end; i += 1) {
         if (units[i].seg === last) continue;
@@ -741,25 +745,21 @@ export function layoutTextOn(
         if (s.sizePt >= maxSize) {
           maxSize = s.sizePt;
           maxFace = s.face;
-          maxRun = s.runIndex;
+          maxMath = !!s.math;
         }
       }
-      // One run in several fonts (its East Asian and Latin text, `font-slots.ts`): the tallest
-      // ascent and the deepest descent of its faces place the baseline (reference PDFs of
-      // `east-asian-line-breaking`, slide 4, and `east-asian-theme-fonts`).
+      // Text in several faces at the largest size, in one run or several (`lineFaceMetrics`).
       let metrics = maxFace?.metrics;
-      if (metrics)
+      if (metrics && !maxMath) {
+        const others: FaceMetrics[] = [];
         for (let i = range.start, last = -1; i < range.end; i += 1) {
           if (units[i].seg === last) continue;
           last = units[i].seg;
           const s = segments[last];
-          if (s.runIndex !== maxRun || s.sizePt !== maxSize || s.face === maxFace) continue;
-          metrics = {
-            ...metrics,
-            ascent: Math.max(metrics.ascent, s.face.metrics.ascent),
-            descent: Math.max(metrics.descent, s.face.metrics.descent),
-          };
+          if (!s.math && s.sizePt === maxSize && s.face !== maxFace) others.push(s.face.metrics);
         }
+        metrics = lineFaceMetrics(metrics, others, basis);
+      }
       if (maxSize === 0 || !maxFace) {
         // An empty line: an empty paragraph, or the line after a trailing break. The paragraph
         // mark (`a:endParaRPr`) sizes it.
